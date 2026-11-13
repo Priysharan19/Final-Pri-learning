@@ -529,4 +529,190 @@ for (const g of groups) {
 assert.match(job('browser'), new RegExp(`for group in ${groups.join(' ')}; do[\\s\\S]*?-eq ${groups.length}\\n`),
   'the browser gate combines exactly one log from every group');
 
-console.log('PASS — release workflows keep only authoritative heads, avoid duplicate feature-branch push runs (both pinned macOS lanes included), never cancel main\'s health evidence, key Build Ink V3 by ref, and scope Ink Hybrid to handwriting changes; the sharded suites and browser gates keep their required check names, fail on any unsuccessful shard and run every npm test and test:e2e suite.');
+
+// ── Lane CI (docs/release/ci-lanes.md) ───────────────────────────────────────
+// A lane pull request (any head that is not task/train-*) runs the four required
+// contexts and every security, marking, data, evidence and governance gate; the
+// heavy workflows run on task/train-* pull requests, on main and on dispatch, and
+// Main Integrity refuses a merge from anything but a train, so every workflow
+// still runs on the exact head that merges. A job skipped by an if: reports
+// "skipped", which branch protection reads as passing: so no lane-gated job may
+// ever carry a required context's name, and ci.yml (which holds all four) may
+// never be lane-gated. Every workflow with a pull_request trigger is classified
+// here, so a new one fails until someone decides.
+export const LANE_CONDITION = "github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')";
+export const REQUIRED_CONTEXTS = Object.freeze([
+  'Suites, coverage and accuracy gates',
+  'Production account, sync and commercial schema',
+  'Browser suites (end-to-end and accessibility)',
+  'Client build and offline-first boundary'
+]);
+export const LANE_GATED = Object.freeze({
+  'android-shell.yml': 'Android emulator matrix (4 profiles) and Gradle build; the shell CSP and store policy stay in CI suites-contracts',
+  'app-health-agent.yml': 'mounted-app health audit, browser evidence and macOS native shell; runs nightly and on main too',
+  'kalp-01-design-system.yml': 'design-system browser journey and visual evidence',
+  'kalp-02-information-architecture.yml': 'navigation browser regression',
+  'kalp-03-onboarding-profile.yml': 'onboarding browser journey (the account gate itself is in the required browser suites)',
+  'kalp-04-home-command-centre.yml': 'home browser journey',
+  'native-ink.yml': 'macOS iOS 26 simulator lane (40-60 min)',
+  'native-journey-ios27.yml': 'macOS iOS 27 simulator lane (45-60 min)',
+  'ink-hybrid.yml': 'on-device ink recognizer metrics; answer-blindness is pinned in the required platform job',
+  'ink-foundation.yml': 'ink model tooling and training contract (Python)',
+  'ink-corpus-evidence.yml': 'ink corpus campaign planning (Python)',
+  'ink-structural-v4.yml': 'structural ink model contract (Python)',
+  'ink-structural-v4-candidate.yml': 'structural model factorial (Python, research)',
+  'ink-structural-v4-joint.yml': 'structural joint decoder (Python, research)',
+  'ink-structural-v4-synthetic.yml': 'structural synthetic pretraining contract (Python, research)',
+  'ink-structural-v4-component-validity.yml': 'structural component validity (Python, research)',
+  'ink-structural-v4-contextual-glyphs.yml': 'structural glyph fusion (Python, research)',
+  'ink-structural-v4-group-relations.yml': 'structural group relations (Python, research)',
+  'ink-structural-v4-live-lan.yml': 'developer LAN structural inference',
+  'ink-writer-generalization.yml': 'V17 writer-generalization smoke (Python)',
+  'build-ink-v3-test-model.yml': 'V3 test-model training and Core ML export (macOS)',
+  'jee-question-department.yml': 'JEE question pipeline (the India suites and marking sweeps run in the required suites job)'
+});
+export const LANE_EVERYWHERE = Object.freeze({
+  'ci.yml': 'the four required contexts (and the Postgres restore rehearsal)',
+  'codeql.yml': 'security: code scanning',
+  'pri-agent-governance.yml': 'governance: mission ledger, R-class and independent-review markers',
+  'pri-agent-concurrency.yml': 'governance: writer admission contract',
+  'pri-agent-concurrency-adversarial.yml': 'governance: adversarial admission',
+  'deployment-image.yml': 'security and data: production container headers, persistent storage and release identity',
+  'data-durability.yml': 'data loss: backup restore rollback',
+  'person1-intelligence.yml': 'marking and handwriting authority contract',
+  'person2-india-platform.yml': 'entitlement, sync, account-link and session boundaries',
+  'pri-reason.yml': 'mathematical reasoning safety (marking)',
+  'promotions.yml': 'commercial: one-time reward integrity',
+  'ink-physical-evidence.yml': 'evidence honesty: no manufactured physical evidence',
+  'ink-physical-study.yml': 'evidence honesty: physical study allocation',
+  'ink-production-evidence-capture.yml': 'evidence honesty: production evidence capture'
+});
+
+const jobBlocks = source => {
+  const lines = source.split('\n');
+  const start = lines.indexOf('jobs:');
+  const out = [];
+  if (start < 0) return out;
+  let current = null;
+  for (const line of lines.slice(start + 1)) {
+    if (/^\S/.test(line) && !line.startsWith('#')) break;
+    const header = line.match(/^  ([A-Za-z0-9_-]+):\s*$/);
+    if (header) { current = { id: header[1], lines: [] }; out.push(current); continue; }
+    if (current) current.lines.push(line);
+  }
+  return out;
+};
+const triggerBlock = (source, key) => {
+  const on = source.match(/\non:\n([\s\S]*?)(?=\n\S)/)?.[1] || '';
+  const m = on.match(new RegExp(`(^|\\n)  ${key}:[^\\n]*\\n((?:    [^\\n]*\\n|\\s*\\n)*)`));
+  return m ? m[2] : null;
+};
+const hasPullRequest = source => /\non:\n(?:  [^\n]*\n|\s*\n|    [^\n]*\n|      [^\n]*\n)*?  pull_request:/.test(source) || /^on:\s*\[[^\]]*\bpull_request\b/m.test(source);
+
+/** Why the lane split does not hold for this set of workflow sources ({ file: text }). */
+export function laneProblems(sources) {
+  const problems = [];
+  const gatedExpr = LANE_CONDITION;
+  for (const [file, source] of Object.entries(sources)) {
+    const gated = file in LANE_GATED; const everywhere = file in LANE_EVERYWHERE;
+    if (gated && everywhere) problems.push(`${file} is classified twice`);
+    if (hasPullRequest(source) && !gated && !everywhere) problems.push(`${file} runs on pull_request but is not classified in LANE_GATED or LANE_EVERYWHERE (tools/ci-runner-policy-check.mjs, docs/release/ci-lanes.md)`);
+    const jobs = jobBlocks(source);
+    const names = jobs.map(j => (j.lines.find(l => /^    name: /.test(l)) || '').replace(/^    name: /, '').trim().replace(/^(["'])(.*)\1$/, '$2'));
+    if (gated) {
+      if (!jobs.length) problems.push(`${file}: no jobs found`);
+      for (const job of jobs) {
+        const ifs = job.lines.filter(l => /^    if:/.test(l));
+        const value = ifs.length === 1 ? ifs[0].replace(/^    if:\s*/, '').trim() : null;
+        const okIf = value === gatedExpr || (value && value.startsWith(`(${gatedExpr}) && (`) && value.endsWith(')'));
+        if (!okIf) problems.push(`${file}: job ${job.id} must carry exactly one "if: ${gatedExpr}" (or "(${gatedExpr}) && (…)")`);
+      }
+      for (const name of names) if (REQUIRED_CONTEXTS.some(ctx => name === ctx)) problems.push(`${file}: a lane-gated job is named "${name}", a required context; a skipped job would read as passing`);
+      if (!triggerBlock(source, 'workflow_dispatch') && !/\n  workflow_dispatch:/.test(source)) problems.push(`${file}: a lane-gated workflow keeps a manual dispatch`);
+      const push = triggerBlock(source, 'push');
+      if (push === null) problems.push(`${file}: a lane-gated workflow runs on push to main`);
+      else if (!/^    branches: \[main\]$/m.test(push)) problems.push(`${file}: its push trigger is main only (a feature-branch push would bypass the lane split)`);
+      const pr = triggerBlock(source, 'pull_request');
+      if (pr && /types\s*:/.test(pr)) problems.push(`${file}: keep GitHub's default pull_request types`);
+    } else if (everywhere) {
+      if (/startsWith\(github\.head_ref/.test(source) || /task\/train-/.test(source)) problems.push(`${file}: runs on every pull request (${LANE_EVERYWHERE[file]}) and must not branch on the head ref`);
+    }
+  }
+  for (const file of [...Object.keys(LANE_GATED), ...Object.keys(LANE_EVERYWHERE)]) if (!(file in sources)) problems.push(`${file} is classified but does not exist`);
+  // The required contexts are ci.yml's and nobody else's.
+  for (const [file, source] of Object.entries(sources)) {
+    if (file === 'ci.yml') continue;
+    for (const ctx of REQUIRED_CONTEXTS) if (source.includes(`name: ${ctx}\n`)) problems.push(`${file}: names a job "${ctx}"; only ci.yml may carry a required context`);
+  }
+  return problems;
+}
+{
+  const workflowDir = new URL('../.github/workflows/', import.meta.url);
+  const sources = Object.fromEntries(readdirSync(workflowDir).filter(n => /\.ya?ml$/.test(n)).map(n => [n, read(n)]));
+  assert.deepEqual(laneProblems(sources), [], 'lane pull requests run the required contexts and the always-on gates; the heavy workflows run on trains, main and dispatch');
+  assert.ok(Object.keys(LANE_EVERYWHERE).includes('ci.yml') && Object.keys(LANE_EVERYWHERE).includes('codeql.yml'), 'CI and CodeQL run on every pull request');
+  for (const ctx of REQUIRED_CONTEXTS) assert.equal(ci.split(`\n    name: ${ctx}\n`).length - 1, 1, `ci.yml carries the required context "${ctx}" once`);
+  assert.doesNotMatch(ci, /head_ref|task\/train-/, 'ci.yml (the required contexts) is never lane-gated');
+  assert.match(sources['main-integrity.yml'], /if \[\[ "\$head_ref" != task\/train-\* \]\]; then\n[^\n]*::error::[^\n]*\n\s+exit 1/, 'Main Integrity refuses a main commit that did not arrive through a task/train-* pull request');
+  // Mutation controls: each way the split could silently weaken is refused.
+  const gatedFile = 'android-shell.yml';
+  const mutate = (file, fn) => ({ ...sources, [file]: fn(sources[file]) });
+  for (const [name, next] of [
+    ['a gated job without its if:', mutate(gatedFile, s => s.replace(/\n    if: github\.event_name != 'pull_request' \|\| startsWith\(github\.head_ref, 'task\/train-'\)\n/, '\n'))],
+    ['a gated job whose if: is widened', mutate(gatedFile, s => s.replace("startsWith(github.head_ref, 'task/train-')", "startsWith(github.head_ref, 'task/')"))],
+    ['a gated workflow with a second if: on a job', mutate(gatedFile, s => s.replace(/(\n    if: github[^\n]*\n)/, '$1    if: true\n'))],
+    ['a required context name on a gated job', mutate(gatedFile, s => s.replace('name: Gradle build, lint, unit tests and web parity', 'name: Client build and offline-first boundary'))],
+    ['a gated workflow pushed from every branch', mutate(gatedFile, s => s.replace(/\n  push:\n    branches: \[main\]\n/, '\n  push:\n'))],
+    ['a gated workflow with no manual dispatch', mutate(gatedFile, s => s.replace(/\n  workflow_dispatch:\n/, '\n'))],
+    ['a lane gate in ci.yml', mutate('ci.yml', s => s.replace(/\n  platform:\n/, `\n  platform:\n    if: ${LANE_CONDITION}\n`))],
+    ['a lane gate in CodeQL', mutate('codeql.yml', s => s.replace(/\njobs:\n(  [A-Za-z0-9_-]+:\n)/, `\njobs:\n$1    if: ${LANE_CONDITION}\n`))],
+    ['a new pull_request workflow nobody classified', { ...sources, 'new-gate.yml': 'name: New\non:\n  pull_request:\npermissions:\n  contents: read\njobs:\n  a:\n    runs-on: ubuntu-latest\n    steps:\n      - run: true\n' }],
+    ['a classified workflow that was deleted', (() => { const s = { ...sources }; delete s['promotions.yml']; return s; })()]
+  ]) {
+    assert.ok(laneProblems(next).length > 0, `the lane policy refuses ${name}`);
+  }
+}
+
+// ── Check-count manifest (ci/check-counts.json) ──────────────────────────────
+// The exact output pins moved out of ci.yml into one manifest. Every group is
+// verified exactly once, inside its own job, by a bare command line (no `|| true`,
+// no `if`, never under continue-on-error), and ci.yml keeps no inline pin against
+// a log, so the manifest is the one place a count lives.
+{
+  const manifest = JSON.parse(readFileSync(new URL('../ci/check-counts.json', import.meta.url), 'utf8'));
+  const calls = new Map();
+  const lines = ci.split('\n');
+  let jobId = null; let inJobs = false; let step = null;
+  for (const [i, line] of lines.entries()) {
+    if (line === 'jobs:') { inJobs = true; continue; }
+    const header = inJobs && line.match(/^  ([A-Za-z0-9_-]+):\s*$/);
+    if (header) { jobId = header[1]; step = null; continue; }
+    if (/^      - /.test(line)) step = { start: i };
+    if (step && /^        continue-on-error:/.test(line)) step.continueOnError = true;
+    const m = line.match(/node tools\/ci-check-counts\.mjs verify (\S+)/);
+    if (!m) continue;
+    assert.match(line, /^ +node tools\/ci-check-counts\.mjs verify \S+$/, `ci.yml:${i + 1}: a verify call stands alone on its line (no || true, no condition)`);
+    const list = calls.get(m[1]) || []; list.push({ job: jobId, line: i + 1, step }); calls.set(m[1], list);
+  }
+  for (const [id, group] of Object.entries(manifest.groups)) {
+    const at = calls.get(id) || [];
+    assert.equal(at.length, 1, `ci/check-counts.json group ${id} is verified exactly once in ci.yml (found ${at.length})`);
+    assert.equal(at[0].job, group.job, `group ${id} is verified in its own job ${group.job}`);
+  }
+  // continue-on-error on the step would turn a failed verify into a pass; checked over the whole step text.
+  for (const [id, at] of calls) {
+    assert.ok(id in manifest.groups, `ci.yml verifies ${id}, which ci/check-counts.json does not have`);
+    const stepText = lines.slice(at[0].step.start, at[0].line).join('\n');
+    assert.doesNotMatch(stepText, /continue-on-error:\s*true/, `the step verifying ${id} is not continue-on-error`);
+  }
+  const inline = lines.filter(l => /^\s*(?:grep -[EF]q|test "\$\(grep -[EF]?c) .*\.log\)?"?(?: -(?:eq|ge) [0-9]+)?$/.test(l));
+  assert.deepEqual(inline, [], 'ci.yml keeps no inline output pin against a log: pins live in ci/check-counts.json');
+  const contracts = job('suites-contracts');
+  assert.match(contracts, /node tools\/ci-check-counts\.mjs validate\n\s+node tools\/ci-check-counts\.test\.mjs\n\s+node tools\/ci-check-counts\.mjs retire-check --base-sha "\$BASE_SHA"\n/, 'Suites policy and contracts validates the manifest, runs its negative tests and the retire check');
+  assert.match(contracts, /BASE_SHA: \$\{\{ github\.event\.pull_request\.base\.sha \|\| github\.event\.before \}\}/, 'the retire check compares against the pull request base (or the previous main)');
+  // Negative control: dropping a verify line, or verifying in the wrong job, is visible to this check.
+  const anyId = Object.keys(manifest.groups)[0];
+  assert.ok(!ci.replace(`node tools/ci-check-counts.mjs verify ${anyId}\n`, '\n').includes(`verify ${anyId}\n`), 'the negative control removes a verify line');
+}
+
+console.log('PASS — lane pull requests run the four required contexts and every security, marking, data, evidence and governance gate while the heavy workflows run on trains, main and dispatch; every check-count group is verified once in its own job; release workflows keep only authoritative heads, avoid duplicate feature-branch push runs (both pinned macOS lanes included), never cancel main\'s health evidence, key Build Ink V3 by ref, and scope Ink Hybrid to handwriting changes; the sharded suites and browser gates keep their required check names, fail on any unsuccessful shard and run every npm test and test:e2e suite.');

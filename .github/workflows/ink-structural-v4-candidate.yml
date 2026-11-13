@@ -6,6 +6,12 @@ on:
       - 'tools/ink-foundation/**'
       - 'scripts/ink-structural-candidate-dev.sh'
       - '.github/workflows/ink-structural-v4-candidate.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/ink-foundation/**'
+      - 'scripts/ink-structural-candidate-dev.sh'
+      - '.github/workflows/ink-structural-v4-candidate.yml'
   workflow_dispatch:
 
 concurrency:
@@ -20,6 +26,8 @@ permissions:
 
 jobs:
   factorial:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Joint validity x pooled relation factorial
     runs-on: ubuntu-24.04
     timeout-minutes: 30

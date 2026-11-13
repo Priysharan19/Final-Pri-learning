@@ -11,6 +11,17 @@ on:
       - 'tools/ink-foundation/live_structural_infer.py'
       - 'scripts/serve-lan.mjs'
       - '.github/workflows/ink-structural-v4-live-lan.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'client/src/main.jsx'
+      - 'client/src/ink/InkAnswer.jsx'
+      - 'client/dev/devStructural.js'
+      - 'client/src/ink/interactionGuard.js'
+      - 'client/test/ink-interaction-guard-check.mjs'
+      - 'tools/ink-foundation/live_structural_infer.py'
+      - 'scripts/serve-lan.mjs'
+      - '.github/workflows/ink-structural-v4-live-lan.yml'
   workflow_dispatch:
 
 permissions:
@@ -22,6 +33,8 @@ concurrency:
 
 jobs:
   live-lan-contract:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Physical iPad V4 research bridge
     runs-on: ubuntu-24.04
     timeout-minutes: 20

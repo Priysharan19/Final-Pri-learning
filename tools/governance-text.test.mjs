@@ -94,6 +94,12 @@ for (const name of ['react', 'react-dom', '@types/react', 'express']) {
 ok(/directory: \/ad[\s\S]*?dependency-name: '\*'\n\s+update-types: \['version-update:semver-major'\]/.test(dependabot), 'Dependabot ignores every major in the unshipped /ad folder');
 ok(!/dependency-name: '\*'\n\s+update-types: \['version-update:semver-major'\][\s\S]*directory: \/(client|server)/.test(dependabot.split('directory: /ad')[0]), 'client and server still receive their non-React, non-Express majors');
 
+// ── lane CI: AGENTS.md, the release policy and Main Integrity say the same thing ──
+ok(agents.includes('the heavy workflows run on `task/train-*` pull requests, so `main` accepts only trains — `docs/release/ci-lanes.md`'), 'AGENTS.md states the lane split and the train-only merge rule');
+ok(/so `main` accepts only trains \(`docs\/release\/ci-lanes\.md`\)/.test(read('docs/release/release-policy.md')), 'the release policy states the train-only merge rule');
+ok(/if \[\[ "\$head_ref" != task\/train-\* \]\]/.test(read('.github/workflows/main-integrity.yml')), 'Main Integrity enforces the train-only merge rule AGENTS.md states');
+ok(existsSync(join(ROOT, 'docs/release/ci-lanes.md')) && existsSync(join(ROOT, 'ci/check-counts.json')), 'the lane document and the check-count manifest exist');
+
 // ── no workflow with write authority is bound to a branch that is not main ────
 ok(!existsSync(join(ROOT, '.github/workflows/prepare-ios-sync.yml')), 'the one-shot prepare-ios-sync workflow (push to pri-local-ink-v2, contents: write) is gone');
 

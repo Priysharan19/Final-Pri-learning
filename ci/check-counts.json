@@ -1,0 +1,637 @@
+{
+  "version": 1,
+  "about": "The exact output pins of .github/workflows/ci.yml. Each group is checked in place by `node tools/ci-check-counts.mjs verify <group>`; regenerate numbers with `regen`, never by deleting a pin (see tools/ci-check-counts.mjs).",
+  "groups": {
+    "suites-contracts/india-legacy-rows.log": {
+      "job": "suites-contracts",
+      "log": "india-legacy-rows.log",
+      "pins": [
+        {"has":"india-legacy-rows-check: 85/85 checks passed"}
+      ]
+    },
+    "suites-contracts/report-narrative.log": {
+      "job": "suites-contracts",
+      "log": "report-narrative.log",
+      "pins": [
+        {"has":"REPORT NARRATIVE: PASS — 9/9 checks"}
+      ]
+    },
+    "suites-contracts/review-consistency.log": {
+      "job": "suites-contracts",
+      "log": "review-consistency.log",
+      "pins": [
+        {"has":"REVIEW CONSISTENCY: PASS — 7/7 checks"}
+      ]
+    },
+    "suites-contracts/plan-slips.log": {
+      "job": "suites-contracts",
+      "log": "plan-slips.log",
+      "pins": [
+        {"has":"PLAN SLIPS: PASS — 11/11 checks"}
+      ]
+    },
+    "suites/suites.log": {
+      "job": "suites",
+      "log": "suites.log",
+      "pins": [
+        {"has":"2904000/2904000 self-checks passed across 363 subtopics"},
+        {"has":"21000/21000 multipart part-checks passed"},
+        {"has":"✔ INDIA SUITE PASSED — 2726/2726 checks"},
+        {"has":"STUDENT PLOT: PASS — 38/38 checks","note":"v1.1: step-mark rows say the engine's mark and never contradict it."},
+        {"has":"INDIA DIFFICULTY TRUTH: PASS — 36964/36964 checks"},
+        {"has":"PASS 7 lazy-loaded CBSE IX source packs, 84 original student exercises, 21 worked lessons, 105 unique identities","note":"Phase 4: Class IX blind packs, JEE complex D4 + escrow lane, advertised levels, CBSE crosswalk."},
+        {"has":"PASS 27 CBSE IX evidence-mapped suboutcomes: 18 PARTIAL, 9 UNCOVERED"},
+        {"has":"PASS 12 original CBSE X/XII questions, 12 distinct archetype identities, 6 each by grade","note":"#483: the CBSE X/XII answer-blind pilot stays review-only and unwired."},
+        {"has":"PASS JEE 20/20 answer-blind original questions"},
+        {"has":"JEE COMPLEX D4: PASS — 205/205 checks — 20 forms rated by the automated rubric (16 D4, 4 D3)"},
+        {"re":"JEE ESCROW LANE: PASS — ([0-9]+)/\\1 checks — 20 public questions answer-blind, 0 issuable without escrow"},
+        {"has":"ADVERTISED LEVELS: PASS — 52/52 advertised"},
+        {"has":"CBSE 2026–27 CROSSWALK: PASS — 77 app chapters"},
+        {"has":"DISTINCT QUESTIONS REPORT: PASS","note":"Hardest-level forms, tranche 1: every D3 answer re-derived from its prompt. #667 + #672 (m-finish-10-marking): 16 JEE D4 generators (Class 11 sets, binomial, conics, inequalities, 3-D; complex quadratic form replaced) take 339 → 355 subtopics, 126 → 142 hardest forms, 566 → 576 declared pairs and 2588 → 2678 India checks. Distinct questions per class (L5): measured against the owner's 10^8-per-class target (lower bounds marked ≥). The pin is the measurement; widening generators moves it and the report together."},
+        {"has":"BOARD SCHEME CONTRACT: PASS — 147/147 checks — Board value points carried in whole-mark groups, never above the Board; only lines the deterministic step check verifies earn, matched to points one-to-one and in order; no model verdict sets a mark; 1 Section B–E archive records, every scheme line engine-verified.","note":"Board-scheme marks contract (L5, R4): CBSE Section B–E value points, awarded only by the deterministic engine."},
+        {"has":"DISTINCT QUESTIONS: Class 7 ≥ 2.98×10^8, Class 8 ≥ 4.17×10^8, Class 9 ≥ 2.43×10^8, Class 10 ≥ 1.46×10^8, Class 11 ≥ 4.01×10^8, Class 12 ≥ 3.83×10^8 — 6/6 classes at the 10^8 target"},
+        {"has":"CLASS X ALGEBRA FORMS: PASS — 5 generators, 29 forms, 6000 items re-derived from the prompt by a second route","note":"Class X Algebra additional forms (L5): 5 generators × D1–D3 take 355 → 360 subtopics, 576 → 591 declared pairs and 2678 → 2708 India checks; every answer re-derived from its prompt by a second route."},
+        {"has":"INDIA HARDEST FORMS: PASS — 647072/647072 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points"},
+        {"has":"PROMPT VARIABLE CONSISTENCY: PASS — 174244 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent"},
+        {"has":"59400 questions from 594 declared (generator, difficulty) pairs × 100 draws — 59400 marked correct by their own marker, 59400 well formed"},
+        {"has":"QUESTION VARIANTS: PASS — 594 generated seeds (0 cells skipped: seed not credited by its own key), 4742 variants verified by the marker and distinct by content hash, 2368/2376 bands filled, 1004/1184 same-band variants keep the seed","note":"Question variants (L5): every live India cell and every official CBSE record yields variants at each band, each credited by the deterministic marker on its own key and distinct by content hash. 576 → 594 seeds (Train 14: re-derived by running all 4 shards on main 0c655e4cf + #837 + #839)."},
+        {"has":"shape; 81 official CBSE records → 314 Pri variants on their chapter (10 bands with no serving generator).","note":"28/110 → 80/310 records/variants (Train 15: #840, #845, #842 records, re-derived by running all 4 shards). 80/310 → 81/314 (#846: 65/2/1 Q24, re-derived by running all 4 shards on Train 15 + #846)."},
+        {"has":"258/258 dot points have a generator behind them; 0 do not"},
+        {"has":"NCERT ANSWER FORMS: PASS — 481/481 checks","note":"L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three)."},
+        {"has":"ADVERSARIAL CORPUS: PASS — 219/219 checks","note":"#723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count."},
+        {"has":"EXACT BOUNDS: PASS — 107/107 checks"},
+        {"has":"STEP14 REVIEW FIXES: PASS — 40667/40667 checks","note":"39533 → 39547 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
+        {"has":"REVIEW FOLLOW-UPS: PASS — 415/415 checks"},
+        {"has":"#680 SOURCED CASES: PASS — 91/91 cases"},
+        {"has":"STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite"},
+        {"has":"Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite"},
+        {"has":"Q1_POINT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite"},
+        {"has":"Q1_SET_SUMMARY 8/8 expected mismatches=0 engine=sqlite"},
+        {"has":"Q1_UNIT_SUMMARY 8/8 expected; mismatches=0 engine=sqlite"},
+        {"has":"MARKING POLICY (D12): PASS — 68/68 checks"},
+        {"has":"STEP COACH: PASS — 49/49 checks","note":"F1 live step coach (#826): no guess oracle, premium-only, off by default, capped."},
+        {"has":"INTERIM MARKING POLICY (D13, D14): PASS — 11285/11285 checks","note":"10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same). 10855 → 10820 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree): the D13 sweep runs over generated questions, and #812's widened Class 9 generators change that sample (sweep 10481 → 10446); every check is still run and passes, none removed."},
+        {"has":"INDIA BANKS (D15): PASS — 124/124 checks","note":"124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124."},
+        {"has":"NSW BANK QUALITY: PASS — 75 generators, 267 cells issued","note":"Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render."},
+        {"has":"FALSE-POSITIVE SWEEP: PASS — 0 of 422837 wrong answers marked correct across 19248 questions","note":"133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit. 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree). 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree). 419741/18696 → 422759/19248 (Train 15: #838 widening + CBSE X/XII Section A (#840, #845) + JEE Main 2026 S2 (#842), re-derived by running all 4 shards on the merged tree). 422759/19248 → 422837/19248 (#846: CBSE XII 65/2/1 Q24, the first Section B record, restacked on Train 15)."},
+        {"has":"CORRECT-ANSWER SWEEP: PASS — 0 of 33992 right answers over 12508 India questions (594 generator×difficulty cells × 24 seeds)","note":"The opposite direction: every right answer to every India question (the key, the box's unit in every spelling, ₹/Rs on an amount, the printed answer, the photo path's \"Ans:\" line) is credited, or refused only by D13."},
+        {"has":"EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes","note":"Train 13 (#800 + #784 + the L1 marking types), re-derived by running all 4 shards on the merged tree: 355 → 363 subtopics, 576 → 594 pairs."},
+        {"has":"WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels"},
+        {"re":"EXAMINER DOSSIER: PASS — [0-9]+ rubric banks, digest [0-9a-f]{12}…, status PENDING","note":"#499: the examiner dossier matches the marking code it hashes (a marking change re-requests review)."},
+        {"has":"METHOD MARKS: PASS — 53/53 checks"},
+        {"has":"VERIFIED STEP MARKS: PASS"},
+        {"has":"VERIFIED STEP MARKS CLIENT: PASS"},
+        {"has":"METHOD PROGRESS: PASS — 1011/1011 checks"},
+        {"has":"WORKING BRANCHES: PASS — 32/32 checks"},
+        {"has":"AP FIRST ERROR + ECF: PASS — 4885/4885 checks","note":"Issue #430: the first wrong AP line is named, method marks before it stay, error is carried forward once, the answer mark is never paid for a wrong answer, and the adversarial corpus earns nothing it did not show. 2140 → 4396 (review round 1): every reviewer page is now a corpus case (formula lines carrying their arithmetic, prose and comma-less givens, listed terms, a last term slipped through continuations, n(…)/2), and each swept seed also checks three prose spellings of its givens, its one-line formula slip and n(…)/2. 4396 → 4795 (review round 2): D4 carries a slipped last term into the sum as D2 does (four D4 pages), and each swept sum seed also checks a last term slipped on its formula line and summed correctly. 4795 → 4885 (review round 2, adversarial): 22 pages where a line Pri may have misread (a part with no value, two statements run together, a word beside the working, a hedged given) is judged nowhere, and a listed line on a gradient plan (y11-diff) is not a derivative mistake."},
+        {"has":"WORKING EVIDENCE: PASS — 25/25 checks"},
+        {"has":"Pri Reason V1 precision gate: PASS"},
+        {"has":"Pri Reason V2 safety gate: PASS"},
+        {"has":"Pri Reason V3 regression gate: PASS"},
+        {"has":"Pri Reason V4 regression gate: PASS"},
+        {"has":"Pri Reason V2 curriculum integration gate: PASS"},
+        {"has":"INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators"},
+        {"has":"INDIA EXAM FLOW: PASS — 163/163 checks"},
+        {"has":"BOARD MOCK: PASS — 64/64 checks"},
+        {"has":"EXAM SESSION: PASS — 176/176 checks"},
+        {"has":"EXAM UNREAD HANDWRITING (DEVICE): PASS — 61/61 checks","note":"61: six D17 checks — a frozen exam page leaves the device only after the prompt is accepted (L4)."},
+        {"has":"EXAM ANALYSIS: PASS — 35/35 checks"},
+        {"has":"INDIA PYQ: PASS — 4528/4528 checks — 251 source-cited previous-year questions","note":"1082/45 → 2915/173, the JEE archive (#795) (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
+        {"has":"✔ INDIA IDENTITY SUITE PASSED — 102/102 checks across 5 groups"},
+        {"has":"INDIA ADAPTIVE: PASS — 308/308 checks","note":"308 (measured in train 10): one check from #544 hardening (every typed answer marked) and one from misconception targeting (#586)."},
+        {"has":"ADAPTIVE SIMULATION: PASS — 77/77 checks"},
+        {"has":"PROGRESS TRUTH: PASS — 147/147 checks"},
+        {"has":"PLACEMENT: PASS — 291/291 checks"},
+        {"has":"INDIA EXAM WEIGHT: PASS — 628/628 checks"},
+        {"has":"PLOTTING: PASS — 78/78 checks"},
+        {"has":"README TRUTH: PASS — 16/16 checks"},
+        {"has":"LEGAL PAGES: PASS — 383/383 checks","note":"364 (m-finish-16): the review switch, store-purchase wording, retention and crash-report disclosures, and the generated third-party notices page. 374 (L7): no notice makes a coverage claim D24 forbids, in either language. 375 (L7): the D18 wording matches the accounts stream's code (#736). 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737). 383 (L7, Train 4 truth): banner conditions walked, Practise-this and Hindi D18 pinned."},
+        {"has":"LEGAL PROMISES GATE: PASS — 19/19 checks","note":"16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination. 19 (L7): the D17 prompt promise."},
+        {"has":"COUNSEL QUESTIONS: PASS — 13/13 checks","note":"L7: the counsel question sheet quotes the current text and code locations."},
+        {"has":"CLOUD HANDWRITING CLIENT: PASS — 192/192 checks","note":"186 → 192 (#196): a remembered read is dropped when the cloud account changes, so account A's transcript and read receipt are never handed to account B on the same device."},
+        {"has":"CONTENT HONESTY: PASS","note":"Content honesty (Nov 2026): no student surface claims a review a human never did; marketing, ad, promotion and store copy carry none of the retired claims; past papers are off by default (D23)."},
+        {"has":"MARKETING CLAIMS: PASS"},
+        {"has":"PAST PAPERS SWITCH: PASS"},
+        {"has":"WORKED STEPS TYPESETTING: PASS","note":"Hints and worked steps carry no double sign, unit/zero coefficient or algebraic +0 term (#700's follow-up)."},
+        {"has":"TRUTHFUL FEEDBACK: PASS — 101/101 checks","note":"A marked handwritten attempt says only what the server established (synthetic evidence: scripted transcripts, the server's marking function)."},
+        {"has":"BROWSER RUN FIXES: PASS — 28/28 checks","note":"23 + 5 (#705): the e2e harness blocks service workers for inspectNetwork flows, and stale-cloud / photo-practise each opt in, with a negative control."},
+        {"has":"CLOUD WORKING CLIENT: PASS — 47/47 checks"},
+        {"has":"CLOUD PHOTO CLIENT: PASS — 73/73 checks","note":"65 → 73 (#196): the camera file (and its EXIF/GPS) is never what is sent; every photo is redrawn and the canvas encoding is sent, with no fall back to the original."},
+        {"has":"TUTOR UI: PASS — 127/127 checks","note":"114 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same). 114 → 127 (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree)."},
+        {"has":"ERROR REPORTS: PASS — 36/36 checks"},
+        {"has":"APPLE SIGN IN: PASS — 66/66 checks"},
+        {"has":"ONBOARDING SCOPE: PASS — 62/62 checks","note":"60 → 62 (plan E4, re-derived by running): the page and manifest checks run for both editions' builds."},
+        {"has":"HANDWRITING CLAIMS: PASS — ","note":"No student-facing text says Pri learns a hand (the count follows the string catalogues, so only the verdict is pinned here)."},
+        {"has":"STUDY PLAN: PASS — 215/215 checks","note":"211 → 215 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
+        {"has":"REMINDERS: PASS — 183/183 checks"},
+        {"has":"I18N: PASS — 198/198 checks","note":"200 → 198 (plan E4, re-derived by running): \"P\" and \"Pri Learning.\" (the brand tile) and \"Pri\" (the old bar label) left the literal allowlist; \"by Pri Learning\" joined it."},
+        {"has":"I18N COVERAGE: PASS — 94/94 checks — 80 files scanned, 0 hard-coded strings","note":"91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason. 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt). 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770). 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree). 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards). 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check). 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost \"P\" and \"Pri Learning.\" and gained Priyabhata, Prithagoras, प्रियभट and \"by Pri Learning\"."},
+        {"has":"READER PERMISSION (D17): PASS — 124/124 checks"},
+        {"has":"PAGE LINK HISTORY: PASS — 39/39 checks"},
+        {"has":"MISCONCEPTION TARGETING: PASS — 41/41 checks"},
+        {"has":"LOST MARKS: PASS — 170/170 checks","note":"Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy."},
+        {"has":"TOLERANCE POLICY: PASS — 221/221 checks"},
+        {"has":"PRECISION BAND: PASS — 2442 draws state a precision","note":"Issue #518: a prompt that states a precision keys a tol or rounding."},
+        {"has":"NOTES CONTENT CHECK PASSED — 77/77 chapters","note":"Chapter notes: every curriculum chapter, every worked answer engine-verified."},
+        {"has":"I18N VOICE: PASS — 92/92 checks"},
+        {"has":"MISCONCEPTION ONTOLOGY: PASS — 99/99 checks"},
+        {"has":"ACCOUNT DELETION LINK: PASS — 111/111 checks"},
+        {"has":"MARK PREDICTOR: PASS — 53/53 checks","note":"42 → 53 (#196): the predicted mark stays display-only — imported only by the progress summary and page, never by the server or a marking module, and a pure read of the evidence."},
+        {"has":"FORECAST PARITY: PASS — 63/63 checks","note":"The server's own readiness estimate equals the device's on a fixture set, and only the read-only forecast route reaches it."},
+        {"has":"PDF WORKING: PASS — 25/25 checks"},
+        {"has":"INK PDF RESOURCE — PASS: pre-parser bytes, raster allocation, timeouts and cleanup bounded","note":"#196: the hostile-PDF bounds of #204 (pre-parser size, canvas allocation, parse/render timeouts with cleanup) had a regression suite that no script or workflow ran."},
+        {"has":"MCQ DISTINCTNESS: PASS — 14/14 checks"},
+        {"has":"INDIA NATIVE SURFACES: PASS — 33/33 checks"},
+        {"re":"INSTALL BUDGET: PASS — 72/72 checks — install [0-9]+ kB raw / [0-9]+ kB gzip under.*previous-year archive 0 kB of it","note":"npm run test:budget measures the one production build: every build ships the Instrument from client/interface.config.mjs (D7), whose Map, Report and Scripts tabs are held in the warm pass (#658), together with every file those tabs import statically; 63 → 65: no tab carries a stylesheet of its own (they are in the boot one)."},
+        {"has":"nothing emitted left uncovered; previous-year archive 0 kB","count":1,"op":"eq"},
+        {"has":"INTERFACE DECISIONS: PASS — 39/39 checks","note":"The V1 interface decisions in source: one interface from one setting on web, iOS and Android (D7, D8), Classes hidden (D10), the language switch says questions stay in English (D11). 34 → 39: the Aurora skin is the default on chrome (D7) and the D8 fallback is one line of the setting, covered."},
+        {"has":"AURORA SKIN: PASS — 32/32 checks","note":"The Aurora skin stays on chrome: scope, no content tokens, glass only on chrome, pools only on Index/Map/Settings, fallbacks, AA."},
+        {"has":"CBSE STEP MARKING: PASS — 37/37 checks"},
+        {"has":"ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks"},
+        {"has":"PAYWALL HONESTY: PASS — 79/79 checks","note":"68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
+        {"has":"NOTEBOOK VIEW: PASS — 19/19 checks"},
+        {"has":"PARENT REPORT UI: PASS — 35/35 checks"},
+        {"has":"LIBRARY UI: PASS — 39/39 checks"},
+        {"has":"DESK CLOCK: PASS — 30/30 checks"},
+        {"has":"DESK IMPORT: PASS — 18/18 checks"},
+        {"has":"EDITION CLIENT (E2): PASS — 136/136 checks","note":"Plan E2: the app knows its own edition from its build, declares it on every /v1 request, and shows a blocking screen at the other's server. 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen)."},
+        {"has":"SERVER DAILY CAP (CLIENT): PASS — 27/27 checks","note":"The device meets the SERVER's daily practice cap (#537): refused through the real dispatcher, no fallback, a prepared question stays unbound and unmarked, a second device is refused at zero."},
+        {"has":"JEE ADVANCED GATE: PASS — 27/27 checks"},
+        {"has":"RESTORE FIDELITY: PASS — 45/45 checks"},
+        {"has":"STREAK CALENDAR: PASS — 19/19 checks"},
+        {"has":"BAD INPUT: PASS — 44/44 checks"},
+        {"has":"CLOUD SYNC ACK: PASS — 44/44 checks"},
+        {"has":"PASS — §09 submission lifecycle: 27 groups"},
+        {"has":"MARKER DEADLINE CLIENT: PASS — 14/14 checks","note":"A marker stopped at its deadline reaches the device as `tooComplex`, never as an unreadable entry (issue #544 hardening)."},
+        {"has":"PASS — §22 submission sync durability: 13 groups"},
+        {"has":"PASS — Grade 9 Ganita Manjari: 1280 seeded forms (1000 numeric handwriting-ready, 280 conceptual)."},
+        {"has":"PASS — 8/8 chapters, 200/200 uploaded pages, 42/42 formal exercise sections and 293/293 formal exercise prompts represented and verified."},
+        {"has":"RETARGET ON REPEAT: PASS — 28 checks","note":"§06 content runtime certification: every V1 launch path (CBSE/NCERT 7–12, JEE Main, JEE Advanced) served, validated, versioned and end-to-end through the local backend; the path count may only grow. 172: 23 checks added — a chapter request that lands on a spent cell is answered from another cell of the same terms (issue #540). A served repeat is re-asked on another cell of the same terms; a misconception hunt never leaves its dot point (issue #540)."},
+        {"has":"INSIGHTS VIEW: PASS — 38/38 checks"},
+        {"has":"IOS BUNDLE FLAG POLICY: PASS — 8/8 checks"},
+        {"has":"CONTENT CERTIFICATION REGRESSIONS: PASS — 174/174 checks"},
+        {"has":"CONTENT REPORT FRESH: PASS","note":"The committed certification report describes the content in the tree (version, digest, scope, result)."},
+        {"has":"CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — "},
+        {"has":"8/8 exam selections"}
+      ]
+    },
+    "platform/blind.log": {
+      "job": "platform",
+      "log": "blind.log",
+      "pins": [
+        {"has":"PROVIDER ANSWER-BLIND: PASS — 150/150 checks","note":"132 → 150 (Train 4, re-derived by running the suite on the merged tree: #774's lead-connective canaries with the other lanes' checks)."},
+        {"has":"HANDWRITING LATENCY BUDGET: PASS"}
+      ]
+    },
+    "platform/pg-export.log": {
+      "job": "platform",
+      "log": "pg-export.log",
+      "pins": [
+        {"has":"SQLITE TO POSTGRES EXPORT: PASS"}
+      ]
+    },
+    "platform/rls-fail-closed.log": {
+      "job": "platform",
+      "log": "rls-fail-closed.log",
+      "pins": [
+        {"has":"RLS FAIL-CLOSED: PASS — 141/141 checks"}
+      ]
+    },
+    "platform/guardian-code-approval.log": {
+      "job": "platform",
+      "log": "guardian-code-approval.log",
+      "pins": [
+        {"has":"GUARDIAN CODE APPROVAL WITHDRAWAL: PASS — 14/14 checks"}
+      ]
+    },
+    "platform/test-mailbox.log": {
+      "job": "platform",
+      "log": "test-mailbox.log",
+      "pins": [
+        {"has":"TEST MAILBOX: PASS — 94/94 checks"}
+      ]
+    },
+    "platform/child-erasure.log": {
+      "job": "platform",
+      "log": "child-erasure.log",
+      "pins": [
+        {"has":"CHILD ERASURE: PASS — 107/107 checks"}
+      ]
+    },
+    "platform/billing-edition.log": {
+      "job": "platform",
+      "log": "billing-edition.log",
+      "pins": [
+        {"has":"BILLING PER EDITION: PASS — 123/123 checks —"}
+      ]
+    },
+    "platform/tutor-diagnose.log": {
+      "job": "platform",
+      "log": "tutor-diagnose.log",
+      "pins": [
+        {"has":"TUTOR DIAGNOSE: PASS — 152/152 checks"}
+      ]
+    },
+    "platform/line-check-constant-pin.log": {
+      "job": "platform",
+      "log": "line-check-constant-pin.log",
+      "pins": [
+        {"has":"LINE CHECK CONSTANT PIN: PASS — 191/191 checks"}
+      ]
+    },
+    "platform/final-attempt-sweep.log": {
+      "job": "platform",
+      "log": "final-attempt-sweep.log",
+      "pins": [
+        {"has":"FINAL-ATTEMPT ORACLE SWEEP: PASS — 207040/207040 checks — 99 plan questions in 7 banks, 99 constant answers, 128154 round-4 probes, 44526 round-5 probes, 12320 sweep831 probes"}
+      ]
+    },
+    "platform/recognition-dedupe.log": {
+      "job": "platform",
+      "log": "recognition-dedupe.log",
+      "pins": [
+        {"has":"RECOGNITION DEDUPE: PASS — 212/212 checks"}
+      ]
+    },
+    "platform/hot-path-budget.log": {
+      "job": "platform",
+      "log": "hot-path-budget.log",
+      "pins": [
+        {"has":"HOT PATH BUDGET: PASS — 117/117 checks"}
+      ]
+    },
+    "platform/photo-pipeline.log": {
+      "job": "platform",
+      "log": "photo-pipeline.log",
+      "pins": [
+        {"has":"PHOTO PIPELINE: PASS — 905/905 checks","note":"860 → 880 (#196 review N4): a reply over the reader's schema limits (422 HANDWRITING_MALFORMED) is offered as one Try again and never resent by itself; a garbled 502 may be. 880 → 905 (Train 4, #739's 25 checks on top; re-derived by running the suite on the merged tree)."}
+      ]
+    },
+    "platform/photo-pipeline.log#2": {
+      "job": "platform",
+      "log": "photo-pipeline.log",
+      "pins": [
+        {"has":"PHOTO WORKING MARKING: PASS — 40/40 checks"}
+      ]
+    },
+    "platform/parent-report.log": {
+      "job": "platform",
+      "log": "parent-report.log",
+      "pins": [
+        {"has":"parent-report-check (sqlite): 90 checks passed"}
+      ]
+    },
+    "platform/resources.log": {
+      "job": "platform",
+      "log": "resources.log",
+      "pins": [
+        {"has":"resources-check (sqlite): 105 checks passed"}
+      ]
+    },
+    "platform/desk.log": {
+      "job": "platform",
+      "log": "desk.log",
+      "pins": [
+        {"has":"desk-check (sqlite): 141 checks passed"}
+      ]
+    },
+    "platform/desk.log#2": {
+      "job": "platform",
+      "log": "desk.log",
+      "pins": [
+        {"has":"DESK ISOLATION: PASS — 39/39 checks"}
+      ]
+    },
+    "platform/edition-agreement.log": {
+      "job": "platform",
+      "log": "edition-agreement.log",
+      "pins": [
+        {"has":"EDITION AGREEMENT (E2): PASS — 155/155 checks"}
+      ]
+    },
+    "platform/practice-http.log": {
+      "job": "platform",
+      "log": "practice-http.log",
+      "pins": [
+        {"has":"LEARNING STATE IDENTITY: PASS — 179/179 checks"}
+      ]
+    },
+    "platform/practice-http.log#2": {
+      "job": "platform",
+      "log": "practice-http.log",
+      "pins": [
+        {"has":"PRACTICE HINT WORK: PASS — 19/19 checks"}
+      ]
+    },
+    "platform/practice-http.log#3": {
+      "job": "platform",
+      "log": "practice-http.log",
+      "pins": [
+        {"has":"SPACED REVIEW: PASS — 16/16 checks"}
+      ]
+    },
+    "platform/practice-http.log#4": {
+      "job": "platform",
+      "log": "practice-http.log",
+      "pins": [
+        {"has":"NSW PRACTICE (G3): PASS — 164/164 checks"}
+      ]
+    },
+    "platform/practice-http.log#5": {
+      "job": "platform",
+      "log": "practice-http.log",
+      "pins": [
+        {"has":"INDIA BANK ISSUE COVERAGE: PASS"},
+        {"has":"DAILY PRACTICE CAP: PASS — 98/98 checks"},
+        {"has":"PREMIUM PRACTICE CONTENT: PASS — 41/41 checks"},
+        {"has":"MISTAKE NOTEBOOK: PASS — 49/49 checks"},
+        {"has":"READINESS FORECAST: PASS — 29/29 checks"},
+        {"has":"MISTAKE DNA: PASS — 16/16 checks"},
+        {"has":"METHOD PROGRESS OVER HTTP: PASS — 1192/1192 checks"},
+        {"has":"FLAGSHIP AP WORKING OVER HTTP: PASS — 301/301 checks"},
+        {"has":"OWNER AP FIRST-MISTAKE CONTRACT: PASS — 29/29 checks"},
+        {"has":"AP FIRST-BREAK REGRESSION: PASS — 4081/4081 checks over 120 seeds"},
+        {"has":"PRACTICE SEED REISSUE: PASS — 106/106 checks"},
+        {"has":"SEEK BUDGET: PASS — 20/20 checks"},
+        {"has":"HINTS AND NOTEBOOK: PASS — 59/59 checks"},
+        {"has":"HINT LADDER: PASS — 24/24 checks"},
+        {"has":"REVIEW QUEUE: PASS — 36/36 checks"},
+        {"has":"PRACTICE TRAP SEEK: PASS — 66/66 checks"},
+        {"has":"SERVER-CHOSEN QUESTIONS: PASS — 34/34 checks"},
+        {"has":"REPEAT CREDIT: PASS — 306/306 checks","note":"295 → 306: legacy-only repeats over HTTP, flagged repeatEvidence: 'legacy' on issue, receipt and event."},
+        {"has":"PRACTICE SEEN-AWARE PICK: PASS — 26/26 checks"}
+      ]
+    },
+    "platform/marker-isolation.log": {
+      "job": "platform",
+      "log": "marker-isolation.log",
+      "pins": [
+        {"has":"MARKER ISOLATION: PASS — 152/152 checks"}
+      ]
+    },
+    "platform/races.log": {
+      "job": "platform",
+      "log": "races.log",
+      "pins": [
+        {"has":"PRACTICE REVEAL/SUBMIT RACE: PASS","note":"The reveal race's check count follows which request wins each round; its pass line does not."},
+        {"has":"ACCOUNT DELETION MID-FLIGHT: PASS — 54/54 checks"},
+        {"has":"BILLING OUT-OF-ORDER CONCURRENCY: PASS — 151/151 checks"},
+        {"has":"GUARDIAN CONSENT COVERAGE — PASS — 38/38 checks"}
+      ]
+    },
+    "platform/ops.log": {
+      "job": "platform",
+      "log": "ops.log",
+      "pins": [
+        {"has":"OBSERVABILITY: PASS"},
+        {"has":"ALERT NOTIFIER: PASS — 15/15 checks"},
+        {"has":"FAILURE DRILLS: PASS"},
+        {"has":"ERROR TELEMETRY: PASS — 73/73 checks"},
+        {"has":"STATIC CACHING: PASS — 55/55 checks"}
+      ]
+    },
+    "platform/secret-shapes.log": {
+      "job": "platform",
+      "log": "secret-shapes.log",
+      "pins": [
+        {"has":"SECRET SHAPES — PASS — 69 checks"}
+      ]
+    },
+    "platform/security-p2.log": {
+      "job": "platform",
+      "log": "security-p2.log",
+      "pins": [
+        {"has":"admin-mfa-class-routes-check: 77/77 checks passed (sqlite)"},
+        {"has":"account-export-completeness-check (sqlite): 82 checks passed","note":"78 → 82 (plan F4a): the Exam Desk's attempts are exported, never their idempotency key or digest."},
+        {"has":"RLS ACCOUNT COVERAGE: PASS — 20/20 checks"},
+        {"has":"OTP DELETE ASYMMETRY: PASS — 15/15 checks"}
+      ]
+    },
+    "platform/exam-authority.log": {
+      "job": "platform",
+      "log": "exam-authority.log",
+      "pins": [
+        {"has":"EXAM AUTHORITY: PASS — 371/371 checks"}
+      ]
+    },
+    "platform/board-mock.log": {
+      "job": "platform",
+      "log": "board-mock.log",
+      "pins": [
+        {"has":"BOARD MOCK AUTHORITY: PASS — 40/40 checks"}
+      ]
+    },
+    "platform/exam-time.log": {
+      "job": "platform",
+      "log": "exam-time.log",
+      "pins": [
+        {"has":"EXAM TIME: PASS — 23/23 checks"}
+      ]
+    },
+    "platform/targeted-mock.log": {
+      "job": "platform",
+      "log": "targeted-mock.log",
+      "pins": [
+        {"has":"TARGETED MOCK: PASS — 43/43 checks"}
+      ]
+    },
+    "platform/exam-handwriting.log": {
+      "job": "platform",
+      "log": "exam-handwriting.log",
+      "pins": [
+        {"has":"EXAM HANDWRITING: PASS — 109/109 checks"},
+        {"has":"SYNTHETIC-READER EVIDENCE"}
+      ]
+    },
+    "platform/postgres-connection-config.log": {
+      "job": "platform",
+      "log": "postgres-connection-config.log",
+      "pins": [
+        {"has":"POSTGRES CONNECTION CONFIG: PASS — 230/230 checks"}
+      ]
+    },
+    "platform/platform-postgres.log": {
+      "job": "platform",
+      "log": "platform-postgres.log",
+      "pins": [
+        {"has":"✓ hot-path-budget-check.mjs"},
+        {"has":"PLATFORM ON POSTGRES: PASS — 89/89 suites","note":"59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres."},
+        {"has":"✓ nsw-practice-check.mjs"},
+        {"has":"✓ billing-edition-check.mjs"},
+        {"has":"✓ resources-check.mjs"},
+        {"has":"✓ desk-check.mjs"},
+        {"has":"✓ guardian-code-approval-withdraw-check.mjs"},
+        {"has":"✓ practice-reveal-submit-race-check.mjs","note":"61 → 66: the reveal/submit race, deletion mid-mark, billing event order, the SQLite -> Postgres cutover rehearsal and guardian-consent coverage. 66 → 67: the question picker passes over content the account has resolved, on Postgres too. 67 → 68 (#689, #690, #691): learning-state identity and monotonic expiry on real Postgres."},
+        {"has":"✓ account-deletion-midflight-check.mjs"},
+        {"has":"✓ billing-out-of-order-concurrency-check.mjs"},
+        {"has":"✓ postgres-cutover-rehearsal-check.mjs"},
+        {"has":"✓ guardian-consent-coverage-check.mjs"},
+        {"has":"✓ practice-seen-aware-pick-check.mjs"},
+        {"has":"✓ learning-state-identity-check.mjs"},
+        {"has":"✓ otp-sign-in-check.mjs","note":"61 → 64: sign-in (the one-time-code card contract and lifecycle) and the guardian-consent state machine and gate, on Postgres as well as SQLite."},
+        {"has":"✓ otp-lifecycle-check.mjs"},
+        {"has":"✓ guardian-consent-check.mjs"},
+        {"has":"✓ test-mailbox-check.mjs","note":"61 → 62: the staging test mailbox, kept and read back as pri_server."},
+        {"has":"✓ child-erasure-check.mjs","note":"61 → 62 (D18): the child-account erasure, as pri_server under RLS."},
+        {"has":"✓ premium-practice-content-check.mjs","note":"61 → 62 (L6): JEE Advanced's own content and notebook twins under the free day, on Postgres. 62 → 63 (L6): the mistake notebook on Postgres."},
+        {"has":"✓ mistake-notebook-check.mjs"},
+        {"has":"✓ board-mock-check.mjs","note":"61 → 62 (L6): typed board mocks on Postgres."},
+        {"has":"✓ exam-time-check.mjs","note":"83 → 84 (L6, plan F10): where the time went, on Postgres."},
+        {"has":"✓ targeted-mock-check.mjs","note":"84 → 85 (L6, plan F3): targeted board mocks on Postgres."},
+        {"has":"✓ parent-report-check.mjs","note":"+5 (#723, Step 14): exact numbers, points, sets, units and false-credit persistence on Postgres (83 = SCHEMA 3 + ENGINE_SUITES 80). 61 → 62 (#659): the parent weekly report runs on real Postgres too."},
+        {"has":"✓ tutor-device-journey-check.mjs"},
+        {"has":"✓ tutor-issued-grounding-check.mjs"},
+        {"has":"✓ online-marking-authority-check.mjs"},
+        {"has":"✓ exam-authority-check.mjs"},
+        {"has":"✓ exam-handwriting-check.mjs"},
+        {"has":"✓ method-progress-http-check.mjs"},
+        {"has":"✓ flagship-ap-working-http-check.mjs"},
+        {"has":"✓ marker-isolation-check.mjs"},
+        {"has":"✓ recognition-dedupe-check.mjs"},
+        {"has":"✓ practice-seed-reissue-check.mjs"},
+        {"has":"✓ practice-server-question-check.mjs"},
+        {"has":"✓ practice-repeat-credit-check.mjs"},
+        {"has":"✓ security-acceptance-check.mjs"},
+        {"has":"✓ admin-mfa-class-routes-check.mjs"},
+        {"has":"✓ account-export-completeness-check.mjs"},
+        {"has":"✓ rls-account-coverage-check.mjs"},
+        {"has":"✓ account-deletion-session-binding-check.mjs"},
+        {"has":"✓ export-reauth-check.mjs"},
+        {"has":"✓ password-set-check.mjs"},
+        {"has":"✓ session-alerts-check.mjs"},
+        {"has":"✓ abuse-limits-check.mjs"},
+        {"has":"✓ pr618-recognition-rate-concurrency-check.mjs"},
+        {"has":"✓ google-billing-check.mjs"},
+        {"has":"✓ practice-attempt-sync-check.mjs"},
+        {"has":"ACCOUNT LIFECYCLE JOURNEY: PASS"},
+        {"has":"POSTGRES SCHEMA MUTATIONS: PASS — 31/31"},
+        {"has":"PLATFORM SYNC BURST: PASS"},
+        {"has":"✓ failure-drills-check.mjs"},
+        {"has":"✓ storekit-entitlement-state-machine-check.mjs"},
+        {"has":"✓ rls-fail-closed-check.mjs"},
+        {"has":"RLS FAIL-CLOSED: PASS — 279/279 checks"},
+        {"has":"DB ROUND TRIPS: PASS — 10/10 checks"}
+      ]
+    },
+    "platform/auth-email-ready.log": {
+      "job": "platform",
+      "log": "auth-email-ready.log",
+      "pins": [
+        {"has":"AUTH EMAIL READINESS: PASS — 174/174 checks"}
+      ]
+    },
+    "platform/storekit.log": {
+      "job": "platform",
+      "log": "storekit.log",
+      "pins": [
+        {"has":"STOREKIT ENTITLEMENT STATE MACHINE: PASS — 172/172 checks"}
+      ]
+    },
+    "postgres-restore/restore.log": {
+      "job": "postgres-restore",
+      "log": "restore.log",
+      "pins": [
+        {"has":"POSTGRES RESTORE REHEARSAL: PASS — 34/34 checks"}
+      ]
+    },
+    "browser/browser.log": {
+      "job": "browser",
+      "log": "browser.log",
+      "pins": [
+        {"re":"E2E SUITE.*432/432.*12 flows","note":"429 across 12 flows: main's 438/13, less cal-smoke (the v1.0 calibration flow, retired with that interface), plus the Instrument's phone destinations. tour-v3 +4 (#490 item 3: the offline lesson reload, 36 -> 40). 438 → 440: tour-exam-india checks the marks-lost headline and the Practise links. 440 → 441 (Train 9): #805's tour-ink check that a line without a relation offers no swaps (438 → 439 on its own). On this branch: 429 + those 3 = 432 across 12 flows (re-derived by running e2e.mjs on the merged tree)."},
+        {"has":"Submission · interruption recovery and one attempt"},
+        {"has":"Cloud · late results never rewrite an attempt"},
+        {"has":"India exam · JEE Main handwritten, reloaded, analysed"},
+        {"has":"India exam · the clock runs out and the paper submits itself"},
+        {"has":"Placement · onboarding → diagnostic → evidence map"},
+        {"has":"Phone · every destination reachable at 390px"},
+        {"has":"iPhone portrait · safe areas, sticky bar, mode switch, write and photo space"},
+        {"re":"E2E SUITE PASSED.*65/65.*1 flows","count":2,"op":"ge","note":"The iPhone layout tour in both engines (65: the welcome wordmark at or below the status-bar inset on 17 Pro Max, 16 Pro Max and SE sizes), and the gate journey in WebKit (62)."},
+        {"re":"E2E SUITE PASSED.*62/62.*1 flows","count":1,"op":"ge"},
+        {"has":"India · onboarding, class labels, demo, cloud entry"},
+        {"has":"Cloud · account, live Settings refresh, assignment hand-off"},
+        {"re":"E2E SUITE PASSED.*21/21.*1 flows","count":2,"op":"ge"},
+        {"has":"Cloud admin · CMS lifecycle and role management"},
+        {"re":"E2E SUITE.*25/25.*1 flows"},
+        {"has":"Cloud admin · independent-review rejection"},
+        {"re":"E2E SUITE.*13/13.*1 flows"},
+        {"has":"AI tutor · dark by default in a production build"},
+        {"has":"AI tutor · three levels, in order, with fallback"},
+        {"re":"E2E SUITE.*33/33.*2 flows"},
+        {"has":"Hindi · Practice, handwriting, Exams, exam room, Progress, Explain"},
+        {"re":"E2E SUITE.*65/65.*1 flows"},
+        {"has":"Progress truth · rendered numbers = attempt ledger"},
+        {"re":"E2E SUITE.*24/24.*1 flows"},
+        {"has":"Account · deletion from the public page, no sign-in, by email code","note":"Account deletion for a code-only account: in the app, and from the public page (Apple 5.1.1(v), Play \"Delete account\"). The in-app flow also proves the persisted account link is gone after the deletion and after a reload (#500). The third flow: Settings \"Sign out everywhere\" ends every session of the account, after a confirmation, and returns to the sign-in card (#481)."},
+        {"has":"Account · a code-only account deletes itself in Settings with a fresh code"},
+        {"has":"Account · Sign out everywhere ends every session, after a confirmation, and returns to the sign-in card"},
+        {"re":"E2E SUITE.*47/47.*3 flows"},
+        {"has":"Account · an adult with an unconfirmed email confirms it with a code on the card, then opens Practice","note":"An adult whose email was never confirmed signs in with a password and is taken to \"Confirm your email\" (a code to that address), not to a false guardian dead end; the server still refuses practice until it is proved."},
+        {"re":"E2E SUITE.*23/23 checks across 1 flows"},
+        {"has":"Account · email code sign-up, a parent approves by SMS on their own page, first question","note":"Account first (issue #477): a child signs up on the one card and a parent approves on their own page; the gate journey in both engines."},
+        {"re":"E2E SUITE.*35/35.*1 flows"},
+        {"has":"Account first · one card, the gate on every route, guardian approval, sign-out, deep links, reload, offline"},
+        {"has":"E2E SUITE PASSED — 72/72 checks across 1 flows"},
+        {"has":"Account first · one card, the gate on every route","count":2,"op":"ge"},
+        {"has":"Cloud · Continue with Google signs in, and Google confirms deletion"},
+        {"has":"D17 · asked once before anything is read — phone finger, tablet, decline, accept, same-revision grade","note":"Online-only, server-authoritative grading (owner decision 2026-10-10) behind the activation gate (issue #477): nobody is inside the app signed out, so these journeys assert what happens when the SESSION ENDS mid-work or at a start, offline inside the app, and a prepared question taken up elsewhere. tour-activation- gate.js proves the gate itself. D17 (L4): asked once, naming OpenAI, before the first read; nothing sent before an accept."},
+        {"has":"D17 · a photo is asked about first; ink written offline is kept and read on return"},
+        {"has":"E2E SUITE PASSED — 38/38 checks across 2 flows"},
+        {"has":"Write · one true save state: ink survives reload, mode switch, resize, offline; a failed write says so and retries"},
+        {"has":"Write · session ended before reading: \"sign in again\" beside the work, then read, corrected and marked over two tries; a real outage still says so, with a retry"},
+        {"has":"Photo · session ended before reading: \"sign in again\" beside the photo, then the same photo is read and marked"},
+        {"has":"Submit · session ended at Submit: work held, \"sign in again\", never a wrong-answer verdict; then marked exactly once"},
+        {"has":"Type · typed answer and working survive a reload, then the same question is server-marked"},
+        {"re":"E2E SUITE.*59/59.*5 flows"},
+        {"has":"Type · offline: reconnect asked, work kept, Retry marked exactly once"},
+        {"has":"Write · offline: reconnect asked, ink kept, Retry marked exactly once"},
+        {"has":"Draft · offline inside the app: never marked, work kept; a new question online is server-issued"},
+        {"has":"Prepared · taken up by another account: not marked here, work kept, next one is"},
+        {"has":"Sync · a pull overlapping a submit never doubles an attempt"},
+        {"has":"Rapid Fire and Match · signed in, every answer is server-marked"},
+        {"has":"Session ended at a start: a paper, Rapid Fire and Match start nothing; signing in again in place starts them"},
+        {"has":"Exam · finished offline: submitted, no score; reconnected: the server's result"},
+        {"re":"E2E SUITE.*73/73.*8 flows"},
+        {"has":"Free cap · nineteen used on another device: the twentieth is issued, Next shows the cap screen from the server, nothing fetched instead","note":"The free plan's daily cap is the server's (#537): with nineteen of the day's questions used on another device, Next shows the cap screen from the server's 402 and fetches nothing instead; a capped account cannot have a signed-out question bound and marked."},
+        {"has":"Free cap · a prepared question on a signed-in account that reaches its cap elsewhere: Submit refused as the free cap, nothing marked, work kept"},
+        {"re":"E2E SUITE.*24/24.*2 flows"},
+        {"has":"Pri Explain V8 · adaptive board-style reasoning playback"},
+        {"re":"E2E SUITE.*18/18.*1 flows"},
+        {"has":"SYNTHETIC-READER EVIDENCE","note":"The handwriting reader behind the real server is a scripted stand-in in these suites; the log must say so."},
+        {"re":"online-only checking +8/8","note":"The accessibility walk must have reached the refused-check states."},
+        {"re":"ACCESSIBILITY SUITE.*48/48.*13 groups"},
+        {"re":"ACCESSIBILITY SUITE.*51/51.*14 groups"},
+        {"has":"BOOT RESILIENCE: PASS — 62/62 checks","note":"61 → 62 (plan E4, re-derived by running): the shell tells boot-guard.js the edition's name (data-brand, data-brand-hi)."},
+        {"has":"Reader · usage limit reached"},
+        {"re":"E2E SUITE.*41/41.*2 flows"},
+        {"has":"INK CANVAS LOSS (emulated Windows scale factors, dark theme, mouse + pen; not Windows 11 hardware evidence): 200 passed, 0 failed","note":"Ink canvas loss (#449/#550): both engines, 200 checks, none failed."},
+        {"has":"Ink · a marked attempt says only what the server established"},
+        {"re":"E2E SUITE PASSED — 49/49 checks across 1 flows","count":2,"op":"eq"},
+        {"has":"E2E BROWSER: webkit"},
+        {"has":"Interface quality · keyboard, names, 44px, text zoom, layout shift, input, snapshots","count":2,"op":"ge","note":"Both engines ran the interface-quality tour (pipefail fails the shard on a red check)."},
+        {"has":"Instrument · v1.1 shell, Index, scope, command bar, theme, names, 44px, shift","count":1,"op":"ge","note":"The v1.1 instrument tour ran (Chromium, flag-on build)."},
+        {"has":"Maths at 200% text: superscripted formulas wrap or scroll in their own box, nothing cut","count":2,"op":"ge","note":"Maths at 200% text ran in both engines (its count follows the sample)."},
+        {"has":"Responsive matrix · 6 viewports, critical routes, write/type, actions","count":2,"op":"ge"},
+        {"has":"E2E SUITE PASSED — 209/209 checks across 1 flows","note":"Chromium's interface-quality tour runs exactly 209 checks. Practice shows a pinned written question (seeded test server), so its Type → Write → Type switch is timed in all four cases (phone 390×844 and tablet 820×1180, light and dark) and is never skipped. The old 196/196 escape, a Practice screen with nothing to time, is gone (#684). The sentinel prints only when all four cases timed both presses inside MAX_INPUT_MS (100, unchanged). The separate ink-canvas 200/200 invariant remains enforced above."},
+        {"has":"PRACTICE INPUT TIMING: PASS — 4/4 cases (390×844 and 820×1180, light and dark), 12/12 answer-mode presses (the selected tab included) inside 100 ms"},
+        {"has":"E2E SUITE PASSED — 129/129 checks across 1 flows"}
+      ]
+    },
+    "build/brand-build.log": {
+      "job": "build",
+      "log": "brand-build.log",
+      "pins": [
+        {"has":"BRAND BUILD: PASS — 33/33 checks — both editions built","note":"32 → 33 (re-derived by running, after E5 #875): exactly the edition-record chunk and E5's three commercial chunks may differ, and those carry no brand."}
+      ]
+    },
+    "build/ios-bundle-features.log": {
+      "job": "build",
+      "log": "ios-bundle-features.log",
+      "pins": [
+        {"has":"IOS BUNDLE FEATURES: PASS — 24/24 checks","note":"20 → 24: each bundle also records the one student interface and its skin from client/interface.config.mjs (V1 decision D7)."}
+      ]
+    }
+  },
+  "retired": [
+  ]
+}
