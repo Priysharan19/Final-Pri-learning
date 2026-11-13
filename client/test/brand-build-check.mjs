@@ -8,9 +8,10 @@
 //      data or icon bytes;
 // and with --both, builds the other edition into a temporary folder and
 // proves the two builds differ ONLY where branding should: the brand files of
-// (1), features.json, the service worker's version line, and the one script
-// chunk that holds the wordmark — every other file is byte-identical once
-// content hashes are set aside.
+// (1), features.json, the service worker's version line, the edition-record
+// chunk (the only one holding the wordmark), and the three chunks E5's
+// commercial configuration folds per edition, which must carry no brand —
+// every other file is byte-identical once content hashes are set aside.
 //
 // Usage: node client/test/brand-build-check.mjs [--dist <dir>] [--both]
 // ─────────────────────────────────────────────────────────────────────────────
@@ -104,12 +105,28 @@ if (BOTH) {
     ok(WEB_FILES.every(rel => plainDiffer.includes(rel)) && ['index.html', 'manifest.webmanifest'].every(rel => plainDiffer.includes(rel)), 'and every brand file does differ');
     const swLines = (m, f) => m.get('sw.js').split('\n').filter(l => !/^const (VERSION|PRECACHE|WARM|OPTIONAL) = /.test(l)).join('\n');
     ok(swLines(A) === swLines(B), 'sw.js differs only in its generated version and file lists');
-    const bag = m => [...m.entries()].filter(([rel]) => !plain(rel)).map(([, c]) => c);
-    const inA = bag(A), inB = new Set(bag(B)), inBArr = bag(B), inASet = new Set(inA);
-    const onlyA = inA.filter(c => !inB.has(c)), onlyB = inBArr.filter(c => !inASet.has(c));
-    ok(onlyA.length === 1 && onlyB.length === 1, `exactly one hashed chunk differs between the builds (${onlyA.length}, ${onlyB.length})`);
-    ok(onlyA.every(c => c.includes(wordmarkTail(first))) && onlyB.every(c => c.includes(wordmarkTail(other))), 'and it is the chunk that holds the wordmark');
-    console.log(`  ${first} vs ${other}: ${plainDiffer.length} named files differ (${plainDiffer.sort().join(', ')}), ${onlyA.length} hashed chunk differs, ${A.size - plainDiffer.length - onlyA.length} files identical`);
+    // Hashed chunks: compared by normalised content. Exactly these may differ,
+    // each for a stated reason; any other difference fails.
+    //   edition        the edition record, which holds this edition's name, cut and wordmark (E2, E4)
+    //   Paywall, CloudAccountPanel, useGooglePlayPurchase
+    //                  commercial configuration: __PRI_PREMIUM_ON_SALE__ folds the
+    //                  purchase paths of an edition that sells nothing (plan E5)
+    const MAY_DIFFER = { edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce' };
+    const base = rel => rel.replace(/^assets\//, '').replace(/-[A-Za-z0-9_-]{8}\.\w+$/, '');
+    const hashed = m => [...m.entries()].filter(([rel]) => !plain(rel));
+    const contentsOf = m => new Set(hashed(m).map(([, c]) => c));
+    const inB = contentsOf(B), inA = contentsOf(A);
+    const onlyA = hashed(A).filter(([, c]) => !inB.has(c)), onlyB = hashed(B).filter(([, c]) => !inA.has(c));
+    const names = list => [...new Set(list.map(([rel]) => base(rel)))].sort();
+    ok(JSON.stringify(names(onlyA)) === JSON.stringify(names(onlyB)) && names(onlyA).every(n => Object.hasOwn(MAY_DIFFER, n)),
+      `hashed chunks differ only where an edition should (${names(onlyA).join(', ')} | ${names(onlyB).join(', ')})`);
+    const brandChunks = (list, id) => list.filter(([, c]) => c.includes(wordmarkTail(id)));
+    ok(brandChunks(onlyA, first).length === 1 && base(brandChunks(onlyA, first)[0][0]) === 'edition' && brandChunks(onlyB, other).length === 1 && base(brandChunks(onlyB, other)[0][0]) === 'edition',
+      'the brand differs in exactly one chunk, the edition record, which holds the wordmark');
+    const commerce = [...onlyA, ...onlyB].filter(([rel]) => MAY_DIFFER[base(rel)] === 'commerce');
+    const brandTokens = EDITION_IDS.flatMap(id => [EDITIONS[id].brand, EDITIONS[id].identity.accent.light, EDITIONS[id].identity.accent.dark, wordmarkTail(id)]).concat(['प्रियभट']);
+    ok(commerce.every(([, c]) => !brandTokens.some(t => c.includes(t))), 'the commercial chunks carry no brand: no edition name, accent or wordmark');
+    console.log(`  ${first} vs ${other}: ${plainDiffer.length} named files differ (${plainDiffer.sort().join(', ')}), ${names(onlyA).length} hashed chunks differ (${names(onlyA).join(', ')}), ${A.size - plainDiffer.length - onlyA.length} files identical`);
   } finally {
     rmSync(out, { recursive: true, force: true });
   }
@@ -120,4 +137,4 @@ if (failures.length) {
   for (const f of failures) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
-console.log(`BRAND BUILD: PASS — ${pass}/${pass} checks${BOTH ? ' — both editions built; they differ only in brand files and the wordmark chunk' : ''}`);
+console.log(`BRAND BUILD: PASS — ${pass}/${pass} checks${BOTH ? ' — both editions built; they differ only in brand files, the edition record and the E5 commercial chunks' : ''}`);
