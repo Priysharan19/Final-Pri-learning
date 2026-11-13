@@ -1436,7 +1436,8 @@ jobs:
         run: |
           set -euo pipefail
           node client/test/brand-build-check.mjs --both | tee brand-build.log
-          grep -Fq 'BRAND BUILD: PASS — 32/32 checks — both editions built' brand-build.log
+          # 32 → 33 (re-derived by running, after E5 #875): exactly the edition-record chunk and E5's three commercial chunks may differ, and those carry no brand.
+          grep -Fq 'BRAND BUILD: PASS — 33/33 checks — both editions built' brand-build.log
       # The iOS web bundles are generated here, never read from git (decision
       # D28): sync copies client/dist into both packages, check proves each
       # copy is complete and byte-exact, then the shipped bytes are inspected.
