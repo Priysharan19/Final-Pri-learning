@@ -21,24 +21,17 @@
    ───────────────────────────────────────────────────────────────────────────── */
 
 html.ui-instrument.skin-aurora {
-  --au-violet: #6445df;            /* chrome text, current place, focus (AA on the chrome glass) */
-  --au-brand: #7f67ff;             /* the light itself: oklch(0.62 0.22 285) */
-  --au-on-violet: #ffffff;
-  --au-violet-soft: rgba(127, 103, 255, 0.12);
-  --au-violet-line: rgba(100, 69, 223, 0.38);
+  --au-light: var(--edition-accent);   /* the edition's light: the current place and what is live (Lit Instrument D1) */
+  --au-light-soft: color-mix(in srgb, var(--edition-accent) 12%, transparent);
+  --au-pool: color-mix(in srgb, var(--edition-accent) 7%, transparent);
   --au-edge: rgba(255, 255, 255, 0.85);
-  --au-glow: 0 0 0 1px rgba(127, 103, 255, 0.32), 0 6px 20px -8px rgba(127, 103, 255, 0.55);
   --au-float: 0 24px 60px -20px rgba(48, 36, 140, 0.28), 0 4px 12px rgba(22, 20, 60, 0.08);
-  --au-pool-1: rgba(127, 103, 255, 0.08); --au-pool-2: rgba(0, 150, 190, 0.04); --au-pool-3: rgba(170, 120, 255, 0.05);
 }
 html.ui-instrument.skin-aurora[data-theme="dark"] {
-  --au-violet: #a49aff; --au-brand: #8f7bff; --au-on-violet: #121212;
-  --au-violet-soft: rgba(143, 123, 255, 0.16);
-  --au-violet-line: rgba(164, 154, 255, 0.4);
+  --au-light-soft: color-mix(in srgb, var(--edition-accent) 16%, transparent);
+  --au-pool: color-mix(in srgb, var(--edition-accent) 10%, transparent);
   --au-edge: rgba(255, 255, 255, 0.10);
-  --au-glow: 0 0 0 1px rgba(155, 144, 255, 0.4), 0 8px 26px -8px rgba(127, 103, 255, 0.6);
   --au-float: 0 30px 70px -20px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
-  --au-pool-1: rgba(127, 103, 255, 0.12); --au-pool-2: rgba(40, 200, 240, 0.04); --au-pool-3: rgba(190, 110, 255, 0.06);
 }
 
 /* ── Glass: the bars, the tab well, ⌘K, More and the account chip ─────────── */
@@ -58,25 +51,32 @@ html.ui-instrument.skin-aurora :is(.in-more-menu, .acct-menu, .mnav-sheet, .in-p
   html.ui-instrument.skin-aurora .in-bar { background: var(--in-base); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 
-/* ── The current place and focus, on chrome: the one violet ─────────────── */
-html.ui-instrument.skin-aurora .in-tab[aria-current="page"] { background: var(--au-violet-soft); color: var(--au-violet); box-shadow: inset 0 0 0 1px var(--au-violet-line); }
-html.ui-instrument.skin-aurora .in-more-item.is-here { color: var(--au-violet); box-shadow: inset 2px 0 0 var(--au-violet); }
-html.ui-instrument.skin-aurora :is(.mnav-item.active, .mnav-item.active .nav-ico) { color: var(--au-violet); }
-html.ui-instrument.skin-aurora :is(.in-bar, .mobilenav, .in-more-menu, .acct-menu, .mnav-sheet, .in-pal, .in-index) :focus-visible { outline-color: var(--au-violet); box-shadow: 0 0 0 5px var(--au-violet-soft); }
+/* ── The current place, on chrome: the edition's light (Lit Instrument D1) ──
+   The accent marks where you are and what is live, as a rule or an edge; it
+   is never text on content, a fill, a verdict or a focus ring (focus is ink,
+   instrument.css, D2). client/test/brand-usage-check.mjs holds the selectors. */
+html.ui-instrument.skin-aurora .in-tab[aria-current="page"] { position: relative; color: var(--in-tx); background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); }
+html.ui-instrument.skin-aurora .in-tab[aria-current="page"]::after { content: ""; position: absolute; left: 10px; right: 10px; bottom: -4px; height: 2px; border-radius: 2px; background: var(--au-light); }
+html.ui-instrument.skin-aurora .in-more-item.is-here { color: var(--in-tx); box-shadow: inset 2px 0 0 var(--au-light); }
+html.ui-instrument.skin-aurora :is(.mnav-item.active, .mnav-item.active .nav-ico) { color: var(--in-tx); }
+html.ui-instrument.skin-aurora .mnav-item.active { position: relative; }
+html.ui-instrument.skin-aurora .mnav-item.active::before { content: ""; position: absolute; left: 50%; top: 0; width: 22px; height: 2px; margin-left: -11px; border-radius: 2px; background: var(--au-light); }
+html.ui-instrument.skin-aurora .in-pal-item[aria-selected="true"] { background: var(--au-light-soft); box-shadow: inset 2px 0 0 var(--au-light); }
+/* The working indicator (D6, instrument/Working.jsx): what is live. */
+html.ui-instrument.skin-aurora .pri-working { color: var(--au-light); }
 
-/* ── The P′ tile, lit from within ────────────────────────────────────────── */
+/* ── The P′ tile ─────────────────────────────────────────────────────────────
+   The edition's mark draws its own cut (components/BrandMark.jsx). */
 html.ui-instrument.skin-aurora .in-mark-glyph {
-  border-radius: 6px; color: var(--in-tx);
-  background: radial-gradient(circle at 50% 34%, var(--au-violet-soft), transparent 72%), var(--in-l1);
-  box-shadow: inset 0 1px 0 var(--au-edge), 0 0 0 1px var(--au-violet-line);
+  border-radius: 6px; color: var(--in-tx); background: var(--in-l1);
+  box-shadow: inset 0 1px 0 var(--au-edge), 0 0 0 1px var(--in-edge-2);
 }
-html.ui-instrument.skin-aurora .in-mark-glyph em { color: var(--au-violet); }
 
 /* ── The Index's furniture (no mathematics on it) ────────────────────────── */
-html.ui-instrument.skin-aurora .in-index .in-resume { box-shadow: inset 3px 0 0 var(--au-violet), inset 0 1px 0 var(--au-edge), 0 0 0 1px var(--in-edge); }
-html.ui-instrument.skin-aurora .in-index .in-btn.is-primary { background: var(--au-violet); color: var(--au-on-violet); box-shadow: var(--au-glow); }
-html.ui-instrument.skin-aurora .in-index .in-btn.is-primary:hover { background: var(--au-brand); }
-html.ui-instrument.skin-aurora .in-index .in-ch[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--au-violet-line); }
+html.ui-instrument.skin-aurora .in-index .in-resume { box-shadow: inset 2px 0 0 var(--au-light), inset 0 1px 0 var(--au-edge), 0 0 0 1px var(--in-edge); }
+html.ui-instrument.skin-aurora .in-index .in-btn.is-primary { background: var(--in-action); color: var(--in-on-action); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14); }
+html.ui-instrument.skin-aurora .in-index .in-ch[aria-pressed="true"] { box-shadow: 0 0 0 1px var(--in-edge-2); }
+html.ui-instrument.skin-aurora .in-index .in-ch[aria-pressed="true"] .in-ch-n { color: var(--au-light); }
 html.ui-instrument.skin-aurora .in-also-link { box-shadow: inset 0 1px 0 var(--au-edge), 0 0 0 1px var(--in-edge); }
 
 /* ── The light pools: on the Index, the Map and Settings only ────────────────
@@ -86,10 +86,7 @@ html.ui-instrument.skin-aurora .in-also-link { box-shadow: inset 0 1px 0 var(--a
    and opacity only; still under Reduce Motion; none in forced colours. */
 html.ui-instrument.skin-aurora .a-aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; overflow: clip; pointer-events: none; background: var(--in-base); contain: strict; }
 html.ui-instrument:not(.skin-aurora) .a-aurora { display: none; }
-html.ui-instrument.skin-aurora .a-aurora i { position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; will-change: transform; animation: au-drift 38s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate; }
-html.ui-instrument.skin-aurora .a-aurora i:nth-child(1) { left: -22vmax; top: -32vmax; background: radial-gradient(closest-side, var(--au-pool-1), transparent); }
-html.ui-instrument.skin-aurora .a-aurora i:nth-child(2) { right: -26vmax; top: -12vmax; background: radial-gradient(closest-side, var(--au-pool-2), transparent); animation-duration: 46s; animation-delay: -12s; }
-html.ui-instrument.skin-aurora .a-aurora i:nth-child(3) { left: 18vmax; bottom: -42vmax; background: radial-gradient(closest-side, var(--au-pool-3), transparent); animation-duration: 52s; animation-delay: -24s; }
+html.ui-instrument.skin-aurora .a-aurora i { position: absolute; width: 90vmax; height: 90vmax; left: -38vmax; top: -52vmax; border-radius: 50%; background: radial-gradient(closest-side, var(--au-pool), transparent); will-change: transform; animation: au-drift 72s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate; }
 @keyframes au-drift { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(6vmax, 4vmax, 0) scale(1.1); } }
 html.ui-instrument.skin-aurora[data-aurora-pools] body { background: transparent; }
 html.ui-instrument.skin-aurora[data-aurora-pools] .in-index { background: transparent; }

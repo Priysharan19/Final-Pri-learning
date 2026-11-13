@@ -394,7 +394,12 @@ jobs:
           grep -Fq 'INTERFACE DECISIONS: PASS — 39/39 checks' suites.log
           # The Aurora skin stays on chrome: scope, no content tokens, glass
           # only on chrome, pools only on Index/Map/Settings, fallbacks, AA.
-          grep -Fq 'AURORA SKIN: PASS — 32/32 checks' suites.log
+          # 32 → 47 (Lit Instrument UI1, re-derived by running): violet retired,
+          # one edition pool, no glow, ink focus, contrast for both editions.
+          grep -Fq 'AURORA SKIN: PASS — 47/47 checks' suites.log
+          # Lit Instrument D6: the working indicator is one component, shown
+          # only while real work is pending (400 ms in, 480 ms held).
+          grep -Fq 'WORKING INDICATOR: PASS — 42/42 checks' suites.log
           grep -Fq 'CBSE STEP MARKING: PASS — 37/37 checks' suites.log
           grep -Fq 'ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks' suites.log
           # 68 → 79 (plan E5): an edition with no payment provider has no store,
@@ -408,7 +413,8 @@ jobs:
           # Plan E2: the app knows its own edition from its build, declares it on
           # every /v1 request, and shows a blocking screen at the other's server.
           # 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen).
-          grep -Fq 'EDITION CLIENT (E2): PASS — 136/136 checks' suites.log
+          # 136 → 137 (Lit Instrument D6): the identity also carries its own cut's working-indicator form.
+          grep -Fq 'EDITION CLIENT (E2): PASS — 137/137 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
@@ -1192,6 +1198,9 @@ jobs:
             # tabs (#658). Every build ships it (client/interface.config.mjs),
             # so it runs on this group's build like the tours above.
             node client/test/tour-instrument.js --no-build 2>&1 | tee -a browser.log
+            # Lit Instrument D6: the working indicator is still under reduced
+            # motion and forced colours, and this build carries its form only.
+            node client/test/working-indicator-check.mjs --browser --dist client/dist 2>&1 | tee -a browser.log
             # Maths at 200% text (375 and 430 pt iPhones): superscripted formulas
             # wrap or scroll in their own box, nothing cut (WCAG 1.4.10).
             node client/test/tour-math-reflow.js --no-build 2>&1 | tee -a browser.log
@@ -1319,6 +1328,7 @@ jobs:
           grep -Fq 'Account · deletion from the public page, no sign-in, by email code' browser.log
           grep -Fq 'Account · a code-only account deletes itself in Settings with a fresh code' browser.log
           grep -Fq 'Account · Sign out everywhere ends every session, after a confirmation, and returns to the sign-in card' browser.log
+          grep -Fq "still under reduced motion and forced colours, each build carries its own edition's form only." browser.log
           grep -Eq 'E2E SUITE.*47/47.*3 flows' browser.log
           # An adult whose email was never confirmed signs in with a password and is
           # taken to "Confirm your email" (a code to that address), not to a false

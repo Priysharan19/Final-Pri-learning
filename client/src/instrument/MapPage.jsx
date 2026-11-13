@@ -10,6 +10,7 @@ import { practiceHref } from '../lib/practiceLinks.js';
 import { chapterEvidence, colourFor, practiceTrack, scopeFor } from './chapters.js';
 import { constellation, MAP_W } from './mapLayout.js';
 import TermGloss from '../components/TermGloss.jsx';
+import Working from './Working.jsx';
 // map.css is part of the boot stylesheet (main.jsx), so a first visit offline
 // needs no stylesheet fetched for this tab (#658).
 
@@ -177,7 +178,7 @@ export default function MapPage() {
   };
   const preNames = node => prerequisitesOf(node.row.id).map(p => layout.byId.get(p.id)?.row.name || IN_CHAPTER_BY_ID[p.id]?.name || p.id);
 
-  if (!curriculum) return <div className="skeleton" style={{ height: 520 }} aria-hidden="true" />;
+  if (!curriculum) return <div className="skeleton" style={{ height: 520 }} aria-hidden="true"><Working pending={!curriculum} size={24} /></div>;
 
   const lost = current ? lostDotpoint(current) : null;
   const feeds = current ? preNames(current) : [];

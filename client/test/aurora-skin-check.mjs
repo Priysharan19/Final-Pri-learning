@@ -2,7 +2,8 @@
 // Pri Learning · the Aurora skin stays on chrome (V1 decisions D7, D8, D9)
 //
 // client/src/instrument/aurora.css dresses the Instrument's chrome in the
-// owner's Aurora (glass, one violet, light pools). D9 allows that on chrome
+// owner's Aurora (glass, and since Lit Instrument D1–D3 the edition's light:
+// the current place, what is live, and one pool). D9 allows that on chrome
 // only: content keeps the Instrument's tokens, and glass or glow never sits
 // behind mathematics or handwriting. D8 makes this a gate: if it cannot pass,
 // the setting goes back to 'instrument'. This suite reads the stylesheet and
@@ -14,15 +15,18 @@
 //   2. reach: no selector names a content surface (questions, KaTeX, working,
 //      ink, transcripts, marks, feedback, Report, Scripts, the scope), and
 //      glass (backdrop-filter) is only ever on chrome surfaces;
-//   3. the light pools: drawn by Aurora.jsx, mounted by App.jsx only on the
+//   3. the light pool (one, D3): drawn by Aurora.jsx, mounted by App.jsx only on the
 //      Index, the Map and Settings, paused when hidden; the Index plate (which
 //      holds the chapter's mathematics) is opaque wherever they show;
 //   4. fallbacks: Reduce Transparency and forced colours make every glass
 //      surface opaque and remove the pools; Reduce Motion stops them;
-//   5. contrast, in light and dark: every chrome text colour meets WCAG AA
+//   5. contrast, for each edition in light and dark (the accent read from
+//      client/edition.config.mjs): every chrome text colour meets WCAG AA
 //      (4.5:1) on its glass composited over each Instrument surface that can
-//      scroll beneath it, and over the pools at their strongest; the focus and
-//      current-place violet meets 3:1 as a non-text indicator.
+//      scroll beneath it, and over the pool at its strongest; the accent meets
+//      AA where it is text (the selected chapter's number) and 3:1 where it is
+//      a current-place rule or the working indicator; the ink focus ring (D2)
+//      meets 3:1 everywhere.
 //
 // The browser half (content-token identity, ink alignment, emulated Reduce
 // Motion / Transparency / forced colours) is tour-instrument's Aurora flow.
@@ -32,6 +36,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { EDITIONS, editionOf } from '../edition.config.mjs';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const read = rel => readFileSync(join(ROOT, rel), 'utf8');
@@ -96,8 +101,13 @@ ok(all.some(r => r.ctx.some(c => c.includes('max-width: 760px')) && r.selector =
 // A glow is a blurred, unoffset shadow (the token, or a literal of 12 px and
 // more), as design-system-check defines it; declaring the token is not one.
 const uses = body => body.replace(/--[a-z0-9-]+\s*:[^;]*;/g, '');
-const glow = all.filter(r => /var\(--au-glow\)|drop-shadow|0 0 (1[2-9]|[2-9]\d)px/.test(uses(r.body)));
-ok(glow.every(r => /\.in-index \.in-btn\.is-primary/.test(r.selector) || /^@/.test(r.selector)), `glow only on the Index's primary action: ${JSON.stringify(glow.map(r => r.selector))}`);
+const glow = all.filter(r => /--au-glow|drop-shadow|0 0 (1[2-9]|[2-9]\d)px/.test(uses(r.body)));
+ok(glow.length === 0 && !/--au-glow/.test(stripComments(css)), `no glow on chrome (Lit Instrument D1: the Index primary is the ink primary): ${JSON.stringify(glow.map(r => r.selector))}`);
+ok(!/--au-(violet|brand|on-violet|pool-\d)/.test(stripComments(css)), 'violet is retired: no --au-violet, --au-brand, --au-on-violet or numbered pool token is left');
+ok(all.some(r => r.selector === 'html.ui-instrument.skin-aurora .in-index .in-btn.is-primary' && /background:\s*var\(--in-action\)/.test(r.body) && /color:\s*var\(--in-on-action\)/.test(r.body)), 'the Index primary is the ink primary (--in-action on --in-on-action)');
+ok(!all.some(r => /\.in-btn\.is-primary:hover/.test(r.selector)), 'and no hover rule brightens it');
+ok(/^html\.ui-instrument :focus-visible \{ outline: 2px solid var\(--in-tx\); outline-offset: 2px; \}$/m.test(instrument), 'the focus ring is var(--in-tx) (D2)');
+ok(!all.some(r => /:focus/.test(r.selector) || /outline/.test(r.body)), 'the skin draws no focus ring of its own (D2: ink everywhere)');
 const gradients = all.filter(r => /gradient\(/.test(r.body));
 ok(gradients.every(r => /\.a-aurora i|\.in-mark-glyph/.test(r.selector)), `gradients only in the light pools and the P′ tile: ${JSON.stringify(gradients.map(r => r.selector))}`);
 const radii = [...stripComments(css).matchAll(/border-radius:\s*(\d+)px/g)].map(m => Number(m[1]));
@@ -112,6 +122,9 @@ ok(/visibilitychange/.test(pools) && /animationPlayState = document\.hidden \? '
 ok(/aria-hidden="true"/.test(pools), 'and are hidden from assistive technology');
 ok(all.some(r => /\[data-aurora-pools\] \.in-plate$/.test(r.selector) && /background:\s*var\(--in-base\)/.test(r.body)), 'where the pools show, the Index plate (the chapter\'s mathematics) is opaque');
 ok(all.some(r => r.selector === 'html.ui-instrument:not(.skin-aurora) .a-aurora' && /display:\s*none/.test(r.body)), 'without the skin no pool is drawn');
+ok((pools.match(/<i \/>/g) || []).length === 1 && !/<i \/><i/.test(pools), 'Aurora.jsx draws one pool (D3)');
+ok(!all.some(r => /\.a-aurora i:nth-child/.test(r.selector)), 'and the stylesheet styles no second or third pool');
+ok(all.some(r => r.selector === 'html.ui-instrument.skin-aurora .a-aurora i' && /radial-gradient\(closest-side, var\(--au-pool\), transparent\)/.test(r.body) && /animation:\s*au-drift 72s/.test(r.body)), 'the pool is a radial wash of --au-pool drifting over 72 s');
 
 // ── 4 · fallbacks ─────────────────────────────────────────────────────────────
 const inMedia = q => all.filter(r => r.ctx.some(c => c.includes(q)));
@@ -145,42 +158,66 @@ const themes = [
   ['light', block(instrument, 'html.ui-instrument {'), block(css, 'html.ui-instrument.skin-aurora {')],
   ['dark', block(instrument, 'html.ui-instrument[data-theme="dark"] {'), block(css, 'html.ui-instrument.skin-aurora[data-theme="dark"] {')]
 ];
+// A color-mix of a colour and transparent at p% is that colour at alpha p/100.
+const mixPct = (blk, name) => { const m = blk.match(new RegExp(`--${name}:\\s*color-mix\\(in srgb, var\\(--edition-accent\\) (\\d+)%, transparent\\)`)); return m ? Number(m[1]) / 100 : null; };
 const glassAlpha = (sel, fallback) => { const r = all.find(x => x.selector.includes(sel) && /color-mix/.test(x.body)); const m = r?.body.match(/color-mix\(in srgb, var\(--in-([a-z0-9]+)\) (\d+)%/); return m ? { token: `in-${m[1]}`, a: Number(m[2]) / 100 } : fallback; };
 const barGlass = glassAlpha('.in-bar', null);
 const wellGlass = glassAlpha('.in-tabs', null);
 const menuGlass = glassAlpha('.in-more-menu', null);
 ok(barGlass && wellGlass && menuGlass, 'the glass tints are read from the stylesheet');
-for (const [name, ins, au] of themes) {
-  const T = n => hex(tok(ins, n));
-  const surfaces = ['in-void', 'in-base', 'in-l1', 'in-l2', 'in-l3', 'in-l4', 'in-l5'].map(n => [n, T(n)]);
-  const violet = hex(tok(au, 'au-violet'));
-  const soft = rgba(tok(au, 'au-violet-soft'));
-  const pairs = [];
-  for (const [sname, s] of surfaces) {
-    const bar = over(T(barGlass.token), barGlass.a, s);
-    const well = over(T(wellGlass.token), wellGlass.a, bar);
-    const menu = over(T(menuGlass.token), menuGlass.a, s);
-    pairs.push([`tab label (tx-3) on the tab well over ${sname}`, T('in-tx-3'), well, 4.5]);
-    pairs.push([`⌘K and More (tx-3) over ${sname}`, T('in-tx-3'), well, 4.5]);
-    pairs.push([`current tab (violet) on violet-soft over ${sname}`, violet, over(soft.c, soft.a, well), 4.5]);
-    pairs.push([`phone bar label (tx-3) over ${sname}`, T('in-tx-3'), bar, 4.5]);
-    pairs.push([`phone bar current (violet) over ${sname}`, violet, bar, 4.5]);
-    pairs.push([`menu item (tx-2) over ${sname}`, T('in-tx-2'), menu, 4.5]);
-    pairs.push([`menu current (violet) over ${sname}`, violet, menu, 4.5]);
-    pairs.push([`focus ring (violet, non-text) on the bar over ${sname}`, violet, bar, 3]);
+ok(/--au-light:\s*var\(--edition-accent\)/.test(themes[0][2]), 'the light is the edition accent');
+const report = [];
+for (const id of Object.keys(EDITIONS)) {
+  const accentOf = editionOf(id).identity.accent;
+  for (const [name, ins, au] of themes) {
+    const T = n => hex(tok(ins, n));
+    const surfaces = ['in-void', 'in-base', 'in-l1', 'in-l2', 'in-l3', 'in-l4', 'in-l5'].map(n => [n, T(n)]);
+    const accent = hex(accentOf[name]);
+    const softA = mixPct(au, 'au-light-soft') ?? mixPct(themes[0][2], 'au-light-soft');
+    const poolA = mixPct(au, 'au-pool') ?? mixPct(themes[0][2], 'au-pool');
+    ok(softA !== null && softA <= 0.16 && poolA !== null && poolA <= 0.10, `${id} ${name}: the soft wash is at most 16% (${softA}) and the pool at most 10% (${poolA})`);
+    const pairs = [];
+    for (const [sname, s] of surfaces) {
+      const bar = over(T(barGlass.token), barGlass.a, s);
+      const well = over(T(wellGlass.token), wellGlass.a, bar);
+      const menu = over(T(menuGlass.token), menuGlass.a, s);
+      pairs.push([`tab label (tx-3) on the tab well over ${sname}`, T('in-tx-3'), well, 4.5]);
+      pairs.push([`⌘K and More (tx-3) over ${sname}`, T('in-tx-3'), well, 4.5]);
+      pairs.push([`current tab (tx on l1) over ${sname}`, T('in-tx'), T('in-l1'), 4.5]);
+      pairs.push([`current tab rule (accent, non-text) on the tab well over ${sname}`, accent, well, 3]);
+      pairs.push([`phone bar label (tx-3) over ${sname}`, T('in-tx-3'), bar, 4.5]);
+      pairs.push([`phone bar current (tx) over ${sname}`, T('in-tx'), bar, 4.5]);
+      pairs.push([`phone bar current rule (accent, non-text) over ${sname}`, accent, bar, 3]);
+      pairs.push([`menu item (tx-2) over ${sname}`, T('in-tx-2'), menu, 4.5]);
+      pairs.push([`menu current (tx) over ${sname}`, T('in-tx'), menu, 4.5]);
+      pairs.push([`menu current edge (accent, non-text) over ${sname}`, accent, menu, 3]);
+      const sel = over(accent, softA, menu);
+      pairs.push([`palette selected row (tx) on the soft wash over ${sname}`, T('in-tx'), sel, 4.5]);
+      pairs.push([`palette selected edge (accent, non-text) on the soft wash over ${sname}`, accent, sel, 3]);
+      pairs.push([`focus ring (ink, non-text) on the bar over ${sname}`, T('in-tx'), bar, 3]);
+      pairs.push([`focus ring (ink, non-text) on ${sname}`, T('in-tx'), s, 3]);
+    }
+    // The pool at its strongest, on the desk.
+    const lit = over(accent, poolA, T('in-base'));
+    for (const t of ['in-tx', 'in-tx-2', 'in-tx-3']) pairs.push([`Index text (${t}) over the pool at its strongest`, T(t), lit, 4.5]);
+    pairs.push(['selected chapter number (accent text) on the pool at its strongest', accent, lit, 4.5]);
+    pairs.push(['Index primary (on-action on action)', T('in-on-action'), T('in-action'), 4.5]);
+    for (const sname of ['in-base', 'in-l1', 'in-l2']) pairs.push([`working indicator (accent, non-text) on ${sname}`, accent, T(sname), 3]);
+    const named = [
+      ['accent text on --in-base', accent, T('in-base')],
+      ['accent text on --in-l1', accent, T('in-l1')],
+      ['accent text on soft wash over l1', accent, over(accent, softA, T('in-l1'))],
+      ['ink focus ring on base', T('in-tx'), T('in-base')]
+    ];
+    for (const [label, fg, bg] of named) { pairs.push([label, fg, bg, 4.5]); report.push(`${id} ${name}: ${label} ${ratio(fg, bg).toFixed(2)}`); }
+    const fails = pairs.map(([label, fg, bg, min]) => [label, ratio(fg, bg), min]).filter(([, r, min]) => r < min);
+    ok(fails.length === 0, `${id} ${name}: every chrome pair meets its minimum (${pairs.length} pairs): ${fails.map(([l, r]) => `${l} ${r.toFixed(2)}`).slice(0, 4).join('; ')}`);
   }
-  // The pools at their strongest: all three stacked on the desk.
-  const desk = T('in-base');
-  const p = ['au-pool-1', 'au-pool-2', 'au-pool-3'].map(n => rgba(tok(au, n)));
-  const lit = p.reduce((bg, q) => over(q.c, q.a, bg), desk);
-  for (const t of ['in-tx', 'in-tx-2', 'in-tx-3']) pairs.push([`Index text (${t}) over the pools at their strongest`, T(t), lit, 4.5]);
-  pairs.push(['Index primary (on-violet on violet)', hex(tok(au, 'au-on-violet')), violet, 4.5]);
-  const fails = pairs.map(([label, fg, bg, min]) => [label, ratio(fg, bg), min]).filter(([, r, min]) => r < min);
-  ok(fails.length === 0, `${name}: every chrome text pair meets AA (${pairs.length} pairs): ${fails.map(([l, r]) => `${l} ${r.toFixed(2)}`).slice(0, 4).join('; ')}`);
 }
+if (process.argv.includes('--ratios')) console.log(report.join('\n'));
 
 if (failures.length) {
   console.log(`AURORA SKIN: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`);
   process.exit(1);
 }
-console.log(`AURORA SKIN: PASS — ${pass}/${pass} checks — chrome only (no --in-* token, no content selector, glass only on chrome surfaces), pools only on the Index, Map and Settings, opaque under Reduce Transparency and forced colours, still under Reduce Motion, AA on every chrome text pair in light and dark.`);
+console.log(`AURORA SKIN: PASS — ${pass}/${pass} checks — chrome only (no --in-* token, no content selector, glass only on chrome surfaces), one edition pool only on the Index, Map and Settings, opaque under Reduce Transparency and forced colours, still under Reduce Motion, no glow, ink focus, AA on every chrome text pair for both editions in light and dark.`);

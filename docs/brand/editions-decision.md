@@ -46,3 +46,12 @@
 - Domains and email sender addresses.
 - Bundle identifiers and native display names (ADR-0002 open question 3).
 - Whether `prithagoras-web` adopts this system now.
+
+## Amendment, 14 November 2026: the edition light on the Aurora chrome
+
+Approved by the owner on 13 November 2026 as Lit Instrument D1, D3 and D6 (`docs/design/lit-instrument-decision.md`, PR #UIPR). This section widens the **places** the edition accent may appear, and nothing else; the decision above is otherwise unchanged. Point 5 above ("Aurora is out of scope") is superseded: Aurora's violet is retired.
+
+- **Allowed consumers:** `BrandMark.jsx` (the cut) and `client/src/instrument/aurora.css`, only in the current-place selectors (the current tab's rule, the current bottom-bar and More item, the Continue edge, the selected chapter's number, the selected palette row), the one light pool, and `.pri-working`, the working indicator (D6: "what is live").
+- **Still never:** marks, verdicts, readings, charts and plots, the prime, focus rings, text on content surfaces, and solid fills. The pool is a radial wash of at most 10% and is not a fill, and the selected palette row's wash is at most 16%. Focus rings are ink (`--in-tx`) everywhere (D2).
+- `client/test/brand-usage-check.mjs` enforces this with a selector allowlist for `aurora.css` and a ban on the token inside any `outline`, `:focus` or `:focus-visible` rule and in any `background` that is not a `color-mix` of 16% or less, the pool's wash, or a 2 px current-place rule.
+

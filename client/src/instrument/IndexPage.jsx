@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
+import Working from './Working.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { useT, tLater } from '../i18n/index.js';
@@ -226,7 +227,7 @@ export default function IndexPage() {
           </>
         )}
 
-        {!curriculum && <div className="skeleton" style={{ height: 380, marginTop: 18 }} aria-hidden="true" />}
+        {!curriculum && <div className="skeleton" style={{ height: 380, marginTop: 18 }} aria-hidden="true"><Working pending={!curriculum} size={24} /></div>}
 
         {curriculum && (
           <nav aria-label={t('inst.chapters')}>
