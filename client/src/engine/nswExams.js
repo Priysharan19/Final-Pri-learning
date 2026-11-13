@@ -23,7 +23,8 @@
 // whether a blueprint can be SAT is the release check below, and a blueprint
 // whose slots cannot all be filled is refused, not trimmed.
 //
-// RELEASE (blueprintRelease). The server hands in its pool of APPROVED
+// RELEASE (blueprintRelease; CTO decision for G4, 13 Nov 2026). The server
+// hands in its pool of APPROVED
 // QUESTION FORMS: each a (generator, difficulty) cell that the Prithagoras
 // edition issues (server/platform/nswBanks.js: crosswalk-mapped to a current
 // syllabus, a dot point behind it, a final answer, and through the quality
@@ -32,9 +33,17 @@
 // approved question for this check, because a paper that draws all its
 // questions on an outcome from one template is that template repeated. A
 // slot is fillable when at least NSW_MIN_FORMS_PER_SLOT distinct forms are on
-// its outcome. A blueprint is released only
-// when every slot is fillable. Nothing here pads a slot from another outcome,
-// another course or another edition's banks.
+// its outcome, and an outcome is COVERED when its slots are fillable.
+//   · Every slot fillable: the whole paper is released.
+//   · Otherwise a PARTIAL paper — the fillable slots only — is released when
+//     at least NSW_RELEASE_FLOOR of the course's Year 12 outcomes are covered.
+//     The course's Year 12 outcomes come from the G2 model, handed in by the
+//     server (never entered here). Its marks and working time are scaled to
+//     what it examines, its title says "Practice paper — N of M Year 12
+//     outcomes" (never HSC or trial), and every surface names what it omits.
+//   · Below the floor the blueprint is refused, with its gaps listed.
+// Nothing here pads a slot from another outcome, another course or another
+// edition's banks.
 //
 // MARKING. Final answer only, by the deterministic engine on the server,
 // exactly as every Prithagoras question is marked until a human HSC examiner
@@ -57,6 +66,9 @@ export const NSW_MARKING_NOTE = 'Each question is checked on its final answer on
 
 /** How many distinct approved question forms each slot needs before a paper is released. */
 export const NSW_MIN_FORMS_PER_SLOT = 3;
+
+/** The share of the course's Year 12 outcomes a partial paper must cover to be released. */
+export const NSW_RELEASE_FLOOR = 0.75;
 
 /**
  * The difficulties (1–4) a slot worth this many marks PREFERS: the server
@@ -112,7 +124,7 @@ function design({ objective, written }) {
 function blueprint(b) {
   const sections = design(b.design);
   return Object.freeze({
-    id: b.id, course: b.course, label: b.label, year: 12,
+    id: b.id, course: b.course, label: b.label, year: 12, modelCourse: b.modelCourse || null,
     syllabus: b.syllabus, syllabusVersion: '2024', firstExamined: 2027,
     readingMin: 10, workingMin: b.workingMin, totalMarks: b.totalMarks,
     spec: Object.freeze(b.spec), source: source(b.sourceCourse, b.examined),
@@ -131,7 +143,7 @@ const EXT2 = 'nsw-mathematics-extension2-11-12-2024';
  */
 export const NSW_EXAM_BLUEPRINTS = Object.freeze([
   blueprint({
-    id: 'nsw-hsc-standard-1-2027', course: 'standard-1', label: 'Mathematics Standard 1', sourceCourse: 'standard',
+    id: 'nsw-hsc-standard-1-2027', course: 'standard-1', label: 'Mathematics Standard 1', sourceCourse: 'standard', modelCourse: 'Standard 1',
     syllabus: STANDARD, workingMin: 120, totalMarks: 80,
     spec: { sectionIMarks: 15, sectionIIMarks: 65, sectionIIItems: [25, 30] },
     examined: 'The Year 12 Standard 1 course; the Year 11 course is assumed knowledge and may be examined. The examination is optional.',
@@ -147,7 +159,7 @@ export const NSW_EXAM_BLUEPRINTS = Object.freeze([
     }
   }),
   blueprint({
-    id: 'nsw-hsc-standard-2-2027', course: 'standard-2', label: 'Mathematics Standard 2', sourceCourse: 'standard',
+    id: 'nsw-hsc-standard-2-2027', course: 'standard-2', label: 'Mathematics Standard 2', sourceCourse: 'standard', modelCourse: 'Standard 2',
     syllabus: STANDARD, workingMin: 150, totalMarks: 100,
     spec: { sectionIMarks: 15, sectionIIMarks: 85, sectionIIItems: [35, 40] },
     examined: 'The Year 12 Standard 2 course; the Year 11 course is assumed knowledge and may be examined.',
@@ -256,31 +268,57 @@ export function formsForSlot(slot, pool) {
   return out;
 }
 
+/** A working time scaled to the marks a partial paper keeps: whole five minutes, at least ten. */
+export const scaledMinutes = (minutes, kept, total) => (kept >= total ? minutes : Math.max(10, Math.round((minutes * kept / Math.max(1, total)) / 5) * 5));
+
 /**
- * Whether a blueprint may be sat on this pool, and exactly why not.
- * Returns `{ released, slots, unfillable, missingOutcomes, thinOutcomes }`:
- * `unfillable` lists each slot with fewer than NSW_MIN_FORMS_PER_SLOT forms;
- * `missingOutcomes` the outcomes with no approved form at any difficulty;
- * `thinOutcomes` those with some forms, but fewer than a slot needs. `formsByOutcome`
- * counts the distinct forms on each outcome at any difficulty.
+ * Whether a blueprint may be sat on this pool, in what form, and exactly why
+ * not. `year12Outcomes` is the course's Year 12 outcome codes from the G2
+ * model (the server's); without it nothing is released.
+ *
+ * Returns `{ released, full, slots, unfillable, included, formsByOutcome,
+ * missingOutcomes, thinOutcomes, omittedOutcomes, year12: { total, covered,
+ * codes, coveredCodes, share }, marks, workingMin, floor }`. `included` is
+ * the slots a released paper sets (every slot when full; the fillable ones
+ * when partial; none when refused). `omittedOutcomes` are the outcomes with
+ * a slot the paper cannot fill, Year 11 and Year 12 alike.
  */
-export function blueprintRelease(b, pool) {
+export function blueprintRelease(b, pool, { year12Outcomes = null } = {}) {
   const slots = slotsOf(b).map(slot => ({ number: slot.number, section: slot.section, outcome: slot.outcome, marks: slot.marks, forms: formsForSlot(slot, pool).length }));
   const unfillable = slots.filter(slot => slot.forms < NSW_MIN_FORMS_PER_SLOT);
   const formsByOutcome = Object.fromEntries(outcomesOf(b).map(code => [code, formsForSlot({ outcome: code }, pool).length]));
   const short = new Set(unfillable.map(slot => slot.outcome));
+  const codes = Array.isArray(year12Outcomes) ? [...new Set(year12Outcomes)] : [];
+  // A Year 12 outcome is covered when the paper has slots on it and all of them can be filled.
+  const coveredCodes = codes.filter(code => slots.some(slot => slot.outcome === code) && !short.has(code));
+  const share = codes.length ? coveredCodes.length / codes.length : 0;
+  const full = unfillable.length === 0 && codes.length > 0 && coveredCodes.length === codes.length;
+  const released = codes.length > 0 && (full || share >= NSW_RELEASE_FLOOR);
+  const included = released ? slots.filter(slot => slot.forms >= NSW_MIN_FORMS_PER_SLOT) : [];
+  const totalMarks = slots.reduce((n, slot) => n + slot.marks, 0);
+  const marks = included.reduce((n, slot) => n + slot.marks, 0);
   return {
-    id: b.id, released: unfillable.length === 0, minFormsPerSlot: NSW_MIN_FORMS_PER_SLOT,
-    slots, unfillable, formsByOutcome,
+    id: b.id, released, full, floor: NSW_RELEASE_FLOOR, minFormsPerSlot: NSW_MIN_FORMS_PER_SLOT,
+    slots, unfillable, included, formsByOutcome,
     missingOutcomes: outcomesOf(b).filter(code => formsByOutcome[code] === 0),
-    thinOutcomes: outcomesOf(b).filter(code => short.has(code) && formsByOutcome[code] > 0)
+    thinOutcomes: outcomesOf(b).filter(code => short.has(code) && formsByOutcome[code] > 0),
+    omittedOutcomes: outcomesOf(b).filter(code => short.has(code)),
+    year12: { total: codes.length, covered: coveredCodes.length, codes, coveredCodes, share },
+    marks: released ? marks : 0, totalMarks,
+    workingMin: released ? scaledMinutes(b.workingMin, marks, totalMarks) : 0
   };
 }
 
-/** The brief's name for the release test: true when every slot is fillable. */
-export function blueprintReleasable(b, pool) {
-  return blueprintRelease(b, pool).released;
+/** The brief's name for the release test: true when the paper, whole or partial, may be sat. */
+export function blueprintReleasable(b, pool, options) {
+  return blueprintRelease(b, pool, options).released;
 }
 
-/** The title a paper is sealed under: the server's, never the device's. */
-export const nswPaperTitle = b => `${b.label} · ${NSW_EXAM_LABEL}`;
+/**
+ * The title a paper is sealed under: the server's, never the device's. A
+ * partial paper is a "Practice paper — N of M Year 12 outcomes", never an HSC
+ * paper or a trial.
+ */
+export const nswPaperTitle = (b, release = null) => (release && release.released && !release.full
+  ? `${b.label} · Practice paper — ${release.year12.covered} of ${release.year12.total} Year 12 outcomes`
+  : `${b.label} · ${NSW_EXAM_LABEL}`);

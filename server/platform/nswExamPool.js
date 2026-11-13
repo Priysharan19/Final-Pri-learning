@@ -22,17 +22,23 @@
 // end to end, while G3's pool may release no HSC-style blueprint, switches on
 // NSW_TEST_BLUEPRINT with `useNswTestBlueprintForTests(true)` (in-process;
 // refused unless NODE_ENV is 'test') or PRI_NSW_EXAMS_TEST_BLUEPRINT=on under
-// NODE_ENV=test (a server process a tour starts). It is a short paper on two
-// Extension 1 outcomes G3's pool does cover, drawn and marked by exactly the
-// path every blueprint uses, through the same release check; it cites no NESA
-// specification, says `test: true` everywhere, and is never listed or
-// created outside a test.
+// NODE_ENV=test (a server process a tour starts). It is a short Extension 1
+// paper with one slot on every Year 12 outcome, so on G3's pool it releases as
+// a PARTIAL paper (5 of 6: Further calculus skills has no approved form) with
+// a one-minute reading time — drawn and marked by exactly the path every
+// blueprint uses, through the same release check. It cites no NESA
+// specification, says `test: true` everywhere, and is never listed or created
+// outside a test.
+//
+// YEAR 12 OUTCOMES. The release floor is over the course's Year 12 outcomes,
+// read here from the G2 model (`year: 12`, and for Standard its `course`) —
+// never entered by hand.
 import { NSW_BANK_LEDGER, nswCell } from './nswBanks.js';
-import { LEGACY_CROSSWALK, NSW_OUTCOME_BY_CODE } from '../../client/src/engine/curriculum-nsw/index.js';
+import { LEGACY_CROSSWALK, NSW_OUTCOME_BY_CODE, NSW_SYLLABUS_BY_ID, outcomesOf as syllabusOutcomes } from '../../client/src/engine/curriculum-nsw/index.js';
 import { formDotpointOrdinals } from '../../client/src/engine/curriculum.js';
 import {
-  NSW_EXAM_BLUEPRINTS, blueprintRelease, nswExamBlueprint, outcomesOf, tallyOf,
-  NSW_EXAM_LABEL, NSW_MARKING_NOTE, NSW_MIN_FORMS_PER_SLOT, DIFFICULTIES_FOR_MARKS
+  NSW_EXAM_BLUEPRINTS, blueprintRelease, nswExamBlueprint, outcomesOf, tallyOf, nswPaperTitle,
+  NSW_EXAM_LABEL, NSW_MARKING_NOTE, NSW_MIN_FORMS_PER_SLOT, NSW_RELEASE_FLOOR, DIFFICULTIES_FOR_MARKS
 } from '../../client/src/engine/nswExams.js';
 import { bankPolicy } from './editionBanks.js';
 import { NSW_COURSE } from './nswBanks.js';
@@ -53,22 +59,23 @@ export const NSW_EXAM_POOL = Object.freeze(NSW_BANK_LEDGER.flatMap(entry => entr
   .map(cell => Object.freeze({ generator: entry.generator, difficulty: cell.difficulty, outcomes: Object.freeze(formOutcomes(entry.generator, cell.difficulty)) }))
   .filter(form => form.outcomes.length > 0)));
 
-/** A short paper on outcomes G3's pool covers. Tests only (see the header). */
+/** A short Extension 1 paper, one slot per Year 12 outcome. Tests only (see the header). */
 export const NSW_TEST_BLUEPRINT = Object.freeze({
-  id: 'nsw-test-extension-1-short', course: 'extension-1', label: 'Mathematics Extension 1 (test paper)', year: 12,
+  id: 'nsw-test-extension-1-short', course: 'extension-1', label: 'Mathematics Extension 1 (test paper)', year: 12, modelCourse: null,
   syllabus: 'nsw-mathematics-extension1-11-12-2024', syllabusVersion: '2024', firstExamined: 2027,
-  readingMin: 1, workingMin: 10, totalMarks: 8, test: true,
-  spec: Object.freeze({ sectionIMarks: 2, sectionIIMarks: 6, sectionIIItems: [3, 3] }),
+  readingMin: 1, workingMin: 10, totalMarks: 9, test: true,
+  spec: Object.freeze({ sectionIMarks: 3, sectionIIMarks: 6, sectionIIItems: [3, 3] }),
   source: Object.freeze({ authority: 'none', document: 'Test paper: no examination specification', url: null, accessed: null, test: true }),
   sections: Object.freeze([
     Object.freeze({ id: 'I', label: 'Section I', marksEach: 1, slots: Object.freeze([
       Object.freeze({ section: 'I', outcome: 'ME1-12-02', marks: 1, difficulties: DIFFICULTIES_FOR_MARKS[1] }),
-      Object.freeze({ section: 'I', outcome: 'ME1-11-02', marks: 1, difficulties: DIFFICULTIES_FOR_MARKS[1] })
+      Object.freeze({ section: 'I', outcome: 'ME1-12-03', marks: 1, difficulties: DIFFICULTIES_FOR_MARKS[1] }),
+      Object.freeze({ section: 'I', outcome: 'ME1-12-06', marks: 1, difficulties: DIFFICULTIES_FOR_MARKS[1] })
     ]) }),
     Object.freeze({ id: 'II', label: 'Section II', slots: Object.freeze([
-      Object.freeze({ section: 'II', outcome: 'ME1-12-02', marks: 2, difficulties: DIFFICULTIES_FOR_MARKS[2] }),
-      Object.freeze({ section: 'II', outcome: 'ME1-12-02', marks: 2, difficulties: DIFFICULTIES_FOR_MARKS[2] }),
-      Object.freeze({ section: 'II', outcome: 'ME1-11-02', marks: 2, difficulties: DIFFICULTIES_FOR_MARKS[2] })
+      Object.freeze({ section: 'II', outcome: 'ME1-12-01', marks: 2, difficulties: DIFFICULTIES_FOR_MARKS[2] }),
+      Object.freeze({ section: 'II', outcome: 'ME1-12-04', marks: 2, difficulties: DIFFICULTIES_FOR_MARKS[2] }),
+      Object.freeze({ section: 'II', outcome: 'ME1-12-05', marks: 2, difficulties: DIFFICULTIES_FOR_MARKS[2] })
     ]) })
   ])
 });
@@ -99,15 +106,28 @@ export function nswExamsOn(env = process.env) {
   return String(env.PRI_NSW_EXAMS || '').trim().toLowerCase() === 'on' && bankPolicy().curriculum === NSW_COURSE;
 }
 
+/** The course's Year 12 outcome codes, from the G2 model. */
+export function year12OutcomesOf(b) {
+  const syllabus = NSW_SYLLABUS_BY_ID[b.syllabus];
+  if (!syllabus || syllabus.status !== 'current') return [];
+  return syllabusOutcomes(syllabus).filter(o => o.year === 12 && (!b.modelCourse || o.course === b.modelCourse)).map(o => o.code);
+}
+
+/** An outcome's code and focus-area name (Pri's model; no NESA outcome wording). */
+export const outcomeNamed = code => ({ code, name: NSW_OUTCOME_BY_CODE[code]?.focusArea || code, year: NSW_OUTCOME_BY_CODE[code]?.year ?? null });
+
+/** A blueprint's release on a pool, with its Year 12 outcomes from the model. */
+export const releaseOf = (b, pool = nswExamPool()) => blueprintRelease(b, pool, { year12Outcomes: year12OutcomesOf(b) });
+
 /** The release of every blueprint on the pool in force. */
 export function nswReleases(pool = nswExamPool()) {
-  return nswBlueprints().map(b => blueprintRelease(b, pool));
+  return nswBlueprints().map(b => releaseOf(b, pool));
 }
 
 /** One blueprint's release on the pool in force, or null for an unknown id. */
 export function nswRelease(id, pool = nswExamPool()) {
   const b = nswExamBlueprint(id) || (testBlueprint()?.id === id ? NSW_TEST_BLUEPRINT : null);
-  return b ? { blueprint: b, release: blueprintRelease(b, pool) } : null;
+  return b ? { blueprint: b, release: releaseOf(b, pool) } : null;
 }
 
 /**
@@ -119,17 +139,23 @@ export function nswRelease(id, pool = nswExamPool()) {
 export function nswExamCatalogue(pool = nswExamPool()) {
   return {
     label: NSW_EXAM_LABEL, marking: 'final-answer-only', markingNote: NSW_MARKING_NOTE,
-    minFormsPerSlot: NSW_MIN_FORMS_PER_SLOT,
+    minFormsPerSlot: NSW_MIN_FORMS_PER_SLOT, releaseFloor: NSW_RELEASE_FLOOR,
     papers: nswBlueprints().map(b => {
-      const release = blueprintRelease(b, pool);
+      const release = releaseOf(b, pool);
       const tally = tallyOf(b);
+      const sat = release.released ? release.included : release.slots;
       return {
         id: b.id, ...(b.test ? { test: true } : {}), course: b.course, label: b.label, year: b.year, syllabus: b.syllabus, syllabusVersion: b.syllabusVersion,
-        readingMin: b.readingMin, workingMin: b.workingMin, totalMarks: tally.totalMarks, questions: tally.items,
-        sections: b.sections.map(s => ({ id: s.id, label: s.label, questions: s.slots.length, marks: s.slots.reduce((n, slot) => n + slot.marks, 0) })),
+        // What a student would sit: the whole design, or a partial paper's kept slots, marks and scaled time.
+        title: nswPaperTitle(b, release), released: release.released, partial: release.released && !release.full,
+        readingMin: b.readingMin, workingMin: release.released ? release.workingMin : b.workingMin,
+        totalMarks: release.released ? release.marks : tally.totalMarks, questions: sat.length,
+        design: { totalMarks: tally.totalMarks, questions: tally.items, workingMin: b.workingMin },
+        sections: b.sections.map(s => ({ id: s.id, label: s.label, questions: sat.filter(slot => slot.section === s.id).length, marks: sat.filter(slot => slot.section === s.id).reduce((n, slot) => n + slot.marks, 0) })),
         source: { authority: b.source.authority, document: b.source.document, url: b.source.url, accessed: b.source.accessed },
         outcomes: outcomesOf(b),
-        released: release.released,
+        year12: { total: release.year12.total, covered: release.year12.covered, floor: NSW_RELEASE_FLOOR },
+        omittedOutcomes: release.omittedOutcomes.map(outcomeNamed),
         missingOutcomes: release.missingOutcomes, thinOutcomes: release.thinOutcomes,
         unfillableSlots: release.unfillable.length
       };

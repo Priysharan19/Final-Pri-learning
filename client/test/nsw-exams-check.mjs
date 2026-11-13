@@ -34,12 +34,12 @@ const SRC = new URL('../src/', import.meta.url).href;
 const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
 await loadAllBanks();
 const {
-  NSW_EXAM_BLUEPRINTS, NSW_EXAM_LABEL, NSW_MIN_FORMS_PER_SLOT, DIFFICULTIES_FOR_MARKS,
-  blueprintRelease, blueprintReleasable, formsForSlot, slotsOf, outcomesOf, tallyOf, nswExamBlueprint
+  NSW_EXAM_BLUEPRINTS, NSW_EXAM_LABEL, NSW_MIN_FORMS_PER_SLOT, NSW_RELEASE_FLOOR, DIFFICULTIES_FOR_MARKS,
+  blueprintRelease, blueprintReleasable, formsForSlot, slotsOf, outcomesOf, tallyOf, nswExamBlueprint, nswPaperTitle, scaledMinutes
 } = await import(`${SRC}engine/nswExams.js`);
 const { NSW_OUTCOME_BY_CODE, NSW_SYLLABUS_BY_ID, outcomesOf: syllabusOutcomes } = await import(`${SRC}engine/curriculum-nsw/index.js`);
 const { parse, evaluate } = await import(`${SRC}engine/expr.js`);
-const { NSW_EXAM_POOL, NSW_TEST_BLUEPRINT } = await import('../../server/platform/nswExamPool.js');
+const { NSW_EXAM_POOL, NSW_TEST_BLUEPRINT, year12OutcomesOf, releaseOf } = await import('../../server/platform/nswExamPool.js');
 const { NSW_BANK_LEDGER, nswIssuable } = await import('../../server/platform/nswBanks.js');
 const { indiaBank } = await import('../../server/platform/indiaBanks.js');
 const { MARKER_OPS } = await import('../../server/platform/markerOps.js');
@@ -86,24 +86,49 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
 check(nswExamBlueprint('constructor') === null && nswExamBlueprint(NSW_TEST_BLUEPRINT.id) === null, 'no inherited or test blueprint is found by id in the engine');
 
 // ── The release check ───────────────────────────────────────────────────────
+check(NSW_MIN_FORMS_PER_SLOT === 3 && NSW_RELEASE_FLOOR === 0.75, 'the rule: three distinct forms per slot; a partial paper needs 75% of the course\'s Year 12 outcomes');
+for (const b of NSW_EXAM_BLUEPRINTS) {
+  const y12 = year12OutcomesOf(b);
+  const model = syllabusOutcomes(NSW_SYLLABUS_BY_ID[b.syllabus]).filter(o => o.year === 12 && SPEC[b.id].year12.test(o.code)).map(o => o.code);
+  check(y12.length > 0 && JSON.stringify(y12) === JSON.stringify(model), `${b.id}: its Year 12 outcomes come from the G2 model (${y12.length})`);
+}
 {
   const b = NSW_EXAM_BLUEPRINTS.find(x => x.id === 'nsw-hsc-extension-1-2027');
   const outcomes = outcomesOf(b);
-  const forms = n => outcomes.flatMap((code, i) => Array.from({ length: n }, (_, k) => ({ generator: `gen-${i}-${k}`, difficulty: 1 + (k % 4), outcomes: [code] })));
-  check(blueprintReleasable(b, forms(NSW_MIN_FORMS_PER_SLOT)), 'three distinct forms on every outcome: released');
-  check(!blueprintReleasable(b, forms(NSW_MIN_FORMS_PER_SLOT - 1)), 'two on every outcome: not released');
-  const oneShort = forms(NSW_MIN_FORMS_PER_SLOT).filter(form => !(form.outcomes[0] === outcomes[3] && form.generator.endsWith('-0')));
-  const r = blueprintRelease(b, oneShort);
-  check(!r.released && r.thinOutcomes.join() === outcomes[3] && r.unfillable.every(slot => slot.outcome === outcomes[3]), 'one outcome one form short: not released, and that outcome is named');
-  const doubled = [...oneShort, ...oneShort.filter(form => form.outcomes[0] === outcomes[3])];
-  check(!blueprintReleasable(b, doubled), 'the same form listed twice is still one form');
-  const offOutcome = [...oneShort, { generator: 'elsewhere', difficulty: 2, outcomes: ['MAV-12-04'] }];
-  check(!blueprintReleasable(b, offOutcome), 'a form on another outcome never fills the slot');
-  const none = blueprintRelease(b, []);
-  check(!none.released && none.missingOutcomes.length === outcomes.length && none.thinOutcomes.length === 0, 'an empty pool: every outcome missing');
+  const year12Outcomes = year12OutcomesOf(b);           // ME1-12-01 … ME1-12-06
+  const y12 = { year12Outcomes };
+  const forms = (n, skip = new Set()) => outcomes.filter(code => !skip.has(code)).flatMap((code, i) => Array.from({ length: n }, (_, k) => ({ generator: `gen-${code}-${k}`, difficulty: 1 + (k % 4), outcomes: [code] })));
+  const all = blueprintRelease(b, forms(NSW_MIN_FORMS_PER_SLOT), y12);
+  check(all.released && all.full && all.included.length === all.slots.length && all.marks === b.totalMarks && all.workingMin === b.workingMin, 'three distinct forms on every outcome: the whole paper, at full marks and time');
+  check(nswPaperTitle(b, all) === `${b.label} · ${NSW_EXAM_LABEL}`, 'a whole paper is an answer-checked practice paper');
+  check(!blueprintReleasable(b, forms(NSW_MIN_FORMS_PER_SLOT - 1), y12), 'two forms on every outcome: refused');
+  check(!blueprintReleasable(b, forms(NSW_MIN_FORMS_PER_SLOT)), 'without the course\'s Year 12 outcomes nothing is released');
+  // The floor, exactly: 6 Year 12 outcomes, 75% = 4.5, so 5 covered is released and 4 is refused.
+  const drop = n => new Set(year12Outcomes.slice(0, n));
+  const five = blueprintRelease(b, forms(NSW_MIN_FORMS_PER_SLOT, drop(1)), y12);
+  const four = blueprintRelease(b, forms(NSW_MIN_FORMS_PER_SLOT, drop(2)), y12);
+  check(five.released && !five.full && five.year12.covered === 5 && five.year12.total === 6, '5 of 6 Year 12 outcomes (83%): a partial paper is released');
+  check(!four.released && four.year12.covered === 4 && four.included.length === 0 && four.marks === 0, '4 of 6 (67%), below the floor: refused, nothing set');
+  check(five.included.every(slot => slot.outcome !== year12Outcomes[0]) && five.omittedOutcomes.join() === year12Outcomes[0], 'a partial paper sets no slot on what it omits, and names it');
+  check(five.marks === five.included.reduce((n, slot) => n + slot.marks, 0) && five.marks < b.totalMarks && five.workingMin === scaledMinutes(b.workingMin, five.marks, b.totalMarks) && five.workingMin < b.workingMin,
+    `its marks (${five.marks}) and working time (${five.workingMin} min) are scaled to what it examines`);
+  const title = nswPaperTitle(b, five);
+  check(title === `${b.label} · Practice paper — 5 of 6 Year 12 outcomes` && !/HSC|trial/i.test(title), `a partial paper is titled by its coverage, never HSC or trial: "${title}"`);
+  // An omitted Year 11 outcome lowers nothing in the floor but is still omitted.
+  const y11gap = blueprintRelease(b, forms(NSW_MIN_FORMS_PER_SLOT, new Set(['ME1-11-05'])), y12);
+  check(y11gap.released && !y11gap.full && y11gap.year12.covered === 6 && y11gap.omittedOutcomes.join() === 'ME1-11-05', 'a Year 11 gap leaves the Year 12 floor whole but is still omitted and named');
+  const doubled = [...forms(2), ...forms(2)];
+  check(!blueprintReleasable(b, doubled, y12), 'the same form listed twice is still one form');
+  check(!blueprintReleasable(b, forms(NSW_MIN_FORMS_PER_SLOT).map(f => ({ ...f, outcomes: ['MAV-12-04'] })), y12), 'forms on another outcome never fill a slot');
+  check(scaledMinutes(120, 30, 70) === 50 && scaledMinutes(120, 70, 70) === 120 && scaledMinutes(10, 1, 9) === 10, 'scaled minutes: whole five minutes, at least ten');
   const slot = { outcome: outcomes[0], difficulties: [3, 4] };
   const ordered = formsForSlot(slot, [{ generator: 'a', difficulty: 1, outcomes: [outcomes[0]] }, { generator: 'b', difficulty: 4, outcomes: [outcomes[0]] }]);
   check(ordered.map(f => f.generator).join() === 'b,a', 'a slot lists its preferred difficulties first, and still counts the others');
+}
+// On G3's pool, released exactly above the floor (no hand-entered list).
+for (const b of NSW_EXAM_BLUEPRINTS) {
+  const r = releaseOf(b);
+  check(r.released === (r.year12.total > 0 && r.year12.covered / r.year12.total >= NSW_RELEASE_FLOOR), `${b.id}: ${r.year12.covered}/${r.year12.total} Year 12 outcomes covered → ${r.released ? (r.full ? 'released' : 'released, partial') : 'refused'}`);
 }
 
 // ── The pool: issued NSW forms only ─────────────────────────────────────────
@@ -262,5 +287,5 @@ if (failures.length) {
   console.error(`NSW EXAM BLUEPRINTS (G4): FAIL — ${failures.length} of ${checks} checks failed`);
   process.exit(1);
 }
-const releasedCount = NSW_EXAM_BLUEPRINTS.filter(b => blueprintRelease(b, NSW_EXAM_POOL).released).length;
+const releasedCount = NSW_EXAM_BLUEPRINTS.filter(b => releaseOf(b).released).length;
 console.log(`NSW EXAM BLUEPRINTS (G4): PASS — ${checks} checks — ${NSW_EXAM_BLUEPRINTS.length} blueprints cited and held to NESA's specification, ${releasedCount} released on ${NSW_EXAM_POOL.length} approved forms; sweep: ${sweep.questions} questions from ${sweep.forms} forms, ${sweep.keys} keys accepted at full marks, ${sweep.probes} near misses all 0. [SYNTHETIC]`);

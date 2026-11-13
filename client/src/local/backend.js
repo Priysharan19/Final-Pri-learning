@@ -74,7 +74,7 @@ import {
   finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper,
   markPendingLines, recoverHandwriting, retryHandwriting, confirmExamPagesSaved
 } from './serverExam.js';
-import { nswExamsFor, nswExamSpec } from './nswExamBackend.js';
+import { nswExamsFor, nswExamSpec, namedOutcomes } from './nswExamBackend.js';
 import { pendingSummary } from './examPages.js';
 import { settleIfLeaving } from './pageLeaving.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
@@ -5756,7 +5756,10 @@ async function storeServerPaper(p, issued, { year, pathway, title, readingMin = 
     createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null,
     paperVersion: issued.paperVersion,
     ...(Number.isFinite(Number(readingMin)) && Number(readingMin) > 0 ? { readingMin: Number(readingMin) } : {}),
-    ...(nsw && typeof nsw === 'object' ? { nsw: { label: String(nsw.label || ''), markingNote: String(nsw.markingNote || ''), blueprintId: String(nsw.blueprintId || ''), course: String(nsw.course || '') } } : {}),
+    ...(nsw && typeof nsw === 'object' ? { nsw: {
+      label: String(nsw.label || ''), markingNote: String(nsw.markingNote || ''), blueprintId: String(nsw.blueprintId || ''), course: String(nsw.course || ''),
+      partial: nsw.partial === true, omittedOutcomes: namedOutcomes(nsw.omittedOutcomes)
+    } } : {}),
     server: serverFieldOf(issued, await profileCloudAccountId(p.id).catch(() => null))
   };
   startExamClock(exam, localStartOf(issued, now));

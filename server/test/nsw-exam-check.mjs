@@ -53,9 +53,9 @@ const { FINISH_GRACE_MS } = await import('../platform/exams.js');
 const { NSW_BANK_LEDGER, nswCell, nswQuestionIdentity } = await import('../platform/nswBanks.js');
 const { indiaBank } = await import('../platform/indiaBanks.js');
 const {
-  NSW_EXAM_POOL, NSW_TEST_BLUEPRINT, nswExamCatalogue, useNswTestBlueprintForTests, formOutcomes
+  NSW_EXAM_POOL, NSW_TEST_BLUEPRINT, nswExamCatalogue, useNswTestBlueprintForTests, formOutcomes, releaseOf
 } = await import('../platform/nswExamPool.js');
-const { NSW_EXAM_BLUEPRINTS, blueprintRelease, slotsOf, NSW_EXAM_LABEL } = await import('../../client/src/engine/nswExams.js');
+const { NSW_EXAM_BLUEPRINTS, slotsOf, NSW_EXAM_LABEL, NSW_RELEASE_FLOOR } = await import('../../client/src/engine/nswExams.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
 const { loadAllBanks, generateQuestion } = await import('../../client/src/engine/generators/index.js');
 
@@ -128,12 +128,12 @@ const h = await startApp({ engine: requestedEngine() });
 let released = [];
 try {
   const accounts = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 7; i++) {
     const a = await registerAccount(h, { email: `nsw.exam.${i}@example.test`, deviceId: `ipad-nsw-exam-${i}` });
     c.eq((await verifyEmail(h, a.account.id)).status, 200, `student ${i + 1} is verified`);
     accounts.push(a);
   }
-  const [a, b, d, e] = accounts;
+  const [a, b, d, e, ...more] = accounts;
   let seq = 0;
   const idem = () => `nsw-exam-${String(++seq).padStart(4, '0')}-${realNow().toString(36)}`;
   const create = (jar, body) => h.request('/v1/exams', { method: 'POST', jar, body, headers: { 'Idempotency-Key': idem() } });
@@ -160,13 +160,23 @@ try {
   c.deq(list.data.papers.map(p => p.id), NSW_EXAM_BLUEPRINTS.map(bp => bp.id), 'it lists the five HSC-style blueprints (no test paper until a test asks)');
   c.deq(list.data, nswExamCatalogue(), 'it is the catalogue the engine computes on the pool');
   for (const paper of list.data.papers) {
-    const release = blueprintRelease(NSW_EXAM_BLUEPRINTS.find(bp => bp.id === paper.id), NSW_EXAM_POOL);
+    const release = releaseOf(NSW_EXAM_BLUEPRINTS.find(bp => bp.id === paper.id));
     assert.equal(paper.released, release.released);
     assert.deepEqual([paper.missingOutcomes, paper.thinOutcomes], [release.missingOutcomes, release.thinOutcomes]);
     assert.ok(paper.source.url.startsWith('https://curriculum.nsw.edu.au/') && paper.source.authority === 'NESA');
+    assert.deepEqual(paper.year12, { total: release.year12.total, covered: release.year12.covered, floor: NSW_RELEASE_FLOOR });
+    // The floor: released exactly when at least 75% of the course's Year 12 outcomes are covered.
+    assert.equal(paper.released, paper.year12.total > 0 && paper.year12.covered / paper.year12.total >= NSW_RELEASE_FLOOR, `${paper.id} is released exactly above the floor`);
+    assert.deepEqual(paper.omittedOutcomes.map(o => o.code), release.omittedOutcomes);
+    assert.ok(paper.omittedOutcomes.every(o => o.name && o.name !== o.code), 'omitted outcomes are named');
+    if (paper.partial) {
+      assert.ok(paper.title.includes(`Practice paper — ${paper.year12.covered} of ${paper.year12.total} Year 12 outcomes`) && !/HSC|trial/i.test(paper.title), `${paper.id}: ${paper.title}`);
+      assert.ok(paper.totalMarks === release.marks && paper.totalMarks < paper.design.totalMarks && paper.workingMin < paper.design.workingMin, 'marks and time scaled to what it examines');
+    }
     if (!paper.released) assert.ok(paper.missingOutcomes.length + paper.thinOutcomes.length > 0, `${paper.id} says what it lacks`);
   }
-  c.ok(true, 'each paper\'s release, gaps and cited source are the engine\'s');
+  c.ok(true, 'each paper\'s release, floor, omissions, title, scaled marks and time, and cited source are the engine\'s on G2/G3 data');
+  c.ok(list.data.papers.some(p => !p.released && p.year12.covered > 0), 'a blueprint with some covered outcomes but below the floor is refused');
   c.deq([leaks(list.data), bandKeys(list.data)], [[], []], 'no question, answer or band is in the list');
   c.eq(list.data.label, NSW_EXAM_LABEL, `every paper is an "${NSW_EXAM_LABEL}"`);
   released = list.data.papers.filter(p => p.released).map(p => p.id);
@@ -195,6 +205,27 @@ try {
   c.ok(true, 'a spec carrying anything but a released blueprint\'s id is refused');
   c.eq(await rows(a.account.id, 'exam-paper'), 0, 'and no refused start sealed a paper');
 
+  // ── A partial paper on G3's real pool: what it sets, and what it omits ────
+  const partials = list.data.papers.filter(p => p.released && p.partial);
+  c.ok(partials.length > 0, `partial papers released on G3's pool: ${partials.map(p => `${p.id} (${p.year12.covered}/${p.year12.total})`).join(', ')}`);
+  for (const [i, entry] of partials.entries()) {
+    const jar = more[i]?.jar;
+    assert.ok(jar, 'an account per partial paper');
+    const made = await create(jar, { kind: 'nsw', blueprint: { id: entry.id } });
+    assert.equal(made.status, 201, `${entry.id} starts`);
+    const ex = made.data.exam;
+    const sealedPaper = await sealed(ex.id);
+    const omitted = new Set(entry.omittedOutcomes.map(o => o.code));
+    assert.equal(ex.questions.length, entry.questions, 'only the kept slots are set');
+    assert.equal(ex.total, entry.totalMarks, 'the marks are the kept slots\' marks');
+    assert.equal(ex.deadline - ex.startedAt, (entry.readingMin + entry.workingMin) * 60000, 'the time is scaled');
+    assert.equal(ex.title, entry.title);
+    assert.ok(sealedPaper.questions.every(sq => !omitted.has(sq.outcome)), 'no question is on an omitted outcome');
+    assert.deepEqual(ex.nsw.omittedOutcomes, entry.omittedOutcomes, 'the paper names what it omits');
+    assert.deepEqual([leaks(made.data), bandKeys(made.data)], [[], []]);
+  }
+  c.ok(true, 'each partial paper is sealed with its kept slots only, scaled marks and time, its omissions named, nothing private');
+
   // ── A released paper: the test blueprint, on G3's real pool ───────────────
   useNswTestBlueprintForTests(true);
   const withTest = await h.request('/v1/exams/nsw', { jar: a.jar });
@@ -203,15 +234,19 @@ try {
   const started = await create(a.jar, testPaper);
   c.eq(started.status, 201, 'a released paper starts');
   const exam = started.data.exam;
+  const testRelease = releaseOf(NSW_TEST_BLUEPRINT);
   c.deq([exam.kind, exam.readingMin, exam.reading, exam.readingEndsAt - exam.startedAt, exam.deadline - exam.startedAt],
-    ['nsw', 1, true, 60000, 11 * 60000], 'reading time leads, and the deadline is reading plus working time, on the server clock');
-  c.deq([exam.nsw.label, exam.nsw.markingScope, exam.nsw.test, exam.title], [NSW_EXAM_LABEL, 'final-answer-only', true, `${NSW_TEST_BLUEPRINT.label} · ${NSW_EXAM_LABEL}`],
-    'the paper says what it is and how it is marked; its title is the server\'s');
+    ['nsw', 1, true, 60000, (1 + testRelease.workingMin) * 60000], 'reading time leads, and the deadline is reading plus working time, on the server clock');
+  c.deq([exam.nsw.label, exam.nsw.markingScope, exam.nsw.test, exam.nsw.partial, exam.title],
+    [NSW_EXAM_LABEL, 'final-answer-only', true, true, `${NSW_TEST_BLUEPRINT.label} · Practice paper — 5 of 6 Year 12 outcomes`],
+    'the paper says what it is and how it is marked; its title is the server\'s, and a partial paper says how much it covers');
+  c.deq(exam.nsw.omittedOutcomes, [{ code: 'ME1-12-04', name: 'Further calculus skills', year: 12 }], 'it names the outcome it leaves out');
   c.deq(leaks(started.data), [], 'no answer, step, criterion, plan, seed or sealed identity leaves at the start');
   c.deq(bandKeys(started.data), [], 'and no band');
-  const slots = slotsOf(NSW_TEST_BLUEPRINT);
+  const kept = new Set(testRelease.included.map(slot => slot.number));
+  const slots = slotsOf(NSW_TEST_BLUEPRINT).filter(slot => kept.has(slot.number));
   c.deq(exam.questions.map(q => [q.section, q.marks]), slots.map(s => [s.section, s.marks]), 'one question per slot, in order, at the slot\'s marks');
-  c.eq(exam.total, NSW_TEST_BLUEPRINT.totalMarks, `${exam.total} marks`);
+  c.eq(exam.total, testRelease.marks, `${exam.total} marks: the kept slots'`);
   const paper = await sealed(exam.id);
   paper.questions.forEach((sq, i) => {
     const q = sq.payload;
@@ -257,6 +292,7 @@ try {
   c.deq(result.detail.map(line => line.syllabusOutcome), slots.map(s => s.outcome), 'each line names its slot\'s syllabus outcome');
   c.deq([result.nsw.label, result.nsw.markingScope, result.nsw.markingNote.includes('final answer only')], [NSW_EXAM_LABEL, 'final-answer-only', true], 'the result is an answer-checked practice paper and says how it was marked');
   c.deq(bandKeys(result), [], 'the result has no band, grade, ATAR, HSC mark or prediction at any depth');
+  c.deq(result.nsw.omittedOutcomes.map(o => o.name), ['Further calculus skills'], 'the result names what the paper did not include');
   const replay = await finish(a.jar, exam.id, { answers: {} });
   c.deq([replay.status, replay.data.score, replay.data.finishedAt], [200, result.score, result.finishedAt], 'a replayed finish returns the stored result unchanged');
   const attempts = (await h.db.all("SELECT payload_json FROM learning_events WHERE account_id=? AND kind='graded-attempt'", [a.account.id])).map(r => JSON.parse(r.payload_json));
@@ -309,4 +345,4 @@ for (const key of keys) {
   else process.env[key] = before[key];
 }
 console.log(`engine: ${h.engine}`);
-console.log(`NSW EXAMS (G4): PASS — ${c.count()}/${c.count()} checks — ${NSW_EXAM_BLUEPRINTS.length} HSC-style blueprints listed, ${released.length} released on the ${NSW_EXAM_POOL.length}-form pool; a released paper is sealed from issued NSW forms on its slots' outcomes, refuses answers in reading time, marks final answers only, keeps the India deadline and grace, and reports no band. [SYNTHETIC]`);
+console.log(`NSW EXAMS (G4): PASS — ${c.count()}/${c.count()} checks — ${NSW_EXAM_BLUEPRINTS.length} HSC-style blueprints listed, ${released.length} released (partial, above the ${NSW_RELEASE_FLOOR * 100}% Year 12 floor) on the ${NSW_EXAM_POOL.length}-form pool; a released paper is sealed from issued NSW forms on its slots' outcomes, refuses answers in reading time, marks final answers only, keeps the India deadline and grace, and reports no band. [SYNTHETIC]`);

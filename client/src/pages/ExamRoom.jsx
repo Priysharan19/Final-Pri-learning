@@ -38,6 +38,7 @@ import SectionTime from '../components/SectionTime.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { freezePage, pendingSummary, unreadInkKeys } from '../local/examPages.js';
 import { featureEnabled } from '../platform/features.js';
+import { omittedNames } from '../local/nswExamBackend.js';
 import { MOCK_LABEL } from '../engine/boardMock.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
@@ -770,6 +771,7 @@ export default function ExamRoom() {
           {exam.targeted && <p className="muted" data-exam-targeted-label>{t('mock.targetedResultNote')}</p>}
           {exam.targeted && <WhyKey why={exam.why} />}
           {exam.nsw && <p className="muted" data-exam-nsw-note>{t('examRoom.nswMarkingNote')}</p>}
+          {exam.nsw?.omittedOutcomes?.length > 0 && <p className="muted" data-exam-nsw-omits>{t('exams.nsw.omits', { outcomes: omittedNames(exam.nsw.omittedOutcomes) })}</p>}
           {/* The number is ink, never a traffic light; the sentence carries the meaning. */}
           <div className="hero-num exam-result-num">
             {shownPct}%<span className="sr-only"> {t(shownPct >= 80 ? 'examRoom.pctSrStrong' : shownPct >= 50 ? 'examRoom.pctSrFair' : 'examRoom.pctSrLow')}</span>
@@ -1121,6 +1123,7 @@ export default function ExamRoom() {
           <span className="verdict-ico"><Icon name="clock" /></span>
           <div>
             <div className="verdict-body"><b>{t('examRoom.readingTitle', { time: mmss(readingLeft) })}</b> {t('examRoom.readingBody')}</div>
+            {exam.nsw?.omittedOutcomes?.length > 0 && <div className="verdict-body" data-exam-nsw-omits>{t('exams.nsw.omits', { outcomes: omittedNames(exam.nsw.omittedOutcomes) })}</div>}
           </div>
         </div>
       )}

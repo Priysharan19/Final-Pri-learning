@@ -21,6 +21,13 @@ import { requireExamAccount, unavailableKind } from './serverExam.js';
 
 const BLUEPRINT_ID = /^[a-z0-9-]{1,64}$/;
 
+/** Outcomes as the server names them: `{ code, name }`, text only. */
+export const namedOutcomes = list => (Array.isArray(list) ? list : [])
+  .filter(o => o && typeof o.code === 'string').map(o => ({ code: String(o.code).slice(0, 24), name: String(o.name || o.code).slice(0, 120) }));
+
+/** "Further calculus skills; The binomial theorem": each focus area once, in order. */
+export const omittedNames = list => [...new Set(namedOutcomes(list).map(o => o.name))].join('; ');
+
 /** Does this profile see NSW papers in this build? */
 export const nswExamsFor = profile => profile?.course === 'nsw' && featureEnabled('nswExams');
 
@@ -48,7 +55,9 @@ export async function dispatchNswExam(profile, method, path) {
   }
   if (out?.accountId !== undefined && String(out.accountId) !== linked) throw checkUnavailable('sign-in');
   const papers = Array.isArray(out?.papers) ? out.papers.filter(p => p && BLUEPRINT_ID.test(String(p.id))).map(p => ({
-    id: p.id, label: String(p.label || ''), course: String(p.course || ''), released: p.released === true, test: p.test === true,
+    id: p.id, label: String(p.label || ''), title: String(p.title || p.label || ''), course: String(p.course || ''), released: p.released === true, partial: p.partial === true, test: p.test === true,
+    year12: { covered: Number(p.year12?.covered) || 0, total: Number(p.year12?.total) || 0 },
+    omittedOutcomes: namedOutcomes(p.omittedOutcomes),
     readingMin: Number(p.readingMin) || 0, workingMin: Number(p.workingMin) || 0, totalMarks: Number(p.totalMarks) || 0, questions: Number(p.questions) || 0,
     missingOutcomes: Array.isArray(p.missingOutcomes) ? p.missingOutcomes.map(String) : [],
     thinOutcomes: Array.isArray(p.thinOutcomes) ? p.thinOutcomes.map(String) : [],

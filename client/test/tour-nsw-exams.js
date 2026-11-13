@@ -5,11 +5,13 @@
 // from the real platform server running as Prithagoras with PRI_NSW_EXAMS=on,
 // signs a Year 12 NSW student in and sits a paper end to end:
 //
-//   · the Exams page lists the five HSC-style papers the server sets, each
-//     with its time and marks; a paper the release check refuses says what it
-//     lacks and has no start button;
+//   · the Exams page lists the five blueprints with their time and marks; on
+//     G3's pool Extension 1 and 2 release as PARTIAL papers ("Practice paper —
+//     N of M Year 12 outcomes", marks and time scaled, omissions named) and a
+//     refused paper says how much it covers and what it lacks, with no start;
 //   · the test paper (PRI_NSW_EXAMS_TEST_BLUEPRINT=on, honoured only under
-//     NODE_ENV=test) is released on G3's real pool and starts;
+//     NODE_ENV=test; one minute of reading) releases partially on G3's real
+//     pool and starts; its start screen and result name what it omits;
 //   · READING TIME: the room shows the paper and a reading-time notice, every
 //     answer control is disabled, nothing is sent to the server, and the
 //     reading state passes an accessibility check on Chrome's own tree;
@@ -21,8 +23,9 @@
 // WHAT IS REAL: the built Prithagoras client, the platform server and its
 // SQLite database, the account, G3's approved NSW forms and the server's
 // marking. WHAT IS SYNTHETIC: the test paper (a short blueprint that cites no
-// NESA specification and says so) and the student. No HSC paper is released
-// on G3's pool today, so none is sat here and none is claimed.
+// NESA specification and says so) and the student. The released Extension
+// papers are listed, not sat: their ten minutes of reading would only slow
+// the tour; the HTTP suite seals both.
 //
 // Run:  node client/test/tour-nsw-exams.js
 // ─────────────────────────────────────────────────────────────────────────────
@@ -101,10 +104,16 @@ try {
   await page.waitForSelector('[data-nsw-papers] [data-nsw-paper]', { timeout: 30000 });
   const listed = await page.locator('[data-nsw-paper]').evaluateAll(els => els.map(el => [el.getAttribute('data-nsw-paper'), el.getAttribute('data-released')]));
   check('the Exams page lists the five HSC-style papers and the test paper', HSC_PAPERS.every(id => listed.some(([x]) => x === id)) && listed.some(([x]) => x === TEST_PAPER), JSON.stringify(listed));
-  check('no HSC-style paper is released on G3\'s pool, and the test paper is', listed.filter(([id]) => HSC_PAPERS.includes(id)).every(([, r]) => r === 'no') && listed.find(([id]) => id === TEST_PAPER)?.[1] === 'yes', JSON.stringify(listed));
+  const state = id => listed.find(([x]) => x === id)?.[1];
+  check('on G3\'s pool Extension 1 and 2 release as partial papers; Standard and Advanced are refused; the test paper releases',
+    state('nsw-hsc-extension-1-2027') === 'yes' && state('nsw-hsc-extension-2-2027') === 'yes' && ['nsw-hsc-standard-1-2027', 'nsw-hsc-standard-2-2027', 'nsw-hsc-advanced-2027'].every(id => state(id) === 'no') && state(TEST_PAPER) === 'yes', JSON.stringify(listed));
+  const adv = await visibleText(page, '[data-nsw-paper="nsw-hsc-advanced-2027"]');
+  check('a refused paper says how much it covers and names what it lacks, and has no start', adv.includes('4 of 8 Year 12 outcomes') && adv.includes('Financial mathematics')
+    && await page.locator('[data-nsw-paper="nsw-hsc-advanced-2027"] [data-nsw-start]').count() === 0, adv);
   const ext1 = await visibleText(page, '[data-nsw-paper="nsw-hsc-extension-1-2027"]');
-  check('an unreleased paper says what it lacks and has no start', ext1.includes('ME1-12-04') && await page.locator('[data-nsw-paper="nsw-hsc-extension-1-2027"] [data-nsw-start]').count() === 0, ext1);
-  check('it gives the paper\'s reading and working time and marks', ext1.includes('10 min reading') && ext1.includes('120 min working') && ext1.includes('70 marks'), ext1);
+  check('a partial paper is titled by its coverage, never HSC or trial', ext1.includes('Practice paper — 5 of 6 Year 12 outcomes') && !/HSC paper|trial/i.test(ext1), ext1);
+  check('it names what it leaves out', (await visibleText(page, '[data-nsw-paper="nsw-hsc-extension-1-2027"] [data-nsw-omits]')).includes('Further calculus skills'), ext1);
+  check('its time and marks are scaled to what it examines', ext1.includes('10 min reading') && ext1.includes('100 min working') && ext1.includes('58 marks'), ext1);
   const intro = await visibleText(page, '[data-nsw-papers]');
   check('the list says these are answer-checked practice papers, final answer only, no band', intro.includes(en['exams.nsw.intro']), intro.slice(0, 200));
 
@@ -114,7 +123,8 @@ try {
   await page.waitForSelector('[data-exam-reading-time]', { timeout: 30000 });
   const startedAt = Date.now();
   const head = await visibleText(page, '.exam-head');
-  check('the paper opens under the server\'s title', head.includes('Answer-checked practice paper'), head.slice(0, 160));
+  check('the paper opens under the server\'s title, with its coverage', head.includes('Practice paper — 5 of 6 Year 12 outcomes') && !/HSC paper|trial/i.test(head), head.slice(0, 160));
+  check('its start screen names what it leaves out', (await visibleText(page, '[data-exam-reading-time] [data-exam-nsw-omits]')).includes('Further calculus skills'));
   check('a reading-time notice is shown, as a status', (await page.locator('[data-exam-reading-time]').getAttribute('role')) === 'status'
     && (await visibleText(page, '[data-exam-reading-time]')).includes('Reading time'));
   check('the question is there to read', (await visibleText(page, '.exam-body')).length > 40);
@@ -149,7 +159,8 @@ try {
   await page.waitForSelector('[data-exam-nsw-note]', { timeout: 60000 });
   const result = await visibleText(page, 'main');
   check('the result is an answer-checked practice paper, checked on final answers only', result.includes(en['examRoom.nswMarkingNote']), result.slice(0, 300));
-  check('the result gives a score out of the paper\'s 8 marks', /of 8\b|\/\s*8\b|out of 8/.test(result), result.slice(0, 300));
+  check('the result gives a score out of the paper\'s 7 kept marks', /of 7\b|\/\s*7\b|out of 7/.test(result), result.slice(0, 300));
+  check('the result names what the paper did not include', (await visibleText(page, '[data-exam-nsw-omits]')).includes('Further calculus skills'));
   check('the result shows no band, ATAR, HSC mark or prediction', !BANDISH.test(result.replace(en['examRoom.nswMarkingNote'], '').replace(en['exams.nsw.intro'], '')), (result.match(BANDISH) || [])[0]);
   check('the paper was finished on the server', answerWrites.some(w => w.path.endsWith('/finish') && w.status === 200), JSON.stringify(answerWrites));
 } catch (error) {

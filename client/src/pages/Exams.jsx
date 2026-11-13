@@ -13,6 +13,7 @@ import { onCloudSessionChange } from '../platform/cloudSession.js';
 import Icon from '../components/Icon.jsx';
 import { BLUEPRINT_KEYS } from '../lib/blueprintKeys.js';
 import { featureEnabled } from '../platform/features.js';
+import { omittedNames } from '../local/nswExamBackend.js';
 
 const CLAIM_KEYS = {
   'official-mathematics-section': 'exams.claim.officialSection',
@@ -65,7 +66,7 @@ export default function Exams() {
   // `nsw`: an NSW HSC-style paper (plan G4), named by its blueprint id.
   const lastStart = useRef({ mock: false, targeted: false, nsw: null });
   async function start(options) {
-    const repeat = options?.mock === undefined && options?.nsw === undefined && refusal !== null;
+    const repeat = options?.mock === undefined && refusal !== null;
     const mock = options?.mock === true || (repeat && lastStart.current.mock);
     const targeted = mock && (options?.targeted === true || (repeat && lastStart.current.targeted));
     const nsw = typeof options?.nsw === 'string' ? options.nsw : (repeat ? lastStart.current.nsw : null);
@@ -168,13 +169,14 @@ function NswPapers({ busy, start }) {
       {list && list.papers.length > 0 && <ul className="nsw-papers" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
         {list.papers.map(p => (
           <li key={p.id} className="stat-tile" data-nsw-paper={p.id} data-released={p.released ? 'yes' : 'no'}>
-            <div className="sc-label">{p.label}{p.test ? ` · ${t('exams.nsw.testPaper')}` : ''}</div>
+            <div className="sc-label">{p.released ? p.title : p.label}{p.test ? ` · ${t('exams.nsw.testPaper')}` : ''}</div>
             <div className="muted">{t('exams.nsw.time', { reading: p.readingMin, working: p.workingMin })} · {t('exams.nsw.size', { marks: p.totalMarks, count: p.questions })}</div>
+            {p.released && p.omittedOutcomes.length > 0 && <p className="muted" style={{ marginTop: 6 }} data-nsw-omits>{t('exams.nsw.omits', { outcomes: omittedNames(p.omittedOutcomes) })}</p>}
             {p.released
               ? <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} onClick={() => start({ nsw: p.id })} disabled={busy} data-nsw-start={p.id}>
                 {busy ? t('exams.building') : t('exams.nsw.start')}
               </button>
-              : <p className="muted" style={{ marginTop: 8 }} data-nsw-not-released>{t('exams.nsw.notYet', { outcomes: [...p.missingOutcomes, ...p.thinOutcomes].join(', ') })}</p>}
+              : <p className="muted" style={{ marginTop: 8 }} data-nsw-not-released>{t('exams.nsw.notYetCovered', { covered: p.year12.covered, total: p.year12.total })} {t('exams.nsw.notYet', { outcomes: omittedNames(p.omittedOutcomes) })}</p>}
           </li>
         ))}
       </ul>}

@@ -174,7 +174,7 @@ import {
 import { loadBanksFor } from '../../client/src/engine/generators/index.js';
 import { practicePapersAllowed } from './indiaBanks.js';
 import { bankPolicy, sealForEdition } from './editionBanks.js';
-import { nswExamsOn, nswRelease, nswExamPool, nswExamCatalogue } from './nswExamPool.js';
+import { nswExamsOn, nswRelease, nswExamPool, nswExamCatalogue, outcomeNamed } from './nswExamPool.js';
 import { slotsOf, formsForSlot, nswPaperTitle, NSW_EXAM_LABEL, NSW_MARKING_NOTE } from '../../client/src/engine/nswExams.js';
 import { generateMultipart } from '../../client/src/engine/generators/multipart.js';
 import { makeRng } from '../../client/src/engine/qhelpers.js';
@@ -559,6 +559,8 @@ function nswPublic(paper) {
     label: NSW_EXAM_LABEL, markingScope: 'final-answer-only', markingNote: NSW_MARKING_NOTE,
     blueprintId: paper.blueprint.id, course: paper.blueprint.course, syllabus: paper.blueprint.syllabus,
     syllabusVersion: paper.blueprint.syllabusVersion, outcomes: paper.blueprint.outcomes,
+    // A partial paper says so, and names every outcome it leaves out.
+    partial: paper.blueprint.partial === true, year12: paper.blueprint.year12, omittedOutcomes: paper.blueprint.omittedOutcomes,
     ...(paper.blueprint.test ? { test: true } : {})
   };
 }
@@ -572,21 +574,27 @@ function readNswSpec(body) {
   if (!plain(b) || unknown(b, new Set(['id'])).length || typeof b.id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(b.id)) return INVALID('Name the paper.');
   const named = nswRelease(b.id);
   if (!named) return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', 'No examination blueprint is released for this selection.');
-  if (!named.release.released) {
-    const lacking = [...named.release.missingOutcomes, ...named.release.thinOutcomes];
-    return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', `This paper is not available yet: there are not enough approved questions for ${lacking.join(', ')}.`);
+  const { blueprint, release } = named;
+  if (!release.released) {
+    const lacking = [...release.missingOutcomes, ...release.thinOutcomes];
+    return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', `This paper is not available yet: it covers ${release.year12.covered} of ${release.year12.total} Year 12 outcomes, and there are not enough approved questions for ${lacking.join(', ')}.`);
   }
-  const blueprint = named.blueprint;
-  const outcomes = [...new Set(slotsOf(blueprint).map(slot => slot.outcome))];
+  // A partial paper sets only the slots it can fill: its marks and working
+  // time are the release check's, scaled to what it examines.
+  const kept = new Set(release.included.map(slot => slot.number));
+  const slots = slotsOf(blueprint).filter(slot => kept.has(slot.number));
   return {
-    kind: 'nsw', nsw: blueprint, readingMin: blueprint.readingMin,
-    durationMin: blueprint.readingMin + blueprint.workingMin,
+    kind: 'nsw', nsw: blueprint, nswSlots: slots, readingMin: blueprint.readingMin,
+    durationMin: blueprint.readingMin + release.workingMin,
     blueprint: {
       id: blueprint.id, label: blueprint.label, course: blueprint.course, year: blueprint.year,
-      syllabus: blueprint.syllabus, syllabusVersion: blueprint.syllabusVersion, outcomes,
+      syllabus: blueprint.syllabus, syllabusVersion: blueprint.syllabusVersion,
+      outcomes: [...new Set(slots.map(slot => slot.outcome))],
+      partial: !release.full, year12: { covered: release.year12.covered, total: release.year12.total },
+      omittedOutcomes: release.omittedOutcomes.map(outcomeNamed),
       ...(blueprint.test ? { test: true } : {})
     },
-    defaultTitle: nswPaperTitle(blueprint)
+    defaultTitle: nswPaperTitle(blueprint, release)
   };
 }
 
@@ -773,7 +781,7 @@ async function issueNswQuestions(read, { seal, draw, fresh, onPaper, unitHashes,
   const pool = nswExamPool();
   const usedForms = new Set();
   const shuffle = list => list.map(item => [randomInt(0x7fffffff), item]).sort((a, b) => a[0] - b[0]).map(([, item]) => item);
-  for (const slot of slotsOf(read.nsw)) {
+  for (const slot of read.nswSlots) {
     const forms = formsForSlot(slot, pool);
     const rank = form => (slot.difficulties.includes(form.difficulty) ? 0 : 2) + (usedForms.has(`${form.generator}|${form.difficulty}`) ? 1 : 0);
     const order = shuffle(forms).sort((a, b) => rank(a) - rank(b));
@@ -790,7 +798,7 @@ async function issueNswQuestions(read, { seal, draw, fresh, onPaper, unitHashes,
       }
       if (q) { form = candidate; break; }
     }
-    if (!q) return UNSUPPORTED(slot.number);
+    if (!q) return UNSUPPORTED(questions.length + 1);
     usedForms.add(`${form.generator}|${form.difficulty}`);
     for (const hash of unitHashes(q)) onPaper.add(hash);
     seal({
