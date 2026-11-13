@@ -63,8 +63,9 @@ html.ui-instrument.skin-aurora .in-more-item.is-here { color: var(--in-tx); box-
 html.ui-instrument.skin-aurora :is(.mnav-item.active, .mnav-item.active .nav-ico) { color: var(--in-tx); }
 html.ui-instrument.skin-aurora .mnav-item.active { position: relative; }
 html.ui-instrument.skin-aurora .in-pal-item[aria-selected="true"] { background: var(--au-light-soft); box-shadow: inset 2px 0 0 var(--au-light); }
-/* The working indicator (D6, instrument/Working.jsx): what is live. */
-html.ui-instrument.skin-aurora .pri-working { color: var(--au-light); }
+/* The working indicator (D6, instrument/Working.jsx): what is live. The
+   drawing only: its label stays ink, so the accent is never text here. */
+html.ui-instrument.skin-aurora .pri-working svg { color: var(--au-light); }
 
 /* ── The Index's furniture (no mathematics on it) ────────────────────────── */
 html.ui-instrument.skin-aurora .in-index .in-resume { box-shadow: inset 2px 0 0 var(--au-light), inset 0 1px 0 var(--au-edge), 0 0 0 1px var(--in-edge); }

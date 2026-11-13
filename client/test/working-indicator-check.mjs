@@ -66,7 +66,7 @@ ok(keyframes.length === 4 && keyframes.every(([, , body]) => !/(width|height|lef
 ok(!/vector-effect/.test(ind), 'no vector-effect: non-scaling-stroke (it breaks the pathLength dash in Chromium)');
 ok(/strokeWidth=\{STROKE\[size\]\}/.test(component) && /16: 2\.25, 24: 1\.5, 40: 0\.9/.test(component), 'the stroke is 1.5 px at 16, 24 and 40 px');
 const aurora = read('client/src/instrument/aurora.css');
-ok(/html\.ui-instrument\.skin-aurora \.pri-working \{ color: var\(--au-light\); \}/.test(aurora), 'under Aurora it is the edition light (D6)');
+ok(/html\.ui-instrument\.skin-aurora \.pri-working svg \{ color: var\(--au-light\); \}/.test(aurora) && !/\.pri-working \{[^}]*--au-light/.test(aurora), 'under Aurora the drawing is the edition light (D6) and its label stays ink, so the accent is never text here');
 const bytes = Buffer.byteLength(component) + Buffer.byteLength(read('client/src/instrument/workingClock.js'));
 console.log(`  component + clock source: ${bytes} bytes; CSS block: ${Buffer.byteLength(ind)} bytes (before minification)`);
 
