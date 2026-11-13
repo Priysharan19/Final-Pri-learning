@@ -51,6 +51,7 @@ import { verifyReadReceipt } from './readReceipt.js';
 // Priyabhata the India curriculum's (D15, indiaBanks.js), Prithagoras the NSW
 // banks that passed their gates (nswBanks.js). Never a request field.
 import { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } from './editionBanks.js';
+import { serverEdition } from './edition.js';
 import { figureHasExternalRef } from './figureRefs.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
@@ -584,6 +585,8 @@ export function hintWorkNote(work, locale = 'en') {
 
 export function createPracticeRouter(db, { transcribe = transcribeHandwriting, env = process.env, banks = bankPolicy() } = {}) {
   db = asStore(db);
+  // The free-practice day is the deployment edition's calendar day (plan H7).
+  const edition = serverEdition(env);
   // Start the marker workers now, so the first submission does not wait for
   // them to import the engine.
   markerPool();
@@ -704,7 +707,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         }
       }
       if (counted) {
-        const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
+        const allowance = await practiceAllowanceVerdict(db, { accountId, now, env, edition });
         if (!allowance.allowed) return { capped: allowance };
       }
       if (preparedNonce) {
@@ -719,7 +722,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (preparedNonce) await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-prepared',?,?,?,?,?)",
         [accountId, preparedNonce, JSON.stringify(publicResponse), requestDigest, now, Math.max(preparedExpiry, now) + PREPARED_TTL]);
       // Counted only now: this question was really issued, in this transaction.
-      if (counted) await recordPracticeIssue(db, { accountId, now });
+      if (counted) await recordPracticeIssue(db, { accountId, now, edition });
       return publicResponse;
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (response.conflict) return reject(res, 409, 'IDEMPOTENCY_KEY_REUSED', 'This key already issued a different question.');
@@ -765,11 +768,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // once it has lapsed (D19): the repeat is a new issue.
       const premiumGap = await premiumContentRefusal(db, { accountId, generator: typeof q._generator === 'string' ? q._generator : q.subtopic, now });
       if (premiumGap) return { premium: premiumGap };
-      const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
+      const allowance = await practiceAllowanceVerdict(db, { accountId, now, env, edition });
       if (!allowance.allowed) return { capped: allowance };
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
-      await recordPracticeIssue(db, { accountId, now });
+      await recordPracticeIssue(db, { accountId, now, edition });
       return {};
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (outcome.premium) return refusePremiumContent(res, outcome.premium);
@@ -1673,11 +1676,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // questions a day) and is refused at the cap; before this it was issued
     // uncounted, so a wrong answer's twins were an unlimited free supply.
     const outcome = await db.transaction(async () => {
-      const allowance = await practiceAllowanceVerdict(db, { accountId, now, env });
+      const allowance = await practiceAllowanceVerdict(db, { accountId, now, env, edition });
       if (!allowance.allowed) return { capped: allowance };
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
         [accountId, id, payload, digest(payload), now, now + MAX_AGE]);
-      await recordPracticeIssue(db, { accountId, now });
+      await recordPracticeIssue(db, { accountId, now, edition });
       return {};
     }, { accountScope: accountId, lock: 'practice-issue:' + accountId });
     if (outcome.capped) return refusePracticeCap(res, outcome.capped, now);

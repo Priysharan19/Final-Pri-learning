@@ -48,7 +48,7 @@
 import { INTERFACE_SKIN as SETTING_SKIN } from '../../interface.config.mjs';
 
 
-/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__, __PRI_FEATURE_LIBRARY__ */
+/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__, __PRI_FEATURE_LIBRARY__, __PRI_FEATURE_EXAM_DESK__ */
 /* global __PRI_FEATURE_NSW_EXAMS__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
@@ -69,6 +69,11 @@ const BUILT = {
   // ADR-0002 plan F1). OFF in a production build: a new student surface outside
   // the frozen V1 scope, so V1 behaviour is unchanged until the owner's GO.
   library: typeof __PRI_FEATURE_LIBRARY__ === 'boolean' ? __PRI_FEATURE_LIBRARY__ : null,
+  // PRI_FEATURE_EXAM_DESK=1 — the Exam Desk (/desk/:attemptId, /desk/import;
+  // ADR-0002 §8 plan F4b): unmarked, timed practice on a library paper. OFF in
+  // a production build until the owner's GO. It is reached from a library
+  // paper, so it also needs PRI_FEATURE_LIBRARY (App.jsx holds both).
+  examDesk: typeof __PRI_FEATURE_EXAM_DESK__ === 'boolean' ? __PRI_FEATURE_EXAM_DESK__ : null,
   // PRI_FEATURE_NSW_EXAMS=1 — Prithagoras's HSC-style timed papers on the
   // Exams page (plan G4). OFF in a production build: it ships dark, and the
   // server is off too unless PRI_NSW_EXAMS=on (server/platform/nswExamPool.js).

@@ -172,6 +172,9 @@ export const ENGINE_SUITES = [
   // Plan E5: billing provider per edition — the same requests to a Priyabhata
   // and a Prithagoras router, each on its own database as pri_server.
   'billing-edition-check.mjs',
+  // Plan H7: the practice day per edition and the paid-call ceiling under each
+  // edition; its HTTP part runs a Prithagoras server as pri_server.
+  'edition-ai-budgets-check.mjs',
   'tutor-help-check.mjs',
   'tutor-device-journey-check.mjs',
   // The tutor grounded in the server's own escrowed question: the escrow read
