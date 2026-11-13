@@ -137,8 +137,8 @@ function buildApp() {
     // new profile only under EXTENDED_TRACKS, so without it here the suite
     // only passes where the CI job happens to export the variable.
     // (KALP-02 pins the four-flag env below; PARENT_REPORT (#743) is added on top so /parent-report is walked too,
-    // and LIBRARY (plan F1) so /library and /library/:id are.)
-    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1', PRI_FEATURE_LIBRARY: '1' } });
+    // and LIBRARY (plan F1) so /library and /library/:id are, and EXAM_DESK (plan F4b) so /desk/import and /desk/:attemptId are.)
+    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1', PRI_FEATURE_LIBRARY: '1', PRI_FEATURE_EXAM_DESK: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -1155,6 +1155,57 @@ async function run() {
     await step('library · one resource, or why it cannot be shown', '/library/:id', async () => {
       await goTo(page, BASE, '/library/2027-mathematics-advanced-assessment-1');
       await page.waitForSelector('.lib-page [data-library-detail], .lib-page [data-library-error]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    // The Exam Desk (ADR-0002 §8 plan F4b): built only with PRI_FEATURE_EXAM_DESK=1
+    // (and the library), which this walk sets. Unmarked practice on a library
+    // paper: the import page, then one attempt from before it starts to the
+    // closed record, with its two sheets open.
+    // TEST DESK: no India paper is published yet, so this server's edition is
+    // offered the library's one seeded paper. Not a product path.
+    const DESK_PAPER = '2027-mathematics-advanced-assessment-1';
+    platform.h.db.prepare('INSERT OR IGNORE INTO resource_editions(resource_id, edition) VALUES (?, ?)').run(DESK_PAPER, process.env.PRI_EDITION || 'priyabhata');
+    await step('exam desk · bring in practice: choose the export file', '/desk/import', async () => {
+      await goTo(page, BASE, '/desk/import');
+      await page.waitForSelector('.dk-page #dk-import-file', { timeout: 20000 });
+      await wait(page, 600);
+    });
+    await step('exam desk · the way in on a library paper', '/library/:id', async () => {
+      await goTo(page, BASE, `/library/${DESK_PAPER}`);
+      await page.waitForSelector('[data-desk-entry] [data-desk-start]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+    await step('exam desk · before starting: the paper, the navigator and the notes', '/desk/:attemptId', async () => {
+      await page.locator('[data-desk-start]').click();
+      await page.waitForSelector('[data-desk-attempt][data-desk-phase="idle"]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+    await step('exam desk · working time, with a note, a flag and a done question', '/desk/:attemptId', async () => {
+      await page.locator('[data-desk-intent="begin-working"]').click();
+      await page.waitForSelector('[data-desk-attempt][data-desk-phase="working"][data-desk-queued="0"]', { timeout: 20000 });
+      await page.locator('.xs-nav button[data-q="3"]').click();
+      await page.locator('textarea[data-notes-for="3"]').fill('check the domain');
+      await page.locator('[data-desk-flag]').click();
+      await page.locator('.xs-nav button[data-q="4"]').click();
+      await page.locator('[data-desk-done]').click();
+      await page.waitForSelector('[data-desk-attempt][data-desk-save="saved"]', { timeout: 20000 });
+      await wait(page, 400);
+    });
+    await step('exam desk · the keyboard shortcut sheet', '/desk/:attemptId', async () => {
+      await page.locator('.dk-keys').click();
+      await page.waitForSelector('[data-testid="shell-shortcuts"]', { timeout: 5000 });
+      await wait(page, 400);
+    });
+    await step('exam desk · "Close this paper?"', '/desk/:attemptId', async () => {
+      await page.keyboard.press('Escape');
+      await page.locator('[data-desk-close]').click();
+      await page.waitForSelector('[data-testid="desk-close-sheet"]', { timeout: 5000 });
+      await wait(page, 400);
+    });
+    await step('exam desk · closed: the record of the sitting, nothing marked', '/desk/:attemptId', async () => {
+      await page.locator('[data-testid="desk-close-sheet"] [data-sheet-confirm]').click();
+      await page.waitForSelector('[data-desk-attempt][data-desk-phase="finished"] [data-desk-closed]', { timeout: 20000 });
       await wait(page, 600);
     });
 

@@ -20,6 +20,17 @@
 // failure shows up in a response, which is the same argument the proxy-hops
 // setting makes, so the server refuses to start rather than guess.
 //
+// PER REGION (plan H7, ADR-0002 §9–10). Deployments are siloed: one edition
+// per deployment, so this deployment's ceiling IS its region's ceiling (while
+// two deployments share a provider key they still share that provider's own
+// limits and bill; a separate Australian key is the owner's, with H1). The
+// rule above holds in every edition: a Prithagoras deployment with a key and
+// no ceiling refuses to start exactly as a Priyabhata one does, and no edition
+// has a default. What the edition adds is a label: every unit spent, refused
+// or refunded is counted under it (paid_calls_total{edition}), the operator's
+// health view names it, and a PAID_CEILING_HIGH email names the edition and
+// region. A refusal never falls back to another region's key or model.
+//
 // When the ceiling is reached the route refuses, before anything is sent to
 // the provider and before anything is marked. Reading is online-only, so the
 // student's page is then NOT read: the client says so, names when the limit
@@ -27,7 +38,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { consumeRateLimit } from './security.js';
 import { asStore } from './store.js';
-import { recordPaidCeilingHigh } from './metrics.js';
+import { recordPaidCall, recordPaidCeilingHigh } from './metrics.js';
+import { serverEdition } from './edition.js';
 
 /** At this share of either window's ceiling, the operator is warned (PAID_CEILING_HIGH). */
 export const PAID_ALERT_RATIO = 0.8;
@@ -47,6 +59,8 @@ const positiveInt = (value) => {
 export function spendCeiling(env = process.env) {
   const configured = String(env.PRI_HANDWRITING_API_KEY || '').trim().length > 0;
   return Object.freeze({
+    // Whose ceiling this is: the deployment's edition, never a request's.
+    edition: serverEdition(env),
     required: configured,
     perHour: positiveInt(env.PRI_PAID_CALLS_PER_HOUR),
     perDay: positiveInt(env.PRI_PAID_CALLS_PER_DAY)
@@ -98,22 +112,23 @@ export async function reservePaidCall(db, { env = process.env, now = Date.now() 
   // these, so arriving here without them means something is wrong, and refusing
   // to spend is the only safe reading of that.
   if (ceiling.perHour === null || ceiling.perDay === null) {
+    recordPaidCall(ceiling.edition, 'refused');
     return { verdict: { status: 503, code: 'PAID_CAPACITY_NOT_CONFIGURED', message: 'Server reading is unavailable on this deployment.' }, units: [] };
   }
 
   // Both buckets in one transaction, as when this ran synchronously: two
   // concurrent calls can never both take the last unit of either budget.
   const store = asStore(db);
-  return store.transaction(async () => {
+  const outcome = await store.transaction(async () => {
     const hourBucket = `${PAID_BUDGET}:hour`;
     const dayBucket = `${PAID_BUDGET}:day`;
     const hour = await consumeRateLimit(store, hourBucket, { limit: ceiling.perHour, windowMs: WINDOWS.hour }, now);
-    if (!hour.allowed) return { verdict: { ...spent(hour.resetAt), window: 'hour' }, units: [] };
+    if (!hour.allowed) return { verdict: { ...spent(hour.resetAt), window: 'hour' }, units: [], edition: ceiling.edition };
     const hourUnit = { bucket: hourBucket, windowStart: hour.resetAt - WINDOWS.hour };
     const day = await consumeRateLimit(store, dayBucket, { limit: ceiling.perDay, windowMs: WINDOWS.day }, now);
     if (!day.allowed) {
       await giveBack(store, hourUnit);
-      return { verdict: { ...spent(day.resetAt), window: 'day' }, units: [] };
+      return { verdict: { ...spent(day.resetAt), window: 'day' }, units: [], edition: ceiling.edition };
     }
     // Early warning: a call that takes either window to 80% or more of its
     // ceiling is counted, and the PAID_CEILING_HIGH alert rule (metrics.js)
@@ -121,8 +136,12 @@ export async function reservePaidCall(db, { env = process.env, now = Date.now() 
     for (const [window, verdict, limit] of [['hour', hour, ceiling.perHour], ['day', day, ceiling.perDay]]) {
       if ((limit - verdict.remaining) >= Math.ceil(limit * PAID_ALERT_RATIO)) recordPaidCeilingHigh(window);
     }
-    return { verdict: null, units: [hourUnit, { bucket: dayBucket, windowStart: day.resetAt - WINDOWS.day }] };
+    return { verdict: null, units: [hourUnit, { bucket: dayBucket, windowStart: day.resetAt - WINDOWS.day }], edition: ceiling.edition };
   });
+  // Counted after the transaction settles, so a rolled-back reservation is
+  // never reported as spent.
+  recordPaidCall(ceiling.edition, outcome.verdict ? 'refused' : 'spent');
+  return outcome;
 }
 
 function giveBack(store, unit) {
@@ -141,6 +160,7 @@ export async function refundPaidCall(db, reservation) {
   await store.transaction(async () => {
     for (const unit of reservation.units) await giveBack(store, unit);
   });
+  recordPaidCall(reservation.edition, 'refunded');
 }
 
 function spent(resetAt) {

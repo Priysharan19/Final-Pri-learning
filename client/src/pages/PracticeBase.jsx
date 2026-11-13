@@ -539,7 +539,7 @@ function ProfilePractice() {
         )}
         {pyqOnly && <p className="muted">{t('practice.pyqOnlyNote')}</p>}
 
-        {capped && <FreeCapNotice gate={capped} onRetry={load} />}
+        {capped && <FreeCapNotice gate={capped} onRetry={load} profile={user} />}
 
         {/* No question exists for this exact selection: an empty state with a way
             forward, not a failure. */}
