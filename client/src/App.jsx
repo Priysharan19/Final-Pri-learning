@@ -61,6 +61,10 @@ const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
 // The shared resource library (ADR-0002 plan F1): its own chunk, built only
 // where PRI_FEATURE_LIBRARY is on.
 const Library = React.lazy(() => import('./library/Library.jsx'));
+// The Exam Desk (ADR-0002 §8 plan F4b): unmarked practice on a library paper.
+// Its own chunk, routed only where PRI_FEATURE_EXAM_DESK and the library are on.
+const DeskPage = React.lazy(() => import('./desk/DeskPage.jsx'));
+const DeskImport = React.lazy(() => import('./desk/DeskImport.jsx'));
 const Insights = React.lazy(() => import('./insights/Insights.jsx'));
 // Outside the frozen V1 scope: the route exists only where the build flag is on.
 const PLACEMENT_ON = featureEnabled('placement');
@@ -69,6 +73,13 @@ const PLACEMENT_ON = featureEnabled('placement');
 const PARENT_REPORT_ON = featureEnabled('parentReport');
 // The resource library's page: off in a production build (PRI_FEATURE_LIBRARY).
 const LIBRARY_ON = featureEnabled('library');
+// The Exam Desk is reached from a library paper, so it needs both flags.
+const DESK_ON = LIBRARY_ON && featureEnabled('examDesk');
+// The desk keeps unsent notes in a device cache of its own (desk/deskCache.js,
+// 'pri-desk-v1'). Signing out of, or deleting, the account on this device
+// forgets it — unsent notes included — like the other account-scoped device
+// state. A session that merely expires keeps it, for the same account's return.
+if (DESK_ON) onCloudSessionChange(event => { if (event?.detail?.connected === false) import('./desk/deskCache.js').then(m => m.clearDeskCache()).catch(() => { try { indexedDB.deleteDatabase('pri-desk-v1'); } catch { /* nothing kept */ } }); });
 // V1 decision D10 (1 Nov 2026): a student tab the V1 evidence does not cover
 // is hidden from students, starting with Classes. The classroom product is the
 // PRI_FEATURE_EXTENDED_TRACKS surface (platform/features.js: "the classroom/
@@ -416,7 +427,7 @@ export default function App() {
   }, [user?.id, user?.theme]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pageTitle = useMemo(
-    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : loc.pathname.startsWith('/notes/') ? t('nav.notes') : loc.pathname.startsWith('/library/') ? t('nav.library') : null),
+    () => (TITLE_KEYS[loc.pathname] ? t(TITLE_KEYS[loc.pathname]) : loc.pathname.startsWith('/exams') ? t('nav.exam') : loc.pathname.startsWith('/notes/') ? t('nav.notes') : loc.pathname.startsWith('/library/') ? t('nav.library') : loc.pathname.startsWith('/desk/') ? t('desk.name') : null),
     [loc.pathname, t]
   );
 
@@ -665,7 +676,9 @@ export default function App() {
                     <Route path="/notes" element={studentOnly(<Notes />)} />
                     <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
                     {LIBRARY_ON && <Route path="/library" element={studentOnly(<Library />)} />}
-                    {LIBRARY_ON && <Route path="/library/:id" element={studentOnly(<Library />)} />}
+                    {LIBRARY_ON && <Route path="/library/:id" element={studentOnly(<Library desk={DESK_ON} />)} />}
+                    {DESK_ON && <Route path="/desk/import" element={studentOnly(<DeskImport />)} />}
+                    {DESK_ON && <Route path="/desk/:attemptId" element={studentOnly(<DeskPage />)} />}
                     <Route path="/rush" element={studentOnly(<Rush />)} />
                     <Route path="/match" element={studentOnly(<Match />)} />
                     <Route path="/review" element={studentOnly(<History />)} />

@@ -14,12 +14,15 @@ import React from 'react';
 import PageLink from './PageLink.jsx';
 import { useT, useTx } from '../i18n/index.js';
 import { PAYWALL_ROUTE } from '../paywall/route.js';
+// Where and how the reset is written (plan H7): lib/locale.js capResetClock.
+import { capResetClock as resetClock } from '../lib/locale.js';
 
-function whenItResets(resetsAt, timeZone) {
+function whenItResets(resetsAt, timeZone, profile = null) {
   if (!Number.isFinite(resetsAt)) return null;
+  const clock = resetClock(timeZone, profile);
   try {
-    const at = new Intl.DateTimeFormat('en-IN', {
-      timeZone: timeZone || undefined, hour: 'numeric', minute: '2-digit', hour12: true,
+    const at = new Intl.DateTimeFormat(clock.locale, {
+      timeZone: clock.timeZone || undefined, hour: 'numeric', minute: '2-digit', hour12: true,
       weekday: 'short', day: 'numeric', month: 'short'
     }).format(new Date(resetsAt));
     return at;
@@ -28,14 +31,16 @@ function whenItResets(resetsAt, timeZone) {
 
 /**
  * `gate` is the error the local backend threw: { code, message, used, limit,
- * resetsAt, nextAt, timeZone, capability, refreshRequired }.
+ * resetsAt, nextAt, timeZone, capability, refreshRequired }. `profile` is the
+ * signed-in student, whose locale and timezone the reset is written in.
  */
-export default function FreeCapNotice({ gate, onRetry }) {
+export default function FreeCapNotice({ gate, onRetry, profile = null }) {
   const t = useT();
   const tx = useTx();
   if (!gate) return null;
   const isExam = gate.code === 'FREE_EXAM_CAP_REACHED' || gate.capability === 'premium-exams';
-  const resets = whenItResets(gate.resetsAt ?? gate.nextAt, gate.timeZone);
+  const resets = whenItResets(gate.resetsAt ?? gate.nextAt, gate.timeZone, profile);
+  const zone = resetClock(gate.timeZone, profile).timeZone;
 
   return (
     <div className="qpage">
@@ -53,7 +58,7 @@ export default function FreeCapNotice({ gate, onRetry }) {
         {resets && (
           <p className="muted">
             {tx(isExam ? 'freeCap.examUnlocks' : 'freeCap.questionsReturn', {
-              when: <><b>{resets}</b>{gate.timeZone ? ` (${gate.timeZone.replace('_', ' ')})` : ''}</>
+              when: <><b>{resets}</b>{zone ? ` (${zone.replace('_', ' ')})` : ''}</>
             })}
           </p>
         )}
