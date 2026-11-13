@@ -568,11 +568,11 @@ function nswPublic(paper) {
 // An NSW paper names its blueprint and nothing else. The server draws every
 // question; a blueprint the release check refuses is not released.
 const NSW_NOT_AVAILABLE = refusal(404, 'EXAM_KIND_UNAVAILABLE', 'These papers are not available here.');
-function readNswSpec(body) {
+function readNswSpec(body, env = process.env) {
   for (const field of ['paper', 'layoutSeed', 'slots']) if (body[field] !== undefined) return INVALID();
   const b = body.blueprint;
   if (!plain(b) || unknown(b, new Set(['id'])).length || typeof b.id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(b.id)) return INVALID('Name the paper.');
-  const named = nswRelease(b.id);
+  const named = nswRelease(b.id, nswExamPool(), env);
   if (!named) return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', 'No examination blueprint is released for this selection.');
   const { blueprint, release } = named;
   if (!release.released) {
@@ -598,7 +598,7 @@ function readNswSpec(body) {
   };
 }
 
-function readSpec(body) {
+function readSpec(body, env = process.env) {
   if (!plain(body) || unknown(body, CREATE_FIELDS).length) return INVALID();
   // D15: the practice paper is the NSW course's, built from banks outside the
   // India curriculum's covers, so it is refused (indiaBanks.js).
@@ -612,12 +612,12 @@ function readSpec(body) {
     return refusal(422, 'EXAM_KIND_OUTSIDE_CURRICULUM', 'This kind of paper is not part of this edition.');
   }
   // An NSW paper is the Prithagoras edition's, behind its own switch (plan G4).
-  if (body.kind === 'nsw' && bankPolicy().curriculum !== 'nsw') {
-    return refusal(422, 'EXAM_KIND_OUTSIDE_CURRICULUM', 'This kind of paper is not part of this edition.');
-  }
-  if (body.kind === 'nsw' && !nswExamsOn()) return NSW_NOT_AVAILABLE;
+  // Anywhere else the kind is unknown, exactly as it was before: Priyabhata's
+  // replies do not change.
+  const nsw = body.kind === 'nsw' && bankPolicy().curriculum === 'nsw';
+  if (nsw && !nswExamsOn(env)) return NSW_NOT_AVAILABLE;
   const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body)
-    : body.kind === 'nsw' ? readNswSpec(body) : INVALID('Name the kind of paper.');
+    : nsw ? readNswSpec(body, env) : INVALID('Name the kind of paper.');
   if (read.refused) return read;
   // A board mock ("Pri mock in board format", engine/boardMock.js, D22) is a
   // full blueprint paper on a board blueprint, sat typed, under its own title.
@@ -768,6 +768,7 @@ async function issueQuestions(read) {
 // (multi-correct, matrix, sketch, geometry, proof, a board scheme) is never on
 // an NSW paper, whatever the marking switch says.
 const NSW_ANSWER_TYPES = new Set(['numeric', 'mcq', 'expression', 'point', 'set']);
+const NSW_WRITTEN_TRIES = 64;
 const nswFinalAnswerOnly = q => !!q?.prompt && NSW_ANSWER_TYPES.has(q.answerType) && !q.multipart && !Array.isArray(q.boardScheme);
 
 /**
@@ -787,10 +788,13 @@ async function issueNswQuestions(read, { seal, draw, fresh, onPaper, unitHashes,
     const order = shuffle(forms).sort((a, b) => rank(a) - rank(b));
     let q = null, form = null;
     for (const candidate of order) {
-      for (let attempt = 0; attempt < ISSUE_TRIES && !q; attempt++) {
+      // A multi-mark slot redraws a form's multiple-choice variants away, so it gets more tries.
+      for (let attempt = 0; attempt < (slot.marks > 1 ? NSW_WRITTEN_TRIES : ISSUE_TRIES) && !q; attempt++) {
         let drawn;
         try { drawn = draw(candidate.generator, candidate.difficulty); } catch { drawn = null; }
         if (!drawn || !nswFinalAnswerOnly(drawn) || !fresh(drawn)) continue;
+        // A multi-mark slot is never a multiple-choice question (engine/nswExams.js formsForSlot).
+        if (slot.marks > 1 && OBJECTIVE.has(drawn.answerType)) continue;
         drawn._generator = candidate.generator;
         if (!sealForEdition(drawn, banks, candidate.generator)) continue;
         if (!drawn._curriculum?.outcomes?.some(o => o.code === slot.outcome)) continue;
@@ -1891,13 +1895,13 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
   // covers and lacks. 404 unless this is a Prithagoras server with the switch on.
   router.get('/nsw', rateLimit(db, 'exam-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     if (bankPolicy().curriculum !== 'nsw' || !nswExamsOn(env)) return reject(res, 404, 'EXAM_KIND_UNAVAILABLE', 'These papers are not available here.');
-    return res.status(200).json(nswExamCatalogue());
+    return res.status(200).json(nswExamCatalogue(nswExamPool(), env));
   });
 
   router.post('/', rateLimit(db, 'exam-create', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const idem = String(req.get('idempotency-key') || '');
     if (!ID.test(idem)) return reject(res, 400, 'IDEMPOTENCY_KEY_REQUIRED', 'Starting a paper needs a stable idempotency key.');
-    const spec = readSpec(req.body);
+    const spec = readSpec(req.body, env);
     if (spec.refused) return reject(res, ...spec.refused);
     const accountId = req.platformSession.account_id;
     const requestDigest = digest(req.body);

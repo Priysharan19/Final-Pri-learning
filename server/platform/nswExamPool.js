@@ -41,6 +41,7 @@ import {
   NSW_EXAM_LABEL, NSW_MARKING_NOTE, NSW_MIN_FORMS_PER_SLOT, NSW_RELEASE_FLOOR, DIFFICULTIES_FOR_MARKS
 } from '../../client/src/engine/nswExams.js';
 import { bankPolicy } from './editionBanks.js';
+import { NSW_FORM_ANSWER_TYPES } from './nswFormTypes.js';
 import { NSW_COURSE } from './nswBanks.js';
 
 const ROW_BY_GENERATOR = new Map(LEGACY_CROSSWALK.map(row => [row.subtopicId, row]));
@@ -56,7 +57,11 @@ export function formOutcomes(generator, difficulty) {
 /** G3's pool: every issued NSW cell with its outcomes. Static for a build. */
 export const NSW_EXAM_POOL = Object.freeze(NSW_BANK_LEDGER.flatMap(entry => entry.cells
   .filter(cell => cell.issued)
-  .map(cell => Object.freeze({ generator: entry.generator, difficulty: cell.difficulty, outcomes: Object.freeze(formOutcomes(entry.generator, cell.difficulty)) }))
+  .map(cell => Object.freeze({
+    generator: entry.generator, difficulty: cell.difficulty, outcomes: Object.freeze(formOutcomes(entry.generator, cell.difficulty)),
+    // Sampled by tools/nsw-exam-releases.mjs; nsw-exams-check fails when stale.
+    types: Object.freeze([...(NSW_FORM_ANSWER_TYPES[`${entry.generator}|${cell.difficulty}`] || [])])
+  }))
   .filter(form => form.outcomes.length > 0)));
 
 /** A short Extension 1 paper, one slot per Year 12 outcome. Tests only (see the header). */
@@ -120,13 +125,13 @@ export const outcomeNamed = code => ({ code, name: NSW_OUTCOME_BY_CODE[code]?.fo
 export const releaseOf = (b, pool = nswExamPool()) => blueprintRelease(b, pool, { year12Outcomes: year12OutcomesOf(b) });
 
 /** The release of every blueprint on the pool in force. */
-export function nswReleases(pool = nswExamPool()) {
-  return nswBlueprints().map(b => releaseOf(b, pool));
+export function nswReleases(pool = nswExamPool(), env = process.env) {
+  return nswBlueprints(env).map(b => releaseOf(b, pool));
 }
 
 /** One blueprint's release on the pool in force, or null for an unknown id. */
-export function nswRelease(id, pool = nswExamPool()) {
-  const b = nswExamBlueprint(id) || (testBlueprint()?.id === id ? NSW_TEST_BLUEPRINT : null);
+export function nswRelease(id, pool = nswExamPool(), env = process.env) {
+  const b = nswExamBlueprint(id) || (testBlueprint(env)?.id === id ? NSW_TEST_BLUEPRINT : null);
   return b ? { blueprint: b, release: releaseOf(b, pool) } : null;
 }
 
@@ -136,11 +141,11 @@ export function nswRelease(id, pool = nswExamPool()) {
  * outcomes have no approved forms or too few. Codes and Pri's own labels only:
  * no NESA wording, no question, no answer.
  */
-export function nswExamCatalogue(pool = nswExamPool()) {
+export function nswExamCatalogue(pool = nswExamPool(), env = process.env) {
   return {
     label: NSW_EXAM_LABEL, marking: 'final-answer-only', markingNote: NSW_MARKING_NOTE,
     minFormsPerSlot: NSW_MIN_FORMS_PER_SLOT, releaseFloor: NSW_RELEASE_FLOOR,
-    papers: nswBlueprints().map(b => {
+    papers: nswBlueprints(env).map(b => {
       const release = releaseOf(b, pool);
       const tally = tallyOf(b);
       const sat = release.released ? release.included : release.slots;

@@ -242,7 +242,7 @@ jobs:
           # Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render.
           grep -Fq 'NSW BANK QUALITY: PASS — 75 generators, 267 cells issued' suites.log
           # Plan G4: NSW HSC-style blueprints held to NESA's specification, the release check, and the exam-path false-positive sweep.
-          grep -Fq 'NSW EXAM BLUEPRINTS (G4): PASS — 539 checks' suites.log
+          grep -Fq 'NSW EXAM BLUEPRINTS (G4): PASS — 546 checks' suites.log
           # 133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the
           # question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit.
           # 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
@@ -644,7 +644,7 @@ jobs:
           grep -Fq 'NSW PRACTICE (G3): PASS — 164/164 checks' practice-http.log
           # Plan G4: NSW HSC-style papers over HTTP — release, reading time, final-answer marking, no band. SQLite here; Postgres below.
           node server/test/nsw-exam-check.mjs 2>&1 | tee -a practice-http.log
-          grep -Fq 'NSW EXAMS (G4): PASS — 66/66 checks' practice-http.log
+          grep -Fq 'NSW EXAMS (G4): PASS — 68/68 checks' practice-http.log
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log

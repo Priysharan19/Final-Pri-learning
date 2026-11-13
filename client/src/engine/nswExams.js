@@ -252,7 +252,14 @@ export function tallyOf(b) {
 /**
  * The approved forms that can fill one slot: every form on its outcome, the
  * ones at a difficulty the slot prefers first. `pool` is the server's list of
- * `{ generator, difficulty, outcomes: [code…] }`.
+ * `{ generator, difficulty, outcomes: [code…], types: [answerType…] }`.
+ *
+ * A slot worth more than one mark is never a multiple-choice question:
+ * marked all or nothing, a blind guess at four options would earn the whole
+ * 2–5 marks one time in four. Such a slot counts only forms KNOWN to set
+ * written questions (their sampled answer types include one that is not
+ * multiple choice), and the server redraws a form's multiple-choice variants
+ * away for it. A form whose answer types are unknown is not counted there.
  */
 export function formsForSlot(slot, pool) {
   const seen = new Set();
@@ -260,6 +267,7 @@ export function formsForSlot(slot, pool) {
   const preferred = form => (slot.difficulties || []).includes(form.difficulty) ? 0 : 1;
   for (const form of [...(pool || [])].sort((a, b) => preferred(a) - preferred(b))) {
     if (!form || !Array.isArray(form.outcomes) || !form.outcomes.includes(slot.outcome)) continue;
+    if ((slot.marks || 1) > 1 && !writtenOnly(form)) continue;
     const key = `${form.generator}|${form.difficulty}`;
     if (seen.has(key)) continue;
     seen.add(key);
@@ -267,6 +275,9 @@ export function formsForSlot(slot, pool) {
   }
   return out;
 }
+
+/** Does this form set questions answered in writing (an answer type that is not multiple choice)? */
+export const writtenOnly = form => Array.isArray(form?.types) && form.types.some(type => type !== 'mcq' && type !== 'multi-mcq');
 
 /** A working time scaled to the marks a partial paper keeps: whole five minutes, at least ten. */
 export const scaledMinutes = (minutes, kept, total) => (kept >= total ? minutes : Math.max(10, Math.round((minutes * kept / Math.max(1, total)) / 5) * 5));

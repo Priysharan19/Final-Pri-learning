@@ -44,7 +44,7 @@ const { NSW_BANK_LEDGER, nswIssuable } = await import('../../server/platform/nsw
 const { indiaBank } = await import('../../server/platform/indiaBanks.js');
 const { MARKER_OPS } = await import('../../server/platform/markerOps.js');
 const { FINAL_ANSWER_ONLY } = await import('../../server/platform/markingPolicy.js');
-const { renderReleases } = await import('../../tools/nsw-exam-releases.mjs');
+const { renderReleases, renderFormTypes } = await import('../../tools/nsw-exam-releases.mjs');
 
 const SEEDS = Number(process.argv[2]) || 8;
 let checks = 0;
@@ -97,10 +97,19 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
   const outcomes = outcomesOf(b);
   const year12Outcomes = year12OutcomesOf(b);           // ME1-12-01 … ME1-12-06
   const y12 = { year12Outcomes };
-  const forms = (n, skip = new Set()) => outcomes.filter(code => !skip.has(code)).flatMap((code, i) => Array.from({ length: n }, (_, k) => ({ generator: `gen-${code}-${k}`, difficulty: 1 + (k % 4), outcomes: [code] })));
+  const forms = (n, skip = new Set()) => outcomes.filter(code => !skip.has(code)).flatMap((code, i) => Array.from({ length: n }, (_, k) => ({ generator: `gen-${code}-${k}`, difficulty: 1 + (k % 4), outcomes: [code], types: ['numeric'] })));
   const all = blueprintRelease(b, forms(NSW_MIN_FORMS_PER_SLOT), y12);
   check(all.released && all.full && all.included.length === all.slots.length && all.marks === b.totalMarks && all.workingMin === b.workingMin, 'three distinct forms on every outcome: the whole paper, at full marks and time');
   check(nswPaperTitle(b, all) === `${b.label} · ${NSW_EXAM_LABEL}`, 'a whole paper is an answer-checked practice paper');
+  // Multiple choice never fills a multi-mark slot: a blind guess would earn the whole slot.
+  const code = outcomes[0];
+  const mcqOnly = [1, 2, 3].map(k => ({ generator: `mcq-${k}`, difficulty: 2, outcomes: [code], types: ['mcq'] }));
+  const mixed = [1, 2, 3].map(k => ({ generator: `mix-${k}`, difficulty: 2, outcomes: [code], types: ['mcq', 'numeric'] }));
+  const untyped = [1, 2, 3].map(k => ({ generator: `unk-${k}`, difficulty: 2, outcomes: [code] }));
+  check(formsForSlot({ outcome: code, marks: 1 }, mcqOnly).length === 3 && formsForSlot({ outcome: code, marks: 2 }, mcqOnly).length === 0,
+    'a multiple-choice-only form fills a 1-mark slot, never a multi-mark one');
+  check(formsForSlot({ outcome: code, marks: 3 }, mixed).length === 3, 'a form that also sets written questions counts for a multi-mark slot (the server redraws its multiple-choice variants away)');
+  check(formsForSlot({ outcome: code, marks: 2 }, untyped).length === 0, 'a form whose answer types are unknown never fills a multi-mark slot');
   check(!blueprintReleasable(b, forms(NSW_MIN_FORMS_PER_SLOT - 1), y12), 'two forms on every outcome: refused');
   check(!blueprintReleasable(b, forms(NSW_MIN_FORMS_PER_SLOT)), 'without the course\'s Year 12 outcomes nothing is released');
   // The floor, exactly: 6 Year 12 outcomes, 75% = 4.5, so 5 covered is released and 4 is refused.
@@ -122,7 +131,7 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
   check(!blueprintReleasable(b, forms(NSW_MIN_FORMS_PER_SLOT).map(f => ({ ...f, outcomes: ['MAV-12-04'] })), y12), 'forms on another outcome never fill a slot');
   check(scaledMinutes(120, 30, 70) === 50 && scaledMinutes(120, 70, 70) === 120 && scaledMinutes(10, 1, 9) === 10, 'scaled minutes: whole five minutes, at least ten');
   const slot = { outcome: outcomes[0], difficulties: [3, 4] };
-  const ordered = formsForSlot(slot, [{ generator: 'a', difficulty: 1, outcomes: [outcomes[0]] }, { generator: 'b', difficulty: 4, outcomes: [outcomes[0]] }]);
+  const ordered = formsForSlot(slot, [{ generator: 'a', difficulty: 1, outcomes: [outcomes[0]], types: ['numeric'] }, { generator: 'b', difficulty: 4, outcomes: [outcomes[0]], types: ['numeric'] }]);
   check(ordered.map(f => f.generator).join() === 'b,a', 'a slot lists its preferred difficulties first, and still counts the others');
 }
 // PINNED against the current pool (G3, 267 forms; CTO decision 13 Nov 2026).
@@ -130,7 +139,7 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
 const PINNED = {
   'nsw-hsc-standard-1-2027': { released: false, covered: 1, total: 7 },
   'nsw-hsc-standard-2-2027': { released: false, covered: 2, total: 10 },
-  'nsw-hsc-advanced-2027': { released: false, covered: 4, total: 8 },
+  'nsw-hsc-advanced-2027': { released: false, covered: 3, total: 8 },
   'nsw-hsc-extension-1-2027': { released: true, full: false, covered: 5, total: 6, omitted: ['ME1-11-05', 'ME1-12-04'], title: 'Mathematics Extension 1 · Practice paper — 5 of 6 Year 12 outcomes', marks: 58, workingMin: 100 },
   'nsw-hsc-extension-2-2027': { released: true, full: false, covered: 4, total: 5, omitted: ['ME2-12-02'], title: 'Mathematics Extension 2 · Practice paper — 4 of 5 Year 12 outcomes', marks: 81, workingMin: 145 }
 };
@@ -169,6 +178,9 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
 {
   const doc = readFileSync(new URL('../../docs/content/nsw-papers-released.md', import.meta.url), 'utf8');
   check(doc === renderReleases(), 'docs/content/nsw-papers-released.md is current (node tools/nsw-exam-releases.mjs --write)');
+  const types = readFileSync(new URL('../../server/platform/nswFormTypes.js', import.meta.url), 'utf8');
+  check(types === await renderFormTypes(), 'server/platform/nswFormTypes.js matches a fresh sample of every form (node tools/nsw-exam-releases.mjs --write)');
+  check(NSW_EXAM_POOL.every(form => form.types.length > 0), 'every pool form has sampled answer types');
 }
 
 // ── Wording ─────────────────────────────────────────────────────────────────
@@ -176,6 +188,33 @@ check(NSW_EXAM_LABEL === 'Answer-checked practice paper', 'the papers are called
 {
   const text = readFileSync(new URL('../src/engine/nswExams.js', import.meta.url), 'utf8');
   check(!/\bbandFor\b|predict(ed)?Band|\bATAR\b\s*[:=]/.test(text.replace(/\/\/.*$/gm, '')), 'the blueprint module computes no band, ATAR or prediction');
+}
+
+// ── The final-answer seal on the exam marker ────────────────────────────────
+// Control first: with method marks on, an unsealed question's wrong answer
+// over its own worked steps can earn method credit. Sealed final-answer-only,
+// the same response earns 0.
+{
+  const METHOD_ON = Object.freeze({ methodMarks: true, scheme: 'method-marks' });
+  const worked = q => (q.steps || []).map(st => String(st.d || st.h || '').replace(/\$/g, '')).filter(Boolean).join('\n');
+  let control = null, sealedHeld = 0;
+  for (const form of NSW_EXAM_POOL) {
+    for (let seed = 1; seed <= 6; seed++) {
+      let q;
+      try { q = generateQuestion(form.generator, form.difficulty, seed * 7907); } catch { continue; }
+      if (!nswIssuable(q, form.generator) || q.answerType === 'mcq') continue;
+      const given = q.answerType === 'numeric' && Number.isFinite(Number(q.answer?.value)) ? String(Number(q.answer.value) + 7) : '987654';
+      const working = worked(q);
+      if (!working) continue;
+      const grid = { correct: 3, incorrect: 0, unanswered: 0 };
+      const open = MARKER_OPS.exam({ q, given, working, grid, policy: METHOD_ON }, () => {}).response;
+      const sealed = MARKER_OPS.exam({ q: { ...q, _marking: 'final-answer-only' }, given, working, grid, policy: METHOD_ON }, () => {}).response;
+      if (open.awarded > 0 && !open.correct) control = control || `${form.generator}|${form.difficulty}: ${open.awarded}/3 unsealed`;
+      if (!sealed.correct) { if (sealed.awarded !== 0 || sealed.partial) failures.push(`${form.generator}|${form.difficulty}: sealed earned ${sealed.awarded}`); else sealedHeld++; }
+    }
+  }
+  check(control !== null, `control: unsealed, method marks on, real working earns credit on a wrong answer (${control})`);
+  check(sealedHeld > 100, `sealed final-answer-only, the same responses earn 0 (${sealedHeld} wrong answers with real working)`);
 }
 
 // ── SWEEP ───────────────────────────────────────────────────────────────────

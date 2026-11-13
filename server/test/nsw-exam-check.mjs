@@ -57,6 +57,9 @@ const {
 } = await import('../platform/nswExamPool.js');
 const { NSW_EXAM_BLUEPRINTS, slotsOf, NSW_EXAM_LABEL, NSW_RELEASE_FLOOR } = await import('../../client/src/engine/nswExams.js');
 const { checkAnswer } = await import('../../client/src/engine/checker.js');
+const { MARKER_OPS } = await import('../platform/markerOps.js');
+// The method-mark policy as markingPolicy.js defines it (not exported there; that file is in the examiner dossier's tree).
+const WITH_METHOD_MARKS = Object.freeze({ methodMarks: true, scheme: 'method-marks' });
 const { loadAllBanks, generateQuestion } = await import('../../client/src/engine/generators/index.js');
 
 const c = checks();
@@ -275,13 +278,16 @@ try {
   skew += 61 * 1000;
   const right0 = rightAnswer(q[0]), wrong1 = wrongAnswer(q[1]), right2 = rightAnswer(q[2]);
   c.ok(right0 !== null && wrong1 !== null && right2 !== null, 'the oracle has a right and a wrong answer');
-  const saved = await save(a.jar, exam.id, { answers: { [ids[0]]: right0, [ids[1]]: wrong1 }, workings: { [ids[1]]: 'some working\nthat looks right' }, rev: 1 });
+  // Real working: the question's own worked steps, ending on a wrong answer.
+  const realWorking = qq => (qq.steps || []).map(st => String(st.d || st.h || '').replace(/\$/g, '')).filter(Boolean).join('\n') || 'x = 1';
+  const working1 = realWorking(q[1]);
+  const saved = await save(a.jar, exam.id, { answers: { [ids[0]]: right0, [ids[1]]: wrong1 }, workings: { [ids[1]]: working1 }, rev: 1 });
   c.deq([saved.status, saved.data.saved], [200, true], 'working time: answers are saved');
   const openView = await read(a.jar, exam.id);
   c.deq([openView.data.exam.reading, leaks(openView.data)], [false, []], 'the open paper still holds nothing private');
   const done = await finish(a.jar, exam.id, {
     answers: { [ids[0]]: right0, [ids[1]]: wrong1, [ids[2]]: right2 },
-    workings: { [ids[1]]: 'some working\nthat looks right', [ids[2]]: 'and some here' }, reason: 'student'
+    workings: { [ids[1]]: working1, [ids[2]]: realWorking(q[2]) }, reason: 'student'
   });
   c.eq(done.status, 200, 'the paper is finished');
   const result = done.data;
@@ -289,6 +295,16 @@ try {
   c.deq(result.detail.map(line => line.awarded), [marks[0], 0, marks[2], 0, 0], 'right earns the slot\'s marks; wrong earns 0 even with working and the method switch on; blank earns 0');
   c.eq(result.score, marks[0] + marks[2], `score ${result.score} of ${result.total}`);
   c.ok(result.detail.every(line => !line.partial && ['objective', 'final-answer'].includes(line.markingScheme)), 'no line carries a part mark or a method scheme');
+  // The seal itself, apart from the edition switch: every sealed question, marked by the exam
+  // operation with method marks ON and its own worked steps under a wrong answer, earns 0.
+  for (const sq of paper.questions) {
+    const wrong = wrongAnswer(sq.payload);
+    if (wrong === null) continue;
+    const r = MARKER_OPS.exam({ q: sq.payload, given: wrong, working: realWorking(sq.payload), grid: sq.marking, policy: WITH_METHOD_MARKS }, () => {}).response;
+    assert.deepEqual([r.awarded, r.partial ?? null], [0, null], `${sq.generator}: the final-answer seal holds with method marks on`);
+  }
+  c.ok(true, 'the sealed final-answer-only marking holds on its own, with the method-mark policy on and real working');
+  c.ok(paper.questions.every(sq => sq.marks === 1 || !['mcq', 'multi-mcq'].includes(sq.payload.answerType)), 'no multi-mark question is multiple choice');
   c.deq(result.detail.map(line => line.syllabusOutcome), slots.map(s => s.outcome), 'each line names its slot\'s syllabus outcome');
   c.deq([result.nsw.label, result.nsw.markingScope, result.nsw.markingNote.includes('final answer only')], [NSW_EXAM_LABEL, 'final-answer-only', true], 'the result is an answer-checked practice paper and says how it was marked');
   c.deq(bandKeys(result), [], 'the result has no band, grade, ATAR, HSC mark or prediction at any depth');
@@ -331,7 +347,7 @@ try {
   process.env.PRI_NSW_EXAMS = 'on';
   process.env.PRI_EDITION = 'priyabhata';
   const india = await create(e.jar, { kind: 'nsw', blueprint: { id: NSW_EXAM_BLUEPRINTS[0].id } });
-  c.deq([india.status, india.data?.error?.code], [422, 'EXAM_KIND_OUTSIDE_CURRICULUM'], 'Priyabhata, switch on: an NSW paper is outside its curriculum');
+  c.deq([india.status, india.data?.error?.code], [400, 'EXAM_SPEC_INVALID'], 'Priyabhata, switch on: the kind is unknown, the same reply as before this change');
   c.eq((await h.request('/v1/exams/nsw', { jar: e.jar })).status, 404, 'Priyabhata lists no NSW papers');
   c.eq(await rows(e.account.id, 'exam-paper'), 0, 'and nothing was sealed');
 } finally {
