@@ -22,16 +22,28 @@ export const flow = {
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
 
+    // A typed question from the linear-equation generator itself. Practice
+    // may first resume the question issued right after sign-in when it is in
+    // this chapter, and the chapter's other generator (context reasoning) is
+    // not one whose solution has an equation-motion step: such a question is
+    // skipped, not taught from.
     const answerBox = page.locator('.editor-body input.answer-input');
-    for (let skips = 0; skips < 12; skips++) {
+    const linearTyped = async () => await answerBox.count() === 1 && (await online.issuedShown())?.generator === TOPIC;
+    let served = false;
+    for (let skips = 0; skips < 12 && !served; skips++) {
       const typeTab = page.getByRole('button', { name: 'Answer by typing' });
       if (await typeTab.count()) await typeTab.click();
       await settle();
-      if (await answerBox.count() === 1) break;
+      if (await linearTyped()) { served = true; break; }
+      const leaving = await page.locator('.qpage[data-question-id]').first().getAttribute('data-question-id');
       await page.locator('.ctx-next').click();
-      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+      await page.waitForFunction(id => {
+        const el = document.querySelector('.qpage[data-question-id]');
+        return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
+      }, leaving, { timeout: 30000 });
     }
-    if (!await check('a typed linear-equation question was served', await answerBox.count() === 1)) return;
+    if (!await check('a typed linear-equation question was served', served,
+      JSON.stringify(await online.issuedShown()))) return;
 
     await answerBox.fill(FIRST_WRONG);
     await page.getByRole('button', SUBMIT).click();
