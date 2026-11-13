@@ -1342,10 +1342,16 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
    one dash offset only. Ink here; the edition light under Aurora (aurora.css).
    Reduced motion: the settled form, only the line breathes. Forced colours:
    still (currentColor is already the system text colour). When it shows is
-   workingClock.js (400 ms in, 480 ms held, 120 ms out). */
+   workingClock.js (400 ms in; 480 ms held and a 120 ms fade where its host
+   stays on screen; where the finished work replaces the host, the result
+   replaces it). The status line keeps one 16 px slot for the dot or the
+   indicator, so neither shifts the line. */
 .pri-working { --in-dur-work: 2400ms; display: inline-flex; align-items: center; gap: 8px; color: var(--in-tx-2); animation: pri-w-in 120ms; }
 .pri-working[data-out] { opacity: 0; transition: opacity 120ms; }
-.pri-working:not(:last-child) { margin-right: 8px; }
+.pri-working { margin-right: 8px; }
+.status-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none; }
+.status-mark > * { grid-area: 1 / 1; margin: 0; }
+.status-mark:has(.pri-working) .dot { visibility: hidden; }
 .pri-working svg { flex: none; overflow: visible; }
 .pri-working path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; animation: pri-w-ln var(--in-dur-work) cubic-bezier(.2, 0, 0, 1) infinite; }
 .pri-working circle { fill: currentColor; animation: pri-w-pt var(--in-dur-work) cubic-bezier(.2, 0, 0, 1) infinite; }

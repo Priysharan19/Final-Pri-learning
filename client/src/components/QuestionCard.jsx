@@ -2235,7 +2235,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {WhyStep && whyStep === i && tutorEnabled && resolved && (
                 <TutorBoundary fallback={t('tutor.unavailable')}>
-                  <React.Suspense fallback={<div className="hintbox" role="status"><Working pending label={t('tutor.why.asking')} /></div>}>
+                  <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.why.asking')}</div>}>
                     <WhyStep questionId={question.id} stepIndex={i} locale={language === 'hi' ? 'hi' : 'en'} onClose={() => setWhyStep(null)} />
                   </React.Suspense>
                 </TutorBoundary>
@@ -2834,7 +2834,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         )}
         {showTutor && !resolved && tutorEnabled && !diagnostic && TutorHelp && (
           <TutorBoundary fallback={t('tutor.unavailable')}>
-            <React.Suspense fallback={<div className="hintbox" role="status"><Working pending label={t('tutor.asking')} /></div>}>
+            <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.asking')}</div>}>
               <TutorHelp
                 question={{ ...question, tutorLevel: tutorUsed }}
                 work={{
@@ -2877,7 +2877,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </div>
               {open && (
                 <TutorBoundary fallback={t('tutor.unavailable')}>
-                  <React.Suspense fallback={<div className="hintbox" role="status"><Working pending label={t('tutor.diagnose.asking')} /></div>}>
+                  <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.diagnose.asking')}</div>}>
                     <MistakeDiagnosis
                       questionId={question.id}
                       work={{ lines, typed: isMcq ? '' : String(answer || '').slice(0, 300) }}
@@ -3173,8 +3173,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
-            <Working pending={statusState === 'working'} />
-            {statusState !== 'idle' && statusState !== 'working' && <span className="dot" aria-hidden="true" />}
+            {statusState !== 'idle' && <span className="status-mark" aria-hidden="true"><Working pending={statusState === 'working'} />{statusState !== 'working' && <span className="dot" />}</span>}
             {writeMode && shownAnswerLine && !inkStale && !needsCheck && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
               : statusText}

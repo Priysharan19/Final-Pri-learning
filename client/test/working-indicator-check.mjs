@@ -97,7 +97,12 @@ for (const s of sites) {
 }
 ok((app.match(/<RouteLoading \/>/g) || []).length >= 1 && (app.match(/<RouteLoading \/>/g) || []).length === (app.match(/fallback=\{<RouteLoading \/>\}/g) || []).length, 'RouteLoading is only ever a Suspense fallback');
 const qc = read('client/src/components/QuestionCard.jsx');
-ok(/<Working pending=\{statusState === 'working'\} \/>\n\s*\{statusState !== 'idle' && statusState !== 'working' && <span className="dot"/.test(qc), 'the status line shows the indicator, not the pulsing dot, while a check, a cloud read or a save is in flight');
+ok(/<span className="status-mark" aria-hidden="true"><Working pending=\{statusState === 'working'\} \/>\{statusState !== 'working' && <span className="dot" \/>\}<\/span>/.test(qc), 'the status line shows the indicator, not the pulsing dot, while a check, a cloud read or a save is in flight, in one slot shared with the dot');
+ok(/\.status-mark \{[^}]*width: 16px; height: 16px; flex: none;/.test(instrument) && /\.status-mark:has\(\.pri-working\) \.dot \{ visibility: hidden; \}/.test(instrument), 'that slot is a fixed 16 px, so the line never shifts, and the dot hides while the indicator holds or fades');
+// Where the host stays on screen, the indicator is held and fades: those sites take a changing pending flag.
+const HELD = sites.filter(x => /pending=\{(statusState === 'working'|lineCheckBusy)\}/.test(x.attrs));
+ok(HELD.length === 2, `the status line and the line-check button keep the indicator mounted with a changing pending flag, so its hold and fade apply (${HELD.length})`);
+ok(!/fallback=\{<div className="hintbox"[^>]*><Working[^/]*label=/.test(qc), 'the tutor fallbacks show their text at once (no empty box for the first 400 ms)');
 ok(!/@keyframes in-sh\b/.test(instrument) && /html\.ui-instrument \.skeleton \{[^}]*animation: none/.test(instrument), 'the Instrument skeleton no longer shimmers: it is a still placeholder and the indicator is the one moving thing');
 
 // ── 3 · the clock, on fake timers ───────────────────────────────────────────
@@ -191,4 +196,4 @@ if (failures.length) {
   for (const f of failures) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
-console.log(`WORKING INDICATOR: PASS — ${pass}/${pass} checks — one component, every site pending on real work, 400 ms in, 480 ms held, 120 ms out${BROWSER ? ', still under reduced motion and forced colours' : ''}${DIST ? `, each build carries its own edition's form only${BOTH ? ' (both editions built)' : ''}` : ''}.`);
+console.log(`WORKING INDICATOR: PASS — ${pass}/${pass} checks — one component, every site pending on real work, 400 ms in, 480 ms held and 120 ms out where the host stays${BROWSER ? ', still under reduced motion and forced colours' : ''}${DIST ? `, each build carries its own edition's form only${BOTH ? ' (both editions built)' : ''}` : ''}.`);
