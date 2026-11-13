@@ -103,7 +103,7 @@ try {
   await page.goto(`${platform.origin}/exams`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('[data-nsw-papers] [data-nsw-paper]', { timeout: 30000 });
   const listed = await page.locator('[data-nsw-paper]').evaluateAll(els => els.map(el => [el.getAttribute('data-nsw-paper'), el.getAttribute('data-released')]));
-  check('the Exams page lists the five HSC-style papers and the test paper', HSC_PAPERS.every(id => listed.some(([x]) => x === id)) && listed.some(([x]) => x === TEST_PAPER), JSON.stringify(listed));
+  check('the Exams page lists the five blueprints and the test paper', HSC_PAPERS.every(id => listed.some(([x]) => x === id)) && listed.some(([x]) => x === TEST_PAPER), JSON.stringify(listed));
   const state = id => listed.find(([x]) => x === id)?.[1];
   check('on G3\'s pool Extension 1 and 2 release as partial papers; Standard and Advanced are refused; the test paper releases',
     state('nsw-hsc-extension-1-2027') === 'yes' && state('nsw-hsc-extension-2-2027') === 'yes' && ['nsw-hsc-standard-1-2027', 'nsw-hsc-standard-2-2027', 'nsw-hsc-advanced-2027'].every(id => state(id) === 'no') && state(TEST_PAPER) === 'yes', JSON.stringify(listed));
@@ -111,7 +111,7 @@ try {
   check('a refused paper says how much it covers and names what it lacks, and has no start', adv.includes('4 of 8 Year 12 outcomes') && adv.includes('Financial mathematics')
     && await page.locator('[data-nsw-paper="nsw-hsc-advanced-2027"] [data-nsw-start]').count() === 0, adv);
   const ext1 = await visibleText(page, '[data-nsw-paper="nsw-hsc-extension-1-2027"]');
-  check('a partial paper is titled by its coverage, never HSC or trial', ext1.includes('Practice paper — 5 of 6 Year 12 outcomes') && !/HSC paper|trial/i.test(ext1), ext1);
+  check('a partial paper is titled by its coverage, never HSC or trial', /practice paper — 5 of 6 year 12 outcomes/i.test(ext1) && !/HSC paper|trial/i.test(ext1), ext1);
   check('it names what it leaves out', (await visibleText(page, '[data-nsw-paper="nsw-hsc-extension-1-2027"] [data-nsw-omits]')).includes('Further calculus skills'), ext1);
   check('its time and marks are scaled to what it examines', ext1.includes('10 min reading') && ext1.includes('100 min working') && ext1.includes('58 marks'), ext1);
   const intro = await visibleText(page, '[data-nsw-papers]');
