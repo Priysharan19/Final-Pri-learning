@@ -150,10 +150,10 @@ export const flow = {
       await check(`${route} renders its own page`, rendered, `nothing matching ${RENDERED} appeared`);
       const actualTitle = await page.title();
       const titleMatches = route === '/practice'
-        ? /^.+ · Pri Learning$/.test(actualTitle) && actualTitle !== 'Pri Learning'
-        : actualTitle === `${title} · Pri Learning`;
+        ? /^.+ · Priyabhata$/.test(actualTitle) && actualTitle !== 'Priyabhata'
+        : actualTitle === `${title} · Priyabhata`;
       await check(`${route} knows which page it is`, titleMatches,
-        `the tab reads ${JSON.stringify(actualTitle)}, expected ${route === '/practice' ? 'a current-topic Pri Learning title' : JSON.stringify(title + ' · Pri Learning')}`);
+        `the tab reads ${JSON.stringify(actualTitle)}, expected ${route === '/practice' ? 'a current-topic Priyabhata title' : JSON.stringify(title + ' · Priyabhata')}`);
       await check(`${route} did not fall to the error boundary`,
         await page.locator('.crash-card').count() === 0);
     }

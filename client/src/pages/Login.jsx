@@ -13,6 +13,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
+import { EditionByline } from '../components/BrandMark.jsx';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
 import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
@@ -569,7 +570,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
         <MathField />
         {SignInPlot && <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>}
         <div className="auth-col fade-in">
-          <Logo large />
+          <Logo large byline />
           {atStart && (
             <>
               <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
@@ -623,6 +624,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
             style={{ display: 'block', background: 'none', border: 'none', padding: 0, margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}>
             <Logo large />
           </button>
+          <EditionByline />
           <div className="hero-kicker" style={{ marginTop: 14 }}>{t('login.brandKicker')}</div>
           <div className="auth-points">
             <div className="auth-point"><span className="auth-tick">✓</span>{t('login.point1')}</div>

@@ -336,21 +336,24 @@ jobs:
           grep -Fq 'TUTOR UI: PASS — 127/127 checks' suites.log
           grep -Fq 'ERROR REPORTS: PASS — 36/36 checks' suites.log
           grep -Fq 'APPLE SIGN IN: PASS — 66/66 checks' suites.log
-          grep -Fq 'ONBOARDING SCOPE: PASS — 60/60 checks' suites.log
+          # 60 → 62 (plan E4, re-derived by running): the page and manifest checks run for both editions' builds.
+          grep -Fq 'ONBOARDING SCOPE: PASS — 62/62 checks' suites.log
           # No student-facing text says Pri learns a hand (the count follows the
           # string catalogues, so only the verdict is pinned here).
           grep -Fq 'HANDWRITING CLAIMS: PASS — ' suites.log
           # 211 → 215 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree).
           grep -Fq 'STUDY PLAN: PASS — 215/215 checks' suites.log
           grep -Fq 'REMINDERS: PASS — 183/183 checks' suites.log
-          grep -Fq 'I18N: PASS — 200/200 checks' suites.log
+          # 200 → 198 (plan E4, re-derived by running): "P" and "Pri Learning." (the brand tile) and "Pri" (the old bar label) left the literal allowlist; "by Pri Learning" joined it.
+          grep -Fq 'I18N: PASS — 198/198 checks' suites.log
           # 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason.
           # 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt).
           # 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770).
           # 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree).
           # 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards).
           # 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check).
-          grep -Fq 'I18N COVERAGE: PASS — 91/91 checks — 80 files scanned, 0 hard-coded strings' suites.log
+          # 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost "P" and "Pri Learning." and gained Priyabhata, Prithagoras, प्रियभट and "by Pri Learning".
+          grep -Fq 'I18N COVERAGE: PASS — 94/94 checks — 80 files scanned, 0 hard-coded strings' suites.log
           grep -Fq 'READER PERMISSION (D17): PASS — 124/124 checks' suites.log
           grep -Fq 'PAGE LINK HISTORY: PASS — 39/39 checks' suites.log
           grep -Fq 'MISCONCEPTION TARGETING: PASS — 41/41 checks' suites.log
@@ -406,7 +409,8 @@ jobs:
           grep -Fq 'DESK IMPORT: PASS — 18/18 checks' suites.log
           # Plan E2: the app knows its own edition from its build, declares it on
           # every /v1 request, and shows a blocking screen at the other's server.
-          grep -Fq 'EDITION CLIENT (E2): PASS — 133/133 checks' suites.log
+          # 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen).
+          grep -Fq 'EDITION CLIENT (E2): PASS — 136/136 checks' suites.log
           # The device meets the SERVER's daily practice cap (#537): refused
           # through the real dispatcher, no fallback, a prepared question
           # stays unbound and unmarked, a second device is refused at zero.
@@ -1381,7 +1385,8 @@ jobs:
           grep -Eq 'online-only checking +8/8' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*48/48.*13 groups' browser.log
           grep -Eq 'ACCESSIBILITY SUITE.*51/51.*14 groups' browser.log
-          grep -Fq 'BOOT RESILIENCE: PASS — 61/61 checks' browser.log
+          # 61 → 62 (plan E4, re-derived by running): the shell tells boot-guard.js the edition's name (data-brand, data-brand-hi).
+          grep -Fq 'BOOT RESILIENCE: PASS — 62/62 checks' browser.log
           grep -Fq 'Reader · usage limit reached' browser.log
           grep -Eq 'E2E SUITE.*41/41.*2 flows' browser.log
           # Ink canvas loss (#449/#550): both engines, 200 checks, none failed.
@@ -1438,6 +1443,15 @@ jobs:
         run: npm run build
       - name: Exact release identity
         run: node tools/verify-release-identity.mjs
+      # Plan E4: this build carries only its own edition's brand, and the
+      # other edition's build (made here into a temporary folder) differs from
+      # it only in the brand files and the one chunk holding the wordmark.
+      - name: Each edition's build carries only its own brand
+        run: |
+          set -euo pipefail
+          node client/test/brand-build-check.mjs --both | tee brand-build.log
+          # 32 → 33 (re-derived by running, after E5 #875): exactly the edition-record chunk and E5's three commercial chunks may differ, and those carry no brand.
+          grep -Fq 'BRAND BUILD: PASS — 33/33 checks — both editions built' brand-build.log
       # The iOS web bundles are generated here, never read from git (decision
       # D28): sync copies client/dist into both packages, check proves each
       # copy is complete and byte-exact, then the shipped bytes are inspected.

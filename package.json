@@ -233,7 +233,7 @@
     "test:mcq:distinct": "node client/test/mcq-distinctness-check.mjs",
     "test:budget": "node client/test/install-budget-check.mjs",
     "test:interface:decisions": "node client/test/interface-decisions-check.mjs",
-    "test:editions": "node client/test/edition-config-check.mjs",
+    "test:editions": "node client/test/edition-config-check.mjs && node client/test/brand-strings-check.mjs && node client/test/brand-usage-check.mjs && node client/test/brand-assets-check.mjs",
     "test:editions:client": "node client/test/edition-client-check.mjs",
     "test:paywall:edition": "node client/test/tour-paywall-edition.js",
     "test:nsw:exams:tour": "node client/test/tour-nsw-exams.js",

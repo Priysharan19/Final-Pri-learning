@@ -1,9 +1,13 @@
 #!/usr/bin/env node
-// Renders the Google Play listing graphics from the existing P′ mark
-// (client/public/favicon.svg) and the app's theme tokens (client/src/theme.css).
+// Renders the Google Play listing graphics from an edition's mark
+// (client/brand/<edition>/favicon.svg, plan E4) and the app's theme tokens
+// (client/src/theme.css).
 //
-//   node tools/play-graphics.mjs
+//   PRI_EDITION=<priyabhata|prithagoras> node tools/play-graphics.mjs
 //
+// Store names and listings per edition are owner decisions
+// (docs/brand/editions-decision.md, "Not decided here"): run this for an
+// edition only once its listing is approved.
 // Writes docs/release/store/play/icon-512.png (512x512, RGBA allowed) and
 // docs/release/store/play/feature-graphic-1024x500.png (1024x500, 24-bit RGB,
 // no alpha), then verifies dimensions and colour type. Uses the Playwright
@@ -20,7 +24,9 @@ const require = createRequire(join(root, 'client/package.json'));
 const { chromium } = require('playwright');
 
 // --- sources of truth -------------------------------------------------------
-const markSvg = readFileSync(join(root, 'client/public/favicon.svg'), 'utf8');
+const { EDITIONS, resolveEdition } = await import('../client/edition.config.mjs');
+const edition = EDITIONS[resolveEdition(process.env)];
+const markSvg = readFileSync(join(root, 'client/brand', edition.id, 'favicon.svg'), 'utf8');
 const theme = readFileSync(join(root, 'client/src/theme.css'), 'utf8');
 const token = (name) => {
   const m = theme.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{3,8})`));
@@ -56,7 +62,7 @@ body{background:${T.paper};
 h1{font-family:'KaTeX_Main',serif;font-weight:400;font-size:76px;letter-spacing:-0.5px;margin:0 0 14px;line-height:1}
 p{font-family:'Inter Variable',sans-serif;font-size:24px;color:${T.ink3};margin:0;font-weight:420}
 </style></head><body><div class="margin"></div>
-<div class="wrap">${mark(168)}<div><h1>Pri Learning</h1><p>${line}</p></div></div></body></html>`;
+<div class="wrap">${mark(168)}<div><h1>${edition.brand}</h1><p>${line}</p></div></div></body></html>`;
 
 // --- minimal PNG tools (inspect + strip alpha) --------------------------------
 function readPng(buf) {

@@ -181,8 +181,11 @@ async function run() {
       ok(typeof en[key] === 'string' && !OLY_EN.test(en[key]), `${key} (EN) does not advertise the Olympiad track while it is off`);
       ok(typeof hi[key] === 'string' && !OLY_HI.test(hi[key]), `${key} (HI) does not advertise the Olympiad track while it is off`);
     }
-    ok(!OLY_EN.test(read('index.html')), 'the page description does not advertise the Olympiad track');
-    ok(!OLY_EN.test(read('public/manifest.webmanifest')), 'nor does the install manifest');
+    const brand = await import('../brand/edition-brand.mjs');
+    for (const id of brand.BRAND_EDITION_IDS) {
+      ok(!OLY_EN.test(brand.builtIndexHtml(id)), `the ${id} page description does not advertise the Olympiad track`);
+      ok(!OLY_EN.test(JSON.stringify(brand.webManifest(id))), `nor does the ${id} install manifest`);
+    }
     ok(/server reads your handwriting and photos/.test(en['login.heroPrivacy']) && /stored on this device/.test(en['login.heroPrivacy']),
       'the privacy line says a signed-in account has its handwriting and photos read on the server, and what stays on the device');
     ok(/हैंडराइटिंग और फ़ोटो पढ़ता है/.test(hi['login.heroPrivacy']) && /इसी डिवाइस पर/.test(hi['login.heroPrivacy']), 'and so does its Hindi');

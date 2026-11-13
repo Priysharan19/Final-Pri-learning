@@ -18,6 +18,10 @@
 //      (client/src/platform/edition-record.js, which a build replaces with its
 //      own edition's record; plan E2) and reaches that through the helper
 //      client/src/platform/edition.js.
+//   6. the brand (E4): each edition has a well-formed identity whose accent
+//      meets WCAG AA (4.5:1) on every Instrument surface in both themes —
+//      computed here from instrument.css, never copied — and the record a
+//      build carries holds its own name, cut and wordmark only.
 //
 // It ends by printing each edition's open gaps — the parity debt still owed.
 //
@@ -161,6 +165,63 @@ ok(vite.featureDefines('build', {}).__PRI_PREMIUM_ON_SALE__ === 'true' && vite.f
   ok(plugin.load('/elsewhere/module.js') === null, 'and leaves every other module alone');
   const helper = await import('../src/platform/edition.js');
   ok(helper.EDITION === ed.DEFAULT_EDITION && helper.defaultCourse() === ed.EDITIONS[ed.DEFAULT_EDITION].defaultCourse, 'outside a build the app is the default edition, with its default course');
+}
+
+// 6. The brand (E4): identity, accent contrast, and the record's brand.
+{
+  ok(ed.COMPANY_LINE === `by ${ed.COMPANY}`, 'the company line is "by Pri Learning"');
+  ok(JSON.stringify(ed.CUTS) === JSON.stringify(['jya', 'square']), 'the cuts are jya and square');
+  ok(ed.EDITIONS.priyabhata.identity.cut === 'jya' && ed.EDITIONS.prithagoras.identity.cut === 'square', 'Priyabhata carries the jyā cut, Prithagoras the square');
+  ok(ed.EDITIONS.priyabhata.identity.brandHi === 'प्रियभट', 'the Hindi name is प्रियभट (one ट)');
+  ok(ed.EDITIONS.prithagoras.identity.brandHi === null && !ed.EDITIONS.prithagoras.languages.includes('hi'), 'Prithagoras has no Hindi name, and offers no Hindi');
+  ok(ed.EDITION_IDS.every(id => Object.isFrozen(ed.EDITIONS[id].identity) && Object.isFrozen(ed.EDITIONS[id].identity.accent)), 'each identity is frozen');
+  const sameCut = JSON.parse(JSON.stringify(ed.EDITIONS));
+  sameCut.prithagoras.identity.cut = 'jya';
+  ok(ed.editionProblems(sameCut).some(p => p.includes('cut')), 'two editions with one cut is a problem');
+  const noHindiName = JSON.parse(JSON.stringify(ed.EDITIONS));
+  noHindiName.priyabhata.identity.brandHi = null;
+  ok(ed.editionProblems(noHindiName).some(p => p.includes('brandHi')), 'an edition offering Hindi without a Hindi name is a problem');
+  const noIdentity = JSON.parse(JSON.stringify(ed.EDITIONS));
+  delete noIdentity.prithagoras.identity;
+  ok(ed.editionProblems(noIdentity).some(p => p.includes('identity')), 'an edition without an identity is a problem');
+  const badAccent = JSON.parse(JSON.stringify(ed.EDITIONS));
+  badAccent.priyabhata.identity.accent.dark = 'teal';
+  ok(ed.editionProblems(badAccent).some(p => p.includes('accent.dark')), 'an accent that is not a #rrggbb colour is a problem');
+
+  // WCAG 2 contrast, computed from the real Instrument surfaces.
+  const css = read('client/src/instrument/instrument.css');
+  const block = sel => { const i = css.indexOf(`${sel} {`); return i < 0 ? '' : css.slice(i, css.indexOf('}', i)); };
+  const token = (text, name) => (text.match(new RegExp(`--${name}:\\s*(#[0-9a-fA-F]{6})`)) || [])[1];
+  const lum = hex => {
+    const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => n - m); return (x + 0.05) / (y + 0.05); };
+  const themes = { light: block('html.ui-instrument'), dark: block('html.ui-instrument[data-theme="dark"]') };
+  for (const id of ed.EDITION_IDS) {
+    for (const [mode, text] of Object.entries(themes)) {
+      for (const surface of ['in-base', 'in-l1', 'in-void']) {
+        const bg = token(text, surface);
+        const accent = ed.EDITIONS[id].identity.accent[mode];
+        const r = bg ? ratio(accent, bg) : 0;
+        ok(r >= 4.5, `${id} ${mode} accent ${accent} on --${surface} ${bg} is ${r.toFixed(2)}:1 (WCAG AA needs 4.5)`);
+      }
+    }
+  }
+
+  // The record a build carries holds this edition's brand, and nothing of the other's.
+  const record = await import('../src/platform/edition-record.js');
+  for (const id of ed.EDITION_IDS) {
+    const r = record.editionRecord(id).identity;
+    ok(r.cut === ed.EDITIONS[id].identity.cut && r.brandHi === ed.EDITIONS[id].identity.brandHi && r.companyLine === ed.COMPANY_LINE, `${id}: the record carries the edition's cut, Hindi name and the company line`);
+    ok(typeof r.wordmark?.d === 'string' && typeof r.cutPath === 'string' && !('accent' in r), `${id}: the record carries its wordmark and cut path, and no accent (the build writes the accent into index.html)`);
+  }
+  const pritha = vite.editionRecordPlugin('prithagoras').load(vite.EDITION_RECORD_MODULE);
+  const { PRIYABHATA_WORDMARK } = await import('../src/brand/paths.js');
+  ok(!pritha.includes(PRIYABHATA_WORDMARK.d.slice(-40)) && !pritha.includes('प्रियभट') && !pritha.includes('#0a6670'), 'a Prithagoras build\'s record holds no Priyabhata wordmark, Hindi name or accent');
+  const brand = await import('../src/brand/edition.js');
+  ok(brand.BRAND === 'Priyabhata' && brand.CUT === 'jya', 'outside a build the app is the default edition');
+  ok(brand.brandVars('hi').brand === 'प्रियभट' && brand.brandVars('en').brand === 'Priyabhata' && brand.brandVars('en').company === 'Pri Learning', 'brandVars: प्रियभट in Hindi, Priyabhata in English, and the company');
 }
 
 const gaps = ed.parityGaps();

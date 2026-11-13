@@ -30,7 +30,7 @@ export const flow = {
     const answerBox = page.locator('.editor-body input.answer-input');
     const linearTyped = async () => await answerBox.count() === 1 && (await online.issuedShown())?.generator === TOPIC;
     let served = false;
-    for (let skips = 0; skips < 12 && !served; skips++) {
+    for (let skips = 0; skips < 12; skips++) {
       const typeTab = page.getByRole('button', { name: 'Answer by typing' });
       if (await typeTab.count()) await typeTab.click();
       await settle();
