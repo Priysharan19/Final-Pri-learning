@@ -1219,6 +1219,9 @@ jobs:
             # Plan E5: a built Prithagoras client on a Prithagoras server shows
             # no price, plan or purchase control and reaches no store.
             node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log
+            # Plan G4: a Prithagoras student sits an NSW HSC-style paper: server-owned reading
+            # time (inputs disabled, nothing sent), working time, an answer-checked result, no band.
+            node client/test/tour-nsw-exams.js 2>&1 | tee -a browser.log
             # A failed chunk, a refused cache write or a probe that never settles must
             # end in the app or in a visible notice with Reload, never a silent splash.
             npm run test:boot 2>&1 | tee -a browser.log
@@ -1291,6 +1294,7 @@ jobs:
           grep -Fq 'Cloud · late results never rewrite an attempt' browser.log
           grep -Fq 'India exam · JEE Main handwritten, reloaded, analysed' browser.log
           grep -Fq 'India exam · the clock runs out and the paper submits itself' browser.log
+          grep -Fq 'NSW PAPERS TOUR (G4): PASS — 20/20 checks' browser.log
           grep -Fq 'Placement · onboarding → diagnostic → evidence map' browser.log
           grep -Fq 'Phone · every destination reachable at 390px' browser.log
           grep -Fq 'iPhone portrait · safe areas, sticky bar, mode switch, write and photo space' browser.log
