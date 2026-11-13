@@ -130,6 +130,22 @@
 // A model never sets a mark here: the reader proposes a transcript, and only
 // the deterministic engine marks it.
 //
+// NSW PAPERS (plan G4, Prithagoras). A third kind, `nsw`: an HSC-style paper
+// on one of the engine's blueprints (client/src/engine/nswExams.js), only on a
+// Prithagoras server with PRI_NSW_EXAMS=on (nswExamPool.js), and only when the
+// release check finds every slot fillable from the edition's approved forms.
+// The device names the blueprint and nothing else: the server draws every
+// question from an issued NSW form on the slot's outcome, seals the edition's
+// identity and its final-answer-only marking on it, and refuses a question
+// that cannot carry them. Reading time is the server's: the paper holds
+// `readingEndsAt`, and before it no snapshot is saved and no finish accepted
+// (EXAM_READING_TIME); the working deadline follows it and is never moved by
+// a device clock. The result is an "Answer-checked practice paper" (`nsw`):
+// no HSC mark, band, ATAR or prediction is computed or stored.
+//
+//   GET  /v1/exams/nsw          the blueprints this server lists, which are
+//                               released, and what each covers and lacks.
+//
 // Storage is the existing account-scoped idempotency_keys table (no schema
 // change), under five scopes of its own, and practice's `practice-content`:
 //   exam-layout   blueprint → { layoutSeed }        pending until a paper is sealed under it
@@ -157,7 +173,9 @@ import {
 } from './markerPool.js';
 import { loadBanksFor } from '../../client/src/engine/generators/index.js';
 import { practicePapersAllowed } from './indiaBanks.js';
-import { bankPolicy } from './editionBanks.js';
+import { bankPolicy, sealForEdition } from './editionBanks.js';
+import { nswExamsOn, nswRelease, nswExamPool, nswExamCatalogue } from './nswExamPool.js';
+import { slotsOf, formsForSlot, nswPaperTitle, NSW_EXAM_LABEL, NSW_MARKING_NOTE } from '../../client/src/engine/nswExams.js';
 import { generateMultipart } from '../../client/src/engine/generators/multipart.js';
 import { makeRng } from '../../client/src/engine/qhelpers.js';
 import { indiaExamPaperSpec, markObjective } from '../../client/src/engine/indiaExams.js';
@@ -230,6 +248,8 @@ const blank = v => v === undefined || v === null || String(v).trim() === '';
 const refusal = (status, code, message) => ({ refused: [status, code, message] });
 const reject = (res, status, code, message) => res.status(status).json({ error: { code, message } });
 const notFound = res => reject(res, 404, 'EXAM_NOT_FOUND', 'This paper does not belong to this account.');
+/** An NSW paper in its reading time: nothing is saved and nothing is finished. */
+const READING_TIME = Object.freeze({ status: 409, code: 'EXAM_READING_TIME', message: 'Reading time: you can read the paper, but no answers can be written until working time starts.' });
 
 // ── The public paper ─────────────────────────────────────────────────────────
 
@@ -315,6 +335,9 @@ function publicPaper(paper, now) {
     ...targetedFields(paper),
     startedAt: paper.startedAt, deadline: paper.deadline, graceMs: FINISH_GRACE_MS,
     now, remainingMs: Math.max(0, paper.deadline - now),
+    // An NSW paper's reading time, on the server's clock (see the header).
+    ...(paper.readingEndsAt ? { readingMin: paper.readingMin, readingEndsAt: paper.readingEndsAt, reading: now < paper.readingEndsAt } : {}),
+    ...(paper.kind === 'nsw' ? { nsw: nswPublic(paper) } : {}),
     blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion, total: paper.total,
     questions: paper.questions.map(publicQuestion)
   };
@@ -530,6 +553,43 @@ function readPracticeSpec(body) {
   };
 }
 
+/** What an NSW paper says about itself on every surface: label, marking, coverage. */
+function nswPublic(paper) {
+  return {
+    label: NSW_EXAM_LABEL, markingScope: 'final-answer-only', markingNote: NSW_MARKING_NOTE,
+    blueprintId: paper.blueprint.id, course: paper.blueprint.course, syllabus: paper.blueprint.syllabus,
+    syllabusVersion: paper.blueprint.syllabusVersion, outcomes: paper.blueprint.outcomes,
+    ...(paper.blueprint.test ? { test: true } : {})
+  };
+}
+
+// An NSW paper names its blueprint and nothing else. The server draws every
+// question; a blueprint the release check refuses is not released.
+const NSW_NOT_AVAILABLE = refusal(404, 'EXAM_KIND_UNAVAILABLE', 'These papers are not available here.');
+function readNswSpec(body) {
+  for (const field of ['paper', 'layoutSeed', 'slots']) if (body[field] !== undefined) return INVALID();
+  const b = body.blueprint;
+  if (!plain(b) || unknown(b, new Set(['id'])).length || typeof b.id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(b.id)) return INVALID('Name the paper.');
+  const named = nswRelease(b.id);
+  if (!named) return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', 'No examination blueprint is released for this selection.');
+  if (!named.release.released) {
+    const lacking = [...named.release.missingOutcomes, ...named.release.thinOutcomes];
+    return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', `This paper is not available yet: there are not enough approved questions for ${lacking.join(', ')}.`);
+  }
+  const blueprint = named.blueprint;
+  const outcomes = [...new Set(slotsOf(blueprint).map(slot => slot.outcome))];
+  return {
+    kind: 'nsw', nsw: blueprint, readingMin: blueprint.readingMin,
+    durationMin: blueprint.readingMin + blueprint.workingMin,
+    blueprint: {
+      id: blueprint.id, label: blueprint.label, course: blueprint.course, year: blueprint.year,
+      syllabus: blueprint.syllabus, syllabusVersion: blueprint.syllabusVersion, outcomes,
+      ...(blueprint.test ? { test: true } : {})
+    },
+    defaultTitle: nswPaperTitle(blueprint)
+  };
+}
+
 function readSpec(body) {
   if (!plain(body) || unknown(body, CREATE_FIELDS).length) return INVALID();
   // D15: the practice paper is the NSW course's, built from banks outside the
@@ -543,7 +603,13 @@ function readSpec(body) {
   if (body.kind === 'india' && bankPolicy().curriculum !== 'in') {
     return refusal(422, 'EXAM_KIND_OUTSIDE_CURRICULUM', 'This kind of paper is not part of this edition.');
   }
-  const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body) : INVALID('Name the kind of paper.');
+  // An NSW paper is the Prithagoras edition's, behind its own switch (plan G4).
+  if (body.kind === 'nsw' && bankPolicy().curriculum !== 'nsw') {
+    return refusal(422, 'EXAM_KIND_OUTSIDE_CURRICULUM', 'This kind of paper is not part of this edition.');
+  }
+  if (body.kind === 'nsw' && !nswExamsOn()) return NSW_NOT_AVAILABLE;
+  const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body)
+    : body.kind === 'nsw' ? readNswSpec(body) : INVALID('Name the kind of paper.');
   if (read.refused) return read;
   // A board mock ("Pri mock in board format", engine/boardMock.js, D22) is a
   // full blueprint paper on a board blueprint, sat typed, under its own title.
@@ -650,6 +716,8 @@ async function issueQuestions(read) {
     return { questions };
   }
 
+  if (read.kind === 'nsw') return issueNswQuestions(read, { seal, draw, fresh, onPaper, unitHashes, questions });
+
   for (const slot of read.slots) {
     if (slot.multipart) {
       let mp;
@@ -682,6 +750,53 @@ async function issueQuestions(read) {
       section: 'I', sectionLabel: 'Section I', item: 'question', chapterId: null, chapterName: null,
       marking: { correct: marks, incorrect: 0, unanswered: 0, partialPerOption: null }, marks,
       pyq: q.pyq === true, conversion: null, generator: slot.generator, difficulty: q.difficulty || slot.difficulty
+    }, { ...q, examItem: 'question' });
+  }
+  return { questions };
+}
+
+// The answer types an NSW paper sets: each marked on its final answer alone,
+// all or nothing. A form that could earn part marks or a person's mark
+// (multi-correct, matrix, sketch, geometry, proof, a board scheme) is never on
+// an NSW paper, whatever the marking switch says.
+const NSW_ANSWER_TYPES = new Set(['numeric', 'mcq', 'expression', 'point', 'set']);
+const nswFinalAnswerOnly = q => !!q?.prompt && NSW_ANSWER_TYPES.has(q.answerType) && !q.multipart && !Array.isArray(q.boardScheme);
+
+/**
+ * Fill each slot of an NSW blueprint from the approved forms on its outcome:
+ * a form at a difficulty the slot prefers when it has one, one not yet used
+ * on this paper when there is one, and a question whose sealed identity names
+ * the slot's outcome. A slot that cannot be filled refuses the whole paper.
+ */
+async function issueNswQuestions(read, { seal, draw, fresh, onPaper, unitHashes, questions }) {
+  const banks = bankPolicy();
+  const pool = nswExamPool();
+  const usedForms = new Set();
+  const shuffle = list => list.map(item => [randomInt(0x7fffffff), item]).sort((a, b) => a[0] - b[0]).map(([, item]) => item);
+  for (const slot of slotsOf(read.nsw)) {
+    const forms = formsForSlot(slot, pool);
+    const rank = form => (slot.difficulties.includes(form.difficulty) ? 0 : 2) + (usedForms.has(`${form.generator}|${form.difficulty}`) ? 1 : 0);
+    const order = shuffle(forms).sort((a, b) => rank(a) - rank(b));
+    let q = null, form = null;
+    for (const candidate of order) {
+      for (let attempt = 0; attempt < ISSUE_TRIES && !q; attempt++) {
+        let drawn;
+        try { drawn = draw(candidate.generator, candidate.difficulty); } catch { drawn = null; }
+        if (!drawn || !nswFinalAnswerOnly(drawn) || !fresh(drawn)) continue;
+        drawn._generator = candidate.generator;
+        if (!sealForEdition(drawn, banks, candidate.generator)) continue;
+        if (!drawn._curriculum?.outcomes?.some(o => o.code === slot.outcome)) continue;
+        q = drawn;
+      }
+      if (q) { form = candidate; break; }
+    }
+    if (!q) return UNSUPPORTED(slot.number);
+    usedForms.add(`${form.generator}|${form.difficulty}`);
+    for (const hash of unitHashes(q)) onPaper.add(hash);
+    seal({
+      section: slot.section, sectionLabel: slot.sectionLabel, item: 'question', chapterId: null, chapterName: null, outcome: slot.outcome,
+      marking: { correct: slot.marks, incorrect: 0, unanswered: 0, partialPerOption: null }, marks: slot.marks,
+      pyq: false, conversion: null, generator: form.generator, difficulty: q.difficulty || form.difficulty
     }, { ...q, examItem: 'question' });
   }
   return { questions };
@@ -957,7 +1072,9 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       id: sq.id, order: sq.order, section: sq.section, sectionLabel: sq.sectionLabel, item: sq.item,
       chapterId: sq.chapterId, subtopic: sq.chapterId || q.subtopic, subtopicName: sq.chapterName || q.title || q.subtopic,
       generator: sq.generator, difficulty: q.difficulty || sq.difficulty || 2, ms, timed,
-      sourceKind: sq.pyq ? 'reviewed-jee-pyq' : 'authored-generator', contentId: opaqueContentId(q.contentId)
+      sourceKind: sq.pyq ? 'reviewed-jee-pyq' : 'authored-generator', contentId: opaqueContentId(q.contentId),
+      // An NSW paper's slot outcome (a code, never NESA wording), once marked. Absent elsewhere.
+      ...(sq.outcome ? { syllabusOutcome: sq.outcome } : {})
     };
     let out;
     if (q.multipart) {
@@ -1035,7 +1152,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       // counted a blank as a wrong attempt, and still does.
       // An answer the marker was stopped on is recorded on no paper as an
       // attempt: unreadable is not wrong. Neither is handwriting not yet read.
-      const attemptId = r.unreadable || r.pending || (r.unanswered && paper.kind === 'india') ? null : attempt(sq, chosen, r, { marks, repeat, ...evidenceFlag(evidence), inputMode: inputMode(key), ms });
+      const attemptId = r.unreadable || r.pending || (r.unanswered && (paper.kind === 'india' || paper.kind === 'nsw')) ? null : attempt(sq, chosen, r, { marks, repeat, ...evidenceFlag(evidence), inputMode: inputMode(key), ms });
       out = {
         ...base, prompt: chosen.prompt, answerType: chosen.answerType, mcqOptions: chosen.mcqOptions || null, matchList: chosen.matchList || null,
         figure: chosen.figure || null, choiceTaken: useAlt ? 'or' : (q.alt ? 'main' : null),
@@ -1217,6 +1334,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     if (stored) return { result: stored };
     const inTime = now <= paper.deadline + FINISH_GRACE_MS;
     if (unattended && inTime) return { open: true };
+    if (!unattended && paper.readingEndsAt && now < paper.readingEndsAt) return READING_TIME;
     let carried = { answers: {}, workings: {}, times: {}, modes: {}, ink: {} };
     if (!unattended) {
       if (!plain(body) || unknown(body, FINISH_FIELDS).length
@@ -1304,6 +1422,9 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
       // (PSYCHOMETRICS_AND_ADAPTIVE_MEASUREMENT.md): it is labelled so nothing
       // downstream reads it as one.
       ...targetedFields(paper),
+      // An NSW paper's result names what it is and how it was marked. It holds
+      // no HSC mark, band, ATAR or prediction: none is computed.
+      ...(paper.kind === 'nsw' ? { nsw: nswPublic(paper) } : {}),
       blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion,
       startedAt: paper.startedAt, deadline: paper.deadline, finishedAt: now, serverAcknowledgedAt: now,
       late: !inTime, finalisedBy: inTime ? (body.reason === 'deadline' ? 'deadline' : 'student') : 'deadline',
@@ -1351,7 +1472,8 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
       indiaExam: paper.kind === 'india' ? {
         blueprintId: paper.blueprint.id, label: paper.blueprint.label, track: paper.blueprint.track,
         variant: paper.blueprint.variant, grade: paper.blueprint.grade
-      } : null
+      } : null,
+      ...(paper.kind === 'nsw' ? { nswExam: { blueprintId: paper.blueprint.id, label: NSW_EXAM_LABEL, course: paper.blueprint.course, year: paper.blueprint.year } } : {})
     });
     return { result, written: true };
   }, { accountScope: accountId, lock: syncLockKey(accountId) }); }
@@ -1757,6 +1879,13 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     return res.status(200).json({ targets, label: TARGETED_LABEL, at: now });
   });
 
+  // The NSW papers this server lists (plan G4): which are released, what each
+  // covers and lacks. 404 unless this is a Prithagoras server with the switch on.
+  router.get('/nsw', rateLimit(db, 'exam-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    if (bankPolicy().curriculum !== 'nsw' || !nswExamsOn(env)) return reject(res, 404, 'EXAM_KIND_UNAVAILABLE', 'These papers are not available here.');
+    return res.status(200).json(nswExamCatalogue());
+  });
+
   router.post('/', rateLimit(db, 'exam-create', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const idem = String(req.get('idempotency-key') || '');
     if (!ID.test(idem)) return reject(res, 400, 'IDEMPOTENCY_KEY_REQUIRED', 'Starting a paper needs a stable idempotency key.');
@@ -1826,6 +1955,8 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       startedAt, deadline: startedAt + spec.durationMin * 60000,
       blueprint: spec.blueprint || null, paper: spec.paper || null,
       ...(spec.kind === 'india' ? { layoutSeed: spec.layoutSeed } : {}),
+      // Reading time leads the paper; the deadline above already includes it.
+      ...(spec.kind === 'nsw' ? { readingMin: spec.readingMin, readingEndsAt: startedAt + spec.readingMin * 60000 } : {}),
       ...(spec.mock ? { mock: true } : {}),
       ...(targeted ? { targeted } : {}),
       total: issued.questions.reduce((n, sq) => n + Number(sq.marks), 0),
@@ -1884,6 +2015,8 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       if (now > paper.deadline + FINISH_GRACE_MS) {
         return { status: 409, code: 'EXAM_DEADLINE_PASSED', message: 'Time is up on this paper — nothing more can be saved to it.' };
       }
+      // Reading time: the paper may be read, nothing may be written to it.
+      if (paper.readingEndsAt && now < paper.readingEndsAt) return READING_TIME;
       const prior = await read(accountId, 'exam-answers', id, now);
       const timing = { now, deadline: paper.deadline, remainingMs: Math.max(0, paper.deadline - now) };
       // A retried older save must never replace a newer one.
