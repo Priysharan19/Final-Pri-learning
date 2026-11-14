@@ -165,6 +165,8 @@ function builtApp(derived) {
 // read that blocks the runner would hold the switch back past the page's own
 // wait (#528). `duringDeadlineMs` bounds that hold; after it the log is read
 // as usual and the page reports its own failure.
+const PHASE_MIN_MS = 600_000;
+const LOG_SHOW_EVERY_MS = 30_000;
 function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, duringWhen = null, duringDeadlineMs = 240_000, tick = null, loops = 75 } = {}) {
   const started = localStamp(new Date(Date.now() - 2000));
   // SIMCTL_CHILD_* reaches the app's environment (DEBUG builds read the cloud
@@ -181,14 +183,31 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     if (container) { reportFile = join(container, 'Documents', 'PRIJOURNEY.log'); offset = existsSync(reportFile) ? readFileSync(reportFile).length : 0; }
   } catch { /* no data container yet: the log is the only channel */ }
   const fromFile = () => {
-    try { return reportFile && existsSync(reportFile) ? readFileSync(reportFile).subarray(offset).toString('utf8').split('\n').filter(l => l.startsWith('PRIJOURNEY')) : []; }
-    catch { return []; }
+    try {
+      if (!reportFile || !existsSync(reportFile)) return [];
+      const bytes = readFileSync(reportFile);
+      // A file shorter than the offset was replaced (the app rewrites it
+      // whole when it cannot append): read it all. Only lines after this
+      // launch's own "started <phase>" are kept below, so an earlier run's
+      // summary still cannot pass this one.
+      if (bytes.length < offset) offset = 0;
+      return bytes.subarray(offset).toString('utf8').split('\n').filter(l => l.startsWith('PRIJOURNEY'));
+    } catch { return []; }
   };
   launchApp(udid, bundleId, [flag], { env });
   let lines = [];
   const t0 = Date.now();
   let duringDone = !during;
-  for (let i = 0; i < loops; i++) {
+  // The phase is bounded by the clock, not by a count of reads: a count let
+  // one phase run 75 slow `log show` reads (18 minutes for the offline phase
+  // on Train editions-6, run 43435306380), and the job hit its 65-minute
+  // limit before the iPad journey finished. The container file is read every
+  // pass (it is cheap); `log show` only when there is no file, or at most
+  // once per LOG_SHOW_EVERY_MS while the file has given nothing.
+  const deadline = t0 + Math.max(loops * 2_000, PHASE_MIN_MS) + (during ? duringDeadlineMs : 0);
+  let lastLogShow = 0;
+  let via = 'nothing';
+  for (let i = 0; Date.now() < deadline; i++) {
     // With an oracle to serve, look twice a second-and-a-half rather than
     // letting the page wait on the (slow) log read.
     if (duringWhen && !duringDone) {
@@ -208,8 +227,11 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // read is reported "not reported" and fails the journey.
     const filed = fromFile();
     let log;
-    if (filed.length) log = filed.join('\n');
+    if (filed.length) { log = filed.join('\n'); via = 'container file'; }
+    else if (reportFile && Date.now() - lastLogShow < LOG_SHOW_EVERY_MS) continue;
     else try {
+      lastLogShow = Date.now();
+      via = 'unified log';
       log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
         '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact'], { timeout: 90_000, killSignal: 'SIGKILL' });
     } catch (e) {
@@ -223,6 +245,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     if (lines.some(l => l.startsWith(`PRIJOURNEY summary ${phase}`))) { execSync('sleep 3'); break; } // let WebKit flush storage
     if (lines.some(l => /^PRIJOURNEY FAIL (script|unreadable)/.test(l))) break;
   }
+  console.log(`  (${phase}: ${((Date.now() - t0) / 1000).toFixed(0)} s, read from ${via})`);
   try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* already gone */ }
   return lines;
 }
