@@ -658,6 +658,32 @@
       "pins": [
         {"has":"IOS BUNDLE FEATURES: PASS — 24/24 checks","note":"20 → 24: each bundle also records the one student interface and its skin from client/interface.config.mjs (V1 decision D7)."}
       ]
+    },
+    "suites-contracts/edition-suites.log": {
+      "job": "suites-contracts",
+      "log": "edition-suites.log",
+      "pins": [
+        {"has":"EDITION SUITES COVERAGE: PASS — 28 listed, 2 exempt, 15 importers accounted for","note":"Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
+        {"has":"EDITION SUITES (prithagoras): PASS — 28/28 suites"}
+      ]
+    },
+    "build/install-budget-prithagoras.log": {
+      "job": "build",
+      "log": "install-budget-prithagoras.log",
+      "pins": [
+        {"re":"INSTALL BUDGET: PASS — 72/72 checks — install [0-9]+ kB raw","note":"Plan E6: the Prithagoras build under the same ceilings as Priyabhata, never a loosened shared number."},
+        {"has":"client/dist is the Prithagoras build"}
+      ]
+    },
+    "browser/browser-prithagoras.log": {
+      "job": "browser",
+      "log": "browser-prithagoras.log",
+      "pins": [
+        {"has":"E2E SUITE PASSED — 35/35 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server."},
+        {"has":"E2E SUITE PASSED — 72/72 checks across 1 flows","note":"The activation gate on a Prithagoras build."},
+        {"has":"E2E SUITE PASSED — 5/5 checks across 1 flows","note":"The Exam Desk dark without its flag, Prithagoras."},
+        {"has":"E2E SUITE PASSED — 120/120 checks across 4 flows","note":"The Exam Desk sitting, import and desk journeys on Prithagoras."}
+      ]
     }
   },
   "retired": [
