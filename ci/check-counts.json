@@ -656,7 +656,7 @@
       "job": "build",
       "log": "ios-bundle-features.log",
       "pins": [
-        {"has":"IOS BUNDLE FEATURES: PASS — 20/20 checks","note":"20 → 24: each bundle also records the one student interface and its skin from client/interface.config.mjs (V1 decision D7). 24 → 20 (E3, re-derived from run 43607414989): PRI_FEATURE_AUSTRALIA retired, two checks per bundle fewer."}
+        {"has":"IOS BUNDLE FEATURES: PASS — 20/20 checks","note":"20 → 24: each bundle also records the one student interface and its skin from client/interface.config.mjs (V1 decision D7). 24 → 20 (E3, re-derived from run 43607414989): the Australia build flag retired, two checks per bundle fewer."}
       ]
     }
   },
