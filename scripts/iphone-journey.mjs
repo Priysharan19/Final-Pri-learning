@@ -108,7 +108,10 @@ const run = (cmd, args, opts = {}) =>
 function launchApp(device, bundleId, args = [], opts = {}) {
   try { run('xcrun', ['simctl', 'bootstatus', device, '-b'], { timeout: 600_000 }); } catch { /* best effort */ }
   for (let attempt = 1; ; attempt++) {
-    try { return run('xcrun', ['simctl', 'launch', device, bundleId, ...args], opts); }
+    // Bounded: an unbounded `simctl launch` (or terminate) that never
+    // returns hangs the whole journey with nothing printed, and the job is
+    // then cancelled at its limit with no log at all (Train editions-9).
+    try { return run('xcrun', ['simctl', 'launch', device, bundleId, ...args], { timeout: 180_000, killSignal: 'SIGKILL', ...opts }); }
     catch (error) {
       const text = String(error?.stderr || error?.message || '');
       if (attempt >= 5 || !/SBMainWorkspace|FBSOpenApplicationServiceErrorDomain/.test(text)) throw error;
@@ -194,6 +197,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
       return bytes.subarray(offset).toString('utf8').split('\n').filter(l => l.startsWith('PRIJOURNEY'));
     } catch { return []; }
   };
+  console.log(`  (${phase}: launching at ${new Date().toISOString().slice(11, 19)}Z)`);
   launchApp(udid, bundleId, [flag], { env });
   let lines = [];
   const t0 = Date.now();
@@ -246,7 +250,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     if (lines.some(l => /^PRIJOURNEY FAIL (script|unreadable)/.test(l))) break;
   }
   console.log(`  (${phase}: ${((Date.now() - t0) / 1000).toFixed(0)} s, read from ${via})`);
-  try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* already gone */ }
+  try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* already gone */ }
   return lines;
 }
 
@@ -267,7 +271,7 @@ if (!app) {
   app = builtApp(derived);
 }
 const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', join(app, 'Info.plist')]).trim();
-try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
 try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
 installApp(udid, app);
 
@@ -341,7 +345,7 @@ if (WANT_CLOUD) try {
     PRI_JOURNEY_ORACLE_DIR: codeDir,
   };
   // A fresh install: nothing on the device has an account yet.
-  try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+  try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
   try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
   installApp(udid, app);
   const show = lines => { for (const line of lines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`); };
@@ -496,7 +500,7 @@ let offlineRelaunchLines = [];
       }
     };
 
-    try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+    try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
     try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
     installApp(udid, app);
     const childEnv = { PRI_CLOUD_ORIGIN: server.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: student, PRI_JOURNEY_ORACLE_DIR: oracleDir };
@@ -562,7 +566,7 @@ let offlineRelaunchLines = [];
     answered.clear();
     // Its own fresh install and address: the daily free-question cap is real
     // product behaviour, and the marking profile has used much of it.
-    try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+    try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
     try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
     installApp(udid, app);
     const offlineEnv = { ...childEnv, PRI_JOURNEY_NEW_EMAIL: offlineStudent };
