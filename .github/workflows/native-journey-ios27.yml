@@ -85,14 +85,15 @@ jobs:
     runs-on: xcode-27
     # The work genuinely takes 42-59 min on these runners (passing runs
     # 43178769921 42.5, 43607096939 50, 43088957238 53, 43460174345 55.5,
-    # 43158651477 59), so 60 cancelled healthy runs (Train editions-10, run
-    # 43617147077: 36 min before the journeys, iPhone 15.6 min, cancelled in
-    # the iPad journey). Worst observed per stage: before the journeys 36,
-    # iPhone journey 17, iPad journey 27 = 80; 90 leaves 10 min. The step
-    # limits below stop a real hang first, with its log kept (a cancelled
-    # job keeps none). The journey phases themselves are short: Train
-    # editions-9's iPhone phases summed to about 7 min, the rest of the step
-    # is simulator boot, installs and the local server.
+    # 43158651477 59), so 60 cancelled a healthy run (Train editions-10, run
+    # 43617147077: 20 min before the journeys, iPhone 15.6 min, cancelled in
+    # the iPad journey). Worst observed per stage: before the journeys 25,
+    # iPhone journey 17, iPad journey 27, plus up to 7 between them = 76;
+    # 90 leaves 14 min. The step limits below (25 + 35, with 25 before them
+    # = 85) stop a real hang first, with its log kept (a cancelled job keeps
+    # none). The journey phases themselves are short: Train editions-9's
+    # iPhone phases summed to about 7 min, the rest of the step is simulator
+    # boot, installs and the local server.
     timeout-minutes: 90
 
     steps:
@@ -170,7 +171,7 @@ jobs:
         run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone-ios27.json
 
       - name: iPad journey (simulator, iOS 27)
-        timeout-minutes: 30
+        timeout-minutes: 35
         run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad-ios27.json
 
       - name: The evidence names the pinned runtime
