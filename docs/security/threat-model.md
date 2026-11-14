@@ -199,6 +199,10 @@ an intent and a revision; the server stamps every time, so a device clock cannot
 sitting. An imported prithagoras-web file is validated by the server against its own edition's
 library and never carries its timer across (`desk-check`).
 
+## 7a. Edition and region boundary (plan H2)
+
+Each edition is its own deployment with its own database, storage, secrets and budgets (ADR-0002 §9). The boundary between them is separate infrastructure, not code inside one server: a cookie, token or idempotency key from one deployment is unknown to the other because the other has a different database and delivery key. Two controls hold it in software. `bindDatabaseEdition` (`server/platform/edition.js`) records the edition in `platform_meta` and stops a server pointed at the other edition's database before it listens. The edition is deployment identity (`PRI_EDITION`); a client-supplied edition is read only by the E2 middleware and only ever refuses. `server/test/region-isolation-check.mjs` proves both with two instances over separate databases, and a static scan of `server/`. Not covered by one server: secrets reused across the two deployments, and storage, backup and admin separation. Those are checked by hand in `docs/operations/region-isolation-verification.md`, which stays unverified until the Australian region exists.
+
 ## 8. Out of scope here
 
 External penetration testing; Supabase project configuration (RLS on the hosted project, network

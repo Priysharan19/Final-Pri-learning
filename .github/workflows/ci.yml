@@ -361,6 +361,10 @@ jobs:
           # refuses (409 everywhere but health and readiness), no request chooses it.
           node server/test/edition-agreement-check.mjs 2>&1 | tee edition-agreement.log
           node tools/ci-check-counts.mjs verify platform/edition-agreement.log
+          # Two regions share nothing (ADR-0002 §9, plan H2): the database binds to
+          # one edition; accounts, sessions, tokens, keys and rows never cross.
+          node server/test/region-isolation-check.mjs 2>&1 | tee region-isolation.log
+          node tools/ci-check-counts.mjs verify platform/region-isolation.log
       # Real HTTP against the shipped app, no mocked receipts. Method marks need
       # progress (neutral working earns 0, one genuine step earns partial marks,
       # replays are identical, the persisted attempt carries the same marks), and

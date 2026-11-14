@@ -414,7 +414,13 @@ const neverServed = run => !/platform_db_open|running on port/.test(run.stdout);
   c.ok(oneLine(typo, /PRI_EDITION="priyabata" is not an edition/) && neverServed(typo), 'edition: with one line, and nothing served');
 
   writeFileSync(featuresPath, JSON.stringify({ edition: 'prithagoras' }));
-  const australia = await bootImage({ PRI_RELEASE_SHA: plainSha, PRI_BUILD_TIMESTAMP: plainTimestamp, PRI_EDITION: 'prithagoras' });
+  // Plan H2: the database the Priyabhata boots above used is bound to
+  // Priyabhata, so a Prithagoras image pointed at it stops with one line.
+  const crossed = await refusedBoot({ PRI_RELEASE_SHA: plainSha, PRI_BUILD_TIMESTAMP: plainTimestamp, PRI_EDITION: 'prithagoras' });
+  c.eq(crossed.exited?.code, 1, 'edition: a Prithagoras image over the Priyabhata database exits 1');
+  c.ok(oneLine(crossed, /^edition_binding: this server is prithagoras \(PRI_EDITION\) but its database is bound to "priyabhata"/) && !/running on port/.test(crossed.stdout), `edition: with one line naming both, and never listening (the database is opened to read its binding) (${crossed.stderr.trim().slice(0, 200)})`);
+  // Its own region's database, as the Australian deployment will have.
+  const australia = await bootImage({ PRI_RELEASE_SHA: plainSha, PRI_BUILD_TIMESTAMP: plainTimestamp, PRI_EDITION: 'prithagoras', PRI_PLATFORM_DB: join(dataDir, 'prithagoras-platform.db') });
   try {
     const body = await (await waitForHealth(australia)).json();
     c.eq(body.edition, 'prithagoras', 'edition: the same image code serves Prithagoras when both the variable and the client say so');
