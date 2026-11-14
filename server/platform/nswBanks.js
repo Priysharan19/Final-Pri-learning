@@ -316,6 +316,21 @@ function buildCurriculum() {
     marking: 'final-answer-only',
     outcomes: { total, generated, missing: total - generated },
     banks: { issued: NSW_BANK_COUNT, cells: NSW_CELL_COUNT },
+    // What may be OFFERED, by Pri subtopic (the unit the app's selectors show):
+    // `requestable` is exactly the difficulties this server issues for the
+    // subtopic and for each of its dot points. A subtopic or level absent
+    // here is not issued and must not be offered (engine/nswOffer.js holds the
+    // device's copy; server/test/nsw-offer-check.mjs holds the two equal).
+    subtopics: Object.fromEntries(NSW_BANK_LEDGER.filter(entry => entry.issued).map(entry => {
+      const requestable = entry.cells.filter(cell => cell.issued).map(cell => cell.difficulty);
+      return [entry.generator, {
+        requestable,
+        dotpoints: Object.fromEntries(dotpointsFor(entry.generator).map(dp => {
+          const levels = dp.forms.filter(d => requestable.includes(d));
+          return [dp.id, { requestable: levels, generated: levels.length > 0 }];
+        }))
+      }];
+    })),
     syllabuses
   };
 }

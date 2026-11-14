@@ -583,8 +583,15 @@ export function examShares(candidates) {
  *
  * Returns { subtopic, difficulty, reason, why, target, score }.
  */
-export function pickNext({ ratings, reviewsDue, year, pathway = 'advanced', rand = Math.random(), recent = [], nowMs = Date.now() }) {
-  const { own, revision } = scopeForYear(year, pathway);
+export function pickNext({ ratings, reviewsDue, year, pathway = 'advanced', rand = Math.random(), recent = [], nowMs = Date.now(), offered = null }) {
+  const scope = scopeForYear(year, pathway);
+  // `offered` (optional): only subtopics it admits are candidates — the NSW
+  // course passes the cells its server issues (engine/nswOffer.js). Without
+  // it every subtopic in scope is a candidate, as always. Null when nothing
+  // in scope is offered.
+  const keep = list => (typeof offered === 'function' ? list.filter(s => offered(s.id)) : list);
+  const own = keep(scope.own), revision = keep(scope.revision);
+  if (typeof offered === 'function' && !own.length && !revision.length) return null;
   const candidates = [
     ...own.map(s => ({ id: s.id, weight: s.weight, own: true })),
     ...revision.map(s => ({ id: s.id, weight: s.weight, own: false }))
