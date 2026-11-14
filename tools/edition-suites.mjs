@@ -34,6 +34,7 @@ export const EDITION_SUITES = [
   'client/test/i18n-coverage-check.mjs',
   // Sign-up scope and paywall honesty, the edition's own limit clock.
   'client/test/signup-consent-check.mjs',
+  'client/test/onboarding-scope-check.mjs',
   'client/test/paywall-honesty-check.mjs',
   'client/test/edition-limit-clock-check.mjs',
   'client/test/account-action-guardian-erase-check.mjs',
@@ -48,6 +49,7 @@ export const EDITION_SUITES = [
   // The server: edition agreement, billing per edition, budgets per region,
   // NSW practice and exams, the desk, the hardened production boundary.
   'server/test/edition-agreement-check.mjs',
+  'server/test/region-isolation-check.mjs',
   'server/test/billing-edition-check.mjs',
   'server/test/edition-ai-budgets-check.mjs',
   'server/test/nsw-practice-check.mjs',
@@ -60,7 +62,7 @@ export const EDITION_SUITES = [
 
 /** Import the edition modules but are proven per edition elsewhere. */
 export const EXEMPT = {
-  'client/test/a11y-gate.mjs': 'a browser walk that assumes an India profile; not yet edition-aware (open gap, plan E6), runs once on Priyabhata in a11y-boot',
+  'client/test/a11y-gate.mjs': 'a browser walk: the CI browser shard "edition-prithagoras" runs it on a Prithagoras build and server',
   'client/test/brand-build-check.mjs': 'builds both editions itself (--both) in the "Client build and offline-first boundary" job'
 };
 
