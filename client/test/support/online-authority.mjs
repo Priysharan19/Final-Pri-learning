@@ -191,7 +191,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   let pinnedPid;                      // undefined = follow the selected profile
   let signedOut = false;
   let offline = false;
-  const traffic = { total: 0, issue: 0, bind: 0, prepare: 0, repeat: 0, seedsSent: 0, grade: 0, reveal: 0, recognize: 0, refusedOffline: 0, examCreate: 0, examSave: 0, examFinish: 0, examRead: 0 };
+  const traffic = { total: 0, issue: 0, bind: 0, prepare: 0, repeat: 0, seedsSent: 0, grade: 0, reveal: 0, recognize: 0, refusedOffline: 0, examCreate: 0, examSave: 0, examFinish: 0, examRead: 0, curricula: [] };
 
   const selectedPid = () => {
     try { return globalThis.localStorage?.getItem('pri-current-profile') || null; } catch { return null; }
@@ -252,6 +252,8 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
       try { asked = JSON.parse(String(options.body || '{}')); } catch { /* the server refuses it */ }
       if (asked?.prepared !== undefined) traffic.bind += 1;
       if (asked && 'seed' in asked) traffic.seedsSent += 1;
+      // The course each issue named (practice-course-request-check.mjs).
+      traffic.curricula.push(asked?.curriculum ?? null);
     } else if (path === '/v1/practice/prepare') traffic.prepare += 1;
     else if (/^\/v1\/practice\/[^/]+\/repeat$/.test(path)) traffic.repeat += 1;
     else if (/^\/v1\/practice\/[^/]+\/submit$/.test(path)) traffic.grade += 1;
