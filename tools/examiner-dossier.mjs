@@ -19,6 +19,28 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
+
+// --jurisdiction cbse (default; this file's own dossier, unchanged) | nsw
+// (the HSC dossier, tools/examiner-dossier-nsw.mjs). Mission CERT.
+const jIdx = process.argv.indexOf('--jurisdiction');
+const JURISDICTION = jIdx > 0 ? String(process.argv[jIdx + 1] || '') : 'cbse';
+if (!['cbse', 'nsw'].includes(JURISDICTION)) { console.error(`EXAMINER DOSSIER: FAIL — --jurisdiction must be cbse or nsw, not "${JURISDICTION}"`); process.exit(1); }
+if (JURISDICTION === 'nsw') {
+  const { buildNswDossier, NSW_DOSSIER } = await import('./examiner-dossier-nsw.mjs');
+  let built;
+  try { built = await buildNswDossier(); } catch (e) { console.error(`EXAMINER DOSSIER (NSW): FAIL — ${e.message}`); process.exit(1); }
+  const out = path.join(ROOT, NSW_DOSSIER);
+  if (process.argv.includes('--check')) {
+    const cur = existsSync(out) ? readFileSync(out, 'utf8') : '';
+    if (cur !== built.text) { console.error(`EXAMINER DOSSIER (NSW): FAIL — ${NSW_DOSSIER} does not match the code; run node tools/examiner-dossier.mjs --jurisdiction nsw and re-request review`); process.exit(1); }
+    console.log(`EXAMINER DOSSIER (NSW): PASS — ${built.cells.length} issued cells, ${built.methodCells.length} method rubrics, digest ${built.digest.slice(0, 12)}…, status PENDING (not academically approved)`);
+  } else {
+    writeFileSync(out, built.text);
+    console.log(`wrote ${out} — ${built.cells.length} cells, digest ${built.digest}`);
+  }
+  process.exit(0);
+}
+
 const OUT = path.join(ROOT, 'docs/marking/order14-examiner-certification-dossier.md');
 const { GENERATORS, loadAllBanks, generateQuestion } = await import(path.join(ROOT, 'client/src/engine/generators/index.js'));
 const { checkAnswer } = await import(path.join(ROOT, 'client/src/engine/checker.js'));
