@@ -296,7 +296,10 @@ try {
   ok(main.includes('const showEditionMismatch = conflict => root.render(<EditionMismatch conflict={conflict} />);'), 'the screen replaces the whole root');
   ok(!/await checkServerEdition/.test(main), 'the first paint never waits on the edition check');
   const login = read('src/pages/Login.jsx');
-  ok(!/platform\/edition|EditionMismatch|X-Pri-Edition/.test(login), 'Login.jsx is not touched by E2 (its course default is plan E3)');
+  // Plan E3: sign-up reads its course through the helper alone — no record,
+  // no table, no mismatch handling of its own.
+  ok(/import \{ defaultCourse, offersCourse \} from '\.\.\/platform\/edition\.js';/.test(login) && !/edition-record|edition\.config|EditionMismatch|X-Pri-Edition/.test(login),
+    'Login.jsx asks only the edition helper for its sign-up course (plan E3)');
   const view = read('src/components/EditionMismatch.jsx');
   ok(!/onClick|<button|<form|href=|reload|retry/i.test(view.replace(/\/\/.*$/gm, '')), 'the screen component offers no action');
 }

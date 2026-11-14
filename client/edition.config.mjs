@@ -30,9 +30,8 @@
 // client/src/platform/edition-record.js (plan E2), which the build replaces with its own
 // edition's record — the wordmark, the icon cut, and the {brand} every
 // catalogue string uses. The build reads it in vite.config.js
-// (index.html, the web manifest, icons). Sign-up course defaults (E2/E3),
-// billing (E5) and the retirement of PRI_FEATURE_AUSTRALIA (E3) read from here
-// in later missions.
+// (index.html, the web manifest, icons). The courses sign-up offers and
+// preselects (E3, client/src/pages/Login.jsx) and billing (E5) read from here.
 // ─────────────────────────────────────────────────────────────────────────────
 
 // The server imports this file at run time, and the production image admits

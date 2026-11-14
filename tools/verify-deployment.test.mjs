@@ -51,7 +51,7 @@ function healthy() {
       }
     }],
     '/release.json': [200, { ...identity }],
-    '/features.json': [200, { placement: false, extendedTracks: false, australia: false, examHandwriting: false, instrument: false, tutor: true, pastPapers: true, parentReport: true }],
+    '/features.json': [200, { placement: false, extendedTracks: false, examHandwriting: false, instrument: false, tutor: true, pastPapers: true, parentReport: true }],
     '/v1/tutor/status': [401, { error: { code: 'AUTH_REQUIRED' } }],
     '/v1/parent-report': [401, { error: { code: 'AUTH_REQUIRED' } }],
     '/v1/billing/config': [200, {
