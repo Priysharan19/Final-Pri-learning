@@ -149,6 +149,17 @@ jobs:
           node client/test/india-exam-duplicate-check.mjs
           node client/test/india-progress-product-check.mjs
           node tools/india-production-census.mjs
+      # Plan E6: the edition-sensitive suites (tools/edition-suites.mjs, one
+      # list, proven to cover every suite that reads the edition) run again
+      # with PRI_EDITION=prithagoras, so their in-process servers and builds
+      # are Prithagoras ones. They ran once under Priyabhata in the shards.
+      # Here rather than in a new job: Actions concurrency is the bottleneck.
+      - name: Edition-sensitive suites on a Prithagoras server (plan E6)
+        run: |
+          set -euo pipefail
+          node tools/edition-suites.mjs --verify-coverage 2>&1 | tee edition-suites.log
+          node tools/edition-suites.mjs --run --edition=prithagoras 2>&1 | tee -a edition-suites.log
+          node tools/ci-check-counts.mjs verify suites-contracts/edition-suites.log
       - name: Real ink diagnostic (advisory in PR CI)
         if: always()
         continue-on-error: true
@@ -645,7 +656,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        group: [e2e-core, e2e-accounts, chromium-layout, webkit-layout, a11y-boot]
+        group: [e2e-core, e2e-accounts, chromium-layout, webkit-layout, a11y-boot, edition-prithagoras]
         include:
           - group: e2e-core
             browsers: chromium webkit
@@ -662,6 +673,12 @@ jobs:
           - group: a11y-boot
             browsers: chromium webkit
             prebuild: false
+          # Plan E6: the Prithagoras edition's browser proof. Every build and
+          # in-process server in this group resolves PRI_EDITION=prithagoras.
+          - group: edition-prithagoras
+            browsers: chromium webkit
+            prebuild: false
+            edition: prithagoras
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -765,6 +782,9 @@ jobs:
           PRI_FEATURE_TUTOR: '0'
         run: node --input-type=module -e "const { ensureBuild } = await import('./client/test/e2e.mjs'); ensureBuild(true);"
       - name: Browser suites (${{ matrix.group }})
+        env:
+          # Unset (= Priyabhata, the default) except in the edition group.
+          PRI_EDITION: ${{ matrix.edition }}
         run: |
           set -o pipefail
           : > browser.log
@@ -882,6 +902,25 @@ jobs:
             # end in the app or in a visible notice with Reload, never a silent splash.
             npm run test:boot 2>&1 | tee -a browser.log
               ;;
+            edition-prithagoras)
+            # Plan E6: PRI_EDITION=prithagoras for the whole group (the step's
+            # env), so each tour's build and its in-process server are Prithagoras.
+            test "$PRI_EDITION" = prithagoras
+            # GAP (plan E6): the accessibility walk (client/test/a11y-gate.mjs)
+            # is not run here yet. It signs up an India profile and walks India
+            # routes; on a Prithagoras build 15 of its 46 checks fail because the
+            # walk, not the app, assumes India. Making it edition-aware is its own
+            # mission; until then Prithagoras accessibility is not proven in CI.
+            # Sign-up and the activation gate on a Prithagoras test build of
+            # client/dist (ensureBuild: the e2e test flags, this group's edition).
+            node --input-type=module -e "const { ensureBuild } = await import('./client/test/e2e.mjs'); ensureBuild(true);"
+            node client/test/tour-otp-onboarding.js --no-build 2>&1 | tee -a browser.log
+            node client/test/tour-activation-gate.js --no-build 2>&1 | tee -a browser.log
+            # The library and the Exam Desk (makes its own flagged builds).
+            node client/test/tour-exam-desk.js 2>&1 | tee -a browser.log
+            # The paywall (E5) and NSW exam (G4) tours stay in a11y-boot: they
+            # build Prithagoras themselves whatever this group's edition is.
+              ;;
             *)
               echo "unknown browser group" >&2
               exit 1
@@ -931,17 +970,20 @@ jobs:
       - name: Combine the shard logs
         run: |
           set -euo pipefail
-          for group in e2e-core e2e-accounts chromium-layout webkit-layout a11y-boot; do
+          for group in e2e-core e2e-accounts chromium-layout webkit-layout a11y-boot edition-prithagoras; do
             test -s "browser-shards/browser-shard-$group/browser.log"
             cat "browser-shards/browser-shard-$group/browser.log"
           done > browser.log
-          test "$(ls -d browser-shards/browser-shard-* | wc -l)" -eq 5
+          test "$(ls -d browser-shards/browser-shard-* | wc -l)" -eq 6
+          # Plan E6: the Prithagoras shard's own pins are verified against its log alone.
+          cp browser-shards/browser-shard-edition-prithagoras/browser.log browser-prithagoras.log
       - name: Browser coverage invariants
         if: always()
         run: |
           set -euo pipefail
           test -s browser.log
           node tools/ci-check-counts.mjs verify browser/browser.log
+          node tools/ci-check-counts.mjs verify browser/browser-prithagoras.log
           if grep -Fq 'not measured:' browser.log; then
             echo 'A browser suite reported skipped coverage.' >&2
             exit 1
@@ -1047,6 +1089,26 @@ jobs:
               exit 1
             fi
           done
+      # Plan E6: the same build for Prithagoras, in this job (Actions
+      # concurrency is the bottleneck, so no new job). Every Priyabhata check
+      # above has run; this replaces client/dist with a Prithagoras build and
+      # proves it builds, keeps its own install budget, loads no remote
+      # presentation asset and carries no secret. The iOS bundles stay
+      # Priyabhata (V1): a Prithagoras native bundle waits for its bundle
+      # identifiers and signing (owner decision O3) and is not built here.
+      - name: Prithagoras build, install budget and boundary (plan E6)
+        env:
+          PRI_EDITION: prithagoras
+        run: |
+          set -euo pipefail
+          node client/test/install-budget-check.mjs 2>&1 | tee install-budget-prithagoras.log
+          node -e "const f=JSON.parse(require('fs').readFileSync('client/dist/features.json','utf8'));if(f.edition!=='prithagoras'){console.error('client/dist is not the Prithagoras build: '+JSON.stringify(f.edition));process.exit(1)}console.log('client/dist is the Prithagoras build')" | tee -a install-budget-prithagoras.log
+          node tools/ci-check-counts.mjs verify build/install-budget-prithagoras.log
+          node tools/secret-scan.mjs
+          if grep -rnoIE --include='*.html' --include='*.css' '(src|href)="https?://|@import[^;]*https?://|url\(https?://' client/dist; then
+            echo 'The Prithagoras build contains a remote presentation load.' >&2
+            exit 1
+          fi
 
   engine-benchmark:
     # Ledger 3.8: the deterministic marker's confusion table, regenerated on

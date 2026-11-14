@@ -236,6 +236,8 @@
     "test:interface:decisions": "node client/test/interface-decisions-check.mjs",
     "test:editions": "node client/test/edition-config-check.mjs && node client/test/brand-strings-check.mjs && node client/test/brand-usage-check.mjs && node client/test/brand-assets-check.mjs",
     "test:editions:client": "node client/test/edition-client-check.mjs",
+    "test:editions:prithagoras": "node tools/edition-suites.mjs --run --edition=prithagoras",
+    "test:a11y:prithagoras": "PRI_EDITION=prithagoras node client/test/a11y-gate.mjs",
     "test:paywall:edition": "node client/test/tour-paywall-edition.js",
     "test:nsw:exams:tour": "node client/test/tour-nsw-exams.js",
     "test:aurora": "node client/test/aurora-skin-check.mjs",
