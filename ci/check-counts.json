@@ -121,7 +121,7 @@
         {"has":"TUTOR UI: PASS — 127/127 checks","note":"114 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same). 114 → 127 (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree)."},
         {"has":"ERROR REPORTS: PASS — 36/36 checks"},
         {"has":"APPLE SIGN IN: PASS — 66/66 checks"},
-        {"has":"ONBOARDING SCOPE: PASS — 62/62 checks","note":"60 → 62 (plan E4, re-derived by running): the page and manifest checks run for both editions' builds."},
+        {"has":"ONBOARDING SCOPE: PASS — 69/69 checks","note":"60 → 62 (plan E4, re-derived by running): the page and manifest checks run for both editions' builds. 62 → 69 (E3, re-derived from run 43607414989): the course step rendered for both editions."},
         {"has":"HANDWRITING CLAIMS: PASS — ","note":"No student-facing text says Pri learns a hand (the count follows the string catalogues, so only the verdict is pinned here)."},
         {"has":"RESIDENCY CLAIMS (H7): PASS — ","note":"Plan H7: nothing says work stays in, never leaves or is processed in India or Australia (the count follows the files read)."},
         {"has":"STUDY PLAN: PASS — 215/215 checks","note":"211 → 215 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
@@ -656,7 +656,7 @@
       "job": "build",
       "log": "ios-bundle-features.log",
       "pins": [
-        {"has":"IOS BUNDLE FEATURES: PASS — 24/24 checks","note":"20 → 24: each bundle also records the one student interface and its skin from client/interface.config.mjs (V1 decision D7)."}
+        {"has":"IOS BUNDLE FEATURES: PASS — 20/20 checks","note":"20 → 24: each bundle also records the one student interface and its skin from client/interface.config.mjs (V1 decision D7). 24 → 20 (E3, re-derived from run 43607414989): the Australia build flag retired, two checks per bundle fewer."}
       ]
     }
   },
