@@ -84,6 +84,8 @@ env:
 
 jobs:
   native-ink:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Swift build, capture gate and bridge smoke test (iOS 26)
     runs-on: macos-26
     timeout-minutes: 60

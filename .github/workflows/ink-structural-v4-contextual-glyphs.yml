@@ -5,6 +5,12 @@ on:
       - 'tools/ink-foundation/**'
       - 'scripts/ink-structural-contextual-glyphs-dev.sh'
       - '.github/workflows/ink-structural-v4-contextual-glyphs.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/ink-foundation/**'
+      - 'scripts/ink-structural-contextual-glyphs-dev.sh'
+      - '.github/workflows/ink-structural-v4-contextual-glyphs.yml'
   workflow_dispatch:
 concurrency:
   # Pull-request runs share one group per pull request, so a newer push supersedes the
@@ -18,6 +24,8 @@ permissions:
 
 jobs:
   glyph-fusion:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Local vs visual-context group symbols
     runs-on: ubuntu-24.04
     timeout-minutes: 30
