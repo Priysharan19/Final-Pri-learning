@@ -114,6 +114,7 @@
     {"pattern":"tools/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R3"},
     {"pattern":"scripts/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R3"},
     {"pattern":".github/workflows/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R4"},
+    {"pattern":"ci/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R4"},
     {"pattern":".github/dependabot.yml","primary":"reliability","reviewers":["security","qa-release"],"risk":"R4"},
     {"pattern":".github/codeql/**","primary":"reliability","reviewers":["security","qa-release"],"risk":"R4"},
     {"pattern":"marketing/**","primary":"growth","reviewers":["security","qa-release"],"risk":"R2"},

@@ -38,6 +38,7 @@ import SectionTime from '../components/SectionTime.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { freezePage, pendingSummary, unreadInkKeys } from '../local/examPages.js';
 import { featureEnabled } from '../platform/features.js';
+import { omittedNames } from '../local/nswExamBackend.js';
 import { MOCK_LABEL } from '../engine/boardMock.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
@@ -160,6 +161,8 @@ export default function ExamRoom() {
   const [showWk, setShowWk] = useState({});
   const [cur, setCur] = useState(0);
   const [deadlineAt, setDeadlineAt] = useState(null);
+  // An NSW paper's reading time (plan G4): the paper shows, nothing can be written.
+  const [readingEndsAt, setReadingEndsAt] = useState(null);
   const [now, setNow] = useState(() => Date.now());
   const [phase, setPhase] = useState('loading');   // loading | sitting | finalising | pending | done
   // Submitted but not yet marked by the server: { reason, code }. Never a score.
@@ -215,7 +218,7 @@ export default function ExamRoom() {
   };
 
   const setPhaseBoth = p => { phaseRef.current = p; setPhase(p); };
-  latest.current = { answers, workings, inks, modes, cur, exam, deadlineAt };
+  latest.current = { answers, workings, inks, modes, cur, exam, deadlineAt, readingEndsAt };
 
   // ── Time on each question ──────────────────────────────────────────────────
   // Measured while the question is on screen and the page is visible; a hidden
@@ -280,6 +283,7 @@ export default function ExamRoom() {
       // older backend) falls back to the paper's own creation time — never to
       // "now", which would turn a crash into extra time.
       setDeadlineAt(session.deadlineAt || ((e.createdAt || Date.now()) + e.durationMin * 60000));
+      setReadingEndsAt(Number.isFinite(session.readingEndsAt) ? session.readingEndsAt : null);
       setExam(e);
       learnClock(session.now);
       setNow(clockNow());
@@ -290,7 +294,9 @@ export default function ExamRoom() {
 
   const secondsLeft = deadlineAt === null ? null : Math.max(0, Math.ceil((deadlineAt - now) / 1000));
   const sitting = phase === 'sitting' && secondsLeft !== null && secondsLeft > 0;
-  const locked = !sitting;
+  const readingLeft = readingEndsAt === null ? 0 : Math.max(0, Math.ceil((readingEndsAt - now) / 1000));
+  const reading = sitting && readingLeft > 0;
+  const locked = !sitting || reading;
 
   // ── Handwriting that has not been read ─────────────────────────────────────
   // Written, kept, and not yet read by the student's own "Read my answer". It
@@ -329,6 +335,8 @@ export default function ExamRoom() {
   const save = useCallback((urgent = false) => {
     if (saveTimer.current) { clearTimeout(saveTimer.current); saveTimer.current = null; }
     if (phaseRef.current !== 'sitting') return saveChain.current;
+    // Reading time: there is nothing to save, and the server would refuse it.
+    if (Number.isFinite(latest.current.readingEndsAt) && clockNow() < latest.current.readingEndsAt) return saveChain.current;
     accrue();
     const snap = latest.current;
     // One request carries at most ~9,000 points of handwriting, which keeps it
@@ -469,6 +477,13 @@ export default function ExamRoom() {
       finalise('deadline');
     }
   }, [secondsLeft, phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Reading time ending is said aloud: the inputs have just opened.
+  const wasReading = useRef(false);
+  useEffect(() => {
+    if (reading) wasReading.current = true;
+    else if (wasReading.current && sitting) { wasReading.current = false; setAnnounce(tLater('examRoom.readingOver')); }
+  }, [reading, sitting]);
 
   // ── Finalise ───────────────────────────────────────────────────────────────
   async function finalise(reason = 'student') {
@@ -755,6 +770,8 @@ export default function ExamRoom() {
           {exam.mock && <p className="muted" data-exam-mock-label>{t('mock.resultNote', { label: MOCK_LABEL })}</p>}
           {exam.targeted && <p className="muted" data-exam-targeted-label>{t('mock.targetedResultNote')}</p>}
           {exam.targeted && <WhyKey why={exam.why} />}
+          {exam.nsw && <p className="muted" data-exam-nsw-note>{t('examRoom.nswMarkingNote')}</p>}
+          {exam.nsw?.omittedOutcomes?.length > 0 && <p className="muted" data-exam-nsw-omits>{t('exams.nsw.omits', { outcomes: omittedNames(exam.nsw.omittedOutcomes) })}</p>}
           {/* The number is ink, never a traffic light; the sentence carries the meaning. */}
           <div className="hero-num exam-result-num">
             {shownPct}%<span className="sr-only"> {t(shownPct >= 80 ? 'examRoom.pctSrStrong' : shownPct >= 50 ? 'examRoom.pctSrFair' : 'examRoom.pctSrLow')}</span>
@@ -1101,6 +1118,15 @@ export default function ExamRoom() {
       <div className="sr-only" role="status" aria-live="polite">{announce}</div>
 
       <div className="exam-body">
+      {reading && (
+        <div className="verdict verdict-technical" role="status" data-exam-reading-time={readingLeft}>
+          <span className="verdict-ico"><Icon name="clock" /></span>
+          <div>
+            <div className="verdict-body"><b>{t('examRoom.readingTitle', { time: mmss(readingLeft) })}</b> {t('examRoom.readingBody')}</div>
+            {exam.nsw?.omittedOutcomes?.length > 0 && <div className="verdict-body" data-exam-nsw-omits>{t('exams.nsw.omits', { outcomes: omittedNames(exam.nsw.omittedOutcomes) })}</div>}
+          </div>
+        </div>
+      )}
       {sitting && left <= UNREAD_WARNING_S && unreadKeys.length > 0 && (
         <div className="verdict verdict-technical" role="alert" data-exam-unread-warning={unreadKeys.length}>
           <span className="verdict-ico"><Icon name="alert" /></span>

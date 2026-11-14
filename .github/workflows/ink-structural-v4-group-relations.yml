@@ -6,6 +6,12 @@ on:
       - 'tools/ink-foundation/**'
       - 'scripts/ink-structural-group-relations-dev.sh'
       - '.github/workflows/ink-structural-v4-group-relations.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'tools/ink-foundation/**'
+      - 'scripts/ink-structural-group-relations-dev.sh'
+      - '.github/workflows/ink-structural-v4-group-relations.yml'
   workflow_dispatch:
 
 concurrency:
@@ -20,6 +26,8 @@ permissions:
 
 jobs:
   pooled-group-relations:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Pooled glyph relation reasoning
     runs-on: ubuntu-24.04
     timeout-minutes: 30

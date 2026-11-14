@@ -1,7 +1,9 @@
 name: Ink Structural V4 Component Validity
 
 on:
+  workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'tools/ink-foundation/structural_component_validity.py'
       - 'tools/ink-foundation/train_component_validity.py'
@@ -43,6 +45,8 @@ concurrency:
 
 jobs:
   component-validity-contract:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Contextual hard-negative component rejection
     runs-on: ubuntu-latest
     timeout-minutes: 25

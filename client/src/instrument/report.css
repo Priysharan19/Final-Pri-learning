@@ -10,7 +10,7 @@
 .in-segc { display: inline-flex; padding: 3px; border-radius: 4px; background: var(--in-l3); box-shadow: inset 0 0 0 1px var(--in-edge); gap: 2px; flex: none; }
 .in-segc button { padding: 5px 12px; min-height: 30px; border: 0; border-radius: 3px; background: transparent; font: 500 13px var(--in-ui); color: var(--in-tx-2); cursor: pointer; }
 .in-segc button[aria-pressed="true"] { background: var(--in-l5); color: var(--in-tx); box-shadow: inset 0 1px 0 var(--in-hi); }
-.in-segc button:focus-visible { outline: 2px solid var(--in-signal); outline-offset: 1px; }
+.in-segc button:focus-visible { outline: 2px solid var(--in-tx); outline-offset: 1px; }
 .in-report-figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
 .in-report-figs > div, .in-report-heat { border-radius: 6px; background: var(--in-l1); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge); }
 .in-report-figs > div { padding: 16px; }
