@@ -86,7 +86,7 @@ try {
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
   const answerBox = page.locator('.editor-body input.answer-input');
   let known = null;
-  for (let skips = 0; skips <= MAX_SKIPS && !known; skips++) {
+  for (let skips = 0; skips <= MAX_SKIPS; skips++) {
     const typeTab = page.locator('.mode-tab').first();
     if (await typeTab.count()) await typeTab.click();
     await online.settled();
