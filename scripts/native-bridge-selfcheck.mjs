@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { installApp, keepOnlySimulator } from './simulator-fleet.mjs';
+import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
@@ -54,24 +54,21 @@ function launchApp(device, bundleId, args = [], opts = {}) {
 }
 
 
+// The device is chosen as every harness script chooses it
+// (scripts/simulator-fleet.mjs pickSimulator): a booted match first, else the
+// newest that satisfies the PINNED runtime. It once took the newest runtime
+// installed, so on the iOS 27 lane the iPhone self-check booted an iOS 27.2
+// phone the journey then shut down for its own iOS 27.0 one: two cold boots
+// (about seven minutes each) and a self-check off the pinned iOS.
+// The pin is read when a device is picked, never at import: a suite that
+// imports judgeContentEnd under CI=true has no PRI_SIM_RUNTIME and no simulator.
 function pickDevice() {
+  const PINNED_RUNTIME = requiredRuntime();
   const named = argOf('device');
-  const family = (argOf('family') || 'ipad').toLowerCase();
-  const pattern = named ? null : (family === 'iphone' ? /iPhone/ : /iPad/);
-  // Devices are listed under runtime headers ("-- iOS 26.0 --"). Prefer the
-  // newest runtime: an older one can need a long first boot on a CI runner.
-  let runtime = [0];
-  const rows = [];
-  for (const l of run('xcrun', ['simctl', 'list', 'devices', 'available']).split('\n')) {
-    const header = l.match(/^-- iOS ([\d.]+) --/);
-    if (header) { runtime = header[1].split('.').map(Number); continue; }
-    const m = l.match(/^\s+(.+?) \(([0-9A-F-]{36})\) \((\w+)\)/i);
-    if (m && /^-- /.test(l) === false) rows.push({ name: m[1], udid: m[2], state: m[3], runtime });
-  }
-  const newer = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (b[i] || 0) - (a[i] || 0); if (d) return d; } return 0; };
-  const matching = rows.filter(d => (named ? d.name === named : pattern.test(d.name))).sort((a, b) => newer(a.runtime, b.runtime));
-  const pick = matching.find(d => d.state === 'Booted') || matching[0];
-  if (!pick) throw new Error(`no ${named || family} simulator is available`);
+  const family = (argOf('family') || 'ipad').toLowerCase() === 'iphone' ? 'iPhone' : 'iPad';
+  const listing = run('xcrun', ['simctl', 'list', 'devices', 'available']);
+  const pick = pickSimulator(listing, { family, named, runtime: PINNED_RUNTIME });
+  if (!pick) throw new Error(`no ${named || family} simulator is available${PINNED_RUNTIME ? ` on the pinned iOS ${PINNED_RUNTIME} runtime` : ''} (installed: ${describeRuntimes(listing) || 'none'})`);
   return pick;
 }
 
