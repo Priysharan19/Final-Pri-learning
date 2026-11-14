@@ -124,3 +124,59 @@ export function refuseOtherEdition(edition) {
     });
   };
 }
+
+// ── The database belongs to one edition (plan H2) ───────────────────────────
+//
+// ADR-0002 §9: each edition has its own database. The binding makes a
+// mistyped PRI_DATABASE_URL (an Australian service pointed at the Mumbai
+// database, or the reverse) stop the server before it listens, rather than
+// serve one edition's students from the other's rows.
+//
+//   platform_meta.edition absent, database has no accounts → write ours, start
+//   absent, accounts exist, we are priyabhata              → write ours, start
+//                                                            (databases from before H2: production India)
+//   absent, accounts exist, we are anything else           → refuse
+//   present and equal to ours                              → start
+//   present and different (or unknown)                     → refuse
+//
+// The application never changes a bound database's edition; that is a manual,
+// owner-authorised operation (docs/operations/region-isolation-verification.md).
+export const EDITION_META_KEY = 'edition';
+/** The edition a database that predates the binding is assumed to hold. */
+export const LEGACY_DATABASE_EDITION = 'priyabhata';
+
+function bindingError(code, message, extra = {}) {
+  return Object.assign(new Error(message), { code, ...extra });
+}
+
+/**
+ * Bind `db` (a platform store) to `edition`, or throw before anything is
+ * served. Returns { edition, bound: 'existing' | 'new' | 'legacy' }.
+ * Concurrent first starts are safe: the insert does nothing on conflict and
+ * the stored value is re-read and compared.
+ */
+export async function bindDatabaseEdition(db, edition) {
+  if (!Object.hasOwn(EDITIONS, edition)) {
+    throw bindingError('EDITION_UNKNOWN', `edition_binding: ${shown(edition)} is not an edition this server knows; refusing to start`);
+  }
+  const read = async () => (await db.get('SELECT value FROM platform_meta WHERE key = ?', [EDITION_META_KEY]))?.value;
+  let stored = await read();
+  let bound = 'existing';
+  if (stored === undefined || stored === null) {
+    const hasAccounts = Boolean(await db.get('SELECT 1 AS one FROM accounts LIMIT 1'));
+    if (hasAccounts && edition !== LEGACY_DATABASE_EDITION) {
+      throw bindingError('EDITION_DATABASE_UNBOUND',
+        `edition_binding: this server is ${edition} (PRI_EDITION) but its database holds accounts and is bound to no edition (a database from before the binding is ${LEGACY_DATABASE_EDITION}'s); refusing to start`,
+        { serverEdition: edition, databaseEdition: null });
+    }
+    await db.run('INSERT INTO platform_meta(key, value) VALUES (?, ?) ON CONFLICT(key) DO NOTHING', [EDITION_META_KEY, edition]);
+    bound = hasAccounts ? 'legacy' : 'new';
+    stored = await read();
+  }
+  if (stored !== edition) {
+    throw bindingError('EDITION_DATABASE_MISMATCH',
+      `edition_binding: this server is ${edition} (PRI_EDITION) but its database is bound to ${shown(stored)} (platform_meta.edition); refusing to start`,
+      { serverEdition: edition, databaseEdition: stored });
+  }
+  return { edition, bound };
+}

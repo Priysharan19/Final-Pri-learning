@@ -138,7 +138,7 @@ function buildApp() {
     // only passes where the CI job happens to export the variable.
     // (KALP-02 pins the four-flag env below; PARENT_REPORT (#743) is added on top so /parent-report is walked too,
     // and LIBRARY (plan F1) so /library and /library/:id are, and EXAM_DESK (plan F4b) so /desk/import and /desk/:attemptId are.)
-    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1', PRI_FEATURE_LIBRARY: '1', PRI_FEATURE_EXAM_DESK: '1' } });
+    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1', PRI_FEATURE_LIBRARY: '1', PRI_FEATURE_EXAM_DESK: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;

@@ -203,7 +203,10 @@ export const ENGINE_SUITES = [
   'db-round-trips-check.mjs',
   // Round trips pinned per hot request on Postgres, the one-request ink Submit,
   // and no account scope leaking back to the pool (#441 port, #524 item 3).
-  'hot-path-budget-check.mjs'
+  'hot-path-budget-check.mjs',
+  // Plan H2: two regions over separate databases share nothing, and the
+  // database-to-edition binding holds on Postgres as pri_server.
+  'region-isolation-check.mjs'
 ];
 
 let failed = 0;

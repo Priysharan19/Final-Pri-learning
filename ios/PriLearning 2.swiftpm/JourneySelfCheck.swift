@@ -110,7 +110,7 @@ enum JourneySelfCheck {
     let at = '';
     async function step(name, fn) {
       at = '';
-      try { const detail = await fn(); steps[name] = { ok: true, detail: detail === undefined ? '' : String(detail).slice(0, 120) }; }
+      try { const detail = await fn(); steps[name] = { ok: true, detail: detail === undefined ? '' : String(detail).slice(0, 200) }; }
       catch (e) { steps[name] = { ok: false, detail: (String(e && e.message || e) + ' at ' + at + ' · ' + (document.body.innerText || '').replace(/\\s+/g, ' ').slice(0, 90)).slice(0, 220) }; }
     }
     """
@@ -893,9 +893,22 @@ enum JourneySelfCheck {
         throw new Error('Home did not open: ' + (g ? 'the gate reads ' + g.getAttribute('data-activation-status') : q('[data-signin-card]') ? 'the sign-in card is shown (no account on this install)' : 'nothing recognisable'));
       }
     }
+    // Settings is a lazy route: the first visit on an install loads its chunk.
+    // 60 s, as Home's first open; 25 s timed out on a slow iOS 27 runner while
+    // the chunk was in flight (Train editions-9, run 43608786830), and the
+    // next step on the same page passed. Every visit reports the time to the
+    // panel and the chunk's own timing, on a pass too, so a real slowdown
+    // stays visible rather than hidden by the longer wait.
+    function settingsChunk() {
+      const e = performance.getEntriesByType('resource').filter(r => r.name.includes('/assets/Settings-') && r.name.endsWith('.js')).pop();
+      return e ? 'chunk ' + (e.duration / 1000).toFixed(1) + ' s at ' + (e.startTime / 1000).toFixed(1) + ' s' : 'chunk not fetched';
+    }
     async function settings() {
+      const t0 = performance.now();
       history.pushState({}, '', '/settings'); dispatchEvent(new PopStateEvent('popstate'));
-      await waitFor(() => q('#cloud-account-title'));
+      try { await waitFor(() => q('#cloud-account-title'), 60000); }
+      catch (e) { throw new Error('Settings did not open in 60 s (' + (q('[role=status]') ? 'route still loading; ' : '') + settingsChunk() + ')'); }
+      return 'Settings in ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s, ' + settingsChunk();
     }
     const stateTag = () => (q('section[aria-labelledby="cloud-account-title"] .tag') || {}).textContent?.trim() || '';
     const byText = t => [...document.querySelectorAll('button')].find(b => b.offsetParent && b.textContent.trim() === t);
@@ -913,9 +926,9 @@ enum JourneySelfCheck {
     private static let cloudSignUp = cloudHelpers + cardHelpers + oracleHelpers + #"""
     await step('cloudSignUp', async () => {
       const said = await cardOnboard(newEmail);
-      at = 'settings'; await settings();
+      at = 'settings'; const opened = await settings();
       at = 'state'; await waitFor(() => stateTag() === 'Connected', 60000);
-      return said + '; Settings reads Connected';
+      return said + '; Settings reads Connected (' + opened + ')';
     });
     await step('cloudDeleteAccount', async () => {
       at = 'phrase'; setValue(await waitFor(() => q('#cloud-delete-phrase')), 'DELETE'); await sleep(150);
@@ -935,9 +948,9 @@ enum JourneySelfCheck {
     private static let cloud = cloudHelpers + cardHelpers + oracleHelpers + #"""
     await step('cloudSignIn', async () => {
       const said = await cardOnboard(email);
-      at = 'settings'; await settings();
+      at = 'settings'; const opened = await settings();
       at = 'connected'; await waitFor(() => stateTag() === 'Connected', 60000);
-      return said + '; connected';
+      return said + '; connected (' + opened + ')';
     });
     await step('cloudSync', async () => {
       (await waitFor(() => enabled('Sync now'), 60000)).click();
