@@ -40,6 +40,7 @@ try {
   same('a profile with no course is NSW, as everywhere in the backend', practiceCurriculumOf({}), 'nsw');
   same('no profile at all is NSW too', practiceCurriculumOf(null), 'nsw');
   same('an unknown course is never sent', practiceCurriculumOf({ course: 'xx' }), 'nsw');
+  for (const course of ['vic', 'qld', 'wa', 'sa', 'ib']) same(`a course no server issues (${course}) is never sent`, practiceCurriculumOf({ course }), 'nsw');
 
   // ── India: unchanged ───────────────────────────────────────────────────────
   const asha = (await POST('/profiles', { name: 'Asha', year: 10, course: 'in' })).user;

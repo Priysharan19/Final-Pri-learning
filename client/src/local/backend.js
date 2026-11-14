@@ -6155,10 +6155,13 @@ async function requireCheckableSession(pid) {
  * India profile, `nsw` for an NSW one). The server issues only its edition's
  * course and refuses any other (server/platform/editionBanks.js), so a
  * hard-coded 'in' left every NSW student on a Prithagoras server with
- * unmarkable drafts. A profile with no course is NSW, as everywhere else here.
+ * unmarkable drafts. A profile with no course, or a course no server issues,
+ * names NSW.
  */
 export function practiceCurriculumOf(profile) {
-  return COURSES[profile?.course] ? profile.course : 'nsw';
+  // Only the two courses a server issues (editionBanks.js): any other course
+  // the device knows (vic, qld, wa, sa, ib) is no server's, and names NSW.
+  return profile?.course === 'in' ? 'in' : 'nsw';
 }
 
 async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null, trap = null }, localDraft) {

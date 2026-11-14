@@ -178,7 +178,7 @@
         {"has":"CONTENT REPORT FRESH: PASS","note":"The committed certification report describes the content in the tree (version, digest, scope, result)."},
         {"has":"CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — "},
         {"has":"8/8 exam selections"},
-        {"has":"PRACTICE COURSE REQUEST: PASS — 9/9 checks"}
+        {"has":"PRACTICE COURSE REQUEST: PASS — 14/14 checks"}
       ]
     },
     "platform/blind.log": {
