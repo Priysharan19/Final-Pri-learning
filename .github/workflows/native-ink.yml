@@ -200,10 +200,19 @@ jobs:
       - name: Server dependencies for the local Pri server
         run: npm ci --prefix server
 
+      # Step limits keep a hung journey from running into the job's 60-minute
+      # limit: a cancelled job keeps no log (Train editions-9, run 43608786790,
+      # lost the iPad journey's log that way), a step that times out fails
+      # with its log and the evidence steps below still run. Healthy runs:
+      # everything before the journeys ~21 min, the iPhone journey 7.5 min
+      # (Train editions-9), the iPad journey 8-10 min (runs 43178769936,
+      # 43166964444); 21 + 15 + 15 stays inside 60.
       - name: iPhone certification journey (simulator)
+        timeout-minutes: 15
         run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone.json
 
       - name: iPad journey (simulator)
+        timeout-minutes: 15
         run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad.json
 
       - name: The evidence names the pinned runtime

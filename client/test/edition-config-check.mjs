@@ -224,6 +224,21 @@ ok(vite.featureDefines('build', {}).__PRI_PREMIUM_ON_SALE__ === 'true' && vite.f
   ok(brand.brandVars('hi').brand === 'प्रियभट' && brand.brandVars('en').brand === 'Priyabhata' && brand.brandVars('en').company === 'Pri Learning', 'brandVars: प्रियभट in Hindi, Priyabhata in English, and the company');
 }
 
+// ── The Australia build flag is retired (mission E3) ─────────────────────────
+// Which course sign-up offers is the edition's `courses`; no flag, override or
+// build variable may bring the other edition's course back (O5: off). Only the
+// ADR/plan history and the two checks that assert its absence may name it.
+{
+  const FLAG = 'FEATURE_' + 'AUSTRALIA';
+  let hits = [];
+  try {
+    hits = execFileSync('git', ['-C', ROOT, 'grep', '--untracked', '-n', '-e', FLAG, '-e', "featureEnabled('" + "australia')", '--',
+      '.', ':!docs', ':!client/test/edition-config-check.mjs', ':!client/test/browser-run-fixes-check.mjs'],
+      { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n').filter(Boolean);
+  } catch (e) { if (e.status !== 1) throw e; }
+  ok(hits.length === 0, `the Australia build flag is gone from code, tests and workflows — found: ${hits.join(' | ')}`);
+}
+
 const gaps = ed.parityGaps();
 console.log('Parity debt (capability → what closes it):');
 for (const id of ed.EDITION_IDS) {

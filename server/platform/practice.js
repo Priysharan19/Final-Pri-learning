@@ -51,6 +51,7 @@ import { verifyReadReceipt } from './readReceipt.js';
 // Priyabhata the India curriculum's (D15, indiaBanks.js), Prithagoras the NSW
 // banks that passed their gates (nswBanks.js). Never a request field.
 import { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } from './editionBanks.js';
+import { courseAllowedForTests } from './indiaBanks.js';
 import { serverEdition } from './edition.js';
 import { figureHasExternalRef } from './figureRefs.js';
 
@@ -382,7 +383,7 @@ function readQuestionRequest(body, fields, banks = bankPolicy()) {
   }
   const generator = typeof body.generator === 'string' ? body.generator : '';
   const difficulty = typeof body.difficulty === 'number' || typeof body.difficulty === 'string' ? Number(body.difficulty) : NaN;
-  if (body.curriculum !== banks.curriculum || !AUTHORED_BANK.test(generator) || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 4) {
+  if ((body.curriculum !== banks.curriculum && !courseAllowedForTests(body.curriculum)) || !AUTHORED_BANK.test(generator) || !Number.isInteger(difficulty) || difficulty < 1 || difficulty > 4) {
     return { error: [400, 'PRACTICE_GENERATOR_INVALID', 'Choose an authored question and difficulty 1–4.'] };
   }
   if (!banks.issues(generator)) return { error: [banks.outside.status, banks.outside.code, banks.outside.message] };

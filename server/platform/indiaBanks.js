@@ -65,6 +65,17 @@ export function allowBanksOutsideIndiaForTests() {
   outsideAllowedForTests = true;
 }
 
+/**
+ * Whether a practice request may name `course` although this server's edition
+ * issues another. Only under allowBanksOutsideIndiaForTests(): a suite that
+ * uses an NSW bank as a vehicle on a Priyabhata server has its NSW profile name
+ * its own course ('nsw'), as the device does. Never true in production, where
+ * allowBanksOutsideIndiaForTests() is refused.
+ */
+export function courseAllowedForTests(course) {
+  return outsideAllowedForTests && process.env.NODE_ENV !== 'production' && course === 'nsw';
+}
+
 export const BANK_OUTSIDE_INDIA = Object.freeze({
   status: 422,
   code: 'PRACTICE_BANK_OUTSIDE_CURRICULUM',
