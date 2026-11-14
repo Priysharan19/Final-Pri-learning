@@ -69,6 +69,32 @@ promotion; each keeps its own approval (`docs/operations/postgres-cutover.md`, A
 
 Ordinary direct pushes, force pushes and deletion of `main` are not part of the release workflow. PRI-01 configures GitHub protection to require a pull request and the four CI contexts above with strict/up-to-date checking, applies the rule to administrators, requires conversation resolution, and blocks force-push/deletion. The rule deliberately requires no approval count, because this owner-operated repository must enforce the PR/check path without creating an impossible self-review deadlock.
 
+### Solo-maintainer mode (7 November 2026)
+
+The owner recorded solo-maintainer development mode on issue #686 ([comment 6700751719](https://github.com/Priysharan19/Final-Pri-learning/issues/686#issuecomment-6700751719)) because no second writer is currently reviewing. This is the protection described above, now explicit about what it does not provide.
+
+**Still enforced by GitHub:**
+- a pull request;
+- the four required contexts, strict/up-to-date;
+- conversation resolution;
+- the rule applied to administrators;
+- no force-push or deletion.
+
+**Not provided:** independent human review. `scripts/pri-manual-authorization.mjs` states the bar such a review must meet. It is not a merge gate, and in this mode a `task/*` PR merges without meeting it.
+
+Every such PR must:
+- say in its body that it merges under this mode, and link the decision;
+- carry an exact-head independent QA record when one exists, labelled non-authorising (an AI or agent review is never a human approval);
+- merge only the exact head whose required checks are green.
+
+After merge, `Main Integrity` and the exact-SHA staging proof run on the merge SHA.
+
+**Unchanged by this mode:**
+- Promotion to production (`deploy/production`) keeps its own approval record.
+- Store submission, legal sign-off, data migration and secret changes keep their own explicit authority.
+
+**To leave the mode:** set required approvals back to at least 1, with approval after the latest push, once a second eligible writer participates again.
+
 ## Break-glass
 
 An emergency bypass is for recovery when the normal PR path is unavailable, not convenience. Record why the bypass was required, the exact resulting SHA and tests run; restore normal protection immediately; then open/link a retrospective PR or issue so provenance is auditable. Never lower tests or release-identity validation to force a deployment.

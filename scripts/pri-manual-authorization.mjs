@@ -1,7 +1,21 @@
 #!/usr/bin/env node
-// A branch name is NOT evidence of human authorization. All governed
-// task/* and feature/* source changes must have exact-head independent
-// approval by a real repository writer before their manual lane can pass.
+// A branch name is NOT evidence of human authorization. This module answers one
+// question about a governed task/* or feature/* PR: does its exact head carry an
+// approval by an independent repository writer (and, for sensitive paths, by a
+// security owner)? manualDecision() is deliberately strict and never treats the
+// author, a bot, an AI comment or a stale approval as that review.
+//
+// It is NOT the merge gate. No workflow runs live(); pri-agent-governance.yml
+// only syntax-checks and unit-tests it. The merge authority for task/* and
+// feature/* is GitHub branch protection as docs/release/release-policy.md sets
+// it ("Main protection"). While the repository runs in solo-maintainer mode
+// (owner decision, issue #686 comment 6700751719, 7 Nov 2026: 0 required
+// approvals), a task/* PR merges WITHOUT independent human review: its verdict
+// here stays INDEPENDENT_EXACT_HEAD_WRITER_APPROVAL_REQUIRED, the PR says so and
+// links the decision, and nothing may describe it as independently reviewed.
+// When a second eligible writer participates again, branch protection returns
+// to >= 1 approval with approval after the latest push, and this module states
+// the bar that review must meet.
 import {validatedDiffPaths} from './pri-admission-paths.mjs';
 const permitted = new Set(['write','maintain','admin']);
 const sensitive = path =>
