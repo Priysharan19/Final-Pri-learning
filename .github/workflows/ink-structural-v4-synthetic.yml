@@ -1,7 +1,9 @@
 name: Ink Structural V4 Synthetic
 
 on:
+  workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'tools/ink-foundation/generate_structural_synthetic.mjs'
       - 'tools/ink-foundation/structural.py'
@@ -41,6 +43,8 @@ concurrency:
 
 jobs:
   exact-synthetic-contract:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

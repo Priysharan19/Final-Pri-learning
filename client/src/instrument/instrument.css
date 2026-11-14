@@ -89,7 +89,7 @@ html.ui-instrument {
   --accent-ink: var(--in-on-action);
   --accent-soft: rgba(27, 26, 23, 0.06);
   --accent-line: rgba(27, 26, 23, 0.3);
-  --focus: var(--in-signal);
+  --focus: var(--in-tx);
   --correction: var(--in-slip);
   --uncertain: var(--in-unc);
   --good: var(--in-good);
@@ -98,7 +98,7 @@ html.ui-instrument {
   --radius: 4px;
   --shadow: 0 1px 2px rgba(30, 28, 20, 0.08), 0 12px 32px -16px rgba(30, 28, 20, 0.22);
   --shadow-sm: 0 1px 0 rgba(30, 28, 20, 0.06);
-  --shadow-focus: 0 0 0 2px var(--in-signal);
+  --shadow-focus: 0 0 0 2px var(--in-tx);
   --in-dot: rgba(30, 28, 20, 0.16);
 }
 
@@ -126,7 +126,7 @@ html.ui-instrument .btn-primary {
   background: var(--in-action); color: var(--in-on-action); border-color: var(--in-action);
   box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25); font-weight: 600;
 }
-html.ui-instrument :focus-visible { outline: 2px solid var(--in-signal); outline-offset: 2px; }
+html.ui-instrument :focus-visible { outline: 2px solid var(--in-tx); outline-offset: 2px; }
 
 /* ── Shell: one bar of tabs, the command field, the account ──────────────── */
 .in-bar {
@@ -137,8 +137,6 @@ html.ui-instrument :focus-visible { outline: 2px solid var(--in-signal); outline
   background: var(--in-base); border-bottom: 1px solid var(--in-edge);
 }
 .in-mark { display: inline-flex; align-items: center; gap: 9px; font: 600 16px var(--in-ui); letter-spacing: -0.02em; color: var(--in-tx); background: none; border: 0; padding: 0; cursor: pointer; }
-.in-mark-glyph { width: 24px; height: 24px; border-radius: 3px; background: var(--in-tx); color: var(--in-base); display: grid; place-items: center; font: 400 15px 'KaTeX_Main', Georgia, serif; }
-.in-mark-glyph em { color: var(--in-c4); font-style: normal; }
 .in-tabs { display: flex; align-items: center; gap: 2px; padding: 3px; border-radius: 4px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); }
 .in-tab { display: inline-flex; align-items: center; padding: 5px 12px; border-radius: 3px; color: var(--in-tx-3); font: 500 13.5px var(--in-ui); text-decoration: none; white-space: nowrap; }
 .in-tab:hover { color: var(--in-tx-2); }
@@ -770,14 +768,10 @@ html.ui-instrument .signup-choice, html.ui-instrument .signup-back, html.ui-inst
 html.ui-instrument .signup-choice.is-selected { border-color: var(--in-tx); background: var(--in-l3); box-shadow: inset 0 0 0 1px var(--in-tx); }
 html.ui-instrument .otp-box { border-radius: 4px; font-family: var(--in-mono); }
 
-/* States (s11). Loading keeps the final geometry and sweeps a hairline
-   gradient; offline says plainly what still works; empty points to a start. */
-html.ui-instrument .skeleton {
-  border-radius: 2px; background: linear-gradient(90deg, var(--in-l2), var(--in-l4), var(--in-l2));
-  background-size: 200% 100%; animation: in-sh 1.4s linear infinite;
-}
-@keyframes in-sh { to { background-position: -200% 0; } }
-@media (prefers-reduced-motion: reduce) { html.ui-instrument .skeleton { animation: none; background: var(--in-l2); } }
+/* States (s11). Loading keeps the final geometry as a still placeholder (a
+   skeleton is not a progress signal: the working indicator, UI-IND, is the one
+   moving thing); offline says plainly what still works; empty points to a start. */
+html.ui-instrument .skeleton { border-radius: 2px; background: var(--in-l2); animation: none; display: grid; place-items: center; }
 html.ui-instrument .offline-entry {
   display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 6px; font-size: 13px;
   background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); color: var(--in-tx-2);
@@ -1140,13 +1134,13 @@ html.ui-instrument .in-led-tools .in-led-bar { padding-bottom: 0; border-bottom:
   font: 500 13px var(--in-ui); color: var(--in-tx-2); box-shadow: 0 0 0 1px var(--in-edge-2); cursor: pointer; white-space: nowrap; }
 .in-flt[aria-pressed="true"] { background: var(--in-l3); color: var(--in-tx); box-shadow: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-2); }
 .in-flt b { font: 500 11px var(--in-mono); color: var(--in-tx-3); font-variant-numeric: tabular-nums; }
-.in-flt:focus-visible, .in-flt:focus-within { outline: 2px solid var(--in-signal); outline-offset: 1px; }
+.in-flt:focus-visible, .in-flt:focus-within { outline: 2px solid var(--in-tx); outline-offset: 1px; }
 .in-flt.is-menu { padding: 0; }
 .in-flt.is-menu select { appearance: none; -webkit-appearance: none; height: 100%; padding: 0 26px 0 11px; border: 0; background: transparent; font: inherit; color: inherit; cursor: pointer; outline: none; max-width: 220px; }
 .in-flt.is-menu::after { content: "▾"; position: absolute; right: 10px; pointer-events: none; font-size: 11px; color: var(--in-tx-3); }
 .in-flt.is-menu option { background: var(--in-l2); color: var(--in-tx); }
 .in-led-search { display: inline-flex; align-items: center; gap: 8px; height: 30px; padding: 0 8px 0 10px; border-radius: 4px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge); color: var(--in-tx-3); min-width: 230px; }
-.in-led-search:focus-within { box-shadow: 0 0 0 1px var(--in-edge-3); outline: 2px solid var(--in-signal); outline-offset: 1px; }
+.in-led-search:focus-within { box-shadow: 0 0 0 1px var(--in-edge-3); outline: 2px solid var(--in-tx); outline-offset: 1px; }
 .in-led-search svg { width: 15px; height: 15px; flex: none; }
 .in-led-search input { flex: 1; min-width: 0; height: 100%; border: 0; background: transparent; font: 400 13.5px var(--in-ui); color: var(--in-tx); outline: none; padding: 0; }
 .in-led-search input::placeholder { color: var(--in-tx-3); }
@@ -1287,7 +1281,7 @@ html.ui-instrument :is(.in-kpis, .in-report-figs, .in-readout, .in-flt b, .in-pa
     box-shadow: none; background: var(--in-action) center / 14px 14px no-repeat;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m2.5 7.5 3 3 6-7'/%3E%3C/svg%3E");
   }
-  html.ui-instrument .nt-check input:focus-visible + span::before { outline: 2px solid var(--in-signal); outline-offset: 1px; }
+  html.ui-instrument .nt-check input:focus-visible + span::before { outline: 2px solid var(--in-tx); outline-offset: 1px; }
 }
 
 /* Device fit: on the iPad the writing bar keeps the live status and the
@@ -1341,3 +1335,36 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
   html.ui-instrument .ws-actions-btns { flex-wrap: wrap; }
   html.ui-instrument .ws-actions-btns > * { min-width: 0; max-width: 100%; }
 }
+
+/* ── UI-IND · the working indicator, "Construction" (Lit Instrument D6) ──────
+   instrument/Working.jsx. Three points gather into the edition's cut (0–34%),
+   the line draws (36–62%), holds (to 80%), then lets go. Transform, opacity and
+   one dash offset only. Ink here; the edition light under Aurora (aurora.css).
+   Reduced motion: the settled form, only the line breathes. Forced colours:
+   still (currentColor is already the system text colour). When it shows is
+   workingClock.js (400 ms in; 480 ms held and a 120 ms fade where its host
+   stays on screen; where the finished work replaces the host, the result
+   replaces it). The status line keeps one 16 px slot for the dot or the
+   indicator while it is not idle, so neither shifts the line; work that ends
+   straight into idle takes the slot away with it. */
+.pri-working { --in-dur-work: 2400ms; display: inline-flex; align-items: center; gap: 8px; color: var(--in-tx-2); animation: pri-w-in 120ms; }
+.pri-working[data-out] { opacity: 0; transition: opacity 120ms; }
+.pri-working { margin-right: 8px; }
+.skeleton > .pri-working, p[role="status"] > .pri-working { margin-right: 0; }
+.status-mark { display: inline-grid; place-items: center; width: 16px; height: 16px; flex: none; }
+.status-mark > * { grid-area: 1 / 1; margin: 0; }
+.status-mark .pri-working + .dot { visibility: hidden; }
+.pri-working svg { flex: none; overflow: visible; }
+.pri-working path { fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; animation: pri-w-ln var(--in-dur-work) cubic-bezier(.2, 0, 0, 1) infinite; }
+.pri-working circle { fill: currentColor; animation: pri-w-pt var(--in-dur-work) cubic-bezier(.2, 0, 0, 1) infinite; }
+.pri-working circle:nth-of-type(2) { animation-delay: 80ms; }
+.pri-working circle:nth-of-type(3) { animation-delay: 160ms; }
+@keyframes pri-w-in { from { opacity: 0; } }
+@keyframes pri-w-pt { 0%, 100% { transform: translate(var(--dx), var(--dy)); opacity: .4; } 34%, 80% { transform: none; opacity: 1; } }
+@keyframes pri-w-ln { 0%, 36% { stroke-dashoffset: 1; opacity: 1; } 62%, 80% { stroke-dashoffset: 0; opacity: 1; } 96%, 100% { stroke-dashoffset: 0; opacity: 0; } }
+@keyframes pri-w-br { 50% { opacity: 1; } 0%, 100% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .pri-working circle { animation: none; }
+  .pri-working path { stroke-dashoffset: 0; animation: pri-w-br var(--in-dur-work) ease-in-out infinite; }
+}
+@media (forced-colors: active) { .pri-working * { animation: none !important; stroke-dashoffset: 0; } }

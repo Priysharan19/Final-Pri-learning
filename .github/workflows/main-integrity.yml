@@ -70,16 +70,30 @@ jobs:
 
           pr_number="$(printf '%s' "$pr" | jq -r '.number')"
           head_sha="$(printf '%s' "$pr" | jq -r '.head.sha')"
+          head_ref="$(printf '%s' "$pr" | jq -r '.head.ref // ""')"
           pr_url="$(printf '%s' "$pr" | jq -r '.html_url')"
 
           echo "Found merged PR #${pr_number}: ${pr_url}"
-          echo "Exact PR head: ${head_sha}"
+          echo "Exact PR head: ${head_sha} (${head_ref})"
+
+          # Lane pull requests run only the required contexts and the security,
+          # marking, data and governance gates; the heavy workflows (emulators,
+          # macOS lanes, KALP, app health, ink evaluation) run on task/train-*
+          # pull requests (docs/release/ci-lanes.md). Main therefore arrives only
+          # through a train, so every workflow ran on the exact head that merged.
+          if [[ "$head_ref" != task/train-* ]]; then
+            echo "::error::PR #${pr_number} merged from '${head_ref}', not a task/train-* branch. Lane pull requests skip the heavy workflows (docs/release/ci-lanes.md); merge through a train (a train of one is a task/train-* branch at the lane head) so every workflow runs on the exact head that merges."
+            exit 1
+          fi
 
           runs="$(curl --fail --silent --show-error "${auth[@]}" \
             "${API}/repos/${REPO}/actions/runs?head_sha=${head_sha}&event=pull_request&per_page=100")"
 
-          latest="$(printf '%s' "$runs" | jq -c '
-            [ .workflow_runs[] ]
+          # Only runs of the merged PR's own branch count: a train of one shares
+          # its head SHA with the lane PR, whose lane-gated (skipped) runs must
+          # never stand in for the train's runs of the same workflow.
+          latest="$(printf '%s' "$runs" | jq -c --arg ref "$head_ref" '
+            [ .workflow_runs[] | select(.head_branch == $ref) ]
             | sort_by(.workflow_id, .updated_at)
             | group_by(.workflow_id)
             | map(max_by(.updated_at))
@@ -113,4 +127,4 @@ jobs:
             exit 1
           fi
 
-          echo "Main integrity verified: PR provenance is exact and every latest PR workflow is terminal green/neutral, with CI successful."
+          echo "Main integrity verified: PR provenance is exact, the head is a task/train-* train, and every latest PR workflow is terminal green/neutral, with CI successful."

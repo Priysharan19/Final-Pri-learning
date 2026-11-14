@@ -35,6 +35,8 @@ env:
 
 jobs:
   app:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Mounted app, product contracts and repair report
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -96,8 +98,9 @@ jobs:
           retention-days: 14
 
   native:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
     name: Native iPad shell health
-    if: github.event_name != 'pull_request'
+    if: (github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')) && (github.event_name != 'pull_request')
     # Pinned like native-ink.yml: the hosted macos-26 image, Xcode 26.6, the
     # iOS 26.5 simulator runtime. The harness refuses to run unpinned on CI.
     runs-on: macos-26
@@ -151,8 +154,9 @@ jobs:
           retention-days: 14
 
   report:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
     name: Consolidated app-health report
-    if: always()
+    if: (github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')) && (always())
     needs: [app, native]
     runs-on: ubuntu-latest
     steps:

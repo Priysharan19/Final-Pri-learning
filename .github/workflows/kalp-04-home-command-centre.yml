@@ -23,6 +23,29 @@ on:
       - 'client/test/golden-student-journey.mjs'
       - 'docs/design/KALP-04-home-command-centre.md'
       - '.github/workflows/kalp-04-home-command-centre.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'client/src/pages/Home.jsx'
+      - 'client/src/home/**'
+      - 'client/src/local/backend.js'
+      - 'client/src/theme.css'
+      - 'client/src/i18n/**'
+      - 'client/test/kalp04-home-check.mjs'
+      - 'client/test/first-run-daily-use-check.mjs'
+      - 'client/test/tour-first-run-scope.js'
+      - 'client/src/pages/PracticeBase.jsx'
+      - 'client/src/engine/indiaProduct.js'
+      - 'client/test/tour-kalp04-home.js'
+      - 'client/test/support/**'
+      - 'client/test/e2e.mjs'
+      - 'client/test/a11y-check.mjs'
+      - 'client/test/tour-kalp01-design.js'
+      - 'client/test/tour-kalp02-navigation.js'
+      - 'client/test/tour-kalp03-onboarding.js'
+      - 'client/test/golden-student-journey.mjs'
+      - 'docs/design/KALP-04-home-command-centre.md'
+      - '.github/workflows/kalp-04-home-command-centre.yml'
   workflow_dispatch:
 
 concurrency:
@@ -43,6 +66,8 @@ env:
 
 jobs:
   verify:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Real next-action hierarchy and regressions
     runs-on: ubuntu-latest
     timeout-minutes: 45

@@ -165,7 +165,7 @@ export const EDITIONS = Object.freeze({
       stepFeedback: NSW_CONTENT,
       notesAndWorkedExamples: pending('NSW notes and worked examples are not yet authored to the current syllabus (plan G2, G3).'),
       adaptivePractice: NSW_ADAPTIVE,
-      timedExams: pending('No HSC-style blueprints built from approved NSW questions yet (plan G4).'),
+      timedExams: pending('Plan G4 ships dark: only partial Extension 1 and 2 papers clear the release floor (docs/content/nsw-papers-released.md); Standard and Advanced need approved questions on more Year 12 outcomes, and method marks wait on certified rubrics (plan G6).'),
       examDesk: EXAM_DESK_AU,
       resourceLibrary: true,
       resourcePublishing: PUBLISHING,
