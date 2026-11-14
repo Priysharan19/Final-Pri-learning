@@ -636,12 +636,11 @@ jobs:
     runs-on: ubuntu-24.04
     # The accessibility gate builds the client itself; give it the same flags
     # client/test/e2e.mjs uses for its build so both walk the same app (the
-    # Teacher role and Olympiad live behind EXTENDED_TRACKS, the AU link behind
-    # AUSTRALIA). PRI_FEATURE_TUTOR stays unset: the tutor tour proves dark.
+    # Teacher role and Olympiad live behind EXTENDED_TRACKS). PRI_FEATURE_TUTOR
+    # stays unset: the tutor tour proves dark.
     env:
       PRI_FEATURE_PLACEMENT: '1'
       PRI_FEATURE_EXTENDED_TRACKS: '1'
-      PRI_FEATURE_AUSTRALIA: '1'
       # Handwriting input in timed exams (off by default in a shipped build): the
       # browser suites drive the gate-ON flow explicitly.
       PRI_FEATURE_EXAM_HANDWRITING: '1'
