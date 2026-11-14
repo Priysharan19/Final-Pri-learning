@@ -321,6 +321,13 @@
         {"has":"EDITION AGREEMENT (E2): PASS — 155/155 checks"}
       ]
     },
+    "platform/region-isolation.log": {
+      "job": "platform",
+      "log": "region-isolation.log",
+      "pins": [
+        {"has":"REGION ISOLATION (H2): PASS — 423 checks (sqlite)"}
+      ]
+    },
     "platform/practice-http.log": {
       "job": "platform",
       "log": "practice-http.log",
@@ -474,7 +481,8 @@
       "log": "platform-postgres.log",
       "pins": [
         {"has":"✓ hot-path-budget-check.mjs"},
-        {"has":"PLATFORM ON POSTGRES: PASS — 91/91 suites","note":"59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres."},
+        {"has":"✓ region-isolation-check.mjs","note":"plan H2: two regions share nothing; the database binding, on Postgres."},
+        {"has":"PLATFORM ON POSTGRES: PASS — 92/92 suites","note":"59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres."},
         {"has":"✓ nsw-practice-check.mjs"},
         {"has":"✓ nsw-exam-check.mjs"},
         {"has":"✓ billing-edition-check.mjs"},
