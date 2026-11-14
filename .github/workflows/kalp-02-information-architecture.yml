@@ -42,11 +42,7 @@ concurrency:
 permissions:
   contents: read
 
-# These browser gates also drive the Australian-syllabus flows, which a V1
-# build hides behind PRI_FEATURE_AUSTRALIA. The shipped iPad bundles stay
-# flag-off (client/test/ios-bundle-features-check.mjs).
 env:
-  PRI_FEATURE_AUSTRALIA: '1'
   # Handwriting input in timed exams (off by default in a shipped build): the
   # browser suites drive the gate-ON flow explicitly.
   PRI_FEATURE_EXAM_HANDWRITING: '1'

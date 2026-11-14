@@ -3,8 +3,8 @@
 //
 // One place decides what "today" means for a student and how a date, a number
 // or a price is written. An Indian profile lives in Asia/Kolkata and reads
-// en-IN with the rupee sign; the legacy Australian profiles keep
-// Australia/Sydney and en-AU. A profile may carry its own IANA timezone, which
+// en-IN with the rupee sign; an NSW profile (Prithagoras) lives in
+// Australia/Sydney and reads en-AU. A profile may carry its own IANA timezone, which
 // wins over the course default — a Class 12 student in Dubai is still an
 // Indian student, but their day ends when their day ends.
 //
