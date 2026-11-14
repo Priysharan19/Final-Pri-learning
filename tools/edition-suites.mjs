@@ -34,6 +34,7 @@ export const EDITION_SUITES = [
   'client/test/i18n-coverage-check.mjs',
   // Sign-up scope and paywall honesty, the edition's own limit clock.
   'client/test/signup-consent-check.mjs',
+  'client/test/paywall-honesty-check.mjs',
   'client/test/edition-limit-clock-check.mjs',
   'client/test/account-action-guardian-erase-check.mjs',
   // NSW curriculum, practice banks and exams; the library and the Exam Desk.
