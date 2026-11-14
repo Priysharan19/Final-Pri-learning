@@ -177,7 +177,8 @@
         {"has":"CONTENT CERTIFICATION REGRESSIONS: PASS — 174/174 checks"},
         {"has":"CONTENT REPORT FRESH: PASS","note":"The committed certification report describes the content in the tree (version, digest, scope, result)."},
         {"has":"CONTENT CERTIFICATION (fast, 4/path/difficulty): PASS — "},
-        {"has":"8/8 exam selections"}
+        {"has":"8/8 exam selections"},
+        {"has":"PRACTICE COURSE REQUEST: PASS — 14/14 checks"}
       ]
     },
     "platform/blind.log": {
@@ -650,7 +651,8 @@
         {"has":"Responsive matrix · 6 viewports, critical routes, write/type, actions","count":2,"op":"ge"},
         {"has":"E2E SUITE PASSED — 209/209 checks across 1 flows","note":"Chromium's interface-quality tour runs exactly 209 checks. Practice shows a pinned written question (seeded test server), so its Type → Write → Type switch is timed in all four cases (phone 390×844 and tablet 820×1180, light and dark) and is never skipped. The old 196/196 escape, a Practice screen with nothing to time, is gone (#684). The sentinel prints only when all four cases timed both presses inside MAX_INPUT_MS (100, unchanged). The separate ink-canvas 200/200 invariant remains enforced above."},
         {"has":"PRACTICE INPUT TIMING: PASS — 4/4 cases (390×844 and 820×1180, light and dark), 12/12 answer-mode presses (the selected tab included) inside 100 ms"},
-        {"has":"E2E SUITE PASSED — 129/129 checks across 1 flows"}
+        {"has":"E2E SUITE PASSED — 129/129 checks across 1 flows"},
+        {"has":"NSW PRACTICE MARKED TOUR: PASS — 9/9 checks","note":"A Prithagoras NSW Year 10 student is issued a question by the server and the server marks it (the device names the profile own course)."}
       ]
     },
     "build/brand-build.log": {

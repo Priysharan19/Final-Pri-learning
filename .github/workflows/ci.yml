@@ -881,6 +881,9 @@ jobs:
             # Plan G4: a Prithagoras student sits an NSW HSC-style paper: server-owned reading
             # time (inputs disabled, nothing sent), working time, an answer-checked result, no band.
             node client/test/tour-nsw-exams.js 2>&1 | tee -a browser.log
+            # A Prithagoras NSW student's practice is issued and marked by the
+            # server: the device names the profile's own course, never 'in'.
+            node client/test/tour-nsw-practice-marked.js 2>&1 | tee -a browser.log
             # A failed chunk, a refused cache write or a probe that never settles must
             # end in the app or in a visible notice with Reload, never a silent splash.
             npm run test:boot 2>&1 | tee -a browser.log
