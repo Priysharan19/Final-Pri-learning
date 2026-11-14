@@ -5536,7 +5536,7 @@ async function servePlacementQuestion(pid, cfg, probe, index) {
   if (!linkedAccount) throw checkUnavailable('sign-in');
   let out;
   try {
-    out = await cloud.issuePractice({ generator: target.generator, difficulty: target.difficulty, curriculum: 'in', mode: 'placement', written: true, account: linkedAccount });
+    out = await cloud.issuePractice({ generator: target.generator, difficulty: target.difficulty, curriculum: practiceCurriculumOf(await get('profiles', pid).catch(() => null)), mode: 'placement', written: true, account: linkedAccount });
   } catch (cause) {
     throw checkUnavailable(cause?.status === 401 ? 'sign-in' : cause?.status === 403 || cause?.status === 426 ? 'refused'
       : !cause?.status || cause.status >= 500 || cause.status === 429 || cause?.code === 'CLOUD_DISABLED' ? 'offline' : 'unavailable', cause);
@@ -6150,9 +6150,24 @@ async function requireCheckableSession(pid) {
  *    on. A draft was never the server's, so it cannot be marked later.
  * Returns { q, fields, trapDelivered, repeat }; `fields` go on the row.
  */
+/**
+ * The course a server-issued request names: the profile's own (`in` for an
+ * India profile, `nsw` for an NSW one). The server issues only its edition's
+ * course and refuses any other (server/platform/editionBanks.js), so a
+ * hard-coded 'in' left every NSW student on a Prithagoras server with
+ * unmarkable drafts. A profile with no course, or a course no server issues,
+ * names NSW.
+ */
+export function practiceCurriculumOf(profile) {
+  // Only the two courses a server issues (editionBanks.js): any other course
+  // the device knows (vic, qld, wa, sa, ib) is no server's, and names NSW.
+  return profile?.course === 'in' ? 'in' : 'nsw';
+}
+
 async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null, trap = null }, localDraft) {
+  const curriculum = practiceCurriculumOf(await get('profiles', pid).catch(() => null));
   const body = {
-    generator, difficulty, curriculum: 'in', mode: SERVER_MODES.includes(mode) ? mode : 'practice',
+    generator, difficulty, curriculum, mode: SERVER_MODES.includes(mode) ? mode : 'practice',
     avoid: recentlyServedContent(pid).filter(h => typeof h === 'string' && /^[a-zA-Z0-9:_-]{6,96}$/.test(h)).slice(0, 40),
     ...(dotpoint ? { dotpoint: String(dotpoint) } : {})
   };

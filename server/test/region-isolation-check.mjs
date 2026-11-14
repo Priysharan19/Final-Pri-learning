@@ -33,7 +33,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
 import { readFileSync, readdirSync } from 'node:fs';
-import { dirname, join, relative, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 process.env.NODE_ENV = 'test';
