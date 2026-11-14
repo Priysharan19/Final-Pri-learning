@@ -9,7 +9,7 @@
 // subtopics smart practice may pick, and the cell a request finally names.
 //
 // NSW_ISSUED_CELLS is a generated copy of the server's ledger, held equal to
-// it by server/test/nsw-offer-check.mjs. Pure: no I/O.
+// it by client/test/nsw-offer-check.mjs. Pure: no I/O.
 import { NSW_ISSUED_CELLS } from './nswIssuedCells.js';
 
 const NONE = Object.freeze([]);

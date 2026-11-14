@@ -320,7 +320,7 @@ function buildCurriculum() {
     // `requestable` is exactly the difficulties this server issues for the
     // subtopic and for each of its dot points. A subtopic or level absent
     // here is not issued and must not be offered (engine/nswOffer.js holds the
-    // device's copy; server/test/nsw-offer-check.mjs holds the two equal).
+    // device's copy; client/test/nsw-offer-check.mjs holds the two equal).
     subtopics: Object.fromEntries(NSW_BANK_LEDGER.filter(entry => entry.issued).map(entry => {
       const requestable = entry.cells.filter(cell => cell.issued).map(cell => cell.difficulty);
       return [entry.generator, {
