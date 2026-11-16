@@ -160,8 +160,8 @@ export async function ensureAccountActivated(pid, options = {}) {
   // Read the durable refusal boundary BEFORE contacting the server. A fresh
   // request may legitimately reauthorize after withdrawal; an older one may
   // not, even if its slow success eventually arrives from another browser tab.
-  let linkedAccount = null;
-  let requestAt = Date.now();
+  let linkedAccount;
+  let requestAt;
   try {
     linkedAccount = (await cloudAccountLink(pid, { strict: true }))?.accountId || null;
   } catch (cause) {
@@ -195,13 +195,11 @@ export async function ensureAccountActivated(pid, options = {}) {
     if (!(error instanceof ActivationBlocked)) throw error;
     if (isActivationDenied(error)) {
       state.denials++;
-      if (pid) {
-        // Separate immutable denial rows cannot be undone by an old promise
-        // or by a concurrent account-link/sync write from another browser tab.
-        const at = Math.max(Date.now(), requestAt, (await cloudAccountLink(pid).catch(() => null))?.clockSeenAt || 0);
-        await persistDenial(pid, linkedAccount, at);
-        await queueActivationRecord(state, pid, null, state.denials, at);
-      }
+      // The atomic account-level watermark cannot be undone by an old
+      // promise or concurrent account-link/sync writes in another tab.
+      const at = Math.max(Date.now(), requestAt, (await cloudAccountLink(pid).catch(() => null))?.clockSeenAt || 0);
+      await persistDenial(pid, linkedAccount, at);
+      await queueActivationRecord(state, pid, null, state.denials, at);
       throw error;
     }
     if (options.offlineGrace && serverUnreachable(error) && state.denials === startedAtDenials) {
