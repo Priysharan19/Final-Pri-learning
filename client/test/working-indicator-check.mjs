@@ -106,7 +106,7 @@ ok((app.match(/<RouteLoading \/>/g) || []).length >= 1 && (app.match(/<RouteLoad
 const qc = read('client/src/components/QuestionCard.jsx');
 ok(/<span className="status-mark" aria-hidden="true"><Working pending=\{statusState === 'working'\} \/>\{statusState !== 'working' && <span className="dot" \/>\}<\/span>/.test(qc), 'the status line shows the indicator, not the pulsing dot, while a check, a cloud read or a save is in flight, in one slot shared with the dot');
 ok(/\.status-mark \{[^}]*width: 16px; height: 16px; flex: none;/.test(instrument) && /\.status-mark \.pri-working \+ \.dot \{ visibility: hidden; \}/.test(instrument) && !/:has\(/.test(ind), 'that slot is a fixed 16 px, so the line never shifts, and the dot hides while the indicator holds or fades (a sibling rule every build target reads, not :has())');
-ok(/\.skeleton > \.pri-working, p\[role="status"\] > \.pri-working \{ margin-right: 0; \}/.test(ind), 'a lone indicator (a skeleton, RouteLoading) carries no trailing gap, so it sits centred');
+ok(/\.skeleton > \.pri-working, p\[role="status"\] > \.pri-working:only-child \{ margin-right: 0; \}/.test(ind), 'a lone indicator (a skeleton, RouteLoading) carries no trailing gap, so it sits centred; one beside status text (:only-child does not match) keeps its 8 px gap');
 // Where the host stays on screen, the indicator is held and fades: those sites take a changing pending flag.
 const HELD = sites.filter(x => /pending=\{(statusState === 'working'|lineCheckBusy)\}/.test(x.attrs));
 ok(HELD.length === 2, `the status line and the line-check button keep the indicator mounted with a changing pending flag, so its hold and fade apply while the line is not idle (${HELD.length})`);
