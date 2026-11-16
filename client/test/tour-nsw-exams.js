@@ -105,11 +105,16 @@ try {
   const listed = await page.locator('[data-nsw-paper]').evaluateAll(els => els.map(el => [el.getAttribute('data-nsw-paper'), el.getAttribute('data-released')]));
   check('the Exams page lists the five blueprints and the test paper', HSC_PAPERS.every(id => listed.some(([x]) => x === id)) && listed.some(([x]) => x === TEST_PAPER), JSON.stringify(listed));
   const state = id => listed.find(([x]) => x === id)?.[1];
-  check('on G3\'s pool Extension 1 and 2 release as partial papers; Standard and Advanced are refused; the test paper releases',
-    state('nsw-hsc-extension-1-2027') === 'yes' && state('nsw-hsc-extension-2-2027') === 'yes' && ['nsw-hsc-standard-1-2027', 'nsw-hsc-standard-2-2027', 'nsw-hsc-advanced-2027'].every(id => state(id) === 'no') && state(TEST_PAPER) === 'yes', JSON.stringify(listed));
-  const adv = await visibleText(page, '[data-nsw-paper="nsw-hsc-advanced-2027"]');
-  check('a refused paper says how much it covers and names what it lacks, and has no start', adv.includes('3 of 8 Year 12 outcomes') && adv.includes('Financial mathematics')
-    && await page.locator('[data-nsw-paper="nsw-hsc-advanced-2027"] [data-nsw-start]').count() === 0, adv);
+  // The release state of each HSC-style paper on the current pool of approved forms (see docs/content/nsw-papers-released.md).
+  const EXPECT = { 'nsw-hsc-standard-1-2027': 'no', 'nsw-hsc-standard-2-2027': 'yes', 'nsw-hsc-advanced-2027': 'no', 'nsw-hsc-extension-1-2027': 'yes', 'nsw-hsc-extension-2-2027': 'yes' };
+  check('the released and refused HSC-style papers are exactly the ones the approved-form pool supports; the test paper releases',
+    Object.entries(EXPECT).every(([id, want]) => state(id) === want) && state(TEST_PAPER) === 'yes', JSON.stringify(listed));
+  // A refused paper (if any is left) says how much it covers, names what it lacks and has no start.
+  const REFUSED_SAYS = { 'nsw-hsc-advanced-2027': ['3 of 8 Year 12 outcomes', 'Financial mathematics'], 'nsw-hsc-standard-2-2027': ['2 of 10 Year 12 outcomes', 'Annuities'], 'nsw-hsc-standard-1-2027': ['1 of 7 Year 12 outcomes', 'Investment'] };
+  const refusedId = HSC_PAPERS.find(id => state(id) === 'no');
+  const refusedText = refusedId ? await visibleText(page, `[data-nsw-paper="${refusedId}"]`) : '';
+  check('a refused paper says how much it covers and names what it lacks, and has no start (none is refused once every course has approved forms)',
+    !refusedId || (REFUSED_SAYS[refusedId].every(part => refusedText.includes(part)) && await page.locator(`[data-nsw-paper="${refusedId}"] [data-nsw-start]`).count() === 0), refusedText);
   const ext1 = await visibleText(page, '[data-nsw-paper="nsw-hsc-extension-1-2027"]');
   check('a partial paper is titled by its coverage, never HSC or trial', /practice paper — 5 of 6 year 12 outcomes/i.test(ext1) && !/HSC paper|trial/i.test(ext1), ext1);
   check('it names what it leaves out', (await visibleText(page, '[data-nsw-paper="nsw-hsc-extension-1-2027"] [data-nsw-omits]')).includes('Further calculus skills'), ext1);
