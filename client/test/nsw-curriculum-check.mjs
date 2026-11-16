@@ -19,11 +19,12 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync, writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { SUBTOPICS, SUBTOPIC_BY_ID } from '../src/engine/curriculum.js';
+import { SUBTOPICS, SUBTOPIC_BY_ID, DOTPOINT_FORMS } from '../src/engine/curriculum.js';
 import {
   NSW_CURRENT_SYLLABUSES, NSW_SUPERSEDED_SYLLABUSES, NSW_SYLLABUSES, NSW_SYLLABUS_BY_ID,
   NSW_OUTCOME_BY_CODE, NSW_HISTORICAL_TOPIC_BY_CODE, LEGACY_CROSSWALK, NEW_OUTCOME_GAPS, NSW_CROSSWALK,
@@ -408,6 +409,23 @@ try {
       return !ok;
     });
     check(blocked.length === 0, `this branch changes the NSW model and also: ${blocked.join(', ')}`);
+    // The line shapes above are not enough on their own (a duplicate key, an injected dot point or a heavy
+    // weight has an innocent shape): compare the parsed course with the base. Every existing subtopic keeps
+    // its name, strand, year, weight, label, dot points and forms; each new one carries a fixed weight.
+    if (changed.split('\n').includes(COURSE)) {
+      const tmp = join(tmpdir(), `nsw-base-curriculum-${process.pid}.mjs`);
+      writeFileSync(tmp, git(['show', `${base}:${COURSE}`]));
+      const baseMod = await import(pathToFileURL(tmp).href);
+      unlinkSync(tmp);
+      const sig = x => JSON.stringify([x.name, x.strand, x.year, x.weight, x.code, x.dotpoints]);
+      for (const b of baseMod.SUBTOPICS) {
+        check(SUBTOPIC_BY_ID[b.id] && sig(SUBTOPIC_BY_ID[b.id]) === sig(b), `curriculum.js changes the existing subtopic ${b.id}`);
+        check(JSON.stringify(DOTPOINT_FORMS[b.id]) === JSON.stringify(baseMod.DOTPOINT_FORMS[b.id]), `curriculum.js changes the existing dot-point forms of ${b.id}`);
+      }
+      const baseIds = new Set(baseMod.SUBTOPICS.map(b => b.id));
+      check(new Set(SUBTOPICS.map(x => x.id)).size === SUBTOPICS.length, 'curriculum.js: subtopic ids are unique');
+      for (const x of SUBTOPICS.filter(x => !baseIds.has(x.id))) check(x.weight === 100 / 9 - 1e-14 || x.weight === 8, `curriculum.js: new subtopic ${x.id} has weight ${x.weight}, not an authored weight`);
+    }
     isolationNote = `India/legacy files byte-unchanged against merge base ${base.slice(0, 9)}${allowed.length ? `, except additive NSW-only changes in ${allowed.join(', ')}` : ''}`;
   } else {
     isolationNote = 'branch does not change the NSW model; byte-unchanged check not applicable';
