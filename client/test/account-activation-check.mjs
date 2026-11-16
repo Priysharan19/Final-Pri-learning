@@ -463,6 +463,43 @@ reset();
   ok('that fresh approval is now recorded for the same account', (await cloudAccountLink('p-race')).activatedAccountId === 'acct-A' && Number((await cloudAccountLink('p-race')).activatedAt) > 0);
 }
 
+
+// ── 13 · a second tab has a DIFFERENT in-memory activation epoch ────────────
+// Two independent module instances share the same IndexedDB device store. A
+// guardian denial in tab 1 must fence an older success from tab 2, including
+// after a reload. An in-memory map alone cannot provide that guarantee.
+reset();
+{
+  await put('profiles', { id: 'p-multitab', name: 'Ananya', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+  await loginCloudAccount('p-multitab', { email: 'a@example.test', password: 'test-password-only' });
+  ok('the second-tab fixture has a real approved activation', !!(await gate('p-multitab')).ready);
+  const secondTab = await import('../src/platform/accountActivation.js?step05-second-tab');
+  let entered, release;
+  const reachedGuardian = new Promise(resolve => { entered = resolve; });
+  const held = new Promise(resolve => { release = resolve; });
+  let calls = 0;
+  server.guardian = async () => {
+    if (++calls === 1) {
+      entered();
+      await held;
+      return { status: 200, body: { accountId: 'acct-A', required: false, state: 'not-required', eligible: true, emailVerified: true, blockerCode: null } };
+    }
+    return { status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } };
+  };
+  const staleInOtherTab = secondTab.ensureAccountActivated('p-multitab', { sync: false })
+    .then(ready => ({ ready }), error => ({ code: error?.code, retryable: error?.retryable }));
+  await reachedGuardian;
+  const withdrawnInThisTab = await gate('p-multitab', { sync: false });
+  eq('guardian withdrawal in tab one is authoritative', withdrawnInThisTab.code, 'GUARDIAN_CONSENT_WITHDRAWN');
+  release();
+  const stale = await staleInOtherTab;
+  ok('a success held in a separate tab cannot reactivate the withdrawn student',
+    !stale.ready && stale.code === 'CONSENT_UNAVAILABLE', JSON.stringify(stale));
+  eq('a separate tab cannot recreate offline grace after guardian withdrawal', await secondTab.offlineGraceFor('p-multitab'), null);
+  reset();
+  ok('a new authorized request can recover even with the durable denial stamp', !!(await gate('p-multitab', { sync: false })).ready);
+}
+
 if (failures.length) {
   console.log(`ACCOUNT ACTIVATION: FAIL — ${failures.length} of ${pass + failures.length} checks failed`);
   for (const f of failures) console.log(`  · ${f}`);
