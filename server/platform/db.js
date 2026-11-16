@@ -624,15 +624,14 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     state TEXT NOT NULL CHECK(state IN ('draft','in_review','approved','published','withdrawn','superseded')),
     body_json TEXT NOT NULL,
     author_account_id TEXT NOT NULL,
-    reviewer_account_id TEXT,
+    reviewer_account_id TEXT CHECK(reviewer_account_id IS NULL OR reviewer_account_id <> author_account_id),
     reason TEXT,
     created_at INTEGER NOT NULL,
     submitted_at INTEGER,
     reviewed_at INTEGER,
     published_at INTEGER,
     withdrawn_at INTEGER,
-    UNIQUE(resource_id, revision),
-    CHECK(reviewer_account_id IS NULL OR reviewer_account_id <> author_account_id)
+    UNIQUE(resource_id, revision)
   );`);
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_resource_revisions_one_open ON resource_revisions(resource_id) WHERE state IN ('draft','in_review','approved');`);
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_resource_revisions_one_published ON resource_revisions(resource_id) WHERE state = 'published';`);

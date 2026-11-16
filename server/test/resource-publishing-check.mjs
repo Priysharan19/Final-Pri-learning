@@ -294,7 +294,7 @@ try {
         c.deq(pol, ['pri_scope_required:RESTRICTIVE', 'pri_server_all:PERMISSIVE'], `forward: ${t} fails closed`);
       }
       const bad = async sql => { try { await su.query(sql); return 'accepted'; } catch (e) { return e.code; } };
-      const rev = (state, reviewer = 'null') => `INSERT INTO pri.resource_revisions(id,resource_id,revision,state,body_json,author_account_id,reviewer_account_id,created_at) VALUES ('${state}-${reviewer}','r-1',${Math.random() * 1e6 | 0},'${state}','{}','a',${reviewer},1)`;
+      const rev = (state, reviewer = 'null') => `INSERT INTO pri.resource_revisions(id,resource_id,revision,state,body_json,author_account_id,reviewer_account_id,created_at) VALUES ('${state}-${reviewer.replace(/'/g, '')}','r-1',${Math.random() * 1e6 | 0},'${state}','{}','a',${reviewer},1)`;
       c.deq([await bad(rev('live')), await bad(rev('draft', "'a'"))], ['23514', '23514'], 'the table refuses an unknown state and a reviewer equal to the author');
       await su.query(rev('draft'));
       c.eq(await bad(rev('draft').replace("'draft-null'", "'x2'")), '23505', 'a second open revision of one resource is refused by the index');

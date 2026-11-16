@@ -31,7 +31,10 @@ const POSTGRES_INTEGER = new Set([
 
 // Constraints Postgres carries that SQLite expresses another way. Each is
 // required on Postgres, not merely tolerated.
-const POSTGRES_ONLY_CHECKS = new Set(['accounts.email']); // email = lower(email): SQLite folds with COLLATE NOCASE
+// accounts.email: email = lower(email), SQLite folds with COLLATE NOCASE.
+// resource_revisions.author_account_id: the one cross-column CHECK (reviewer <> author)
+// is declared once, on reviewer_account_id, in SQLite; Postgres attributes it to both columns.
+const POSTGRES_ONLY_CHECKS = new Set(['accounts.email', 'resource_revisions.author_account_id']);
 // …and exactly what each of them says.
 const POSTGRES_ONLY_CHECK_EXPRESSIONS = new Map([['accounts', ['email=loweremail']]]);
 // Tables the server may read but never write on Postgres.
