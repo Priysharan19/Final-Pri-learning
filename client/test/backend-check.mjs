@@ -2284,8 +2284,12 @@ async function run() {
     if (retryLegacy) {
       await idb.del('questions', retryLegacy.id);
       await idb.del('questions', `${retryLegacy.id}-retired`);
-      eq('History retry fixtures leave no synthetic answered rows behind',
-        (await POST('/history/list', { pageSize: 1000 })).total, history.total);
+      const afterFixtureCleanup = await POST('/history/list', { pageSize: 1000 });
+      ok('History retry fixtures leave no synthetic answered rows behind',
+        !afterFixtureCleanup.items.some(i => i.id === retryLegacy.id || i.id === `${retryLegacy.id}-retired`));
+      ok('both synthetic question rows were actually deleted from device storage',
+        !(await idb.get('questions', retryLegacy.id)) &&
+        !(await idb.get('questions', `${retryLegacy.id}-retired`)));
     }
     await rejects('another profile cannot read your history detail',
       (async () => {
