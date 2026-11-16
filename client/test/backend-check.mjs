@@ -2278,6 +2278,15 @@ async function run() {
     } else {
       ok('a retryable question exists in history', false, 'no history row reported canRetry');
     }
+    // These two synthetic answered History rows exist only to test retry
+    // eligibility. Remove them before the backup/restore contract measures
+    // the original profile's exact history count later in this same suite.
+    if (retryLegacy) {
+      await idb.del('questions', retryLegacy.id);
+      await idb.del('questions', `${retryLegacy.id}-retired`);
+      eq('History retry fixtures leave no synthetic answered rows behind',
+        (await POST('/history/list', { pageSize: 1000 })).total, history.total);
+    }
     await rejects('another profile cannot read your history detail',
       (async () => {
         await POST('/profiles/select', { id: grace.id, password: 'punch-cards-9' });
