@@ -314,6 +314,20 @@ for (const file of walk(srcDir)) {
       check(clash.length === 0, `${file} defines ${id}, which ${clash.join(', ')} also defines: an NSW-authored generator may not replace another bank's`);
     }
   }
+  // Where the spread sits, and that no other bank source names an NSW id as a key, are checked on the
+  // text too: a spread placed after an original key would replace it inside the bank, and then the bank
+  // would hold the very same function the NSW module does.
+  const nswIds = new Set((await Promise.all(nswFiles.map(fnEntries))).flat().map(([id]) => id));
+  for (const file of files.filter(f => !f.endsWith('-nsw.js') && f !== 'index.js')) {
+    const text = readFileSync(join(genDir, file), 'utf8');
+    const spreads = [...text.matchAll(/^\s*\.\.\.\w+Nsw\b/gm)];
+    if (spreads.length) {
+      const lines = text.split('\n');
+      const open = lines.findIndex(l => /^export const \w+ = \{\s*$/.test(l));
+      check(spreads.length === 1 && open >= 0 && /^\s*\.\.\.\w+Nsw,\s*$/.test(lines[open + 1] || ''), `${file}: the NSW spread must be the first and only entry of the bank's object, so an original generator can never be replaced`);
+    }
+    for (const id of nswIds) check(!new RegExp(`['"\`]${id}['"\`]\\s*:`).test(text), `${file} names ${id}, an NSW-authored generator id, as a key`);
+  }
   check(nswFiles.length > 0, 'NSW-authored generator modules were found and their ids are unique across banks');
 }
 
