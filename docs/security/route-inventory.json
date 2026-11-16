@@ -1543,7 +1543,7 @@
       "verifiedEmail": false,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "read-only, no account data: global catalogue rows (resources, resource_editions) that are review_state 'published', availability 'external' with an https url, and offered to THIS server's edition (PRI_EDITION, server/platform/edition.js) — a client ?edition= or any other parameter is ignored, so one edition's server never serves the other's library; any signed-in account (guardian consent for children); private, no-store; nothing written. Filters type/course/year/subject are closed sets or validated (400 RESOURCE_FILTER_INVALID); q ≤120 chars, at most 8 words, each a LIKE with %, _ and \\ escaped (400 RESOURCE_SEARCH_INVALID); at most 100 rows; facets from visible rows only",
+      "ownership": "read-only, no account data: global catalogue rows (resources, resource_editions) that are review_state 'published', either availability 'external' with an https url or (plan F3) availability 'hosted' whose published revision has a file record, and offered to THIS server's edition (PRI_EDITION, server/platform/edition.js) — a client ?edition= or any other parameter is ignored, so one edition's server never serves the other's library; any signed-in account (guardian consent for children); private, no-store; nothing written. Filters type/course/year/subject are closed sets or validated (400 RESOURCE_FILTER_INVALID); q ≤120 chars, at most 8 words, each a LIKE with %, _ and \\ escaped (400 RESOURCE_SEARCH_INVALID); at most 100 rows; facets from visible rows only",
       "rateLimits": [
         {
           "key": "resources-list",
@@ -1564,7 +1564,7 @@
       "verifiedEmail": false,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "read-only, no account data: global catalogue rows (resources, resource_editions) that are review_state 'published', availability 'external' with an https url, and offered to THIS server's edition (PRI_EDITION, server/platform/edition.js) — a client ?edition= or any other parameter is ignored, so one edition's server never serves the other's library; any signed-in account (guardian consent for children); private, no-store; nothing written. An unknown id, a malformed id, a draft or withdrawn row, a hosted or non-https row and another edition's row are the same 404 RESOURCE_NOT_FOUND, so the answer never reveals what exists elsewhere",
+      "ownership": "read-only, no account data: global catalogue rows (resources, resource_editions) that are review_state 'published', either availability 'external' with an https url or (plan F3) availability 'hosted' whose published revision has a file record, and offered to THIS server's edition (PRI_EDITION, server/platform/edition.js) — a client ?edition= or any other parameter is ignored, so one edition's server never serves the other's library; any signed-in account (guardian consent for children); private, no-store; nothing written. An unknown id, a malformed id, a draft or withdrawn row, a hosted or non-https row and another edition's row are the same 404 RESOURCE_NOT_FOUND, so the answer never reveals what exists elsewhere",
       "rateLimits": [
         {
           "key": "resources-read",
@@ -3003,6 +3003,393 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/resources/admin/",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only (support, admin) with the second factor; global publishing history only (resource_revisions); lists revision summaries (no bodies), at most 250; private, no-store; nothing written",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/resources/admin/:rid/revisions",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; one resource's revision history without bodies; resource id is pattern-validated (404 otherwise); nothing written",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/resources/admin/:rid/revisions/:n",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; one revision with its body and its file record's hash, size and region (never the storage key); nothing written",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/drafts",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; creates the next draft revision of a resource id; one open revision per resource (partial unique index); body is an allow-listed, ≤64 KB record; the author is the session's account; audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/revisions/:n/revise",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; copies an earlier revision's body into a new draft (the file hash is dropped); one open revision per resource; audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/resources/admin/:rid/revisions/:n",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; edits a DRAFT only, by its author or an administrator; allow-listed, ≤64 KB record; nothing is edited in place after draft; audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/revisions/:n/submit",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; draft → in_review by the author or an administrator, only when the F1 contract, the rights basis and (for a hosted file) the stored file's hash all hold (400 RESOURCE_INCOMPLETE lists the problems); audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/revisions/:n/reject",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; in_review or approved → draft with a required reason; clears the reviewer; audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/revisions/:n/approve",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; in_review → approved by a staff account that is NOT the author (409 INDEPENDENT_REVIEW_REQUIRED; the table also refuses reviewer = author); audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/revisions/:n/publish",
+      "auth": "session",
+      "roles": [
+        "admin"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": {
+        "stepUpMs": 300000
+      },
+      "ownership": "admin with a second factor verified in the last 5 minutes (step-up); only an approved revision whose reviewer is not its author; re-validates the contract and the file hash; the only writer of the library tables (resources, resource_editions); supersedes the previous published revision; audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/withdraw",
+      "auth": "session",
+      "roles": [
+        "admin"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": {
+        "stepUpMs": 300000
+      },
+      "ownership": "admin with a step-up second factor; takes the published revision out of the library at once (resources.review_state = withdrawn), keeps the history; reason required; audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/revisions/:n/rollback",
+      "auth": "session",
+      "roles": [
+        "admin"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": {
+        "stepUpMs": 300000
+      },
+      "ownership": "admin with a step-up second factor; publishes an earlier independently reviewed body as a NEW revision (hosted file copied under a new server-made key and re-hashed); refuses while a revision is open; audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/revisions/:n/asset/start",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; DRAFT only, author or administrator; requires configured storage (409 otherwise); clears staging parts under server-made keys; no caller-supplied path reaches storage",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/revisions/:n/asset/parts/:i",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; DRAFT only, author or administrator; one base64 part of at most 512 KiB (inside the 1 MiB transport limit), part number 0–49, stored under a server-made staging key",
+      "rateLimits": [
+        {
+          "key": "resource-upload-part",
+          "limit": 1200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/resources/admin/:rid/revisions/:n/asset/complete",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; DRAFT only; assembles the parts server-side (every part but the last exactly 512 KiB), requires %PDF- at byte 0, %%EOF in the last KiB, no script/launch/embedded file, ≤25 MiB, and the declared length and sha256 to equal the server's own; stores under a server-made key in the deployment's region; audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/resources/admin/:rid/revisions/:n/asset",
+      "auth": "session",
+      "roles": [
+        "admin",
+        "support"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "staff-only with the second factor; DRAFT only, author or administrator; deletes the stored object and its record; audit row",
+      "rateLimits": [
+        {
+          "key": "resource-publish",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/resources/:id/file",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only, no account data: for a PUBLISHED, hosted resource offered to THIS server's edition, a signed URL valid 5 minutes that forces a PDF download (never the storage key, never inline); any signed-in account (guardian consent for children); private, no-store; 404 for anything else (an external, draft, withdrawn or other-edition resource, or storage not configured)",
+      "rateLimits": [
+        {
+          "key": "resources-file",
+          "limit": 300,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
     }
   ]
 }

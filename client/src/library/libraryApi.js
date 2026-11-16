@@ -14,6 +14,8 @@ const ID = /^[a-z0-9][a-z0-9-]{2,119}$/;
 
 export const libraryApi = Object.freeze({
   list: () => cloudRequest('/v1/resources'),
+  // A hosted file's short-lived signed URL (plan F3); never a storage key.
+  file: (id) => (ID.test(String(id || '')) ? cloudRequest(`/v1/resources/${id}/file`) : Promise.reject(Object.assign(new Error('Unknown resource.'), { code: 'RESOURCE_NOT_FOUND' }))),
   read: (id) => {
     if (!ID.test(String(id || ''))) return Promise.reject(Object.assign(new Error('Unknown resource.'), { code: 'RESOURCE_NOT_FOUND' }));
     return cloudRequest(`/v1/resources/${id}`);

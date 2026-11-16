@@ -61,7 +61,9 @@ const ACCOUNT_SCOPED = new Set([
   // 20261022000000_parent_report.sql: the parent weekly report's link and send ledger.
   'parent_report_links', 'parent_report_sends',
   // 20261113010000_desk_attempts.sql: the Exam Desk's practice attempts.
-  'desk_attempts'
+  'desk_attempts',
+  // 20261114000000_resource_publishing.sql: revision history and hosted-file records.
+  'resource_revisions', 'resource_assets'
 ]);
 // The ownership predicate of each pri_account_scope policy (default account_id).
 const ACCOUNT_OWNER = new Map([

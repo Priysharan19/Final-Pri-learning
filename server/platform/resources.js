@@ -53,14 +53,18 @@ const likeEscape = s => s.replace(/[\\%_]/g, c => `\\${c}`);
 
 // What every read may return: published, offered to this edition, and linked
 // over https (a 'hosted' row from a later mission is never served by F1).
-export const VISIBLE = `r.review_state='published' AND r.availability='external' AND r.url LIKE 'https://%'
+// 'hosted' (plan F3) is served only while the published revision has its file record.
+export const VISIBLE = `r.review_state='published'
+  AND ((r.availability='external' AND r.url LIKE 'https://%')
+    OR (r.availability='hosted' AND EXISTS (SELECT 1 FROM resource_revisions v JOIN resource_assets a ON a.resource_id=v.resource_id AND a.revision=v.revision
+        WHERE v.resource_id=r.id AND v.state='published')))
   AND EXISTS (SELECT 1 FROM resource_editions e WHERE e.resource_id=r.id AND e.edition=?)`;
 
 /**
  * The library router. `edition` defaults to the server's own (PRI_EDITION);
  * tests pass one to prove the other edition's rows stay out.
  */
-export function createResourceRouter(db, { edition = serverEdition(process.env) } = {}) {
+export function createResourceRouter(db, { edition = serverEdition(process.env), storage = null } = {}) {
   db = asStore(db);
   if (!EDITION_IDS.includes(edition)) throw new Error(`resource library: unknown edition ${JSON.stringify(edition)}`);
   const router = asyncRouter();
@@ -122,6 +126,19 @@ export function createResourceRouter(db, { edition = serverEdition(process.env) 
     res.set('Cache-Control', 'private, no-store');
     if (!row) return res.status(404).json({ error: { code: 'RESOURCE_NOT_FOUND', message: 'No such resource in this library.' } });
     res.json({ resource: resourcePublic(row) });
+  });
+
+  // A hosted file: a short-lived signed URL that forces a download; never the
+  // storage key, never inline in the app's origin. Same visibility as the record.
+  router.get('/:id/file', rateLimit(db, 'resources-file', { limit: 300, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const id = String(req.params.id || '');
+    res.set('Cache-Control', 'private, no-store');
+    const row = ID.test(id) && storage ? await db.get(`SELECT r.id FROM resources r WHERE r.id=? AND r.availability='hosted' AND ${VISIBLE}`, [id, edition]) : null;
+    const asset = row ? await db.get(`SELECT a.* FROM resource_assets a JOIN resource_revisions v ON v.resource_id=a.resource_id AND v.revision=a.revision
+      WHERE v.resource_id=? AND v.state='published'`, [id]) : null;
+    if (!asset) return res.status(404).json({ error: { code: 'RESOURCE_NOT_FOUND', message: 'No such file in this library.' } });
+    const { url, expiresAt } = storage.signedReadUrl(asset.storage_key);
+    res.json({ url, expiresAt, byteLength: Number(asset.byte_length), sha256: asset.sha256, contentType: 'application/pdf' });
   });
 
   return router;

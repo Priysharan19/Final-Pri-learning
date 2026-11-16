@@ -155,6 +155,8 @@ export const ENGINE_SUITES = [
   // The Exam Desk (plan F4a): unmarked attempts under RLS, the server-stamped
   // clock, the import, and the schema-15 → 16 upgrade/rollback.
   'desk-check.mjs',
+  // Resource publishing (plan F3): the schema-16 → 17 upgrade/rollback and the state machine.
+  'resource-publishing-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',

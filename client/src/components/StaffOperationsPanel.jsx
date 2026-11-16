@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import StaffMfaGate, { useMfaStepUp } from './StaffMfaGate.jsx';
+import ResourcePublishingPanel from './ResourcePublishingPanel.jsx';
 
 function parseJson(text, label) {
   let value;
@@ -201,6 +202,9 @@ function StaffOperationsConsole() {
           ))}
         </div>
       </div>
+
+      {/* The library's publishing section: drawn only where the server has it on (plan F3). */}
+      <ResourcePublishingPanel admin={admin} />
 
       {admin && <>
         <div style={{ marginTop: 20 }}>

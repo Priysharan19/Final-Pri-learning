@@ -19,6 +19,9 @@ import { createHandwritingRouter } from './handwriting.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
 import { createExamRouter } from './exams.js';
 import { createResourceRouter } from './resources.js';
+import { createResourcePublishingRouter } from './resourcePublishing.js';
+import { createObjectStorage } from './objectStorage.js';
+import { resourcePublishingEnabled } from './config.js';
 import { createDeskRouter } from './desk.js';
 import { createCurriculumRouter } from './curriculum.js';
 import { createWorkingRouter } from './working.js';
@@ -258,7 +261,16 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/exams', requireGuardianConsent(db), createExamRouter(db));
   // The shared resource library (ADR-0002 plan F1): published resources of
   // this server's edition, for signed-in accounts. Read-only.
-  router.use('/resources', requireGuardianConsent(db), createResourceRouter(db, resources));
+  //
+  // Publishing (plan F3): staff-only write routes under /resources/admin, present
+  // only while PRI_RESOURCE_PUBLISHING=on (tests pass resources.publishing).
+  // Mounted first so /resources/admin is never read as a resource id. A bad
+  // storage configuration (a region outside the edition's) stops the boot here.
+  const publishing = resources.publishing ?? resourcePublishingEnabled(process.env);
+  const libraryEdition = resources.edition ?? serverEdition(process.env);
+  const storage = resources.storage !== undefined ? resources.storage : (publishing ? createObjectStorage(process.env, libraryEdition) : null);
+  if (publishing) router.use('/resources/admin', createResourcePublishingRouter(db, { edition: libraryEdition, storage, now: resources.now }));
+  router.use('/resources', requireGuardianConsent(db), createResourceRouter(db, { ...resources, storage: publishing ? storage : null }));
   // The Exam Desk (ADR-0002 §8 plan F4): the UNMARKED mode of the
   // examination system — practice at a library paper under reading and
   // working time, notes and flags, never a mark. A sibling of /exams that
