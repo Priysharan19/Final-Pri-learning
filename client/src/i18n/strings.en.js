@@ -3543,7 +3543,6 @@ export default {
   'examRoom.nswMarkingNote': 'Answer-checked practice paper. Each question was checked on its final answer only: a question worth n marks earned n or 0. HSC markers also give marks for working, so this is not an HSC mark and predicts no band.',
   'library.save': 'Save',
   'library.saveLabel': 'Save “{title}”',
-  'library.unsaveLabel': 'Remove “{title}” from saved',
   'library.savedState': 'Saved',
   'library.savedPending': 'Saving…',
   'library.savedFilter': 'Saved only',

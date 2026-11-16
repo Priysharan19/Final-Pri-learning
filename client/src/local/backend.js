@@ -5093,10 +5093,14 @@ const routes = {
   'GET /library/saved': async () => {
     const p = await requireProfile();
     const rows = await byIndex('resourceBookmarks', 'pid', p.id);
-    const queued = new Map((await pendingProfileMutations(p.id, 500).catch(() => []))
+    // A failed read, or a queue as long as the read allows, says nothing is
+    // acknowledged: every saved resource then shows as pending, never as saved.
+    const asked = 500;
+    const pendingAll = await pendingProfileMutations(p.id, asked).catch(() => null);
+    const queued = new Map((pendingAll || [])
       .filter(item => item.kind === 'resource-bookmark' || item.kind === 'full-rescan')
       .map(item => [item.kind === 'full-rescan' ? '*' : item.entityId, item.operation]));
-    const everything = queued.has('*');
+    const everything = queued.has('*') || !pendingAll || pendingAll.length >= asked;
     return {
       items: rows.map(r => ({ id: r.resourceId, at: r.createdAt || 0, pending: everything || queued.has(r.resourceId) }))
         .filter(r => typeof r.id === 'string').sort((a, b) => b.at - a.at)

@@ -49,7 +49,7 @@ export function SaveButton({ r, saved, onToggle, t }) {
   const label = on ? (mine.pending ? t('library.savedPending') : t('library.savedState')) : t('library.save');
   return (
     <button type="button" className={`btn btn-ghost lib-save${on ? ' is-on' : ''}`} aria-pressed={on}
-      aria-label={on ? t('library.unsaveLabel', { title: r.title }) : t('library.saveLabel', { title: r.title })}
+      aria-label={t('library.saveLabel', { title: r.title })}
       data-save-resource={r.id} data-save-state={on ? (mine.pending ? 'pending' : 'saved') : 'off'}
       onClick={() => onToggle(r.id)}>
       <span aria-hidden="true">{label}</span>

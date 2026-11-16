@@ -3598,7 +3598,6 @@ export default {
   'examRoom.nswMarkingNote': 'उत्तर-जाँच अभ्यास प्रश्नपत्र। हर प्रश्न केवल अंतिम उत्तर पर जाँचा गया: n अंक का प्रश्न n या 0 अंक पाता है। HSC परीक्षक कार्य के लिए भी अंक देते हैं, इसलिए यह HSC अंक नहीं है और कोई बैंड नहीं बताता।',
   'library.save': 'सहेजें',
   'library.saveLabel': '“{title}” सहेजें',
-  'library.unsaveLabel': '“{title}” को सहेजे हुए से हटाएँ',
   'library.savedState': 'सहेजा गया',
   'library.savedPending': 'सहेजा जा रहा है…',
   'library.savedFilter': 'केवल सहेजे हुए',
