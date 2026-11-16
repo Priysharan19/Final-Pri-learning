@@ -169,6 +169,12 @@ function builtApp(derived) {
 // wait (#528). `duringDeadlineMs` bounds that hold; after it the log is read
 // as usual and the page reports its own failure.
 const PHASE_MIN_MS = 600_000;
+// A launch whose page never writes "started <phase>" within this long is
+// treated as a stalled launch: it is described, then terminated and launched
+// once more. The slowest healthy first line seen is 102 s (a cold first
+// launch on iOS 27). Train editions-12's iPad markingRelaunch printed
+// nothing for 632 s and failed the journey (run 43860746750).
+const STALL_MS = 180_000;
 const LOG_SHOW_EVERY_MS = 30_000;
 function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, duringWhen = null, duringDeadlineMs = 240_000, tick = null, loops = 75 } = {}) {
   const started = localStamp(new Date(Date.now() - 2000));
@@ -211,7 +217,8 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   const deadline = t0 + Math.max(loops * 2_000, PHASE_MIN_MS) + (during ? duringDeadlineMs : 0);
   let lastLogShow = 0;
   let via = 'nothing';
-  for (let i = 0; Date.now() < deadline; i++) {
+  let relaunched = false, launchedAt = Date.now(), stalledDeadline = 0, startedSeen = false;
+  for (let i = 0; Date.now() < deadline + stalledDeadline; i++) {
     // With an oracle to serve, look twice a second-and-a-half rather than
     // letting the page wait on the (slow) log read.
     if (duringWhen && !duringDone) {
@@ -224,6 +231,18 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
       duringDone = true;
     } else if (tick) { for (let k = 0; k < 4; k++) { execSync('sleep 0.5'); tick(); } } else execSync('sleep 2');
     if (!duringDone && Date.now() - t0 >= duringAfterMs) { duringDone = true; during(); }
+    if (!startedSeen && !relaunched && Date.now() - launchedAt > STALL_MS) {
+      relaunched = true;
+      console.log(`  (${phase}: no "started" line in ${Math.round((Date.now() - launchedAt) / 1000)} s — launching once more)`);
+      const describe = (label, fn) => { try { console.log(`    ${label}: ${String(fn()).trim().split('\n').slice(0, 6).join(' | ').slice(0, 400) || '(none)'}`); } catch (e) { console.log(`    ${label}: unreadable (${String(e?.code || e?.signal || e?.message).slice(0, 50)})`); } };
+      describe('app process', () => run('xcrun', ['simctl', 'spawn', udid, 'launchctl', 'list'], { timeout: 30_000, killSignal: 'SIGKILL' }).split('\n').filter(l => l.includes(bundleId)).join('\n'));
+      describe('crash reports', () => run('/bin/sh', ['-c', 'ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i pri | head -3'], { timeout: 15_000 }));
+      try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* already gone */ }
+      launchApp(udid, bundleId, [flag], { env });
+      launchedAt = Date.now();
+      stalledDeadline = STALL_MS + 60_000;
+      continue;
+    }
     // One read is bounded: on a loaded machine `log show` inside a simulator
     // has hung for many minutes, and an unbounded read then hangs the whole
     // journey with nothing reported. A read that does not come back is not a
@@ -246,6 +265,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // Only this launch: everything after its own "started <phase>" line.
     const start = lines.lastIndexOf(`PRIJOURNEY started ${phase}`);
     lines = start >= 0 ? lines.slice(start) : [];
+    if (lines.length) startedSeen = true;
     if (lines.some(l => l.startsWith(`PRIJOURNEY summary ${phase}`))) { execSync('sleep 3'); break; } // let WebKit flush storage
     if (lines.some(l => /^PRIJOURNEY FAIL (script|unreadable)/.test(l))) break;
   }
