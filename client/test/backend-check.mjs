@@ -2120,6 +2120,16 @@ async function run() {
     ok('the bookmark filter finds it', marks.items.some(i => i.id === target.id), `bookmarked ${marks.total}`);
     eq('bookmarking again turns it off', (await POST(`/history/${target.id}/bookmark`, {})).bookmarked, false);
     eq('and the filter forgets it', (await POST('/history/list', { filter: 'bookmarked', pageSize: 100 })).items.filter(i => i.id === target.id).length, 0);
+    // Saved library resources (plan F2): a separate store, never the question bookmarks.
+    const savedBefore = (await GET('/library/saved')).items.length;
+    eq('saving a resource turns it on', (await POST('/library/nsw-2024-paper/bookmark', {})).saved, true);
+    const savedList = (await GET('/library/saved')).items;
+    eq('it is listed, once', savedList.filter(i => i.id === 'nsw-2024-paper').length, 1);
+    eq('and is not yet acknowledged by an account (pending)', savedList.find(i => i.id === 'nsw-2024-paper').pending, true);
+    eq('a question bookmark is not a saved resource', savedList.some(i => i.id === target.id), false);
+    eq('saving it again turns it off', (await POST('/library/nsw-2024-paper/bookmark', {})).saved, false);
+    eq('and the list is as before', (await GET('/library/saved')).items.length, savedBefore);
+    await rejects('an id that is not a resource id is refused', POST('/library/Not_A_Resource/bookmark', {}), { status: 404 });
     await POST(`/history/${target.id}/bookmark`, {});
 
     const detail = await GET(`/history/${target.id}/detail`);

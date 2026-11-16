@@ -20,6 +20,7 @@ import { useT } from '../i18n/index.js';
 import {
   certificationKey, courseKey, filterResources, isResourceId, libraryApi, safeExternalUrl, typeKey, workingTime
 } from './libraryApi.js';
+import { useSavedResources } from './savedResources.js';
 import './library.css';
 
 // The Exam Desk's way in (plan F4b): its own chunk, drawn only where
@@ -38,6 +39,22 @@ const errorKey = (code) => ERROR_KEYS[code] || 'library.loadFailed';
 
 function Certification({ state, t }) {
   return <p className="lib-cert" data-certification={state}>{t(certificationKey(state))}</p>;
+}
+
+/** The save control on a card and on the detail page: a toggle button (aria-pressed), 44 px, label always visible. */
+export function SaveButton({ r, saved, onToggle, t }) {
+  if (!saved) return null;
+  const mine = saved.get(r.id);
+  const on = !!mine;
+  const label = on ? (mine.pending ? t('library.savedPending') : t('library.savedState')) : t('library.save');
+  return (
+    <button type="button" className={`btn btn-ghost lib-save${on ? ' is-on' : ''}`} aria-pressed={on}
+      aria-label={t('library.saveLabel', { title: r.title })}
+      data-save-resource={r.id} data-save-state={on ? (mine.pending ? 'pending' : 'saved') : 'off'}
+      onClick={() => onToggle(r.id)}>
+      <span aria-hidden="true">{label}</span>
+    </button>
+  );
 }
 
 function Facts({ r, t }) {
@@ -61,6 +78,7 @@ function Facts({ r, t }) {
 
 function Detail({ id, t, desk }) {
   const [state, setState] = useState({ status: 'loading' });
+  const { saved, toggle, error } = useSavedResources();
   useEffect(() => {
     let live = true;
     if (!isResourceId(id)) { setState({ status: 'error', code: 'RESOURCE_NOT_FOUND' }); return undefined; }
@@ -78,7 +96,8 @@ function Detail({ id, t, desk }) {
   return (
     <div className="lib-page" data-library-detail={state.resource.id}>
       {back}
-      <ResourceView r={state.resource} t={t} />
+      <ResourceView r={state.resource} t={t} save={<SaveButton r={state.resource} saved={saved} onToggle={toggle} t={t} />} />
+      {error && <p className="lib-honest" role="alert">{t(error)}</p>}
       {desk && state.resource.type === 'paper' && Number.isInteger(state.resource.questionCount) && (
         <React.Suspense fallback={null}><DeskEntry resource={state.resource} /></React.Suspense>
       )}
@@ -109,7 +128,7 @@ function HostedDownload({ id, t }) {
 }
 
 /** One resource, as drawn on its page. Exported for client/test/library-ui-check.mjs. */
-export function ResourceView({ r, t }) {
+export function ResourceView({ r, t, save = null }) {
   const url = safeExternalUrl(r.url);
   const hosted = r.availability === 'hosted';
   return (
@@ -118,6 +137,7 @@ export function ResourceView({ r, t }) {
       <h1 id="lib-detail-title">{r.title}</h1>
       {r.subtitle && <p className="lib-subtitle">{r.subtitle}</p>}
       <Certification state={r.certificationState} t={t} />
+      {save && <p className="lib-save-row">{save}</p>}
       <p>{r.description}</p>
       {/* i18n-exempt-end */}
       <Facts r={r} t={t} />
@@ -154,11 +174,12 @@ function Select({ id, label, value, onChange, options, t }) {
   );
 }
 
-const NO_FILTERS = { q: '', type: '', subject: '', year: '', course: '' };
+const NO_FILTERS = { q: '', type: '', subject: '', year: '', course: '', saved: false };
 
 function Browse({ t }) {
   const [state, setState] = useState({ status: 'loading' });
   const [filters, setFilters] = useState(NO_FILTERS);
+  const { saved, toggle, error } = useSavedResources();
   const load = useCallback(async () => {
     setState({ status: 'loading' });
     try {
@@ -170,9 +191,19 @@ function Browse({ t }) {
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const shown = useMemo(() => (state.status === 'ready' ? filterResources(state.resources, filters) : []), [state, filters]);
+  const shown = useMemo(() => {
+    if (state.status !== 'ready') return [];
+    const found = filterResources(state.resources, filters);
+    return filters.saved && saved ? found.filter(r => saved.has(r.id)) : found;
+  }, [state, filters, saved]);
+  // Saved resources the library no longer lists (withdrawn, or another edition's)
+  // stay in the account's data and are counted, never an error. Not counted while
+  // the list is cut short: the missing one may simply be past the first 100.
+  const hidden = state.status === 'ready' && saved && !state.hasMore
+    ? [...saved.keys()].filter(id => !state.resources.some(r => r.id === id)).length : 0;
   const set = key => value => setFilters(f => ({ ...f, [key]: value }));
   const filtered = Object.values(filters).some(Boolean);
+  const setSaved = on => setFilters(f => ({ ...f, saved: on }));
 
   return (
     <div className="lib-page">
@@ -206,11 +237,18 @@ function Browse({ t }) {
               <Select id="lib-course" label={t('library.courseLabel')} value={filters.course} onChange={set('course')} t={t}
                 options={state.facets.courses.map(v => ({ value: v, label: t(courseKey(v)) }))} />
             )}
+            {saved && (
+              <div className="lib-filter lib-filter-saved">
+                <label className="lib-check"><input type="checkbox" checked={filters.saved} onChange={e => setSaved(e.target.checked)} data-saved-filter /> <span>{t('library.savedFilter')}</span></label>
+              </div>
+            )}
             {filtered && <button type="button" className="btn btn-ghost lib-clear" onClick={() => setFilters(NO_FILTERS)}>{t('library.clear')}</button>}
           </form>
           <p className="in-note" role="status" aria-live="polite">{t('library.count', { count: shown.length, n: shown.length })}</p>
+          {hidden > 0 && <p className="in-note" data-saved-hidden>{t('library.savedHidden', { count: hidden, n: hidden })}</p>}
+          {error && <p className="lib-honest" role="alert">{t(error)}</p>}
           {shown.length === 0
-            ? <p className="lib-honest" data-library-empty="match">{t('library.emptyMatch')}</p>
+            ? <p className="lib-honest" data-library-empty="match">{filters.saved && !filters.q && saved?.size === 0 ? t('library.savedEmpty') : t('library.emptyMatch')}</p>
             : (
               <ul className="lib-list">
                 {shown.map(r => (
@@ -227,6 +265,7 @@ function Browse({ t }) {
                       </span>
                     </PageLink>
                     <Certification state={r.certificationState} t={t} />
+                    <SaveButton r={r} saved={saved} onToggle={toggle} t={t} />
                   </li>
                 ))}
               </ul>

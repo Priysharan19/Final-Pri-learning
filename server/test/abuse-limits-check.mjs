@@ -31,6 +31,8 @@ const { RESET_MAILBOX_LIMIT } = await import('../platform/accounts.js');
 const c = checks();
 // The parent report is off by default (D22); its declared limits are proved
 // like every other route's, so it is switched on here.
+// The anonymous public catalogue (plan F6a) is off by default; its declared rate limits are reviewed like every other route's.
+process.env.PRI_PUBLIC_CATALOGUE = 'on';
 const h = await startApp({ engine: requestedEngine(), parentReport: { enabled: true }, resources: { publishing: true, storage: null } });
 const db = h.db;
 const inventory = loadInventory();

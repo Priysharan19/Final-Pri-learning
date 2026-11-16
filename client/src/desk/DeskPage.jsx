@@ -40,6 +40,8 @@ import { useAnnounce } from '../examShell/useAnnounce.js';
 import { IMPORT_SITE, deskApi, isAttemptId, newKey, unreachable } from './deskApi.js';
 import { dropCache, dropOtherAccounts, linkedAccount, openDeskCache, readCache, sweepCache, writeCache } from './deskCache.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
+import ExportActions from '../components/ExportActions.jsx';
+import { composeDeskExport } from './deskExport.js';
 import { changesOf, confirmQuestions, editQuestion, entryOf, fromCache, groupsOf, nextFlagged, overlay, projectEvents, sectionOf, settleSave, timeLedger } from './deskState.js';
 import '../examShell/examShell.css';
 import './desk.css';
@@ -511,6 +513,16 @@ function Desk({ attemptId }) {
         </div>
       )}
       {startError && <p className="dk-honest" role="alert" data-desk-start-error>{t(startError)}</p>}
+
+      <ExportActions fileName={`desk-${attempt.resource.id}`} title={`${t('export.deskTitle')}: ${attempt.resource.title || paper.title}`} unmarked
+        compose={() => composeDeskExport({ attempt, clock, questions, groups })}>
+        <p>{t('desk.tallies', composeDeskExport({ attempt, clock, questions, groups }).tallies)}</p>
+        <ul>
+          {Array.from({ length: paper.questionCount }, (_, i) => i + 1).map(n => ({ n, e: entryOf(questions, n) })).filter(x => x.e.done || x.e.flagged || x.e.note).map(({ n, e }) => (
+            <li key={n}>{t('shell.q', { n })}{e.done ? ` · ${t('desk.done')}` : ''}{e.flagged ? ` · ${t('desk.flag')}` : ''}{e.note ? ` — ${e.note}` : ''}</li>
+          ))}
+        </ul>
+      </ExportActions>
 
       {finished && (
         <ClosedSummary t={t} attempt={attempt} clock={clock} questions={questions} groups={groups} estimate={estimate} busy={busy}

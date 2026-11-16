@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `4eefae950b779f0d46a7a38f62950787c1511a487dc1a4867d9457919acb18b8` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `a6f686aa4a6cb9fc510d4fd572a33d23b67a3725b312454cbdf75882ef7fcbf2` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2188,6 +2188,226 @@ Final answer: 0
 | alternative | `157.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
 | common wrong | `158` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
 | partial | `158` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-integral-calc/D1` — seed 1009
+
+> Find $\\displaystyle\\int 10\\sin(5x)\\,dx$. (You may omit the $+C$.)
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-integral-calc/D2` — seed 1009
+
+> Evaluate $\\displaystyle\\int_0^{2} \\left(6x^2 + 4\\right)dx$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `24` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `24.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `25` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `25` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-integral-calc/D3` — seed 1009
+
+> Find $\\displaystyle\\int 10e^{5x - 1}\\,dx$. (You may omit the $+C$.)
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-integral-calc/D4` — seed 1009
+
+> A particle moves along a line with velocity $v(t) = 6t^2 + 3t$ metres per second. It starts at the origin. Find its displacement, in metres, from the origin after $6$ seconds.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `486` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `486.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `487` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `487` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-random-var/D1` — seed 1009
+
+> A discrete random variable $X$ has $P(X=3) = \\dfrac{3}{20}$, $P(X=4) = \\dfrac{4}{20}$, $P(X=5) = \\dfrac{3}{20}$, $P(X=6) = \\dfrac{k}{20}$. Find $E(X)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `5.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `6` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-random-var/D2` — seed 1009
+
+> A random variable $X$ takes the values $5, 9, 13$ with probabilities $\\dfrac{1}{8}, \\dfrac{6}{8}, \\dfrac{1}{8}$. Find $\\mathrm{Var}(X)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-random-var/D3` — seed 1009
+
+> Scores on a test are normally distributed with mean $75$ and standard deviation $6$. A student scores $93$. Find the $z$-score of this result.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-random-var/D4` — seed 1009
+
+> A normally distributed variable has a value of $72$ with $z$-score $1$ and a value of $58$ with $z$-score $-1$. Find the mean $\\mu$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `65` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `65.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `66` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `66` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-fin-exact/D1` — seed 1009
+
+> \\$16,000 is invested at 5% per annum, compounded annually. Find the value of the investment after 2 years, in dollars.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `17640` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `17640.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `17641` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17641` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-fin-exact/D2` — seed 1009
+
+> A loan of \\$28,000 is charged 5% interest per year, added at the end of each year. A repayment of \\$800 is made at the end of the first year, straight after the interest is added. Find the balance owing after the first repayment, in dollars.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `28600` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `28600.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `28601` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `28601` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-fin-exact/D3` — seed 1009
+
+> A loan of \\$16,000 has 5% interest per year added annually, with a repayment of \\$1,600 at the end of each year straight after the interest is added. Find the balance owing after the second repayment, in dollars.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `14360` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `14360.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `14361` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `14361` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-fin-exact/D4` — seed 1009
+
+> \\$2,800 is deposited at the end of each year for 3 years into an account paying 5% per annum, compounded annually. Find the value of the account immediately after the last deposit, in dollars.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `8827` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `8827.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `8828` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8828` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-trig-model/D1` — seed 1009
+
+> Find the maximum value of $y = 6\\sin\\left(\\dfrac{\\pi x}{4}\\right) + 10$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `16` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `16.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `17` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-trig-model/D2` — seed 1009
+
+> Find the period of $y = 6\\cos\\left(\\dfrac{\\pi x}{5}\\right) - 10$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `10.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `11` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-trig-model/D3` — seed 1009
+
+> The depth of water at a jetty is modelled by $h(t) = 10 + 6\\sin\\left(\\dfrac{\\pi t}{6}\\right)$ metres, where $t$ is in hours after midnight. Find the depth at $t = 1$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `13` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `13.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `14` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `14` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-trig-model/D4` — seed 1009
+
+> A quantity is modelled by $y = A\\cos(bt) + k$ with $b > 0$. Its maximum value is $16$ and its minimum value is $4$, its maximum occurs at $t = 0$, and its period is $12$. Find $y$ when $t = 2$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `13` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `13.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `14` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `14` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-func-model/D1` — seed 1009
+
+> A culture of bacteria numbers $350$ and doubles every $4$ hours, so $N(t) = 350\\times 2^{t/4}$. How many bacteria are there after $12$ hours?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2800` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `2800.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `2801` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2801` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-func-model/D2` — seed 1009
+
+> A sample of a radioactive substance has a half-life of $6$ days. Its mass is modelled by $M(t) = 448\\times\\left(\\tfrac12\\right)^{t/6}$ grams. Find its mass after $18$ days.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `56` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `56.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `57` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `57` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-func-model/D3` — seed 1009
+
+> A population is modelled by $P(t) = 150\\times 2^{t/5}$, where $t$ is in years. After how many years does the population reach $2400$?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `20` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `20.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `21` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `21` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-func-model/D4` — seed 1009
+
+> A school sells $n$ tickets to a fundraiser and the revenue, in dollars, is modelled by $R(n) = 5n(18 - n)$ for $0 \\le n \\le 18$. Find the maximum revenue, in dollars.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `405` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `405.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `406` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `406` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-formulas/D1` — seed 1009
 

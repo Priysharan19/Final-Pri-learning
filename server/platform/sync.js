@@ -9,7 +9,13 @@ const SCHEMA = 1;
 const MAX_PUSH = 100;
 const MAX_PULL = 500;
 const ID = /^[A-Za-z0-9._:-]{1,160}$/;
-const CLIENT_ENTITY = new Set(['profile', 'settings', 'bookmark', 'favorite', 'task', 'custom-question']);
+const CLIENT_ENTITY = new Set(['profile', 'settings', 'bookmark', 'favorite', 'task', 'custom-question', 'resource-bookmark']);
+// A saved library resource (plan F2): the entity id is the resource id, the body
+// is exactly { present: true }. Its own kind, never `bookmark`, whose restore
+// path writes question rows.
+const RESOURCE_BOOKMARK = 'resource-bookmark';
+const RESOURCE_ID = /^[a-z0-9][a-z0-9-]{2,119}$/;
+export const MAX_RESOURCE_BOOKMARKS = 500;
 const APPEND_EVENT = new Set(['practice-progress', 'practice-attempt', 'exam-attempt', 'rush-history', 'match-history', 'task-completion', 'mastery-observation']);
 
 // Ids the server writes its own learning events under. Every one of them is a
@@ -82,6 +88,13 @@ function cleanEntity(raw) {
   if (!plain(raw) || !CLIENT_ENTITY.has(raw.kind) || !ID.test(String(raw.entityId || ''))) throw Object.assign(new Error('Invalid sync entity.'), { status: 400, code: 'SYNC_ENTITY_INVALID' });
   if (!['upsert', 'delete'].includes(raw.operation)) throw Object.assign(new Error('Invalid entity operation.'), { status: 400, code: 'SYNC_ENTITY_INVALID' });
   if (!Number.isSafeInteger(raw.baseVersion) || raw.baseVersion < 0) throw Object.assign(new Error('Invalid entity base version.'), { status: 400, code: 'SYNC_VERSION_INVALID' });
+  if (raw.kind === RESOURCE_BOOKMARK) {
+    if (!RESOURCE_ID.test(String(raw.entityId))) throw Object.assign(new Error('Invalid resource id.'), { status: 400, code: 'SYNC_ENTITY_INVALID' });
+    if (raw.operation === 'upsert') {
+      const keys = plain(raw.body) ? Object.keys(raw.body) : [];
+      if (keys.length !== 1 || keys[0] !== 'present' || raw.body.present !== true) throw Object.assign(new Error('Invalid resource bookmark body.'), { status: 400, code: 'SYNC_ENTITY_INVALID' });
+    }
+  }
   let body = null;
   if (raw.operation === 'upsert') {
     if (!plain(raw.body || {})) throw Object.assign(new Error('Invalid entity body.'), { status: 400, code: 'SYNC_ENTITY_INVALID' });
@@ -286,6 +299,12 @@ export function createSyncRouter(db) {
           const currentVersion = current?.version || 0;
           if (currentVersion !== entity.baseVersion) {
             throw Object.assign(new Error(`Sync conflict for ${entity.kind}:${entity.entityId}.`), { status: 409, code: 'SYNC_ENTITY_CONFLICT', conflict: conflictPayload(current) });
+          }
+          if (entity.kind === RESOURCE_BOOKMARK && entity.operation === 'upsert' && (!current || current.tombstone)) {
+            const live = await db.get('SELECT COUNT(*) AS n FROM sync_entities WHERE account_id=? AND kind=? AND tombstone=0', [accountId, RESOURCE_BOOKMARK]);
+            if (Number(live?.n || 0) >= MAX_RESOURCE_BOOKMARKS) {
+              throw Object.assign(new Error('This account has saved the most resources it can.'), { status: 422, code: 'SYNC_RESOURCE_BOOKMARK_LIMIT' });
+            }
           }
           const cursor = await nextSyncCursor(db, accountId);
           const version = currentVersion + 1;

@@ -152,6 +152,8 @@ export const ENGINE_SUITES = [
   // The shared resource library (plan F1): its seed equals the migration's,
   // the edition and review filters, and the schema-14 → 15 upgrade/rollback.
   'resources-check.mjs',
+  // Saved library resources (plan F2): the `resource-bookmark` sync kind.
+  'resource-bookmark-sync-check.mjs',
   // The Exam Desk (plan F4a): unmarked attempts under RLS, the server-stamped
   // clock, the import, and the schema-15 → 16 upgrade/rollback.
   'desk-check.mjs',

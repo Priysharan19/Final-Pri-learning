@@ -22,7 +22,7 @@ export function loadInventory(path = INVENTORY_PATH) {
 
 // Every route the code can serve, the parent report's included: it is off by
 // default (PRI_PARENT_REPORT, D22) but its routes are reviewed like any other.
-export function mountedRoutes(router = createPlatformRouter(createPlatformDb(':memory:'), { parentReport: { enabled: true }, resources: { publishing: true, storage: null } })) {
+export function mountedRoutes(router = createPlatformRouter(createPlatformDb(':memory:'), { parentReport: { enabled: true }, publicCatalogue: { enabled: true }, resources: { publishing: true, storage: null } })) {
   return listRoutes(router, '/v1');
 }
 

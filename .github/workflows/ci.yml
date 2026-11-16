@@ -365,6 +365,10 @@ jobs:
           # region rule; and the schema-17 migration with its rollback (Postgres job).
           node server/test/resource-publishing-check.mjs 2>&1 | tee resource-publishing.log
           node tools/ci-check-counts.mjs verify platform/resource-publishing.log
+          # Saved library resources (plan F2): the `resource-bookmark` sync kind,
+          # account-scoped, capped, in the export and gone with the account.
+          node server/test/resource-bookmark-sync-check.mjs 2>&1 | tee resource-bookmark.log
+          node tools/ci-check-counts.mjs verify platform/resource-bookmark.log
           # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.
@@ -372,6 +376,11 @@ jobs:
           node tools/ci-check-counts.mjs verify platform/desk.log
           node server/test/desk-isolation-check.mjs 2>&1 | tee -a desk.log
           node tools/ci-check-counts.mjs verify platform/desk.log#2
+          # The anonymous public resource catalogue (plan F6a): off by default,
+          # published rows of this server's edition only, no cookie, CORS only
+          # for a listed origin, rate-limited; the signed-in library stays signed in.
+          node server/test/public-catalogue-check.mjs 2>&1 | tee public-catalogue.log
+          node tools/ci-check-counts.mjs verify platform/public-catalogue.log
           # One deployment, one edition (ADR-0002 plan E2): the server starts only
           # over a client built for its own edition, X-Pri-Edition only ever
           # refuses (409 everywhere but health and readiness), no request chooses it.

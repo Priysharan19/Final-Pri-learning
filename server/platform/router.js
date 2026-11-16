@@ -22,6 +22,7 @@ import { createResourceRouter } from './resources.js';
 import { createResourcePublishingRouter } from './resourcePublishing.js';
 import { createObjectStorage } from './objectStorage.js';
 import { resourcePublishingEnabled } from './config.js';
+import { createPublicResourceRouter, publicCatalogueConfig } from './publicResources.js';
 import { createDeskRouter } from './desk.js';
 import { createCurriculumRouter } from './curriculum.js';
 import { createWorkingRouter } from './working.js';
@@ -70,7 +71,7 @@ const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
 // and no cookie. Its token can only stop parent reports (parentReport.js).
 const ONE_CLICK_UNSUBSCRIBE = /^\/parent-report\/unsubscribe\/one-click$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {}, desk = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {}, desk = {}, publicCatalogue: publicOverride = {} } = {}) {
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
@@ -177,6 +178,12 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // only ever refuses: it selects no data, brand, currency or authorization,
   // and a request without it passes unchanged (edition.js).
   router.use(refuseOtherEdition(edition));
+
+  // The anonymous public resource catalogue (plan F6a): OFF unless
+  // PRI_PUBLIC_CATALOGUE=on, and then not mounted at all when off, so the
+  // server answers exactly as before. Read-only, no account data, no cookie.
+  const publicCatalogue = { ...publicCatalogueConfig(), ...publicOverride };
+  if (publicCatalogue.enabled) router.use('/public/resources', createPublicResourceRouter(db, { edition: resources.edition || edition, origins: publicCatalogue.origins }));
 
   // OPERATIONAL SIGNALS. Counters, latency and evaluated alert rules for an
   // operator holding PRI_METRICS_TOKEN; closed in production without one.
