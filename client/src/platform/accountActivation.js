@@ -179,6 +179,12 @@ export async function ensureAccountActivated(pid, options = {}) {
   let requestAt = Date.now();
   try {
     linkedAccount = (await cloudAccountLink(pid, { strict: true }))?.accountId || null;
+  } catch (cause) {
+    // A dropped IndexedDB link read remains the established retryable session
+    // failure, never a claim that the local profile/account was unlinked.
+    throw new ActivationBlocked('SESSION_UNAVAILABLE', { cause, retryable: true });
+  }
+  try {
     requestAt = Math.max(Date.now(), (await latestDenialAt(pid, linkedAccount)) + 1);
   } catch (cause) {
     throw new ActivationBlocked('CONSENT_UNAVAILABLE', { cause, retryable: true });
