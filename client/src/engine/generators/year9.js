@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Year 9 generators
 // ─────────────────────────────────────────────────────────────────────────────
+import { year9Nsw } from './year9-nsw.js';
 import { ri, rc, rs, nz, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
 import { figRightTriangle, figBoxPlot } from '../figures.js';
 
@@ -12,6 +13,7 @@ const TRIPLES = [
 ];
 
 export const year9 = {
+  ...year9Nsw,
 
   // ── Pythagoras ───────────────────────────────────────────────────────────
   'y9-pythagoras': (rng, diff) => {

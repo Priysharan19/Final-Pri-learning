@@ -106,7 +106,7 @@ try {
   check('the Exams page lists the five blueprints and the test paper', HSC_PAPERS.every(id => listed.some(([x]) => x === id)) && listed.some(([x]) => x === TEST_PAPER), JSON.stringify(listed));
   const state = id => listed.find(([x]) => x === id)?.[1];
   // The release state of each HSC-style paper on the current pool of approved forms (see docs/content/nsw-papers-released.md).
-  const EXPECT = { 'nsw-hsc-standard-1-2027': 'yes', 'nsw-hsc-standard-2-2027': 'yes', 'nsw-hsc-advanced-2027': 'no', 'nsw-hsc-extension-1-2027': 'yes', 'nsw-hsc-extension-2-2027': 'yes' };
+  const EXPECT = { 'nsw-hsc-standard-1-2027': 'yes', 'nsw-hsc-standard-2-2027': 'yes', 'nsw-hsc-advanced-2027': 'yes', 'nsw-hsc-extension-1-2027': 'yes', 'nsw-hsc-extension-2-2027': 'yes' };
   check('the released and refused HSC-style papers are exactly the ones the approved-form pool supports; the test paper releases',
     Object.entries(EXPECT).every(([id, want]) => state(id) === want) && state(TEST_PAPER) === 'yes', JSON.stringify(listed));
   // A refused paper (if any is left) says how much it covers, names what it lacks and has no start.
