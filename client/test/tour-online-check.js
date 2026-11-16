@@ -680,12 +680,12 @@ export const preparedTaken = {
   id: 'prepared-taken',
   name: 'Prepared · taken up by another account: not marked here, work kept, next one is',
   online: true,
+  inspectNetwork: true, // request interception must bypass service-worker routing
 
   async run({ page, ctx, base, check, goto, createProfile, mathText, settle, online }) {
     await goto('/');
-    await createProfile({ name: 'Late Binder', year: 7 });
-    // Arm the issue failure BEFORE sign-in: account activation can pre-issue
-    // a Practice question, and an after-login handler misses that request.
+    // The verified onboarding helper signs the profile in and may pre-issue
+    // Practice before returning. Arm before it, not after createProfile().
     // While armed, a fresh issue (no prepared token) fails at the route, so
     // serveQuestion falls back to a prepared question for this signed-in student.
     let armed = true;
@@ -697,6 +697,7 @@ export const preparedTaken = {
       return route.continue();
     };
     await ctx.route(issueRoute, handler);
+    await createProfile({ name: 'Late Binder', year: 7 });
     const account = await online.signIn({ name: 'Late Binder' });
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
