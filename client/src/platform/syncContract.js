@@ -80,7 +80,8 @@ export function validateEntityMutation(mutation) {
   return true;
 }
 
-export function createPushEnvelope({ deviceId, baseCursor = 0, events = [], entities = [], fullRescan = false }) {
+export function createPushEnvelope({ deviceId, accountId = null, baseCursor = 0, events = [], entities = [], fullRescan = false }) {
+  if (accountId != null && !ID.test(String(accountId))) throw new TypeError('sync accountId is invalid');
   if (!ID.test(String(deviceId || ''))) throw new TypeError('deviceId is invalid');
   if (!Number.isSafeInteger(baseCursor) || baseCursor < 0) throw new TypeError('baseCursor must be a non-negative integer');
   if (!Array.isArray(events) || !Array.isArray(entities)) throw new TypeError('events and entities must be arrays');
@@ -90,6 +91,7 @@ export function createPushEnvelope({ deviceId, baseCursor = 0, events = [], enti
   return Object.freeze({
     schemaVersion: SYNC_SCHEMA_VERSION,
     deviceId: String(deviceId),
+    ...(accountId == null ? {} : { accountId: String(accountId) }),
     baseCursor,
     fullRescan: !!fullRescan,
     events: Object.freeze(events.map(x => Object.freeze({ ...x, payload: Object.freeze({ ...(x.payload || {}) }) }))),
