@@ -226,3 +226,24 @@ merger policy evaluator and the fifth trusted required check. The runtime
 remains intentionally not deployed and unauthorized. Do not set a public
 webhook endpoint or GitHub main/admission App bypass yet. Staging of private
 App credentials must occur through the GitHub environment UI, never this PR.
+
+## Separate stacked runtime work — Phase 4D
+
+A distinct draft branch is intentionally stacked on PR #626 to avoid
+invalidating its exact-head CodeQL/CI and independent human review. The new
+`pri-serialized-signer.mjs` is a **fail-closed dependency adapter**, not a
+public signing endpoint: it requires independently approved workflow-run
+proof, verified signed ledger before/after snapshots, a shared durable
+Postgres advisory lock and a queued emergency barrier before REVOKE. The
+adapter deliberately will not run without externally certified dependencies.
+
+`pri-serialized-signer-check.mjs` tests revocation priority, signer crash,
+independent approval, stale ledger, and shared lock; the separate
+`pri-serialized-signer-postgres-check.mjs` executes genuine isolated Postgres
+transactions and confirms a failed simulated revocation leaves a persisted
+PENDING emergency denial for mergers.
+
+The production signer CLI has **not** been connected to this adapter, and
+no signed grant or revocation has been issued. This is the next independently
+reviewed engineering change after PR #626, not authorization to remove its
+pre-token unconditional shutdown. Do not enable App bypass or writer admission.

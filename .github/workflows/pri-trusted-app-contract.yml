@@ -34,6 +34,7 @@ jobs:
           node scripts/reliability/pri-serial-merge-controller-check.mjs
           node scripts/reliability/pri-github-app-transport-check.mjs
           node scripts/reliability/pri-signer-provisioning-check.mjs
+          node scripts/reliability/pri-serialized-signer-check.mjs
           node --check scripts/reliability/pri-webhook-ingress.mjs
           node scripts/pri-fleet.mjs simulate-guard reliability \
             scripts/reliability/pri-trusted-check-publisher.mjs \
@@ -47,6 +48,9 @@ jobs:
             scripts/reliability/pri-github-app-transport.mjs \
             scripts/reliability/pri-github-app-transport-check.mjs \
             scripts/reliability/pri-signer-provisioning-check.mjs \
+            scripts/reliability/pri-serialized-signer.mjs \
+            scripts/reliability/pri-serialized-signer-check.mjs \
+            scripts/reliability/pri-serialized-signer-postgres-check.mjs \
             .github/workflows/pri-writer-authority.yml \
             scripts/reliability/sql/001_trusted_merger.sql \
             scripts/reliability/PHASE4_ACTIVATION_GATES.md \
@@ -100,3 +104,4 @@ jobs:
           NODE
           node scripts/reliability/pri-postgres-control-store-check.mjs
           node scripts/reliability/pri-webhook-ingress-check.mjs
+          node scripts/reliability/pri-serialized-signer-postgres-check.mjs
