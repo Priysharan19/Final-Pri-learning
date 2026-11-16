@@ -79,6 +79,11 @@
         {"has":"EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes","note":"Train 13 (#800 + #784 + the L1 marking types), re-derived by running all 4 shards on the merged tree: 355 → 363 subtopics, 576 → 594 pairs."},
         {"has":"WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels"},
         {"re":"EXAMINER DOSSIER: PASS — [0-9]+ rubric banks, digest [0-9a-f]{12}…, status PENDING","note":"#499: the examiner dossier matches the marking code it hashes (a marking change re-requests review)."},
+        {"re":"EXAMINER DOSSIER \\(NSW\\): PASS — [0-9]+ issued cells, [0-9]+ method rubrics, digest [0-9a-f]{12}…, status PENDING","note":"Mission CERT: the NSW HSC examiner dossier matches the code it hashes."},
+        {"re":"EXAMINER PACKETS: PASS — cbse [0-9]+ items, nsw-hsc [0-9]+ items, packet digest [0-9a-f]{12}…, status PENDING","note":"Mission CERT: both examiner packets match the current commit."},
+        {"has":"EXAMINER DOSSIER TEST: PASS — 10/10 checks","note":"Mission CERT: CBSE dossier byte-identical, NSW deterministic, a plan change changes the digest."},
+        {"has":"EXAMINER CERTIFICATION VERIFIER: PASS — 60/60 checks","note":"Mission CERT: an incomplete, stale, fixture or other-jurisdiction record never enables method marks."},
+        {"has":"EXAMINER CERTIFICATION GATE: PASS — 0 signed record(s); method marks: CBSE OFF, NSW HSC OFF","note":"Mission CERT: no examiner has signed; method marks stay off in both editions, and no fabricated record is in the tree."},
         {"has":"METHOD MARKS: PASS — 53/53 checks"},
         {"has":"VERIFIED STEP MARKS: PASS"},
         {"has":"VERIFIED STEP MARKS CLIENT: PASS"},
@@ -182,7 +187,7 @@
       ]
     },
     "platform/blind.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "blind.log",
       "pins": [
         {"has":"PROVIDER ANSWER-BLIND: PASS — 150/150 checks","note":"132 → 150 (Train 4, re-derived by running the suite on the merged tree: #774's lead-connective canaries with the other lanes' checks)."},
@@ -190,182 +195,182 @@
       ]
     },
     "platform/pg-export.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "pg-export.log",
       "pins": [
         {"has":"SQLITE TO POSTGRES EXPORT: PASS"}
       ]
     },
     "platform/rls-fail-closed.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "rls-fail-closed.log",
       "pins": [
         {"has":"RLS FAIL-CLOSED: PASS — 141/141 checks"}
       ]
     },
     "platform/guardian-code-approval.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "guardian-code-approval.log",
       "pins": [
         {"has":"GUARDIAN CODE APPROVAL WITHDRAWAL: PASS — 14/14 checks"}
       ]
     },
     "platform/test-mailbox.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "test-mailbox.log",
       "pins": [
         {"has":"TEST MAILBOX: PASS — 94/94 checks"}
       ]
     },
     "platform/child-erasure.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "child-erasure.log",
       "pins": [
         {"has":"CHILD ERASURE: PASS — 107/107 checks"}
       ]
     },
     "platform/billing-edition.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "billing-edition.log",
       "pins": [
         {"has":"BILLING PER EDITION: PASS — 123/123 checks —"}
       ]
     },
     "platform/tutor-diagnose.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "tutor-diagnose.log",
       "pins": [
         {"has":"TUTOR DIAGNOSE: PASS — 152/152 checks"}
       ]
     },
     "platform/line-check-constant-pin.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "line-check-constant-pin.log",
       "pins": [
         {"has":"LINE CHECK CONSTANT PIN: PASS — 191/191 checks"}
       ]
     },
     "platform/final-attempt-sweep.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "final-attempt-sweep.log",
       "pins": [
         {"has":"FINAL-ATTEMPT ORACLE SWEEP: PASS — 207040/207040 checks — 99 plan questions in 7 banks, 99 constant answers, 128154 round-4 probes, 44526 round-5 probes, 12320 sweep831 probes"}
       ]
     },
     "platform/edition-ai-budgets.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "edition-ai-budgets.log",
       "pins": [
         {"has":"EDITION AI BUDGETS (H7): PASS — 100/100 checks"}
       ]
     },
     "platform/recognition-dedupe.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "recognition-dedupe.log",
       "pins": [
         {"has":"RECOGNITION DEDUPE: PASS — 212/212 checks"}
       ]
     },
     "platform/hot-path-budget.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "hot-path-budget.log",
       "pins": [
         {"has":"HOT PATH BUDGET: PASS — 117/117 checks"}
       ]
     },
     "platform/photo-pipeline.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "photo-pipeline.log",
       "pins": [
         {"has":"PHOTO PIPELINE: PASS — 905/905 checks","note":"860 → 880 (#196 review N4): a reply over the reader's schema limits (422 HANDWRITING_MALFORMED) is offered as one Try again and never resent by itself; a garbled 502 may be. 880 → 905 (Train 4, #739's 25 checks on top; re-derived by running the suite on the merged tree)."}
       ]
     },
     "platform/photo-pipeline.log#2": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "photo-pipeline.log",
       "pins": [
         {"has":"PHOTO WORKING MARKING: PASS — 40/40 checks"}
       ]
     },
     "platform/parent-report.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "parent-report.log",
       "pins": [
         {"has":"parent-report-check (sqlite): 90 checks passed"}
       ]
     },
     "platform/resources.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "resources.log",
       "pins": [
         {"has":"resources-check (sqlite): 105 checks passed"}
       ]
     },
     "platform/desk.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "desk.log",
       "pins": [
         {"has":"desk-check (sqlite): 141 checks passed"}
       ]
     },
     "platform/desk.log#2": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "desk.log",
       "pins": [
         {"has":"DESK ISOLATION: PASS — 39/39 checks"}
       ]
     },
     "platform/edition-agreement.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "edition-agreement.log",
       "pins": [
         {"has":"EDITION AGREEMENT (E2): PASS — 155/155 checks"}
       ]
     },
     "platform/region-isolation.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "region-isolation.log",
       "pins": [
         {"has":"REGION ISOLATION (H2): PASS — 423 checks (sqlite)"}
       ]
     },
     "platform/practice-http.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
         {"has":"LEARNING STATE IDENTITY: PASS — 179/179 checks"}
       ]
     },
     "platform/practice-http.log#2": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
         {"has":"PRACTICE HINT WORK: PASS — 19/19 checks"}
       ]
     },
     "platform/practice-http.log#3": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
         {"has":"SPACED REVIEW: PASS — 16/16 checks"}
       ]
     },
     "platform/practice-http.log#4": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
         {"has":"NSW PRACTICE (G3): PASS — 164/164 checks"}
       ]
     },
     "platform/practice-http.log#6": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
         {"has":"NSW EXAMS (G4): PASS — 68/68 checks"}
       ]
     },
     "platform/practice-http.log#5": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
         {"has":"INDIA BANK ISSUE COVERAGE: PASS"},
@@ -390,14 +395,14 @@
       ]
     },
     "platform/marker-isolation.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "marker-isolation.log",
       "pins": [
         {"has":"MARKER ISOLATION: PASS — 152/152 checks"}
       ]
     },
     "platform/races.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "races.log",
       "pins": [
         {"has":"PRACTICE REVEAL/SUBMIT RACE: PASS","note":"The reveal race's check count follows which request wins each round; its pass line does not."},
@@ -407,7 +412,7 @@
       ]
     },
     "platform/ops.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "ops.log",
       "pins": [
         {"has":"OBSERVABILITY: PASS"},
@@ -418,14 +423,14 @@
       ]
     },
     "platform/secret-shapes.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "secret-shapes.log",
       "pins": [
         {"has":"SECRET SHAPES — PASS — 69 checks"}
       ]
     },
     "platform/security-p2.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "security-p2.log",
       "pins": [
         {"has":"admin-mfa-class-routes-check: 77/77 checks passed (sqlite)"},
@@ -435,35 +440,35 @@
       ]
     },
     "platform/exam-authority.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "exam-authority.log",
       "pins": [
         {"has":"EXAM AUTHORITY: PASS — 371/371 checks"}
       ]
     },
     "platform/board-mock.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "board-mock.log",
       "pins": [
         {"has":"BOARD MOCK AUTHORITY: PASS — 40/40 checks"}
       ]
     },
     "platform/exam-time.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "exam-time.log",
       "pins": [
         {"has":"EXAM TIME: PASS — 23/23 checks"}
       ]
     },
     "platform/targeted-mock.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "targeted-mock.log",
       "pins": [
         {"has":"TARGETED MOCK: PASS — 43/43 checks"}
       ]
     },
     "platform/exam-handwriting.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "exam-handwriting.log",
       "pins": [
         {"has":"EXAM HANDWRITING: PASS — 109/109 checks"},
@@ -471,14 +476,14 @@
       ]
     },
     "platform/postgres-connection-config.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "postgres-connection-config.log",
       "pins": [
         {"has":"POSTGRES CONNECTION CONFIG: PASS — 230/230 checks"}
       ]
     },
     "platform/platform-postgres.log": {
-      "job": "platform",
+      "job": "platform-postgres",
       "log": "platform-postgres.log",
       "pins": [
         {"has":"✓ hot-path-budget-check.mjs"},
@@ -544,14 +549,14 @@
       ]
     },
     "platform/auth-email-ready.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "auth-email-ready.log",
       "pins": [
         {"has":"AUTH EMAIL READINESS: PASS — 174/174 checks"}
       ]
     },
     "platform/storekit.log": {
-      "job": "platform",
+      "job": "platform-contracts",
       "log": "storekit.log",
       "pins": [
         {"has":"STOREKIT ENTITLEMENT STATE MACHINE: PASS — 172/172 checks"}

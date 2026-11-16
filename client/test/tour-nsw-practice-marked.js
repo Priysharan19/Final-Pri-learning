@@ -80,12 +80,13 @@ try {
   // Before E3 a Prithagoras sign-up starts on the India course; only what the
   // NSW profile asks after the switch is this tour's subject.
   const nswFrom = issueBodies.length;
+  const nswReplyFrom = issueReplies.length;
 
   await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
   const answerBox = page.locator('.editor-body input.answer-input');
   let known = null;
-  for (let skips = 0; skips <= MAX_SKIPS && !known; skips++) {
+  for (let skips = 0; skips <= MAX_SKIPS; skips++) {
     const typeTab = page.locator('.mode-tab').first();
     if (await typeTab.count()) await typeTab.click();
     await online.settled();
@@ -102,7 +103,8 @@ try {
     }, leaving, { timeout: 30000 });
   }
 
-  const nswReplies = issueReplies.slice(nswFrom);
+  await online.settled();
+  const nswReplies = issueReplies.slice(nswReplyFrom);
   check(`the server issued what the NSW profile asked for (${CHAPTER})`, nswReplies.length > 0 && nswReplies.every(r => r.status === 201), JSON.stringify(nswReplies));
   const shown = await online.shownRow();
   check('practice shows a question the server issued, not a draft', shown?.checkState === 'issued', JSON.stringify(shown));

@@ -215,8 +215,8 @@ jobs:
           path: suites.log
           if-no-files-found: error
 
-  platform:
-    name: Production account, sync and commercial schema
+  platform-contracts:
+    name: Platform contracts (SQLite, static and Postgres tools)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     # A throwaway Postgres for the Supabase schema gates (ADR-0001). It lives
@@ -540,11 +540,6 @@ jobs:
           node server/test/postgres-connection-config-check.mjs | tee postgres-connection-config.log
           node tools/ci-check-counts.mjs verify platform/postgres-connection-config.log
           node server/test/platform-startup-check.mjs
-      - name: Supabase migrations and every engine-agnostic platform suite on real Postgres
-        run: |
-          set -o pipefail
-          node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
-          node tools/ci-check-counts.mjs verify platform/platform-postgres.log
       - name: Platform migration contract
         run: node server/test/platform-migration-check.mjs
       - name: Billing v3 to v4 payment-retention rebuild on a populated SQLite database
@@ -602,6 +597,65 @@ jobs:
   # histories, marks and Premium. pg_dump refuses a newer server, so the job
   # installs the client tools of the service's major version. A job of its own:
   # the apt step never sits inside a required check.
+  platform-postgres:
+    name: Platform suites on real Postgres
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # A throwaway Postgres for the Supabase schema gates (ADR-0001). It lives
+    # only for this job, trusts loopback connections and holds no credential;
+    # the suites create, migrate and drop their own scratch databases in it.
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      PRI_TEST_PG_ADMIN_URL: postgres://postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - name: Install server dependencies
+        run: npm ci --prefix server
+      - name: Supabase migrations and every engine-agnostic platform suite on real Postgres
+        run: |
+          set -o pipefail
+          node scripts/with-postgres.mjs node server/test/run-platform-postgres.mjs 2>&1 | tee platform-postgres.log
+          node tools/ci-check-counts.mjs verify platform/platform-postgres.log
+
+  # "Production account, sync and commercial schema" (the required check) ran as
+  # one job that reached 898 s of its 900 s limit; the Postgres suite alone took
+  # 322-432 s. The two halves now run in parallel and this job, which runs
+  # always(), fails unless both succeeded, so a skipped or cancelled half can
+  # never read as a passed required check.
+  platform:
+    name: Production account, sync and commercial schema
+    needs: [platform-contracts, platform-postgres]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Both platform halves finished green
+        env:
+          PLATFORM_CONTRACTS_RESULT: ${{ needs.platform-contracts.result }}
+          PLATFORM_POSTGRES_RESULT: ${{ needs.platform-postgres.result }}
+        run: |
+          set -euo pipefail
+          echo "platform-contracts: $PLATFORM_CONTRACTS_RESULT"
+          echo "platform-postgres: $PLATFORM_POSTGRES_RESULT"
+          test "$PLATFORM_CONTRACTS_RESULT" = success
+          test "$PLATFORM_POSTGRES_RESULT" = success
+
   postgres-restore:
     name: Postgres backup restore rehearsal
     runs-on: ubuntu-latest
