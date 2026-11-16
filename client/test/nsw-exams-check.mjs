@@ -134,7 +134,7 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
   const ordered = formsForSlot(slot, [{ generator: 'a', difficulty: 1, outcomes: [outcomes[0]], types: ['numeric'] }, { generator: 'b', difficulty: 4, outcomes: [outcomes[0]], types: ['numeric'] }]);
   check(ordered.map(f => f.generator).join() === 'b,a', 'a slot lists its preferred difficulties first, and still counts the others');
 }
-// PINNED against the current pool (G3, 267 forms; CTO decision 13 Nov 2026).
+// PINNED against the current pool (G3 + the Years 7–10 generators, 331 forms; CTO decision 13 Nov 2026).
 // A content change that moves any of these must update this table on purpose.
 const PINNED = {
   'nsw-hsc-standard-1-2027': { released: false, covered: 1, total: 7 },
@@ -155,7 +155,7 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
     check(r.included.length === 0 && r.omittedOutcomes.length > 0, `pinned: ${b.id} sets nothing and lists its gaps (${r.omittedOutcomes.length})`);
   }
 }
-check(NSW_EXAM_POOL.length === 267, `the pool the pins were taken on: 267 approved forms (got ${NSW_EXAM_POOL.length})`);
+check(NSW_EXAM_POOL.length === 331, `the pool the pins were taken on: 331 approved forms (got ${NSW_EXAM_POOL.length})`);
 
 // On G3's pool, released exactly above the floor (no hand-entered list).
 for (const b of NSW_EXAM_BLUEPRINTS) {
