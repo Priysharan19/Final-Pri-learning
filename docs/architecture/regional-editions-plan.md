@@ -21,6 +21,8 @@ auth, subscription, examiner dossier), and a Prithagoras build exists in CI with
 | E5 | **Billing provider per edition.** Factor `server/platform/billing.js` behind an edition → provider map. Priyabhata stays on Razorpay/INR, unchanged and regression-tested. Prithagoras has *no* provider until owner decision O2: its paywall shows "not yet available" rather than a broken checkout. **In review:** branch `task/e5-billing-per-edition`; `docs/billing/providers-per-edition.md`. | `server/platform/billing*.js`, `client/src/paywall/` | R4 |
 | E6 | **CI for both editions.** Build, unit, browser and accessibility suites run for each edition (matrix), with the heavy browser suites sharded so the four required contexts keep their names. | `.github/workflows/`, `scripts/` | R2 (R4 if workflow security changes) |
 
+**E6 as built:** targeted, not a full matrix — one extra browser shard and Prithagoras steps inside the existing build and contracts jobs (`tools/edition-suites.mjs`, `docs/release/release-policy.md`). Not covered: a Prithagoras native bundle (O3) and an Australian database (O1).
+
 ## Phase 2 — Bring Prithagoras features into the core
 
 Exit criterion: everything `prithagoras-web` does exists in the shared app for signed-in students of both editions,
