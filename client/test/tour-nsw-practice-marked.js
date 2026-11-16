@@ -67,6 +67,7 @@ try {
       try { issueBodies.push(JSON.parse(request.postData() || '{}')); } catch { issueBodies.push(null); }
     }
   });
+
   await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
   await createVerifiedProfile(page, platform, { name: 'NSW Practice Student', year: 10, fromPicker: await page.getByTestId('picker-create-account').count() > 0 });
@@ -79,7 +80,7 @@ try {
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
   const answerBox = page.locator('.editor-body input.answer-input');
   let known = null;
-  for (let skips = 0; skips <= MAX_SKIPS && !known; skips++) {
+  for (let skips = 0; skips <= MAX_SKIPS; skips++) {
     const typeTab = page.locator('.mode-tab').first();
     if (await typeTab.count()) await typeTab.click();
     await online.settled();
@@ -96,17 +97,15 @@ try {
     }, leaving, { timeout: 30000 });
   }
 
-  // The prior async page.on('response') listener did not await its own
-  // response.json() before this assertion. A real issued/marked question could
-  // therefore produce [] even though the request and response both existed.
-  // Follow each captured NSW request to its actual completed HTTP reply;
-  // never infer success from the displayed card or skip a missing response.
+  await online.settled();
+  // Await the actual response for every NSW issue request. An async event
+  // listener can still be parsing its JSON when the assertion runs.
   const nswReplies = await Promise.all(issueRequests.slice(nswFrom).map(async request => {
     const response = await request.response();
     if (!response) return { status: null, code: 'NO_RESPONSE', generator: null };
     const failure = await response.finished();
     let body = null;
-    try { body = await response.json(); } catch { /* reported by status below */ }
+    try { body = await response.json(); } catch { /* status below remains authoritative */ }
     return {
       status: failure ? null : response.status(),
       code: failure ? String(failure) : (body?.error?.code || body?.code || null),
