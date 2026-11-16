@@ -1355,6 +1355,14 @@ export async function getFresh(store, key) {
     try { db.close?.(); } catch { /* already closed */ }
   }
 }
+export async function put(store, value) {
+  await ready();
+  const row = await seal(store, value);
+  if (row === null) return undefined;
+  const written = await writeRaw(store, row);
+  await dropTwins(store, value, row);
+  return written;
+}
 /**
  * Advance an account's durable guardian-denial high-water mark as ONE
  * IndexedDB readwrite transaction. Transactions on the same object store
@@ -1393,14 +1401,6 @@ export async function advanceDeviceDenialAt(id, at) {
   });
 }
 
-export async function put(store, value) {
-  await ready();
-  const row = await seal(store, value);
-  if (row === null) return undefined;
-  const written = await writeRaw(store, row);
-  await dropTwins(store, value, row);
-  return written;
-}
 export async function del(store, key) {
   await ready();
   const at = await storedKey(store, key);
