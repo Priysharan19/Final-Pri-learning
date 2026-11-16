@@ -165,7 +165,7 @@ function NswPapers({ busy, start }) {
     <section className="card" style={{ gridColumn: '1 / -1' }} data-nsw-papers aria-labelledby="nsw-papers-title">
       <h2 className="card-title" id="nsw-papers-title">{t('exams.nsw.heading')}</h2>
       <p className="sub" style={{ marginBottom: 14 }}>{t('exams.nsw.intro')}</p>
-      {list === null && <p className="muted" role="status"><Working pending={list === null} size={24} />{t('exams.nsw.loading')}</p>}
+      {list === null && <p className="muted" role="status"><Working pending={list === null} size={24} /><span>{t('exams.nsw.loading')}</span></p>}
       {list && !list.papers.length && <p className="muted" data-nsw-papers-none>{t('exams.nsw.none')}</p>}
       {list && list.papers.length > 0 && <ul className="nsw-papers" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
         {list.papers.map(p => (
