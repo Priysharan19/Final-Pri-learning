@@ -496,6 +496,12 @@ reset();
   ok('a success held in a separate tab cannot reactivate the withdrawn student',
     !stale.ready && stale.code === 'CONSENT_UNAVAILABLE', JSON.stringify(stale));
   eq('a separate tab cannot recreate offline grace after guardian withdrawal', await secondTab.offlineGraceFor('p-multitab'), null);
+  const { all: readDeviceRows } = await import('../src/local/idb.js');
+  const markerCount = async () => (await readDeviceRows('device')).filter(row =>
+    row?.id?.startsWith?.('pri-activation-denial-v1:acct-A:')).length;
+  const firstDenials = await markerCount();
+  eq('an additional withdrawn recheck remains denied', (await gate('p-multitab', { sync: false })).code, 'GUARDIAN_CONSENT_WITHDRAWN');
+  eq('repeated denied rechecks do not accumulate unbounded device rows', await markerCount(), firstDenials);
   reset();
   ok('a new authorized request can recover even with the durable denial stamp', !!(await gate('p-multitab', { sync: false })).ready);
 }
