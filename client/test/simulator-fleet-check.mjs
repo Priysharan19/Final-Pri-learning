@@ -260,7 +260,7 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   // which could cold-boot another phone and invalidate the journey evidence.
   for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfcheck.mjs', 'scripts/ink-native-check.mjs']) {
     const content = src(script);
-    ok(/pickSimulator\(listing, \{[^}]*\bruntime:/.test(content) && /requiredRuntime\(\)/.test(content),
+    ok(/pickSimulator\(listing, \{[^}]*\bruntime\b/.test(content) && /requiredRuntime\(\)/.test(content),
       `${script}: picks a simulator through the shared pinned-runtime selector`);
   }
   const wf = src('.github/workflows/native-journey-ios27.yml');
