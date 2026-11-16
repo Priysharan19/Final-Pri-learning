@@ -85,7 +85,20 @@ async function latestDenialAt(pid, accountId) {
 }
 async function persistDenial(pid, accountId, at) {
   if (!pid || !accountId) return;
-  await add('device', { id: `${denialPrefix(pid, accountId)}${uuid()}`, deniedAt: at });
+  const rows = await all('device');
+  const prefix = denialPrefix(pid, accountId);
+  const latestRefusal = rows.reduce((max, row) => row?.id?.startsWith?.(prefix) && Number.isFinite(row.deniedAt)
+    ? Math.max(max, row.deniedAt) : max, 0);
+  const latestApproval = rows.reduce((max, row) =>
+    String(row?.accountId || '') === String(accountId) &&
+      String(row?.activatedAccountId || '') === String(accountId)
+      ? Math.max(max, Number(row.activatedAt) || 0) : max, 0);
+  // A pending/withdrawn account may recheck many times while blocked. One
+  // durable denial is enough until a genuinely newer online approval occurs.
+  // Keep immutable evidence to survive concurrent writes from another tab,
+  // without growing one record for every unsuccessful poll.
+  if (latestRefusal > 0 && latestApproval <= latestRefusal) return;
+  await add('device', { id: `${prefix}${uuid()}`, deniedAt: at });
 }
 
 /** True when an offline entry verified at `verifiedAt` may no longer stay open (a missing time counts as expired). */
