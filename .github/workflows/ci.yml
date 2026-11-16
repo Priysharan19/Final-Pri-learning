@@ -367,6 +367,11 @@ jobs:
           node tools/ci-check-counts.mjs verify platform/desk.log
           node server/test/desk-isolation-check.mjs 2>&1 | tee -a desk.log
           node tools/ci-check-counts.mjs verify platform/desk.log#2
+          # The anonymous public resource catalogue (plan F6a): off by default,
+          # published rows of this server's edition only, no cookie, CORS only
+          # for a listed origin, rate-limited; the signed-in library stays signed in.
+          node server/test/public-catalogue-check.mjs 2>&1 | tee public-catalogue.log
+          node tools/ci-check-counts.mjs verify platform/public-catalogue.log
           # One deployment, one edition (ADR-0002 plan E2): the server starts only
           # over a client built for its own edition, X-Pri-Edition only ever
           # refuses (409 everywhere but health and readiness), no request chooses it.

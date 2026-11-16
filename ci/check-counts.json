@@ -306,6 +306,13 @@
         {"has":"resources-check (sqlite): 105 checks passed"}
       ]
     },
+    "platform/public-catalogue.log": {
+      "job": "platform-contracts",
+      "log": "public-catalogue.log",
+      "pins": [
+        {"has":"public-catalogue-check (sqlite): 51 checks passed"}
+      ]
+    },
     "platform/desk.log": {
       "job": "platform-contracts",
       "log": "desk.log",
