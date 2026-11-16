@@ -149,7 +149,9 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
 
   router.get('/', async (req, res) => {
     const state = REVISION_STATES.includes(req.query?.state) ? req.query.state : null;
-    const rows = await db.all(`SELECT * FROM resource_revisions ${state ? 'WHERE state=?' : ''} ORDER BY created_at DESC, resource_id LIMIT 250`, state ? [state] : []);
+    const rows = state
+      ? await db.all('SELECT * FROM resource_revisions WHERE state=? ORDER BY created_at DESC, resource_id LIMIT 250', [state])
+      : await db.all('SELECT * FROM resource_revisions ORDER BY created_at DESC, resource_id LIMIT 250');
     res.set('Cache-Control', 'private, no-store');
     res.json({ revisions: rows.map(r => revisionPublic(r, { body: false })), storage: storage ? { kind: storage.kind, region: storage.region } : null, edition });
   });
@@ -256,7 +258,7 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     const v = resourceRowValues(record);
     await db.run(`INSERT INTO resources(id,title,subtitle,description,type,subject,year,grade,marks,duration_minutes,reading_minutes,question_count,sections_json,tags_json,course,
       syllabus_version,certification_state,availability,url,source,attribution,rights_note,disclaimer,review_state,created_at,updated_at,published_at)
-      VALUES (${v.map(() => '?').join(',')})
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(id) DO UPDATE SET title=excluded.title,subtitle=excluded.subtitle,description=excluded.description,type=excluded.type,subject=excluded.subject,year=excluded.year,
         grade=excluded.grade,marks=excluded.marks,duration_minutes=excluded.duration_minutes,reading_minutes=excluded.reading_minutes,question_count=excluded.question_count,
         sections_json=excluded.sections_json,tags_json=excluded.tags_json,course=excluded.course,syllabus_version=excluded.syllabus_version,certification_state=excluded.certification_state,

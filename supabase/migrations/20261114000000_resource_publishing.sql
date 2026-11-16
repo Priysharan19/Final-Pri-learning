@@ -23,8 +23,9 @@
 --
 -- Both are global (staff-authored, not owned by an account), like
 -- pri.resources: the permissive pri_server policy and the fail-closed
--- RESTRICTIVE pri_scope_required policy of 20261016000000_rls_fail_closed.sql,
--- no account policy. Authorisation is the server's (resourcePublishing.js:
+-- RESTRICTIVE pri_scope_required policy of 20261016000000_rls_fail_closed.sql;
+-- resource_revisions, which names staff accounts, also gets the restrictive
+-- pri_account_scope policy (see the end of this file), as content_revisions does. Authorisation is the server's (resourcePublishing.js:
 -- staff session, role, MFA, two-person rule). Staff account ids are plain text,
 -- not foreign keys: history outlives a staff account.
 --
@@ -99,6 +100,13 @@ begin
       t);
   end loop;
 end $$;
+
+-- resource_revisions names staff accounts (author, reviewer), so — exactly like
+-- content_revisions in 20261019000000_rls_account_coverage.sql — it also fails
+-- closed in account scope: only the staff handlers read it, in system scope.
+create policy pri_account_scope on pri.resource_revisions as restrictive for all to pri_server
+  using (current_setting('pri.scope', true) = 'system' or (current_setting('pri.scope', true) = 'account' and coalesce(current_setting('pri.account_id', true), '') <> '' and (author_account_id = current_setting('pri.account_id', true) or reviewer_account_id = current_setting('pri.account_id', true))))
+  with check (current_setting('pri.scope', true) = 'system' or (current_setting('pri.scope', true) = 'account' and coalesce(current_setting('pri.account_id', true), '') <> '' and (author_account_id = current_setting('pri.account_id', true) or reviewer_account_id = current_setting('pri.account_id', true))));
 
 update pri.platform_meta set value = '17' where key = 'schema_version';
 

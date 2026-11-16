@@ -289,9 +289,11 @@ try {
       await su.query(MIGRATION);
       c.eq(await version(), '17', 'forward: schema_version is 17');
       c.deq((await tables()).filter(t => !before.includes(t)), ['resource_assets', 'resource_revisions'], 'forward: exactly the two tables are added');
-      for (const t of ['resource_assets', 'resource_revisions']) {
+      for (const [t, expected] of [['resource_assets', ['pri_scope_required:RESTRICTIVE', 'pri_server_all:PERMISSIVE']],
+        // It names staff accounts, so (as content_revisions) it also confines account scope.
+        ['resource_revisions', ['pri_account_scope:RESTRICTIVE', 'pri_scope_required:RESTRICTIVE', 'pri_server_all:PERMISSIVE']]]) {
         const pol = (await su.query("SELECT policyname, permissive FROM pg_policies WHERE schemaname='pri' AND tablename=$1 ORDER BY policyname", [t])).rows.map(p => `${p.policyname}:${p.permissive}`);
-        c.deq(pol, ['pri_scope_required:RESTRICTIVE', 'pri_server_all:PERMISSIVE'], `forward: ${t} fails closed`);
+        c.deq(pol, expected, `forward: ${t} fails closed`);
       }
       const bad = async sql => { try { await su.query(sql); return 'accepted'; } catch (e) { return e.code; } };
       const rev = (state, reviewer = 'null') => `INSERT INTO pri.resource_revisions(id,resource_id,revision,state,body_json,author_account_id,reviewer_account_id,created_at) VALUES ('${state}-${reviewer.replace(/'/g, '')}','r-1',${Math.random() * 1e6 | 0},'${state}','{}','a',${reviewer},1)`;
