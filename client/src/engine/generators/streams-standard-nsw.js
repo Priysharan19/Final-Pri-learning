@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · Year 12 generators for the NSW Mathematics Standard 2 (2024)
-// outcomes the original Standard bank left without an approved form. Every item
+// Pri Learning · Year 12 generators for the NSW Mathematics Standard 2 and Standard 1
+// (2024) outcomes the original Standard bank left without an approved form. Every item
 // is original to Pri; none is taken from a NESA paper or marking guideline.
 //
 // Every answer is a whole number: parameters are chosen so that no question
@@ -16,6 +16,10 @@
 //   ms12-critical-path MST-12-S2-07  Critical path analysis
 //   ms12-bivariate-fit MST-12-S2-08  Bivariate data analysis
 //   ms12-normal-exact  MST-12-S2-10  The normal distribution
+//   ms12-simple-interest MST-12-S1-02  Investment (Standard 1)
+//   ms12-depreciation  MST-12-S1-03  Depreciation and loans (Standard 1)
+//   ms12-right-triangle MST-12-S1-04  Right-angled triangles (Standard 1)
+// ms12-algebraic, -rates and -bivariate-fit also serve Standard 1 (S1-01, S1-05, S1-06).
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, nz } from '../qhelpers.js';
 
@@ -489,12 +493,144 @@ const raw = {
       hints: [`$${mu + k * sd}$ is $${k}$ standard deviation${k > 1 ? 's' : ''} above the mean.`, `About ${pct}% of values lie above that.`, `${pct}% of $${N}$.`],
       steps: [{ h: 'Match the rule', d: `Above $\\mu + ${k}\\sigma$: about ${pct}%` }, { h: 'Count', d: `${pct}% of $${N} = ${Math.round(N * pct * 10) / 1000}$` }]
     };
+  },
+
+  // ── Standard 1 · Investment (simple interest) ─────────────────────────────
+  'ms12-simple-interest': (rng, diff) => {
+    const P = 1000 * ri(rng, 1, 9), r = rc(rng, [2, 3, 4, 5, 6, 8]), n = ri(rng, 2, 6);
+    const I = P * r / 100 * n;
+    if (diff === 1) {
+      return {
+        prompt: `${D(P)} is invested at ${r}% per annum simple interest for ${n} years. How much interest is earned, in dollars?`,
+        answerType: 'numeric', answer: { value: I },
+        traps: [{ value: P * r / 100, why: `That is one year's interest. Simple interest is the same each year, so multiply by the ${n} years.` }],
+        hints: ['$I = Prn$ with $r$ as a decimal.', `$r = ${r / 100}$.`, `$${P}\\times ${r / 100}\\times ${n}$.`],
+        steps: [{ h: 'Simple interest', d: `$I = ${P}\\times ${r / 100}\\times ${n} = ${I}$ dollars` }]
+      };
+    }
+    if (diff === 2) {
+      return {
+        prompt: `${D(P)} is invested at ${r}% per annum simple interest for ${n} years. What is the total value of the investment at the end, in dollars?`,
+        answerType: 'numeric', answer: { value: P + I },
+        traps: [{ value: I, why: 'The value includes the amount first invested as well as the interest.' }],
+        hints: ['Total value $=$ amount invested $+$ interest.', `$I = ${P}\\times ${r / 100}\\times ${n} = ${I}$.`, `$${P} + ${I}$.`],
+        steps: [{ h: 'Interest', d: `$I = ${P}\\times ${r / 100}\\times ${n} = ${I}$` }, { h: 'Total', d: `$${P} + ${I} = ${P + I}$ dollars` }]
+      };
+    }
+    if (diff === 3) {
+      return {
+        prompt: `An investment of ${D(P)} earns ${D(I)} simple interest in ${n} years. What is the annual interest rate, as a percentage?`,
+        answerType: 'numeric', answer: { value: r }, answerSuffix: '%',
+        traps: [{ value: r * n, why: `The interest over ${n} years is ${r * n}% of the investment; divide by the number of years for the annual rate.` }],
+        hints: ['$I = Prn$, so $r = \\dfrac{I}{Pn}$.', `$r = \\dfrac{${I}}{${P}\\times ${n}}$.`, 'Write the decimal as a percentage.'],
+        steps: [{ h: 'Rearrange', d: `$r = \\dfrac{${I}}{${P}\\times ${n}} = ${r / 100}$` }, { h: 'As a percentage', d: `$${r}\\%$` }]
+      };
+    }
+    return {
+      prompt: `${D(P)} is invested at ${r}% per annum simple interest. For how many years must it be invested to earn ${D(I)} in interest?`,
+      answerType: 'numeric', answer: { value: n }, answerSuffix: 'years',
+      traps: [{ value: I / P, why: 'Divide the interest by the interest earned each year, not by the amount invested.' }].filter(t => t.value !== n),
+      hints: ['$I = Prn$, so $n = \\dfrac{I}{Pr}$.', `Interest each year: $${P}\\times ${r / 100} = ${P * r / 100}$.`, `$${I}\\div ${P * r / 100}$.`],
+      steps: [{ h: 'Interest each year', d: `$${P}\\times ${r / 100} = ${P * r / 100}$` }, { h: 'Number of years', d: `$${I}\\div ${P * r / 100} = ${n}$` }]
+    };
+  },
+
+  // ── Standard 1 · Depreciation and loans ───────────────────────────────────
+  'ms12-depreciation': (rng, diff) => {
+    const V0 = 1000 * ri(rng, 5, 40), d = 500 * ri(rng, 1, 6), n = ri(rng, 2, 6);
+    if (diff === 1) {
+      const V = V0 - d * n;
+      if (V <= 0) return raw['ms12-depreciation'](rng, diff);
+      return {
+        prompt: `A van is bought for ${D(V0)} and loses ${D(d)} of its value each year (straight-line depreciation). What is it worth after ${n} years, in dollars?`,
+        answerType: 'numeric', answer: { value: V },
+        traps: [{ value: V0 - d, why: `The loss happens every year: take off ${D(d)} for each of the ${n} years.` }].filter(t => t.value !== V),
+        hints: ['Straight-line depreciation takes off the same amount each year.', `Total loss $= ${d}\\times ${n} = ${d * n}$.`, `$${V0} - ${d * n}$.`],
+        steps: [{ h: 'Total depreciation', d: `$${d}\\times ${n} = ${d * n}$` }, { h: 'Value', d: `$${V0} - ${d * n} = ${V}$ dollars` }]
+      };
+    }
+    if (diff === 2) {
+      const V = V0 - d * n;
+      if (V <= 0) return raw['ms12-depreciation'](rng, diff);
+      return {
+        prompt: `A machine bought for ${D(V0)} is worth ${D(V)} after ${n} years. Assuming straight-line depreciation, how many dollars does it lose each year?`,
+        answerType: 'numeric', answer: { value: d },
+        traps: [{ value: V0 - V, why: `That is the loss over all ${n} years; divide by ${n} for one year.` }],
+        hints: ['Loss in value $= \\text{original} - \\text{current}$.', `$${V0} - ${V} = ${V0 - V}$.`, `Divide by $${n}$ years.`],
+        steps: [{ h: 'Total loss', d: `$${V0} - ${V} = ${V0 - V}$` }, { h: 'Per year', d: `$${V0 - V}\\div ${n} = ${d}$ dollars` }]
+      };
+    }
+    if (diff === 3) {
+      const P = 1000 * ri(rng, 2, 12), m = 100 * ri(rng, 1, 6), months = ri(rng, 6, 36);
+      const total = m * months;
+      if (total <= P) return raw['ms12-depreciation'](rng, diff);
+      return {
+        prompt: `A loan of ${D(P)} is repaid in equal instalments of ${D(m)} per month for ${months} months. How much interest is paid in total, in dollars?`,
+        answerType: 'numeric', answer: { value: total - P },
+        traps: [{ value: total, why: 'That is everything repaid. The interest is the amount repaid less the amount borrowed.' }],
+        hints: ['Total repaid $=$ instalment $\\times$ number of instalments.', `$${m}\\times ${months} = ${total}$.`, 'Interest = total repaid $-$ amount borrowed.'],
+        steps: [{ h: 'Total repaid', d: `$${m}\\times ${months} = ${total}$` }, { h: 'Interest', d: `$${total} - ${P} = ${total - P}$ dollars` }]
+      };
+    }
+    const lose = d * n;
+    return {
+      prompt: `A tractor bought for ${D(V0 + lose)} loses ${D(d)} of its value each year (straight-line depreciation). After how many years is it worth ${D(V0)}?`,
+      answerType: 'numeric', answer: { value: n }, answerSuffix: 'years',
+      traps: [{ value: V0 / d, why: 'Use the amount of value lost (original less current), not the current value.' }].filter(t => t.value !== n),
+      hints: ['Value lost $=$ original $-$ current.', `$${V0 + lose} - ${V0} = ${lose}$.`, `Divide by $${d}$ a year.`],
+      steps: [{ h: 'Value lost', d: `$${V0 + lose} - ${V0} = ${lose}$` }, { h: 'Years', d: `$${lose}\\div ${d} = ${n}$` }]
+    };
+  },
+
+  // ── Standard 1 · Right-angled triangles (exact values only) ───────────────
+  'ms12-right-triangle': (rng, diff) => {
+    if (diff === 1) {
+      const k = ri(rng, 2, 9), [a, b, c] = rc(rng, [[3, 4, 5], [5, 12, 13], [8, 15, 17]]);
+      return {
+        prompt: `A right-angled triangle has perpendicular sides of $${a * k}$ cm and $${b * k}$ cm. What is the length of the hypotenuse, in centimetres?`,
+        answerType: 'numeric', answer: { value: c * k }, answerSuffix: 'cm',
+        traps: [{ value: (a + b) * k, why: "Use Pythagoras: $c^2 = a^2 + b^2$, then take the square root. The hypotenuse is shorter than the sum of the sides." }],
+        hints: ["Pythagoras' theorem: $c^2 = a^2 + b^2$.", `$${a * k}^2 + ${b * k}^2 = ${(a * k) ** 2 + (b * k) ** 2}$.`, 'Take the square root.'],
+        steps: [{ h: 'Pythagoras', d: `$c^2 = ${(a * k) ** 2} + ${(b * k) ** 2} = ${(c * k) ** 2}$` }, { h: 'Square root', d: `$c = ${c * k}$ cm` }]
+      };
+    }
+    if (diff === 2) {
+      const k = ri(rng, 2, 9), [a, b, c] = rc(rng, [[3, 4, 5], [5, 12, 13], [8, 15, 17]]);
+      return {
+        prompt: `A ladder $${c * k}$ m long leans against a vertical wall. Its foot is $${a * k}$ m from the base of the wall. How high up the wall does the ladder reach, in metres?`,
+        answerType: 'numeric', answer: { value: b * k }, answerSuffix: 'm',
+        traps: [{ value: (c - a) * k, why: 'The ladder is the hypotenuse: subtract the squares, $h^2 = c^2 - a^2$, then take the square root.' }],
+        hints: ['The ladder is the hypotenuse of a right-angled triangle.', `$h^2 = ${c * k}^2 - ${a * k}^2 = ${(c * k) ** 2 - (a * k) ** 2}$.`, 'Take the square root.'],
+        steps: [{ h: 'Pythagoras', d: `$h^2 = ${(c * k) ** 2} - ${(a * k) ** 2} = ${(b * k) ** 2}$` }, { h: 'Square root', d: `$h = ${b * k}$ m` }]
+      };
+    }
+    if (diff === 3) {
+      const L = 2 * ri(rng, 2, 12), ang = rc(rng, [30, 60]);
+      const trig = ang === 30 ? 'sin' : 'cos';
+      return {
+        prompt: `A ramp $${L}$ m long makes an angle of $${ang}^\\circ$ with ${ang === 30 ? 'the horizontal ground. How high is the top of the ramp above the ground, in metres?' : 'the vertical wall it leans on. How far up the wall does the ramp reach, in metres?'}`,
+        answerType: 'numeric', answer: { value: L / 2 }, answerSuffix: 'm',
+        traps: [{ value: L * 2, why: `The side is the hypotenuse $\\times\\,\\${trig}${ang}^\\circ = ${L}\\times\\dfrac12$; it cannot be longer than the ramp.` }],
+        hints: [`Use $${trig}$ with the ${ang === 30 ? 'opposite side and hypotenuse' : 'adjacent side and hypotenuse'}.`, `$${trig}\\,${ang}^\\circ = \\dfrac12$.`, `$${L}\\times\\dfrac12$.`],
+        steps: [{ h: 'Choose the ratio', d: `$${trig}\\,${ang}^\\circ = \\dfrac{\\text{${ang === 30 ? 'opposite' : 'adjacent'}}}{\\text{hypotenuse}} = \\dfrac12$` }, { h: 'Evaluate', d: `$${L}\\times\\dfrac12 = ${L / 2}$ m` }]
+      };
+    }
+    const k = ri(rng, 2, 12), kind = rc(rng, ['tan', 'sin', 'cos']);
+    const ans = { tan: 45, sin: 30, cos: 60 }[kind];
+    const [x, y, sx, sy] = kind === 'tan' ? [k, k, 'opposite', 'adjacent'] : kind === 'sin' ? [k, 2 * k, 'opposite', 'hypotenuse'] : [k, 2 * k, 'adjacent', 'hypotenuse'];
+    return {
+      prompt: `In a right-angled triangle the side opposite angle $\\theta$ is ${kind === 'cos' ? `not given; the side adjacent to $\\theta$ is $${x}$ cm and the hypotenuse is $${y}$ cm` : `$${x}$ cm, ${kind === 'tan' ? `and the side adjacent to $\\theta$ is $${y}$ cm` : `and the hypotenuse is $${y}$ cm`}`}. Find $\\theta$ in degrees, given that $\\theta$ is acute.`,
+      answerType: 'numeric', answer: { value: ans }, answerSuffix: '°',
+      traps: [{ value: 90 - ans, why: `Check which sides you were given: the ratio is ${kind} ${'$\\theta$'} $= \\dfrac{${x}}{${y}}$, which is the ratio for ${ans}°, not ${90 - ans}°.` }].filter(t => t.value !== ans),
+      hints: [`You are given the ${sx} and the ${sy}, so use $${kind}$.`, `$${kind}\\,\\theta = \\dfrac{${x}}{${y}} = ${kind === 'tan' ? '1' : '\\dfrac12'}$.`, `Use the inverse ${kind} on your calculator.`],
+      steps: [{ h: 'Choose the ratio', d: `${sx} and ${sy}: $${kind}\\,\\theta = \\dfrac{${x}}{${y}} = ${kind === 'tan' ? '1' : '\\dfrac12'}$` }, { h: 'Inverse ratio', d: `$\\theta = ${ans}^\\circ$` }]
+    };
   }
 };
 
 // A dollar answer is asked for in a box with a "$" prefix, as the older money cells do: the marker
 // reads a "$" typed with a money answer only when the question says it asks for money.
-const MONEY = { 'ms12-invest-loans': [1, 2, 3, 4], 'ms12-annuity-table': [1, 2, 3, 4], 'ms12-algebraic': [2, 4], 'ms12-rates': [3] };
+const MONEY = { 'ms12-invest-loans': [1, 2, 3, 4], 'ms12-annuity-table': [1, 2, 3, 4], 'ms12-algebraic': [2, 4], 'ms12-rates': [3], 'ms12-simple-interest': [1, 2], 'ms12-depreciation': [1, 2, 3] };
 const withMoneyPrefix = (id, fn) => (rng, diff) => {
   const q = fn(rng, diff);
   return MONEY[id]?.includes(diff) ? { ...q, answerPrefix: '$' } : q;

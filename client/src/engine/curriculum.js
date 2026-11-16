@@ -414,7 +414,7 @@ export const STREAM_CURRICULUM = {
         'Cosine rule for sides and angles',
         'Area of a triangle A = ½ab sin C'
       ]),
-      T('ms12-algebraic', 'Algebraic Relationships in Practice', 'Algebra', 8, 'MS-A4', [
+      T('ms12-algebraic', 'Algebraic Relationships in Practice', 'Algebra', 8, 'MS-A3/A4', [
         'Solve problems with two linear models (break-even and equal-cost points)',
         'Use exponential models',
         'Interpret linear graphs of practical situations'
@@ -429,7 +429,7 @@ export const STREAM_CURRICULUM = {
         'Find the present value of an annuity from a given table factor',
         'Find the interest earned by an annuity'
       ]),
-      T('ms12-rates', 'Ratios & Rates in Practice', 'Number', 8, 'MS-M7', [
+      T('ms12-rates', 'Ratios & Rates in Practice', 'Number', 8, 'MS-M4/M7', [
         'Convert between units of a rate',
         'Calculate with rates',
         'Share a quantity in a given ratio'
@@ -453,6 +453,21 @@ export const STREAM_CURRICULUM = {
         'Find a z-score',
         'Use the 68–95–99.7 rule to count values',
         'Find a value from its z-score'
+      ]),
+      T('ms12-simple-interest', 'Investment: Simple Interest', 'Financial Maths', 8, 'MS-F2', [
+        'Calculate simple interest',
+        'Find the value of a simple-interest investment',
+        'Find the rate or the time from the interest earned'
+      ]),
+      T('ms12-depreciation', 'Depreciation & Loans: Exact Results', 'Financial Maths', 8, 'MS-F3', [
+        'Find the value of an asset using straight-line depreciation',
+        'Find the annual depreciation of an asset',
+        'Find the interest paid on a loan repaid in equal instalments'
+      ]),
+      T('ms12-right-triangle', 'Right-Angled Triangles: Exact Results', 'Trigonometry', 8, 'MS-M3', [
+        'Use Pythagoras’ theorem to find a side',
+        'Use a special-angle ratio to find a side',
+        'Find an acute angle from an exact ratio'
       ])
     ]
   },
@@ -762,6 +777,9 @@ export const DOTPOINT_FORMS = Object.freeze({
   'ms12-critical-path': [[0], [1], [2], [1]],
   'ms12-bivariate-fit': [[0], [1], [2], [0]],
   'ms12-normal-exact': [[0], [2], [1], [1]],
+  'ms12-simple-interest': [[0], [1], [2], [2]],
+  'ms12-depreciation': [[0], [1], [2], [0]],
+  'ms12-right-triangle': [[0], [0], [1], [2]],
   // ── Extension 1 · Year 11 ─────────────────────────────────────────────────
   'me11-poly': [[0], [0], [1], [2]],
   'me11-functions': [[0], [1], [0], [2]],

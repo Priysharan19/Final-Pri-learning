@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `6bf68bc7e474485367354803dad03990f9b352c490c0341779c424dfb457a1cc` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `59c48db77d6a37337e48243454247b84cdefcc957cb533895b2622ed97fdacdb` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2813,6 +2813,138 @@ Final answer: 6
 | alternative | `100.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
 | common wrong | `101` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `101` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-simple-interest/D1` — seed 1009
+
+> \\$7,000 is invested at 5% per annum simple interest for 4 years. How much interest is earned, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1400` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `1400.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `1401` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1401` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-simple-interest/D2` — seed 1009
+
+> \\$7,000 is invested at 5% per annum simple interest for 4 years. What is the total value of the investment at the end, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `8400` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `8400.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `8401` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8401` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-simple-interest/D3` — seed 1009
+
+> An investment of \\$7,000 earns \\$1,400 simple interest in 4 years. What is the annual interest rate, as a percentage?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-simple-interest/D4` — seed 1009
+
+> \\$7,000 is invested at 5% per annum simple interest. For how many years must it be invested to earn \\$1,400 in interest?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-depreciation/D1` — seed 1009
+
+> A van is bought for \\$29,000 and loses \\$2,000 of its value each year (straight-line depreciation). What is it worth after 4 years, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `21000` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `21000.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `21001` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `21001` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-depreciation/D2` — seed 1009
+
+> A machine bought for \\$29,000 is worth \\$21,000 after 4 years. Assuming straight-line depreciation, how many dollars does it lose each year?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2000` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2000.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `2001` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2001` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-depreciation/D3` — seed 1009
+
+> A loan of \\$6,000 is repaid in equal instalments of \\$500 per month for 15 months. How much interest is paid in total, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1500` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `1500.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `1501` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1501` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-depreciation/D4` — seed 1009
+
+> A tractor bought for \\$37,000 loses \\$2,000 of its value each year (straight-line depreciation). After how many years is it worth \\$29,000?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-right-triangle/D1` — seed 1009
+
+> A right-angled triangle has perpendicular sides of $35$ cm and $84$ cm. What is the length of the hypotenuse, in centimetres?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `91` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `91.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `92` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `92` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-right-triangle/D2` — seed 1009
+
+> A ladder $91$ m long leans against a vertical wall. Its foot is $35$ m from the base of the wall. How high up the wall does the ladder reach, in metres?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `84` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `84.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `85` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `85` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-right-triangle/D3` — seed 1009
+
+> A ramp $18$ m long makes an angle of $60^\\circ$ with the vertical wall it leans on. How far up the wall does the ramp reach, in metres?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `9` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `9.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-right-triangle/D4` — seed 1009
+
+> In a right-angled triangle the side opposite angle $\\theta$ is $9$ cm, and the hypotenuse is $18$ cm. Find $\\theta$ in degrees, given that $\\theta$ is acute.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `30` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `30.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `31` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `31` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-poly/D1` — seed 1009
 

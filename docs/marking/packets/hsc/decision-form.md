@@ -7,7 +7,7 @@ Complete one form per examiner. Return the signed original as the README says; t
 ```text
 Jurisdiction:                    nsw-hsc
 Syllabus version(s):             nsw-mathematics-advanced-11-12-2024@2024, nsw-mathematics-extension1-11-12-2024@2024, nsw-mathematics-extension2-11-12-2024@2024, nsw-mathematics-k-10-2022@2022, nsw-mathematics-standard-11-12-2024@2024
-Dossier digest reviewed:         6bf68bc7e474485367354803dad03990f9b352c490c0341779c424dfb457a1cc
+Dossier digest reviewed:         59c48db77d6a37337e48243454247b84cdefcc957cb533895b2622ed97fdacdb
 Repository commit reviewed:      ________________________________________
 Examiner full name:              ________________________________________
 Qualification:                   ________________________________________
@@ -238,9 +238,9 @@ Verdict per item: **A** approved as the engine behaves · **C** approved with ch
 | 215 | `nsw-final:ms12-nonright/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-04 |  |  |
 | 216 | `nsw-final:ms12-nonright/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-04 |  |  |
 | 217 | `nsw-final:ms12-algebraic/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-01 |  |  |
-| 218 | `nsw-final:ms12-algebraic/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-01 |  |  |
-| 219 | `nsw-final:ms12-algebraic/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-01 |  |  |
-| 220 | `nsw-final:ms12-algebraic/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-01 |  |  |
+| 218 | `nsw-final:ms12-algebraic/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-01, MST-12-S2-01 |  |  |
+| 219 | `nsw-final:ms12-algebraic/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-01, MST-12-S2-01 |  |  |
+| 220 | `nsw-final:ms12-algebraic/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-01, MST-12-S2-01 |  |  |
 | 221 | `nsw-final:ms12-invest-loans/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-02 |  |  |
 | 222 | `nsw-final:ms12-invest-loans/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-02 |  |  |
 | 223 | `nsw-final:ms12-invest-loans/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-02 |  |  |
@@ -249,10 +249,10 @@ Verdict per item: **A** approved as the engine behaves · **C** approved with ch
 | 226 | `nsw-final:ms12-annuity-table/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-03 |  |  |
 | 227 | `nsw-final:ms12-annuity-table/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-03 |  |  |
 | 228 | `nsw-final:ms12-annuity-table/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-03 |  |  |
-| 229 | `nsw-final:ms12-rates/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-05 |  |  |
-| 230 | `nsw-final:ms12-rates/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-05 |  |  |
-| 231 | `nsw-final:ms12-rates/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-05 |  |  |
-| 232 | `nsw-final:ms12-rates/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-05 |  |  |
+| 229 | `nsw-final:ms12-rates/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-05, MST-12-S2-05 |  |  |
+| 230 | `nsw-final:ms12-rates/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-05, MST-12-S2-05 |  |  |
+| 231 | `nsw-final:ms12-rates/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-05, MST-12-S2-05 |  |  |
+| 232 | `nsw-final:ms12-rates/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-05, MST-12-S2-05 |  |  |
 | 233 | `nsw-final:ms12-network-flow/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-06 |  |  |
 | 234 | `nsw-final:ms12-network-flow/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-06 |  |  |
 | 235 | `nsw-final:ms12-network-flow/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-06 |  |  |
@@ -261,84 +261,96 @@ Verdict per item: **A** approved as the engine behaves · **C** approved with ch
 | 238 | `nsw-final:ms12-critical-path/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-07 |  |  |
 | 239 | `nsw-final:ms12-critical-path/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-07 |  |  |
 | 240 | `nsw-final:ms12-critical-path/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-07 |  |  |
-| 241 | `nsw-final:ms12-bivariate-fit/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-08 |  |  |
-| 242 | `nsw-final:ms12-bivariate-fit/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-08 |  |  |
-| 243 | `nsw-final:ms12-bivariate-fit/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-08 |  |  |
-| 244 | `nsw-final:ms12-bivariate-fit/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-08 |  |  |
+| 241 | `nsw-final:ms12-bivariate-fit/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-06, MST-12-S2-08 |  |  |
+| 242 | `nsw-final:ms12-bivariate-fit/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-06, MST-12-S2-08 |  |  |
+| 243 | `nsw-final:ms12-bivariate-fit/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-06, MST-12-S2-08 |  |  |
+| 244 | `nsw-final:ms12-bivariate-fit/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-06, MST-12-S2-08 |  |  |
 | 245 | `nsw-final:ms12-normal-exact/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-10 |  |  |
 | 246 | `nsw-final:ms12-normal-exact/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-10 |  |  |
 | 247 | `nsw-final:ms12-normal-exact/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-10 |  |  |
 | 248 | `nsw-final:ms12-normal-exact/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S2-10 |  |  |
-| 249 | `nsw-final:me11-poly/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-02 |  |  |
-| 250 | `nsw-final:me11-poly/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-02 |  |  |
-| 251 | `nsw-final:me11-poly/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-02 |  |  |
-| 252 | `nsw-final:me11-functions/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-01 |  |  |
-| 253 | `nsw-final:me11-functions/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-01 |  |  |
-| 254 | `nsw-final:me11-functions/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · MAV-11-02, ME1-11-01 |  |  |
-| 255 | `nsw-final:me11-trigid/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-03 |  |  |
-| 256 | `nsw-final:me11-trigid/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-03 |  |  |
-| 257 | `nsw-final:me11-trigid/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-03 |  |  |
-| 258 | `nsw-final:me11-trigid/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-03 |  |  |
-| 259 | `nsw-final:me11-inversetrig/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-03 |  |  |
-| 260 | `nsw-final:me11-inversetrig/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-03 |  |  |
-| 261 | `nsw-final:me11-inversetrig/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-03 |  |  |
-| 262 | `nsw-final:me11-inversetrig/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-03 |  |  |
-| 263 | `nsw-final:me11-rates/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · MAV-12-06, ME1-12-05 |  |  |
-| 264 | `nsw-final:me11-rates/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · MAV-12-06, ME1-12-05 |  |  |
-| 265 | `nsw-final:me11-rates/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-05 |  |  |
-| 266 | `nsw-final:me11-rates/D4` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-06, MAV-12-06 |  |  |
-| 267 | `nsw-final:me12-induction/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-01 |  |  |
-| 268 | `nsw-final:me12-induction/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-01 |  |  |
-| 269 | `nsw-final:me12-induction/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-01 |  |  |
-| 270 | `nsw-final:me12-vectors/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 271 | `nsw-final:me12-vectors/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 272 | `nsw-final:me12-vectors/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 273 | `nsw-final:me12-vectors/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 274 | `nsw-final:me12-binomial/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-06 |  |  |
-| 275 | `nsw-final:me12-binomial/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-06 |  |  |
-| 276 | `nsw-final:me12-binomial/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-06 |  |  |
-| 277 | `nsw-final:me12-projectile/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 278 | `nsw-final:me12-projectile/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 279 | `nsw-final:me12-projectile/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 280 | `nsw-final:me12-projectile/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 281 | `nsw-final:mex-proof/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-01 |  |  |
-| 282 | `nsw-final:mex-proof/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-01 |  |  |
-| 283 | `nsw-final:mex-proof/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-01 |  |  |
-| 284 | `nsw-final:mex-proof/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-01 |  |  |
-| 285 | `nsw-final:mex-complex/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
-| 286 | `nsw-final:mex-complex/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
-| 287 | `nsw-final:mex-complex/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
-| 288 | `nsw-final:mex-complex/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
-| 289 | `nsw-final:mex-demoivre/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
-| 290 | `nsw-final:mex-demoivre/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
-| 291 | `nsw-final:mex-demoivre/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
-| 292 | `nsw-final:mex-demoivre/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
-| 293 | `nsw-final:mex-integration/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-04 |  |  |
-| 294 | `nsw-final:mex-integration/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-04 |  |  |
-| 295 | `nsw-final:mex-integration/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-04 |  |  |
-| 296 | `nsw-final:mex-integration/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-04 |  |  |
-| 297 | `nsw-final:mex-vectors/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 298 | `nsw-final:mex-vectors/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 299 | `nsw-final:mex-vectors/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
-| 300 | `nsw-final:mex-vectors/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME1-12-02, ME2-12-02 |  |  |
-| 301 | `nsw-final:mex-mechanics/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
-| 302 | `nsw-final:mex-mechanics/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
-| 303 | `nsw-final:mex-mechanics/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
-| 304 | `nsw-final:mex-mechanics/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
-| 305 | `nsw-method:y7-equations/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 306 | `nsw-method:y7-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 307 | `nsw-method:y7-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 308 | `nsw-method:y7-equations/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 309 | `nsw-method:y7-angles/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 310 | `nsw-method:y8-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 311 | `nsw-method:y8-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 312 | `nsw-method:y10-quadratics/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 313 | `nsw-method:y10-quadratics/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 314 | `nsw-method:y11-explog/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 315 | `nsw-method:y11-diff/D1` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
-| 316 | `nsw-method:y11-diff/D2` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
-| 317 | `nsw-method:y11-diff/D3` | Method rubric (plan) — may partial marks ever be paid? |  |  |
-| 318 | `nsw-method:y11-diff/D4` | Method rubric (plan) — may partial marks ever be paid? |  |  |
-| 319 | `nsw-method:ms11-formulas/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 249 | `nsw-final:ms12-simple-interest/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-02 |  |  |
+| 250 | `nsw-final:ms12-simple-interest/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-02 |  |  |
+| 251 | `nsw-final:ms12-simple-interest/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-02 |  |  |
+| 252 | `nsw-final:ms12-simple-interest/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-02 |  |  |
+| 253 | `nsw-final:ms12-depreciation/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-03 |  |  |
+| 254 | `nsw-final:ms12-depreciation/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-03 |  |  |
+| 255 | `nsw-final:ms12-depreciation/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-03 |  |  |
+| 256 | `nsw-final:ms12-depreciation/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-03 |  |  |
+| 257 | `nsw-final:ms12-right-triangle/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-04 |  |  |
+| 258 | `nsw-final:ms12-right-triangle/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-04 |  |  |
+| 259 | `nsw-final:ms12-right-triangle/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-04 |  |  |
+| 260 | `nsw-final:ms12-right-triangle/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-12-S1-04 |  |  |
+| 261 | `nsw-final:me11-poly/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-02 |  |  |
+| 262 | `nsw-final:me11-poly/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-02 |  |  |
+| 263 | `nsw-final:me11-poly/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-02 |  |  |
+| 264 | `nsw-final:me11-functions/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-01 |  |  |
+| 265 | `nsw-final:me11-functions/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-01 |  |  |
+| 266 | `nsw-final:me11-functions/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · MAV-11-02, ME1-11-01 |  |  |
+| 267 | `nsw-final:me11-trigid/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-03 |  |  |
+| 268 | `nsw-final:me11-trigid/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-03 |  |  |
+| 269 | `nsw-final:me11-trigid/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-03 |  |  |
+| 270 | `nsw-final:me11-trigid/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-03 |  |  |
+| 271 | `nsw-final:me11-inversetrig/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-03 |  |  |
+| 272 | `nsw-final:me11-inversetrig/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-03 |  |  |
+| 273 | `nsw-final:me11-inversetrig/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-03 |  |  |
+| 274 | `nsw-final:me11-inversetrig/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-03 |  |  |
+| 275 | `nsw-final:me11-rates/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · MAV-12-06, ME1-12-05 |  |  |
+| 276 | `nsw-final:me11-rates/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · MAV-12-06, ME1-12-05 |  |  |
+| 277 | `nsw-final:me11-rates/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-05 |  |  |
+| 278 | `nsw-final:me11-rates/D4` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-06, MAV-12-06 |  |  |
+| 279 | `nsw-final:me12-induction/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-01 |  |  |
+| 280 | `nsw-final:me12-induction/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-01 |  |  |
+| 281 | `nsw-final:me12-induction/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-01 |  |  |
+| 282 | `nsw-final:me12-vectors/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 283 | `nsw-final:me12-vectors/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 284 | `nsw-final:me12-vectors/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 285 | `nsw-final:me12-vectors/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 286 | `nsw-final:me12-binomial/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-06 |  |  |
+| 287 | `nsw-final:me12-binomial/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-06 |  |  |
+| 288 | `nsw-final:me12-binomial/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-06 |  |  |
+| 289 | `nsw-final:me12-projectile/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 290 | `nsw-final:me12-projectile/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 291 | `nsw-final:me12-projectile/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 292 | `nsw-final:me12-projectile/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 293 | `nsw-final:mex-proof/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-01 |  |  |
+| 294 | `nsw-final:mex-proof/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-01 |  |  |
+| 295 | `nsw-final:mex-proof/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-01 |  |  |
+| 296 | `nsw-final:mex-proof/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-01 |  |  |
+| 297 | `nsw-final:mex-complex/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
+| 298 | `nsw-final:mex-complex/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
+| 299 | `nsw-final:mex-complex/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
+| 300 | `nsw-final:mex-complex/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
+| 301 | `nsw-final:mex-demoivre/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
+| 302 | `nsw-final:mex-demoivre/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
+| 303 | `nsw-final:mex-demoivre/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
+| 304 | `nsw-final:mex-demoivre/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-03 |  |  |
+| 305 | `nsw-final:mex-integration/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-04 |  |  |
+| 306 | `nsw-final:mex-integration/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-04 |  |  |
+| 307 | `nsw-final:mex-integration/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-04 |  |  |
+| 308 | `nsw-final:mex-integration/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-04 |  |  |
+| 309 | `nsw-final:mex-vectors/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 310 | `nsw-final:mex-vectors/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 311 | `nsw-final:mex-vectors/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-02 |  |  |
+| 312 | `nsw-final:mex-vectors/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME1-12-02, ME2-12-02 |  |  |
+| 313 | `nsw-final:mex-mechanics/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
+| 314 | `nsw-final:mex-mechanics/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
+| 315 | `nsw-final:mex-mechanics/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
+| 316 | `nsw-final:mex-mechanics/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
+| 317 | `nsw-method:y7-equations/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 318 | `nsw-method:y7-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 319 | `nsw-method:y7-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 320 | `nsw-method:y7-equations/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 321 | `nsw-method:y7-angles/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 322 | `nsw-method:y8-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 323 | `nsw-method:y8-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 324 | `nsw-method:y10-quadratics/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 325 | `nsw-method:y10-quadratics/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 326 | `nsw-method:y11-explog/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 327 | `nsw-method:y11-diff/D1` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
+| 328 | `nsw-method:y11-diff/D2` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
+| 329 | `nsw-method:y11-diff/D3` | Method rubric (plan) — may partial marks ever be paid? |  |  |
+| 330 | `nsw-method:y11-diff/D4` | Method rubric (plan) — may partial marks ever be paid? |  |  |
+| 331 | `nsw-method:ms11-formulas/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
 
-Items: 319.
+Items: 331.
