@@ -540,7 +540,7 @@ const raw = {
     const V0 = 1000 * ri(rng, 5, 40), d = 500 * ri(rng, 1, 6), n = ri(rng, 2, 6);
     if (diff === 1) {
       const V = V0 - d * n;
-      if (V <= 0) return raw['ms12-depreciation'](rng, diff);
+      if (V < 0.3 * V0) return raw['ms12-depreciation'](rng, diff);
       return {
         prompt: `A van is bought for ${D(V0)} and loses ${D(d)} of its value each year (straight-line depreciation). What is it worth after ${n} years, in dollars?`,
         answerType: 'numeric', answer: { value: V },
@@ -561,9 +561,15 @@ const raw = {
       };
     }
     if (diff === 3) {
-      const P = 1000 * ri(rng, 2, 12), m = 100 * ri(rng, 1, 6), months = ri(rng, 6, 36);
-      const total = m * months;
-      if (total <= P) return raw['ms12-depreciation'](rng, diff);
+      // Flat interest r% a year over a whole number of years, shared into equal monthly instalments.
+      let P, r, yrs, total;
+      for (let tries = 0; ; tries++) {
+        P = 1000 * ri(rng, 2, 20); r = rc(rng, [5, 6, 8, 9, 10]); yrs = ri(rng, 1, 4);
+        total = P + P * r / 100 * yrs;
+        if (Number.isInteger(total / (12 * yrs))) break;
+        if (tries > 2000) throw new Error('ms12-depreciation: no whole instalment found');
+      }
+      const months = 12 * yrs, m = total / months;
       return {
         prompt: `A loan of ${D(P)} is repaid in equal instalments of ${D(m)} per month for ${months} months. How much interest is paid in total, in dollars?`,
         answerType: 'numeric', answer: { value: total - P },
@@ -595,35 +601,47 @@ const raw = {
       };
     }
     if (diff === 2) {
-      const k = ri(rng, 2, 9), [a, b, c] = rc(rng, [[3, 4, 5], [5, 12, 13], [8, 15, 17]]);
+      // A ladder up to 10 m, or a support wire up to 25 m: lengths that exist.
+      const [a, b, c, k, thing] = rc(rng, [[3, 4, 5, 1, 'ladder'], [3, 4, 5, 2, 'ladder'], [5, 12, 13, 1, 'support wire'], [8, 15, 17, 1, 'support wire'], [9, 12, 15, 1, 'support wire'], [12, 16, 20, 1, 'support wire'], [7, 24, 25, 1, 'support wire']]);
+      const wall = thing === 'ladder' ? 'leans against a vertical wall' : 'runs from the top of a vertical pole to the ground';
+      const findHeight = rng() < 0.5;
+      const known = findHeight ? a * k : b * k, ans = findHeight ? b * k : a * k;
       return {
-        prompt: `A ladder $${c * k}$ m long leans against a vertical wall. Its foot is $${a * k}$ m from the base of the wall. How high up the wall does the ladder reach, in metres?`,
-        answerType: 'numeric', answer: { value: b * k }, answerSuffix: 'm',
-        traps: [{ value: (c - a) * k, why: 'The ladder is the hypotenuse: subtract the squares, $h^2 = c^2 - a^2$, then take the square root.' }],
-        hints: ['The ladder is the hypotenuse of a right-angled triangle.', `$h^2 = ${c * k}^2 - ${a * k}^2 = ${(c * k) ** 2 - (a * k) ** 2}$.`, 'Take the square root.'],
-        steps: [{ h: 'Pythagoras', d: `$h^2 = ${(c * k) ** 2} - ${(a * k) ** 2} = ${(b * k) ** 2}$` }, { h: 'Square root', d: `$h = ${b * k}$ m` }]
+        prompt: findHeight
+          ? `A ${thing} $${c * k}$ m long ${wall}. Its lower end is $${a * k}$ m from the base. How high is its top above the ground, in metres?`
+          : `A ${thing} $${c * k}$ m long ${wall}. Its top is $${b * k}$ m above the ground. How far is its lower end from the base, in metres?`,
+        answerType: 'numeric', answer: { value: ans }, answerSuffix: 'm',
+        traps: [{ value: c * k - known, why: `The ${thing} is the hypotenuse: subtract the squares, then take the square root.` }].filter(t => t.value !== ans),
+        hints: [`The ${thing} is the hypotenuse of a right-angled triangle.`, `Other side$^2 = ${c * k}^2 - ${known}^2 = ${(c * k) ** 2 - known ** 2}$.`, 'Take the square root.'],
+        steps: [{ h: 'Pythagoras', d: `side$^2 = ${(c * k) ** 2} - ${known ** 2} = ${ans ** 2}$` }, { h: 'Square root', d: `The side is $${ans}$ m` }]
       };
     }
     if (diff === 3) {
-      const L = 2 * ri(rng, 2, 12), ang = rc(rng, [30, 60]);
+      const ang = rc(rng, [30, 60]);
+      const L = 2 * ri(rng, 2, 5);
       const trig = ang === 30 ? 'sin' : 'cos';
+      const ratio = ang === 30 ? 'opposite side and hypotenuse' : 'adjacent side and hypotenuse';
+      const word = ang === 30 ? 'opposite' : 'adjacent';
       return {
-        prompt: `A ramp $${L}$ m long makes an angle of $${ang}^\\circ$ with ${ang === 30 ? 'the horizontal ground. How high is the top of the ramp above the ground, in metres?' : 'the vertical wall it leans on. How far up the wall does the ramp reach, in metres?'}`,
+        prompt: ang === 30
+          ? `A ramp $${L}$ m long makes an angle of $30^\\circ$ with the horizontal ground. How high is the top of the ramp above the ground, in metres? (Use $\\sin 30^\\circ = \\tfrac12$.)`
+          : `A ladder $${L}$ m long leans against a vertical wall and makes an angle of $60^\\circ$ with the wall. How far up the wall does it reach, in metres? (Use $\\cos 60^\\circ = \\tfrac12$.)`,
         answerType: 'numeric', answer: { value: L / 2 }, answerSuffix: 'm',
-        traps: [{ value: L * 2, why: `The side is the hypotenuse $\\times\\,\\${trig}${ang}^\\circ = ${L}\\times\\dfrac12$; it cannot be longer than the ramp.` }],
-        hints: [`Use $${trig}$ with the ${ang === 30 ? 'opposite side and hypotenuse' : 'adjacent side and hypotenuse'}.`, `$${trig}\\,${ang}^\\circ = \\dfrac12$.`, `$${L}\\times\\dfrac12$.`],
-        steps: [{ h: 'Choose the ratio', d: `$${trig}\\,${ang}^\\circ = \\dfrac{\\text{${ang === 30 ? 'opposite' : 'adjacent'}}}{\\text{hypotenuse}} = \\dfrac12$` }, { h: 'Evaluate', d: `$${L}\\times\\dfrac12 = ${L / 2}$ m` }]
+        traps: [{ value: L * 2, why: `The length is the hypotenuse times $\\${trig}\\,${ang}^\\circ = \\tfrac12$, so it cannot be longer than the ${ang === 30 ? 'ramp' : 'ladder'}.` }],
+        hints: [`Use $\\${trig}$ with the ${ratio}.`, `$\\${trig}\\,${ang}^\\circ = \\tfrac12$.`, `$${L}\\times\\tfrac12$.`],
+        steps: [{ h: 'Choose the ratio', d: `$\\${trig}\\,${ang}^\\circ = \\dfrac{\\text{${word}}}{\\text{hypotenuse}} = \\dfrac12$` }, { h: 'Evaluate', d: `$${L}\\times\\tfrac12 = ${L / 2}$ m` }]
       };
     }
     const k = ri(rng, 2, 12), kind = rc(rng, ['tan', 'sin', 'cos']);
     const ans = { tan: 45, sin: 30, cos: 60 }[kind];
     const [x, y, sx, sy] = kind === 'tan' ? [k, k, 'opposite', 'adjacent'] : kind === 'sin' ? [k, 2 * k, 'opposite', 'hypotenuse'] : [k, 2 * k, 'adjacent', 'hypotenuse'];
+    const ratio = kind === 'tan' ? '1' : '\\tfrac12';
     return {
-      prompt: `In a right-angled triangle the side opposite angle $\\theta$ is ${kind === 'cos' ? `not given; the side adjacent to $\\theta$ is $${x}$ cm and the hypotenuse is $${y}$ cm` : `$${x}$ cm, ${kind === 'tan' ? `and the side adjacent to $\\theta$ is $${y}$ cm` : `and the hypotenuse is $${y}$ cm`}`}. Find $\\theta$ in degrees, given that $\\theta$ is acute.`,
+      prompt: `In a right-angled triangle, the side ${sx} to the acute angle $\\theta$ is $${x}$ cm and the ${sy === 'hypotenuse' ? 'hypotenuse' : `side ${sy} to $\\theta$`} is $${y}$ cm. Find $\\theta$ in degrees.`,
       answerType: 'numeric', answer: { value: ans }, answerSuffix: '°',
-      traps: [{ value: 90 - ans, why: `Check which sides you were given: the ratio is ${kind} ${'$\\theta$'} $= \\dfrac{${x}}{${y}}$, which is the ratio for ${ans}°, not ${90 - ans}°.` }].filter(t => t.value !== ans),
-      hints: [`You are given the ${sx} and the ${sy}, so use $${kind}$.`, `$${kind}\\,\\theta = \\dfrac{${x}}{${y}} = ${kind === 'tan' ? '1' : '\\dfrac12'}$.`, `Use the inverse ${kind} on your calculator.`],
-      steps: [{ h: 'Choose the ratio', d: `${sx} and ${sy}: $${kind}\\,\\theta = \\dfrac{${x}}{${y}} = ${kind === 'tan' ? '1' : '\\dfrac12'}$` }, { h: 'Inverse ratio', d: `$\\theta = ${ans}^\\circ$` }]
+      traps: [{ value: 90 - ans, why: `The ratio is $\\${kind}\\,\\theta = \\dfrac{${x}}{${y}} = ${ratio}$, which is the ratio for ${ans}°, not ${90 - ans}°.` }].filter(t => t.value !== ans),
+      hints: [`You are given the ${sx} side and the ${sy}, so use $\\${kind}$.`, `$\\${kind}\\,\\theta = \\dfrac{${x}}{${y}} = ${ratio}$.`, `Use the inverse ${kind} on your calculator.`],
+      steps: [{ h: 'Choose the ratio', d: `${sx} and ${sy}: $\\${kind}\\,\\theta = \\dfrac{${x}}{${y}} = ${ratio}$` }, { h: 'Inverse ratio', d: `$\\theta = ${ans}^\\circ$` }]
     };
   }
 };

@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `59c48db77d6a37337e48243454247b84cdefcc957cb533895b2622ed97fdacdb` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `7c48bab79fc6ff0fe1a7d77a0ca65e7a390ab0937412f3c8265a95775d9853e3` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2882,14 +2882,14 @@ Final answer: 6
 
 ## `nsw-final:ms12-depreciation/D3` — seed 1009
 
-> A loan of \\$6,000 is repaid in equal instalments of \\$500 per month for 15 months. How much interest is paid in total, in dollars?
+> A loan of \\$15,000 is repaid in equal instalments of \\$1,325 per month for 12 months. How much interest is paid in total, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1500` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `1500.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `1501` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1501` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `900` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `900.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `901` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `901` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-depreciation/D4` — seed 1009
 
@@ -2915,18 +2915,7 @@ Final answer: 6
 
 ## `nsw-final:ms12-right-triangle/D2` — seed 1009
 
-> A ladder $91$ m long leans against a vertical wall. Its foot is $35$ m from the base of the wall. How high up the wall does the ladder reach, in metres?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `84` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `84.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `85` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `85` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-right-triangle/D3` — seed 1009
-
-> A ramp $18$ m long makes an angle of $60^\\circ$ with the vertical wall it leans on. How far up the wall does the ramp reach, in metres?
+> A support wire $15$ m long runs from the top of a vertical pole to the ground. Its top is $12$ m above the ground. How far is its lower end from the base, in metres?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2935,9 +2924,20 @@ Final answer: 6
 | common wrong | `10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:ms12-right-triangle/D3` — seed 1009
+
+> A ladder $8$ m long leans against a vertical wall and makes an angle of $60^\\circ$ with the wall. How far up the wall does it reach, in metres? (Use $\\cos 60^\\circ = \\tfrac12$.)
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:ms12-right-triangle/D4` — seed 1009
 
-> In a right-angled triangle the side opposite angle $\\theta$ is $9$ cm, and the hypotenuse is $18$ cm. Find $\\theta$ in degrees, given that $\\theta$ is acute.
+> In a right-angled triangle, the side opposite to the acute angle $\\theta$ is $9$ cm and the hypotenuse is $18$ cm. Find $\\theta$ in degrees.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
