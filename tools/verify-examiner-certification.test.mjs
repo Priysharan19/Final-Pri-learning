@@ -9,7 +9,7 @@
 // passes on the tree, and fails on a planted fixture record, on a deploy file
 // that turns method marks on without a record, and on Prithagoras leaving
 // UNCERTIFIED_EDITIONS without one.
-import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, cpSync, rmSync } from 'node:fs';
+import { readFileSync, mkdtempSync, writeFileSync, cpSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
