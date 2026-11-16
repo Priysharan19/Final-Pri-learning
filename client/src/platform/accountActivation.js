@@ -105,20 +105,53 @@ export async function offlineGraceFor(pid, now = Date.now()) {
  * that cannot be reached at all is answered from the recorded success when it
  * is under OFFLINE_GRACE_MS old (the result then carries `offline: true`).
  */
+// Rechecks can overlap (foreground, online event, periodic timer and gate).
+// An old network success must not rewrite offline-grace authority after a
+// later authoritative denial. Keep each profile's record writes in arrival
+// order, and invalidate every request that started before a denial arrived.
+const activationOrder = new Map();
+function activationState(pid) {
+  const key = String(pid ?? '');
+  let state = activationOrder.get(key);
+  if (!state) {
+    state = { denials: 0, writes: Promise.resolve() };
+    activationOrder.set(key, state);
+  }
+  return state;
+}
+function queueActivationRecord(state, pid, accountId, startedAtDenials) {
+  const write = state.writes.then(async () => {
+    if (accountId && state.denials !== startedAtDenials) return false;
+    await recordCloudActivation(pid, accountId).catch(() => {});
+    return true;
+  });
+  // A failed IndexedDB operation must not poison subsequent consent clears.
+  state.writes = write.then(() => {}, () => {});
+  return write;
+}
+
 export async function ensureAccountActivated(pid, options = {}) {
+  const state = activationState(pid);
+  const startedAtDenials = state.denials;
   try {
     const ready = await activateOnline(pid, options);
-    await recordCloudActivation(pid, ready.accountId).catch(() => {});
+    const current = await queueActivationRecord(state, pid, ready.accountId, startedAtDenials);
+    if (!current || state.denials !== startedAtDenials) {
+      // A newer authoritative refusal wins over this older online success.
+      // Do not hand a stale activation to App or to an offline-grace caller.
+      throw new ActivationBlocked('CONSENT_UNAVAILABLE', { retryable: true });
+    }
     return ready;
   } catch (error) {
     if (!(error instanceof ActivationBlocked)) throw error;
     if (isActivationDenied(error)) {
-      if (pid) await recordCloudActivation(pid, null).catch(() => {});
+      state.denials++;
+      if (pid) await queueActivationRecord(state, pid, null, state.denials);
       throw error;
     }
-    if (options.offlineGrace && serverUnreachable(error)) {
+    if (options.offlineGrace && serverUnreachable(error) && state.denials === startedAtDenials) {
       const grace = await offlineGraceFor(pid);
-      if (grace) return grace;
+      if (grace && state.denials === startedAtDenials) return grace;
     }
     throw error;
   }
