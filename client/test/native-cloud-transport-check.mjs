@@ -66,8 +66,8 @@ assert.match(shell, /NativeHostBridge\.hostScript\(cloudConfigured: NativeCloudB
   'the host descriptor and the legacy flag must come from the same configuration check');
 
 const nativeEnvelope = readFileSync(new URL('../src/platform/native/envelope.js', import.meta.url), 'utf8');
-assert.doesNotMatch(transport, /Math\\.random\\s*\\(/, 'cloud transport must never downgrade request IDs to insecure randomness');
-assert.doesNotMatch(nativeEnvelope, /Math\\.random\\s*\\(/, 'native bridge must never downgrade request IDs to insecure randomness');
+assert.doesNotMatch(transport, /Math\.random\s*\(/, 'cloud transport must never downgrade request IDs to insecure randomness');
+assert.doesNotMatch(nativeEnvelope, /Math\.random\s*\(/, 'native bridge must never downgrade request IDs to insecure randomness');
 assert.match(transport, /getRandomValues/, 'cloud request ID fallback must use secure random bytes');
 assert.match(nativeEnvelope, /getRandomValues/, 'native request ID fallback must use secure random bytes');
 assert.match(transport, /SECURE_RANDOM_UNAVAILABLE/, 'cloud transport fails closed if secure randomness is unavailable');
