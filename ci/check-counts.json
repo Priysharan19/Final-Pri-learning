@@ -159,7 +159,8 @@
         {"has":"PAYWALL HONESTY: PASS — 79/79 checks","note":"68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
         {"has":"NOTEBOOK VIEW: PASS — 19/19 checks"},
         {"has":"PARENT REPORT UI: PASS — 35/35 checks"},
-        {"has":"LIBRARY UI: PASS — 39/39 checks"},
+        {"has":"LIBRARY UI: PASS — 56/56 checks","note":"39 → 56 (plan F2): the save toggle and its pending state, the hidden-count line, saved-first order, and the local route that never touches the question bookmarks."},
+        {"has":"COMMAND BAR LIBRARY: PASS — 18/18 checks","note":"Plan F2: the command bar's Library group — flag-gated, saved first, no call per keystroke."},
         {"has":"DESK UI: PASS — 191/191 checks","note":"The exam shell and the Exam Desk as drawn (plan F4b): navigator labels, shortcuts inert while typing, a clock face that computes nothing, autosave order, the save merge, no mark wording in either language."},
         {"has":"DESK CLOCK: PASS — 30/30 checks"},
         {"has":"DESK IMPORT: PASS — 18/18 checks"},
@@ -297,6 +298,13 @@
       "log": "parent-report.log",
       "pins": [
         {"has":"parent-report-check (sqlite): 90 checks passed"}
+      ]
+    },
+    "platform/resource-bookmark.log": {
+      "job": "platform-contracts",
+      "log": "resource-bookmark.log",
+      "pins": [
+        {"has":"RESOURCE BOOKMARK SYNC — PASS — 30/30 checks"}
       ]
     },
     "platform/resources.log": {
@@ -488,12 +496,13 @@
       "pins": [
         {"has":"✓ hot-path-budget-check.mjs"},
         {"has":"✓ region-isolation-check.mjs","note":"plan H2: two regions share nothing; the database binding, on Postgres."},
-        {"has":"PLATFORM ON POSTGRES: PASS — 92/92 suites","note":"59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres."},
+        {"has":"PLATFORM ON POSTGRES: PASS — 93/93 suites","note":"59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres."},
         {"has":"✓ nsw-practice-check.mjs"},
         {"has":"✓ nsw-exam-check.mjs"},
         {"has":"✓ billing-edition-check.mjs"},
         {"has":"✓ edition-ai-budgets-check.mjs"},
         {"has":"✓ resources-check.mjs"},
+        {"has":"✓ resource-bookmark-sync-check.mjs"},
         {"has":"✓ desk-check.mjs"},
         {"has":"✓ guardian-code-approval-withdraw-check.mjs"},
         {"has":"✓ practice-reveal-submit-race-check.mjs","note":"61 → 66: the reveal/submit race, deletion mid-mark, billing event order, the SQLite -> Postgres cutover rehearsal and guardian-consent coverage. 66 → 67: the question picker passes over content the account has resolved, on Postgres too. 67 → 68 (#689, #690, #691): learning-state identity and monotonic expiry on real Postgres."},
