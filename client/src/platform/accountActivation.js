@@ -73,7 +73,9 @@ export const OFFLINE_GRACE_MS = 72 * 60 * 60 * 1000;
 // row: unlike the account-link row it cannot be overwritten by a concurrent
 // sync stamp, session refresh, or a stale activation from a second tab.
 const DENIAL_PREFIX = 'pri-activation-denial-v1:';
-const denialPrefix = (pid, accountId) => `${DENIAL_PREFIX}${String(pid)}:${String(accountId)}:`;
+// The denial belongs to the cloud account, not one local profile: a second
+// profile linked to the same child must not regain an older offline grant.
+const denialPrefix = (_pid, accountId) => `${DENIAL_PREFIX}${String(accountId)}:`;
 async function latestDenialAt(pid, accountId) {
   if (!pid || !accountId) return 0;
   const prefix = denialPrefix(pid, accountId);
