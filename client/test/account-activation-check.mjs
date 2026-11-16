@@ -367,6 +367,14 @@ reset();
   await put('profiles', { id: 'p6', name: 'Zoya', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
   await loginCloudAccount('p6', { email: 'a@example.test', password: 'test-password-only' });
   ok('a fresh online answer to start from', !!(await gate('p6')).ready);
+  const p6Link = await cloudAccountLink('p6');
+  const { get: readDevice } = await import('../src/local/idb.js');
+  const accountDenial = await readDevice('device', 'pri-activation-denial-v1:acct-A:');
+  ok('a new profile approved after the other profile future-clock test has a real, not future, activation time',
+    p6Link.activatedAt <= Date.now() && Date.now() - p6Link.activatedAt < 60_000,
+    JSON.stringify({ activatedAt: p6Link.activatedAt, now: Date.now() }));
+  eq('new approval belongs to the current shared-account denial generation',
+    p6Link.activatedGeneration, accountDenial?.generation);
   const origin = globalThis.__PRI_CLOUD_ORIGIN__;
   const realFetch = globalThis.fetch;
   const hadLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
@@ -502,15 +510,21 @@ reset();
   const firstDenials = await markerCount();
   eq('an additional withdrawn recheck remains denied', (await gate('p-multitab', { sync: false })).code, 'GUARDIAN_CONSENT_WITHDRAWN');
   eq('repeated denied rechecks do not accumulate unbounded device rows', await markerCount(), firstDenials);
-  const { advanceDeviceDenialAt } = await import('../src/local/idb.js');
+  const { advanceDeviceDenialGeneration } = await import('../src/local/idb.js');
   const denialRow = 'pri-activation-denial-v1:acct-A:';
-  const deniedAt = (await readDeviceRows('device')).find(row => row?.id === denialRow)?.deniedAt;
-  ok('the account has a durable refusal high-water mark', Number.isSafeInteger(deniedAt) && deniedAt > 0);
-  await advanceDeviceDenialAt(denialRow, Math.max(1, deniedAt - 1000));
-  eq('an older refusal arriving later cannot lower the cross-tab denial watermark',
-    (await readDeviceRows('device')).find(row => row?.id === denialRow)?.deniedAt, deniedAt);
+  const previousGeneration = (await readDeviceRows('device')).find(row => row?.id === denialRow)?.generation;
+  ok('the account has a durable refusal generation independent of wall time',
+    Number.isSafeInteger(previousGeneration) && previousGeneration > 0);
+  const nextGeneration = await advanceDeviceDenialGeneration(denialRow);
+  eq('atomic withdrawal generation increases by exactly one', nextGeneration, previousGeneration + 1);
+  eq('the account-scoped denial record cannot be duplicated', await markerCount(), firstDenials);
+  eq('a new refusal invalidates the earlier online approval across tabs',
+    await secondTab.offlineGraceFor('p-multitab'), null);
   reset();
-  ok('a new authorized request can recover even with the durable denial stamp', !!(await gate('p-multitab', { sync: false })).ready);
+  const recovered = await gate('p-multitab', { sync: false });
+  ok('a new authorized request can recover after two independent refusals', !!recovered.ready);
+  eq('the recovery records the current generation without synthetic future time',
+    (await cloudAccountLink('p-multitab')).activatedGeneration, nextGeneration);
 }
 
 if (failures.length) {
