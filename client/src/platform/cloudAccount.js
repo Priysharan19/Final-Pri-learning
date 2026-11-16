@@ -236,10 +236,18 @@ export async function refreshCloudEntitlement(pid) {
   return entitlement;
 }
 
-export async function markCloudSynced(pid, at = Date.now()) {
+export async function markCloudSynced(pid, at = Date.now(), expectedAccountId = null) {
   const id = linkRowId(pid);
   const prior = await get('device', id).catch(() => null);
-  if (!prior) return;
+  if (!prior) {
+    if (expectedAccountId != null) throw Object.assign(new Error('Sync account link disappeared.'), { code: 'SYNC_ACCOUNT_MISMATCH' });
+    return;
+  }
+  // Another tab may unlink or change the identity while network sync awaits.
+  // A reply for A must not make B look as though its first sync has completed.
+  if (expectedAccountId != null && String(prior.accountId) !== String(expectedAccountId)) {
+    throw Object.assign(new Error('Sync completed for a different account.'), { code: 'SYNC_ACCOUNT_MISMATCH' });
+  }
   await put('device', { ...prior, lastSyncAt: at });
 }
 
