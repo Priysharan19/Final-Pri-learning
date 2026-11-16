@@ -19,8 +19,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, statSync, writeFileSync, unlinkSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -413,10 +412,8 @@ try {
     // weight has an innocent shape): compare the parsed course with the base. Every existing subtopic keeps
     // its name, strand, year, weight, label, dot points and forms; each new one carries a fixed weight.
     if (changed.split('\n').includes(COURSE)) {
-      const tmp = join(tmpdir(), `nsw-base-curriculum-${process.pid}.mjs`);
-      writeFileSync(tmp, git(['show', `${base}:${COURSE}`]));
-      const baseMod = await import(pathToFileURL(tmp).href);
-      unlinkSync(tmp);
+      // curriculum.js imports nothing, so the base text can be loaded from a data: URL (no file is written).
+      const baseMod = await import(`data:text/javascript;base64,${Buffer.from(git(['show', `${base}:${COURSE}`])).toString('base64')}`);
       const sig = x => JSON.stringify([x.name, x.strand, x.year, x.weight, x.code, x.dotpoints]);
       for (const b of baseMod.SUBTOPICS) {
         check(SUBTOPIC_BY_ID[b.id] && sig(SUBTOPIC_BY_ID[b.id]) === sig(b), `curriculum.js changes the existing subtopic ${b.id}`);
