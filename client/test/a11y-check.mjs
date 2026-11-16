@@ -546,6 +546,7 @@ async function run() {
   const views = [];
   const skipped = [];
   const notApplicable = [];
+  const notApplicableRoutes = new Set();
   let liveVerdict = null;
   let skipLink = null;
   let selfTest = null;
@@ -1047,7 +1048,9 @@ async function run() {
       await goTo(page, BASE, '/progress');
       // An India student's Progress (Progress.jsx → IndiaProgress.jsx): the
       // chapter table is the page's content; the skeleton alone is not.
-      await page.waitForSelector(INDIA ? '.pg-table' : '.hero-num', { timeout: 20000 });
+      if (INDIA) await page.waitForSelector('.pg-table', { timeout: 20000 });
+      // An NSW student's Progress: the page's heading with its loading skeleton gone.
+      else await page.waitForFunction(() => !document.querySelector('main .skeleton') && document.querySelector('main h1'), null, { timeout: 20000 });
       await wait(page, 900);
     });
 
@@ -1086,7 +1089,14 @@ async function run() {
 
     await step('exams', '/exams', async () => { await goTo(page, BASE, '/exams'); });
 
-    await step('exam room · sitting a paper', '/exams/:id', async () => {
+    if (!INDIA) {
+      // D15 (server/platform/exams.js readSpec): the server composes no
+      // generated practice paper outside the India course yet; the NSW papers
+      // are G4's, walked by tour-nsw-exams.js. The refused start is still
+      // audited below ('exams · refused, session ended').
+      for (const view of ['exam room · sitting a paper', 'exam room · marked paper', 'exams · printable paper']) indiaOnly(view, 'the server composes no generated practice paper outside the India course (EXAM_KIND_OUTSIDE_CURRICULUM, D15)');
+      notApplicableRoutes.add('/exams/:id');
+    } else await step('exam room · sitting a paper', '/exams/:id', async () => {
       await goTo(page, BASE, '/exams');
       // The walk's student is CBSE Class 10 (D2): the paper they can sit is the
       // board mock (Exams.jsx, IndiaExams), not the JEE Main simulation.
@@ -1102,7 +1112,7 @@ async function run() {
       if (await wk.count()) { await wk.click(); await wait(page, SETTLE); }
     });
 
-    await step('exam room · marked paper', '/exams/:id', async () => {
+    if (INDIA) await step('exam room · marked paper', '/exams/:id', async () => {
       await click(page, '.exam-head .btn', { text: 'Review and submit' });
       await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
       await click(page, '[role="dialog"] button.btn-primary', { text: 'Submit paper' });
@@ -1110,7 +1120,7 @@ async function run() {
       await wait(page, 900);
     });
 
-    await step('exams · printable paper', '/exams', async () => {
+    if (INDIA) await step('exams · printable paper', '/exams', async () => {
       await goTo(page, BASE, '/exams');
       await click(page, '.prio-item .btn-quiet');
       await page.waitForSelector('.paper-overlay', { timeout: 20000 });
@@ -1170,7 +1180,8 @@ async function run() {
     });
     await step('library · one resource, or why it cannot be shown', '/library/:id', async () => {
       await goTo(page, BASE, '/library/2027-mathematics-advanced-assessment-1');
-      await page.waitForSelector('.lib-page [data-library-detail], .lib-page [data-library-error]', { timeout: 20000 });
+      // data-library-detail is on .lib-page itself; the error is inside it.
+      await page.waitForSelector('.lib-page[data-library-detail], .lib-page [data-library-error]', { timeout: 20000 });
       await wait(page, 600);
     });
 
@@ -1519,7 +1530,7 @@ async function run() {
     section('the walk');
     const declared = declaredRoutes();
     ok('the router declares routes to walk', declared.length > 0, `${declared.length} found in App.jsx`);
-    const missed = declared.filter(r => !routesSeen.has(r));
+    const missed = declared.filter(r => !routesSeen.has(r) && !notApplicableRoutes.has(r));
     ok('every route the router declares was rendered and audited', missed.length === 0,
       missed.length ? `never visited: ${missed.join(', ')}` : '');
     ok('the walk reached past the routes into their states', views.length >= declared.length + 12,
