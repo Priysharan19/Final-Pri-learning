@@ -566,9 +566,19 @@ reset();
     return tr;
   };
   try {
-    // Clock advances after the server answer, forcing noteCloudClock to write.
-    const heldOffline = anotherTab.offlineGraceFor(pid, Date.now() + 1);
-    await paused;
+    // Force a real asynchronous clock write without inventing a future
+    // activation time. The fixture's stored clock can otherwise already
+    // equal now and no write occurs, leaving this interleaving unexercised.
+    const { get: readDevice } = await import('../src/local/idb.js');
+    const linkKey = `pri-cloud-account-link-v1:${pid}`;
+    const linkRow = await readDevice('device', linkKey);
+    await put('device', { ...linkRow, clockSeenAt: Date.now() - 30_000 });
+    const heldOffline = anotherTab.offlineGraceFor(pid);
+    await Promise.race([
+      paused,
+      new Promise((_, reject) => setTimeout(() =>
+        reject(new Error('offline-grace interleaving did not reach the clock write')), 5000))
+    ]);
     server.guardian = () => ({ status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } });
     const revoked = await gate(pid, { sync: false });
     eq('other tab commits authoritative guardian withdrawal', revoked.code, 'GUARDIAN_CONSENT_WITHDRAWN');

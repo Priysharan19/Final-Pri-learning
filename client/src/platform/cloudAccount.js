@@ -69,6 +69,10 @@ export async function cloudAccountLink(pid, { strict = false } = {}) {
     // Legacy approvals have generation 0 and remain valid only before any
     // guardian refusal was recorded for the same cloud account.
     activatedGeneration: Number(row.activatedGeneration) || 0,
+    // Recovery fence is persisted with a successful online consent. Reading
+    // this value back is mandatory: without it offline access would always
+    // compare null to the live account-scoped revocation token.
+    activatedRecoveryFence: row.activatedRecoveryFence ?? null,
     // The latest device time the grace has seen: a clock earlier than this
     // has moved backwards, and the grace refuses it.
     clockSeenAt: Number(row.clockSeenAt) || null,
