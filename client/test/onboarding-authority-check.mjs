@@ -81,6 +81,80 @@ await test('an adult the server calls ineligible is not admitted by the client\'
 await test('an approved child the server calls ineligible is refused, not told to wait', async () => {
   assert.equal(decideOnboardingAuthority('A', { ...child('given'), eligible: false }).outcome, 'unavailable');
 });
+// ── An unproved address (L8's real-staging finding on 1d3829103) ────────────
+// An adult password account whose email is unverified signed in, chose a
+// class and was told "We couldn't confirm your account's guardian approval":
+// the reply was {required:false, state:'not-required', eligible:false,
+// emailVerified:false}, judged 'unavailable', and nothing let them prove the
+// address. The only thing missing is the proof, so the outcome says so.
+const unverified = shape => ({ ...shape, emailVerified: false, eligible: false });
+await test('an adult whose only missing step is a proved address is told to confirm it, not that a guardian is missing', async () => {
+  const verdict = decideOnboardingAuthority('A', unverified(adult()));
+  assert.equal(verdict.outcome, 'unverified');
+  assert.deepEqual(verdict.consent, { required: false, state: 'not-required' });
+});
+await test('a child a guardian approved, with an unproved address, confirms the address next', async () => {
+  const verdict = decideOnboardingAuthority('A', unverified(child('given')));
+  assert.equal(verdict.outcome, 'unverified');
+  assert.deepEqual(verdict.consent, { required: true, state: 'given' });
+});
+await test('consent first: an unproved child still waiting for a guardian waits, a withdrawn one is revoked, an undeclared one waits', async () => {
+  assert.equal(decideOnboardingAuthority('A', unverified(child('pending'))).outcome, 'waiting');
+  assert.equal(decideOnboardingAuthority('A', unverified(child('withdrawn'))).outcome, 'revoked');
+  assert.equal(decideOnboardingAuthority('A', unverified(child('undeclared'))).outcome, 'waiting');
+});
+await test('"unverified" is never permission: an unproved address the server calls eligible is still refused as contradictory', async () => {
+  assert.equal(decideOnboardingAuthority('A', { ...adult(), emailVerified: false, eligible: true }).outcome, 'unavailable');
+  assert.equal(decideOnboardingAuthority('A', { ...child('given'), emailVerified: false, eligible: true }).outcome, 'unavailable');
+});
+await test('a proved address the server still calls ineligible stays unavailable, not "confirm your email"', async () => {
+  assert.equal(decideOnboardingAuthority('A', { ...adult(), eligible: false }).outcome, 'unavailable');
+  assert.equal(decideOnboardingAuthority('A', { ...child('given'), eligible: false }).outcome, 'unavailable');
+});
+await test('an unproved statement about another account is still "changed", never "unverified"', async () => {
+  assert.equal(decideOnboardingAuthority('A', unverified(adult('B'))).outcome, 'changed');
+});
+await test('every eligibility shape has exactly one outcome', async () => {
+  const table = [];
+  for (const base of [adult(), child('given'), child('pending'), child('withdrawn'), child('undeclared')]) {
+    for (const emailVerified of [true, false]) {
+      for (const eligible of [true, false]) {
+        table.push(`${base.required ? `child:${base.state}` : 'adult'} verified=${emailVerified} eligible=${eligible} → ${decideOnboardingAuthority('A', { ...base, emailVerified, eligible }).outcome}`);
+      }
+    }
+  }
+  assert.deepEqual(table, [
+    'adult verified=true eligible=true → approved',
+    'adult verified=true eligible=false → unavailable',
+    'adult verified=false eligible=true → unavailable',
+    'adult verified=false eligible=false → unverified',
+    'child:given verified=true eligible=true → approved',
+    'child:given verified=true eligible=false → unavailable',
+    'child:given verified=false eligible=true → unavailable',
+    'child:given verified=false eligible=false → unverified',
+    'child:pending verified=true eligible=true → unavailable',
+    'child:pending verified=true eligible=false → waiting',
+    'child:pending verified=false eligible=true → unavailable',
+    'child:pending verified=false eligible=false → waiting',
+    'child:withdrawn verified=true eligible=true → unavailable',
+    'child:withdrawn verified=true eligible=false → revoked',
+    'child:withdrawn verified=false eligible=true → unavailable',
+    'child:withdrawn verified=false eligible=false → revoked',
+    'child:undeclared verified=true eligible=true → unavailable',
+    'child:undeclared verified=true eligible=false → waiting',
+    'child:undeclared verified=false eligible=true → unavailable',
+    'child:undeclared verified=false eligible=false → waiting'
+  ]);
+});
+await test('the card sends "unverified" to the confirm-your-email step and keeps the guardian sentence for guardian outcomes only', async () => {
+  const card = readFileSync(new URL('../src/components/SignUpFlow.jsx', import.meta.url), 'utf8');
+  const gate = readFileSync(new URL('../src/platform/accountActivation.js', import.meta.url), 'utf8');
+  assert.match(card, /authority\.outcome === 'unverified'[\s\S]{0,700}go\('verify-email'\)/);
+  assert.match(card, /authority\.outcome === 'unavailable'[\s\S]{0,300}signup\.accountCheckUnavailable/);
+  assert.doesNotMatch(card, /consentCheckUnavailable/, 'the old "guardian approval" sentence for an unavailable statement is gone');
+  assert.match(card, /step === 'verify-email'[\s\S]{0,1500}sendCode\(\)[\s\S]{0,1500}useDifferentEmail/);
+  assert.match(gate, /authority\.outcome === 'unverified'\) throw new ActivationBlocked\('EMAIL_UNVERIFIED'\)/);
+});
 await test('an undeclared age waits: the server\'s correction path, never the client, repairs it', async () => {
   assert.equal(decideOnboardingAuthority('A', child('undeclared')).outcome, 'waiting');
 });

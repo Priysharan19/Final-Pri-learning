@@ -89,7 +89,7 @@ const arithmeticExpressions = (rng, diff) => {
     return numeric(`Evaluate $${a}-(${b}-${c})$.`, answer, 2, {
       traps: [{ value: a - b - c, why: 'Removing a bracket after a minus sign changes the signs of the terms inside it.' }],
       hints: ['A minus sign before a bracket reverses the signs inside.', `Equivalently, compute $${b}-${c}$ first.`],
-      steps: [{ h: 'Bracket', d: `$${b}-${c}=${b - c}$` }, { h: 'Subtract the bracket value', d: `$${a}-${b - c}=${answer}$` }]
+      steps: [{ h: 'Bracket', d: `$${b}-${c}=${b - c}$` }, { h: 'Subtract the bracket value', d: `$${a}-${b - c < 0 ? `(${b - c})` : b - c}=${answer}$` }]
     });
   }
   const k = ri(rng, 2, 9), a = ri(rng, 3, 15), b = ri(rng, 3, 15);

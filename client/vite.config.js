@@ -3,8 +3,13 @@ import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/release-identity.mjs';
 import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
+import { STUDENT_INTERFACE, STUDENT_INTERFACES, INTERFACE_SKIN, INTERFACE_SKINS } from './interface.config.mjs';
+import { editionOf, resolveEdition } from './edition.config.mjs';
+import { WEB_FILES, brandFile, brandIndexHtml, webManifest } from './brand/edition-brand.mjs';
+import { editionRecordModule } from './src/platform/edition-record.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -89,6 +94,10 @@ export const CHUNK_GROUPS = [
   // small and always wanted together, so they share one chunk rather than
   // costing the boot path five requests.
   { name: 'ncert-syllabus', test: /\/src\/engine\/ncert\/[a-z0-9-]+-syllabus\.js$/, priority: 40 },
+  // The Exam Desk and the exam shell it is built on (plan F4b): one chunk with
+  // a name of its own, so the service worker can leave it out of the install
+  // (see ON_DEMAND) and the budget check can prove it did.
+  { name: 'exam-desk', test: /\/src\/(?:(?:desk|examShell)\/[^?]*|engine\/desk(?:Clock|Import)\.js)$/, priority: 40 },
   { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//, priority: 30 },
   { name: 'vendor-katex', test: /\/node_modules\/katex\//, priority: 30 }
 ];
@@ -124,6 +133,20 @@ export const CHUNK_GROUPS = [
 
 // Exported so client/test/install-budget-check.mjs can hold the build to these
 // exact rules rather than to a second copy of them that would drift.
+// The student interface comes from the one setting, client/interface.config.mjs
+// (V1 decision D7), never from a build variable: web, iOS and Android all run
+// this build and so all ship the same interface. It changes what is warmed:
+// see the instrument rules in ON_DEMAND and BOOT_FONTS.
+if (!STUDENT_INTERFACES.includes(STUDENT_INTERFACE)) throw new Error(`client/interface.config.mjs: unknown STUDENT_INTERFACE ${JSON.stringify(STUDENT_INTERFACE)}`);
+if (!INTERFACE_SKINS.includes(INTERFACE_SKIN)) throw new Error(`client/interface.config.mjs: unknown INTERFACE_SKIN ${JSON.stringify(INTERFACE_SKIN)}`);
+export const INSTRUMENT_BUILD = STUDENT_INTERFACE === 'instrument';
+// PRI_FEATURE_INSTRUMENT used to choose the interface per build. It is retired:
+// a build variable left set on Railway or a laptop changes nothing, and the
+// build says so rather than silently disagreeing with what it was asked for.
+if (process.env.PRI_FEATURE_INSTRUMENT !== undefined && process.env.PRI_FEATURE_INSTRUMENT !== (INSTRUMENT_BUILD ? '1' : '0')) {
+  console.warn(`[pri] PRI_FEATURE_INSTRUMENT=${process.env.PRI_FEATURE_INSTRUMENT} is ignored: the student interface is set in client/interface.config.mjs (${STUDENT_INTERFACE}).`);
+}
+
 export const PRECACHE_SKIP = /(^|\/)sw\.js$|(^|\/)release\.json$|(^|\/)features\.json$|(^|\/)\.DS_Store$|\.map$|\.woff$|\.ttf$/;
 
 export const ON_DEMAND = [
@@ -141,6 +164,32 @@ export const ON_DEMAND = [
   // in practice a stylus user has it before they ask.
   [/(^|\/)(ink-model|ink-engine|ink-personal|model-data|recognizer|InkAnswer|NativeInkCanvas|feedbackGeometry|InkPhysicalEvidenceSession)-[^/]*\.(js|css)$/, 'handwriting recogniser'],
   // (the .css is the handwriting surface's own styles, split from theme.css)
+
+  // The shared resource library's page (ADR-0002 plan F1, PRI_FEATURE_LIBRARY):
+  // behind import() in App.jsx, and online-only — every resource it lists comes
+  // from GET /v1/resources and opens on its publisher's site — so a copy kept
+  // for offline would only ever draw "needs a connection". Off in a production
+  // build, where the chunk is never reached at all.
+  // (libraryApi: the library's calls, a chunk of their own now that the Exam
+  // Desk reads a paper through them too.)
+  [/(^|\/)(Library|libraryApi)-[^/]*\.(js|css)$/, 'resource library (online-only)'],
+
+  // The Exam Desk (ADR-0002 §8 plan F4b, PRI_FEATURE_EXAM_DESK): the desk's
+  // pages, the shared exam shell they are built on and the desk's pure clock
+  // and import reader, in one named chunk behind import() in App.jsx and
+  // Library.jsx. Starting an attempt needs the server and every paper is a
+  // library resource, so a first visit offline could only say "needs a
+  // connection"; a student who has opened the desk once has the chunk from the
+  // runtime cache, and their attempt from the desk's own device cache. Off in
+  // a production build, where the chunk is never reached. When the marked exam
+  // room moves onto the shell (plan F4c) the shell leaves this chunk and is
+  // warmed with the room.
+  [/(^|\/)(exam-desk|Desk(Page|Import|Entry)|deskCache)-[^/]*\.(js|css)$/, 'exam desk (started online)'],
+
+  // The live step coach's practice route (F1, #826): behind import() in
+  // local/backend.js, reached only when the server has the coach on for this
+  // account, so it costs the first visit nothing.
+  [/(^|\/)stepCoach-[^/]*\.js$/, 'live step coach'],
 
   // Inter ships one file per script. Latin is the only one an Indian student
   // reading English maths paints from; the browser fetches a subset only when a
@@ -177,7 +226,11 @@ export const ON_DEMAND = [
   // 16 kB of Australian exam questions; a profile that holds the NSW course has
   // it from its first paper on, and backend.js already charges an unreachable
   // fetch to that one paper rather than every paper after it.
-  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|multipart|india-(algebra|calculus|class10|class11|class12|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
+  // The Class 7 and Class 8 hardest-level (D3) forms are the same case: each
+  // is one class's bank in the registry (generators/index.js), and warmScope()
+  // loads it at sign-in for that class through the generator-to-bank map, so a
+  // Class 7 or 8 student is offline-ready for it and nobody else warms ~157 kB.
+  [/(^|\/)(year(7|8|9|10|11|12)|streams-(standard|ext)|multipart|india-(algebra|calculus|class10|class11|class12|class7-hardest|class7-part2-hardest|class8-hardest|coordinate|foundation|junior-overlay|olympiad|senior|native-helpers))-[^/]*\.js$/, 'question bank for another year'],
 
   // The source-audited NCERT Class 7–9 production banks: each class's
   // generators, topper notes, worked examples and answer audits. They used to
@@ -192,10 +245,41 @@ export const ON_DEMAND = [
   // nothing, never a crash, if one cannot be fetched.
   [/(^|\/)class(7|8|9)-[a-z0-9-]+-production-[^/]*\.js$/, 'NCERT Class 7–9 production bank'],
 
+  // The Instrument interface (client/interface.config.mjs) pays for itself by
+  // not warming what it leaves unpainted or reaches only by an explicit visit.
+  // (The branch below for a build without it is kept only so the rules stay
+  // correct if the setting ever names another interface; no build makes one.)
+  //   · Inter. Once instrument.css has loaded, every interface token (--font,
+  //     --font-display) is remapped to Instrument Sans. Before that, the boot
+  //     theme.css still names 'Inter Variable', so the moment between first
+  //     paint and instrument.css arriving paints in Inter where it is cached,
+  //     and in the system fallback face on an offline first open where it is
+  //     not. That is a brief flash of the fallback face, not missing text.
+  //     Instrument Sans takes Inter's place in the install (BOOT_FONTS below);
+  //     Inter is still declared, so a browser that asks for it fetches it and
+  //     keeps it.
+  //   · Instrument Sans's Latin Extended subset, by the Inter script-subset
+  //     argument above: fetched only when a glyph in its range appears.
+  // The Map, the Report (ReportHead with the Progress page under it) and
+  // Scripts (the History page, at /review) are NOT on demand: they are three
+  // of the interface's six tabs, and a student who opened the app online and
+  // then lost the connection expects a tab to open (issue #658). They ride in
+  // the warm pass like every other tab, and install-budget-check.mjs
+  // --instrument holds them there against the unchanged ceiling.
+  ...(INSTRUMENT_BUILD ? [
+    [/(^|\/)inter-latin-wght-normal-[^/]*\.woff2$/, 'Inter (the instrument build paints in Instrument Sans)'],
+    [/(^|\/)instrument-sans-(?!latin-wght-normal)[a-z-]+-wght-normal-[^/]*\.woff2$/, 'Instrument Sans script subset']
+  ] : [
+    [/(^|\/)(InstrumentBar|IndexPage|MapPage|ReportHead|SignInPlot|CommandBar|ledger|instrument|instrument-sans-[a-z-]+)-[^/]*\.(js|css|woff2)$/, 'v1.1 instrument interface (flag off in this build)']
+  ]),
+
   // The previous-year archive is reached only by a student who asks for past
-  // papers. It is behind an import() already; warming it spent 48 kB on the
-  // majority who never open one.
-  [/(^|\/)pyqArchive-[^/]*\.js$/, 'previous-year question archive'],
+  // papers, which are online-only and behind a switch. Its records, schema,
+  // cited sources and coverage manifest are all behind an import(); the shell
+  // carries only pyq/pyqIndex.js (ids and rungs). Warming the rest spent kB on
+  // the majority who never open one, and grew with every transcribed paper —
+  // install-budget-check.mjs holds the archive at 0 bytes of the measure.
+  [/(^|\/)(pyqArchive|pyqCoverage|pyqSources|pyqSchema|records-[a-z0-9-]+)-[^/]*\.js$/, 'previous-year question archive'],
 
   // A translation catalogue is the same argument in miniature. Every install
   // would otherwise carry every language: an English reader paying to download
@@ -219,6 +303,12 @@ export const ON_DEMAND = [
   // governs — and says so, which legal-pages-check.mjs holds it to.
   [/(^|\/)legalHindi-[^/]*\.js$/, 'Hindi legal notices'],
 
+  // The third-party licence notices, generated from the dependency licences
+  // (tools/third-party-notices.mjs) and reached by import() from Legal.jsx
+  // only when /third-party-notices is opened. Licence prose nobody reads
+  // twice has no place in anyone's install.
+  [/(^|\/)thirdPartyNotices-[^/]*\.js$/, 'third-party licence notices'],
+
   // Staff-only screens. ADR-0001 makes the product online-first, and these are
   // the screens a student never opens, so nothing a student does offline
   // depends on them and no student should pay to download them:
@@ -239,7 +329,16 @@ export const ON_DEMAND = [
   // ADR-0001 makes the product online-first, and the one case this shows — a
   // first open with no connection — is reported by api.js as a chapter that has
   // not been downloaded yet; practice, which needs none of it, is unaffected.
-  [/(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check'],
+  // The instrument build is the exception for the prerequisite graph itself:
+  // its Map (MapPage.jsx) imports engine/prerequisites.js statically to draw
+  // each chapter's strand and "needs" line, so in that build the graph is part
+  // of a warmed tab, not of the placement check. Leaving it on demand there
+  // made the Map crash on a first visit offline ("Failed to fetch dynamically
+  // imported module"). install-budget-check.mjs --instrument now holds every
+  // file a tab chunk statically imports to the install or the warm pass.
+  [INSTRUMENT_BUILD
+    ? /(^|\/)(Placement|placement|prerequisiteSkillsHi)-[^/]*\.js$/
+    : /(^|\/)(Placement|placement|prerequisites|prerequisiteSkillsHi)-[^/]*\.js$/, 'placement check'],
 
   // Reviewed JEE past-paper shards (tools/jee-question-department/pack.py).
   // Only a JEE student opening a chapter that has reviewed past papers ever
@@ -270,7 +369,8 @@ export const ON_DEMAND = [
 // every word of UI, and the KaTeX faces a rendered question uses. The rest of
 // KaTeX's faces are ON_DEMAND above; these are the ones a student meets in
 // their first minute, so they belong in the install with the shell.
-const BOOT_FONTS = /(^|\/)(inter-latin-wght-normal|KaTeX_(Main|Math|AMS|Size\d)-[A-Za-z]+)-[^/]*\.woff2$/;
+// In the instrument build the interface face is Instrument Sans, not Inter.
+const BOOT_FONTS = new RegExp(`(^|/)(${INSTRUMENT_BUILD ? 'instrument-sans-latin-wght-normal' : 'inter-latin-wght-normal'}|KaTeX_(Main|Math|AMS|Size\\d)-[A-Za-z]+)-[^/]*\\.woff2$`);
 
 // On-demand, but worth having in advance where the bytes are cheap — a browser
 // that reports an unmetered 4G link, or a shell reading them off an app bundle.
@@ -368,42 +468,137 @@ function releaseIdentityManifest(identity) {
   };
 }
 
+// The edition's brand (plan E4, docs/brand/editions-decision.md): index.html's
+// %PRI_…% placeholders, manifest.webmanifest, the favicon, the splash and the
+// app icons all come from the edition this build resolved (PRI_EDITION), from
+// client/brand/<edition>/, and the build carries no other edition's files.
+// The app reads its own name, cut and wordmark from the edition record
+// (editionRecordPlugin below, plan E2), which carries them for this edition
+// alone, so no bundle holds the other edition's name, accent or wordmark.
+// The assets are emitted in generateBundle, before pri-precache's writeBundle
+// lists dist/, so the service worker installs them. The development server
+// serves the same files from the same place.
+const BRAND_TYPES = { '.svg': 'image/svg+xml', '.png': 'image/png' };
+export function editionBrand(edition) {
+  const manifest = `${JSON.stringify(webManifest(edition), null, 2)}\n`;
+  return {
+    name: 'pri-edition-brand',
+    transformIndexHtml: { order: 'pre', handler: html => brandIndexHtml(html, edition) },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: manifest });
+      for (const rel of WEB_FILES) this.emitFile({ type: 'asset', fileName: rel, source: readFileSync(brandFile(edition, rel)) });
+    },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = (req.url || '').split('?')[0].slice(1);
+        if (path === 'manifest.webmanifest') {
+          res.setHeader('Content-Type', 'application/manifest+json');
+          return res.end(manifest);
+        }
+        if (!WEB_FILES.includes(path)) return next();
+        res.setHeader('Content-Type', BRAND_TYPES[path.slice(path.lastIndexOf('.'))]);
+        return res.end(readFileSync(brandFile(edition, path)));
+      });
+    }
+  };
+}
+
+// The app's own edition record (plan E2). client/src/platform/edition-record.js
+// is the one module that reads the edition table; a build or dev server loads
+// this edition's record in its place, so a bundle knows its own edition's
+// defaults (course, languages, locale, currency) and nothing of the other's.
+// A real build passes mustLoad: if the replacement never happened (the module
+// moved, or its path stopped matching), the bundle would carry the default
+// edition's record and the whole table while features.json named this
+// edition, so the build stops instead.
+export const EDITION_RECORD_MODULE = fileURLToPath(new URL('./src/platform/edition-record.js', import.meta.url));
+export function editionRecordPlugin(edition, { mustLoad = false } = {}) {
+  let replaced = false;
+  return {
+    name: 'pri-edition-record',
+    load(id) {
+      if (id.split('?')[0] !== EDITION_RECORD_MODULE) return null;
+      replaced = true;
+      return editionRecordModule(edition);
+    },
+    buildEnd(error) {
+      if (mustLoad && !error && !replaced) this.error(`pri-edition-record: ${EDITION_RECORD_MODULE} was never loaded, so this build does not carry the ${edition} record`);
+    }
+  };
+}
+
 // Build-time feature flags (client/src/platform/features.js). A production
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
-export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
+export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR']);
+// The FEATURE_FLAGS a shipping build may turn on at an owner's GO, by building
+// with PRI_FEATURE_<NAME>=1. The generated iPad bundles must then carry exactly
+// what that build asked for: on only when the release environment says =1, off
+// otherwise. Every other FEATURE_FLAG is still required off. TUTOR: the owner
+// decides at GO (premium plan F11); the server keeps its own PRI_FEATURE_TUTOR.
+export const SHIPPABLE_FEATURE_FLAGS = Object.freeze(['TUTOR']);
 // Flags built and recorded in features.json like the ones above, but not yet
-// asserted off in the tracked iPad bundles (client/test/ios-bundle-features-
-// check.mjs), because those bundles predate the flag and carry no record of
-// it. Move a name into FEATURE_FLAGS with the next `npm run sync:ios`.
+// asserted off in the generated iPad bundles (client/test/ios-bundle-features-
+// check.mjs, run by the CI build job right after `npm run sync:ios`). Move a
+// name into FEATURE_FLAGS once every build that ships is made with it off.
 //   EXTENDED_TRACKS — the Olympiad track and the Teacher role in onboarding,
 //   classroom panels for students (src/platform/features.js).
 //   EXAM_HANDWRITING — handwriting as an input in TIMED exams (the exam room's
 //   "Write by hand"). Off: a paper offers Type only, so no path can leave
 //   unread handwriting on a paper. On: the frozen-page / pending / Retry
 //   checking flow of server/platform/exams.js applies.
-// INSTRUMENT (v1.1 interface) is opt-in everywhere, the dev server included,
-// so the interface production ships stays the one developers see by default.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'INSTRUMENT']);
-const OPT_IN_FLAGS = new Set(['INSTRUMENT']);
+// The interface is not a flag any more: `instrument` is recorded beside the
+// flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
+// to it, but its value comes from client/interface.config.mjs in every build and
+// on the development server alike.
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK', 'NSW_EXAMS']);
+//   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
+//   everywhere, the dev server included: off until a rights opinion exists
+//   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
+//   PARENT_REPORT — the parent weekly report's screens ("For parents" and the
+//   emailed confirm/stop page). Off until counsel has reviewed email about
+//   minors (owner default D22); the server is off too unless PRI_PARENT_REPORT=on.
+//   LIBRARY — the shared resource library's page (/library, ADR-0002 plan F1).
+//   Off in a production build: a new student surface outside the frozen V1
+//   scope ships dark until the owner turns it on. The read-only server routes
+//   (/v1/resources) answer whatever the flag says.
+//   EXAM_DESK — the Exam Desk's screens (/desk/:attemptId, /desk/import, and
+//   "Practise at the desk" on a library paper; ADR-0002 §8 plan F4b). Off in a
+//   production build until the owner's GO; it needs LIBRARY too. The server's
+//   /v1/desk routes answer a signed-in student whatever the flag says.
+//   NSW_EXAMS — Prithagoras's HSC-style timed papers on the Exams page (plan
+//   G4). Off in a production build; the server has its own switch
+//   (PRI_NSW_EXAMS=on), also off by default.
+const OPT_IN_FLAGS = new Set(['PAST_PAPERS']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
-  return Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)]));
+  // The regional edition (client/edition.config.mjs, ADR-0002) this build
+  // serves: PRI_EDITION, unset = Priyabhata. An unknown value stops the build.
+  return { ...Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN, edition: resolveEdition(env) };
 }
 export function featureDefines(command, env = process.env) {
   const states = featureStates(command, env);
   return {
     __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
     __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks),
-    __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia),
     __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting),
-    __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument)
+    __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument),
+    __PRI_FEATURE_PAST_PAPERS__: JSON.stringify(states.pastPapers),
+    __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport),
+    __PRI_FEATURE_LIBRARY__: JSON.stringify(states.library),
+    __PRI_FEATURE_EXAM_DESK__: JSON.stringify(states.examDesk),
+    __PRI_FEATURE_NSW_EXAMS__: JSON.stringify(states.nswExams),
+    __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
+    __PRI_EDITION__: JSON.stringify(states.edition),
+    // Plan E5: false in a build of an edition with no payment provider, so its
+    // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).
+    __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0)
   };
 }
 
 // The flags a build was made with, written beside it as features.json so the
-// tracked iPad bundles can be checked for a flag-on test build committed by
+// generated iPad bundles can be checked for a flag-on test build synced by
 // mistake (client/test/ios-bundle-features-check.mjs). Records every known
 // PRI_FEATURE_* flag, including ones whose code lives on other branches.
 function featureManifest(states) {
@@ -428,7 +623,7 @@ export default defineConfig(({ command }) => {
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
       __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
     },
-    plugins: [react(), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
+    plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), editionBrand(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',

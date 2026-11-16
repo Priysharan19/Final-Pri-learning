@@ -7,7 +7,7 @@
 //
 // Usage: node client/test/native-ink-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -104,36 +104,12 @@ check('stroke metadata survives the page → native message',
   && posted[5].strokes[0].points[0].p === 0.7
   && posted[5].strokes[0].points[0].azimuth === 1.1);
 
-// ── recognition round trips ──────────────────────────────────────────────────
+// ── no read op: the shell captures, the server reads ────────────────────────
 posted.length = 0;
-const foundationPending = nativeInk.foundationRecognize({ f0_2: 'x' });
-const foundationRequest = posted[0];
-check('foundation recognizer sends a request id and corrections',
-  foundationRequest.op === 'foundationRecognize'
-  && Number.isInteger(foundationRequest.reqId)
-  && foundationRequest.overrides.f0_2 === 'x');
-window.__priInkReceive({
-  type: 'reading', reqId: foundationRequest.reqId, engine: 'pri-foundation',
-  available: true, text: 'x=3', lines: []
-});
-check('foundation reply resolves its matching request',
-  (await foundationPending)?.engine === 'pri-foundation');
-
-posted.length = 0;
-const pending = nativeInk.recognize({ n0_2: 'x' });
-const request = posted[0];
-check('rescue recognizer sends a request id and corrections',
-  request.op === 'recognize' && Number.isInteger(request.reqId)
-  && request.overrides.n0_2 === 'x');
-
-window.__priInkReceive({ type: 'reading', reqId: request.reqId, text: 'x=3', lines: [] });
-const reading = await pending;
-check('a reply resolves the matching request', reading?.text === 'x=3');
-
-const stray = nativeInk.recognize({});
-window.__priInkReceive({ type: 'reading', reqId: 99999, text: 'wrong', lines: [] });
-window.__priInkReceive({ type: 'reading', reqId: posted[1].reqId, text: 'right', lines: [] });
-check('a reply for another request is ignored', (await stray)?.text === 'right');
+check('the page has no native read op (recognition is on the server)',
+  nativeInk.recognize === undefined && nativeInk.foundationRecognize === undefined && posted.length === 0);
+check('a stray native reading message is ignored, never resolved into anything',
+  (() => { try { window.__priInkReceive({ type: 'reading', reqId: 7, text: 'x=3', lines: [] }); return true; } catch { return false; } })());
 
 let heard = null;
 const stop = nativeInk.onStrokes(s => { heard = s; });
@@ -180,28 +156,43 @@ const swift = readFileSync(BRIDGE_SWIFT, 'utf8');
 const handled = new Set([...swift.matchAll(/case\s+"([a-zA-Z]+)"/g)].map(m => m[1]));
 const sent = new Set([
   'mount', 'layout', 'unmount', 'appearance', 'tool', 'enabled',
-  'undo', 'redo', 'clear', 'setStrokes', 'foundationRecognize', 'recognize'
+  'undo', 'redo', 'clear', 'setStrokes'
 ]);
 for (const op of sent) {
   check(`the shell handles "${op}"`, handled.has(op),
     `InkBridge.swift has no case for it`);
 }
+check('the shell handles exactly the ops the page may send (no read op on either side)',
+  [...handled].every(op => sent.has(op)), `extra cases in InkBridge.swift: ${[...handled].filter(op => !sent.has(op)).join(', ')}`);
 const source = readFileSync(join(HERE, '../src/ink/native.js'), 'utf8');
 for (const op of sent) {
   check(`the page sends "${op}"`, source.includes(`op: '${op}'`));
 }
-check('recognition retains the current immutable native stroke snapshot by reference',
-  source.includes('strokes: latestStrokes, surfaceEpoch'));
+const platformIndex = readFileSync(join(HERE, '../src/platform/native/index.js'), 'utf8');
+check('the answer-blind allowlist names the same ops and no read op',
+  [...sent].every(op => platformIndex.includes(`'${op}'`)) && !/foundationRecognize|'recognize'|overrides/.test(platformIndex));
 check('external setStrokes input is copied once at the bridge boundary',
   source.includes('latestStrokes = snapshotInkStrokes(strokes);'));
-check('native bridge bumps revision and cancels Vision at stroke begin',
-  swift.includes('func inkSurfaceDidBeginStroke(_ surface: InkSurfaceView)')
-  && swift.includes('invalidateRecognitionForInkMutation()')
-  && swift.includes('recognizer.cancelActiveVision()'));
-check('Foundation and rescue readers both reject stale revisions',
-  swift.includes('pri-foundation-stale')
-  && swift.includes('native-rescue-stale')
-  && (swift.match(/revisionIsCurrent\(revision\)/g)?.length || 0) >= 4);
+check('the page keeps no recogniser imports',
+  !/hybrid\.js|setNotation\.js|trigNotation\.js|requestReading|failedReading/.test(source));
+
+// ── nothing native reads ink: Vision and Core ML are out of the target ──────
+const inkDir = join(HERE, '../../ios/PriLearning.swiftpm/Ink');
+const inkFiles = readdirSync(inkDir).filter(n => n.endsWith('.swift')).sort();
+check('the Ink target holds the surface, the stroke model, the bridge, the self-check and the demo driver only',
+  JSON.stringify(inkFiles) === JSON.stringify(['InkBridge.swift', 'InkDemoDriver.swift', 'InkSelfCheck.swift', 'InkStroke.swift', 'InkSurface.swift']),
+  inkFiles.join(', '));
+for (const name of inkFiles) {
+  const text = readFileSync(join(inkDir, name), 'utf8');
+  check(`${name} imports neither Vision nor CoreML`, !/^import (Vision|CoreML)$/m.test(text));
+}
+check('InkBridge.swift has no read op and no recogniser',
+  !/case "(recognize|foundationRecognize)"|MathInkRecognizer|InkFoundationPageRecognizer|cancelActiveVision|^import (Vision|CoreML)$/m.test(swift));
+check('the self-check scores capture fidelity, not a reader',
+  readFileSync(join(inkDir, 'InkSelfCheck.swift'), 'utf8').includes('capture fidelity:')
+  && !/MathInkRecognizer|character accuracy/.test(readFileSync(join(inkDir, 'InkSelfCheck.swift'), 'utf8')));
+check('the stroke-begin hook stays so a new mark is seen at pen-down',
+  swift.includes('func inkSurfaceDidBeginStroke(_ surface: InkSurfaceView)'));
 
 // ── release configuration belongs to the same native trust boundary ─────────
 const packageRoot = join(HERE, '../../ios/PriLearning.swiftpm');
@@ -218,6 +209,7 @@ const icon = readFileSync(join(packageRoot, 'Assets.xcassets/AppIcon.appiconset/
 const duplicateIcon = readFileSync(join(duplicateRoot, 'Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png'));
 
 check('native packages keep identical release manifests', packageSwift === duplicatePackageSwift);
+check('no model asset is bundled (reading is on the server)', !packageSwift.includes('Resources/Models') && !existsSync(join(packageRoot, 'Resources/Models')));
 check('release package never falls back to a placeholder app icon',
   !packageSwift.includes('.placeholder(') && packageSwift.includes('appIcon: .asset("AppIcon")'));
 check('the AppIcon asset catalog is processed by SwiftPM', packageSwift.includes('.process("Assets.xcassets")'));

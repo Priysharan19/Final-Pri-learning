@@ -130,7 +130,92 @@ export const INDIA_JEE_HARDEST_COVERS = Object.freeze({
   'c12-vector-algebra': [d4('c12-vector-direction-reasoning', 0)]
 });
 
+// ── Replacements and retired rungs · issue #408 ─────────────────────────────
+// A dot point can have a form at the hardest level that is not a hardest-level
+// question. Issue #408 found one: Complex Numbers dot point 2 ("solve quadratic
+// equations with complex roots") reached D4 on both JEE tracks only through the
+// chapter's own generator at D4 — "solve x² + bx + c = 0 and give the imaginary
+// part of the roots", which is the quadratic formula and nothing more. A
+// chapter-level D4 request drew it too.
+//
+// The fix is a replacement, then a retirement, in that order. The replacement
+// table adds an original D4 form for the dot point (same provenance as tranche
+// 2). The retirement removes the routine rung from the chapter's covers; the
+// generator itself is untouched and still serves its other rungs. The
+// installer (curriculum-in.js) refuses a retirement that names a rung the
+// chapter does not have, or that would leave the dot point with no form at
+// that rung — so retiring can never turn a selectable level into a refusal.
+//
+// The routine rung sat above the CBSE window (D1–D3), so CBSE students see no
+// change: their dot point 2 is still served at D3 by c11-complex-quadratic-
+// reasoning. Only the JEE tracks' D4 pool changes.
+export const INDIA_JEE_REPLACEMENT_PROVENANCE = Object.freeze({
+  ...INDIA_HARDEST_PROVENANCE,
+  tranche: 'phase-4-issue-408-replacement',
+  scope: 'JEE dot points whose only D4 form was routine (issue #408), including the Class 11 chapters whose one whole-chapter template was claimed at D4 for every dot point'
+});
+
+/** chapterId → original D4 forms that replace a retired routine rung. */
+export const INDIA_JEE_REPLACEMENT_COVERS = Object.freeze({
+  'c11-complex-numbers': [d4('c11-complex-quadratic-jee-reasoning', 2)],
+  // Single-template chapters: the whole-chapter generator's one D4 template
+  // was claimed for all three dot points (india-class11-jee-d4.js).
+  'c11-sets': [d4('c11-set-notation-jee-reasoning', 0), d4('c11-set-operations-jee-reasoning', 1), d4('c11-inclusion-exclusion-jee-reasoning', 2)],
+  'c11-linear-inequalities': [d4('c11-linear-inequality-jee-reasoning', 0), d4('c11-inequality-system-jee-reasoning', 1), d4('c11-inequality-region-jee-reasoning', 2)],
+  'c11-binomial-theorem': [d4('c11-binomial-expansion-jee-reasoning', 0), d4('c11-binomial-general-term-jee-reasoning', 1), d4('c11-binomial-middle-term-jee-reasoning', 2)],
+  'c11-conic-sections': [d4('c11-circle-jee-reasoning', 0), d4('c11-parabola-jee-reasoning', 1), d4('c11-ellipse-hyperbola-jee-reasoning', 2)],
+  'c11-3d-introduction': [d4('c11-3d-point-jee-reasoning', 0), d4('c11-3d-distance-jee-reasoning', 1), d4('c11-3d-section-jee-reasoning', 2)]
+});
+
+/** Why each single-template chapter's whole-chapter D4 rung is retired. */
+const SINGLE_TEMPLATE_D4 = Object.freeze({
+  'c11-sets': 'the D4 rung counts proper subsets or k-element subsets of an n-set, one formula',
+  'c11-linear-inequalities': 'the D4 rung counts the integers in |ax + b| < c or a ≤ ax + b ≤ c, one dot point and routine',
+  'c11-binomial-theorem': 'the D4 rung is only the term independent of x, for every dot point',
+  'c11-conic-sections': 'the D4 rung is only the eccentricity of x²/a² − y²/b² = 1, for the circle and parabola dot points too',
+  'c11-3d-introduction': 'the D4 rung is only the x-coordinate of a centroid, for every dot point'
+});
+/** The whole-chapter generator's D4 rung at one dot point, replaced by `replacedBy`. */
+const retire = (chapterId, dp, replacedBy) => Object.freeze({
+  gen: chapterId, dp, diff: 4, replacedBy,
+  reason: `routine and claimed for every dot point: ${SINGLE_TEMPLATE_D4[chapterId]}`
+});
+
+/** chapterId → rungs removed from the chapter's covers, each with what replaced it and why. */
+export const INDIA_RETIRED_RUNGS = Object.freeze({
+  'c11-complex-numbers': [Object.freeze({
+    gen: 'c11-complex-numbers', dp: 2, diff: 4,
+    replacedBy: 'c11-complex-quadratic-jee-reasoning',
+    reason: 'routine: the D4 rung asks for the imaginary part of the roots of x² + bx + c = 0, a direct use of the quadratic formula (issue #408)'
+  })],
+  'c11-sets': [
+    retire('c11-sets', 0, 'c11-set-notation-jee-reasoning'),
+    retire('c11-sets', 1, 'c11-set-operations-jee-reasoning'),
+    retire('c11-sets', 2, 'c11-inclusion-exclusion-jee-reasoning')
+  ],
+  'c11-linear-inequalities': [
+    retire('c11-linear-inequalities', 0, 'c11-linear-inequality-jee-reasoning'),
+    retire('c11-linear-inequalities', 1, 'c11-inequality-system-jee-reasoning'),
+    retire('c11-linear-inequalities', 2, 'c11-inequality-region-jee-reasoning')
+  ],
+  'c11-binomial-theorem': [
+    retire('c11-binomial-theorem', 0, 'c11-binomial-expansion-jee-reasoning'),
+    retire('c11-binomial-theorem', 1, 'c11-binomial-general-term-jee-reasoning'),
+    retire('c11-binomial-theorem', 2, 'c11-binomial-middle-term-jee-reasoning')
+  ],
+  'c11-conic-sections': [
+    retire('c11-conic-sections', 0, 'c11-circle-jee-reasoning'),
+    retire('c11-conic-sections', 1, 'c11-parabola-jee-reasoning'),
+    retire('c11-conic-sections', 2, 'c11-ellipse-hyperbola-jee-reasoning')
+  ],
+  'c11-3d-introduction': [
+    retire('c11-3d-introduction', 0, 'c11-3d-point-jee-reasoning'),
+    retire('c11-3d-introduction', 1, 'c11-3d-distance-jee-reasoning'),
+    retire('c11-3d-introduction', 2, 'c11-3d-section-jee-reasoning')
+  ]
+});
+
 /** The generators this table introduces, in table order. */
 export const INDIA_HARDEST_GENERATORS = Object.freeze(
-  [INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS].flatMap(table => Object.values(table).flatMap(list => list.map(entry => entry.gen)))
+  [INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_REPLACEMENT_COVERS].flatMap(table => Object.values(table).flatMap(list => list.map(entry => entry.gen)))
 );

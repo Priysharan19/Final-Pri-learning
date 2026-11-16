@@ -71,12 +71,11 @@ function looksLikeRelease(value) {
  * transport. Kept only for the migration window (see §4.2 "Migration").
  */
 function legacyAppleHost(scope) {
-  const flags = ['__PRI_NATIVE__', '__PRI_NATIVE_INK__', '__PRI_NATIVE_PHOTO__', '__PRI_NATIVE_BILLING__', '__PRI_NATIVE_CLOUD__'];
+  const flags = ['__PRI_NATIVE__', '__PRI_NATIVE_INK__', '__PRI_NATIVE_BILLING__', '__PRI_NATIVE_CLOUD__'];
   if (!flags.some(flag => scope[flag] === true)) return null;
   const caps = {};
   const webkit = scope.webkit?.messageHandlers;
   if (scope.__PRI_NATIVE_INK__ && webkit?.priInk) caps.ink = { versions: [1], transport: 'legacy', stylus: true, finger: true };
-  if (scope.__PRI_NATIVE_PHOTO__ && webkit?.priPhoto) caps.photo = { versions: [1], transport: 'legacy', ocr: true };
   if (scope.__PRI_NATIVE_BILLING__ === true && webkit?.priBilling) caps.billing = { versions: [1], transport: 'legacy', store: 'app-store' };
   if (scope.__PRI_NATIVE_CLOUD__ === true && webkit?.priCloud) {
     caps.cloud = { versions: [1], transport: 'legacy', configured: scope.__PRI_NATIVE_CLOUD_CONFIGURED__ === true };

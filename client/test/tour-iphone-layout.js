@@ -161,7 +161,8 @@ export const flow = {
       const probe = document.createElement('div'); probe.style.color = page; document.body.appendChild(probe);
       const pageRgb = getComputedStyle(probe).color; probe.remove();
       const htmlBg = getComputedStyle(document.documentElement).backgroundColor;
-      const bar = document.querySelector('.topbar');
+      // The v1.0 top bar, or the instrument build's one bar of tabs.
+      const bar = document.querySelector('.topbar') || document.querySelector('[data-instrument-bar]');
       const strip = document.elementFromPoint(innerWidth / 2, 4);
       const brand = bar.querySelector('a, button, svg')?.getBoundingClientRect();
       const nav = document.querySelector('.mobilenav');
@@ -308,7 +309,7 @@ export const flow = {
     await page.waitForTimeout(900);
     const plan = await page.evaluate(() => {
       const card = document.querySelector('.settings-grid .grid > .card');
-      const top = document.querySelector('.topbar').getBoundingClientRect().bottom;
+      const top = (document.querySelector('.topbar') || document.querySelector('[data-instrument-bar]')).getBoundingClientRect().bottom;
       const nav = document.querySelector('.mobilenav').getBoundingClientRect().top;
       const rows = [...card.querySelectorAll('.set-row')].map(r => r.getBoundingClientRect());
       return { cardTop: Math.round(card.getBoundingClientRect().top), topbar: Math.round(top), nav: Math.round(nav), lastRow: Math.round(rows.at(-1)?.bottom) };
@@ -392,6 +393,9 @@ export const flow = {
         const peek = getComputedStyle(document.querySelector('.ws-qpeek'));
         const name = getComputedStyle(document.querySelector('.ws-bar .ctx-pill-name'));
         return {
+          // The instrument's split workspace (≥ 900px, design s4/s5) sets the
+          // action dock under the sheet rather than sticky at the foot.
+          split: document.documentElement.classList.contains('ui-instrument') && !!document.querySelector('.ws-split') && matchMedia('(min-width: 900px)').matches,
           tabsShare: tabs && tools ? +(tabs.width / tools.width).toFixed(2) : null,
           actionsPosition: actions.position, actionsMarginTop: actions.marginTop,
           exitLabel: !!exitLabel && getComputedStyle(exitLabel).display !== 'none',
@@ -399,19 +403,29 @@ export const flow = {
           barMinHeight: getComputedStyle(document.querySelector('.ws-bar')).minHeight
         };
       });
-      await check(`${vp.id} ${vp.width}×${vp.height}: the workspace keeps its composition (inline mode switch, labelled exit, sticky bars, one-line topic)`,
-        s.tabsShare !== null && s.tabsShare < 0.8 && s.actionsPosition === 'sticky' && s.actionsMarginTop === '6px' && s.exitLabel
+      const dock = s.split ? s.actionsPosition === 'static' && s.actionsMarginTop === '14px' : s.actionsPosition === 'sticky' && s.actionsMarginTop === '6px';
+      await check(`${vp.id} ${vp.width}×${vp.height}: the workspace keeps its composition (inline mode switch, labelled exit, ${s.split ? 'the dock under the sheet' : 'sticky bars'}, one-line topic)`,
+        s.tabsShare !== null && s.tabsShare < 0.8 && dock && s.exitLabel
           && s.peekPosition === 'sticky' && s.peekTop === '52px' && s.nameWrap === 'nowrap' && s.barMinHeight === '52px',
         JSON.stringify(s));
       await goto('/');
       await settle();
-      const shellSig = await page.evaluate(() => ({
-        side: getComputedStyle(document.querySelector('.sidebar')).display !== 'none',
-        bar: !!document.querySelector('.mobilenav') && getComputedStyle(document.querySelector('.mobilenav')).display !== 'none',
-        topbar: Math.round(document.querySelector('.topbar').getBoundingClientRect().height),
-        pad: getComputedStyle(document.querySelector('.content')).paddingBottom
-      }));
-      await check(`${vp.id}: the shell keeps its rail and top bar, no bottom bar`, shellSig.side && !shellSig.bar && shellSig.topbar === 64, JSON.stringify(shellSig));
+      // The v1.0 shell keeps its rail and 64px top bar; the instrument build
+      // keeps its one 54px bar of tabs and has no rail at any width.
+      const shellSig = await page.evaluate(() => {
+        const instrument = document.documentElement.classList.contains('ui-instrument');
+        const topbar = document.querySelector('.topbar') || document.querySelector('[data-instrument-bar]');
+        return {
+          instrument,
+          side: !!document.querySelector('.sidebar') && getComputedStyle(document.querySelector('.sidebar')).display !== 'none',
+          bar: !!document.querySelector('.mobilenav') && getComputedStyle(document.querySelector('.mobilenav')).display !== 'none',
+          topbar: topbar ? Math.round(topbar.getBoundingClientRect().height) : null,
+          pad: getComputedStyle(document.querySelector('.content')).paddingBottom
+        };
+      });
+      await check(`${vp.id}: ${shellSig.instrument ? 'the shell keeps its tab bar, no rail, no bottom bar' : 'the shell keeps its rail and top bar, no bottom bar'}`,
+        // (54px of bar plus its 1px rule.)
+        shellSig.instrument ? !shellSig.side && !shellSig.bar && shellSig.topbar === 55 : shellSig.side && !shellSig.bar && shellSig.topbar === 64, JSON.stringify(shellSig));
     }
     await page.setViewportSize(PHONE);
   }

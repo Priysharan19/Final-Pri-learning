@@ -74,8 +74,8 @@ if (existsSync(FILE)) {
   for (const t of Object.keys(COVERED)) ok(new RegExp(`\\('${t}',`).test(sql), `the migration covers ${t}`);
   // Train 10 decision: the version moves so a server expecting these policies
   // refuses to boot on a database without them (fail closed).
-  ok(/update pri\.platform_meta set value = '13' where key = 'schema_version';/.test(sql) && SCHEMA_VERSION === 13,
-    'schema_version moves to 13 with the build: a schema-13 server refuses a database without these policies');
+  ok(/update pri\.platform_meta set value = '13' where key = 'schema_version';/.test(sql) && SCHEMA_VERSION >= 13,
+    'schema_version moves to 13 with the build (later migrations move it on: 14, 20261022000000_parent_report.sql): a server refuses a database without these policies');
 }
 
 // ── 2–3 · Live Postgres ────────────────────────────────────────────────────

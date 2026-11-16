@@ -2,6 +2,8 @@ import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from
 import { asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
 import { tagPolicy } from './routePolicy.js';
+import { isIP } from 'node:net';
+import { clientIpHeader } from './config.js';
 import { noteSessionCreated } from './sessionAlerts.js';
 import { timedMiddleware } from './requestTiming.js';
 
@@ -389,10 +391,24 @@ export async function consumeRateLimit(db, bucket, { limit, windowMs }, now = Da
   return { allowed: false, remaining: 0, resetAt: (row ? Number(row.window_start) : now) + windowMs };
 }
 
+/**
+ * Who an anonymous request is, for rate limits: the trusted edge's client-address
+ * header when PRI_CLIENT_IP_HEADER names one and it holds exactly one valid IP,
+ * otherwise req.ip. A missing or malformed header never becomes an identity.
+ */
+export function clientIdentity(req, env = process.env) {
+  const header = clientIpHeader(env);
+  if (header) {
+    const value = String(req.get?.(header) ?? req.headers?.[header] ?? '').trim();
+    if (value && !value.includes(',') && isIP(value)) return value;
+  }
+  return req.ip || 'unknown';
+}
+
 export function rateLimit(db, key, options) {
   db = asStore(db);
   return tagPolicy(timedMiddleware('limit', asyncHandler(async (req, res, next) => {
-    const identity = req.platformSession?.account_id || req.ip || 'unknown';
+    const identity = req.platformSession?.account_id || clientIdentity(req);
     const verdict = await consumeRateLimit(db, `${key}:${sha256(identity).slice(0, 24)}`, options);
     res.set('RateLimit-Remaining', String(verdict.remaining));
     res.set('RateLimit-Reset', String(Math.ceil(verdict.resetAt / 1000)));

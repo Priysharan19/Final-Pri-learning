@@ -179,7 +179,12 @@ export function buildDeterministicStoryboard(solution, context = {}) {
     } else if (after) {
       actions.push({ kind: 'focus_math', expression: after, tokens: [] });
     }
-    if (figure && ['graph', 'geometry', 'calculus', 'statistics', 'figure'].includes(concept)) {
+    // A step that carries its own figure (a graph, a region, a conic sketch
+    // drawn for that step of the worked solution) shows it in place of the
+    // question's figure for that scene.
+    if (typeof step?.figure === 'string' && step.figure) {
+      actions.push({ kind: 'show_figure', mode: ['graph', 'geometry', 'calculus', 'statistics'].includes(concept) ? concept : 'figure', step: stepIndex });
+    } else if (figure && ['graph', 'geometry', 'calculus', 'statistics', 'figure'].includes(concept)) {
       actions.push({ kind: 'show_figure', mode: concept });
     }
     // One graph per lesson, on the first step that has one to draw: a curve
@@ -218,8 +223,14 @@ export function buildDeterministicStoryboard(solution, context = {}) {
   return { version: STORYBOARD_VERSION, source: 'deterministic', scenes };
 }
 
-function visualFromAction(action, context) {
+function visualFromAction(action, context, solution) {
   if (!action) return null;
+  if (action.kind === 'show_figure' && Number.isInteger(action.step)) {
+    const stepFigure = solution?.steps?.[action.step]?.figure;
+    return typeof stepFigure === 'string' && stepFigure
+      ? { kind: 'figure', mode: action.mode || 'figure', figure: stepFigure }
+      : null;
+  }
   if (action.kind === 'replay_attempt') {
     const attempt = cleanAttempt(context.wrongAttempt || context.submission);
     if (!attempt) return null;
@@ -260,7 +271,7 @@ export function compileStoryboard(storyboard, solution, context = {}, options = 
   if (!checked.ok) return { ok: false, reason: checked.reason, timeline: [] };
 
   const timeline = checked.storyboard.scenes.map((scene, index) => {
-    const visuals = (scene.actions || []).map(action => visualFromAction(action, context)).filter(Boolean);
+    const visuals = (scene.actions || []).map(action => visualFromAction(action, context, solution)).filter(Boolean);
     const compiled = {
       kind: scene.concept === 'diagnosis' ? 'diagnosis' : 'solution',
       heading: scene.heading,

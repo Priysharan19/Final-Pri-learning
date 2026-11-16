@@ -7,6 +7,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React from 'react';
 import { useT } from '../i18n/index.js';
+import PageLink from './PageLink.jsx';
+import { indiaProgressPracticeHref } from '../lib/practiceLinks.js';
 
 const pctText = v => (v === null || v === undefined ? '—' : `${v}%`);
 const signed = n => (n > 0 ? `+${n}` : String(n));
@@ -19,10 +21,13 @@ function minutes(ms) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function ExamAnalysis({ analysis }) {
+export default function ExamAnalysis({ analysis, track }) {
   const t = useT();
   if (!analysis || !Array.isArray(analysis.sections) || !analysis.sections.length) return null;
   const { pattern, totals, sections, timed, weakChapters = [] } = analysis;
+  // The next step: the weak chapters, or when none fell below half marks the
+  // chapters that lost the most (examAnalysis.js focus), each with Practise.
+  const focus = analysis.focus || { kind: weakChapters.length ? 'weak' : 'none', chapters: weakChapters };
   const jee = pattern === 'jee-main' || pattern === 'jee-advanced';
   const cbse = pattern === 'cbse';
   const partialCol = cbse || pattern === 'jee-advanced';
@@ -102,13 +107,14 @@ export default function ExamAnalysis({ analysis }) {
         </p>
       )}
 
-      {weakChapters.length > 0 && (
-        <div style={{ marginTop: 12 }}>
-          <h3 className="sc-label" style={{ fontSize: 13, margin: '0 0 6px' }}>{t('examAnalysis.weakTitle')}</h3>
-          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 14 }}>
-            {weakChapters.map(c => (
-              <li key={c.id}>
-                {t('examAnalysis.weakItem', { label: c.label, awarded: c.awarded, marks: c.marks, lost: c.lost, wrong: c.wrong, unattempted: c.unattempted })}
+      {focus.chapters.length > 0 && (
+        <div style={{ marginTop: 12 }} data-exam-focus={focus.kind}>
+          <h3 className="sc-label" style={{ fontSize: 13, margin: '0 0 6px' }}>{t(focus.kind === 'weak' ? 'examAnalysis.weakTitle' : 'examAnalysis.mostLostTitle')}</h3>
+          <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', fontSize: 14, display: 'grid', gap: 8 }}>
+            {focus.chapters.map(c => (
+              <li key={c.id} className="spread" style={{ gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ minWidth: 0 }}>{t('examAnalysis.weakItem', { label: c.label, awarded: c.awarded, marks: c.marks, lost: c.lost, wrong: c.wrong, unattempted: c.unattempted })}</span>
+                <PageLink className="btn btn-ghost btn-sm" to={indiaProgressPracticeHref({ id: c.id }, track)} data-exam-practise={c.id}>{t('examAnalysis.practise', { label: c.label })}</PageLink>
               </li>
             ))}
           </ul>

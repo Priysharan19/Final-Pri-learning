@@ -37,11 +37,14 @@
 // coverage entry claims these generators below or above D3, and the check
 // fails if one ever does, so the label a student sees is always D3.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, gcd, makeRng } from '../qhelpers.js';
+import { ri, rc, gcd, makeRng, term } from '../qhelpers.js';
 import { frac, fracTex, IN_NAMES, IN_CITIES } from './india-native-helpers.js';
 import {
   FALLBACK_SEED, traps, texNum, dec, numericAnswer, ordinal, pick, shuffled, plusConst, linearTex
 } from './india-class7-hardest-kit.js';
+
+/** A magnitude written in front of a letter: 1 → "b", 3 → "3b" (the sign is written separately). */
+const mag = (k, v) => `${Math.abs(k) === 1 ? '' : Math.abs(k)}${v}`;
 
 const list = items => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`);
 const times = m => (m === 2 ? 'twice' : m === 3 ? 'three times' : `${m} times`);
@@ -868,8 +871,8 @@ function bracketFormula(rng) {
         'Then put in the values, taking care with the negative numbers.'
       ],
       steps: [
-        { h: 'Open the brackets', d: `$${k1 * m1}a ${k1 * n1 < 0 ? '-' : '+'} ${Math.abs(k1 * n1)}b - ${k2 * m2}a ${-k2 * n2 < 0 ? '-' : '+'} ${Math.abs(k2 * n2)}b${plusConst(c)}$` },
-        { h: 'Collect', d: `$${ca}a ${cb < 0 ? '-' : '+'} ${Math.abs(cb)}b${plusConst(c)}$` },
+        { h: 'Open the brackets', d: `$${term(k1 * m1, 'a')} ${k1 * n1 < 0 ? '-' : '+'} ${mag(k1 * n1, 'b')} - ${mag(k2 * m2, 'a')} ${-k2 * n2 < 0 ? '-' : '+'} ${mag(k2 * n2, 'b')}${plusConst(c)}$` },
+        { h: 'Collect', d: `$${ca === 0 ? `${cb < 0 ? '-' : ''}${mag(cb, 'b')}` : `${term(ca, 'a')} ${cb < 0 ? '-' : '+'} ${mag(cb, 'b')}`}${plusConst(c)}$` },
         { h: 'Substitute', d: `$${ca} \\times ${paren(a)} ${cb < 0 ? '-' : '+'} ${Math.abs(cb)} \\times ${paren(b)}${plusConst(c)} = ${value}$` }
       ]
     };
@@ -1705,8 +1708,8 @@ function smallestMultiplier(rng) {
         'Try whole numbers for $k$ near where the combined fraction equals 1.'
       ],
       steps: [
-        { h: 'Combined multiplier', d: `$\\dfrac{${p}}{${q}} \\times \\dfrac{k}{${r}} = \\dfrac{${p}k}{${q * r}}$` },
-        { h: 'Condition', d: `$\\dfrac{${p}k}{${q * r}} ${ask === 'smallest' ? '>' : '<'} 1$ means $${p}k ${ask === 'smallest' ? '>' : '<'} ${q * r}$` },
+        { h: 'Combined multiplier', d: `$\\dfrac{${p}}{${q}} \\times \\dfrac{k}{${r}} = \\dfrac{${term(p, 'k')}}{${q * r}}$` },
+        { h: 'Condition', d: `$\\dfrac{${term(p, 'k')}}{${q * r}} ${ask === 'smallest' ? '>' : '<'} 1$ means $${term(p, 'k')} ${ask === 'smallest' ? '>' : '<'} ${q * r}$` },
         { h: 'Answer', d: `$k = ${answer}$ ($${p} \\times ${answer} = ${p * answer}$)` }
       ]
     };

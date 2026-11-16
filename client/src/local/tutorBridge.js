@@ -21,14 +21,35 @@ export function setTutorTransportForTests(fn) {
   override = typeof fn === 'function' ? fn : null;
 }
 
+let lineOverride = null;
+/** Tests replace the line-check transport; production never calls this. */
+export function setLineCheckTransportForTests(fn) {
+  lineOverride = typeof fn === 'function' ? fn : null;
+}
+
+/** Ask /v1/tutor/line-check. Resolves to { lineCheck } or { error: { code } }; never rejects. */
+export async function requestLineCheck(body, { signal = null } = {}) {
+  if (!tutorFeatureEnabled()) return { error: { code: 'TUTOR_DISABLED' } };
+  try {
+    if (lineOverride) return await lineOverride(body, { signal });
+    if (!cloudAvailable()) return { error: { code: 'TUTOR_OFFLINE' } };
+    const response = await cloud.tutorLineCheck(body, { signal });
+    if (!response?.lineCheck) return { error: { code: 'TUTOR_MALFORMED' } };
+    return { lineCheck: response.lineCheck };
+  } catch (error) {
+    return { error: { code: String(error?.code || 'TUTOR_FAILED').slice(0, 60) } };
+  }
+}
+
 /** Ask /v1/tutor/help. Resolves to { tutor } or { error: { code } }; never rejects. */
-export async function requestTutorHelp(body, { signal = null } = {}) {
+export async function requestTutorHelp(body, { signal = null, timeoutMs = TIMEOUT_MS } = {}) {
   // Dark by default: with the feature off nothing is sent to /v1/tutor.
   if (!tutorFeatureEnabled()) return { error: { code: 'TUTOR_DISABLED' } };
   try {
-    if (override) return await override(body, { signal });
+    if (override) return await override(body, { signal, timeoutMs });
     if (!cloudAvailable()) return { error: { code: 'TUTOR_OFFLINE' } };
-    const response = await cloud.tutorHelp(body, { signal, timeoutMs: TIMEOUT_MS });
+    // A diagnosis asks for longer (high reasoning effort); never past a minute.
+    const response = await cloud.tutorHelp(body, { signal, timeoutMs: Math.min(60_000, Math.max(1_000, Number(timeoutMs) || TIMEOUT_MS)) });
     if (!response?.tutor) return { error: { code: 'TUTOR_MALFORMED' } };
     return { tutor: response.tutor };
   } catch (error) {

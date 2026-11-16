@@ -3,11 +3,11 @@
 // These questions cover the current outcome "formulate and solve situational
 // problems leading to a quadratic equation". Each problem has one physically
 // meaningful positive solution and an explicit modelling step.
-import { ri, rc } from '../qhelpers.js';
+import { ri, rc, term } from '../qhelpers.js';
 
 function rectangleProblem(rng, harder = false) {
-  const width = ri(rng, harder ? 7 : 4, harder ? 16 : 11);
-  const gap = ri(rng, 2, harder ? 8 : 5);
+  const width = ri(rng, harder ? 7 : 3, harder ? 250 : 150);
+  const gap = ri(rng, 1, harder ? 90 : 60);
   const length = width + gap;
   const area = width * length;
   return {
@@ -20,12 +20,12 @@ function rectangleProblem(rng, harder = false) {
     hints: [
       'Let the width be $x$ metres.',
       `Then the length is $x+${gap}$ and area gives $x(x+${gap})=${area}$.`,
-      `Solve $x^2+${gap}x-${area}=0$ and keep the positive length.`
+      `Solve $x^2+${term(gap)}-${area}=0$ and keep the positive length.`
     ],
     steps: [
       { h: 'Choose the variable', d: 'Let the width be $x$ m.' },
       { h: 'Model the area', d: `$x(x+${gap})=${area}$` },
-      { h: 'Form the quadratic', d: `$x^2+${gap}x-${area}=0$` },
+      { h: 'Form the quadratic', d: `$x^2+${term(gap)}-${area}=0$` },
       { h: 'Solve and interpret', d: `$(x-${width})(x+${length})=0$, so $x=${width}$ or $x=-${length}$. Reject the negative length.` },
       { h: 'Answer', d: `Width $=${width}$ m.` }
     ],
@@ -34,7 +34,7 @@ function rectangleProblem(rng, harder = false) {
 }
 
 function consecutiveProblem(rng, even = false) {
-  const first = even ? 2 * ri(rng, 2, 9) : ri(rng, 4, 15);
+  const first = even ? 2 * ri(rng, 2, 400) : ri(rng, 4, 800);
   const step = even ? 2 : 1;
   const second = first + step;
   const product = first * second;
@@ -50,7 +50,7 @@ function consecutiveProblem(rng, even = false) {
     steps: [
       { h: 'Represent the integers', d: `$x$ and $x+${step}$` },
       { h: 'Use their product', d: `$x(x+${step})=${product}$` },
-      { h: 'Form the quadratic', d: `$x^2+${step}x-${product}=0$` },
+      { h: 'Form the quadratic', d: `$x^2+${term(step)}-${product}=0$` },
       { h: 'Factorise', d: `$(x-${first})(x+${second})=0$` },
       { h: 'Interpret', d: `$x=${first}$ or $x=-${second}$; the positive context gives $x=${first}$.` }
     ],
@@ -59,11 +59,16 @@ function consecutiveProblem(rng, even = false) {
 }
 
 function speedProblem(rng) {
-  const slow = ri(rng, 20, 45);
-  const increase = rc(rng, [5, 10, 15]);
+  // d/slow − d/(slow+increase) = 1 needs d = slow·(slow+increase)/increase to be
+  // a whole number: redraw (bounded) until it is; the rectangle is the fallback.
+  let slow = 0, increase = 0, distance = 0.5;
+  for (let tries = 0; tries < 40 && !Number.isInteger(distance); tries++) {
+    slow = ri(rng, 12, 150);
+    increase = rc(rng, [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 24, 25, 30, 40]);
+    distance = slow * (slow + increase) / increase;
+  }
   const fast = slow + increase;
   const timeSaved = 1;
-  const distance = slow * fast / increase; // d/slow - d/fast = 1
   if (!Number.isInteger(distance)) return rectangleProblem(rng, true);
   return {
     prompt: `A car travels $${distance}$ km. If its speed were $${increase}$ km/h faster, the journey would take $${timeSaved}$ hour less. Find the original speed.`,
@@ -78,7 +83,7 @@ function speedProblem(rng) {
       { h: 'Model the two times', d: `$\\dfrac{${distance}}{x}$ and $\\dfrac{${distance}}{x+${increase}}$ hours` },
       { h: 'Use the one-hour difference', d: `$\\dfrac{${distance}}{x}-\\dfrac{${distance}}{x+${increase}}=1$` },
       { h: 'Clear denominators', d: `$${distance * increase}=x(x+${increase})$` },
-      { h: 'Form the quadratic', d: `$x^2+${increase}x-${distance * increase}=0$` },
+      { h: 'Form the quadratic', d: `$x^2+${term(increase)}-${distance * increase}=0$` },
       { h: 'Solve and interpret', d: `$(x-${slow})(x+${fast})=0$, so the positive speed is $${slow}$ km/h.` }
     ],
     modelKind: 'speed-time'

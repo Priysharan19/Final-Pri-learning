@@ -20,7 +20,7 @@
 //   node scripts/ci-provision-simulators.mjs --boot ipad   # create both, boot the iPad only
 //   node scripts/ci-provision-simulators.mjs --create      # always create (tests the create path)
 // ─────────────────────────────────────────────────────────────────────────────
-import { FAMILIES, bootFamily, keepOnlySimulator, simctl } from './simulator-fleet.mjs';
+import { FAMILIES, bootFamily, keepOnlySimulator, requiredRuntime, runtimeMatches, simctl } from './simulator-fleet.mjs';
 
 // Preferred device types, in order: a standard 6.1" iPhone (393pt, the width
 // the journey's Dynamic Type step was certified at) and a standard iPad.
@@ -37,11 +37,19 @@ const fail = msg => { console.log(`::error::${msg}`); process.exit(1); };
 // flag fails the step at once.
 let toBoot = null;
 try { toBoot = bootFamily(process.argv); } catch (error) { fail(String(error?.message || error)); }
+// The lane names its iOS runtime (PRI_SIM_RUNTIME / --runtime); on CI it must.
+// Only devices on that runtime are used or created, and a runner image that
+// does not carry it fails this step by name instead of running on another iOS.
+let pin = null;
+try { pin = requiredRuntime(); } catch (error) { fail(String(error?.message || error)); }
 
-const runtimes = json('runtimes').runtimes
+const installed = json('runtimes').runtimes
   .filter(r => r.isAvailable !== false && (r.platform === 'iOS' || /SimRuntime\.iOS-/.test(r.identifier)))
   .sort((a, b) => newer(version(a.version), version(b.version)));
-if (!runtimes.length) fail('No iOS simulator runtime is installed on this runner (xcrun simctl list runtimes)');
+if (!installed.length) fail('No iOS simulator runtime is installed on this runner (xcrun simctl list runtimes)');
+const runtimes = installed.filter(r => runtimeMatches(`iOS ${r.version}`, pin));
+if (!runtimes.length) fail(`The pinned iOS ${pin} simulator runtime is not installed on this runner (installed: ${installed.map(r => r.name).join(', ')}). Install it (xcodebuild -downloadPlatform iOS) or change the lane's pin deliberately; never let the gate move to another iOS.`);
+console.log(pin ? `iOS runtime pinned to ${pin}: ${runtimes.map(r => r.name).join(', ')}` : `iOS runtime not pinned (local run): newest is ${runtimes[0].name}`);
 
 const deviceTypes = json('devicetypes').devicetypes;
 const devices = json('devices', 'available').devices;

@@ -5,8 +5,14 @@
 // The runtime content is rewritten for Pri Learning. It preserves every
 // mathematical idea, worked example, Exercise 2.1 item, Exercise 2.2 item,
 // chapter-summary point, and the intentionally blank Notes page in the upload.
+//
+// Served questions are original. Every generator below draws its own
+// equation and solves it itself; none carries an NCERT exercise or example
+// number and none serves a textbook item (NCERT's reuse terms; audit item 6,
+// Nov 2026). The textbook's exercise items stay in NCERT_CLASS8_LINEAR_EXERCISES
+// for the chapter shell's worked source checks only.
 
-import { ri, rc, mcq, Frac, poly } from '../qhelpers.js';
+import { ri, rc, mcq, Frac, poly, term } from '../qhelpers.js';
 
 export const NCERT_CLASS8_LINEAR_DOTPOINTS = Object.freeze([
   'Distinguish expressions from equations, identify LHS/RHS and linearity, and understand a solution as the value that makes both sides equal',
@@ -14,7 +20,7 @@ export const NCERT_CLASS8_LINEAR_DOTPOINTS = Object.freeze([
   'Reduce equations with fractions, brackets and decimals to a simpler linear form, solve exactly and check by substitution',
   'Choose efficient denominator-clearing and simplification strategies before isolating the variable',
   'Diagnose common sign, transposition, distribution and denominator errors in linear-equation working',
-  'Solve the complete NCERT Exercise 2.1 and Exercise 2.2 styles with fully worked verification'
+  'Solve mixed equations drawn from every form in the chapter, with fully worked verification'
 ]);
 
 export const NCERT_CLASS8_LINEAR_GENERATOR_IDS = Object.freeze([
@@ -107,7 +113,7 @@ export const NCERT_CLASS8_LINEAR_TOPPER_NOTES = Object.freeze([
       'Find the LCM of all numerical denominators appearing in the equation.',
       'Multiply every term on both sides by that LCM. Do not multiply only the fractional terms.',
       'After denominators disappear, solve the resulting integer-coefficient equation.',
-      'NCERT Example 16 uses 6 because it is the smallest common multiple of 3 and 6.'
+      'The denominator-clearing worked example uses 6 because it is the smallest common multiple of 3 and 6.'
     ],
     edge: 'Topper habit: write one denominator-clearing line before expanding. This makes it visually obvious whether every term received the multiplier.'
   },
@@ -118,7 +124,7 @@ export const NCERT_CLASS8_LINEAR_TOPPER_NOTES = Object.freeze([
       'A factor outside a bracket multiplies every term inside: a(b + c) = ab + ac and a(b − c) = ab − ac.',
       'A negative multiplier changes the sign of every term in the bracket.',
       'After expansion, combine x-terms with x-terms and constants with constants separately.',
-      'NCERT Example 17 becomes x + 14 on the LHS before any transposition is attempted.'
+      'In the bracketed worked example the LHS becomes x + 14 before any transposition is attempted.'
     ],
     edge: 'Topper habit: simplify LHS and RHS independently first. Then solve the cleaner equation. This separates arithmetic errors from equation-solving errors.'
   },
@@ -159,7 +165,7 @@ export const NCERT_CLASS8_LINEAR_TOPPER_NOTES = Object.freeze([
 export const NCERT_CLASS8_LINEAR_WORKED_EXAMPLES = Object.freeze([
   {
     id: 'ncert-example-1',
-    title: 'NCERT Example 1 · variable on both sides',
+    title: 'Worked example 1 · variable on both sides',
     prompt: '$2x-3=x+2$',
     steps: [
       'Add 3 to both sides: $2x=x+5$.',
@@ -172,7 +178,7 @@ export const NCERT_CLASS8_LINEAR_WORKED_EXAMPLES = Object.freeze([
   },
   {
     id: 'ncert-example-2',
-    title: 'NCERT Example 2 · fractional coefficients',
+    title: 'Worked example 2 · fractional coefficients',
     prompt: '$5x+\\frac72=\\frac32x-14$',
     steps: [
       'Multiply every term on both sides by 2: $10x+7=3x-28$.',
@@ -185,7 +191,7 @@ export const NCERT_CLASS8_LINEAR_WORKED_EXAMPLES = Object.freeze([
   },
   {
     id: 'ncert-example-16',
-    title: 'NCERT Example 16 · LCM and bracket opening',
+    title: 'Worked example 3 · LCM and bracket opening',
     prompt: '$\\frac{6x+1}{3}+1=\\frac{x-3}{6}$',
     steps: [
       'The LCM of 3 and 6 is 6. Multiply the entire equation by 6.',
@@ -200,7 +206,7 @@ export const NCERT_CLASS8_LINEAR_WORKED_EXAMPLES = Object.freeze([
   },
   {
     id: 'ncert-example-17',
-    title: 'NCERT Example 17 · simplify both sides first',
+    title: 'Worked example 4 · simplify both sides first',
     prompt: '$5x-2(2x-7)=2(3x-1)+\\frac72$',
     steps: [
       'Simplify the LHS: $5x-4x+14=x+14$.',
@@ -248,15 +254,29 @@ const byExercise = ex => NCERT_CLASS8_LINEAR_EXERCISES.filter(q => q.exercise ==
 export const NCERT_CLASS8_LINEAR_EXERCISE_21 = Object.freeze(byExercise('2.1'));
 export const NCERT_CLASS8_LINEAR_EXERCISE_22 = Object.freeze(byExercise('2.2'));
 
-const frac = a => new Frac(a.n, a.d);
-const answerContract = a => {
-  const f = frac(a);
-  return f.d === 1
-    ? { value: f.n }
-    : { value: f.value, simplestFraction: { n: f.n, d: f.d } };
-};
-const answerLatex = a => frac(a).latex();
-const signedLatex = f => f.n < 0 ? `-${new Frac(-f.n, f.d).latex()}` : `+${f.latex()}`;
+const gcdInt = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a || 1; };
+/** "+5" / "-5" / "" — an integer constant appended to an expression, never "+0". */
+const sgnInt = k => (k === 0 ? '' : k > 0 ? `+${k}` : `${k}`);
+/**
+ * A fractional term with the sign in front and the fraction in lowest terms:
+ * "+\frac{2x}{3}", "-\frac{x}{3}", "+x" when the denominator cancels, "" for 0.
+ */
+function fracTerm(c, v, den, { lead = false } = {}) {
+  if (c === 0) return '';
+  const g = gcdInt(c, den);
+  const num = Math.abs(c) / g, d = den / g;
+  const body = d === 1 ? term(num, v) : `\\frac{${num === 1 ? v : `${num}${v}`}}{${d}}`;
+  if (c < 0) return `-${body}`;
+  return lead ? body : `+${body}`;
+}
+/** A fractional constant with the sign in front and in lowest terms: "+\frac{3}{4}", "-2", "" for 0. */
+function fracConst(n, den, { lead = false } = {}) {
+  const f = new Frac(n, den);
+  if (f.n === 0) return '';
+  const body = f.d === 1 ? String(Math.abs(f.n)) : new Frac(Math.abs(f.n), f.d).latex();
+  if (f.n < 0) return `-${body}`;
+  return lead ? body : `+${body}`;
+}
 
 function numericQuestion(prompt, answer, { hints = [], steps = [], traps = [], variable = 'x', inputHint } = {}) {
   const f = answer instanceof Frac ? answer : new Frac(answer, 1);
@@ -310,12 +330,12 @@ function bothSidesParts(rng, diff) {
     hints: [
       `Collect the ${variable}-terms on one side.`,
       'Collect constants on the other side.',
-      `The equation reduces to $${a-c}${variable}=${d-b}$.`
+      `The equation reduces to $${term(a - c, variable)}=${d - b}$.`
     ],
     steps: [
       { h: 'Original equation', d: prompt },
-      { h: 'Collect variable terms', d: `$${fmtLin(a-c, b, variable)}=${d}$` },
-      { h: 'Collect constants', d: `$${a-c}${variable}=${d-b}$` },
+      { h: 'Collect variable terms', d: `$${fmtLin(a - c, b, variable)}=${d}$` },
+      { h: 'Collect constants', d: `$${term(a - c, variable)}=${d - b}$` },
       { h: 'Divide', d: `$${variable}=${sol}$` },
       { h: 'Check', d: `Substituting ${sol} into both original sides gives the same value.` }
     ],
@@ -335,20 +355,51 @@ function bracketGenerated(rng, diff) {
   const k = ri(rng, -6, 6) || 2;
   const b = ri(rng, -8, 8);
   const d = p * (sol + k) + b - q * sol;
-  const kText = k >= 0 ? `+${k}` : `${k}`;
-  const bText = b >= 0 ? `+${b}` : `${b}`;
+  const kText = sgnInt(k);
+  const bText = sgnInt(b);
   const prompt = `$${p}(${v}${kText})${bText}=${fmtLin(q, d, v)}$`;
   return numericQuestion(prompt, sol, {
     variable: v,
     hints: ['Expand the bracket first.', 'Combine like terms on each side.', 'Then collect variable terms and constants.'],
     steps: [
-      { h: 'Expand', d: `$${p}${v}${p*k >= 0 ? '+' : ''}${p*k}${bText}=${fmtLin(q, d, v)}$` },
-      { h: 'Combine constants', d: `$${fmtLin(p, p*k+b, v)}=${fmtLin(q, d, v)}$` },
-      { h: 'Collect variable terms', d: `$${p-q}${v}=${d-(p*k+b)}$` },
+      { h: 'Expand', d: `$${fmtLin(p, p * k, v)}${bText}=${fmtLin(q, d, v)}$` },
+      { h: 'Combine constants', d: `$${fmtLin(p, p * k + b, v)}=${fmtLin(q, d, v)}$` },
+      { h: 'Collect variable terms', d: `$${term(p - q, v)}=${d - (p * k + b)}$` },
       { h: 'Solve', d: `$${v}=${sol}$` },
       { h: 'Check', d: `Substitute ${sol} into the original bracketed equation.` }
     ]
   });
+}
+
+// a(bv − c) − d(ev − f) = g(hv − k) + m: three brackets, like terms on both
+// sides, m chosen so the solution is the integer drawn.
+function threeBracketGenerated(rng) {
+  const v = rc(rng, ['x', 'z', 't']);
+  for (let guard = 0; guard < 60; guard++) {
+    const sol = ri(rng, -5, 8);
+    const a = ri(rng, 2, 5), b = ri(rng, 1, 5), c = ri(rng, 1, 9);
+    const d = ri(rng, 2, 5), e = ri(rng, 1, 5), f = ri(rng, 1, 9);
+    const g = ri(rng, 2, 5), h = ri(rng, 1, 6), k = ri(rng, 1, 9);
+    const coefL = a * b - d * e, constL = -a * c + d * f;
+    const coefR = g * h;
+    if (coefL === coefR || coefL === 0) continue;
+    const m = (coefL * sol + constL) - (coefR * sol - g * k);
+    const constR = -g * k + m;
+    const prompt = `$${a}(${poly([b, -c], v)})-${d}(${poly([e, -f], v)})=${g}(${poly([h, -k], v)})${sgnInt(m)}$`;
+    return numericQuestion(prompt, sol, {
+      variable: v,
+      hints: ['Expand every bracket, watching the sign in front of the second one.', 'Combine like terms on each side separately.', 'Then collect variable terms and constants.'],
+      steps: [
+        { h: 'Expand the left side', d: `$${poly([a * b, -a * c], v)}${poly([-d * e, d * f], v).startsWith('-') ? '' : '+'}${poly([-d * e, d * f], v)}$` },
+        { h: 'Simplify each side', d: `$${poly([coefL, constL], v)}=${poly([coefR, constR], v)}$` },
+        { h: 'Collect variable terms', d: `$${term(coefL - coefR, v)}=${constR - constL}$` },
+        { h: 'Solve', d: `$${v}=${sol}$` },
+        { h: 'Check', d: `Substitute ${sol} into each bracket of the original equation; both sides agree.` }
+      ],
+      traps: [{ value: -sol, why: 'A sign in front of a bracket changes the sign of every term inside it.' }]
+    });
+  }
+  return bracketGenerated(rng, 4);
 }
 
 function fractionGenerated(rng, diff) {
@@ -357,22 +408,53 @@ function fractionGenerated(rng, diff) {
   const sol = ri(rng, -9, 12);
   const a = ri(rng, 2, 6);
   let c = ri(rng, -2, 5);
+  if (c === 0) c = 1;
   if (a * den === c) c += 1;
-  const b = ri(rng, -8, 8);
-  // a*v + b/den = (c/den)*v + d, with integer d chosen to force sol.
+  let b = ri(rng, -8, 8);
+  while (b % den === 0) b += 1;
+  // a*v + b/den = (c/den)*v + dNum/den, with integer dNum chosen to force sol.
   const dNum = (a * den - c) * sol + b;
-  const dFrac = new Frac(dNum, den);
-  const prompt = `$${a}${v}+\\frac{${b}}{${den}}=\\frac{${c}${v}}{${den}}${signedLatex(dFrac)}$`;
+  const prompt = `$${a}${v}${fracConst(b, den)}=${fracTerm(c, v, den, { lead: true })}${fracConst(dNum, den)}$`;
   return numericQuestion(prompt, sol, {
     variable: v,
     hints: [`Multiply the entire equation by ${den}.`, 'Then solve the integer-coefficient equation.', 'Check in the original fractional equation.'],
     steps: [
-      { h: 'Clear denominators', d: `$${a*den}${v}${b >= 0 ? '+' : ''}${b}=${c}${v}${dNum >= 0 ? '+' : ''}${dNum}$` },
-      { h: 'Collect variable terms', d: `$${a*den-c}${v}=${dFrac.n-b}$` },
+      { h: 'Clear denominators', d: `$${poly([a * den, b], v)}=${poly([c, dNum], v)}$` },
+      { h: 'Collect variable terms', d: `$${term(a * den - c, v)}=${dNum - b}$` },
       { h: 'Solve', d: `$${v}=${sol}$` },
       { h: 'Check', d: `Substituting ${sol} makes both original sides equal.` }
     ]
   });
+}
+
+// (av + b)/p = (cv + d)/q: a fraction on each side, cleared by cross-multiplying.
+function fractionTwoSidedGenerated(rng) {
+  const v = rc(rng, ['x', 'y', 't']);
+  for (let guard = 0; guard < 60; guard++) {
+    const sol = ri(rng, -6, 9);
+    const p = rc(rng, [2, 3, 4, 5]);
+    let q = rc(rng, [2, 3, 4, 5, 6]);
+    if (q === p) q += 1;
+    const a = ri(rng, 1, 5), c = ri(rng, 1, 5);
+    const m = ri(rng, -4, 6);
+    const b = p * m - a * sol;
+    const d = q * m - c * sol;
+    if (a * q === c * p || b === 0 || d === 0) continue;
+    const prompt = `$\\frac{${poly([a, b], v)}}{${p}}=\\frac{${poly([c, d], v)}}{${q}}$`;
+    return numericQuestion(prompt, sol, {
+      variable: v,
+      hints: [`Multiply both sides by ${p * q}, or cross-multiply.`, 'Expand both brackets.', 'Collect variable terms on one side and constants on the other.'],
+      steps: [
+        { h: 'Cross-multiply', d: `$${q}(${poly([a, b], v)})=${p}(${poly([c, d], v)})$` },
+        { h: 'Expand', d: `$${poly([q * a, q * b], v)}=${poly([p * c, p * d], v)}$` },
+        { h: 'Collect variable terms', d: `$${term(q * a - p * c, v)}=${p * d - q * b}$` },
+        { h: 'Solve', d: `$${v}=${sol}$` },
+        { h: 'Check', d: `At ${v} = ${sol} both fractions equal ${m}.` }
+      ],
+      traps: [{ value: -sol, why: 'Each denominator multiplies the whole of the other side, not one term of it.' }]
+    });
+  }
+  return fractionGenerated(rng, 4);
 }
 
 function decimalGenerated(rng, diff) {
@@ -383,34 +465,52 @@ function decimalGenerated(rng, diff) {
   if (Math.abs(a - c) < 1e-9) c = 0.1;
   const b = ri(rng, -8, 8) / 10;
   const d = Math.round(((a - c) * sol + b) * 100) / 100;
-  const prompt = `$${a}${v}${b >= 0 ? '+' : ''}${b}=${c}${v}${d >= 0 ? '+' : ''}${d}$`;
+  const dec = k => (k === 0 ? '' : k > 0 ? `+${k}` : `${k}`);
+  const prompt = `$${a}${v}${dec(b)}=${c}${v}${dec(d)}$`;
   return numericQuestion(prompt, sol, {
     variable: v,
     hints: ['Multiply the whole equation by 100 to clear terminating decimals.', 'Collect variable terms.', 'Then divide by the final coefficient.'],
     steps: [
-      { h: 'Clear decimals', d: `Multiply every term by 100.` },
-      { h: 'Collect terms', d: `$${Math.round((a-c)*100)}${v}=${Math.round((d-b)*100)}$` },
+      { h: 'Clear decimals', d: `Multiply every term by 100: $${poly([Math.round(a * 100), Math.round(b * 100)], v)}=${poly([Math.round(c * 100), Math.round(d * 100)], v)}$` },
+      { h: 'Collect terms', d: `$${term(Math.round((a - c) * 100), v)}=${Math.round((d - b) * 100)}$` },
       { h: 'Solve', d: `$${v}=${sol}$` },
       { h: 'Check', d: `Substitute ${sol} in the original decimal equation.` }
     ]
   });
 }
 
-function sourceQuestion(item) {
-  const f = frac(item.answer);
-  return {
-    prompt: `NCERT Exercise ${item.exercise} Q${item.q}: ${item.prompt}`,
-    answerType: 'numeric',
-    answer: answerContract(item.answer),
-    inputHint: f.d === 1 ? `e.g. ${f.n}` : `e.g. ${item.displayAnswer || f.str()}`,
-    hints: [
-      'Simplify each side before moving terms.',
-      'Clear fractions or decimals first when that shortens the equation.',
-      `The final exact value is checked by substituting back into the original ${item.variable}-equation.`
-    ],
-    steps: item.steps.map((d, i) => ({ h: i === item.steps.length - 1 ? 'Check / result' : `Step ${i + 1}`, d })),
-    solutionText: `${item.variable} = ${item.displayAnswer || f.str()}`
-  };
+// A(av − b) = B(cv − d) with decimal multipliers whose ratio is a small
+// integer, so clearing them by 100 leaves an integer-coefficient equation.
+const DECIMAL_PAIRS = Object.freeze([[0.25, 0.05, 5], [0.5, 0.1, 5], [0.2, 0.1, 2], [0.4, 0.2, 2], [0.3, 0.1, 3]]);
+function decimalBracketsGenerated(rng) {
+  const v = rc(rng, ['x', 'f', 't']);
+  for (let guard = 0; guard < 60; guard++) {
+    const [A, B, ratio] = rc(rng, DECIMAL_PAIRS);
+    const sol = ri(rng, -4, 9);
+    const a = ri(rng, 2, 6), b = ri(rng, 1, 9), c = ri(rng, 2, 9);
+    const d = c * sol - ratio * (a * sol - b);
+    if (ratio * a === c || d === 0) continue;
+    const P = Math.round(A * 100), Q = Math.round(B * 100);
+    const prompt = `$${A}(${poly([a, -b], v)})=${B}(${poly([c, -d], v)})$`;
+    return numericQuestion(prompt, sol, {
+      variable: v,
+      hints: ['Multiply the whole equation by 100 to turn the decimals into whole numbers.', 'Expand both brackets.', 'Collect variable terms and constants, then divide.'],
+      steps: [
+        { h: 'Clear decimals', d: `Multiply by 100: $${P}(${poly([a, -b], v)})=${Q}(${poly([c, -d], v)})$` },
+        { h: 'Expand', d: `$${poly([P * a, -P * b], v)}=${poly([Q * c, -Q * d], v)}$` },
+        { h: 'Collect variable terms', d: `$${term(P * a - Q * c, v)}=${P * b - Q * d}$` },
+        { h: 'Solve', d: `$${v}=${sol}$` },
+        { h: 'Check', d: `Substitute ${sol} into both brackets of the original equation; the two sides agree.` }
+      ],
+      traps: [{ value: -sol, why: 'Multiplying by 100 scales both sides; the brackets still have to be expanded with their signs.' }]
+    });
+  }
+  return decimalGenerated(rng, 4);
+}
+
+// A mixed-review draw adds the chapter's verification standard to its steps.
+function withVerification(q) {
+  return { ...q, steps: [...q.steps, { h: 'Verification standard', d: 'Evaluate the original LHS and RHS independently with this value and state LHS = RHS.' }] };
 }
 
 export const NCERT_CLASS8_LINEAR_GENERATORS = Object.freeze({
@@ -431,67 +531,69 @@ export const NCERT_CLASS8_LINEAR_GENERATORS = Object.freeze({
         { h: 'Linear', d: 'Its highest appearing power is 1.' }
       ]
     );
+    // ax − b = c, drawn fresh each time, with integer solution s.
+    const a = ri(rng, 2, 6), s = ri(rng, 2, 9), b = ri(rng, 1, 9), c = a * s - b;
+    const eq = `${a}x-${b}=${c}`;
     if (diff === 2) return propertyMcq(
       rng,
-      'For $2x-3=7$, what are the LHS and RHS?',
-      'LHS = 2x − 3 and RHS = 7',
+      `For $${eq}$, what are the LHS and RHS?`,
+      `LHS = ${a}x − ${b} and RHS = ${c}`,
       [
-        { text: 'LHS = 2x and RHS = 3 + 7', why: 'The equality sign separates the complete expressions, not individual terms.' },
-        { text: 'LHS = 7 and RHS = 2x − 3', why: 'LHS is literally the expression written on the left of =.' },
+        { text: `LHS = ${a}x and RHS = ${b} + ${c}`, why: 'The equality sign separates the complete expressions, not individual terms.' },
+        { text: `LHS = ${c} and RHS = ${a}x − ${b}`, why: 'LHS is literally the expression written on the left of =.' },
         { text: 'There is no LHS/RHS until x is known', why: 'LHS and RHS name the expressions before solving.' }
       ],
       ['Look only at the equality sign.', 'Everything to its left is the LHS.', 'Everything to its right is the RHS.'],
       [
-        { h: 'Locate =', d: '$2x-3\\;=\\;7$' },
-        { h: 'Read left', d: 'LHS is $2x-3$.' },
-        { h: 'Read right', d: 'RHS is $7$.' }
+        { h: 'Locate =', d: `$${a}x-${b}\\;=\\;${c}$` },
+        { h: 'Read left', d: `LHS is $${a}x-${b}$.` },
+        { h: 'Read right', d: `RHS is $${c}$.` }
       ]
     );
-    if (diff === 3) return numericQuestion('Find the value of x that makes $2x-3=7$ true.', 5, {
-      hints: ['Add 3 to both sides.', 'Then divide by 2.', 'Check LHS against RHS.'],
+    if (diff === 3) return numericQuestion(`Find the value of x that makes $${eq}$ true.`, s, {
+      hints: [`Add ${b} to both sides.`, `Then divide by ${a}.`, 'Check LHS against RHS.'],
       steps: [
-        { h: 'Add 3', d: '$2x=10$' },
-        { h: 'Divide by 2', d: '$x=5$' },
-        { h: 'Check', d: '$2(5)-3=7$, which equals the RHS.' }
-      ]
+        { h: `Add ${b}`, d: `$${a}x=${a * s}$` },
+        { h: `Divide by ${a}`, d: `$x=${s}$` },
+        { h: 'Check', d: `$${a}(${s})-${b}=${c}$, which equals the RHS.` }
+      ],
+      traps: [{ value: (c - b) / a, why: `The ${b} is subtracted on the left, so it is added to both sides, not subtracted again.` }]
     });
+    const w = s + rc(rng, [2, 3, 4, 5]);
+    const lhsAtW = a * w - b;
     return propertyMcq(
       rng,
-      'Why is x = 10 **not** a solution of $2x-3=7$?',
-      'Substitution gives LHS = 17 while RHS = 7, so the equality is false.',
+      `Why is x = ${w} **not** a solution of $${eq}$?`,
+      `Substitution gives LHS = ${lhsAtW} while RHS = ${c}, so the equality is false.`,
       [
-        { text: 'Because 10 is too large to be used in a linear equation', why: 'Variable values are not restricted by size.' },
-        { text: 'Because x must always be 5 in a linear equation', why: 'x = 5 is specific to this equation only.' },
-        { text: 'Because the LHS becomes 7 and the RHS becomes 17', why: 'The substitution was evaluated in the wrong expressions.' }
+        { text: `Because ${w} is too large to be used in a linear equation`, why: 'Variable values are not restricted by size.' },
+        { text: `Because x must always be ${s} in a linear equation`, why: `x = ${s} is specific to this equation only.` },
+        { text: `Because the LHS becomes ${c} and the RHS becomes ${lhsAtW}`, why: 'The substitution was evaluated in the wrong expressions.' }
       ],
-      ['Substitute 10 into the original LHS.', '$2(10)-3=17$.', 'Compare that with the unchanged RHS 7.'],
+      [`Substitute ${w} into the original LHS.`, `$${a}(${w})-${b}=${lhsAtW}$.`, `Compare that with the unchanged RHS ${c}.`],
       [
-        { h: 'Substitute', d: 'LHS $=2(10)-3=17$' },
-        { h: 'RHS', d: '$7$' },
-        { h: 'Compare', d: '$17\\ne7$, so x = 10 is not a solution.' }
+        { h: 'Substitute', d: `LHS $=${a}(${w})-${b}=${lhsAtW}$` },
+        { h: 'RHS', d: `$${c}$` },
+        { h: 'Compare', d: `$${lhsAtW}\\ne${c}$, so x = ${w} is not a solution.` }
       ]
     );
   },
 
-  'y8-ncert-linear-both-sides': (rng, diff) => {
-    if (diff === 1 && rng() < 0.35) return sourceQuestion(NCERT_CLASS8_LINEAR_EXERCISE_21[0]);
-    return bothSidesGenerated(rng, diff);
-  },
+  'y8-ncert-linear-both-sides': (rng, diff) => bothSidesGenerated(rng, diff),
 
   'y8-ncert-linear-fractions': (rng, diff) => {
-    if (diff === 4) return sourceQuestion(NCERT_CLASS8_LINEAR_EXERCISE_22[4]);
-    if (diff === 3 && rng() < 0.4) return sourceQuestion(NCERT_CLASS8_LINEAR_EXERCISE_21[7]);
+    if (diff === 4) return fractionTwoSidedGenerated(rng);
+    if (diff === 3 && rng() < 0.4) return fractionTwoSidedGenerated(rng);
     return fractionGenerated(rng, diff);
   },
 
   'y8-ncert-linear-brackets': (rng, diff) => {
-    if (diff === 1) return sourceQuestion(NCERT_CLASS8_LINEAR_EXERCISE_21[5]);
-    if (diff === 4) return sourceQuestion(NCERT_CLASS8_LINEAR_EXERCISE_22[8]);
+    if (diff === 4) return threeBracketGenerated(rng);
     return bracketGenerated(rng, diff);
   },
 
   'y8-ncert-linear-decimals': (rng, diff) => {
-    if (diff >= 3 && rng() < 0.5) return sourceQuestion(NCERT_CLASS8_LINEAR_EXERCISE_22[9]);
+    if (diff >= 3 && rng() < 0.5) return decimalBracketsGenerated(rng);
     return decimalGenerated(rng, diff);
   },
 
@@ -525,15 +627,14 @@ export const NCERT_CLASS8_LINEAR_GENERATORS = Object.freeze({
     });
   },
 
+  // Mixed review: one equation of any form the chapter teaches, at the level
+  // asked for, with the verification standard appended. Every draw is an
+  // original equation with its own solver; nothing here is a textbook item.
   'y8-ncert-linear-source-mastery': (rng, diff) => {
-    const pool = diff === 1
-      ? NCERT_CLASS8_LINEAR_EXERCISE_21.slice(0, 5)
-      : diff === 2
-        ? NCERT_CLASS8_LINEAR_EXERCISE_21.slice(5)
-        : diff === 3
-          ? NCERT_CLASS8_LINEAR_EXERCISE_22.slice(0, 6)
-          : NCERT_CLASS8_LINEAR_EXERCISE_22.slice(6);
-    return sourceQuestion(rc(rng, pool));
+    if (diff === 1) return withVerification(bothSidesGenerated(rng, 2));
+    if (diff === 2) return withVerification(rng() < 0.5 ? bracketGenerated(rng, 2) : fractionGenerated(rng, 2));
+    if (diff === 3) return withVerification(rng() < 0.5 ? fractionTwoSidedGenerated(rng) : decimalGenerated(rng, 3));
+    return withVerification(rng() < 0.5 ? threeBracketGenerated(rng) : decimalBracketsGenerated(rng));
   }
 });
 
@@ -552,6 +653,6 @@ export const NCERT_CLASS8_LINEAR_CONTENT = Object.freeze({
     authoredCells: NCERT_CLASS8_LINEAR_GENERATOR_IDS.length * 4,
     difficultyLevels: 4,
     handwriting: 'Numeric solution forms use Pri Learning Write / AI handwriting recognition; conceptual classification uses MCQ.',
-    solutionSupport: 'Every authored form includes progressive hints and a complete worked solution. All 20 uploaded NCERT exercise items have dedicated source solutions.'
+    solutionSupport: 'Every authored form includes progressive hints and a complete worked solution. Served questions are original; the 20 uploaded NCERT exercise items are kept as worked source checks in the chapter shell only.'
   })
 });

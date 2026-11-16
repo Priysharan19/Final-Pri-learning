@@ -31,7 +31,7 @@ import { pathToFileURL } from 'node:url';
 import { handwrite, pressRead } from './fakeServerReader.js';
 
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const SUBMIT = { name: 'Submit Answer' };
 
 export const flow = {

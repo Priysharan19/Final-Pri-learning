@@ -66,6 +66,8 @@ const rTex = f => fracTex(f.n, f.d);
 // ── Formatting ───────────────────────────────────────────────────────────────
 /** "+ 3" / "- 3" — a signed constant written after another term. */
 const sg = k => (k >= 0 ? `+ ${k}` : `- ${Math.abs(k)}`);
+// A signed term with a symbol: "+ 3i", "- i"; "" when the coefficient is 0.
+const sgt = (k, v) => (k === 0 ? '' : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}${v}`);
 /** cx written the way it is read: x, -x, 3x. */
 const cx = (c, v = 'x') => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
 /** "ax + b", with a zero term left out. */
@@ -569,10 +571,10 @@ function complexAlgebraReasoning(rng) {
       const value = askModulus ? modulus : x;
       if (value.n === 0) continue;
       return {
-        prompt: `Find ${askModulus ? '$|z|$' : 'the real part of $z$'} for the complex number $z$ that satisfies $|z| ${plus ? '+' : '-'} z = ${a} ${sg(b)}i$.`,
+        prompt: `Find ${askModulus ? '$|z|$' : 'the real part of $z$'} for the complex number $z$ that satisfies $|z| ${plus ? '+' : '-'} z = ${a} ${sgt(b, 'i')}$.`,
         answerType: 'numeric', ...exact(value),
         traps: traps(value.value, [
-          { value: askModulus ? Math.hypot(a, b) : a, why: askModulus ? `That is $|${a} ${sg(b)}i|$, the modulus of the right-hand side, not of $z$.` : 'The real part of the right-hand side also contains $|z|$; it is not the real part of $z$.' },
+          { value: askModulus ? Math.hypot(a, b) : a, why: askModulus ? `That is $|${a} ${sgt(b, 'i')}|$, the modulus of the right-hand side, not of $z$.` : 'The real part of the right-hand side also contains $|z|$; it is not the real part of $z$.' },
           { value: -value.value, why: 'Check the sign when the square root is isolated: the real part satisfies a linear equation once both sides are squared.' },
           { value: askModulus ? R(a * a + b * b, a).value : R(Math.abs(a * a - b * b), a).value, why: 'Expanding $(a \\mp x)^2$ gives a cross term $2ax$, so the division at the end is by $2a$.' }
         ]),
@@ -611,8 +613,8 @@ function complexAlgebraReasoning(rng) {
       ],
       steps: [
         { h: 'Triangle inequality', d: `$\\left|r - \\dfrac{${a}}{r}\\right| \\le \\left|z - \\dfrac{${a}}{z}\\right| = ${b}$, where $r = |z|$` },
-        { h: 'Upper bound', d: `$r - \\dfrac{${a}}{r} \\le ${b} \\Rightarrow r^2 - ${b}r - ${a} \\le 0 \\Rightarrow r \\le \\dfrac{${b} + \\sqrt{${b * b + 4 * a}}}{2} = ${(k + b) / 2}$` },
-        { h: 'Lower bound', d: `$\\dfrac{${a}}{r} - r \\le ${b} \\Rightarrow r^2 + ${b}r - ${a} \\ge 0 \\Rightarrow r \\ge \\dfrac{-${b} + \\sqrt{${b * b + 4 * a}}}{2} = ${(k - b) / 2}$` },
+        { h: 'Upper bound', d: `$r - \\dfrac{${a}}{r} \\le ${b} \\Rightarrow r^2 - ${b === 1 ? '' : b}r - ${a} \\le 0 \\Rightarrow r \\le \\dfrac{${b} + \\sqrt{${b * b + 4 * a}}}{2} = ${(k + b) / 2}$` },
+        { h: 'Lower bound', d: `$\\dfrac{${a}}{r} - r \\le ${b} \\Rightarrow r^2 + ${b === 1 ? '' : b}r - ${a} \\ge 0 \\Rightarrow r \\ge \\dfrac{-${b} + \\sqrt{${b * b + 4 * a}}}{2} = ${(k - b) / 2}$` },
         { h: 'Both are reached', d: `$z = ${(k + b) / 2}$ gives $\\left|${(k + b) / 2} - ${rTex(R(a, (k + b) / 2))}\\right| = ${b}$, and $z = ${(k - b) / 2}$ gives $\\left|${(k - b) / 2} - ${rTex(R(a, (k - b) / 2))}\\right| = ${b}$` },
         { h: 'Answer', d: `The ${askMax ? 'greatest' : 'least'} value of $|z|$ is $${value}$` }
       ],
@@ -640,9 +642,9 @@ function complexAlgebraReasoning(rng) {
       ],
       steps: [
         { h: 'Compare parts', d: `$x^2 - y^2 = ${a}$ and $2xy = ${b}$` },
-        { h: 'Moduli', d: `$x^2 + y^2 = \\sqrt{${a}^2 + ${b}^2} = ${x * x + y * y}$` },
+        { h: 'Moduli', d: `$x^2 + y^2 = \\sqrt{${a < 0 ? `(${a})` : a}^2 + ${b < 0 ? `(${b})` : b}^2} = ${x * x + y * y}$` },
         { h: 'Solve', d: `$x^2 = ${x * x}$ and $y^2 = ${y * y}$; with $x > 0$, $x = ${x}$, and $2xy = ${b}$ makes $y = ${y}$` },
-        { h: 'Answer', d: `The root is $${x} ${sg(y)}i$; its ${askIm ? 'imaginary' : 'real'} part is $${value}$` }
+        { h: 'Answer', d: `The root is $${x} ${sgt(y, 'i')}$; its ${askIm ? 'imaginary' : 'real'} part is $${value}$` }
       ],
       reasoning: 'square-root'
     };
@@ -1193,7 +1195,7 @@ function lineEquationReasoning(rng) {
           { h: 'Section formula', d: `The point dividing $AB$ in the ratio $${m} : ${n}$ is $\\left(\\dfrac{${n}a}{${m + n}}, \\dfrac{${m}b}{${m + n}}\\right)$` },
           { h: 'Equate with P', d: `$\\dfrac{${n}a}{${m + n}} = ${h} \\Rightarrow a = ${rTex(a)}$ and $\\dfrac{${m}b}{${m + n}} = ${k} \\Rightarrow b = ${rTex(b)}$` },
           { h: 'The line', d: `$\\dfrac{x}{${rTex(a)}} + \\dfrac{y}{${rTex(b)}} = 1$` },
-          { h: 'Answer', d: askSlope ? `Slope $= -\\dfrac{b}{a} = ${rTex(value)}$` : `$a + b = ${rTex(a)} + ${rTex(b)} = ${rTex(value)}$` }
+          { h: 'Answer', d: askSlope ? `Slope $= -\\dfrac{b}{a} = ${rTex(value)}$` : `$a + b = ${rTex(a)} + ${b.n < 0 ? `\\left(${rTex(b)}\\right)` : rTex(b)} = ${rTex(value)}$` }
         ],
         reasoning: 'section-intercepts'
       };
@@ -1312,8 +1314,8 @@ function lineAngleReasoning(rng) {
         ],
         steps: [
           { h: 'Slope of the given line', d: `$m = ${rTex(m)}$` },
-          { h: 'The two slopes', d: `$\\dfrac{s - m}{1 + sm} = \\pm${rTex(t)}$ gives $s_1 = \\dfrac{m + ${rTex(t)}}{1 - ${rTex(t)}m} = ${rTex(s1)}$ and $s_2 = \\dfrac{m - ${rTex(t)}}{1 + ${rTex(t)}m} = ${rTex(s2)}$` },
-          { h: askProduct ? 'Product' : 'Intercepts', d: askProduct ? `$s_1 s_2 = ${rTex(value)}$` : `$(${k} - ${par(h)}s_1) + (${k} - ${par(h)}s_2) = ${2 * k} - ${par(h)}(s_1 + s_2)$` },
+          { h: 'The two slopes', d: `$\\dfrac{s - m}{1 + sm} = \\pm${rTex(t)}$ gives $s_1 = \\dfrac{m + ${rTex(t)}}{1 - ${t.n === t.d ? '' : rTex(t)}m} = ${rTex(s1)}$ and $s_2 = \\dfrac{m - ${rTex(t)}}{1 + ${t.n === t.d ? '' : rTex(t)}m} = ${rTex(s2)}$` },
+          { h: askProduct ? 'Product' : 'Intercepts', d: askProduct ? `$s_1 s_2 = ${rTex(value)}$` : (h === 0 ? `$${k} + ${par(k)} = ${2 * k}$, whatever the slopes` : `$(${k} - ${h === 1 ? '' : par(h)}s_1) + (${k} - ${h === 1 ? '' : par(h)}s_2) = ${2 * k} - ${h === 1 ? '' : par(h)}(s_1 + s_2)$`) },
           { h: 'Answer', d: `$${rTex(value)}$` }
         ],
         reasoning: 'angle-between-lines'
@@ -1522,7 +1524,7 @@ function limitReasoning(rng) {
           'Divide numerator and denominator by $x$ and let $x \\to \\infty$.'
         ],
         steps: [
-          { h: 'Rationalise', d: `$\\dfrac{(${polyTex([a * a, p, qq])}) - ${a * a}x^2}{\\sqrt{${polyTex([a * a, p, qq])}} + ${cx(a)}} = \\dfrac{${lin(p, qq)}}{\\sqrt{${polyTex([a * a, p, qq])}} + ${cx(a)}}$` },
+          { h: 'Rationalise', d: `$\\dfrac{(${polyTex([a * a, p, qq])}) - ${a * a === 1 ? '' : a * a}x^2}{\\sqrt{${polyTex([a * a, p, qq])}} + ${cx(a)}} = \\dfrac{${lin(p, qq)}}{\\sqrt{${polyTex([a * a, p, qq])}} + ${cx(a)}}$` },
           { h: 'Divide by x', d: `$\\dfrac{${p} + \\frac{${qq}}{x}}{\\sqrt{${a * a} ${sg(p)}/x + ${qq}/x^2} + ${a}}$` },
           { h: 'Limit', d: `$\\dfrac{${p}}{${a} + ${a}}$` },
           { h: 'Answer', d: `$${rTex(value)}$` }
@@ -1590,8 +1592,8 @@ function firstPrinciplesReasoning(rng) {
         ],
         steps: [
           { h: 'f(0)', d: '$x = y = 0$ gives $f(0) = 2f(0)$, so $f(0) = 0$' },
-          { h: 'Difference', d: `$f(x + h) - f(x) = f(h) ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k)}xh(x + h)` : `${k < 0 ? '-' : '+'} ${Math.abs(k)}xh`}$` },
-          { h: 'Divide and let h → 0', d: `$f'(x) = \\displaystyle\\lim_{h \\to 0}\\left(\\dfrac{f(h)}{h} ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k)}x(x + h)` : `${k < 0 ? '-' : '+'} ${Math.abs(k)}x`}\\right) = ${c} ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k)}x^2` : `${k < 0 ? '-' : '+'} ${Math.abs(k)}x`}$` },
+          { h: 'Difference', d: `$f(x + h) - f(x) = f(h) ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}xh(x + h)` : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}xh`}$` },
+          { h: 'Divide and let h → 0', d: `$f'(x) = \\displaystyle\\lim_{h \\to 0}\\left(\\dfrac{f(h)}{h} ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}x(x + h)` : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}x`}\\right) = ${c} ${cubic ? `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}x^2` : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}x`}$` },
           { h: 'Evaluate', d: `$f'(${x0}) = ${c} ${k < 0 ? '-' : '+'} ${Math.abs(k)}${cubic ? `(${x0})^2` : `(${x0})`} = ${value}$` }
         ],
         reasoning: cubic ? 'functional-cubic' : 'functional-quadratic'
@@ -1630,7 +1632,7 @@ function firstPrinciplesReasoning(rng) {
           ]
           : [
             { h: 'Add and subtract f(a)', d: `$\\dfrac{f(${atTex(a, p, 1)}) - f(${a})}{h} + \\dfrac{f(${a}) - f(${atTex(a, qq, -1)})}{h}$` },
-            { h: 'Each piece', d: `$\\to ${p}f'(${a}) + ${qq}f'(${a}) = ${p + qq}f'(${a})$` },
+            { h: 'Each piece', d: `$\\to ${p === 1 ? '' : p}f'(${a}) + ${qq === 1 ? '' : qq}f'(${a}) = ${p + qq}f'(${a})$` },
             { h: 'Differentiate', d: `$f'(x) = ${polyTex([3 * co[0], 2 * co[1], co[2]])}$, so $f'(${a}) = ${fp}$` },
             { h: 'Answer', d: `$${p + qq} \\times ${par(fp)} = ${rTex(value)}$` }
           ],
@@ -1658,14 +1660,14 @@ function firstPrinciplesReasoning(rng) {
       ],
       steps: reciprocal
         ? [
-          { h: 'Quotient', d: `$\\dfrac{1}{h}\\left(\\dfrac{1}{\\sqrt{${lin(a, b)} + ${a}h}} - \\dfrac{1}{\\sqrt{${lin(a, b)}}}\\right) = \\dfrac{\\sqrt{${lin(a, b)}} - \\sqrt{${lin(a, b)} + ${a}h}}{h\\sqrt{${lin(a, b)}}\\sqrt{${lin(a, b)} + ${a}h}}$` },
-          { h: 'Rationalise', d: `The numerator times its conjugate is $-${a}h$, so the quotient is $\\dfrac{-${par(a)}}{\\sqrt{\\cdots}\\sqrt{\\cdots}\\left(\\sqrt{\\cdots} + \\sqrt{\\cdots}\\right)}$` },
+          { h: 'Quotient', d: `$\\dfrac{1}{h}\\left(\\dfrac{1}{\\sqrt{${lin(a, b)} ${a < 0 ? '-' : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h}} - \\dfrac{1}{\\sqrt{${lin(a, b)}}}\\right) = \\dfrac{\\sqrt{${lin(a, b)}} - \\sqrt{${lin(a, b)} ${a < 0 ? '-' : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h}}{h\\sqrt{${lin(a, b)}}\\sqrt{${lin(a, b)} ${a < 0 ? '-' : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h}}$` },
+          { h: 'Rationalise', d: `The numerator times its conjugate is $${cx(-a, 'h')}$, so the quotient is $\\dfrac{-${par(a)}}{\\sqrt{\\cdots}\\sqrt{\\cdots}\\left(\\sqrt{\\cdots} + \\sqrt{\\cdots}\\right)}$` },
           { h: 'Let h → 0', d: `$f'(x) = \\dfrac{-${par(a)}}{2(${lin(a, b)})^{3/2}}$` },
           { h: 'At the point', d: `$${lin(a, b).replace('x', `(${x0})`)} = ${u * u}$, so $f'(${x0}) = \\dfrac{-${par(a)}}{2 \\times ${u}^3} = ${rTex(value)}$` }
         ]
         : [
-          { h: 'Quotient', d: `$\\dfrac{\\sqrt{${a}(${x0} + h) ${sg(b)}} - \\sqrt{${u * u}}}{h}$` },
-          { h: 'Rationalise', d: `$\\dfrac{${a}h}{h\\left(\\sqrt{${u * u} ${sg(a)}h} + ${u}\\right)}$` },
+          { h: 'Quotient', d: `$\\dfrac{\\sqrt{${a === 1 ? '' : a === -1 ? '-' : a}(${x0} + h) ${sg(b)}} - \\sqrt{${u * u}}}{h}$` },
+          { h: 'Rationalise', d: `$\\dfrac{${cx(a, 'h')}}{h\\left(\\sqrt{${u * u} ${a < 0 ? '-' : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}h} + ${u}\\right)}$` },
           { h: 'Let h → 0', d: `$\\dfrac{${a}}{${u} + ${u}}$` },
           { h: 'Answer', d: `$${rTex(value)}$` }
         ],
@@ -1715,10 +1717,10 @@ function meanDeviationReasoning(rng) {
           'Add the deviations, divide by the number of observations, and solve for $d$.'
         ],
         steps: [
-          { h: 'Centre', d: n % 2 ? `The ${about} is the middle observation, $a + ${r}d$` : `The ${about} is halfway between $a + ${r - 1}d$ and $a + ${r}d$, i.e. $a + ${rTex(R(2 * r - 1, 2))}d$` },
-          { h: 'Sum of deviations', d: n % 2 ? `$2(1 + 2 + \\cdots + ${r})d = ${total}d$` : `$2\\left(\\dfrac{1}{2} + \\dfrac{3}{2} + \\cdots + \\dfrac{${2 * r - 1}}{2}\\right)d = ${total}d$` },
-          { h: 'Mean deviation', d: `$\\dfrac{${total}d}{${n}} = ${rTex(R(total, n))}d$` },
-          { h: 'Solve', d: `$${rTex(R(total, n))}d = ${mdText} \\Rightarrow d = ${d}$` }
+          { h: 'Centre', d: n % 2 ? `The ${about} is the middle observation, $${(k => (k === 0 ? 'a' : k === 1 ? 'a + d' : `a + ${k}d`))(r)}$` : `The ${about} is halfway between $${(k => (k === 0 ? 'a' : k === 1 ? 'a + d' : `a + ${k}d`))(r - 1)}$ and $${(k => (k === 0 ? 'a' : k === 1 ? 'a + d' : `a + ${k}d`))(r)}$, i.e. $a + ${rTex(R(2 * r - 1, 2))}d$` },
+          { h: 'Sum of deviations', d: n % 2 ? `$2(1 + 2 + \\cdots + ${r})d = ${total === 1 ? '' : total}d$` : `$2\\left(\\dfrac{1}{2} + \\dfrac{3}{2} + \\cdots + \\dfrac{${2 * r - 1}}{2}\\right)d = ${total === 1 ? '' : total}d$` },
+          { h: 'Mean deviation', d: `$\\dfrac{${total === 1 ? '' : total}d}{${n}} = ${rTex(R(total, n)) === '1' ? '' : rTex(R(total, n))}d$` },
+          { h: 'Solve', d: `$${rTex(R(total, n)) === '1' ? '' : rTex(R(total, n))}d = ${mdText} \\Rightarrow d = ${d}$` }
         ],
         reasoning: 'inverse-mean-deviation'
       };
@@ -2044,6 +2046,171 @@ function sampleSpaceReasoning(rng) {
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
+// 17 · Complex Numbers — quadratic equations with complex roots
+//
+// Added after tranche 2 to replace the chapter's routine D4 form for this dot
+// point ("solve x² + bx + c = 0, give the imaginary part"), which issue #408
+// found was the quadratic formula and nothing more. The coverage table retires
+// that rung (curriculum-in-hardest-covers.js, INDIA_RETIRED_RUNGS). Each form
+// joins two ideas the formula does not supply:
+//   · αⁿ + βⁿ from the coefficients alone — the recurrence sₖ = (α + β)sₖ₋₁ −
+//     αβ·sₖ₋₂ (or the polar form of the roots), with a period to find when the
+//     roots lie on the unit circle;
+//   · the k for which the roots are non-real and on |z| = r: |α|² = αβ for a
+//     conjugate pair gives two candidates, and the discriminant rejects one;
+//   · how many integers k put both roots strictly inside |z| = r: the product
+//     bounds k to an interval, and the discriminant thins it.
+// An independent maths review (2026-10-22) judged a conjugate-root variant and
+// the pure-imaginary roots (x² + k² = 0) too routine for this rung; both were
+// left out. Human maths review of what remains is still pending.
+// ═════════════════════════════════════════════════════════════════════════════
+
+/** √c with its square factor taken out: 3, 2\sqrt{2}, \sqrt{2}. */
+function sqrtTex(c) {
+  let out = 1, rest = c;
+  for (let f = 2; f * f <= rest; f++) while (rest % (f * f) === 0) { rest /= f * f; out *= f; }
+  if (rest === 1) return String(out);
+  return `${out === 1 ? '' : out}\\sqrt{${rest}}`;
+}
+
+/**
+ * x² + bx + c with non-real roots r·e^{±iθ} at a standard angle (θ = π/3, 2π/3,
+ * π/4, 3π/4), scaled by k; t = [p, q] means θ = pπ/q. The roots are never
+ * written in the prompt. Duplicates across scalings are removed.
+ */
+const ROOT_PAIRS = Object.freeze((() => {
+  const out = new Map();
+  for (let k = 1; k <= 3; k++) {
+    for (const row of [
+      { b: -k, c: k * k, t: [1, 3] }, { b: k, c: k * k, t: [2, 3] },
+      { b: -2 * k, c: 2 * k * k, t: [1, 4] }, { b: 2 * k, c: 2 * k * k, t: [3, 4] },
+      { b: -2 * k, c: 4 * k * k, t: [1, 3] }, { b: 2 * k, c: 4 * k * k, t: [2, 3] }
+    ]) if (!out.has(`${row.b},${row.c}`)) out.set(`${row.b},${row.c}`, Object.freeze(row));
+  }
+  return [...out.values()];
+})());
+
+/** αⁿ + βⁿ for the roots of x² + bx + c, by the recurrence in exact integers. */
+function powerSum(b, c, n) {
+  let prev = 2, cur = -b;                       // s₀ = 2, s₁ = α + β = −b
+  if (n === 0) return prev;
+  for (let i = 2; i <= n; i++) [prev, cur] = [cur, -b * cur - c * prev];
+  return cur;
+}
+
+/** The recurrence sₖ = (α + β)sₖ₋₁ − αβ·sₖ₋₂ for x² + bx + c, as written. */
+const recurrenceTex = (b, c) => `s_k = ${cx(-b, 's_{k-1}')} - ${c === 1 ? '' : c}s_{k-2}`;
+
+function complexQuadraticReasoning(rng) {
+  const kind = rc(rng, ['root-powers', 'roots-on-circle', 'roots-inside']);
+  for (let guard = 0; guard < 400; guard++) {
+    if (kind === 'root-powers') {
+      // On the unit circle (x² ∓ x + 1) the powers repeat with period 6, so n
+      // can be large; elsewhere the size grows like rⁿ, so n stays small.
+      const unit = rng() < 1 / 3;
+      const { b, c, t } = unit ? rc(rng, ROOT_PAIRS.filter(p => p.c === 1)) : rc(rng, ROOT_PAIRS.filter(p => p.c > 1));
+      const n = unit ? ri(rng, 20, 2030) : ri(rng, 5, 15);
+      const value = powerSum(b, c, n);
+      if (value === 0 || Math.abs(value) > 50000) continue;
+      const root = Math.round(Math.sqrt(c));
+      const modulusOnly = root * root === c ? 2 * root ** n : n % 2 === 0 ? 2 * c ** (n / 2) : null;
+      const turns = mod(n * t[0], 2 * t[1]);   // nθ reduced into [0, 2π), in units of π/t[1]
+      const reduced = n * t[0] === turns ? '' : `, which is $${piTex(turns, t[1])}$ after whole turns`;
+      const firstSix = [0, 1, 2, 3, 4, 5].map(i => powerSum(b, c, i));
+      return {
+        prompt: `Let $\\alpha$ and $\\beta$ be the roots of $${polyTex([1, b, c])} = 0$. Find $\\alpha^{${n}} + \\beta^{${n}}$.`,
+        answerType: 'numeric', answer: { value },
+        traps: traps(value, [
+          { value: (-b) ** n, why: '$\\alpha^n + \\beta^n$ is not $(\\alpha + \\beta)^n$: the cross terms of the binomial expansion do not vanish.' },
+          { value: -value, why: 'The size is right; recheck the sign — the angle $n\\theta$ or the step of the recurrence.' },
+          ...(modulusOnly == null ? [] : [{ value: modulusOnly, why: 'That is $2r^n$, the modulus part alone: $\\alpha^n + \\beta^n = 2r^n\\cos n\\theta$ also needs the cosine of $n\\theta$.' }])
+        ]),
+        hints: [
+          'Let $s_k = \\alpha^k + \\beta^k$. The coefficients give $s_1 = \\alpha + \\beta$ and the product $\\alpha\\beta$.',
+          'Each root satisfies the equation, so $\\alpha^2 = (\\alpha + \\beta)\\alpha - \\alpha\\beta$; multiplying by $\\alpha^{k-2}$ and adding the same for $\\beta$ gives $s_k = (\\alpha + \\beta)s_{k-1} - \\alpha\\beta\\,s_{k-2}$.',
+          'The roots are non-real conjugates, so the sequence is $2r^k\\cos k\\theta$; when the roots lie on the unit circle it repeats, and only $n$ modulo the period matters.'
+        ],
+        steps: [
+          { h: 'Sum and product', d: `$\\alpha + \\beta = ${-b}$ and $\\alpha\\beta = ${c}$` },
+          { h: 'Recurrence', d: `With $s_k = \\alpha^k + \\beta^k$: $${recurrenceTex(b, c)}$, $s_0 = 2$, $s_1 = ${-b}$${c === 1 ? `; $s_0, \\ldots, s_5 = ${firstSix.join(', ')}$ and the values repeat every $6$ terms, so $s_{${n}} = s_{${n % 6}}$` : ''}` },
+          { h: 'Polar form, as a check', d: `$r = ${sqrtTex(c)}$ and $\\theta = ${piTex(t[0], t[1])}$, so $s_{${n}} = 2${c === 1 ? '' : `\\left(${sqrtTex(c)}\\right)^{${n}}`}\\cos ${piTex(n * t[0], t[1])}$${reduced}` },
+          { h: 'Answer', d: `$\\alpha^{${n}} + \\beta^{${n}} = ${value}$` }
+        ],
+        reasoning: unit ? 'root-powers-periodic' : 'root-powers'
+      };
+    }
+    // For a real quadratic the non-real roots are conjugates, so |α|² = αβ =
+    // C(k). C(k) = (k − k₁)(k − k₂) + r², with B(k) = mk + n₀ the coefficient of x.
+    const r = ri(rng, 1, 6);
+    const k1 = ri(rng, -6, 4), k2 = k1 + ri(rng, 1, 8);
+    const m = nz(rng, -3, 3), n0 = nz(rng, -8, 8);
+    const B = k => m * k + n0;
+    const C = k => (k - k1) * (k - k2) + r * r;
+    const c1 = -(k1 + k2), c0 = k1 * k2 + r * r;
+    const quad = `x^2 + (${lin(m, n0, 'k')})x + (${polyTex([1, c1, c0], 'k')}) = 0`;
+    const hints = [
+      'Non-real roots of a quadratic with real coefficients are a conjugate pair $\\alpha$, $\\bar{\\alpha}$, so they have the same modulus.',
+      'For a conjugate pair, $|\\alpha|^2 = \\alpha\\bar{\\alpha}$, which is the product of the roots.',
+      'A value of $k$ that gets the modulus right must still give non-real roots: check the discriminant.'
+    ];
+    if (kind === 'roots-on-circle') {
+      const good = rng() < 0.5 ? k1 : k2, bad = good === k1 ? k2 : k1;
+      if (r < 1 || !(B(good) ** 2 < 4 * r * r) || !(B(bad) ** 2 > 4 * r * r)) continue;
+      return {
+        prompt: `Find the real number $k$ for which the roots of $${quad}$ are non-real and both lie on the circle $|z| = ${r}$.`,
+        answerType: 'numeric', answer: { value: good },
+        traps: traps(good, [
+          { value: bad, why: `That value also makes the product of the roots $${r * r}$, but then the discriminant is positive and the roots are real, not non-real.` },
+          { value: k1 + k2, why: 'That is the sum of the two candidate values, not a value of $k$.' }
+        ]),
+        hints,
+        steps: [
+          { h: 'Modulus from the product', d: `Both roots on $|z| = ${r}$ and conjugate: $\\alpha\\bar{\\alpha} = ${r * r}$, so $${polyTex([1, c1, c0], 'k')} = ${r * r}$` },
+          { h: 'Candidates', d: `$${polyTex([1, c1, k1 * k2], 'k')} = 0$, so $k = ${k1}$ or $k = ${k2}$` },
+          { h: 'Reject', d: `At $k = ${bad}$ the coefficient of $x$ is $${B(bad)}$ and $${par(B(bad))}^2 - 4(${r * r}) = ${B(bad) ** 2 - 4 * r * r} > 0$: the roots are real` },
+          { h: 'Keep', d: `At $k = ${good}$: $${par(B(good))}^2 - 4(${r * r}) = ${B(good) ** 2 - 4 * r * r} < 0$, so the roots are non-real with modulus $${r}$` },
+          { h: 'Answer', d: `$k = ${good}$` }
+        ],
+        reasoning: 'roots-on-circle'
+      };
+    }
+    // Strictly inside: C(k) < r², i.e. k₁ < k < k₂; then B(k)² < 4C(k) for non-real.
+    if (r < 2 || k2 - k1 < 3) continue;
+    const between = [];
+    for (let k = k1 + 1; k < k2; k++) between.push(k);
+    // No candidate may sit on the discriminant boundary (a repeated real root).
+    if (between.some(k => B(k) ** 2 === 4 * C(k))) continue;
+    const kept = between.filter(k => B(k) ** 2 < 4 * C(k));
+    if (!kept.length || kept.length === between.length) continue;
+    const value = kept.length;
+    // At k₁ and k₂ the product is r²: where those roots are non-real they lie ON the circle.
+    const onCircle = [k1, k2].filter(k => B(k) ** 2 < 4 * C(k));
+    const realCount = between.length - value;
+    const endsWhy = `At ${onCircle.map(k => `$k = ${k}$`).join(' and ')} the roots are non-real but lie ON the circle, not strictly inside it.`;
+    const realWhy = 'That counts the values of $k$ that give real roots.';
+    return {
+      prompt: `For how many integers $k$ are the roots of $${quad}$ non-real and both strictly inside the circle $|z| = ${r}$?`,
+      answerType: 'numeric', answer: { value },
+      traps: traps(value, [
+        { value: between.length, why: 'That counts every $k$ that makes the product of the roots less than the square of the radius, but some of those give real roots.' },
+        // When two mistakes give the same number, the explanation names both.
+        ...(onCircle.length ? [{ value: value + onCircle.length, why: value + onCircle.length === realCount ? `${endsWhy} Or: ${realWhy.charAt(0).toLowerCase()}${realWhy.slice(1)}` : endsWhy }] : []),
+        { value: realCount, why: realWhy }
+      ]),
+      hints: [hints[0], hints[1], `Inside means $|\\alpha| < ${r}$, which bounds $k$ to an interval; then keep only the integers that give a negative discriminant.`],
+      steps: [
+        { h: 'Modulus from the product', d: `Non-real roots are conjugate, so $|\\alpha|^2 = \\alpha\\bar{\\alpha} = ${polyTex([1, c1, c0], 'k')}$` },
+        { h: 'Inside the circle', d: `$${polyTex([1, c1, c0], 'k')} < ${r * r} \\iff ${polyTex([1, c1, k1 * k2], 'k')} < 0 \\iff ${k1} < k < ${k2}$: the integers ${between.map(k => `$${k}$`).join(', ')}` },
+        { h: 'Non-real roots', d: `The discriminant $(${lin(m, n0, 'k')})^2 - 4(${polyTex([1, c1, c0], 'k')})$ is negative only at ${kept.map(k => `$k = ${k}$`).join(', ')}` },
+        { h: 'Answer', d: `$${value}$ integer${value === 1 ? '' : 's'}` }
+      ],
+      reasoning: 'roots-inside'
+    };
+  }
+  return complexQuadraticReasoning(makeRng(FALLBACK_SEED));
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
 
 /** One rung, D4: every other rung returns the same form (see the header). */
 const d4 = form => (rng, _diff) => form(rng);
@@ -2064,7 +2231,8 @@ export const class11JeeHardestForms = Object.freeze({
   'c11-first-principles-reasoning': d4(firstPrinciplesReasoning),
   'c11-mean-deviation-jee-reasoning': d4(meanDeviationReasoning),
   'c11-variance-reasoning': d4(varianceReasoning),
-  'c11-sample-space-jee-reasoning': d4(sampleSpaceReasoning)
+  'c11-sample-space-jee-reasoning': d4(sampleSpaceReasoning),
+  'c11-complex-quadratic-jee-reasoning': d4(complexQuadraticReasoning)
 });
 
 // Exposed for the independent check, which asserts the tables are non-empty.

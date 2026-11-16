@@ -103,12 +103,22 @@ function cleanAction(raw, evidence, context) {
   }
 
   if (kind === 'show_figure') {
-    if (!context?.questionFigure) {
-      return { ok: false, reason: 'missing verified figure', action: null };
-    }
     const mode = ['graph', 'geometry', 'calculus', 'statistics', 'figure'].includes(raw.mode)
       ? raw.mode
       : 'figure';
+    // A step may carry its own figure (a graph or region drawn for that step of
+    // a verified worked solution). It is shown only by naming the step, and only
+    // when that step really has one: a storyboard cannot bring a picture in.
+    if (raw.step !== undefined) {
+      const step = Number(raw.step);
+      if (!Number.isInteger(step) || step < 0 || typeof context?.verifiedSteps?.[step]?.figure !== 'string' || !context.verifiedSteps[step].figure) {
+        return { ok: false, reason: 'missing verified step figure', action: null };
+      }
+      return { ok: true, reason: '', action: { kind, mode, step } };
+    }
+    if (!context?.questionFigure) {
+      return { ok: false, reason: 'missing verified figure', action: null };
+    }
     return { ok: true, reason: '', action: { kind, mode } };
   }
 
@@ -235,9 +245,11 @@ export function validateStoryboard(raw, solution, context = {}, options = {}) {
   // author that field too.
   const trustedText = options?.trustedText === true;
   const scenes = [];
+  // Step figures are checked against the verified solution's own steps.
+  const checkContext = { ...context, verifiedSteps: Array.isArray(solution?.steps) ? solution.steps : [] };
 
   for (let index = 0; index < raw.scenes.length; index++) {
-    const cleaned = cleanScene(raw.scenes[index], index, evidence, context, trustedText);
+    const cleaned = cleanScene(raw.scenes[index], index, evidence, checkContext, trustedText);
     if (!cleaned.ok) return { ok: false, reason: cleaned.reason, storyboard: null };
     scenes.push(cleaned.scene);
   }

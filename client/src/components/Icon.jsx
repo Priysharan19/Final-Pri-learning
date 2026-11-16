@@ -26,6 +26,8 @@ const PATHS = {
   classes: ['m2.5 9 9.5-5 9.5 5-9.5 5-9.5-5Z', 'M6.5 11.5V16c0 1.4 2.5 2.8 5.5 2.8s5.5-1.4 5.5-2.8v-4.5'],
   settings: <><circle cx="12" cy="12" r="3" /><path d="M19 12a7 7 0 0 0-.15-1.4l2.1-1.6-2-3.4-2.45 1a7 7 0 0 0-2.4-1.4L13.7 2.6h-3.9l-.4 2.6a7 7 0 0 0-2.4 1.4l-2.45-1-2 3.4 2.1 1.6A7 7 0 0 0 4.5 12c0 .5.05.9.15 1.4l-2.1 1.6 2 3.4 2.45-1a7 7 0 0 0 2.4 1.4l.4 2.6h3.9l.4-2.6a7 7 0 0 0 2.4-1.4l2.45 1 2-3.4-2.1-1.6c.1-.5.15-.9.15-1.4Z" /></>,
   more: ['M4 7h16M4 12h16M4 17h16'],
+  // The chapter map: three nodes and the links between them.
+  map: <><circle cx="6" cy="6" r="2.2" /><circle cx="17.5" cy="7.5" r="2.2" /><circle cx="10.5" cy="17.5" r="2.2" /><path d="m8.2 6.3 7.1 1M6.8 8.1l2.9 7.3M16.5 9.5l-4.6 6.2" /></>,
   back: ['M15 5l-7 7 7 7'],
   next: ['M9 5l7 7-7 7'],
   arrowRight: ['M4.5 12h15', 'm13.5 6 6 6-6 6'],
@@ -55,7 +57,8 @@ const PATHS = {
   device: <><rect x="3.5" y="5" width="17" height="11.5" rx="1.5" /><path d="M9 20h6M12 16.5V20" /></>,
   chevronDown: ['m6 9 6 6 6-6'],
   search: <><circle cx="10.5" cy="10.5" r="6.5" /><path d="m15.5 15.5 5 5" /></>,
-  compare: <><rect x="3.5" y="4.5" width="7.5" height="15" rx="1" /><rect x="13" y="4.5" width="7.5" height="15" rx="1" /></>
+  compare: <><rect x="3.5" y="4.5" width="7.5" height="15" rx="1" /><rect x="13" y="4.5" width="7.5" height="15" rx="1" /></>,
+  scan: <path d="M3 7.5v-3A1.5 1.5 0 0 1 4.5 3h3M16.5 3h3A1.5 1.5 0 0 1 21 4.5v3M21 16.5v3a1.5 1.5 0 0 1-1.5 1.5h-3M7.5 21h-3A1.5 1.5 0 0 1 3 19.5v-3M3 12h18" />
 };
 
 export const ICON_NAMES = Object.freeze(Object.keys(PATHS));

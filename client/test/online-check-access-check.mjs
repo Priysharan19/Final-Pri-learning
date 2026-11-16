@@ -29,6 +29,15 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 
+// What a button says: its text without markup, and without the aria-hidden
+// shortcut hint (<kbd aria-hidden>) the Instrument draws beside the label.
+// Each removal repeats until the string stops changing, so markup that a
+// removal itself reassembles is removed too (CodeQL js/incomplete-multi-character-sanitization).
+const stripAll = (s, re) => { let prev; do { prev = s; s = s.replace(re, ''); } while (s !== prev); return s; };
+const buttonText = inner => stripAll(stripAll(stripAll(inner, /<kbd[^>]*aria-hidden="true"[^>]*>[\s\S]*?<\/kbd>/g), /<svg[\s\S]*?<\/svg>/g), /<[^>]+>/g).trim();
+// The action bar's primary button (the in-card sign-in button is primary too).
+const primaryLabel = html => { const bar = /<div class="ws-actions-btns">([\s\S]*?)<\/div>/.exec(html)?.[1] || ''; const m = /<button[^>]*class="btn btn-primary"[^>]*>([\s\S]*?)<\/button>/.exec(bar); return m ? buttonText(m[1]) : null; };
+
 let pass = 0;
 const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
@@ -154,17 +163,20 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   ok(/could not reach the server/.test(en['check.reconnectTitle']), 'reconnect is stated plainly');
   // Copy that used to promise marking with no account or no connection.
   const promised = /marked on your device|Typed practice works|works offline|Offline practice continues|marking happens entirely on this device|marking and handwriting all run on this device|use Pri fully on this device|Offline-first|type your answer/i;
-  for (const key of ['login.heroSub', 'login.heroPrivacy', 'login.point4', 'login.localOnlySub', 'login.authFoot', 'cloud.created', 'cloud.offlineNote', 'cloud.intro', 'cloud.disabled', 'cloud.under18', 'signup.cloudUnavailable', 'signup.parentLead', 'settings.cloudMarkingUnavailable', 'home.cloudUnavailable', 'home.reason.practiceOffline', 'ink.waitingSignIn', 'ink.waitingOffline', 'ink.waitingGuardian', 'ink.waitingVerifyEmail', 'verdict.photoReadingSignIn', 'verdict.photoReadingOffline', 'verdict.photoReadingGuardian', 'verdict.photoReadingVerifyEmail']) {
+  for (const key of ['login.heroSub', 'login.heroPrivacy', 'login.point4', 'login.localOnlySub', 'login.authFoot', 'cloud.created', 'cloud.offlineNote', 'cloud.intro', 'cloud.disabled', 'cloud.under18', 'signup.cloudUnavailable', 'signup.parentLead', 'settings.cloudMarkingUnavailable', 'home.cloudUnavailable', 'home.reason.practiceOffline', 'ink.waitingSignIn', 'ink.waitingOffline', 'ink.waitingGuardian', 'ink.waitingVerifyEmail', 'ink.waitingMfa', 'verdict.photoReadingSignIn', 'verdict.photoReadingOffline', 'verdict.photoReadingGuardian', 'verdict.photoReadingVerifyEmail', 'verdict.photoReadingMfa']) {
     ok(typeof en[key] === 'string' && !promised.test(en[key]), `${key} no longer promises checking without an account or a connection`);
   }
   // Issue #477: there is no device-only mode any more. A device profile says
   // that nothing opens until it is signed in to a Pri account.
   ok(/Pri account/.test(en['login.localOnlySub']) && /Before anything opens/.test(en['login.localOnlySub']) && !/[Dd]evice-only mode/.test(en['login.localOnlySub']),
     'a device profile says nothing opens before it is signed in to a Pri account');
-  const html = read('index.html');
-  ok(!/marked on your device|Offline-first|account is optional/.test(html) && /checked by Pri’s server/.test(html), 'the page description says answers are checked by Pri\'s server');
-  const manifest = read('public/manifest.webmanifest');
-  ok(!/marked on your device|Offline-first|account is optional/.test(manifest) && /checked by Pri’s server/.test(manifest), 'and so does the install manifest');
+  const brand = await import('../brand/edition-brand.mjs');
+  for (const id of brand.BRAND_EDITION_IDS) {
+    const html = brand.builtIndexHtml(id);
+    ok(!/marked on your device|Offline-first|account is optional/.test(html) && /checked by our server/.test(html), `the ${id} page description says answers are checked by our server`);
+    const manifest = JSON.stringify(brand.webManifest(id));
+    ok(!/marked on your device|Offline-first|account is optional/.test(manifest) && /checked by our server/.test(manifest), `and so does the ${id} install manifest`);
+  }
 }
 
 // ── 3 · A refused check: no verdict, and the same submission on Retry ────────
@@ -217,7 +229,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
 // be marked: that refusal offers the next question instead.
 {
   const { startOnlineAuthority } = await import('./support/online-authority.mjs');
-  const online = await startOnlineAuthority({ label: 'online-check-access' });
+  const online = await startOnlineAuthority({ label: 'online-check-access', nswBanks: true });
   const { api } = await import('../src/api.js');
   const idb = await import('../src/local/idb.js');
   const recovery = await import('../src/components/practiceRecovery.js');
@@ -344,7 +356,9 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
       ok(button && button[1] === en['check.signInAction'] && !/\sdisabled(=""|\s|>)/.test(button[0]), `${mode}: with the sign-in in the card, enabled`);
       ok(!/href="\/settings"/.test(block) && !/Account settings/.test(block), `${mode}: never a link to Settings`);
       ok(html.indexOf('data-check-needs-account') < html.indexOf('ws-actions') && html.indexOf('data-check-needs-account') > html.indexOf('ws-tools'), `${mode}: placed with the work, directly above the Submit bar`);
-      ok(new RegExp(`<button[^>]*class="btn btn-primary"[^>]*>${en['verdict.submit']}</button>`).test(html), `${mode}: Submit is still the primary action`);
+      // The Instrument's primary button carries its scan glyph and an
+      // aria-hidden shortcut hint around the label: the label is what it says.
+      ok(primaryLabel(html) === en['verdict.submit'], `${mode}: Submit is still the primary action (${JSON.stringify(primaryLabel(html))})`);
       ok(!/eval-card|verdict-title|data-outcome|solution-panel|eval-marks/.test(html), `${mode}: no verdict, marks or solution on an unchecked question`);
       ok(/data-phase="answering"/.test(html), `${mode}: the card is open for work`);
       const linked = card(signedIn, mode);
@@ -431,6 +445,11 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
   ok(!/no network needed|answer by typing right now/.test(en['verdict.inkNeedsDownloadBody']) && /need a connection/.test(en['verdict.inkNeedsDownloadBody']), 'the ink download note promises nothing without a network');
   ok(!/offline/.test(en['ncert.c10ChapterCount']) && !/ऑफ़लाइन/.test(hi['ncert.c10ChapterCount']), 'the Class 10 library count carries no "offline" badge');
   ok(/repeat/.test(en['verdict.repeatNote']) && /does not count/.test(en['verdict.repeatNote']) && hi['verdict.repeatNote'] !== en['verdict.repeatNote'], 'a repeat says it does not count, in both languages');
+// Said before the answer is sent, too, and for either cause the server marks a
+// repeat (an exhausted pool, or a solution already seen — practice.js), so the
+// note names neither cause as the only one.
+ok(/this one is a repeat/.test(en['practice.repeatNote']) && /will not count towards your progress/.test(en['practice.repeatNote']) && !/in this session/.test(en['practice.repeatNote'])
+  && /नहीं गिना जाएगा/.test(hi['practice.repeatNote']), 'before submitting, a repeat says it will not count, in both languages');
 
   const { createServer } = await import('vite');
   const react = (await import('@vitejs/plugin-react')).default;
@@ -456,7 +475,7 @@ const UPGRADE = err(426, 'CLIENT_UPGRADE_REQUIRED');
       return renderToStaticMarkup(React.createElement(AppCtx.Provider, { value: { user, celebrate: noop, refreshUser: noop, refreshDue: noop, refreshRecent: noop, toast: noop } },
         React.createElement(QuestionCard, { question, onNext: noop, onReplace: noop })));
     };
-    const buttons = html => [...(/<div class="ws-actions-btns">([\s\S]*?)<\/div>/.exec(html)?.[1] || '').matchAll(/<button[^>]*>([^<]*)<\/button>/g)].map(m => m[1]);
+    const buttons = html => [...(/<div class="ws-actions-btns">([\s\S]*?)<\/div>/.exec(html)?.[1] || '').matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g)].map(m => buttonText(m[1]));
     for (const user of [{ id: 'p', cloudLinked: false }, { id: 'p', cloudLinked: true }]) {
       for (const mode of ['type', 'write', 'photo']) {
         const html = card(user, { ...base, checkState: 'draft' }, mode);

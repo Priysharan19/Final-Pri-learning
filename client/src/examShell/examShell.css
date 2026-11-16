@@ -1,0 +1,62 @@
+/* The shared exam shell (client/src/examShell). Instrument tokens only
+   (instrument.css): no colour, face or scale is defined here. Structure for
+   the approved Pencil-first layout — a header with the mono clock, a
+   full-width elapsed rule, then rail · question column · sheet — stacked on a
+   phone and side by side from 1024 px. The Lit Instrument styling (rail of
+   ticks, tool dock) arrives with the UI missions; nothing here is a verdict
+   colour, and no state is drawn in red or green. */
+.xs-room { display: grid; gap: 12px; }
+.xs-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 20px; }
+.xs-paper { flex: 1 1 320px; min-width: 0; display: grid; gap: 4px; justify-items: start; }
+.xs-paper-title { margin: 0; font-size: 1.15rem; line-height: 1.25; overflow-wrap: anywhere; }
+.xs-paper-source, .xs-paper-disclaimer, .xs-paper-note { margin: 0; color: var(--in-tx-2); font-size: 0.85rem; }
+.xs-paper-link { margin-top: 6px; }
+.xs-head-clock { display: grid; gap: 8px; justify-items: end; margin-left: auto; }
+.xs-phases { display: flex; margin: 0; padding: 0; list-style: none; font: 500 0.72rem var(--in-mono); color: var(--in-tx-3); }
+.xs-phases li { padding: 5px 10px; box-shadow: 0 0 0 1px var(--in-edge-2); font-variant-numeric: tabular-nums; }
+.xs-phases li:first-child { border-radius: 4px 0 0 4px; }
+.xs-phases li:last-child { border-radius: 0 4px 4px 0; }
+.xs-phases li.is-on { color: var(--in-tx); background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-3); }
+
+.xs-clock { display: grid; justify-items: end; }
+.xs-clock-btn { display: grid; justify-items: end; gap: 4px; min-height: 44px; min-width: 44px; padding: 2px 0; border: 0; background: none; color: inherit; cursor: pointer; text-align: right; }
+.xs-clock-label { font: 500 0.62rem var(--in-mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--in-tx-3); }
+.xs-clock-time { font: 500 1.65rem/1 var(--in-mono); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--in-tx); }
+.xs-clock-note { font: 500 0.72rem var(--in-mono); color: var(--in-tx-2); }
+.xs-rule { position: relative; height: 3px; background: var(--in-l3); }
+.xs-rule i { position: absolute; inset: 0 auto 0 0; background: var(--in-tx-2); }
+.xs-rule[data-tone="reading"] i { background: var(--in-tx-3); }
+.xs-rule u { position: absolute; top: -3px; width: 1px; height: 9px; background: var(--in-tx-4); }
+
+.xs-grid { display: grid; gap: 20px; align-items: start; }
+.xs-rail, .xs-qcol, .xs-sheet-col { min-width: 0; display: grid; gap: 12px; align-content: start; }
+.xs-qcol h2 { margin: 0; font-size: 1.3rem; }
+.xs-marks, .xs-step { display: flex; flex-wrap: wrap; gap: 8px; }
+.xs-marks .btn[aria-pressed="true"] { background: var(--in-action); color: var(--in-on-action); border-color: var(--in-action); }
+.xs-sheet-col { padding: 14px; border: 1px solid var(--in-edge-2); border-radius: 8px; background: var(--in-l2); }
+@media (min-width: 1024px) {
+  .xs-grid { grid-template-columns: minmax(200px, 264px) minmax(260px, 380px) minmax(0, 1fr); }
+  .xs-rail, .xs-qcol { padding-right: 20px; border-right: 1px solid var(--in-edge-2); }
+  .xs-sheet-col { min-height: 420px; }
+  .xs-notes-input { min-height: 320px; }
+}
+
+.xs-nav { display: grid; gap: 12px; }
+.xs-nav-label { margin: 0 0 6px; font: 500 0.72rem var(--in-mono); letter-spacing: 0.06em; color: var(--in-tx-3); }
+.xs-nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 6px; }
+.xs-q { position: relative; min-width: 44px; min-height: 44px; padding: 0; border: 1px solid var(--in-edge-2); border-radius: 6px; background: var(--in-l1); color: var(--in-tx-2); font: 500 0.85rem var(--in-mono); font-variant-numeric: tabular-nums; cursor: pointer; }
+.xs-q.is-done { background: var(--in-l4); color: var(--in-tx); }
+.xs-q.is-current { border-color: var(--in-tx); box-shadow: inset 0 0 0 1px var(--in-tx); color: var(--in-tx); }
+/* Flagged: a notch at the top corner. A note: a hairline along the foot. */
+.xs-q.is-flagged::before { content: ''; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 1px; background: var(--in-slip); }
+.xs-q.is-noted::after { content: ''; position: absolute; left: 8px; right: 8px; bottom: 5px; height: 1px; background: var(--in-tx-2); }
+.xs-tally { margin: 0; font-variant-numeric: tabular-nums; }
+
+.xs-notes { display: grid; gap: 6px; }
+.xs-notes-input { width: 100%; min-height: 180px; resize: vertical; font: inherit; line-height: 1.5; }
+.xs-notes-hint { margin: 0; }
+.xs-keys { display: grid; gap: 8px; margin: 12px 0; }
+.xs-keys div { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: baseline; }
+.xs-keys dt { display: flex; gap: 4px; }
+.xs-keys dd { margin: 0; }
+.xs-keys kbd { min-width: 24px; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 0 1px var(--in-edge-3); background: var(--in-l2); font: 500 0.8rem var(--in-mono); text-align: center; }

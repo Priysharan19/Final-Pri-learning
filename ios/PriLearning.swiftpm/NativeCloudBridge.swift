@@ -44,12 +44,20 @@ final class NativeCloudBridge {
     }
 
     func detach() {
+        cancelAll()
+        webView = nil
+    }
+
+    /// Cancel every request in flight and keep the web view: the page that
+    /// asked has gone (its WebContent process ended) and the reloaded page
+    /// must not receive replies to requests it never made. A cancelled task
+    /// never replies (NSURLErrorCancelled is dropped below).
+    func cancelAll() {
         taskLock.lock()
         let running = Array(tasks.values)
         tasks.removeAll()
         taskLock.unlock()
         running.forEach { $0.cancel() }
-        webView = nil
     }
 
     func handle(_ raw: Any) {

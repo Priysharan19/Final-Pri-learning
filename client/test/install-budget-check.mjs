@@ -29,18 +29,28 @@
 //
 // Usage:  node client/test/install-budget-check.mjs [--no-build]
 // A fresh build is made first unless --no-build, so this can never be green
-// about a dist somebody left behind three commits ago.
+// about a dist somebody left behind three commits ago. Every build ships the
+// one interface client/interface.config.mjs names (V1 decision D7), so there
+// is one build to measure: the Instrument's own warm set and on-demand rules,
+// with the Map, Report and Scripts tabs held in the warm pass (issue #658).
+// (--instrument, which used to select that build, is accepted and changes
+// nothing.)
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync, statSync, existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { gzipSync } from 'node:zlib';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { optionalWarmAllowed, warmOfflineBuild } from '../src/local/offlineWarm.js';
-import { ON_DEMAND, PRECACHE_SKIP } from '../vite.config.js';
+import { optionalWarmAllowed, warmOfflineBuild, studentBusy } from '../src/local/offlineWarm.js';
+
+const { ON_DEMAND, PRECACHE_SKIP, INSTRUMENT_BUILD } = await import('../vite.config.js');
+const { STUDENT_INTERFACE } = await import('../interface.config.mjs');
+const INSTRUMENT = INSTRUMENT_BUILD;
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
+const LABEL = 'INSTALL BUDGET';
+let PYQ_ARCHIVE_MEASURED = null;
 
 // ── The budget ───────────────────────────────────────────────────────────────
 // Measured on the build these numbers were first set against: 1,159 kB raw /
@@ -56,10 +66,22 @@ const DIST = join(ROOT, 'client', 'dist');
 // ceiling (which includes the install) moved by the same amount the install
 // ceiling did — nothing else got looser. Raising one is a decision, and it
 // should read like one in the diff.
+//
+// Raised again 2026-11-14 (train editions-6, CTO under the same owner
+// decision, which also says to raise a ceiling "via an owner-approved PR
+// quoting the owner" when a needed feature hits it): FIRST_VISIT_RAW only,
+// 3,350,000 -> 3,400,000 bytes. main 997c4edb6 measured 3,271 kB, at the old
+// ceiling with no headroom; the Exam Desk UI (#877) and per-region AI budgets
+// (#879) bring the warm pass to 3,280 kB, and the NSW HSC-style papers (#880,
+// next train) add about 7.6 kB more. The other three ceilings were measured
+// under their limits and are unchanged (#880's merged head: install 1,725,132 /
+// 2,500,000 raw and 662,308 / 1,000,000 gzipped; warm pass 1,179,144 /
+// 1,290,000 gzipped), as are the banned-from-install list, render-from-install
+// and offline coverage.
 
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 3_350_000;
+const FIRST_VISIT_RAW_CEILING = 3_400_000;
 const FIRST_VISIT_GZIP_CEILING = 1_290_000;
 
 // Things that must never be in the install again, and what each one costs.
@@ -93,15 +115,22 @@ const kb = (n) => `${(n / 1024).toFixed(0)} kB`;
 // ── A build to measure ───────────────────────────────────────────────────────
 
 if (!process.argv.includes('--no-build')) {
-  const built = spawnSync('npx', ['vite', 'build'], { cwd: join(ROOT, 'client'), encoding: 'utf8' });
+  const built = spawnSync('npx', ['vite', 'build'], { cwd: join(ROOT, 'client'), encoding: 'utf8', env: { ...process.env } });
   if (built.status !== 0) {
-    console.log(`INSTALL BUDGET: FAIL — the client did not build\n${built.stderr || built.stdout}`);
+    console.log(`${LABEL}: FAIL — the client did not build\n${built.stderr || built.stdout}`);
     process.exit(1);
   }
 }
 if (!existsSync(join(DIST, 'sw.js'))) {
-  console.log('INSTALL BUDGET: FAIL — no client/dist/sw.js to measure. Run `npm run build` first, or drop --no-build.');
+  console.log(`${LABEL}: FAIL — no client/dist/sw.js to measure. Run \`npm run build\` first, or drop --no-build.`);
   process.exit(1);
+}
+// The dist being measured was made with the flag this run is about: the build
+// writes the flags it was made with beside itself (vite.config.js featureManifest).
+{
+  let flags = null;
+  try { flags = JSON.parse(readFileSync(join(DIST, 'features.json'), 'utf8')); } catch { flags = null; }
+  eq(flags?.instrument, INSTRUMENT, `the dist under measurement ships the interface client/interface.config.mjs names (${STUDENT_INTERFACE})`);
 }
 
 const sw = readFileSync(join(DIST, 'sw.js'), 'utf8');
@@ -116,8 +145,19 @@ const OPTIONAL = manifest('OPTIONAL');
 ok(Array.isArray(PRECACHE) && PRECACHE.length > 1, 'the build wrote an install manifest into the worker');
 ok(Array.isArray(WARM) && WARM.length > 0, 'and a warm manifest for what the install no longer carries');
 ok(Array.isArray(OPTIONAL) && OPTIONAL.length > 0, 'and an optional one for the recogniser');
+// The Class 7 and 8 hardest banks are on demand (not warmed for everyone)
+// only because warmScope() loads them at sign-in for their own class: a Class 7
+// or 8 profile's scope must name them, or that student loses them offline.
+{
+  const { indiaGeneratorsForScope } = await import('../src/engine/indiaProduct.js');
+  const { bankOf } = await import('../src/engine/generators/index.js');
+  for (const [grade, bank] of [[7, 'india-class7-hardest'], [8, 'india-class8-hardest']]) {
+    const banks = new Set(indiaGeneratorsForScope('cbse', grade).map(bankOf));
+    ok(banks.has(bank), `a Class ${grade} profile's sign-in scope loads ${bank}, so it is offline-ready without being warmed for everyone`);
+  }
+}
 if (!PRECACHE || !WARM || !OPTIONAL) {
-  console.log(`INSTALL BUDGET: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`);
+  console.log(`${LABEL}: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`);
   process.exit(1);
 }
 
@@ -203,8 +243,19 @@ eq(absent.length, 0, `every file the first paint blocks on is in the install (${
 
 ok(PRECACHE.includes('/') && PRECACHE.includes('/index.html'),
   'the shell is installed under both the names a navigation can arrive at');
-ok(PRECACHE.some(url => /inter-latin-wght-normal/.test(url)),
-  'the Latin Inter subset is installed — it paints every word of the interface');
+// The interface face's Latin subset paints every word of the interface, so it
+// is installed. Which face that is depends on the build: Inter in the
+// interface production ships, Instrument Sans where the v1.1 instrument
+// interface is built in (features.json records the flag; instrument.css remaps
+// every interface font token to Instrument Sans). Same promise, per build.
+{
+  const instrumentBuild = JSON.parse(readFileSync(join(DIST, 'features.json'), 'utf8')).instrument === true;
+  const [face, name] = instrumentBuild
+    ? [/instrument-sans-latin-wght-normal/, 'Instrument Sans']
+    : [/inter-latin-wght-normal/, 'Inter'];
+  ok(PRECACHE.some(url => face.test(url)),
+    `the Latin ${name} subset is installed — it paints every word of the interface in this build`);
+}
 ok(PRECACHE.some(url => /KaTeX_Main-Regular/.test(url)) && PRECACHE.some(url => /KaTeX_Math-Italic/.test(url)),
   'and the KaTeX faces a rendered question is set in');
 ok(PRECACHE.includes('/manifest.webmanifest'), 'the web manifest is installed, so the app can be added to a home screen offline');
@@ -286,9 +337,109 @@ const silent = fakeWorker();
 const timedOut = await warmOfflineBuild({ scope: silent.scope, timeoutMs: 30 });
 eq(timedOut, null, 'a worker that never answers resolves rather than leaving the page waiting on it forever');
 
+// ── 8 · The instrument's tabs are offline from the warm pass (issue #658) ──
+// Three of the interface's six tabs — the Map, the Report (ReportHead over the
+// Progress page) and Scripts (the History page) — used to be on demand in the
+// instrument build, with a runtime prefetch as the interim. A student who had
+// opened the app online and then lost the connection could still meet a tab
+// that would not open. They are warmed now, so a first open offline works,
+// and nothing in ON_DEMAND may name them again. With the flag off those chunks
+// are rightly on demand (that build never imports them), so the offline
+// promise is asserted on the instrument build and the rule's absence on both.
+const TAB_CHUNK = /(^|\/)(MapPage|ReportHead|Progress|History|ledger)-[^/]*\.(js|css)$/;
+for (const name of ['assets/MapPage-abc123.js', 'assets/ReportHead-abc123.js', 'assets/Progress-abc123.js', 'assets/History-abc123.js', 'assets/ledger-abc123.css']) {
+  const reason = onDemandReason(name);
+  ok(!reason || /flag off in this build/.test(reason),
+    `${name} is never on demand in the interface that paints it (${INSTRUMENT ? 'instrument build' : 'flag-off build'}: ${reason || 'no rule'})`);
+}
+if (INSTRUMENT) {
+  const tabChunks = emitted().filter(url => TAB_CHUNK.test(url.slice(1)));
+  ok(tabChunks.some(u => /MapPage-/.test(u)) && tabChunks.some(u => /ReportHead-/.test(u)) && tabChunks.some(u => /History-/.test(u)) && tabChunks.some(u => /Progress-/.test(u)),
+    `the instrument build emits the Map, Report, Progress and Scripts chunks (${tabChunks.length} tab files)`);
+  const warmed = tabChunks.filter(u => PRECACHE.includes(u) || WARM.includes(u));
+  eq(warmed.length, tabChunks.length,
+    `every Map, Report and Scripts chunk is installed or warmed, so a first open offline works — missing: ${JSON.stringify(tabChunks.filter(u => !warmed.includes(u)))}`);
+  // A warmed tab chunk is not enough: every module it imports statically is
+  // fetched before it runs, so the whole static-import closure has to be
+  // carried too. The Map once imported the prerequisite graph, which the
+  // placement rule left on demand: the Map chunk was warmed and the Map still
+  // crashed on its first visit offline ("Failed to fetch dynamically imported
+  // module"). Read from the emitted files themselves, so a chunking change
+  // moves the closure with it.
+  const staticImports = (url) => {
+    const file = join(DIST, url.slice(1));
+    if (!/\.js$/.test(url) || !existsSync(file)) return [];
+    const src = readFileSync(file, 'utf8');
+    const dir = url.slice(0, url.lastIndexOf('/') + 1);
+    const out = [];
+    for (const m of src.matchAll(/(?:^|[;}\s])(?:import|export)\s*(?:[^'"`()]*?\bfrom\s*)?["']\.\/([^"']+)["']/g)) out.push(dir + m[1]);
+    return out;
+  };
+  const closure = new Set();
+  const queue = tabChunks.filter(u => /\.js$/.test(u));
+  while (queue.length) {
+    const url = queue.pop();
+    for (const dep of staticImports(url)) if (!closure.has(dep)) { closure.add(dep); queue.push(dep); }
+  }
+  ok(closure.size > 0, `the tab chunks' static imports were read from the build (${closure.size} files)`);
+  const uncarried = [...closure].filter(u => !PRECACHE.includes(u) && !WARM.includes(u));
+  eq(uncarried.length, 0,
+    `every file a Map, Report or Scripts chunk imports statically is installed or warmed, so the tab does not crash on a first open offline — missing: ${JSON.stringify(uncarried)}`);
+  ok(!/prefetchInstrumentTabs/.test(readFileSync(join(ROOT, 'client', 'src', 'App.jsx'), 'utf8')),
+    'and the shell no longer relies on an idle prefetch to get them');
+  // A warmed stylesheet is still fetched by Vite's runtime CSS preload the
+  // moment its tab first opens, and that step is what failed on a first visit
+  // offline in WebKit ("Unable to preload CSS for …/MapPage-….css"). The
+  // Instrument's stylesheets are therefore part of the boot stylesheet, and no
+  // tab chunk carries one of its own.
+  const tabSheets = emitted().filter(url => /(^|\/)(instrument|MapPage|ReportHead|History|Progress|ledger|map|report)-[^/]*\.css$/.test(url.slice(1)));
+  eq(tabSheets.length, 0, `no Instrument or tab stylesheet is emitted on its own, so opening a tab never preloads CSS: ${JSON.stringify(tabSheets)}`);
+  const bootSheets = PRECACHE.filter(url => /\.css$/.test(url) && readFileSync(join(DIST, 'index.html'), 'utf8').includes(url));
+  const bootCss = bootSheets.map(url => readFileSync(join(DIST, url.slice(1)), 'utf8')).join('\n');
+  ok(['.in-bar', '.in-map', '.in-led-row', '.in-report'].every(sel => bootCss.includes(sel)),
+    `the boot stylesheet carries the shell, Map, Scripts and Report rules (${bootSheets.join(', ') || 'no boot stylesheet'})`);
+}
+// V1 decision D10: the student Classes page follows the classroom-product
+// flag, and a production build made with it off (both builds this suite
+// measures) emits no chunk for a page no student of that build can open.
+ok(!emitted().some(url => /(^|\/)Classes-[^/]*\.js$/.test(url)), 'a production build with the classroom flag off emits no Classes chunk');
+ok(studentBusy({ navigator: {}, document: { querySelector: sel => (sel.includes('.ink-stage') ? {} : null) } }), 'an ink surface on screen counts as the student writing');
+ok(studentBusy({ navigator: {}, document: { querySelector: sel => (sel.includes('aria-busy') ? {} : null) } }), 'an aria-busy control counts as a Check in flight');
+ok(!studentBusy({ navigator: {}, document: { querySelector: () => null } }), 'and neither on screen means idle');
+
+// ── The previous-year archive adds 0 bytes to the measure ───────────────────
+// Past papers are online-only and behind a switch. Their records, schema,
+// cited sources and coverage manifest are on demand; the shell carries only
+// pyq/pyqIndex.js (ids and rungs). Proved three ways, so a transcribed paper can
+// never again move the install or the whole offline build:
+//   · no archive chunk is installed or warmed;
+//   · no record id and no cited document's sha256 appears in any byte that is;
+//   · the index chunk stays small, so a new chapter costs a line, not a paper.
+{
+  const measured = [...PRECACHE, ...WARM];
+  const archiveChunks = emitted().filter(url => /(^|\/)(pyqArchive|pyqCoverage|pyqSources|pyqSchema|records-[a-z0-9-]+)-[^/]*\.js$/.test(url.slice(1)));
+  ok(archiveChunks.some(u => /pyqArchive-/.test(u)), 'the build emits the archive as its own chunk');
+  const carried = archiveChunks.filter(u => measured.includes(u));
+  eq(carried.length, 0, `no previous-year archive chunk is installed or warmed: ${JSON.stringify(carried)}`);
+  const { PYQ_RECORDS } = await import('../src/engine/pyq/pyqArchive.js');
+  const { PYQ_SOURCES } = await import('../src/engine/pyq/pyqSources.js');
+  const needles = [
+    ...PYQ_RECORDS.map(r => r.id),
+    ...new Set(JSON.stringify(PYQ_SOURCES).match(/\b[0-9a-f]{64}\b/g) || [])
+  ];
+  ok(needles.length > 0, 'there are archive records and source hashes to look for');
+  const body = measured.filter(u => /\.(js|html)$/.test(u)).map(u => { try { return readFileSync(join(DIST, fileOf(u)), 'utf8'); } catch { return ''; } }).join('\n');
+  const leaked = needles.filter(n => body.includes(n));
+  eq(leaked.length, 0, `no archive record id or source sha256 is in an installed or warmed file: ${JSON.stringify(leaked.slice(0, 4))}`);
+  const index = emitted().filter(url => /(^|\/)pyqIndex-[^/]*\.js$/.test(url.slice(1)));
+  const indexRaw = total(index, raw);
+  ok(indexRaw <= 4096, `the archive index the shell carries is ${indexRaw} bytes, over 4096 — the archive's growth belongs on demand`);
+  PYQ_ARCHIVE_MEASURED = { chunks: archiveChunks.length, onDemandRaw: total(archiveChunks, raw), indexRaw };
+}
+
 // ── Report ───────────────────────────────────────────────────────────────────
 
 console.log(failures.length
-  ? `INSTALL BUDGET: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
-  : `INSTALL BUDGET: PASS — ${pass}/${pass} checks — install ${kb(installRaw)} raw / ${kb(installGzip)} gzip under ${kb(INSTALL_RAW_CEILING)}/${kb(INSTALL_GZIP_CEILING)}, whole offline build ${kb(firstVisitRaw)} raw / ${kb(firstVisitGzip)} gzip, ${PRECACHE.length} files installed and ${WARM.length} warmed, nothing emitted left uncovered.`);
+  ? `${LABEL}: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`
+  : `${LABEL}: PASS — ${pass}/${pass} checks — install ${kb(installRaw)} raw / ${kb(installGzip)} gzip under ${kb(INSTALL_RAW_CEILING)}/${kb(INSTALL_GZIP_CEILING)}, whole offline build ${kb(firstVisitRaw)} raw / ${kb(firstVisitGzip)} gzip, ${PRECACHE.length} files installed and ${WARM.length} warmed, nothing emitted left uncovered; previous-year archive 0 kB of it (${PYQ_ARCHIVE_MEASURED?.chunks} chunks, ${kb(PYQ_ARCHIVE_MEASURED?.onDemandRaw || 0)} on demand).`);
 process.exit(failures.length ? 1 : 0);

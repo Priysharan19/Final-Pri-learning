@@ -15,16 +15,34 @@ on:
       - 'client/test/support/**'
       - 'docs/design/KALP-02-information-architecture.md'
       - '.github/workflows/kalp-02-information-architecture.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'client/src/App.jsx'
+      - 'client/src/pages/History.jsx'
+      - 'client/src/pages/Teach.jsx'
+      - 'client/src/components/FreeCapNotice.jsx'
+      - 'client/src/i18n/**'
+      - 'client/src/theme.css'
+      - 'client/test/kalp02-navigation-check.mjs'
+      - 'client/test/tour-kalp02-navigation.js'
+      - 'client/test/tour-kalp01-design.js'
+      - 'client/test/support/**'
+      - 'docs/design/KALP-02-information-architecture.md'
+      - '.github/workflows/kalp-02-information-architecture.yml'
   workflow_dispatch:
+
+concurrency:
+  # Pull-request runs share one group per pull request, so a newer push supersedes the
+  # queued or running check. Every other run gets its own group, keyed by its run id,
+  # so it is never cancelled or replaced while pending.
+  group: kalp-02-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
 
-# These browser gates also drive the Australian-syllabus flows, which a V1
-# build hides behind PRI_FEATURE_AUSTRALIA. The shipped iPad bundles stay
-# flag-off (client/test/ios-bundle-features-check.mjs).
 env:
-  PRI_FEATURE_AUSTRALIA: '1'
   # Handwriting input in timed exams (off by default in a shipped build): the
   # browser suites drive the gate-ON flow explicitly.
   PRI_FEATURE_EXAM_HANDWRITING: '1'
@@ -32,6 +50,8 @@ env:
 
 jobs:
   verify:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Route, role, browser and responsive navigation
     runs-on: ubuntu-latest
     timeout-minutes: 35

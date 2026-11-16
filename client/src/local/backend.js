@@ -25,6 +25,7 @@ import {
   indiaPyqAlternatives
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
+import { reportSeries, needsAnotherLookIds, HISTORY_FILTERS, HISTORY_SORTS } from '../engine/reportSeries.js';
 import { attemptTotals, isCreditedCorrect, isRepeat as isRepeatAttempt, quotedTotals } from '../engine/progressTruth.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
@@ -60,7 +61,7 @@ import {
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { featureEnabled } from '../platform/features.js';
 import { stageAttemptProgress } from '../platform/profileOutbox.js';
-import { requestTutorHelp } from './tutorBridge.js';
+import { requestLineCheck, requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
 import { cloud, nativeCloudAvailable } from '../platform/cloudTransport.js';
@@ -73,7 +74,9 @@ import {
   finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper,
   markPendingLines, recoverHandwriting, retryHandwriting, confirmExamPagesSaved
 } from './serverExam.js';
+import { nswExamsFor, nswExamSpec, namedOutcomes } from './nswExamBackend.js';
 import { pendingSummary } from './examPages.js';
+import { settleIfLeaving } from './pageLeaving.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 
@@ -626,7 +629,14 @@ const safeFigure = (v) => sanitizeFigure(typeof v === 'string' ? v : '') || null
 // is escaped by the renderer that shows it.
 const safeLabel = (v, max) => sanitizeText(String(primitive(v) ?? '').replace(/<[^>]*>?/g, ' ').replace(/\s+/g, ' '), max);
 const safeSteps = (v) => (Array.isArray(v) ? v : []).slice(0, 40)
-  .map(s => ({ h: sanitizeText(s?.h, 200), d: sanitizeText(s?.d, 2000) }));
+  .map(s => {
+    const step = { h: sanitizeText(s?.h, 200), d: sanitizeText(s?.d, 2000) };
+    // A worked-solution step may carry a figure (SVG); it goes through the
+    // same figure sanitiser as a question's figure, or is dropped.
+    const figure = typeof s?.figure === 'string' ? safeFigure(s.figure) : null;
+    if (figure) step.figure = figure;
+    return step;
+  });
 const safeOptions = (v) => (Array.isArray(v) ? v : []).slice(0, 6).map(o => sanitizeText(o, 200));
 const safeStrokes = (v, max) => (Array.isArray(v) ? v : []).slice(0, max)
   .map(st => ({ points: (Array.isArray(st?.points) ? st.points : []).slice(0, 4000).map(pt => ({
@@ -991,25 +1001,70 @@ function aggregateRows(rows, now) {
  */
 function indiaState(chapter, ratings, now = Date.now()) {
   const own = chapter?.id ? ratings[chapter.id] : null;
+  // Generator-keyed rows a device recorded before chapters had rows (#300).
+  // An India answer is recorded under its chapter id only, so a sibling
+  // generator's row (any id other than the chapter's own) is frozen legacy
+  // evidence: it is added to the chapter, never double-counted. A generator
+  // that shares the chapter's id already lives in `own`.
+  const siblings = indiaGeneratorIds(chapter).filter(id => id !== chapter?.id).map(id => ratings[id]).filter(Boolean);
   if (own) {
-    return {
-      ...own, rating: own.rating || START_RATING, attempts: own.attempts || 0, correct: own.correct || 0,
-      mastery: masteryOf(own.rating, own.attempts, own.last_at, now), legacy: false
-    };
+    const base = { ...own, rating: own.rating || START_RATING, attempts: own.attempts || 0, correct: own.correct || 0 };
+    if (!siblings.length) return { ...base, mastery: masteryOf(own.rating, own.attempts, own.last_at, now), legacy: false };
+    return { ...base, ...aggregateRows([base, ...siblings], now), legacy: true };
   }
-  const rows = indiaGeneratorIds(chapter).map(id => ratings[id]).filter(Boolean);
-  if (!rows.length) return { attempts: 0, correct: 0, rating: START_RATING, mastery: 0, last_at: null, legacy: false };
-  return { ...aggregateRows(rows, now), legacy: true };
+  if (!siblings.length) return { attempts: 0, correct: 0, rating: START_RATING, mastery: 0, last_at: null, legacy: false };
+  return { ...aggregateRows(siblings, now), legacy: true };
 }
 
-/** The rating state of one Indian dot point: its own row under the chapter, or the legacy generator aggregate. */
+/**
+ * The answers on a rating row that no dot point accounts for: what a row keyed
+ * by a generator that shares its chapter's id held before chapters recorded
+ * dot points, kept whether or not the row has since gained a `dp` map (a new
+ * answer, a backup restore) (#300).
+ */
+function unattributedOf(row) {
+  if (!row) return null;
+  // Legacy is decided by what the row IS, never by a missing dot point: a row
+  // written before rows recorded dot points has no dp map at all; once such a
+  // row is written again its pre-cutover totals are frozen in `legacy`
+  // (legacyBaselineOf). An answer recorded today without a dot point (a
+  // notebook twin, a past-paper question) is current evidence and is never
+  // spread over dot points.
+  const frozen = row.legacy && typeof row.legacy === 'object' ? row.legacy
+    : (!row.dp || typeof row.dp !== 'object') ? row : null;
+  const attempts = Number(frozen?.attempts) || 0;
+  if (attempts <= 0) return null;
+  return { rating: Number(frozen.rating) || START_RATING, attempts, correct: Math.max(0, Math.min(attempts, Number(frozen.correct) || 0)), last_at: frozen.last_at || null };
+}
+
+/**
+ * The pre-cutover totals of a rating row written before rows recorded dot
+ * points, frozen the first time it is written again (#300); null for a
+ * current row. Kept on the row as `legacy`.
+ */
+export function legacyBaselineOf(st) {
+  if (!st || (st.dp && typeof st.dp === 'object')) return st?.legacy || null;
+  if (!(Number(st.attempts) > 0)) return null;
+  return { attempts: Number(st.attempts) || 0, correct: Number(st.correct) || 0, rating: Number(st.rating) || START_RATING, last_at: st.last_at || null };
+}
+
+/**
+ * The rating state of one Indian dot point: its own state under the chapter,
+ * plus the legacy generator evidence that covers it — sibling generators'
+ * rows, and the unattributed answers of a generator row sharing the
+ * chapter's id (#300).
+ */
 function indiaDotpointState(chapter, ordinal, chapterRow, ratings, now = Date.now()) {
-  if (chapterRow) return dpStateOf(chapterRow, indiaDotpointKey(chapter.id, ordinal));
   const ids = [...new Set((chapter.covers || []).filter(c => c.dp.includes(ordinal)).map(c => c.gen))];
-  const rows = ids.map(id => ratings[id]).filter(Boolean);
-  if (!rows.length) return EMPTY_DP();
-  const { rating, attempts, correct, last_at } = aggregateRows(rows, now);
-  return { rating, attempts, correct, last_at };
+  const own = chapterRow ? dpStateOf(chapterRow, indiaDotpointKey(chapter.id, ordinal)) : null;
+  const parts = [];
+  if (own?.attempts) parts.push(own);
+  if (chapterRow && ids.includes(chapter.id)) { const rest = unattributedOf(chapterRow); if (rest) parts.push(rest); }
+  for (const id of ids) if (id !== chapter.id && ratings[id]) parts.push(ratings[id]);
+  if (!parts.length) return own || EMPTY_DP();
+  if (parts.length === 1 && parts[0] === own) return own;
+  const { rating, attempts, correct, last_at } = aggregateRows(parts, now);
+  return { ...(own || {}), rating, attempts, correct, last_at };
 }
 
 /**
@@ -1539,7 +1594,10 @@ async function indiaStats(p, ratings, now) {
     examPrediction: (() => {
       const blueprint = indiaExamBlueprint({ track: trackId, grade: p.year, variant: p.indiaVariant || 'standard' });
       if (!blueprint?.units?.length) return null;
-      try { return predictExamMark(blueprint, ratings, { nowMs: now }); } catch { return null; }
+      // Evidence per chapter as every other India surface reads it: the
+      // chapter's row plus its legacy generator rows (#300).
+      const evidenceFor = id => { const c = indiaChapter(id); return c ? indiaState(c, ratings, now) : ratings[id]; };
+      try { return predictExamMark(blueprint, ratings, { nowMs: now, evidenceFor }); } catch { return null; }
     })(),
     priorities: prio, strands, misconceptions, recommendation, chapters, reviewsDue: due.size,
     activity: days.slice(-120), totals, byDiff,
@@ -2247,7 +2305,8 @@ async function resolve(profile, row, q, correct, answerGiven, ms, mode, viaInk =
       ...st, key: `${pid}:${owner}`, pid, subtopic: owner,
       rating: ratingAfter, attempts: st.attempts + 1,
       correct: st.correct + (correct ? 1 : 0), last_at: now,
-      dp, traps, recent
+      dp, traps, recent,
+      ...(legacyBaselineOf(st) ? { legacy: legacyBaselineOf(st) } : {})
     };
   }
 
@@ -2701,7 +2760,11 @@ const IMPORT_ROWS = {
       key: `${pid}:${subtopic}`, pid, subtopic,
       rating: safeNum(r.rating, START_RATING), attempts: safeInt(r.attempts, 0, 1e7, 0),
       correct: safeInt(r.correct, 0, 1e7, 0), last_at: safeTime(r.last_at),
-      dp: safeDotpointStats(r.dp), traps: safeTrapLedger(r.traps),
+      // A row restored without a dot-point map stays without one (#300).
+      ...(r.dp && typeof r.dp === 'object' ? { dp: safeDotpointStats(r.dp) } : {}), traps: safeTrapLedger(r.traps),
+      ...(r.legacy && typeof r.legacy === 'object' ? { legacy: {
+        attempts: safeInt(r.legacy.attempts, 0, 1e7, 0), correct: safeInt(r.legacy.correct, 0, 1e7, 0),
+        rating: safeNum(r.legacy.rating, START_RATING), last_at: safeTime(r.legacy.last_at) } } : {}),
       recent: (Array.isArray(r.recent) ? r.recent : []).slice(0, RECENT_WINDOW).map(v => (v ? 1 : 0))
     };
   },
@@ -3020,9 +3083,15 @@ async function serverReviewQueue(p) {
       ? `/practice?subtopic=${encodeURIComponent(named.chapterId)}&track=${encodeURIComponent(p.indiaTrack || 'cbse')}`
       : `/practice?subtopic=${encodeURIComponent(named.chapterId)}${Number.isInteger(named.ordinal) ? `&dotpoint=${named.ordinal}` : ''}`;
     return { id: `${r.subtopic}|${r.dotpoint}`, subtopic: r.subtopic, dotpoint: r.dotpoint, chapterName: named.chapterName, text: named.text,
-      recall: Number(r.recall) || 0, target: Number(r.target) || 0.9, overdueDays: Number(r.overdueDays) || 0, dueAt: Number(r.dueAt) || 0, href };
+      recall: Number(r.recall) || 0, target: Number(r.target) || 0.9, overdueDays: Number(r.overdueDays) || 0, dueAt: Number(r.dueAt) || 0, href,
+      // The history the estimate rests on, as the server counted it.
+      attempts: Math.max(0, Number(r.attempts) || 0), correct: Math.max(0, Number(r.correct) || 0), lastAt: Number(r.lastAt) || 0 };
   };
-  return { due: (out?.due || []).map(decorate), upcoming: (out?.upcoming || []).map(decorate), dueCount: Number(out?.dueCount) || 0, counted: Number(out?.counted) || 0 };
+  // Due today on the server's spaced ladder (engine/spacedReview.js).
+  const today = (Array.isArray(out?.spaced?.today) ? out.spaced.today : []).map(r => ({ ...decorate(r),
+    intervalDays: Math.max(0, Number(r.intervalDays) || 0), dueAt: Number(r.dueAt) || 0 }));
+  return { due: (out?.due || []).map(decorate), upcoming: (out?.upcoming || []).map(decorate), dueCount: Number(out?.dueCount) || 0, counted: Number(out?.counted) || 0,
+    today, todayCount: Number(out?.spaced?.todayCount) || today.length };
 }
 
 const routes = {
@@ -3770,6 +3839,148 @@ const routes = {
       code: outcome?.error?.code || null
     };
   },
+  // "What went wrong?" — a diagnosis of working the deterministic engine has
+  // already judged. It explains the verdict and never changes it: nothing here
+  // touches the mark. Asked while the attempt is still open it is help, so it is
+  // charged like the first tutor level (once); asked after the question is
+  // resolved it costs nothing, because the mark is already decided. The
+  // server grounds a server-issued question in its own escrow and decides for
+  // itself whether that question is resolved; it never takes the device's word.
+  'POST /practice/:id/tutor/diagnose': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    const q = row.payload;
+    const resolvedRow = !!row.answered;
+    const used = Math.max(0, Math.min(3, Number(row.tutorLevel) || 0));
+    const solution = row.serverQuestionId ? (row.serverReceipt?.solution
+      ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText,
+          solutionText: row.serverReceipt.solution.solutionText }
+      : null)
+      : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    const work = tutorWork(q, body?.work);
+    // Nothing written: nothing to diagnose, and nothing charged (F5).
+    if (!work.lines.length && !work.typedAnswer) {
+      return { source: 'deterministic', diagnosis: null, message: null, code: 'TUTOR_NOTHING_TO_DIAGNOSE', tutorLevel: used };
+    }
+    if (!resolvedRow && used < 1) {
+      row.tutorLevel = 1;
+      await put('questions', row);
+    }
+    const finalAnswer = ['correct', 'wrong'].includes(body?.finalAnswer) ? body.finalAnswer : 'unknown';
+    const request = tutorRequest(p, row, q, solution, {
+      level: 'diagnose', locale: body?.locale,
+      work: { ...work, lineStatus: work.lines.map((_, i) => (i === work.firstBreak ? 'break' : i < work.verifiedLines && (work.firstBreak < 0 || i < work.firstBreak) ? 'ok' : 'unknown')), finalAnswer },
+      resolved: resolvedRow
+    });
+    // A diagnosis waits for a high-effort model: longer than the ladder's 25 s.
+    const outcome = request ? await requestTutorHelp(request, { timeoutMs: 58_000 }) : { error: { code: 'TUTOR_UNGROUNDED' } };
+    const d = outcome?.tutor?.diagnosis;
+    const clean = d && typeof d === 'object' ? {
+      didRight: sanitizeText(d.didRight, 400) || '',
+      wentWrong: sanitizeText(d.wentWrong, 400) || '',
+      nextStep: sanitizeText(d.nextStep, 400) || '',
+      wentWrongLine: Number.isInteger(d.wentWrongLine) ? d.wentWrongLine : -1
+    } : null;
+    return {
+      diagnosis: clean && clean.wentWrong ? clean : null,
+      source: outcome?.tutor?.source === 'model' ? 'tutor' : 'deterministic',
+      code: outcome?.tutor?.source === 'model' ? null : (outcome?.error?.code || outcome?.tutor?.reason || null),
+      tutorLevel: Number(row.tutorLevel) || 0
+    };
+  },
+
+  // "Why this step?" — a grounded dialogue about one step of a RESOLVED
+  // question's verified solution. Writes nothing to the row (no charge: the
+  // mark is decided; Premium and the free taster are the server's to enforce).
+  'POST /practice/:id/tutor/why': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (!row.answered) throw Object.assign(new Error('"Why this step?" follows the answer.'), { status: 409, code: 'TUTOR_LEVEL_ORDER' });
+    const q = row.payload;
+    const stepIndex = Number(body?.stepIndex);
+    if (!Number.isInteger(stepIndex) || stepIndex < 0 || stepIndex > 23) throw Object.assign(new Error('Choose a step of the solution.'), { status: 400, code: 'TUTOR_BODY_INVALID' });
+    const solution = row.serverQuestionId ? (row.serverReceipt?.solution
+      ? { steps: row.serverReceipt.solution.steps || [], answerText: row.serverReceipt.solution.answerText, solutionText: row.serverReceipt.solution.solutionText }
+      : null)
+      : { steps: q.steps || [], answerText: displayAnswer(q), solutionText: q.solutionText };
+    const base = tutorRequest(p, row, q, solution, { level: 'why', locale: body?.locale, work: tutorWork(q, body?.work), resolved: true });
+    if (!base) return { message: null, source: 'deterministic', code: 'TUTOR_UNGROUNDED' };
+    const message = typeof body?.message === 'string' ? sanitizeText(body.message, 600) : '';
+    const history = (Array.isArray(body?.history) ? body.history : []).slice(-6)
+      .map(turn => ({ role: turn?.role === 'tutor' ? 'tutor' : 'student', text: sanitizeText(turn?.text, 600) })).filter(turn => turn.text);
+    const outcome = await requestTutorHelp({ ...base, stepIndex, ...(message ? { message, history } : {}) });
+    const tutor = outcome?.tutor;
+    if (!tutor || typeof tutor.message !== 'string') return { message: null, source: 'deterministic', code: outcome?.error?.code || 'TUTOR_FAILED' };
+    return { message: sanitizeText(tutor.message, 1200), source: tutor.source === 'model' ? 'tutor' : 'deterministic', code: tutor.source === 'model' ? null : (tutor.reason || null) };
+  },
+
+  // "Check this line so far": the server's Step Check of the lines on an OPEN
+  // server-issued question. It names a step of the method, never a value, and
+  // never marks. It is help, so it is charged like a tutor level (one level
+  // per check, never past 2 so the walkthrough stays its own rung), and a
+  // question allows at most two, so it cannot be used to test guesses.
+  'POST /practice/:id/tutor/line-check': async (body, params) => {
+    if (!tutorFeatureEnabled()) throw tutorDisabledError();
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409, code: 'ALREADY_RESOLVED' });
+    if (!row.serverQuestionId) throw Object.assign(new Error('Only a question the server issued can be checked.'), { status: 409, code: 'LINE_CHECK_UNAVAILABLE' });
+    const lines = (Array.isArray(body?.lines) ? body.lines : []).map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40);
+    if (!lines.length) return { lineCheck: null, code: 'TUTOR_NOTHING_TO_DIAGNOSE', tutorLevel: Number(row.tutorLevel) || 0 };
+    const usedChecks = Math.max(0, Number(row.lineChecks) || 0);
+    if (usedChecks >= 2) throw Object.assign(new Error('Two line checks per question.'), { status: 409, code: 'LINE_CHECK_LIMIT' });
+    const outcome = await requestLineCheck({ context: 'practice', serverQuestionId: String(row.serverQuestionId), lines, locale: body?.locale === 'hi' ? 'hi' : 'en' });
+    const lc = outcome?.lineCheck;
+    if (outcome?.error?.code === 'LINE_CHECK_LIMIT') throw Object.assign(new Error('Two line checks per question.'), { status: 409, code: 'LINE_CHECK_LIMIT' });
+    if (!lc || typeof lc.message !== 'string') return { lineCheck: null, code: outcome?.error?.code || 'TUTOR_FAILED', tutorLevel: Number(row.tutorLevel) || 0 };
+    // Charged only when the server actually checked (an 'unchecked' reply costs nothing).
+    if (lc.status !== 'unchecked' && lc.status !== 'final') {
+      row.lineChecks = usedChecks + 1;
+      const level = Math.max(0, Number(row.tutorLevel) || 0);
+      row.tutorLevel = Math.max(level, Math.min(2, level + 1));
+      await put('questions', row);
+    }
+    return {
+      lineCheck: { status: ['ok', 'break', 'unplaced', 'unchecked', 'final'].includes(lc.status) ? lc.status : 'unplaced', message: sanitizeText(lc.message, 300) },
+      tutorLevel: Number(row.tutorLevel) || 0, checksLeft: Math.max(0, 2 - (Number(row.lineChecks) || 0))
+    };
+  },
+
+  // The live step coach (F1): is it on for this account? The server decides.
+  // Its code is an on-demand chunk; offline or unloadable means off.
+  // Folded out of a tutor-off production build, like the ask route.
+  'GET /tutor/step-coach': TUTOR_BUILT_OUT
+    ? async () => ({ on: false })
+    : async () => ({ on: tutorFeatureEnabled() && await import('./stepCoach.js').then(m => m.stepCoachAvailable(), () => false) }),
+
+  // The live step coach (F1): the server's Step Check of the FINISHED lines of
+  // an OPEN server-issued question, as the student writes. One status per
+  // line — 'ok' (with the plan step), 'break' (the first line that does not
+  // follow from a verified line above), 'unsure' (say nothing) or 'final' (a
+  // final-answer attempt: only "Press Check"). No value, no mark. The server
+  // gates it (switch, Premium, per-question cap, daily allowance).
+  //
+  // Assistance provenance (PRODUCTIVE_MISTAKE_REPAIR_PROTOCOL §6): a shown
+  // break is A1 (localization only), a shown tick is verification feedback.
+  // Both are recorded on the attempt, system-initiated, with the line index;
+  // no help credit is charged here — that policy is the owner's decision.
+  'POST /practice/:id/tutor/step-coach': TUTOR_BUILT_OUT
+    ? async () => { throw tutorDisabledError(); }
+    : async (body, params) => {
+      if (!tutorFeatureEnabled()) throw tutorDisabledError();
+      return (await import('./stepCoach.js')).coachRoute(body, params, { requireProfile, get, put, assertPracticeRow, sanitizeText });
+    },
+
   // The student's own question, between levels 1 and 3. Grounded and streamed
   // here (client/src/tutor/askRoute.js); the panel never sees the solution.
   // The route module (and the conversation and streaming code behind it) is
@@ -4061,7 +4272,16 @@ const routes = {
         dotpointText: namedDotpoint(p, item.subtopic, item.dotpoint).text
       }))
     }));
-    return { entries, available: true };
+    // The mistake notebook (engine/mistakeNotebook.js on the server): every
+    // wrong resolution with its first broken line, fixed and due states. This
+    // device only names chapters and dot points; it decides nothing.
+    const book = out?.notebook && typeof out.notebook === 'object' ? out.notebook : null;
+    const notebook = book ? { ...book, groups: (Array.isArray(book.groups) ? book.groups : []).map(g => ({
+      ...g, chapterName: namedDotpoint(p, g.subtopic, null).chapterName,
+      misconception: g.misconception ? { ...g.misconception, nameKey: misconceptionById(g.misconception.id)?.name || null } : null,
+      items: (Array.isArray(g.items) ? g.items : []).map(item => ({ ...item, dotpointText: namedDotpoint(p, item.subtopic, item.dotpoint).text }))
+    })) } : null;
+    return { entries, notebook, available: true };
   },
 
   // A twin is drawn and issued by the server; this device keeps the row it
@@ -4070,7 +4290,9 @@ const routes = {
     const p = await requireProfile();
     const linked = await profileCloudAccountId(p.id).catch(() => null);
     if (!linked) throw checkUnavailable('sign-in');
-    const out = await viaServer(() => cloud.notebookTwin(params.id));
+    // A twin counts toward the free day and JEE Advanced stays Premium (D19):
+    // the server's refusal is explained by the one paywall, like a repeat's.
+    const out = await viaServer(() => cloud.notebookTwin(params.id)).catch(cause => { throw serverGateRefusal(cause) || cause; });
     const q = out?.question;
     if (!q?.id || String(out?.accountId || '') !== linked) throw checkUnavailable('unavailable');
     const named = p.course === 'in' ? indiaNameOf(q.subtopic, { grade: p.year }) : null;
@@ -4090,6 +4312,13 @@ const routes = {
   // their answers until it has marked the paper. Nothing here marks an answer.
   'POST /exams': async (body) => {
     const p = await requireProfile();
+    // An NSW HSC-style paper (plan G4): named by its blueprint, composed and
+    // marked by the server. Stored like any other server paper below.
+    if (body?.nsw !== undefined) {
+      if (!nswExamsFor(p)) throw Object.assign(new Error('These papers are not available here.'), { status: 404, code: 'EXAM_KIND_UNAVAILABLE' });
+      const issued = await issueServerExam(p.id, nswExamSpec(body.nsw), `nsw:${body.nsw}`);
+      return storeServerPaper(p, issued, { year: 12, pathway: null, title: issued.title, readingMin: issued.readingMin, nsw: issued.nsw });
+    }
     const length = [10, 15, 20].includes(Number(body?.length)) ? Number(body.length) : 10;
     const minutes = Math.round(Math.min(90, Math.max(10, Number(body?.minutes) || (length * 3))));
     const year = Math.min(12, Math.max(7, Math.round(Number(body?.year) || p.year)));
@@ -4118,30 +4347,7 @@ const routes = {
     const issued = await issueServerExam(p.id, {
       kind: 'practice-paper', paper: { year, minutes, ...(examPw ? { pathway: examPw } : {}) }, slots
     }, `practice-paper:${year}:${examPw || ''}:${length}:${minutes}`);
-
-    const examId = String(issued.id);
-    const now = Date.now();
-    const qids = [];
-    try {
-      for (const sq of issued.questions) {
-        const row = paperRowOf(p.id, examId, sq, now);
-        await put('questions', row);
-        qids.push(row.id);
-      }
-    } catch (err) {
-      await Promise.all(qids.map(id => del('questions', id).catch(() => {})));
-      throw err;
-    }
-    const exam = {
-      id: examId, pid: p.id, year, pathway: examPw, title, durationMin: issued.durationMin, questionIds: qids,
-      createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null,
-      paperVersion: issued.paperVersion,
-      server: serverFieldOf(issued, await profileCloudAccountId(p.id).catch(() => null))
-    };
-    startExamClock(exam, localStartOf(issued, now));
-    await put('exams', exam);
-    noteReconciled(exam.id);
-    return { exam: await examFor(p.id, examId) };
+    return storeServerPaper(p, issued, { year, pathway: examPw, title });
   },
   'GET /exams': async () => {
     const p = await requireProfile();
@@ -4698,8 +4904,11 @@ const routes = {
   // ---- history: every answered question, revisitable ----
   'POST /history/list': async (body) => {
     const p = await requireProfile();
-    const { filter = 'all', page = 0, pageSize = 20 } = body || {};
-    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const { filter = 'all', page = 0, pageSize = 20, subtopic = null, sort = 'newest' } = body || {};
+    if (!Object.hasOwn(HISTORY_FILTERS, filter)) throw Object.assign(new Error('Unknown history filter'), { status: 400 });
+    if (!Object.hasOwn(HISTORY_SORTS, sort)) throw Object.assign(new Error('sort must be newest, oldest or marks'), { status: 400 });
+    const allRows = await byIndex('questions', 'pid', p.id);
+    const rows = allRows.filter(r => r.answered);
     const attempts = await attemptsInOrder(p.id);
     const attemptByQ = {};
     for (const a of attempts) attemptByQ[a.questionId] = a;   // latest wins (answer order)
@@ -4707,6 +4916,10 @@ const routes = {
     const marked = new Set(marks.map(b => b.key.split(':').slice(1).join(':')));
     const inkRows = await byIndex('inks', 'pid', p.id);
     const inkById = Object.fromEntries(inkRows.map(r => [r.id, r]));
+    const needsLook = needsAnotherLookIds(allRows.map(r => ({
+      id: r.id, answered: !!r.answered, retryOf: r.retryOf, repeatOf: r.repeatOf,
+      correct: attemptByQ[r.id] ? !!attemptByQ[r.id].correct : null, marks: certifiedMarksOfRow(r)
+    })));
 
     let list = rows.map(r => {
       const q = r.payload;
@@ -4728,43 +4941,118 @@ const routes = {
         correct: a ? !!a.correct : null, answerGiven: a?.answerGiven ?? '',
         viaInk: !!a?.viaInk, hasInk: !!(ink && ink.strokes?.length), hasPhoto: !!ink?.photo, hasScribble: !!(ink?.scribble?.length),
         bookmarked: marked.has(r.id),
+        needsLook: needsLook.has(r.id),
         canRetry: !q.custom && !q.multipart,
         answeredAt: a?.createdAt || r.createdAt,
         // The server-certified mark and its step rows, when the server sent one.
         ...(() => { const m = certifiedMarksOfRow(r); return m ? { marksEarned: m.earned, marksPossible: m.possible, markRows: m.markRows, ...(m.repeat || r.repeatOf ? { repeat: true } : {}) } : {}; })()
       };
-    }).sort((a, b) => b.answeredAt - a.answeredAt);
-
-    if (filter === 'wrong') list = list.filter(x => x.correct === false);
-    if (filter === 'correct') list = list.filter(x => x.correct === true);
-    if (filter === 'bookmarked') list = list.filter(x => x.bookmarked);
-    if (filter === 'ink') list = list.filter(x => x.hasInk || x.hasScribble || x.hasPhoto);
+    });
+    // Answers this ACCOUNT gave on another device (§22.2: History on a second
+    // device). Sync restores each of them as an attempt row only
+    // (platform/cloudSyncRestore.js): the question itself and the typed answer
+    // never travel through the replica, so this device has no question row
+    // for them and the list above, built from question rows, left them out —
+    // History read "Nothing here yet" on a second device that had restored
+    // every marked attempt. They are listed from the restored attempt itself:
+    // the chapter, difficulty, the verdict, the server-certified marks when
+    // the server sent them, and when — newest restored attempt per question,
+    // only for a question this device has no row of its own for. Nothing is
+    // invented: no prompt (it never arrived), no answer, no retry (there is no
+    // question to retry), no detail to open.
+    const local = new Set(allRows.map(r => r.id));
+    const restoredByQ = {};
+    for (const a of attempts) {
+      if (!a.remoteEventId || !a.questionId || local.has(a.questionId)) continue;
+      restoredByQ[a.questionId] = a;   // latest wins (answer order)
+    }
+    for (const a of Object.values(restoredByQ)) {
+      const inChapter = indiaChapter(a.subtopic);
+      const certified = Number.isInteger(a.marksEarned) && Number.isInteger(a.marksPossible);
+      list.push({
+        id: a.questionId, subtopic: inChapter ? inChapter.id : a.subtopic,
+        subtopicName: inChapter?.name || SUBTOPIC_BY_ID[a.subtopic]?.name || a.subtopic,
+        year: inChapter ? indiaChapterGrade(inChapter) : undefined,
+        multipart: false, prompt: '',
+        difficulty: a.difficulty, mode: a.mode,
+        correct: !!a.correct, answerGiven: '',
+        viaInk: !!a.viaInk, hasInk: false, hasPhoto: false, hasScribble: false,
+        bookmarked: marked.has(a.questionId),
+        needsLook: false,
+        canRetry: false,
+        fromAnotherDevice: true,
+        answeredAt: a.createdAt,
+        ...(certified ? { marksEarned: a.marksEarned, marksPossible: a.marksPossible, markRows: [] } : {}),
+        ...(a.repeat ? { repeat: true } : {})
+      });
+    }
+    // Counts per filter, inside the chapter asked for (before paging).
+    if (subtopic) list = list.filter(x => x.subtopic === subtopic);
+    const counts = Object.fromEntries(Object.entries(HISTORY_FILTERS).map(([k, f]) => [k, list.filter(f).length]));
+    list = list.filter(HISTORY_FILTERS[filter]).sort(HISTORY_SORTS[sort]);
 
     const start = page * pageSize;
-    return { total: list.length, page, pageSize, items: list.slice(start, start + pageSize) };
+    return { total: list.length, page, pageSize, filter, sort, subtopic: subtopic || null, counts, items: list.slice(start, start + pageSize) };
   },
 
   // Marks per chapter, from server-certified receipts only (read-only; nothing
   // is stored or inferred). A repeat (a question whose solution the student
   // had already seen) is left out entirely — it earns nothing, and counting
   // its possible marks would read as marks lost; `repeats` says how many.
-  'GET /marks/by-chapter': async () => {
+  // `since` (YYYY-MM-DD) keeps only answers on or after that calendar day in
+  // the profile's timezone; `monthStart` is the first day of the current
+  // month there. Each chapter also carries `dotpoints`: marks per dot point,
+  // for answers whose stored question names exactly one dot point; the rest
+  // are counted in `unattributed` (a mark is never split across dot points).
+  'GET /marks/by-chapter': async (body) => {
     const p = await requireProfile();
+    const tz = timezoneOf(p);
+    const since = body?.since == null ? null : String(body.since);
+    if (since != null && !/^\d{4}-\d{2}-\d{2}$/.test(since)) throw Object.assign(new Error('since must be a date, YYYY-MM-DD'), { status: 400 });
     const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const answeredAt = {};
+    for (const a of await attemptsInOrder(p.id)) answeredAt[a.questionId] = a.createdAt;
     const chapters = {};
     for (const r of rows) {
       const m = certifiedMarksOfRow(r);
       if (!m) continue;
+      if (since && dayKey(Number(answeredAt[r.id] || r.createdAt) || 0, tz) < since) continue;
       const inChapter = r.india ? indiaChapter(r.india.chapterId) : null;
       const id = inChapter ? inChapter.id : r.subtopic;
       if (!id) continue;
-      const c = chapters[id] ||= { earned: 0, possible: 0, questions: 0, repeats: 0 };
+      const c = chapters[id] ||= { earned: 0, possible: 0, questions: 0, repeats: 0, dotpoints: {}, unattributed: { earned: 0, possible: 0, questions: 0 } };
       if (m.repeat || r.repeatOf) { c.repeats += 1; continue; }
       c.earned += m.earned;
       c.possible += m.possible;
       c.questions += 1;
+      let dp = null;
+      if (inChapter && Number.isInteger(r.india?.dotpointIndex) && inChapter.dotpoints?.[r.india.dotpointIndex]) {
+        dp = { key: String(r.india.dotpointIndex), text: inChapter.dotpoints[r.india.dotpointIndex] };
+      } else if (!r.india) {
+        const ids = dotpointsCredited(r.payload);
+        if (ids.length === 1) dp = { key: ids[0], text: dotpointOf(r.subtopic, ids[0])?.text || null };
+      }
+      const bucket = dp ? (c.dotpoints[dp.key] ||= { text: dp.text, earned: 0, possible: 0, questions: 0 }) : c.unattributed;
+      bucket.earned += m.earned; bucket.possible += m.possible; bucket.questions += 1;
     }
-    return { chapters, source: 'server-certified-receipts' };
+    const today = dayKey(Date.now(), tz);
+    return { chapters, since, monthStart: `${today.slice(0, 7)}-01`, timezone: tz, source: 'server-certified-receipts' };
+  },
+
+  // Windowed report figures and their chart series (engine/reportSeries.js
+  // documents every definition). Read-only, this profile's rows only.
+  'GET /report/series': async (body) => {
+    const p = await requireProfile();
+    const period = String(body?.period || 'week');
+    const rows = (await byIndex('questions', 'pid', p.id)).filter(r => r.answered);
+    const answeredAt = {};
+    for (const a of await attemptsInOrder(p.id)) answeredAt[a.questionId] = a.createdAt;
+    const activity = await byIndex('activity', 'pid', p.id);
+    return reportSeries({
+      period, now: Date.now(), timezone: timezoneOf(p),
+      activeDates: activity.filter(a => a.questions > 0).map(a => a.date),
+      rows: rows.map(r => ({ answeredAt: answeredAt[r.id] || r.createdAt, mode: r.mode, repeatOf: r.repeatOf, marks: certifiedMarksOfRow(r) }))
+    });
   },
 
   'POST /history/:id/bookmark': async (body, params) => {
@@ -4816,7 +5104,7 @@ const routes = {
     }
     // A retried Indian question keeps its chapter, or its evidence would fall
     // onto the generator id instead of the chapter the student is working on.
-    const newRow = { id: uuid(), ...out.fields, pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload: out.q, generator, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
+    const newRow = { id: uuid(), ...out.fields, retryOf: row.id, pid: p.id, subtopic: row.subtopic, difficulty: row.difficulty, payload: out.q, generator, india: row.india || undefined, mode: 'practice', examId: null, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: Date.now() };
     await put('questions', newRow);
     return { question: sanitize(out.q, newRow), variant: out.same ? 'same' : 'fresh' };
   },
@@ -5248,7 +5536,7 @@ async function servePlacementQuestion(pid, cfg, probe, index) {
   if (!linkedAccount) throw checkUnavailable('sign-in');
   let out;
   try {
-    out = await cloud.issuePractice({ generator: target.generator, difficulty: target.difficulty, curriculum: 'in', mode: 'placement', written: true, account: linkedAccount });
+    out = await cloud.issuePractice({ generator: target.generator, difficulty: target.difficulty, curriculum: practiceCurriculumOf(await get('profiles', pid).catch(() => null)), mode: 'placement', written: true, account: linkedAccount });
   } catch (cause) {
     throw checkUnavailable(cause?.status === 401 ? 'sign-in' : cause?.status === 403 || cause?.status === 426 ? 'refused'
       : !cause?.status || cause.status >= 500 || cause.status === 429 || cause?.code === 'CLOUD_DISABLED' ? 'offline' : 'unavailable', cause);
@@ -5373,7 +5661,10 @@ function tutorWork(q, raw) {
 }
 
 /** The /v1/tutor/help body for a practice row, or null when there is no verified solution to ground it. */
-function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
+function tutorRequest(p, row, q, solution, { level, locale, work, captions, resolved }) {
+  // `resolved` belongs to a diagnosis only (the server refuses it elsewhere);
+  // for a server-issued question the server decides it from its own records.
+  const diagnosis = level === 'diagnose' || level === 'why' ? { resolved: resolved === true } : {};
   if (row.serverQuestionId) {
     // Server-issued: name the question, send the student's own work, and
     // nothing else. No prompt, step, answer or hint leaves the device for it —
@@ -5386,7 +5677,8 @@ function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
       locale: lang === 'hi' ? 'hi' : 'en',
       serverQuestionId: String(row.serverQuestionId),
       studentWork: work,
-      ...(captions ? { captions } : {})
+      ...(captions ? { captions } : {}),
+      ...diagnosis
     };
   }
   if (!solution) return null;
@@ -5409,7 +5701,8 @@ function tutorRequest(p, row, q, solution, { level, locale, work, captions }) {
       hints: (Array.isArray(q.hints) ? q.hints : []).slice(0, 6).map(h => String(h).slice(0, 500))
     },
     studentWork: work,
-    ...(captions ? { captions } : {})
+    ...(captions ? { captions } : {}),
+    ...diagnosis
   };
 }
 
@@ -5436,7 +5729,43 @@ async function examFor(pid, examId) {
     if (!row) continue;
     questions.push(sanitize(row.payload, row));
   }
-  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e) };
+  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e), ...(e.nsw ? { nsw: e.nsw } : {}) };
+}
+
+/**
+ * Store a paper the server has just issued — a practice paper or an NSW
+ * paper (plan G4) — as this profile's open paper: its public questions, the
+ * server's clock, and for an NSW paper its reading time and what it is.
+ */
+async function storeServerPaper(p, issued, { year, pathway, title, readingMin = null, nsw = null }) {
+  const examId = String(issued.id);
+  const now = Date.now();
+  const qids = [];
+  try {
+    for (const sq of issued.questions) {
+      const row = paperRowOf(p.id, examId, sq, now);
+      await put('questions', row);
+      qids.push(row.id);
+    }
+  } catch (err) {
+    await Promise.all(qids.map(id => del('questions', id).catch(() => {})));
+    throw err;
+  }
+  const exam = {
+    id: examId, pid: p.id, year, pathway, title, durationMin: issued.durationMin, questionIds: qids,
+    createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null,
+    paperVersion: issued.paperVersion,
+    ...(Number.isFinite(Number(readingMin)) && Number(readingMin) > 0 ? { readingMin: Number(readingMin) } : {}),
+    ...(nsw && typeof nsw === 'object' ? { nsw: {
+      label: String(nsw.label || ''), markingNote: String(nsw.markingNote || ''), blueprintId: String(nsw.blueprintId || ''), course: String(nsw.course || ''),
+      partial: nsw.partial === true, omittedOutcomes: namedOutcomes(nsw.omittedOutcomes)
+    } } : {}),
+    server: serverFieldOf(issued, await profileCloudAccountId(p.id).catch(() => null))
+  };
+  startExamClock(exam, localStartOf(issued, now));
+  await put('exams', exam);
+  noteReconciled(exam.id);
+  return { exam: await examFor(p.id, examId) };
 }
 
 /** The device's row for one server-issued practice-paper question: the public payload only. */
@@ -5821,9 +6150,24 @@ async function requireCheckableSession(pid) {
  *    on. A draft was never the server's, so it cannot be marked later.
  * Returns { q, fields, trapDelivered, repeat }; `fields` go on the row.
  */
+/**
+ * The course a server-issued request names: the profile's own (`in` for an
+ * India profile, `nsw` for an NSW one). The server issues only its edition's
+ * course and refuses any other (server/platform/editionBanks.js), so a
+ * hard-coded 'in' left every NSW student on a Prithagoras server with
+ * unmarkable drafts. A profile with no course, or a course no server issues,
+ * names NSW.
+ */
+export function practiceCurriculumOf(profile) {
+  // Only the two courses a server issues (editionBanks.js): any other course
+  // the device knows (vic, qld, wa, sa, ib) is no server's, and names NSW.
+  return profile?.course === 'in' ? 'in' : 'nsw';
+}
+
 async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null, trap = null }, localDraft) {
+  const curriculum = practiceCurriculumOf(await get('profiles', pid).catch(() => null));
   const body = {
-    generator, difficulty, curriculum: 'in', mode: SERVER_MODES.includes(mode) ? mode : 'practice',
+    generator, difficulty, curriculum, mode: SERVER_MODES.includes(mode) ? mode : 'practice',
     avoid: recentlyServedContent(pid).filter(h => typeof h === 'string' && /^[a-zA-Z0-9:_-]{6,96}$/.test(h)).slice(0, 40),
     ...(dotpoint ? { dotpoint: String(dotpoint) } : {})
   };
@@ -5854,6 +6198,12 @@ async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null
       return { q: out.question, fields: { prepared: out.prepared, preparedExpiresAt: Number(out.expiresAt) || null }, trapDelivered: false, repeat: out.repeat === true };
     }
   } catch { /* no server: an offline draft */ }
+  // Requests cancelled because the page is navigating away fail exactly like a
+  // dropped connection, and WebKit lets this code run on before the page goes.
+  // A draft stored then could never be marked, though the student was online
+  // all along: when the page has said it is leaving, wait — a page that really
+  // unloads never gets here (client/src/local/pageLeaving.js).
+  await settleIfLeaving();
   const local = localDraft();
   return { q: draftQuestion(local.q), fields: { draftOnly: true }, trapDelivered: false, repeat: !!local.repeat, local };
 }
@@ -6170,6 +6520,9 @@ async function runGated(method, pattern, handler, body, params) {
     || key === 'POST /practice/:id/reveal'
     || key === 'POST /practice/:id/hint'
     || key === 'POST /practice/:id/tutor'
+    || key === 'POST /practice/:id/tutor/diagnose'
+    || key === 'POST /practice/:id/tutor/line-check'
+    || key === 'POST /practice/:id/tutor/step-coach'
     || key === 'POST /practice/:id/discard'
     || key === 'POST /practice/:id/misconception'
   )) return withMutationLock(`question:${params.id}`, work);
@@ -6211,6 +6564,14 @@ export async function dispatch(method, path, body) {
   // exact match first
   // Own keys only: a path such as "/constructor" must never resolve to a
   // property inherited from Object.prototype and be called as a handler.
+  // A GET may carry its parameters as a query string; they reach the handler
+  // as its body, the way a POST's do.
+  const qAt = typeof path === 'string' ? path.indexOf('?') : -1;
+  if (qAt >= 0) {
+    const query = Object.fromEntries(new URLSearchParams(path.slice(qAt + 1)));
+    path = path.slice(0, qAt);
+    body = method === 'GET' ? { ...query, ...(body || {}) } : body;
+  }
   const exactKey = `${method} ${path}`;
   const exact = Object.hasOwn(routes, exactKey) && typeof routes[exactKey] === 'function' ? routes[exactKey] : null;
   if (exact) return runGated(method, path, exact, body, {});

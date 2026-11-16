@@ -118,7 +118,11 @@ class PlayBilling(private val activity: Activity, private val emit: (String, JSO
                     if (out.length() >= 24) break
                     out.put(JSONObject().put("id", d.productId).put("basePlanId", offer.basePlanId)
                         .put("title", d.name).put("displayPrice", phase.formattedPrice)
-                        .put("billingPeriod", phase.billingPeriod).put("currency", phase.priceCurrencyCode))
+                        .put("billingPeriod", phase.billingPeriod).put("currency", phase.priceCurrencyCode)
+                        // Numeric price for the Premium screen's "about … a month"
+                        // line only (client/src/paywall/pricing.js); displayPrice
+                        // stays the billed amount it shows.
+                        .put("priceMicros", phase.priceAmountMicros))
                 }
                 done(Result.Ok(JSONObject().put("products", out)))
             }

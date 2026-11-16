@@ -5,23 +5,55 @@
 //      version comment (Dependabot refreshes both together);
 //   3. no `pull_request_target` workflow that checks out the pull request's
 //      head (`github.event.pull_request.head.*` / `github.head_ref`) — that is
-//      the privileged-token-meets-untrusted-code pattern; untrusted builds run
-//      on `pull_request` and hand privileged consumers an artifact
-//      (.github/workflows/pri-agent-derived-sync.yml → pri-agent-derived-apply.yml);
+//      the privileged-token-meets-untrusted-code pattern; an untrusted build
+//      runs on `pull_request` and, if a privileged consumer is ever needed
+//      again, hands it an artifact over `workflow_run` (the derived-mirror pair
+//      that did this was retired when the iPad bundles left git, decision D28);
 //   4. a `pull_request_target` workflow may not install or run npm from the
-//      candidate at all.
+//      candidate at all;
+//   5. every job that builds the Swift package (`xcodebuild -scheme
+//      PriLearning`) generates the iOS web bundles earlier in the same job:
+//      `npm run sync:ios` then `npm run check:ios`. Resources/Web is not
+//      tracked (decision D28), so a checkout alone gives the app an empty Web
+//      folder and every simulator journey fails at the first page.
 // Deliberately dependency-free: the checks are line-oriented so they run from a
 // bare Node install before any package tree is installed.
+//
+//   node tools/ci-workflow-policy-check.mjs                   # this repository
+//   node tools/ci-workflow-policy-check.mjs --workflows DIR   # a fixture copy (the regression test)
 import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const WORKFLOWS = path.join(ROOT, '.github', 'workflows');
+const dirArg = process.argv.indexOf('--workflows');
+const WORKFLOWS = dirArg > 0 && process.argv[dirArg + 1] ? path.resolve(process.argv[dirArg + 1]) : path.join(ROOT, '.github', 'workflows');
 
 const SHA_REF = /^[0-9a-f]{40}$/;
 const VERSION_COMMENT = /#\s*v?\d+(\.\d+){0,2}(\S*)?\s*$/;
 const PR_HEAD_REF = /github\.(event\.pull_request\.head\.(sha|ref)|head_ref)/;
+const SWIFT_BUILD = /\bxcodebuild\b[^#\n]*\s-scheme\s+PriLearning\b/;
+const BUNDLE_SYNC = /\bnpm run sync:ios\b/;
+const BUNDLE_CHECK = /\bnpm run check:ios\b/;
+
+/**
+ * Jobs of a workflow as [{ id, lines: [{ n, text }] }], from the two-space
+ * `jobs:` children; comment lines are dropped so prose never satisfies a rule.
+ */
+function jobsOf(lines) {
+  const jobs = [];
+  let inJobs = false;
+  let current = null;
+  for (const [i, raw] of lines.entries()) {
+    if (/^jobs:\s*$/.test(raw)) { inJobs = true; continue; }
+    if (!inJobs) continue;
+    if (/^\S/.test(raw)) { inJobs = false; current = null; continue; }
+    const header = raw.match(/^  ([A-Za-z0-9_-]+):\s*(#.*)?$/);
+    if (header) { current = { id: header[1], lines: [] }; jobs.push(current); continue; }
+    if (current && raw.trim() && !raw.trim().startsWith('#')) current.lines.push({ n: i + 1, text: raw });
+  }
+  return jobs;
+}
 
 const files = readdirSync(WORKFLOWS).filter(name => /\.ya?ml$/.test(name)).sort();
 let passed = 0;
@@ -89,6 +121,27 @@ for (const name of files) {
     check(!/persist-credentials:\s*true/.test(source),
       `${name}: workflow_run consumer must not persist credentials into a checkout`);
   }
+
+  // 5. a Swift build of the package needs the generated web bundles first,
+  //    in the same job (a sync in another job never reaches this runner).
+  const jobs = jobsOf(lines);
+  const attributed = new Set(jobs.flatMap(job => job.lines.map(l => l.n)));
+  for (const [i, raw] of lines.entries()) {
+    if (SWIFT_BUILD.test(raw) && !raw.trim().startsWith('#') && !attributed.has(i + 1)) {
+      check(false, `${name}: xcodebuild -scheme PriLearning at line ${i + 1} is not inside a two-space-indented job under jobs:, so the bundle-generation rule cannot be verified`);
+    }
+  }
+  for (const job of jobs) {
+    const build = job.lines.find(l => SWIFT_BUILD.test(l.text));
+    if (!build) continue;
+    const sync = job.lines.find(l => BUNDLE_SYNC.test(l.text));
+    const verify = job.lines.find(l => BUNDLE_CHECK.test(l.text));
+    const where = `${name}: job '${job.id}' runs xcodebuild -scheme PriLearning at line ${build.n}`;
+    check(sync && sync.n < build.n,
+      `${where} without 'npm run sync:ios' earlier in the same job — Resources/Web is generated, not tracked (D28), so the app would ship an empty Web folder`);
+    check(verify && verify.n < build.n && (!sync || sync.n < verify.n),
+      `${where} without 'npm run check:ios' after the sync and before the build — the sync must be proven complete`);
+  }
 }
 
 check(files.length >= 30, `expected the full workflow set, found ${files.length}`);
@@ -99,4 +152,4 @@ if (failures.length) {
   console.error(`CI WORKFLOW POLICY: FAIL — ${passed}/${total} checks across ${files.length} workflows`);
   process.exit(1);
 }
-console.log(`CI WORKFLOW POLICY: PASS — ${passed}/${total} checks across ${files.length} workflows — every workflow declares least-privilege permissions, every action is SHA-pinned, no privileged workflow executes pull-request code`);
+console.log(`CI WORKFLOW POLICY: PASS — ${passed}/${total} checks across ${files.length} workflows — every workflow declares least-privilege permissions, every action is SHA-pinned, no privileged workflow executes pull-request code, every Swift build generates the iOS web bundles first`);

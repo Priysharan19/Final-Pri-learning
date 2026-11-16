@@ -17,6 +17,7 @@ import {
   saveInkDraft, savePendingSubmission, submissionContentKey,
   noteSubmissionEdited, recoveryPlan, settleFailedSubmission, submissionToSettleFirst
 } from './practiceRecovery.js';
+import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js';
 import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
@@ -38,7 +39,7 @@ import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconcepti
 import { strokeSignature } from '../ink/strokeSignature.js';
 import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
-import { HINT_RUNGS, markWeightAfter } from '../engine/hintLadder.js';
+import { HINT_RUNGS, RUNG_COST, markWeightAfter } from '../engine/hintLadder.js';
 
 // The hint ladder's rungs, as catalogue keys.
 const RUNG_KEY = { nudge: 'verdict.rung.nudge', method: 'verdict.rung.method', worked: 'verdict.rung.worked', solution: 'verdict.rung.solution' };
@@ -48,11 +49,23 @@ import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords } from './signed
 import './inkAccountRecovery.css';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
+import Working from '../instrument/Working.jsx';
 import TypedAnswerFields from './TypedAnswerFields.jsx';
 import VerifiedMarkBreakdown from './VerifiedMarkBreakdown.jsx';
 import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
 import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
+import { asksForInequality } from '../ink/relationSwap.js';
+import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../tutor/diagnoseGate.js';
+import { INSTRUMENT_UI } from '../platform/features.js';
+import QuestionHead from '../instrument/QuestionHead.jsx';
+// v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
+// The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
+// line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
+const INSTRUMENT = INSTRUMENT_UI;
+// Both chords work (the handler takes Meta or Control), so the chip names both
+// rather than guessing the keyboard from the device.
+const CHECK_KEY_GLYPH = '⌘/Ctrl ↵';
 // True in a production build made with the tutor off (see src/tutor/flag.js).
 // A literal test of the build constants, not a helper imported from flag.js:
 // the bundler folds only what it can see in this module, and that fold is what
@@ -112,6 +125,12 @@ export const SR_ONLY = {
 // In a production build with the tutor off the panel is unreachable
 // (tutorEnabled below is false on every device), so it is not built at all.
 const TutorHelp = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/TutorHelp.jsx'));
+// "What went wrong?" — the diagnosis of judged work, its own lazy chunk on the same terms.
+const MistakeDiagnosis = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/MistakeDiagnosis.jsx'));
+// "Why this step?" — a grounded dialogue about one solution step, its own lazy chunk.
+const WhyStep = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/WhyStep.jsx'));
+// The live step coach (F1): its requests and per-line verdicts, on demand.
+const StepCoachLive = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/StepCoachLive.jsx'));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -244,6 +263,8 @@ function doubtOf(ink) {
   // The server reader's own flag: a line under its confidence floor. The
   // student corrects it in the reading panel ("I wrote…") or stands behind
   // it; it is never marked from silently.
+  const doubtedLine = lines.findIndex(l => typeof l?.doubt === 'string' && l.doubt && l.corrected !== true);
+  if (doubtedLine >= 0) return { why: 'glyph', weakest, line: doubtedLine, doubt: lines[doubtedLine].doubt };
   if (ink.needsConfirmation === true) return { why: 'glyph', weakest };
   // The server/provider floor is authoritative for cloud readings. Keep the
   // older local confirmation threshold only as a fallback when no floor was
@@ -283,7 +304,7 @@ const REASON_TAG_KEY = {
 // `diagnostic.submitPath`, it is marked once by the same deterministic marker,
 // and nothing that belongs to practice is offered — no hints, no favourite, no
 // reveal, no self-marking, no XP or mastery tags. `I don't know` records a miss.
-export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, onReplace = null, compact = false, diagnostic = null }) {
+export default function QuestionCard({ question, why, reason, reasonTag = null, onResolved, onNext, onRedo, onReplace = null, compact = false, diagnostic = null, sessionIndex = null, sessionLength = null, sessionAnswered = 0 }) {
   const { celebrate, refreshUser, refreshDue, refreshRecent, toast, user } = useApp();
   const t = useT();
   const [answer, setAnswer] = useState('');
@@ -309,10 +330,16 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // The hint ladder (engine/hintLadder.js): the rungs opened on this card,
   // each { rung, text }, and the level the server has committed so far.
   const [hints, setHints] = useState([]);
+  const inkControlRef = useRef(null);
   const [hintLevel, setHintLevel] = useState(question.hintLevel || 0);
   // The last rung is the whole solution: like Show solution it takes two presses.
   const [solutionRungArmed, setSolutionRungArmed] = useState(false);
   const [showTutor, setShowTutor] = useState(false);
+  // The diagnosis panel is keyed by the attempt it explains; a new attempt closes it.
+  const [diagnoseFor, setDiagnoseFor] = useState(null);
+  const [whyStep, setWhyStep] = useState(null);
+  const [lineCheck, setLineCheck] = useState(null);
+  const [lineCheckBusy, setLineCheckBusy] = useState(false);
   const [tutorUsed, setTutorUsed] = useState(question.tutorLevel || 0);
   const { language } = useLanguage();
   // Dark by default (src/tutor/flag.js): off, the card offers only the hints.
@@ -380,6 +407,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // `busy` is React state and lands a render late, so two taps inside one frame
   // both saw it false and both posted. The ref is set synchronously.
   const inFlightRef = useRef(false);
+  // A relaunch replay of an earlier typed or photo submission is in flight
+  // (Relaunch recovery below). The page stays writable meanwhile: ink is the
+  // student's new work, not the submission being checked (#627). (An ink
+  // replay is the page itself, and stays frozen while it is checked.)
+  const [replaying, setReplaying] = useState(false);
+  const replayingRef = useRef(false);
+  // Strokes reported while a submission was in flight, reported again when it
+  // settles — for the question they were written on, never another.
+  const deferredInkRef = useRef(null);   // { questionId, strokes }
+  const onInkStrokesRef = useRef(null);
+  const questionIdRef = useRef(String(question.id));
+  questionIdRef.current = String(question.id);
   // A submission that has not had a definitive answer: an identical retry
   // reuses its idempotency key, so a timeout followed by a second tap is still
   // one attempt.
@@ -434,7 +473,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   useEffect(() => {
     const draft = readDraft('question', question.id);
     setAnswer(draft?.typed || ''); setMcqSel(null); setInkResult(null); setInkReaderState({ kind: INK_READER_STATE.IDLE }); setInkHasStrokes(false); setHints([]); setHintLevel(question.hintLevel || 0); setSolutionRungArmed(false);
-    setShowTutor(false); setTutorUsed(question.tutorLevel || 0);
+    setShowTutor(false); setDiagnoseFor(null); setWhyStep(null); setLineCheck(null); setTutorUsed(question.tutorLevel || 0);
     setWorking(draft?.working || ''); setShowWorking(!!draft?.working);
     setState({ phase: 'answering' }); setBusy(false);
     // An old photo must never follow the student into a new question.
@@ -448,6 +487,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setJudged(null); setJudgedStale(false); setInkSignature(null);
     setSaveState(draft?.typed || draft?.working ? 'saved' : null);
     latestInk.current = null;
+    deferredInkRef.current = null;
     ++inkSaveRevision.current;
     setPeekOpen(false);
     startRef.current = Date.now();
@@ -502,6 +542,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const ladderOffered = !diagnostic && question.hintLadder > 0;
   const nextRung = ladderOffered ? (HINT_RUNGS[hintLevel] || null) : null;
   const helpUsed = hintLevel + tutorUsed;
+  const rungLevelUsed = Math.min(HINT_RUNGS.length, hintLevel);
   const credit = hintLevel > 0
     ? Math.min(markWeightAfter(hintLevel), Math.max(0.55, 1 - 0.15 * tutorUsed))
     : Math.max(0.55, 1 - 0.15 * tutorUsed);
@@ -1018,7 +1059,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // The page's content, whatever else is going on: an annotation of an
     // earlier revision must not outlive a single new stroke.
     setInkSignature(Array.isArray(strokes) && strokes.length ? strokeSignature(strokes) : null);
-    if (inFlightRef.current || attemptRef.current) return;
+    if (inFlightRef.current) {
+      deferredInkRef.current = { questionId: String(question.id), strokes };
+      // Written during a relaunch replay: kept on disk now, whatever the
+      // replay's answer (edit detection waits for the replay to settle).
+      if (replayingRef.current) { setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0); saveInk(strokes); }
+      return;
+    }
+    if (attemptRef.current) return;
     // New pen strokes after a submission was pressed are an edit of it. The
     // first report after a mount is the kept page being restored, not an edit.
     // (Ink drawn over a typed or photo submission is an edit from the first stroke.)
@@ -1030,6 +1078,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0);
     saveInk(strokes);
   }, [question.id, question.subtopicName]); // eslint-disable-line react-hooks/exhaustive-deps
+  onInkStrokesRef.current = onInkStrokes;
   /**
    * Keep the page: the strokes, and with them the transcript and typed answer
    * of the moment (inkExtrasRef). "Saved" is said only after exactly that has
@@ -1190,6 +1239,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     }
     // Name a runner-up only when it is genuinely close and genuinely different:
     // offering "1 or l?" on a number is a question with no useful answer.
+    // A cloud reading names the doubted line and its two readings; the swap
+    // buttons sit on that line in the reading below.
+    if (doubt.doubt) return t('verdict.checkLineDoubt', { n: doubt.line + 1, doubt: doubt.doubt });
     const w = doubt.weakest;
     const rival = w?.rival || w?.alts?.find(a => a.sym !== w.sym) || null;
     const contested = rival && rival.conf >= w.conf - CONFIRM_MARGIN;
@@ -1309,7 +1361,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (String(given).trim() === '') return;
       steps = (workingOpen || mode === 'photo') && working.trim() ? working : undefined;
     }
-    const sourceMode = viaInk ? 'ink' : (mode === 'photo' && photo ? 'photo' : 'typed');
+    // D17: a photo the student did not allow to be read (declined, or never
+    // asked) never leaves the device with the answer — "Type instead" sends
+    // the typed answer alone.
+    const sentPhoto = photo && readerPermission(user) === READER_PERMISSION.ACCEPTED ? photo : undefined;
+    const sourceMode = viaInk ? 'ink' : (mode === 'photo' && sentPhoto ? 'photo' : 'typed');
     // The same answer through a different input authority is NOT a replay of
     // the same request. Never reuse a Photo idempotency key as a typed grade.
     const contentKey = submissionContentKey(given, steps);
@@ -1354,7 +1410,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const scribbleStrokes = scribbleRef.current && !scribbleRef.current.isEmpty()
       ? compactInkStrokes(scribbleRef.current.getStrokes())
       : undefined;
-    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo, ...(photo && photoAttested ? { photoAttested } : {}), scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
+    await deliver({ answer: String(given), ms, steps, viaInk, ink, photo: sentPhoto, ...(sentPhoto && photoAttested ? { photoAttested } : {}), scribble: scribbleStrokes, submissionId }, { lines, sourceMode, revision: currentRevision });
   }
 
   /**
@@ -1503,6 +1559,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     } finally {
       inFlightRef.current = false;
       if (mountedRef.current) setBusy(false);
+      const deferred = deferredInkRef.current;
+      deferredInkRef.current = null;
+      if (deferred && mountedRef.current && deferred.questionId === questionIdRef.current) onInkStrokesRef.current?.(deferred.strokes);
     }
   }
 
@@ -1534,13 +1593,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (plan.reattach) setPhotoReattachRequired(true);
       return;
     }
+    if (!pending.viaInk) { replayingRef.current = true; setReplaying(true); }
     (pending.viaInk ? Promise.resolve().then(() => readInkDraft(question.id)).catch(() => null) : Promise.resolve(null)).then(kept => {
-      deliver({
+      return deliver({
         answer: pending.answer, ms: pending.ms, steps: pending.steps, viaInk: pending.viaInk,
         ink: kept ? { strokes: compactInkStrokes(kept), recognized: (pending.lines || []).join('\n') || null, engine: null } : undefined,
         submissionId: pending.submissionId
       }, { lines: pending.lines, recovering: true, sourceMode: pending.sourceMode });
-    });
+    }).catch(() => { }).finally(() => { replayingRef.current = false; if (mountedRef.current) setReplaying(false); });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   /** The ink surface reports here. Frozen while marking and after the verdict. */
@@ -1551,7 +1611,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (r?.stale !== true) setInkReadExpired(false);
     // Recovery: the page restored after a relaunch is read once, for display
     // beside the verdict, and then frozen like any submitted reading.
-    if (inFlightRef.current || attemptRef.current) inkFrozenRef.current = true;
+    if ((inFlightRef.current && !replayingRef.current) || attemptRef.current) inkFrozenRef.current = true;
   }, []);
 
   // Ink that waited for the reader (offline, signed out, reader down) is READ
@@ -1837,7 +1897,31 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const cloudCheck = cloudCheckFor && attempt?.submissionId && cloudCheckFor.submissionId === attempt.submissionId
     ? cloudCheckFor.result : null;
 
+  // ── The live step coach (F1) ────────────────────────────────────────────────
+  // While the attempt is open, each FINISHED line the reader has read is
+  // checked by the server against the worked steps: a tick with the step it
+  // reached, "doesn't follow from the line above" on the first break under a
+  // verified line, or nothing. A final-answer line gets only "Press Check".
+  // No value and no mark: Check alone marks. On only where the server says so
+  // (its switch and the account's Premium), so this asks the backend once.
+  // Its state and requests live in tutor/StepCoachLive.jsx, a lazy chunk;
+  // a tutor-off production build folds all of this away.
+  const [coachOn, setCoachOn] = useState(false);
+  const [liveCoach, setLiveCoach] = useState(null);   // { verdicts, final }
+  useEffect(() => {
+    if (TUTOR_BUILT_OUT || !writeMode) return undefined;
+    let live = true;
+    api.get('/tutor/step-coach').then(r => { if (live) setCoachOn(r?.on === true); }).catch(() => { });
+    return () => { live = false; };
+  }, [writeMode]);
+  useEffect(() => { setLiveCoach(null); }, [question?.id]);
+  const coaching = !TUTOR_BUILT_OUT && coachOn && writeMode && !resolved;
+  const liveLineVerdicts = coaching ? liveCoach?.verdicts || null : null;
+  const liveCoachFinal = coaching && !!liveCoach?.final;
+
   const lineVerdicts = useMemo(() => {
+    // The live coach speaks only while nothing has been submitted for marking.
+    if (!localLineVerdicts && !resolved && liveLineVerdicts) return liveLineVerdicts;
     // The second read was of the submitted lines: it is drawn only on them.
     const ofShown = resolved && sameLines(judged?.lines, inkResult?.lines) && inkResult?.stale !== true;
     const merged = mergeVerdicts(localLineVerdicts, ofShown ? cloudCheck : null, { lineCount: inkResult?.lines?.length || 0 });
@@ -1847,7 +1931,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // nothing wrong it earns no tick on the page.
     const out = merged.map(v => (!v || (v.status === 'ok' && v.source === CLOUD_WORKING_ENGINE) ? { status: 'unknown' } : v));
     return out.some(v => v.status !== 'unknown' && v.status !== 'note') ? out : null;
-  }, [localLineVerdicts, cloudCheck, inkResult, judged, resolved]);
+  }, [localLineVerdicts, cloudCheck, inkResult, judged, resolved, liveLineVerdicts]);
   // What the server established about the working that was submitted, for a
   // reading-based submission (handwriting or a photo), where the lines came
   // from a reader and may not be what the student wrote.
@@ -1953,6 +2037,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // its verdict is shown without a marks figure rather than with a claim that
   // marks are missing.
   const shownGrade = committedGrade;
+  const instrumentScore = INSTRUMENT && !!shownGrade && Number.isFinite(Number(shownGrade.awarded))
+    && Number(shownGrade.possible) > 0 && Number(shownGrade.awarded) >= 0 && Number(shownGrade.awarded) <= Number(shownGrade.possible);
 
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
@@ -2107,6 +2193,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           run: () => submit(), disabled: busy || !canSubmit
         };
 
+  // v1.1 instrument: ⌘↵ / Ctrl+↵ presses the primary action while it is a
+  // check (never Next, never a confirmation the student has to read). No other
+  // shortcut in the app uses a modifier with Enter; Enter alone keeps its
+  // field behaviour.
+  const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable && !(needsCheck && checking);
+  const checkKeyRef = useRef(null);
+  checkKeyRef.current = instrumentCheckKey && !primary.disabled ? primary.run : null;
+  useEffect(() => {
+    if (!INSTRUMENT || diagnostic) return undefined;
+    const onKey = e => {
+      if (e.key !== 'Enter' || !(e.metaKey || e.ctrlKey) || e.altKey || e.shiftKey || e.isComposing || e.defaultPrevented) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      const run = checkKeyRef.current;
+      if (!run) return;
+      e.preventDefault();
+      run();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [diagnostic]);
+
   const solutionBody = res?.solution?.steps ? (
     <div className="solution-block">
       {plotSpec && (
@@ -2121,6 +2228,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div>
               <div className="step-h"><MathText text={s.h} /></div>
               <div className="step-d"><MathText text={s.d} /></div>
+              {/* "Why this step?" — a grounded dialogue about this step; tutor on only, after resolution. */}
+              {WhyStep && tutorEnabled && !diagnostic && resolved && (
+                <button type="button" className="btn btn-ghost btn-sm no-print" data-why-step={i} aria-expanded={whyStep === i}
+                  onClick={() => setWhyStep(v => (v === i ? null : i))}>{t('tutor.why.button')}</button>
+              )}
+              {WhyStep && whyStep === i && tutorEnabled && resolved && (
+                <TutorBoundary fallback={t('tutor.unavailable')}>
+                  <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.why.asking')}</div>}>
+                    <WhyStep questionId={question.id} stepIndex={i} locale={language === 'hi' ? 'hi' : 'en'} onClose={() => setWhyStep(null)} />
+                  </React.Suspense>
+                </TutorBoundary>
+              )}
             </div>
           </div>
         ))}
@@ -2186,7 +2305,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           {!reasonTag && reason === 'new-ground' && <span className="tag tag-brand">{t('verdict.newGround')}</span>}
           {reason === 'task' && <span className="tag tag-brand">{t('verdict.task')}</span>}
           {/* Practice is untimed on screen: time on task is still measured for the
-              marker, but a running clock is pressure, not information. */}
+              marker, but a running clock is pressure, not information. (The
+              v1.1 instrument design shows one, owner-approved; display only.) */}
+          {INSTRUMENT && !diagnostic && (
+            <QuestionHead index={sessionIndex} length={sessionLength} answered={sessionAnswered}
+              startedAt={startRef.current} stopped={resolved} />
+          )}
         </div>
         {/* A practice question's marks are the server's alone to state, so the
             card promises no credit figure for it. */}
@@ -2202,7 +2326,48 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
         {showWhy && why && <p className="q-why">{why}</p>}
 
-        {hints.length > 0 && (
+        {INSTRUMENT && ladderOffered && (!resolved || hints.length > 0) ? (
+          // v1.1 instrument: every rung of the ladder, the locked ones closed.
+          // Each states the charge the server's table makes (engine/hintLadder.js);
+          // opening the next rung is getHint(), exactly as the toolbar's bulb.
+          <section className="hints-block in-ladder" aria-label={t('verdict.hints')} data-hint-ladder={`${hintLevel}/${HINT_RUNGS.length}`}>
+            <div className="hints-block-title">{t('inst.ladderHead', { used: rungLevelUsed, total: HINT_RUNGS.length })}</div>
+            {HINT_RUNGS.map((rung, i) => {
+              const cost = rung === 'solution' ? t('inst.rungEnds') : t('inst.rungCost', { percent: Math.round(RUNG_COST[rung] * 100) });
+              const shown = hints.find(h => h.rung === rung);
+              if (shown) {
+                return (
+                  <div className="hintbox in-rung is-open" key={rung} data-hint-shown={rung}>
+                    <span className="h-n">{t(RUNG_KEY[rung])}<small className="in-rung-cost">{cost}</small></span>
+                    {shown.text ? <MathText text={shown.text} /> : <span className="muted">{t('verdict.rungThin')}</span>}
+                  </div>
+                );
+              }
+              if (!resolved && rung === nextRung) {
+                const label = rung === 'solution'
+                  ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
+                  : t('verdict.rungLabel', { n: i + 1, rung: t(RUNG_KEY[rung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
+                return (
+                  <button type="button" className={`in-rung is-next${solutionRungArmed && rung === 'solution' ? ' is-armed' : ''}`} key={rung}
+                    data-hint-rung-open={rung} disabled={busy} aria-label={label} onClick={getHint}>
+                    <span className="in-rung-k" aria-hidden="true">{i + 1}</span>
+                    <b>{solutionRungArmed && rung === 'solution' ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY[rung])}</b>
+                    <small>{cost}</small>
+                  </button>
+                );
+              }
+              return (
+                <div className={`in-rung ${i < hintLevel ? 'is-used' : 'is-locked'}`} key={rung} data-hint-rung-locked={i < hintLevel ? undefined : rung}>
+                  <span className="in-rung-k" aria-hidden="true">{i + 1}</span>
+                  <b>{t(RUNG_KEY[rung])}</b>
+                  <small>{cost}</small>
+                  {i >= hintLevel && <span className="sr-only"> {t('inst.rungLocked')}</span>}
+                </div>
+              );
+            })}
+            {!resolved && hintLevel > 0 && <div className="hints-block-title">{t('verdict.markWeightLeft', { percent: Math.round(credit * 100) })}</div>}
+          </section>
+        ) : hints.length > 0 && (
           <div className="hints-block">
             <div className="hints-block-title">{t('verdict.hints')}</div>
             {hints.map(h => (
@@ -2253,7 +2418,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <div className="ws-tools-end">
             {/* The hint ladder: one control, naming the next rung and what
                 it leaves. nudge → method → worked step → full solution. */}
-            {ladderOffered && !resolved && nextRung && (() => {
+            {/* Under the instrument the footer's Hint is this control (same hook, label and arming). */}
+            {!INSTRUMENT && ladderOffered && !resolved && nextRung && (() => {
               const left = Math.round(markWeightAfter(hintLevel + 1) * 100);
               const label = nextRung === 'solution'
                 ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
@@ -2366,7 +2532,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                           : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={dropPhoto}>✕</button></div>}
                         <div style={{ flex: 1 }} role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
-                            <span className="muted">{t('verdict.readingWork')}</span>
+                            <span className="muted"><Working pending={photoOCR.phase === 'reading'} label={t('verdict.readingWork')} /></span>
                           )}
                           {photoOCR.phase === 'done' && (
                             <>
@@ -2401,7 +2567,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                              photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && sessionEnded
                                ? <span className="verdict-body" data-photo-session-ended>{t('check.sessionEnded')}</span>
                                : <span className="verdict-body" data-photo-reading-problem={photoOCR.block?.kind || (photoOCR.unreadable ? 'unreadable' : 'failed')}>
-                                   {photoOCR.blockedKey ? t(photoOCR.blockedKey, { time: retryClock(photoOCR.block?.retryAt, language) }) : photoOCR.error}
+                                   {photoOCR.blockedKey ? t(photoOCR.blockedKey, { time: retryClock(photoOCR.block?.retryAt, language, user) }) : photoOCR.error}
                                  </span>
                            )}
                           {/* A reading problem is never a verdict: it comes with a retry
@@ -2523,11 +2689,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
-                <InkAnswer onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
-                  disabled={resolved || busy} focusSymbol={checkFocus} recognitionContext={recognitionContext}
+                <InkAnswer liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                  disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
+                  focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
                   initialReading={inkExtrasRef.current.reading || restoredReading || null}
                   readExpired={inkExpiredCount}
+                  controlRef={INSTRUMENT ? inkControlRef : null}
                   draftSaved={saveState === 'saved'} />
               )}
               {/* The answer taken from handwritten working: shown, editable,
@@ -2666,7 +2834,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         )}
         {showTutor && !resolved && tutorEnabled && !diagnostic && TutorHelp && (
           <TutorBoundary fallback={t('tutor.unavailable')}>
-            <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.asking')}</div>}>
+            <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.asking')}</div>}>
               <TutorHelp
                 question={{ ...question, tutorLevel: tutorUsed }}
                 work={{
@@ -2688,6 +2856,42 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             </React.Suspense>
           </TutorBoundary>
         )}
+
+        {/* "What went wrong?" — where a wrong line or answer is shown, and only
+            with the tutor on. It explains the engine's verdict; the mark above
+            is the engine's and does not move (src/tutor/diagnoseGate.js). */}
+        {showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry }) && MistakeDiagnosis && (() => {
+          const attemptKey = String(attempt?.submissionId || judged?.revision || question.id);
+          const judgedLines = (attempt?.lines?.length ? attempt.lines : judged?.lines) || [];
+          const lines = (judgedLines.length ? judgedLines : (working ? working.split('\n') : []))
+            .map(l => String(typeof l === 'string' ? l : l?.text ?? '').trim()).filter(Boolean).slice(0, 40).map(l => l.slice(0, 400));
+          const open = diagnoseFor === attemptKey;
+          return (
+            <>
+              <div className="tutor-launch-row no-print">
+                <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${open ? 'on' : ''}`}
+                  aria-expanded={open} data-tutor-diagnose
+                  onClick={() => setDiagnoseFor(open ? null : attemptKey)}>
+                  {t('tutor.diagnose.button')}
+                </button>
+              </div>
+              {open && (
+                <TutorBoundary fallback={t('tutor.unavailable')}>
+                  <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.diagnose.asking')}</div>}>
+                    <MistakeDiagnosis
+                      questionId={question.id}
+                      work={{ lines, typed: isMcq ? '' : String(answer || '').slice(0, 300) }}
+                      finalAnswer={finalAnswerStatus(state.res)}
+                      locale={language === 'hi' ? 'hi' : 'en'}
+                      onUsed={level => setTutorUsed(u => Math.max(u, level))}
+                      onClose={() => setDiagnoseFor(null)}
+                    />
+                  </React.Suspense>
+                </TutorBoundary>
+              )}
+            </>
+          );
+        })()}
 
         <div style={SR_ONLY} role="status" aria-live="polite" aria-atomic="true">{verdictSpeech}</div>
 
@@ -2722,7 +2926,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <div data-reader-block={state.res.readerBlock.kind}>
                   <div className="verdict-title">{t('verdict.readerNotCheckedTitle')}</div>
                   <div className="verdict-body">
-                    {t(state.res.viaInk ? state.res.readerBlock.inkKey : state.res.readerBlock.key, { time: retryClock(state.res.readerBlock.retryAt, language) })}{' '}
+                    {t(state.res.viaInk ? state.res.readerBlock.inkKey : state.res.readerBlock.key, { time: retryClock(state.res.readerBlock.retryAt, language, user) })}{' '}
                     <span className="muted">{t('verdict.readerNotCheckedNote')}</span>
                   </div>
                   <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -2826,7 +3030,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </div>
             )}
 
-            <div className="eval-card" data-outcome={verdictGood ? 'correct' : res.revealed ? 'revealed' : 'incorrect'}>
+            <div className={`eval-card${instrumentScore ? ' in-has-score' : ''}`} data-outcome={verdictGood ? 'correct' : res.revealed ? 'revealed' : 'incorrect'}>
+              {/* v1.1 instrument: the score card (design s4 .score). A visual
+                  duplicate of the head below, which stays for assistive tech:
+                  the figure is the server's receipt, nothing else. */}
+              {instrumentScore && (
+                <div className="in-score" aria-hidden="true" data-score-dial={`${shownGrade.awarded}/${shownGrade.possible}`}>
+                  <span className="in-dial">
+                    <svg viewBox="0 0 68 68" focusable="false">
+                      <circle cx="34" cy="34" r="29" fill="none" className="in-dial-tr" strokeWidth="5" />
+                      <circle cx="34" cy="34" r="29" fill="none" className="in-dial-v" strokeWidth="5" strokeLinecap="round"
+                        pathLength="100" strokeDasharray="100 100" strokeDashoffset={100 - Math.round((shownGrade.awarded / shownGrade.possible) * 100)} />
+                    </svg>
+                    <b>{shownGrade.awarded}/{shownGrade.possible}<small>{t('inst.dialMarks')}</small></b>
+                  </span>
+                  <span className="in-score-s1">{t(verdictGood ? 'verdict.correct' : res.revealed ? 'verdict.revealed' : 'verdict.notThisTime')}</span>
+                  <span className="in-score-s2">
+                    {t('inst.scoreSub')}
+                    {helpUsed > 0 && <> · {t('verifiedMarks.beforeHints')}</>}
+                  </span>
+                </div>
+              )}
               <div className="eval-head">
                 <span className="eval-title">
                   <Icon name={verdictGood ? 'check' : 'correction'} />
@@ -2864,7 +3088,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {!verdictGood && res.solution && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
                 )}
-                {res.stepReport && <StepReport report={res.stepReport} />}
+                {res.stepReport && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}
                 {/* Only display the matched server receipt after resolution. */}
                 {serverAuthoritative && shownGrade && <VerifiedMarkBreakdown result={res} grade={shownGrade} />}
                 {boardAward && (
@@ -2949,7 +3173,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
-            {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
+            {statusState !== 'idle' && <span className="status-mark" aria-hidden="true"><Working pending={statusState === 'working'} />{statusState !== 'working' && <span className="dot" />}</span>}
             {writeMode && shownAnswerLine && !inkStale && !needsCheck && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
               : statusText}
@@ -2958,6 +3182,41 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               <span className="ws-read-by">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkReadByServerPending')}</span>
             )}
           </span>
+          {INSTRUMENT && writeMode && !resolved && (
+            <span className="in-wbar-note" aria-hidden="true">{t('inst.wbarNote', { key: CHECK_KEY_GLYPH })}</span>
+          )}
+          {/* "Check this line so far": the server's Step Check of the lines read,
+              naming a step of the method — never a value, never a mark. Help,
+              charged like a tutor level; two per question; tutor on only. */}
+          {showLineCheckButton({ tutorEnabled, diagnostic, writeMode, resolved, hasLines: !!inkResult?.lines?.length && !inkStale, checksLeft: lineCheck?.checksLeft ?? 2 }) && (
+            <span className="ws-line-check no-print">
+              <button type="button" className="btn btn-ghost btn-sm" data-line-check disabled={lineCheckBusy}
+                onClick={async () => {
+                  setLineCheckBusy(true);
+                  try {
+                    const lines = (inkResult?.lines || []).map(l => String(typeof l === 'string' ? l : l?.text ?? '').trim()).filter(Boolean).slice(0, 40);
+                    const r = await api.post(`/practice/${question.id}/tutor/line-check`, { lines, locale: language === 'hi' ? 'hi' : 'en' });
+                    if (Number.isInteger(r?.tutorLevel)) setTutorUsed(u => Math.max(u, r.tutorLevel));
+                    setLineCheck({ message: r?.lineCheck?.message || null, key: 'tutor.lineCheck.unavailable', status: r?.lineCheck?.status || 'none', checksLeft: r?.checksLeft ?? lineCheck?.checksLeft ?? 2 });
+                  } catch (e) {
+                    setLineCheck({ message: null, key: e?.code === 'LINE_CHECK_LIMIT' ? 'tutor.lineCheck.limit' : 'tutor.lineCheck.unavailable', status: 'none', checksLeft: e?.code === 'LINE_CHECK_LIMIT' ? 0 : (lineCheck?.checksLeft ?? 2) });
+                  } finally { setLineCheckBusy(false); }
+                }}>
+                <Working pending={lineCheckBusy} />{lineCheckBusy ? t('tutor.lineCheck.asking') : t('tutor.lineCheck.button')}
+              </button>
+            </span>
+          )}
+          {StepCoachLive && coaching && (
+            <React.Suspense fallback={null}>
+              <StepCoachLive questionId={question.id} inkResult={inkResult} onChange={setLiveCoach} />
+            </React.Suspense>
+          )}
+          {writeMode && liveCoachFinal && (
+            <span className="ws-line-check-result muted" role="status" data-step-coach-final>{t('ink.coachPressCheck')}</span>
+          )}
+          {writeMode && !resolved && (lineCheck?.message || lineCheck?.key) && (
+            <span className="ws-line-check-result muted" role="status" data-line-check-status={lineCheck.status}>{lineCheck.message || t(lineCheck.key)}</span>
+          )}
           {submitReasonKey && (
             <span className="ws-submit-reason muted" id={`submit-reason-${question.id}`} role="status" data-submit-reason={submitReasonKey}>{t(submitReasonKey)}</span>
           )}
@@ -2967,6 +3226,31 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {workState === 'save-failed' && (
               <button type="button" className="btn btn-quiet" data-save-retry data-ink-save-retry={writeMode ? '' : undefined}
                 onClick={retrySave}>{t('verdict.saveRetry')}</button>
+            )}
+            {/* v1.1 instrument footer (design s4 .wbar): Hint opens the next
+                rung (getHint, as H and the bulb do); Reset is the page's Clear,
+                which the toolbar can still undo. */}
+            {INSTRUMENT && ladderOffered && nextRung && !resolved && (
+              (() => {
+                // The last rung reveals the solution (no marks): it says so, and
+                // its second press reads as a confirmation, exactly as the bulb.
+                const solution = nextRung === 'solution';
+                const label = solution
+                  ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
+                  : t('verdict.rungLabel', { n: hintLevel + 1, rung: t(RUNG_KEY[nextRung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
+                return (
+                  <button type="button" className={`btn btn-quiet hint-bulb in-wbar-hint${solution && solutionRungArmed ? ' on is-armed' : ''}`}
+                    data-wbar-hint={nextRung} data-hint-rung={nextRung} data-armed={solution && solutionRungArmed ? 'true' : undefined}
+                    disabled={busy} title={label} aria-label={label} aria-keyshortcuts="H" onClick={getHint}>
+                    <Icon name="hint" size={16} />
+                    {solution ? (solutionRungArmed ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY.solution)) : t('inst.hint')}
+                  </button>
+                );
+              })()
+            )}
+            {INSTRUMENT && writeMode && !resolved && inkHasStrokes && (
+              <button type="button" className="btn btn-quiet in-wbar-reset" data-wbar-reset disabled={busy}
+                aria-label={t('ink.clearLabel')} onClick={() => inkControlRef.current?.clear?.()}>{t('inst.reset')}</button>
             )}
             {!resolved && diagnostic && (
               <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
@@ -2983,8 +3267,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             )}
             {!(diagnostic && resolved) && primary && (
               <button className="btn btn-primary" data-primary-action={unmarkable ? 'replace' : undefined} onClick={primary.run} disabled={primary.disabled} aria-busy={busy || undefined}
-                aria-describedby={submitReasonKey ? `submit-reason-${question.id}` : undefined}>
+                aria-describedby={submitReasonKey ? `submit-reason-${question.id}` : undefined}
+                aria-keyshortcuts={instrumentCheckKey ? 'Meta+Enter Control+Enter' : undefined}>
+                {instrumentCheckKey && <Icon name="scan" size={16} />}
                 {primary.label}
+                {instrumentCheckKey && <kbd className="in-kbd" aria-hidden="true">{CHECK_KEY_GLYPH}</kbd>}
               </button>
             )}
           </div>
@@ -3025,7 +3312,7 @@ function LostMarks({ lost, t }) {
   );
 }
 
-function StepReport({ report }) {
+function StepReport({ report, instrument = false, correctAnswer = null }) {
   const t = useT();
   if (!report?.lines?.length) return null;
   // The first meaningful break leads, with its diagnosis. Every other line is
@@ -3038,6 +3325,8 @@ function StepReport({ report }) {
     <React.Fragment key={i}>
       <div className={`stepcheck-line sc-${l.status}${l.status === 'ok' && l.ecf === true ? ' sc-ecf' : ''}`}
         data-stepcheck-line={i} data-stepcheck-status={l.status} data-stepcheck-ecf={l.status === 'ok' && l.ecf === true ? 'true' : undefined}>
+        {/* v1.1 instrument: the path's numbered key, coloured from the engine's own status. */}
+        {instrument && <span className={`in-step-k is-${l.status === 'ok' ? 'g' : l.status === 'break' ? 's' : 'n'}`} aria-hidden="true" data-step-badge={l.status}>{i + 1}</span>}
         <span aria-hidden="true">{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
         <span>{l.text}</span>
         {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t(i === first ? 'verdict.mistakeIsHere' : 'verdict.alsoWrong')}</b>}
@@ -3045,6 +3334,17 @@ function StepReport({ report }) {
         {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
       </div>
       {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
+      {/* Your line beside the correct one — only at the first break, only
+          when that break is the final line (the answer), and only from the
+          resolved reply's own answer, which this card already shows. The
+          engine does not state a correct value for a line mid-working. */}
+      {instrument && i === first && i === report.lines.length - 1 && typeof correctAnswer === 'string' && correctAnswer.trim() !== '' && (
+        <div className="in-cmp" data-step-compare>
+          <div className="in-cmp-yours"><small>{t('inst.yourLine')}</small><span className="in-cmp-e">{l.text}</span></div>
+          <span className="in-cmp-arrow" aria-hidden="true">↵</span>
+          <div className="in-cmp-right"><small>{t('inst.correctLine')}</small><MathText text={correctAnswer} /></div>
+        </div>
+      )}
     </React.Fragment>
   );
   if (first < 0) {

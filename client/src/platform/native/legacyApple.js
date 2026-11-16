@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · legacy Apple bridge adapters (CP-02 migration window)
 //
-// The Apple shell's five pre-envelope WKScriptMessageHandlers (priInk,
-// priPhoto, priBilling, priCloud, priShare) keep their wire formats during the
-// migration. This file is the ONLY place that talks to them; product code goes
+// The Apple shell's four pre-envelope WKScriptMessageHandlers (priInk,
+// priBilling, priCloud, priShare) keep their wire formats during the
+// migration. (priPhoto, the on-device Vision OCR, was removed with the
+// on-device ink readers: photos are read on the server.) This file is the ONLY place that talks to them; product code goes
 // through priNative, which picks exactly one transport per capability (the
 // host descriptor says which), so nothing is ever sent over both.
 //
@@ -47,58 +48,6 @@ export function createLegacyApple({ scope = globalThis, emit = () => {}, now = (
       if (typeof fn !== 'function') return () => {};
       inkListeners.add(fn);
       return () => inkListeners.delete(fn);
-    },
-  };
-
-  // ── photo ──────────────────────────────────────────────────────────────────
-  let nextPhotoId = 1;
-  const photoPending = new Map();
-  let photoReceiverInstalled = false;
-  function installPhotoReceiver() {
-    if (photoReceiverInstalled || !scope) return;
-    photoReceiverInstalled = true;
-    scope.__priPhotoReceive = payload => {
-      if (!payload || typeof payload !== 'object') return;
-      const entry = photoPending.get(payload.reqId);
-      if (!entry) return; // late, duplicate or unknown
-      photoPending.delete(payload.reqId);
-      entry.cleanup();
-      if (payload.ok === false) entry.reject(new PriNativeError('PROVIDER_ERROR', payload.error || 'Photo handwriting could not be read.'));
-      else entry.resolve(payload);
-    };
-  }
-  const photo = {
-    available: () => !!handler('priPhoto'),
-    recognize(dataURL, { timeoutMs = 12_000, signal = null } = {}) {
-      const h = handler('priPhoto');
-      if (!h) return Promise.reject(new PriNativeError('UNSUPPORTED', 'Native photo handwriting OCR is unavailable in this build.'));
-      if (signal?.aborted) return Promise.reject(new PriNativeError('CANCELLED', 'Photo recognition was cancelled.'));
-      installPhotoReceiver();
-      return new Promise((resolve, reject) => {
-        const reqId = nextPhotoId++;
-        let timer = null;
-        const onAbort = () => {
-          if (!photoPending.delete(reqId)) return;
-          entry.cleanup();
-          reject(new PriNativeError('CANCELLED', 'Photo recognition was cancelled.'));
-        };
-        const entry = {
-          resolve, reject,
-          cleanup() { clearTimeout(timer); signal?.removeEventListener('abort', onAbort); },
-        };
-        photoPending.set(reqId, entry);
-        signal?.addEventListener('abort', onAbort, { once: true });
-        timer = setTimeout(() => {
-          if (!photoPending.delete(reqId)) return;
-          entry.cleanup();
-          reject(new PriNativeError('TIMEOUT', 'Photo handwriting recognition timed out.'));
-        }, Math.max(1, Number(timeoutMs) || 12_000));
-        try { h.postMessage({ reqId, dataURL }); } catch (error) {
-          photoPending.delete(reqId);
-          entry.cleanup();
-          reject(new PriNativeError('UNAVAILABLE', 'Could not start photo handwriting recognition.', { cause: error }));
-        }
-      });
     },
   };
 
@@ -252,5 +201,5 @@ export function createLegacyApple({ scope = globalThis, emit = () => {}, now = (
     },
   };
 
-  return { ink, photo, billing, cloud, share };
+  return { ink, billing, cloud, share };
 }

@@ -48,3 +48,26 @@ export function cloudErrorText(error, tr, fallback = '') {
 }
 
 export const CLOUD_ERROR_CODES_WITH_COPY = Object.freeze(Object.keys(KEY_FOR_CODE));
+
+/**
+ * The catalogue key for a failed "Sign out everywhere" (#481), chosen so the
+ * panel never claims what it cannot know:
+ *   · ACCOUNT_MISMATCH: the device's session belongs to another account; the
+ *     server refused before revoking anything;
+ *   · 401 / AUTH_REQUIRED, or no link on this profile: this device is no
+ *     longer signed in, so it cannot ask — sign in again;
+ *   · 429 / RATE_LIMITED: refused before anything changed — try later;
+ *   · no answer (network, timeout), a 5xx, or a local forget that failed after
+ *     the server said yes: the outcome is not confirmed, so the copy says so;
+ *   · any other 4xx refusal (CSRF, Origin): refused before anything changed.
+ */
+export function signOutEverywhereFailureKey(error) {
+  const code = String(error?.code || '');
+  const status = Number(error?.status) || 0;
+  if (code === 'ACCOUNT_MISMATCH') return 'cloudSecurity.signOutEverywhereMismatch';
+  if (code === 'AUTH_REQUIRED' || code === 'CLOUD_ACCOUNT_NOT_LINKED' || status === 401) return 'cloudSecurity.signOutEverywhereSignInAgain';
+  if (code === 'RATE_LIMITED' || status === 429) return 'cloudSecurity.signOutEverywhereTryLater';
+  if (code === 'CLOUD_DISABLED') return 'cloudSecurity.signOutEverywhereFailed';
+  if (code === 'LOCAL_FORGET_FAILED' || !status || status >= 500) return 'cloudSecurity.signOutEverywhereUnconfirmed';
+  return 'cloudSecurity.signOutEverywhereFailed';
+}

@@ -12,7 +12,7 @@ import { LADDER } from '../math/expressions';
 /**
  * S4 — THE LADDER (20.00–27.00). One continuous upward camera move past five
  * stations — the same motif (a line touching a curve) at five pressures.
- * Not four products; one ladder. The Olympiad station answers the seize.
+ * Not four products; one ladder. The JEE Advanced station answers the seize.
  */
 
 // station transitions relative to the act start (on beats)
@@ -132,7 +132,7 @@ const Motif: React.FC<{ index: number; p: number; size: number }> = ({ index, p,
       </svg>
     );
   }
-  // Olympiad — eˣ ≥ 1 + x: the seize question, now a two-line proof
+  // JEE Advanced — eˣ ≥ 1 + x: the seize question, now a two-line proof
   const m = makeMap(-2.3, 1.7, -1.5, 3.6, W, H);
   return (
     <svg width={W} height={H} style={{ overflow: 'visible' }}>

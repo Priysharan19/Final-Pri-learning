@@ -29,7 +29,7 @@ appears. Metrics labels come from fixed alphabets (status class, provider name, 
 never ids or paths.
 
 | Alert emails — `server/platform/alertNotifier.js` evaluates every rule in §2 each 60 s; a rule turning firing sends one `FIRING` email, its clearing one `RESOLVED` email (only for a notified episode), with a 30-minute per-rule cooldown on firing emails (a re-fire inside it is suppressed, and emailed once the cooldown ends if still firing) and a 5-minute retry after a failed send. Sent through the auth-email Resend path (`PRI_RESEND_API_KEY`, `PRI_AUTH_EMAIL_FROM`) to `PRI_ALERT_EMAIL`; unset or invalid = disabled (counted as `outcome=disabled`). The body carries only rule id, severity, thresholds, window counts, release SHA and environment name (`PRI_ALERT_ENVIRONMENT`, else `RAILWAY_ENVIRONMENT_NAME`). Counted on `/v1/metrics` as `alert_notifications_total{rule,outcome}` (`firing_sent`, `resolved_sent`, `failed`, `suppressed_cooldown`, `disabled`) | email to the operator | the owner's inbox |
-| `SERVER_DOWN` external check — `.github/workflows/staging-uptime.yml` probes staging `/v1/health` and `/v1/ready` every 5 minutes (and on demand); a failed scheduled run is emailed by GitHub to the repository owner. Staging only; production needs its own check | GitHub Actions | the repository owner |
+| `SERVER_DOWN` external **backstop** — `.github/workflows/staging-uptime.yml` probes staging **and production** `/v1/health` and `/v1/ready` (GET only, no secrets) on a 5-minute cron and on demand; a failed scheduled run is emailed by GitHub to the repository owner. GitHub delivers scheduled runs best-effort: **measured 92 runs in 423 h (19 Oct – 6 Nov 2026), median gap 4.7 h, worst 9.9 h**, so an outage can go unnoticed for hours. It is not the 1-minute `SERVER_DOWN` page of §2, which still needs an external uptime monitor configured by the owner | GitHub Actions | the repository owner |
 
 The alert emails are evaluated inside the server process, so they cannot report the server
 being down — that is what the external `SERVER_DOWN` check is for. Built and tested
@@ -79,6 +79,7 @@ states every one of its numbers (`≥ N`, `≥ P%`, `N minutes`).
 | `WEBHOOK_FAILURES` | ≥ 1 billing webhook failed to apply (5xx) in 15 minutes. Rejections (4xx: bad signature, malformed, a provider this deployment does not use) are counted as `webhook_total{outcome=rejected}` but never page — anyone can send one | page | `webhook_total{provider,outcome}`, `webhook_failures_total{provider,code}`; `platform_error` lines on `/v1/billing/webhook/:provider` | Railway log alert on `"route":"/v1/billing/webhook/:provider"` with status ≥ 500; Razorpay dashboard webhook failure notifications; App Store Server Notifications retry visibility |
 | `CLIENT_ERROR_SPIKE` | ≥ 20 crash reports accepted on `POST /v1/telemetry/error` in 15 minutes, across every platform | warn | `client_errors_total{platform,code}`; `client_error` lines; the sink's `source=client` events grouped by `code` + `surface` + `fingerprint` | Railway log alert on `"event":"client_error"` ≥ 20 in 15 min; or a monitor polling `/v1/metrics` for `CLIENT_ERROR_SPIKE` in `firing`; the Sentry project's own issue alert on new `source:client` groups. Response: read `platform`, `surface` and `code` from the lines; the stored row carries the client `build`. A spike right after a deploy is a rollback candidate (`runbook.md` §3) |
 | `ERROR_SINK_FAILURES` | ≥ 5 deliveries to the error sink refused or unreachable in 15 minutes | warn | `error_sink_total{outcome=failed}`; `error_sink_failed` lines (`ERROR_SINK_REFUSED` with the HTTP status, `ERROR_SINK_TIMEOUT`, `ERROR_SINK_UNREACHABLE`) | Railway log alert on `"event":"error_sink_failed"`; Sentry's quota/rate-limit notifications. Errors are still logged while the sink is down; `error_sink_total{outcome=noop}` rising instead means `PRI_SENTRY_DSN` is unset on this replica |
+| `PAID_CEILING_HIGH` | ≥ 1 paid call in 60 minutes that took the hour or day paid-call ceiling (`PRI_PAID_CALLS_PER_HOUR` / `PRI_PAID_CALLS_PER_DAY`) to 80% or more | warn | `paid_ceiling_high_total{window=hour or day}` (spendCeiling.js); `paid_calls_total{edition,outcome=spent|refused|refunded}` and the snapshot's `deployment` say whose region's budget it is (plan H7). The email subject names the edition and region | Each regional deployment has its own ceiling (`ai-budgets-per-region.md`). Raising the ceiling is an owner decision. Until then the tutor ("Why this step?", diagnose) and server reading refuse with `PAID_CAPACITY_REACHED` once it is reached; the per-account tutor allowance and the "Why this step?" free taster still bound each account |
 
 ### 2a. Handwriting latency budget
 
@@ -137,6 +138,98 @@ it. What to do next, per failure, is `docs/operations/runbook.md`.
    provider key. Unset, the sink is a no-op and `error_sink_total{outcome=noop}` says so; a
    malformed value makes production refuse to boot (`platformConfigStatus`).
 
+## 3a. Paste-ready configuration and a 15-minute test (owner)
+
+This sets up all ten alerts and proves their routes in about 15 minutes. Nine rules are evaluated
+inside the server and mailed by `alertNotifier.js`, so one block of variables turns all nine on.
+`SERVER_DOWN` needs a monitor outside Railway, because a dead process cannot report itself. Staging
+comes first. Production gets the same block at its cutover, and is never drilled (`drills.md` §3).
+
+**Before you start:** have the address that should receive alerts ready. Staging must already
+send auth email: `PRI_AUTH_EMAIL_PROVIDER=resend`, `PRI_RESEND_API_KEY` and `PRI_AUTH_EMAIL_FROM`
+are set there (`/v1/ready` reports `authEmail` `ok`). Alert emails use the same sender.
+
+**Step 1 — staging variables (3 minutes).** If staging has no `PRI_METRICS_TOKEN` yet, generate one
+on your machine with `openssl rand -base64 48 | tr -d '/+=\n'; echo`. Then open Railway → `staging`
+→ `/v1` service → Variables → Raw Editor, paste the lines below with your values, and deploy the
+staged change:
+
+```dotenv
+PRI_ALERT_EMAIL=<the address that receives alerts>
+PRI_ALERT_ENVIRONMENT=staging
+# only if staging does not already have one:
+PRI_METRICS_TOKEN=<the token you generated>
+# optional, for the error sink and ERROR_SINK_FAILURES (without it that rule can never fire):
+PRI_SENTRY_DSN=<the DSN of your Sentry project>
+```
+
+The token goes into Railway and into your shell for the next step, and nowhere else: not a file,
+the repository or a chat.
+
+**Step 2 — the rules are live (1 minute).** In a terminal, type the token at a hidden prompt, then
+list the rules staging evaluates:
+
+```bash
+read -rs PRI_METRICS_TOKEN && export PRI_METRICS_TOKEN
+curl -s -H "Authorization: Bearer $PRI_METRICS_TOKEN" https://pri-learning-staging-staging.up.railway.app/v1/metrics \
+  | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const m=JSON.parse(s);console.log(m.alerts.length+" rules: "+m.alerts.map(a=>a.id+(a.firing?" (FIRING)":"")).join(", "))})'
+```
+
+You should see `9 rules:` and the nine ids of §2, with none firing. A `401` means the token in
+your shell is not staging's.
+
+**Step 3 — fire one rule, end to end (5 minutes).** From a checkout of `main`, with the token still
+exported, run:
+
+```bash
+node tools/release-alert-drill.mjs
+```
+
+The drill trips `CLIENT_ERROR_SPIKE`, the one rule that can be fired without breaking anything. It
+registers one adult test account at a Resend sink address (never a person) and sends exactly the
+rule's 20 crash reports, each coded `ALERT_DRILL`. It then waits until `/v1/metrics` shows the rule
+firing and the notifier counting a FIRING email, and deletes the test account even if something
+failed. If staging's `PRI_PUBLIC_ORIGIN` is already `https://app.prilearning.com`, add
+`--public-origin https://app.prilearning.com`.
+
+Expect `ALERT DRILL: FIRED`, and within about two minutes an email with the subject
+`[Pri staging] FIRING CLIENT_ERROR_SPIKE (warning)`. A `RESOLVED` email follows about 15 minutes
+later; you need not wait for it. The drill names what is wrong if the rule fires but no email was
+counted: the notifier is off (`PRI_ALERT_EMAIL`), or the send failed (the Resend variables).
+
+All nine server rules share this route: evaluation in `metrics.js`, then the notifier, then Resend,
+then your inbox. Their thresholds are proven in CI by `server/test/observability-check.mjs`.
+
+**Step 4 — `SERVER_DOWN`, outside Railway (5 minutes).** In an uptime tool that can check every
+minute and alert on a second failure (§2 names some), create these two monitors. Point them at the
+production service's own Railway address: it stays the production service when
+`app.prilearning.com` moves (`production-config-v1.md` note 7). After the promotion, add a third,
+identical to A, on `https://app.prilearning.com/v1/health`.
+
+| Monitor | URL (GET) | Every | Up when | Alert when | Notify |
+|---|---|---|---|---|---|
+| A · Pri production health | `https://final-pri-learning-production.up.railway.app/v1/health` | 1 minute, 10 s timeout | status 200 **and** the body contains `"service":"pri-learning-platform"` | 2 checks in a row fail | the alert address and a phone push (it pages) |
+| B · Pri production ready | `https://final-pri-learning-production.up.railway.app/v1/ready` | 1 minute, 10 s timeout | status 200 | 3 checks in a row fail (a 503 for 3 minutes or more) | the alert address |
+
+To prove the route, add a throw-away monitor, C · "Pri alert test, delete me", on
+`https://pri-learning-staging-staging.up.railway.app/v1/alert-drill-404`. Every unknown `/v1` path
+answers 404, so the monitor fails on its first two checks. When its alert arrives (about two
+minutes), delete C. If the tool has a "send a test alert" button, that is equivalent.
+
+**Step 5 — production, at its cutover.** Paste the same block on Railway → `production` with
+`PRI_ALERT_ENVIRONMENT=production`, and a **new** token (never staging's). Run Step 2 against the
+production address. Do not run the drill on production: its notifier is the same code with the
+same variables, and the staging drill at the same SHA is the proof.
+
+**Step 6 — record it in §5.** Write what each step showed in that row's "Configured by / date" and
+"Tool and check name" cells. Step 3 is the staging drill for `CLIENT_ERROR_SPIKE`; monitor C is the
+drill for `SERVER_DOWN`'s route. The column "fired once in a drill" still needs each alert's own
+drill. Four alerts have no drill yet: `HTTP_5XX_SPIKE`, `DB_SATURATION`, `HANDWRITING_LATENCY_P95`
+and `ERROR_SINK_FAILURES`. Until one exists, their rows say "route proven by the
+`CLIENT_ERROR_SPIKE` drill on <date>; threshold proven in CI", and they stay short of "fired once"
+(`drills.md` covers `SERVER_DOWN`, `DB_CONNECTIVITY`, `AUTH_EMAIL_FAILURES`,
+`PROVIDER_FAILURE_SPIKE` and `WEBHOOK_FAILURES`).
+
 ## 4. Supabase configuration (owner action)
 
 1. Enable the project's email/Slack alerts for database health, connection saturation and
@@ -158,6 +251,7 @@ it. What to do next, per failure, is `docs/operations/runbook.md`.
 | `WEBHOOK_FAILURES` | — | — | — | — |
 | `CLIENT_ERROR_SPIKE` | — | — | — | — |
 | `ERROR_SINK_FAILURES` | — | — | — | — |
+| `PAID_CEILING_HIGH` | — | — | — | — |
 
 An alert counts as configured only when this row is filled **and** the alert has been seen to
 fire during a staging drill.

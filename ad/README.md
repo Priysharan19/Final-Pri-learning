@@ -1,10 +1,12 @@
 # Pri Learning — Instagram ad ("The Tangent")
 
+> Copy revised 2 November 2026 under owner decision D24: none of the retired coverage, accuracy, price-comparison, connectivity, rank-prediction or marking-authority claims (the list lives in `client/test/marketing-claims-check.mjs`). Rendered files under `out/` predate this revision and must be re-rendered before use. See COPY.md.
+
 A 36 s launch-film-grade Instagram ad, built as code (Remotion 4 + React +
 TypeScript), plus a real 15 s edit, in the product's own **Dark LaTeX** design
 language. One idea carries the whole film: the tangent line — memorised in the factory,
 understood at the lock, backed by the feature run ("The Instrument"), scaled
-Class 7 → Olympiad, offered as an invitation. Creative rationale: [docs/INTERPRETATION.md](docs/INTERPRETATION.md);
+Class 7 → JEE Advanced, offered as an invitation. Creative rationale: [docs/INTERPRETATION.md](docs/INTERPRETATION.md);
 frame-accurate board: [docs/STORYBOARD.md](docs/STORYBOARD.md).
 
 ## Deliverables (in `out/`, gitignored build artifacts)

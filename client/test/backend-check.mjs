@@ -541,6 +541,7 @@ function routeTable() {
 
 /** The route key a call lands on, or null when nothing in the table matches. */
 function resolveRoute(keys, method, path) {
+  path = String(path).split('?')[0];   // a GET's query string is its body, not its route
   const exact = `${method} ${path}`;
   if (keys.includes(exact)) return exact;
   for (const key of keys) {
@@ -621,7 +622,7 @@ async function run() {
   // submits, reveals or starts an exam does it against the real /v1 app, as a
   // real verified account linked to the local profile.
   const { startOnlineAuthority, nextSubmissionId } = await import('./support/online-authority.mjs');
-  const online = await startOnlineAuthority({ label: 'backend', ink: true });
+  const online = await startOnlineAuthority({ label: 'backend', ink: true, nswBanks: true });
   const { dispatch } = await import(`${SRC}local/backend.js`);
   const idb = await import(`${SRC}local/idb.js`);
   const { checkAnswer } = await import(`${SRC}engine/checker.js`);
@@ -657,6 +658,12 @@ async function run() {
 
   const GET = (path, body) => call('GET', path, body);
   const POST = (path, body) => call('POST', path, body);
+  // The way the app sends a request: through the gateway's validateRequest
+  // (local/gateway.js), then to the backend with what it passed on.
+  const { validateRequest } = await import(`${SRC}local/gateway.js`);
+  const gated = async (method, path, body) => { const c = validateRequest(method, path, body); return call(c.method, c.path, c.body); };
+  const GATED_GET = path => gated('GET', path);
+  const GATED_POST = (path, body) => gated('POST', path, body);
   const PATCH = (path, body) => call('PATCH', path, body);
 
   // Bindings a later group needs from an earlier one. Declared here so that a
@@ -1574,6 +1581,12 @@ async function run() {
     const darkErr = await rejects('with the tutor off, a help request is refused', POST(`/practice/${dark.question.id}/tutor`, { level: 1 }), { status: 404 });
     eq('— as disabled', darkErr?.code, 'TUTOR_DISABLED');
     await rejects('and so are captions', POST(`/practice/${dark.question.id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }), { status: 404 });
+    const darkWhy = await rejects('and so is "Why this step?"', POST(`/practice/${dark.question.id}/tutor/why`, { stepIndex: 0 }), { status: 404 });
+    eq('— as disabled', darkWhy?.code, 'TUTOR_DISABLED');
+    const darkDiag = await rejects('and so is "What went wrong?"', POST(`/practice/${dark.question.id}/tutor/diagnose`, { work: { lines: ['x = 1'] } }), { status: 404 });
+    eq('— as disabled', darkDiag?.code, 'TUTOR_DISABLED');
+    const darkLine = await rejects('and so is "Check this line so far"', POST(`/practice/${dark.question.id}/tutor/line-check`, { lines: ['x = 1'] }), { status: 404 });
+    eq('— as disabled', darkLine?.code, 'TUTOR_DISABLED');
     eq('the bridge itself refuses to call out', (await requestTutorHelp({ level: 'nudge' })).error?.code, 'TUTOR_DISABLED');
     eq('nothing reached /v1/tutor', tutorCalls.length, 0);
     eq('and nothing was charged to the question', (await idb.get('questions', dark.question.id)).tutorLevel || 0, 0);
@@ -1672,6 +1685,95 @@ async function run() {
     const caps = await POST(`/practice/${wid}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'Step one' }, { id: 'solution-1', text: 'Step two' }] });
     eq('rephrased captions come back by id, the rest deterministic', caps.captions.map(c => [c.id, c.source]), [['solution-0', 'tutor'], ['solution-1', 'deterministic']]);
     eq('the walkthrough request carries the captions', tutorCalls.at(-1)?.level, 'walkthrough');
+
+    // "Why this step?" — a dialogue about one step of the resolved question.
+    reply = () => ({ tutor: { source: 'model', level: 'why', message: 'Because both sides must stay balanced.' } });
+    const rowBeforeWhy = await idb.get('questions', wid);
+    const why1 = await POST(`/practice/${wid}/tutor/why`, { stepIndex: 0, locale: 'en' });
+    eq('a resolved question\'s step can be asked "why?"', [why1.source, why1.message], ['tutor', 'Because both sides must stay balanced.']);
+    const whySent = tutorCalls.at(-1) || {};
+    eq('as level why, about that step, on a resolved question', [whySent.level, whySent.stepIndex, whySent.resolved], ['why', 0, true]);
+    eq('naming the issued question and sending none of its solution', ['question', 'prompt', 'steps', 'answer', 'hints', 'solution'].filter(k => k in whySent), []);
+    await POST(`/practice/${wid}/tutor/why`, { stepIndex: 0, message: 'why balanced?', history: [{ role: 'tutor', text: 'Because both sides must stay balanced.' }] });
+    eq('a follow-up carries the message and history', [tutorCalls.at(-1)?.message, tutorCalls.at(-1)?.history?.length], ['why balanced?', 1]);
+    const whyRow = await idb.get('questions', wid);
+    eq('"why?" writes nothing to the question', [whyRow.tutorLevel, whyRow.answered], [rowBeforeWhy.tutorLevel, rowBeforeWhy.answered]);
+    reply = () => ({ error: { code: 'TUTOR_PREMIUM_REQUIRED', status: 402 } });
+    eq('past the free tries the server\'s Premium code reaches the card', (await POST(`/practice/${wid}/tutor/why`, { stepIndex: 1 })).code, 'TUTOR_PREMIUM_REQUIRED');
+    const openWhyQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    await rejects('"why?" is refused before the question is answered', POST(`/practice/${openWhyQ.question.id}/tutor/why`, { stepIndex: 0 }), { status: 409 });
+
+    // "What went wrong?" — explains the engine's verdict, never changes it.
+    reply = () => ({ tutor: { source: 'model', level: 'diagnose', diagnosis: { didRight: 'You set it up.', wentWrong: 'You skipped a step.', nextStep: 'Find it first.', wentWrongLine: 0 } } });
+    const rowBeforeDiag = await idb.get('questions', wid);
+    const diagResolved = await POST(`/practice/${wid}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong', locale: 'en' });
+    eq('a resolved question can be diagnosed by the tutor', [diagResolved.source, diagResolved.diagnosis?.wentWrong, diagResolved.diagnosis?.nextStep], ['tutor', 'You skipped a step.', 'Find it first.']);
+    const diagSent = tutorCalls.at(-1) || {};
+    eq('as a diagnosis of a resolved question, with the engine’s final-answer status', [diagSent.level, diagSent.resolved, diagSent.studentWork?.finalAnswer], ['diagnose', true, 'wrong']);
+    ok('with a per-line verdict for each line', Array.isArray(diagSent.studentWork?.lineStatus) && diagSent.studentWork.lineStatus.length === 1, show(diagSent.studentWork));
+    eq('naming the issued question and sending none of its solution', ['question', 'prompt', 'steps', 'answer', 'hints', 'solution'].filter(k => k in diagSent), []);
+    const rowAfterDiag = await idb.get('questions', wid);
+    eq('a resolved diagnosis charges nothing and moves no mark', [rowAfterDiag.tutorLevel, rowAfterDiag.answered, rowAfterDiag.resolution?.correct],
+      [rowBeforeDiag.tutorLevel, rowBeforeDiag.answered, rowBeforeDiag.resolution?.correct]);
+    const emptyFirst = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    eq('an empty diagnosis request is refused before anything is charged',
+      [(await POST(`/practice/${emptyFirst.question.id}/tutor/diagnose`, { work: { lines: [] } })).code, (await idb.get('questions', emptyFirst.question.id)).tutorLevel || 0],
+      ['TUTOR_NOTHING_TO_DIAGNOSE', 0]);
+    const openDiag = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    await POST(`/practice/${openDiag.question.id}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong' });
+    eq('an open attempt’s diagnosis is sent as open', tutorCalls.at(-1)?.resolved, false);
+    eq('and is charged like the first tutor level', (await idb.get('questions', openDiag.question.id)).tutorLevel, 1);
+    reply = () => ({ error: { code: 'TUTOR_UNAVAILABLE', status: 503 } });
+    const diagDown = await POST(`/practice/${openDiag.question.id}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong' });
+    eq('an outage gives no diagnosis and says why', [diagDown.source, diagDown.code, diagDown.diagnosis], ['deterministic', 'TUTOR_UNAVAILABLE', null]);
+    eq('and charges nothing more', (await idb.get('questions', openDiag.question.id)).tutorLevel, 1);
+    // "Check this line so far": charged like a tutor level, two per question.
+    const { setLineCheckTransportForTests } = await import(`${SRC}local/tutorBridge.js`);
+    const lcCalls = [];
+    let lcReply = { lineCheck: { status: 'ok', message: 'Your lines match the method so far. Next: Substitute.' } };
+    setLineCheckTransportForTests(async body => { lcCalls.push(body); return lcReply; });
+    const lcQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+    const lcId = lcQ.question.id;
+    lcReply = { lineCheck: { status: 'unchecked', message: 'Couldn’t check your working this time — try again.' } };
+    const lcSilent = await POST(`/practice/${lcId}/tutor/line-check`, { lines: ['x = 1'] });
+    eq('a line check that did not run says so and charges nothing', [lcSilent.lineCheck?.status, (await idb.get('questions', lcId)).tutorLevel || 0], ['unchecked', 0]);
+    lcReply = { lineCheck: { status: 'ok', message: 'Your lines match the method so far. Next: Substitute.' } };
+    const lc1 = await POST(`/practice/${lcId}/tutor/line-check`, { lines: ['x = 1'] });
+    eq('a line check names a step and is charged like a tutor level', [lc1.lineCheck?.status, lc1.tutorLevel, lc1.checksLeft], ['ok', 1, 1]);
+    eq('it sends only the issued id and the lines', Object.keys(lcCalls.at(-1)).sort(), ['context', 'lines', 'locale', 'serverQuestionId']);
+    await POST(`/practice/${lcId}/tutor/line-check`, { lines: ['x = 1'] });
+    eq('a second check charges a second level', (await idb.get('questions', lcId)).tutorLevel, 2);
+    const lcLimit = await rejects('a third line check is refused', POST(`/practice/${lcId}/tutor/line-check`, { lines: ['x = 1'] }), { status: 409 });
+    eq('— with the limit code', lcLimit?.code, 'LINE_CHECK_LIMIT');
+    eq('empty lines are refused before any charge', (await POST(`/practice/${openDiag.question.id}/tutor/line-check`, { lines: [] })).code, 'TUTOR_NOTHING_TO_DIAGNOSE');
+    setLineCheckTransportForTests(null);
+    // The live step coach (F1): status per finished line, no value, no charge;
+    // a shown tick or break is recorded as assistance provenance on the attempt.
+    {
+      const { setStepCoachTransportForTests } = await import(`${SRC}local/stepCoach.js`);
+      const scCalls = [];
+      let scReply = { stepCoach: { lines: [{ status: 'ok', step: 1 }, { status: 'break', note: 'leak 11' }, { status: 'final' }], checksLeft: 11 } };
+      setStepCoachTransportForTests(async body => { scCalls.push(body); return scReply; });
+      eq('the coach is on when the server says so', (await GET('/tutor/step-coach')).on, true);
+      const scQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+      const scId = scQ.question.id;
+      const before = (await idb.get('questions', scId)).tutorLevel || 0;
+      const sc = await POST(`/practice/${scId}/tutor/step-coach`, { lines: ['a', 'b', 'c'] });
+      eq('one status per line; only status and a verified step leave the bridge', sc.stepCoach?.lines, [{ status: 'ok', step: 1 }, { status: 'break' }, { status: 'final' }]);
+      eq('it sends only the issued id and the lines', Object.keys(scCalls.at(-1)).sort(), ['context', 'lines', 'serverQuestionId']);
+      const row = await idb.get('questions', scId);
+      eq('no help credit is charged', row.tutorLevel || 0, before);
+      eq('the shown tick and break are recorded as A1 assistance, system-initiated', [row.assistance?.stepCoach?.level, row.assistance?.stepCoach?.ticks, row.assistance?.stepCoach?.breaks, row.assistance?.stepCoach?.initiatedBy, row.assistance?.stepCoach?.revealedFinalAnswer],
+        ['A1', [0], [1], 'system', false]);
+      scReply = { stepCoach: { lines: [{ status: 'ok' }], checksLeft: 3 } };
+      eq('a reply for the wrong number of lines is dropped', (await POST(`/practice/${scId}/tutor/step-coach`, { lines: ['a', 'b'] })).stepCoach, null);
+      scReply = { stepCoach: { lines: [{ status: 'unsure' }, { status: 'unsure' }], unchecked: true } };
+      eq('a check that did not run says nothing', (await POST(`/practice/${scId}/tutor/step-coach`, { lines: ['a', 'b'] })).stepCoach, null);
+      eq('empty lines send nothing', [(await POST(`/practice/${scId}/tutor/step-coach`, { lines: [] })).stepCoach, scCalls.length], [null, 3]);
+      setStepCoachTransportForTests(null);
+    }
+    const emptyDiag = await POST(`/practice/${openDiag.question.id}/tutor/diagnose`, { work: { lines: [] } });
+    eq('with nothing written there is nothing to diagnose', emptyDiag.code, 'TUTOR_NOTHING_TO_DIAGNOSE');
 
     // Offline: the real bridge with no cloud configured.
     setTutorTransportForTests(null);
@@ -1925,6 +2027,9 @@ async function run() {
       await locked(`a ${label} active exam question cannot take a practice hint`, POST(`/practice/${id}/hint`, {}));
       await locked(`a ${label} active exam question cannot take AI tutor help`, POST(`/practice/${id}/tutor`, { level: 1 }));
       await locked(`a ${label} active exam question cannot take a tutor walkthrough caption`, POST(`/practice/${id}/tutor/captions`, { captions: [{ id: 'solution-0', text: 'x' }] }));
+      await locked(`a ${label} active exam question cannot take a line check`, POST(`/practice/${id}/tutor/line-check`, { lines: ['x = 1'] }));
+      await locked(`a ${label} active exam question cannot be asked "why?"`, POST(`/practice/${id}/tutor/why`, { stepIndex: 0 }));
+      await locked(`a ${label} active exam question cannot be diagnosed by the tutor`, POST(`/practice/${id}/tutor/diagnose`, { work: { lines: ['x = 1'] }, finalAnswer: 'wrong' }));
       await locked(`a ${label} active exam question cannot be asked about in the tutor conversation`, POST(`/practice/${id}/tutor/ask`, { message: 'what is the answer?' }));
       await locked(`a ${label} active exam question cannot be revealed through practice`, POST(`/practice/${id}/reveal`, { ms: 1000 }));
       await locked(`a ${label} active exam question cannot be marked through practice`,
@@ -2074,12 +2179,45 @@ async function run() {
           if (rec.repeat === true || q.repeatOf) { c.repeats += 1; continue; }
           c.earned += rec.marksEarned; c.possible += rec.marksPossible; c.questions += 1;
         }
-        eq('marks per chapter are the certified receipts’ totals, repeats left out', JSON.stringify(Object.entries(byChapter).sort()), JSON.stringify(Object.entries(expected).sort()));
+        const core = o => Object.fromEntries(Object.entries(o).map(([k, c]) => [k, { earned: c.earned, possible: c.possible, questions: c.questions, repeats: c.repeats }]));
+        eq('marks per chapter are the certified receipts’ totals, repeats left out', JSON.stringify(Object.entries(core(byChapter)).sort()), JSON.stringify(Object.entries(expected).sort()));
         const owner = row.india?.chapterId || row.subtopic;
         ok('the repeat is counted as a repeat, not as marks lost', byChapter[owner]?.repeats >= (stored.answered ? 1 : 0), show(byChapter[owner]));
         ok('no chapter claims more marks than it could have earned', Object.values(byChapter).every(c => c.earned <= c.possible && c.earned >= 0), show(byChapter));
         const listed = (await POST('/history/list', { pageSize: 100 })).items.find(i => i.id === again.value.question.id);
         ok('a repeat’s history row says it was a repeat', !stored.answered || listed?.repeat === true, show(listed && { repeat: listed.repeat, marks: listed.marksEarned }));
+
+        // Report series, map-this-month and History counts/sort/chapter (v1.1 instrument).
+        const series = await GATED_GET('/report/series?period=week');
+        eq('report series names its rolling window', [series.period, series.window, series.series.length], ['week', 'rolling-7-days', 7]);
+        ok('report series reads only certified receipts', series.source === 'server-certified-receipts' && series.current.marksEarned <= series.current.marksPossible, show(series.current));
+        ok('report repeats are counted apart, never as questions', series.current.repeats >= (stored.answered ? 1 : 0), show(series.current));
+        ok('a percentage under the evidence floor is null', series.current.certifiedQuestions >= series.floors.window || series.current.marksPct === null, show(series.current));
+        eq('the question delta is current minus previous', series.delta.questions, series.current.questions - series.previous.questions);
+        await rejects('an unknown report period is refused', GATED_GET('/report/series?period=decade'), { status: 400 });
+        eq('a month reaches the backend through the gateway', (await GATED_GET('/report/series?period=month')).series.length, 4);
+        eq('a term reaches the backend through the gateway', (await GATED_GET('/report/series?period=term')).window, 'rolling-13-weeks');
+        const monthMap = await GATED_GET(`/marks/by-chapter?since=${(await GET('/marks/by-chapter')).monthStart}`);
+        const allMap = (await GET('/marks/by-chapter')).chapters;
+        ok('this month’s map never exceeds all-time marks', Object.entries(monthMap.chapters).every(([k, c]) => c.possible <= allMap[k].possible), show(monthMap));
+        eq('a future since keeps nothing', Object.keys((await GATED_GET('/marks/by-chapter?since=2999-01-01')).chapters).length, 0);
+        await rejects('a malformed since is refused', GATED_GET('/marks/by-chapter?since=last-week'), { status: 400 });
+        ok('dot-point marks sum with the unattributed rest to the chapter', Object.values(allMap).every(c =>
+          ['earned', 'possible', 'questions'].every(k => Object.values(c.dotpoints).reduce((s, d) => s + d[k], 0) + c.unattributed[k] === c[k])), show(allMap));
+        const everything = await GATED_POST('/history/list', { pageSize: 1000 });
+        const items = everything.items;
+        eq('filter counts: all', everything.counts.all, items.length);
+        eq('filter counts: incorrect', everything.counts.wrong, items.filter(i => i.correct === false).length);
+        eq('filter counts: correct', everything.counts.correct, items.filter(i => i.correct === true).length);
+        eq('filter counts: handwritten', everything.counts.ink, items.filter(i => i.hasInk || i.hasScribble || i.hasPhoto).length);
+        eq('filter counts: needs another look', everything.counts.needsLook, items.filter(i => i.needsLook).length);
+        eq('the needs-another-look filter lists exactly those', (await GATED_POST('/history/list', { filter: 'needsLook', pageSize: 1000 })).total, everything.counts.needsLook);
+        const oldest = (await GATED_POST('/history/list', { sort: 'oldest', pageSize: 1000 })).items.map(i => i.answeredAt);
+        ok('sort=oldest is ascending', oldest.every((t, i) => !i || oldest[i - 1] <= t), show(oldest));
+        const chapter = items[0]?.subtopic;
+        const inChapter = await GATED_POST('/history/list', { subtopic: chapter, pageSize: 1000 });
+        ok('subtopic keeps one chapter, and its counts are that chapter’s', inChapter.items.every(i => i.subtopic === chapter) && inChapter.counts.all === inChapter.total, show(inChapter.counts));
+        await rejects('an unknown sort is refused', GATED_POST('/history/list', { sort: 'random' }), { status: 400 });
       }
     }
 

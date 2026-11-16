@@ -34,7 +34,20 @@
 //    (supabase/migrations/20261019000000_rls_account_coverage.sql). No SQLite
 //    structural change; the version moves so a server refuses to boot on a
 //    database without these policies (fail closed).
-export const SCHEMA_VERSION = 13;
+// 14: the parent weekly report — parent_report_links (a recipient who confirmed
+//    by email, and their unsubscribe credential) and parent_report_sends (one
+//    row per account and week: the send is idempotent), both account-scoped
+//    under RLS (supabase/migrations/20261022000000_parent_report.sql).
+// 15: the shared resource library (ADR-0002 plan F1) — resources and
+//    resource_editions, global tables under the fail-closed pri_scope_required
+//    policy, seeded with the one published Prithagoras paper
+//    (supabase/migrations/20261113000000_resource_library.sql).
+// 16: the Exam Desk (ADR-0002 §8, plan F4) — desk_attempts, unmarked practice
+//    attempts at library papers: account-owned under RLS (pri_scope_required +
+//    RESTRICTIVE pri_account_scope), cascade with the account, no score or
+//    mark column, mode 'unmarked' only, at most one open attempt per account
+//    and paper (supabase/migrations/20261113010000_desk_attempts.sql).
+export const SCHEMA_VERSION = 16;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).

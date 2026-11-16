@@ -17,7 +17,11 @@
       Data the app sends off the device, and only with a cloud account that the person
       creates (docs/legal/privacy.md "What we receive if you create a cloud account").
       Without an account nothing leaves the device (and nothing is marked: grading is online-only). Nothing is used for tracking or
-      advertising; nothing is sold.
+      advertising; nothing is sold. No PhoneNumber entry: sign-in and guardian codes by SMS are off at
+      launch (owner decision D3) and the shipped client shows the SMS option only when the server
+      reports it live; turning PRI_SMS_PROVIDER on requires adding PhoneNumber here, in
+      docs/release/app-store-privacy-labels.md, docs/release/play-data-safety.md and docs/legal/privacy.md
+      in the same change.
     -->
     <key>NSPrivacyCollectedDataTypes</key>
     <array>
@@ -113,19 +117,6 @@
                 <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
             </array>
         </dict>
-        <!-- Mobile number, if the person signs in with an SMS code, or a guardian's mobile number for a child's account (server/platform/otp.js account_phones, guardian-phone-otp; only when PRI_SMS_PROVIDER is configured). Passed to the SMS delivery provider to send the code. -->
-        <dict>
-            <key>NSPrivacyCollectedDataType</key>
-            <string>NSPrivacyCollectedDataTypePhoneNumber</string>
-            <key>NSPrivacyCollectedDataTypeLinked</key>
-            <true/>
-            <key>NSPrivacyCollectedDataTypeTracking</key>
-            <false/>
-            <key>NSPrivacyCollectedDataTypePurposes</key>
-            <array>
-                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
-            </array>
-        </dict>
         <!-- The random per-install identifier the app generates (client/src/platform/cloudAccount.js device-<uuid>; not IDFV/IDFA), stored with each session and each synced learning event. Declared conservatively as a device-level id. -->
         <dict>
             <key>NSPrivacyCollectedDataType</key>
@@ -170,6 +161,20 @@
         <dict>
             <key>NSPrivacyCollectedDataType</key>
             <string>NSPrivacyCollectedDataTypePerformanceData</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+                <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+            </array>
+        </dict>
+        <!-- Coded crash reports (client/src/platform/telemetry.js reportCrash -> POST /v1/telemetry/error, server/platform/telemetry.js cleanErrorReport): platform, surface slug, an upper-case error code, scope, a hex fingerprint and the client build SHA; never the message, stack, URL or anything typed. Sent only while signed in and while the per-device Settings -> Crash reports switch is on; blocked for a child until a guardian confirms; kept 90 days; forwarded to Sentry only if PRI_SENTRY_DSN is set on the server (unset at launch). -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeCrashData</string>
             <key>NSPrivacyCollectedDataTypeLinked</key>
             <true/>
             <key>NSPrivacyCollectedDataTypeTracking</key>

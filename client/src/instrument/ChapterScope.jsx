@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { MathText } from '../lib/latex.jsx';
 
 // The Index scope: the chapter's mathematics drawn on a graduated instrument
 // face, with a tracer the student can steer and a numeric readout. Decorative
@@ -13,7 +14,7 @@ const FN = {
   parabola: x => (2 * x * x - 7 * x + 3) / 3 - 1.2,
   progression: x => Math.floor(x + 6) * 0.45 - 2.4,
   triangle: x => 2.6 - Math.abs(x) * 0.95,
-  circle: x => Math.sqrt(Math.max(0, 9 - x * x)) - 0.6,
+  circle: x => (Math.abs(x) <= 3 ? Math.sqrt(9 - x * x) - 0.6 : NaN),
   coordinate: x => 0.6 * x + 0.4,
   bars: x => 1.6 * Math.exp(-(x * x) / 4) - 0.6,
   numberLine: x => Math.sin(x * 1.1) * 1.4,
@@ -23,9 +24,25 @@ const FN = {
   lines: x => 3.5 - x * 0.9
 };
 
+// The figure's own equation, exactly the curve drawn (an illustration of the
+// chapter's mathematics, never a question or a mark).
+const EQN = {
+  cubic: 'y = \\tfrac{1}{3}(x^3 - 4x)',
+  parabola: 'y = \\tfrac{1}{3}(2x^2 - 7x + 3) - 1.2',
+  triangle: 'y = 2.6 - 0.95\\lvert x \\rvert',
+  circle: 'y = \\sqrt{9 - x^2} - 0.6',
+  coordinate: 'y = 0.6x + 0.4',
+  derivative: 'y = \\tfrac{x^3}{8} - x',
+  vectors: 'y = 0.8x',
+  lines: 'y = 3.5 - 0.9x,\\; y = 0.9x - 1.3',
+  unit: 'x^2 + y^2 = 1',
+  wave: 'y = 1.6\\sin 1.3x',
+  numberLine: 'y = 1.4\\sin 1.1x'
+};
+
 const css = (el, name) => getComputedStyle(el).getPropertyValue(name).trim();
 
-export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', label }) {
+export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', label, tracerHint = '', probeHint = '' }) {
   const wrap = useRef(null);
   const canvas = useRef(null);
   const readout = useRef(null);
@@ -39,6 +56,8 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
     const start = performance.now();
     let frame = 0;
 
+    const esc = v => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const hint = () => { const text = probe.current >= 0 ? probeHint : tracerHint; return text ? `<span class="in-readout-hint">${esc(text)}</span>` : ''; };
     const draw = now => {
       const dpr = window.devicePixelRatio || 1;
       const w = el.offsetWidth; const h = el.offsetHeight;
@@ -78,7 +97,7 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
       const t = (now - start) / 1000;
       const grow = reduce ? 1 : Math.min(1, t / 1.1);
       const curve = (fn, colour) => {
-        c.strokeStyle = colour; c.lineWidth = 2; c.lineJoin = 'round'; c.beginPath();
+        c.strokeStyle = colour; c.lineWidth = 2.4; c.lineJoin = 'round'; c.beginPath();
         let first = true;
         for (let px = 0; px <= w * grow; px += 2) {
           const y = fn((px - w / 2) / sx);
@@ -93,7 +112,7 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
       if (figure === 'unit') {
         const r = h * 0.34; const a = reduce ? 0.7 : t * 0.7;
         c.strokeStyle = tick; c.beginPath(); c.arc(w / 2, h / 2, r, 0, Math.PI * 2); c.stroke();
-        c.strokeStyle = col; c.lineWidth = 2; c.beginPath();
+        c.strokeStyle = col; c.lineWidth = 2.4; c.beginPath();
         c.moveTo(w / 2, h / 2); c.lineTo(w / 2 + Math.cos(a) * r, h / 2 - Math.sin(a) * r); c.lineTo(w / 2 + Math.cos(a) * r, h / 2); c.closePath(); c.stroke();
         dot(w / 2 + Math.cos(a) * r, h / 2 - Math.sin(a) * r, 4.5, col);
         readout.current && (readout.current.innerHTML = `<span>θ = <b>${Math.round(((a % (Math.PI * 2)) * 180) / Math.PI)}°</b></span><span>sin θ = <b>${Math.sin(a).toFixed(2)}</b></span>`);
@@ -111,7 +130,7 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
           c.strokeStyle = edge; c.setLineDash([3, 4]); c.beginPath(); c.moveTo(px, 0); c.lineTo(px, h); c.moveTo(0, Y(readY)); c.lineTo(w, Y(readY)); c.stroke(); c.setLineDash([]);
           dot(px, Y(readY), 5, col);
         }
-        readout.current && (readout.current.innerHTML = `<span>x = <b>${readX.toFixed(2)}</b></span><span>y = <b>${Number.isFinite(readY) ? readY.toFixed(2) : '—'}</b></span>`);
+        readout.current && (readout.current.innerHTML = `<span>x = <b>${readX.toFixed(2)}</b></span><span>y = <b>${Number.isFinite(readY) ? readY.toFixed(2) : '—'}</b></span>${hint()}`);
       }
     };
 
@@ -133,12 +152,13 @@ export default function ChapterScope({ figure = 'wave', colourVar = '--in-c1', l
     const resize = () => reduce && draw(performance.now());
     window.addEventListener('resize', resize);
     return () => { cancelAnimationFrame(frame); io?.disconnect(); document.removeEventListener('visibilitychange', onVisibility); box.removeEventListener('pointermove', move); box.removeEventListener('pointerleave', leave); window.removeEventListener('resize', resize); };
-  }, [figure, colourVar]);
+  }, [figure, colourVar, tracerHint, probeHint]);
 
   return (
     <div className="in-scope" ref={wrap} role="img" aria-label={label} data-instrument-scope={figure}>
       <canvas ref={canvas} aria-hidden="true" />
       <div className="in-readout" ref={readout} aria-hidden="true" />
+      {EQN[figure] && <div className="in-eqn" aria-hidden="true"><MathText text={`$${EQN[figure]}$`} /></div>}
     </div>
   );
 }

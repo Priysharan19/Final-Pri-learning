@@ -36,6 +36,10 @@ const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLI
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-owner-ap-first-break-'));
 process.env.NODE_ENV = 'test';
+// D12: method marks are off by default — production marks the final answer only
+// until an examiner signs (#499). This suite pins the method rubric itself, so it
+// turns the server switch on; marking-policy-check.mjs pins the default.
+process.env.PRI_METHOD_MARKS = 'on';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = 'fa'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;

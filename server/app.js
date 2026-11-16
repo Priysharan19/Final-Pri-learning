@@ -16,7 +16,7 @@ import { createAppleBilling } from './platform/appleBilling.js';
 import { createGoogleBilling } from './platform/googleBilling.js';
 import { createRazorpayBilling } from './platform/razorpay.js';
 import { createPlatformRouter } from './platform/router.js';
-import { trustedProxyHops } from './platform/config.js';
+import { trustedProxyHops, clientIpHeader, clientIpProbeEnabled } from './platform/config.js';
 import { securityHeaders } from './platform/headers.js';
 import { rateLimit } from './platform/security.js';
 import { asStore } from './platform/store.js';
@@ -26,6 +26,7 @@ import { recordHttpResponse, recordRouteTiming, recordServerError } from './plat
 import { captureError } from './platform/errorSink.js';
 import { staticCacheHeaders } from './platform/staticCache.js';
 import { releaseShaForLogs } from './platform/releaseIdentity.js';
+import { assertEditionAgreement, bindDatabaseEdition, serverEdition } from './platform/edition.js';
 import { rejectUnsafeText } from './platform/text.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -91,15 +92,26 @@ export async function createServerApp(db, {
   dist = DEFAULT_DIST,
   legacy = !production,
   requestLog = true,
-  log
+  log,
+  parentReport = {},
+  // { edition } for the resource library (resources.js); default: PRI_EDITION.
+  resources = {},
+  // { edition, now } for the Exam Desk (desk.js); default: PRI_EDITION, Date.now.
+  desk = {}
 } = {}) {
+  // The built client this app will serve must have been made for this
+  // server's edition (platform/edition.js). Throws before anything is mounted.
+  assertEditionAgreement({ dist, production });
+  // The database must belong to this edition too (plan H2): a service pointed
+  // at the other region's database stops here, before any route is mounted.
+  await bindDatabaseEdition(asStore(db), serverEdition());
   const app = express();
   // How much of X-Forwarded-For to believe is deployment configuration with no
   // default, because req.ip is the identity the anonymous rate limiters count
   // against: trusting one hop too many lets a client pick its own identity and
   // walk past them, one too few puts every user in one bucket. Production will
   // not start without PRI_TRUSTED_PROXY_HOPS; development trusts nothing.
-  if (production) app.set('trust proxy', trustedProxyHops());
+  if (production) { app.set('trust proxy', trustedProxyHops()); clientIpHeader(); }  // an invalid PRI_CLIENT_IP_HEADER stops startup
   app.disable('x-powered-by');
   app.use(securityHeaders({ production }));
   // Before everything that can answer: every response, including the body
@@ -125,6 +137,13 @@ export async function createServerApp(db, {
   // retry until it gives up, losing the entitlement change.
   // After the body parsers: the timing context must be entered on the path
   // that actually reaches the handlers (requestTiming.js).
+  // Staging-only measurement of the client-address headers (see config.js clientIpProbeEnabled).
+  if (clientIpProbeEnabled()) {
+    app.get('/v1/diag/client-ip', (req, res) => {
+      res.set('Cache-Control', 'no-store');
+      res.json({ probe: 'client-ip', xRealIp: req.get('x-real-ip') ?? null, xForwardedFor: req.get('x-forwarded-for') ?? null, reqIp: req.ip ?? null, socket: req.socket?.remoteAddress ?? null });
+    });
+  }
   app.use('/v1', requestTiming());
   app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/, /^\/billing\/webhook\/[^/]+\/?$/] }));
 
@@ -136,7 +155,10 @@ export async function createServerApp(db, {
     billingVerifiers: { ...webBilling.verifiers, ...appleBilling.verifiers, ...googleBilling.verifiers },
     billingCheckout: webBilling.checkout,
     billingNative: { ...appleBilling.native, ...googleBilling.native },
-    billingLifecycle: webBilling.lifecycle
+    billingLifecycle: webBilling.lifecycle,
+    parentReport,
+    resources,
+    desk
   }));
 
   if (legacy && !production) {

@@ -477,7 +477,7 @@ try {
   check((await call('/account/export', { jar: jars.child })).data.guardianConsent.state === 'pending', 'consent pending: the child can still export, and sees the state');
   const guardianMail = await outboxToken(C, 'guardian-consent');
   check(guardianMail.destination === 'parent@example.test', 'the consent link goes to the guardian, not the child');
-  check((await call('/account/guardian/confirm', { method: 'POST', body: { token: guardianMail.token } })).data.confirmed === true, 'the guardian confirms');
+  check((await call('/account/guardian/confirm', { method: 'POST', body: { token: guardianMail.token, approve: true, noticeVersion: '2026-10-22' } })).data.confirmed === true, 'the guardian confirms');
   check((await call('/sync/push', { method: 'POST', jar: jars.child, headers: { 'Idempotency-Key': 'c-2' }, body: { schemaVersion: 1, deviceId: 'ipad-child', events: [], entities: [] } })).status === 200, 'consent given: sync opens');
   check((await call('/classes/join', { method: 'POST', jar: jars.child, body: { code: klass.data.joinCode } })).status === 200, 'consent given: class join opens');
   check((await call('/account', { method: 'DELETE', jar: jars.child, body: { password: 'child-pass-123' } })).data.deleted === true, 'a child can delete their account');

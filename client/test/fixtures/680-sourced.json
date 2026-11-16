@@ -1,0 +1,1641 @@
+[
+  {
+    "id": "shift-001",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1000000000",
+        "variable": "x"
+      }
+    },
+    "input": "x > 999999999.9375",
+    "expect": "refuse",
+    "provenance": "issue body (Agent 2, 24 Oct 2026) — \"Example: authored `x > 1000000000`; submitted `x > 999999999.9375` -> `{correct:true}`\" | also: 2026-10-28T10:59:45Z — \"Student `x > 999999999.9375`, authored `x > 1000000000`: **true**\" | also: 2026-11-07T01:11:52Z — \"['interval-large-shift', iv('x > 1000000000'), 'x > 999999999.9375', false]\"",
+    "fidelity": "verbatim",
+    "origin": "original-197: the one case the issue body quotes from the 104"
+  },
+  {
+    "id": "shift-002",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1.05001",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1.05",
+    "expect": "refuse",
+    "provenance": "2026-10-28T10:59:45Z — \"Student `x > 1.05`, authored `x > 1.05001`: **true**; reversed: **false**.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source ran original parseIntervalInput/sameRegion in V8, not checkAnswer"
+  },
+  {
+    "id": "shift-003",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 0.050001",
+        "variable": "x"
+      }
+    },
+    "input": "x > 0.05",
+    "expect": "refuse",
+    "provenance": "2026-10-28T10:59:45Z — \"Student `x > 0.05`, authored `x > 0.050001`: **true**; reversed: **false**.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source ran original parseIntervalInput/sameRegion in V8, not checkAnswer"
+  },
+  {
+    "id": "shift-004",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 0",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1e-23",
+    "expect": "refuse",
+    "provenance": "2026-10-28T15:03:47Z — \"`x > 0` vs `x > 1e-23` (both directions falsely true)\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source ran original parseIntervalInput/sameRegion in V8, not checkAnswer"
+  },
+  {
+    "id": "shift-005",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1e-23",
+        "variable": "x"
+      }
+    },
+    "input": "x > 0",
+    "expect": "refuse",
+    "provenance": "2026-10-28T15:03:47Z — \"`x > 0` vs `x > 1e-23` (both directions falsely true)\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source ran original parseIntervalInput/sameRegion in V8, not checkAnswer"
+  },
+  {
+    "id": "shift-006",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1.00001",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1",
+    "expect": "refuse",
+    "provenance": "2026-10-28T15:03:47Z — \"`x > 1` vs `x > 1.00001` (forward true, reverse false)\"",
+    "fidelity": "reconstructed",
+    "rule": "direction of an \"A vs B (forward true, reverse false)\" pair read as student = first-listed, as in Cycle 168's \"Student …, authored …: true; reversed: false\" for the same family",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source ran original parseIntervalInput/sameRegion in V8; the reverse direction (authored x > 1, student x > 1.00001) is refused by a5778a319, consistent with \"reverse false\""
+  },
+  {
+    "id": "shift-007",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "x > 3.0000000001",
+    "expect": "refuse",
+    "provenance": "2026-11-01T12:06:40Z — \"Exact inequality `x > 3`: `x > 3.0000000001` and `x > 3.000000001` returned `correct:true`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source: native Node ESM import of the unmodified checker at a5778a319"
+  },
+  {
+    "id": "shift-008",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "x > 3.000000001",
+    "expect": "refuse",
+    "provenance": "2026-11-01T12:06:40Z — \"Exact inequality `x > 3`: `x > 3.0000000001` and `x > 3.000000001` returned `correct:true`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source: native Node ESM import of the unmodified checker at a5778a319"
+  },
+  {
+    "id": "shift-009",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 100000000",
+        "variable": "x"
+      }
+    },
+    "input": "x > 100000000.1",
+    "expect": "refuse",
+    "provenance": "2026-11-01T12:06:40Z — \"Exact inequality `x > 100000000`: `x > 100000000.1` and `x > 99999999.9` returned `correct:true`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source: native Node ESM import of the unmodified checker at a5778a319"
+  },
+  {
+    "id": "shift-010",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 100000000",
+        "variable": "x"
+      }
+    },
+    "input": "x > 99999999.9",
+    "expect": "refuse",
+    "provenance": "2026-11-01T12:06:40Z — \"Exact inequality `x > 100000000`: `x > 100000000.1` and `x > 99999999.9` returned `correct:true`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source: native Node ESM import of the unmodified checker at a5778a319"
+  },
+  {
+    "id": "shift-011",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x ∈ (1, 5]",
+        "variable": "x"
+      }
+    },
+    "input": "(1.0000000001, 5]",
+    "expect": "refuse",
+    "provenance": "2026-11-01T12:06:40Z — \"Exact region `x ∈ (1, 5]`: `(1.0000000001, 5]` and `(1, 5.0000000001]` returned `correct:true`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source: native Node ESM import of the unmodified checker at a5778a319"
+  },
+  {
+    "id": "shift-012",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x ∈ (1, 5]",
+        "variable": "x"
+      }
+    },
+    "input": "(1, 5.0000000001]",
+    "expect": "refuse",
+    "provenance": "2026-11-01T12:06:40Z — \"Exact region `x ∈ (1, 5]`: `(1.0000000001, 5]` and `(1, 5.0000000001]` returned `correct:true`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source: native Node ESM import of the unmodified checker at a5778a319"
+  },
+  {
+    "id": "shift-013",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1000000000",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1000000000.2",
+    "expect": "refuse",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('shifted bound', iv('x > 1000000000'), 'x > 1000000000.2', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "shift-014",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x <= 300000000",
+        "variable": "x"
+      }
+    },
+    "input": "x <= 300000000.2",
+    "expect": "refuse",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('shifted bound', iv('x <= 300000000'), 'x <= 300000000.2', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "shift-015",
+    "family": "shifted-boundary",
+    "subfamily": "rounding-band-shift",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "2 < x <= 5",
+        "variable": "x"
+      }
+    },
+    "input": "2.0000001 < x <= 5",
+    "expect": "refuse",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('shifted bound', iv('2 < x <= 5'), '2.0000001 < x <= 5', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "a5778a319 already refuses this input (integer band 2e-9 < 1e-7), so it cannot be one of the 104 the issue says were credited; kept as a sourced regression only"
+  },
+  {
+    "id": "shift-016",
+    "family": "shifted-boundary",
+    "subfamily": "rounded-irrational-bound",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > sqrt(2)",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1.4142",
+    "expect": "refuse",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('rounded irrational bound', iv('x > sqrt(2)'), 'x > 1.4142', false);\" … \"| shifted interval bound (`x > 999999999.9375` for `x > 10^9`), rounded irrational bound |\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "C1 groups the rounded irrational bound with the shifted-bound root cause; whether the original 104 contained such a case is unknown"
+  },
+  {
+    "id": "exact-001",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1000000000",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1000000000",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('exact bound', iv('x > 1000000000'), 'x > 1000000000', true);\" | also: 2026-11-07T01:11:52Z — \"['interval-large-valid', iv('x > 1000000000'), 'x > 1000000000', true]\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-002",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "x > 3",
+    "expect": "credit",
+    "provenance": "2026-11-01T12:06:40Z — \"Exact inequality `x > 3`:\" … \"Controls `1:2`, `x > 3`, `(3, ∞)`, `(1,5]` passed\"",
+    "fidelity": "reconstructed",
+    "rule": "control paired with the authored region the same comment names",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-003",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x ∈ (1, 5]",
+        "variable": "x"
+      }
+    },
+    "input": "(1,5]",
+    "expect": "credit",
+    "provenance": "2026-11-01T12:06:40Z — \"Exact region `x ∈ (1, 5]`:\" … \"Controls `1:2`, `x > 3`, `(3, ∞)`, `(1,5]` passed\"",
+    "fidelity": "reconstructed",
+    "rule": "control paired with the authored region the same comment names",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-004",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > sqrt(2)",
+        "variable": "x"
+      }
+    },
+    "input": "x > sqrt(2)",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('exact irrational bound', iv('x > sqrt(2)'), 'x > sqrt(2)', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-005",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1.05001",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1.05001",
+    "expect": "credit",
+    "provenance": "2026-10-28T10:59:45Z — \"Student `x > 1.05`, authored `x > 1.05001`\" | also: issue body (Agent 2, 24 Oct 2026) — \"26/26 exact controls awarded\"",
+    "fidelity": "reconstructed",
+    "rule": "exact control = the authored boundary resubmitted unchanged (issue body: \"26/26 exact controls awarded\"); generated only for authored boundaries sourced in the shifted family that lack a sourced exact control",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-006",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 0.050001",
+        "variable": "x"
+      }
+    },
+    "input": "x > 0.050001",
+    "expect": "credit",
+    "provenance": "2026-10-28T10:59:45Z — \"Student `x > 0.05`, authored `x > 0.050001`\" | also: issue body (Agent 2, 24 Oct 2026) — \"26/26 exact controls awarded\"",
+    "fidelity": "reconstructed",
+    "rule": "exact control = the authored boundary resubmitted unchanged (issue body: \"26/26 exact controls awarded\"); generated only for authored boundaries sourced in the shifted family that lack a sourced exact control",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-007",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 0",
+        "variable": "x"
+      }
+    },
+    "input": "x > 0",
+    "expect": "credit",
+    "provenance": "2026-10-28T15:03:47Z — \"`x > 0` vs `x > 1e-23`\" | also: issue body (Agent 2, 24 Oct 2026) — \"26/26 exact controls awarded\"",
+    "fidelity": "reconstructed",
+    "rule": "exact control = the authored boundary resubmitted unchanged (issue body: \"26/26 exact controls awarded\"); generated only for authored boundaries sourced in the shifted family that lack a sourced exact control",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-008",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1e-23",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1e-23",
+    "expect": "credit",
+    "provenance": "2026-10-28T15:03:47Z — \"`x > 0` vs `x > 1e-23`\" | also: issue body (Agent 2, 24 Oct 2026) — \"26/26 exact controls awarded\"",
+    "fidelity": "reconstructed",
+    "rule": "exact control = the authored boundary resubmitted unchanged (issue body: \"26/26 exact controls awarded\"); generated only for authored boundaries sourced in the shifted family that lack a sourced exact control",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-009",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1.00001",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1.00001",
+    "expect": "credit",
+    "provenance": "2026-10-28T15:03:47Z — \"`x > 1` vs `x > 1.00001`\" | also: issue body (Agent 2, 24 Oct 2026) — \"26/26 exact controls awarded\"",
+    "fidelity": "reconstructed",
+    "rule": "exact control = the authored boundary resubmitted unchanged (issue body: \"26/26 exact controls awarded\"); generated only for authored boundaries sourced in the shifted family that lack a sourced exact control",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-010",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 100000000",
+        "variable": "x"
+      }
+    },
+    "input": "x > 100000000",
+    "expect": "credit",
+    "provenance": "2026-11-01T12:06:40Z — \"Exact inequality `x > 100000000`\" | also: issue body (Agent 2, 24 Oct 2026) — \"26/26 exact controls awarded\"",
+    "fidelity": "reconstructed",
+    "rule": "exact control = the authored boundary resubmitted unchanged (issue body: \"26/26 exact controls awarded\"); generated only for authored boundaries sourced in the shifted family that lack a sourced exact control",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-011",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x <= 300000000",
+        "variable": "x"
+      }
+    },
+    "input": "x <= 300000000",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"iv('x <= 300000000')\" | also: issue body (Agent 2, 24 Oct 2026) — \"26/26 exact controls awarded\"",
+    "fidelity": "reconstructed",
+    "rule": "exact control = the authored boundary resubmitted unchanged (issue body: \"26/26 exact controls awarded\"); generated only for authored boundaries sourced in the shifted family that lack a sourced exact control",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-012",
+    "family": "exact-boundary-control",
+    "subfamily": "resubmitted-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "2 < x <= 5",
+        "variable": "x"
+      }
+    },
+    "input": "2 < x <= 5",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('shifted bound', iv('2 < x <= 5')\" | also: issue body (Agent 2, 24 Oct 2026) — \"26/26 exact controls awarded\"",
+    "fidelity": "reconstructed",
+    "rule": "exact control = the authored boundary resubmitted unchanged (issue body: \"26/26 exact controls awarded\"); generated only for authored boundaries sourced in the shifted family that lack a sourced exact control",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-013",
+    "family": "exact-boundary-control",
+    "subfamily": "equivalent-spelling",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1000000000",
+        "variable": "x"
+      }
+    },
+    "input": "(10^9, inf)",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('exact bound, other spelling', iv('x > 1000000000'), '(10^9, inf)', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-014",
+    "family": "exact-boundary-control",
+    "subfamily": "equivalent-spelling",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "(3, ∞)",
+    "expect": "credit",
+    "provenance": "2026-11-07T01:11:52Z — \"['interval-valid-alternative', iv('x > 3'), '(3, ∞)', true]\" | also: 2026-11-01T12:06:40Z — \"Controls `1:2`, `x > 3`, `(3, ∞)`, `(1,5]` passed\" | also: 2026-11-06T13:34:34Z — \"expect('interval notation', iv('x > 3'), '(3, ∞)', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-015",
+    "family": "exact-boundary-control",
+    "subfamily": "equivalent-spelling",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 0.1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 0.10",
+    "expect": "credit",
+    "provenance": "2026-10-28T15:03:47Z — \"Six controls passed, including `x > 0.1` vs `x > 0.10`, `x > 1e-3` vs `x > 0.001`\"",
+    "fidelity": "reconstructed",
+    "rule": "authored = first-listed of an equivalent pair; the pair is mathematically equal, so the direction does not change the expectation",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "exact-016",
+    "family": "exact-boundary-control",
+    "subfamily": "equivalent-spelling",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1e-3",
+        "variable": "x"
+      }
+    },
+    "input": "x > 0.001",
+    "expect": "credit",
+    "provenance": "2026-10-28T15:03:47Z — \"Six controls passed, including `x > 0.1` vs `x > 0.10`, `x > 1e-3` vs `x > 0.001`\"",
+    "fidelity": "reconstructed",
+    "rule": "authored = first-listed of an equivalent pair; the pair is mathematically equal, so the direction does not change the expectation",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "far-001",
+    "family": "far-wrong-control",
+    "subfamily": "far-boundary",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1000000000",
+        "variable": "x"
+      }
+    },
+    "input": "x > 999999999",
+    "expect": "refuse",
+    "provenance": "2026-11-07T01:11:52Z — \"['interval-large-far', iv('x > 1000000000'), 'x > 999999999', false]\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "missop-001",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1 |",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-002",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "| x > 1",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-003",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1 ||",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-004",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1 &",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-005",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1 &&",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-006",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1 or",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-007",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1 and",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-008",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1 ∪",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-009",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1 ∩",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-010",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1 | | |",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-011",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 1",
+        "variable": "x"
+      }
+    },
+    "input": "x > 1 & & &",
+    "expect": "refuse",
+    "provenance": "2026-11-03T10:59:49Z — \"authored interval question `{answerType:'interval',answer:{region:'x > 1',variable:'x'}}`\" … \"**11/11** dangling or empty union/intersection operands returned `{correct:true}`: `x > 1 |`, `| x > 1`, `x > 1 ||`, `x > 1 &`, `x > 1 &&`, `x > 1 or`, `x > 1 and`, `x > 1 ∪`, `x > 1 ∩`, `x > 1 | | |`, `x > 1 & & &`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source says these \"may overlap the previously reported 60 missing-operand failures\""
+  },
+  {
+    "id": "missop-012",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "x > 3 or",
+    "expect": "refuse",
+    "provenance": "2026-10-26T02:59:53Z — \"For an authored `x > 3`, submission `x > 3 or` gets `{correct:true}`.\" | also: 2026-10-25T16:03:39Z — \"so `x>3 or`, `or x>3`, `x>3 and`, `x>3 and and x<5` reduce to otherwise correct solutions\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "missop-013",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3 and x < 5",
+        "variable": "x"
+      }
+    },
+    "input": "x > 3 && x < 5",
+    "expect": "refuse",
+    "provenance": "2026-10-26T02:59:53Z — \"For an authored `x > 3 and x < 5`, `x > 3 && x < 5` gets full credit.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "missop-014",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "all real numbers",
+        "variable": "x"
+      }
+    },
+    "input": "x > 3 | & x < 5",
+    "expect": "refuse",
+    "provenance": "2026-10-26T02:59:53Z — \"authored `all real numbers`, malformed `x > 3 | & x < 5` is interpreted as the universal set and gets full credit.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "missop-015",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x>3",
+        "variable": "x"
+      }
+    },
+    "input": "or x>3",
+    "expect": "refuse",
+    "provenance": "2026-10-25T16:03:39Z — \"so `x>3 or`, `or x>3`, `x>3 and`, `x>3 and and x<5` reduce to otherwise correct solutions\" … \"`x>3 and y<5` matches `3<x<5`\"",
+    "fidelity": "reconstructed",
+    "rule": "authored region = the region left once the empty operand is dropped (comment: \"reduce to otherwise correct solutions\"); 3<x<5 for the chain, as the same comment pairs x>3 and y<5 with 3<x<5",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source ran a parser excerpt with num() replaced, not checkAnswer"
+  },
+  {
+    "id": "missop-016",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x>3",
+        "variable": "x"
+      }
+    },
+    "input": "x>3 and",
+    "expect": "refuse",
+    "provenance": "2026-10-25T16:03:39Z — \"so `x>3 or`, `or x>3`, `x>3 and`, `x>3 and and x<5` reduce to otherwise correct solutions\" … \"`x>3 and y<5` matches `3<x<5`\"",
+    "fidelity": "reconstructed",
+    "rule": "authored region = the region left once the empty operand is dropped (comment: \"reduce to otherwise correct solutions\"); 3<x<5 for the chain, as the same comment pairs x>3 and y<5 with 3<x<5",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source ran a parser excerpt with num() replaced, not checkAnswer"
+  },
+  {
+    "id": "missop-017",
+    "family": "negative-holdout",
+    "subfamily": "missing-operand",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "3<x<5",
+        "variable": "x"
+      }
+    },
+    "input": "x>3 and and x<5",
+    "expect": "refuse",
+    "provenance": "2026-10-25T16:03:39Z — \"so `x>3 or`, `or x>3`, `x>3 and`, `x>3 and and x<5` reduce to otherwise correct solutions\" … \"`x>3 and y<5` matches `3<x<5`\"",
+    "fidelity": "reconstructed",
+    "rule": "authored region = the region left once the empty operand is dropped (comment: \"reduce to otherwise correct solutions\"); 3<x<5 for the chain, as the same comment pairs x>3 and y<5 with 3<x<5",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source ran a parser excerpt with num() replaced, not checkAnswer"
+  },
+  {
+    "id": "wrongvar-001",
+    "family": "negative-holdout",
+    "subfamily": "wrong-variable",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x>3",
+        "variable": "x"
+      }
+    },
+    "input": "y>3",
+    "expect": "refuse",
+    "provenance": "2026-10-25T16:03:39Z — \"Thus `y>3` matches the interval of authored `x>3`\" | also: 2026-10-28T17:03:08Z — \"a student submission `y > 3` is a statement about the wrong free variable\" | also: 2026-10-28T18:03:23Z — \"to an authored `x > 3` (or corresponding bounded) question:\" … \"`y > 3`, `3 < y`, `z > 3`\" | also: 2026-11-06T13:34:34Z — \"expect('wrong variable', iv('x > 3'), 'y > 3', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "wrongvar-002",
+    "family": "negative-holdout",
+    "subfamily": "wrong-variable",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "y in (3, inf)",
+    "expect": "refuse",
+    "provenance": "2026-10-28T17:03:08Z — \"On an interval question explicitly authored for `x` with correct answer `x > 3`\" … \"and `y in (3, inf)` refers to the wrong free variable\" | also: 2026-10-28T18:03:23Z — \"`y in (3,inf)`\" | also: 2026-11-06T13:34:34Z — \"expect('membership in the wrong variable', iv('x > 3'), 'y in (3, inf)', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "wrongvar-003",
+    "family": "negative-holdout",
+    "subfamily": "wrong-variable",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "3 < y",
+    "expect": "refuse",
+    "provenance": "2026-10-28T18:03:23Z — \"to an authored `x > 3` (or corresponding bounded) question:\" … \"`y > 3`, `3 < y`, `z > 3`\" | also: 2026-11-06T13:34:34Z — \"expect('wrong variable, reversed', iv('x > 3'), '3 < y', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "wrongvar-004",
+    "family": "negative-holdout",
+    "subfamily": "wrong-variable",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "z > 3",
+    "expect": "refuse",
+    "provenance": "2026-10-28T18:03:23Z — \"to an authored `x > 3` (or corresponding bounded) question:\" … \"`y > 3`, `3 < y`, `z > 3`\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "wrongvar-005",
+    "family": "negative-holdout",
+    "subfamily": "wrong-variable",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x in R",
+        "variable": "x"
+      }
+    },
+    "input": "y in R",
+    "expect": "refuse",
+    "provenance": "2026-10-28T18:03:23Z — \"`y in R` (against `x in R`)\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "wrongvar-006",
+    "family": "negative-holdout",
+    "subfamily": "wrong-variable",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "2 < x <= 5",
+        "variable": "x"
+      }
+    },
+    "input": "2 < y <= 5",
+    "expect": "refuse",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('mixed letters in a chain', iv('2 < x <= 5'), '2 < y <= 5', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "C1 labels it \"mixed letters\"; the input names only y, so it is filed as a wrong variable"
+  },
+  {
+    "id": "wrongvar-007",
+    "family": "negative-holdout",
+    "subfamily": "wrong-variable",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "t >= -1",
+        "variable": "t"
+      }
+    },
+    "input": "x >= -1",
+    "expect": "refuse",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('question in t, x given', iv('t >= -1', 't'), 'x >= -1', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "mixvar-001",
+    "family": "negative-holdout",
+    "subfamily": "mixed-variables",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "3<x<5",
+        "variable": "x"
+      }
+    },
+    "input": "x>3 and y<5",
+    "expect": "refuse",
+    "provenance": "2026-10-25T16:03:39Z — \"and `x>3 and y<5` matches `3<x<5`\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "source ran a parser excerpt, not checkAnswer"
+  },
+  {
+    "id": "mixvar-002",
+    "family": "negative-holdout",
+    "subfamily": "mixed-variables",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "y > 3 or z > 3",
+    "expect": "refuse",
+    "provenance": "2026-10-28T18:03:23Z — \"to an authored `x > 3` (or corresponding bounded) question:\" … \"`y > 3 or z > 3`\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "mixvar-003",
+    "family": "negative-holdout",
+    "subfamily": "mixed-variables",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "2 < x <= 5",
+        "variable": "x"
+      }
+    },
+    "input": "2 < x & y <= 5",
+    "expect": "refuse",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('mixed letters across &', iv('2 < x <= 5'), '2 < x & y <= 5', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "mixvar-004",
+    "family": "negative-holdout",
+    "subfamily": "mixed-variables",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x < 2 | x > 5",
+        "variable": "x"
+      }
+    },
+    "input": "x < 2 | y > 5",
+    "expect": "refuse",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('mixed letters across a union', iv('x < 2 | x > 5'), 'x < 2 | y > 5', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "setb-001",
+    "family": "negative-holdout",
+    "subfamily": "set-builder-binding",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "{x: y > 3}",
+    "expect": "refuse",
+    "provenance": "2026-10-28T17:03:08Z — \"with correct answer `x > 3`\" … \"Likewise `{x: y > 3}` contains an unbound `y`\" | also: 2026-10-28T18:03:23Z — \"`{x:y > 3}`\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "setb-002",
+    "family": "negative-holdout",
+    "subfamily": "set-builder-binding",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "{x|y > 3}",
+    "expect": "refuse",
+    "provenance": "2026-10-28T18:03:23Z — \"to an authored `x > 3` (or corresponding bounded) question:\" … \"`{x|y > 3}`\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "setb-003",
+    "family": "negative-holdout",
+    "subfamily": "set-builder-binding",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "3 < x < 7",
+        "variable": "x"
+      }
+    },
+    "input": "{x:y > 3 and y < 7}",
+    "expect": "refuse",
+    "provenance": "2026-10-28T18:03:23Z — \"to an authored `x > 3` (or corresponding bounded) question:\" … \"`{x:y > 3 and y < 7}`\"",
+    "fidelity": "reconstructed",
+    "rule": "authored region = 3 < x < 7, the \"corresponding bounded\" question the comment names for the and-y<7 forms",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "setb-004",
+    "family": "negative-holdout",
+    "subfamily": "set-builder-binding",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "3 < x < 7",
+        "variable": "x"
+      }
+    },
+    "input": "{x:x > 3 and y < 7}",
+    "expect": "refuse",
+    "provenance": "2026-10-28T18:03:23Z — \"to an authored `x > 3` (or corresponding bounded) question:\" … \"`{x:x > 3 and y < 7}`\"",
+    "fidelity": "reconstructed",
+    "rule": "authored region = 3 < x < 7, the \"corresponding bounded\" question the comment names for the and-y<7 forms",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "binder x with a condition mixing x and y: filed under set-builder binding, could equally be a mixed-variable case"
+  },
+  {
+    "id": "setb-005",
+    "family": "negative-holdout",
+    "subfamily": "set-builder-binding",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "{x:y > 3 or x > 5}",
+    "expect": "refuse",
+    "provenance": "2026-10-28T18:03:23Z — \"to an authored `x > 3` (or corresponding bounded) question:\" … \"`{x:y > 3 or x > 5}`\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "binder x with a condition mixing x and y: filed under set-builder binding, could equally be a mixed-variable case"
+  },
+  {
+    "id": "setb-006",
+    "family": "negative-holdout",
+    "subfamily": "set-builder-binding",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "{y:x > 3}",
+    "expect": "refuse",
+    "provenance": "2026-10-28T18:03:23Z — \"to an authored `x > 3` (or corresponding bounded) question:\" … \"`{y:x > 3}`\" | also: 2026-11-06T13:34:34Z — \"expect('binder over another letter', iv('x > 3'), '{y : x > 3}', false);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "setb-007",
+    "family": "negative-holdout",
+    "subfamily": "set-builder-binding",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "{x:x > 3 or y > 3}",
+    "expect": "refuse",
+    "provenance": "2026-10-28T18:03:23Z — \"to an authored `x > 3` (or corresponding bounded) question:\" … \"`{x:x > 3 or y > 3}`\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197",
+    "note": "binder x with a condition mixing x and y: filed under set-builder binding, could equally be a mixed-variable case"
+  },
+  {
+    "id": "vecsign-001",
+    "family": "negative-holdout",
+    "subfamily": "vector-sign-parity",
+    "question": {
+      "answerType": "vector",
+      "answer": {
+        "components": [
+          1,
+          -2,
+          3
+        ]
+      }
+    },
+    "input": "i - -2j + 3k",
+    "expect": "refuse",
+    "provenance": "2026-11-06T13:34:34Z — \"const vec = { answerType: 'vector', answer: { components: [1, -2, 3] } };\" … \"expect('double minus', vec, 'i - -2j + 3k', false);\" | also: 2026-10-29T22:03:53Z — \"Thus `i--2j+3k` (mathematically `(1,+2,+3)`) parses as `(1,-2,+3)`\" | also: 2026-10-23T21:04:54Z — \"matrix junk, double-negative vector sign\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "erased-001",
+    "family": "negative-holdout",
+    "subfamily": "nonempty-interval-erased",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "no solution",
+        "variable": "x"
+      }
+    },
+    "input": "(0, 0.0000000000001)",
+    "expect": "refuse",
+    "provenance": "2026-10-26T05:03:29Z — \"Authored `no solution`; student `(0, 0.0000000000001)` -> **`correct:true`**\" | also: 2026-11-07T01:11:52Z — \"['interval-nonempty-vs-empty', iv('no solution'), '(0, 0.0000000000001)', false]\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "erased-002",
+    "family": "negative-holdout",
+    "subfamily": "nonempty-interval-erased",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "(0, 0.0000000000001)",
+        "variable": "x"
+      }
+    },
+    "input": "no solution",
+    "expect": "refuse",
+    "provenance": "2026-10-26T05:03:29Z — \"Authored `(0, 0.0000000000001)`; student `no solution` -> **`correct:true`**\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "erased-003",
+    "family": "negative-holdout",
+    "subfamily": "nonempty-interval-erased",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "no solution",
+        "variable": "x"
+      }
+    },
+    "input": "(0,0.0000000000005)",
+    "expect": "refuse",
+    "provenance": "2026-10-28T13:01:12Z — \"`(0,0.0000000000005)` parses as the empty set and is accepted against `no solution`.\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-001",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "{y: y > 3}",
+    "expect": "credit",
+    "provenance": "2026-10-28T17:03:08Z — \"`{y: y > 3}` is a correctly alpha-renamed *bound-variable* set builder and must remain accepted\" | also: 2026-10-28T18:03:23Z — \"`{y:y>3}`\" | also: 2026-11-06T13:34:34Z — \"expect('binder over its own letter', iv('x > 3'), '{y : y > 3}', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-002",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "(3, inf)",
+    "expect": "credit",
+    "provenance": "2026-10-28T17:03:08Z — \"variable-free interval notation `(3, inf)` must also pass\" | also: 2026-10-28T18:03:23Z — \"variable-free `(3,inf)`\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-003",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "{x: x > 3}",
+    "expect": "credit",
+    "provenance": "2026-10-28T17:03:08Z — \"must remain accepted as the same set as `{x: x > 3}`\" | also: 2026-11-06T13:34:34Z — \"expect('binder x', iv('x > 3'), '{x : x > 3}', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-004",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "x ∈ (3, ∞)",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('membership x', iv('x > 3'), 'x ∈ (3, ∞)', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-005",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x > 3",
+        "variable": "x"
+      }
+    },
+    "input": "3 < x",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('reversed relation', iv('x > 3'), '3 < x', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-006",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "2 < x <= 5",
+        "variable": "x"
+      }
+    },
+    "input": "(2, 5]",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('chain', iv('2 < x <= 5'), '(2, 5]', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-007",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "x < 2 | x > 5",
+        "variable": "x"
+      }
+    },
+    "input": "(-∞, 2) ∪ (5, ∞)",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('union', iv('x < 2 | x > 5'), '(-∞, 2) ∪ (5, ∞)', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-008",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "t >= -1",
+        "variable": "t"
+      }
+    },
+    "input": "t >= -1",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"expect('question in t', iv('t >= -1', 't'), 't >= -1', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-009",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "0 < x < 0.0000000000001",
+        "variable": "x"
+      }
+    },
+    "input": "(0, 0.0000000000001)",
+    "expect": "credit",
+    "provenance": "2026-11-06T14:22:08Z — \"expect('tiny nonempty interval kept', iv('0 < x < 0.0000000000001'), '(0, 0.0000000000001)', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-010",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "3 <= x <= 3",
+        "variable": "x"
+      }
+    },
+    "input": "[3, 3]",
+    "expect": "credit",
+    "provenance": "2026-11-06T14:22:08Z — \"expect('point interval [3, 3] is {3}', iv('3 <= x <= 3'), '[3, 3]', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-011",
+    "family": "valid-control",
+    "subfamily": "interval",
+    "question": {
+      "answerType": "interval",
+      "answer": {
+        "region": "no solution",
+        "variable": "x"
+      }
+    },
+    "input": "(3, 3)",
+    "expect": "credit",
+    "provenance": "2026-11-06T14:22:08Z — \"expect('(3, 3) is empty', iv('no solution'), '(3, 3)', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-012",
+    "family": "valid-control",
+    "subfamily": "matrix",
+    "question": {
+      "answerType": "matrix",
+      "answer": {
+        "rows": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ]
+        ]
+      }
+    },
+    "input": "[[1,2],[3,4]]",
+    "expect": "credit",
+    "provenance": "2026-11-06T14:22:08Z — \"const mat = { answerType: 'matrix', answer: { rows: [[1, 2], [3, 4]] } };\" … \"expect('matrix nested', mat, '[[1,2],[3,4]]', true);\" | also: 2026-11-07T01:11:52Z — \"['matrix-valid', mat, '[[1,2],[3,4]]', true]\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-013",
+    "family": "valid-control",
+    "subfamily": "matrix",
+    "question": {
+      "answerType": "matrix",
+      "answer": {
+        "rows": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ]
+        ]
+      }
+    },
+    "input": "[1 2; 3 4]",
+    "expect": "credit",
+    "provenance": "2026-11-06T14:22:08Z — \"const mat = { answerType: 'matrix', answer: { rows: [[1, 2], [3, 4]] } };\" … \"expect('matrix semicolons', mat, '[1 2; 3 4]', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-014",
+    "family": "valid-control",
+    "subfamily": "matrix",
+    "question": {
+      "answerType": "matrix",
+      "answer": {
+        "rows": [
+          [
+            1,
+            2
+          ],
+          [
+            3,
+            4
+          ]
+        ]
+      }
+    },
+    "input": "1 2\n\n3 4",
+    "expect": "credit",
+    "provenance": "2026-11-06T14:22:08Z — \"const mat = { answerType: 'matrix', answer: { rows: [[1, 2], [3, 4]] } };\" … \"expect('matrix rows on lines', mat, '1 2\\n\\n3 4', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-015",
+    "family": "valid-control",
+    "subfamily": "vector",
+    "question": {
+      "answerType": "vector",
+      "answer": {
+        "components": [
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    "input": "(1, 2, 3)",
+    "expect": "credit",
+    "provenance": "2026-11-06T14:22:08Z — \"const v3 = { answerType: 'vector', answer: { components: [1, 2, 3] } };\" … \"expect('vector', v3, '(1, 2, 3)', true);\" | also: 2026-11-07T01:11:52Z — \"['vector-valid', vec, '(1,2,3)', true]\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-016",
+    "family": "valid-control",
+    "subfamily": "vector",
+    "question": {
+      "answerType": "vector",
+      "answer": {
+        "components": [
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    "input": "1  2  3",
+    "expect": "credit",
+    "provenance": "2026-11-06T14:22:08Z — \"const v3 = { answerType: 'vector', answer: { components: [1, 2, 3] } };\" … \"expect('vector spaced', v3, '1  2  3', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-017",
+    "family": "valid-control",
+    "subfamily": "vector",
+    "question": {
+      "answerType": "vector",
+      "answer": {
+        "components": [
+          1,
+          -2,
+          3
+        ]
+      }
+    },
+    "input": "i + -2j + 3k",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"const vec = { answerType: 'vector', answer: { components: [1, -2, 3] } };\" … \"expect('plus minus', vec, 'i + -2j + 3k', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-018",
+    "family": "valid-control",
+    "subfamily": "vector",
+    "question": {
+      "answerType": "vector",
+      "answer": {
+        "components": [
+          1,
+          -2,
+          3
+        ]
+      }
+    },
+    "input": "i - 2j + 3k",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"const vec = { answerType: 'vector', answer: { components: [1, -2, 3] } };\" … \"expect('plain', vec, 'i - 2j + 3k', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  },
+  {
+    "id": "valid-019",
+    "family": "valid-control",
+    "subfamily": "vector",
+    "question": {
+      "answerType": "vector",
+      "answer": {
+        "components": [
+          1,
+          -2,
+          3
+        ]
+      }
+    },
+    "input": "(1, -2, 3)",
+    "expect": "credit",
+    "provenance": "2026-11-06T13:34:34Z — \"const vec = { answerType: 'vector', answer: { components: [1, -2, 3] } };\" … \"expect('list', vec, '(1, -2, 3)', true);\"",
+    "fidelity": "verbatim",
+    "origin": "later same-family case; not shown to be one of the original 197"
+  }
+]

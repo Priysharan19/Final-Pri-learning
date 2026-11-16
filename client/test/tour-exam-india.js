@@ -207,6 +207,15 @@ export const flow = {
     const net = /net (-?\d+)/.exec(text);
     await check('the analysis net agrees with the paper score', !!scored && !!net && scored[1] === net[1],
       `score ${scored?.[1]}, analysis net ${net?.[1]}`);
+    // The headline says where the marks went, never a tier sentence that a
+    // mock's own disclaimer contradicts (intelligence audit #9).
+    const lostAttr = await page.locator('[data-exam-lost]').getAttribute('data-exam-lost').catch(() => null);
+    await check('the headline states the marks lost, by section, and no tier sentence',
+      !!scored && lostAttr === String(Number(scored[2]) - Number(scored[1])) && /marks? lost: \d+ in Section [AB]/.test(scoreLine) &&
+      !/topper|exam ready|tighten up|fair base|win back/i.test(scoreLine), `${lostAttr} · ${scoreLine.slice(0, 240)}`);
+    const practise = await analysis.locator('[data-exam-practise]').evaluateAll(as => as.map(a => a.getAttribute('href')));
+    await check('each chapter to work on has a Practise link into that chapter on the paper\'s track',
+      practise.length > 0 && practise.every(h => /^\/practice\?subtopic=[^&]+&track=jee-main$/.test(h || '')), JSON.stringify(practise));
     const review = (await page.locator('main').innerText()).replace(/\s+/g, ' ');
     await check('the handwritten answer is what was marked', /Your answer: 42/.test(review), review.slice(0, 200));
     const done = await storedExam(page, examId);

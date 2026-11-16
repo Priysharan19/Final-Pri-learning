@@ -32,10 +32,12 @@ import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
 import { ACCOUNT_BLOCKED_KEYS, inkReaderUiState, readerBlock, readerPaused, readinessIdentity, resumeReaderNow, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
 import { retryClock } from './readerFailure.js';
-import { Link, useInRouterContext } from 'react-router-dom';
+import { useInRouterContext } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
 import { feedbackGeometry } from './feedbackGeometry.js';
 import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
+import { neqWorthCheck, relationChoices, swapRelation } from './relationSwap.js';
 import { MathText } from '../lib/latex.jsx';
 import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
@@ -45,6 +47,7 @@ import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
 import { strokeSignature } from './strokeSignature.js';
+import { askReaderPermission, PROMPT_ANSWER, READER_PERMISSION, readerPermission } from './readerPermission.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
 import ReadingPlot from '../instrument/ReadingPlot.jsx';
@@ -91,13 +94,20 @@ function knownBlockOf(who, isOnline) {
  * reading panel (and on the ink where line geometry is known).
  * focusSymbol and recognitionContext are accepted for API compatibility; the
  * server reader is answer-blind and receives no question context.
+ * liveRead (the live step coach, F1): when true, a page is read on its own
+ * once the student has started a NEW line and the pen has rested — one read
+ * per finished line, and only after the student has already said yes to the
+ * reader (D17). It never opens the permission prompt. The read is the same
+ * answer-blind picture-only request; the reading it lands carries `live`.
  */
 // eslint-disable-next-line no-unused-vars
 /** One page of paper. More pages extend the same sheet, so reading, the stored
  *  strokes and History replay all keep one coordinate space. */
 const MAX_PAGES = 4;
+/** The pen rests this long on a new line before the line above is read (liveRead). */
+export const LIVE_READ_REST_MS = 1500;
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0 }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -168,6 +178,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const readRef = useRef(null);
   const strokesRef = useRef([]);
   const disabledRef = useRef(!!disabled);
+  const liveReadRef = useRef(!!liveRead);
+  liveReadRef.current = !!liveRead;
+  // The finished-line count the last live read was for, and its pending timer.
+  const liveFinishedRef = useRef(0);
+  const liveTimerRef = useRef(null);
   const onStrokesRef = useRef(onStrokes);
   useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
   useEffect(() => {
@@ -177,7 +192,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     });
   }, []);
 
-  const publish = useCallback((r, strokes, { afterWait = false, stale: isStale = false } = {}) => {
+  const publish = useCallback((r, strokes, { afterWait = false, stale: isStale = false, readMs = null, live = false } = {}) => {
     setRec(r);
     setStale(isStale && r.lines.length > 0);
     if (r.engine) recordLocalHandwritingDiagnostics({ engine: r.engine });
@@ -204,8 +219,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       attested: r.attested || null,
       afterWait: afterWait && r.lines.length > 0,
       readKey: r.lines.length ? `${strokeSignature(strokes)}|${r.text}` : null,
+      // How long the read the student waited for took, device to device: from
+      // the press of "Read my answer" to this transcription landing, measured
+      // here around the one readWithCloud call. Null when this publish is not
+      // a fresh read (a correction, a kept reading, a page that changed).
+      readMs: Number.isFinite(readMs) ? Math.max(0, readMs) : null,
       // The reading is of EARLIER writing: shown, labelled, never submitted.
       stale: isStale && r.lines.length > 0,
+      // A live read (liveRead): its last line may still be being written.
+      live: live === true,
       // What the card keeps with the ink so a reload restores the transcript
       // (and the student's corrections) without reading the page again.
       kept: r.lines.length ? { signature: readRef.current, reading: r } : null,
@@ -233,7 +255,34 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
    * Send the page to the server reader — ONE recognition operation, because
    * the student asked. Its reading is the only reading.
    */
-  const readNow = useCallback(() => {
+  const askingRef = useRef(false);
+  const readNow = useCallback(async (opts) => {
+    const auto = opts?.auto === true;
+    if (disabledRef.current || !strokesRef.current.length) return;
+    if (flyingRef.current === strokeSignature(strokesRef.current)) return;
+    const asker = userRef.current;
+    const known = knownBlock(asker);
+    if (known && known.kind !== 'capacity' && known.kind !== 'rate-limited') {
+      setStatus(known.kind === 'allowance' ? { kind: 'allowance', key: known.inkKey, block: known } : { kind: 'waiting', key: known.inkKey, block: known });
+      return;
+    }
+    // D17: before the first read, the student is told the picture of their
+    // writing goes to OpenAI, and nothing is sent unless they say yes. The
+    // press that opened the prompt is the press that reads, once accepted.
+    if (readerPermission(asker) !== READER_PERMISSION.ACCEPTED) {
+      // A live read never asks: only a press of "Read my answer" may.
+      if (auto || askingRef.current) return;
+      askingRef.current = true;
+      let permitted;
+      try { permitted = await askReaderPermission(asker, { kind: 'ink' }); } finally { askingRef.current = false; }
+      if (permitted !== PROMPT_ANSWER.ACCEPTED) {
+        // Closing the prompt chooses nothing: "Read my answer" stays.
+        if (permitted !== PROMPT_ANSWER.DISMISSED) waitFor(asker, { reason: permitted === PROMPT_ANSWER.DECLINED ? 'declined' : 'not-permitted' });
+        return;
+      }
+    }
+    // The page as it stands NOW is what is read: the student may have gone on
+    // writing, or the card closed, while the prompt was open.
     const strokes = strokesRef.current;
     if (disabledRef.current || !strokes.length) return;
     const signature = strokeSignature(strokes);
@@ -253,6 +302,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const landed = () => { if (flyingRef.current === signature) flyingRef.current = null; };
     focusAfterRead.current = typeof document !== 'undefined' && !!document.activeElement?.closest?.('.ink-read-action, .ink-status-action');
     setStatus({ kind: 'reading' });
+    const pressedAt = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
+    const sincePress = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()) - pressedAt;
     readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
       // The page was submitted or left while the server was reading it (§09:
       // a late reading never rewrites the reading a mark was given for).
@@ -293,7 +344,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           before.lines.forEach((line, i) => { if (line.corrected === true) landed = applyLineCorrection(landed, i, line.text); });
         }
         expiredSigRef.current = null;
-        publish(landed, now, { stale: nowSignature !== signature });
+        publish(landed, now, { stale: nowSignature !== signature, readMs: sincePress(), live: auto });
         setStatus(null);
         return;
       }
@@ -306,6 +357,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       waitFor(who, { error: { code: error?.code, status: error?.status, resetAt: error?.resetAt } });
     });
   }, [publish]); // eslint-disable-line react-hooks/exhaustive-deps
+  const readRef2 = useRef(readNow);
+  readRef2.current = readNow;
 
   /**
    * One tap: the student says what they wrote on a line the reader was unsure
@@ -324,6 +377,21 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     if (strokes?.length) setCleared(null);
     strokesRef.current = strokes;
     setHasInk(strokes.length > 0);
+    // The live step coach: a new line has been started below the last one, so
+    // the line above is finished. Read once the pen rests — once per finished
+    // line, never before the student accepted the reader.
+    if (liveReadRef.current && !disabledRef.current) {
+      clearTimeout(liveTimerRef.current);
+      let finished = 0;
+      try { finished = Math.max(0, segmentInkLines(strokes).length - 1); } catch { finished = 0; }
+      if (finished < liveFinishedRef.current) liveFinishedRef.current = finished;
+      if (finished > liveFinishedRef.current && readerPermission(userRef.current) === READER_PERMISSION.ACCEPTED) {
+        liveTimerRef.current = setTimeout(() => {
+          liveFinishedRef.current = finished;
+          readRef2.current?.({ auto: true });
+        }, LIVE_READ_REST_MS);
+      }
+    }
     setCorrecting(null);
     // Kept the moment the pen lifts, whatever happens to reading: a page
     // written in the second before the app went away is still the student's.
@@ -352,7 +420,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // the note goes and "Read my answer" is there to be pressed.
   useEffect(() => {
     const clearIf = kinds => setStatus(prev => (prev?.kind === 'waiting' && kinds.includes(prev.block?.kind) ? null : prev));
-    const stopSession = onCloudSessionChange(() => clearIf(['session', 'verify-email', 'guardian', 'not-allowed']));
+    const stopSession = onCloudSessionChange(() => clearIf(['session', 'verify-email', 'guardian', 'mfa', 'not-allowed']));
     const onOnline = () => { setOnline(true); clearIf(['offline']); };
     const onOffline = () => setOnline(false);
     if (typeof window !== 'undefined') {
@@ -372,7 +440,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const identity = readinessIdentity(user);
     const changed = identity !== identityRef.current;
     identityRef.current = identity;
-    if (changed) setStatus(prev => (prev?.kind === 'waiting' && ['session', 'verify-email', 'guardian', 'not-allowed', 'turned-off'].includes(prev.block?.kind) ? null : prev));
+    if (changed) setStatus(prev => (prev?.kind === 'waiting' && ['session', 'verify-email', 'guardian', 'mfa', 'not-allowed', 'turned-off'].includes(prev.block?.kind) ? null : prev));
   }, [user]);
 
   // Submit found the server no longer holds this page's read (readExpired is
@@ -422,6 +490,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     setStatus(null);
   }, [disabled]);
   useEffect(() => () => {
+    clearTimeout(liveTimerRef.current);
     readSeqRef.current += 1;
     abortRef.current?.abort?.();
   }, []);
@@ -456,6 +525,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     setCleared(null);
   };
   const pageHeight = fittedHeight;
+  // v1.1 instrument: the footer's Reset is the toolbar's Clear (with its undo).
+  useEffect(() => {
+    if (!controlRef) return undefined;
+    controlRef.current = { clear: () => act('clear')() };
+    return () => { controlRef.current = null; };
+  });
 
   // i18n-exempt-start: engine identifier for developers and evaluators, drawn only when inkDiagnosticsVisible(); students see t('verdict.readOnServer')
   const engineNote = rec.cloud === true ? `Read on the server · ${rec.engine || 'cloud'}` : null;
@@ -467,13 +542,18 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     : shownStatus?.kind === 'empty'
       ? t('ink.serverEmpty')
       : shownStatus?.kind === 'allowance'
-        ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language) })
+        ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language, user) })
         : shownStatus?.kind === 'waiting'
-          ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language) })
-          : null;
+          ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language, user) })
+          : checkingEarlier
+            // An earlier submission of this question is being checked again
+            // (after the app was closed mid-check). The page stays writable;
+            // a read waits until that check has its answer.
+            ? t('ink.checkingEarlier')
+            : null;
   // "Read my answer": offered whenever there is ink that has not been read as
   // it now stands and nothing is known to stop a read. One press, one read.
-  const canAskToRead = hasInk && !disabled && !shownStatus && (!rec.lines.length || stale);
+  const canAskToRead = hasInk && !disabled && !shownStatus && !checkingEarlier && (!rec.lines.length || stale);
 
   return (
     <div className={`ink-answer ${disabled ? 'ink-disabled' : ''}`} data-engine={rec.engine || undefined}>
@@ -560,6 +640,41 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             })()}
           </div>
         )}
+        {/* v1.1 instrument: Pri's reading set beside each written line, as
+            the design's chips. A visual duplicate of the reading list below
+            (which stays the accessible source and keeps Edit / I wrote): only
+            on lines the geometry plausibly matched, the bar only from the
+            reader's own confidence, the tag only from the engine's verdict. */}
+        {INSTRUMENT_PLOT && !stale && rec.lines.some(l => l.box) && (
+          <div className="in-read-layer" aria-hidden="true" data-reading-chips={rec.lines.filter(l => l.box).length}>
+            {rec.lines.map((line, li) => {
+              if (!line.box) return null;
+              const b = line.box;
+              const low = isLowConfidence(line, lineConfidenceFloor);
+              const v = lineVerdicts ? lineVerdicts[li] : null;
+              const slip = !low && !!v && (v.status === 'break' || v.status === 'wrong');
+              const ok = !low && !!v && v.status === 'ok';
+              // toReading() writes 0 when the reader gave no confidence at all,
+              // so 0 is drawn as no bar rather than as an empty one.
+              const conf = line.conf == null || Number(line.conf) <= 0 ? NaN : Number(line.conf);
+              const tag = low ? t('inst.readUnsure') : slip ? t('inst.readSlip') : ok ? t('inst.readOk') : null;
+              return (
+                <React.Fragment key={li}>
+                  {low && <span className="in-read-unc" style={{ left: b.x - 6, top: b.y - 6, width: b.w + 12, height: b.h + 12 }} />}
+                  <span className={`in-read${slip ? ' is-slip' : ''}${low ? ' is-unc' : ''}`} data-read-chip={li} style={{ top: b.y + b.h / 2 }}>
+                    <span className="in-read-m"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
+                    {Number.isFinite(conf) && (
+                      <span className="in-read-cf" data-read-confidence={Math.round(Math.max(0, Math.min(1, conf)) * 100)}>
+                        <i style={{ width: `${Math.round(Math.max(0, Math.min(1, conf)) * 100)}%` }} />
+                      </span>
+                    )}
+                    {tag && <span className={`in-read-tg ${low ? 'is-u' : slip ? 'is-s' : 'is-g'}`}>{tag}</span>}
+                  </span>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {statusLine && !disabled && (
@@ -585,7 +700,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           so it carries its own way back: one press asks once more. A reason
           the device already knows (signed out, offline, switched off) does
           not — its own action is the way forward. */}
-      {status?.kind === 'waiting' && !disabled && status.block?.kind !== 'session' && status.block?.kind !== 'offline' && status.block?.kind !== 'turned-off' && status.block?.kind !== 'not-available' && (
+      {status?.kind === 'waiting' && !disabled && status.block?.kind !== 'session' && status.block?.kind !== 'offline' && status.block?.kind !== 'turned-off' && status.block?.kind !== 'declined' && status.block?.kind !== 'not-available' && (
         <div className="ink-status-action">
           <button type="button" className="btn btn-ghost btn-sm" data-ink-retry-reading data-reader-block={shownStatus.block?.kind || undefined}
             onClick={() => {
@@ -599,7 +714,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       {shownStatus?.kind === 'waiting' && !disabled && ACCOUNT_BLOCKED_KEYS.has(shownStatus.key) && (
         <div className="ink-status-action">
           {inRouter
-            ? <Link className="ink-status-link" to="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</Link>
+            ? <PageLink className="ink-status-link" to="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</PageLink>
             : <a className="ink-status-link" href="/settings" data-ink-blocker={shownStatus.key}>{t('app.accountSettings')}</a>}
         </div>
       )}
@@ -633,6 +748,26 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {line.corrected === true && (
                 <span className="ink-line-corrected" role="status"><Icon name="check" size={13} /> {t('ink.correctedSr', { n: li + 1 })}</span>
               )}
+              {/* The reader's own doubt about this line, said as a question about the
+                  reading; a relation sign is fixed with one tap, not by retyping. */}
+              {!disabled && !stale && line.corrected !== true && (line.doubt || neqWorthCheck(line.text, promptAsksInequality)) && (
+                <span className="ink-line-symbol-check" role="status" data-line-symbol-doubt={line.doubt || '≠'}>
+                  {line.doubt ? t('ink.checkSymbol', { doubt: line.doubt }) : t('ink.checkNotEqual')}
+                </span>
+              )}
+              {!disabled && !stale && correcting?.index !== li && (() => {
+                const choice = relationChoices(line);
+                if (!choice || (line.corrected === true && !line.doubt)) return null;
+                return (
+                  <span className="ink-relation-swaps" role="group" aria-label={t('ink.relationSwapAria', { n: li + 1 })} data-relation-swaps>
+                    {choice.options.map(sign => (
+                      <button key={sign} type="button" className="btn btn-quiet btn-sm ink-relation-swap" data-relation-swap={sign}
+                        aria-label={t('ink.relationSwapTo', { from: choice.current, to: sign })}
+                        onClick={() => correctLine(li, swapRelation(line.text, choice.at, sign))}>{sign}</button>
+                    ))}
+                  </span>
+                );
+              })()}
               {/* Every line of the reading is the student's to correct before
                   Submit, not only the ones the reader doubted: a confident
                   misread is still a misread, and it is their page. */}

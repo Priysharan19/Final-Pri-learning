@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
-import { featureEnabled } from '../platform/features.js';
+import { INSTRUMENT_UI } from '../platform/features.js';
+import { pastPapersEnabled } from '../engine/pastPapers.js';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import {
@@ -19,6 +21,7 @@ import { practiceHref, practiceRequestFromQuery } from '../lib/practiceLinks.js'
 import { queueTelemetry } from '../platform/telemetry.js';
 import { consumeSessionReceipt } from './practiceSessionReceipt.js';
 import { shouldReloadPracticeOnCloudSignIn } from './practiceCloudRecovery.js';
+import { BRAND } from '../brand/edition.js';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
@@ -55,6 +58,10 @@ function ProfilePractice() {
   // the chapter the request is refused with a reason rather than quietly
   // serving an authored one, so the label on the card is always true.
   const pyqOnly = params.get('pyq') === '1';
+  // The filter is offered only while past papers are switched on (decision
+  // D23: off until a rights opinion exists). An old link with pyq=1 is still
+  // read, and the server's refusal then explains itself.
+  const pastPapersOn = pastPapersEnabled();
   const assignmentClassId = params.get('classId');
   const assignmentId = params.get('assignment');
   const assignmentMode = !!assignmentClassId && !!assignmentId;
@@ -64,6 +71,9 @@ function ProfilePractice() {
   const assignmentTargetReached = useRef(false);
   const assignmentSync = useRef(Promise.resolve());
   const [serve, setServe] = useState(null);
+  // v1.1 instrument: the question's number within this visit to Practice
+  // (each distinct question shown counts once). Display only.
+  const shownCount = useRef({ id: null, n: 0 });
   const currentQuestionRef = useRef(null);
   const handedRef = useRef(location.state?.serve || null);   // a retry handed over from History
   const [error, setError] = useState('');
@@ -309,8 +319,8 @@ function ProfilePractice() {
   }, [load, assignmentMode, replaceSession]);
 
   useEffect(() => {
-    if (serve?.question?.subtopicName) document.title = `${serve.question.subtopicName} · Pri Learning`;
-    return () => { document.title = 'Pri Learning'; };
+    if (serve?.question?.subtopicName) document.title = `${serve.question.subtopicName} · ${BRAND}`;
+    return () => { document.title = BRAND; };
   }, [serve]);
 
   const assignmentTarget = assignmentContext ? assignmentQuestionTarget(assignmentContext.specification) : 0;
@@ -420,7 +430,7 @@ function ProfilePractice() {
 
   const exitBar = (
     <button type="button" className="icon-btn ws-exit" onClick={() => navigate('/')} aria-label={t('practice.leave')}>
-      <Icon name="back" /><span>{t(featureEnabled('instrument') ? 'inst.tabIndex' : 'nav.home')}</span>
+      <Icon name="back" /><span>{t(INSTRUMENT_UI ? 'inst.tabIndex' : 'nav.home')}</span>
     </button>
   );
 
@@ -460,7 +470,7 @@ function ProfilePractice() {
           </span>
         </div>
         <div className="ws-bar-end">
-          {user.course === 'in' && !assignmentMode && !taskId && (
+          {pastPapersOn && user.course === 'in' && !assignmentMode && !taskId && (
             <button type="button" className="icon-btn ws-filter" aria-pressed={pyqOnly}
               title={t('practice.pyqOnlyTitle')} onClick={() => setPyqOnly(!pyqOnly)}>
               {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
@@ -516,7 +526,7 @@ function ProfilePractice() {
             India-only. */}
         {((user.course === 'in' && !assignmentMode && !taskId) || subtopic || taskId || difficulty || pyqOnly || assignmentMode) && (
           <div className="row ws-filter-inline" style={{ gap: 8 }}>
-            {user.course === 'in' && !assignmentMode && !taskId && (
+            {pastPapersOn && user.course === 'in' && !assignmentMode && !taskId && (
               <button type="button" className="icon-btn ws-filter" aria-pressed={pyqOnly}
                 title={t('practice.pyqOnlyTitle')} onClick={() => setPyqOnly(!pyqOnly)}>
                 {t(pyqOnly ? 'practice.pyqOnlyLabelOn' : 'practice.pyqOnlyLabel')}
@@ -529,7 +539,7 @@ function ProfilePractice() {
         )}
         {pyqOnly && <p className="muted">{t('practice.pyqOnlyNote')}</p>}
 
-        {capped && <FreeCapNotice gate={capped} onRetry={load} />}
+        {capped && <FreeCapNotice gate={capped} onRetry={load} profile={user} />}
 
         {/* No question exists for this exact selection: an empty state with a way
             forward, not a failure. */}
@@ -538,7 +548,7 @@ function ProfilePractice() {
             <strong>{t('practice.emptyTitle')}</strong>
             <p className="muted" style={{ margin: '4px 0 10px' }}>{t('practice.emptyBody')}</p>
             <div className="row" style={{ gap: 10, flexWrap: 'wrap' }}>
-              <Link className="btn btn-primary btn-sm" to="/">{t('practice.emptyChooseTopic')}</Link>
+              <PageLink className="btn btn-primary btn-sm" to="/">{t('practice.emptyChooseTopic')}</PageLink>
               {(subtopic || dotpoint != null) && !taskId && !assignmentMode && (
                 <button className="btn btn-quiet btn-sm" onClick={() => setParams(new URLSearchParams())}>{t('practice.emptySmart')}</button>
               )}
@@ -571,7 +581,7 @@ function ProfilePractice() {
                   {t('practice.levelLetPriChoose')}
                 </button>
               )}
-              <Link className="btn btn-quiet btn-sm" to="/">{t('practice.emptyChooseTopic')}</Link>
+              <PageLink className="btn btn-quiet btn-sm" to="/">{t('practice.emptyChooseTopic')}</PageLink>
             </div>
           </div>
         )}
@@ -589,10 +599,10 @@ function ProfilePractice() {
                   <p className="muted" style={{ margin: '0 0 8px' }}>{t('practice.pyqNearestTitle')}</p>
                   <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
                     {pyqAlternatives.map(alt => (
-                      <Link key={alt.subtopic} className="btn btn-ghost btn-sm"
+                      <PageLink key={alt.subtopic} className="btn btn-ghost btn-sm"
                         to={practiceHref({ subtopic: alt.subtopic, track: track || null, pyq: true })}>
                         {t('practice.pyqNearestCta', { name: alt.name })}
-                      </Link>
+                      </PageLink>
                     ))}
                   </div>
                 </div>
@@ -665,8 +675,15 @@ function ProfilePractice() {
 
       {serve && !assignmentCompleteLocally && (
         <>
+          {(() => {
+            if (shownCount.current.id !== serve.question.id) shownCount.current = { id: serve.question.id, n: shownCount.current.n + 1 };
+            return null;
+          })()}
           <QuestionCard
             key={`${user.id}:${serve.question.id}`}
+            sessionIndex={shownCount.current.n}
+            sessionLength={assignmentMode && Number.isInteger(assignmentTarget) && assignmentTarget > 0 ? assignmentTarget : null}
+            sessionAnswered={session.answered}
             question={serve.question}
             reason={serve.reason}
             reasonTag={serve.reasonTag || null}

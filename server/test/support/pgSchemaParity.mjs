@@ -57,7 +57,11 @@ const ACCOUNT_SCOPED = new Set([
   // account, scoped through the column(s) in ACCOUNT_OWNER below.
   'accounts', 'classes', 'class_members', 'assignments', 'assignment_submissions', 'assignment_feedback',
   'issue_reports', 'billing_payments', 'billing_events', 'billing_apple_signed_events', 'otp_challenges',
-  'audit_log', 'content_revisions', 'teacher_invites', 'feature_flags'
+  'audit_log', 'content_revisions', 'teacher_invites', 'feature_flags',
+  // 20261022000000_parent_report.sql: the parent weekly report's link and send ledger.
+  'parent_report_links', 'parent_report_sends',
+  // 20261113010000_desk_attempts.sql: the Exam Desk's practice attempts.
+  'desk_attempts'
 ]);
 // The ownership predicate of each pri_account_scope policy (default account_id).
 const ACCOUNT_OWNER = new Map([

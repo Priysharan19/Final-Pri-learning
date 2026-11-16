@@ -113,15 +113,15 @@ const CUE = { Hook: 0, Write: 2.4, Marked: 7.6, Bank: 11.4, Map: 14.0, Band: 16.
   Match: 18.6, Exam: 21.4, Kit: 24.0, Price: 29.4, Close: 33.2, End: 36.4 };
 const LINES = [
   { at: CUE.Hook + 0.05,  until: CUE.Write + 0.15,  text: 'What if your handwriting, marked itself?' },
-  { at: CUE.Write + 0.15, until: CUE.Marked + 0.1,  text: 'A real J E E Advanced integral. Watch it read every symbol, live.' },
-  { at: CUE.Marked + 0.1, until: CUE.Bank + 0.1,    text: 'Marked step by step, like a real examiner. Full marks.' },
-  { at: CUE.Bank + 0.1,   until: CUE.Map + 0.1,     text: 'Over three lakh J E E style questions.' },
-  { at: CUE.Map + 0.1,    until: CUE.Band + 0.1,    text: 'Every topic on the syllabus, mapped.' },
-  { at: CUE.Band + 0.1,   until: CUE.Match + 0.1,   text: 'Your J E E percentile? Predicted.' },
+  { at: CUE.Write + 0.15, until: CUE.Marked + 0.1,  text: 'A J E E Advanced integral. Pri reads your handwriting.' },
+  { at: CUE.Marked + 0.1, until: CUE.Bank + 0.1,    text: 'Marked automatically. The solution shows every step.' },
+  { at: CUE.Bank + 0.1,   until: CUE.Map + 0.1,     text: 'Seventy seven chapters of generated questions, fresh numbers every time.' },
+  { at: CUE.Map + 0.1,    until: CUE.Band + 0.1,    text: 'Chapters mapped to outcomes, C B S E to J E E Advanced.' },
+  { at: CUE.Band + 0.1,   until: CUE.Match + 0.1,   text: 'Your chapters, tracked. No rank is predicted.' },
   { at: CUE.Match + 0.1,  until: CUE.Exam + 0.1,    text: 'Race your rivals in Match Mode.' },
-  { at: CUE.Exam + 0.1,   until: CUE.Kit + 0.1,     text: 'Full mocks. Real marking.' },
+  { at: CUE.Exam + 0.1,   until: CUE.Kit + 0.1,     text: 'Timed papers. Automatic marking.' },
   { at: CUE.Kit + 0.1,    until: CUE.Price + 0.1,   text: 'Smart practice, hints, photo answers, rush rounds, streaks, task packs, backups.' },
-  { at: CUE.Price + 0.1,  until: CUE.Close + 0.15,  text: 'Two lakhs a year for coaching. This? Nine ninety nine a month.' },
+  { at: CUE.Price + 0.1,  until: CUE.Close + 0.15,  text: 'Free, twenty questions a day. Premium, one ninety nine a month.' },
   { at: CUE.Close + 0.15, until: CUE.End - 0.4,     text: 'Pri Learning. Coming soon.' },
 ];
 

@@ -1,3 +1,5 @@
+import { createForecastRouter } from './forecast.js';
+import { createMistakeDnaRouter } from './mistakeDna.js';
 import { asyncRouter } from './asyncRouter.js';
 import { clientCompatibility } from './clientCompatibility.js';
 import { asStore } from './store.js';
@@ -11,10 +13,14 @@ import { createEntitlementRouter } from './entitlements.js';
 import { createIdentityRouter } from './identities.js';
 import { createOtpRouter } from './otp.js';
 import { createReportRouter } from './reports.js';
+import { createParentReportRecipientRouter, createParentReportRouter, parentReportEnabled } from './parentReport.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
 import { createExamRouter } from './exams.js';
+import { createResourceRouter } from './resources.js';
+import { createDeskRouter } from './desk.js';
+import { createCurriculumRouter } from './curriculum.js';
 import { createWorkingRouter } from './working.js';
 import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
@@ -25,11 +31,19 @@ import { csrfGuard, originGuard } from './security.js';
 import { housekeepingStatus } from './housekeeping.js';
 import { operatorHealthDetail } from './operatorHealth.js';
 import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
+import { refuseOtherEdition, serverEdition } from './edition.js';
 import { readinessReport } from './readiness.js';
+import { createTestMailboxRouter } from './testMailbox.js';
 import { tagPolicy } from './routePolicy.js';
 import { metrics, metricsAccess, recordDatabaseError, recordServerError } from './metrics.js';
 import { captureError } from './errorSink.js';
 import { logEvent, routeTemplate, safeCode } from './observability.js';
+
+/** 'staging' | 'production' | another short [a-z0-9-] token | null, from the deployment's own environment. */
+export function deploymentEnvironment(env = process.env) {
+  const raw = String(env.PRI_DEPLOYMENT_ENVIRONMENT || env.RAILWAY_ENVIRONMENT_NAME || env.RAILWAY_ENVIRONMENT || '').trim().toLowerCase();
+  return /^[a-z0-9-]{1,32}$/.test(raw) ? raw : null;
+}
 
 /** /v1/health's own bound on its database reads (liveness must answer fast). */
 export const HEALTH_DB_TIMEOUT_MS = 1_500;
@@ -49,8 +63,11 @@ const SERVER_WEBHOOK = /^\/billing\/webhook\/(?:apple|google|web)$/;
 // Sign in with Apple form-posts its answer from appleid.apple.com, so it can
 // never carry this origin; the route only relays it to the callback page.
 const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
+// RFC 8058 one-click unsubscribe: the mailbox provider POSTs it with no Origin
+// and no cookie. Its token can only stop parent reports (parentReport.js).
+const ONE_CLICK_UNSUBSCRIBE = /^\/parent-report\/unsubscribe\/one-click$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {}, desk = {} } = {}) {
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
@@ -69,14 +86,19 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // Old native shells get a structured upgrade answer, not odd failures (CP-11).
   router.use(clientCompatibility());
 
+  // Resolved once, when the router is built: an unknown PRI_EDITION stops the
+  // server here rather than answering health checks under no edition.
+  const edition = serverEdition();
+
   // LIVENESS. Cheap, and up while the process is: a database outage is
   // reported here as a field, never as a failure of this endpoint, so an
   // orchestrator does not restart a healthy process in a loop. Readiness —
   // whether this replica can actually serve — is /v1/ready.
   //
   // EXPOSURE. Anonymous callers get the ok flag, the release identity, the
-  // schema versions, the engine name and whether the database answered — what
-  // an uptime check needs and nothing an attacker can act on. Which identity,
+  // regional edition, the schema versions, the engine name and whether the
+  // database answered — what an uptime check needs and nothing an attacker can
+  // act on. Which identity,
   // email and billing providers are configured, the Google notification
   // backlog and the housekeeping purge counts are operator detail: they are
   // answered only to the holder of PRI_METRICS_TOKEN (the /v1/metrics gate),
@@ -118,6 +140,13 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       billingSchemaVersion,
       // Which driver serves /v1 — never the URL, host, user or file path.
       database: { engine: db.dialect, reachable },
+      // Which deployment this is, as it declares itself (Railway sets the name),
+      // so a native archive's release evidence can tell staging from
+      // production behind https://app.prilearning.com. A short token, never a URL.
+      environment: deploymentEnvironment(),
+      // Which regional edition this deployment serves (client/edition.config.mjs,
+      // ADR-0002): a short id, 'priyabhata' or 'prithagoras'.
+      edition,
       // The per-account storage cap every device is held to: two numbers a
       // client may show, never a per-account figure.
       syncQuota: { maxBytesPerAccount: quota.maxBytesPerAccount, maxEventsPerAccount: quota.maxEventsPerAccount },
@@ -138,6 +167,14 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     res.json(report);
   });
 
+  // EDITION (ADR-0002, plan E2). A client that declares another edition in
+  // X-Pri-Edition is refused here (409 EDITION_MISMATCH) on everything below.
+  // /v1/health and /v1/ready above stay open, so a mismatched app can still
+  // read the health reply that tells it which service it reached. The header
+  // only ever refuses: it selects no data, brand, currency or authorization,
+  // and a request without it passes unchanged (edition.js).
+  router.use(refuseOtherEdition(edition));
+
   // OPERATIONAL SIGNALS. Counters, latency and evaluated alert rules for an
   // operator holding PRI_METRICS_TOKEN; closed in production without one.
   router.get('/metrics', requireOperatorToken, (req, res) => {
@@ -154,7 +191,7 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // and authenticate with provider signatures instead of a browser Origin. The
   // Apple sign-in callback is the other: it changes nothing server-side.
   router.use((req, res, next) => {
-    if (req.method === 'POST' && (SERVER_WEBHOOK.test(req.path) || PROVIDER_CALLBACK.test(req.path))) return next();
+    if (req.method === 'POST' && (SERVER_WEBHOOK.test(req.path) || PROVIDER_CALLBACK.test(req.path) || ONE_CLICK_UNSUBSCRIBE.test(req.path))) return next();
     return originGuard(req, res, next);
   });
   router.use(csrfGuard);
@@ -199,15 +236,40 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/assignments', requireGuardianConsent(db), createAssignmentExecutionRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', requireGuardianConsent(db), createReportRouter(db));
+  // The parent weekly report. The recipient's confirm/unsubscribe routes carry
+  // their own token and no session, so they come first; everything the
+  // account itself does is behind the guardian gate and premium (parentReport.js).
+  // Not mounted at all unless the deployment turns it on (D22: off until
+  // counsel has reviewed email about minors): every path answers 404.
+  const { enabled: parentReportOn = parentReportEnabled(process.env), ...parentReportOptions } = parentReport;
+  if (parentReportOn === true) {
+    router.use('/parent-report', createParentReportRecipientRouter(db));
+    router.use('/parent-report', requireGuardianConsent(db), createParentReportRouter(db, parentReportOptions));
+  }
   // A signed-out student may be shown a question to start working on. The
   // route takes no session and writes no account data; binding it to an
   // account later goes through the guarded /practice/issue below.
   router.post('/practice/prepare', ...createPracticePrepareRoute(db));
   router.use('/practice', requireGuardianConsent(db), createPracticeRouter(db));
+  router.use('/habits', requireGuardianConsent(db), createMistakeDnaRouter(db));
   // An examination paper is issued, collected and marked here: the same
   // eligibility as checking one answer (session, verified email, student,
   // guardian consent), for the whole life of the paper.
   router.use('/exams', requireGuardianConsent(db), createExamRouter(db));
+  // The shared resource library (ADR-0002 plan F1): published resources of
+  // this server's edition, for signed-in accounts. Read-only.
+  router.use('/resources', requireGuardianConsent(db), createResourceRouter(db, resources));
+  // The Exam Desk (ADR-0002 §8 plan F4): the UNMARKED mode of the
+  // examination system — practice at a library paper under reading and
+  // working time, notes and flags, never a mark. A sibling of /exams that
+  // shares none of its marking, counting or allowance code (desk.js). Same
+  // eligibility as a marked paper; free on every plan.
+  router.use('/desk', requireGuardianConsent(db), createDeskRouter(db, { edition: resources.edition, ...desk }));
+  // The curriculum this edition teaches, with honest availability (plan G3):
+  // the current NSW outcomes on a Prithagoras server. Read-only; its own
+  // guards are on the route (curriculum.js).
+  router.use('/curriculum', createCurriculumRouter(db, { edition }));
+  router.use('/forecast', requireGuardianConsent(db), createForecastRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));
   router.use('/question-photo', requireGuardianConsent(db), createQuestionPhotoRouter(db));
@@ -216,6 +278,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   router.use('/tutor', requireGuardianConsent(db), createTutorRouter(db, tutor));
   router.use('/telemetry', requireGuardianConsent(db), createTelemetryRouter(db));
   router.use('/admin', createAdminRouter(db));
+  // STAGING ONLY: reserved-domain test mail (testMailbox.js). Off — and then
+  // indistinguishable from an unknown path — in production and by default.
+  router.use('/test-mailbox', createTestMailboxRouter(db));
 
   router.use((req, res) => res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } }));
   router.use((err, req, res, next) => {

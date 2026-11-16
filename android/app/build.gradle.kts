@@ -23,9 +23,26 @@ val verifyPriWeb by tasks.registering {
         }
         require(release.isFile) { "client/dist/release.json is missing — the web build has no release identity" }
         val text = release.readText()
-        require(Regex("\"schemaVersion\"\\s*:\\s*1").containsMatchIn(text) &&
-            Regex("\"releaseSha\"\\s*:\\s*\"[0-9a-f]{40}\"").containsMatchIn(text)) {
+        require(Regex("\"schemaVersion\"\\s*:\\s*1").containsMatchIn(text)) {
             "client/dist/release.json is not a valid release identity"
+        }
+        val bundledSha = Regex("\"releaseSha\"\\s*:\\s*\"([0-9a-f]{40})\"")
+            .find(text)?.groupValues?.get(1)
+            ?: error("client/dist/release.json has no valid releaseSha")
+        // Do not accept an arbitrary well-formed SHA: a stale web build would
+        // otherwise be silently packaged into a newer native release.
+        // Release packaging is from Git checkouts only; an archive without
+        // verifiable source provenance must fail closed.
+        val sourceSha = try {
+            providers.exec {
+                commandLine("git", "-C", rootProject.projectDir.parentFile.absolutePath,
+                    "rev-parse", "--verify", "HEAD")
+            }.standardOutput.asText.get().trim()
+        } catch (cause: Exception) {
+            throw GradleException("Cannot verify Android bundled web source revision", cause)
+        }
+        require(Regex("^[0-9a-f]{40}$").matches(sourceSha) && bundledSha == sourceSha) {
+            "Stale Android web bundle: embedded releaseSha=$bundledSha, current source=$sourceSha; run npm run build"
         }
     }
 }
@@ -77,6 +94,18 @@ if (uploadSigning.isEmpty && !uploadSigningFile.isFile) {
     require(!file(uploadSigning.getProperty("storeFile")).canonicalPath.startsWith(rootProject.projectDir.parentFile.canonicalPath + File.separator)) {
         "the upload keystore must live outside the repository"
     }
+}
+
+// Every signed store bundle talks to exactly the public origin (Director
+// decision 9 Nov 2026 under owner default D5, "test what you ship"): until GO
+// https://app.prilearning.com fronts the staging service at the candidate SHA,
+// at promotion it is re-pointed to production, and the bundle is the same
+// either way. The iOS archive gate (scripts/check-native-archive.mjs) holds the
+// Apple build to the same origin. Compile-only checks (-Ppri.unsignedRelease)
+// may leave it empty; a signed bundle may not name any other origin.
+val candidateOrigin = "https://app.prilearning.com"
+require(!bundleRequested || unsignedRelease || cloudOrigin.trimEnd('/') == candidateOrigin) {
+    "a signed release bundle needs -Ppri.cloudOrigin=$candidateOrigin (got '${cloudOrigin.ifEmpty { "(empty)" }}')"
 }
 
 android {

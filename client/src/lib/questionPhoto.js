@@ -16,12 +16,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { preparePhoto } from '../ink/photoRaster.js';
+import { askReaderPermission, PROMPT_ANSWER } from '../ink/readerPermission.js';
 import { IN_CHAPTER_BY_ID, IN_CHAPTERS } from '../engine/curriculum-in.js';
 import { practiceHref } from './practiceLinks.js';
 
 export const PHOTO_STATES = Object.freeze([
   'ok', 'offline', 'signed-out', 'unverified', 'consent', 'not-configured',
-  'provider-down', 'allowance', 'not-maths', 'unreadable', 'no-match', 'bad-photo'
+  'provider-down', 'allowance', 'not-maths', 'unreadable', 'no-match', 'bad-photo',
+  'declined', 'not-permitted'
 ]);
 
 /** Map a transport error onto one of the named states. */
@@ -93,13 +95,18 @@ export async function identifyQuestionPhoto(dataUrl, {
   available = cloudAvailable,
   online = () => (typeof navigator === 'undefined' ? true : navigator.onLine !== false),
   prepare = preparePhoto,
-  signal = null
+  signal = null,
+  // D17: the photo goes to OpenAI only after the student said yes, once.
+  user = null,
+  permission = askReaderPermission
 } = {}) {
   const empty = { questionText: '', candidates: [] };
   if (!online()) return { state: 'offline', ...empty };
   let ready = false;
   try { ready = available() === true; } catch { ready = false; }
   if (!ready) return { state: 'not-configured', ...empty };
+  const permitted = await permission(user, { kind: 'question-photo' });
+  if (permitted !== PROMPT_ANSWER.ACCEPTED) return { state: permitted === PROMPT_ANSWER.DECLINED ? 'declined' : 'not-permitted', ...empty };
   let prepared = null;
   try { prepared = await prepare(dataUrl); } catch { prepared = null; }
   if (!prepared?.dataUrl) return { state: 'bad-photo', ...empty };

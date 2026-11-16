@@ -49,21 +49,58 @@ export function parseDevices(listText) {
 }
 
 /** "iOS 26.1" → [26, 1]; anything else → [] (sorts oldest). */
-const runtimeVersion = runtime => (String(runtime || '').match(/^iOS (\d+(?:\.\d+)*)$/)?.[1] || '').split('.').filter(Boolean).map(Number);
+export const runtimeVersion = runtime => (String(runtime || '').match(/^iOS (\d+(?:\.\d+)*)$/)?.[1] || '').split('.').filter(Boolean).map(Number);
 const compareVersions = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (a[i] || 0) - (b[i] || 0); if (d) return d; } return 0; };
 
 /**
- * The simulator a harness script runs on: the exact name when one is given,
- * otherwise any device whose name contains `family`. A booted match wins;
- * otherwise the match on the NEWEST iOS runtime — the same choice the CI
- * provisioner and `xcodebuild -destination name=…` make. `simctl list` prints
- * runtimes oldest first, so taking the first row picked the oldest runtime on
- * a runner image that carries several (App Health native lane, run 39227834970).
+ * The iOS runtime a lane is pinned to, as "27", "27.0" or "26.5": --runtime on
+ * the command line, else PRI_SIM_RUNTIME. A lane that runs on CI MUST name one:
+ * the iOS 27 regression of #676 went unseen because every harness took "the
+ * newest runtime installed", so a runner-image change could move a gate onto
+ * another iOS — or off it — without anyone deciding to. Off CI (a person's
+ * Mac) the pin is optional and the newest runtime is used, as before.
  */
-export function pickSimulator(listText, { family = 'iPad', named = null } = {}) {
+export function requiredRuntime({ argv = process.argv, env = process.env } = {}) {
+  const i = argv.indexOf('--runtime');
+  const raw = (i >= 0 ? argv[i + 1] : env.PRI_SIM_RUNTIME) || '';
+  const pin = String(raw).trim().replace(/^iOS\s*/i, '');
+  if (pin && !/^\d+(?:\.\d+){0,2}$/.test(pin)) throw new Error(`the iOS runtime pin must look like 27 or 27.0 (got ${JSON.stringify(raw)})`);
+  if (!pin && env.CI) {
+    throw new Error('CI must name the iOS simulator runtime (PRI_SIM_RUNTIME=27.0 or --runtime 27.0): a lane that takes the newest runtime installed can be moved to another iOS by a runner-image change without anyone deciding to.');
+  }
+  return pin || null;
+}
+
+/** "iOS 27.0" matches the pin "27" and "27.0", not "27.1"; "iOS 27" matches "27" only. */
+export function runtimeMatches(runtime, pin) {
+  if (!pin) return true;
+  const have = runtimeVersion(runtime);
+  const want = String(pin).split('.').map(Number);
+  if (!have.length) return false;
+  return want.every((part, i) => (have[i] || 0) === part);
+}
+
+/** The runtimes a `simctl list devices` listing carries, for an error message. */
+export function describeRuntimes(listText) {
+  return [...new Set(parseDevices(listText).map(d => d.runtime).filter(r => runtimeVersion(r).length))].join(', ');
+}
+
+/**
+ * The simulator a harness script runs on: the exact name when one is given,
+ * otherwise any device whose name contains `family`, on the pinned `runtime`
+ * when one is given (and only there: a pin that nothing satisfies is null, so
+ * the caller fails naming the runtime instead of running on another iOS). A
+ * booted match wins; otherwise the match on the NEWEST matching iOS runtime —
+ * the same choice the CI provisioner and `xcodebuild -destination name=…`
+ * make. `simctl list` prints runtimes oldest first, so taking the first row
+ * picked the oldest runtime on a runner image that carries several (App
+ * Health native lane, run 39227834970).
+ */
+export function pickSimulator(listText, { family = 'iPad', named = null, runtime = null } = {}) {
   const matching = parseDevices(listText)
     .filter(d => (named ? d.name === named : d.name.includes(family)))
-    .filter(d => runtimeVersion(d.runtime).length);
+    .filter(d => runtimeVersion(d.runtime).length)
+    .filter(d => runtimeMatches(d.runtime, runtime));
   const booted = matching.find(d => /^Booted$/i.test(d.state));
   if (booted) return booted;
   return matching.slice().sort((a, b) => compareVersions(runtimeVersion(b.runtime), runtimeVersion(a.runtime)))[0] || null;

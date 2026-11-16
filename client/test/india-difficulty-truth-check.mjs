@@ -273,7 +273,7 @@ async function run() {
     ok('Practice renders the unavailable-level chooser', practice.includes('data-difficulty-unavailable') && practice.includes('data-difficulty-choice') && practice.includes('practice.levelPractiseAt'));
     ok('the chooser clears whatever question was on screen', /DIFFICULTY_UNAVAILABLE'\) \{[^}]*setServe\(null\)/s.test(practice));
     ok('no auto-substitution notice remains', !practice.includes('difficulty-substituted') && !practice.includes('difficultySubstituted') && !practice.includes('difficultyHonoured'));
-    const home = read('pages/Home.jsx');
+    const home = read('home/TopicGenerator.jsx');
     ok('Home narrows the difficulty buttons to authored levels', home.includes('selectableDifficulties(trackDifficulties'));
     for (const lang of ['en', 'hi']) {
       const strings = read(`i18n/strings.${lang}.js`);

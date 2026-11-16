@@ -1,16 +1,19 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { printPage } from '../lib/files.js';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { MathText } from '../lib/latex.jsx';
 import { indiaExamBlueprint, indiaExamClaim } from '../engine/indiaExams.js';
+import { boardMockOf, MOCK_LABEL } from '../engine/boardMock.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { CheckRefusal } from '../components/CheckRefusal.jsx';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import Icon from '../components/Icon.jsx';
 import { BLUEPRINT_KEYS } from '../lib/blueprintKeys.js';
+import { featureEnabled } from '../platform/features.js';
+import { omittedNames } from '../local/nswExamBackend.js';
 
 const CLAIM_KEYS = {
   'official-mathematics-section': 'exams.claim.officialSection',
@@ -52,13 +55,28 @@ export default function Exams() {
 
   useEffect(() => { api.get('/exams').then(r => setExams(r.exams)).catch(() => setExams([])); }, []);
 
-  async function start() {
+  // `mock`: a board mock (D22, engine/boardMock.js) — a typed, timed CBSE
+  // Class X Standard or Class XII paper, labelled "Pri mock in board format".
+  // The refusal's Retry (after signing in, say) starts the same kind of paper
+  // again: while a refusal is on screen, a start that does not name a kind
+  // repeats the last one. (For a CBSE Class X/XII student the only start
+  // button on the page is the mock's.)
+  // `targeted`: a targeted paper (Premium, engine/targetedMock.js) — the same
+  // board mock, its questions leaning toward weak and due subtopics.
+  // `nsw`: an NSW HSC-style paper (plan G4), named by its blueprint id.
+  const lastStart = useRef({ mock: false, targeted: false, nsw: null });
+  async function start(options) {
+    const repeat = options?.mock === undefined && refusal !== null;
+    const mock = options?.mock === true || (repeat && lastStart.current.mock);
+    const targeted = mock && (options?.targeted === true || (repeat && lastStart.current.targeted));
+    const nsw = typeof options?.nsw === 'string' ? options.nsw : (repeat ? lastStart.current.nsw : null);
+    lastStart.current = { mock, targeted, nsw };
     setBusy(true);
     setError('');
     setRefusal(null);
     setStillOpen(null);
     try {
-      const body = user.course === 'in' ? { year: user.year } : cfg;
+      const body = nsw ? { nsw } : user.course === 'in' ? { year: user.year, ...(mock ? { mock: true } : {}), ...(targeted ? { targeted: true } : {}) } : cfg;
       const r = await api.post('/exams', body);
       nav(`/exams/${r.exam.id}`);
     } catch (err) {
@@ -89,6 +107,7 @@ export default function Exams() {
   return (
     <div className="grid cols-2" style={{ alignItems: 'start' }}>
       {!paper && <h1 className="sr-only">{t('nav.exams')}</h1>}
+      {user.course === 'nsw' && featureEnabled('nswExams') && <NswPapers busy={busy} start={start} />}
       <div className="card">
         <div className="card-title">{t('exams.sitPaperTitle')}</div>
         <p className="sub" style={{ marginBottom: 18 }}>
@@ -131,6 +150,40 @@ export default function Exams() {
   );
 }
 
+// Prithagoras's HSC-style papers (plan G4): the server's list, released or
+// not. A paper that is not released says what it lacks; it has no start.
+function NswPapers({ busy, start }) {
+  const t = useT();
+  const [list, setList] = useState(null);
+  useEffect(() => {
+    let live = true;
+    api.get('/exams/nsw').then(r => { if (live) setList(r); }).catch(() => { if (live) setList({ available: false, papers: [] }); });
+    return () => { live = false; };
+  }, []);
+  return (
+    <section className="card" style={{ gridColumn: '1 / -1' }} data-nsw-papers aria-labelledby="nsw-papers-title">
+      <h2 className="card-title" id="nsw-papers-title">{t('exams.nsw.heading')}</h2>
+      <p className="sub" style={{ marginBottom: 14 }}>{t('exams.nsw.intro')}</p>
+      {list === null && <p className="muted">{t('exams.nsw.loading')}</p>}
+      {list && !list.papers.length && <p className="muted" data-nsw-papers-none>{t('exams.nsw.none')}</p>}
+      {list && list.papers.length > 0 && <ul className="nsw-papers" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
+        {list.papers.map(p => (
+          <li key={p.id} className="stat-tile" data-nsw-paper={p.id} data-released={p.released ? 'yes' : 'no'}>
+            <div className="sc-label">{p.released ? p.title : p.label}{p.test ? ` · ${t('exams.nsw.testPaper')}` : ''}</div>
+            <div className="muted">{t('exams.nsw.time', { reading: p.readingMin, working: p.workingMin })} · {t('exams.nsw.size', { marks: p.totalMarks, count: p.questions })}</div>
+            {p.released && p.omittedOutcomes.length > 0 && <p className="muted" style={{ marginTop: 6 }} data-nsw-omits>{t('exams.nsw.omits', { outcomes: omittedNames(p.omittedOutcomes) })}</p>}
+            {p.released
+              ? <button className="btn btn-primary btn-sm" style={{ marginTop: 10 }} onClick={() => start({ nsw: p.id })} disabled={busy} data-nsw-start={p.id}>
+                {busy ? t('exams.building') : t('exams.nsw.start')}
+              </button>
+              : <p className="muted" style={{ marginTop: 8 }} data-nsw-not-released>{t('exams.nsw.notYetCovered', { covered: p.year12.covered, total: p.year12.total })} {t('exams.nsw.notYet', { outcomes: omittedNames(p.omittedOutcomes) })}</p>}
+          </li>
+        ))}
+      </ul>}
+    </section>
+  );
+}
+
 function IndiaExams({ user, exams, blueprint, busy, error, startRefused, stillOpen, start, openPaper, nav, paper, setPaper }) {
   const claim = indiaExamClaim(blueprint);
   const track = user.indiaTrack || 'cbse';
@@ -170,9 +223,20 @@ function IndiaExams({ user, exams, blueprint, busy, error, startRefused, stillOp
           {track === 'jee-advanced' && <p className="muted">
             {t('exams.jeeAdvancedNote')}
           </p>}
-          <button className="btn btn-ghost btn-lg" style={{ width: '100%', marginTop: 16 }} disabled>
-            {t('exams.notReleased')}
-          </button>
+          {boardMockOf({ track, grade: user.year, variant: 'standard' })
+            ? <div data-exam-board-mock-offer style={{ marginTop: 16 }}>
+              <p className="muted">{t('mock.intro')}</p>
+              <button className="btn btn-primary btn-lg" style={{ width: '100%' }} onClick={() => start({ mock: true })} disabled={busy} data-exam-board-mock>
+                {busy ? t('exams.building') : t('mock.start')}
+              </button>
+              <p className="muted" style={{ marginTop: 14 }}>{t('mock.targetedIntro')}</p>
+              <button className="btn btn-ghost btn-lg" style={{ width: '100%' }} onClick={() => start({ mock: true, targeted: true })} disabled={busy} data-exam-targeted-mock>
+                {t('mock.targetedStart')}
+              </button>
+            </div>
+            : <button className="btn btn-ghost btn-lg" style={{ width: '100%', marginTop: 16 }} disabled>
+              {t('exams.notReleased')}
+            </button>}
         </>}
         {startRefused}
         {error && <div role="alert" style={{ marginTop: 14, color: 'var(--bad)' }}>{error}
@@ -199,6 +263,7 @@ function PaperHistory({ exams, openPaper, nav, india = false }) {
           <div className="prio-item" key={e.id}>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 640, fontSize: 14 }}>{e.title}</div>
+              {e.mock && <div className="muted" data-exam-mock-label style={{ fontSize: 12 }}>{t('mock.notOfficial', { label: MOCK_LABEL })}</div>}
               <div className="muted" style={{ fontSize: 12.5 }}>
                 {t(india ? 'exams.paperMetaIndia' : 'exams.paperMeta', { date: new Date(e.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }), n: e.duration_min })}
                 {/* A score the server did not certify says where it came from. */}

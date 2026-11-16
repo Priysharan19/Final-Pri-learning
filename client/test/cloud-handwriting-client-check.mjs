@@ -20,6 +20,11 @@ import { plausibleLineMatch, segmentInkLines } from '../src/ink/inkLines.js';
 import { retryDelayMs, RETRY_CAP_MS } from '../src/ink/cloudReader.js';
 import { announceEntitlementChange } from '../src/platform/cloudSession.js';
 import { UNAVAILABLE_READINESS_TTL_MS, cloudHandwritingReadiness, cloudReadingEnabled, handwritingDiagnostics, readWithCloud, recordLocalHandwritingDiagnostics, shouldSupersede, toReading } from '../src/ink/cloudReader.js';
+import { setReaderPermissionPrompt } from '../src/ink/readerPermission.js';
+// D17: every read below is of a student who accepted the one-time prompt naming
+// OpenAI. The prompt itself, and that nothing is sent without it, is
+// client/test/ink-reader-permission-check.mjs.
+setReaderPermissionPrompt(async () => 'accepted');
 
 let pass = 0;
 const failures = [];
@@ -459,6 +464,8 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   const linked = { cloudLinked: true, cloudHandwriting: null };
   const on = () => true;
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'EMAIL_UNVERIFIED', status: 403 } } }), 'ink.waitingVerifyEmail', 'EMAIL_UNVERIFIED from transcribe → verify-email copy');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { reason: 'unavailable', readiness: { usable: false, lastFailureCode: 'MFA_ENROLMENT_REQUIRED' } } }), 'ink.waitingMfa', 'MFA refusal on /status directs staff to authenticator setup, not a reader outage');
+  eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'MFA_REQUIRED', status: 403 } } }), 'ink.waitingMfa', 'MFA refusal on transcribe directs staff to security setup');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { reason: 'unavailable', readiness: { usable: false, lastFailureCode: 'EMAIL_UNVERIFIED' } } }), 'ink.waitingVerifyEmail', 'EMAIL_UNVERIFIED from the status probe → verify-email copy');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { reason: 'unavailable', readiness: { usable: false, lastFailureCode: 'AUTH_REQUIRED' } } }), 'ink.waitingSignIn', 'AUTH_REQUIRED (session expired on the server) → sign-in copy');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { status: 401 } } }), 'ink.waitingSignIn', 'a bare 401 → sign-in copy');
@@ -468,13 +475,16 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'HANDWRITING_PROVIDER_5XX', status: 503 } } }), 'ink.waitingServiceDown', 'only a true 5xx/transport failure says the reader is down');
   eq(inkReadingBlockedKey(linked, { online: on, available: there, outcome: { error: { code: 'EMAIL_UNVERIFIED' }, readiness: { lastFailureCode: 'HANDWRITING_PROVIDER_5XX' } } }), 'ink.waitingVerifyEmail', 'the transcribe refusal wins over a stale probe code');
   const { ACCOUNT_BLOCKED_KEYS, INK_READER_STATE, inkReaderUiState } = await import('../src/ink/cloudReader.js');
-  ok(['ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian'].every(k => ACCOUNT_BLOCKED_KEYS.has(k)) && !ACCOUNT_BLOCKED_KEYS.has('ink.waitingServiceDown'),
-    'sign-in, verify-email and guardian blockers offer the way to Account settings; an outage does not');
+  ok(['ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingGuardian', 'ink.waitingMfa'].every(k => ACCOUNT_BLOCKED_KEYS.has(k)) && !ACCOUNT_BLOCKED_KEYS.has('ink.waitingServiceDown'),
+    'sign-in, verify-email, guardian and staff MFA blockers offer the way to Account settings; an outage does not');
 
   eq(inkReaderUiState({ kind: 'reading' }), { kind: INK_READER_STATE.READING }, 'in-flight recognition is READING');
   eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingGuardian' }),
     { kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: 'ink.waitingGuardian' },
     'guardian pending is ACCOUNT_ACTION_REQUIRED, never handwriting failure');
+  eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingMfa' }),
+    { kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: 'ink.waitingMfa' },
+    'MFA restriction is ACCOUNT_ACTION_REQUIRED, never handwriting failure');
   eq(inkReaderUiState({ kind: 'waiting', key: 'ink.waitingVerifyEmail' }),
     { kind: INK_READER_STATE.ACCOUNT_ACTION_REQUIRED, blocker: 'ink.waitingVerifyEmail' },
     'email verification is ACCOUNT_ACTION_REQUIRED');
@@ -640,6 +650,76 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
   ok(/InkAnswer && restoredInk !== undefined && \(/.test(card), 'the ink surface mounts only once the kept page has been looked for');
   ok(!/autoMarkedRef/.test(card), 'a page read after waiting is not marked by the card on its own');
+}
+
+// ── A remembered read belongs to the account that paid for it (#196) ────────
+// Reconciliation of the #192 cloud-handwriting authority on current main. The
+// device remembers a confident read of an identical picture for ten minutes so
+// it is not paid for twice — and that read carries the server's read receipt,
+// which names the account. When the cloud account changes on the same device
+// (switch, sign out, register), the next read must go to the server for the
+// new account: account A's transcript and receipt must never be handed to B.
+// This drives the real production transport (cloudTransport.js `cloud`) with
+// only the network replaced.
+{
+  if (typeof globalThis.addEventListener !== 'function') {
+    const target = new EventTarget();
+    globalThis.addEventListener = target.addEventListener.bind(target);
+    globalThis.removeEventListener = target.removeEventListener.bind(target);
+    globalThis.dispatchEvent = target.dispatchEvent.bind(target);
+  }
+  const { announceCloudSessionChange } = await import('../src/platform/cloudSession.js');
+  const { forgetCloudReads, resumeReaderNow, setReadingQuestion } = await import('../src/ink/cloudReader.js');
+  const priorOrigin = globalThis.__PRI_CLOUD_ORIGIN__;
+  const priorFetch = globalThis.fetch;
+  globalThis.__PRI_CLOUD_ORIGIN__ = 'https://pri.example.test';
+  let account = 'acct-A';
+  const sent = [];
+  globalThis.fetch = async (url, init) => {
+    if (new URL(String(url)).pathname !== '/v1/handwriting/transcribe') {
+      return new Response('{"error":{"code":"NOT_FOUND"}}', { status: 404, headers: { 'content-type': 'application/json' } });
+    }
+    sent.push({ account, body: String(init?.body ?? '') });
+    const text = `read for ${account}`;
+    return new Response(JSON.stringify({
+      receipt: `v1.receipt-${account}.sig`, reused: false,
+      transcription: { lines: [{ text, confidence: 0.97 }], text, confidence: 0.97, needsConfirmation: false, engine: 'cloud-test' }
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  };
+  try {
+    clearCloudAllowanceExhausted();
+    resumeReaderNow();
+    setReadingQuestion(null);
+    forgetCloudReads();
+    const samePage = () => ({ dataUrl: 'data:image/png;base64,' + Buffer.from('one identical page of ink').toString('base64'), width: 10, height: 10, bytes: 25 });
+    const profile = { id: 'p1', cloudLinked: true, cloudHandwriting: true };
+    const read = () => readWithCloud(STROKES, { user: profile, rasterize: samePage, available: there, readiness: ready });
+
+    const a1 = await read();
+    eq([sent.length, a1.transcription?.text, a1.attested?.receipt], [1, 'read for acct-A', 'v1.receipt-acct-A.sig'],
+      'account A\'s first read goes to the server and comes back with A\'s receipt');
+    eq(Object.keys(JSON.parse(sent[0].body)), ['image'], 'and the request carries the picture alone');
+    const a2 = await read();
+    eq([sent.length, a2.transcription?.text], [1, 'read for acct-A'],
+      'the same picture read again for A is served from the device, unpaid (so the memory the next checks clear is real)');
+
+    account = 'acct-B';
+    announceCloudSessionChange({ localProfileId: 'p1', connected: true, accountId: 'acct-B', role: 'student' });
+    const b1 = await read();
+    eq(sent.length, 2, 'after switching to account B, the identical picture is sent to the server again');
+    eq([b1.transcription?.text, b1.attested?.receipt], ['read for acct-B', 'v1.receipt-acct-B.sig'],
+      'and B is given its own read and its own receipt — never A\'s transcript or A\'s receipt');
+
+    account = 'acct-C';
+    announceCloudSessionChange({ localProfileId: 'p1', connected: false });
+    const c1 = await read();
+    eq([sent.length, c1.attested?.receipt], [3, 'v1.receipt-acct-C.sig'],
+      'signing out drops remembered reads too: the next account to sign in on this device pays for, and owns, its own read');
+  } finally {
+    globalThis.fetch = priorFetch;
+    if (priorOrigin === undefined) delete globalThis.__PRI_CLOUD_ORIGIN__; else globalThis.__PRI_CLOUD_ORIGIN__ = priorOrigin;
+    forgetCloudReads();
+  }
 }
 
 console.log(failures.length

@@ -8,6 +8,7 @@ import { asStore, platformDatabaseUrl } from './store.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_PATH = join(here, '..', 'data', 'pri-learning-platform.db');
 import { SCHEMA_VERSION } from './schemaVersions.js';
+import { seedResourcesSqlite } from './resourceCatalog.js';
 
 export { SCHEMA_VERSION };
 
@@ -506,6 +507,113 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     PRIMARY KEY(account_id, code_hash)
   );`);
   addColumnIfMissing(db, 'account_sessions', 'mfa_verified_at', 'mfa_verified_at INTEGER');
+
+
+  // Schema v14 — the parent weekly report (parentReport.js): who has confirmed
+  // they want it, and one row per account and week so a report is sent once.
+  db.exec(`CREATE TABLE IF NOT EXISTS parent_report_links (
+    account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
+    recipient_email TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','active','stopped')),
+    confirm_token_hash TEXT,
+    confirm_expires_at INTEGER,
+    unsubscribe_token_hash TEXT,
+    unsubscribe_token_envelope TEXT,
+    requested_at INTEGER NOT NULL,
+    confirmed_at INTEGER,
+    stopped_at INTEGER,
+    stopped_by TEXT CHECK(stopped_by IN ('recipient','account','consent'))
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_links_confirm ON parent_report_links(confirm_token_hash);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_links_unsubscribe ON parent_report_links(unsubscribe_token_hash);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_links_status ON parent_report_links(status);`);
+  db.exec(`CREATE TABLE IF NOT EXISTS parent_report_sends (
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    week_start INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','sent','skipped','failed')),
+    skip_reason TEXT,
+    attempts INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at INTEGER,
+    claimed_until INTEGER,
+    provider_message_id TEXT,
+    last_error_code TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    sent_at INTEGER,
+    PRIMARY KEY(account_id, week_start)
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_parent_report_sends_due ON parent_report_sends(status, next_attempt_at);`);
+
+  // Schema v15 — the shared resource library (resources.js, ADR-0002 plan F1):
+  // papers, solutions and notes linked where they are published, each offered
+  // to one or both editions through resource_editions. Global, like content.
+  db.exec(`CREATE TABLE IF NOT EXISTS resources (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    subtitle TEXT,
+    description TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('paper','solutions','notes')),
+    subject TEXT NOT NULL,
+    year INTEGER NOT NULL,
+    grade TEXT,
+    marks INTEGER,
+    duration_minutes INTEGER,
+    reading_minutes INTEGER,
+    question_count INTEGER,
+    sections_json TEXT NOT NULL,
+    tags_json TEXT NOT NULL,
+    course TEXT NOT NULL CHECK(course IN ('in','nsw')),
+    syllabus_version TEXT,
+    certification_state TEXT NOT NULL CHECK(certification_state IN ('uploaded','structured','verified','issued','certified')),
+    availability TEXT NOT NULL CHECK(availability IN ('external','hosted')),
+    url TEXT,
+    source TEXT NOT NULL,
+    attribution TEXT NOT NULL,
+    rights_note TEXT NOT NULL,
+    disclaimer TEXT NOT NULL,
+    review_state TEXT NOT NULL CHECK(review_state IN ('draft','published','withdrawn')),
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    published_at INTEGER
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_resources_listing ON resources(review_state, year, title);`);
+  db.exec(`CREATE TABLE IF NOT EXISTS resource_editions (
+    resource_id TEXT NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+    edition TEXT NOT NULL CHECK(edition IN ('priyabhata','prithagoras')),
+    PRIMARY KEY(resource_id, edition)
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_resource_editions_edition ON resource_editions(edition, resource_id);`);
+  seedResourcesSqlite(db);
+
+  // Schema v16 — the Exam Desk (desk.js, ADR-0002 §8 plan F4): unmarked
+  // practice attempts at library papers. Account-owned; no column can hold a
+  // score, mark or result, and `mode` can only be 'unmarked'. The clock is a
+  // log of server-stamped events; an account has at most one open attempt per
+  // paper (the partial unique index).
+  db.exec(`CREATE TABLE IF NOT EXISTS desk_attempts (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    edition TEXT NOT NULL CHECK(edition IN ('priyabhata','prithagoras')),
+    mode TEXT NOT NULL DEFAULT 'unmarked' CHECK(mode = 'unmarked'),
+    origin TEXT NOT NULL CHECK(origin IN ('desk','prithagoras-import')),
+    resource_id TEXT NOT NULL REFERENCES resources(id),
+    paper_json TEXT NOT NULL,
+    clock_json TEXT NOT NULL,
+    questions_json TEXT NOT NULL,
+    state TEXT NOT NULL CHECK(state IN ('idle','reading','ready','working','finished')),
+    rev INTEGER NOT NULL DEFAULT 0 CHECK(rev >= 0),
+    create_key TEXT,
+    create_digest TEXT,
+    import_digest TEXT CHECK((origin = 'desk' AND import_digest IS NULL) OR (origin = 'prithagoras-import' AND import_digest IS NOT NULL)),
+    imported_from_json TEXT,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    finished_at INTEGER CHECK((state = 'finished') = (finished_at IS NOT NULL)),
+    UNIQUE(account_id, create_key),
+    UNIQUE(account_id, import_digest)
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_desk_attempts_account_resource ON desk_attempts(account_id, resource_id, created_at);`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_desk_attempts_one_open ON desk_attempts(account_id, resource_id) WHERE state <> 'finished';`);
 
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;

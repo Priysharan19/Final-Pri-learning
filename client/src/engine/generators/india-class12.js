@@ -48,11 +48,16 @@
 // and the binomial distribution in `c12-random-variable`. Neither is padded out
 // to look like more of the chapter than it is.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz } from '../qhelpers.js';
+import { ri, rc, nz, term } from '../qhelpers.js';
 import { exact, frac, fracTex, traps, twoNames, IN_CITIES } from './india-native-helpers.js';
+
+// A negative value written after a minus sign keeps its own brackets: - (-7)(6).
+const pn = v => (v < 0 ? `(${v})` : `${v}`);
 
 const cx = (c, v = 'x') => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
 const sg = k => (k >= 0 ? `+ ${k}` : `- ${Math.abs(k)}`);
+// A signed term with a symbol: "+ 3x", "- x^2"; "" when the coefficient is 0.
+const sgt = (k, v) => (k === 0 ? '' : `${k < 0 ? '-' : '+'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}${v}`);
 /** A power, written the way it is read: x rather than x^{1}. */
 const pw = (base, e) => (e === 1 ? base : `${base}^{${e}}`);
 
@@ -463,7 +468,7 @@ export const indiaClass12 = {
       ],
       steps: [
         { h: 'Name the inside function', d: `$u = ${cx(a)}$, so $\\dfrac{du}{dx} = ${a}$` },
-        { h: 'Differentiate the arctangent', d: `$\\dfrac{dy}{dx} = \\dfrac{${a}}{1 + ${a * a}x^2}$` },
+        { h: 'Differentiate the arctangent', d: `$\\dfrac{dy}{dx} = \\dfrac{${a}}{1 + ${a * a === 1 ? '' : a * a}x^2}$` },
         { h: 'Substitute', d: `At $x = ${p}$: $\\dfrac{${a}}{1 + ${a * a * p * p}} = \\dfrac{${a}}{${1 + a * a * p * p}}$` },
         { h: 'Reduce', d: `$= ${fracTex(want.n, want.d)}$` }
       ]
@@ -508,7 +513,7 @@ export const indiaClass12 = {
       const c = nz(rng, -9, 9);
       const want = frac(-b, 2 * a);
       return {
-        prompt: `The function $f(x) = ${cx(a)}^2 ${sg(b)}x ${sg(c)}$ is decreasing for $x < k$ and increasing for $x > k$. Find $k$.`,
+        prompt: `The function $f(x) = ${cx(a)}^2 ${sgt(b, 'x')} ${sg(c)}$ is decreasing for $x < k$ and increasing for $x > k$. Find $k$.`,
         answerType: 'numeric', ...exact(want),
         traps: traps(want.value, [
           { value: frac(b, 2 * a).value, why: `$f'(x) = ${2 * a}x ${sg(b)}$, and setting it to zero gives $${2 * a}x = ${-b}$ — the sign changes when the term crosses over.` },
@@ -536,7 +541,7 @@ export const indiaClass12 = {
       const askNormal = rng() < 0.5;
       const want = askNormal ? frac(-1, slope) : frac(slope, 1);
       return {
-        prompt: `Find the slope of the ${askNormal ? 'normal' : 'tangent'} to the curve $y = ${cx(a)}^3 ${sg(b)}x^2 ${sg(c)}$ at the point where $x = ${p}$.`,
+        prompt: `Find the slope of the ${askNormal ? 'normal' : 'tangent'} to the curve $y = ${cx(a)}^3 ${sgt(b, 'x^2')} ${sg(c)}$ at the point where $x = ${p}$.`,
         answerType: 'numeric', ...exact(want),
         traps: traps(want.value, [
           {
@@ -692,7 +697,7 @@ export const indiaClass12 = {
         steps: [
           { h: 'Choose u and dv', d: `$u = x ${sg(m)}$, $dv = e^x\\,dx$, so $du = dx$ and $v = e^x$` },
           { h: 'Apply integration by parts', d: `$= (x ${sg(m)})e^x - \\displaystyle\\int e^x\\,dx$` },
-          { h: 'Integrate what is left', d: `$= (x ${sg(m)})e^x - e^x = (x ${sg(want)})e^x$` },
+          { h: 'Integrate what is left', d: `$= (x ${sg(m)})e^x - e^x = ${want === 0 ? 'xe^x' : `(x ${sg(want)})e^x`}$` },
           { h: 'Read off k', d: `$k = ${want}$` }
         ]
       };
@@ -732,18 +737,18 @@ export const indiaClass12 = {
         prompt: `Evaluate $\\displaystyle\\int_{${a}}^{${b}} ${k}\\,dx$.`,
         answerType: 'numeric', answer: { value: want },
         traps: traps(want, [
-          { value: k * (b + a), why: `The fundamental theorem *subtracts* the value at the lower limit: $[${k}x]_{${a}}^{${b}} = ${k}(${b}) - ${k}(${a})$.` },
+          { value: k * (b + a), why: `The fundamental theorem *subtracts* the value at the lower limit: $[${term(k)}]_{${a}}^{${b}} = ${k}(${b}) - ${pn(k)}(${a})$.` },
           { value: b - a, why: `$${b - a}$ is the width of the interval; the integrand $${k}$ still multiplies it.` },
           { value: k, why: 'The integrand alone is not the integral; it has to be accumulated across the interval.' }
         ]),
         hints: [
           'An antiderivative of a constant $k$ is $kx$.',
-          `$\\displaystyle\\int_{${a}}^{${b}} ${k}\\,dx = \\left[${k}x\\right]_{${a}}^{${b}}$.`,
+          `$\\displaystyle\\int_{${a}}^{${b}} ${k}\\,dx = \\left[${term(k)}\\right]_{${a}}^{${b}}$.`,
           `That is $${k} \\times (${b} - (${a}))$.`
         ],
         steps: [
-          { h: 'Find an antiderivative', d: `$\\displaystyle\\int ${k}\\,dx = ${k}x$` },
-          { h: 'Apply the fundamental theorem', d: `$\\left[${k}x\\right]_{${a}}^{${b}} = ${k}(${b}) - ${k}(${a})$` },
+          { h: 'Find an antiderivative', d: `$\\displaystyle\\int ${k}\\,dx = ${term(k)}$` },
+          { h: 'Apply the fundamental theorem', d: `$\\left[${term(k)}\\right]_{${a}}^{${b}} = ${k}(${b}) - ${pn(k)}(${a})$` },
           { h: 'Evaluate', d: `$= ${want}$` }
         ]
       };
@@ -787,12 +792,12 @@ export const indiaClass12 = {
           { value: p * (b - a) + q, why: 'Each term is integrated first and then evaluated; the integrand itself is not the thing being subtracted.' }
         ]),
         hints: [
-          `An antiderivative is $\\dfrac{${p}x^2}{2} ${sg(q)}x$.`,
+          `An antiderivative is $\\dfrac{${p === 1 ? '' : p === -1 ? '-' : p}x^2}{2} ${q < 0 ? '-' : '+'} ${Math.abs(q) === 1 ? '' : Math.abs(q)}x$.`,
           `Evaluate it at $x = ${b}$ and at $x = ${a}$.`,
           'Subtract the second from the first.'
         ],
         steps: [
-          { h: 'Find an antiderivative', d: `$F(x) = \\dfrac{${p}x^2}{2} ${sg(q)}x$` },
+          { h: 'Find an antiderivative', d: `$F(x) = \\dfrac{${p === 1 ? '' : p === -1 ? '-' : p}x^2}{2} ${q < 0 ? '-' : '+'} ${Math.abs(q) === 1 ? '' : Math.abs(q)}x$` },
           { h: 'Evaluate at the upper limit', d: `$F(${b}) = ${fracTex(p * b * b, 2)} ${sg(q * b)} = ${fracTex(p * b * b + 2 * q * b, 2)}$` },
           { h: 'Evaluate at the lower limit', d: `$F(${a}) = ${fracTex(p * a * a + 2 * q * a, 2)}$` },
           { h: 'Subtract', d: `$F(${b}) - F(${a}) = ${fracTex(want.n, want.d)}$` }
@@ -817,7 +822,7 @@ export const indiaClass12 = {
       ],
       steps: [
         { h: 'Find an antiderivative', d: '$\\displaystyle\\int 2x\\,dx = x^2$' },
-        { h: 'Apply the fundamental theorem', d: `$\\left[x^2\\right]_{0}^{a} = a^2 - 0 = a^2$` },
+        { h: 'Apply the fundamental theorem', d: `$\\left[x^2\\right]_{0}^{a} = a^2 - 0^2 = a^2$` },
         { h: 'Set it equal to the given value', d: `$a^2 = ${value}$` },
         { h: 'Solve for the positive root', d: `$a = ${k}$` }
       ]

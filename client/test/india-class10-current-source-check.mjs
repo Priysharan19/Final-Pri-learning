@@ -28,9 +28,10 @@ assert.equal(CBSE_CLASS10_2026_27_REVIEWED_IDS.size, 14);
 for (const chapter of group.chapters) {
   const status = indiaProductionStatus(chapter, 10);
   assert.deepEqual(uncoveredDotpoints(chapter), [], `${chapter.id}: every current source outcome must have exact practice`);
-  assert.equal(status.quality, INDIA_CONTENT_QUALITY.REVIEWED_MAPPING, `${chapter.id}: source-reviewed mapping`);
-  assert.equal(status.releaseState, INDIA_RELEASE_STATE.REVIEWED);
-  assert.equal(status.sourceReviewed, true);
+  assert.equal(status.quality, INDIA_CONTENT_QUALITY.REVIEWED_MAPPING, `${chapter.id}: agent-audited mapping`);
+  assert.equal(status.releaseState, INDIA_RELEASE_STATE.AGENT_AUDITED);
+  assert.equal(status.agentAudited, true);
+  assert.equal(status.humanReviewed, false, `${chapter.id}: no human review is claimed`);
   assert.equal(status.generatorComplete, true);
 }
 

@@ -5,6 +5,29 @@
   "routes": [
     {
       "method": "GET",
+      "path": "/v1/forecast/",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; derived from this account's own server-graded events (learning_events where account_id = the session's account and device_id = 'server-grader'); premium detail only when the server's own entitlement_snapshots row grants advanced-analytics, otherwise coverage only; no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "forecast",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/health",
       "auth": "none",
       "roles": null,
@@ -27,6 +50,27 @@
       "mfa": false,
       "ownership": "public by design for uptime checks and the Railway deploy healthcheck: one state and one code per dependency, schema versions and release SHA; no counts, configuration values, identifiers or secrets",
       "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/test-mailbox/latest",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "STAGING AND TEST HARNESS ONLY (server/platform/testMailboxPolicy.js): on only when RAILWAY_ENVIRONMENT_NAME is 'staging' or NODE_ENV=test with no Railway variable; hard-off in Railway production, for a prilearning.com PRI_PUBLIC_ORIGIN and with PRI_TEST_MAILBOX=off (tools/production-preflight.mjs refuses a production configuration under which it would be on; /v1/ready reports testMailbox on|off). Answers only for an address at the reserved, undeliverable domain e2e.prilearning.test (RFC 2606/6761), whose accounts are synthetic by definition; returns the newest kept code, link or notice for that address. When off, or for any other address, the request falls through to /v1's ordinary 404 before the rate limit or any read, so it is indistinguishable from a path that does not exist. Codes and links keep their own expiry, single use and send limits.",
+      "rateLimits": [
+        {
+          "key": "test-mailbox",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
       "csrf": "not-applicable",
       "origin": "not-applicable",
       "bodyLimit": "no-body"
@@ -123,7 +167,7 @@
       "verifiedEmail": false,
       "guardianConsent": false,
       "mfa": false,
-      "ownership": "own account only: revokes every unrevoked session whose account id is the session account id, including the caller's; no id is taken from the request; another account's sessions are never touched",
+      "ownership": "own account only: revokes every unrevoked session whose account id is the session account id, including the caller's; the optional body accountId never selects what is revoked — it is the account the client means, and a session for any other account is refused 409 ACCOUNT_MISMATCH before anything is revoked (#481, as #521); another account's sessions are never touched",
       "rateLimits": [
         {
           "key": "logout-all",
@@ -211,6 +255,27 @@
       "rateLimits": [
         {
           "key": "guardian-withdraw",
+          "limit": 20,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/account/guardian/erase",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "guardian-withdraw credential only (issued solely when a guardian confirms), unconsumed, unexpired, and issued at or after the current confirmation (a superseded guardian's credential and any consent link are refused); acts only on the token's account and only when it is recorded as a child (age_basis 'child'); withdraws consent, revokes the credential, cancels a charging web subscription and soft-deletes the account (no sign-in, sessions revoked, links spent) in one request; the erasure itself runs a grace period later in housekeeping (childErasure.js, decision D18)",
+      "rateLimits": [
+        {
+          "key": "guardian-erase",
           "limit": 20,
           "windowMs": 3600000,
           "identity": "ip"
@@ -1472,6 +1537,253 @@
     },
     {
       "method": "GET",
+      "path": "/v1/resources/",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only, no account data: global catalogue rows (resources, resource_editions) that are review_state 'published', availability 'external' with an https url, and offered to THIS server's edition (PRI_EDITION, server/platform/edition.js) — a client ?edition= or any other parameter is ignored, so one edition's server never serves the other's library; any signed-in account (guardian consent for children); private, no-store; nothing written. Filters type/course/year/subject are closed sets or validated (400 RESOURCE_FILTER_INVALID); q ≤120 chars, at most 8 words, each a LIKE with %, _ and \\ escaped (400 RESOURCE_SEARCH_INVALID); at most 100 rows; facets from visible rows only",
+      "rateLimits": [
+        {
+          "key": "resources-list",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/resources/:id",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only, no account data: global catalogue rows (resources, resource_editions) that are review_state 'published', availability 'external' with an https url, and offered to THIS server's edition (PRI_EDITION, server/platform/edition.js) — a client ?edition= or any other parameter is ignored, so one edition's server never serves the other's library; any signed-in account (guardian consent for children); private, no-store; nothing written. An unknown id, a malformed id, a draft or withdrawn row, a hosted or non-https row and another edition's row are the same 404 RESOURCE_NOT_FOUND, so the answer never reveals what exists elsewhere",
+      "rateLimits": [
+        {
+          "key": "resources-read",
+          "limit": 1200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/desk/attempts",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Starts an attempt at a library paper THIS edition offers (published, external https, type paper, 1–200 questions); body {resourceId} only. Idempotency-Key required (a replay returns the same attempt; another body under the key is 409). At most one open attempt per account and paper (partial unique index): a second start returns the open one. The paper's desk configuration is frozen into the row.",
+      "rateLimits": [
+        {
+          "key": "desk-create",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/desk/attempts",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Lists this account's attempts in this edition, newest first, at most 50; optional ?resourceId= (a validated slug), any other parameter is 400. Summaries only: state, done/flagged/note tallies, time used.",
+      "rateLimits": [
+        {
+          "key": "desk-list",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/desk/attempts/:id",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. One of this account's attempts: the frozen paper, the server-stamped clock log and the clock derived at the server's now, questions (done, flagged, notes).",
+      "rateLimits": [
+        {
+          "key": "desk-read",
+          "limit": 1200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/desk/attempts/:id/clock",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Body {intent, rev, early?} only: the server stamps every event with its own clock; a body carrying a time, deadline, remaining time or any other field is 400 DESK_CLOCK_INVALID before anything is read. 409 DESK_REV_STALE / DESK_INTENT_NOT_ALLOWED / DESK_FINISHED carry the attempt as it stands; a closed attempt never restarts, closing twice writes one finish.",
+      "rateLimits": [
+        {
+          "key": "desk-clock",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "PATCH",
+      "path": "/v1/desk/attempts/:id/questions",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Body {changes: {<q>: {done?, flagged?, note?, noteRev?, ms?}}} only; q within the frozen paper; notes ≤5,000 characters without control characters, kept only on a newer noteRev (a stale one is reported, not applied); ms ≤24 h and only grows. Editable after the paper is closed.",
+      "rateLimits": [
+        {
+          "key": "desk-questions",
+          "limit": 1800,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "DELETE",
+      "path": "/v1/desk/attempts/:id",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. The student's own explicit delete of one attempt: body {confirm: <id>} must name it (400 DESK_DELETE_UNCONFIRMED otherwise). Deletes only that row.",
+      "rateLimits": [
+        {
+          "key": "desk-delete",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/desk/import/preview",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Reads a prithagoras-web desk export ({export}, exportVersion 1, ≤256 KB) against THIS edition's library and returns what would come across; writes nothing. The other edition's paper is refused like an unknown one (404 DESK_IMPORT_UNKNOWN_PAPER); malformed, empty, changed-paper and other-version files are 422.",
+      "rateLimits": [
+        {
+          "key": "desk-import-preview",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/desk/import",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Exam Desk (ADR-0002 §8 plan F4a), the UNMARKED mode: a verified student (guardian consent for a child), free on every plan and outside the exam allowance. Every read and write is keyed on (account_id, id, this server's edition PRI_EDITION) inside a transaction declared for the account (RLS pri_account_scope on desk_attempts); another account's, another edition's, an unknown and a malformed id are the same 404 DESK_ATTEMPT_NOT_FOUND. No score, mark or result exists in the table or any reply; mode 'unmarked' on every reply; desk.js imports nothing of the marking path (desk-isolation-check.mjs). Cache-Control no-store. Commits an export read as in the preview: Idempotency-Key required; the same content again (any key) returns the same record; it creates a closed, unmarked attempt with no clock events — the old timer (phase/running/remaining time) is never stored; only the export's date and phase name are kept for reference.",
+      "rateLimits": [
+        {
+          "key": "desk-import",
+          "limit": 20,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/curriculum/",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only, no account data: the curriculum THIS server's edition teaches (PRI_EDITION, server/platform/edition.js; no request field selects it). On a Prithagoras server: every outcome code of the current NSW syllabuses with honest availability (generated true/false) and the practice targets the server issues (server/platform/nswBanks.js); the same reply for every account; codes and Pri's own focus-area names only, no NESA wording; private, no-store; nothing written. On an edition with no server-built curriculum (Priyabhata) the same guards apply and a signed-in account is answered 404 NOT_FOUND",
+      "rateLimits": [
+        {
+          "key": "curriculum-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/handwriting/status",
       "auth": "session",
       "roles": null,
@@ -1592,7 +1904,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "a body naming serverQuestionId is grounded in that server-issued practice question, read from the practice-question escrow keyed by (account_id, id): another account's id, an expired id and an unknown id are the same 404 TUTOR_QUESTION_NOT_FOUND before the cache, the allowance or the provider; such a body may not carry question (400); the Step Check is re-run on the server and, until the question is resolved, the answer is never excused and level walkthrough is 409 TUTOR_LEVEL_ORDER. A device question (no serverQuestionId) is stateless per account. Ladder replies (nudge/socratic/walkthrough) cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request; a conversational turn (level ask: free-text message ≤600 chars, control characters stripped, last 6 history turns server-trimmed) is cached under a key that also takes a truncated hash of the account, so free text is never read back by another account. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call",
+      "ownership": "a body naming serverQuestionId is grounded in that server-issued practice question, read from the practice-question escrow keyed by (account_id, id): another account's id, an expired id and an unknown id are the same 404 TUTOR_QUESTION_NOT_FOUND before the cache, the allowance or the provider; such a body may not carry question (400); the Step Check is re-run on the server and, until the question is resolved, the answer is never excused and level walkthrough is 409 TUTOR_LEVEL_ORDER. A device question (no serverQuestionId) is stateless per account. Ladder replies (nudge/socratic/walkthrough) cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request; a conversational turn (level ask: free-text message ≤600 chars, control characters stripped, last 6 history turns server-trimmed) is cached under a key that also takes a truncated hash of the account, so free text is never read back by another account. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call (PAID_CEILING_HIGH alert at 80%). Level why (\"Why this step?\", stepIndex into the grounded solution, optional follow-up message and history as for ask, cached per account): only on a RESOLVED question — a server-issued one by the server's own completion record (409 TUTOR_LEVEL_ORDER otherwise), a device one by resolved:true; Premium by the server's entitlement snapshot (additional-ai-usage) or one of PRI_TUTOR_WHY_FREE_PER_DAY (default 3) free taster calls a day per account, else 402 TUTOR_PREMIUM_REQUIRED before the allowance, ceiling or provider; reply maths must be copied from the solution, question or student lines, else the verified step itself is shown. Level diagnose: an open attempt is engine-only (no model, no spend, one fixed shape); a resolved one is one model call under the same allowance and ceiling. A resolved issued question passes the server Step Check's misconception id to the model; the device's is never taken",
       "rateLimits": [
         {
           "key": "tutor-help",
@@ -1617,6 +1929,48 @@
       "rateLimits": [
         {
           "key": "tutor-stream",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/tutor/line-check",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "404 (before any session lookup) unless PRI_FEATURE_LINE_CHECK=1 — and the tutor router itself 404s unless PRI_FEATURE_TUTOR=1. Closed body { context, serverQuestionId, lines, locale }: practice context only (TUTOR_EXAM_LOCKED), no question or solution may be sent (400). serverQuestionId is read from the practice-question escrow keyed by (account_id, id): another account's, expired or unknown id is 404 TUTOR_QUESTION_NOT_FOUND; a resolved question is 409. The server's own Step Check (marker pool) judges only the lines before the first final-answer attempt (engine-decided by form, never by value; unreadable fails closed); with none left the reply is the one generic 'Press Check to mark your answer.' and nothing is charged. Reply names a step heading only, never a value or a mark; no model call. Two checks per issued question per account (bucket line-check:sha256(account:id), 30-day window, peeked before and taken after the check ran; a third is 409 LINE_CHECK_LIMIT) and one unit of the per-account daily tutor allowance; a check that did not run (cooldown, busy, deadline) spends neither.",
+      "rateLimits": [
+        {
+          "key": "tutor-line-check",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/tutor/step-coach",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "404 (before any session lookup) unless PRI_FEATURE_STEP_COACH=1 — and the tutor router itself 404s unless PRI_FEATURE_TUTOR=1 (#826, off by default). Closed body { context, serverQuestionId, lines }: practice context only (TUTOR_EXAM_LOCKED), no question or solution may be sent (400). Premium only, decided from the server's entitlement snapshot (403 STEP_COACH_PREMIUM). serverQuestionId is read from the practice-question escrow keyed by (account_id, id): another account's, expired or unknown id is 404 TUTOR_QUESTION_NOT_FOUND; a resolved question is 409. The server's own Step Check (marker pool) ticks finished lines against the worked steps; a final-answer line gets only 'Press Check', right and wrong final lines get identical rows. No values, no headings, no marks, no model call. STEP_COACH_READS_PER_QUESTION checks per issued question per account (bucket step-coach:sha256(account:id), 30-day window, peeked before and taken after the check ran; then 409 STEP_COACH_LIMIT) and one unit of the per-account daily tutor allowance; a check that did not run spends neither. The client route holds the question lock (runGated).",
+      "rateLimits": [
+        {
+          "key": "tutor-step-coach",
           "limit": 60,
           "windowMs": 3600000,
           "identity": "account"
@@ -2240,6 +2594,29 @@
       "bodyLimit": "no-body"
     },
     {
+      "method": "GET",
+      "path": "/v1/habits/",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; derived from this account's own server-graded attempts (learning_events where account_id = the session's account and device_id = 'server-grader'); the profile only when the server's own entitlement_snapshots row grants advanced-analytics, otherwise a count; no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "habits",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
       "method": "POST",
       "path": "/v1/practice/:id/hint",
       "auth": "session",
@@ -2307,6 +2684,52 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exams/targets",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only, Premium only (premium-exams from the server's entitlement snapshot, else 402 PREMIUM_REQUIRED): the subtopics a targeted board mock would lean toward, derived only from this account's own server-graded attempts (due dot points and unfixed mistakes); no question, answer or other account's data; Cache-Control no-store. The server re-derives the targets when it seals a targeted paper and writes the 'why these questions' key itself.",
+      "rateLimits": [
+        {
+          "key": "exam-targets",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exams/nsw",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only list of the NSW HSC-style blueprints this server sets (plan G4): 404 EXAM_KIND_UNAVAILABLE unless the server's edition issues the NSW banks (PRI_EDITION=prithagoras) and PRI_NSW_EXAMS=on. Per blueprint: course, times, marks, sections, the NESA specification page it cites, its outcome codes, whether the release check finds every slot fillable from the edition's approved forms, and the outcomes it lacks. Static for a build and the same for every account; no question, answer, seed or other account's data; Cache-Control no-store. POST /v1/exams then takes kind 'nsw' with blueprint { id } only — slots, layout seed, paper, mock and targeted are refused (400 EXAM_SPEC_INVALID), an unreleased blueprint is 409 EXAM_BLUEPRINT_NOT_RELEASED and seals nothing, a Priyabhata server treats the kind as unknown exactly as before (400 EXAM_SPEC_INVALID), a multi-mark slot is never a multiple-choice question, and the paper's reading time is the server's: PUT/PATCH answers and finish inside it are 409 EXAM_READING_TIME and store nothing.",
+      "rateLimits": [
+        {
+          "key": "exam-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
     },
     {
       "method": "POST",
@@ -2468,6 +2891,118 @@
       "csrf": "not-applicable",
       "origin": "not-applicable",
       "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/parent-report/confirm",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "single-use parent-report confirm token (purpose-bound, 7 days, hash-stored); acts only on the token's account link; re-checks the recipient rule (a child's report goes only to the guardian whose consent is given) before activating",
+      "rateLimits": [
+        {
+          "key": "parent-report-confirm",
+          "limit": 20,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/parent-report/unsubscribe",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "parent-report unsubscribe token (hash-stored); permission-reducing only: it can stop the token's account link and nothing else; idempotent",
+      "rateLimits": [
+        {
+          "key": "parent-report-unsubscribe",
+          "limit": 30,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/parent-report/unsubscribe/one-click",
+      "auth": "bearer-token",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "RFC 8058 one-click: the mailbox provider POSTs with no Origin or cookie, so origin is exempt (router.js ONE_CLICK_UNSUBSCRIBE); the unsubscribe token in the URL is the only authority and is permission-reducing only: it can stop the token's account link and nothing else; its own wide per-IP bucket (not shared with the page route): mailbox providers send one-click POSTs from a few shared addresses and a refused unsubscribe breaks RFC 8058",
+      "rateLimits": [
+        {
+          "key": "parent-report-one-click",
+          "limit": 2000,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "exempt-one-click-unsubscribe",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/parent-report/",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: keyed by the session account id, read in the account's RLS scope; premium-gated server-side (entitlement_snapshots, advanced-analytics); built only from server-grader graded-attempt rows; the recipient address is masked",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/parent-report/link",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: keyed by the session account id; premium-gated server-side; a child account may name only the guardian whose consent is given; the address must confirm by emailed link before any report is sent",
+      "rateLimits": [
+        {
+          "key": "parent-report-link",
+          "limit": 5,
+          "windowMs": 86400000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/parent-report/link/stop",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: keyed by the session account id; permission-reducing only (stops the account's own parent report link)",
+      "rateLimits": [],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
     }
   ]
 }

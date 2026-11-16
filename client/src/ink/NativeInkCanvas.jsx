@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { nativeInk } from './native.js';
+import { MODAL_EVENT } from './readerPermission.js';
 import { useT } from '../i18n/index.js';
 
 const NativeInkCanvas = forwardRef(function NativeInkCanvas({
@@ -64,6 +65,9 @@ const NativeInkCanvas = forwardRef(function NativeInkCanvas({
     observer.observe(document.documentElement);
     window.addEventListener('scroll', schedule, { passive: true, capture: true });
     window.addEventListener('resize', schedule, { passive: true });
+    // A modal dialog opening or closing (ReaderPermission.jsx says so) moves
+    // the surface out of its way and back (native.js modalCoversInk).
+    window.addEventListener(MODAL_EVENT, schedule);
     const themeWatcher = new MutationObserver(() => nativeInk.setAppearance());
     themeWatcher.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
@@ -73,6 +77,7 @@ const NativeInkCanvas = forwardRef(function NativeInkCanvas({
       themeWatcher.disconnect();
       window.removeEventListener('scroll', schedule, { capture: true });
       window.removeEventListener('resize', schedule);
+      window.removeEventListener(MODAL_EVENT, schedule);
       stopListening();
       nativeInk.unmount();
     };

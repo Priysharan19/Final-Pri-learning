@@ -34,6 +34,22 @@ function throws(name, fn, { status, code } = {}) {
 // ── good traffic ─────────────────────────────────────────────────────────────
 
 same('GET /me passes', validateRequest('GET', '/me').path, '/me');
+// Query strings: two GET routes, one checked parameter each; nothing else.
+for (const period of ['week', 'month', 'term']) same(`report series ${period} passes`, validateRequest('GET', `/report/series?period=${period}`).path, `/report/series?period=${period}`);
+same('report series with no query passes', validateRequest('GET', '/report/series').path, '/report/series');
+same('marks since a real day passes', validateRequest('GET', '/marks/by-chapter?since=2026-10-01').path, '/marks/by-chapter?since=2026-10-01');
+throws('an unknown period is refused', () => validateRequest('GET', '/report/series?period=year'), { status: 400, code: 'INVALID_QUERY' });
+throws('a second parameter is refused', () => validateRequest('GET', '/report/series?period=week&x=1'), { status: 400, code: 'INVALID_QUERY' });
+throws('a repeated parameter is refused', () => validateRequest('GET', '/report/series?period=week&period=term'), { status: 400, code: 'INVALID_QUERY' });
+throws('a malformed since is refused', () => validateRequest('GET', '/marks/by-chapter?since=last-week'), { status: 400, code: 'INVALID_QUERY' });
+throws('an impossible date is refused', () => validateRequest('GET', '/marks/by-chapter?since=2026-02-30'), { status: 400, code: 'INVALID_QUERY' });
+throws('since on the wrong route is refused', () => validateRequest('GET', '/report/series?since=2026-10-01'), { status: 400, code: 'INVALID_QUERY' });
+throws('a query on any other GET is refused', () => validateRequest('GET', '/me?x=1'), { status: 400, code: 'INVALID_PATH' });
+throws('a query on a POST is refused', () => validateRequest('POST', '/report/series?period=week', {}), { status: 400, code: 'INVALID_PATH' });
+throws('a fragment after the query is refused', () => validateRequest('GET', '/report/series?period=week#x'), { status: 400, code: 'INVALID_PATH' });
+same('history sort and chapter pass', validateRequest('POST', '/history/list', { sort: 'marks', subtopic: 'y10-quadratics' }).body.sort, 'marks');
+throws('an unknown history sort is refused', () => validateRequest('POST', '/history/list', { sort: 'random' }), { status: 400, code: 'INVALID_FIELD' });
+throws('a non-string chapter is refused', () => validateRequest('POST', '/history/list', { subtopic: 7 }), { status: 400 });
 same('method is canonicalised', validateRequest('post', '/profiles/demo', {}).method, 'POST');
 same('normal profile create passes', validateRequest('POST', '/profiles', {
   name: 'Ada', year: 10, email: 'ada@example.test', provider: 'email', password: 'correct horse battery staple'

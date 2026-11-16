@@ -30,7 +30,7 @@ import { installBrowserEnv, resetStorage } from './backend-check.mjs';
 installBrowserEnv(); resetStorage();
 
 const { startOnlineAuthority } = await import('./support/online-authority.mjs');
-const online = await startOnlineAuthority({ label: 'durability' });
+const online = await startOnlineAuthority({ label: 'durability', nswBanks: true });
 // What the server said to each grade request, read off a copy of its reply.
 // The device loses the first reply when it crashes; the suite keeps it so the
 // recovered receipt can be compared with the one that was committed.

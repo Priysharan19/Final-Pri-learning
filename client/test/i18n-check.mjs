@@ -242,21 +242,19 @@ const SPOKEN_ATTRIBUTES = new Set(['aria-label', 'aria-description', 'aria-place
 // Literals a reader does see, which are correctly not translated. Same rule as
 // the catalogue allowlist: a reason, in writing, about the language.
 const LITERAL_ALLOWLIST = new Map([
-  ['Pri Learning', 'the product’s name'],
+  ['Pri Learning', 'the company’s name, written the same in every language (students meet the edition’s name, {brand})'],
+  ['by Pri Learning', 'the company line under an edition wordmark, the same in every language'],
   ['ABCD', 'the option letters of a multiple-choice item, indexed into rather than read'],
   ['Standard', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['Advanced', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['Extension 1', 'the proper name of an NSW course, shown only on the Australian branch'],
   ['Extension 2', 'the proper name of an NSW course, shown only on the Australian branch'],
-  ['Pri Learning.', 'the product’s name with the wordmark’s full stop'],
-  ['P', 'the letter on the brand tile, aria-hidden beside the full wordmark'],
   ['XP', 'the app’s own unit, written XP in every language'],
   ['D', 'the D1–D4 difficulty shorthand, read as a code'],
   ['Evaluation', 'inside the wordmark block, translated separately as verdict.evaluation'],
   ['CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD', 'examination boards, printed in Latin on the Hindi admit card too'],
   ['CBSE · NCERT · JEE MAIN · JEE ADVANCED', 'examination boards (flag-off build, no Olympiad), printed in Latin on the Hindi admit card too'],
   ['you@example.com', 'an example address, not prose'],
-  ['Pri', 'the product’s short name beside its mark in the instrument bar'],
   ['⌘K', 'a key chord, printed as the keyboard prints it'],
   ['esc', 'the label on the Escape key, printed as the keyboard prints it'],
   ['Password', 'placeholder replaced by t(); any survivor here is a failure'],
@@ -560,7 +558,7 @@ eq(root.lang, 'hi', 'and the document says Hindi — never before the text is Hi
 eq(i18n.translate('common.questionsCounted', { count: 1, n: 1 }), '1 प्रश्न', 'a counted noun takes its Hindi singular');
 eq(i18n.translate('common.questionsCounted', { count: 5, n: 5 }), '5 प्रश्न',
   'and its plural — which in Hindi is the same word after a numeral, which is the point of writing both out');
-eq(i18n.translate('home.reviewDue', { count: 3, n: 3 }), 'अंतराल पुनरावृत्ति के लिए आपके 3 टॉपिक बाकी हैं।',
+eq(i18n.translate('home.next.reviews', { count: 3, n: 3 }), '3 टॉपिक पुनरावृत्ति के लिए बाकी हैं',
   'a whole sentence comes back in Hindi word order, with the verb last');
 
 await i18n.setLanguage('en');

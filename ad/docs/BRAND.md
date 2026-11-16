@@ -1,5 +1,7 @@
 # BRAND.md — Pri Learning, as evidenced by the repo
 
+> Copy revised 2 November 2026 under owner decision D24: none of the retired coverage, accuracy, price-comparison, connectivity, rank-prediction or marking-authority claims (the list lives in `client/test/marketing-claims-check.mjs`). Rendered files under `out/` predate this revision and must be re-rendered before use. See COPY.md.
+
 Source of truth: `client/src/theme.css` (1,157 lines, self-titled **"Design system v4 — Dark LaTeX"**:
 "near-black paper, Computer Modern serif everywhere (KaTeX fonts, already bundled), ivory ink, cream
 primary actions, gold accents, 1px hairlines, small-caps labels. Light mode = the same paper, printed.")
@@ -87,5 +89,5 @@ American idiom, no forced Hinglish.
 - No invented statistics, no rank claims, no competitor names. Every equation on screen is verified
   numerically in `src/math` and gated by `scripts/check.ts`.
 - Market note, honestly recorded: the codebase's curriculum is NSW-HSC-shaped; the *shipped marketing*
-  (merged PRs #40–44) and this brief position for India (Class 7–12 · JEE · Olympiad). The film follows
+  (merged PRs #40–44) and this brief position for India (Class 7–12 · JEE · JEE Advanced). The film follows
   the shipped marketing direction and makes no board-alignment claim anywhere.

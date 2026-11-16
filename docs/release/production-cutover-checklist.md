@@ -65,8 +65,7 @@ Auth email, paid-ceiling, handwriting and working checks are all `ok`.
 
 ### What remains before production cutover
 
-1. Production Railway source must move to a nominated green `main` SHA and CI gating must be
-   enabled; today it still tracks the old handwriting feature branch.
+1. Production Railway must remain sourced from the protected `deploy/production` pointer, never directly from `main`. Nominate an exact green `main` SHA, verify staging and all mandatory owner gates, and only then fast-forward the pointer with *Wait for CI* on. The feature-branch source described in the 2026-10-04 snapshot below is historical.
 2. The nine repository platform migrations must be applied to production Supabase in order, the
    production login role must be established, and `verify:platform:pg-target` must pass against
    that exact target.
@@ -87,12 +86,21 @@ explicit production-infrastructure actions and were not performed by this recove
 
 - [ ] Pick one `main` SHA. All four required CI contexts in `release-policy.md` are green on it,
       and `Production Container` (`deployment-image.yml`) is green on it:
-      `node scripts/release-nominate.mjs <sha>` checks all of that plus that staging serves exactly
-      this SHA on Postgres at that commit's schema versions and that `deploy/production → sha` is a
-      fast-forward, then prints the promotion commands. It pushes nothing. It counts *every* workflow
-      run on the SHA, scheduled and agent workflows included: an unrelated red run (for example a
-      failed `Pri App Health Agent` schedule on the tip) blocks nomination until it is green or
-      rerun; it does not pick which workflows are code gates. The order from here to the
+      `node scripts/release-nominate.mjs <sha> --candidate` checks all of that plus that staging
+      serves exactly this SHA on Postgres at that commit's schema versions and that
+      `deploy/production → sha` is a fast-forward. It pushes nothing. It counts *every* workflow
+      on the SHA, scheduled and agent workflows included, by the newest run of each workflow and
+      event: an unrelated red run (for example a failed `Pri App Health Agent` schedule on the tip)
+      blocks nomination until that workflow's newest run on the SHA is green; a later schedule that
+      passed supersedes a flaky one; it does not pick which workflows are code gates. The same
+      command without `--candidate` is the release-stage run of §4.6 step 7: it also requires a
+      passing `Release Candidate` run (`release-candidate.yml`) titled and checked out as this
+      exact SHA with both blocking jobs `success`, the physical-device matrix (every case `pass`)
+      and the real-human reader evidence for this exact SHA, clearing Gate C's floors and measured
+      by that Release Candidate run (its `cloud-reader-eval-<sha>` artifact). A public-release
+      override approved by a repository admin in a GitHub comment may waive an evidence row by
+      name; nothing waives the Release Candidate gates. It prints the promotion commands with the
+      engine production serves, and is followed by `node scripts/release-dossier.mjs <sha>`. The order from here to the
       promotion, with the 24 h soak gate, is `docs/operations/postgres-cutover.md` §4.6.
 - [ ] On a checkout of that SHA: `node tools/verify-release-identity.mjs` passes and
       `npm run test:deploy` passes.
@@ -104,7 +112,7 @@ explicit production-infrastructure actions and were not performed by this recove
 
 - [ ] Railway project has two environments, `staging` and `production`, each with the `/v1` service.
 - [ ] Production service → Settings → Source: repository `Priysharan19/Final-Pri-learning`,
-      branch **`main`** (not a feature branch), *Wait for CI* on.
+      branch **`deploy/production`** (not `main` or any feature branch), *Wait for CI* on. Only a separately approved fast-forward of this pointer may deploy a certified candidate; staging alone follows `main`.
 - [ ] Staging service: same repository; branch `main` too, or a deliberately named staging branch.
 - [ ] The deploy log shows the Dockerfile build and the `/v1/ready` healthcheck from
       `railway.json`, and no dashboard start command is set.
@@ -147,8 +155,9 @@ Follow `docs/operations/postgres-cutover.md` exactly, in this order:
       verification email, sign in, sync between two devices, teacher class + assignment, account
       export, account deletion. Test accounts only; record results as synthetic evidence.
       Scripted part: `node tools/acceptance/staging-acceptance.mjs --email <owner mailbox> --tester "<name>"`
-      runs steps 0 and A–E (one-time-code sign-in with a real mailbox, guardian confirmation,
-      handwriting and photo read + server mark with SYNTHETIC pictures, the A/B isolation probe) and
+      runs steps S0–S7 (one-time-code sign-in with a real mailbox, guardian confirmation and
+      withdrawal, handwriting and photo read + server mark with SYNTHETIC pictures, the returning
+      student's History, the student A / B2 isolation probe; S8 is cleanup) and
       prints a `HUMAN STEP` line for every code a person must read. Device steps are
       `docs/release/device-matrix.md`.
 - [ ] 24 hours with no `/v1` 500, no `platform_db_pool_error`, no unexplained 503 (§4.5).
@@ -156,11 +165,19 @@ Follow `docs/operations/postgres-cutover.md` exactly, in this order:
 ## 5. Production prerequisites — OWNER
 
 - [ ] Production Supabase project in `ap-south-1`, separate from staging; daily backups and
-      Point-in-Time Recovery enabled.
-- [ ] Backup taken and **restore drill** run into a scratch project (cutover runbook §6).
+      Point-in-Time Recovery enabled (the owner's click-list: `postgres-cutover.md` §6.1).
+- [ ] Backup taken and **restore drill** run into a scratch project (cutover runbook §6.2–§6.3;
+      `pri_server` is created in the scratch project before the schema dump is restored).
+- [ ] The rollback stages of `postgres-cutover.md` §5.5 are read before the window, and the
+      Step 24 log (§7a) is copied for this window and filled as it runs.
 - [ ] Production login role `pri_app_production` with its own password (never the staging one).
 - [ ] Production variables: same list as §2 with production values, plus §3's database pair.
       Fresh `PRI_CSRF_SECRET` and `PRI_AUTH_DELIVERY_KEY`.
+- [ ] The V1 decisions are set as `docs/operations/production-config-v1.md` lists them (D4, D12, D18,
+      D21, D22, #653, D5, Apple billing, the auth email sender), and after the promotion
+      `npm run verify:deployment -- --origin https://app.prilearning.com --sha <SHA> --engine postgres
+      --auth-email-proven --require-handwriting --expect-config docs/operations/production-config-v1.md`
+      passes, with its human checks H2–H9 recorded in that file's §4.
 - [ ] If the production SQLite volume holds real accounts, decide (ADR-0001 "Not decided here")
       whether they are migrated or Supabase starts empty. Importing is a separate reviewed
       mission; do not cut over until this is decided.

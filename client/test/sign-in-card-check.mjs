@@ -133,8 +133,8 @@ const login = read('pages/Login.jsx');
 const refusal = read('components/CheckRefusal.jsx');
 const gate = read('components/AccountActivationGate.jsx');
 const question = read('components/QuestionCard.jsx');
-ok(/<h1 className="hero-title">\{t\('login\.welcomeTitle'\)\}<\/h1>\s*<p className="hero-sub">\{t\('login\.welcomeSub'\)\}<\/p>/.test(login) && en['login.welcomeTitle'] === 'Welcome to Pri Learning',
-  'the landing screen is the card under "Welcome to Pri Learning"');
+ok(/<h1 className="hero-title">\{t\('login\.welcomeTitle'\)\}<\/h1>\s*<p className="hero-sub">\{t\('login\.welcomeSub'\)\}<\/p>/.test(login) && en['login.welcomeTitle'] === 'Welcome to {brand}',
+  'the landing screen is the card under "Welcome to {brand}" (the edition\'s name, plan E4)');
 ok(/<SignUpFlow variant="page" onFinish=\{finishAccount\} onStep=\{setCardStep\} \/>/.test(login) && !/stage === 'account'/.test(login), 'mounted on the landing screen itself — there is no separate account screen to navigate to');
 ok(/<SignInCard variant="inline"[\s\S]{0,200}allowCreate=\{user\?\.cloudLinked !== true\}/.test(refusal), 'every in-question sign-in is the same card, inline');
 ok(/<SignUpFlow variant="inline"[\s\S]{0,200}allowCreate=\{link !== undefined && !link\?\.accountId\} onFinish=\{finishSignIn\} \/>/.test(gate), 'and so is the activation gate\'s, which creates no account until the profile\'s link row has been read');

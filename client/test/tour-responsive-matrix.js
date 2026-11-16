@@ -55,8 +55,16 @@ async function writableQuestion(page, settle) {
     if (ready) return true;
     const next = page.locator('.ctx-next');
     if (!(await next.count())) return false;
+    // Wait for Next to have brought a DIFFERENT question. The old card's
+    // prompt is still on the page while the next one loads, so waiting for
+    // `.q-prompt` returns at once; a second Next pressed then is queued
+    // behind the first and replaces the writable question this loop finds.
+    const leaving = await page.evaluate(() => document.querySelector('.qpage[data-question-id]')?.getAttribute('data-question-id') || null);
     await next.click({ timeout: 5000 }).catch(() => {});
-    await page.waitForSelector('.q-prompt', { timeout: 30000 }).catch(() => null);
+    await page.waitForFunction(id => {
+      const el = document.querySelector('.qpage[data-question-id]');
+      return !!el && el.getAttribute('data-question-id') !== id && !!el.querySelector('.q-prompt');
+    }, leaving, { timeout: 30000 }).catch(() => null);
     await settle();
   }
   return false;
@@ -95,21 +103,27 @@ export const flow = {
       // therefore measured on Home, and Practice is asserted to be free of it.
       await goto('/');
       await settle();
+      // The v1.0 shell is a top bar with a rail; the instrument build
+      // (PRI_FEATURE_INSTRUMENT, html.ui-instrument) is one bar of tabs with
+      // no rail at any width. Both keep the phone's bottom bar.
       const shell = await page.evaluate(() => ({
         ff: document.documentElement.dataset.ff,
         short: document.documentElement.dataset.short,
+        instrument: document.documentElement.classList.contains('ui-instrument'),
         bar: !!document.querySelector('.mobilenav') && getComputedStyle(document.querySelector('.mobilenav')).display !== 'none',
         side: !!document.querySelector('.sidebar') && getComputedStyle(document.querySelector('.sidebar')).display !== 'none',
+        tabs: !!document.querySelector('[data-instrument-bar]') && getComputedStyle(document.querySelector('[data-instrument-bar]')).display !== 'none',
       }));
       await check(`${tag}: classified ${vp.ff}${vp.short ? ' + short' : ''}`,
         shell.ff === vp.ff && shell.short === String(!!vp.short), JSON.stringify(shell));
       const phoneNav = vp.width <= 760;
-      await check(`${tag}: ${phoneNav ? 'bottom bar, no sidebar' : 'sidebar, no bottom bar'}`,
-        phoneNav ? shell.bar && !shell.side : shell.side && !shell.bar, JSON.stringify(shell));
-      // The top bar and sidebar line up (measured where the shell exists).
+      await check(`${tag}: ${phoneNav ? 'bottom bar, no sidebar' : shell.instrument ? 'the tab bar, no rail, no bottom bar' : 'sidebar, no bottom bar'}`,
+        phoneNav ? shell.bar && !shell.side : shell.instrument ? shell.tabs && !shell.side && !shell.bar : shell.side && !shell.bar, JSON.stringify(shell));
+      // The top bar and sidebar line up (measured where the shell exists); in
+      // the instrument build the content starts below the one bar.
       const align = vp.width > 760 ? await page.evaluate(() => {
-        const t = document.querySelector('.topbar')?.getBoundingClientRect();
-        const sb = document.querySelector('.sidebar')?.getBoundingClientRect();
+        const t = (document.querySelector('.topbar') || document.querySelector('[data-instrument-bar]'))?.getBoundingClientRect();
+        const sb = (document.querySelector('.sidebar') || document.querySelector('#main'))?.getBoundingClientRect();
         return t && sb ? { topbarBottom: Math.round(t.bottom), sidebarTop: Math.round(sb.top) } : null;
       }) : null;
 
@@ -128,6 +142,9 @@ export const flow = {
       // ── 3 · writing: fits the screen, takes strokes, no developer copy ───
       const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
       if (await writeTab.count()) { await writeTab.click(); await settle(); }
+      // The sheet is drawn once the handwriting engine is up ("Warming up the
+      // handwriting engine…" until then); measure it then, not before.
+      await page.locator('.ink-canvas').last().waitFor({ state: 'attached', timeout: 20000 }).catch(() => null);
       const canvas = page.locator('.ink-canvas').last();
       const ink = await canvas.count() ? await canvas.evaluate(c => {
         const r = c.getBoundingClientRect();
@@ -266,8 +283,15 @@ export const flow = {
       });
       const submitReach = submit ? await reachable(page, '[data-matrix="submit"]') : { ok: false, why: 'no submit button' };
       await check(`${tag}: the submit action can be scrolled into view and pressed`, submitReach.ok, JSON.stringify(submitReach));
+      // Wait for the server's mark, not a clock: while it is on its way the
+      // primary action reads "Marking…" and the card takes no other action, so
+      // "Show solution" pressed then is lost, the attempt stays open, and every
+      // later viewport inherits this question with its ink still on the sheet.
+      const marked = page.waitForResponse(r => /^\/v1\/practice\/[^/]+\/submit$/.test(new URL(r.url()).pathname), { timeout: 30000 }).catch(() => null);
       if (submit) await page.locator('[data-matrix="submit"]').click({ timeout: 5000 }).catch(() => {});
-      await page.waitForTimeout(1800);
+      await marked;
+      await page.waitForFunction(() => ![...document.querySelectorAll('button')]
+        .some(b => b.offsetParent && /^\s*Marking…\s*$/.test(b.textContent || '')), null, { timeout: 30000 }).catch(() => null);
 
       const after = await reachable(page, '.ctx-next');
       await check(`${tag}: after answering, Next is visible and not covered`, after.ok, JSON.stringify(after));
@@ -278,8 +302,10 @@ export const flow = {
       const show = page.getByRole('button', { name: 'Show solution' });
       for (let press = 0; press < 2 && await show.count(); press++) {
         await show.first().click({ timeout: 5000 }).catch(() => {});
-        await page.waitForTimeout(press ? 1200 : 250);
+        await page.waitForTimeout(250);
       }
+      // The launcher follows the released solution; wait for it rather than a clock.
+      await page.locator('.pri-explain-launch').first().waitFor({ state: 'attached', timeout: 15000 }).catch(() => null);
       // The launcher is a row in the flow of the page under the marked work,
       // never a card floating over the student's reasoning: scroll to it, then
       // measure that it is on screen, within the width, and clear of Next.
@@ -305,7 +331,7 @@ export const flow = {
 
       // ── iPad composition: the top bar and sidebar line up ─────────────────
       if (vp.width > 760) {
-        await check(`${tag}: the sidebar starts below the top bar`, !!align && align.sidebarTop >= align.topbarBottom - 1, JSON.stringify(align));
+        await check(`${tag}: ${shell.instrument ? 'the content starts below the tab bar' : 'the sidebar starts below the top bar'}`, !!align && align.sidebarTop >= align.topbarBottom - 1, JSON.stringify(align));
       } else {
         await check(`${tag}: (sidebar alignment applies above 760px)`, true);
       }

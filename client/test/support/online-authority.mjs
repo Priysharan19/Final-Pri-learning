@@ -132,7 +132,12 @@ export const nextSubmissionId = (prefix = 'sub_suite') =>
 let current = null;
 export const currentOnlineAuthority = () => current;
 
-export async function startOnlineAuthority({ label = 'suite', keepRateLimits = false, ink = false, env = {} } = {}) {
+// `nswBanks: true` — D15: a production server never issues a bank outside the
+// India covers (server/platform/indiaBanks.js). A suite that drives the legacy
+// NSW flows (Year 7–12 subtopics, the practice paper) as its vehicle says so
+// here, at its own call; server/test/india-banks-check.mjs pins the refusal.
+export async function startOnlineAuthority({ label = 'suite', keepRateLimits = false, ink = false, env = {}, nswBanks = false } = {}) {
+  if (nswBanks) (await import('../../../server/platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
   const prior = Object.fromEntries([...ENV_NAMES, ...Object.keys(env)].map(name => [name, process.env[name]]));
   const scratch = mkdtempSync(join(tmpdir(), `pri-online-${label}-`));
   process.env.NODE_ENV = 'test';
@@ -157,7 +162,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
         reader.calls += 1;
         res.writeHead(200, { 'content-type': 'application/json' });
         res.end(JSON.stringify({ output_text: JSON.stringify({
-          lines: [{ text: READER_TEXT, latex: null, confidence: 0.99 }], confidence: 0.99, needs_confirmation: false
+          lines: [{ text: READER_TEXT, latex: '', confidence: 0.99, uncertain: false, doubt: '', gap_before: false }], confidence: 0.99, needs_confirmation: false
         }) }));
       });
     });
@@ -186,7 +191,7 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
   let pinnedPid;                      // undefined = follow the selected profile
   let signedOut = false;
   let offline = false;
-  const traffic = { total: 0, issue: 0, bind: 0, prepare: 0, repeat: 0, seedsSent: 0, grade: 0, reveal: 0, recognize: 0, refusedOffline: 0, examCreate: 0, examSave: 0, examFinish: 0, examRead: 0 };
+  const traffic = { total: 0, issue: 0, bind: 0, prepare: 0, repeat: 0, seedsSent: 0, grade: 0, reveal: 0, recognize: 0, refusedOffline: 0, examCreate: 0, examSave: 0, examFinish: 0, examRead: 0, curricula: [] };
 
   const selectedPid = () => {
     try { return globalThis.localStorage?.getItem('pri-current-profile') || null; } catch { return null; }
@@ -247,6 +252,8 @@ export async function startOnlineAuthority({ label = 'suite', keepRateLimits = f
       try { asked = JSON.parse(String(options.body || '{}')); } catch { /* the server refuses it */ }
       if (asked?.prepared !== undefined) traffic.bind += 1;
       if (asked && 'seed' in asked) traffic.seedsSent += 1;
+      // The course each issue named (practice-course-request-check.mjs).
+      traffic.curricula.push(asked?.curriculum ?? null);
     } else if (path === '/v1/practice/prepare') traffic.prepare += 1;
     else if (/^\/v1\/practice\/[^/]+\/repeat$/.test(path)) traffic.repeat += 1;
     else if (/^\/v1\/practice\/[^/]+\/submit$/.test(path)) traffic.grade += 1;

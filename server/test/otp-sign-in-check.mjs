@@ -39,6 +39,7 @@ process.env.PRI_PUBLIC_ORIGIN = 'http://localhost:5173';
 
 const express = (await import('express')).default;
 const { startApp, checks, pendingVerificationToken } = await import('./support/app-harness.mjs');
+const { requestedEngine } = await import('./support/engine.mjs');
 const { readTestOutbox, clearTestOutbox } = await import('../platform/smsProvider.js');
 const { OTP_MAX_ATTEMPTS, OTP_TTL_MS, OTP_RESEND_COOLDOWN_MS } = await import('../platform/otpCore.js');
 const { OTP_DESTINATION_LIMIT, createOtpRouter } = await import('../platform/otp.js');
@@ -46,17 +47,24 @@ const { otpEmailMessage, otpEmailConsentLink } = await import('../platform/otpEm
 const { createPlatformDb } = await import('../platform/db.js');
 const { CONSENT_NOTICE_VERSION } = await import('../platform/guardianConsent.js');
 
+// SQLite by default; `--engine=postgres` runs the same card contract on a
+// migrated Postgres as the pri_server role (server/test/run-platform-postgres.mjs).
+// The two routers mounted with no working sender below keep their own
+// in-memory SQLite: they test configuration (what a deployment with no sender
+// offers), not the store.
+const engine = requestedEngine();
+console.log(`engine: ${engine}`);
 const c = checks();
-const h = await startApp();
-const raw = h.db;
+const h = await startApp({ engine });
+const raw = h.db; // the async store (get/all/run) on either engine
 const ORIGIN = { Origin: 'http://localhost:5173' };
-const resetLimits = () => raw.prepare('DELETE FROM rate_limits').run();
-const clearCooldown = () => raw.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'otp-cooldown%'").run();
+const resetLimits = () => raw.run('DELETE FROM rate_limits');
+const clearCooldown = () => raw.run("DELETE FROM rate_limits WHERE bucket LIKE 'otp-cooldown%'");
 const lastMail = to => readTestOutbox({ to, channel: 'email' }).at(-1);
 const post = (path, body, jar = {}) => h.request(`/v1/account/otp${path}`, { method: 'POST', body, jar, headers: ORIGIN });
 const login = (body, jar = {}) => h.request('/v1/account/login', { method: 'POST', body, jar, headers: ORIGIN });
-const accounts = () => Number(raw.prepare('SELECT COUNT(*) AS n FROM accounts').get().n);
-const liveSessions = id => Number(raw.prepare('SELECT COUNT(*) AS n FROM account_sessions WHERE account_id=? AND revoked_at IS NULL AND expires_at>?').get(id, Date.now()).n);
+const accounts = async () => Number((await raw.get('SELECT COUNT(*) AS n FROM accounts', [])).n);
+const liveSessions = async id => Number((await raw.get('SELECT COUNT(*) AS n FROM account_sessions WHERE account_id=? AND revoked_at IS NULL AND expires_at>?', [id, Date.now()])).n);
 const wrongOf = code => (code === '000000' ? '111111' : '000000');
 const PASSWORD = 'a-long-unusual-passphrase-93';
 const setCookies = r => (typeof r.headers.getSetCookie === 'function' ? r.headers.getSetCookie() : []);
@@ -80,7 +88,7 @@ async function verifyEmail(harness, accountId) {
  * later assertion to pass for the wrong reason.
  */
 async function ask(email, jar = {}) {
-  raw.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'otp-%'").run();
+  (await raw.run("DELETE FROM rate_limits WHERE bucket LIKE 'otp-%'", []));
   const r = await post('/request', { channel: 'email', destination: email }, jar);
   if (r.status !== 202) throw new Error(`otp-sign-in-check: the desk could not get a code (${r.status} ${r.text})`);
   return { r, challengeId: r.data.challengeId, code: lastMail(email.toLowerCase()).code };
@@ -126,11 +134,11 @@ try {
   }
 
   // ── an existing, verified password account signs in with a code ──────────
-  resetLimits(); clearTestOutbox();
+  await resetLimits(); clearTestOutbox();
   const made = await registerAccount(h, { name: 'Verified', email: 'verified@example.test', password: PASSWORD, deviceId: 'd1' });
   c.eq(made.status, 201, 'a password account exists');
   await verifyEmail(h, made.account.id);
-  const before = accounts();
+  const before = (await accounts());
   let a = await ask('Verified@Example.test');
   c.eq(a.r.status, 202, 'a code is sent for the address of an existing account');
   const unknown = await ask('nobody-here@example.test');
@@ -142,8 +150,8 @@ try {
   r = await post('/verify', { channel: 'email', destination: 'verified@example.test', challengeId: a.challengeId, code: a.code, deviceId: 'card' }, jar);
   c.eq(r.status, 200, 'the right code signs the existing account in');
   c.deq({ status: r.data.status, created: r.data.created, id: r.data.account.id }, { status: 'signed-in', created: false, id: made.account.id }, 'as itself: signed-in, created:false, the same account id');
-  c.eq(accounts(), before, 'no account was created');
-  c.ok(raw.prepare('SELECT password_hash FROM accounts WHERE id=?').get(made.account.id).password_hash, 'a VERIFIED account keeps its password');
+  c.eq((await accounts()), before, 'no account was created');
+  c.ok((await raw.get('SELECT password_hash FROM accounts WHERE id=?', [made.account.id])).password_hash, 'a VERIFIED account keeps its password');
   c.eq((await login({ email: 'verified@example.test', password: PASSWORD })).status, 200, 'which still signs in');
 
   // ── the one bound statement the activation gate reads ────────────────────
@@ -167,13 +175,13 @@ try {
   const csrfCookie = setCookies(r).find(v => v.startsWith('pri_csrf='));
   c.ok(csrfCookie && !/HttpOnly/i.test(csrfCookie) && /SameSite=Lax/i.test(csrfCookie), 'its CSRF pair is readable by the page and SameSite=Lax');
   const token = cookieJar.pri_cloud_session;
-  c.ok(!JSON.stringify(raw.prepare('SELECT * FROM account_sessions WHERE account_id=?').all(made.account.id)).includes(token), 'the raw session token is not stored (hash only)');
+  c.ok(!JSON.stringify((await raw.all('SELECT * FROM account_sessions WHERE account_id=?', [made.account.id]))).includes(token), 'the raw session token is not stored (hash only)');
   r = await h.request('/v1/account/me', { jar: cookieJar });
   c.eq(r.status, 200, 'the session authenticates /me');
   c.ok(setCookies(r).some(v => v.startsWith('pri_cloud_session=')), 'and /me renews the cookie within the session\'s lifetime');
   r = await h.request('/v1/account/logout-all', { method: 'POST', jar: { pri_cloud_session: cookieJar.pri_cloud_session }, body: {}, headers: ORIGIN });
   c.eq(r.status, 403, 'a state-changing request with the session cookie but no CSRF header is refused');
-  c.ok(liveSessions(made.account.id) >= 2, 'and revoked nothing');
+  c.ok(await liveSessions(made.account.id) >= 2, 'and revoked nothing');
   {
     const { setSessionCookies } = await import('../platform/security.js');
     const seen = [];
@@ -186,7 +194,7 @@ try {
   }
 
   // ── expiry of a session, sign out, sign out everywhere ───────────────────
-  raw.prepare('UPDATE account_sessions SET expires_at = ? WHERE token_hash = (SELECT token_hash FROM account_sessions WHERE account_id = ? ORDER BY created_at DESC LIMIT 1)').run(Date.now() - 1000, made.account.id);
+  (await raw.run('UPDATE account_sessions SET expires_at = ? WHERE token_hash = (SELECT token_hash FROM account_sessions WHERE account_id = ? ORDER BY created_at DESC LIMIT 1)', [Date.now() - 1000, made.account.id]));
   r = await h.request('/v1/account/me', { jar: cookieJar });
   c.eq(r.status, 401, 'a session past its expiry no longer authenticates');
   r = await h.request('/v1/practice/issue', { method: 'POST', jar: cookieJar, body: {}, headers: ORIGIN });
@@ -203,11 +211,11 @@ try {
   c.eq((await h.request('/v1/account/me', { jar: two })).status, 200, 'the other device is not');
   r = await h.request('/v1/account/logout-all', { method: 'POST', jar: two, body: {}, headers: ORIGIN });
   c.ok(r.status === 200 && r.data.revoked >= 1, 'sign out everywhere revokes every live session');
-  c.eq(liveSessions(made.account.id), 0, 'none is left live');
+  c.eq(await liveSessions(made.account.id), 0, 'none is left live');
   c.eq((await h.request('/v1/account/me', { jar })).status, 401, 'including the first card sign-in');
 
   // ── wrong, expired, reused and superseded codes ──────────────────────────
-  resetLimits();
+  await resetLimits();
   a = await ask('verified@example.test');
   for (let i = 1; i <= OTP_MAX_ATTEMPTS; i++) {
     r = await post('/verify', { channel: 'email', destination: 'verified@example.test', challengeId: a.challengeId, code: wrongOf(a.code) });
@@ -218,7 +226,7 @@ try {
   c.ok(!('attemptsRemaining' in r.data.error), 'with no count to tell a burnt challenge from an unknown one');
 
   a = await ask('verified@example.test');
-  raw.prepare('UPDATE otp_challenges SET expires_at = ? WHERE id = ?').run(Date.now() - 1, a.challengeId);
+  (await raw.run('UPDATE otp_challenges SET expires_at = ? WHERE id = ?', [Date.now() - 1, a.challengeId]));
   r = await post('/verify', { channel: 'email', destination: 'verified@example.test', challengeId: a.challengeId, code: a.code });
   c.deq({ status: r.status, code: r.data.error.code }, { status: 400, code: 'OTP_INVALID' }, 'an expired code is refused');
   c.eq(OTP_TTL_MS, 10 * 60 * 1000, 'the lifetime the card and the email both state is the server\'s: 10 minutes');
@@ -242,17 +250,17 @@ try {
   r = await post('/verify', { channel: 'email', destination: 'someone-else@example.test', challengeId: a.challengeId, code: a.code });
   c.eq(r.status, 400, 'a code cannot be used for a different address (change-email cannot carry a code across)');
   r = await post('/delete-confirm', { email: 'verified@example.test', challengeId: a.challengeId, code: a.code });
-  c.ok(r.status === 400 && raw.prepare('SELECT 1 FROM accounts WHERE id=? AND deleted_at IS NULL').get(made.account.id), 'a sign-in code cannot be spent as a deletion code');
+  c.ok(r.status === 400 && (await raw.get('SELECT 1 FROM accounts WHERE id=? AND deleted_at IS NULL', [made.account.id])), 'a sign-in code cannot be spent as a deletion code');
 
   // ── duplicate submit ─────────────────────────────────────────────────────
   a = await ask('verified@example.test');
-  const sessionsBefore = liveSessions(made.account.id);
+  const sessionsBefore = await liveSessions(made.account.id);
   const pair = await Promise.all([{}, {}].map(j => post('/verify', { channel: 'email', destination: 'verified@example.test', challengeId: a.challengeId, code: a.code }, j)));
   c.deq(pair.map(x => x.status).sort(), [200, 400], 'two simultaneous correct submits: exactly one wins');
-  c.eq(liveSessions(made.account.id), sessionsBefore + 1, 'and exactly one session is made');
+  c.eq(await liveSessions(made.account.id), sessionsBefore + 1, 'and exactly one session is made');
 
   // ── the limits the card names ────────────────────────────────────────────
-  resetLimits();
+  await resetLimits();
   r = await post('/request', { channel: 'email', destination: 'limits@example.test' });
   c.eq(r.status, 202, 'first code');
   c.eq(r.data.resendAfterMs, OTP_RESEND_COOLDOWN_MS, 'the answer tells the card how long its "Resend code" must wait');
@@ -261,14 +269,14 @@ try {
   c.ok(Number(r.headers.get('retry-after')) >= 1 && Number(r.headers.get('retry-after')) <= 30, 'with Retry-After, which the card turns into "wait N s"');
   c.eq(readTestOutbox({ to: 'limits@example.test', channel: 'email' }).length, 1, 'and no second message was sent');
   for (let i = 2; i <= OTP_DESTINATION_LIMIT.limit; i++) {
-    clearCooldown();
+    await clearCooldown();
     c.eq((await post('/request', { channel: 'email', destination: 'limits@example.test' })).status, 202, `code ${i} of ${OTP_DESTINATION_LIMIT.limit} this hour`);
   }
-  clearCooldown();
+  await clearCooldown();
   r = await post('/request', { channel: 'email', destination: 'limits@example.test' });
   c.eq(r.status, 429, `the ${OTP_DESTINATION_LIMIT.limit + 1}th code in an hour to one mailbox is refused, whoever asks`);
   c.eq(readTestOutbox({ to: 'limits@example.test', channel: 'email' }).length, OTP_DESTINATION_LIMIT.limit, 'a mailbox cannot be flooded through this form');
-  clearCooldown();
+  await clearCooldown();
   c.eq((await post('/request', { channel: 'email', destination: 'another@example.test' })).status, 202, 'another mailbox is unaffected');
   r = await post('/request', { channel: 'email', destination: 'not-an-email' });
   c.deq({ status: r.status, code: r.data.error.code }, { status: 400, code: 'OTP_DESTINATION_INVALID' }, 'a malformed address is a 400, not a code');
@@ -277,7 +285,7 @@ try {
   // Registered with a password, never verified; "register" again says
   // EMAIL_EXISTS; a code proves the mailbox, and BY DESIGN clears whatever the
   // unproven registrant set — so the password stops working afterwards.
-  resetLimits(); clearTestOutbox();
+  await resetLimits(); clearTestOutbox();
   const rough = await registerAccount(h, { name: 'Rough', email: 'rough@example.test', password: PASSWORD, deviceId: 'd1' });
   c.eq(rough.status, 201, 'registered with a password, unverified');
   r = await h.request('/v1/account/register', { method: 'POST', body: { name: 'Rough', email: 'rough@example.test', password: PASSWORD, isAdult: true }, headers: ORIGIN });
@@ -287,7 +295,7 @@ try {
   const roughJar = {};
   r = await post('/verify', { channel: 'email', destination: 'rough@example.test', challengeId: a.challengeId, code: a.code }, roughJar);
   c.deq({ status: r.status, created: r.data.created, verified: r.data.account.emailVerified }, { status: 200, created: false, verified: true }, 'the code signs in and verifies the existing account');
-  c.eq(raw.prepare('SELECT password_hash FROM accounts WHERE id=?').get(rough.account.id).password_hash, null, 'the unproven registrant\'s password is cleared (pre-registration takeover defence)');
+  c.eq((await raw.get('SELECT password_hash FROM accounts WHERE id=?', [rough.account.id])).password_hash, null, 'the unproven registrant\'s password is cleared (pre-registration takeover defence)');
   c.eq((await h.request('/v1/account/me', { jar: rough.jar })).status, 401, 'and the session made at registration is revoked');
   const afterClear = await login({ email: 'rough@example.test', password: PASSWORD });
   const neverExisted = await login({ email: 'never-existed@example.test', password: PASSWORD });
@@ -303,7 +311,7 @@ try {
   // an account and one that does not. (Before this was fixed, an invalid
   // profile was answered PROFILE_NAME_REQUIRED / AGE_DECLARATION_REQUIRED for
   // unknown addresses only.)
-  resetLimits();
+  await resetLimits();
   {
     const known = 'verified@example.test';
     const unknownAddress = 'no-such-student@example.test';
@@ -338,7 +346,7 @@ try {
       }
       c.deq(answers[0], answers[1], `/verify, the live challenge with a WRONG code and profile ${JSON.stringify(profile)}: identical for known and unknown, tries left included`);
     }
-    c.eq(raw.prepare("SELECT COUNT(*) AS n FROM accounts WHERE email = ?").get(unknownAddress).n, 0, 'none of those probes created an account');
+    c.eq((await raw.get("SELECT COUNT(*) AS n FROM accounts WHERE email = ?", [unknownAddress])).n, 0, 'none of those probes created an account');
     // Only the correct code tells them apart — which is the proof of the mailbox.
     const right = { [known]: await ask(known), [unknownAddress]: await ask(unknownAddress) };
     const a1 = await post('/verify', { channel: 'email', destination: known, challengeId: right[known].challengeId, code: right[known].code, profile: {} });
@@ -354,22 +362,22 @@ try {
   }
 
   // ── a new address: nothing is created until the questions are answered ───
-  resetLimits();
-  const beforeNew = accounts();
+  await resetLimits();
+  const beforeNew = (await accounts());
   a = await ask('new-card@example.test');
   r = await post('/verify', { channel: 'email', destination: 'new-card@example.test', challengeId: a.challengeId, code: a.code });
   c.deq({ status: r.status, state: r.data.status }, { status: 200, state: 'profile-required' }, 'a right code for a new address earns a sign-up ticket');
-  c.eq(accounts(), beforeNew, 'and creates nothing');
+  c.eq((await accounts()), beforeNew, 'and creates nothing');
   const ticket = r.data.signupTicket;
   r = await post('/verify', { channel: 'email', destination: 'new-card@example.test', signupTicket: ticket, profile: { name: 'Kid' } });
   c.deq({ status: r.status, code: r.data.error.code }, { status: 400, code: 'AGE_DECLARATION_REQUIRED' }, 'an account without an age declaration is refused: silence is never an adult');
-  c.eq(accounts(), beforeNew, 'still nothing created');
+  c.eq((await accounts()), beforeNew, 'still nothing created');
   const kidJar = {};
   r = await post('/verify', { channel: 'email', destination: 'new-card@example.test', signupTicket: ticket, profile: { name: 'Kid', year: '10', isAdult: false } }, kidJar);
   c.eq(r.status, 201, 'with the declaration the ticket creates the account');
   c.deq(r.data.guardianConsent, { required: true, state: 'pending' }, 'UNDER 18: the account starts limited, consent pending');
   const kid = r.data.account.id;
-  c.ok(raw.prepare('SELECT confirmed_at FROM guardian_consents WHERE account_id=?').get(kid).confirmed_at === null, 'nothing is recorded as confirmed');
+  c.ok((await raw.get('SELECT confirmed_at FROM guardian_consents WHERE account_id=?', [kid])).confirmed_at === null, 'nothing is recorded as confirmed');
   r = await post('/verify', { channel: 'email', destination: 'new-card@example.test', signupTicket: ticket, profile: { name: 'Kid', year: '10', isAdult: false } });
   c.eq(r.status, 400, 'the ticket is single use');
   r = await h.request('/v1/account/guardian/state', { jar: kidJar });
@@ -404,13 +412,13 @@ try {
   c.ok(r.data.required === true && r.data.ageBasis === 'child', 'an approved child is still a child on record (required:true, ageBasis child), not silently an adult');
 
   // ── deletion still works for an account made by a code ───────────────────
-  resetLimits();
+  await resetLimits();
   r = await post('/reauth-request', {}, kidJar);
   c.eq(r.status, 202, 'a code-only account asks for a fresh code to delete itself');
   const reauth = readTestOutbox({ to: 'new-card@example.test', channel: 'email' }).filter(m => m.purpose === 'reauth').at(-1);
   r = await h.request('/v1/account', { method: 'DELETE', jar: kidJar, body: { otpChallengeId: r.data.challengeId, otpCode: reauth.code }, headers: ORIGIN });
   c.deq({ status: r.status, deleted: r.data.deleted }, { status: 200, deleted: true }, 'and is deleted with it');
-  c.eq(raw.prepare('SELECT COUNT(*) AS n FROM accounts WHERE id=?').get(kid).n, 0, 'the account row is gone');
+  c.eq((await raw.get('SELECT COUNT(*) AS n FROM accounts WHERE id=?', [kid])).n, 0, 'the account row is gone');
   c.eq((await h.request('/v1/account/me', { jar: kidJar })).status, 401, 'and its session with it');
 
   // ── the email itself ─────────────────────────────────────────────────────

@@ -293,7 +293,7 @@ async function enrol(http, dbPath, label, tinyImage) {
   const verify = await http('/v1/account/email/verify', { method: 'POST', body: { token: queuedToken(dbPath, accountId, 'verify-email') } });
   if (verify.status !== 200) throw new Error(`verify email ${label}: ${verify.status} ${verify.code}`);
   if (tinyImage) gates.verifiedNoConsent = await http('/v1/handwriting/transcribe', { method: 'POST', jar, body: { image: tinyImage } });
-  const consent = await http('/v1/account/guardian/confirm', { method: 'POST', body: { token: queuedToken(dbPath, accountId, 'guardian-consent') } });
+  const consent = await http('/v1/account/guardian/confirm', { method: 'POST', body: { token: queuedToken(dbPath, accountId, 'guardian-consent'), approve: true, noticeVersion: '2026-10-22' } });
   if (consent.status !== 200 || consent.data?.confirmed !== true) throw new Error(`guardian confirm ${label}: ${consent.status} ${consent.code}`);
   const state = await http('/v1/account/guardian/state', { jar });
   return { jar, accountId, gates, consentState: state.data?.state ?? null, ageBasis: state.data?.ageBasis ?? null };

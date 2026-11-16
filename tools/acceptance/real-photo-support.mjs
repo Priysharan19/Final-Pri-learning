@@ -82,7 +82,7 @@ export async function enrol(http, dbPath, label, secrets) {
   if (verify.status !== 200) throw new Error(`verify email ${label}: ${verify.status} ${verify.code}`);
   const consentToken = secrets.queuedToken(dbPath, accountId, 'guardian-consent');
   if (consentToken) {
-    const consent = await http('/v1/account/guardian/confirm', { method: 'POST', body: { token: consentToken } });
+    const consent = await http('/v1/account/guardian/confirm', { method: 'POST', body: { token: consentToken, approve: true, noticeVersion: '2026-10-22' } });
     if (consent.status !== 200 || consent.data?.confirmed !== true) throw new Error(`guardian confirm ${label}: ${consent.status} ${consent.code}`);
   }
   const state = await http('/v1/account/guardian/state', { jar });

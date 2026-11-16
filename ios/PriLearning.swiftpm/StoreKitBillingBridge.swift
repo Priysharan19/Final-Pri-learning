@@ -48,13 +48,24 @@ final class StoreKitBillingBridge {
                     let ids = self.productIds(body["productIds"])
                     let products = try await Product.products(for: ids)
                     let rows: [[String: Any]] = products.map { product in
-                        [
+                        // displayPrice is what the Premium screen shows as the
+                        // billed amount. The numeric price and its currency are
+                        // only for an "about … a month" line it labels as such
+                        // (client/src/paywall/pricing.js); nothing grants or
+                        // prices Premium from them.
+                        var row: [String: Any] = [
                             "id": product.id,
                             "displayName": product.displayName,
                             "description": product.description,
                             "displayPrice": product.displayPrice,
+                            "price": NSDecimalNumber(decimal: product.price).stringValue,
+                            "currencyCode": product.priceFormatStyle.currencyCode,
                             "subscription": product.subscription != nil
                         ]
+                        if let period = product.subscription?.subscriptionPeriod {
+                            row["period"] = ["unit": self.periodUnit(period.unit), "value": period.value]
+                        }
+                        return row
                     }
                     self.respond(requestId, ok: true, result: ["products": rows])
 
@@ -127,6 +138,16 @@ final class StoreKitBillingBridge {
             } catch {
                 self.respond(requestId, ok: false, error: error)
             }
+        }
+    }
+
+    private func periodUnit(_ unit: Product.SubscriptionPeriod.Unit) -> String {
+        switch unit {
+        case .day: return "day"
+        case .week: return "week"
+        case .month: return "month"
+        case .year: return "year"
+        @unknown default: return "unknown"
         }
     }
 

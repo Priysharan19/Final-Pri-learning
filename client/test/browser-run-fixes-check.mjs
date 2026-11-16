@@ -60,17 +60,38 @@ const cloudPanel = read('client/src/components/CloudAccountPanel.jsx');
 ok(!/t\('cloud\.pricingUnset'\)/.test(cloudPanel), 'the "pricing has not been configured" note is never rendered');
 ok(/if \(!monthly && !annual\) return null;/.test(cloudPanel) && /return note \? <div/.test(cloudPanel), 'with no prices the pricing line is absent');
 
-// ── 6 · The Australian syllabus link is off in a V1 build ────────────────────
-ok(featureDefines('build', {}).__PRI_FEATURE_AUSTRALIA__ === 'false', 'a production build has the Australia link off');
-ok(featureDefines('build', { PRI_FEATURE_AUSTRALIA: '1' }).__PRI_FEATURE_AUSTRALIA__ === 'true', 'and on only with PRI_FEATURE_AUSTRALIA=1');
-ok(featureStates('build', {}).australia === false, 'and the build manifest records it off');
+// ── 6 · The sign-up course comes from the edition, not a flag (mission E3) ───
+ok(!('__PRI_FEATURE_AUSTRALIA__' in featureDefines('build', { PRI_FEATURE_AUSTRALIA: '1' })), 'no build constant for an Australia flag exists, even when the variable is set');
+ok(!('australia' in featureStates('build', { PRI_FEATURE_AUSTRALIA: '1' })), 'and the build manifest carries no australia key');
+ok(featureStates('build', { PRI_EDITION: 'prithagoras' }).edition === 'prithagoras' && featureStates('build', {}).edition === 'priyabhata', 'the edition, recorded in the manifest, is what selects the course');
 const login = read('client/src/pages/Login.jsx');
-ok(/\{featureEnabled\('australia'\) && \(\s*<div className="field" style=\{\{ marginTop: -4 \}\}>\s*<button type="button" className="linklike" onClick=\{openAustralia\}>/.test(login),
-  'the onboarding link renders only when the flag is on');
+ok(/const SIGNUP_COURSE = defaultCourse\(\);/.test(login) && !/openAustralia|featureEnabled\('australia'\)/.test(login),
+  'the sign-up course step follows the edition, with no link to the other one');
 
 // ── 7 · A prefilled name is replaced, not appended to ────────────────────────
 ok(/id="cloud-name"[\s\S]{0,400}onFocus=\{e => \{ if \(e\.target\.value && e\.target\.value === \(user\?\.name \|\| ''\)\) e\.target\.select\(\); \}\}/.test(cloudPanel),
   'focusing the prefilled account name selects it');
+
+// ── 8 · WebKit Playwright stubs see requests ahead of the service worker ─────
+// These two tours intercept *synthetic* /v1/ responses. With an installed
+// service worker, WebKit can satisfy a request before context.route sees it,
+// making a test claim no request happened while a real reading may finish.
+// inspectNetwork is only used in the e2e context; it never changes app code.
+const e2eHarness = read('client/test/e2e.mjs');
+ok(/flow\.inspectNetwork\s*\?\s*\{\s*serviceWorkers:\s*['"]block['"]\s*\}/.test(e2eHarness),
+  'inspectNetwork excludes service workers from stub-network Playwright contexts');
+function hasVisibleStubRequests(src, id) {
+  const pos = src.indexOf("id: '" + id + "'");
+  return pos >= 0 && /inspectNetwork:\s*true\s*,/.test(src.slice(pos, pos + 250)) &&
+    /ctx\.route\(/.test(src);
+}
+for (const [file, id] of [['client/test/tour-stale-cloud.js', 'stale-cloud'], ['client/test/tour-photo-practise.js', 'photo-practise']]) {
+  const source = read(file);
+  ok(hasVisibleStubRequests(source, id), `${id} opts into network-visible intercepts`);
+  // Negative control: removing the opt-in has to make the guard fail.
+  const disabled = source.replace(/inspectNetwork:\s*true\s*,/, '');
+  ok(!hasVisibleStubRequests(disabled, id), `${id} loses eligibility when the opt-in is removed`);
+}
 
 if (failures.length) {
   for (const f of failures) console.log('  ✖ ' + f);

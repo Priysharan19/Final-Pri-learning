@@ -6,7 +6,10 @@ const SOLUTION_LABELS = Object.freeze({
   infinite: 'Infinitely many solutions'
 });
 
-const equation = ([a, b, c]) => `$${a}x+${b}y=${c}$`;
+// "x+2y=3", "2x-y=4": unit coefficients are not written, and a negative
+// coefficient carries its own sign.
+const coefficient = (k, v) => (k === 1 ? v : k === -1 ? `-${v}` : `${k}${v}`);
+const equation = ([a, b, c]) => `$${coefficient(a, 'x')}${b < 0 ? '' : '+'}${coefficient(b, 'y')}=${c}$`;
 
 function linearFixture(rng, kind) {
   const a = ri(rng, 1, 5), b = ri(rng, 1, 5), c = ri(rng, 2, 10), k = ri(rng, 2, 4);

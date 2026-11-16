@@ -23,6 +23,10 @@ import { join } from 'node:path';
 
 const scratch = mkdtempSync(join(tmpdir(), 'pri-hints-notebook-'));
 process.env.NODE_ENV = 'test'; // fixed seeds: the same content on demand
+// D15: a production server never issues a bank outside the India covers
+// (server/platform/indiaBanks.js). This suite says so explicitly because its notebook trap case is an NSW bank (y7-decimals-perc, seed 4242);
+// india-banks-check.mjs pins the refusal itself. Refused under NODE_ENV=production.
+(await import('../platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = '6b'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;

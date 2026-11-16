@@ -13,6 +13,8 @@ import { currentLinearSolutionConditions, currentQuadraticDiscriminant, currentT
 import { indiaClass10Core } from './india-class10-core.js';
 // Hardest-level (D3) forms, tranche 1 — see curriculum-in-hardest-covers.js.
 import { class10HardestForms } from './india-class10-hardest.js';
+// Additional Algebra forms (D1–D3) — see curriculum-in-forms-covers.js.
+import { CLASS10_ALGEBRA_FORMS } from './india-class10-algebra-forms.js';
 
 const basePolynomialZeroes = baseIndiaClass10['c10-polynomial-zeroes'];
 
@@ -36,5 +38,6 @@ export const indiaClass10 = Object.freeze({
   'c10-trigonometry-current': currentClass10Trigonometry,
   'c10-trig-boundary-relations': currentTrigBoundaryRelations,
   'c10-trig-applications-current': currentClass10TrigApplications,
-  ...class10HardestForms
+  ...class10HardestForms,
+  ...CLASS10_ALGEBRA_FORMS
 });

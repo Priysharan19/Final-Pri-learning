@@ -111,7 +111,7 @@ try {
   const gated = await h.request('/v1/sync/pull/0', { jar: child.jar });
   c.deq([gated.status, code(gated)], [403, 'GUARDIAN_CONSENT_PENDING'], 'the child cannot sync until the guardian confirms');
   c.eq((await h.request('/v1/account/guardian/state', { jar: child.jar })).data.state, 'pending', 'and sees the pending state');
-  c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: bearer } })).data.confirmed, true, 'the guardian confirms');
+  c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: bearer, approve: true, noticeVersion: '2026-10-22' } })).data.confirmed, true, 'the guardian confirms');
   c.eq((await h.request('/v1/sync/pull/0', { jar: child.jar })).status, 200, 'then the child may sync');
 
   // Apple, with the hashed nonce form, is held to the same rule.

@@ -7,14 +7,16 @@
 // hands the reminders runtime the schedule that follows from it. Home's card
 // and the Plan page both read from here, so they can never disagree.
 //
-// Nothing is fetched from a network and nothing is written but the student's
+// The mistake notebook is read through GET /notebook (the server's, so only
+// signed in and online). Nothing is written but the student's
 // settings, today's pin and (browser only) the queued reminders.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ratingsFor } from '../local/store.js';
 import { byIndex } from '../local/idb.js';
 import { dayKey } from '../lib/locale.js';
-import { buildStudyPlan, todayProgress } from './studyPlan.js';
+import { buildStudyPlan, slipFocus, todayProgress } from './studyPlan.js';
+import { api } from '../api.js';
 import { loadPlanSettings, savePlanSettings, loadTodayPin, saveTodayPin } from './settings.js';
 import { computeReminders, zonedMs } from '../reminders/schedule.js';
 import { loadReminderSettings } from '../reminders/settings.js';
@@ -42,8 +44,11 @@ export function usePlan(user, { stats = null, now = null } = {}) {
   const reload = useCallback(async () => {
     if (!pid) { setEvidence({ ratings: {}, reviews: [] }); return; }
     try {
-      const [ratings, reviews] = await Promise.all([ratingsFor(pid), byIndex('reviews', 'pid', pid)]);
-      setEvidence({ ratings: ratings || {}, reviews: reviews || [] });
+      // The notebook is the server's (signed in and online); without it the
+      // plan is built from this device's evidence alone.
+      const [ratings, reviews, book] = await Promise.all([ratingsFor(pid), byIndex('reviews', 'pid', pid),
+        api.get('/notebook').catch(() => null)]);
+      setEvidence({ ratings: ratings || {}, reviews: reviews || [], notebook: book?.notebook || null });
     } catch {
       setEvidence({ ratings: {}, reviews: [] });
     }
@@ -57,11 +62,12 @@ export function usePlan(user, { stats = null, now = null } = {}) {
     const built = buildStudyPlan({
       profile: user, ratings: evidence.ratings, reviews: evidence.reviews,
       examDate: settings.examDate, weeklyMinutes: settings.weeklyMinutes, restDay: settings.restDay,
-      today, previous, nowMs
+      today, previous, nowMs,
+      slips: slipFocus({ misconceptions: stats?.misconceptions, notebook: evidence.notebook })
     });
     saveTodayPin(pid, built);
     return built;
-  }, [evidence, user, pid, today, settings.examDate, settings.weeklyMinutes, settings.restDay, nowMs]);
+  }, [evidence, user, pid, today, settings.examDate, settings.weeklyMinutes, settings.restDay, nowMs, stats?.misconceptions]);
 
   const progress = useMemo(() => {
     if (!plan || !evidence) return null;

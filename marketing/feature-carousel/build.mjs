@@ -9,9 +9,10 @@
 //
 // Edit this file, never the generated HTML.
 //
-// Every figure on a slide is a measured one, and each carries its command in
-// COPY beside it — see POST.md's claims table. Do not add a number here that
-// README's "Measured accuracy" block does not carry.
+// No slide carries a figure that is not measured in CI (the chapter count is
+// IN_CURRICULUM's), and none carries a coverage, accuracy, price-saving,
+// offline or examiner claim — owner decision D24 (1 Nov 2026); the banned
+// phrases are enforced by client/test/marketing-claims-check.mjs.
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -306,32 +307,32 @@ const stat = (label, value, note) => `<div class="stat">
 
 // ─── the seven slides ─────────────────────────────────────────────────────
 const SLIDES = [
-  // The whole post on one artboard — the five features, each with the figure
-  // that backs it. Same numbers, same commands as the carousel; POST.md's
-  // claims table covers both.
+  // The whole post on one artboard. Every line is true of the shipped app
+  // (owner decision D24, 1 Nov 2026): no coverage, accuracy, price-saving,
+  // offline or examiner claim, and no figure that is not measured in CI.
   ['00-all-in-one', 'Everything', `<div class="slide">
     ${head('Pri Learning')}
-    <h1 style="font-size:62px;margin-top:24px;letter-spacing:-0.9px;line-height:1.08">Your handwriting, <em>marked</em>.<br>Your syllabus, <em>mapped</em>.<br>Your practice, <em>endless</em>.</h1>
+    <h1 style="font-size:62px;margin-top:24px;letter-spacing:-0.9px;line-height:1.08">Your handwriting, <em>read</em>.<br>Your answer, <em>marked</em>.<br>Class 7 to <em>JEE Advanced</em>.</h1>
     <div class="hero">
-      <div class="cap"><span>Class 10 · Quadratic equations</span><span class="live">Marked on device</span></div>
-      <div class="l"><span class="w">x<sup>2</sup> + 6x + 5 = 0</span><span class="m">M1</span><span class="v">✓</span></div>
-      <div class="l"><span class="w">(x + 3)<sup>2</sup> − 9 + 5 = 0</span><span class="m">M1</span><span class="v">✓</span></div>
-      <div class="l wrong"><span class="w">x = −1  or  x = 5</span><span class="m">A1</span><span class="v no">✗</span></div>
-      <div class="said">Line 3 — <b>you keep flipping the sign</b>. 2 of 3 marks.</div>
+      <div class="cap"><span>Class 10 · Quadratic equations</span><span class="live">Marked by the engine</span></div>
+      <div class="l"><span class="w">x<sup>2</sup> + 6x + 5 = 0</span><span class="m"></span><span class="v">✓</span></div>
+      <div class="l"><span class="w">(x + 3)<sup>2</sup> − 9 + 5 = 0</span><span class="m"></span><span class="v">✓</span></div>
+      <div class="l wrong"><span class="w">x = −1  or  x = 5</span><span class="m"></span><span class="v no">✗</span></div>
+      <div class="said">Line 3 — <b>the sign flipped</b> taking the root across. Final answer: not accepted.</div>
     </div>
     <div class="tiles">
-      <div class="tile"><span class="k">AI recognition</span>
-        <div class="d">Reads your Pencil<small>Every symbol, on device. No upload, no account.</small></div></div>
-      <div class="tile"><span class="k">Instant marking</span>
-        <div class="d">Graded like a teacher<small>Line by line, method marks, the mistake named.</small></div></div>
-      <div class="tile"><span class="k">Every level</span>
-        <div class="d">Boards → JEE Advanced<small>CBSE, JEE Main, Advanced, Olympiad. Four tiers.</small></div></div>
-      <div class="tile"><span class="k">Every class</span>
-        <div class="d">Class 7 to Class 12<small>Every NCERT chapter, mapped line by line.</small></div></div>
-      <div class="tile"><span class="k">Unlimited · premium</span>
-        <div class="d">It never runs out<small>Built from a seed, not drawn from a pool.</small></div></div>
-      <div class="tile"><span class="k">Exam ready</span>
-        <div class="d">Mocks &amp; percentile<small>Timed papers, criteria marking, predicted percentile.</small></div></div>
+      <div class="tile"><span class="k">Handwriting</span>
+        <div class="d">Reads your Pencil<small>Read by Pri’s server when you are online. Needs an account.</small></div></div>
+      <div class="tile"><span class="k">Automatic marking</span>
+        <div class="d">Checked by the engine<small>Final answer marked at once, with the worked solution. It can be wrong.</small></div></div>
+      <div class="tile"><span class="k">Three tracks</span>
+        <div class="d">Boards → JEE Advanced<small>CBSE / NCERT, JEE Main, JEE Advanced.</small></div></div>
+      <div class="tile"><span class="k">Classes 7 to 12</span>
+        <div class="d">77 chapters<small>Class 9: 8 of the 15 CBSE 2026–27 chapters. Class 8: the earlier NCERT book.</small></div></div>
+      <div class="tile"><span class="k">Generated practice</span>
+        <div class="d">Fresh numbers each time<small>Small pools repeat, and Pri says so when they do.</small></div></div>
+      <div class="tile"><span class="k">Timed papers</span>
+        <div class="d">Exam-style practice<small>Timed paper simulations, marked automatically. No rank is predicted.</small></div></div>
     </div>
     <div class="spacer"></div>
     <div class="signoff">
@@ -344,8 +345,8 @@ const SLIDES = [
     ${head('What Pri does')}
     <div class="lead"></div>
     <h1>Write the maths.<br>It marks the maths.</h1>
-    <div class="sub">Handwriting read on the iPad itself, working marked line by line —
-      Class 7 to JEE Advanced, and the question bank does not run out.</div>
+    <div class="sub">Handwriting read by Pri’s server, final answers marked automatically — maths practice
+      for CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced. Marking can be wrong.</div>
     <div class="swipe"><span>Five things</span><span class="dash"></span><span>→</span></div>
     <div class="spacer"></div>
     ${foot(1)}
@@ -354,100 +355,88 @@ const SLIDES = [
   ['02-recognition', 'Recognition', `<div class="slide">
     ${head('Recognition', '01')}
     <h2>It reads your handwriting,<br>not your <em>typing</em>.</h2>
-    <p class="body">A convolutional net ships <b>inside the app</b> — 597 kB of int8 weights,
-      running on the iPad itself. Fractions, roots, exponents, multi-line working. No network,
-      no upload, no account. It learns your hand, per profile.</p>
+    <p class="body">Write with the Pencil the way you would on paper — fractions, roots, exponents,
+      multi-line working. When you are online, Pri’s server reads the ink and the engine marks the
+      final answer. It needs an account and a connection, and the reading can be wrong: Pri shows
+      what it read, and you can type instead.</p>
     <div class="glyphs">
-      <div class="cap">56 symbols · read on device</div>
+      <div class="cap">fractions · roots · exponents · multi-line working</div>
       <div class="row">${
-        // Every glyph here is a class the shipped net actually has —
-        // client/src/ink/model-data.js, 56 of them. Do not add one that is not.
         ['0','1','2','3','4','5','6','7','8','9','x','y','t','n','a',
          'b','e','θ','π','√','÷','±','+','−','=','≠','≤','≥','%','°']
           .map(g => `<span>${g}</span>`).join('')
       }</div>
     </div>
     <div class="spacer"></div>
-    ${stat(
-      'Held-out writer suite · 40 writers × 14 lines',
-      '<b>98.4%</b> of characters read correctly<br><b>94.5%</b> of whole lines exact',
-      'Simulated writers, n = 560 lines — <code>inkcheck-holdout2.mjs</code>. Worst single hand: 71%. Not a human trial.'
-    )}
+    <div class="foot">The ink is read by an outside AI service (OpenAI) through Pri’s server; the mark is decided
+      by Pri’s own deterministic engine, never by the AI. Nothing leaves the device until you have agreed to that.</div>
     ${foot(2)}
   </div>`],
 
   ['03-marking', 'Marking', `<div class="slide">
     ${head('Feedback', '02')}
-    <h2>The ticks land on<br><em>your own ink</em>.</h2>
-    <p class="body">Marked the moment you lift the Pencil — line by line, method marks awarded
-      where the reasoning holds even when the final answer does not, and the exact line where
-      the maths breaks named in the margin.</p>
+    <h2>The verdict lands on<br><em>your own answer</em>.</h2>
+    <p class="body">Marked when you submit — the final answer is checked by Pri’s deterministic engine, and the
+      worked solution shows every step and names the usual slip. Marking is automatic and can be wrong;
+      the solution is there to check it against.</p>
     <div class="paper">
       <div class="cap">Class 10 · Quadratic equations</div>
-      <div class="line"><span class="ink">x<sup>2</sup> + 6x + 5 = 0</span><span class="marks">M1</span><span class="tick">✓</span></div>
-      <div class="line"><span class="ink">(x + 3)<sup>2</sup> − 9 + 5 = 0</span><span class="marks">M1</span><span class="tick">✓</span></div>
-      <div class="line"><span class="ink">x = −1  or  x = 5</span><span class="marks">A1</span><span class="cross">✗</span></div>
-      <div class="note">The maths breaks on this line — <b>you keep flipping the sign</b> taking the
-        root across. 2 of 3 marks.</div>
+      <div class="line"><span class="ink">x<sup>2</sup> + 6x + 5 = 0</span><span class="marks"></span><span class="tick">✓</span></div>
+      <div class="line"><span class="ink">(x + 3)<sup>2</sup> − 9 + 5 = 0</span><span class="marks"></span><span class="tick">✓</span></div>
+      <div class="line"><span class="ink">x = −1  or  x = 5</span><span class="marks"></span><span class="cross">✗</span></div>
+      <div class="note">The maths breaks on this line — <b>the sign flipped</b> taking the
+        root across. Final answer: not accepted.</div>
     </div>
     <div class="spacer"></div>
-    <div class="foot">A grade is not feedback. The misconception has a name, and the engine
-      names it — <b>795 / 795</b> seeded mistakes identified, <code>npm run test:diagnose</code>.</div>
+    <div class="foot">Not a grade alone: the worked solution and the named slip come with every marked answer.
+      The ticks on working lines are illustrative; the mark is on the final answer.</div>
     ${foot(3)}
   </div>`],
 
   ['04-levels', 'Levels', `<div class="slide">
-    ${head('Every level', '03')}
+    ${head('Three tracks', '03')}
     <h2>Boards to <em>JEE Advanced</em>.<br>One app.</h2>
-    <p class="body">Four tracks over the same mathematics. What separates them is not the
+    <p class="body">Three tracks over the same mathematics. What separates them is not the
       chapter list — it is the pressure.</p>
     <div class="ladder">
       <div class="rung"><span class="name">CBSE / NCERT</span><span class="desc">The school syllabus, Classes 7–12</span><span class="tier">D1–D3</span></div>
       <div class="rung"><span class="name">JEE Main</span><span class="desc">Classes 11–12 at objective depth, negative marking, 3 hours</span><span class="tier">D1–D4</span></div>
-      <div class="rung"><span class="name">JEE Advanced</span><span class="desc">The same syllabus taken to multi-concept depth</span><span class="tier">D1–D4</span></div>
-      <div class="rung"><span class="name">Olympiad</span><span class="desc">PRMO → RMO → INMO — not harder school maths, a different subject</span><span class="tier">D1–D4</span></div>
+      <div class="rung"><span class="name">JEE Advanced</span><span class="desc">Classes 11–12 at JEE Advanced depth</span><span class="tier">D3–D4</span></div>
     </div>
     <div class="spacer"></div>
-    <div class="foot">Full mock papers with criteria marking, a predicted percentile from your
-      own practice, and Match Mode races. Percentile is an estimate from practice data — not a
-      guarantee of results.</div>
+    <div class="foot">Timed paper simulations in each track, marked automatically. Pri does not predict a rank.
+      JEE Advanced is part of Premium.</div>
     ${foot(4)}
   </div>`],
 
   ['05-syllabus', 'Syllabus', `<div class="slide">
-    ${head('Every class', '04')}
-    <h2>Class 7 to Class 12.<br><em>All of it</em>, mapped.</h2>
-    <p class="body">Not a chapter list on a landing page — every NCERT chapter broken into the
-      syllabus lines it teaches, each with a generator behind it.</p>
+    ${head('Classes 7–12', '04')}
+    <h2>Class 7 to Class 12.<br><em>77 chapters</em>.</h2>
+    <p class="body">Chapters broken into the outcomes they teach, each with generated practice behind it.
+      Class 9 currently has 8 of the 15 chapters in the CBSE 2026–27 list; Class 8 follows the earlier
+      NCERT book.</p>
     <div class="grid">
       <div class="cell"><div class="n">7</div><div class="t">Integers, first algebra, plane geometry</div></div>
       <div class="cell"><div class="n">8</div><div class="t">Identities, mensuration, first graphs</div></div>
-      <div class="cell"><div class="n">9</div><div class="t">Irrationals, polynomials, proof</div></div>
+      <div class="cell"><div class="n">9</div><div class="t">Irrationals, polynomials, circles</div></div>
       <div class="cell"><div class="n">10</div><div class="t">The board year — quadratics, AP, trig</div></div>
       <div class="cell"><div class="n">11</div><div class="t">The JEE foundation year</div></div>
       <div class="cell"><div class="n">12</div><div class="t">Calculus, matrices, vectors, boards</div></div>
     </div>
     <div class="spacer"></div>
-    ${stat(
-      'Syllabus coverage',
-      '<b>252 / 252</b> dot points covered<br><b>220</b> targeted exactly · <b>0</b> reach zero',
-      '<code>node tools/dotpoint-coverage.mjs</code> — 32 are reachable only alongside a sibling, so 220 is the number that survives “targeted”.'
-    )}
+    <div class="foot">Not endorsed by, affiliated with or approved by NCERT, CBSE or the NTA.</div>
     ${foot(5)}
   </div>`],
 
-  ['06-unlimited', 'Unlimited', `<div class="slide">
-    ${head('Unlimited', '05')}
-    <h2>The bank does<br><em>not run out</em>.</h2>
-    <p class="body">Every question is built from a seed, not drawn from a pool — so the same
-      chapter at the same difficulty hands you a new question, not the one you did last week.
-      Premium is unlimited: every track, every class, no cap.</p>
+  ['06-unlimited', 'Generated', `<div class="slide">
+    ${head('Generated', '05')}
+    <h2>Fresh numbers,<br><em>every time</em>.</h2>
+    <p class="body">Questions are generated, so the same chapter at the same difficulty hands you a new
+      question rather than the one you did last week. Small pools repeat, and Pri tells you when a
+      question is a repeat.</p>
     <div class="spacer"></div>
-    ${stat(
-      'Question census · 3,000 draws × 336 cells',
-      '<b>344,798</b> distinct questions observed<br>thinnest cell holds <b>54</b> · <b>0</b> cells return one',
-      '<code>node tools/count-questions.mjs</code>, last measured 2026-08-21. “Unlimited” is a claim about the space; the thin-cell number is the half that keeps it honest.'
-    )}
+    <div class="foot">Free: 20 practice questions a day and one timed paper every 30 days. Premium (₹199 a month or
+      ₹1,499 a year): no daily cap, no paper limit, and the JEE Advanced track.</div>
     ${foot(6)}
   </div>`],
 
@@ -455,9 +444,9 @@ const SLIDES = [
     <div class="word"><span class="P">P</span>ri Learning</div>
     <div class="join">Join the change.</div>
     <div class="rulebreak"></div>
-    <div class="handle">Class 7 to Olympiad · marked like an examiner<br>All of it on your iPad</div>
+    <div class="handle">CBSE / NCERT Classes 7–12 · JEE Main · JEE Advanced<br>Marking is automatic and can be wrong</div>
     <div class="pill">Follow @pri.learning — coming soon</div>
-  </div>`],
+  </div>`]
 ];
 
 mkdirSync(resolve(HERE, 'slides'), { recursive: true });

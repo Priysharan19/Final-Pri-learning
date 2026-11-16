@@ -8,7 +8,6 @@ const critical = [
   'Info.plist',
   'PriLearningApp.swift',
   'LocalSchemeHandler.swift',
-  'PhotoOCR.swift',
   'WebShell.swift',
   'StoreKitBillingBridge.swift',
   'NativeCloudBridge.swift'

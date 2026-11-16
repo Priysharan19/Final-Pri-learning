@@ -30,10 +30,15 @@ import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 import { inkLineVerdicts, workingEvidence, workingEvidenceCopy } from '../src/components/attemptEvidence.js';
 import EN from '../src/i18n/strings.en.js';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 // Plain arithmetic: the server has no step meta for these, so it can check the
 // final answer and nothing else — the conditions of the staging report.
-const ARITHMETIC = 'y7-integers';
+const ARITHMETIC = 'c7-integer-operations-current';
+// A method the server CAN check: it needs step meta (an "x =" answer). No
+// Class 7 India form carries one ("Solve $2x=12$." has no answer prefix), so
+// the checked-method case uses the Class 10 pair of linear equations, whose
+// D1/D2 forms ask for x (or y) by name.
+const STEP_CHECKED = 'c10-linear-pair-methods';
 const WHOLE = /^-?\d{1,4}$/;
 const SUBMIT = { name: 'Submit Answer' };
 const TAG = '[SYNTHETIC-READER EVIDENCE]';
@@ -111,7 +116,8 @@ export const flow = {
     /** A fresh, untried numeric question, in handwriting mode. */
     const openFresh = async ({ want = () => true, tries = 6, topic = TOPIC } = {}) => {
       await quiet();
-      await page.goto(`${base}/practice?subtopic=${topic}`, { waitUntil: 'domcontentloaded' });
+      // The integers chapter at D3 is mostly multiple choice; held at D2, where every form is written.
+      await page.goto(`${base}/practice?subtopic=${topic}${topic === ARITHMETIC ? '&difficulty=2' : ''}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.q-prompt', { timeout: 30000 });
       await settle();
       for (let moved = 0; moved < tries; moved++) {
@@ -229,7 +235,10 @@ export const flow = {
     {
       // The page says the question's working can be step-checked only when the
       // server has step meta for it; the lines below are then checked by it.
-      const made = await openFresh();
+      // Only a question whose answer names its letter ("x =") has the step
+      // meta the server checks lines against (markerOps.stepMetaFor); the
+      // topic's later forms do not, so they are skipped.
+      const made = await openFresh({ topic: STEP_CHECKED, tries: 16, want: right => /^[a-z]\s*=$/i.test(String(right.answerPrefix || '')) });
       if (await check('checked method: a numeric question is on the card', !!made)) {
         const { right, box } = made;
         const lines = [String(right.text), String(right.text)];

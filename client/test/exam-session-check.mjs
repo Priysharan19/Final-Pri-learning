@@ -40,7 +40,7 @@ installBrowserEnv();
 // shares this suite's Date.now; both students sign in at offset 0 and the
 // clock never moves more than a paper's length from real time.
 const { startOnlineAuthority } = await import('./support/online-authority.mjs');
-const online = await startOnlineAuthority({ label: 'exam-session' });
+const online = await startOnlineAuthority({ label: 'exam-session', nswBanks: true });
 const { dispatch } = await import('../src/local/backend.js');
 const { dispatchIndiaExam } = await import('../src/local/indiaExamBackend.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');

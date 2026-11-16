@@ -1,79 +1,78 @@
-# Request to an independent maths examiner (issue #499)
+# Request to an independent maths examiner (issue #499) — V1
 
-**Purpose:** a ready-to-send email the owner can address to a qualified, independent CBSE / JEE
-mathematics examiner, plus the sign-off template the examiner returns. Prepared 2026-10-18 from
-GitHub issue #499. The owner fills the `<…>` fields, attaches the dossier, and sends it. The
-examiner's reply is the only thing that can turn on the method-mark rubrics; agent-written
-checklists, model output and the owner's own review do not count (#499).
+**Purpose:** a ready-to-send email the owner addresses to a qualified, independent CBSE / JEE mathematics examiner, the material to attach, and the sign-off form the examiner returns. Rewritten 9 Nov 2026 for the V1 scope (owner defaults D12–D15, `docs/release/V1_DECISIONS_2026-11-01.md`); it replaces the 18 Oct 2026 version, which asked only about the method-mark pilot.
 
-**Before sending, the owner:**
+The examiner's signed reply is the only thing that can (a) confirm the interim final-answer policies D13 and D14, and (b) turn on method marks (D12). Agent-written checklists, model output and the owner's own review do not count (#499).
 
-1. Chooses an examiner who is independent of Pri (not an employee, investor, relative or the
-   owner) and qualified — for example a current or former CBSE board examiner or senior school
-   mathematics teacher for Classes VIII–XI, or a JEE mathematics faculty member.
-2. Exports the dossier `docs/marking/order14-examiner-certification-dossier.md` from the preserved
-   local checkout `~/Developer/pri-marking-order14-local` (candidate `71634704fc07d97498fdef8ec39e0d0e3baac9b3`,
-   based on `8df9a7a6d9ece3475c0954ac6a2a2b6f4eea976d`) to PDF, and records its SHA-256 below.
-3. Agrees a fee and a deadline with the examiner.
-4. Records the examiner's identity and qualification with the release governor (not in this
-   repository if the examiner prefers).
+## What V1 asks of the examiner
 
----
+V1 launches with **marks for the final answer only** (D12): method marks are off in production through a server switch (`PRI_METHOD_MARKS`, `server/platform/markingPolicy.js`) that stays off until this review is signed. So the review has two parts, and only Part A is on the launch path.
+
+| Part | What | Launch | Material |
+|---|---|---|---|
+| **A** | Final-answer marking: what counts as a correct final answer, the interim policies D13 (unevaluated answers) and D14 (units), and a sample of served questions | **Before launch** (#499) | A1–A4 below |
+| **B** | Method-mark rubrics (the five-family pilot): only needed before method marks are switched on | After launch | B1 below |
+| **C** | (optional, can be another reviewer) PR #243's domain policy for final expression answers — blocker B-08 | Before launch, unless the release governor rules it non-blocking | `docs/marking/B-08-pr243-disposition.md` |
+
+## Before sending, the owner
+
+1. Chooses an examiner independent of Pri (not an employee, investor, relative or the owner) and qualified — for example a current or former CBSE board examiner or senior mathematics teacher for Classes VII–XII, or a JEE mathematics faculty member.
+2. **Freezes the release candidate** and regenerates every attachment **at the candidate's exact SHA**, so the review is bound to the code that ships:
+   ```
+   git checkout <release-candidate SHA>
+   node tools/examiner-dossier.mjs                    # docs/marking/order14-examiner-certification-dossier.md
+   node client/test/support/examiner-sample.mjs       # docs/marking/examiner-sample-v1.md
+   node client/test/correct-answer-sweep-check.mjs    # must print PASS
+   node client/test/false-positive-sweep-check.mjs    # must print PASS
+   ```
+   and records below the candidate SHA, the dossier's rubric digest, the sample digest (the last line of the sample file) and the #680 case-set digest (`sha256sum client/test/fixtures/680-sourced.json`). A signature over any other digest does not carry over: every marking change produces a new digest and re-requests review.
+3. Exports the attachments to PDF and records their SHA-256 values.
+4. Agrees a fee and a deadline, and records the examiner's identity and qualification with the release governor (outside this repository if the examiner prefers).
+
+| Bound to | Value (fill at candidate freeze) |
+|---|---|
+| Release-candidate SHA | `<sha>` |
+| Dossier rubric digest | `<digest>` |
+| Served-question sample digest | `<digest>` |
+| #680 case-set digest (`680-sourced.json`) | `<digest>` |
+
+## Attachments (Part A)
+
+- **A1 · The final-answer rules** — `docs/content/marking-tolerance.md` (hashed into the dossier digest): exactness of whole-number answers, the decimal band, named precision, fractions and surds, percentages, angles, rupees and paise, intervals, sets, points, ratios.
+- **A2 · The interim policies, with the questions to rule on** — section "Questions for the examiner" in this email.
+- **A3 · The #680 case set** — `client/test/fixtures/680-sourced.json`, run by `client/test/marker-680-sourced-check.mjs`. Issue #680 reported 197 wrong answers an earlier version of the marker credited (104 shifted interval boundaries, 93 malformed or mismatched answers), with 44 valid and 26 far-wrong controls. **The original manifest of those cases was never committed and is lost.** This file holds every case #680's own comments preserve: 91 cases, each quoting the comment it comes from (73 verbatim, 18 rebuilt from a stated rule) — 55 of the 197 wrong answers, 35 of the 44 valid controls and 1 of the 26 far-wrong controls — with Pri's current verdict. The families it cannot fill are covered, from other sources, by `client/test/marker-adversarial-corpus-check.mjs` (219 cases) and `client/test/marker-exact-bounds-check.mjs` (107 cases); the examiner should treat those as the same families, not as the lost originals.
+- **A4 · A sample of served questions** — `docs/marking/examiner-sample-v1.md`: one question for each of the 84 chapters served, with the printed answer and Pri's verdict on the key, the key with its unit, ₹ on an amount, the key written as a sum still to do, a neighbouring wrong value and a contradicting unit. The examiner fills in the last column.
 
 ## Email
 
-**Subject:** Paid review request: marking rules for a CBSE / JEE maths practice app (about 2 days)
+**Subject:** Paid review request: final-answer marking rules for a CBSE / JEE maths practice app
 
 > Dear <Examiner name>,
 >
-> I am building Pri Learning, a maths practice app for Indian students (CBSE / NCERT Classes 7–12
-> and JEE). Students write their working by hand; a computer program then awards marks using
-> fixed rules. Before I switch on the rules that give **method marks** (marks for working, not
-> only the final answer), I need an independent, qualified examiner to check that they award
-> marks the way a board examiner would. I would like to ask whether you would do this review,
-> for a fee of <amount> and by <date>.
+> I am building Pri Learning, a maths practice app for Indian students (CBSE / NCERT Classes 7–12 and JEE). A computer program marks each answer with fixed rules — no AI decides a mark. Before the app goes to students I need an independent, qualified examiner to check that those rules give a mark exactly when a board examiner would. I would like to ask whether you would do this review, for a fee of <amount> and by <date>.
 >
-> **What the review covers (a small pilot).** Five question families, each generated by the app
-> from a template with a numbered "seed":
+> **At launch, marks are for the final answer only.** Students can show working, and the app checks each line and points to the first slip, but no marks are given for working until an examiner has approved the rules for that too (Part B, later). So the question for now is narrow: **when is a final answer correct?**
 >
-> 1. Class X arithmetic progressions — final-answer-only questions (difficulty 1), and
->    set-up / term-index / result questions (difficulty 3), including seed 645
->    (first term 1, common difference −1, target −26, n = 28).
-> 2. Class VIII two-sided linear equations (difficulty 3) — 85 listed seeds only.
-> 3. Year 8 working-only questions (difficulty 3) — seeds 4, 5 and 13.
-> 4. Class XI domain of a rational function (difficulty 2) — seeds 1–20 and 5401 only.
-> 5. Class XI least value of an expression (difficulty 3) — **a policy decision, not yet a
->    marking rule**: should its three marks be for the final answer only, or should they require
->    showing that a square is non-negative, that equality is attained, and the final answer? At
->    present a correct final answer with a false strict inequality in the working receives 3/3.
->    I would like your independent view.
+> **What I am asking you to do (Part A).**
 >
-> **What I am asking you to do.** For each question form in the attached dossier:
+> 1. Read the attached final-answer rules (A1) and tell me any rule a board examiner would not apply.
+> 2. Rule on the interim policies below (A2). I have taken a default for each; your decision replaces it.
+> 3. Look at the attached case set (A3): wrong answers an earlier version wrongly accepted, and right answers that must stay accepted (the original list was lost; this is what our records preserve). Tell me any verdict you disagree with.
+> 4. Mark the attached sample of real questions from the app (A4): for each question, mark the listed answers as you would on a board paper, and note every disagreement with the app's verdict.
 >
-> - solve it yourself, without relying on the software's expected marks;
-> - mark these student responses as a board examiner would, criterion by criterion: the standard
->   method; a valid alternative or reversed equality; a correct but compressed method; a right
->   final answer with an invalid method; a wrong final answer with a good method; repeated or
->   padded lines; several independent mistakes; and correct follow-through after an earlier
->   arithmetic slip (error carried forward);
-> - note every case where your mark differs from the mark the software gives;
-> - confirm the questions are within the syllabus and appropriate for students.
+> **Questions for the examiner (A2).**
 >
-> The dossier lists each generator, the rubric text, the seed numbers and the printed forms. The
-> software already has automated tests, but those tests check the program against itself; they
-> cannot tell me whether the policy is right. That is what I need from you.
+> - **D13 — answers with an operation left to do.** The app refuses a final answer that still has an operation to do — `2 + 3`, `3² − 4`, `√25`, `2 × 2.5`, `8!/7!`, `⁵C₂`, `π + π` — whatever it equals, and asks the student to work it out (no try is spent). It accepts a single value: a number (also `3.2 × 10⁵`), a fraction (also unsimplified, unless the question asks for lowest terms), a mixed number, a surd `k√n`, a multiple of π, `e` or a logarithm of a whole number, or a sum of unlike terms (`2 + √3`, `(1 + √5)/2`). *Is that right? Should an unsimplified fraction (`10/4`) or surd (`√18`) be refused where the question does not ask for simplest form? Should a list of roots written `2 ± 3` be accepted?*
+> - **D14 — units.** A bare number passes where the answer box shows the unit; the right unit in any spelling passes (`12 cm`, `12 cms`, `60 kmph`, `₹500/-`, `98.1 crore`); a different unit or currency is wrong (`12 m` for 12 cm, `$500` for ₹500, `₹16` for "how many ₹20 notes"). Where the box shows no unit, a unit is accepted only if it matches the quantity asked (a length in `cm` when the question is in cm) and is otherwise not read. *Is that right? Should a correct value in an equivalent unit (`120 mm` for `12 cm`) be accepted?*
+> - **Labels.** `x = 5` is accepted for "find x"; `b = 50` is refused for "find b²"; `Profit % = 20` is accepted for "find the percentage profit". *Is that right?*
+> - **Percentages.** Where a question asks for a percentage, `20%`, `20 percent` and `20` are accepted; `0.2` is not. Where it asks for a probability, `20%` and `0.2` are both accepted. *Is that right?*
+> - **Rounding.** A whole-number answer must be exact; a decimal answer is accepted to about five significant figures unless the question names a precision ("to 2 decimal places"), and then only to that precision. *Is that right?*
 >
-> **What I would like back.** The completed sign-off form below (a scanned signed copy or a
-> signed PDF is fine), and, for any question you do not approve, a short list of what is wrong and
-> what the correct marking should be. You do not need to change any software, and nothing will be
-> switched on in the app on your word alone without our own governance review.
+> **What I would like back.** The completed sign-off form below (a scanned signed copy or a signed PDF is fine), the marked sample, and for any rule you do not approve, a short note of what the correct marking should be. You do not need to change any software, and nothing will be changed in the app on your word alone without our own review.
 >
-> **Time.** I estimate about **12–16 hours** in total: roughly 6–8 hours for the arithmetic
-> progression and linear-equation forms, 3–4 hours for the rational-domain forms, and 2–3 hours for
-> the least-value decision and the write-up. Please tell me if you think it will take longer.
+> **Time.** I estimate about **10–14 hours**: 2–3 for the rules and policies, 2–3 for the case set, 6–8 for the sample. Please tell me if you think it will take longer. (Part B, the method-mark rubrics, is a separate, later engagement of about 12–16 hours.)
 >
-> **Confidentiality.** The dossier is unpublished material; please do not share it. No student
-> data is included — every response in it is constructed.
+> **Confidentiality.** The material is unpublished; please do not share it. No student data is included — every answer in it is constructed.
 >
 > I would be glad to answer questions by email or phone (<phone>). Thank you for considering it.
 >
@@ -81,14 +80,12 @@ checklists, model output and the owner's own review do not count (#499).
 > <Owner name>
 > Pri Learning — <email>
 >
-> Attachment: <dossier file name> (SHA-256 `<digest>`)
+> Attachments: A1–A4 (SHA-256 values listed in the sign-off form)
 
----
-
-## Sign-off template (for the examiner to return)
+## Sign-off form (for the examiner to return)
 
 ```text
-PRI LEARNING — INDEPENDENT EXAMINER REVIEW OF METHOD-MARK RUBRICS (GitHub issue #499)
+PRI LEARNING — INDEPENDENT EXAMINER REVIEW OF FINAL-ANSWER MARKING (GitHub issue #499, V1)
 
 Reviewer
   Full name:
@@ -97,55 +94,40 @@ Reviewer
   I confirm I am independent of Pri Learning and its owner:        [ ] yes
   I was paid a fee for this review:                                 [ ] yes  [ ] no
 
-Material reviewed
-  Dossier file name:
-  Dossier SHA-256:
-  Source candidate SHA:      71634704fc07d97498fdef8ec39e0d0e3baac9b3
-  Rubric file digest(s):
+Material reviewed (bound to the release candidate)
+  Release-candidate SHA:
+  Dossier rubric digest:
+  Served-question sample digest:
+  #680 case-set digest:
+  Attachment PDFs and their SHA-256:
   Date(s) of review:
 
-Coverage (tick what you reviewed; list seeds not reviewed)
-  [ ] Class X arithmetic progressions, D1 final-only
-  [ ] Class X arithmetic progressions, D3 setup / index / result (incl. seed 645)
-  [ ] Class VIII D3 two-sided linear equations (85 listed seeds)
-  [ ] Year 8 D3 working-only (seeds 4, 5, 13)
-  [ ] Class XI rational-domain D2 (seeds 1–20, 5401)
-  Seeds or forms not reviewed:
+A1 Final-answer rules            APPROVE / CONDITIONAL / REJECT
+   Rules you would change (numbered):
+A2 Interim policies
+   D13 unevaluated answers        APPROVE / CHANGE:
+       unsimplified fraction (10/4) where lowest terms not asked:  accept / refuse
+       unsimplified surd (√18) where simplest form not asked:       accept / refuse
+       "2 ± 3" for a list of roots:                                 accept / refuse
+   D14 units                      APPROVE / CHANGE:
+       equivalent unit (120 mm for 12 cm):                          accept / refuse
+   Labels                         APPROVE / CHANGE:
+   Percentages                    APPROVE / CHANGE:
+   Rounding                       APPROVE / CHANGE:
+A3 #680 case set                  verdicts you disagree with (case ids):
+A4 Served-question sample         rows you mark differently (chapter, writing, your mark):
+   Questions outside the CBSE / NCERT / JEE syllabus, or unsuitable (list):
 
-Response cases checked for each form
-  [ ] canonical method                 [ ] valid alternative / reversed equality
-  [ ] correct compressed method        [ ] right final / invalid method
-  [ ] wrong final / good method        [ ] repeated or padded lines
-  [ ] multiple independent mistakes    [ ] error carried forward after an arithmetic slip
-
-Policy decisions
-  Error-carried-forward policy you recommend:
-  Approved alternative methods (list):
-  Instances you reject, with the correct mark per criterion (list or attach):
-
-Class XI least value (D3) — NOT currently admitted for method marking
-  Decision:  [ ] final answer only (3 marks)
-             [ ] requires: non-negative square + equality attained + final answer
-             [ ] other (describe):
-  Mark for "correct final answer with a false strict inequality":
-
-Syllabus and content
-  [ ] Within the CBSE / NCERT syllabus for the stated class
-  [ ] Content appropriate for students
-  Notes:
-
-Result for each family:  APPROVE / CONDITIONAL / REJECT
-  Class X AP D1:
-  Class X AP D3:
-  Class VIII linear equations D3:
-  Year 8 working-only D3:
-  Class XI rational domain D2:
-  Conditions or defects (numbered):
+Overall, for launch (final-answer marking only):  APPROVE / CONDITIONAL / REJECT
+Conditions (numbered):
 
 Signature:                                   Date:
 ```
 
-**After it comes back:** the release governor records the result against issue #499 with the
-dossier digest, keeps the signed copy outside the repository if it contains personal details, and
-opens a separate reviewed change for any rubric the examiner approved. A CONDITIONAL or REJECT
-result becomes a repair register; nothing is switched on in production from this document alone.
+## Part B (after launch) · method marks
+
+Method marks stay off until a separate signed review of the method-mark rubrics. The material for that review is the dossier `docs/marking/order14-examiner-certification-dossier.md` (40 rubric banks), regenerated at the candidate SHA; the five-family pilot it lists (Class X arithmetic progressions D1 and D3, Class VIII two-sided linear equations D3, Year 8 working-only D3, Class XI rational domain D2, and the Class XI least-value policy decision) and the response cases (canonical method, valid alternative, compressed method, right final / invalid method, wrong final / good method, padded lines, several mistakes, error carried forward) are unchanged from the 18 Oct 2026 request. After a signed APPROVE for a family, the owner sets `PRI_METHOD_MARKS=on` with `PRI_METHOD_MARKS_EXAMINER_RESULT` naming the signed result, in the same release as the app and store wording that announces method marks.
+
+## After it comes back
+
+The release governor records the result against #499 with the bound digests, keeps the signed copy outside the repository if it contains personal details, and opens a separate reviewed change for every rule the examiner changes; each change regenerates the dossier, the sample and the sweeps, and so re-requests review of what changed. A CONDITIONAL or REJECT becomes a repair register. Nothing in production changes from this document alone.

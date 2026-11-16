@@ -94,6 +94,12 @@ function sizeOf(node) {
   return size;
 }
 
+/**
+ * Charge `units` of other deterministic work (exact BigInt arithmetic) to the
+ * check's one budget. False once the budget is spent; outside a check, free.
+ */
+export function chargeEvaluation(units) { return spend(units); }
+
 /** Run `fn` with at most `units` evaluated sum-term nodes and counting-loop turns in total. An enclosing budget is kept. */
 export function withEvaluationBudget(units, fn) {
   if (evaluationBudget !== null) return fn();
@@ -253,7 +259,8 @@ function tokenize(input) {
       }
       const numStr = src.slice(i, j);
       if ((numStr.match(/\./g) || []).length > 1) throw new Error('Malformed number');
-      tokens.push({ t: 'num', v: parseFloat(numStr) });
+      // The literal as written rides along so exact.js can read it exactly.
+      tokens.push({ t: 'num', v: parseFloat(numStr), s: numStr });
       i = j;
       continue;
     }
@@ -364,7 +371,7 @@ class Parser {
   parseAtom() {
     const tok = this.next();
     if (!tok) throw new Error('Unexpected end of expression');
-    if (tok.t === 'num') return this.maybePower({ t: 'num', v: tok.v });
+    if (tok.t === 'num') return this.maybePower({ t: 'num', v: tok.v, ...(tok.s !== undefined ? { s: tok.s } : {}) });
     if (tok.t === 'const') return this.maybePower({ t: 'const', v: tok.v });
     if (tok.t === 'var') return this.maybePower({ t: 'var', v: tok.v });
     if (tok.t === 'lp') {
@@ -1032,20 +1039,49 @@ function exprEquivalentUncached(a, b, opts) {
  */
 export function numsClose(a, b, tol) {
   if (!Number.isFinite(a) || !Number.isFinite(b)) return false;
-  return Math.abs(a - b) <= (tol ?? numericBand(b));
+  if (tol != null) return Math.abs(a - b) <= tol;
+  // A rounded decimal is right only when it is the target rounded to the
+  // places it was written to: 141.43 is not 100√2 to two places (141.42),
+  // though it sits inside the relative band (#518).
+  // The places of an evaluated exact form (17496√2) cap at twelve, and half a
+  // unit of the twelfth place is below binary64 noise once |b| passes ~2000,
+  // so the band never falls under four units of b's last binary place.
+  const band = Number.isInteger(b) ? numericBand(b)
+    : Math.min(numericBand(b), Math.max(0.5 * 10 ** -decimalPlaces(a) * (1 + 1e-9), Math.abs(b) * 4 * Number.EPSILON));
+  return Math.abs(a - b) <= band;
 }
 
 /** The default band numsClose allows around a target b. */
 export function numericBand(b) {
+  // A whole-number target is exact: its band only absorbs floating-point
+  // noise — 1e-9 near zero, two units of the last binary place at any size
+  // (#680: a |b|·1e-9 band, capped at 0.25, accepted 21149700.019 for a key of
+  // 21149700 and 3840000000000.2 for 3840000000000).
   return Number.isInteger(b)
-    ? Math.min(0.25, Math.max(1e-9, Math.abs(b) * 1e-9))
-    : Math.min(decimalCap(b), Math.max(1e-6, Math.abs(b) * 1e-4));
+    ? Math.max(1e-9, Math.abs(b) * 2 * Number.EPSILON)
+    : Math.min(decimalCap(b), relativeBand(b));
+}
+
+/**
+ * The relative band a non-integer value gets: 1e-4 of its size, with a 1e-9
+ * floor that only absorbs floating-point noise around zero (a 1e-6 floor
+ * forgave 0 for a target of 3e-7).
+ */
+export function relativeBand(b) {
+  return Math.max(1e-9, Math.abs(b) * 1e-4);
+}
+
+// The decimal places a value is written to: the fewest (up to 12) that
+// reproduce it to floating-point noise, so a computed 1357.9500000000003 is
+// two places, not sixteen. Infinity for anything longer (π, √2, 1/3).
+function decimalPlaces(b) {
+  for (let p = 0; p <= 12; p++) if (Math.abs(b - Number(b.toFixed(p))) <= Math.abs(b) * 4 * Number.EPSILON + 1e-12) return p;
+  return Infinity;
 }
 
 // Half a unit of the last decimal place for a target authored to one or two
 // places; 0.05 (one-place rounding) for every longer or non-terminating value.
 function decimalCap(b) {
-  const text = String(Math.abs(b));
-  const places = /e/i.test(text) ? Infinity : (text.split('.')[1] || '').length;
+  const places = decimalPlaces(b);
   return places <= 2 ? 0.5 * 10 ** -places : 0.05;
 }

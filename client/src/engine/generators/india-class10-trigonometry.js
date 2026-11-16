@@ -6,7 +6,18 @@
 import { ri, rc, Frac, mcq, rad, r1 } from '../qhelpers.js';
 import { figRightTriangle } from '../figures.js';
 
-const TRIPLES = Object.freeze([[3,4,5], [5,12,13], [8,15,17], [7,24,25], [20,21,29]]);
+// Primitive Pythagorean triples [a, b, c] with c < 1700 (Euclid's formula),
+// so every ratio is an exact fraction already in lowest terms.
+const TRIPLES = Object.freeze((() => {
+  const out = [];
+  const g = (x, y) => { while (y) [x, y] = [y, x % y]; return x; };
+  for (let m = 2; m * m < 1700; m++) for (let n = 1; n < m; n++) {
+    if ((m - n) % 2 === 0 || g(m, n) !== 1) continue;
+    const a = m * m - n * n, b = 2 * m * n;
+    out.push(Object.freeze([Math.min(a, b), Math.max(a, b), m * m + n * n]));
+  }
+  return out;
+})());
 const SPECIAL = Object.freeze({
   0: Object.freeze({ sin: '0', cos: '1', tan: '0' }),
   30: Object.freeze({ sin: '\\frac{1}{2}', cos: '\\frac{\\sqrt{3}}{2}', tan: '\\frac{\\sqrt{3}}{3}' }),
@@ -32,7 +43,9 @@ function exactFraction(frac) {
 
 export function currentClass10Trigonometry(rng, diff) {
   if (diff === 1) {
-    const [opp, adj, hyp] = rc(rng, TRIPLES);
+    const [p, q, c] = rc(rng, TRIPLES);
+    const k = ri(rng, 1, 6);
+    const [opp, adj, hyp] = rng() < 0.5 ? [k * p, k * q, k * c] : [k * q, k * p, k * c];
     const fn = rc(rng, ['sin', 'cos', 'tan']);
     const frac = fn === 'sin' ? new Frac(opp, hyp) : fn === 'cos' ? new Frac(adj, hyp) : new Frac(opp, adj);
     const ratio = fn === 'sin' ? 'opposite / hypotenuse' : fn === 'cos' ? 'adjacent / hypotenuse' : 'opposite / adjacent';
@@ -86,7 +99,8 @@ export function currentClass10Trigonometry(rng, diff) {
   }
 
   if (diff === 3) {
-    const [a, b, c] = rc(rng, TRIPLES);
+    const [p, q, c] = rc(rng, TRIPLES);
+    const [a, b] = rng() < 0.5 ? [p, q] : [q, p];
     const giveSin = rng() < 0.5;
     const given = giveSin ? new Frac(a, c) : new Frac(b, c);
     const want = giveSin ? new Frac(b, c) : new Frac(a, c);
@@ -138,7 +152,7 @@ function twoHeightFigure({ distance } = {}) {
 export function currentClass10TrigApplications(rng, diff) {
   if (diff === 1) {
     const angle = rc(rng, [30, 45, 60]);
-    const distance = ri(rng, 20, 80);
+    const distance = ri(rng, 10, 600);
     const height = distance * Math.tan(rad(angle));
     const answer = r1(height);
     return {
@@ -157,7 +171,7 @@ export function currentClass10TrigApplications(rng, diff) {
 
   if (diff === 2) {
     const angle = rc(rng, [30, 45, 60]);
-    const height = ri(rng, 18, 60);
+    const height = ri(rng, 10, 600);
     const distance = height / Math.tan(rad(angle));
     const answer = r1(distance);
     return {
@@ -175,7 +189,7 @@ export function currentClass10TrigApplications(rng, diff) {
   }
 
   if (diff === 3) {
-    const gap = rc(rng, [20, 30, 40, 50]);
+    const gap = 2 * ri(rng, 5, 300);
     const nearDistance = gap / 2;
     const height = nearDistance * Math.sqrt(3);
     const answer = r1(height);
@@ -194,7 +208,7 @@ export function currentClass10TrigApplications(rng, diff) {
     };
   }
 
-  const distance = rc(rng, [30, 45, 60, 75]);
+  const distance = ri(rng, 10, 600);
   const lower = distance / Math.sqrt(3);
   const upper = distance;
   const extra = upper - lower;

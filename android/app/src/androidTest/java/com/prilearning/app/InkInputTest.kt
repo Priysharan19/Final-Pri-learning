@@ -281,8 +281,21 @@ class InkInputTest {
             Thread.sleep(2000)
             assertEquals("nothing is read before the student presses Read my answer", "false",
                 eval(s, "!!document.querySelector('.ink-preview .ink-line[data-text]')"))
+            // D17: the first read of a profile meets the one-time prompt naming
+            // OpenAI. Nothing is read while it is open; the student's accept is
+            // the go-ahead. (An install that already accepted is not asked.)
+            val acceptedBefore = eval(s, "(function(){try{var r=JSON.parse(localStorage.getItem('pri-reader-permission-v1')||'{}');return Object.keys(r).some(function(k){return r[k]&&r[k].choice==='accepted'&&r[k].version===1;});}catch(e){return false;}})()") == "true"
             assertEquals("the press reaches the Read my answer button", "true",
                 eval(s, "(function(){var b=document.querySelector('[data-ink-read]');if(!b)return false;b.click();return true;})()"))
+            if (!acceptedBefore) {
+                val sheet = waitFor(s, "(function(){var d=document.querySelector('[data-reader-permission-sheet=\"ink\"]');return d?d.innerText:false;})()", 30_000)
+                assertTrue("the prompt before the first read names OpenAI: $sheet", sheet.contains("OpenAI"))
+                Thread.sleep(1500)
+                assertEquals("nothing is read while the permission prompt is open", "false",
+                    eval(s, "!!document.querySelector('.ink-preview .ink-line[data-text]')"))
+                assertEquals("the student accepts the prompt", "true",
+                    eval(s, "(function(){var b=document.querySelector('[data-reader-permission=\"accept\"]');if(!b)return false;b.click();return true;})()"))
+            }
             val read = waitFor(s, "(function(){var p=document.querySelector('.ink-preview');if(!p)return false;var n=p.querySelector('.ink-status');var l=p.querySelector('.ink-line[data-text]');return n&&l?(n.innerText.trim()+'|'+l.getAttribute('data-text')):false;})()", 30_000).trim('"')
             assertTrue("the card shows a reading made on Pri's server: $read", read.startsWith("Read on the server"))
             assertEquals("the reading is the server reader's (synthetic stand-in), not the device's: $read", "7", read.substringAfter('|'))

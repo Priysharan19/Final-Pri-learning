@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { cloud } from '../platform/cloudTransport.js';
-import { deleteCloudAccount, disconnectCloudAccount } from '../platform/cloudAccount.js';
+import { deleteCloudAccount, disconnectCloudAccount, signOutCloudAccountEverywhere } from '../platform/cloudAccount.js';
 import { requestIdentityToken, socialProviderConfig } from '../platform/socialSignIn.js';
 import { tLater, useT } from '../i18n/index.js';
 import { downloadJSON } from '../lib/files.js';
-import { cloudErrorCopy, cloudErrorText } from '../platform/cloudErrorCopy.js';
+import { cloudErrorCopy, cloudErrorText, signOutEverywhereFailureKey } from '../platform/cloudErrorCopy.js';
 import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 
 function when(value, t) {
@@ -20,6 +20,21 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const [deletePassword, setDeletePassword] = useState('');
   const [deletePhrase, setDeletePhrase] = useState('');
   const [busy, setBusy] = useState('');
+  // "Sign out everywhere" asks once more before it ends every session.
+  const [confirmEverywhere, setConfirmEverywhere] = useState(false);
+  // Focus follows the confirmation: onto its safe default (Cancel) when it
+  // opens, and back to the button that opened it when it closes.
+  const everywhereTrigger = useRef(null);
+  const everywhereCancel = useRef(null);
+  const everywhereReturn = useRef(false);
+  useEffect(() => {
+    if (confirmEverywhere) everywhereCancel.current?.focus();
+    else if (everywhereReturn.current) { everywhereReturn.current = false; everywhereTrigger.current?.focus(); }
+  }, [confirmEverywhere]);
+  function closeEverywhere() {
+    everywhereReturn.current = true;
+    setConfirmEverywhere(false);
+  }
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   // The export asks for fresh proof of the credential (401 REAUTH_REQUIRED
@@ -198,6 +213,26 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
     finally { setBusy(''); }
   }
 
+  /**
+   * Sign out everywhere (#481), after the inline confirmation: the server ends
+   * every session of this account on every device, this one included, and
+   * only then does this device forget its link, so the gate shows the sign-in
+   * card. A refusal or an outage keeps everything as it was and says so.
+   */
+  async function signOutEverywhere() {
+    if (busy) return;
+    start('logout-all');
+    try {
+      await signOutCloudAccountEverywhere(pid);
+      setConfirmEverywhere(false);
+      setMessage(tLater('cloudSecurity.signedOutEverywhere'));
+      await onDeleted?.({ cloudDeleted: false, sessionRevoked: true });
+    } catch (err) {
+      closeEverywhere();
+      setError(tLater(signOutEverywhereFailureKey(err)));
+    } finally { setBusy(''); }
+  }
+
   function resetExportProof() {
     setExportProof(null);
     setExportPassword('');
@@ -354,7 +389,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
   const providerLabel = useMemo(() => ({ password: t('cloudSecurity.providerPassword'), google: 'Google', apple: 'Apple' }), [t]);
 
   return (
-    <div style={{ marginTop: 14 }}>
+    <div className="cs-stack" style={{ marginTop: 14 }}>
       {!account?.emailVerified && <div className="card" style={{ boxShadow: 'none', marginBottom: 14 }}>
         <div className="sc-label">{t('cloudSecurity.emailVerification')}</div>
         <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.verificationRequired')}</div>
@@ -448,6 +483,24 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
             </div>
           )) : <div className="muted" style={{ fontSize: 13 }}>{t('cloudSecurity.noSessions')}</div>}
         </div>
+        <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid var(--hairline)' }}>
+          {!confirmEverywhere
+            ? <button ref={everywhereTrigger} className="btn btn-quiet btn-sm" type="button" data-testid="cloud-sign-out-everywhere" onClick={() => { setConfirmEverywhere(true); setMessage(''); setError(''); }} disabled={!!busy}>
+              {t('cloudSecurity.signOutEverywhere')}
+            </button>
+            : <div role="group" aria-labelledby="cloud-sign-out-everywhere-ask" data-testid="cloud-sign-out-everywhere-confirm">
+              <p id="cloud-sign-out-everywhere-ask" style={{ fontWeight: 600, margin: '0 0 8px' }}>{t('cloudSecurity.signOutEverywhereAsk')}</p>
+              <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
+                <button className="btn btn-ghost btn-sm" type="button" data-testid="cloud-sign-out-everywhere-yes" onClick={signOutEverywhere} disabled={!!busy}>
+                  {busy === 'logout-all' ? t('cloudSecurity.signingOutEverywhere') : t('cloudSecurity.signOutEverywhereYes')}
+                </button>
+                <button ref={everywhereCancel} className="btn btn-quiet btn-sm" type="button" data-testid="cloud-sign-out-everywhere-cancel" onClick={closeEverywhere} disabled={!!busy}>
+                  {t('common.cancel')}
+                </button>
+              </div>
+            </div>}
+          <p className="muted" style={{ fontSize: 12, margin: '6px 0 0' }}>{t('cloudSecurity.signOutEverywhereHelp')}</p>
+        </div>
       </div>
 
       {hasPassword && <form className="card" style={{ boxShadow: 'none', marginTop: 14 }} onSubmit={changePassword}>
@@ -511,7 +564,7 @@ export default function CloudAccountSecurity({ pid, account, onChanged, onDelete
         </>}
       </form>}
 
-      <form className="card" style={{ boxShadow: 'none', marginTop: 14, borderColor: 'var(--bad)' }} onSubmit={deleteAccount}>
+      <form className="card set-danger" style={{ boxShadow: 'none', marginTop: 14, borderColor: 'var(--bad)' }} onSubmit={deleteAccount}>
         <div className="sc-label">{t('cloudSecurity.dangerZone')}</div>
         <div style={{ fontWeight: 650, marginTop: 4 }}>{t('cloudSecurity.deleteTitle')}</div>
         <p className="muted" style={{ fontSize: 13, margin: '6px 0 10px' }}>

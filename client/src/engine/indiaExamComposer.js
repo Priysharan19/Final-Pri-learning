@@ -19,6 +19,7 @@
 // owns storage, marking and evidence.
 import { makeRng } from './qhelpers.js';
 import { numsClose } from './expr.js';
+import { targetSubtopics, targetedCap } from './targetedMock.js';
 
 export const ASSERTION_REASON_OPTIONS = Object.freeze([
   'Both Assertion (A) and Reason (R) are true, and Reason (R) is the correct explanation of Assertion (A).',
@@ -243,12 +244,24 @@ function shapeFor(q, need, rng) {
  * archive cannot. Every prompt is deduplicated across the whole paper.
  */
 function drawQuestion(ctx, chapter, need, range, extraCells = []) {
-  const authored = chapterCells(chapter, range);
+  let authored = chapterCells(chapter, range);
+  // Once a targeted paper's budget is spent, its target subtopics are left to
+  // the other cells of the chapter where it has any, so the cap holds.
+  if (ctx.target && ctx.target.left <= 0) {
+    const others = authored.filter(c => !ctx.target.set.has(c.generator));
+    if (others.length) { authored = others; extraCells = extraCells.filter(c => !ctx.target.set.has(c.generator)); }
+  }
   const cells = [...extraCells, ...authored];
   if (!cells.length) return null;
+  // A targeted paper (engine/targetedMock.js) tries the chapter's cells for a
+  // target subtopic first, while the paper's targeted budget lasts. Without a
+  // target nothing here runs, so an untargeted paper's draws are unchanged.
+  const aimed = ctx.target && ctx.target.left > 0 ? cells.filter(c => ctx.target.set.has(c.generator)) : [];
+  const aimedTries = aimed.length * 6;
   for (let attempt = 0; attempt < MAX_DRAWS_PER_SLOT; attempt++) {
-    const preferPyq = extraCells.length && attempt < extraCells.length * 6;
-    const cell = preferPyq ? extraCells[attempt % extraCells.length] : pick(ctx.rng, cells);
+    const plain = attempt - aimedTries;
+    const preferPyq = plain >= 0 && extraCells.length && plain < extraCells.length * 6;
+    const cell = plain < 0 ? aimed[attempt % aimed.length] : preferPyq ? extraCells[plain % extraCells.length] : pick(ctx.rng, cells);
     const seed = seededInt(ctx.rng);
     let q;
     try { q = ctx.draw(cell.generator, cell.difficulty, seed); }
@@ -262,6 +275,7 @@ function drawQuestion(ctx, chapter, need, range, extraCells = []) {
     const signature = String(q.prompt).replace(/\s+/g, ' ').trim();
     if (ctx.seen.has(signature)) continue;
     ctx.seen.add(signature);
+    if (ctx.target?.set.has(cell.generator)) ctx.target.hit = true;
     return {
       payload: shaped.payload, generator: cell.generator,
       difficulty: q.difficulty || cell.difficulty, seed, pyq: !!cell.pyq, conversion: shaped.conversion,
@@ -613,11 +627,16 @@ export function paperLayout(spec, chapters, seed) {
  * `pyqCellsFor(chapter, range)` names reviewed-PYQ cells the caller has already
  * loaded (empty when the archive has none).
  */
-export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = () => [] }) {
+export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = () => [], targets = null }) {
   if (!spec?.sections?.length) throw new Error('A paper needs a blueprint with sections.');
   if (!chapters?.length) throw new Error('A paper needs a chapter scope.');
   const { rng, slots, units, choiceSlots } = paperLayout(spec, chapters, seed);
   const ctx = { rng, draw, seen: new Set(), pyqCellsFor };
+  // `targets` (engine/targetedMock.js targetsFrom): the layout, sections and
+  // marks stay the blueprint's; only which cell of the allotted chapter is
+  // drawn changes, for at most targetedCap(slots) questions.
+  const aim = targetSubtopics(targets);
+  if (aim.size) ctx.target = { set: aim, left: targetedCap(slots.length), hit: false };
   const range = paperRange(spec);
   const composition = { pyq: 0, authored: 0, nativeMcq: 0, numericToMcq: 0, assertionReason: 0, caseStudy: 0, multiCorrect: 0, matrixMatch: 0, writtenAsObjective: 0, chapterSubstituted: 0, internalChoice: 0 };
   const reduced = [];
@@ -628,6 +647,7 @@ export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = ()
     const section = slot.section;
     const choice = !!choiceSlots[section.id]?.has(slot.index);
     let chapter = chapterOf(slot.chapterId);
+    if (ctx.target) ctx.target.hit = false;
     let built = buildItem(ctx, spec, section, slot, chapter, chapters, range, composition, choice);
     if (!built) {
       // The allotted chapter cannot produce this item type: take it from any
@@ -645,6 +665,8 @@ export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = ()
     if (!built) {
       throw Object.assign(new Error(`The authored banks cannot compose Section ${section.id} (${(section.types || [section.type]).join('/')}) of ${spec.label}.`), { status: 503, code: 'INDIA_EXAM_COMPOSITION_FAILED' });
     }
+    const targeted = !!ctx.target?.hit;
+    if (targeted) ctx.target.left--;
     if (built.pyq) composition.pyq++; else composition.authored++;
     if (built.conversion === 'native-mcq') composition.nativeMcq++;
     if (built.conversion === 'numeric-to-mcq') composition.numericToMcq++;
@@ -661,6 +683,7 @@ export function composeIndiaPaper(spec, { seed, draw, chapters, pyqCellsFor = ()
       allottedChapterId: slot.chapterId,
       generator: built.generator, difficulty: built.difficulty, seed: built.seed, altSeed: built.altSeed || null,
       pyq: built.pyq, conversion: built.conversion || null,
+      ...(ctx.target ? { targeted } : {}),
       recipe: built.recipe,
       marking: marking(section),
       payload: { ...built.payload, examItem: built.item }
@@ -771,6 +794,7 @@ function issueCell(ctx, cell) {
     const signature = String(q.prompt).replace(/\s+/g, ' ').trim();
     if (ctx.seen.has(signature)) continue;
     ctx.seen.add(signature);
+    if (ctx.target?.set.has(cell.generator)) ctx.target.hit = true;
     return {
       payload: shaped.payload, generator: cell.generator, difficulty: q.difficulty || cell.difficulty,
       seed: q.seed, pyq: !!ctx.isPyq?.(cell), conversion: shaped.conversion, cell, need: cell.need

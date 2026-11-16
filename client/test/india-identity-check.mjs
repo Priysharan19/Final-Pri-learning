@@ -232,14 +232,20 @@ async function run() {
   // ── the product describes itself as Indian ─────────────────────────────────
   section('product identity');
   try {
-    const html = readFileSync(`${CLIENT}index.html`, 'utf8');
+    // The page and manifest a Priyabhata build serves (plan E4: both come from
+    // the build's edition, client/brand/edition-brand.mjs).
+    const brand = await import('../brand/edition-brand.mjs');
+    const html = brand.builtIndexHtml('priyabhata');
     const description = /<meta name="description" content="([^"]*)"/.exec(html)?.[1] || '';
-    ok('index.html describes the app for Indian students', /NCERT/.test(description) && /JEE/.test(description) && /olympiad/i.test(description),
+    // The Olympiad track is off in a production build (V1 decision; the
+    // description is held to that by onboarding-scope-check.mjs), so the
+    // description names NCERT and JEE only and must not advertise it.
+    ok('index.html describes the app for Indian students', /NCERT/.test(description) && /JEE/.test(description) && !/olympiad/i.test(description),
       `description reads ${show(description)}`);
     ok('and never mentions the HSC or an iPad', !/HSC|iPad/i.test(description), `description reads ${show(description)}`);
-    ok('the document language is English', /<html lang="en[^"]*">/.test(html));
-    const manifest = JSON.parse(readFileSync(`${CLIENT}public/manifest.webmanifest`, 'utf8'));
-    eq('the manifest names the app', manifest.name, 'Pri Learning');
+    ok('the document language is English', /<html lang="en[^"]*"[ >]/.test(html));
+    const manifest = brand.webManifest('priyabhata');
+    eq('the manifest names the app', manifest.name, 'Priyabhata');
     ok('the manifest describes the Indian product', /NCERT/.test(manifest.description) && /JEE/.test(manifest.description) && !/HSC|iPad/i.test(manifest.description),
       `manifest description reads ${show(manifest.description)}`);
     eq('the manifest is in Indian English', manifest.lang, 'en-IN');
@@ -251,20 +257,14 @@ async function run() {
     const splitStart = login.indexOf('/* ── split layout');
     const hero = login.slice(heroStart, splitStart);
     ok('the Login hero source carries no HSC or NSW copy', heroStart > 0 && splitStart > heroStart && !/HSC|NSW|NESA/.test(hero));
-    ok('the sign-up form opens on the India course', /course: 'in'/.test(login) && /STUDY_DEFAULT/.test(login));
-    // Australia remains an explicit secondary path off the India-first course
-    // step. KALP-03 made the link role-aware, so prove the full student/teacher
-    // translation contract rather than requiring the removed student-only call.
-    const enStrings = readFileSync(`${CLIENT}src/i18n/strings.en.js`, 'utf8');
-    const hiStrings = readFileSync(`${CLIENT}src/i18n/strings.hi.js`, 'utf8');
-    ok('the Australian option is a secondary, collapsed control',
-      /createStep === 1 && !australia && \(/.test(login)
-      && /t\(form\.role === 'teacher' \? 'login\.teachingInAustralia' : 'login\.studyingInAustralia'\)/.test(login)
-      && /createStep === 1 && australia && \(/.test(login)
-      && /'login\.studyingInAustralia': 'Studying in Australia\?/.test(enStrings)
-      && /'login\.teachingInAustralia': 'Teaching in Australia\?/.test(enStrings)
-      && /'login\.studyingInAustralia':/.test(hiStrings)
-      && /'login\.teachingInAustralia':/.test(hiStrings));
+    // The sign-up course is the edition's (mission E3): Priyabhata opens on the
+    // India course; the NSW chooser belongs to Prithagoras and has no link from
+    // the India step (O5: off). The rendered proof is onboarding-scope-check.
+    ok('the sign-up form opens on the edition\'s course', /const SIGNUP_COURSE = defaultCourse\(\);/.test(login) && /course: SIGNUP_COURSE/.test(login) && /STUDY_DEFAULT/.test(login));
+    ok('the India and NSW choosers are chosen by the edition, never by a link',
+      /createStep === 1 && !YEAR_CHOOSER && \(/.test(login)
+      && /createStep === 1 && YEAR_CHOOSER && \(/.test(login)
+      && !/openAustralia|closeAustralia|featureEnabled\('australia'\)/.test(login));
     ok('the cloud sign-in routes to the cloud account panel', /CLOUD_ACCOUNT_ROUTE = '\/settings#cloud-account-title'/.test(login));
 
     for (const page of ['Home.jsx', 'History.jsx', 'Favorites.jsx', 'Progress.jsx']) {

@@ -1,0 +1,49 @@
+# Weekly runtime dependency security floor on main.
+#
+# The audit floor already runs on every push and pull_request (ci.yml), but a
+# new advisory published against an already-locked dependency turns every PR red
+# with no warning and reaches nobody while main is idle: GHSA-27r3-jxmh-p828
+# (body-parser) and GHSA-6pq8-jhm2-2vcw (qs) both surfaced only as failing PR
+# CI, days after they were published. This scheduled run audits main's locked
+# runtime dependencies once a week and fails visibly, so GitHub emails the repo
+# owner before the next PR goes red. It is read-only, uses no secrets, and
+# changes nothing — it is the same tools/runtime-audit-floor.mjs the required CI
+# check runs, so it can never be more lenient than the floor itself.
+#
+# Enabling Dependabot alerts and security updates in the repository settings is
+# the complementary step and is an owner console action (audit-release item 15,
+# audit-backend item 18); this workflow does not depend on it.
+name: Runtime audit floor (weekly)
+
+on:
+  schedule:
+    # Monday 06:37 UTC — away from codeql (04:23 Mon) and the 5-minute uptime probe.
+    - cron: '37 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: runtime-audit-floor-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit-floor:
+    name: Runtime dependency security floor (main)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24"
+      # npm audit reads the committed lockfiles; no install is needed. The tool
+      # exits 0 clean, 1 on advisories (hard fail, names printed), 2 when the
+      # registry was unreachable after its retries (also a visible red run).
+      - name: Runtime dependency security floor (server)
+        run: node tools/runtime-audit-floor.mjs server
+      - name: Runtime dependency security floor (client)
+        run: node tools/runtime-audit-floor.mjs client

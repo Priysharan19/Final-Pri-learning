@@ -58,6 +58,8 @@
 //   node scripts/iphone-journey.mjs                 # an iPhone simulator
 //   node scripts/iphone-journey.mjs --family ipad
 //   node scripts/iphone-journey.mjs --cloud --dynamic-type --evidence out.json
+//   node scripts/iphone-journey.mjs --staging --family iphone|ipad --app <DEBUG .app> [--origin <url>] --evidence out.json
+//     (the deployed staging service, the real reader, a real emailed code: scripts/journey-staging.mjs)
 // ─────────────────────────────────────────────────────────────────────────────
 import { execFileSync, execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -65,13 +67,13 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { openServerDesk } from './journey-oracle.mjs';
-import { installApp, keepOnlySimulator } from './simulator-fleet.mjs';
+import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
 const PACKAGE = join(ROOT, 'ios/PriLearning.swiftpm');
 // Leg 1 · no server: nothing opens without an account.
-const FIRST = ['launch', 'noEntryWithoutAccount', 'deepLinkHeld', 'nothingMarked', 'persistenceMarker'];
+const FIRST = ['launch', 'wordmarkClearsStatusBar', 'noEntryWithoutAccount', 'deepLinkHeld', 'nothingMarked', 'persistenceMarker'];
 const RELAUNCH = ['relaunchStillHeld', 'relaunchMarker'];
 // The signed-in leg. The server* steps are read by this process from the
 // server's own database, request log and the stand-in reader's request log.
@@ -106,7 +108,10 @@ const run = (cmd, args, opts = {}) =>
 function launchApp(device, bundleId, args = [], opts = {}) {
   try { run('xcrun', ['simctl', 'bootstatus', device, '-b'], { timeout: 600_000 }); } catch { /* best effort */ }
   for (let attempt = 1; ; attempt++) {
-    try { return run('xcrun', ['simctl', 'launch', device, bundleId, ...args], opts); }
+    // Bounded: an unbounded `simctl launch` (or terminate) that never
+    // returns hangs the whole journey with nothing printed, and the job is
+    // then cancelled at its limit with no log at all (Train editions-9).
+    try { return run('xcrun', ['simctl', 'launch', device, bundleId, ...args], { timeout: 180_000, killSignal: 'SIGKILL', ...opts }); }
     catch (error) {
       const text = String(error?.stderr || error?.message || '');
       if (attempt >= 5 || !/SBMainWorkspace|FBSOpenApplicationServiceErrorDomain/.test(text)) throw error;
@@ -117,24 +122,21 @@ function launchApp(device, bundleId, args = [], opts = {}) {
 }
 
 
+// The iOS runtime this run is pinned to (PRI_SIM_RUNTIME / --runtime). On CI
+// it is required: a lane that took "the newest runtime installed" could be
+// moved to another iOS by a runner-image change without anyone deciding to
+// (#676 went unseen that way). Off CI it is optional.
+const PINNED_RUNTIME = requiredRuntime();
+
 function pickDevice() {
   const named = argOf('device');
-  const family = (argOf('family') || 'iphone').toLowerCase();
-  const pattern = family === 'ipad' ? /iPad/ : /iPhone/;
-  // Devices are listed under runtime headers ("-- iOS 26.0 --"). Prefer the
-  // newest runtime: an older one can need a long first boot on a CI runner.
-  let runtime = [0];
-  const rows = [];
-  for (const l of run('xcrun', ['simctl', 'list', 'devices', 'available']).split('\n')) {
-    const header = l.match(/^-- iOS ([\d.]+) --/);
-    if (header) { runtime = header[1].split('.').map(Number); continue; }
-    const m = l.match(/^\s+(.+?) \(([0-9A-F-]{36})\) \((\w+)\)/i);
-    if (m && /^-- /.test(l) === false) rows.push({ name: m[1], udid: m[2], state: m[3], runtime });
-  }
-  const newer = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (b[i] || 0) - (a[i] || 0); if (d) return d; } return 0; };
-  const matching = rows.filter(d => (named ? d.name === named : pattern.test(d.name))).sort((a, b) => newer(a.runtime, b.runtime));
-  const pick = matching.find(d => d.state === 'Booted') || matching[0];
-  if (!pick) throw new Error(`no ${named || family} simulator is available`);
+  const family = (argOf('family') || 'iphone').toLowerCase() === 'ipad' ? 'iPad' : 'iPhone';
+  const listing = run('xcrun', ['simctl', 'list', 'devices', 'available']);
+  // A booted match wins; otherwise the newest runtime that satisfies the pin
+  // (scripts/simulator-fleet.mjs). A pin nothing satisfies is a failure that
+  // names the runtime, never a run on another iOS.
+  const pick = pickSimulator(listing, { family, named, runtime: PINNED_RUNTIME });
+  if (!pick) throw new Error(`no ${named || family} simulator is available${PINNED_RUNTIME ? ` on the pinned iOS ${PINNED_RUNTIME} runtime` : ''} (installed: ${describeRuntimes(listing) || 'none'})`);
   return pick;
 }
 
@@ -166,17 +168,50 @@ function builtApp(derived) {
 // read that blocks the runner would hold the switch back past the page's own
 // wait (#528). `duringDeadlineMs` bounds that hold; after it the log is read
 // as usual and the page reports its own failure.
+const PHASE_MIN_MS = 600_000;
+const LOG_SHOW_EVERY_MS = 30_000;
 function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, duringWhen = null, duringDeadlineMs = 240_000, tick = null, loops = 75 } = {}) {
   const started = localStamp(new Date(Date.now() - 2000));
   // SIMCTL_CHILD_* reaches the app's environment (DEBUG builds read the cloud
   // origin override and the journey's fixture account from it).
   const env = { ...process.env };
   for (const [k, v] of Object.entries(childEnv)) env[`SIMCTL_CHILD_${k}`] = v;
+  // JourneySelfCheck.say appends every PRIJOURNEY line to Documents/PRIJOURNEY.log
+  // in the app's container (the hosted iOS 27 image shows the app nothing in
+  // `log show`). Only what THIS launch appends is read: the size is taken first,
+  // so a summary left by an earlier run can never pass this one.
+  let reportFile = null, offset = 0;
+  try {
+    const container = run('xcrun', ['simctl', 'get_app_container', udid, bundleId, 'data'], { timeout: 60_000 }).trim();
+    if (container) { reportFile = join(container, 'Documents', 'PRIJOURNEY.log'); offset = existsSync(reportFile) ? readFileSync(reportFile).length : 0; }
+  } catch { /* no data container yet: the log is the only channel */ }
+  const fromFile = () => {
+    try {
+      if (!reportFile || !existsSync(reportFile)) return [];
+      const bytes = readFileSync(reportFile);
+      // A file shorter than the offset was replaced (the app rewrites it
+      // whole when it cannot append): read it all. Only lines after this
+      // launch's own "started <phase>" are kept below, so an earlier run's
+      // summary still cannot pass this one.
+      if (bytes.length < offset) offset = 0;
+      return bytes.subarray(offset).toString('utf8').split('\n').filter(l => l.startsWith('PRIJOURNEY'));
+    } catch { return []; }
+  };
+  console.log(`  (${phase}: launching at ${new Date().toISOString().slice(11, 19)}Z)`);
   launchApp(udid, bundleId, [flag], { env });
   let lines = [];
   const t0 = Date.now();
   let duringDone = !during;
-  for (let i = 0; i < loops; i++) {
+  // The phase is bounded by the clock, not by a count of reads: a count let
+  // one phase run 75 slow `log show` reads (18 minutes for the offline phase
+  // on Train editions-6, run 43435306380), and the job hit its 65-minute
+  // limit before the iPad journey finished. The container file is read every
+  // pass (it is cheap); `log show` only when there is no file, or at most
+  // once per LOG_SHOW_EVERY_MS while the file has given nothing.
+  const deadline = t0 + Math.max(loops * 2_000, PHASE_MIN_MS) + (during ? duringDeadlineMs : 0);
+  let lastLogShow = 0;
+  let via = 'nothing';
+  for (let i = 0; Date.now() < deadline; i++) {
     // With an oracle to serve, look twice a second-and-a-half rather than
     // letting the page wait on the (slow) log read.
     if (duringWhen && !duringDone) {
@@ -194,8 +229,13 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // journey with nothing reported. A read that does not come back is not a
     // result — the next pass reads again, and a phase whose summary is never
     // read is reported "not reported" and fails the journey.
+    const filed = fromFile();
     let log;
-    try {
+    if (filed.length) { log = filed.join('\n'); via = 'container file'; }
+    else if (reportFile && Date.now() - lastLogShow < LOG_SHOW_EVERY_MS) continue;
+    else try {
+      lastLogShow = Date.now();
+      via = 'unified log';
       log = run('xcrun', ['simctl', 'spawn', udid, 'log', 'show', '--start', started,
         '--predicate', 'eventMessage CONTAINS "PRIJOURNEY"', '--style', 'compact'], { timeout: 90_000, killSignal: 'SIGKILL' });
     } catch (e) {
@@ -209,13 +249,16 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     if (lines.some(l => l.startsWith(`PRIJOURNEY summary ${phase}`))) { execSync('sleep 3'); break; } // let WebKit flush storage
     if (lines.some(l => /^PRIJOURNEY FAIL (script|unreadable)/.test(l))) break;
   }
-  try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* already gone */ }
+  console.log(`  (${phase}: ${((Date.now() - t0) / 1000).toFixed(0)} s, read from ${via})`);
+  try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* already gone */ }
   return lines;
 }
 
 const sim = pickDevice();
 const udid = sim.udid;
-console.log(`Native student journey on ${sim.name} (${udid}) — ${TIER} evidence (programmatic strokes; not a physical device, a Pencil or a real provider)\n`);
+console.log(process.argv.includes('--staging')
+  ? `Native student journey on ${sim.name} (${udid}) against the deployed staging service — SIMULATOR + DEPLOYED evidence (programmatic strokes; not a physical device, a Pencil or a finger)\n`
+  : `Native student journey on ${sim.name} (${udid}) — ${TIER} evidence (programmatic strokes; not a physical device, a Pencil or a real provider)\n`);
 ensureBooted(sim);
 // `main` declares iPhone + iPad (the V1 shipping target, #504), so both
 // families build the canonical package itself. --app reuses a prebuilt
@@ -228,9 +271,17 @@ if (!app) {
   app = builtApp(derived);
 }
 const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', join(app, 'Info.plist')]).trim();
-try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
 try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
 installApp(udid, app);
+
+// --staging: the deployed staging service, the real reader and a real emailed
+// code instead of the local legs (scripts/journey-staging.mjs; SIMULATOR +
+// DEPLOYED evidence). Exits here with its own verdict.
+if (process.argv.includes('--staging')) {
+  const { runStagingLeg, STAGING_ORIGIN } = await import('./journey-staging.mjs');
+  process.exit(await runStagingLeg({ sim, udid, bundleId, launchAndRead, run, origin: argOf('origin') || STAGING_ORIGIN, out: argOf('evidence') }));
+}
 
 console.log('Leg 1 · no server: the app opens to the sign-in card and nothing opens without an account …');
 const first = launchAndRead(udid, bundleId, '--journey-selfcheck', 'first', {}, { loops: 110 });
@@ -294,7 +345,7 @@ if (WANT_CLOUD) try {
     PRI_JOURNEY_ORACLE_DIR: codeDir,
   };
   // A fresh install: nothing on the device has an account yet.
-  try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+  try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
   try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
   installApp(udid, app);
   const show = lines => { for (const line of lines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`); };
@@ -449,7 +500,7 @@ let offlineRelaunchLines = [];
       }
     };
 
-    try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+    try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
     try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
     installApp(udid, app);
     const childEnv = { PRI_CLOUD_ORIGIN: server.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: student, PRI_JOURNEY_ORACLE_DIR: oracleDir };
@@ -515,7 +566,7 @@ let offlineRelaunchLines = [];
     answered.clear();
     // Its own fresh install and address: the daily free-question cap is real
     // product behaviour, and the marking profile has used much of it.
-    try { run('xcrun', ['simctl', 'terminate', udid, bundleId]); } catch { /* not running */ }
+    try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
     try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
     installApp(udid, app);
     const offlineEnv = { ...childEnv, PRI_JOURNEY_NEW_EMAIL: offlineStudent };
@@ -588,10 +639,12 @@ const evidence = {
     'the Pri /v1 server (accounts, sessions, prepare / issue / recognise / confirm / grade) on a local SQLite file'],
   synthetic: ['an iOS simulator, not a device', 'strokes placed on the surface programmatically, not written with a Pencil or finger',
     'the handwriting reader: a scripted stand-in at the provider hop that never looks at the picture', 'a fixture account verified in the local database', 'email delivery: the server\'s TEST email adapter (the code is read from its outbox, nothing is sent)'],
-  notEvidenceFor: ['a physical iPad or Apple Pencil', 'real handwriting recognition accuracy', 'a real model provider', 'the production or staging deployment'],
+  notEvidenceFor: ['a physical iPad or Apple Pencil', 'real handwriting recognition accuracy', 'a real model provider', 'the production or staging deployment',
+    'system Dynamic Type: the shell scales the whole page through the viewport, capped so the CSS viewport never drops below 360 px (about 1.12× at the largest size on a 402 pt iPhone, up to 1.5× on iPad); the dynamicType steps prove that capped scale and no sideways overflow, not text reflow at system metrics',
+    'VoiceOver, Full Keyboard Access or any assistive technology: a11yAudit is a DOM smoke test'],
   sha,
   dirtyWorkingTree: dirty,
-  simulator: { name: sim.name, udid, runtime: os },
+  simulator: { name: sim.name, udid, runtime: os, pinnedRuntime: PINNED_RUNTIME, runtimePinned: PINNED_RUNTIME !== null },
   workflow: process.env.GITHUB_WORKFLOW || 'local',
   run: process.env.GITHUB_RUN_ID || null,
   timestamp: new Date().toISOString(),

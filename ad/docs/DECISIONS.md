@@ -1,5 +1,7 @@
 # Decisions log — Pri Learning Instagram ad
 
+> Copy revised 2 November 2026 under owner decision D24: none of the retired coverage, accuracy, price-comparison, connectivity, rank-prediction or marking-authority claims (the list lives in `client/test/marketing-claims-check.mjs`). Rendered files under `out/` predate this revision and must be re-rendered before use. See COPY.md.
+
 Every call made without you, one line of reasoning each. Newest at the bottom.
 
 1. **Repo path** — `<REPO_PATH_OR_URL>` was never replaced in the brief; the working directory *is* the Pri Learning repo, so it is the recon source.
@@ -7,7 +9,7 @@ Every call made without you, one line of reasoning each. Newest at the bottom.
 3. **Branch** — built on `marketing/ig-ad-production` off `main`'s tip. The uncommitted `marketing/reel/reel.jsx` edit (someone's in-progress cinematic pass on the old reel) is left untouched and unstaged throughout.
 4. **Toolchain** — Remotion 4 (pinned 4.0.226) as specified; its bundled ffmpeg/ffprobe covers the missing system ffmpeg.
 5. **Voice-over** — an ElevenLabs key is present (`~/.elevenlabs_key`), so the ad ships with a studio VO cut to the new 30 s beat grid, mixed and mastered with the same DSP chain the launch reel used (90 Hz HP, presence EQ, 3:1 comp, −14 LUFS, −1 dBFS ceiling). Sound-off remains primary; every line is also a burned-in caption.
-6. **Market** — the repo's package.json says "Years 7–12 / HSC-style", the shipped reel and posting kit say India/JEE/₹999. The brief specifies the Indian market; the shipped marketing agrees; India it is.
+6. **Market** — the repo's package.json says "Years 7–12 / HSC-style", the earlier reel and posting kit said India/JEE at a price since withdrawn. The brief specifies the Indian market; the shipped marketing agrees; India it is.
 7. **No price in frame** — README says free-by-architecture while the old reel invented ₹999/mo; the two contradict, and this film's argument doesn't need a price. It shows none.
 8. **VO voice** — the account's only Indian-accent voice (Riya Rao) is a library voice: HTTP 402 on the free API tier. Shipped with Alice (the same premade educator voice the launch reel used) rather than degrade to macOS TTS. An Indian-English re-voice is a 15-minute change once the account has a suitable voice (`ad/tools/make-vo.mjs --voice <id>`).
 9. **Film grain** — per-frame SVG turbulence cost ~×3 render time; replaced with 8 pre-generated deterministic grain PNGs cycling at 2× scale (the shipped reel's grade upscales the same way). Visually identical at 4.5% opacity.
@@ -15,4 +17,4 @@ Every call made without you, one line of reasoning each. Newest at the bottom.
 11. **ESM** — `ad/` switched to `"type": "module"` so the TS gate scripts and the Node tools share one module world; verified Remotion CLI unaffected.
 12. **Frame 0 vs loop seam** — the brief wants frame 0 to be the cover AND a loop-safe hand-off from the black last frame. Resolved: frame 0 is special-cased to the fully-set hook line (a single frame at 60 fps is imperceptible in motion), so the cover is strong and the loop reads as the hook re-slamming.
 13. **The master grew to 36 s for the feature act** — "flex all the features" cannot fit an honest 30 s without gutting the factory or the ladder; the shipped launch reel is 36.4 s, so 36.0 is inside the house precedent. The 15 s cut stays the tight argument edit, deliberately feature-light.
-14. **Feature-act claims hygiene** — 3,44,798 is the measured figure the shipped marketing already quotes; the percentile (96.4) and Match rivals are illustrative and labelled so in-frame, with the launch reel's own disclaimer lines.
+14. **Feature-act claims hygiene** — 77 chapters is the measured figure the shipped marketing already quotes; the progress (96.4) and Match rivals are illustrative and labelled so in-frame, with the launch reel's own disclaimer lines.

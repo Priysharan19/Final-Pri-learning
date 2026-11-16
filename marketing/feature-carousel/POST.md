@@ -1,94 +1,97 @@
-# Posting kit — "Five things Pri does"
+# Posting kit — five-feature carousel
 
-Two cuts of the same post, covering the five headline features: AI handwriting
-recognition, examiner-style instant marking, every level from boards to JEE Advanced,
-all of Class 7–12, and an unlimited question bank.
+Copy revised 2 November 2026 under owner decision D24: none of the retired coverage,
+accuracy, price-comparison, connectivity, rank-prediction or marking-authority claims, and no
+figure that CI does not measure. `client/test/marketing-claims-check.mjs` fails CI if any of the retired phrases
+comes back. Rendered PNGs under `out/` are rebuilt from `build.mjs` (`node build.mjs &&
+node render.mjs`); anything rendered before this revision must not be posted.
 
-- **`out/00-all-in-one.png`** — the post: the marked-ink demonstration over a six-tile
-  grid carrying the rest of the product.
-- **`out/01`–`07`** — the seven-slide carousel, one feature per slide with its figure.
+**Not yet posted.** Nothing from this kit has been published; the owner confirms the
+copy before the first post.
 
-Register follows `ad/docs/COPY.md`: Indian English, dry and confident, no exclamation
-marks, no shame hooks. Design system is `client/src/theme.css` v4 "Dark LaTeX", same as
-the reel and the A2Z poster.
+## What is true of the shipped app (and what the slides say)
 
-## Build
-
-```bash
-node marketing/feature-carousel/build.mjs && node marketing/feature-carousel/render.mjs
-```
-
-`build.mjs` emits `slides/*.html` + `preview.html`; `render.mjs` shoots `out/*.png` at
-2160×2700 (2×) using the Chromium already installed for the client's Playwright.
-**Edit `build.mjs`, never the generated HTML.**
-
-## The single slide — this is the post
-
-`out/00-all-in-one.png`. It leads with the thing that sells Pri — a student's own
-handwriting with the ticks landing on it, the wrong line flagged, the mistake named in the
-margin — and then carries the whole product underneath it in a six-tile grid. The hero
-persuades; the grid answers "what else does it do?" before the reader has to ask. The
-measured figures move to the caption, where anyone who wants a number will look.
-
-The six tiles: **AI recognition · Instant marking · Every level · Every class ·
-Unlimited (premium) · Exam ready**.
-
-| Field | Value |
+| Claim on a slide | Where it is true in the code |
 |---|---|
-| Format | one PNG |
-| Aspect / size | 4:5 — exported 2160×2700, Instagram serves 1080×1350 |
-| Caption | the single-slide caption below |
+| Handwriting is read by Pri’s server when you are online; needs an account | `server/platform/handwritingProvider.js`; `client/src/ink/cloudReader.js` |
+| The mark is decided by Pri’s deterministic engine, never by the AI | `client/src/engine/checker.js`; AGENTS.md invariant |
+| Marking is automatic and can be wrong | `strings.en.js` `verifiedMarks.notOfficial`; store listing |
+| Three tracks: CBSE / NCERT, JEE Main, JEE Advanced | `IN_TRACKS` in `client/src/engine/curriculum-in-base.js` (no fourth track: the one outside V1 is flagged off) |
+| 77 chapters, Classes 7–12 | `IN_CURRICULUM` in `client/src/engine/curriculum-in.js` |
+| Class 9: 8 of the 15 CBSE 2026–27 chapters; Class 8: the earlier NCERT book | `client/src/engine/indiaProductionMeta.js` notes; decision D24 |
+| Generated questions; a repeat is flagged when a pool is small | `client/src/engine/contentIdentity.js` repeat window; `docs/content/certification-report.md` |
+| Timed paper simulations, marked automatically; no rank predicted | `server/platform/exams.js`; `strings.en.js` `progress.honesty` |
+| Free: 20 questions a day, one timed paper in 30 days; Premium ₹199 / ₹1,499 | `client/src/local/entitlementGate.js`; decision D19 |
 
-**No pricing on the artboard.** Tier language ("premium", "no cap") reads as a sales sheet
-under a hero image and undercuts the demonstration above it. It belongs in the caption, or
-on a pricing slide of its own.
+Nothing on a slide makes a coverage or completeness claim, states an accuracy figure or a
+marking-authority comparison, predicts a rank, claims to work without a connection, names a
+track outside V1, counts questions, or compares the price with coaching. The exact retired
+phrases are listed in `client/test/marketing-claims-check.mjs`, which runs over this folder.
 
-### Single-slide caption
-
-> You wrote it. It marked it.
->
-> Write your working with the Pencil, the way you would on paper. Pri reads every line on
-> the iPad itself — no upload, no account — awards the method marks where your reasoning
-> holds, and names the exact line where the maths broke. Not "62%". "You keep flipping the
-> sign."
->
-> Class 7 to Class 12. Boards, JEE Main, JEE Advanced, Olympiad. Questions built from a
-> seed rather than drawn from a pool, so the practice does not run out. Timed mock papers
-> with criteria marking, and a percentile predicted from your own practice.
->
-> Unlimited on premium: every track, every class, no daily cap.
->
-> Join the change. Follow @pri.learning — coming soon. 🔔
->
-> —
-> Recognition measured at 98.4% of characters on held-out writer tests (simulated writers,
-> 560 lines, worst single hand 71%). 3,44,798 distinct questions counted at 3,000 draws per
-> chapter-difficulty cell. Predicted percentile is an estimate from your practice data, not
-> a guarantee of results.
-
-**Short — the one to use unless you want the detail.** No figures in it, so it carries no
-footnote: every line is true on its face, the way the artboard's tiles are.
+## Single-slide caption
 
 > You wrote it. It marked it.
 >
-> Pri reads your handwriting on the iPad itself, marks every line like an examiner, and
-> names the exact mistake. Class 7 to JEE Advanced. Practice that does not run out.
+> Write your working with the Pencil, the way you would on paper. When you are online, Pri’s
+> server reads the ink and Pri’s own engine marks the final answer — then shows the worked
+> solution and names the usual slip. Marking is automatic and can be wrong, and the solution is
+> there to check it against.
 >
-> Join the change. Follow @pri.learning — coming soon. 🔔
+> Maths practice for CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced. 77 chapters.
+> Class 9 currently has 8 of the 15 chapters in the CBSE 2026–27 list; Class 8 follows the
+> earlier NCERT book.
+>
+> Free: 20 questions a day. Premium: ₹199 a month or ₹1,499 a year.
+>
+> Not endorsed by NCERT, CBSE or the NTA. Follow @pri.learning — coming soon. 🔔
 
-Adding a number back means adding its n back with it. That is the whole reason the short
-version is short.
+## Carousel caption
 
-### Single-slide alt text
+> Five things Pri does.
+>
+> **1 · It reads your handwriting.** Fractions, roots, exponents, multi-line working — read by
+> Pri’s server when you are online. It needs an account, and the reading can be wrong: Pri shows
+> what it read, and you can type instead.
+>
+> **2 · It marks the final answer, automatically.** Pri’s own engine decides the mark; the worked
+> solution shows every step and names the usual slip. Marking can be wrong.
+>
+> **3 · Boards to JEE Advanced.** Three tracks over the same mathematics — CBSE / NCERT, JEE
+> Main, JEE Advanced. What separates them is the pressure, not the chapter list.
+>
+> **4 · Class 7 to Class 12, 77 chapters.** Each chapter broken into the outcomes it teaches.
+> Class 9 has 8 of the 15 CBSE 2026–27 chapters today; Class 8 follows the earlier NCERT book.
+>
+> **5 · Fresh numbers every time.** Questions are generated; small pools repeat, and Pri tells
+> you when a question is a repeat.
+>
+> Not endorsed by NCERT, CBSE or the NTA. Follow @pri.learning — coming soon. 🔔
 
-> A dark slide headed "Your handwriting, marked. Your syllabus, mapped. Your practice,
-> endless." Below it, a card showing three lines of handwritten quadratic working: the
-> first two carry green ticks and method marks, the third — x = −1 or x = 5 — is tinted
-> red with a cross, and a margin note reads "Line 3 — you keep flipping the sign. 2 of 3
-> marks." Under the card, six tiles: AI recognition, reads your Pencil on device; instant
-> marking, graded like a teacher; every level, boards to JEE Advanced; every class, 7 to
-> 12; unlimited on premium; exam ready, mocks and predicted percentile. Signed Pri
-> Learning, Join the change, @pri.learning — coming soon.
+## Hashtags (7)
+
+`#JEEAdvanced #IITJEE #JEEpreparation #Class12 #NCERT #ApplePencil #PriLearning`
+
+## Alt text
+
+**Single slide:**
+
+> A dark slide set in Computer Modern, headed "Your handwriting, read. Your answer, marked. Class
+> 7 to JEE Advanced." A card shows three lines of handwritten quadratic working; the last, x = −1
+> or x = 5, is tinted red with a cross and a note that the sign flipped and the final answer was
+> not accepted. Six tiles: handwriting read by Pri’s server; automatic marking by the engine, which
+> can be wrong; three tracks, boards to JEE Advanced; Classes 7 to 12, 77 chapters, with the Class
+> 8 and 9 notes; generated practice with fresh numbers; timed papers with no rank predicted. Signed
+> Pri Learning, Join the change, @pri.learning — coming soon.
+
+**Carousel:**
+
+> A seven-slide carousel on near-black paper. Slide 1: "Write the maths. It marks the maths."
+> Slide 2: handwriting read by Pri’s server, a strip of symbols, the AI reads and the engine
+> marks. Slide 3: handwritten quadratic working with a red cross on the last line and a note naming
+> the sign slip; the mark is on the final answer. Slide 4: three tracks — CBSE / NCERT, JEE Main,
+> JEE Advanced. Slide 5: Class 7 to 12 in a grid, 77 chapters, with the Class 8 and 9 notes. Slide
+> 6: fresh numbers every time, free and Premium limits. Slide 7: Pri Learning, Join the change,
+> follow @pri.learning, coming soon.
 
 ## Upload spec
 
@@ -99,123 +102,27 @@ version is short.
 | Cover | `01-cover.png` |
 | Reusable as | Facebook carousel, LinkedIn document post (same order) |
 
-Safe areas: all type sits inside a 88px margin at 1080 scale, and the footer rule clears
+Safe areas: all type sits inside an 88px margin at 1080 scale, and the footer rule clears
 the bottom ~6%, so nothing collides with Instagram's caption gradient.
 
 ## Slides
 
 | # | File | Says |
 |---|---|---|
-| — | `00-all-in-one` | **The single-image post — marked-ink hero over a six-tile feature grid** |
+| — | `00-all-in-one` | The single-image post: marked answer over a six-tile feature grid |
 | 1 | `01-cover` | Write the maths. It marks the maths. |
-| 2 | `02-recognition` | **AI recognition** — on-device CNN, 56 symbols, 98.4% chars |
-| 3 | `03-marking` | **Instant feedback** — ✓/✗ on your own ink, method marks, misconception named |
-| 4 | `04-levels` | **Every level** — CBSE, JEE Main, JEE Advanced, Olympiad |
-| 5 | `05-syllabus` | **Every class** — 7 to 12, 252/252 dot points covered |
-| 6 | `06-unlimited` | **Unlimited** — 344,798 distinct questions, no cell a short loop |
+| 2 | `02-recognition` | Handwriting read by Pri’s server; the engine marks |
+| 3 | `03-marking` | Automatic marking of the final answer, worked solution, can be wrong |
+| 4 | `04-levels` | Three tracks — CBSE / NCERT, JEE Main, JEE Advanced |
+| 5 | `05-syllabus` | Classes 7–12, 77 chapters, Class 8 and 9 notes |
+| 6 | `06-unlimited` | Fresh numbers every time; free and Premium limits |
 | 7 | `07-cta` | Join the change · @pri.learning · coming soon |
 
-## Caption (ready to paste)
+## Before posting
 
-> Five things Pri does that a formula sheet cannot.
->
-> **1 · It reads your handwriting.** A convolutional net ships inside the app — 597 kB of
-> weights running on the iPad itself. Fractions, roots, exponents, multi-line working. No
-> network, no upload, no account. It learns your hand.
->
-> **2 · It marks like an examiner, instantly.** ✓ and ✗ land on your own ink, line by line.
-> Method marks where the reasoning holds even when the final answer does not — and the
-> exact line where the maths breaks, with the misconception named. Not "62%". "You keep
-> flipping the sign."
->
-> **3 · Boards to JEE Advanced.** Four tracks over the same mathematics — CBSE/NCERT, JEE
-> Main, JEE Advanced, Olympiad (PRMO → RMO → INMO). What separates them is not the chapter
-> list. It is the pressure.
->
-> **4 · Class 7 to Class 12, all of it.** Every NCERT chapter broken into the syllabus
-> lines it teaches, each with a generator behind it and a square on your skill map.
->
-> **5 · The bank does not run out.** Questions are built from a seed, not drawn from a
-> pool. 3,44,798 distinct questions counted, and no chapter-difficulty cell is a short
-> loop. Premium is unlimited: every track, every class, no cap.
->
-> Join the change. Follow @pri.learning — coming soon. 🔔
-
-**Short variant** (if the long one is too much for the feed):
-
-> Five things Pri does that a formula sheet cannot: reads your handwriting on-device,
-> marks your working line by line like an examiner, covers boards to JEE Advanced, maps
-> all of Class 7–12, and never runs out of questions. Join the change. Follow
-> @pri.learning — coming soon.
-
-## Hashtags (7 — not spam)
-
-`#JEEAdvanced #IITJEE #JEEpreparation #Class12 #NCERT #ApplePencil #PriLearning`
-
-Lead with the first three. Swap `#Class12` → `#Class10` if you post this in board season.
-
-## Alt text
-
-**Single slide:**
-
-> A dark slide set in Computer Modern, headed "Write the maths. It marks the maths." Five
-> numbered rows: recognition, reading handwriting on the iPad itself, 98.4% of characters;
-> instant feedback, ticks and crosses on your own ink, 795 of 795 mistakes named; every
-> level, boards to JEE Advanced across four tracks; every class, 7 to 12, 252 of 252 dot
-> points covered; unlimited, questions built from a seed, 3,44,798 distinct. Signed off
-> Pri Learning, Join the change, @pri.learning — coming soon.
-
-**Carousel:**
-
-> A seven-slide carousel on near-black paper set in Computer Modern. Slide 1: "Write the
-> maths. It marks the maths." Slide 2: on-device handwriting recognition, a strip of the
-> 56 symbols it reads, 98.4% character accuracy. Slide 3: handwritten quadratic working
-> marked line by line with green ticks, a red cross on the last line and a margin note
-> naming the sign error. Slide 4: four tracks — CBSE, JEE Main, JEE Advanced, Olympiad.
-> Slide 5: Class 7 to 12 in a grid, 252 of 252 syllabus dot points covered. Slide 6:
-> 344,798 distinct questions observed. Slide 7: Pri Learning, Join the change, follow
-> @pri.learning, coming soon.
-
-## Claims checklist
-
-Every number on a slide, with the command that produced it. Re-run before reposting —
-these move whenever a generator or the model changes, and a date has never once caught a
-stale figure (README, "Measured accuracy").
-
-The **single slide carries no numbers at all** — every tile is qualitative and true on its
-face. Two wordings on it were chosen deliberately and should not drift:
-
-- **"It never runs out"**, not *never repeats*. The thinnest (subtopic × difficulty) cell
-  holds 54 distinct questions, so a hard-working student does eventually see one twice.
-  "Never runs out" is the claim the census supports; "never repeats" is not.
-- **"predicted percentile"**, not *predicted rank* — the app predicts a percentile with a
-  confidence band, and the caption carries the estimate-not-a-guarantee line the reel uses.
-
-The figures live in the caption instead, with their n attached; the table below backs them
-either way.
-
-| Slide | Claim | Source |
-|---|---|---|
-| 2 | 597 kB of int8 weights, on device | `client/src/ink/model-data.js`; README "The handwriting engine" |
-| 2 | 56 symbols | the `classes` array in `model-data.js` — exactly 56. **The glyph strip only shows classes that are actually in it** (no ∫, no ×) |
-| 2 | 98.4% chars · 94.5% lines | `node client/test/inkcheck-holdout2.mjs 40` — 40 simulated writers × 14 lines = 560 |
-| 2 | footnote: simulated writers, worst hand 71% | same run. **This is not a human trial** and the slide says so; do not drop that line |
-| 3 | 795 / 795 mistakes named | `npm run test:diagnose` — 20 mistakes × 40 seeded draws, buried in random context |
-| 3 | the worked example | Class 10 completing-the-square with a sign slip. Every glyph in it is one the shipped net has a class for |
-| 4 | four tracks, difficulty ceilings | `IN_TRACKS` in `client/src/engine/curriculum-in.js` |
-| 4 | percentile disclaimer | required — carried in the reel too |
-| 5 | 252 / 252 · 220 exact · 0 empty | `node tools/dotpoint-coverage.mjs` |
-| 5 | Class 7–12 captions | `IN_CURRICULUM` in `curriculum-in.js`, verbatim |
-| 6 | 344,798 distinct · thinnest cell 54 · 0 single-question cells | `node tools/count-questions.mjs` (client registry row — **not** the 365,333 server row) |
-
-### One claim that is a plan, not a measurement
-
-Slide 6 says **"Premium is unlimited: every track, every class, no cap."** The shipped app
-has no tiers at all — `client/src/pages/Settings.jsx` reads "Everything unlocked — no
-account, no subscription, no limits", and the README's feature matrix says the same. So
-this is launch pricing (the reel already markets ₹999/month), not a description of what
-runs today. It is honest as a forward-looking statement about the paid tier and dishonest
-if read as "the free tier is capped" — there is no free tier yet. If you would rather not
-carry a pre-launch claim at all, the drop-in replacement for that sentence is:
-
-> Unlimited today, unlimited on premium: every track, every class, no cap.
+1. `node build.mjs && node render.mjs`, then look at every PNG.
+2. `node client/test/marketing-claims-check.mjs` passes on the tree you rendered from.
+3. The owner confirms the prices in App Store Connect and Google Play match ₹199 / ₹1,499.
+4. The owner has withdrawn anything posted earlier that carried the retired claims (the old
+   price, the connectivity and marking-authority lines, the rank prediction, the track outside
+   V1 and the question counts).

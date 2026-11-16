@@ -69,9 +69,18 @@ const languages = new Set([...documents.values()].flatMap(byLang => [...byLang.k
 const scope = `${documents.size} notices in ${languages.size} languages (${files.length} documents)`;
 
 if (!all.size) {
-  console.log(`LEGAL TEMPLATES: every placeholder is filled across ${scope}. A lawyer must still review them — in both languages — before publishing.`);
+  console.log(`LEGAL TEMPLATES: every placeholder is filled across ${scope}.`);
 } else {
   console.log(`LEGAL TEMPLATES: ${all.size} placeholder${all.size === 1 ? '' : 's'} still to fill across ${scope}.`);
   for (const [key, n] of [...all].sort()) console.log(`  ${key} — used in ${n} document${n === 1 ? '' : 's'}`);
-  console.log('\nThe app shows a "not yet reviewed" banner on any page that still has one, in whichever language it is being read in.');
+  console.log('\nThe app shows a template banner on any page that still has one, in whichever language it is being read in.');
 }
+
+// Filling the placeholders is not a legal review. The banner that says so is
+// driven by one explicit switch, docs/legal/review-status.json, which only a
+// person sets after a lawyer qualified in Indian law has reviewed the notices;
+// client/test/legal-pages-check.mjs refuses the switch without the paperwork.
+const review = JSON.parse(readFileSync(join(DIR, 'review-status.json'), 'utf8'));
+console.log(review.reviewed === true
+  ? `LEGAL REVIEW: reviewed by ${review.reviewer} (${review.qualification}) on ${review.reviewedOn}, languages ${(review.languages || []).join(', ')}; evidence: ${review.evidence}.`
+  : `LEGAL REVIEW: not yet reviewed by a lawyer (unreviewed since ${review.unreviewedSince}). The app shows the "not yet reviewed" banner on every notice until review-status.json records a review.`);

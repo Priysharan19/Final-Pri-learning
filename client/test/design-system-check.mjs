@@ -72,8 +72,16 @@ check('one icon family: every nav mark comes from Icon.jsx', /const I = \{[\s\S]
 const icons = readFileSync(new URL('../src/components/Icon.jsx', import.meta.url), 'utf8');
 check('the icon family is one grid and one stroke', /viewBox="0 0 24 24"/.test(icons) && /strokeWidth = 1\.6/.test(icons) && /aria-hidden="true"/.test(icons));
 
+// The v1.0 top bar and rail are gone with the v1.0 interface (every build ships
+// the Instrument, client/interface.config.mjs): nothing styles them any more,
+// and the Instrument's own shell primitives take their place.
+const instrumentCss = readFileSync(new URL('../src/instrument/instrument.css', import.meta.url), 'utf8');
+for (const gone of ['.topbar', '.sidebar', '.nav-section', '.nav-hist', '.hist-mini', '.home-next', '.home-alt', '.home-wrap']) {
+  check(`the retired v1.0 surface ${gone} has no rule left`, !new RegExp(`\\${gone}(?![A-Za-z0-9_-])`).test(theme) && !new RegExp(`\\${gone}(?![A-Za-z0-9_-])`).test(instrumentCss), gone);
+}
+for (const selector of ['.in-bar', '.in-tabs', '.in-tab', '.in-more-menu']) check(`shell primitive ${selector} is adopted`, instrumentCss.includes(selector), selector);
 const selectors = [
-  '.topbar', '.sidebar', '.nav-item.active', '.card', '.btn-primary', '.input',
+  '.nav-item.active', '.card', '.btn-primary', '.input',
   '.auth-wrap', '.home-greet', '.genbar-head', '.q-prompt', '.editor-shell',
   '.eval-card', '.verdict-good', '.pri-explain-dialog', '.mobilenav'
 ];
@@ -119,11 +127,15 @@ check('reduced motion forces no transition duration on every element (it would m
   forcedOnEverything.length > 0 && startsTransitions.length === 0, startsTransitions.map(r => `${r.name}: ${r.declared['transition-duration'] || r.declared.transition}`).join(', '));
 check('reduced motion switches transitions off globally: zero duration and zero delay',
   forcedOnEverything.some(({ name, declared }) => name === 'theme.css' && zeroTime(declared['transition-duration']) && zeroTime(declared['transition-delay'])));
+// The tablet's navigation is the Instrument's tab bar: always drawn (its tabs
+// scroll inside it rather than collapse), with a 44 px command control on touch.
 check('tablet has a persistent touch navigation contract',
-  /pointer:\s*coarse[\s\S]*min-width:\s*761px[\s\S]*max-width:\s*1180px[\s\S]*\.sidebar\s*\{\s*width:\s*178px/s.test(theme));
+  /@media \(min-width: 761px\) and \(max-width: 1180px\)[\s\S]*?\.in-tabs \{ min-width: 0; overflow-x: auto;/.test(instrumentCss)
+    && /\(min-width: 761px\) and \(max-width: 1100px\) and \(pointer: coarse\)[\s\S]*?\.in-cmd \{ width: 44px; min-width: 44px; height: 44px; \}/.test(instrumentCss));
 check('tablet touch controls reach at least 44px',
   /pointer:\s*coarse[\s\S]*\.mode-tab[\s\S]*min-height:\s*44px/s.test(theme));
-check('thinking mode removes the navigation furniture', /\.shell\.is-focus \.sidebar/.test(theme) && /is-focus/.test(app));
+check('thinking mode removes the navigation furniture',
+  /html\.ui-instrument \.shell\.is-focus \.in-bar \{ display: none; \}/.test(instrumentCss) && /\.shell\.is-focus ~ \.mobilenav \{ display: none !important; \}/.test(theme) && /is-focus/.test(app));
 check('landscape tablets get the split workspace', /orientation:\s*landscape\)\s*\{[\s\S]*?\.qpage\.ws-split\s*\{\s*grid-template-columns:\s*minmax\(330px,\s*38fr\)\s*minmax\(0,\s*62fr\)/.test(theme));
 // The phone action bar stays in the page's flow (sticky), so it is its own
 // spacer and never covers the last field; it pads itself into the home

@@ -61,3 +61,7 @@ assert.ok(seenKinds.has('consecutive-even'));
 assert.ok(seenKinds.has('speed-time'));
 
 console.log(`PASS — current Class 10 Quadratic Equations: ${checked} deterministic contextual-modelling forms cover rectangle, integer and speed/time situations with positive-root interpretation.`);
+
+// The separately keyed original competency banks must also be generated and
+// independently solved in the hosted India-contract job; no optional CI skip.
+await import('./india-class10-competency-2026-check.mjs');

@@ -261,11 +261,11 @@ for (const chapterId of INDIA_NATIVE_COVER_IDS) {
   ok(status.generatorComplete, `${chapterId} has a generator behind every dot point`);
   if (CLASS10_REWIRED.includes(chapterId)) {
     eq(status.quality, INDIA_CONTENT_QUALITY.REVIEWED_MAPPING, `${chapterId} keeps the Class 10 reviewed mapping it already had`);
-    eq(status.releaseState, INDIA_RELEASE_STATE.REVIEWED, `${chapterId} keeps its release state`);
+    eq(status.releaseState, INDIA_RELEASE_STATE.AGENT_AUDITED, `${chapterId} keeps its release state`);
   } else {
     eq(status.quality, INDIA_CONTENT_QUALITY.WEAK_MAPPING, `${chapterId} is NOT promoted by authoring a generator`);
     eq(status.releaseState, INDIA_RELEASE_STATE.UNREVIEWED, `${chapterId} stays published-unreviewed until a source review`);
-    eq(status.sourceReviewed, false, `${chapterId} makes no source-review claim`);
+    eq(status.agentAudited, false, `${chapterId} makes no audit claim`);
   }
 }
 

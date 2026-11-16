@@ -49,12 +49,29 @@ export const flow = {
     await check('opening More reports itself open', await more.getAttribute('aria-expanded') === 'true');
 
     const reachable = await hrefsNow();
-    for (const path of ['/', '/practice', '/tasks', '/progress', '/exams', '/classes', '/review?filter=wrong', '/rush', '/match', '/settings']) {
+    // The Instrument's destinations (App.jsx STUDENT_NAV): the Map is a tab of
+    // its own, and Scripts is every script, with "Wrong" one filter away on it
+    // (checked below) rather than a separate destination. Classes is listed
+    // because this test build turns the classroom flag on (D10 hides it in a
+    // production build).
+    for (const path of ['/', '/practice', '/map', '/progress', '/review', '/notes', '/plan', '/tasks', '/exams', '/classes', '/rush', '/match', '/settings']) {
       await check(`a student on a phone can reach ${path}`, reachable.includes(path),
         `reachable: ${JSON.stringify(reachable.sort())}`);
     }
     await check('the sheet adds what the bar could not hold',
       reachable.length > onBar.length, `${onBar.length} on the bar, ${reachable.length} with More open`);
+
+    // ── 2b · wrong answers are one tap from Scripts ──────────────────────────
+    await page.locator('.mnav-sheet-item[href="/review"]').click();
+    await page.waitForSelector('[data-history-filter="wrong"]', { timeout: 30000 }).catch(() => {});
+    await page.locator('[data-history-filter="wrong"]').click().catch(() => {});
+    await settle();
+    await check('a student on a phone reaches /review?filter=wrong from Scripts',
+      new URL(page.url()).pathname === '/review' && new URL(page.url()).searchParams.get('filter') === 'wrong', page.url());
+    await goto('/');
+    await settle();
+    await page.getByRole('button', { name: 'More' }).click();
+    await settle();
 
     // ── 3 · it closes, and it goes where it says ─────────────────────────────
     await page.locator('.mnav-sheet-item[href="/exams"]').click();

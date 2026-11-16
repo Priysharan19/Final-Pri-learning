@@ -18,6 +18,7 @@ delete process.env.PRI_PUBLIC_ORIGIN;
 
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { loadAllBanks, GENERATORS, generateQuestion } = await import('../../client/src/engine/generators/index.js');
+const { allGenerators } = await import('../../client/src/engine/curriculum-in.js');
 await loadAllBanks();
 
 const h = await startApp();
@@ -36,8 +37,11 @@ try {
     assert.equal((await verifyEmail(h, made.account.id)).status, 200, 'and verifies its email');
     return made;
   };
-  // Every India class bank the client ships, at a difficulty it authors.
-  const banks = Object.keys(GENERATORS).filter(id => /^c(?:[7-9]|1[0-2])-/.test(id));
+  // Every India class bank the curriculum's covers draw on, at a difficulty it
+  // authors. (D15: a class bank the covers no longer draw on — c8-squares-roots,
+  // replaced by its NCERT-native successor — is refused; india-banks-check.mjs.)
+  const covered = new Set(allGenerators());
+  const banks = Object.keys(GENERATORS).filter(id => /^c(?:[7-9]|1[0-2])-/.test(id) && covered.has(id));
   for (const generator of banks) {
     try { generateQuestion(generator, 1, 104729); } catch { continue; }
     if (served % PER_ACCOUNT === 0) student = await nextStudent();

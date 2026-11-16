@@ -50,7 +50,7 @@ export function createWebhookIngress({store,secret}){
       // recordVerifiedWebhook. Derive expected PR number/head from the signed
       // payload only as input to its exact-identity consistency check.
       let event;
-      try{event=JSON.parse(raw)}catch{fail('BAD_JSON')}
+      try{event=JSON.parse(raw);}catch{fail('BAD_JSON');}
       const number=event?.pull_request?.number;
       const head=event?.pull_request?.head?.sha;
       if(!Number.isSafeInteger(number) || number<1 || !sha.test(head||''))fail('INVALID_SOURCE_ID');

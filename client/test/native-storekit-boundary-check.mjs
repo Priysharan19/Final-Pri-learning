@@ -64,8 +64,27 @@ assert.match(panel, /const canUseWebBilling = canSync && webCheckout && !nativeS
 assert.match(panel, /const nativeStoreKit = nativeStore === 'app-store';/,
   'the StoreKit flow runs only when the shell\'s store is the App Store');
 
-// CP-08 · Google Play: the server re-fetches every purchase from Google.
-const google = readFileSync(new URL('../src/components/GooglePlayBilling.jsx', import.meta.url), 'utf8');
+// The Premium screen (paywall/) runs the same StoreKit flow as Settings, from
+// one hook: the same server-first order, token binding and restore.
+const storeKitHook = readFileSync(new URL('../src/paywall/useStoreKitPurchase.js', import.meta.url), 'utf8');
+const hookAuthority = storeKitHook.indexOf('await cloud.submitAppleTransaction(signedTransaction)');
+const hookFinish = storeKitHook.indexOf('await finishNativeTransaction(transactionId)');
+assert.ok(hookAuthority >= 0 && hookFinish > hookAuthority, 'the Premium screen must obtain server acceptance before finishing a StoreKit transaction');
+assert.match(storeKitHook, /purchaseNativeProduct\(product\.id, appleBootstrap\.appAccountToken\)/, 'the Premium screen purchases with the server-generated appAccountToken');
+assert.match(storeKitHook, /acceptEachTransaction\(transactions,/, 'the Premium screen restores each transaction, not only the first');
+assert.equal(/set(?:Premium|Entitlement)\s*\(|fetch\(|cloudRequest\(/.test(storeKitHook.replace(/\/\/.*$/gm, '')), false,
+  'the Premium screen never sets Premium itself and uses only the audited cloud transport');
+const paywall = readFileSync(new URL('../src/paywall/Paywall.jsx', import.meta.url), 'utf8');
+assert.match(paywall, /useStoreKitPurchase\(/, 'the Premium screen uses the shared StoreKit flow');
+assert.match(paywall, /useGooglePlayPurchase\(/, 'the Premium screen uses the shared Google Play flow');
+assert.equal(/createWebBillingCheckout|checkout\/web|razorpay/i.test(paywall), false, 'the Premium screen never offers web checkout (out of V1)');
+
+// CP-08 · Google Play: the server re-fetches every purchase from Google. The
+// flow lives in one hook, used by the account panel and the Premium screen.
+const google = readFileSync(new URL('../src/paywall/useGooglePlayPurchase.js', import.meta.url), 'utf8');
+const googleView = readFileSync(new URL('../src/components/GooglePlayBilling.jsx', import.meta.url), 'utf8');
+assert.match(googleView, /useGooglePlayPurchase\(\{ user, canSync, onChanged \}\)/, 'the account panel\'s Google Play view runs the shared flow');
+assert.equal(/\bcloud\.[a-zA-Z]+\(|purchaseGoogleSubscription|restoreNativePurchases|refreshCloudEntitlement/.test(googleView), false, 'and holds no purchase logic of its own');
 assert.match(panel, /nativeShell && googlePlay && <GooglePlayBilling/, 'the Google Play flow runs only when the shell\'s store is Google Play');
 assert.match(google, /purchaseGoogleSubscription\(\{ productId: plan\.id, basePlanId: plan\.basePlanId, obfuscatedAccountId: bootstrap\.obfuscatedAccountId \}\)/,
   'a Google purchase carries the server-issued obfuscatedAccountId');

@@ -141,7 +141,7 @@ function posterA4(t) {
 
   <div style="margin-top: 28px; border-top: 1px solid ${t.hairline}; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 28px">
       <p style="margin: 0; font-size: 13px; line-height: 1.5; color: ${t.ink2}; max-width: 420px; text-wrap: pretty">${FINE}</p>
-      <div style="flex: 0 0 auto; padding-top: 2px">${scLabel(t, 'Class 7–12 · JEE · Olympiad', t.ink3)}</div>
+      <div style="flex: 0 0 auto; padding-top: 2px">${scLabel(t, 'Class 7–12 · JEE Main · JEE Advanced', t.ink3)}</div>
   </div>
 
 </div>`;
@@ -179,7 +179,7 @@ function square(t) {
 
   <div style="margin-top: 24px; border-top: 1px solid ${t.hairline}; padding-top: 16px; display: flex; justify-content: space-between; align-items: flex-start; gap: 32px">
       <p style="margin: 0; font-size: 15px; line-height: 1.5; color: ${t.ink2}; max-width: 560px; text-wrap: pretty">${FINE}</p>
-      <div style="flex: 0 0 auto; padding-top: 2px">${scLabel(t, 'Class 7–12 · JEE · Olympiad', t.ink3, 13)}</div>
+      <div style="flex: 0 0 auto; padding-top: 2px">${scLabel(t, 'Class 7–12 · JEE Main · JEE Advanced', t.ink3, 13)}</div>
   </div>
 
 </div>`;

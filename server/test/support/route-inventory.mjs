@@ -11,7 +11,7 @@ const INVENTORY_PATH = join(root, 'docs', 'security', 'route-inventory.json');
 const AUTH_KINDS = new Set(['none', 'session', 'credentials', 'bearer-token', 'oidc-token', 'provider-signature', 'operator-token']);
 const ROLES = new Set(['student', 'teacher', 'support', 'admin']);
 const CSRF = new Set(['not-applicable', 'double-submit-when-session-cookie']);
-const ORIGIN = new Set(['not-applicable', 'enforced', 'exempt-provider-webhook', 'exempt-provider-callback']);
+const ORIGIN = new Set(['not-applicable', 'enforced', 'exempt-provider-webhook', 'exempt-provider-callback', 'exempt-one-click-unsubscribe']);
 const MUTATION = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export function loadInventory(path = INVENTORY_PATH) {
@@ -20,7 +20,9 @@ export function loadInventory(path = INVENTORY_PATH) {
   return inventory;
 }
 
-export function mountedRoutes(router = createPlatformRouter(createPlatformDb(':memory:'))) {
+// Every route the code can serve, the parent report's included: it is off by
+// default (PRI_PARENT_REPORT, D22) but its routes are reviewed like any other.
+export function mountedRoutes(router = createPlatformRouter(createPlatformDb(':memory:'), { parentReport: { enabled: true } })) {
   return listRoutes(router, '/v1');
 }
 

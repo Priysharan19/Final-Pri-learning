@@ -10,9 +10,12 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const CONTROL_FILE = path.join(ROOT, '.pri-os', 'mission-control.json');
 const FLEET_FILE = path.join(ROOT, '.pri-os', 'fleet.json');
 const DERIVED_FILE = path.join(ROOT, '.pri-os', 'derived-artifacts.json');
-// A review, CI wait, or merge-ready record does not itself occupy a code writer.
-const WRITER_STATES = new Set(['ACTIVE','IMPLEMENTING','TESTING','REPAIR']);
-const REVIEW_STATES = new Set(['REVIEW','CI','MERGE_READY','REPAIR_PENDING']);
+// The state sets live in .pri-os/mission-control.json (lease.writer_holding_states,
+// lease.review_states): a review, CI wait, or merge-ready record does not itself
+// occupy a code writer. These defaults are the policy a control file without the
+// arrays falls back to; `validate` requires version 2 to declare them.
+const DEFAULT_WRITER_STATES = ['ACTIVE','IMPLEMENTING','TESTING','REPAIR'];
+const DEFAULT_REVIEW_STATES = ['REVIEW','CI','MERGE_READY','REPAIR_PENDING'];
 const SERIAL_PATHS = [
   '.pri-os/', 'AGENTS.md', '.github/workflows/', 'package.json', 'package-lock.json',
   'client/package.json', 'client/package-lock.json', 'Dockerfile'
@@ -31,6 +34,12 @@ const derived = readJson(DERIVED_FILE);
 const agents = new Set(fleet.agents.map(agent => agent.id));
 const risks = new Set(Object.keys(fleet.risk_classes || {}));
 const gateIds = new Set(Object.keys(fleet.gates || {}));
+function declaredStates(key, fallback) {
+  const value = control.lease?.[key];
+  return new Set(Array.isArray(value) && value.length ? value.map(String) : fallback);
+}
+const WRITER_STATES = declaredStates('writer_holding_states', DEFAULT_WRITER_STATES);
+const REVIEW_STATES = declaredStates('review_states', DEFAULT_REVIEW_STATES);
 
 function maxWriters() {
   const value = Number(control.lease?.max_writers);
@@ -48,6 +57,15 @@ function validateControl() {
     if (control.lease?.single_active_writer !== false) errors.push('version 2 requires bounded writer-pool semantics');
     if (!Number.isInteger(control.lease?.max_writers) || control.lease.max_writers < 1 || control.lease.max_writers > 2) errors.push('lease.max_writers must be 1..2');
     if (control.lease?.fallback_max_writers !== 1) errors.push('fallback_max_writers must remain 1');
+    for (const key of ['writer_holding_states', 'review_states']) {
+      const value = control.lease?.[key];
+      if (!Array.isArray(value) || !value.length) errors.push(`version 2 requires lease.${key} (the single source of truth AGENTS.md quotes)`);
+      else for (const state of value) if (!control.states?.includes(state)) errors.push(`lease.${key}: unknown state ${state}`);
+    }
+    const writer = control.lease?.writer_holding_states || [], review = control.lease?.review_states || [];
+    for (const state of writer) if (review.includes(state)) errors.push(`state ${state} cannot both hold a writer and be a review state`);
+    if (!writer.includes('ACTIVE')) errors.push('ACTIVE must be a writer-holding state');
+    if (!review.includes('REVIEW')) errors.push('REVIEW must be a review state');
   } else if (!control.lease?.single_active_writer) {
     errors.push('version 1 requires single_active_writer=true');
   }

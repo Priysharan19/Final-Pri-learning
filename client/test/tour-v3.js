@@ -25,7 +25,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
+// The chapter's own name, as the card, History and the review print it
+// (CBSE Class 7; it replaced NSW Year 7 "Linear Equations", D2/D15).
+const TOPIC_NAME = 'Finding the Unknown';
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 12;
 
@@ -36,7 +39,7 @@ export const flow = {
   name: 'Practice · a question, marked both ways',
   online: true,
 
-  async run({ page, ctx, base, check, goto, createProfile, mathText, settle, online }) {
+  async run({ page, ctx, base, check, note, goto, createProfile, mathText, settle, online, browserName = 'chromium' }) {
     await goto('/');
     await createProfile({ name: 'Blaise Pascal', year: 7 });
     await online.signIn({ name: 'Blaise Pascal' });
@@ -48,7 +51,7 @@ export const flow = {
     await check('a question renders with a prompt', !!firstPrompt && firstPrompt.length > 8,
       `prompt reads ${JSON.stringify(firstPrompt)}`);
     await check('the card names the topic it came from',
-      (await page.locator('.q-topmeta').innerText()).includes('Linear Equations'),
+      (await page.locator('.q-topmeta').innerText()).includes(TOPIC_NAME),
       `topmeta reads ${JSON.stringify(await page.locator('.q-topmeta').innerText())}`);
     // Practice is deliberately untimed on screen: time on task is still
     // recorded with the attempt, but a running clock is pressure, not help.
@@ -142,11 +145,15 @@ export const flow = {
     // The right answer comes from the oracle (support/online-session.mjs): the
     // device no longer holds one to read, and the server never hands one out
     // before the question is resolved.
+    // The resolved card's id is read BEFORE the click: read after it, a fast
+    // render had already put the next question's id there, and the wait for
+    // "a different id" could never end (about one run in ten).
+    const resolvedId = (await online.shownRow()).id;
     await page.locator('.ws-actions .btn-primary').click();
     await page.waitForFunction(id => {
       const el = document.querySelector('.qpage[data-question-id]');
       return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
-    }, (await online.shownRow()).id, { timeout: 30000 });
+    }, resolvedId, { timeout: 30000 });
     let right = null;
     for (let i = 0; i <= MAX_SKIPS; i++) {
       if (await typeTab.count()) await typeTab.click();
@@ -194,14 +201,29 @@ export const flow = {
       scores.some(t => /\bCorrect\b/.test(t)) && scores.some(t => /\bIncorrect\b/.test(t)),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
     await check('both attempts are on the same question',
-      scores.every(t => t.includes('Linear Equations')),
+      scores.every(t => t.includes(TOPIC_NAME)),
       `rows read ${JSON.stringify(scores.map(t => t.replace(/\s+/g, ' ').slice(0, 60)))}`);
+    // Each row names the real chapter (never a demo, generator or device label)
+    // and dates it the India way: day then month ("22 Oct"), not "Oct 22".
+    const names = await page.locator('.hist-row .hist-name').allInnerTexts();
+    await check('each History row names the chapter, not a demo, generator or device',
+      names.length === 2 && names.every(n => n.includes(TOPIC_NAME)) && !names.some(n => /Pri demo|generator|iPad/i.test(n)),
+      `names read ${JSON.stringify(names)}`);
+    // The Scripts ledger groups rows under day headings; each row also states
+    // its own date (data-history-date, and a spoken prefix), which is read here.
+    const dates = await page.locator('.hist-row [data-history-date]').evaluateAll(els => els.map(el => el.getAttribute('data-history-date')));
+    await check('History dates read day then month (en-IN), not US month-first',
+      dates.length === 2 && dates.every(d => /^\d{1,2}\s+[A-Za-z]{3,4}$/.test(d.trim())),
+      `dates read ${JSON.stringify(dates)}`);
+    await check('History never calls the device an iPad', !/\biPad\b/i.test(await page.locator('main').innerText()));
 
     // ── 6b · "Same question" from History: the server repeats it ─────────────
     // The missed question is tried again. The server — which chose it and
     // never disclosed a seed — is asked to repeat it; the new attempt is its
     // own server question, marked by the server, and its receipt says repeat.
     const missedRow = page.locator('.hist-row').filter({ has: page.locator('.hist-verdict.bad') }).first();
+    // A ledger row opens to show its actions and its working.
+    await missedRow.locator('.hist-main').click();
     await missedRow.locator('.hist-actions .btn').first().click();
     await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
     if (await typeTab.count()) await typeTab.click();
@@ -221,7 +243,10 @@ export const flow = {
     }
 
     // ── 7 · a question that comes with a diagram ─────────────────────────────
-    await page.goto(`${base}/practice?subtopic=y9-pythagoras`, { waitUntil: 'domcontentloaded' });
+    // CBSE Class X "Some Applications of Trigonometry": every form is a
+    // right-triangle heights-and-distances question drawn with its own figure
+    // (the India chapter that replaced NSW Year 9 Pythagoras here, D2/D15).
+    await page.goto(`${base}/practice?subtopic=c10-trig-applications`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     let figure = false;
     for (let i = 0; i < 6 && !figure; i++) {
@@ -232,7 +257,7 @@ export const flow = {
       await settle();
     }
     await check('a geometry question draws its own figure', figure,
-      'six Pythagoras questions and not one of them rendered an SVG figure');
+      'six heights-and-distances questions and not one of them rendered an SVG figure');
 
     // ── 8 · a connection lost mid-lesson never erases the open lesson ────────
     // Only the server lets a profile in (issue #477): an app OPENED offline is
@@ -252,6 +277,55 @@ export const flow = {
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
     await settle(); await settle();
     await check('the connection back, the same lesson is still open', await page.evaluate(() => document.querySelector('.qpage') === window.__lesson));
+
+    // ── 8b · a full reload with the network gone, mid-lesson ─────────────────
+    // A visibilitychange on a mounted lesson is not a reload. Here the page is
+    // reloaded offline through the installed service worker: it must boot a
+    // safe screen for this account (the shell inside the grace, or the gate),
+    // never a blank or crashed page. With the connection back, the reloaded
+    // lesson is the same question for the same learner, with no second code.
+    const lessonBefore = await page.locator('.qpage').getAttribute('data-question-id');
+    const claimed = await page.waitForFunction(() => !!navigator.serviceWorker?.controller, null, { timeout: 30000 })
+      .then(() => true).catch(() => false);
+    if (await check('the service worker is in charge of the open lesson, so an offline reload can paint at all', claimed,
+      'no worker claimed the client')) {
+      let offlineState = '';
+      await ctx.setOffline(true);
+      // Marks this document, so a reload that never happened cannot pass as one.
+      await page.evaluate(() => { window.__beforeOfflineReload = true; });
+      await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 }).catch(e => { offlineState = String(e).slice(0, 180); });
+      const reloaded = !(await page.evaluate(() => window.__beforeOfflineReload === true).catch(() => false));
+      if (!reloaded && browserName === 'webkit') {
+        // Playwright's offline emulation in WebKit fails the service worker's
+        // navigation, so no offline document loads (see tour-activation-gate.js).
+        // Said, not passed; Chromium runs it.
+        note('offline lesson reload: NOT exercised in WebKit — Playwright\'s offline emulation fails the service-worker navigation');
+        await ctx.setOffline(false);
+      } else {
+        const booted = await page.locator('.shell, [data-testid="account-activation-gate"]').first()
+          .waitFor({ state: 'attached', timeout: 15000 }).then(() => true).catch(() => false);
+        await page.locator('.qpage[data-question-id] .q-prompt').waitFor({ timeout: 15000 }).catch(() => {});
+        offlineState ||= (await page.locator('body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 180);
+        await check('reloaded offline mid-lesson, the app boots a safe account-aware screen, not a blank or crashed page',
+          reloaded && booted && await page.locator('.crash-card').count() === 0,
+          `reloaded ${reloaded}, page ${page.url()}, state ${JSON.stringify(offlineState)}`);
+        // Inside the 72-hour grace (tour-activation-gate.js §5) that screen is
+        // the lesson itself: the same question, told nothing is checked offline.
+        const lessonOffline = await page.locator('.qpage').getAttribute('data-question-id').catch(() => null);
+        await check('inside the grace, the offline reload resumes the same question in the shell, with the offline line and no gate',
+          lessonOffline === lessonBefore && await page.locator('.shell').count() === 1 &&
+            await page.locator('[data-testid="account-activation-gate"]').count() === 0 &&
+            /nothing is checked/.test(await page.locator('[data-testid="offline-entry"]').innerText().catch(() => '')),
+          `before ${lessonBefore}, offline ${lessonOffline}, state ${JSON.stringify(offlineState)}`);
+        await ctx.setOffline(false);
+        await page.reload({ waitUntil: 'domcontentloaded' });
+        await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
+        const lessonAfter = await page.locator('.qpage').getAttribute('data-question-id');
+        await check('the connection back, the reloaded lesson resumes the same question for the same learner, with no second code',
+          !!lessonBefore && lessonAfter === lessonBefore && await page.locator('[data-testid="account-activation-gate"]').count() === 0,
+          `before ${lessonBefore}, after ${lessonAfter}`);
+      }
+    }
   }
 };
 

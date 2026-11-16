@@ -120,6 +120,14 @@ export function startExamClock(exam, now = Date.now()) {
 export const deadlinePassed = (exam, now = Date.now()) =>
   finite(exam?.deadlineAt) && now >= exam.deadlineAt;
 
+/**
+ * When an NSW paper's reading time ends (plan G4), on this device's clock, or
+ * null for a paper with none. The server owns the real boundary and refuses a
+ * save before it; this only keeps the room from asking.
+ */
+export const readingEndsAtOf = exam => (finite(exam?.readingMin) && exam.readingMin > 0 && finite(exam.startedAt) ? exam.startedAt + exam.readingMin * 60000 : null);
+export const inReadingTime = (exam, now = Date.now()) => { const end = readingEndsAtOf(exam); return end !== null && now < end; };
+
 /** Which top-level question a response key belongs to: `qid`, `qid::a`, `qid::a::or`, `qid::or`. */
 const questionOfKey = key => String(key).split('::')[0];
 
@@ -256,6 +264,7 @@ export function saveExamResponses(exam, body = {}, now = Date.now()) {
   ensureExamClock(exam, now);
   now = exam.latestSeenAt;
   if (deadlinePassed(exam, now)) throw examError('Time is up on this paper — nothing more can be saved to it.', 409, 'EXAM_DEADLINE_PASSED');
+  if (inReadingTime(exam, now)) throw examError('Reading time: you can read the paper, but no answers can be written until working time starts.', 409, 'EXAM_READING_TIME');
   const allowed = allowedKeys(exam);
   const prior = exam.responses || {};
   const next = {
@@ -390,6 +399,7 @@ export function examSessionView(exam, now = Date.now()) {
     deadlineAt: exam.deadlineAt,
     now,
     remainingMs: finished ? 0 : Math.max(0, exam.deadlineAt - now),
+    ...(readingEndsAtOf(exam) !== null ? { readingEndsAt: readingEndsAtOf(exam) } : {}),
     expired: !finished && deadlinePassed(exam, now),
     finalised: finished,
     responses: finished ? null : (exam.responses || null),

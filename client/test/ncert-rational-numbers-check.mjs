@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { makeRng } from '../src/engine/qhelpers.js';
+import { checkAnswer } from '../src/engine/checker.js';
+import { AS_FRACTION } from '../src/engine/ncert/class8-rational-numbers.js';
 import {
   NCERT_CLASS8_RATIONAL_CONTENT,
   NCERT_CLASS8_RATIONAL_DOTPOINTS,
@@ -99,5 +101,41 @@ for (const [gi, id] of NCERT_CLASS8_RATIONAL_GENERATOR_IDS.entries()) {
 
 assert.ok(numeric > 0, 'the bank must contain handwriting-ready numeric questions');
 assert.ok(mcqs > 0, 'the bank must contain precise conceptual property checks');
+
+// #547: a fraction-arithmetic form that refuses the exact decimal says so in
+// its prompt, and one that does not say so accepts it. Every draw is checked
+// through the shipped marker; the demanded forms are counted by prompt shape so
+// losing the wording from any one of them fails here.
+const terminating = (n, d) => { let k = Math.abs(d); while (k % 2 === 0) k /= 2; while (k % 5 === 0) k /= 5; return k === 1; };
+const demandedForms = new Set();
+let demandedDraws = 0, acceptedDecimals = 0;
+for (const [gi, id] of NCERT_CLASS8_RATIONAL_GENERATOR_IDS.entries()) {
+  const gen = NCERT_CLASS8_RATIONAL_GENERATORS[id];
+  for (let diff = 1; diff <= 4; diff++) {
+    for (let sample = 0; sample < 60; sample++) {
+      const q = gen(makeRng(0x8c547000 + gi * 10000 + diff * 100 + sample), diff);
+      const f = q?.answer?.simplestFraction;
+      if (q?.answerType !== 'numeric' || !f || f.d === 1) continue;
+      const fraction = `${f.n}/${f.d}`;
+      assert.equal(checkAnswer(q, fraction).correct, true, `${id} D${diff}: the keyed fraction ${fraction} is accepted`);
+      if (q.answer.requireFraction === true) {
+        assert.ok(String(q.prompt).includes(AS_FRACTION) || /\bas a (?:fraction|rational number) in simplest form\b/i.test(String(q.prompt)), `${id} D${diff}: requireFraction is set, so the prompt must ask for the fraction ("${AS_FRACTION}") — ${q.prompt}`);
+        demandedDraws++;
+        demandedForms.add(`${id}:${String(q.prompt).replace(/\$[^$]*\$/g, '$').slice(0, 60)}`);
+        if (terminating(f.n, f.d)) {
+          assert.equal(checkAnswer(q, String(f.n / f.d)).correct, false, `${id} D${diff}: the exact decimal ${f.n / f.d} is refused where a fraction is asked — ${q.prompt}`);
+        }
+      } else if (!/fraction|simplest|lowest terms|simplif/i.test(String(q.prompt)) && terminating(f.n, f.d)) {
+        assert.equal(checkAnswer(q, String(f.n / f.d)).correct, true, `${id} D${diff}: no fraction is asked, so the exact decimal ${f.n / f.d} is accepted — ${q.prompt}`);
+        acceptedDecimals++;
+      }
+    }
+  }
+}
+// Measured: 10 forms carry the wording (closure subtraction and division,
+// associativity sum, two distributivity forms, Examples 1–3, the topper
+// challenge and foundations D3 "as a rational number in simplest form").
+assert.ok(demandedForms.size >= 10, `every worded fraction-arithmetic form was drawn and checked (${demandedForms.size}: ${[...demandedForms].join(' | ')})`);
+assert.ok(acceptedDecimals > 0, 'the forms that ask for no fraction still accept the exact decimal');
 
 console.log(`NCERT Class 8 Rational Numbers: 3 product outcomes, ${NCERT_CLASS8_RATIONAL_GENERATOR_IDS.length} generators × 4 levels audited; ${numeric + mcqs} sampled questions passed; attached Exercise 1.1 answers verified.`);

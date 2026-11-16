@@ -25,7 +25,7 @@ resetStorage();
 // An exam starts only for a signed-in account that can reach the server
 // (online-only grading), so the suite runs against the real one.
 const { startOnlineAuthority } = await import('./support/online-authority.mjs');
-const online = await startOnlineAuthority({ label: 'bad-input' });
+const online = await startOnlineAuthority({ label: 'bad-input', nswBanks: true });
 
 const { dispatch } = await import('../src/local/backend.js');
 const { validateRequest } = await import('../src/local/gateway.js');

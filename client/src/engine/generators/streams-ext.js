@@ -1965,8 +1965,12 @@ export const streamsExt = {
       const wantArg = rng() < 0.5;
       const argF = piFrac(pick.t * n, 12);
       const modV = pick.modV ** n;
+      // The modulus evaluated (D13: a numeric answer has no operation left to
+      // do): (k√2)ⁿ = kⁿ·2^⌊n/2⌋, times √2 when n is odd.
+      const k = pick.mod === 'sqrt(2)' ? 1 : pick.mod === '2sqrt(2)' ? 2 : pick.mod === '3sqrt(2)' ? 3 : 0;
+      const whole = k ** n * 2 ** Math.floor(n / 2);
       const modTyped = pick.mod === '2' ? String(2 ** n)
-        : pick.mod.includes('sqrt') ? `(${pick.mod})^${n}` : `${pick.mod}^${n}`;
+        : k ? (n % 2 ? `${whole === 1 ? '' : whole}sqrt(2)` : String(whole)) : `${pick.mod}^${n}`;
       return wantArg ? {
         prompt: `Write $z = ${pick.z}$ in polar form and hence find the argument of $z^{${n}}$, in radians (this may lie outside $(-\\pi, \\pi]$).`,
         answerType: 'numeric', answer: { value: argF.val, requireExact: true, canonicalInput: argF.typed },
@@ -1980,7 +1984,7 @@ export const streamsExt = {
       } : {
         prompt: `Using polar form, find $\\left|\\,(${pick.z})^{${n}}\\,\\right|$ — the modulus of $(${pick.z})^{${n}}$.`,
         answerType: 'numeric', answer: { value: modV, requireExact: true, canonicalInput: modTyped },
-        inputHint: 'e.g. 16 or (2sqrt(2))^3',
+        inputHint: 'e.g. 16 or 8sqrt(2)',
         traps: [{ value: pick.modV * n, why: `Moduli RAISE to the power: $|z^n| = |z|^n = (${pick.modTex})^{${n}}$.`, tol: 0.01 }],
         hints: [`$|${pick.z}| = ${pick.modTex}$.`, `$|z^n| = |z|^n = (${pick.modTex})^{${n}}$.`, `Evaluate it.`],
         steps: [

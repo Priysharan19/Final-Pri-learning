@@ -45,7 +45,7 @@ if (typeof globalThis.document === 'undefined') globalThis.document = Object.ass
 // Only the server marks (owner decision 2026-10-10): every submission below is
 // graded by the real /v1 app for a real verified account.
 const { startOnlineAuthority } = await import('./support/online-authority.mjs');
-const online = await startOnlineAuthority({ label: 'lifecycle' });
+const online = await startOnlineAuthority({ label: 'lifecycle', nswBanks: true });
 
 const { api } = await import('../src/api.js');
 const idb = await import('../src/local/idb.js');

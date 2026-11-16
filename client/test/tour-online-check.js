@@ -45,7 +45,7 @@ import { pathToFileURL } from 'node:url';
 import { handwrite, pressRead } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
-const TOPIC = 'y7-equations';
+const TOPIC = 'c7-finding-unknown-current';
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 14;
 
@@ -157,6 +157,24 @@ export const typeOffline = {
     await goto('/');
     await createProfile({ name: 'Offline Typist', year: 7 });
     await online.signIn({ name: 'Offline Typist' });
+    // D15 through this harness: its platform no longer allows a bank outside
+    // the India covers (support/online-session.mjs), so the client's own issue
+    // request, made from this signed-in page for an NSW bank, is refused with
+    // D15's code (it is checked after the request's shape, so nothing else can
+    // produce it). Nothing is issued.
+    const nsw = await page.evaluate(async () => {
+      const csrf = (document.cookie.match(/(?:^|;\s*)pri_csrf=([^;]+)/) || [])[1];
+      const response = await fetch('/v1/practice/issue', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Pri-Client': 'web-v1', ...(csrf ? { 'X-Pri-CSRF': decodeURIComponent(csrf) } : {}) },
+        body: JSON.stringify({ generator: 'y7-equations', difficulty: 2, curriculum: 'in' })
+      });
+      let json = null;
+      try { json = await response.json(); } catch { json = null; }
+      return { status: response.status, code: json?.code ?? json?.error?.code ?? null };
+    });
+    await check('the harness server refuses an NSW bank (D15): an issue request for y7-equations is 422 PRACTICE_BANK_OUTSIDE_CURRICULUM',
+      nsw.status === 422 && nsw.code === 'PRACTICE_BANK_OUTSIDE_CURRICULUM', JSON.stringify(nsw));
     const known = await openTypedQuestion({ page, base, settle, online });
     if (!await check('signed in, Practice serves a typed question', !!known)) return;
     const qid = await shownId(page);
@@ -466,11 +484,13 @@ export const examOfflineFinish = {
 
   async run({ page, base, check, goto, createProfile, settle, online }) {
     await goto('/');
-    await createProfile({ name: 'Offline Finisher', year: 9 });
+    // The released India paper is the JEE Main simulation (D2); the NSW-era
+    // practice paper this flow sat is refused at the server (D15).
+    await createProfile({ name: 'Offline Finisher', year: 12, track: 'jee-main' });
     const account = await online.signIn({ name: 'Offline Finisher' });
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
-    await page.getByRole('button', { name: 'Start practice paper' }).waitFor({ timeout: 30000 });
-    await page.getByRole('button', { name: 'Start practice paper' }).click();
+    await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).waitFor({ timeout: 30000 });
+    await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
     await page.waitForSelector('.exam-timer', { timeout: 60000 });
     const examId = new URL(page.url()).pathname.split('/').pop();
     const sealed = new Map(await online.examAnswers(examId));
@@ -508,7 +528,16 @@ export const examOfflineFinish = {
     await check('nothing claims a mark made on this device', !/marked on this device|checked on this device/i.test(await page.locator('main, .shell').first().innerText()));
     // The Exams list tells the same truth. Reached inside the app: a page
     // load with no server is the activation gate's retry screen (issue #477).
-    await page.locator('a[href="/exams"]').first().evaluate(a => a.click());
+    // The Instrument shell keeps Exams in its More menu (a phone keeps it in
+    // the More sheet); either way it is a client-side route change. The exam
+    // room hides the bar while a paper is open, so — as with the sidebar link
+    // this replaced — the controls are pressed from script, not by pointer.
+    if (await page.locator('a[href="/exams"]').count()) await page.locator('a[href="/exams"]').first().evaluate(a => a.click());
+    else {
+      await page.locator('#in-more-btn').evaluate(b => b.click());
+      await page.waitForSelector('#in-more-menu [role="menuitem"]', { state: 'attached', timeout: 15000 });
+      await page.evaluate(() => [...document.querySelectorAll('#in-more-menu [role="menuitem"]')].find(el => /Exams/.test(el.textContent))?.click());
+    }
     await page.waitForSelector('.prio-item', { timeout: 30000 });
     await check('the Exams list shows the paper as waiting to be marked, with no score',
       await page.locator('.prio-item [data-exam-pending]').count() === 1 && !/\d+\/\d+/.test((await page.locator('.prio-item').first().innerText()).replace(/\d{1,2}[:/]\d{2}/g, '')),
@@ -723,7 +752,7 @@ export const sessionEndedStarts = {
 
   async run({ page, base, check, goto, createProfile, online }) {
     await goto('/');
-    await createProfile({ name: 'Ended Starter', year: 9 });
+    await createProfile({ name: 'Ended Starter', year: 12, track: 'jee-main' });
     const account = await online.signIn({ name: 'Ended Starter' });
     const endSession = () => online.platform.h.db.prepare('DELETE FROM account_sessions WHERE account_id=?').run(account.id).changes;
     const storedExams = () => page.evaluate(() => new Promise(done => {
@@ -734,14 +763,14 @@ export const sessionEndedStarts = {
 
     // ── Exams ────────────────────────────────────────────────────────────────
     await page.goto(`${base}/exams`, { waitUntil: 'domcontentloaded' });
-    const start = page.getByRole('button', { name: 'Start practice paper' });
+    const start = page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' });
     await start.waitFor({ timeout: 30000 });
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
     const ended = endSession();
     await start.click();
     const refused = page.locator('[data-exam-start-refused]');
     await refused.waitFor({ state: 'visible', timeout: 20000 }).catch(() => {});
-    await check('session ended, "Start practice paper" is refused in place with the sign-in beside it; the paper has not started',
+    await check('session ended, "Start JEE Main Mathematics simulation" is refused in place with the sign-in beside it; the paper has not started',
       ended >= 1 && await refused.getAttribute('data-exam-start-refused').catch(() => null) === 'sign-in' && await refused.getAttribute('role') === 'alert' &&
         /has not started/i.test(await refused.innerText()) && await refused.locator('[data-check-sign-in]').isEnabled().catch(() => false),
       (await refused.innerText().catch(() => 'no refusal shown')).slice(0, 200));
@@ -754,7 +783,7 @@ export const sessionEndedStarts = {
     await check('signed in again on the Exams page: no navigation, no reload, and the sign-in card is gone',
       new URL(page.url()).pathname === '/exams' && await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' &&
         await page.locator('[data-signin-card="inline"]').count() === 0, page.url());
-    await page.getByRole('button', { name: 'Start practice paper' }).click();
+    await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
     await page.waitForSelector('.exam-timer', { timeout: 60000 }).catch(() => {});
     const issued = (await online.practiceCalls(/^\/v1\/exams$/)).filter(c => c.status < 300);
     await check('then the same button starts the paper — issued by the server, once',

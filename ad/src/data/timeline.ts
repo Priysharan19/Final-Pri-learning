@@ -59,11 +59,11 @@ export const TEXT_MAIN: TextBeat[] = [
   { at: 9.2, until: 11.6, text: 'Watch the secant become the tangent.', role: 'caption' },
   { at: 12.9, until: 14.9, text: 'The derivative isn’t a rule.\nIt’s what you’re watching.', role: 'caption' },
   { at: 15.3, until: 17.4, text: 'Understand one idea.\nSolve what you’ve never seen.', role: 'caption' },
-  { at: 18.6, until: 20.0, text: 'Marked like an examiner.', role: 'caption' },
-  { at: 20.4, until: 23.2, text: 'Three lakh questions, on your iPad.\nYour misconceptions, traced.', role: 'caption' },
-  { at: 23.5, until: 26.2, text: 'Percentile predicted. Rivals raced.\nMocks marked.', role: 'caption' },
-  { at: 25.6, until: 26.45, text: 'All of it offline.', role: 'headline' },
-  { at: 27.1, until: 32.8, text: 'Class 7 to Olympiad.\nThe same mathematics, at different pressures.', role: 'caption' },
+  { at: 18.6, until: 20.0, text: 'Marked by the engine. It can be wrong.', role: 'caption' },
+  { at: 20.4, until: 23.2, text: 'Generated questions, fresh every time.\nYour misconceptions, traced.', role: 'caption' },
+  { at: 23.5, until: 26.2, text: 'Timed papers, marked.\nRivals raced.', role: 'caption' },
+  { at: 25.6, until: 26.45, text: 'Sign in. Connect. Practise.', role: 'headline' },
+  { at: 27.1, until: 32.8, text: 'Class 7 to JEE Advanced.\nThe same mathematics, at different pressures.', role: 'caption' },
   { at: 33.2, until: 35.6, text: 'Join the change.', role: 'headline' },
   { at: 33.8, until: 35.5, text: '@pri.learning · coming soon', role: 'cta' },
 ];
@@ -73,8 +73,8 @@ export const TEXT15: TextBeat[] = [
   { at: 2.6, until: 3.9, text: 'Until the question is new.', role: 'caption' },
   { at: 4.2, until: 6.4, text: 'Watch the secant become the tangent.', role: 'caption' },
   { at: 7.1, until: 8.4, text: 'The derivative isn’t a rule.', role: 'caption' },
-  { at: 8.7, until: 10.4, text: 'Your working,\nmarked like an examiner.', role: 'caption' },
-  { at: 10.6, until: 12.4, text: 'Class 7 to Olympiad.', role: 'caption' },
+  { at: 8.7, until: 10.4, text: 'Your working,\nmarked by the engine.', role: 'caption' },
+  { at: 10.6, until: 12.4, text: 'Class 7 to JEE Advanced.', role: 'caption' },
   { at: 12.7, until: 14.6, text: 'Join the change.', role: 'headline' },
   { at: 13.2, until: 14.5, text: '@pri.learning · coming soon', role: 'cta' },
 ];
@@ -95,10 +95,10 @@ export const VO_MAIN: VoLine[] = [
   { at: 6.1, until: 7.35, text: 'Until the question is new.' },
   { at: 9.0, until: 11.7, text: 'Watch the secant become the tangent.' },
   { at: 13.0, until: 15.3, text: 'Not a rule. A reason.' },
-  { at: 15.4, until: 19.6, text: 'Understand one idea, and you can solve what you’ve never seen. Marked like an examiner.' },
-  { at: 20.3, until: 23.2, text: 'Three lakh questions. Your misconceptions, traced.' },
-  { at: 23.5, until: 26.1, text: 'Percentile predicted. Rivals raced. Mocks marked.' },
-  { at: 27.3, until: 32.6, text: 'Class seven to Olympiad. The same mathematics, at different pressures.' },
+  { at: 15.4, until: 19.6, text: 'Understand one idea, and you can solve what you’ve never seen. Marked by the engine; it can be wrong.' },
+  { at: 20.3, until: 23.2, text: 'Generated questions, fresh every time. Your misconceptions, traced.' },
+  { at: 23.5, until: 26.1, text: 'Timed papers, marked. Rivals raced.' },
+  { at: 27.3, until: 32.6, text: 'Class seven to J E E Advanced. The same mathematics, at different pressures.' },
   { at: 33.3, until: 35.2, text: 'Pri Learning. Join the change.' },
 ];
 
@@ -106,8 +106,8 @@ export const VO15: VoLine[] = [
   { at: 0.2, until: 1.15, text: 'Stop memorising maths.' },
   { at: 2.2, until: 3.35, text: 'Until the question is new.' },
   { at: 3.9, until: 6.5, text: 'Watch the secant become the tangent.' },
-  { at: 8.7, until: 10.4, text: 'Your working, marked like an examiner.' },
-  { at: 10.7, until: 12.3, text: 'Class seven to Olympiad.' },
+  { at: 8.7, until: 10.4, text: 'Your working, marked by the engine.' },
+  { at: 10.7, until: 12.3, text: 'Class seven to J E E Advanced.' },
   { at: 12.8, until: 14.5, text: 'Pri Learning. Join the change.' },
 ];
 

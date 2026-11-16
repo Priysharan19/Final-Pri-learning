@@ -165,6 +165,20 @@ async function reachRealFeedback(page, check, online) {
   }
 }
 
+// The one student interface is the Instrument (client/interface.config.mjs):
+// its navigation is the bar's tabs plus its More menu, opened and closed.
+async function instrumentNavLabels(page) {
+  const tabs = (await page.locator('[data-instrument-bar] .in-tab').allTextContents()).map(s => s.trim());
+  let more = [];
+  if (await page.locator('#in-more-btn').count()) {
+    await page.locator('#in-more-btn').click();
+    await page.waitForSelector('#in-more-menu', { timeout: 10000 });
+    more = (await page.locator('#in-more-menu [role="menuitem"]').allTextContents()).map(s => s.trim());
+    await page.keyboard.press('Escape');
+  }
+  return [...tabs, ...more];
+}
+
 export const flow = {
   id: 'kalp03-onboarding',
   name: 'KALP-03 · onboarding, real profiles and first learning action',
@@ -192,9 +206,10 @@ export const flow = {
     await check('Class 10 drives the real Home curriculum',
       /Class 10/.test(await page.locator('.genbar-chips').innerText()));
 
-    const studentLabels = await page.locator('.sidebar .nav-label').allTextContents();
+    // The Instrument's navigation: the bar's tabs and its More menu.
+    const studentLabels = await instrumentNavLabels(page);
     await check('student receives KALP-02 student navigation',
-      ['Home', 'Practice', 'Tasks', 'Exams', 'Progress', 'Review'].every(x => studentLabels.includes(x)));
+      ['Index', 'Practice', 'Map', 'Report', 'Scripts', 'Tasks', 'Exams'].every(x => studentLabels.includes(x)), studentLabels.join(' | '));
     await check('student navigation does not expose Teacher workspace', !studentLabels.includes('Teacher workspace'));
     // The session the card made is the one that marks (online.signIn reuses it).
     await online.signIn({ name: 'KALP03 Class 10 Student' });
@@ -357,9 +372,9 @@ export const flow = {
     await page.waitForURL(/\/teach(?:#.*)?$/, { timeout: 30000 });
     await page.waitForSelector('.teacher-workspace-head');
     await check('signed in on the gate, the teacher profile lands directly in Teacher Workspace', new URL(page.url()).pathname === '/teach');
-    const teacherLabels = await page.locator('.sidebar .nav-label').allTextContents();
+    const teacherLabels = await instrumentNavLabels(page);
     await check('teacher gets teacher-specific navigation',
-      ['Teacher workspace', 'Classes', 'Assignments', 'Analytics & reports', 'Question tools'].every(x => teacherLabels.includes(x)));
+      ['Teacher workspace', 'Classes', 'Assignments', 'Analytics & reports', 'Question tools'].every(x => teacherLabels.includes(x)), teacherLabels.join(' | '));
     await check('teacher primary navigation excludes student Practice and Exams',
       !teacherLabels.includes('Practice') && !teacherLabels.includes('Exams'));
     await check('teacher workspace exposes legitimate class and assignment sections',

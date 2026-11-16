@@ -10,7 +10,13 @@
 //     directive must be present and may only allow a subset of its sources;
 //     script-src, object-src and frame-ancestors are additionally pinned);
 //   • an inline <script> or inline event handler in client/index.html, which
-//     would need 'unsafe-inline' or a hash to run under script-src 'self'.
+//     would need 'unsafe-inline' or a hash to run under script-src 'self';
+//   • the same in the GENERATED iPad bundles' index.html. Those bundles are
+//     written by `npm run build && npm run sync:ios` and are not tracked
+//     (decision D28), so without them this run says so and checks the source;
+//     with --require-generated (the CI build job, right after the sync) a
+//     missing bundle is a failure, so a wrong shipped page can never pass by
+//     being absent.
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -169,22 +175,42 @@ ok(swiftSources[0] === swiftSources[1], 'LocalSchemeHandler.swift is byte-identi
 }
 
 // ── The bundle needs no inline script, so script-src 'self' is sufficient ───
-function inlineScriptFree(rel) {
-  if (!existsSync(at(rel))) return;
+const REQUIRE_GENERATED = process.argv.includes('--require-generated');
+let generatedChecked = 0;
+let generatedAbsent = 0;
+function inlineScriptFree(rel, { generated = false } = {}) {
+  if (!existsSync(at(rel))) {
+    if (generated && !REQUIRE_GENERATED) {
+      generatedAbsent += 1;
+      console.log(`  · ${rel}: not generated here — the CI build job runs this check with --require-generated after npm run build && npm run sync:ios`);
+      return;
+    }
+    ok(false, generated
+      ? `${rel}: generated bundle is missing — run npm run build && npm run sync:ios before this check`
+      : `${rel}: missing`);
+    return;
+  }
+  if (generated) generatedChecked += 1;
   const html = read(rel);
   const scripts = [...html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\b[^>]*>/gi)];
   const inline = scripts.filter(m => !/\bsrc\s*=/.test(m[1]) || m[2].trim().length > 0);
   ok(inline.length === 0, `${rel}: no inline <script> (found ${inline.length})`);
   ok(!/\son[a-z]+\s*=\s*["']/i.test(html), `${rel}: no inline event handler attributes`);
   ok(!/javascript:/i.test(html), `${rel}: no javascript: URLs`);
+  if (generated) {
+    // What ships must be the production page, not a dev server shell.
+    ok(!/\/@vite\/client|\/src\/main\.jsx/.test(html), `${rel}: is a built page, not the Vite development shell`);
+  }
 }
 inlineScriptFree('client/index.html');
-inlineScriptFree('ios/PriLearning.swiftpm/Resources/Web/index.html');
-inlineScriptFree('ios/PriLearning 2.swiftpm/Resources/Web/index.html');
+inlineScriptFree('ios/PriLearning.swiftpm/Resources/Web/index.html', { generated: true });
+inlineScriptFree('ios/PriLearning 2.swiftpm/Resources/Web/index.html', { generated: true });
+if (REQUIRE_GENERATED) ok(generatedChecked === 2, `--require-generated: both generated bundles were present and checked (${generatedChecked}/2)`);
 
 const total = passed + failed;
 if (failed) {
   console.error(`NATIVE SHELL CSP: FAIL — ${passed}/${total} checks`);
   process.exit(1);
 }
-console.log(`NATIVE SHELL CSP: PASS — ${passed}/${total} checks — both native shells enforce the server's Content-Security-Policy, nosniff and Referrer-Policy on every bundled response`);
+const bundles = generatedChecked === 2 ? 'both generated iPad bundles checked' : `generated iPad bundles not present here (${generatedAbsent} absent; the build job checks them)`;
+console.log(`NATIVE SHELL CSP: PASS — ${passed}/${total} checks — both native shells enforce the server's Content-Security-Policy, nosniff and Referrer-Policy on every bundled response; ${bundles}`);

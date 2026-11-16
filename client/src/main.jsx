@@ -6,16 +6,31 @@ import './theme.css';
 import './theme-state.css';
 import './ink/interactionGuard.js';
 import App from './App.jsx';
+// The Instrument is the one student interface (client/interface.config.mjs), so
+// its stylesheets are part of the boot stylesheet, after theme.css which they
+// override: the shell, and the Map, Report and Scripts tabs. A tab opened for
+// the first time offline then needs no stylesheet of its own fetched at that
+// moment — Vite's runtime CSS preload was the step that failed there (#658).
+// Every rule is scoped to html.ui-instrument or an .in-* class.
+import './instrument/instrument.css';
+import './instrument/map.css';
+import './instrument/report.css';
+import './instrument/ledger.css';
+// The Aurora skin (chrome only), scoped to html.skin-aurora so the setting's
+// 'instrument' value leaves the plain tokens untouched.
+import './instrument/aurora.css';
 import AccountAction from './pages/AccountAction.jsx';
 import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
-import { discoverCloudOrigin } from './platform/cloudTransport.js';
+import { parseParentEmailFragment } from './parent/parentReportApi.js';
+import { checkServerEdition, discoverCloudOrigin, editionMismatch, onEditionMismatch } from './platform/cloudTransport.js';
+import EditionMismatch from './components/EditionMismatch.jsx';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
 import { priNative } from './platform/native/index.js';
 import { installFormFactorAttributes } from './platform/formFactor.js';
 import { installBackNavigation } from './platform/backNavigation.js';
-import { featureSnapshot } from './platform/features.js';
+import { featureEnabled, featureSnapshot } from './platform/features.js';
 
 // Where the boot has got to, for public/boot-guard.js (which says so on screen
 // when the app never renders) and for the browser suites. Reaching this line
@@ -58,6 +73,17 @@ if (ACCOUNT_ACTION_MODE) {
   if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
 }
 
+// The parent's own page for the weekly report email (confirm / stop): no
+// profile, no session; the token is in the fragment and stripped the same way.
+// Off in a production build until counsel has reviewed email about minors (D22).
+const PARENT_EMAIL_MODE = featureEnabled('parentReport') && window.location.pathname === '/parent/report-email';
+let parentEmailData = null;
+if (PARENT_EMAIL_MODE) {
+  parentEmailData = parseParentEmailFragment(window.location.hash);
+  window.history.replaceState(null, '', accountActionCleanUrl(window.location));
+  if (!window.__PRI_CLOUD_ORIGIN__) window.__PRI_CLOUD_ORIGIN__ = window.location.origin;
+}
+
 // Physical iPad LAN testing must never be controlled by an older offline shell.
 // A production Vite build normally registers the service worker below, which is
 // exactly what we want for the shipped offline app but the opposite of what we
@@ -91,8 +117,17 @@ if (LAN_DEV) {
 }
 
 const root = createRoot(document.getElementById('root'));
-if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE) bootPhase('render');
-if (GUARDIAN_MODE) {
+if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE || PARENT_EMAIL_MODE) bootPhase('render');
+if (PARENT_EMAIL_MODE) {
+  const ParentReportEmailAction = React.lazy(() => import('./parent/ParentReportEmailAction.jsx'));
+  root.render(
+    <ErrorBoundary scope="parent report email">
+      <React.Suspense fallback={null}>
+        <ParentReportEmailAction data={parentEmailData} />
+      </React.Suspense>
+    </ErrorBoundary>
+  );
+} else if (GUARDIAN_MODE) {
   // Outside StrictMode for the same reason as account actions: one-time codes.
   const GuardianConsent = React.lazy(() => import('./pages/GuardianConsent.jsx'));
   root.render(
@@ -129,8 +164,19 @@ if (GUARDIAN_MODE) {
   // costs the first paint at most that long and never the app: it starts with
   // the cloud not found, and every screen that needs the server says so in its
   // own words, as it does when the connection drops later.
+  //
+  // One app, one edition (plan E2). The probe above also hears which edition
+  // the serving server is. A server of the other edition gets the blocking
+  // screen in place of the app, with no sign-in form: at once when the probe
+  // heard it, and otherwise as soon as it is known (a native shell or an
+  // injected origin reads /v1/health once, after the first paint, so a
+  // matching or unreachable server never delays a start).
+  const showEditionMismatch = conflict => root.render(<EditionMismatch conflict={conflict} />);
   void discoverCloudOrigin().catch(() => null).then(() => {
     bootPhase('render');
+    onEditionMismatch(showEditionMismatch);
+    if (editionMismatch()) { showEditionMismatch(editionMismatch()); return; }
+    void checkServerEdition();
     // The root boundary sits outside the router so that everything is covered —
     // the boot screen, the whole Login and cold-start path, the topbar, the account
     // menu, the sidebar, the toasts and the mobile nav, not only the routes.

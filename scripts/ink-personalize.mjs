@@ -140,7 +140,9 @@ const payload = {
   templates
 };
 // A standalone script resource keeps the private profile OUT of Vite's hashed
-// tracked bundles. The iPad loads it from its own local Web resources. No fetch,
+// chunks (and out of git: client/public/ink-bootstrap-profile.js is ignored, and
+// the generated iPad bundle it is copied into is never committed). The iPad
+// loads it from its own local Web resources. No fetch,
 // XHR, beacon or socket API is used, so the offline/no-telemetry guarantee stays
 // mechanically enforceable.
 const source = `globalThis.__PRI_INK_BOOTSTRAP__=${JSON.stringify(payload).replace(/</g, '\\u003c')};\n`;

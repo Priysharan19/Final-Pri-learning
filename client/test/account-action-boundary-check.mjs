@@ -43,7 +43,8 @@ assert.ok(/cloud\.me\(\)[\s\S]{0,120}emailVerified === true/.test(page),
 // decorative — so no page can split the name across a tile and a text node.
 const brand = readFileSync(new URL('../src/components/BrandMark.jsx', import.meta.url), 'utf8');
 assert.ok(page.includes('<Wordmark') && page.includes("from '../components/BrandMark.jsx'"), 'the link page draws the brand through the BrandMark slot');
-assert.ok(/label = "Pri Learning"/.test(brand) && /role="img" aria-label=\{label\}/.test(brand), 'the wordmark spells the full product name');
+// Plan E4: the name is the build's edition brand (client/src/brand/edition.js), never a split literal.
+assert.ok(/label = BRAND\b/.test(brand) && /from '\.\.\/brand\/edition\.js'/.test(brand) && /role="img" aria-label=\{label\}/.test(brand), 'the wordmark spells the full edition name');
 assert.ok(/className="brand-mark"[^>]*aria-hidden="true"/.test(brand), 'the brand mark is decorative');
 for (const file of ['../src/pages/AccountAction.jsx', '../src/App.jsx', '../src/components/QuestionCard.jsx', '../src/components/BrandMark.jsx']) {
   assert.ok(!/>ri Learning/.test(readFileSync(new URL(file, import.meta.url), 'utf8')),

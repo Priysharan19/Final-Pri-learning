@@ -33,6 +33,7 @@
 // Secret-shaped values are assembled at runtime so the repository secret scan
 // (tools/secret-scan.mjs) never sees one committed.
 import './support/hermetic.mjs';
+import { pngDataUrl } from './support/test-image.mjs';
 const shaped = (prefix, body) => `${prefix}${body}`;
 const SECRETS = {
   PRI_HANDWRITING_API_KEY: shaped('sk-', 'proj-ACCEPTANCEhandwritingSECRET0123456789abcdef'),
@@ -63,6 +64,10 @@ Object.assign(process.env, SECRETS, {
   // The AI tutor ships dark; the sweeps run with it switched on so its real
   // guards are what they meet. Section H also proves the dark 404.
   PRI_FEATURE_TUTOR: '1',
+  // Line check ships off too (PRI_FEATURE_LINE_CHECK); swept with it on, dark 404 proved in H.
+  PRI_FEATURE_LINE_CHECK: '1',
+  // The live step coach ships off too (PRI_FEATURE_STEP_COACH, #826); swept with it on, dark 404 proved in H.
+  PRI_FEATURE_STEP_COACH: '1',
   PRI_PAID_CALLS_PER_HOUR: '1000',
   PRI_PAID_CALLS_PER_DAY: '1000'
 });
@@ -84,7 +89,9 @@ const { decryptJoinCode } = await import('../platform/classes.js');
 const inventory = loadInventory();
 
 const c = checks();
-const h = await startApp({ engine: requestedEngine(), log: () => {} });
+// The parent report is off by default (D22), but every inventoried route —
+// its included — is held to the same fail-closed floor, so it is on here.
+const h = await startApp({ engine: requestedEngine(), log: () => {}, parentReport: { enabled: true } });
 const db = h.db;
 const responses = [];
 
@@ -313,8 +320,17 @@ try {
       }
       c.deq([badOrigin.status, badOrigin.data?.error?.code], [403, 'ORIGIN_REJECTED'], 'logout-all from a foreign Origin is 403');
       c.eq((await h.request('/v1/account/me', { jar: phone })).status, 200, 'refused logout-all attempts revoke nothing');
-      const all = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, body: {} });
-      c.deq([all.status, all.data?.revoked], [200, 2], 'logout-all revokes both sessions');
+      // #481: the client names the account it means. The cookie is device-wide
+      // and can change hands, so a session for any other account is refused
+      // before anything is revoked (as DELETE /v1/account, #521).
+      const liveOf = async id => Number((await db.get('SELECT COUNT(*) AS n FROM account_sessions WHERE account_id=? AND revoked_at IS NULL', [id])).n);
+      const mismatch = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, body: { accountId: bystander.id } });
+      c.deq([mismatch.status, mismatch.data?.error?.code], [409, 'ACCOUNT_MISMATCH'], 'logout-all naming another account is 409 ACCOUNT_MISMATCH');
+      c.deq([await liveOf(owner.id), await liveOf(bystander.id)], [2, 1], 'and revokes nothing, on either account');
+      c.eq((await h.request('/v1/account/me', { jar: owner.jar })).status, 200, 'the mismatched caller is still signed in');
+      const all = await h.request('/v1/account/logout-all', { method: 'POST', jar: owner.jar, body: { accountId: owner.id } });
+      c.deq([all.status, all.data?.revoked], [200, 2], 'logout-all naming its own account revokes both sessions');
+      c.eq(await liveOf(owner.id), 0, 'and no session of that account is left');
       c.eq((await h.request('/v1/account/me', { jar: ownerCopy })).status, 401, 'logout-all signs out the current device');
       c.eq((await h.request('/v1/account/me', { jar: phone })).status, 401, 'logout-all signs out the other device');
       c.eq((await h.request('/v1/account/me', { jar: bystander.jar })).status, 200, 'logout-all leaves another account signed in');
@@ -353,7 +369,7 @@ try {
     c.ok(resetToken, 'reset token queued');
     // Purpose binding: a reset token is not an email-verification or guardian token.
     c.eq((await h.request('/v1/account/email/verify', { method: 'POST', body: { token: resetToken } })).data?.error?.code, 'TOKEN_INVALID', 'reset token cannot verify email');
-    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: resetToken } })).data?.error?.code, 'TOKEN_INVALID', 'reset token cannot confirm guardian consent');
+    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: resetToken, approve: true, noticeVersion: '2026-10-22' } })).data?.error?.code, 'TOKEN_INVALID', 'reset token cannot confirm guardian consent');
     c.eq((await h.request('/v1/account/me', { jar: { pri_cloud_session: resetToken } })).status, 401, 'a reset token is not a session');
     c.eq((await h.request('/v1/account/password/reset', { method: 'POST', body: { token: resetToken, password: 'reset-password-value-1' } })).status, 200, 'reset succeeds');
     c.eq((await h.request('/v1/account/me', { jar: before })).status, 401, 'reset signs out every existing session');
@@ -473,7 +489,9 @@ try {
     c.ok(exported.data.receipts.every(row => !('request_digest' in row) && !('requestDigest' in row)), 'no receipt carries its request digest');
     const ownPhones = (await db.all('SELECT phone_e164 FROM account_phones WHERE account_id=?', [alice.id])).length;
     c.eq(exported.data.phones.length, ownPhones, 'export phones are exactly Alice\'s');
-    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'phones', 'receipts', 'telemetry'], 'the export has exactly the sections checked above');
+    const ownDesk = (await db.all('SELECT id FROM desk_attempts WHERE account_id=? ORDER BY created_at, id', [alice.id])).map(row => row.id);
+    c.deq(exported.data.deskAttempts.map(row => row.id), ownDesk, 'export deskAttempts are exactly Alice\'s');
+    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'deskAttempts', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'parentReport', 'phones', 'receipts', 'telemetry'], 'the export has exactly the sections checked above');
     await db.run("DELETE FROM class_members WHERE class_id IN ('cls_export_bob','cls_export_alice')");
     await db.run("DELETE FROM classes WHERE id IN ('cls_export_bob','cls_export_alice')");
     c.eq((await h.request(`/v1/account/export?accountId=${bob.id}`, { jar: alice.jar })).data.account.id, alice.id, 'an accountId query parameter is ignored');
@@ -504,7 +522,7 @@ try {
     } });
     const childTwoId = reg.data.account.id;
     const firstGuardian = await outboxToken(child.id, 'guardian-consent');
-    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: firstGuardian } })).data.confirmed, true, 'guardian one confirms child one');
+    c.eq((await h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: firstGuardian, approve: true, noticeVersion: '2026-10-22' } })).data.confirmed, true, 'guardian one confirms child one');
     c.eq((await h.request('/v1/account/guardian/state', { jar: otherChild })).data.state, 'pending', 'child two is untouched by guardian one');
     c.ok(!(await h.request('/v1/account/guardian/state', { jar: otherChild })).text.includes('guardian.one'), 'child two never sees guardian one\'s address');
     c.eq((await h.request('/v1/account/guardian/withdraw', { method: 'POST', body: { token: firstGuardian } })).data.withdrawn, true, 'guardian one withdraws');
@@ -759,7 +777,7 @@ try {
     c.eq(health.status, 200, 'health');
     const status = await h.request('/v1/handwriting/status', { jar: reader.jar });
     c.eq(status.status, 200, 'handwriting status');
-    const transcribe = await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: reader.jar, body: { image: 'data:image/png;base64,' + Buffer.from('a'.repeat(600)).toString('base64') } });
+    const transcribe = await h.request('/v1/handwriting/transcribe', { method: 'POST', jar: reader.jar, body: { image: pngDataUrl('a'.repeat(600)) } });
     c.ok(transcribe.status >= 500 && transcribe.data?.error?.code, `a failing provider is answered with a coded error (${transcribe.status} ${transcribe.data?.error?.code})`);
     const working = await h.request('/v1/working/check', { method: 'POST', jar: reader.jar, body: { lines: ['x = 2', 'x + 1 = 3'], prompt: 'Solve' } });
     c.ok(working.status >= 400 && working.data?.error?.code, `a failing working provider is answered with a coded error (${working.status} ${working.data?.error?.code})`);
@@ -850,11 +868,27 @@ try {
     const dark = await help(first, body());
     c.deq([dark.status, dark.data?.error?.code], [404, 'NOT_FOUND'], 'tutor: dark without PRI_FEATURE_TUTOR=1, even for a verified account');
     process.env.PRI_FEATURE_TUTOR = '1';
+    process.env.PRI_FEATURE_LINE_CHECK = '0';
+    const darkLine = await h.request('/v1/tutor/line-check', { method: 'POST', jar: first.jar, body: { context: 'practice', serverQuestionId: '11111111-1111-4111-8111-111111111111', lines: ['a + b = c'] } });
+    c.deq([darkLine.status, darkLine.data?.error?.code], [404, 'NOT_FOUND'], 'line check: dark without PRI_FEATURE_LINE_CHECK=1, even for a verified account with the tutor on');
+    process.env.PRI_FEATURE_LINE_CHECK = '1';
+    process.env.PRI_FEATURE_STEP_COACH = '0';
+    const darkCoach = await h.request('/v1/tutor/step-coach', { method: 'POST', jar: first.jar, body: { context: 'practice', serverQuestionId: '11111111-1111-4111-8111-111111111111', lines: ['a + b = c'] } });
+    c.deq([darkCoach.status, darkCoach.data?.error?.code], [404, 'NOT_FOUND'], 'step coach: dark without PRI_FEATURE_STEP_COACH=1, even for a verified account with the tutor on');
+    process.env.PRI_FEATURE_STEP_COACH = '1';
 
     const exam = await help(first, body({ context: 'exam' }));
     c.deq([exam.status, exam.data?.error?.code], [403, 'TUTOR_EXAM_LOCKED'], 'tutor: an exam context is locked');
     const essay = await help(first, body({ question: { ...Q, prompt: 'Write an essay about the French Revolution please' } }));
     c.deq([essay.status, essay.data?.error?.code], [400, 'TUTOR_NOT_MATHS'], 'tutor: a non-maths body is not proxied to the model');
+    // "Why this step?" (level why): resolved-only, step-bounded, exam-locked, premium/taster-gated server-side.
+    const why = (over = {}) => body({ level: 'why', stepIndex: 0, resolved: true, ...over });
+    c.deq([(await help(first, why({ resolved: undefined }))).data?.error?.code], ['TUTOR_LEVEL_ORDER'], 'why: an open question is refused');
+    c.deq([(await help(first, why({ context: 'exam' }))).status], [403], 'why: an exam context is locked');
+    c.deq([(await help(first, why({ stepIndex: 23 }))).data?.error?.code], ['TUTOR_BODY_INVALID'], 'why: a step outside the solution is refused');
+    c.deq([(await help(first, { ...why(), serverQuestionId: '00000000-0000-4000-8000-000000000000', question: undefined, questionId: undefined })).status], [404], "why: another account's (or no) issued question is 404");
+    const anonWhy = await h.request('/v1/tutor/help', { method: 'POST', body: why() });
+    c.eq(anonWhy.status, 401, 'why: never anonymous');
     const named = await help(first, body({ email: first.email }));
     c.eq(named.status, 400, 'tutor: a body carrying an identifier is refused');
     const huge = await help(first, body({ question: { ...Q, prompt: `Solve ${'x + '.repeat(15000)}1` } }));

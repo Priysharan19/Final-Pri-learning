@@ -66,6 +66,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile, freshEmail, signInOnCard } from './support/verified-onboarding.mjs';
+import { acceptReaderPermissionOnSight } from './fakeServerReader.js';
 
 const CLIENT = fileURLToPath(new URL('../', import.meta.url));
 const APP_JSX = join(CLIENT, 'src', 'App.jsx');
@@ -135,7 +136,9 @@ function buildApp() {
     // signs up a Teacher and audits /teach; the Teacher role is offered to a
     // new profile only under EXTENDED_TRACKS, so without it here the suite
     // only passes where the CI job happens to export the variable.
-    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } });
+    // (KALP-02 pins the four-flag env below; PARENT_REPORT (#743) is added on top so /parent-report is walked too,
+    // and LIBRARY (plan F1) so /library and /library/:id are, and EXAM_DESK (plan F4b) so /desk/import and /desk/:attemptId are.)
+    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1', PRI_FEATURE_LIBRARY: '1', PRI_FEATURE_EXAM_DESK: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -447,8 +450,9 @@ let platformForWalk = null;
  * A student inside the app, made as a student makes one: the landing card,
  * the server's emailed code, name, age and agreement, class — then the gate
  * (support/verified-onboarding.mjs). On a device with saved profiles the
- * picker offers another Pri account through the same card. The NSW Year 10
- * syllabus the walk audits is chosen afterwards in Settings, by the fixture.
+ * picker offers another Pri account through the same card. The walk audits
+ * a CBSE Class 10 student, the class chosen on the card (V1 is India only,
+ * D2; the server issues no NSW bank, D15).
  */
 async function signInToDemo(page, base) {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
@@ -456,7 +460,7 @@ async function signInToDemo(page, base) {
   await wait(page, 500);
   if (await page.locator('.shell').count()) return;
   const fromPicker = await page.getByTestId('picker-create-account').count() > 0;
-  await createVerifiedProfile(page, platformForWalk, { name: 'Accessibility Student', year: 10, course: 'nsw', fromPicker, landing: 'home' });
+  await createVerifiedProfile(page, platformForWalk, { name: 'Accessibility Student', year: 10, course: 'in', fromPicker, landing: 'home' });
   await wait(page, 900);
 }
 
@@ -550,6 +554,9 @@ async function run() {
 
     browser = await chromium.launch();
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    // D17: the walk's reads accept the one-time prompt naming OpenAI when it
+    // appears (the prompt's own flow is tour-ink-reader-permission.js).
+    await ctx.addInitScript(acceptReaderPermissionOnSight);
     const page = await ctx.newPage();
     const pageErrors = [];
     page.on('pageerror', e => pageErrors.push(e.message));
@@ -675,12 +682,14 @@ async function run() {
       await click(page, '.genbar-toggle');
     });
 
-    for (const label of ['Course', 'Topics', 'Dot Points', 'Difficulty']) {
+    // The walk's student is on the India course (D2), whose generator names
+    // the second tab "Track" (home.catTrack) where Australia says "Course".
+    for (const label of ['Track', 'Topics', 'Dot Points', 'Difficulty']) {
       await step(`home · generator · ${label.toLowerCase()}`, '/', async () => {
         const tab = page.locator('.gen-cat', { hasText: label }).first();
         if (await tab.isDisabled()) {
           // walk far enough into the flow that this pane has something to show
-          await click(page, '.gen-cat', { text: 'Course' });
+          await click(page, '.gen-cat', { text: 'Track' });
           await click(page, '.gen-pane .gen-opt');
           await click(page, '.gen-pane .gen-opt');
         }
@@ -702,7 +711,7 @@ async function run() {
     await step('practice · symbol palette + working', '/practice', async () => {
       const sym = page.locator('.editor-tool').first();
       if (await sym.count()) await sym.click();
-      const wk = page.getByRole('button', { name: /Show working for partial credit/ });
+      const wk = page.getByRole('button', { name: /^Show working/ });
       if (await wk.count()) await wk.click();
       await wait(page, SETTLE);
     });
@@ -883,11 +892,32 @@ async function run() {
     // the scripted stand-in reader. Where focus goes when "Read my answer"
     // leaves the page, and what the stale and submit-reason states say.
     await step('practice · read on request', '/practice', async () => {
-      await typedQuestion();
-      const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
-      if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
-      await writeTab.click();
-      await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+      // Regression for #627: that one replay is held for a while, as a slow
+      // runner does by chance, so the surface is still disabled when the
+      // canvas shows. `times: 1` — only the replay; nothing later is slowed.
+      const REPLAY = '**/v1/practice/*/submit';
+      let held = 0, replayDone = false;
+      const holdReplay = async route => {
+        held += 1;
+        await new Promise(r => setTimeout(r, 2500));
+        await route.continue().catch(() => { });
+        replayDone = true;
+      };
+      await page.route(REPLAY, holdReplay, { times: 1 });
+      try {
+        await typedQuestion();
+        const writeTab = page.getByRole('button', { name: 'Answer by handwriting' });
+        if (!(await writeTab.count())) throw new Error('this question offers no handwriting tab');
+        await writeTab.click();
+        // The question reopened here is the one "reconnect asked" left a held
+        // submission on, and relaunch recovery replays it as the card mounts.
+        // While that replay is in flight the writing surface is disabled
+        // (.ink-disabled: pointer-events none), so a stroke drawn then is never
+        // written and "Read my answer" never comes (#627; on a slow runner the
+        // replay outlasted the canvas appearing). Drawing waits until the surface
+        // accepts the pen, not merely until the canvas exists.
+        await page.waitForSelector('.ink-answer:not(.ink-disabled) .ink-canvas-live', { timeout: 30000 });
+      } catch (err) { await page.unroute(REPLAY, holdReplay).catch(() => { }); throw err; }
       const box = await page.locator('.ink-canvas-live').boundingBox();
       const stroke = async (x) => {
         await page.mouse.move(box.x + x, box.y + 40);
@@ -907,10 +937,37 @@ async function run() {
       });
       platform.reader.lines = null; platform.reader.text = '7'; platform.reader.confidence = 0.97;
       let release; platform.reader.gate = new Promise(resolve => { release = resolve; });
+      // While the earlier answer is still being checked the page says so, and
+      // the pen is drawn on now, inside that check: it must not be dropped.
+      refusals.replay = {
+        held,
+        checking: await page.locator('.ink-answer .ink-status[role="status"]').first().textContent({ timeout: 2000 }).then(t => (t || '').trim()).catch(() => null),
+        disabled: await page.locator('.ink-answer.ink-disabled').count()
+      };
       try {
+        refusals.replay.strokeDuringReplay = !replayDone;
         await stroke(60);
         const read = page.locator('[data-ink-read]').first();
-        await read.waitFor({ timeout: 15000 });
+        await read.waitFor({ timeout: 15000 }).catch(async (err) => {
+          // What the writing surface was showing when "Read my answer" never
+          // came: enough to tell no ink, a known block and a missing button apart.
+          const state = await page.evaluate((at) => {
+            const ink = document.querySelector('.ink-answer');
+            const live = document.querySelector('.ink-canvas-live');
+            const hit = document.elementFromPoint(at.x, at.y);
+            return {
+              question: (document.querySelector('.q-prompt')?.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 100),
+              canvases: document.querySelectorAll('.ink-canvas-live').length,
+              hitAtStroke: hit ? `${hit.tagName.toLowerCase()}.${String(hit.className || '').split(' ').join('.')}` : null,
+              online: navigator.onLine,
+              inkClass: ink?.className || null,
+              status: (ink?.querySelector('[role="status"]')?.textContent || '').trim().slice(0, 120),
+              buttons: [...(ink?.querySelectorAll('button') || [])].map(b => (b.textContent || '').trim()).slice(0, 12),
+              canvas: live ? { w: live.width, h: live.height, rect: live.getBoundingClientRect().toJSON() } : null
+            };
+          }, { x: box.x + 60, y: box.y + 40 }).catch(e => ({ error: String(e) }));
+          throw new Error(`${String(err.message || err).split('\n')[0]} — ${JSON.stringify({ box, state })}`);
+        });
         refusals.read = { unread: await reason(), button: await read.evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })) };
         await read.focus();
         await page.keyboard.press('Enter');
@@ -927,7 +984,13 @@ async function run() {
           again: await page.locator('[data-ink-read="again"]').evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })).catch(() => null),
           reason: await reason()
         };
-      } finally { release?.(); platform.reader.gate = null; platform.reader.text = '7'; platform.reader.confidence = 0.6; }
+      } finally {
+        release?.(); platform.reader.gate = null; platform.reader.text = '7'; platform.reader.confidence = 0.6;
+        // Never left armed for a later step's submit.
+        await page.unroute(REPLAY, holdReplay).catch(() => { });
+        // Without a replay the regression above proved nothing: said, not hidden.
+        if (held !== 1) console.log(`note: read on request — the relaunch replay was held ${held} times (expected 1); the #627 regression did not run`);
+      }
     });
 
     // the marked state — the verdict, the evaluation card and the criteria table
@@ -969,28 +1032,19 @@ async function run() {
 
     await step('progress · overview', '/progress', async () => {
       await goTo(page, BASE, '/progress');
-      await page.waitForSelector('.band-card, .skeleton', { timeout: 20000 });
+      // An India student's Progress (Progress.jsx → IndiaProgress.jsx): the
+      // chapter table is the page's content; the skeleton alone is not.
+      await page.waitForSelector('.pg-table', { timeout: 20000 });
       await wait(page, 900);
     });
 
-    await step('progress · priorities', '/progress', async () => {
-      await click(page, '.page-tab', { text: 'Priorities' });
-      await wait(page, 700);
-    });
-
-    await step('progress · knowledge map', '/progress', async () => {
-      await click(page, '.page-tab', { text: 'Knowledge map' });
-      await wait(page, 1200);
-    });
-
-    await step('progress · knowledge map · curriculum', '/progress', async () => {
-      await click(page, '.kmap-foot .btn');
+    // The Australian Progress tabs (Priorities, Knowledge map) are never shown
+    // to an India student, so this walk cannot reach them (D2: V1 is India
+    // only). The India page's own control is a chapter's practise button.
+    await step('progress · a chapter opened in practice', '/practice', async () => {
+      await click(page, '.pg-table .btn');
+      await page.waitForSelector('.q-prompt, .qpage', { timeout: 30000 });
       await wait(page, 600);
-    });
-
-    await step('progress · knowledge map · a year opened', '/progress', async () => {
-      await click(page, '.kmap-panel .nav-item');
-      await wait(page, 500);
     });
 
     // This walk's profile is Australian, so the placement route renders its
@@ -1020,12 +1074,15 @@ async function run() {
 
     await step('exam room · sitting a paper', '/exams/:id', async () => {
       await goTo(page, BASE, '/exams');
-      await click(page, 'button.btn-primary', { text: 'Start practice paper' });
+      // The walk's student is CBSE Class 10 (D2): the paper they can sit is the
+      // board mock (Exams.jsx, IndiaExams), not the JEE Main simulation.
+      await page.locator('[data-exam-board-mock]').click({ timeout: 30000 });
+      await wait(page, SETTLE);
       await page.waitForSelector('.exam-nav', { timeout: 60000 }).catch(async err => {
         throw new Error(`${String(err.message).split('\n')[0]} · on screen: ${JSON.stringify((await page.locator('[role="alert"]').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').slice(0, 200)))} · last server calls ${JSON.stringify(online.calls.slice(-4).map(c => `${c.status} ${c.path}`))}`);
       });
       await wait(page, 900);
-      const wk = page.getByRole('button', { name: /Show working for partial credit/ });
+      const wk = page.getByRole('button', { name: /^Show working/ });
       if (await wk.count()) { await wk.click(); await wait(page, SETTLE); }
     });
 
@@ -1067,6 +1124,98 @@ async function run() {
       await goTo(page, BASE, '/plan');
       await page.waitForSelector('[data-plan-day]', { timeout: 20000 });
       await wait(page, 800);
+    });
+
+    // The Premium screen (D22): the plans, the store's own prices, Restore,
+    // the renewal disclosure and the legal links, with a working close button.
+    await step('premium · plans, renewal terms and close', '/premium', async () => {
+      await goTo(page, BASE, '/premium');
+      await page.waitForSelector('[data-paywall] [data-paywall-close]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    // The parent weekly report (#743, D22): built only with PRI_FEATURE_PARENT_REPORT=1,
+    // which this walk sets, so its route is rendered and audited like the others.
+    await step('parent report · the week, or why there is none', '/parent-report', async () => {
+      await goTo(page, BASE, '/parent-report');
+      await page.waitForSelector('.parent-page h1', { timeout: 20000 });
+      await page.waitForSelector('.parent-page [data-parent-report], .parent-page [data-parent-error]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    // The shared resource library (ADR-0002 plan F1): built only with
+    // PRI_FEATURE_LIBRARY=1, which this walk sets. Signed in or not, the page
+    // settles on the library, its honest empty state or an honest error.
+    await step('library · search and filters, or why there is nothing', '/library', async () => {
+      await goTo(page, BASE, '/library');
+      await page.waitForSelector('.lib-page h1', { timeout: 20000 });
+      await page.waitForSelector('.lib-page [data-library-resource], .lib-page [data-library-empty], .lib-page [data-library-error]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+    await step('library · one resource, or why it cannot be shown', '/library/:id', async () => {
+      await goTo(page, BASE, '/library/2027-mathematics-advanced-assessment-1');
+      await page.waitForSelector('.lib-page [data-library-detail], .lib-page [data-library-error]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    // The Exam Desk (ADR-0002 §8 plan F4b): built only with PRI_FEATURE_EXAM_DESK=1
+    // (and the library), which this walk sets. Unmarked practice on a library
+    // paper: the import page, then one attempt from before it starts to the
+    // closed record, with its two sheets open.
+    // TEST DESK: no India paper is published yet, so this server's edition is
+    // offered the library's one seeded paper. Not a product path.
+    const DESK_PAPER = '2027-mathematics-advanced-assessment-1';
+    platform.h.db.prepare('INSERT OR IGNORE INTO resource_editions(resource_id, edition) VALUES (?, ?)').run(DESK_PAPER, process.env.PRI_EDITION || 'priyabhata');
+    await step('exam desk · bring in practice: choose the export file', '/desk/import', async () => {
+      await goTo(page, BASE, '/desk/import');
+      await page.waitForSelector('.dk-page #dk-import-file', { timeout: 20000 });
+      await wait(page, 600);
+    });
+    await step('exam desk · the way in on a library paper', '/library/:id', async () => {
+      await goTo(page, BASE, `/library/${DESK_PAPER}`);
+      await page.waitForSelector('[data-desk-entry] [data-desk-start]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+    await step('exam desk · before starting: the paper, the navigator and the notes', '/desk/:attemptId', async () => {
+      await page.locator('[data-desk-start]').click();
+      await page.waitForSelector('[data-desk-attempt][data-desk-phase="idle"]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+    await step('exam desk · working time, with a note, a flag and a done question', '/desk/:attemptId', async () => {
+      await page.locator('[data-desk-intent="begin-working"]').click();
+      await page.waitForSelector('[data-desk-attempt][data-desk-phase="working"][data-desk-queued="0"]', { timeout: 20000 });
+      await page.locator('.xs-nav button[data-q="3"]').click();
+      await page.locator('textarea[data-notes-for="3"]').fill('check the domain');
+      await page.locator('[data-desk-flag]').click();
+      await page.locator('.xs-nav button[data-q="4"]').click();
+      await page.locator('[data-desk-done]').click();
+      await page.waitForSelector('[data-desk-attempt][data-desk-save="saved"]', { timeout: 20000 });
+      await wait(page, 400);
+    });
+    await step('exam desk · the keyboard shortcut sheet', '/desk/:attemptId', async () => {
+      await page.locator('.dk-keys').click();
+      await page.waitForSelector('[data-testid="shell-shortcuts"]', { timeout: 5000 });
+      await wait(page, 400);
+    });
+    await step('exam desk · "Close this paper?"', '/desk/:attemptId', async () => {
+      await page.keyboard.press('Escape');
+      await page.locator('[data-desk-close]').click();
+      await page.waitForSelector('[data-testid="desk-close-sheet"]', { timeout: 5000 });
+      await wait(page, 400);
+    });
+    await step('exam desk · closed: the record of the sitting, nothing marked', '/desk/:attemptId', async () => {
+      await page.locator('[data-testid="desk-close-sheet"] [data-sheet-confirm]').click();
+      await page.waitForSelector('[data-desk-attempt][data-desk-phase="finished"] [data-desk-closed]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    // Readiness estimate and Mistake DNA (premium insights): signed in or not,
+    // the page settles on a section or an honest error, and is audited.
+    await step('insights · estimate from practice and Mistake DNA', '/insights', async () => {
+      await goTo(page, BASE, '/insights');
+      await page.waitForSelector('.ins-page h1', { timeout: 20000 });
+      await page.waitForSelector('.ins-page [data-insights-dna], .ins-page [data-insights-error]', { timeout: 20000 });
+      await wait(page, 600);
     });
 
     await step('notes · index and chapter map', '/notes', async () => {
@@ -1144,17 +1293,11 @@ async function run() {
       await click(page, 'button.btn-quiet', { text: 'Delete this profile' });
     });
 
-    await step('settings · handwriting calibration', '/settings', async () => {
-      await goTo(page, BASE, '/settings');
-      await click(page, 'button.btn-primary', { text: 'Teach it your handwriting' });
-      await page.waitForSelector('.ink-wrap', { timeout: 30000 });
-      await wait(page, 600);
-    });
-
     // ── the documents a store, a payment provider and the DPDP Act require ──
     // A parent reading a privacy notice on a phone with a screen reader is
     // exactly the reader these pages have to work for.
-    for (const path of ['/privacy', '/terms', '/refund-policy', '/grievance']) {
+    // /third-party-notices fetches its licence texts by import() on first open.
+    for (const path of ['/privacy', '/terms', '/refund-policy', '/grievance', '/third-party-notices']) {
       await step(`legal · ${path.slice(1)}`, path, async () => {
         await goTo(page, BASE, path);
         await wait(page, 500);
@@ -1448,6 +1591,10 @@ async function run() {
       JSON.stringify({ rush: refusals.rush, match: refusals.match }));
 
     section('read on request');
+    ok('an earlier answer being checked again after a relaunch is said on the writing surface in words, the page stays writable, and a stroke written meanwhile is kept and offered for reading',
+      refusals.replay?.held === 1 && /^Checking your earlier answer/.test(refusals.replay.checking || '') && refusals.replay.disabled === 0 &&
+        refusals.replay.strokeDuringReplay === true && refusals.read?.button?.tag === 'button',
+      JSON.stringify(refusals.replay));
     ok('handwriting not yet read: a real, named "Read my answer" button, and Submit says why it is unavailable in a status the button is described by',
       refusals.read?.button?.tag === 'button' && /\p{L}/u.test(refusals.read.button.name) && refusals.read.unread?.role === 'status' &&
         /\p{L}/u.test(refusals.read.unread.text) && refusals.read.unread.describes === true && refusals.read.unread.disabled === true,

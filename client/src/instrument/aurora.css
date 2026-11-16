@@ -1,0 +1,112 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Pri Learning · the Aurora skin, on chrome only (V1 decisions D7, D9)
+
+   The owner chose "Aurora" on 22 Oct (commit 70026a687, PR #655): glass and
+   depth, one luminous violet-indigo, cyan only as its specular partner. D9
+   limits it to chrome: the bars, menus, the command palette, sheets, the P′
+   tile, the Index's own furniture and focus on those controls. Content keeps
+   the Instrument exactly: questions, KaTeX, working, the ink canvas and its
+   paper, transcripts, marks, feedback, the Report and Scripts. So:
+
+   - Every rule is scoped to html.ui-instrument.skin-aurora. App.jsx sets
+     skin-aurora only when client/interface.config.mjs says INTERFACE_SKIN =
+     'aurora'; 'instrument' (D8's fallback) turns all of this off.
+   - No --in-* token is declared here: the content palette is untouched, and
+     client/test/aurora-skin-check.mjs fails if one is.
+   - Glass sits only on chrome. Nothing that holds mathematics or ink is
+     translucent; the Index plate is made opaque where the light pools show.
+   - Under Reduce Transparency and in forced colours the chrome is opaque;
+     under Reduce Motion the pools stand still; they pause when hidden
+     (Aurora.jsx) and render only on the Index, the Map and Settings.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+html.ui-instrument.skin-aurora {
+  --au-light: var(--edition-accent);   /* the edition's light: the current place and what is live (Lit Instrument D1) */
+  --au-light-soft: color-mix(in srgb, var(--edition-accent) 12%, transparent);
+  --au-pool: color-mix(in srgb, var(--edition-accent) 7%, transparent);
+  --au-edge: rgba(255, 255, 255, 0.85);
+  --au-float: 0 24px 60px -20px rgba(48, 36, 140, 0.28), 0 4px 12px rgba(22, 20, 60, 0.08);
+}
+html.ui-instrument.skin-aurora[data-theme="dark"] {
+  --au-light-soft: color-mix(in srgb, var(--edition-accent) 16%, transparent);
+  --au-pool: color-mix(in srgb, var(--edition-accent) 10%, transparent);
+  --au-edge: rgba(255, 255, 255, 0.10);
+  --au-float: 0 30px 70px -20px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+/* ── Glass: the bars, the tab well, ⌘K, More and the account chip ─────────── */
+html.ui-instrument.skin-aurora :is(.in-bar, .mobilenav) { background: var(--in-base); box-shadow: inset 0 1px 0 var(--au-edge); }
+html.ui-instrument.skin-aurora :is(.in-tabs, .in-cmd, .in-more) { background: var(--in-l1); box-shadow: inset 0 1px 0 var(--au-edge), 0 0 0 1px var(--in-edge); }
+html.ui-instrument.skin-aurora :is(.in-more-menu, .acct-menu, .mnav-sheet, .in-pal) { background: var(--in-l1); box-shadow: inset 0 1px 0 var(--au-edge), 0 0 0 1px var(--in-edge-2), var(--au-float); }
+@supports (background: color-mix(in srgb, red, blue)) and ((-webkit-backdrop-filter: blur(1px)) or (backdrop-filter: blur(1px))) {
+  html.ui-instrument.skin-aurora :is(.in-bar, .mobilenav) { background: color-mix(in srgb, var(--in-base) 84%, transparent); -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
+  html.ui-instrument.skin-aurora :is(.in-tabs, .in-cmd, .in-more) { background: color-mix(in srgb, var(--in-l1) 70%, transparent); }
+  html.ui-instrument.skin-aurora :is(.in-more-menu, .acct-menu, .mnav-sheet, .in-pal) { background: color-mix(in srgb, var(--in-l1) 92%, transparent); -webkit-backdrop-filter: blur(24px) saturate(1.5); backdrop-filter: blur(24px) saturate(1.5); }
+}
+
+/* On a phone the top bar runs under the status bar: that strip stays exactly
+   the page colour (tour-iphone-layout), so the top bar is opaque there; the
+   bottom bar keeps its glass. */
+@media (max-width: 760px) {
+  html.ui-instrument.skin-aurora .in-bar { background: var(--in-base); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+
+/* ── The current place, on chrome: the edition's light (Lit Instrument D1) ──
+   The accent marks where you are and what is live, as a rule or an edge; it
+   is never text on content, a fill, a verdict or a focus ring (focus is ink,
+   instrument.css, D2). client/test/brand-usage-check.mjs holds the selectors. */
+html.ui-instrument.skin-aurora .in-tab[aria-current="page"] { position: relative; color: var(--in-tx); background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); }
+html.ui-instrument.skin-aurora .in-tab[aria-current="page"]::after, html.ui-instrument.skin-aurora .mnav-item.active::before { content: ""; position: absolute; height: 2px; border-radius: 2px; background: var(--au-light); }
+html.ui-instrument.skin-aurora .in-tab[aria-current="page"]::after { left: 10px; right: 10px; bottom: -4px; }
+html.ui-instrument.skin-aurora .mnav-item.active::before { left: calc(50% - 11px); top: 0; width: 22px; }
+html.ui-instrument.skin-aurora .in-more-item.is-here { color: var(--in-tx); box-shadow: inset 2px 0 0 var(--au-light); }
+html.ui-instrument.skin-aurora :is(.mnav-item.active, .mnav-item.active .nav-ico) { color: var(--in-tx); }
+html.ui-instrument.skin-aurora .mnav-item.active { position: relative; }
+html.ui-instrument.skin-aurora .in-pal-item[aria-selected="true"] { background: var(--au-light-soft); box-shadow: inset 2px 0 0 var(--au-light); }
+/* The working indicator (D6, instrument/Working.jsx): what is live. The
+   drawing only: its label stays ink, so the accent is never text here. */
+html.ui-instrument.skin-aurora .pri-working svg { color: var(--au-light); }
+
+/* ── The Index's furniture (no mathematics on it) ────────────────────────── */
+html.ui-instrument.skin-aurora .in-index .in-resume { box-shadow: inset 2px 0 0 var(--au-light), inset 0 1px 0 var(--au-edge), 0 0 0 1px var(--in-edge); }
+html.ui-instrument.skin-aurora .in-index .in-btn.is-primary { background: var(--in-action); color: var(--in-on-action); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14); }
+html.ui-instrument.skin-aurora .in-index .in-ch[aria-pressed="true"] { box-shadow: 0 0 0 1px var(--in-edge-2); }
+html.ui-instrument.skin-aurora .in-index .in-ch[aria-pressed="true"] .in-ch-n { color: var(--au-light); }
+html.ui-instrument.skin-aurora .in-also-link { box-shadow: inset 0 1px 0 var(--au-edge), 0 0 0 1px var(--in-edge); }
+
+/* ── The light pools: on the Index, the Map and Settings only ────────────────
+   Aurora.jsx mounts them and marks <html data-aurora-pools>. The pages they
+   sit behind drop their own backdrop; every surface that holds mathematics
+   stays opaque (the Index plate gets the desk colour as its own). Transform
+   and opacity only; still under Reduce Motion; none in forced colours. */
+html.ui-instrument.skin-aurora .a-aurora { position: fixed; inset: 0; z-index: -1; overflow: hidden; overflow: clip; pointer-events: none; background: var(--in-base); contain: strict; }
+html.ui-instrument:not(.skin-aurora) .a-aurora { display: none; }
+html.ui-instrument.skin-aurora .a-aurora i { position: absolute; width: 90vmax; height: 90vmax; left: -38vmax; top: -52vmax; border-radius: 50%; background: radial-gradient(closest-side, var(--au-pool), transparent); will-change: transform; animation: au-drift 72s cubic-bezier(0.16, 1, 0.3, 1) infinite alternate; }
+@keyframes au-drift { from { transform: translate3d(0, 0, 0) scale(1); } to { transform: translate3d(6vmax, 4vmax, 0) scale(1.1); } }
+html.ui-instrument.skin-aurora[data-aurora-pools] body { background: transparent; }
+html.ui-instrument.skin-aurora[data-aurora-pools] .in-index { background: transparent; }
+html.ui-instrument.skin-aurora[data-aurora-pools] .in-plate { background: var(--in-base); }
+
+/* ── Reduce Transparency, forced colours, Reduce Motion ──────────────────── */
+@media (prefers-reduced-transparency: reduce) {
+  html.ui-instrument.skin-aurora :is(.in-bar, .mobilenav) { background: var(--in-base); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  html.ui-instrument.skin-aurora :is(.in-tabs, .in-cmd, .in-more, .in-more-menu, .acct-menu, .mnav-sheet, .in-pal) { background: var(--in-l1); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  html.ui-instrument.skin-aurora .a-aurora { display: none; }
+  html.ui-instrument.skin-aurora[data-aurora-pools] body { background: var(--in-base); }
+}
+/* iOS WebKit does not answer prefers-reduced-transparency, so the shell states
+   the device's Reduce Transparency setting as a class on <html> (WebShell.swift
+   applyReduceTransparency, kept current on change); the same opaque fallback
+   keys on it. */
+html.ui-instrument.skin-aurora.a11y-reduce-transparency :is(.in-bar, .mobilenav) { background: var(--in-base); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.ui-instrument.skin-aurora.a11y-reduce-transparency :is(.in-tabs, .in-cmd, .in-more, .in-more-menu, .acct-menu, .mnav-sheet, .in-pal) { background: var(--in-l1); -webkit-backdrop-filter: none; backdrop-filter: none; }
+html.ui-instrument.skin-aurora.a11y-reduce-transparency .a-aurora { display: none; }
+html.ui-instrument.skin-aurora.a11y-reduce-transparency[data-aurora-pools] body { background: var(--in-base); }
+@media (forced-colors: active) {
+  html.ui-instrument.skin-aurora .a-aurora { display: none; }
+  html.ui-instrument.skin-aurora :is(.in-bar, .mobilenav, .in-tabs, .in-cmd, .in-more, .in-more-menu, .acct-menu, .mnav-sheet, .in-pal) { -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: none; }
+  html.ui-instrument.skin-aurora .in-index .in-btn.is-primary { box-shadow: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.ui-instrument.skin-aurora .a-aurora i { animation: none; }
+}

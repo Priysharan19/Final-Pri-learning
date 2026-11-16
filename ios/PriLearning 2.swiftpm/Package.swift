@@ -56,12 +56,10 @@ let package = Package(
                 .process("Assets.xcassets"),
                 .copy("Resources/Web"),
                 // Apple privacy manifest; .copy places it at the app bundle root.
-                .copy("Resources/PrivacyInfo.xcprivacy"),
-                // A validated PriInkFoundation.mlpackage is exported here. The
-                // directory exists even in development builds where no learned
-                // asset has been promoted yet, so handwriting can fall back to
-                // the current local engine without changing the package graph.
-                .copy("Resources/Models")
+                // No model asset ships: handwriting and photos are read on the
+                // server (owner decision 2026-10-02, default D16), and the
+                // Core ML foundation model left the target with the Vision reader.
+                .copy("Resources/PrivacyInfo.xcprivacy")
             ]
         )
     ]

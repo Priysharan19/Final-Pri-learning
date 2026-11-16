@@ -205,7 +205,9 @@ const publicQ = { id: 'q-area', answerType: 'numeric', supportsSteps: true, prom
   }
   ok(/number/.test(en['verdict.finalNumberTitle']) && /5\/8/.test(en['verdict.finalNumberBody']) && /Working/.test(en['verdict.finalNumberWorking']),
     'the message is specific: a number, a neutral format example, and where working goes');
-  ok(/method marks?/.test(en['verdict.workingMethodMarks']), 'the working area says plainly that working earns method marks');
+  // D12: until an examiner signs (#499) the marks are the final answer's, and
+  // the working area says so instead of promising method marks.
+  ok(/final answer/.test(en['verdict.workingMethodMarks']) && !/earns? a method mark/.test(en['verdict.workingMethodMarks']), 'the working area says plainly that the marks are for the final answer (D12)');
 }
 
 // ── 4 · The mounted fields ───────────────────────────────────────────────────
@@ -247,7 +249,7 @@ const publicQ = { id: 'q-area', answerType: 'numeric', supportsSteps: true, prom
     const workingBox = tag(fresh, 'data-typed-working=', 'textarea');
     const workingId = /\sid="([^"]+)"/.exec(workingBox)?.[1];
     ok(workingBox && new RegExp(`<label[^>]*for="${workingId}"[^>]*>${en['verdict.workingLabel']}</label>`).test(fresh), 'the working textarea is present and labelled "Working"');
-    ok(fresh.includes(en['verdict.workingMethodMarks'].replace('{marks}', '3')), 'and states that verified steps earn method marks on this 3-mark question');
+    ok(fresh.includes(en['verdict.workingMethodMarks'].replace('{marks}', '3')), 'and states that this 3-mark question\'s marks are for the final answer (D12)');
     ok(!/btn-disclose/.test(fresh), 'it is not hidden behind a disclosure');
     ok(fresh.indexOf('data-final-answer=') < fresh.indexOf('data-working-area'), 'the final answer comes first, the working below it');
     ok(!/data-final-answer-guidance/.test(fresh) && !/aria-invalid/.test(finalInput), 'an empty field shows no error');

@@ -1,7 +1,9 @@
 name: Ink Structural V4
 
 on:
+  workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'tools/ink-foundation/structural.py'
       - 'tools/ink-foundation/structural_data.py'
@@ -13,7 +15,6 @@ on:
       - 'tools/ink-annotate-v4/**'
       - 'client/test/ink-structural-annotator-check.mjs'
       - 'scripts/serve-lan.mjs'
-      - 'package.json'
       - '.github/workflows/ink-structural-v4.yml'
   pull_request:
     paths:
@@ -27,7 +28,6 @@ on:
       - 'tools/ink-annotate-v4/**'
       - 'client/test/ink-structural-annotator-check.mjs'
       - 'scripts/serve-lan.mjs'
-      - 'package.json'
       - '.github/workflows/ink-structural-v4.yml'
 
 permissions:
@@ -39,6 +39,8 @@ concurrency:
 
 jobs:
   structural-contract:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Hierarchical grouping and relation contract
     runs-on: ubuntu-latest
     timeout-minutes: 20

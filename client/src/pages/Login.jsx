@@ -9,14 +9,21 @@
 // one still passes the same gate before anything opens.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
+import { EditionByline } from '../components/BrandMark.jsx';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
-import { featureEnabled } from '../platform/features.js';
+import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
+import { defaultCourse, offersCourse } from '../platform/edition.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
+
+// The instrument build's sign-in carries a decorative plot panel (design s10);
+// the flag-off build never loads it.
+const SignInPlot = INSTRUMENT_UI ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));
@@ -32,10 +39,12 @@ const AVATARS = ['🚀', '🦊', '🐨', '🦉', '🌟', '🐯', '🍀', '🎧',
 // Only cbse, jee-main and jee-advanced are launch-certified
 // (docs/content/certification-report.md; PRI_V1_RELEASE_SCOPE §6). The
 // Olympiad track and the Teacher role are offered for NEW profiles only in a
-// build made with PRI_FEATURE_EXTENDED_TRACKS=1, the Australian syllabuses
-// only in one made with PRI_FEATURE_AUSTRALIA=1 (development, test builds).
-// Existing profiles that already hold one keep working: the picker, the
-// backend and the summary never read a flag.
+// build made with PRI_FEATURE_EXTENDED_TRACKS=1. Which course sign-up offers
+// is the edition's (its record's courses, ADR-0002): Priyabhata offers
+// the India classes and tracks, Prithagoras the NSW years and pathways, and
+// neither offers the other's (owner decision O5: off). Existing profiles that
+// already hold another course keep working: the picker, the backend and the
+// summary never read the edition.
 const STUDY = [
   ...[7, 8, 9, 10, 11, 12].map(y => ({ key: String(y), classOf: y, year: y, track: 'cbse' })),
   { key: 'jee-main', label: 'JEE Main', year: 12, track: 'jee-main' },
@@ -50,10 +59,16 @@ export const roleOptions = (extended = featureEnabled('extendedTracks')) => (ext
 const ONBOARDING_STEPS = 5;
 const LOCAL_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// The course a new profile starts on comes from the edition. An edition whose
+// default is not the India course signs students up through the year/syllabus
+// chooser (today Prithagoras, NSW).
+const SIGNUP_COURSE = defaultCourse();
+const YEAR_CHOOSER = SIGNUP_COURSE !== 'in';
+
 function freshProfileDraft() {
   const draft = {
-    name: '', email: '', password: '', password2: '', study: '', year: STUDY_DEFAULT.year,
-    avatar: '🚀', role: '', course: 'in', pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track,
+    name: '', email: '', password: '', password2: '', study: '', year: YEAR_CHOOSER ? 10 : STUDY_DEFAULT.year,
+    avatar: '🚀', role: '', course: SIGNUP_COURSE, pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track,
     protect: false
   };
   // With one role on offer the step still shows it, pressed, so the student
@@ -62,8 +77,11 @@ function freshProfileDraft() {
   return draft;
 }
 
-// The Australian syllabuses stay selectable, folded away behind one link.
+// Labels for every Australian syllabus a profile may already hold; sign-up
+// offers only the ones this edition's `courses` lists (today NSW alone).
 const AU_COURSES = [['nsw', 'NSW · HSC'], ['vic', 'VIC · VCE'], ['qld', 'QLD · QCE'], ['wa', 'WA · WACE'], ['sa', 'SA · SACE'], ['ib', 'IB']];
+/** The Australian syllabuses this edition offers a new profile. */
+export const signupAuCourses = (offers = offersCourse) => AU_COURSES.filter(([id]) => offers(id));
 // Where the cloud account UI lives. The panel is Settings' own; this screen only links to it.
 export const CLOUD_ACCOUNT_ROUTE = '/settings#cloud-account-title';
 /** The signature backdrop: a sheet of ruled notebook paper, nothing more. */
@@ -240,16 +258,22 @@ function fmtWait(ms, t) {
 function LanguagePicker() {
   const { chosen, t } = useLanguage();
   const pick = (id) => { rememberSignInLanguage(id); setLanguage(id); };
+  // V1 decision D11: the switch stays, and the app says plainly that
+  // questions and worked solutions remain in English — here, on the first
+  // screen, the moment another language is chosen, as Settings already does.
   return (
-    <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
-      role="group" aria-label={t('login.chooseLanguage')}>
-      {LANGUAGES.map(l => (
-        <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
-          lang={l.htmlLang} aria-pressed={chosen === l.id}
-          aria-label={t('lang.switchTo', { language: l.english })}
-          onClick={() => pick(l.id)}>{l.label}</button>
-      ))}
-    </div>
+    <>
+      <div className="row" style={{ justifyContent: 'center', gap: 8, marginTop: 18 }}
+        role="group" aria-label={t('login.chooseLanguage')}>
+        {LANGUAGES.map(l => (
+          <button key={l.id} type="button" className={`pill-opt ${chosen === l.id ? 'on' : ''}`}
+            lang={l.htmlLang} aria-pressed={chosen === l.id}
+            aria-label={t('lang.switchTo', { language: l.english })}
+            onClick={() => pick(l.id)}>{l.label}</button>
+        ))}
+      </div>
+      {chosen !== 'en' && <p className="muted lang-note" data-lang-note role="note">{t('lang.help')}</p>}
+    </>
   );
 }
 
@@ -272,7 +296,6 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   const [cardStep, setCardStep] = useState('method');
   const [createStep, setCreateStep] = useState(initialStep);
   const [form, setForm] = useState(freshProfileDraft);
-  const [australia, setAustralia] = useState(false);
   const [cloudIntent, setCloudIntent] = useState(false);
   const [unlockId, setUnlockId] = useState(null);
   const [unlockPw, setUnlockPw] = useState('');
@@ -351,7 +374,6 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
 
   const beginCreate = (wantCloud = false) => {
     setForm(freshProfileDraft());
-    setAustralia(false);
     setCreateStep(0);
     setCloudIntent(!!wantCloud);
     setUnlockId(null);
@@ -411,25 +433,13 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     }));
   };
 
-  const openAustralia = () => {
-    setAustralia(true);
-    setForm(f => ({ ...f, study: '', course: 'nsw', year: 10, pathway: 'advanced', indiaTrack: 'cbse' }));
-    setError('');
-  };
-
-  const closeAustralia = () => {
-    setAustralia(false);
-    setForm(f => ({ ...f, study: '', course: 'in', year: STUDY_DEFAULT.year, pathway: 'advanced', indiaTrack: 'cbse' }));
-    setError('');
-  };
-
   const courseChoiceValid = () => {
     if (form.course === 'in') {
       if (!selectedStudy) return false;
       if ((form.indiaTrack === 'jee-main' || form.indiaTrack === 'jee-advanced') && ![11, 12].includes(Number(form.year))) return false;
       return Number(form.year) >= 7 && Number(form.year) <= 12;
     }
-    if (!AU_COURSES.some(([id]) => id === form.course)) return false;
+    if (!signupAuCourses().some(([id]) => id === form.course)) return false;
     if (Number(form.year) < 7 || Number(form.year) > 12) return false;
     return !(form.course === 'nsw' && form.pathway === 'ext2' && Number(form.year) !== 12);
   };
@@ -506,7 +516,8 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     if (!pid) {
       const r = await api.post('/profiles', {
         name: name || account.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
-        language: signInLanguage(), course: 'in', indiaTrack: track || 'cbse'
+        language: signInLanguage(), course: SIGNUP_COURSE,
+        ...(SIGNUP_COURSE === 'in' ? { indiaTrack: track || 'cbse' } : { pathway: 'advanced' })
       });
       pid = r.user.id;
       accountProfileRef.current = { accountId: account.id, pid };
@@ -556,8 +567,9 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     return (
       <div className="auth-wrap">
         <MathField />
+        {SignInPlot && <React.Suspense fallback={<div className="in-signin-plot" aria-hidden="true" />}><SignInPlot /></React.Suspense>}
         <div className="auth-col fade-in">
-          <Logo large />
+          <Logo large byline />
           {atStart && (
             <>
               <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
@@ -586,9 +598,9 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for
                   these, and each is required of us before the app can be sold. */}
-              <p className="muted" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
-                <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link> ·{' '}
-                <Link to="/refund-policy">{t('login.refunds')}</Link> · <Link to="/grievance">{t('login.grievances')}</Link>
+              <p className="muted login-legal" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
+                <PageLink to="/privacy">{t('login.privacy')}</PageLink> · <PageLink to="/terms">{t('login.terms')}</PageLink> ·{' '}
+                <PageLink to="/refund-policy">{t('login.refunds')}</PageLink> · <PageLink to="/grievance">{t('login.grievances')}</PageLink>
               </p>
             </>
           )}
@@ -611,6 +623,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
             style={{ display: 'block', background: 'none', border: 'none', padding: 0, margin: 0, font: 'inherit', color: 'inherit', cursor: 'pointer' }}>
             <Logo large />
           </button>
+          <EditionByline />
           <div className="hero-kicker" style={{ marginTop: 14 }}>{t('login.brandKicker')}</div>
           <div className="auth-points">
             <div className="auth-point"><span className="auth-tick">✓</span>{t('login.point1')}</div>
@@ -720,7 +733,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                 </>
               )}
 
-              {createStep === 1 && !australia && (
+              {createStep === 1 && !YEAR_CHOOSER && (
                 <>
                   <div className="field">
                     <label className="label" htmlFor="signup-track">
@@ -743,19 +756,10 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                       </div>
                     )}
                   </div>
-                  {/* V1 is India-only (frozen scope): the Australian syllabuses are
-                      offered only in a build with PRI_FEATURE_AUSTRALIA=1. */}
-                  {featureEnabled('australia') && (
-                    <div className="field" style={{ marginTop: -4 }}>
-                      <button type="button" className="linklike" onClick={openAustralia}>
-                        {t(form.role === 'teacher' ? 'login.teachingInAustralia' : 'login.studyingInAustralia')}
-                      </button>
-                    </div>
-                  )}
                 </>
               )}
 
-              {createStep === 1 && australia && (
+              {createStep === 1 && YEAR_CHOOSER && (
                 <>
                   <div className="grid cols-2" style={{ gap: 12 }}>
                     <div className="field">
@@ -769,7 +773,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                       <label className="label" htmlFor="signup-course">{t('settings.syllabus')}</label>
                       <select className="input" id="signup-course" value={form.course}
                         onChange={e => { setForm(f => ({ ...f, course: e.target.value })); setError(''); }}>
-                        {AU_COURSES.map(([k, name]) => <option key={k} value={k}>{name}</option>)}
+                        {signupAuCourses().map(([k, name]) => <option key={k} value={k}>{name}</option>)}
                       </select>
                     </div>
                   </div>
@@ -789,9 +793,6 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                       </div>
                     </div>
                   )}
-                  <div className="field" style={{ marginTop: -4 }}>
-                    <button type="button" className="linklike" onClick={closeAustralia}>{t('login.backToIndian')}</button>
-                  </div>
                 </>
               )}
 

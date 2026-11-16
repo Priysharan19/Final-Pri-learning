@@ -7,12 +7,27 @@ import { ri, rc } from '../qhelpers.js';
 
 const PI_N = 22, PI_D = 7;
 const areaWithPi = factor => PI_N * factor / PI_D;
-const RADII = [7, 14, 21];
-const CONES = Object.freeze([
-  { r: 7, h: 24, l: 25 },
-  { r: 14, h: 48, l: 50 },
-  { r: 21, h: 72, l: 75 }
-]);
+// Radii are multiples of 7 so every area with π = 22/7 is a whole number.
+const RADII = Array.from({ length: 30 }, (_, i) => 7 * (i + 1));
+// Cones whose radius, height and slant height are whole numbers with r a
+// multiple of 7: every Pythagorean triple (either leg as the radius), scaled so
+// the radius is a multiple of 7, r ≤ 210 and h ≤ 400.
+const CONES = Object.freeze((() => {
+  const out = new Map();
+  for (let m = 2; m < 40; m++) for (let n = 1; n < m; n++) {
+    if ((m - n) % 2 === 0 || gcdInt(m, n) !== 1) continue;
+    const a = m * m - n * n, b = 2 * m * n, c = m * m + n * n;
+    for (const [leg, other] of [[a, b], [b, a]]) {
+      for (let k = 1; k * leg <= 210; k++) {
+        const r = k * leg, h = k * other, l = k * c;
+        if (r % 7 !== 0 || h > 400) continue;
+        out.set(`${r},${h}`, Object.freeze({ r, h, l }));
+      }
+    }
+  }
+  return [...out.values()].sort((x, y) => x.r - y.r || x.h - y.h);
+})());
+function gcdInt(a, b) { while (b) [a, b] = [b, a % b]; return a; }
 
 function schematic(kind, labels = []) {
   const text = (x, y, value) => `<text x="${x}" y="${y}" fill="currentColor" stroke="none" text-anchor="middle" font-size="11">${value}</text>`;
@@ -46,7 +61,7 @@ function common(answer, kind, prompt, figure, traps, hints, steps) {
 
 export function currentSurfaceAreaCombination(rng, diff) {
   if (diff === 1) {
-    const r = rc(rng, RADII), h = ri(rng, 6, 24);
+    const r = rc(rng, RADII), h = ri(rng, 5, 250);
     const curvedCylinder = areaWithPi(2 * r * h);
     const bottom = areaWithPi(r * r);
     const curvedHemi = areaWithPi(2 * r * r);
@@ -70,6 +85,39 @@ export function currentSurfaceAreaCombination(rng, diff) {
         { h: 'Visible cylinder base', d: `$\\pi r^2=${bottom}$ cm²` },
         { h: 'Hemisphere curved surface', d: `$2\\pi r^2=${curvedHemi}$ cm²` },
         { h: 'Add exposed pieces only', d: `$${curvedCylinder}+${bottom}+${curvedHemi}=${answer}$ cm²` }
+      ]
+    );
+  }
+
+  if (diff === 2 && rng() < 0.5) {
+    // A cone, a cylinder and a hemisphere of one radius, end to end (a toy
+    // rocket or capsule): both circular joins are internal.
+    const { r, h, l } = rc(rng, CONES);
+    const cylH = ri(rng, 5, 250);
+    const coneCurved = areaWithPi(r * l);
+    const cylCurved = areaWithPi(2 * r * cylH);
+    const hemiCurved = areaWithPi(2 * r * r);
+    const answer = coneCurved + cylCurved + hemiCurved;
+    return common(
+      answer,
+      'cone-cylinder-hemisphere',
+      `A toy is a cone of radius $${r}$ cm and height $${h}$ cm on top of a cylinder of the same radius and length $${cylH}$ cm, with a hemisphere of the same radius at the bottom. Find the total exposed surface area. Take $\\pi=\\dfrac{22}{7}$.`,
+      schematic('cylinder-cone', [`r=${r}`, `cyl ${cylH}`, `l=${l}`]),
+      [
+        { value: answer + 4 * areaWithPi(r * r), why: 'Both circular joins (cone–cylinder and cylinder–hemisphere) are internal; adding their four faces counts hidden area.' },
+        { value: areaWithPi(r * h) + cylCurved + hemiCurved, why: 'Cone curved area uses slant height $l$, not vertical height $h$.' }
+      ],
+      [
+        `First find the cone slant height: $l=\\sqrt{${r}^2+${h}^2}=${l}$ cm.`,
+        'Both circular faces where the solids are joined are internal.',
+        'Exposed area $=\\pi rl+2\\pi rH+2\\pi r^2$.'
+      ],
+      [
+        { h: 'Slant height', d: `$l=\\sqrt{${r * r}+${h * h}}=${l}$ cm` },
+        { h: 'Cone curved surface', d: `$\\pi rl=${coneCurved}$ cm²` },
+        { h: 'Cylinder curved surface', d: `$2\\pi rH=${cylCurved}$ cm²` },
+        { h: 'Hemisphere curved surface', d: `$2\\pi r^2=${hemiCurved}$ cm²` },
+        { h: 'Total exposed area', d: `$${coneCurved}+${cylCurved}+${hemiCurved}=${answer}$ cm²` }
       ]
     );
   }
@@ -103,8 +151,10 @@ export function currentSurfaceAreaCombination(rng, diff) {
   }
 
   if (diff === 3) {
-    const side = rc(rng, [14, 28, 42]);
-    const r = side / 2;
+    // Any whole-number side; the hemisphere's radius is a multiple of 7 that
+    // fits on the top face (r <= side/2), so the area stays whole under 22/7.
+    const side = ri(rng, 14, 400);
+    const r = 7 * ri(rng, 1, Math.floor(side / 14));
     const cubeArea = 6 * side * side;
     const coveredCircle = areaWithPi(r * r);
     const hemiCurved = areaWithPi(2 * r * r);
@@ -132,8 +182,8 @@ export function currentSurfaceAreaCombination(rng, diff) {
     );
   }
 
-  const { r, h: coneH, l } = rc(rng, CONES.slice(0, 2));
-  const cylH = ri(rng, 8, 24);
+  const { r, h: coneH, l } = rc(rng, CONES);
+  const cylH = ri(rng, 5, 250);
   const cylCurved = areaWithPi(2 * r * cylH);
   const bottom = areaWithPi(r * r);
   const coneCurved = areaWithPi(r * l);

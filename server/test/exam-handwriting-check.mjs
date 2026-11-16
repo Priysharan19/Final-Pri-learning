@@ -27,13 +27,14 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pngDataUrl } from './support/test-image.mjs';
 
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const scratch = mkdtempSync(join(tmpdir(), 'pri-exam-handwriting-'));
 
 // ── The counting stand-in reader ─────────────────────────────────────────────
 const picture = (label, behaviour = 'ok', filler = 'a') =>
-  'data:image/png;base64,' + Buffer.from(`PICTURE|${behaviour}|${label}|` + filler.repeat(300)).toString('base64');
+  pngDataUrl(`PICTURE|${behaviour}|${label}|` + filler.repeat(300));
 const digestOf = image => createHash('sha256').update(Buffer.from(image.split(',')[1], 'base64')).digest('hex');
 
 const provider = { calls: new Map(), total: 0, held: new Map(), arrivals: new Map(), hanging: new Set(), doubting: new Set() };
@@ -59,7 +60,7 @@ const fake = createServer((req, res) => {
     const [, behaviour, label] = Buffer.from(image.split(',')[1], 'base64').toString('utf8').split('|');
     provider.total += 1;
     provider.calls.set(label, callsFor(label) + 1);
-    const lines = label.split('\n').map(text => ({ text, latex: '', confidence: 0.96 }));
+    const lines = label.split('\n').map(text => ({ text, latex: '', confidence: 0.96, uncertain: false, doubt: '', gap_before: false }));
     const read = { lines, confidence: 0.96, needs_confirmation: false };
     if (behaviour === 'blank') return reply(res, sent.model, { lines: [], confidence: 0, needs_confirmation: true });
     if (behaviour === 'unsure') return reply(res, sent.model, { lines: lines.map(l => ({ ...l, confidence: 0.4 })), confidence: 0.4, needs_confirmation: true });
@@ -90,6 +91,11 @@ Object.assign(process.env, {
 });
 for (const name of ['PRI_PUBLIC_ORIGIN', 'PRI_AI_DAILY_FREE', 'PRI_AI_DAILY_PREMIUM', 'PRI_HANDWRITING_FALLBACK_MODEL']) delete process.env[name];
 
+// D15: a production server never issues a bank outside the India covers
+// (server/platform/indiaBanks.js). This suite says so explicitly because its papers are
+// the NSW-era practice paper (Year 7), the vehicle for handwritten exam answers;
+// india-banks-check.mjs pins the refusal itself. Refused under NODE_ENV=production.
+(await import('../platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { createPlatformDb } = await import('../platform/db.js');

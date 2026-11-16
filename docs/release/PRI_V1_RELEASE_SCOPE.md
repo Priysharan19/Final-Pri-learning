@@ -162,9 +162,9 @@ Required V1 handwriting behaviour includes:
 
 - Apple Pencil writing;
 - finger behaviour where required by supported iPad interaction;
-- native/local recognition capability;
-- optional cloud handwriting recognition where production-ready;
-- graceful local fallback;
+- native/local recognition capability; *(superseded by §23: the server reader is the only reader; the native layer captures ink, it does not read it)*
+- optional cloud handwriting recognition where production-ready; *(superseded by §23: the server reader is mandatory, on by default for an eligible signed-in account, and fails closed)*
+- graceful local fallback; *(superseded by §23: there is no local reading; the fallback is a named reason, the kept ink and typed answers)*
 - answer editing;
 - submission;
 - marking/feedback integration;
@@ -304,7 +304,7 @@ The frozen V1 IN-scope set includes:
 - existing accurately described approved/generated JEE practice/exam functionality;
 - student product behaviour required by accepted K1–K5;
 - learning-intelligence behaviour required by accepted P1–P5;
-- handwriting, including Apple Pencil and required local/cloud-fallback behaviour;
+- handwriting, including Apple Pencil and required local/cloud-fallback behaviour; *(superseded by §23: Apple Pencil capture plus the server reader; no local reading)*
 - marking/grading correctness required for launch;
 - account lifecycle, recovery and deletion required for the student product;
 - guardian consent lifecycle where required;
@@ -601,3 +601,23 @@ TalkBack, font scale) is assigned to Kalp and stays open under §22.4.
 
 Signing, Play Billing licence-tester certification and the Play internal-test track remain under §22.4 and
 need the owner's Play Console authority.
+
+## 23. Scope change — the server reader is the only handwriting reader (owner decision 2 October 2026; default D16, 1 November 2026)
+
+### 23.1 Decision (§20 item 1)
+
+The owner decided on 2 October 2026 that Pri Learning reads handwriting and photos **online only**, through the server reader, because the local engine "is just not good enough". On 1 November 2026 the owner ordered the programme to finish on its defaults; default **D16** (`V1_DECISIONS_2026-11-01.md`) retires the on-device readers from the shipped path and from the release gates, keeps every accuracy floor unchanged and re-bases it on the server reader, and keeps the deterministic marking engine bundled. This section records that change against §9 and §15, which are annotated above and otherwise left as the frozen record. It is **provisional until the owner confirms D16**.
+
+### 23.2 Reason (§20 item 2)
+
+Until this change the real-writer gate scored the JS recogniser no student used, and the physical gate demanded a 500 ms on-device p95 that a network reader can never meet: as written the gates could not pass, or meant nothing for the shipped reader. The Vision benchmark in Gate A also went red on iOS 27 (#676) while guarding a reader no student reached.
+
+### 23.3 Implications (§20 item 3)
+
+- **Gates.** `handwriting/v12/PRODUCTION_STANDARD.md` Gates A, C and D now describe the server reader. Gate A is a PencilKit capture-fidelity and journey gate on pinned Xcode and iOS runtimes; Gate C scores the newest real-human evaluation of the server reader row by row against the committed corpus; Gate D's latency floor is a **server read p95 of 4,000 ms measured on the device** (the product's existing end-to-end budget, `docs/operations/alerts.md` §2a), set as a default pending the owner's confirmation. Exact, character, worst-writer, critical-structure and auto-mark floors are unchanged.
+- **Code.** Vision, Core ML and the photo OCR bridge leave the shipping Swift target (git history keeps them). The JS recogniser modules stay in the client only where the deterministic marking engine and its regression suites share them; no student path calls them.
+- **Privacy.** Every handwritten or photographed page a signed-in, eligible account reads leaves the device for the model provider; `docs/legal/privacy.md` must say so (it does), and the one-time permission prompt of default D17 is a separate item.
+- **Offline.** Nothing is read or marked offline. The ink is kept, the student is told why, and typed answers remain available. §9's "graceful local fallback" is that behaviour, not a local reading.
+- **Evidence.** Blocker #5 (real-writer evidence) now needs the server reader scored on real Pencil ink: `tools/ink-cloud-reader-eval.mjs` on the committed corpus, and the physical study at `/practice?inkEvidence=1` recorded in schema 2. Nothing collected so far counts; 0 of 24 test writers have been collected.
+- **Not changed.** Answer-blindness, the deterministic engine's authority over every mark, the student's confirmation of an unsure reading, and every numeric floor.
+

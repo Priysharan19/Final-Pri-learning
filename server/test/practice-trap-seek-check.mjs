@@ -41,13 +41,16 @@ const h = await startApp({ engine: requestedEngine() });
 await loadAllBanks();
 
 const OWNER = 'c8-linear-equations';
-const GEN = 'c8-linear-equations-both-sides';
-const TRAPPED_SEED = 1; // d1 seed 1 carries a numeric trap
-const PLAIN_SEED = 7; // d1 seed 7 carries none
+// #766 (Class 8 original forms) gave every both-sides form the same trap, so the fixture moved to a generator
+// whose d3 forms still split between carrying a numeric trap and carrying none.
+const GEN = 'c8-linear-equations-fractions';
+const DIFF = 3;
+const TRAPPED_SEED = 7; // d3 seed 7 carries a numeric trap
+const PLAIN_SEED = 1; // d3 seed 1 carries none
 const keysOf = q => [...(Array.isArray(q?.traps) ? q.traps : []).map(t => t?.why), ...Object.values(q?.answer?.optionTraps || {})]
   .filter(Boolean).map(why => misconceptionIdForTrap(OWNER, why));
-const trapped = generateQuestion(GEN, 1, TRAPPED_SEED);
-const plain = generateQuestion(GEN, 1, PLAIN_SEED);
+const trapped = generateQuestion(GEN, DIFF, TRAPPED_SEED);
+const plain = generateQuestion(GEN, DIFF, PLAIN_SEED);
 const KEY = keysOf(trapped)[0];
 
 try {
@@ -77,19 +80,19 @@ try {
     ['an empty key', { owner: OWNER, key: '' }], ['a key past 200 characters', { owner: OWNER, key: 'k'.repeat(201) }],
     ['an owner past 120 characters', { owner: 'o'.repeat(121), key: KEY }], ['a string', KEY], ['a number key', { owner: OWNER, key: 7 }]
   ]) {
-    const refused = await issue(a.jar, { generator: GEN, difficulty: 1, trap: bad });
+    const refused = await issue(a.jar, { generator: GEN, difficulty: DIFF, trap: bad });
     c.eq(refused.status, 400, `a trap that is ${name} is refused`);
     c.eq(refused.data?.error?.code, 'PRACTICE_ISSUE_INVALID', `${name}: coded as an invalid issue request`);
   }
 
   // 2 · fixed seeds: attested exactly when the question carries it
-  const hit = await issue(a.jar, { generator: GEN, difficulty: 1, seed: TRAPPED_SEED, trap });
+  const hit = await issue(a.jar, { generator: GEN, difficulty: DIFF, seed: TRAPPED_SEED, trap });
   c.eq(hit.status, 201, 'a seeded question that carries the trap is issued');
   c.eq(hit.data.trapDelivered, true, 'and attested as carrying it');
-  const miss = await issue(a.jar, { generator: GEN, difficulty: 1, seed: PLAIN_SEED, trap });
+  const miss = await issue(a.jar, { generator: GEN, difficulty: DIFF, seed: PLAIN_SEED, trap });
   c.eq(miss.status, 201, 'a seeded question without the trap is still issued');
   c.ok(!('trapDelivered' in miss.data), 'and carries no attestation');
-  const unasked = await issue(a.jar, { generator: GEN, difficulty: 1, seed: TRAPPED_SEED });
+  const unasked = await issue(a.jar, { generator: GEN, difficulty: DIFF, seed: TRAPPED_SEED });
   c.ok(!('trapDelivered' in unasked.data), 'a question issued without a trap request carries no attestation either');
   const publicKeys = JSON.stringify(hit.data);
   c.ok(!/"traps"|"optionTraps"|"why"/.test(publicKeys), 'the attested issue reply discloses no trap text');
@@ -97,7 +100,7 @@ try {
   // 3 · unseeded: every attestation is true of the escrowed question
   let attested = 0;
   for (let i = 0; i < 10; i++) {
-    const r = await issue(a.jar, { generator: GEN, difficulty: 1, trap });
+    const r = await issue(a.jar, { generator: GEN, difficulty: DIFF, trap });
     c.eq(r.status, 201, `unseeded seek ${i + 1}: issued`);
     const stored = await escrowedOf(a.account.id, r.data.question.id);
     const carries = keysOf(stored).includes(KEY);
@@ -131,11 +134,11 @@ try {
   c.eq(foreign.status, 404, 'another account cannot replay the trapped question\'s submission');
   c.ok(!JSON.stringify(foreign.data || {}).includes(second.data.trapWhy), 'and learns nothing of its misconception');
   c.eq((await h.request(`/v1/practice/${qid}/reveal`, { method: 'POST', jar: b.jar, body: {} })).status, 404, 'nor reveal it');
-  const theirs = await issue(b.jar, { generator: GEN, difficulty: 1, seed: TRAPPED_SEED, trap });
+  const theirs = await issue(b.jar, { generator: GEN, difficulty: DIFF, seed: TRAPPED_SEED, trap });
   c.eq(theirs.data.trapDelivered, true, 'a second account asking for the same key is attested for its own question');
   c.ok(theirs.data.question.id !== qid, 'under its own id');
   c.ok(await escrowedOf(b.account.id, qid) === null, 'the first account\'s escrow is not the second account\'s');
-  c.eq((await issue({}, { generator: GEN, difficulty: 1, trap })).status, 401, 'no session, no seek');
+  c.eq((await issue({}, { generator: GEN, difficulty: DIFF, trap })).status, 401, 'no session, no seek');
 } finally {
   await h.close();
   rmSync(scratch, { recursive: true, force: true });

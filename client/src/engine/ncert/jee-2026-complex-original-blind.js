@@ -7,7 +7,7 @@
  */
 export const JEE_2026_COMPLEX_ORIGINAL_BLIND = {
   "packageId": "pri-jee-advanced-complex-20261014",
-  "version": "2026.10.14.2",
+  "version": "2026.11.08.1",
   "publicationState": "author-draft-unwired",
   "publicVisibility": "answer-blind-only",
   "verifiedStudentProblems": 20,
@@ -50,10 +50,10 @@ export const JEE_2026_COMPLEX_ORIGINAL_BLIND = {
       "original": true,
       "rightsStatus": "original-author-draft",
       "syllabusTopic": "Complex numbers: algebraic/geometric interpretation",
-      "question": "If |z|=1 and z≠−1, prove (z−1)/(z+1) is purely imaginary and prove the converse.",
+      "question": "Let z≠−1 and w=(z−1)/(z+1). Prove that if |z|=1 then Re(w)=0 (w=0 included, at z=1), and prove the converse: if Re(w)=0 then |z|=1.",
       "firstHint": "Use conjugate(z)=1/z and compare w with its conjugate.",
       "diagram": null,
-      "version": "2026.10.14.1",
+      "version": "2026.11.08.1",
       "reviewState": "deterministic-recheck-complete-independent-blind-difficulty-review-pending"
     },
     {

@@ -11,12 +11,18 @@
 // The server issues from nothing outside this set, so a spec cannot name a
 // generator the student's own track and class do not own.
 import { indiaScope, resolveIndiaTarget } from './indiaProduct.js';
-import { pyqCellsFor } from './pyq/pyqCoverage.js';
+import { pyqCellsFor } from './pyq/pyqIndex.js';
 import { chapterCells } from './indiaExamComposer.js';
+import { pastPapersEnabled } from './pastPapers.js';
 
-/** Previous-year cells for every chapter in scope: Map(chapterId → cells). */
+/**
+ * Previous-year cells for every chapter in scope: Map(chapterId → cells).
+ * Empty while past papers are switched off (engine/pastPapers.js): a paper is
+ * then composed from authored cells alone, on the device and on the server.
+ */
 export function indiaPyqCells(track, chapters) {
   const cells = new Map();
+  if (!pastPapersEnabled()) return cells;
   for (const chapter of chapters) {
     const list = [];
     if (track === 'jee-main' || track === 'jee-advanced') {

@@ -27,7 +27,9 @@ import {
 import { NCERT_CLASS9_SYLLABUS as NCERT_CLASS9_CHAPTERS } from './ncert/class9-syllabus.js';
 import { CBSE_CLASS10_2026_27_CHAPTERS } from './ncert/class10-2026-27-production.js';
 import { INDIA_NATIVE_COVERS } from './curriculum-in-native-covers.js';
-import { INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS } from './curriculum-in-hardest-covers.js';
+import { INDIA_FORMS_COVERS } from './curriculum-in-forms-covers.js';
+import { CBSE_CLASS10_ORIGINAL_COMPETENCY_COVERS } from './curriculum-in-competency-covers.js';
+import { INDIA_HARDEST_COVERS, INDIA_JEE_HARDEST_COVERS, INDIA_JEE_REPLACEMENT_COVERS, INDIA_RETIRED_RUNGS } from './curriculum-in-hardest-covers.js';
 
 function replaceClass7() {
   const group = IN_CURRICULUM.find(g => g.grade === 7);
@@ -108,7 +110,8 @@ function replaceClass9() {
   if (first < 0 || !count) throw new Error('Class 9 flat curriculum is missing');
 
   for (const id of oldIds) delete IN_CHAPTER_BY_ID[id];
-  group.caption = 'Ganita Manjari Grade 9 Part I — coordinates, linear polynomials, real numbers, identities, circles, mensuration, probability and progressions';
+  // The honest label Class 9 carries until the rebuild is reviewed (D24).
+  group.caption = 'Ganita Manjari Grade 9 Part I — 8 of the 15 chapters in the CBSE 2026–27 list: coordinates, linear polynomials, real numbers, identities, circles, mensuration, probability and progressions';
   group.chapters = chapters;
 
   const flat = chapters.map(ch => ({ ...ch, dotpoints:[...ch.dotpoints], covers:ch.covers.map(c=>({gen:c.gen,dp:[...c.dp],diff:[...c.diff]})), grade:9 }));
@@ -135,7 +138,7 @@ function overlayClass10() {
   for (const chapter of CBSE_CLASS10_2026_27_CHAPTERS) {
     applyChapterOverlay(chapter.id, chapter.dotpoints, chapter.covers, { native: false });
   }
-  group.caption = 'CBSE/NCERT Class X Mathematics 2026–27 — current rationalised outcomes with source-reviewed production coverage';
+  group.caption = 'CBSE/NCERT Class X Mathematics 2026–27 — current rationalised outcomes, mapping checked by software, not yet by an examiner';
 }
 
 overlayClass10();
@@ -206,7 +209,66 @@ function installHardestCovers(table) {
 }
 
 installHardestCovers(INDIA_HARDEST_COVERS);
+// Later original Class X competency additions have separate pending-review
+// provenance and do not rewrite the historical source or hardest-form table.
+installHardestCovers(CBSE_CLASS10_ORIGINAL_COMPETENCY_COVERS);
 // Tranche 2: one D4 form for each JEE Class 11 / Class 12 dot point that had none.
 installHardestCovers(INDIA_JEE_HARDEST_COVERS);
+
+// Issue #408: a routine form claimed at the hardest level is replaced, then its
+// rung retired (see INDIA_RETIRED_RUNGS). Only the named rung at the named dot
+// point goes: a cover that spans several dot points is split, so the rung stays
+// claimed for the others until they are retired too, and every other rung of
+// the cover stays. Load-time errors, not silent no-ops, when a retirement names
+// a rung the chapter does not have, or would leave the dot point with no form
+// at that rung, or when the named replacement is not what now serves it.
+const retiredLog = [];
+// Covers of one generator at the same rungs are one cover: splitting must not
+// leave a generator listed once per dot point, which would multiply its weight
+// wherever a chapter's covers are drawn from as a pool.
+function coalesce(covers) {
+  const out = [];
+  for (const c of covers) {
+    const same = out.find(o => o.gen === c.gen && o.diff.join() === c.diff.join());
+    if (same) same.dp = [...new Set([...same.dp, ...c.dp])].sort((a, b) => a - b);
+    else out.push({ ...c, dp: [...c.dp], diff: [...c.diff] });
+  }
+  return out;
+}
+function retireRungs(table) {
+  for (const [chapterId, retirements] of Object.entries(table)) {
+    const views = new Set([
+      IN_CURRICULUM.flatMap(group => group.chapters).find(chapter => chapter.id === chapterId),
+      IN_CHAPTER_BY_ID[chapterId],
+      IN_CHAPTERS.find(chapter => chapter.id === chapterId)
+    ].filter(Boolean));
+    if (!views.size) throw new Error(`${chapterId} is not a chapter of this curriculum`);
+    let first = true;
+    for (const chapter of views) {
+      for (const { gen, dp, diff, replacedBy } of retirements) {
+        const at = chapter.covers.findIndex(c => c.gen === gen && c.dp.includes(dp) && (c.diff || []).includes(diff));
+        if (at < 0) throw new Error(`${chapterId}: no cover ${gen} at dot point ${dp}, D${diff} to retire`);
+        const cover = chapter.covers[at];
+        if (first) retiredLog.push(Object.freeze({ chapterId, gen, dp, diff, replacedBy, claimed: Object.freeze({ dp: [...cover.dp], diff: [...cover.diff] }) }));
+        const here = { gen, dp: [dp], diff: cover.diff.filter(d => d !== diff) };
+        const others = { gen, dp: cover.dp.filter(i => i !== dp), diff: [...cover.diff] };
+        const split = [here, others].filter(c => c.dp.length && c.diff.length);
+        chapter.covers = coalesce([...chapter.covers.slice(0, at), ...split, ...chapter.covers.slice(at + 1)]);
+        const still = chapter.covers.filter(c => c.dp.includes(dp) && (c.diff || []).includes(diff)).map(c => c.gen);
+        if (!still.length) throw new Error(`${chapterId}: retiring ${gen} D${diff} would leave dot point ${dp} with no form at D${diff}`);
+        if (!still.includes(replacedBy)) throw new Error(`${chapterId}: ${replacedBy} does not serve dot point ${dp} at D${diff}`);
+      }
+      first = false;
+    }
+  }
+}
+
+installHardestCovers(INDIA_JEE_REPLACEMENT_COVERS);
+retireRungs(INDIA_RETIRED_RUNGS);
+// Additional forms per dot point (curriculum-in-forms-covers.js): appended at
+// D1–D3 with the same load-time checks; nothing already claimed changes.
+installHardestCovers(INDIA_FORMS_COVERS);
+/** What each retirement removed, recorded at load: the cover as it was claimed before its rung went. */
+export const INDIA_RETIRED_LOG = Object.freeze(retiredLog);
 
 export * from './curriculum-in-base.js';

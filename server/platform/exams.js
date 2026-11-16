@@ -130,6 +130,22 @@
 // A model never sets a mark here: the reader proposes a transcript, and only
 // the deterministic engine marks it.
 //
+// NSW PAPERS (plan G4, Prithagoras). A third kind, `nsw`: an HSC-style paper
+// on one of the engine's blueprints (client/src/engine/nswExams.js), only on a
+// Prithagoras server with PRI_NSW_EXAMS=on (nswExamPool.js), and only when the
+// release check finds every slot fillable from the edition's approved forms.
+// The device names the blueprint and nothing else: the server draws every
+// question from an issued NSW form on the slot's outcome, seals the edition's
+// identity and its final-answer-only marking on it, and refuses a question
+// that cannot carry them. Reading time is the server's: the paper holds
+// `readingEndsAt`, and before it no snapshot is saved and no finish accepted
+// (EXAM_READING_TIME); the working deadline follows it and is never moved by
+// a device clock. The result is an "Answer-checked practice paper" (`nsw`):
+// no HSC mark, band, ATAR or prediction is computed or stored.
+//
+//   GET  /v1/exams/nsw          the blueprints this server lists, which are
+//                               released, and what each covers and lacks.
+//
 // Storage is the existing account-scoped idempotency_keys table (no schema
 // change), under five scopes of its own, and practice's `practice-content`:
 //   exam-layout   blueprint → { layoutSeed }        pending until a paper is sealed under it
@@ -156,6 +172,10 @@ import {
   MARKING_BUSY, BUSY_MESSAGE, TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
 } from './markerPool.js';
 import { loadBanksFor } from '../../client/src/engine/generators/index.js';
+import { practicePapersAllowed } from './indiaBanks.js';
+import { bankPolicy, sealForEdition } from './editionBanks.js';
+import { nswExamsOn, nswRelease, nswExamPool, nswExamCatalogue, outcomeNamed } from './nswExamPool.js';
+import { slotsOf, formsForSlot, nswPaperTitle, NSW_EXAM_LABEL, NSW_MARKING_NOTE } from '../../client/src/engine/nswExams.js';
 import { generateMultipart } from '../../client/src/engine/generators/multipart.js';
 import { makeRng } from '../../client/src/engine/qhelpers.js';
 import { indiaExamPaperSpec, markObjective } from '../../client/src/engine/indiaExams.js';
@@ -167,9 +187,15 @@ import {
 import { scopeForYear, subtopicsForYear, PATHWAYS } from '../../client/src/engine/curriculum.js';
 import { multipartForYear } from '../../client/src/engine/generators/multipart.js';
 import { FREE_EXAM_ALLOWANCE } from '../../client/src/engine/examAllowance.js';
+import { boardMockOf, mockTitleOf, MOCK_LABEL } from '../../client/src/engine/boardMock.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
+import { timeReport } from '../../client/src/engine/examTime.js';
+import { targetsFrom, whyTheseQuestions, TARGETED_LABEL } from '../../client/src/engine/targetedMock.js';
+import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/reviewQueue.js';
+import { buildNotebook } from '../../client/src/engine/mistakeNotebook.js';
+import { rungLevelOf } from '../../client/src/engine/hintLadder.js';
 import { stampExamItem, contentHashOf } from '../../client/src/engine/contentIdentity.js';
-import { seenKeysOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
+import { seenKeysOf, seenKeyOf, repeatEvidenceOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
 import { recognitionOpsFor } from './recognitionOps.js';
 import { transcribeHandwriting, validateImage } from './handwritingProvider.js';
 
@@ -197,7 +223,7 @@ const MAX_KEYS = 400;
 const MAX_MS = 24 * 60 * 60 * 1000;
 const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
 
-const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots']);
+const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots', 'mock', 'targeted']);
 const LAYOUT_FIELDS = new Set(['blueprint']);
 const SNAPSHOT_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'cur', 'rev']);
 const FINISH_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'ms', 'reason', 'submissionKey']);
@@ -222,6 +248,8 @@ const blank = v => v === undefined || v === null || String(v).trim() === '';
 const refusal = (status, code, message) => ({ refused: [status, code, message] });
 const reject = (res, status, code, message) => res.status(status).json({ error: { code, message } });
 const notFound = res => reject(res, 404, 'EXAM_NOT_FOUND', 'This paper does not belong to this account.');
+/** An NSW paper in its reading time: nothing is saved and nothing is finished. */
+const READING_TIME = Object.freeze({ status: 409, code: 'EXAM_READING_TIME', message: 'Reading time: you can read the paper, but no answers can be written until working time starts.' });
 
 // ── The public paper ─────────────────────────────────────────────────────────
 
@@ -290,11 +318,26 @@ function publicQuestion(sq) {
   };
 }
 
+/**
+ * A targeted paper (engine/targetedMock.js, plan F3) says so on every surface,
+ * with the key the SERVER wrote when it sealed the paper: which questions were
+ * drawn toward which subtopic, and on what evidence from this account's own
+ * marked work.
+ */
+function targetedFields(paper) {
+  if (!paper?.targeted) return {};
+  return { targeted: true, targetedLabel: TARGETED_LABEL, why: paper.targeted.key };
+}
+
 function publicPaper(paper, now) {
   return {
-    id: paper.id, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
+    id: paper.id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL, typedOnly: true } : {}), title: paper.title, durationMin: paper.durationMin,
+    ...targetedFields(paper),
     startedAt: paper.startedAt, deadline: paper.deadline, graceMs: FINISH_GRACE_MS,
     now, remainingMs: Math.max(0, paper.deadline - now),
+    // An NSW paper's reading time, on the server's clock (see the header).
+    ...(paper.readingEndsAt ? { readingMin: paper.readingMin, readingEndsAt: paper.readingEndsAt, reading: now < paper.readingEndsAt } : {}),
+    ...(paper.kind === 'nsw' ? { nsw: nswPublic(paper) } : {}),
     blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion, total: paper.total,
     questions: paper.questions.map(publicQuestion)
   };
@@ -510,10 +553,83 @@ function readPracticeSpec(body) {
   };
 }
 
-function readSpec(body) {
+/** What an NSW paper says about itself on every surface: label, marking, coverage. */
+function nswPublic(paper) {
+  return {
+    label: NSW_EXAM_LABEL, markingScope: 'final-answer-only', markingNote: NSW_MARKING_NOTE,
+    blueprintId: paper.blueprint.id, course: paper.blueprint.course, syllabus: paper.blueprint.syllabus,
+    syllabusVersion: paper.blueprint.syllabusVersion, outcomes: paper.blueprint.outcomes,
+    // A partial paper says so, and names every outcome it leaves out.
+    partial: paper.blueprint.partial === true, year12: paper.blueprint.year12, omittedOutcomes: paper.blueprint.omittedOutcomes,
+    ...(paper.blueprint.test ? { test: true } : {})
+  };
+}
+
+// An NSW paper names its blueprint and nothing else. The server draws every
+// question; a blueprint the release check refuses is not released.
+const NSW_NOT_AVAILABLE = refusal(404, 'EXAM_KIND_UNAVAILABLE', 'These papers are not available here.');
+function readNswSpec(body, env = process.env) {
+  for (const field of ['paper', 'layoutSeed', 'slots']) if (body[field] !== undefined) return INVALID();
+  const b = body.blueprint;
+  if (!plain(b) || unknown(b, new Set(['id'])).length || typeof b.id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(b.id)) return INVALID('Name the paper.');
+  const named = nswRelease(b.id, nswExamPool(), env);
+  if (!named) return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', 'No examination blueprint is released for this selection.');
+  const { blueprint, release } = named;
+  if (!release.released) {
+    const lacking = [...release.missingOutcomes, ...release.thinOutcomes];
+    return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', `This paper is not available yet: it covers ${release.year12.covered} of ${release.year12.total} Year 12 outcomes, and there are not enough approved questions for ${lacking.join(', ')}.`);
+  }
+  // A partial paper sets only the slots it can fill: its marks and working
+  // time are the release check's, scaled to what it examines.
+  const kept = new Set(release.included.map(slot => slot.number));
+  const slots = slotsOf(blueprint).filter(slot => kept.has(slot.number));
+  return {
+    kind: 'nsw', nsw: blueprint, nswSlots: slots, readingMin: blueprint.readingMin,
+    durationMin: blueprint.readingMin + release.workingMin,
+    blueprint: {
+      id: blueprint.id, label: blueprint.label, course: blueprint.course, year: blueprint.year,
+      syllabus: blueprint.syllabus, syllabusVersion: blueprint.syllabusVersion,
+      outcomes: [...new Set(slots.map(slot => slot.outcome))],
+      partial: !release.full, year12: { covered: release.year12.covered, total: release.year12.total },
+      omittedOutcomes: release.omittedOutcomes.map(outcomeNamed),
+      ...(blueprint.test ? { test: true } : {})
+    },
+    defaultTitle: nswPaperTitle(blueprint, release)
+  };
+}
+
+function readSpec(body, env = process.env) {
   if (!plain(body) || unknown(body, CREATE_FIELDS).length) return INVALID();
-  const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body) : INVALID('Name the kind of paper.');
+  // D15: the practice paper is the NSW course's, built from banks outside the
+  // India curriculum's covers, so it is refused (indiaBanks.js).
+  if (body.kind === 'practice-paper' && !practicePapersAllowed()) {
+    return refusal(422, 'EXAM_KIND_OUTSIDE_CURRICULUM', 'This kind of paper is not part of the India curriculum.');
+  }
+  // An India paper is composed from the India curriculum's banks: only the
+  // edition that issues them composes one (editionBanks.js). Another edition's
+  // own papers are a later mission (plan G4); until then it issues none.
+  if (body.kind === 'india' && bankPolicy().curriculum !== 'in') {
+    return refusal(422, 'EXAM_KIND_OUTSIDE_CURRICULUM', 'This kind of paper is not part of this edition.');
+  }
+  // An NSW paper is the Prithagoras edition's, behind its own switch (plan G4).
+  // Anywhere else the kind is unknown, exactly as it was before: Priyabhata's
+  // replies do not change.
+  const nsw = body.kind === 'nsw' && bankPolicy().curriculum === 'nsw';
+  if (nsw && !nswExamsOn(env)) return NSW_NOT_AVAILABLE;
+  const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body)
+    : nsw ? readNswSpec(body, env) : INVALID('Name the kind of paper.');
   if (read.refused) return read;
+  // A board mock ("Pri mock in board format", engine/boardMock.js, D22) is a
+  // full blueprint paper on a board blueprint, sat typed, under its own title.
+  // For the plan it is a timed paper like any other (D19).
+  // A TARGETED paper (plan F3, engine/targetedMock.js) is a board mock whose
+  // questions lean toward this account's weak and due subtopics. Premium only;
+  // the server decides what counts as targeted, never the device.
+  if (body.targeted !== undefined && (body.targeted !== true || body.mock !== true)) return INVALID('A targeted paper is a board mock.');
+  if (body.mock !== undefined) {
+    if (body.mock !== true || read.kind !== 'india' || !boardMockOf(read.blueprint)) return INVALID('A board mock is a CBSE Class X Standard or Class XII paper.');
+    return { ...read, mock: true, ...(body.targeted === true ? { targeted: true } : {}), title: mockTitleOf(read.blueprint) + (body.targeted === true ? ' · targeted' : '') };
+  }
   // The title of a certified paper is the server's, from the blueprint. A
   // device may call the paper what it likes locally; that name is never here.
   return { ...read, title: read.defaultTitle };
@@ -608,6 +724,8 @@ async function issueQuestions(read) {
     return { questions };
   }
 
+  if (read.kind === 'nsw') return issueNswQuestions(read, { seal, draw, fresh, onPaper, unitHashes, questions });
+
   for (const slot of read.slots) {
     if (slot.multipart) {
       let mp;
@@ -640,6 +758,57 @@ async function issueQuestions(read) {
       section: 'I', sectionLabel: 'Section I', item: 'question', chapterId: null, chapterName: null,
       marking: { correct: marks, incorrect: 0, unanswered: 0, partialPerOption: null }, marks,
       pyq: q.pyq === true, conversion: null, generator: slot.generator, difficulty: q.difficulty || slot.difficulty
+    }, { ...q, examItem: 'question' });
+  }
+  return { questions };
+}
+
+// The answer types an NSW paper sets: each marked on its final answer alone,
+// all or nothing. A form that could earn part marks or a person's mark
+// (multi-correct, matrix, sketch, geometry, proof, a board scheme) is never on
+// an NSW paper, whatever the marking switch says.
+const NSW_ANSWER_TYPES = new Set(['numeric', 'mcq', 'expression', 'point', 'set']);
+const NSW_WRITTEN_TRIES = 64;
+const nswFinalAnswerOnly = q => !!q?.prompt && NSW_ANSWER_TYPES.has(q.answerType) && !q.multipart && !Array.isArray(q.boardScheme);
+
+/**
+ * Fill each slot of an NSW blueprint from the approved forms on its outcome:
+ * a form at a difficulty the slot prefers when it has one, one not yet used
+ * on this paper when there is one, and a question whose sealed identity names
+ * the slot's outcome. A slot that cannot be filled refuses the whole paper.
+ */
+async function issueNswQuestions(read, { seal, draw, fresh, onPaper, unitHashes, questions }) {
+  const banks = bankPolicy();
+  const pool = nswExamPool();
+  const usedForms = new Set();
+  const shuffle = list => list.map(item => [randomInt(0x7fffffff), item]).sort((a, b) => a[0] - b[0]).map(([, item]) => item);
+  for (const slot of read.nswSlots) {
+    const forms = formsForSlot(slot, pool);
+    const rank = form => (slot.difficulties.includes(form.difficulty) ? 0 : 2) + (usedForms.has(`${form.generator}|${form.difficulty}`) ? 1 : 0);
+    const order = shuffle(forms).sort((a, b) => rank(a) - rank(b));
+    let q = null, form = null;
+    for (const candidate of order) {
+      // A multi-mark slot redraws a form's multiple-choice variants away, so it gets more tries.
+      for (let attempt = 0; attempt < (slot.marks > 1 ? NSW_WRITTEN_TRIES : ISSUE_TRIES) && !q; attempt++) {
+        let drawn;
+        try { drawn = draw(candidate.generator, candidate.difficulty); } catch { drawn = null; }
+        if (!drawn || !nswFinalAnswerOnly(drawn) || !fresh(drawn)) continue;
+        // A multi-mark slot is never a multiple-choice question (engine/nswExams.js formsForSlot).
+        if (slot.marks > 1 && OBJECTIVE.has(drawn.answerType)) continue;
+        drawn._generator = candidate.generator;
+        if (!sealForEdition(drawn, banks, candidate.generator)) continue;
+        if (!drawn._curriculum?.outcomes?.some(o => o.code === slot.outcome)) continue;
+        q = drawn;
+      }
+      if (q) { form = candidate; break; }
+    }
+    if (!q) return UNSUPPORTED(questions.length + 1);
+    usedForms.add(`${form.generator}|${form.difficulty}`);
+    for (const hash of unitHashes(q)) onPaper.add(hash);
+    seal({
+      section: slot.section, sectionLabel: slot.sectionLabel, item: 'question', chapterId: null, chapterName: null, outcome: slot.outcome,
+      marking: { correct: slot.marks, incorrect: 0, unanswered: 0, partialPerOption: null }, marks: slot.marks,
+      pyq: false, conversion: null, generator: form.generator, difficulty: q.difficulty || form.difficulty
     }, { ...q, examItem: 'question' });
   }
   return { questions };
@@ -724,6 +893,9 @@ function readResponses(body, paper) {
   const times = readTimes(body.times, paper);
   const modes = readModes(body.modes, keys);
   const ink = readInk(body.ink, keys);
+  // A board mock is a typed paper (D22): a handwritten answer, or a page of
+  // ink left to read, does not belong on it.
+  if (paper.mock && ((modes && Object.values(modes).includes('ink')) || (ink && Object.keys(ink).length))) return null;
   return answers && workings && times && modes && ink ? { answers, workings, times, modes, ink } : null;
 }
 
@@ -869,7 +1041,12 @@ function summarise(paper, detail, totalMs) {
  */
 export function markPaper(paper, responses, { now, totalMs, seen = null, mark }) {
   const { answers, workings, times, modes } = responses;
-  const isRepeat = item => !!seen && seen.size > 0 && seenKeysOf(item).some(key => seen.has(key));
+  // Why an item is a repeat (contentSeen.js), or null. A repeat decided on a
+  // record written before the canonical identity, under a key that could not
+  // have told this item from another, is reported as `repeatEvidence: 'legacy'`
+  // beside its `repeat: true`: honoured, never passed off as a canonical match.
+  const repeatOf = item => (seen && seen.size > 0 ? repeatEvidenceOf(item, seen) : null);
+  const evidenceFlag = evidence => (evidence?.ambiguous ? { repeatEvidence: 'legacy' } : {});
   const timed = Object.keys(times).length > 0;
   const nQ = Math.max(1, paper.questions.length);
   const detail = [];
@@ -890,6 +1067,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       ...(sq.chapterId ? { chapterId: sq.chapterId } : {}),
       ...(extra.part ? { part: extra.part } : {}),
       ...(extra.repeat ? { repeat: true } : {}),
+      ...(extra.repeat && extra.repeatEvidence ? { repeatEvidence: extra.repeatEvidence } : {}),
       mode: 'exam', inputMode: extra.inputMode, ms: extra.ms,
       // The server offers an exam question no hint, tutor or second try, but it
       // cannot see what else was open beside the paper. As with practice, an
@@ -906,12 +1084,14 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       id: sq.id, order: sq.order, section: sq.section, sectionLabel: sq.sectionLabel, item: sq.item,
       chapterId: sq.chapterId, subtopic: sq.chapterId || q.subtopic, subtopicName: sq.chapterName || q.title || q.subtopic,
       generator: sq.generator, difficulty: q.difficulty || sq.difficulty || 2, ms, timed,
-      sourceKind: sq.pyq ? 'reviewed-jee-pyq' : 'authored-generator', contentId: opaqueContentId(q.contentId)
+      sourceKind: sq.pyq ? 'reviewed-jee-pyq' : 'authored-generator', contentId: opaqueContentId(q.contentId),
+      // An NSW paper's slot outcome (a code, never NESA wording), once marked. Absent elsewhere.
+      ...(sq.outcome ? { syllabusOutcome: sq.outcome } : {})
     };
     let out;
     if (q.multipart) {
       const partsOut = [];
-      let qMarks = 0, qAwarded = 0, allCorrect = true, anyAnswered = false, repeatParts = 0;
+      let qMarks = 0, qAwarded = 0, allCorrect = true, anyAnswered = false, repeatParts = 0, legacyParts = 0;
       const parts = q.parts || [];
       for (const part of parts) {
         const mainKey = `${sq.id}::${part.key}`;
@@ -922,8 +1102,10 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
         const grid = { correct: part.marks, incorrect: 0, unanswered: 0 };
         const r = mark(synth, answers[key], workings[key], grid, key);
         if (r.pending) pendingKeys.push(key);
-        const repeat = isRepeat(chosen);
+        const evidence = repeatOf(chosen);
+        const repeat = evidence !== null;
         if (repeat) repeatParts++;
+        if (evidence?.ambiguous) legacyParts++;
         qMarks += part.marks; qAwarded += r.awarded;
         if (!r.correct) allCorrect = false;
         let attemptId = null;
@@ -933,7 +1115,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
           // own evidence. A structured Section II question is one piece of work
           // with no single subtopic, so it is recorded on the paper only.
           if (paper.kind === 'india') {
-            attemptId = attempt(sq, synth, r, { marks: part.marks, part: String(part.key), repeat, inputMode: inputMode(key), ms: Math.round(ms / Math.max(1, parts.length)) });
+            attemptId = attempt(sq, synth, r, { marks: part.marks, part: String(part.key), repeat, ...evidenceFlag(evidence), inputMode: inputMode(key), ms: Math.round(ms / Math.max(1, parts.length)) });
           }
         }
         partsOut.push({
@@ -944,7 +1126,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
           working: blank(workings[key]) ? null : String(workings[key]),
           // Withheld while the part is pending on handwriting (see solution below).
           ...(r.pending ? {} : { answerText: keyedAnswer(chosen), steps: chosen.steps || [] }), subtopic: synth.subtopic, difficulty: synth.difficulty, attemptId,
-          ...(repeat ? { repeat: true } : {}),
+          ...(repeat ? { repeat: true } : {}), ...evidenceFlag(evidence),
           ...cutOffFlags(r),
           // Both versions of a part that offered a choice, now that it is marked.
           ...(part.alt && !r.pending ? { choices: Object.fromEntries([['main', part], ['or', part.alt]].map(([name, it]) => [name, {
@@ -960,7 +1142,12 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
         // A part is waiting on handwriting: the question's marks are not final.
         ...(partsOut.some(part => part.pending) ? { pending: true } : {}),
         // The whole question again, or every part of it: nothing on it is new work.
-        ...(isRepeat(q) || (parts.length > 0 && repeatParts === parts.length) ? { repeat: true } : {})
+        ...(whole => ({
+          ...(whole || (parts.length > 0 && repeatParts === parts.length) ? { repeat: true } : {}),
+          // Legacy evidence when the whole-question match is ambiguous, or when
+          // the flag rests on every part and any of those rested on legacy.
+          ...(whole ? evidenceFlag(whole) : (parts.length > 0 && repeatParts === parts.length && legacyParts > 0 ? { repeatEvidence: 'legacy' } : {}))
+        }))(repeatOf(q))
       };
     } else {
       const useAlt = blank(answers[sq.id]) && q.alt && (!blank(answers[`${sq.id}::or`]) || (inked(`${sq.id}::or`) && !inked(sq.id)));
@@ -970,13 +1157,14 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       if (r.pending) pendingKeys.push(key);
       const marks = Number(sq.marking.correct);
       // The question answered (the alternative, when that is the one taken).
-      const repeat = isRepeat(useAlt ? q.alt : q);
+      const evidence = repeatOf(useAlt ? q.alt : q);
+      const repeat = evidence !== null;
       // A blueprint paper leaves a question it never saw an answer to out of
       // the evidence: not attempted is not wrong. A practice paper has always
       // counted a blank as a wrong attempt, and still does.
       // An answer the marker was stopped on is recorded on no paper as an
       // attempt: unreadable is not wrong. Neither is handwriting not yet read.
-      const attemptId = r.unreadable || r.pending || (r.unanswered && paper.kind === 'india') ? null : attempt(sq, chosen, r, { marks, repeat, inputMode: inputMode(key), ms });
+      const attemptId = r.unreadable || r.pending || (r.unanswered && (paper.kind === 'india' || paper.kind === 'nsw')) ? null : attempt(sq, chosen, r, { marks, repeat, ...evidenceFlag(evidence), inputMode: inputMode(key), ms });
       out = {
         ...base, prompt: chosen.prompt, answerType: chosen.answerType, mcqOptions: chosen.mcqOptions || null, matchList: chosen.matchList || null,
         figure: chosen.figure || null, choiceTaken: useAlt ? 'or' : (q.alt ? 'main' : null),
@@ -988,7 +1176,7 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
         // the result carries no solution, no keyed answer, no marking criteria
         // and no distractor explanations for it — nothing to decide by.
         ...(r.pending ? {} : { solution: solutionOf(chosen, marks, sq.marking) }), attemptId,
-        ...(repeat ? { repeat: true } : {}),
+        ...(repeat ? { repeat: true } : {}), ...evidenceFlag(evidence),
         ...cutOffFlags(r),
         // Both questions of an internal choice, now that the paper is marked.
         ...(q.alt && !r.pending ? { choices: Object.fromEntries([['main', q], ['or', q.alt]].map(([name, it]) => [name, {
@@ -1021,6 +1209,26 @@ const EXAM_WINDOW_MS = FREE_EXAM_ALLOWANCE.examWindowDays * DAY_MS;
  * the codes the device's own gate uses (402 FREE_CAP_REACHED / PREMIUM_REQUIRED)
  * so the same paywall copy applies. Reads only; consumes nothing.
  */
+/**
+ * The targets of a targeted paper, from this account's own server-graded
+ * attempts only: due dot points (engine/reviewQueue.js) and unfixed mistakes
+ * (engine/mistakeNotebook.js) — the same pure functions the review queue and
+ * the notebook routes run, over the same events.
+ */
+export async function accountTargets(db, accountId, now) {
+  const rows = await db.all(
+    "SELECT id,occurred_at,payload_json FROM learning_events WHERE account_id=? AND device_id='server-grader' AND kind='graded-attempt' ORDER BY server_cursor DESC LIMIT 4000",
+    [accountId]);
+  const attempts = rows.map(row => { try { return { id: row.id, at: Number(row.occurred_at), ...JSON.parse(row.payload_json) }; } catch { return null; } })
+    .filter(a => a && a.mode !== 'placement' && typeof a.subtopic === 'string' && a.subtopic);
+  const { ratings, reviews } = reviewStateFromAttempts(attempts.map(a => ({
+    subtopic: a.subtopic, dotpoint: a.dotpoint || null, correct: a.correct === true, revealed: a.revealed === true,
+    hintsUsed: rungLevelOf(a.hintLevel), difficulty: Number(a.difficulty) || 2, at: a.at })));
+  const { due } = dueDotpoints({ ratings, reviews, now });
+  const book = buildNotebook(attempts.map(a => ({ ...a, attemptId: a.attemptId || a.id })), { now });
+  return targetsFrom({ due, notebook: book.entries });
+}
+
 async function entitlementRefusal(db, accountId, spec, now) {
   const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
   const capabilities = serverEntitlementCapabilities(snapshot, now);
@@ -1029,6 +1237,10 @@ async function entitlementRefusal(db, accountId, spec, now) {
   if (spec.blueprint?.track === 'jee-advanced' && !capabilities.includes('jee-advanced-content')) {
     return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'jee-advanced-content',
       message: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.' };
+  }
+  if (spec.targeted && !capabilities.includes('premium-exams')) {
+    return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams',
+      message: 'Targeted papers are part of Pri Learning Premium. Board mocks in the usual pattern stay on the free plan.' };
   }
   if (capabilities.includes('premium-exams')) return null;
   const recent = await db.all("SELECT created_at FROM idempotency_keys WHERE account_id=? AND scope='exam-paper' AND created_at>? ORDER BY created_at",
@@ -1134,6 +1346,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     if (stored) return { result: stored };
     const inTime = now <= paper.deadline + FINISH_GRACE_MS;
     if (unattended && inTime) return { open: true };
+    if (!unattended && paper.readingEndsAt && now < paper.readingEndsAt) return READING_TIME;
     let carried = { answers: {}, workings: {}, times: {}, modes: {}, ink: {} };
     if (!unattended) {
       if (!plain(body) || unknown(body, FINISH_FIELDS).length
@@ -1208,13 +1421,22 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     // marked: those items are repeats. Then every item of this paper joins
     // them, because the result below discloses all of its solutions. Read
     // here, under the lock: which items are repeats does not affect any mark,
-    // so it needs no second marking.
-    const contentKeys = paper.questions.flatMap(sq => examItemsOf(sq.payload).flatMap(seenKeysOf));
-    const seen = await seenAmong(db, accountId, contentKeys);
+    // so it needs no second marking. Read under every key an item may hold a
+    // record of (the canonical identity and the keys that predate it); written
+    // below under the canonical key alone.
+    const items = paper.questions.flatMap(sq => examItemsOf(sq.payload));
+    const seen = await seenAmong(db, accountId, items.flatMap(seenKeysOf));
     let next = 0;
     const marked = markPaper(paper, responses, { now, totalMs, seen, mark: () => results[next++] });
     const result = {
-      authoritative: true, examId: id, kind: paper.kind, title: paper.title,
+      authoritative: true, examId: id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL } : {}), title: paper.title,
+      // A targeted paper's score is not a whole-syllabus estimate
+      // (PSYCHOMETRICS_AND_ADAPTIVE_MEASUREMENT.md): it is labelled so nothing
+      // downstream reads it as one.
+      ...targetedFields(paper),
+      // An NSW paper's result names what it is and how it was marked. It holds
+      // no HSC mark, band, ATAR or prediction: none is computed.
+      ...(paper.kind === 'nsw' ? { nsw: nswPublic(paper) } : {}),
       blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion,
       startedAt: paper.startedAt, deadline: paper.deadline, finishedAt: now, serverAcknowledgedAt: now,
       late: !inTime, finalisedBy: inTime ? (body.reason === 'deadline' ? 'deadline' : 'student') : 'deadline',
@@ -1244,14 +1466,14 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
     };
     const json = JSON.stringify(result);
     await db.run(INSERT, [accountId, 'exam-result', id, json, digest(json), now, now + RECORD_TTL]);
-    await markSeen(db, accountId, contentKeys, now);
+    await markSeen(db, accountId, items.map(seenKeyOf), now);
     // Progress is committed in the same transaction as the immutable result.
     const event = await serverEvents(db, accountId, now);
     for (const a of marked.attempts) await event(a.attemptId, 'graded-attempt', a.questionId, a);
     // `exam-result` is a kind only this server writes: /v1/sync/push does not
     // accept it, so no device can publish a paper as server-marked.
     await event(id, 'exam-result', id, {
-      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, title: paper.title, durationMin: paper.durationMin,
+      state: 'finished', examId: id, serverMarked: true, kind: paper.kind, ...(paper.mock ? { mock: true } : {}), ...(paper.targeted ? { targeted: true } : {}), title: paper.title, durationMin: paper.durationMin,
       year: paper.blueprint?.grade ?? paper.paper?.year ?? null,
       score: marked.score, total: marked.total, late: !inTime,
       createdAt: paper.startedAt, finishedAt: now, serverAcknowledgedAt: now,
@@ -1262,7 +1484,8 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
       indiaExam: paper.kind === 'india' ? {
         blueprintId: paper.blueprint.id, label: paper.blueprint.label, track: paper.blueprint.track,
         variant: paper.blueprint.variant, grade: paper.blueprint.grade
-      } : null
+      } : null,
+      ...(paper.kind === 'nsw' ? { nswExam: { blueprintId: paper.blueprint.id, label: NSW_EXAM_LABEL, course: paper.blueprint.course, year: paper.blueprint.year } } : {})
     });
     return { result, written: true };
   }, { accountScope: accountId, lock: syncLockKey(accountId) }); }
@@ -1288,6 +1511,22 @@ const mayAttempt = (page, now, retry) => page.state !== 'resolved' && page.tries
  * handwriting is returned as stored. One with some says so: `provisional`
  * while any page is unresolved, and how many marks are not yet decided.
  */
+/**
+ * Where the time went (engine/examTime.js, plan F10) is Premium's
+ * (premium-exams): added to a result as it is READ, from the entitlement the
+ * server holds now, so it is never stored as a free plan's and appears the
+ * day an account upgrades. The basic section analysis stays on every plan.
+ */
+async function withTimeReport(db, accountId, view, now) {
+  // A paper with no measured times has nothing to report on any plan, and
+  // its result is returned exactly as stored.
+  const report = view && Array.isArray(view.detail) ? timeReport(view.detail) : null;
+  if (!report) return view;
+  const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+  if (!serverEntitlementCapabilities(snapshot, now).includes('premium-exams')) return { ...view, timeReportOffered: true };
+  return { ...view, timeReport: report };
+}
+
 export function resultView(result, now) {
   const handwriting = result?.handwriting;
   if (!handwriting) return result;
@@ -1636,10 +1875,33 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     return res.status(200).json({ blueprint, layoutSeed, accountId: String(accountId) });
   });
 
+  // The targets a targeted paper would lean toward now, for the device to
+  // compose with. Premium only (premium-exams); the server re-derives them at
+  // the seal and writes the key itself.
+  router.get('/targets', rateLimit(db, 'exam-targets', { limit: 120, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+    if (!serverEntitlementCapabilities(snapshot, now).includes('premium-exams')) {
+      return refuseEntitlement(res, { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams',
+        message: 'Targeted papers are part of Pri Learning Premium. Board mocks in the usual pattern stay on the free plan.' });
+    }
+    const targets = await accountTargets(db, accountId, now);
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({ targets, label: TARGETED_LABEL, at: now });
+  });
+
+  // The NSW papers this server lists (plan G4): which are released, what each
+  // covers and lacks. 404 unless this is a Prithagoras server with the switch on.
+  router.get('/nsw', rateLimit(db, 'exam-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    if (bankPolicy().curriculum !== 'nsw' || !nswExamsOn(env)) return reject(res, 404, 'EXAM_KIND_UNAVAILABLE', 'These papers are not available here.');
+    return res.status(200).json(nswExamCatalogue(nswExamPool(), env));
+  });
+
   router.post('/', rateLimit(db, 'exam-create', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const idem = String(req.get('idempotency-key') || '');
     if (!ID.test(idem)) return reject(res, 400, 'IDEMPOTENCY_KEY_REQUIRED', 'Starting a paper needs a stable idempotency key.');
-    const spec = readSpec(req.body);
+    const spec = readSpec(req.body, env);
     if (spec.refused) return reject(res, ...spec.refused);
     const accountId = req.platformSession.account_id;
     const requestDigest = digest(req.body);
@@ -1688,6 +1950,16 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       }
       return reject(res, ...issued.refused);
     }
+    // A targeted paper's key is the server's, from its own records of this
+    // account: a question counts as targeted only when its generator is a
+    // target subtopic now. More than the cap allows is refused, not trimmed.
+    let targeted = null;
+    if (spec.targeted) {
+      const targets = await accountTargets(db, accountId, Date.now());
+      const key = whyTheseQuestions(issued.questions, targets);
+      if (!key.withinCap) return reject(res, 409, 'EXAM_TARGETING_OVER_CAP', `A targeted paper may lean on at most ${key.cap} of its ${key.questions} questions.`);
+      targeted = { key, targets: targets.map(t => ({ subtopic: t.subtopic, reasons: t.reasons })) };
+    }
     const id = randomUUID();
     const startedAt = Date.now();
     const paper = {
@@ -1695,6 +1967,10 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       startedAt, deadline: startedAt + spec.durationMin * 60000,
       blueprint: spec.blueprint || null, paper: spec.paper || null,
       ...(spec.kind === 'india' ? { layoutSeed: spec.layoutSeed } : {}),
+      // Reading time leads the paper; the deadline above already includes it.
+      ...(spec.kind === 'nsw' ? { readingMin: spec.readingMin, readingEndsAt: startedAt + spec.readingMin * 60000 } : {}),
+      ...(spec.mock ? { mock: true } : {}),
+      ...(targeted ? { targeted } : {}),
       total: issued.questions.reduce((n, sq) => n + Number(sq.marks), 0),
       questions: issued.questions
     };
@@ -1751,6 +2027,8 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       if (now > paper.deadline + FINISH_GRACE_MS) {
         return { status: 409, code: 'EXAM_DEADLINE_PASSED', message: 'Time is up on this paper — nothing more can be saved to it.' };
       }
+      // Reading time: the paper may be read, nothing may be written to it.
+      if (paper.readingEndsAt && now < paper.readingEndsAt) return READING_TIME;
       const prior = await read(accountId, 'exam-answers', id, now);
       const timing = { now, deadline: paper.deadline, remainingMs: Math.max(0, paper.deadline - now) };
       // A retried older save must never replace a newer one.
@@ -1782,7 +2060,8 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     if (outcome.status === 404) return notFound(res);
     if (outcome.status === 503) res.set('Retry-After', '2');
     if (outcome.status) return reject(res, outcome.status, outcome.code, outcome.message);
-    return res.status(200).json(resultView(outcome.result, Date.now()));
+    const now = Date.now();
+    return res.status(200).json(await withTimeReport(db, accountId, resultView(outcome.result, now), now));
   });
 
   // One page of handwriting that was frozen, unread, when the paper closed.
@@ -1798,7 +2077,7 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     });
     if (outcome.status === 404) return notFound(res);
     if (outcome.status) return reject(res, outcome.status, outcome.code, outcome.message);
-    return res.status(200).json({ result: outcome.result, attempted: outcome.attempted === true, ...(outcome.retryAt ? { retryAt: outcome.retryAt } : {}) });
+    return res.status(200).json({ result: await withTimeReport(db, accountId, outcome.result, Date.now()), attempted: outcome.attempted === true, ...(outcome.retryAt ? { retryAt: outcome.retryAt } : {}) });
   });
 
   router.get('/:id', rateLimit(db, 'exam-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
@@ -1813,7 +2092,7 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     if (!paper) return notFound(res);
     const result = await read(accountId, 'exam-result', id, now);
     const exam = publicPaper(paper, now);
-    if (result) return res.status(200).json({ state: 'finished', exam, result: resultView(result, now), accountId: String(accountId) });
+    if (result) return res.status(200).json({ state: 'finished', exam, result: await withTimeReport(db, accountId, resultView(result, now), now), accountId: String(accountId) });
     const snapshot = await read(accountId, 'exam-answers', id, now);
     return res.status(200).json({
       state: 'open', exam, snapshot: snapshot || null,

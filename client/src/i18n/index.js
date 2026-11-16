@@ -34,6 +34,7 @@
 import { Fragment, createElement, useMemo, useSyncExternalStore } from 'react';
 import en from './strings.en.js';
 import { DEFAULT_LANGUAGE, LANGUAGES, cleanLanguage, htmlLangOf, pluralCategory } from './languages.js';
+import { brandVars } from '../brand/edition.js';
 
 export { LANGUAGES, DEFAULT_LANGUAGE, cleanLanguage, pluralCategory, speechTagsOf } from './languages.js';
 
@@ -112,10 +113,13 @@ export function setLanguage(raw) {
 
 const PLACEHOLDER = /\{(\w+)\}/g;
 
-function fill(template, vars) {
-  if (!vars) return template;
+// {brand} and {company} resolve in every string without each call passing them:
+// the edition's name (प्रियभट in Hindi where the edition has one) and the
+// company's (client/src/brand/edition.js, plan E4). A caller's own vars win.
+function fill(template, vars, language) {
+  const all = { ...brandVars(language), ...vars };
   return template.replace(PLACEHOLDER, (whole, name) => (
-    Object.prototype.hasOwnProperty.call(vars, name) ? String(vars[name]) : whole
+    Object.prototype.hasOwnProperty.call(all, name) ? String(all[name]) : whole
   ));
 }
 
@@ -143,7 +147,7 @@ function select(strings, key, vars, language) {
   return typeof form === 'string' ? form : key;
 }
 
-const lookup = (strings, key, vars, language) => fill(select(strings, key, vars, language), vars);
+const lookup = (strings, key, vars, language) => fill(select(strings, key, vars, language), vars, language);
 
 /**
  * Translate outside a component — a module-scope constant, an event handler
@@ -219,10 +223,13 @@ export function useTx() {
     // fallback still happen, but the placeholders are left standing so the
     // split below can put a React node where one of them was.
     const text = select(store.strings, key, vars, store.language);
+    // {brand} and {company} are ambient here too, exactly as in fill(): the
+    // caller's own vars win (plan E4).
+    const all = { ...brandVars(store.language), ...vars };
     const parts = String(text).split(/(\{\w+\})/g).map((piece, i) => {
       const name = /^\{(\w+)\}$/.exec(piece)?.[1];
-      if (!name || !vars || !Object.prototype.hasOwnProperty.call(vars, name)) return piece;
-      const value = vars[name];
+      if (!name || !Object.prototype.hasOwnProperty.call(all, name)) return piece;
+      const value = all[name];
       return typeof value === 'object' && value !== null
         ? createElement(Fragment, { key: i }, value)
         : String(value);

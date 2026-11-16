@@ -59,7 +59,13 @@ const ENV = {
   // browser, by tour-free-cap.js — which boots this platform with the default
   // (`env: { PRI_FREE_PRACTICE_PER_DAY: null }`). Every other flow runs with
   // the cap raised by configuration so it is never read as a fault.
-  PRI_FREE_PRACTICE_PER_DAY: '100000'
+  PRI_FREE_PRACTICE_PER_DAY: '100000',
+  // Likewise the per-account read allowance (D20 defaults: 5 reads and 5
+  // question photos a day on the free plan), proved at its defaults by
+  // server/test/premium-authority-check.mjs: a flow that reads one account's
+  // writing more than five times is not a flow about the allowance.
+  PRI_AI_DAILY_FREE: '100000',
+  PRI_AI_DAILY_PREMIUM: '100000'
 };
 // PRI_PUBLIC_ORIGIN is cleared: outside production the server then accepts the
 // page's own origin, which is this server's ephemeral loopback port.
@@ -136,6 +142,11 @@ export async function startOnlinePlatform({ dist = DIST, env = {}, allowSeededPr
   const { createPlatformDb } = await import('../../../server/platform/db.js');
   const sms = await import('../../../server/platform/smsProvider.js');
   const db = createPlatformDb(join(dir, 'platform.sqlite'));
+  // D15: this platform is the production server, and it issues only the
+  // India covers' banks (server/platform/indiaBanks.js). The browser suites
+  // sign every student up on the India course (support/verified-onboarding.mjs),
+  // so nothing here allows another bank; tour-online-check.js proves an NSW
+  // bank is refused through this harness.
   const h = await harness.startApp({ db, dist });
 
   /**
@@ -413,6 +424,24 @@ function onlineSession(platform, ctx, page) {
   }));
 
   /**
+   * The server's sealed record of the question on screen, read at the test's
+   * desk: { serverQuestionId, accountId, generator } for a question the server
+   * issued, null for one it only prepared (or a draft). Practice resumes an
+   * unfinished question of the chapter it is asked for — the first one issued
+   * right after sign-in included, whichever of the chapter's generators that
+   * was drawn from — so a flow that needs a particular generator asks this
+   * rather than assuming a fresh question.
+   */
+  async function issuedShown() {
+    const shown = await shownRow();
+    if (!shown?.serverQuestionId) return null;
+    const sealed = platform.h.db.prepare("SELECT account_id, response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?").get(shown.serverQuestionId);
+    if (!sealed) return null;
+    const q = JSON.parse(sealed.response_json);
+    return { serverQuestionId: shown.serverQuestionId, accountId: String(sealed.account_id), generator: typeof q._generator === 'string' ? q._generator : (q.subtopic ?? null) };
+  }
+
+  /**
    * The right answer to the question on screen, read at the test's desk from
    * the server's own sealed copy of the question it issued. Returns
    * { answerType, kind, text, index, prompt, serverQuestionId }; `kind` is
@@ -431,7 +460,7 @@ function onlineSession(platform, ctx, page) {
     if (shown.prompt !== null && q.prompt !== shown.prompt) {
       throw new Error('online-session: the server\'s sealed question is not the one on screen — the oracle refuses to guess');
     }
-    return { answerType: q.answerType, prompt: q.prompt, serverQuestionId: shown.serverQuestionId, accountId: String(sealed.account_id), ...typedAnswerOf(q) };
+    return { answerType: q.answerType, answerPrefix: q.answerPrefix ?? null, prompt: q.prompt, serverQuestionId: shown.serverQuestionId, accountId: String(sealed.account_id), ...typedAnswerOf(q) };
   }
 
   // ── Exam papers: the server's sealed paper and its stored result ───────────
@@ -503,7 +532,7 @@ function onlineSession(platform, ctx, page) {
 
   const session = {
     platform, origin: platform.origin, reader: platform.reader, sms: platform.sms, calls, account: null,
-    settled, practiceCalls, examServerId, examAnswers, examResult, signIn, signInHere, linkedAccounts, shownRow, answerOf, disconnect, reconnect,
+    settled, practiceCalls, examServerId, examAnswers, examResult, signIn, signInHere, linkedAccounts, shownRow, issuedShown, answerOf, disconnect, reconnect,
     ledger: (serverQuestionId = null) => platform.ledger(session.account?.id, serverQuestionId),
     /** Test desk only: the stand-in reader was re-scripted — forget this account's kept reads. */
     forgetKeptReads: () => platform.forgetKeptReads(session.account?.id),

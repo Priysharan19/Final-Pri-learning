@@ -115,7 +115,7 @@ try {
   });
   c.eq(child.status, 201, 'a child registers with a guardian');
   const consentToken = await deliveryToken(child.data.account.id, 'guardian-consent');
-  const consentResults = await at(ATTEMPTS, () => h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: consentToken } }));
+  const consentResults = await at(ATTEMPTS, () => h.request('/v1/account/guardian/confirm', { method: 'POST', body: { token: consentToken, approve: true, noticeVersion: '2026-10-22' } }));
   c.eq(consentResults.filter(r => r.status === 200).length, 1, `exactly one of ${ATTEMPTS} concurrent guardian confirmations is accepted`);
   c.eq(consentResults.find(r => r.status === 200)?.data?.confirmed, true, 'and it is the one that confirmed');
   c.eq(await count('SELECT COUNT(*) AS n FROM guardian_consents WHERE account_id=? AND confirmed_at IS NOT NULL', [child.data.account.id]), 1, 'consent is recorded once');

@@ -69,7 +69,13 @@ export const flow = {
     await page.locator('[data-final-answer]').fill(BAD);
     const work = page.locator('[data-typed-working]');
     await work.waitFor({ state: 'visible', timeout: 10000 });
+    // Focus the Working box itself before filling: WebKit's fill inserts into
+    // whatever holds focus, and on Linux WebKit the lines landed in the final
+    // answer (CI screenshot). Both fields are then held to what was written.
+    await work.click();
     await work.fill(ELIMINATION);
+    const fields = { answer: await page.locator('[data-final-answer]').inputValue(), working: await work.inputValue() };
+    if (!await check('the final answer and the working are each in their own field', fields.answer === BAD && fields.working === ELIMINATION, JSON.stringify(fields))) return;
 
     // Inject a *forged browser-only presentation field* into the real first
     // unRESOLVED response. It must not appear as a marks panel, regardless of
@@ -171,7 +177,11 @@ export const flow = {
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
   const { onlinePlatform } = await import('./support/online-session.mjs');
   // The preselected seed is accepted ONLY by the test server, never deployed.
-  await onlinePlatform({ allowSeededPractice: true });
+  // This tour checks how method credit is DISPLAYED, so its test server runs
+  // the method-mark pilot (D12: PRI_METHOD_MARKS=on), as the server method
+  // suites do. Production's default — final answer only, 0 method marks — is
+  // pinned by server/test/marking-policy-check.mjs.
+  await onlinePlatform({ allowSeededPractice: true, env: { PRI_METHOD_MARKS: 'on' } });
   const { runOne } = await import('./e2e.mjs');
   process.exit(await runOne(flow) ? 1 : 0);
 }

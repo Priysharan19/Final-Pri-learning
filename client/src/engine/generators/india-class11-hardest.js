@@ -37,7 +37,7 @@
 //
 // Asked for any rung other than D3, each generator returns its D3 form.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, gcd, makeRng } from '../qhelpers.js';
+import { ri, rc, nz, gcd, makeRng, term } from '../qhelpers.js';
 import { IN_NAMES, IN_CITIES } from './india-native-helpers.js';
 import { traps, numericAnswer, pick, texNum } from './india-class7-hardest-kit.js';
 
@@ -375,7 +375,7 @@ function complexModulus(rng) {
         ],
         steps: [
           { h: 'Substitute', d: `$${p}(x + iy) + ${q}(x - iy) = ${p + q}x ${p - q < 0 ? '-' : '+'} ${Math.abs(p - q)}iy$` },
-          { h: 'Compare', d: `$${p + q}x = ${u}$ and $${p - q}y = ${v}$, so $x = ${x}$, $y = ${y}$` },
+          { h: 'Compare', d: `$${term(p + q)} = ${u}$ and $${term(p - q, 'y')} = ${v}$, so $x = ${x}$, $y = ${y}$` },
           { h: 'Answer', d: ask === 'mod' ? `$|z|^2 = ${x * x} + ${y * y} = ${answer}$` : `$x + y = ${answer}$` }
         ]
       };
@@ -825,11 +825,11 @@ function limitReasoning(rng) {
       traps: traps(N / D, form === 'sum' ? [{ value: p * q / r, why: 'The two limits ADD; they do not multiply.' }, { value: (p + q) * r, why: 'The $' + r + '$ is in the denominator.' }] : [{ value: p * p / r, why: '$1 - \\cos px = 2\\sin^2 \\dfrac{px}{2}$ — the half-angle brings a factor $\\dfrac{1}{2}$.' }, { value: p / (2 * r), why: 'The angle is squared in the limit: $\\left(\\dfrac{p}{2}\\right)^2 \\times 2$.' }]),
       hints: form === 'sum' ? ['Split the fraction into two limits.', 'Use $\\displaystyle\\lim_{x \\to 0} \\dfrac{\\sin kx}{x} = k$ and $\\displaystyle\\lim_{x \\to 0} \\dfrac{\\tan kx}{x} = k$.', 'Add the two limits and divide by the constant in the denominator.'] : ['Write $1 - \\cos px = 2\\sin^2 \\dfrac{px}{2}$.', 'Use $\\displaystyle\\lim_{x \\to 0} \\dfrac{\\sin kx}{kx} = 1$ on the squared sine.', 'Collect the constants carefully.'],
       steps: form === 'sum' ? [
-        { h: 'Split', d: `$\\dfrac{1}{${r}}\\left(\\dfrac{\\sin ${p}x}{x} + \\dfrac{\\tan ${q}x}{x}\\right)$` },
+        { h: 'Split', d: `$\\dfrac{1}{${r}}\\left(\\dfrac{\\sin ${term(p)}}{x} + \\dfrac{\\tan ${term(q)}}{x}\\right)$` },
         { h: 'Standard limits', d: `$\\dfrac{1}{${r}}(${p} + ${q})$` },
         { h: 'Answer', d: `$${ratText(N, D)}$` }
       ] : [
-        { h: 'Half-angle', d: `$\\dfrac{2\\sin^2 (${p}x/2)}{${r}x^2}$` },
+        { h: 'Half-angle', d: `$\\dfrac{2\\sin^2 (${term(p)}/2)}{${r}x^2}$` },
         { h: 'Standard limit', d: `$\\dfrac{2}{${r}} \\times \\left(\\dfrac{${p}}{2}\\right)^2$` },
         { h: 'Answer', d: `$${ratText(N, D)}$` }
       ]
@@ -871,8 +871,8 @@ function derivativeRules(rng) {
         traps: traps(val, [{ value: 2 * t * q, why: 'The derivative of a product is not the product of the derivatives.' }, { value: 2 * t * (q * t + r), why: 'The product rule has two terms: $u\'v + uv\'$.' }]),
         hints: ['For $f = uv$, $f\' = u\'v + uv\'$.', 'Differentiate each factor separately.', 'Substitute the value of $x$ into both terms and add.'],
         steps: [
-          { h: 'Product rule', d: `$f'(x) = 2x(${polyTex([q, r])}) + ${q}(${polyTex([1, 0, p])})$` },
-          { h: 'Substitute', d: `$f'(${t}) = ${2 * t * (q * t + r)} + ${q * (t * t + p)}$` },
+          { h: 'Product rule', d: `$f'(x) = 2x(${polyTex([q, r])}) ${q === 1 ? '+ ' : q === -1 ? '- ' : sg(q)}(${polyTex([1, 0, p])})$` },
+          { h: 'Substitute', d: `$f'(${t}) = ${2 * t * (q * t + r)} ${sg(q * (t * t + p))}$` },
           { h: 'Answer', d: `$${val}$` }
         ]
       };
@@ -888,8 +888,8 @@ function derivativeRules(rng) {
       hints: ['Differentiate with the product rule, keeping $k$ as a letter.', 'Substitute the given value of $x$: you get a linear expression in $k$.', 'Set it equal to the given value of the derivative and solve.'],
       steps: [
         { h: 'Product rule', d: `$f'(x) = (2x + k)(${polyTex([1, m])}) + (x^2 + kx)$` },
-        { h: 'Substitute', d: `$f'(${t}) = ${2 * t + m}k + ${2 * t * (t + m) + t * t}$` },
-        { h: 'Solve', d: `$${2 * t + m}k = ${K - 2 * t * (t + m) - t * t}$` },
+        { h: 'Substitute', d: `$f'(${t}) = ${term(2 * t + m, 'k')}${2 * t * (t + m) + t * t === 0 ? '' : ` ${sg(2 * t * (t + m) + t * t)}`}$` },
+        { h: 'Solve', d: `$${term(2 * t + m, 'k')} = ${K - 2 * t * (t + m) - t * t}$` },
         { h: 'Answer', d: `$k = ${k}$` }
       ]
     };

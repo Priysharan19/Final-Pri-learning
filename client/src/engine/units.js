@@ -8,14 +8,16 @@
 
 // canonical spelling ← the ways it is written (lower-cased, spaces collapsed)
 const SPELLINGS = {
-  mm: ['mm', 'millimetre', 'millimetres', 'millimeter', 'millimeters'],
-  cm: ['cm', 'centimetre', 'centimetres', 'centimeter', 'centimeters'],
-  m: ['m', 'metre', 'metres', 'meter', 'meters', 'mtr', 'mtrs'],
+  // D14: the right unit in any spelling passes, including the plurals and
+  // short forms Indian classrooms write ("12 cms", "5 gms", "2 ltrs", "60 kmph").
+  mm: ['mm', 'mms', 'millimetre', 'millimetres', 'millimeter', 'millimeters'],
+  cm: ['cm', 'cms', 'centimetre', 'centimetres', 'centimeter', 'centimeters'],
+  m: ['m', 'metre', 'metres', 'meter', 'meters', 'mtr', 'mtrs', 'mts'],
   km: ['km', 'kilometre', 'kilometres', 'kilometer', 'kilometers', 'kms'],
-  g: ['g', 'gm', 'gram', 'grams'],
+  g: ['g', 'gm', 'gms', 'gram', 'grams'],
   kg: ['kg', 'kgs', 'kilogram', 'kilograms'],
-  ml: ['ml', 'millilitre', 'millilitres', 'milliliter', 'milliliters'],
-  l: ['l', 'litre', 'litres', 'liter', 'liters', 'ltr'],
+  ml: ['ml', 'mls', 'millilitre', 'millilitres', 'milliliter', 'milliliters'],
+  l: ['l', 'litre', 'litres', 'liter', 'liters', 'ltr', 'ltrs'],
   s: ['s', 'sec', 'secs', 'second', 'seconds'],
   min: ['min', 'mins', 'minute', 'minutes'],
   h: ['h', 'hr', 'hrs', 'hour', 'hours'],
@@ -23,6 +25,9 @@ const SPELLINGS = {
 };
 const CANON = new Map();
 for (const [c, list] of Object.entries(SPELLINGS)) for (const w of list) CANON.set(w, c);
+// Whole-unit spellings that are not a base unit with a power or a rate written
+// out: "kmph" is km/h, "cc" is cm³.
+const WHOLE = new Map([['kmph', 'km/h'], ['kmhr', 'km/h'], ['cc', 'cm³']]);
 const POWER = { '²': '²', '2': '²', '^2': '²', '³': '³', '3': '³', '^3': '³' };
 
 /**
@@ -33,6 +38,7 @@ export function canonicalUnit(raw) {
   let s = String(raw ?? '').toLowerCase().replace(/\s+/g, ' ').replace(/\.(?=\s|$)/g, '').trim();
   if (!s) return null;
   if (s === '°') return '°';
+  if (WHOLE.has(s)) return WHOLE.get(s);
   // a rate: km/h, m/s, m/s²
   const rate = s.split(/\s*(?:\/|\bper\b)\s*/);
   if (rate.length === 2) {
@@ -40,7 +46,8 @@ export function canonicalUnit(raw) {
     return a && b ? `${a}/${b}` : null;
   }
   let power = '';
-  const sq = s.match(/^(?:square|sq)\s*(.+)$/), cu = s.match(/^(?:cubic|cu)\s*(.+)$/);
+  // "sq cm", "sq. cm" and "sq.cm" alike.
+  const sq = s.match(/^(?:square|sq)\.?\s*(.+)$/), cu = s.match(/^(?:cubic|cu)\.?\s*(.+)$/);
   if (sq) { power = '²'; s = sq[1]; } else if (cu) { power = '³'; s = cu[1]; }
   const tail = s.match(/^(.*?)\s*(\^?[23]|[²³])$/);
   if (tail && !power) { power = POWER[tail[2]]; s = tail[1]; }
@@ -50,6 +57,7 @@ export function canonicalUnit(raw) {
 }
 
 /** The dimension a canonical unit measures, so km and m compare as lengths. */
+export function unitDimension(c) { return dimension(c); }
 function dimension(c) {
   if (!c) return null;
   if (c.includes('/')) return `rate:${c.split('/').map(dimension).join('/')}`;
@@ -166,6 +174,57 @@ export function unitContradicts(expectedSuffix, answerText) {
   // "square units" accepts any area unit and "units" any length unit
   if (/^units/.test(want)) return dimension(want) !== dimension(got);
   return true;
+}
+
+/**
+ * Every unit a question's wording names, in any spelling: "8 cm by 4 cm",
+ * "in cm²", "\\text{ km/h}", "square centimetres", "3 s per lap". Read word by
+ * word (windows of one to three words), so a unit counts with or without a
+ * number before it. Returns a Set of canonical units.
+ */
+export function unitsNamed(text) {
+  const words = String(text ?? '')
+    .replace(/\$/g, ' ')
+    .replace(/\\(?:text|mathrm|operatorname)\s*\{([^{}]*)\}/g, ' $1 ')
+    .replace(/\^\{?([23])\}?/g, '^$1')
+    .replace(/\\[,;! ]/g, ' ')
+    .replace(/[(),.;:?!]/g, ' ')
+    .split(/\s+/).filter(Boolean);
+  const named = new Set();
+  for (let i = 0; i < words.length; i++) {
+    for (let k = 1; k <= 3 && i + k <= words.length; k++) {
+      const c = canonicalUnit(words.slice(i, i + k).join(' '));
+      if (c) named.add(c);
+    }
+  }
+  return named;
+}
+
+/**
+ * The units a question STATES a quantity in: after a number ("8 cm by 4 cm",
+ * "12.5 m²", "for 2 seconds") or after "in" / "per" ("in cm²", "per hour").
+ * Unlike unitsNamed, a letter that is a function or a point ("g(x)", "∠M") or
+ * an ordinal ("the second term") states no unit. Returns canonical units.
+ */
+export function unitsStated(text) {
+  const words = String(text ?? '')
+    .replace(/\$/g, ' ')
+    .replace(/\\(?:text|mathrm|operatorname)\s*\{([^{}]*)\}/g, ' $1 ')
+    .replace(/\^\{?([23])\}?/g, '^$1')
+    .replace(/\\[,;! ]/g, ' ')
+    .replace(/(\d)([a-zA-Z°])/g, '$1 $2')
+    .replace(/[(),;:?!]/g, ' ')
+    .replace(/\.(?=\s|$)/g, ' ')
+    .split(/\s+/).filter(Boolean);
+  const stated = new Set();
+  for (let i = 1; i < words.length; i++) {
+    if (!/^[-+]?\d[\d.,]*$/.test(words[i - 1]) && !/^(?:in|per)$/i.test(words[i - 1])) continue;
+    for (let k = 1; k <= 3 && i + k <= words.length; k++) {
+      const c = canonicalUnit(words.slice(i, i + k).join(' '));
+      if (c) stated.add(c);
+    }
+  }
+  return stated;
 }
 
 /** Is the question's unit written, as a whole unit, anywhere in the text? */

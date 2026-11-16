@@ -10,7 +10,10 @@
 // Same contract as every other bank: (rng, diff) → a question payload whose own
 // keyed answer passes the real marker, at all four difficulties.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, rs, nz, mcq, gcd } from '../qhelpers.js';
+import { ri, rc, rs, nz, mcq, gcd, term, sgn } from '../qhelpers.js';
+
+// A negative entry written after a + or - keeps its own brackets: - (-2), + (-4).
+const pn = v => (v < 0 ? `(${v})` : `${v}`);
 
 const fact = n => (n <= 1 ? 1 : n * fact(n - 1));
 const nCr = (n, r) => (r < 0 || r > n ? 0 : Math.round(fact(n) / (fact(r) * fact(n - r))));
@@ -369,12 +372,13 @@ export const indiaAlgebra = {
       ].filter(t => t.value !== value),
       hints: [
         `$T_{r+1} = \\binom{${n}}{r}\\left(${pw('x', p)}\\right)^{${n}-r}\\left(\\dfrac{${a}}{${pw('x', q)}}\\right)^{r}$.`,
-        `Collect the powers of x: $x^{${p}(${n}-r) - ${q}r}$.`,
-        `Independent of x means that exponent is zero: $${p}(${n} - r) = ${q}r$.`
+        // A power of 1 on x is not written: x^{(4-r) - r}, not x^{1(4-r) - 1r}.
+        `Collect the powers of x: $x^{${p === 1 ? '' : p}(${n}-r) - ${q === 1 ? '' : q}r}$.`,
+        `Independent of x means that exponent is zero: $${p === 1 ? `${n} - r` : `${p}(${n} - r)`} = ${q === 1 ? '' : q}r$.`
       ],
       steps: [
-        { h: 'General term', d: `$T_{r+1} = \\binom{${n}}{r} x^{${p}(${n}-r)} \\cdot \\dfrac{${a}^{r}}{x^{${q}r}}$` },
-        { h: 'Set the exponent to zero', d: `$${p}(${n} - r) - ${q}r = 0 \\Rightarrow r = ${r}$` },
+        { h: 'General term', d: `$T_{r+1} = \\binom{${n}}{r} x^{${p === 1 ? `${n}-r` : `${p}(${n}-r)`}} \\cdot \\dfrac{${a}^{r}}{x^{${q === 1 ? '' : q}r}}$` },
+        { h: 'Set the exponent to zero', d: `$${p === 1 ? `${n} - r` : `${p}(${n} - r)`} - ${q === 1 ? '' : q}r = 0 \\Rightarrow r = ${r}$` },
         { h: 'Evaluate that term', d: `$\\binom{${n}}{${r}} \\times ${a}^{${r}} = ${nCr(n, r)} \\times ${Math.pow(a, r)} = ${value}$` }
       ]
     };
@@ -389,18 +393,19 @@ export const indiaAlgebra = {
       const pos = ri(rng, 0, 3);
       const NAME = ['a_{11}', 'a_{12}', 'a_{21}', 'a_{22}'][pos];
       const value = A[pos] + k * B[pos];
+      const kB = `${k === 1 ? '' : k === -1 ? '-' : k}B`;
       return {
-        prompt: `Let $A = ${M2(A[0], A[1], A[2], A[3])}$ and $B = ${M2(B[0], B[1], B[2], B[3])}$. Find the entry $${NAME}$ of $A ${k >= 0 ? '+' : '-'} ${Math.abs(k)}B$.`,
+        prompt: `Let $A = ${M2(A[0], A[1], A[2], A[3])}$ and $B = ${M2(B[0], B[1], B[2], B[3])}$. Find the entry $${NAME}$ of $A ${k >= 0 ? '+' : '-'} ${Math.abs(k) === 1 ? '' : Math.abs(k)}B$.`,
         answerType: 'numeric', answer: { value },
         traps: [{ value: A[pos] + B[pos], why: `Every entry of $B$ is multiplied by $${k}$ before it is added.` }].filter(t => t.value !== value),
         hints: [
           'Matrices of the same order are added entry by entry.',
-          `A scalar multiplies every entry, so $${k}B$ has entry $${k} \\times ${B[pos]}$ in that position.`,
+          `A scalar multiplies every entry, so $${kB}$ has entry $${k} \\times ${B[pos]}$ in that position.`,
           `$${A[pos]} + (${k})(${B[pos]})$.`
         ],
         steps: [
-          { h: 'Scalar first', d: `The entry of $${k}B$ in that position is $${k} \\times ${B[pos]} = ${k * B[pos]}$` },
-          { h: 'Then add entrywise', d: `$${A[pos]} + ${k * B[pos]}$` },
+          { h: 'Scalar first', d: `The entry of $${kB}$ in that position is $${k} \\times ${B[pos]} = ${k * B[pos]}$` },
+          { h: 'Then add entrywise', d: `$${A[pos]} ${k * B[pos] < 0 ? '-' : '+'} ${Math.abs(k * B[pos])}$` },
           { h: 'Answer', d: `$= ${value}$` }
         ]
       };
@@ -418,7 +423,7 @@ export const indiaAlgebra = {
         hints: [
           `The $(${i + 1},${j + 1})$ entry of $AB$ is row $${i + 1}$ of $A$ against column $${j + 1}$ of $B$.`,
           `Row $${i + 1}$ of $A$ is $(${A[i * 2]},\\ ${A[i * 2 + 1]})$; column $${j + 1}$ of $B$ is $(${B[j]},\\ ${B[2 + j]})$.`,
-          `Multiply matching entries and add: $${A[i * 2]}\\times${B[j]} + ${A[i * 2 + 1]}\\times${B[2 + j]}$.`
+          `Multiply matching entries and add: $${A[i * 2]}\\times${pn(B[j])} + ${pn(A[i * 2 + 1])}\\times${pn(B[2 + j])}$.`
         ],
         steps: [
           { h: 'Row against column', d: `Row $${i + 1}$ of $A$ is $(${A[i * 2]},\\ ${A[i * 2 + 1]})$, column $${j + 1}$ of $B$ is $(${B[j]},\\ ${B[2 + j]})$` },
@@ -522,8 +527,8 @@ export const indiaAlgebra = {
           'Each minor is the $2\\times2$ determinant left after deleting that entry’s row and column.'
         ],
         steps: [
-          { h: 'Expand along row 1', d: `$= ${m[0][0]}\\begin{vmatrix} ${m[1][1]} & ${m[1][2]} \\\\ ${m[2][1]} & ${m[2][2]} \\end{vmatrix} - ${m[0][1]}\\begin{vmatrix} ${m[1][0]} & ${m[1][2]} \\\\ ${m[2][0]} & ${m[2][2]} \\end{vmatrix} + ${m[0][2]}\\begin{vmatrix} ${m[1][0]} & ${m[1][1]} \\\\ ${m[2][0]} & ${m[2][1]} \\end{vmatrix}$` },
-          { h: 'Evaluate the minors', d: `$= ${m[0][0]}(${det2(m[1][1], m[1][2], m[2][1], m[2][2])}) - ${m[0][1]}(${det2(m[1][0], m[1][2], m[2][0], m[2][2])}) + ${m[0][2]}(${det2(m[1][0], m[1][1], m[2][0], m[2][1])})$` },
+          { h: 'Expand along row 1', d: `$= ${m[0][0]}\\begin{vmatrix} ${m[1][1]} & ${m[1][2]} \\\\ ${m[2][1]} & ${m[2][2]} \\end{vmatrix} - ${pn(m[0][1])}\\begin{vmatrix} ${m[1][0]} & ${m[1][2]} \\\\ ${m[2][0]} & ${m[2][2]} \\end{vmatrix} + ${pn(m[0][2])}\\begin{vmatrix} ${m[1][0]} & ${m[1][1]} \\\\ ${m[2][0]} & ${m[2][1]} \\end{vmatrix}$` },
+          { h: 'Evaluate the minors', d: `$= ${m[0][0]}(${det2(m[1][1], m[1][2], m[2][1], m[2][2])}) - ${pn(m[0][1])}(${det2(m[1][0], m[1][2], m[2][0], m[2][2])}) + ${pn(m[0][2])}(${det2(m[1][0], m[1][1], m[2][0], m[2][1])})$` },
           { h: 'Answer', d: `$= ${value}$` }
         ]
       };
@@ -544,12 +549,12 @@ export const indiaAlgebra = {
         traps: [{ value: -sol, why: `Expanding gives $${dd}x - (${bb})(${cc}) = 0$, so $x = \\dfrac{(${bb})(${cc})}{${dd}}$ — check the sign.` }].filter(t => t.value !== sol),
         hints: [
           'Expand the determinant first, then set it equal to zero.',
-          `$${dd}x - (${bb})(${cc}) = 0$.`,
-          `So $${dd}x = ${bb * cc}$.`
+          `$${term(dd)} - (${bb})(${cc}) = 0$.`,
+          `So $${term(dd)} = ${bb * cc}$.`
         ],
         steps: [
-          { h: 'Expand', d: `$x(${dd}) - (${bb})(${cc}) = ${dd}x - ${bb * cc}$` },
-          { h: 'Set to zero', d: `$${dd}x = ${bb * cc}$` },
+          { h: 'Expand', d: `$x(${dd}) - (${bb})(${cc}) = ${term(dd)} ${sgn(-bb * cc)}$` },
+          { h: 'Set to zero', d: `$${term(dd)} = ${bb * cc}$` },
           { h: 'Solve', d: `$x = ${sol}$` }
         ]
       };
@@ -573,7 +578,7 @@ export const indiaAlgebra = {
         ],
         steps: [
           { h: 'The determinant form', d: `$2\\,\\text{Area} = \\left|\\,${D3([[x1, y1, 1], [x2, y2, 1], [x3, y3, 1]])}\\,\\right|$` },
-          { h: 'Expand', d: `$= |${x1}(${y2} - ${y3}) + ${x2}(${y3} - ${y1}) + ${x3}(${y1} - ${y2})|$` },
+          { h: 'Expand', d: `$= |${x1}(${y2} - ${pn(y3)}) ${sgn(x2)}(${y3} - ${pn(y1)}) ${sgn(x3)}(${y1} - ${pn(y2)})|$` },
           { h: 'Answer', d: `$= ${area2}$` }
         ]
       };
@@ -590,7 +595,7 @@ export const indiaAlgebra = {
       ],
       steps: [
         { h: 'The determinant form', d: `$\\text{Area} = \\dfrac{1}{2}\\left|\\,${D3([[x1, y1, 1], [x2, y2, 1], [x3, y3, 1]])}\\,\\right|$` },
-        { h: 'Expand', d: `$= \\dfrac{1}{2}|${x1}(${y2} - ${y3}) + ${x2}(${y3} - ${y1}) + ${x3}(${y1} - ${y2})| = \\dfrac{1}{2}|${twice}|$` },
+        { h: 'Expand', d: `$= \\dfrac{1}{2}|${x1}(${y2} - ${pn(y3)}) ${sgn(x2)}(${y3} - ${pn(y1)}) ${sgn(x3)}(${y1} - ${pn(y2)})| = \\dfrac{1}{2}|${twice}|$` },
         { h: 'Answer', d: `$= ${area}$ square units` }
       ]
     };

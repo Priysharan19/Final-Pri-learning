@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import InkAnswer from '../ink/InkAnswer.jsx';
-import { nativeInk, nativeInkAvailable } from '../ink/native.js';
+import { nativeInkAvailable } from '../ink/native.js';
 import { downloadJSON } from '../lib/files.js';
 import {
+  BUILD_KINDS,
   REAL_PENCIL_PROMPTS,
+  SERVERS,
   assignedEvidenceSplit,
   buildCorpusFromPhysicalRun,
   buildPhysicalEvidenceRun,
@@ -13,7 +15,7 @@ import {
   productionAuthorityOf
 } from '../ink/productionEvidence.js';
 
-const STORAGE = 'pri-ink-physical-evidence-setup-v1';
+const STORAGE = 'pri-ink-physical-evidence-setup-v2';
 
 function savedSetup() {
   try { return JSON.parse(localStorage.getItem(STORAGE) || '{}'); }
@@ -34,6 +36,15 @@ function shareJson(filename, value) {
   return downloadJSON(value, filename);
 }
 
+/**
+ * Hidden physical-study route (/practice?inkEvidence=1). It mounts the real
+ * InkAnswer: the PencilKit surface, the production picture and the SERVER
+ * reader, read when the writer presses "Read my answer". The reading, the
+ * card's confirmation decision and the round trip InkAnswer itself measured
+ * (readMs) are what get recorded. Nothing here times, calls or substitutes a
+ * reader of its own, so this route cannot change ordinary Practice behaviour
+ * and cannot record a latency the student would not have waited.
+ */
 export default function InkPhysicalEvidenceSession() {
   const nativeAvailable = nativeInkAvailable();
   const initial = useMemo(savedSetup, []);
@@ -44,6 +55,8 @@ export default function InkPhysicalEvidenceSession() {
     pencil: initial.pencil || '',
     buildCommit: initial.buildCommit || '',
     appVersion: initial.appVersion || '',
+    buildKind: BUILD_KINDS.includes(initial.buildKind) ? initial.buildKind : 'development',
+    server: SERVERS.includes(initial.server) ? initial.server : 'staging',
     consent: false
   });
   const [session, setSession] = useState(null);
@@ -51,37 +64,11 @@ export default function InkPhysicalEvidenceSession() {
   const [samples, setSamples] = useState([]);
   const [latest, setLatest] = useState(null);
   const [error, setError] = useState('');
-  const timingRef = useRef({ startedAt: null });
 
   const writer = canonicalEvidenceWriter(setup.writerId);
   const split = writer ? assignedEvidenceSplit(writer) : null;
   const prompt = REAL_PENCIL_PROMPTS[index] || null;
   const complete = Boolean(session && index >= REAL_PENCIL_PROMPTS.length);
-
-  // Instrument, but never replace, the production recognisers. The wrapper only
-  // timestamps the start of the exact calls InkAnswer already makes. Restoring
-  // the original functions on unmount guarantees this hidden study route cannot
-  // change ordinary Practice behaviour.
-  useEffect(() => {
-    if (!session || !nativeAvailable) return undefined;
-    const originalFoundation = nativeInk.foundationRecognize;
-    const originalRescue = nativeInk.recognize;
-    const foundationProbe = function (...args) {
-      timingRef.current.startedAt = performance.now();
-      return originalFoundation.apply(nativeInk, args);
-    };
-    const rescueProbe = function (...args) {
-      if (!Number.isFinite(timingRef.current.startedAt)) timingRef.current.startedAt = performance.now();
-      return originalRescue.apply(nativeInk, args);
-    };
-    nativeInk.foundationRecognize = foundationProbe;
-    nativeInk.recognize = rescueProbe;
-    return () => {
-      if (nativeInk.foundationRecognize === foundationProbe) nativeInk.foundationRecognize = originalFoundation;
-      if (nativeInk.recognize === rescueProbe) nativeInk.recognize = originalRescue;
-      timingRef.current.startedAt = null;
-    };
-  }, [session, nativeAvailable]);
 
   const update = (key, value) => setSetup(current => ({ ...current, [key]: value }));
 
@@ -116,6 +103,8 @@ export default function InkPhysicalEvidenceSession() {
       startedAt: now,
       buildCommit: setup.buildCommit.trim(),
       appVersion: setup.appVersion.trim(),
+      buildKind: setup.buildKind,
+      server: setup.server,
       deviceModel: setup.deviceModel.trim(),
       osVersion: setup.osVersion.trim(),
       pencil: setup.pencil.trim()
@@ -127,10 +116,11 @@ export default function InkPhysicalEvidenceSession() {
     setLatest(null);
   };
 
+  // Every reading InkAnswer publishes for this prompt. Only a FRESH server
+  // read carries readMs; a correction, a kept reading or a page that changed
+  // after the read does not, and cannot be recorded as a timed sample.
   const onRecognized = reading => {
-    const startedAt = timingRef.current.startedAt;
-    const recognitionMs = Number.isFinite(startedAt) ? Math.max(0, performance.now() - startedAt) : NaN;
-    timingRef.current.startedAt = null;
+    const recognitionMs = Number.isFinite(reading?.readMs) ? Math.max(0, reading.readMs) : NaN;
     const authority = productionAuthorityOf(reading, { nativeAvailable });
     setLatest({ ...reading, ...authority, recognitionMs });
   };
@@ -138,15 +128,19 @@ export default function InkPhysicalEvidenceSession() {
   const record = () => {
     if (!prompt || !latest) return;
     if (!latest.productionReady) {
-      setError('This reading came from a debug/research/non-production path. Use a release iPad build before recording evidence.');
+      setError('This reading did not come from the server reader on the native build. Use a release or development iPad build that is signed in, and press "Read my answer".');
       return;
     }
     if (!Array.isArray(latest.strokes) || !latest.strokes.length) {
-      setError('No Pencil strokes were attached to the current recognition result.');
+      setError('No Pencil strokes were attached to the current reading.');
       return;
     }
     if (!Number.isFinite(latest.recognitionMs)) {
-      setError('Recognition timing was not captured for this sample. Rewrite the prompt and wait for the reading to settle.');
+      setError('This reading was not a fresh server read (it was corrected, kept, or the page changed after it). Press "Read my answer" again and record that reading.');
+      return;
+    }
+    if (latest.stale) {
+      setError('The ink changed after this reading was made. Press "Read my answer" again so the sample and its timing are of the same page.');
       return;
     }
     const sample = {
@@ -157,8 +151,11 @@ export default function InkPhysicalEvidenceSession() {
       authority: latest.authority,
       authorityReason: latest.reason,
       pencil: true,
+      reader: 'server',
       recognitionMs: Number(latest.recognitionMs.toFixed(2)),
-      engine: String(latest.engine || 'pri-native-no-reading'),
+      engine: String(latest.engine || ''),
+      serverConfidence: Number.isFinite(Number(latest.minConf)) ? Number(latest.minConf) : null,
+      serverNeedsConfirmation: latest.needsConfirmation === true,
       productionReady: true,
       researchOnly: false,
       critical: criticalEvidenceTarget(prompt.target),
@@ -200,9 +197,9 @@ export default function InkPhysicalEvidenceSession() {
 
   if (!session) {
     return (
-      <section className="card" style={{ maxWidth: 760, margin: '0 auto' }}>
+      <section className="card" style={{ maxWidth: 760, margin: '0 auto' }} data-ink-evidence="setup">
         <h1 style={{ marginTop: 0 }}>Pri Ink physical release evidence</h1>
-        <p className="muted">Hidden research route. It uses the same native PencilKit + production recognition path as Practice. No expected answer or mark scheme is supplied to recognition.</p>
+        <p className="muted">Hidden research route. It uses the same native PencilKit surface and the same server reader as Practice, read when you press "Read my answer". No expected answer or mark scheme is supplied to the reader. Each prompt is one paid server read, so the device must be signed in to an account the server allows to read.</p>
         {!nativeAvailable && <div className="callout warn" role="alert">Native PencilKit is unavailable. Open this route inside the physical iPad app; browser/LAN fallback cannot produce release evidence.</div>}
         <div className="grid2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
           <label style={{ gridColumn: '1 / -1' }}>Anonymous participant code
@@ -211,14 +208,26 @@ export default function InkPhysicalEvidenceSession() {
           <label>Assigned split<input value={split || 'enter participant code'} readOnly /></label>
           <label>Exact build commit<input value={setup.buildCommit} onChange={e => update('buildCommit', e.target.value)} placeholder="40-char Git SHA" autoCapitalize="none" /></label>
           <label>App version<input value={setup.appVersion} onChange={e => update('appVersion', e.target.value)} placeholder="e.g. 1.0 (42)" /></label>
+          <label>Build kind
+            <select value={setup.buildKind} onChange={e => update('buildKind', e.target.value)}>
+              <option value="development">development (Xcode run of the frozen SHA)</option>
+              <option value="testflight">testflight (signed store build)</option>
+            </select>
+          </label>
+          <label>Server this build talks to
+            <select value={setup.server} onChange={e => update('server', e.target.value)}>
+              <option value="staging">staging</option>
+              <option value="production">production</option>
+            </select>
+          </label>
           <label>iPad model<input value={setup.deviceModel} onChange={e => update('deviceModel', e.target.value)} placeholder="e.g. iPad Air 11-inch (M2)" /></label>
-          <label>iPadOS<input value={setup.osVersion} onChange={e => update('osVersion', e.target.value)} placeholder="e.g. 18.6" /></label>
+          <label>iPadOS<input value={setup.osVersion} onChange={e => update('osVersion', e.target.value)} placeholder="e.g. 26.1" /></label>
           <label>Pencil model<input value={setup.pencil} onChange={e => update('pencil', e.target.value)} placeholder="e.g. Apple Pencil Pro" /></label>
         </div>
-        {split === 'final-holdout' && <p className="callout warn"><b>Final holdout.</b> Collect and export the session, but do not inspect individual recognition mistakes while tuning the recogniser.</p>}
+        {split === 'final-holdout' && <p className="callout warn"><b>Final holdout.</b> Collect and export the session, but do not inspect individual recognition mistakes while tuning the reader.</p>}
         <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 18 }}>
           <input type="checkbox" checked={setup.consent} onChange={e => update('consent', e.target.checked)} style={{ width: 'auto', marginTop: 4 }} />
-          <span>I confirm this participant agreed to anonymous Apple Pencil strokes being used for Pri Ink training and evaluation. No name, email, account history or student identifier is stored.</span>
+          <span>I confirm this participant agreed to anonymous Apple Pencil strokes being used for Pri Ink evaluation, and to the pictures of them being read by Pri's server. No name, email, account history or student identifier is stored.</span>
         </label>
         {error && <p role="alert" style={{ color: 'var(--danger, #c44)' }}>{error}</p>}
         <button className="btn btn-primary" type="button" onClick={start} style={{ marginTop: 16 }}>Start production evidence session</button>
@@ -231,51 +240,51 @@ export default function InkPhysicalEvidenceSession() {
     const confirm = samples.filter(s => s.authority === 'confirm').length;
     const abstain = samples.filter(s => s.authority === 'abstain').length;
     return (
-      <section className="card" style={{ maxWidth: 760, margin: '0 auto' }}>
+      <section className="card" style={{ maxWidth: 760, margin: '0 auto' }} data-ink-evidence="complete" data-ink-evidence-recorded={samples.length}>
         <h1>Session complete</h1>
         <p><b>{session.writerId}</b> · {assignedEvidenceSplit(session.writerId)} · {samples.length}/{REAL_PENCIL_PROMPTS.length} recorded</p>
         <p className="muted">Authority decisions captured before ground-truth comparison: auto {auto}, confirm {confirm}, abstain {abstain}.</p>
         <p>Save <b>both</b> files. The evidence file feeds the physical release scorer. The corpus file contains the same raw PencilKit strokes and deterministic writer split for the real-writer corpus.</p>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button className="btn btn-primary" type="button" onClick={exportEvidence}>Export release evidence JSON</button>
-          <button className="btn" type="button" onClick={exportCorpus}>Export corpus JSON</button>
+          <button className="btn btn-primary" type="button" onClick={exportEvidence} data-ink-evidence-export="evidence">Export release evidence JSON</button>
+          <button className="btn" type="button" onClick={exportCorpus} data-ink-evidence-export="corpus">Export corpus JSON</button>
         </div>
       </section>
     );
   }
 
-  const canRecord = Boolean(latest && latest.productionReady && latest.strokes?.length && Number.isFinite(latest.recognitionMs));
+  const canRecord = Boolean(latest && latest.productionReady && latest.strokes?.length && Number.isFinite(latest.recognitionMs) && !latest.stale);
   return (
-    <section className="ink-evidence-session" style={{ maxWidth: 980, margin: '0 auto' }}>
+    <section className="ink-evidence-session" style={{ maxWidth: 980, margin: '0 auto' }} data-ink-evidence="prompt" data-ink-evidence-recorded={samples.length}>
       <style>{`.ink-evidence-session .ink-syms,.ink-evidence-session .ink-picker{display:none!important}`}</style>
       <div className="spread" style={{ gap: 12, alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <div className="muted">Physical production evidence · {session.writerId} · {assignedEvidenceSplit(session.writerId)}</div>
+          <div className="muted">Physical production evidence · {session.writerId} · {assignedEvidenceSplit(session.writerId)} · {session.buildKind} build → {session.server}</div>
           <h1 style={{ margin: '4px 0' }}>Write naturally</h1>
-          <p style={{ fontSize: 26, margin: 0 }}>{prompt.shown}</p>
-          <p className="muted">Prompt {index + 1} of {REAL_PENCIL_PROMPTS.length}. One natural attempt. Do not make it neat for the model.</p>
+          <p style={{ fontSize: 26, margin: 0 }} data-ink-evidence-prompt={prompt.id}>{prompt.shown}</p>
+          <p className="muted">Prompt {index + 1} of {REAL_PENCIL_PROMPTS.length}. One natural attempt, then press "Read my answer". Do not make it neat for the reader.</p>
         </div>
-        <span className="chip">{samples.length} recorded</span>
+        <span className="chip" data-ink-evidence-count={samples.length}>{samples.length} recorded</span>
       </div>
 
       <InkAnswer key={`${session.runId}-${prompt.id}`} onRecognized={onRecognized} height={380} />
 
       <div className="card" style={{ marginTop: 14 }}>
-        <b>Pre-correction production reading</b>
-        {!latest && <p className="muted">Write the prompt, then wait for recognition to settle.</p>}
+        <b>Pre-correction server reading</b>
+        {!latest && <p className="muted">Write the prompt, then press "Read my answer" and wait for the reading.</p>}
         {latest && (
           <>
-            <p style={{ overflowWrap: 'anywhere' }}>{latest.text || <i>no reading</i>}</p>
-            <p className="muted" style={{ marginBottom: 4 }}>
-              engine: {latest.engine || 'unknown'} · authority: <b>{latest.authority}</b> ({latest.reason}) · recognition: {Number.isFinite(latest.recognitionMs) ? `${latest.recognitionMs.toFixed(1)} ms` : 'timing unavailable'}
+            <p style={{ overflowWrap: 'anywhere' }} data-ink-evidence-reading={latest.text || ''}>{latest.text || <i>no reading</i>}</p>
+            <p className="muted" style={{ marginBottom: 4 }} data-ink-evidence-ms={Number.isFinite(latest.recognitionMs) ? latest.recognitionMs.toFixed(1) : ''}>
+              engine: {latest.engine || 'unknown'} · authority: <b>{latest.authority}</b> ({latest.reason}) · server read: {Number.isFinite(latest.recognitionMs) ? `${latest.recognitionMs.toFixed(1)} ms` : 'not a fresh read'}
             </p>
-            {!latest.productionReady && <p style={{ color: 'var(--danger, #c44)' }}>This is a debug/research/non-production engine result and cannot be recorded as release evidence.</p>}
+            {!latest.productionReady && <p style={{ color: 'var(--danger, #c44)' }}>This reading did not come from the server reader on the native build and cannot be recorded as release evidence.</p>}
           </>
         )}
         {error && <p role="alert" style={{ color: 'var(--danger, #c44)' }}>{error}</p>}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 12 }}>
-          <button className="btn btn-primary" type="button" onClick={record} disabled={!canRecord}>Record this sample →</button>
-          <button className="btn btn-ghost" type="button" onClick={skip}>Skip prompt</button>
+          <button className="btn btn-primary" type="button" onClick={record} disabled={!canRecord} data-ink-evidence-record>Record this sample →</button>
+          <button className="btn btn-ghost" type="button" onClick={skip} data-ink-evidence-skip>Skip prompt</button>
         </div>
       </div>
     </section>

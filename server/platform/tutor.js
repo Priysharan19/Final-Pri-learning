@@ -36,6 +36,17 @@
 //      sent. Its cache key is scoped to the account: a free-text exchange is
 //      never read back by another account. The fixed-ladder levels keep the
 //      content-keyed shared cache, because their requests carry no free text.
+//  10. A diagnosis (level "diagnose") explains work the deterministic engine
+//      has ALREADY judged: what was right, the first place it went wrong and
+//      why, and the single next step. The engine's verdict is the input, never
+//      the output — nothing in the reply is a mark, and the mark does not move.
+//      One model call (one unit of the ceiling, one of the daily allowance); its
+//      mathematics must be copied from the verified solution, the question or
+//      the student's own lines (diagnosisGroundingIssues), and while the attempt
+//      is open the answer guard runs on every part as well. A reply that fails
+//      either check, or no model at all, gives the deterministic diagnosis built
+//      from the engine's first break and the solution's next step.
+//
 //   9. POST /stream answers an ask/nudge/socratic turn as server-sent events.
 //      Every refusal above still happens first, as JSON, before a byte of the
 //      stream; the model's text is released one guarded sentence at a time
@@ -71,11 +82,12 @@ import { asStore, sqliteHandle } from './store.js';
 import { consumeRateLimit, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import { issuedQuestionForTutor } from './practice.js';
-import { buildGuard, captionWordingOk, createReleaseGate, leakedExpressions, solutionSpans } from './tutorGuard.js';
+import { buildGuard, captionWordingOk, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
 import {
-  MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
-  TUTOR_TURN_LEVEL, TutorProviderError, askTutorModel, providerConfig, streamTutorModel
+  MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_DIAGNOSE_LEVEL, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
+  TUTOR_TURN_LEVEL, TUTOR_WHY_LEVEL, TutorProviderError, askTutorModel, providerConfig, streamTutorModel
 } from './tutorProvider.js';
+import { serverEntitlementCapabilities } from './entitlements.js';
 
 export const TUTOR_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 export const MAX_TUTOR_BODY_BYTES = 48 * 1024;
@@ -117,6 +129,30 @@ export const GENERIC_HELP = Object.freeze({
   })
 });
 
+/** The deterministic diagnosis's sentences. {n} is a line number (1-based), {line} the student's line. */
+export const DIAGNOSIS_TEXT = Object.freeze({
+  en: Object.freeze({
+    rightLines: 'Your working checks out up to {line}.',
+    rightNone: 'You set out to work towards the answer — the checker could not verify a line yet.',
+    wrongAt: 'Your working first goes wrong at line {n}: {line}. It does not follow from the line before it.',
+    wrongFinal: 'Each line the checker could judge holds, but your final answer does not match.',
+    wrongUnplaced: 'The checker has not placed a break in these lines.',
+    unchecked: 'Couldn’t check your working this time — try again.',
+    nextStep: 'Next: {step}.',
+    nextGeneric: 'Next: go back to the last line that checks out and redo the step after it.'
+  }),
+  hi: Object.freeze({
+    rightLines: 'आपका हल {line} तक सही है।',
+    rightNone: 'आपने उत्तर की ओर काम शुरू किया — जाँचकर्ता अभी कोई पंक्ति सत्यापित नहीं कर सका।',
+    wrongAt: 'आपके हल में पहली गलती पंक्ति {n} में है: {line}। यह पिछली पंक्ति से नहीं निकलती।',
+    wrongFinal: 'जाँची गई हर पंक्ति सही है, पर आपका अंतिम उत्तर मेल नहीं खाता।',
+    wrongUnplaced: 'जाँचकर्ता ने इन पंक्तियों में कोई गलती चिह्नित नहीं की है।',
+    unchecked: 'इस बार आपका हल जाँचा नहीं जा सका — फिर से कोशिश करें।',
+    nextStep: 'अगला क़दम: {step}।',
+    nextGeneric: 'अगला क़दम: आख़िरी सही पंक्ति पर लौटें और उसके बाद का क़दम फिर से करें।'
+  })
+});
+
 function ensureTable(db) {
   // SQLite builds its schema here; Postgres is migrated (supabase/migrations).
   const raw = sqliteHandle(db);
@@ -150,6 +186,9 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
   if (!request.serverQuestionId) return { ok: true, request };
   const issued = await issuedQuestionForTutor(db, accountId, request.serverQuestionId, at);
   if (!issued) return invalid('This question does not belong to this account.', 'TUTOR_QUESTION_NOT_FOUND', 404);
+  if (request.level === TUTOR_WHY_LEVEL && !issued.resolved) {
+    return invalid('"Why this step?" follows the reveal of a server-issued question.', 'TUTOR_LEVEL_ORDER', 409);
+  }
   if (request.level === 'walkthrough' && !issued.resolved) {
     return invalid('The walkthrough follows the reveal of a server-issued question.', 'TUTOR_LEVEL_ORDER', 409);
   }
@@ -171,12 +210,15 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
   const evidence = issued.resolved
     ? await issued.workEvidence(request.studentWork.lines)
     : { firstBreak: -1, verifiedLines: 0, misconception: null };
+  const diagnose = request.level === TUTOR_DIAGNOSE_LEVEL;
   return {
     ok: true,
     request: {
       ...request,
       questionVersion: issued.version.slice(0, 60),
       question: checked.question,
+      // A diagnosis's open/resolved state is the server's, never the device's.
+      ...(diagnose || request.level === TUTOR_WHY_LEVEL ? { resolved: !!issued.resolved } : {}),
       studentWork: {
         ...request.studentWork,
         // Which line is the first mistake is a verdict on the student's working.
@@ -184,11 +226,28 @@ export async function groundIssued(db, accountId, request, at = Date.now()) {
         // whether a guessed line is right, so it is withheld with the rest.
         firstBreak: issued.resolved ? evidence.firstBreak : -1,
         verifiedLines: issued.resolved ? evidence.verifiedLines : 0,
-        misconception: null
+        // The engine's own misconception id (the server's Step Check), once the
+        // question is resolved; the device's word for it is never taken (D1).
+        misconception: issued.resolved && typeof evidence.misconception === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(evidence.misconception) ? evidence.misconception : null,
+        // The per-line verdict for a diagnosis is re-derived from the server's
+        // own Step Check, and withheld like the rest until resolution. The final
+        // answer's status is not in the escrow, so the device's word is dropped.
+        ...(diagnose ? {
+          lineStatus: issued.resolved ? lineStatusFrom(request.studentWork.lines.length, evidence) : request.studentWork.lines.map(() => 'unknown'),
+          finalAnswer: 'unknown',
+          lostMarks: [],
+          // The Step Check did not run (cooldown, busy, deadline): said plainly.
+          ...(issued.resolved && evidence.unchecked ? { unchecked: true } : {})
+        } : {})
       }
     }
   };
 }
+/** Per-line status from the Step Check's evidence: verified lines ok, the first break, the rest unjudged. */
+export function lineStatusFrom(count, { firstBreak = -1, verifiedLines = 0 } = {}) {
+  return Array.from({ length: count }, (_, i) => (i === firstBreak ? 'break' : i < verifiedLines && (firstBreak < 0 || i < firstBreak) ? 'ok' : 'unknown'));
+}
+
 const isText = (value, max, { required = false } = {}) =>
   (value === undefined && !required) || (typeof value === 'string' && value.length <= max && (!required || value.trim().length > 0));
 const closed = (object, allowed) => Object.keys(object).filter(key => !allowed.includes(key));
@@ -254,12 +313,24 @@ export function validateTutorRequest(body) {
   if (body.context === 'exam' || body.mode === 'exam' || body.examId !== undefined) {
     return invalid('Help is not available during an exam.', 'TUTOR_EXAM_LOCKED', 403);
   }
-  const unknown = closed(body, ['context', 'level', 'locale', 'questionId', 'questionVersion', 'question', 'serverQuestionId', 'studentWork', 'captions', 'message', 'history']);
+  const unknown = closed(body, ['context', 'level', 'locale', 'questionId', 'questionVersion', 'question', 'serverQuestionId', 'studentWork', 'captions', 'message', 'history', 'resolved', 'stepIndex']);
   if (unknown.length) return invalid(`Unexpected field: ${unknown.join(', ')}.`);
   if (body.context !== 'practice') return invalid('The tutor helps with practice questions only; send context "practice".', 'TUTOR_CONTEXT_REQUIRED');
   if (!TUTOR_REQUEST_LEVELS.includes(body.level)) return invalid(`level must be one of ${TUTOR_REQUEST_LEVELS.join(', ')}.`);
-  const asking = body.level === TUTOR_TURN_LEVEL;
-  if (!asking && (body.message !== undefined || body.history !== undefined)) return invalid('message and history are only sent with level "ask".');
+  const why = body.level === TUTOR_WHY_LEVEL;
+  // "Why this step?" is a dialogue too: an optional follow-up message and history.
+  const asking = body.level === TUTOR_TURN_LEVEL || (why && body.message !== undefined);
+  const diagnosing = body.level === TUTOR_DIAGNOSE_LEVEL;
+  if (!diagnosing && !why && body.resolved !== undefined) return invalid('resolved is only sent with level "diagnose" or "why".');
+  if (!why && body.stepIndex !== undefined) return invalid('stepIndex is only sent with level "why".');
+  if (why && !(Number.isInteger(body.stepIndex) && body.stepIndex >= 0 && body.stepIndex < LIMITS.steps)) return invalid('stepIndex names a step of the verified solution.');
+  if (why && body.history !== undefined && body.message === undefined) return invalid('history is sent with a follow-up message.');
+  // A device question's solution is on the device already; the dialogue is
+  // offered once the question is resolved, and the body says so. A server-
+  // issued question's resolution is the server's own record (groundIssued).
+  if (why && body.serverQuestionId === undefined && body.resolved !== true) return invalid('"Why this step?" follows the reveal of the question.', 'TUTOR_LEVEL_ORDER', 409);
+  if (diagnosing && body.resolved !== undefined && typeof body.resolved !== 'boolean') return invalid('resolved is true or false.');
+  if (!asking && !why && (body.message !== undefined || body.history !== undefined)) return invalid('message and history are only sent with level "ask" or "why".');
   const locale = body.locale === undefined ? 'en' : body.locale;
   if (!TUTOR_LOCALES.includes(locale)) return invalid(`locale must be one of ${TUTOR_LOCALES.join(', ')}.`);
   // A server-issued question is named, never described: the server grounds the
@@ -282,8 +353,17 @@ export function validateTutorRequest(body) {
 
   const work = body.studentWork === undefined ? {} : body.studentWork;
   if (!plain(work)) return invalid('studentWork must be an object.');
-  const wUnknown = closed(work, ['lines', 'typedAnswer', 'firstBreak', 'verifiedLines', 'misconception']);
+  const wUnknown = closed(work, ['lines', 'typedAnswer', 'firstBreak', 'verifiedLines', 'misconception', ...(diagnosing ? ['lineStatus', 'finalAnswer', 'lostMarks'] : [])]);
   if (wUnknown.length) return invalid(`Unexpected studentWork field: ${wUnknown.join(', ')}.`);
+  if (diagnosing) {
+    if (work.lineStatus !== undefined && (!Array.isArray(work.lineStatus) || work.lineStatus.length > LIMITS.lines || !work.lineStatus.every(v => ['ok', 'break', 'unknown'].includes(v)))) {
+      return invalid('studentWork.lineStatus is the checker\'s per-line verdict: "ok", "break" or "unknown".');
+    }
+    if (work.finalAnswer !== undefined && !['correct', 'wrong', 'unknown'].includes(work.finalAnswer)) return invalid('studentWork.finalAnswer is "correct", "wrong" or "unknown".');
+    if (work.lostMarks !== undefined && (!Array.isArray(work.lostMarks) || work.lostMarks.length > 8 || !work.lostMarks.every(v => typeof v === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(v)))) {
+      return invalid('studentWork.lostMarks is a short list of stable reason ids, not free text.');
+    }
+  }
   if (work.lines !== undefined && (!Array.isArray(work.lines) || work.lines.length > LIMITS.lines || !work.lines.every(l => typeof l === 'string' && l.length <= LIMITS.line))) {
     return invalid(`studentWork.lines must be at most ${LIMITS.lines} lines of at most ${LIMITS.line} characters.`);
   }
@@ -342,11 +422,22 @@ export function validateTutorRequest(body) {
   }
 
   const lines = (work.lines || []).map(l => l.trim()).filter(Boolean);
+  // A diagnosis explains judged work: with nothing written there is nothing to explain.
+  if (diagnosing && !lines.length && !(work.typedAnswer || '').trim()) return invalid('A diagnosis needs the working or the answer it explains.', 'TUTOR_NOTHING_TO_DIAGNOSE');
+  // The per-line verdict follows the trimmed lines; anything unstated is 'unknown'.
+  const lineStatus = diagnosing ? lines.map((_, i) => {
+    const firstBreak = Number.isInteger(work.firstBreak) ? work.firstBreak : -1;
+    const stated = Array.isArray(work.lineStatus) ? work.lineStatus[i] : undefined;
+    if (stated) return stated;
+    return lineStatusFrom(lines.length, { firstBreak, verifiedLines: Number.isInteger(work.verifiedLines) ? work.verifiedLines : 0 })[i];
+  }) : null;
   return {
     ok: true,
     request: {
       level: body.level,
       ...(asking ? { message, history } : {}),
+      ...(diagnosing ? { resolved: body.resolved === true } : {}),
+      ...(why ? { resolved: body.resolved === true, stepIndex: body.stepIndex } : {}),
       locale,
       questionId: issued ? body.serverQuestionId : body.questionId,
       questionVersion: body.questionVersion || '1',
@@ -358,7 +449,8 @@ export function validateTutorRequest(body) {
         typedAnswer: work.typedAnswer ? work.typedAnswer.trim() : '',
         firstBreak: Number.isInteger(work.firstBreak) ? work.firstBreak : -1,
         verifiedLines: Number.isInteger(work.verifiedLines) ? Math.min(work.verifiedLines, lines.length) : 0,
-        misconception: work.misconception || null
+        misconception: work.misconception || null,
+        ...(diagnosing ? { lineStatus, finalAnswer: work.finalAnswer || 'unknown', lostMarks: work.lostMarks || [] } : {})
       },
       captions
     }
@@ -373,14 +465,20 @@ export function validateTutorRequest(body) {
  * student typed is cached for that account alone.
  */
 export function tutorCacheKey(request, scope = null) {
-  const asking = request.level === TUTOR_TURN_LEVEL;
+  const asking = request.level === TUTOR_TURN_LEVEL || request.level === TUTOR_WHY_LEVEL;
   if (asking && !scope) throw new Error('a conversational turn is cached per account: scope is required');
   const material = JSON.stringify([
     'pri-tutor-v1', request.level, request.locale, request.questionId, request.questionVersion,
     request.question.prompt, request.question.steps, request.question.answer, request.question.hints,
     request.studentWork.lines, request.studentWork.typedAnswer, request.studentWork.firstBreak,
     request.studentWork.verifiedLines, request.studentWork.misconception, request.captions,
-    ...(asking ? [scope, request.message, request.history] : [])
+    ...(asking ? [scope, request.message || '', request.history || []] : []),
+    ...(request.level === TUTOR_WHY_LEVEL ? [request.stepIndex, !!request.resolved] : []),
+    // A diagnosis's key also covers the verdict it explains and whether the
+    // attempt is open — an open attempt's reply is guarded, a resolved one's is not.
+    ...(request.level === TUTOR_DIAGNOSE_LEVEL
+      ? [!!request.resolved, request.studentWork.lineStatus, request.studentWork.finalAnswer, request.studentWork.lostMarks]
+      : [])
   ]);
   return createHash('sha256').update(material).digest('hex');
 }
@@ -402,6 +500,159 @@ export function deterministicHelp(request) {
   return (GENERIC_HELP[request.locale] || GENERIC_HELP.en)[request.level];
 }
 
+/** The index of the solution step the student should take next: the one after the last verified step result they reached. */
+export function nextStepIndex(request) {
+  const steps = request.question.steps;
+  const lines = request.studentWork.lines;
+  const firstBreak = request.studentWork.firstBreak;
+  const good = lines.slice(0, Math.max(0, firstBreak >= 0 ? Math.min(firstBreak, request.studentWork.verifiedLines) : request.studentWork.verifiedLines)).map(normalizeMath);
+  // The first step whose result the student has not reached in a verified
+  // line: a skipped step (cos A and cos B never found) comes before a later
+  // step they did write (the identity).
+  const reached = steps.map(step => {
+    const spans = mathSpans(step.d);
+    const result = spans.length ? normalizeMath(spans[spans.length - 1]) : '';
+    return !!result && good.includes(result);
+  });
+  const first = reached.indexOf(false);
+  return first < 0 ? steps.length - 1 : first;
+}
+
+/** The step AFTER the last one the student verifiably reached (line check, G3); step 0 when none. */
+export function stepAfterLastReached(request) {
+  const steps = request.question.steps;
+  const good = request.studentWork.lines.slice(0, Math.max(0, Number(request.studentWork.verifiedLines) || 0)).map(normalizeMath);
+  let last = -1;
+  steps.forEach((step, j) => {
+    const spans = mathSpans(step.d);
+    const result = spans.length ? normalizeMath(spans[spans.length - 1]) : '';
+    if (result && good.includes(result)) last = j;
+  });
+  return Math.min(last + 1, steps.length - 1);
+}
+
+/**
+ * The diagnosis with no model: the engine's first break, the lines it verified,
+ * and the verified solution's next step. While the attempt is open the next
+ * step is its heading only, and only if the answer guard passes it; once the
+ * question is resolved it is the whole verified step.
+ */
+export function deterministicDiagnosis(request) {
+  const copy = DIAGNOSIS_TEXT[request.locale] || DIAGNOSIS_TEXT.en;
+  const lines = request.studentWork.lines;
+  const firstBreak = request.studentWork.firstBreak;
+  const status = request.studentWork.lineStatus || lineStatusFrom(lines.length, request.studentWork);
+  let lastOk = -1;
+  for (let i = 0; i < lines.length && status[i] === 'ok'; i += 1) lastOk = i;
+  const fill = (template, values) => template.replace(/\{(\w+)\}/g, (_, k) => String(values[k] ?? ''));
+  const asMath = line => `$${String(line).replace(/\$/g, '')}$`;
+  const didRight = lastOk >= 0 ? fill(copy.rightLines, { line: asMath(lines[lastOk]) }) : copy.rightNone;
+  const wentWrong = request.studentWork.unchecked ? copy.unchecked : firstBreak >= 0 && firstBreak < lines.length
+    ? fill(copy.wrongAt, { n: firstBreak + 1, line: asMath(lines[firstBreak]) })
+    // Only a resolved question's final-answer status is spoken; an open attempt
+    // is told nothing about correctness that the engine did not place (F3).
+    : request.resolved && request.studentWork.finalAnswer === 'wrong' && lines.length && status.every(v => v === 'ok') ? copy.wrongFinal : copy.wrongUnplaced;
+  const index = nextStepIndex(request);
+  const step = request.question.steps[index] || {};
+  let nextStep = copy.nextGeneric;
+  let referencesStepIndex = -1;
+  if (request.resolved) {
+    const text = [step.h, step.d].filter(Boolean).join(' — ');
+    if (text) { nextStep = fill(copy.nextStep, { step: text }); referencesStepIndex = index; }
+  } else if (step.h) {
+    const guard = buildGuard(request.question, { studentLines: lines, verifiedLines: request.studentWork.verifiedLines });
+    const candidate = fill(copy.nextStep, { step: step.h });
+    if (!leakedExpressions(candidate, guard, { prompt: request.question.prompt }).length) { nextStep = candidate; referencesStepIndex = index; }
+  }
+  return {
+    didRight, wentWrong, nextStep,
+    creditedLines: status.map((v, i) => (v === 'ok' ? i : -1)).filter(i => i >= 0),
+    wentWrongLine: firstBreak >= 0 && firstBreak < lines.length ? firstBreak : -1,
+    referencesStepIndex
+  };
+}
+
+/** Why a model diagnosis may not be shown: grounding always, the answer guard while the attempt is open. */
+export function diagnosisIssues(reply, request) {
+  const parts = [reply.didRight, reply.wentWrong, reply.nextStep];
+  const issues = parts.flatMap(part => diagnosisGroundingIssues(part, { question: request.question, studentLines: request.studentWork.lines }));
+  if (!request.resolved) {
+    if (reply.revealsAnswer) issues.push('declared');
+    const guard = buildGuard(request.question, { studentLines: request.studentWork.lines, verifiedLines: request.studentWork.verifiedLines });
+    // Quoting the student's own line back to them reveals nothing they did not
+    // write, even when it matches an intermediate step of the solution: a
+    // `step:` or `verbatim:` hit on their own line is excused. The answer and the
+    // next step's result (`value:`, `range:`, `expression:`) never are.
+    const own = request.studentWork.lines.map(normalizeMath);
+    const ownProse = request.studentWork.lines.map(proseKey);
+    const excused = leak => (leak.startsWith('step:') && own.includes(leak.slice(5)))
+      || (leak.startsWith('verbatim:') && ownProse.some(line => line.includes(leak.slice(9))));
+    for (const part of parts) issues.push(...leakedExpressions(part, guard, { prompt: request.question.prompt }).filter(leak => !excused(leak)));
+  }
+  return issues;
+}
+
+const diagnosisMessage = d => [d.didRight, d.wentWrong, d.nextStep].filter(Boolean).join(' ');
+
+export const LINE_CHECKS_PER_QUESTION = 2;
+export const LINE_CHECK_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
+export const LINE_CHECK_TEXT = Object.freeze({
+  en: Object.freeze({
+    ok: 'Your lines match the method so far.', unplaced: 'The checker could not place these lines against the method.', next: 'Next: {step}.', nextGeneric: 'Keep going with the next step of the method.',
+    breakAt: 'First break at line {n} — this line should reach: {step}.', breakGeneric: 'First break at line {n} — redo the step from the line before.',
+    unchecked: 'Couldn’t check your working this time — try again.',
+    final: 'Press Check to mark your answer.'
+  }),
+  hi: Object.freeze({
+    ok: 'अब तक आपकी पंक्तियाँ विधि से मेल खाती हैं।', unplaced: 'जाँचकर्ता इन पंक्तियों को विधि से नहीं मिला सका।', next: 'अगला क़दम: {step}।', nextGeneric: 'विधि के अगले क़दम के साथ आगे बढ़ें।',
+    breakAt: 'पहली गलती पंक्ति {n} में — इस पंक्ति को यहाँ पहुँचना चाहिए: {step}।', breakGeneric: 'पहली गलती पंक्ति {n} में — पिछली पंक्ति से यह क़दम फिर करें।',
+    unchecked: 'इस बार आपका हल जाँचा नहीं जा सका — फिर से कोशिश करें।',
+    final: 'अपना उत्तर जँचवाने के लिए Check दबाएँ।'
+  })
+});
+
+/**
+ * The "Check this line so far" reply: the engine's evidence put in words, a
+ * step NAME (heading) only. A heading that states the answer or the next
+ * result is replaced by the generic wording, so no value ever leaves.
+ */
+export function lineCheckReply(question, lines, evidence, locale = 'en') {
+  const copy = LINE_CHECK_TEXT[locale] || LINE_CHECK_TEXT.en;
+  if (evidence?.unchecked) return { status: 'unchecked', message: copy.unchecked };
+  const request = { question, studentWork: { lines, firstBreak: evidence.firstBreak, verifiedLines: evidence.verifiedLines } };
+  const guard = buildGuard(question, {});
+  const named = index => {
+    const heading = String(question.steps[index]?.h || '').trim();
+    if (!heading || /[0-9०-९=]/.test(heading) || leakedExpressions(heading, guard, { prompt: question.prompt }).length) return null;
+    return heading;
+  };
+  const step = named(stepAfterLastReached(request));
+  if (evidence.firstBreak >= 0 && evidence.firstBreak < lines.length) {
+    const n = evidence.firstBreak + 1;
+    return { status: 'break', line: evidence.firstBreak, message: step ? copy.breakAt.replace('{n}', n).replace('{step}', step) : copy.breakGeneric.replace('{n}', n) };
+  }
+  // "Matches" only when the engine verified every line; otherwise say nothing
+  // about correctness, only what to do next.
+  if (!(Number(evidence.verifiedLines) >= lines.length)) {
+    return { status: 'unplaced', message: `${copy.unplaced} ${step ? copy.next.replace('{step}', step) : copy.nextGeneric}` };
+  }
+  return { status: 'ok', message: `${copy.ok} ${step ? copy.next.replace('{step}', step) : copy.nextGeneric}` };
+}
+
+/**
+ * The open-attempt diagnosis: engine-only, one shape, no code, no model, no
+ * spend. Its fields are the same whatever the student wrote, so a right guess
+ * and a wrong guess cannot be told apart by anything but the engine's own
+ * (already withheld or already shown) verdict.
+ */
+export function openDiagnosis(request) {
+  const diagnosis = deterministicDiagnosis({ ...request, resolved: false });
+  return {
+    level: TUTOR_DIAGNOSE_LEVEL, diagnosis, message: diagnosisMessage(diagnosis), referencesStepIndex: diagnosis.referencesStepIndex,
+    source: 'checker', resolved: false, cached: false
+  };
+}
+
 const positiveInt = value => { const n = Number(value); return Number.isInteger(n) && n > 0 ? n : null; };
 
 /**
@@ -415,6 +666,85 @@ export async function tutorDailyLimit(db, accountId, env = process.env) {
   return plan === 'premium'
     ? positiveInt(env.PRI_TUTOR_CALLS_PER_ACCOUNT_DAY_PREMIUM) || TUTOR_DAILY_DEFAULTS.premium
     : positiveInt(env.PRI_TUTOR_CALLS_PER_ACCOUNT_DAY) || TUTOR_DAILY_DEFAULTS.free;
+}
+
+/** "Check this line so far" ships dark on its own switch: PRI_FEATURE_LINE_CHECK=1. */
+export function lineCheckFeatureEnabled(env = process.env) {
+  return String(env.PRI_FEATURE_LINE_CHECK || '').trim() === '1';
+}
+
+/** The live step coach (F1) ships dark on its own switch: PRI_FEATURE_STEP_COACH=1. */
+export function stepCoachFeatureEnabled(env = process.env) {
+  return String(env.PRI_FEATURE_STEP_COACH || '').trim() === '1';
+}
+
+/** Is this account on the premium plan, by the server's own entitlement snapshot? */
+export async function accountIsPremium(db, accountId) {
+  const row = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id = ?', [accountId]);
+  return !!row && publicEntitlement(row).plan === 'premium';
+}
+
+/**
+ * The live step coach's reads per issued question per account. One read per
+ * finished line, so this is also the most lines one question can have coached;
+ * it bounds probing a question's checker line by line.
+ */
+export const STEP_COACH_READS_PER_QUESTION = 12;
+const STEP_COACH_STATUSES = new Set(['ok', 'break', 'unsure', 'final']);
+
+/**
+ * The step coach's public reply: status and step number only. No message, no
+ * value, no heading; a step number is given only for a verified line.
+ */
+export function stepCoachReply(rows) {
+  return (Array.isArray(rows) ? rows : []).map(r => {
+    const status = STEP_COACH_STATUSES.has(r?.status) ? r.status : 'unsure';
+    return status === 'ok' && Number.isInteger(r.step) && r.step > 0 ? { status, step: r.step } : { status };
+  });
+}
+
+export const WHY_FREE_PER_DAY_DEFAULT = 3;
+
+/**
+ * May this account ask "Why this step?" now? Premium (the server's own
+ * entitlement snapshot carries `additional-ai-usage`) always may; a free
+ * account has PRI_TUTOR_WHY_FREE_PER_DAY taster calls a day (default 3;
+ * "0" means none), counted per account. Never the client's word.
+ */
+export async function whyAccess(db, accountId, env = process.env, at = Date.now()) {
+  const row = await db.get('SELECT * FROM entitlement_snapshots WHERE account_id = ?', [accountId]);
+  if (row && serverEntitlementCapabilities(row, at).includes('additional-ai-usage')) return { allowed: true, plan: 'premium', tasterLeft: null };
+  const raw = String(env.PRI_TUTOR_WHY_FREE_PER_DAY ?? '').trim();
+  const limit = raw === '' ? WHY_FREE_PER_DAY_DEFAULT : (Number.isInteger(Number(raw)) && Number(raw) >= 0 ? Number(raw) : WHY_FREE_PER_DAY_DEFAULT);
+  const windowMs = 24 * 60 * 60 * 1000;
+  if (limit === 0) return { allowed: false, plan: 'free', tasterLeft: 0, resetAt: at + windowMs };
+  const bucket = `tutor-why-taster:${sha256(accountId).slice(0, 24)}`;
+  const taster = await consumeRateLimit(db, bucket, { limit, windowMs }, at);
+  return taster.allowed
+    ? { allowed: true, plan: 'free', tasterLeft: taster.remaining, unit: { bucket, windowStart: taster.resetAt - windowMs } }
+    : { allowed: false, plan: 'free', tasterLeft: 0, resetAt: taster.resetAt };
+}
+
+/**
+ * Give a free taster try back: the call it paid for was refused (allowance,
+ * ceiling) or did not produce a model reply the student could use (provider
+ * failure, grounding guard). Only inside the window it was taken in, never
+ * below zero; a Premium access has no unit and nothing to give back.
+ */
+export async function refundWhyTaster(db, access) {
+  if (!access?.unit) return;
+  await db.run('UPDATE rate_limits SET count = count - 1 WHERE bucket = ? AND window_start = ? AND count > 0', [access.unit.bucket, access.unit.windowStart]);
+}
+
+/** The verified step itself, as the "why" reply when no model can (or may) speak. */
+export function whyFallback(request) {
+  const step = request.question.steps[request.stepIndex] || {};
+  const lead = request.locale === 'hi' ? 'यह क़दम' : 'This step';
+  return {
+    level: TUTOR_WHY_LEVEL, stepIndex: request.stepIndex, referencesStepIndex: request.stepIndex,
+    message: `${lead}: ${[step.h, step.d].filter(Boolean).join(' — ')}`.slice(0, 1200),
+    source: 'fallback', guarded: true, model: null
+  };
 }
 
 /** The tutor ships dark: the route exists only where PRI_FEATURE_TUTOR=1. */
@@ -444,7 +774,11 @@ export function createTutorRouter(db, {
 
   router.get('/status', requireSession(db), async (req, res) => {
     const config = providerConfig(env);
-    res.json({ available: config.configured, model: config.configured ? config.model : null, levels: TUTOR_LEVELS, conversation: true, streaming: true });
+    res.json({
+      available: config.configured, model: config.configured ? config.model : null, levels: TUTOR_LEVELS, conversation: true, streaming: true, diagnosis: true,
+      // The live step coach needs no model: on where its switch is on and the account is premium.
+      stepCoach: stepCoachFeatureEnabled(env) && await accountIsPremium(db, req.platformSession.account_id)
+    });
   });
 
   async function cached(key, at) {
@@ -501,6 +835,112 @@ export function createTutorRouter(db, {
     };
   }
 
+  /**
+   * One model call, checked; the deterministic diagnosis otherwise. A provider
+   * failure is not an error here: the engine's own diagnosis is still useful,
+   * so it is returned (not cached) with the code that explains it.
+   */
+  async function diagnose(request) {
+    const fallback = (reason, model = null) => {
+      const diagnosis = deterministicDiagnosis(request);
+      return {
+        tutor: {
+          level: TUTOR_DIAGNOSE_LEVEL, diagnosis, message: diagnosisMessage(diagnosis), referencesStepIndex: diagnosis.referencesStepIndex,
+          source: 'fallback', guarded: reason === 'TUTOR_ANSWER_GUARD' || reason === 'TUTOR_GROUNDING_GUARD', reason, model, resolved: !!request.resolved
+        },
+        cache: reason === 'TUTOR_ANSWER_GUARD' || reason === 'TUTOR_GROUNDING_GUARD'
+      };
+    };
+    // The paid-call unit was taken by the route before the daily allowance (F5).
+    let reply;
+    try { reply = await ask(request, { env }); } catch (error) {
+      return { ...fallback(error instanceof TutorProviderError ? error.code : 'TUTOR_FAILED'), cache: false };
+    }
+    const issues = diagnosisIssues(reply, request);
+    if (issues.length) {
+      const leak = issues.some(i => !i.startsWith('span:') && !i.startsWith('prose:') && i !== 'unbalanced-span');
+      return fallback(leak ? 'TUTOR_ANSWER_GUARD' : 'TUTOR_GROUNDING_GUARD', reply.model || null);
+    }
+    // Which lines are credited and which is at fault are the ENGINE's, never the
+    // model's (F2): the model only words them.
+    const engine = deterministicDiagnosis(request);
+    const diagnosis = {
+      didRight: reply.didRight, wentWrong: reply.wentWrong, nextStep: reply.nextStep,
+      creditedLines: engine.creditedLines, wentWrongLine: engine.wentWrongLine, referencesStepIndex: reply.referencesStepIndex
+    };
+    return {
+      tutor: {
+        level: TUTOR_DIAGNOSE_LEVEL, diagnosis, message: diagnosisMessage(diagnosis), referencesStepIndex: reply.referencesStepIndex,
+        source: 'model', guarded: false, model: reply.model || null, effort: reply.effort || null, resolved: !!request.resolved
+      },
+      cache: true
+    };
+  }
+
+  /**
+   * "Why this step?" (F11). Order, every refusal before any spend:
+   *   1. the step exists in the grounded solution and the question is resolved
+   *      (a server-issued question's resolution is the server's own record);
+   *   2. cache — a per-account reply for this exact step and dialogue is free;
+   *   3. Premium (`additional-ai-usage`, server-side), or one of the free
+   *      taster calls a day (PRI_TUTOR_WHY_FREE_PER_DAY, default 3) — 402 after;
+   *   4. the per-account daily tutor allowance, then the deployment's
+   *      paid-call ceiling (which raises PAID_CEILING_HIGH at 80%);
+   *   5. one model call; its maths must be copied from the solution, question
+   *      or the student's lines, or the step itself is shown instead.
+   * Model unconfigured or failing: the verified step itself, never an error.
+   */
+  async function whyThisStep(req, res, request, at) {
+    const accountId = req.platformSession.account_id;
+    if (!(request.stepIndex < request.question.steps.length)) {
+      return res.status(400).json({ error: { code: 'TUTOR_BODY_INVALID', message: 'stepIndex names a step of the verified solution.' } });
+    }
+    if (!request.resolved) return res.status(409).json({ error: { code: 'TUTOR_LEVEL_ORDER', message: '"Why this step?" follows the reveal of the question.' } });
+    const key = tutorCacheKey(request, cacheScope(accountId));
+    const hit = await cached(key, at);
+    if (hit) return res.json({ tutor: { ...hit, cached: true } });
+
+    const fallback = reason => res.json({ tutor: { ...whyFallback(request), reason, cached: false } });
+    if (!providerConfig(env).configured) return fallback('TUTOR_NOT_CONFIGURED');
+
+    const access = await whyAccess(db, accountId, env, at);
+    if (!access.allowed) {
+      res.set('RateLimit-Reset', String(Math.ceil(access.resetAt / 1000)));
+      return res.status(402).json({ error: { code: 'TUTOR_PREMIUM_REQUIRED', message: '"Why this step?" is part of Premium. Today\'s free tries are used.', resetAt: access.resetAt } });
+    }
+    const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
+      { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
+    if (!daily.allowed) {
+      await refundWhyTaster(db, access);
+      res.set('RateLimit-Reset', String(Math.ceil(daily.resetAt / 1000)));
+      return res.status(429).json({ error: { code: 'TUTOR_DAILY_LIMIT', message: "You have used today's tutor help.", retryable: true } });
+    }
+    const overBudget = await consumePaidCall(db, { env });
+    if (overBudget) { await refundWhyTaster(db, access); return refusePaidCall(res, overBudget); }
+
+    let reply;
+    try { reply = await ask(request, { env }); } catch (error) {
+      await refundWhyTaster(db, access);
+      return fallback(error instanceof TutorProviderError ? error.code : 'TUTOR_FAILED');
+    }
+    const issues = reply?.message
+      ? diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines })
+      : ['empty'];
+    if (issues.length) {
+      // The student got the step itself, not an explanation: the try is given back.
+      await refundWhyTaster(db, access);
+      const tutor = { ...whyFallback(request), reason: 'TUTOR_GROUNDING_GUARD', model: reply?.model || null };
+      await remember(key, tutor, at);
+      return res.json({ tutor: { ...tutor, cached: false } });
+    }
+    const tutor = {
+      level: TUTOR_WHY_LEVEL, stepIndex: request.stepIndex, message: reply.message, referencesStepIndex: request.stepIndex,
+      source: 'model', guarded: false, model: reply.model || null, plan: access.plan, tasterLeft: access.tasterLeft
+    };
+    await remember(key, { ...tutor, tasterLeft: undefined }, at);
+    return res.json({ tutor: { ...tutor, cached: false } });
+  }
+
   async function walkthrough(request) {
     const overBudget = await consumePaidCall(db, { env });
     if (overBudget) return { refusal: overBudget };
@@ -540,12 +980,45 @@ export function createTutorRouter(db, {
       const grounded = await groundIssued(db, req.platformSession.account_id, checked.request, at);
       if (!grounded.ok) return res.status(grounded.status).json({ error: { code: grounded.code, message: grounded.message } });
       const request = grounded.request;
+      const diagnosing = request.level === TUTOR_DIAGNOSE_LEVEL;
+      // An OPEN attempt is diagnosed by the engine alone, with no model call and
+      // one fixed response shape (F1/F2). A model reply on open work could be
+      // refused by the answer guard exactly when a guess is right, and that
+      // refusal — or a model's own "this is right" — would be an answer oracle.
+      // Here nothing in the reply depends on whether the student's guess is
+      // correct: only on the engine's verdict (withheld until resolution for a
+      // server-issued question) and the verified plan.
+      if (diagnosing && !request.resolved) return res.json({ tutor: openDiagnosis(request) });
+      if (request.level === TUTOR_WHY_LEVEL) return whyThisStep(req, res, request, at);
+
       const key = tutorCacheKey(request, cacheScope(req.platformSession.account_id));
       const hit = await cached(key, at);
       if (hit) return res.json({ tutor: { ...hit, cached: true } });
 
+      // A diagnosis still helps with no model: the engine's own diagnosis is
+      // served (never cached) when the tutor is unconfigured or the allowance is spent.
+      const deterministicOnly = reason => {
+        const diagnosis = deterministicDiagnosis(request);
+        return res.json({ tutor: {
+          level: TUTOR_DIAGNOSE_LEVEL, diagnosis, message: diagnosisMessage(diagnosis), referencesStepIndex: diagnosis.referencesStepIndex,
+          source: 'fallback', guarded: false, reason, model: null, resolved: !!request.resolved, cached: false
+        } });
+      };
+
+      // A resolved diagnosis whose Step Check did not run says so, and asks no
+      // model: with no verdict to explain, a model would invent one.
+      if (diagnosing && request.studentWork.unchecked) return deterministicOnly('STEP_CHECK_UNAVAILABLE');
+
       if (!providerConfig(env).configured) {
+        if (diagnosing) return deterministicOnly('TUTOR_NOT_CONFIGURED');
         return res.status(503).json({ error: { code: 'TUTOR_NOT_CONFIGURED', message: 'The AI tutor is not available on this deployment.' } });
+      }
+
+      // A diagnosis takes its paid-call unit first, so a ceiling-reached fallback
+      // spends no daily allowance (F5).
+      if (diagnosing) {
+        const overBudget = await consumePaidCall(db, { env });
+        if (overBudget) return deterministicOnly('PAID_CAPACITY_REACHED');
       }
 
       // Per-account daily allowance, counted per request that reaches the model.
@@ -554,7 +1027,14 @@ export function createTutorRouter(db, {
         { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
       if (!daily.allowed) {
         res.set('RateLimit-Reset', String(Math.ceil(daily.resetAt / 1000)));
+        if (diagnosing) return deterministicOnly('TUTOR_DAILY_LIMIT');
         return res.status(429).json({ error: { code: 'TUTOR_DAILY_LIMIT', message: "You have used today's tutor help. The question's own hints still work.", retryable: true } });
+      }
+
+      if (diagnosing) {
+        const outcome = await diagnose(request);
+        if (outcome.cache) await remember(key, outcome.tutor, at);
+        return res.json({ tutor: { ...outcome.tutor, cached: false } });
       }
 
       try {
@@ -570,6 +1050,113 @@ export function createTutorRouter(db, {
         }
         res.status(502).json({ error: { code: 'TUTOR_FAILED', message: 'The tutor could not help this time.', retryable: true } });
       }
+    });
+
+  // ── "Check this line so far" ───────────────────────────────────────────────
+  // The server's own Step Check of the student's lines against its escrowed
+  // solution, for an OPEN server-issued question. The reply names a step of the
+  // method — never a value, never a mark — and is help: the device charges it
+  // like a tutor level and allows at most LINE_CHECKS_PER_QUESTION per question,
+  // and here it spends one unit of the per-account daily allowance. No model.
+  router.post('/line-check',
+    // Off unless PRI_FEATURE_LINE_CHECK=1 (Director decision). Final-answer
+    // detection is now engine-based (finalAttempt.js); the switch stays off
+    // until the owner turns it on. Off, it is the platform's ordinary 404,
+    // before any session lookup — exactly as the tutor itself is when dark.
+    (req, res, next) => (lineCheckFeatureEnabled(env) ? next()
+      : res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } })),
+    requireSession(db),
+    requireVerifiedEmail,
+    rateLimit(db, 'tutor-line-check', TUTOR_RATE_LIMIT),
+    async (req, res) => {
+      const refuse = (status, code, message) => res.status(status).json({ error: { code, message } });
+      const b = req.body;
+      if (!plain(b) || closed(b, ['context', 'serverQuestionId', 'lines', 'locale']).length) return refuse(400, 'TUTOR_BODY_INVALID', 'Send { context, serverQuestionId, lines }.');
+      if (b.context !== 'practice') return refuse(b.context === 'exam' ? 403 : 400, b.context === 'exam' ? 'TUTOR_EXAM_LOCKED' : 'TUTOR_CONTEXT_REQUIRED', 'Line checks are for practice only.');
+      if (!(typeof b.serverQuestionId === 'string' && ISSUED_ID.test(b.serverQuestionId))) return refuse(400, 'TUTOR_BODY_INVALID', 'serverQuestionId is the id of a question this server issued.');
+      if (!Array.isArray(b.lines) || b.lines.length > LIMITS.lines || !b.lines.every(l => typeof l === 'string' && l.length <= LIMITS.line)) return refuse(400, 'TUTOR_BODY_INVALID', 'lines are the student\'s working lines.');
+      const lines = b.lines.map(l => l.trim()).filter(Boolean);
+      if (!lines.length) return refuse(400, 'TUTOR_NOTHING_TO_DIAGNOSE', 'Write a line to check.');
+      const locale = b.locale === 'hi' ? 'hi' : 'en';
+      const at = now();
+      const accountId = req.platformSession.account_id;
+      const issued = await issuedQuestionForTutor(db, accountId, b.serverQuestionId, at);
+      if (!issued) return refuse(404, 'TUTOR_QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+      if (issued.resolved) return refuse(409, 'TUTOR_LEVEL_ORDER', 'This question is already resolved.');
+      // G1: two checks per issued question per account, held HERE, not only on
+      // the device. Peeked before anything runs, taken only after a check ran.
+      const capBucket = `line-check:${sha256(`${accountId}:${b.serverQuestionId}`).slice(0, 32)}`;
+      const capRow = await db.get('SELECT window_start, count FROM rate_limits WHERE bucket = ?', [capBucket]);
+      if (capRow && Number(capRow.count) >= LINE_CHECKS_PER_QUESTION && at - Number(capRow.window_start) < LINE_CHECK_WINDOW_MS) {
+        return refuse(409, 'LINE_CHECK_LIMIT', 'Two line checks per question.');
+      }
+      // G1: a final-answer attempt is never judged here. The engine decides,
+      // in the marker pool, by FORM — the answer's relation shape and free
+      // symbols, a pinned unknown, the plan's final stage — and never by
+      // value (finalAttempt.js). From the first attempt onward the reply is
+      // the one generic line, identical for a right and a wrong answer, and
+      // nothing is charged. Unreadable lines fail closed into that reply.
+      const evidence = await issued.lineCheckEvidence(lines);
+      if (!evidence.unchecked && evidence.attemptAt >= 0) {
+        return res.json({ lineCheck: { status: 'final', message: (LINE_CHECK_TEXT[locale] || LINE_CHECK_TEXT.en).final } });
+      }
+      const reply = lineCheckReply({ steps: issued.steps, prompt: issued.prompt, answer: issued.answerText, hints: [] }, lines, evidence, locale);
+      // G2: a check that did not run costs nothing — no cap, no allowance.
+      if (reply.status === 'unchecked') return res.json({ lineCheck: reply });
+      const cap = await consumeRateLimit(db, capBucket, { limit: LINE_CHECKS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, at);
+      if (!cap.allowed) return refuse(409, 'LINE_CHECK_LIMIT', 'Two line checks per question.');
+      const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
+        { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
+      if (!daily.allowed) return refuse(429, 'TUTOR_DAILY_LIMIT', "You have used today's tutor help.");
+      res.json({ lineCheck: { ...reply, checksLeft: cap.remaining } });
+    });
+
+  // ── The live step coach (F1) ───────────────────────────────────────────────
+  // As the student writes, each finished line is checked against the server's
+  // escrowed solution for an OPEN server-issued question. One row per line:
+  // 'ok' (with the plan step it reached), 'break' (the first line that does
+  // not follow from the one above — a location only, A1), 'unsure' (say
+  // nothing) or 'final' (a final-answer attempt, by FORM — finalAttempt.js —
+  // which gets only "Press Check"; right and wrong final lines get identical
+  // rows). No values, no headings, no marks. Premium only, decided here from
+  // the server's entitlement snapshot; off unless PRI_FEATURE_STEP_COACH=1.
+  // Each check that runs spends one of STEP_COACH_READS_PER_QUESTION and one
+  // unit of the per-account daily allowance. No model.
+  router.post('/step-coach',
+    (req, res, next) => (stepCoachFeatureEnabled(env) ? next()
+      : res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Platform endpoint not found.' } })),
+    requireSession(db),
+    requireVerifiedEmail,
+    rateLimit(db, 'tutor-step-coach', TUTOR_RATE_LIMIT),
+    async (req, res) => {
+      const refuse = (status, code, message) => res.status(status).json({ error: { code, message } });
+      const b = req.body;
+      if (!plain(b) || closed(b, ['context', 'serverQuestionId', 'lines']).length) return refuse(400, 'TUTOR_BODY_INVALID', 'Send { context, serverQuestionId, lines }.');
+      if (b.context !== 'practice') return refuse(b.context === 'exam' ? 403 : 400, b.context === 'exam' ? 'TUTOR_EXAM_LOCKED' : 'TUTOR_CONTEXT_REQUIRED', 'The step coach is for practice only.');
+      if (!(typeof b.serverQuestionId === 'string' && ISSUED_ID.test(b.serverQuestionId))) return refuse(400, 'TUTOR_BODY_INVALID', 'serverQuestionId is the id of a question this server issued.');
+      if (!Array.isArray(b.lines) || b.lines.length > LIMITS.lines || !b.lines.every(l => typeof l === 'string' && l.length <= LIMITS.line)) return refuse(400, 'TUTOR_BODY_INVALID', 'lines are the student\'s working lines.');
+      const lines = b.lines.map(l => l.trim());
+      if (!lines.length || lines.some(l => !l)) return refuse(400, 'TUTOR_NOTHING_TO_DIAGNOSE', 'Send the finished lines, none blank.');
+      const at = now();
+      const accountId = req.platformSession.account_id;
+      if (!(await accountIsPremium(db, accountId))) return refuse(403, 'STEP_COACH_PREMIUM', 'The step coach is part of Premium.');
+      const issued = await issuedQuestionForTutor(db, accountId, b.serverQuestionId, at);
+      if (!issued) return refuse(404, 'TUTOR_QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+      if (issued.resolved) return refuse(409, 'TUTOR_LEVEL_ORDER', 'This question is already resolved.');
+      const capBucket = `step-coach:${sha256(`${accountId}:${b.serverQuestionId}`).slice(0, 32)}`;
+      const capRow = await db.get('SELECT window_start, count FROM rate_limits WHERE bucket = ?', [capBucket]);
+      if (capRow && Number(capRow.count) >= STEP_COACH_READS_PER_QUESTION && at - Number(capRow.window_start) < LINE_CHECK_WINDOW_MS) {
+        return refuse(409, 'STEP_COACH_LIMIT', 'This question has had all its live checks.');
+      }
+      const rows = await issued.stepCoachEvidence(lines);
+      // A check that did not run costs nothing and says nothing.
+      if (!rows) return res.json({ stepCoach: { lines: lines.map(() => ({ status: 'unsure' })), unchecked: true } });
+      const cap = await consumeRateLimit(db, capBucket, { limit: STEP_COACH_READS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, at);
+      if (!cap.allowed) return refuse(409, 'STEP_COACH_LIMIT', 'This question has had all its live checks.');
+      const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
+        { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
+      if (!daily.allowed) return refuse(429, 'TUTOR_DAILY_LIMIT', "You have used today's tutor help.");
+      res.json({ stepCoach: { lines: stepCoachReply(rows), checksLeft: cap.remaining } });
     });
 
   // ── Streaming ──────────────────────────────────────────────────────────────

@@ -16,8 +16,19 @@ async function pathState(page) {
   return page.evaluate(() => location.pathname + location.search + location.hash);
 }
 
+// The one student interface (client/interface.config.mjs) is the Instrument:
+// its navigation is the bar's tabs plus its More menu. Both are read, More
+// opened and closed again, so a destination counts wherever the bar puts it.
 async function visibleSidebarLabels(page) {
-  return page.locator('.sidebar .nav-label').allTextContents();
+  const tabs = (await page.locator('[data-instrument-bar] .in-tab').allTextContents()).map(s => s.trim());
+  let more = [];
+  if (await page.locator('#in-more-btn').count()) {
+    await page.locator('#in-more-btn').click();
+    await page.waitForSelector('#in-more-menu', { timeout: 10000 });
+    more = (await page.locator('#in-more-menu [role="menuitem"]').allTextContents()).map(s => s.trim());
+    await page.keyboard.press('Escape');
+  }
+  return [...tabs, ...more];
 }
 
 export const flow = {
@@ -36,10 +47,12 @@ export const flow = {
     await settle();
 
     const studentLabels = await visibleSidebarLabels(page);
-    for (const label of ['Home', 'Practice', 'Tasks', 'Exams', 'Classes', 'Progress', 'Review', 'Rapid Fire', 'Match', 'Settings']) {
-      await check('student sidebar exposes ' + label, studentLabels.includes(label), studentLabels.join(' | '));
+    // The v1.0 names are the Instrument's: Home is the Index, Progress the
+    // Report, Review is Scripts (every script; Wrong is one of its filters).
+    for (const label of ['Index', 'Practice', 'Map', 'Report', 'Scripts', 'Notes', 'Plan', 'Tasks', 'Exams', 'Classes', 'Rapid Fire', 'Match', 'Settings']) {
+      await check('student navigation exposes ' + label, studentLabels.includes(label), studentLabels.join(' | '));
     }
-    await check('student sidebar hides teacher workspace', !studentLabels.includes('Teacher workspace'));
+    await check('student navigation hides teacher workspace', !studentLabels.includes('Teacher workspace'));
     await snap(page, '01-student-tablet-home');
     await goto('/practice');
     await check('Practice direct load reaches the real workspace',
@@ -64,7 +77,6 @@ export const flow = {
       ['/history', '/review'],
       ['/favorites', '/review?filter=bookmarked'],
       ['/mistakes', '/review?filter=wrong'],
-      ['/map', '/progress?tab=map'],
       ['/stats', '/progress'],
       ['/badges', '/progress'],
     ]) {
@@ -72,6 +84,10 @@ export const flow = {
       await page.waitForTimeout(150);
       await check(legacy + ' redirects without a duplicate destination', (await pathState(page)) === canonical, await pathState(page));
     }
+    // The Map is a destination of its own in the Instrument, not a Progress tab.
+    await goto('/map');
+    await page.waitForTimeout(150);
+    await check('/map is its own destination', (await pathState(page)) === '/map' && !!(await page.waitForSelector('[data-map-chapter]', { timeout: 30000 }).catch(() => null)), await pathState(page));
     await goto('/teach');
     await page.waitForTimeout(150);
     await check('student direct Teacher Studio URL returns safely to Home', (await pathState(page)) === '/');
@@ -82,12 +98,12 @@ export const flow = {
     await page.setViewportSize(PHONE);
     await goto('/');
     const primaryPhone = await page.locator('.mobilenav .mnav-item').allTextContents();
-    for (const label of ['Home', 'Practice', 'Tasks', 'Progress', 'More']) {
+    for (const label of ['Index', 'Practice', 'Map', 'Report', 'More']) {
       await check('phone primary navigation exposes ' + label, primaryPhone.some(x => x.includes(label)), primaryPhone.join(' | '));
     }
     await page.getByRole('button', { name: /More/i }).click();
     const moreText = await page.locator('#mobile-more').innerText();
-    for (const label of ['Exams', 'Classes', 'Review', 'Rapid Fire', 'Match', 'Settings']) {
+    for (const label of ['Scripts', 'Notes', 'Plan', 'Tasks', 'Exams', 'Classes', 'Rapid Fire', 'Match', 'Settings']) {
       await check('student More exposes ' + label, moreText.includes(label), moreText);
     }
     await snap(page, '03-student-phone-more');
@@ -107,10 +123,10 @@ export const flow = {
 
     const teacherLabels = await visibleSidebarLabels(page);
     for (const label of ['Teacher workspace', 'Classes', 'Assignments', 'Analytics & reports', 'Question tools', 'Settings']) {
-      await check('teacher sidebar exposes ' + label, teacherLabels.includes(label), teacherLabels.join(' | '));
+      await check('teacher navigation exposes ' + label, teacherLabels.includes(label), teacherLabels.join(' | '));
     }
-    for (const label of ['Practice', 'Exams', 'Rapid Fire', 'Match']) {
-      await check('teacher sidebar hides student-only ' + label, !teacherLabels.includes(label), teacherLabels.join(' | '));
+    for (const label of ['Index', 'Practice', 'Map', 'Report', 'Scripts', 'Exams', 'Rapid Fire', 'Match']) {
+      await check('teacher navigation hides student-only ' + label, !teacherLabels.includes(label), teacherLabels.join(' | '));
     }
     await snap(page, '04-teacher-tablet-workspace');
 
@@ -129,9 +145,9 @@ export const flow = {
     }
     await goto('/teach#teacher-classes');
     await page.waitForTimeout(180);
-    await page.getByText('Assignments', { exact: true }).first().click();
+    await page.locator('[data-instrument-bar] .in-tab', { hasText: 'Assignments' }).first().click();
     await page.waitForTimeout(120);
-    await check('teacher sidebar link changes hash without leaving workspace', (await pathState(page)) === '/teach#teacher-assignments', await pathState(page));
+    await check('teacher tab changes hash without leaving workspace', (await pathState(page)) === '/teach#teacher-assignments', await pathState(page));
     await page.goBack();
     await check('Back restores prior teacher workspace section', (await pathState(page)) === '/teach#teacher-classes');
     await page.goForward();

@@ -33,6 +33,9 @@
 import { ri, rc, nz } from '../qhelpers.js';
 import { exact, frac, fracTex, traps, twoNames, IN_GOODS } from './india-native-helpers.js';
 
+// A negative value written after a minus sign keeps its own brackets: 0 - (-4).
+const sub = v => (v < 0 ? `(${v})` : `${v}`);
+
 /** ax written the way it is read: x, -x, 3x. */
 const cx = (c, v = 'x') => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
 
@@ -56,8 +59,8 @@ export const indiaClass10Core = {
   // chapter has not taught yet.
   'c10-linear-pair-methods': (rng, diff) => {
     if (diff === 1) {
-      const x0 = ri(rng, 1, 9), y0 = ri(rng, 1, 9);
-      const a = ri(rng, 1, 4), b = ri(rng, 2, 5);
+      const x0 = ri(rng, 1, 40), y0 = ri(rng, 1, 40);
+      const a = ri(rng, 1, 12), b = ri(rng, 2, 12);
       const r1 = x0 + a * y0;             // x + ay = r1  → x = r1 − ay
       const r2 = b * x0 - y0;             // bx − y = r2
       return {
@@ -82,6 +85,9 @@ export const indiaClass10Core = {
       };
     }
     if (diff === 2) {
+      // D2 keeps its original ranges: its seeds are certified fixtures (the
+      // two-mark elimination question at seed 7 in the browser and server
+      // marking suites), and widening them re-rolled every one (#838 D25).
       const x0 = nz(rng, -7, 9), y0 = nz(rng, -7, 9);
       const a = ri(rng, 2, 6), b = nz(rng, -6, 6);
       const c = ri(rng, 2, 6), d = nz(rng, -6, 6);
@@ -109,9 +115,9 @@ export const indiaClass10Core = {
       };
     }
     if (diff === 3) {
-      const x0 = nz(rng, -8, 9), y0 = nz(rng, -8, 9);
-      const a = ri(rng, 2, 7), b = nz(rng, -7, 7);
-      const c = nz(rng, -7, 7), d = ri(rng, 2, 7);
+      const x0 = nz(rng, -50, 50), y0 = nz(rng, -50, 50);
+      const a = ri(rng, 2, 15), b = nz(rng, -15, 15);
+      const c = nz(rng, -15, 15), d = ri(rng, 2, 15);
       if (a * d - b * c === 0) return indiaClass10Core['c10-linear-pair-methods'](rng, 1);
       const r1 = a * x0 + b * y0;
       const r2 = c * x0 + d * y0;
@@ -250,12 +256,12 @@ export const indiaClass10Core = {
         ]),
         hints: [
           `Here $a = 1$, $b = ${b}$ and $c = ${c}$.`,
-          `$b^2 - 4ac = ${b * b} - ${4 * c} = ${disc}$, and $\\sqrt{${disc}} = ${Math.round(Math.sqrt(disc))}$.`,
+          `$b^2 - 4ac = ${b * b} - ${sub(4 * c)} = ${disc}$, and $\\sqrt{${disc}} = ${Math.round(Math.sqrt(disc))}$.`,
           `$x = \\dfrac{${-b} \\pm ${Math.round(Math.sqrt(disc))}}{2}$.`
         ],
         steps: [
           { h: 'Identify a, b and c', d: `$a = 1$, $b = ${b}$, $c = ${c}$` },
-          { h: 'Evaluate the discriminant', d: `$b^2 - 4ac = ${b * b} - ${4 * c} = ${disc}$` },
+          { h: 'Evaluate the discriminant', d: `$b^2 - 4ac = ${b * b} - ${sub(4 * c)} = ${disc}$` },
           { h: 'Apply the formula', d: `$x = \\dfrac{${-b} \\pm \\sqrt{${disc}}}{2} = \\dfrac{${-b} \\pm ${Math.round(Math.sqrt(disc))}}{2}$` },
           { h: 'Both roots', d: `$x = ${roots[0]}$ or $x = ${roots[1]}$` }
         ]
@@ -279,12 +285,12 @@ export const indiaClass10Core = {
       ]),
       hints: [
         `Here $a = ${a}$, $b = ${b}$ and $c = ${c}$.`,
-        `$b^2 - 4ac = ${b * b} - ${4 * a * c} = ${disc}$, and $\\sqrt{${disc}} = ${Math.round(Math.sqrt(disc))}$.`,
+        `$b^2 - 4ac = ${b * b} - ${sub(4 * a * c)} = ${disc}$, and $\\sqrt{${disc}} = ${Math.round(Math.sqrt(disc))}$.`,
         `$x = \\dfrac{${-b} \\pm ${Math.round(Math.sqrt(disc))}}{${2 * a}}$ — simplify each fraction fully.`
       ],
       steps: [
         { h: 'Identify a, b and c', d: `$a = ${a}$, $b = ${b}$, $c = ${c}$` },
-        { h: 'Evaluate the discriminant', d: `$b^2 - 4ac = ${b * b} - ${4 * a * c} = ${disc}$` },
+        { h: 'Evaluate the discriminant', d: `$b^2 - 4ac = ${b * b} - ${sub(4 * a * c)} = ${disc}$` },
         { h: 'Apply the formula', d: `$x = \\dfrac{${-b} \\pm ${Math.round(Math.sqrt(disc))}}{${2 * a}}$` },
         { h: 'Simplify both roots', d: `$x = ${fracTex(r1.n, r1.d)}$ or $x = ${fracTex(r2.n, r2.d)}$` },
         { h: 'Take the larger', d: `$x = ${fracTex(bigger.n, bigger.d)}$` }

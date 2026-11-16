@@ -37,7 +37,7 @@
 // coverage entry claims these generators below or above D3, and the check
 // fails if one ever does, so the label a student sees is always D3.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, gcd, makeRng } from '../qhelpers.js';
+import { ri, rc, gcd, makeRng, term } from '../qhelpers.js';
 import { IN_NAMES, IN_CITIES } from './india-native-helpers.js';
 import { FALLBACK_SEED, traps, dec, numericAnswer, pick, shuffled, paren } from './india-class7-hardest-kit.js';
 
@@ -855,8 +855,8 @@ function balance(rng) {
         'What is left shows a number of items balancing a weight. Divide.'
       ],
       steps: [
-        { h: 'Equation', d: `$${a}x + ${b} = ${c}x + ${d}$` },
-        { h: 'Same on both sides', d: `Remove $${c}x$ and $${b}$: $${a - c}x = ${d - b}$` },
+        { h: 'Equation', d: `$${a}x + ${b} = ${term(c)} + ${d}$` },
+        { h: 'Same on both sides', d: `Remove $${term(c)}$ and $${b}$: $${term(a - c)} = ${d - b}$` },
         { h: 'Answer', d: ask === 'one' ? `$x = ${x}$ kg` : `$x = ${x}$, and there are $${a + c}$ items: $${answer}$ kg` }
       ]
     };

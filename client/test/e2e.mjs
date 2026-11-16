@@ -30,8 +30,8 @@
 // of the screen at that moment was written.
 // ─────────────────────────────────────────────────────────────────────────────
 import { createServer } from 'node:http';
-import { readFile, mkdir } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { readFile, writeFile } from 'node:fs/promises';
+import { existsSync, mkdtempSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join, normalize, extname, sep } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -39,7 +39,8 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { chromium, webkit } from '@playwright/test';
 import { onlinePlatform, closeOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile } from './support/verified-onboarding.mjs';
-import { watchBoot, bootFailure, bootRecovery } from './support/boot-diagnostics.mjs';
+import { watchBoot, bootFailure, bootRecovery, recordFlight } from './support/boot-diagnostics.mjs';
+import { acceptReaderPermissionOnSight } from './fakeServerReader.js';
 
 const ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const DIST = join(ROOT, 'client', 'dist');
@@ -62,9 +63,13 @@ function parseArgs(argv) {
 }
 
 // A red line that cannot be looked at is half a report, so every failed check
-// leaves a picture of the screen behind. It goes to the system temp directory,
-// named in the failure — a test run never leaves anything in the repo.
-const SHOTS = join(tmpdir(), 'pri-e2e-shots');
+// leaves a picture of the screen behind. It goes to a private directory this
+// run creates under the system temp directory (mkdtemp: unpredictable name,
+// owner-only), named in the failure — a test run never leaves anything in the
+// repo, and no other local user can pre-create or swap the file it writes.
+// CI uploads /tmp/pri-e2e-shots-*/*FAIL*.png when a shard fails.
+let shotsDir = null;
+const shots = () => (shotsDir ??= mkdtempSync(join(tmpdir(), 'pri-e2e-shots-')));
 
 // ── Assertions ───────────────────────────────────────────────────────────────
 // Same shape as the security suite: groups collect counts, failures collect the
@@ -177,7 +182,7 @@ export function ensureBuild(build) {
   // and tour-placement.js asserts that state when it meets such a build.
   const run = spawnSync('npm', ['run', 'build', '--prefix', 'client'], {
     cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32',
-    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_AUSTRALIA: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' }
+    env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' }
   });
   if (run.status !== 0) {
     const tail = `${run.stdout || ''}${run.stderr || ''}`.trim().split('\n').slice(-12).join('\n      ');
@@ -208,9 +213,9 @@ function helpers(page, base, flowId) {
   const shot = async (label) => {
     const name = `${flowId}-${String(++shotN).padStart(2, '0')}-${label}.png`;
     try {
-      await mkdir(SHOTS, { recursive: true });
-      await page.screenshot({ path: join(SHOTS, name), fullPage: false });
-      return join(SHOTS, name);
+      const file = join(shots(), name);
+      await page.screenshot({ path: file, fullPage: false });
+      return file;
     } catch { return null; }
   };
 
@@ -270,7 +275,7 @@ function helpers(page, base, flowId) {
 
 // ── Flow runner ──────────────────────────────────────────────────────────────
 
-const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './tour-exam-india.js', './tour-exam-deadline.js', './cal-smoke.mjs', './tour-submit-lifecycle.js', './tour-stale-cloud.js', './tour-placement.js', './tour-photo-practise.js'];
+const FLOWS = ['./tour-login.js', './tour-india.js', './tour-phone.js', './tour-v3.js', './tour-ink.js', './tour-v4.js', './tour-exam-india.js', './tour-exam-deadline.js', './tour-submit-lifecycle.js', './tour-stale-cloud.js', './tour-placement.js', './tour-photo-practise.js'];
 
 async function loadFlows() {
   const loaded = [];
@@ -301,6 +306,9 @@ async function runFlow(flow, { browser, opts }) {
     // Playwright, not intercepted first by a service worker (WebKit too).
     ...(flow.inspectNetwork ? { serviceWorkers: 'block' } : {})
   });
+  // D17: a reading flow accepts the one-time prompt naming OpenAI when it
+  // appears (fakeServerReader.js); the flow about that prompt asks instead.
+  if (flow.readerPermission !== 'ask') await ctx.addInitScript(acceptReaderPermissionOnSight);
   const page = await ctx.newPage();
   const crashes = [];
   // WebKit, tearing a page down for a navigation, cancels its in-flight
@@ -338,13 +346,24 @@ async function runFlow(flow, { browser, opts }) {
   const base = platform.origin;
   const online = flow.online ? platform.session(ctx, page) : null;
   const api = helpers(page, base, flow.id);
+  const flight = recordFlight(browser, ctx);
   try {
     await flow.run({ page, ctx, base, note, online, browserName: opts.browser, ...api });
   } catch (err) {
     const path = await api.shot('FAIL-crash');
+    const seen = await flight.report().catch(e => [`the flight record could not be read: ${String(e?.message || e).slice(0, 120)}`]);
+    const saved = [];
+    for (const { name, screen } of flight.closedScreens()) {
+      try {
+        const file = join(shots(), `${flow.id}-FAIL-closed-${name}.png`);
+        await writeFile(file, screen, { flag: 'wx' });
+        saved.push(file);
+      } catch { /* a missing picture never hides the failure it belongs to */ }
+    }
     ok('the flow ran to the end', false,
-      `threw: ${String(err?.stack || err).split('\n').slice(0, 4).join('\n      ')}${path ? `\n      screenshot: ${path}` : ''}`);
+      `threw: ${String(err?.stack || err).split('\n').slice(0, 4).join('\n      ')}${path ? `\n      screenshot: ${path}` : ''}${saved.map(file => `\n      screenshot: ${file}`).join('')}${seen.map(line => `\n      ${line}`).join('')}`);
   }
+  flight.stop();
   // An exception thrown out of a render is invisible to every assertion above
   // it — the boundary catches it and the page carries on looking plausible.
   ok('no uncaught errors reached the page', crashes.length === 0, crashes.slice(0, 3).join(' · '));

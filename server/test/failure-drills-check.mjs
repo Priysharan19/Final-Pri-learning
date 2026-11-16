@@ -317,7 +317,7 @@ try {
         res.end(JSON.stringify({
           output_text: JSON.stringify(working
             ? { lines: [{ index: 0, status: 'ok', carried: false, why: '' }], first_break: -1, hint: '', confidence: 0.9 }
-            : { lines: [{ text: 'x = 4', confidence: 0.95 }], confidence: 0.95, needs_confirmation: false })
+            : { lines: [{ text: 'x = 4', confidence: 0.95, uncertain: false, doubt: '', gap_before: false }], confidence: 0.95, needs_confirmation: false })
         }));
       });
     });

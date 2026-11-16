@@ -47,6 +47,10 @@
 //                 holds readiness)                           → degrades only:
 //                 the on-device reader works without it
 //   working       configured or not                          → informational
+//   testMailbox   'on' | 'off' (top level, not a check): whether reserved-domain
+//                 test mail is kept instead of sent (testMailboxPolicy.js). On
+//                 only on staging and in the test harness; a production
+//                 deployment must say 'off' (tools/verify-deployment.mjs).
 //   staffMfa      PRI_MFA_KEY present whenever an admin/support account exists
 //                 (production)                               → degrades: staff
 //                 cannot enrol or verify a second factor, students are unaffected
@@ -60,6 +64,7 @@
 // product is misconfigured, latencies beyond the database round-trip, or any
 // configuration value. That detail is on /v1/metrics, behind PRI_METRICS_TOKEN.
 // ─────────────────────────────────────────────────────────────────────────────
+import { testMailboxEnabled } from './testMailboxPolicy.js';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from './schemaVersions.js';
 import { probeHandwritingProvider, providerStaticStatus } from './handwritingProvider.js';
 import { providerConfig as workingConfig } from './workingProvider.js';
@@ -216,7 +221,8 @@ export async function readinessReport(db, {
     billing: billingCheck(),
     handwriting,
     working: { state: workingConfig(env).configured ? 'ok' : 'not_configured', code: null },
-    staffMfa
+    staffMfa,
+    testMailbox: { state: testMailboxEnabled(env) ? 'on' : 'off', code: null }
   };
   const failing = [];
   if (database.state !== 'ok') failing.push(database.code);
@@ -237,6 +243,7 @@ export async function readinessReport(db, {
     service: 'pri-learning-platform',
     releaseSha,
     database: { engine: db.dialect },
+    testMailbox: checks.testMailbox.state,
     checks,
     failing,
     degraded,

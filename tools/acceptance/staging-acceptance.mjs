@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // ─────────────────────────────────────────────────────────────────────────────
-// Pri Learning · scripted staging acceptance A–D
+// Pri Learning · scripted staging acceptance S0–S8
 //
 // The journey that blocks the cross-device V1 is PRI_V1_RELEASE_SCOPE.md §22.2:
 //
@@ -11,18 +11,25 @@
 //
 // This runner drives the parts of that journey that can be driven over HTTP
 // against a DEPLOYED host, in the shipped client's order, and names the parts
-// only a person can do. The letters are this tool's (production-cutover-
+// only a person can do. The step ids are this tool's (production-cutover-
 // checklist.md §4 and the cutover runbook §4.4 step 4 describe the same
-// test-account journey without naming its parts):
+// test-account journey without naming its parts). They are numbered S0–S8,
+// never lettered, so they cannot be read as issue #686's Gates A–D:
 //
-//   0  preflight — health, readiness, release identity, schema versions
-//   A  one-time-code sign-in with a REAL mailbox (a human reads the code)
-//   B  guardian confirmation for a child account (a human reads the parent's code)
-//   C  handwriting read + server mark   (a SYNTHETIC picture, the REAL reader and marker)
-//   D  photo read + server mark         (a SYNTHETIC "photo", the REAL reader and marker)
-//   E  account isolation probe — a VERIFIED student B2 (code sign-up, HUMAN STEP) never sees,
-//      marks or revokes student A; refusals must be the ownership refusal (404 QUESTION_NOT_FOUND)
-//   F  cleanup — delete the TEST accounts this run created (never a pre-existing one)
+//   S0  preflight — health, readiness, release identity, schema versions
+//   S1  one-time-code sign-in with a REAL mailbox (a human reads the code)
+//   S2  guardian confirmation for a child account (a human reads the parent's code)
+//   S3  guardian withdrawal — the parent's emailed link (a human copies it) withdraws through
+//       POST /v1/account/guardian/withdraw, the route the parent's own page calls; the child's
+//       next question is refused 403 GUARDIAN_CONSENT_WITHDRAWN and its guardian state reads withdrawn
+//   S4  handwriting read + server mark   (a SYNTHETIC picture, the REAL reader and marker)
+//   S5  photo read + server mark         (a SYNTHETIC "photo", the REAL reader and marker)
+//   S6  returning student — student A signs in again in a FRESH session (a human reads a new
+//       code) and History (GET /v1/sync/pull/:cursor, as the app pulls) gives back every attempt
+//       S4 and S5 marked, with the same attempt id and mark
+//   S7  account isolation probe — a VERIFIED student B2 (code sign-up, HUMAN STEP) never sees,
+//       marks or revokes student A; refusals must be the ownership refusal (404 QUESTION_NOT_FOUND)
+//   S8  cleanup — delete the TEST accounts this run created (never a pre-existing one)
 //
 // Evidence classes (AGENTS.md: synthetic evidence stays separate from real
 // human/physical evidence) are printed with every step and written to the
@@ -41,7 +48,7 @@
 //
 //   node tools/acceptance/staging-acceptance.mjs --email <your mailbox> --tester "<your name>"
 //     [--target staging|production] [--sha <40-hex>] [--guardian-email <mailbox>]
-//     [--child-email <mailbox>] [--skip B,E] [--cleanup|--no-cleanup]
+//     [--child-email <mailbox>] [--skip S2,S7] [--cleanup|--no-cleanup]
 //     [--non-interactive] [--out <dir>] [--max-reads 4] [--json]
 //
 // Exit 0 every attempted step passed · 1 a check failed · 3 nothing failed but
@@ -66,30 +73,41 @@ const ISSUE_DRAWS = 12;
 const PROMPT = /first term \$(-?\d+)\$ and common difference \$(-?\d+)\$, which term is equal to \$(-?\d+)\$\? Give the term number\./;
 
 export const TARGETS = Object.freeze({ staging: STAGING_ORIGIN, production: PRODUCTION_ORIGIN });
-export const STEP_IDS = Object.freeze(['0', 'A', 'B', 'C', 'D', 'E', 'F']);
+/** Numbered, never lettered: issue #686 names its own Gates A–D. */
+export const STEP_IDS = Object.freeze(['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8']);
+/** Every step but the preflight can be left out with --skip. */
+export const SKIPPABLE_STEPS = Object.freeze(STEP_IDS.slice(1));
 /**
  * GET /v1/account/export needs the credential proven inside this window
  * (server/platform/security.js REAUTH_FRESH_MS; accounts.js requireRecentAuth):
  * the sign-in that made the session, or POST /v1/account/reauth. Student A
- * signs in at step A and reaches the export at the end of step E, after three
- * human mailbox reads, so A's session is usually older than this by then and
- * the contract the probe holds is the refusal, not the export.
+ * signs in at S1 and reaches the export at the end of S7, after five human
+ * mailbox reads (S2 twice, S3, S6, S7), so A's S1 session is usually older than
+ * this by then and the contract the probe holds is the refusal, not the export.
+ * (S6's fresh sign-in is a different session; freshness is per session.)
  */
 export const EXPORT_FRESH_MS = 10 * 60 * 1000;
 /** Either outcome is accepted this close to the window's edge (clock and request latency). */
 const EXPORT_FRESH_MARGIN_MS = 30 * 1000;
 export const STEPS = Object.freeze({
-  0: 'Preflight: health, readiness, release identity, schema versions',
-  A: 'One-time-code sign-in with a real mailbox',
-  B: 'Guardian confirmation for a child account',
-  C: 'Handwriting read and server mark',
-  D: 'Photo read and server mark',
-  E: 'Account isolation probe (server ownership authorisation and RLS, observed over HTTP with a verified second test account)',
-  F: 'Cleanup: delete the test accounts this run created'
+  S0: 'Preflight: health, readiness, release identity, schema versions',
+  S1: 'One-time-code sign-in with a real mailbox',
+  S2: 'Guardian confirmation for a child account',
+  S3: 'Guardian withdrawal: the parent withdraws and the child is refused',
+  S4: 'Handwriting read and server mark',
+  S5: 'Photo read and server mark',
+  S6: 'Returning student: a fresh session gets the marked attempts back from History',
+  S7: 'Account isolation probe (server ownership authorisation and RLS, observed over HTTP with a verified second test account)',
+  S8: 'Cleanup: delete the test accounts this run created'
 });
+/** What the child's next practice call answers once the guardian has withdrawn (server/platform/guardianConsent.js consentBlockerCode, requireGuardianConsent). */
+export const CONSENT_WITHDRAWN = Object.freeze({ status: 403, code: 'GUARDIAN_CONSENT_WITHDRAWN' });
+/** The app's pull walks at most this many pages (client/src/platform/syncWorker.js pullAll). */
+const PULL_PAGES = 100;
 export const EVIDENCE = Object.freeze({
   REAL_HOST: 'REAL deployed host: unauthenticated HTTP reads. Not device evidence.',
   REAL_MAILBOX: 'REAL mailbox delivery, code read by the named human; TEST account, not a student.',
+  REAL_MAILBOX_LINK: 'REAL mailbox delivery, the parent\'s emailed link copied by the named human; TEST child account, not a student.',
   SYNTHETIC_PICTURE: 'SYNTHETIC picture (simulated pen strokes: not a student, not a device, not a camera) read by the REAL deployed reader and marked by the REAL deployed server; TEST account.',
   TEST_ACCOUNTS: 'TEST accounts on the deployed host, server authorisation and Postgres RLS observed from outside; not student evidence and not a substitute for server/test/security-acceptance-check.mjs.',
   NONE: 'No evidence recorded.'
@@ -123,9 +141,11 @@ export function parseArgs(argv) {
   if (!Object.hasOwn(TARGETS, args.target)) throw new Error('--target must be staging or production');
   if (args.sha !== null && !SHA.test(String(args.sha).toLowerCase())) throw new Error('--sha must be a full 40-hex commit');
   if (args.sha) args.sha = args.sha.toLowerCase();
-  // C and D each reserve 2 reads before they start; a budget of 1 would silently skip both.
-  if (!Number.isInteger(args.maxReads) || args.maxReads < 2 || args.maxReads > 10) throw new Error('--max-reads must be a whole number from 2 to 10 (each of C and D reserves 2 reads)');
-  for (const id of args.skip) if (!['A', 'B', 'C', 'D', 'E', 'F'].includes(id)) throw new Error(`--skip names an unknown step: ${id}`);
+  // S4 and S5 each reserve 2 reads before they start; a budget of 1 would silently skip both.
+  if (!Number.isInteger(args.maxReads) || args.maxReads < 2 || args.maxReads > 10) throw new Error('--max-reads must be a whole number from 2 to 10 (each of S4 and S5 reserves 2 reads)');
+  // The old letters (A–F) are refused, not mapped: a skip list written for them
+  // would otherwise silently skip different steps.
+  for (const id of args.skip) if (!SKIPPABLE_STEPS.includes(id)) throw new Error(`--skip names an unknown step: ${id} (the steps that can be skipped are ${SKIPPABLE_STEPS.join(', ')}; the preflight S0 cannot be)`);
   if (args.target === 'production') {
     if (!args.sha) throw new Error('--target production needs --sha <nominated 40-hex main SHA>');
     if (args.origin && args.origin !== PRODUCTION_ORIGIN) throw new Error(`--target production always means ${PRODUCTION_ORIGIN}; --origin cannot change it`);
@@ -176,7 +196,7 @@ export function deriveAddresses({ email, childEmail = null, guardianEmail = null
 /**
  * Rows of a pri-account-export-v1 body that belong to another account A: any
  * learningEvents or entities row whose entity_id/entityId is one of A's questions,
- * or whose id/entity_id is one of A's attempts. Used by step E against the real
+ * or whose id/entity_id is one of A's attempts. Used by S7 against the real
  * export shape (server/platform/accounts.js: `learningEvents`, `entities`).
  */
 export function exportedForeignRows(body, A) {
@@ -185,6 +205,64 @@ export function exportedForeignRows(body, A) {
     const entity = row?.entity_id ?? row?.entityId;
     return A.questionIds.has(entity) || A.attemptIds.has(entity) || A.attemptIds.has(row?.id);
   });
+}
+
+const OPAQUE_TOKEN = /^[A-Za-z0-9_-]{16,512}$/;
+/** Which page each kind of parent link opens (server/platform/authDelivery.js buildAuthActionUrl). */
+const PARENT_LINK_PATHS = Object.freeze({ 'guardian-consent': '/guardian/consent', 'guardian-withdraw': '/account-action' });
+
+/**
+ * The token of a parent's emailed link, read the way the parent's page reads
+ * it: from the URL fragment. The approval email's link is
+ * `<origin>/guardian/consent#action=guardian-consent&token=…`; the withdrawal
+ * link sent after a link confirmation is `<origin>/account-action#action=guardian-withdraw&token=…`
+ * (authDelivery.js buildAuthActionUrl). POST /v1/account/guardian/withdraw
+ * accepts either token (server/platform/accounts.js). A bare token is accepted
+ * too. `problem` and `origin` never carry the token; the caller never prints it.
+ */
+export function withdrawalTokenFrom(text) {
+  const raw = String(text ?? '').trim();
+  if (!raw) return { token: null, origin: null, problem: 'nothing was pasted' };
+  if (OPAQUE_TOKEN.test(raw)) return { token: raw, origin: null, problem: null };
+  let url;
+  try { url = new URL(raw); } catch { return { token: null, origin: null, problem: 'neither a link nor a token' }; }
+  const params = new URLSearchParams(url.hash.replace(/^#/, ''));
+  const action = params.get('action');
+  const token = params.get('token');
+  const path = Object.hasOwn(PARENT_LINK_PATHS, action || '') ? PARENT_LINK_PATHS[action] : null;
+  if (!path) return { token: null, origin: url.origin, problem: `the link's action is ${action ? JSON.stringify(action.slice(0, 40)) : 'missing'}, not a parent's consent or withdrawal link` };
+  if (url.pathname !== path) return { token: null, origin: url.origin, problem: `a ${action} link opens ${path}; this one opens ${url.pathname.slice(0, 80)}` };
+  if (!token || !OPAQUE_TOKEN.test(token)) return { token: null, origin: url.origin, problem: 'the link carries no token in its fragment' };
+  return { token, origin: url.origin, problem: null };
+}
+
+/**
+ * Which of `expected` (the attempts S4 and S5 had marked: { attemptId,
+ * questionId, submissionId, marksEarned, marksPossible, correct }) came back in
+ * `events` (GET /v1/sync/pull pages). Only the rows the app's History counts
+ * are read — the canonical grader's: kind graded-attempt, deviceId
+ * server-grader, id equal to payload.attemptId and entityId equal to
+ * payload.questionId (client/src/platform/syncWorker.js remoteLearningSummary;
+ * server/platform/practice.js writes them).
+ */
+export function returnedAttempts(expected, events) {
+  const byId = new Map();
+  for (const ev of Array.isArray(events) ? events : []) {
+    const p = ev?.payload;
+    if (ev?.kind !== 'graded-attempt' || ev.deviceId !== 'server-grader' || !p || ev.id !== p.attemptId || ev.entityId !== p.questionId) continue;
+    byId.set(ev.id, [...(byId.get(ev.id) || []), ev]);
+  }
+  const matched = [], missing = [], mismatched = [], duplicated = [];
+  for (const want of expected) {
+    const rows = byId.get(want.attemptId) || [];
+    if (rows.length === 0) { missing.push(want.attemptId); continue; }
+    if (rows.length > 1) duplicated.push(want.attemptId);
+    const p = rows[0].payload;
+    const same = rows[0].entityId === want.questionId && p.submissionId === want.submissionId
+      && p.marksEarned === want.marksEarned && p.marksPossible === want.marksPossible && p.correct === want.correct;
+    (same ? matched : mismatched).push(want);
+  }
+  return { matched, missing, mismatched, duplicated };
 }
 
 /** The expected term number from the printed question, or null when the prompt is another form. */
@@ -338,8 +416,8 @@ export async function runAcceptance(args, deps = {}) {
   };
   const sessionIdOf = async jar => (await http('/v1/account/devices', { jar })).data?.devices?.find(d => d.current)?.id || null;
 
-  // ══ 0 · preflight ══════════════════════════════════════════════════════════
-  const pre = open('0', EVIDENCE.REAL_HOST);
+  // ══ S0 · preflight ═════════════════════════════════════════════════════════
+  const pre = open('S0', EVIDENCE.REAL_HOST);
   let runningSha = null;
   try {
     const [health, ready, web] = await Promise.all([http('/v1/health'), http('/v1/ready'), http('/release.json')]);
@@ -358,29 +436,31 @@ export async function runAcceptance(args, deps = {}) {
     const readyDetail = [r.state, ...(r.failing || []), ...(r.degraded || []).map(code => `degraded:${code}`)].filter(Boolean).join(' ');
     check(pre, ready.status === 200 && r.ready === true, '/v1/ready says the replica can serve', readyDetail || `status ${ready.status}`);
     check(pre, r.checks?.authEmail?.state === 'ok', 'verification email is ready (codes can be delivered)', `state ${r.checks?.authEmail?.state ?? 'unknown'}`);
-    if (r.checks?.handwriting && r.checks.handwriting.state !== 'ok') note(pre, `handwriting readiness is ${r.checks.handwriting.state} (${r.checks.handwriting.code || 'no code'}); C and D will show whether the reader answers`);
+    if (r.checks?.handwriting && r.checks.handwriting.state !== 'ok') note(pre, `handwriting readiness is ${r.checks.handwriting.state} (${r.checks.handwriting.code || 'no code'}); S4 and S5 will show whether the reader answers`);
     note(pre, 'run this tool from a checkout at the running SHA so the expected schema versions are that build\'s');
   } catch (error) {
     check(pre, false, 'host reachable', error?.message || String(error));
   }
   settle(pre);
   if (pre.status === STATUS.FAIL) {
-    for (const id of ['A', 'B', 'C', 'D', 'E', 'F']) skipped(id, 'preflight failed; nothing else was attempted');
+    for (const id of SKIPPABLE_STEPS) skipped(id, 'preflight failed; nothing else was attempted');
     return finish();
   }
 
-  // ══ A · one-time-code sign-in, real mailbox ════════════════════════════════
-  const A = { jar: {}, accountId: null, created: false, email: addresses.student, sessionId: null, signedInAt: null, verified: false, questionIds: new Set(), attemptIds: new Set() };
-  if (!want('A') || !addresses.student) {
-    skipped('A', want('A') ? 'no --email: a real mailbox is needed for the code' : 'skipped by --skip');
+  // ══ S1 · one-time-code sign-in, real mailbox ═══════════════════════════════
+  // `marked`: the attempts S4 and S5 had resolved, as their submit answered —
+  // what S6's returning student must get back from History.
+  const A = { jar: {}, accountId: null, created: false, email: addresses.student, sessionId: null, signedInAt: null, verified: false, questionIds: new Set(), attemptIds: new Set(), marked: [] };
+  if (!want('S1') || !addresses.student) {
+    skipped('S1', want('S1') ? 'no --email: a real mailbox is needed for the code' : 'skipped by --skip');
   } else {
     needsTester();
-    const a = open('A', EVIDENCE.REAL_MAILBOX);
+    const a = open('S1', EVIDENCE.REAL_MAILBOX);
     const requested = await http('/v1/account/otp/request', { method: 'POST', body: { channel: 'email', destination: A.email } });
     if (check(a, requested.status === 202 && requested.data?.challengeId, 'POST /v1/account/otp/request accepted (202) for the mailbox', `status ${requested.status} ${requested.code || ''}`)) {
       const code = await ask(a, `open the mailbox ${maskEmail(A.email)}; read the 6-digit Pri Learning sign-in code from the email that just arrived (the sender must be the deployed service's configured address, not a lookalike).`);
       if (code) {
-        const body = { channel: 'email', destination: A.email, challengeId: requested.data.challengeId, code, deviceId: `acceptance-A-${tag}` };
+        const body = { channel: 'email', destination: A.email, challengeId: requested.data.challengeId, code, deviceId: `acceptance-S1-${tag}` };
         let verified = await http('/v1/account/otp/verify', { method: 'POST', jar: A.jar, body });
         if (verified.status === 200 && verified.data?.status === 'profile-required') {
           note(a, 'new address: the server asked for a profile without spending the code (profile-required); signing up as an ADULT test account');
@@ -396,7 +476,7 @@ export async function runAcceptance(args, deps = {}) {
         A.verified = me.data?.account?.emailVerified === true || verified.data?.account?.emailVerified === true;
         check(a, A.verified, 'the mailbox counts as verified (the code proved it)');
         const consent = verified.data?.guardianConsent;
-        if (consent?.required && consent.state !== 'given') note(a, `this account needs guardian consent (${consent.state}); C and D will be gated until it is given`);
+        if (consent?.required && consent.state !== 'given') note(a, `this account needs guardian consent (${consent.state}); S4 and S5 will be gated until it is given`);
         A.sessionId = await sessionIdOf(A.jar);
         report.accounts.push({ role: 'A', email: maskEmail(A.email), accountId: A.accountId, created: A.created, ageBasis: consent?.required ? 'child' : 'adult' });
         note(a, `account ${A.accountId} ${A.created ? 'CREATED by this run' : 'already existed (signed in; it will NOT be deleted)'}`);
@@ -405,19 +485,20 @@ export async function runAcceptance(args, deps = {}) {
     settle(a);
   }
 
-  // ══ B · guardian confirmation ══════════════════════════════════════════════
-  const B = { jar: {}, accountId: null, created: false, email: addresses.child, guardian: addresses.guardian };
-  if (!want('B') || !addresses.student) {
-    skipped('B', want('B') ? 'no --email: two mailboxes are needed (child and parent)' : 'skipped by --skip');
+  // ══ S2 · guardian confirmation ═════════════════════════════════════════════
+  // `confirmed`: the parent approved at S2 on this run and the state read given — what S3 withdraws.
+  const B = { jar: {}, accountId: null, created: false, confirmed: false, email: addresses.child, guardian: addresses.guardian };
+  if (!want('S2') || !addresses.student) {
+    skipped('S2', want('S2') ? 'no --email: two mailboxes are needed (child and parent)' : 'skipped by --skip');
   } else {
     needsTester();
-    const b = open('B', EVIDENCE.REAL_MAILBOX);
+    const b = open('S2', EVIDENCE.REAL_MAILBOX);
     note(b, `child address ${maskEmail(B.email)}, parent address ${maskEmail(B.guardian)}${args.childEmail || args.guardianEmail ? '' : ' (plus-addressed into the same mailbox; pass --child-email / --guardian-email if your provider drops +tags)'}`);
     const requested = await http('/v1/account/otp/request', { method: 'POST', body: { channel: 'email', destination: B.email } });
     if (check(b, requested.status === 202 && requested.data?.challengeId, 'otp/request accepted (202) for the child address', `status ${requested.status} ${requested.code || ''}`)) {
       const code = await ask(b, `open the mailbox for ${maskEmail(B.email)}; read the 6-digit sign-in code for the CHILD account.`);
       if (code) {
-        const body = { channel: 'email', destination: B.email, challengeId: requested.data.challengeId, code, deviceId: `acceptance-B-${tag}` };
+        const body = { channel: 'email', destination: B.email, challengeId: requested.data.challengeId, code, deviceId: `acceptance-S2-${tag}` };
         let verified = await http('/v1/account/otp/verify', { method: 'POST', jar: B.jar, body });
         if (verified.status === 200 && verified.data?.status === 'profile-required') {
           verified = await http('/v1/account/otp/verify', { method: 'POST', jar: B.jar, body: { ...body, code: undefined, signupTicket: verified.data.signupTicket, profile: { name: `Acceptance Child B ${tag}`, isAdult: false, year: '10' } } });
@@ -435,9 +516,10 @@ export async function runAcceptance(args, deps = {}) {
             const parentCode = await ask(b, `the PARENT opens their mailbox ${maskEmail(B.guardian)}, reads the notice and the 6-digit approval code. In the product the parent approves on /guardian/consent on THEIR device (device-matrix step 03); here the same server route is driven with the code the human read.`);
             if (parentCode) {
               const approved = await http('/v1/account/otp/guardian/approve', { method: 'POST', body: { approve: true, noticeVersion: asked.data.noticeVersion, channel: 'email', destination: B.guardian, code: parentCode } });
-              check(b, approved.status === 200 && approved.data?.confirmed === true, 'the parent\'s code approves (guardian/approve → confirmed, no child session involved)', `status ${approved.status} ${approved.code || ''}`);
+              const approvedOk = check(b, approved.status === 200 && approved.data?.confirmed === true, 'the parent\'s code approves (guardian/approve → confirmed, no child session involved)', `status ${approved.status} ${approved.code || ''}`);
               const state = await http('/v1/account/guardian/state', { jar: B.jar });
-              check(b, state.status === 200 && state.data?.state === 'given', 'the child\'s guardian state is now given', `state ${state.data?.state ?? 'unknown'}`);
+              const given = check(b, state.status === 200 && state.data?.state === 'given', 'the child\'s guardian state is now given', `state ${state.data?.state ?? 'unknown'}`);
+              B.confirmed = approvedOk && given;
               const issued = await http('/v1/practice/issue', { method: 'POST', jar: B.jar, body: { generator: GENERATOR, difficulty: DIFFICULTY, curriculum: 'in' } });
               check(b, issued.status === 201 && issued.data?.question?.id, 'after approval the child is issued a server question (201)', `status ${issued.status} ${issued.code || ''}`);
             }
@@ -453,10 +535,52 @@ export async function runAcceptance(args, deps = {}) {
     settle(b);
   }
 
-  // ══ C and D · read + server mark ═══════════════════════════════════════════
+  // ══ S3 · guardian withdrawal ═══════════════════════════════════════════════
+  // The parent takes back the consent S2 recorded, through the route their own
+  // page uses: /guardian/consent opened from the emailed link answers "no" with
+  // POST /v1/account/guardian/withdraw { token } (client/src/pages/GuardianConsent.jsx
+  // answerLink('withdraw') → cloudTransport guardianWithdraw). For a parent asked
+  // by email, otp/guardian/request queues that link (the "Confirm your child's Pri
+  // Learning account" email) beside the approval code, and the route accepts its
+  // token for a withdrawal in any state (server/platform/accounts.js). The phone
+  // routes (otp/guardian/withdraw-request + otp/guardian/withdraw) are for a parent
+  // who approved by SMS; S2 asks by email, so they do not apply. No child session
+  // is involved. Withdrawal is terminal for the ceremony (the child cannot ask
+  // again: GUARDIAN_CONSENT_WITHDRAWN), so only a child account THIS run created
+  // is withdrawn; a pre-existing one is left as it is and S3 stays open.
+  if (!want('S3')) {
+    skipped('S3', 'skipped by --skip');
+  } else if (!B.confirmed) {
+    skipped('S3', 'needs the child account its parent confirmed at S2 on this run');
+  } else {
+    const w = open('S3', EVIDENCE.REAL_MAILBOX_LINK);
+    try {
+      if (!B.created) {
+        note(w, 'the child account existed before this run: this tool never withdraws a consent it did not create (the child cannot ask again afterwards); use a fresh --child-email');
+        w.pending = true;
+      } else {
+        const pasted = await ask(w, `the PARENT opens their mailbox ${maskEmail(B.guardian)}, finds the email "Confirm your child’s Pri Learning account" that came with the approval code, and copies its link (it opens /guardian/consent). In the product the parent opens that link on THEIR device and says no, which withdraws through POST /v1/account/guardian/withdraw; here the same route is driven with the link the human pasted. Paste the whole link; it is never printed or saved.`);
+        if (pasted) {
+          const link = withdrawalTokenFrom(pasted);
+          if (check(w, !!link.token, 'what was pasted is the parent\'s link (or its token)', link.problem || (link.origin ? `a link on ${link.origin === args.origin ? 'this host' : link.origin}` : 'a bare token'))) {
+            if (link.origin && link.origin !== args.origin) note(w, `the link names ${link.origin}, not ${args.origin}; its token is sent only to ${args.origin}`);
+            const withdrawn = await http('/v1/account/guardian/withdraw', { method: 'POST', body: { token: link.token } });
+            check(w, withdrawn.status === 200 && withdrawn.data?.ok === true && withdrawn.data?.withdrawn === true, 'the parent\'s link withdraws consent (POST /v1/account/guardian/withdraw → withdrawn, no child session involved)', `status ${withdrawn.status} ${withdrawn.code || ''}, withdrawn ${withdrawn.data?.withdrawn}`);
+            const refused = await http('/v1/practice/issue', { method: 'POST', jar: B.jar, body: { generator: GENERATOR, difficulty: DIFFICULTY, curriculum: 'in' } });
+            check(w, refused.status === CONSENT_WITHDRAWN.status && refused.code === CONSENT_WITHDRAWN.code && !refused.data?.question, `the child's next question is refused (${CONSENT_WITHDRAWN.status} ${CONSENT_WITHDRAWN.code})`, `status ${refused.status} ${refused.code || ''}${refused.data?.question ? ', a question was issued' : ''}`);
+            const state = await http('/v1/account/guardian/state', { jar: B.jar });
+            check(w, state.status === 200 && state.data?.state === 'withdrawn' && state.data?.blockerCode === CONSENT_WITHDRAWN.code, 'the child\'s guardian state is now withdrawn', `status ${state.status}, state ${state.data?.state ?? 'unknown'}, blocker ${state.data?.blockerCode ?? 'none'}`);
+          }
+        }
+      }
+    } catch (error) { check(w, false, 'S3 ran to completion', error?.message || String(error)); }
+    settle(w);
+  }
+
+  // ══ S4 and S5 · read + server mark ═════════════════════════════════════════
   const needA = id => {
     if (!want(id)) return skipped(id, 'skipped by --skip'), false;
-    if (!A.accountId) return skipped(id, 'needs the signed-in account from A'), false;
+    if (!A.accountId) return skipped(id, 'needs the signed-in account from S1'), false;
     return true;
   };
   async function issueQuestion(step) {
@@ -542,6 +666,10 @@ export async function runAcceptance(args, deps = {}) {
     if (!check(step, graded.status === 200 && g.authoritative === true && Number.isFinite(g.marksPossible) && g.marksPossible > 0, 'POST /v1/practice/:id/submit returned the server\'s authoritative mark', `status ${graded.status} ${graded.code || ''}`)) return;
     note(step, `verdict ${g.invalid ? 'invalid' : g.correct ? 'correct' : 'incorrect'}, marks ${g.marksEarned}/${g.marksPossible}, resolved ${g.resolved}, attempt ${g.attemptId}`);
     if (g.attemptId) A.attemptIds.add(g.attemptId);
+    // Only a resolved attempt becomes a graded-attempt row (server/platform/practice.js),
+    // so only a resolved one is what S6's returning student must get back.
+    if (g.attemptId && g.resolved === true) A.marked.push({ step: step.id, questionId: q.id, attemptId: g.attemptId, submissionId, marksEarned: g.marksEarned, marksPossible: g.marksPossible, correct: g.correct === true });
+    else if (g.attemptId) note(step, 'the attempt is not resolved (a try is left), so S6 does not expect it in History');
     const finalNumber = answer.replace(/[−–—]/g, '-').replace(/\s+/g, '').replace(/^n=/, '');
     if (expected && finalNumber === String(expected.n)) check(step, g.correct === true && g.marksEarned === g.marksPossible, 'the right term number is marked right with full marks', `${g.marksEarned}/${g.marksPossible}`);
     else if (expected) note(step, `the submitted answer ${JSON.stringify(answer)} is not the expected ${expected.n}; the verdict is recorded, not judged`);
@@ -552,8 +680,8 @@ export async function runAcceptance(args, deps = {}) {
     check(step, pull.status === 200 && events.length === 1, 'the attempt is persisted once and reads back through GET /v1/sync/pull (History)', `status ${pull.status}, ${events.length} graded-attempt event(s) for the question`);
   }
 
-  if (needA('C')) {
-    const c = open('C', EVIDENCE.SYNTHETIC_PICTURE);
+  if (needA('S4')) {
+    const c = open('S4', EVIDENCE.SYNTHETIC_PICTURE);
     try {
       // Write mode: the answer alone, as a student writes it on the page.
       await readAndMark(c, {
@@ -561,11 +689,11 @@ export async function runAcceptance(args, deps = {}) {
         linesFor: expected => [String(expected ? expected.n : 24)],
         render: lines => pictures.ink(lines, { seed: 20261018 })
       });
-    } catch (error) { check(c, false, 'C ran to completion', error?.message || String(error)); }
+    } catch (error) { check(c, false, 'S4 ran to completion', error?.message || String(error)); }
     settle(c);
   }
-  if (needA('D')) {
-    const d = open('D', EVIDENCE.SYNTHETIC_PICTURE);
+  if (needA('S5')) {
+    const d = open('S5', EVIDENCE.SYNTHETIC_PICTURE);
     try {
       // Photo mode: a page of working whose last line is the answer
       // (a + (n-1)d = term, then n), in the glyphs the simulated pen has.
@@ -576,11 +704,71 @@ export async function runAcceptance(args, deps = {}) {
           : ['(n-1) = 23', 'n = 24'],
         render: lines => pictures.photo(lines, { seed: 20261019 })
       });
-    } catch (error) { check(d, false, 'D ran to completion', error?.message || String(error)); }
+    } catch (error) { check(d, false, 'S5 ran to completion', error?.message || String(error)); }
     settle(d);
   }
 
-  // ══ E · account isolation ══════════════════════════════════════════════════
+  // ══ S6 · returning student ═════════════════════════════════════════════════
+  // Student A comes back on another device: a NEW session (a new code read from
+  // the mailbox, a new device id, an empty cookie jar) and nothing local, so
+  // History is whatever the server gives back. The app rebuilds it by walking
+  // GET /v1/sync/pull/:cursor from 0 while hasMore (client/src/platform/syncWorker.js
+  // pullAll) and counts only the canonical grader's rows (remoteLearningSummary);
+  // so does this step. Every attempt S4 and S5 had marked must come back once,
+  // with the attempt id, question, submission and mark the server gave then.
+  // S1's session is left alone: S7 still probes it.
+  if (!want('S6')) {
+    skipped('S6', 'skipped by --skip');
+  } else if (!A.accountId) {
+    skipped('S6', 'needs the signed-in account from S1');
+  } else if (A.marked.length === 0) {
+    skipped('S6', 'needs an attempt S4 or S5 marked on this run (none was)');
+  } else {
+    const s6 = open('S6', EVIDENCE.REAL_MAILBOX);
+    try {
+      const fresh = { jar: {} };
+      const requested = await http('/v1/account/otp/request', { method: 'POST', body: { channel: 'email', destination: A.email } });
+      if (check(s6, requested.status === 202 && requested.data?.challengeId, 'otp/request accepted (202) for student A\'s mailbox again', `status ${requested.status} ${requested.code || ''}`)) {
+        const code = await ask(s6, `student A comes back on another device: open the mailbox ${maskEmail(A.email)} and read the NEW 6-digit sign-in code that just arrived (not the one used at S1).`);
+        if (code) {
+          const verified = await http('/v1/account/otp/verify', { method: 'POST', jar: fresh.jar, body: { channel: 'email', destination: A.email, challengeId: requested.data.challengeId, code, deviceId: `acceptance-S6-${tag}` } });
+          const same = check(s6, verified.status === 200 && verified.data?.status === 'signed-in' && verified.data?.created !== true && verified.data?.account?.id === A.accountId,
+            'the returning student signs in to the same account (200 signed-in, no new profile asked)',
+            `status ${verified.status} ${verified.code || ''}${verified.data?.status === 'profile-required' ? ', profile-required: the server did not know the address' : ''}`);
+          const newCookie = !!fresh.jar.pri_cloud_session && fresh.jar.pri_cloud_session !== A.jar.pri_cloud_session;
+          const freshId = newCookie ? await sessionIdOf(fresh.jar) : null;
+          const fresher = check(s6, newCookie && !!freshId && freshId !== A.sessionId, 'it is a NEW session, not S1\'s (a fresh cookie and its own device session)', newCookie ? (freshId ? (freshId === A.sessionId ? 'the devices list calls it S1\'s session' : 'a new device session') : 'the devices list names no current session') : 'no new session cookie');
+          if (same && fresher) {
+            const events = [];
+            let cursor = 0, pages = 0, complete = false, failure = null;
+            while (pages < PULL_PAGES) {
+              const page = await http(`/v1/sync/pull/${cursor}`, { jar: fresh.jar });
+              pages += 1;
+              if (page.status !== 200 || !Array.isArray(page.data?.events)) { failure = `page ${pages}: status ${page.status} ${page.code || ''}`; break; }
+              events.push(...page.data.events);
+              if (!page.data.hasMore) { complete = true; break; }
+              const next = Number(page.data.cursor);
+              if (!Number.isSafeInteger(next) || next <= cursor) { failure = `page ${pages}: hasMore with a cursor that does not move on (${page.data.cursor})`; break; }
+              cursor = next;
+            }
+            if (!complete && !failure) failure = `still hasMore after ${PULL_PAGES} pages`;
+            check(s6, complete, 'the fresh session reads History back through GET /v1/sync/pull/:cursor (from 0, following hasMore, as the app does)', failure || `${pages} page(s), ${events.length} event(s)`);
+            if (complete) {
+              const back = returnedAttempts(A.marked, events);
+              check(s6, back.missing.length === 0 && back.duplicated.length === 0, `every attempt S4 and S5 marked comes back, once, by attempt id (${A.marked.length})`,
+                `${A.marked.length - back.missing.length}/${A.marked.length} back${back.missing.length ? `; missing ${back.missing.join(', ')}` : ''}${back.duplicated.length ? `; more than once ${back.duplicated.join(', ')}` : ''}`);
+              check(s6, back.matched.length > 0 && back.mismatched.length === 0, 'each attempt that came back carries the question, submission and mark the server gave at S4/S5',
+                `${back.matched.length} match${back.mismatched.length ? `; different ${back.mismatched.map(m => `${m.step} ${m.attemptId}`).join(', ')}` : ''}`);
+              for (const m of back.matched) note(s6, `${m.step} attempt ${m.attemptId}: ${m.marksEarned}/${m.marksPossible}, ${m.correct ? 'correct' : 'not correct'}`);
+            }
+          }
+        }
+      }
+    } catch (error) { check(s6, false, 'S6 ran to completion', error?.message || String(error)); }
+    settle(s6);
+  }
+
+  // ══ S7 · account isolation ═════════════════════════════════════════════════
   // Student B2 is signed up the same way as A (a code read from the plus-addressed
   // pri-iso mailbox) so that its mailbox is VERIFIED: the practice router refuses
   // every unverified account with 403 EMAIL_UNVERIFIED before it looks the question
@@ -590,8 +778,8 @@ export async function runAcceptance(args, deps = {}) {
   const ISO = { jar: {}, accountId: null, created: false, email: addresses.isolation, verified: false };
   const OWNERSHIP_REFUSAL = Object.freeze({ status: 404, code: 'QUESTION_NOT_FOUND' });
   const isOwnershipRefusal = res => res.status === OWNERSHIP_REFUSAL.status && res.code === OWNERSHIP_REFUSAL.code && res.data?.authoritative !== true;
-  if (needA('E')) {
-    const e = open('E', EVIDENCE.TEST_ACCOUNTS);
+  if (needA('S7')) {
+    const e = open('S7', EVIDENCE.TEST_ACCOUNTS);
     try {
       const anon = await http('/v1/sync/pull/0');
       check(e, anon.status === 401, 'no session: GET /v1/sync/pull is refused (401)', `status ${anon.status} ${anon.code || ''}`);
@@ -599,7 +787,7 @@ export async function runAcceptance(args, deps = {}) {
       if (check(e, requested.status === 202 && requested.data?.challengeId, 'otp/request accepted (202) for the isolation address', `status ${requested.status} ${requested.code || ''}`)) {
         const code = await ask(e, `open the mailbox ${maskEmail(ISO.email)} (student B2, the isolation account); read the 6-digit sign-in code that just arrived.`);
         if (code) {
-          const body = { channel: 'email', destination: ISO.email, challengeId: requested.data.challengeId, code, deviceId: `acceptance-E-${tag}` };
+          const body = { channel: 'email', destination: ISO.email, challengeId: requested.data.challengeId, code, deviceId: `acceptance-S7-${tag}` };
           let verified = await http('/v1/account/otp/verify', { method: 'POST', jar: ISO.jar, body });
           if (verified.status === 200 && verified.data?.status === 'profile-required') {
             verified = await http('/v1/account/otp/verify', { method: 'POST', jar: ISO.jar, body: { ...body, code: undefined, signupTicket: verified.data.signupTicket, profile: { name: `Acceptance Isolation B2 ${tag}`, isAdult: true } } });
@@ -619,13 +807,13 @@ export async function runAcceptance(args, deps = {}) {
         check(e, pullB.status === 200 && Array.isArray(pullB.data?.events) && leakedEvents.length === 0 && pullB.data.events.length === 0, 'student B2\'s sync pull holds none of student A\'s questions or attempts', `status ${pullB.status}, ${(pullB.data?.events || []).length} event(s), ${leakedEvents.length} of A's`);
         const [qid] = [...A.questionIds];
         if (!qid) {
-          human(e, 'A issued no question this run (C and D were skipped or stopped early): the cross-account question probes were NOT run and E cannot read PASS without them.');
+          human(e, 'student A issued no question this run (S4 and S5 were skipped or stopped early): the cross-account question probes were NOT run and S7 cannot read PASS without them.');
           e.pending = true;
         } else if (!ISO.verified) {
           human(e, 'student B2 is not verified: the four cross-account question probes were NOT run (an unverified account is refused EMAIL_UNVERIFIED before ownership is checked, which proves nothing about isolation).');
           e.pending = true;
         } else {
-          const steal = await http(`/v1/practice/${qid}/submit`, { method: 'POST', jar: ISO.jar, body: { submissionId: `accept-E-${tag}`, answer: '0', mode: 'typed' } });
+          const steal = await http(`/v1/practice/${qid}/submit`, { method: 'POST', jar: ISO.jar, body: { submissionId: `accept-S7-${tag}`, answer: '0', mode: 'typed' } });
           check(e, isOwnershipRefusal(steal), `verified student B2 submitting to student A's question is refused by ownership (${OWNERSHIP_REFUSAL.status} ${OWNERSHIP_REFUSAL.code})`, `status ${steal.status} ${steal.code || ''}`);
           const peek = await http(`/v1/practice/${qid}/recognize`, { method: 'POST', jar: ISO.jar, body: { mode: 'ink', image: 'data:image/png;base64,iVBORw0KGgo=' } });
           check(e, isOwnershipRefusal(peek), `verified student B2 minting a reading receipt on student A's question is refused by ownership (${OWNERSHIP_REFUSAL.status} ${OWNERSHIP_REFUSAL.code})`, `status ${peek.status} ${peek.code || ''}`);
@@ -653,7 +841,7 @@ export async function runAcceptance(args, deps = {}) {
           const foreign = exportedForeignRows(rowsB, A);
           check(e, foreign.length === 0, 'student B2\'s export holds none of student A\'s questions or attempts', `${rowsB.learningEvents.length} event(s), ${rowsB.entities.length} entit(y/ies), ${foreign.length} of A's`);
         }
-        // Student A's session was made at step A. Inside EXPORT_FRESH_MS the
+        // Student A's session was made at S1. Inside EXPORT_FRESH_MS the
         // sign-in is fresh proof and the export is A's own; past it, the cookie
         // alone must be refused 401 REAUTH_REQUIRED naming the one-time code as
         // the proof a code-only account can offer — that refusal is the security
@@ -671,15 +859,15 @@ export async function runAcceptance(args, deps = {}) {
           check(e, exportServed || exportRefused, 'student A\'s export at the edge of the fresh-proof window is either A\'s own or refused 401 REAUTH_REQUIRED naming otp', `${ageDetail}; status ${exportA.status} ${exportA.code || ''}`);
         }
       }
-    } catch (error) { check(e, false, 'E ran to completion', error?.message || String(error)); }
+    } catch (error) { check(e, false, 'S7 ran to completion', error?.message || String(error)); }
     settle(e);
   }
 
-  // ══ F · cleanup ════════════════════════════════════════════════════════════
-  if (!want('F') || !args.cleanup) {
-    skipped('F', !want('F') ? 'skipped by --skip' : `cleanup is off for ${args.target} (pass --cleanup to delete the accounts this run created)`);
+  // ══ S8 · cleanup ═══════════════════════════════════════════════════════════
+  if (!want('S8') || !args.cleanup) {
+    skipped('S8', !want('S8') ? 'skipped by --skip' : `cleanup is off for ${args.target} (pass --cleanup to delete the accounts this run created)`);
   } else {
-    const f = open('F', EVIDENCE.TEST_ACCOUNTS);
+    const f = open('S8', EVIDENCE.TEST_ACCOUNTS);
     for (const [label, acct] of [['A', A], ['B (child)', B], ['B2 (isolation)', ISO]]) {
       if (!acct.created || !acct.accountId) { if (acct.accountId) note(f, `${label} existed before this run and is left alone`); continue; }
       const requested = await http('/v1/account/otp/delete-request', { method: 'POST', body: { email: acct.email } });
@@ -715,12 +903,12 @@ export function exitCodeFor(report) {
 }
 
 async function main() {
-  const usage = 'Usage: node tools/acceptance/staging-acceptance.mjs --email <mailbox> --tester "<name>" [--target staging|production] [--sha <40-hex>] [--guardian-email <mailbox>] [--child-email <mailbox>] [--skip B,E] [--cleanup] [--non-interactive] [--out <dir>] [--max-reads 4] [--json]';
+  const usage = 'Usage: node tools/acceptance/staging-acceptance.mjs --email <mailbox> --tester "<name>" [--target staging|production] [--sha <40-hex>] [--guardian-email <mailbox>] [--child-email <mailbox>] [--skip S2,S7] [--cleanup] [--non-interactive] [--out <dir>] [--max-reads 4] [--json]';
   let args;
   try { args = parseArgs(process.argv.slice(2)); }
   catch (error) { console.error(`${error.message}\n${usage}`); process.exit(2); }
   const interactive = !args.nonInteractive && process.stdin.isTTY === true;
-  console.log(`── Pri Learning staging acceptance A–D ─ target ${args.target} ─ ${args.origin}${args.sha ? ` ─ nominated ${args.sha}` : ''}`);
+  console.log(`── Pri Learning staging acceptance S0–S8 ─ target ${args.target} ─ ${args.origin}${args.sha ? ` ─ nominated ${args.sha}` : ''}`);
   console.log(`   ${interactive ? 'interactive: HUMAN STEP lines wait for the person at this terminal' : 'non-interactive: HUMAN STEP lines are printed and left open (NOT VERIFIED)'}`);
   let report;
   try {

@@ -21,11 +21,17 @@ assert.equal((ink.match(/\breadNow\(\)/g) || []).length, 1, 'the only call of re
 assert.match(ink, /data-ink-read=\{[^}]+\} onClick=\{readNow\}/, 'a read is sent by the student pressing Read my answer');
 assert.match(ink, /if \(flyingRef\.current === signature\) return;/, 'a page that is being read is never sent again');
 assert.match(ink, /readRef\.current === nowSignature && recRef\.current\.lines\.length/, 'a late reading of other ink never replaces the transcript of the page as it stands');
-assert.match(native, /pri-foundation.*timeout/s, 'foundation timeout must remain visible evidence');
-assert.match(native, /native-rescue.*timeout/s, 'native rescue timeout must remain visible evidence');
-assert.match(bridge, /strokeRevision/, 'native queue must invalidate stale page jobs');
-assert.match(bridge, /pri-foundation-stale/, 'stale Foundation jobs must answer without doing expensive work');
-assert.doesNotMatch(bridge, /let rescue = self\.recognizer\.readWithGlyphConsensus[\s\S]{0,300}native-rescue-debug/, 'Foundation DEBUG path must not secretly run rescue twice');
+// D16 (V1_DECISIONS_2026-11-01.md): the shell no longer reads ink, so the
+// on-device job queue these lines once pinned (foundation/rescue timeouts,
+// strokeRevision, stale Foundation jobs) is gone from both sides. What must
+// hold instead: no read op survives on either side, and a late SERVER reading
+// can never land on changed ink (the read sequence guard in InkAnswer, beside
+// the readRef/flyingRef checks above; tour-stale-cloud.js drives it).
+const code = text => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+assert.doesNotMatch(code(native), /foundationRecognize|op:\s*['"]recognize['"]|type === 'reading'/, 'the web side of the bridge asks the shell to read nothing');
+assert.doesNotMatch(code(bridge), /case "recognize"|case "foundationRecognize"|"reading"/, 'the shell answers no read op');
+assert.match(ink, /const seq = \+\+readSeqRef\.current;/, 'every server read takes a sequence number');
+assert.match(ink, /if \(seq !== readSeqRef\.current \|\| disabledRef\.current\) return;/, 'a reply to an older read is dropped');
 
 // Reproduce the gateway failure class from the real iPad page: 3,000 points as
 // {x,y} exceeds MAX_KEYS, while the compact tuple transport remains legal.

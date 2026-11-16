@@ -53,15 +53,16 @@ const script = extractRunBlock(workflow);
 check(/set -euo pipefail/.test(script), 'the audit script fails closed (set -euo pipefail)');
 check(/for attempt in 1 2 3 4 5; do/.test(script) && /sleep 10/.test(script), 'the merged-PR lookup retries 5 × 10 s');
 check(/not the recorded merge result of a merged pull request/.test(script), 'an unrecorded commit is still refused after the retries');
+check(/if \[\[ "\$head_ref" != task\/train-\* \]\]; then/.test(script), 'a merge from a lane branch (not task/train-*) is refused: lane PRs skip the heavy workflows');
 
 // ── a stub GitHub API and a stub clock ───────────────────────────────────────
 const SHA = 'e1d0f08c2000000000000000000000000000abcd';
 const HEAD = '95930d70a000000000000000000000000000beef';
-const pullsJson = (base = 'main') => JSON.stringify([{
+const pullsJson = (base = 'main', headRef = 'task/train-6') => JSON.stringify([{
   number: 515, html_url: 'https://github.com/o/r/pull/515', merged_at: '2026-10-17T15:40:11Z', merge_commit_sha: SHA,
-  base: { ref: base }, head: { sha: HEAD },
+  base: { ref: base }, head: { sha: HEAD, ref: headRef },
 }]);
-const run = (id, name, status, conclusion, updated = '2026-10-17T15:30:00Z') => ({ workflow_id: id, name, status, conclusion, updated_at: updated });
+const run = (id, name, status, conclusion, updated = '2026-10-17T15:30:00Z', branch = 'task/train-6') => ({ workflow_id: id, name, status, conclusion, updated_at: updated, head_branch: branch });
 const runsJson = runs => JSON.stringify({ workflow_runs: runs });
 const GREEN = [run(1, 'CI', 'completed', 'success'), run(2, 'Native Ink', 'completed', 'success'), run(3, 'CodeQL', 'completed', 'skipped')];
 
@@ -155,6 +156,35 @@ function audit({ emptyUntil = 0, pulls = pullsJson(), runs = runsJson(GREEN) }) 
   check(r.status === 1 && /no pull-request workflow evidence exists/.test(r.out), 'a head with no workflow runs at all is refused');
 }
 
+// 4b. Lane PRs run only the required contexts and the always-on gates, so main
+// arrives only through a task/train-* pull request (docs/release/ci-lanes.md).
+for (const ref of ['task/g4-hsc-blueprints', 'feature/x', 'dependabot/npm_and_yarn/client/vite-7', 'claude/ci-speed-no-cost', 'task/trainer', 'train-6', '']) {
+  const r = audit({ pulls: pullsJson('main', ref) });
+  check(r.status === 1 && /not a task\/train-\* branch/.test(r.out) && r.runsLookups.length === 0, `a merge from ${JSON.stringify(ref)} is refused before any workflow evidence is read (exit ${r.status})`);
+}
+{
+  const r = audit({ pulls: JSON.stringify([{ number: 515, html_url: 'u', merged_at: '2026-10-17T15:40:11Z', merge_commit_sha: SHA, base: { ref: 'main' }, head: { sha: HEAD } }]) });
+  check(r.status === 1 && /not a task\/train-\* branch/.test(r.out), 'a PR record with no head ref is refused (fails closed)');
+}
+{
+  const r = audit({ pulls: pullsJson('main', 'task/train-editions-6'), runs: runsJson([run(1, 'CI', 'completed', 'success', '2026-10-17T15:30:00Z', 'task/train-editions-6')]) });
+  check(r.status === 0 && /Main integrity verified/.test(r.out), 'a train head (task/train-editions-6) passes');
+}
+
+{
+  // A train of one shares its head SHA with the lane PR: the lane's later, lane-gated (skipped)
+  // run of a workflow must not hide the train's failed run of it.
+  const r = audit({ runs: runsJson([
+    run(1, 'CI', 'completed', 'success'),
+    run(2, 'Android Shell', 'completed', 'failure', '2026-10-17T15:30:00Z', 'task/train-6'),
+    run(2, 'Android Shell', 'completed', 'skipped', '2026-10-17T15:45:00Z', 'task/g4-hsc-blueprints'),
+    run(1, 'CI', 'completed', 'success', '2026-10-17T15:45:00Z', 'task/g4-hsc-blueprints')
+  ]) });
+  check(r.status === 1 && /merged with 1 latest workflow\(s\) in a failing/.test(r.out), 'a newer skipped lane run on the same SHA cannot hide the train\'s failed run');
+  const lanesOnly = audit({ runs: runsJson([run(1, 'CI', 'completed', 'success', '2026-10-17T15:30:00Z', 'task/g4-hsc-blueprints')]) });
+  check(lanesOnly.status === 1 && /no pull-request workflow evidence exists/.test(lanesOnly.out), 'runs of another branch on the same SHA are no evidence for the train');
+}
+
 // 5. Everything green at once: no wait, pass.
 {
   const r = audit({});
@@ -169,4 +199,4 @@ if (failures.length) {
   console.error(`MAIN INTEGRITY LOOKUP: FAIL — ${passed}/${total} checks`);
   process.exit(1);
 }
-console.log(`MAIN INTEGRITY LOOKUP: PASS — ${passed}/${total} checks — the merged-PR lookup retries 5 × 10 s, a commit with no merged PR is still refused, and every latest workflow on the exact PR head must be complete and green.`);
+console.log(`MAIN INTEGRITY LOOKUP: PASS — ${passed}/${total} checks — the merged-PR lookup retries 5 × 10 s, a commit with no merged PR is still refused, main arrives only through a task/train-* pull request, and every latest workflow on the exact PR head must be complete and green.`);

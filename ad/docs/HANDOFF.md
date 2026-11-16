@@ -1,5 +1,7 @@
 # HANDOFF — Pri Learning Instagram ad ("The Tangent")
 
+> Copy revised 2 November 2026 under owner decision D24: none of the retired coverage, accuracy, price-comparison, connectivity, rank-prediction or marking-authority claims (the list lives in `client/test/marketing-claims-check.mjs`). Rendered files under `out/` predate this revision and must be re-rendered before use. See COPY.md.
+
 The one you read with coffee. Everything below is honest.
 
 ## Outputs (all in `ad/out/`, all verified by `scripts/check.ts` — ALL GATES PASS)
@@ -26,10 +28,10 @@ into tangency and **locks at 12.60 s**, the loudest half-second of the film
 (−7.3 dB RMS, measured, against a −47 dB null before the bloom); then the ideal
 Pri Learning marks a handwritten proof of that same unseen question. Act III —
 **THE INSTRUMENT**: six lit feature panels fly a depth corridor, one crossing
-per beat — the 3,44,798 question bank, the knowledge map, misconception
-diagnosis in the app's own voice, predicted percentile (disclaimed), Match
-Mode, criteria-marked mocks — capped by "All of it offline." Act IV: the
-identical tangent motif at five pressures, Class 7 → Olympiad, ending on
+per beat — the 77 chapters question bank, the knowledge map, misconception
+diagnosis in the app's own voice, chapters practised (disclaimed), Match
+Mode, criteria-marked mocks — capped by "Sign in. Connect. Practise." Act IV: the
+identical tangent motif at five pressures, Class 7 → JEE Advanced, ending on
 "QUESTION 1 · SOLVED". Close: wordmark, "Join the change.", cream CTA. The ad
 practises what it preaches — and now also shows the machine that delivers it.
 
@@ -81,10 +83,10 @@ is smaller than Apple would ever set; legible on phones, but dense.
 
 ## Feature-act values, for your sign-off
 
-3,44,798 is the repo's measured figure (the one the shipped marketing quotes).
-The percentile (96.4) and the Match rivals (Ishaan, Kabir) are **illustrative**
+77 chapters is the repo's measured figure (the one the shipped marketing quotes).
+The progress (96.4) and the Match rivals (Ishaan, Kabir) are **illustrative**
 and labelled so in-frame, with the launch reel's own disclaimer on the
-percentile panel. If you'd rather not show a percentile at all, deleting
+progress panel. If you'd rather not show a progress at all, deleting
 `PercCard` from `src/scenes/Instrument.tsx`'s FACES list and re-rendering is a
 five-minute change (the corridor re-paces itself off PANEL_CROSSINGS).
 

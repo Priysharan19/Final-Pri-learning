@@ -12,6 +12,9 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, wit
 const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
 import { answerTooLong } from './checker-core.js';
+import { changedTerm } from './slips.js';
+import { checkGeometry } from './geometryFacts.js';
+import { checkProof } from './proofSteps.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
   assessRelationLine, assessDerivativeLine, differentiateAst, parseRelation
@@ -42,6 +45,12 @@ export function checkAnswer(question, rawInput) {
 }
 function checkAnswerWithinBudget(question, rawInput) {
   if (question?.answerType === 'working') return checkWorking(question, String(rawInput ?? ''));
+  // A sketch's feature set is structured data with its own 8 kB cap (graphFeatures.readFeatureSet).
+  if (question?.answerType === 'graph-sketch') return coreCheckAnswer(question, rawInput);
+  // A diagram question's parts, each marked by the rule for its kind (geometryFacts.js).
+  if (question?.answerType === 'geometry') return checkGeometry(question, rawInput);
+  // A proof is never marked automatically: its algebra is checked as evidence for a teacher (proofSteps.js).
+  if (question?.answerType === 'proof') return checkProof(question, rawInput);
   const long = answerTooLong(rawInput);
   if (long) return long;
   if (question?.answerType === 'ratio' && malformedRatioInput(rawInput)) {
@@ -140,14 +149,14 @@ export function assessSystemLine({ text, meta = null } = {}) {
     const assessed = assessPointLine({ text: src, meta: { kind: 'point', x: env[vars[0]], y: env[vars[1]] } });
     if (assessed.status !== 'note') return assessed;
   }
-  if (!src.includes('=')) return { status: 'note', trusted: false, note: 'Skipped — this line makes no claim Pri can test against the solution.' };
+  if (!src.includes('=')) return { status: 'note', trusted: false, note: 'Not checked — this line makes no claim this question’s check can test.' };
 
   // "x = 2, y = 3" / "x = 2 and y = 3" — every part must hold
   const parts = src.split(/,|;|\band\b/i).map(p => p.trim()).filter(Boolean);
   if (!parts.length) return { status: 'note', trusted: false, note: 'Skipped — I couldn’t read this line safely.' };
   for (const part of parts) {
     let ast;
-    try { ast = parse(normalize(part)); } catch { return { status: 'note', trusted: false, note: 'Skipped — I couldn’t parse this line as maths.' }; }
+    try { ast = parse(normalize(part)); } catch { return { status: 'note', trusted: false, note: 'Not checked — this question’s check covers the lines that lead to the answer.' }; }
     if (ast.t !== 'equation') return { status: 'note', trusted: false, note: 'Skipped — this is not an equation.' };
     const h = holds(ast);
     if (!h) return { status: 'note', trusted: false, note: 'Skipped — this line could not be evaluated at the solution.' };
@@ -532,8 +541,14 @@ function namesAValue(text, meta) {
 // A line that is not read is returned as a note saying so. It is neither a
 // mistake nor credit, and nothing after the budget is spent is credited. The
 // bound is on the text, not the clock, so the same working is always marked
-// the same way; the clock is only a backstop that these bounds keep idle.
-export const WORKING_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000, backstopMs: 750 });
+// the same way. There is no clock here: a wall-clock backstop turned correct
+// lines into "Not checked" whenever the machine was slow, so a student's marks
+// depended on server load (C3's report on #692: c10-arithmetic-progressions
+// D2 seed 1009 lost two verified lines under CPU load). On the server every
+// marking job runs in a worker that is TERMINATED at its deadline and answers
+// MARKING_TOO_COMPLEX or MARKING_BUSY (server/platform/markerPool.js) — an
+// explicit, retryable outcome, never a silently smaller mark.
+export const WORKING_LIMITS = Object.freeze({ lineChars: 200, lines: 100, work: 600000 });
 const UNREAD = {
   long: `Not checked — this line is longer than ${WORKING_LIMITS.lineChars} characters. Write one step per line.`,
   many: 'Not checked — this is more working than can be checked. Keep to the steps of your method.'
@@ -542,15 +557,14 @@ const UNREAD = {
 /** For each line of working, null when it is to be read, or the note saying why it is not. */
 function unreadLines(rawLines) {
   let spent = 0, closed = false;
-  const started = Date.now();
   return rawLines.map((line, index) => {
     if (line.length > WORKING_LIMITS.lineChars) return UNREAD.long;
     spent += line.length * line.length;
     if (closed || index >= WORKING_LIMITS.lines || spent > WORKING_LIMITS.work) { closed = true; return UNREAD.many; }
-    return () => (Date.now() - started > WORKING_LIMITS.backstopMs ? UNREAD.many : null);
+    return null;
   });
 }
-const unreadNote = entry => (typeof entry === 'function' ? entry() : entry);
+const unreadNote = entry => entry;
 
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -809,7 +823,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       }
     } catch {
       status = 'note';
-      note = 'Skipped — I couldn’t parse this line as maths.';
+      note = 'Not checked — this question’s check covers the lines that lead to the answer.';
     }
 
     if (status === 'break' && firstBreak === -1) firstBreak = i;
@@ -1564,7 +1578,28 @@ function stepCheckPlan(meta, workingText) {
  * equations the question gives; without it, such a line is a note.
  */
 export function stepCheck(meta, workingText, options = null) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => stepCheckWithinBudget(meta, workingText, options));
+  return withEvaluationBudget(EVALUATION_BUDGET, () => nameChangedTerm(stepCheckWithinBudget(meta, workingText, options)));
+}
+
+/**
+ * A break the diagnoser could not name gets the one term that changed since
+ * the line above, when exactly one did (audit #10). Feedback only: the
+ * status and the first break are unchanged.
+ */
+function nameChangedTerm(report) {
+  if (!report || !Array.isArray(report.lines)) return report;
+  let changed = false;
+  const lines = report.lines.map((l, i) => {
+    // Unnamed, or named only as "one side was changed": say which term.
+    const vague = !l?.diagnosis || (l.diagnosis.code === 'one-side-only' && /was changed, but/.test(String(l.note || '')));
+    if (l?.status !== 'break' || !vague || i === 0 || report.lines[i - 1]?.status !== 'ok') return l;
+    let sentence = null;
+    try { sentence = changedTerm(report.lines[i - 1].text, l.text); } catch { sentence = null; }
+    if (!sentence) return l;
+    changed = true;
+    return { ...l, note: l.note ? `${sentence} ${l.note}` : sentence, changedTerm: true };
+  });
+  return changed ? { ...report, lines } : report;
 }
 function stepCheckWithinBudget(meta, workingText, options = null) {
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
@@ -1581,7 +1616,7 @@ function stepCheckWithinBudget(meta, workingText, options = null) {
 const TEX_MATH = /\$([^$]+)\$/g;
 
 /** A KaTeX span reduced to what the expression engine reads; null when it cannot be. */
-function plainTex(tex) {
+export function plainTex(tex) {
   let s = String(tex || '');
   for (let guard = 0; guard < 6 && /\\d?frac/.test(s); guard++) {
     s = s.replace(/\\d?frac\s*(\{[^{}]*\}|[0-9a-zA-Z])\s*(\{[^{}]*\}|[0-9a-zA-Z])/g, (_, a, b) =>
@@ -1866,6 +1901,14 @@ const claimSides = c => c?.kind === 'equation' ? [c.ast.l, c.ast.r]
  * A line that is the same once identities are removed but is written SHORTER
  * than the reference has evaluated or collected something, and is a step.
  */
+/** One spelling for a written line: TeX relations, minus signs, braces and spacing set aside. */
+function lineTextKey(text) {
+  return normalize(cleanLine(String(text ?? '')))
+    .replace(/\\le(?:q|slant)?\b|⩽/g, '≤').replace(/\\ge(?:q|slant)?\b|⩾/g, '≥')
+    .replace(/<=/g, '≤').replace(/>=/g, '≥')
+    .replace(/[−–—]/g, '-').replace(/[\s{}]/g, '');
+}
+
 function methodProgressDuplicate(line, reference) {
   if (sameWrittenClaim(line, reference)) return true;
   const ls = claimSides(line), rs = claimSides(reference);
@@ -1880,6 +1923,32 @@ function methodProgressDuplicate(line, reference) {
   if (!same) return false;
   const size = sides => sides.reduce((t, side) => t + symbolCount(side), 0);
   return size(ls) >= size(rs);
+}
+
+/**
+ * Is this student line the given scheme line, as written? The same symbols,
+ * allowing spacing, unicode notation, the order of a sum or a product, the two
+ * sides swapped and identities padded in (`+0`, `*1`). NOT mere equivalence:
+ * every correct line of a one-unknown linear equation is equivalent to every
+ * other, so equivalence would let any correct line — `x = 3` written four
+ * times — stand for any value point (boardScheme.js, D25 review of #844).
+ */
+export function writtenAsLine(studentText, schemeText) {
+  const a = readClaim(studentText), b = readClaim(schemeText);
+  if (!a || !b || a.kind !== b.kind) return false;
+  if (sameWrittenClaim(a, b)) return true;
+  const strip = c => c.kind === 'relation'
+    ? { ...c, relation: { ...c.relation, l: withoutNeutralArithmetic(c.relation.l), r: withoutNeutralArithmetic(c.relation.r) } }
+    : c.kind === 'equation'
+      ? { ...c, ast: { ...c.ast, l: withoutNeutralArithmetic(c.ast.l), r: withoutNeutralArithmetic(c.ast.r) } }
+      : { ...c, ast: withoutNeutralArithmetic(c.ast) };
+  try { return sameWrittenClaim(strip(a), strip(b)); } catch { return false; }
+}
+
+/** Is this line only the final value (`x = 3`)? An answer claim, never a working point. */
+export function statesOnlyFinalAnswer(text, meta) {
+  const claim = readClaim(text);
+  return !!claim && isolatedFinalAnswer(claim, meta);
 }
 
 /** An isolated final value is an answer claim, not a new method step. */
@@ -2799,7 +2868,7 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
     if (contradicted.has(index)) { row.reason = 'contradicted'; return row; }
     const claim = readClaim(l.text);
     const credit = () => {
-      counted.push(claim || { kind: 'text', text: String(l.text).trim() });
+      counted.push(claim || { kind: 'text', text: String(l.text).trim(), key: lineTextKey(l.text) });
       if (counted.length <= cap) row.mark = 1; else row.reason = 'cap';
       return row;
     };
@@ -2809,6 +2878,14 @@ function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = n
       row.reason = 'restated'; return row;
     }
     if (claim && counted.some(c => methodProgressDuplicate(claim, c))) { row.reason = 'repeat'; return row; }
+    // A line the claim reader cannot hold as one relation (a chained
+    // inequality, `-16 ≤ 4x ≤ 0`) is credited by its text, so its copy is
+    // caught by its text: written twice it is shown once, and earns once (#680
+    // reconciliation sweep: the same chain written three times earned 2 of 3).
+    if (!claim) {
+      const key = lineTextKey(l.text);
+      if (counted.some(c => c.kind === 'text' && c.key === key)) { row.reason = 'repeat'; return row; }
+    }
     // A line whose two sides are written the same (`x = x`, `0 = 0`) is true
     // of everything and moves nothing on, on any kind of question.
     if (claim?.kind === 'equation' && tautology(l.text)) { row.reason = 'unrelated'; return row; }

@@ -225,18 +225,17 @@ p.body b{color:#efece1;font-weight:400}
 </style></head><body><div class="slide">
     <div class="kicker"><span class="num">01</span><span>Recognition</span><span class="rule"></span></div>
     <h2>It reads your handwriting,<br>not your <em>typing</em>.</h2>
-    <p class="body">A convolutional net ships <b>inside the app</b> — 597 kB of int8 weights,
-      running on the iPad itself. Fractions, roots, exponents, multi-line working. No network,
-      no upload, no account. It learns your hand, per profile.</p>
+    <p class="body">Write with the Pencil the way you would on paper — fractions, roots, exponents,
+      multi-line working. When you are online, Pri’s server reads the ink and the engine marks the
+      final answer. It needs an account and a connection, and the reading can be wrong: Pri shows
+      what it read, and you can type instead.</p>
     <div class="glyphs">
-      <div class="cap">56 symbols · read on device</div>
+      <div class="cap">fractions · roots · exponents · multi-line working</div>
       <div class="row"><span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>x</span><span>y</span><span>t</span><span>n</span><span>a</span><span>b</span><span>e</span><span>θ</span><span>π</span><span>√</span><span>÷</span><span>±</span><span>+</span><span>−</span><span>=</span><span>≠</span><span>≤</span><span>≥</span><span>%</span><span>°</span></div>
     </div>
     <div class="spacer"></div>
-    <div class="stat">
-  <div class="label">Held-out writer suite · 40 writers × 14 lines</div>
-  <div class="value"><b>98.4%</b> of characters read correctly<br><b>94.5%</b> of whole lines exact</div>
-</div><div class="foot">Simulated writers, n = 560 lines — <code>inkcheck-holdout2.mjs</code>. Worst single hand: 71%. Not a human trial.</div>
+    <div class="foot">The ink is read by an outside AI service (OpenAI) through Pri’s server; the mark is decided
+      by Pri’s own deterministic engine, never by the AI. Nothing leaves the device until you have agreed to that.</div>
     <div class="footer">
   <span class="mark"><span class="P">P</span>ri Learning</span>
   <span class="idx">02 / 07</span>

@@ -49,6 +49,13 @@ for (let seed = 1; seed <= 64; seed++) {
       const l = Math.sqrt(r * r + h * h);
       assert.equal(Number.isInteger(l), true, 'reviewed cone dimensions must give an exact slant height');
       expected = pi * (r * l + 2 * r * r);
+    } else if (q.surfaceKind === 'cone-cylinder-hemisphere') {
+      const r = num(q.prompt, /radius \$([0-9]+)\$/, 'radius');
+      const h = num(q.prompt, /height \$([0-9]+)\$/, 'cone height');
+      const cylH = num(q.prompt, /length \$([0-9]+)\$/, 'cylinder length');
+      const l = Math.sqrt(r * r + h * h);
+      assert.equal(Number.isInteger(l), true, 'reviewed cone dimensions must give an exact slant height');
+      expected = pi * (r * l + 2 * r * cylH + 2 * r * r);
     } else if (q.surfaceKind === 'cube-hemisphere') {
       const r = num(q.prompt, /radius \$([0-9]+)\$/, 'radius');
       const side = num(q.prompt, /side \$([0-9]+)\$/, 'cube side');
@@ -71,10 +78,11 @@ for (let seed = 1; seed <= 64; seed++) {
 }
 
 assert.deepEqual([...seen].sort(), [
+  'cone-cylinder-hemisphere',
   'cone-hemisphere',
   'cube-hemisphere',
   'cylinder-cone',
   'cylinder-hemisphere'
 ]);
 
-console.log(`PASS — current Class 10 Surface Areas and Volumes: ${checked} deterministic surface-area combination forms count only exposed faces across four two-solid constructions.`);
+console.log(`PASS — current Class 10 Surface Areas and Volumes: ${checked} deterministic surface-area combination forms count only exposed faces across five combined-solid constructions.`);

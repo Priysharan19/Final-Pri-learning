@@ -19,7 +19,7 @@
 //              finish: nothing is lost, try again
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import PageLink from './PageLink.jsx';
 import { cloud } from '../platform/cloudTransport.js';
 import { cloudAccountLink, cloudDeviceId, linkSignedInAccount, verifyCloudSession } from '../platform/cloudAccount.js';
 import {
@@ -302,7 +302,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
             <button type="button" className="linklike" data-testid="activation-switch-profile" onClick={onSwitch}>{t('activation.switchProfile')}</button>
           </div>
           <p className="muted activation-foot">
-            <Link to="/privacy">{t('login.privacy')}</Link> · <Link to="/terms">{t('login.terms')}</Link>
+            <PageLink to="/privacy">{t('login.privacy')}</PageLink> · <PageLink to="/terms">{t('login.terms')}</PageLink>
           </p>
         </div>
       </div>

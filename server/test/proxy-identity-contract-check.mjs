@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(here, '..', '..');
-const names = ['NODE_ENV', 'PRI_PUBLIC_ORIGIN', 'PRI_CSRF_SECRET', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PLATFORM_DB', 'PRI_TRUSTED_PROXY_HOPS'];
+const names = ['NODE_ENV', 'PRI_PUBLIC_ORIGIN', 'PRI_CSRF_SECRET', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PLATFORM_DB', 'PRI_TRUSTED_PROXY_HOPS', 'PRI_CLIENT_IP_HEADER'];
 const prior = Object.fromEntries(names.map(name => [name, process.env[name]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-proxy-identity-'));
 
@@ -119,6 +119,25 @@ for (const name of names) {
   if (prior[name] === undefined) delete process.env[name];
   else process.env[name] = prior[name];
 }
+// ── 4 · Behind Railway's edge: PRI_CLIENT_IP_HEADER=x-real-ip (#653) ──────────
+// Railway staging resolved req.ip to the edge node. With the opt-in, the edge's
+// X-Real-IP is the identity: two clients behind one node get two buckets, while
+// a rotating X-Forwarded-For still buys nothing.
+process.env.PRI_CLIENT_IP_HEADER = 'x-real-ip';
+{
+  const db3 = createPlatformDb(':memory:');
+  const app3 = await startApp({ db: db3, production: true });
+  try {
+    const reg = async (i, headers) => (await app3.request('/v1/account/register', { method: 'POST', headers: { Origin: ORIGIN, ...headers },
+      body: { email: `edge-${i}@example.test`, name: 'Test', password: 'correct-horse-battery', isAdult: true } })).status;
+    const a = []; for (let i = 0; i < 9; i++) a.push(await reg(i, { 'X-Real-IP': '49.36.10.20', 'X-Forwarded-For': `203.0.113.${i}` }));
+    const b = await reg(100, { 'X-Real-IP': '49.36.10.21' });
+    c.ok(a.includes(429), `one client (X-Real-IP) is limited even behind a rotating X-Forwarded-For (${a.join(',')})`);
+    c.ok(b !== 429, `another client behind the same edge node is not (${b})`);
+  } finally { await app3.close(); }
+}
+delete process.env.PRI_CLIENT_IP_HEADER;
+
 console.log(`PROXY IDENTITY — PASS — ${c.count()}/${c.count()} checks — the proxy topology is stated, validated at boot, and a spoofed X-Forwarded-For buys no second rate bucket.`);
 
 /** True when `fn` throws and the thrown error matches. */

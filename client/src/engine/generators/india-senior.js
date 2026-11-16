@@ -11,7 +11,7 @@
 // than a surd — and every integral, cross product and probability is keyed as an
 // integer or an exact fraction.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, Frac, mcq } from '../qhelpers.js';
+import { ri, rc, nz, Frac, mcq, bin, poly } from '../qhelpers.js';
 
 /** A numeric answer that stays exact. */
 function exact(f, suffix) {
@@ -329,17 +329,18 @@ export const indiaSenior = {
       const q = p + 2 * ri(rng, 1, 6);
       const c = (p + q) / 2;
       return {
-        prompt: `Rolle's theorem applies to $f(x) = (x - ${p})(x - ${q})$ on $[${p}, ${q}]$. Find the value of $c$ in $(${p}, ${q})$ with $f'(c) = 0$.`,
+        // (x − p)(x − q) with p negative is written (x + |p|), and a zero root as x.
+        prompt: `Rolle's theorem applies to $f(x) = (${bin('x', -p)})(${bin('x', -q)})$ on $[${p}, ${q}]$. Find the value of $c$ in $(${p}, ${q})$ with $f'(c) = 0$.`,
         answerType: 'numeric', answer: { value: c },
         traps: [{ value: p, why: `$x = ${p}$ is an endpoint, where $f$ is zero — Rolle promises a point strictly inside where the *derivative* is zero.` }].filter(t => t.value !== c),
         hints: [
           `$f(${p}) = f(${q}) = 0$, so Rolle's theorem applies.`,
-          `Expand: $f(x) = x^2 - ${p + q}x + ${p * q}$, so $f'(x) = 2x - ${p + q}$.`,
+          `Expand: $f(x) = ${poly([1, -(p + q), p * q])}$, so $f'(x) = ${poly([2, -(p + q)])}$.`,
           'Set the derivative to zero.'
         ],
         steps: [
           { h: 'Check the hypothesis', d: `$f$ is a polynomial, and $f(${p}) = f(${q}) = 0$` },
-          { h: 'Differentiate', d: `$f'(x) = 2x - ${p + q}$` },
+          { h: 'Differentiate', d: `$f'(x) = ${poly([2, -(p + q)])}$` },
           { h: 'Answer', d: `$2c = ${p + q}$, so $c = ${c}$ — the midpoint, as it always is for a quadratic` }
         ]
       };
@@ -354,12 +355,12 @@ export const indiaSenior = {
       answerType: 'numeric', answer: { value: c },
       traps: [{ value: hi, why: `$x = ${hi}$ is an endpoint. The mean value theorem promises a point strictly inside the interval.` }].filter(t => t.value !== c),
       hints: [
-        `The average rate of change is $\\dfrac{f(${hi}) - f(${lo})}{${hi} - ${lo}}$.`,
-        `$f(x) = ${a}x^2$ gives $f'(x) = ${2 * a}x$.`,
+        `The average rate of change is $\\dfrac{f(${hi}) - f(${lo})}{${hi} - ${lo < 0 ? `(${lo})` : lo}}$.`,
+        `$f(x) = ${a === 1 ? '' : a}x^2$ gives $f'(x) = ${2 * a}x$.`,
         'Set the two equal and solve for $c$.'
       ],
       steps: [
-        { h: 'Average rate of change', d: `$\\dfrac{${a}(${hi})^2 - ${a}(${lo})^2}{${hi} - ${lo}} = ${a}(${hi} + ${lo}) = ${a * (hi + lo)}$` },
+        { h: 'Average rate of change', d: `$\\dfrac{${a}(${hi})^2 - ${a}(${lo})^2}{${hi} - (${lo})} = ${a}(${hi} ${lo < 0 ? '-' : '+'} ${Math.abs(lo)}) = ${a * (hi + lo)}$` },
         { h: 'Set the derivative equal to it', d: `$${2 * a}c = ${a * (hi + lo)}$` },
         { h: 'Answer', d: `$c = ${c}$ — the midpoint, as it always is for a quadratic` }
       ]

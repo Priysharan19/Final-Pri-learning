@@ -39,6 +39,26 @@ export async function handwrite(page, box, text, { x = 40, y = 34 } = {}) {
   await page.waitForTimeout(600);   // the reader is asked 240 ms after the last point
 }
 
+/**
+ * D17: the first read of a profile meets the one-time prompt naming OpenAI.
+ * A flow that is not about that prompt accepts it the moment it appears — the
+ * same press a student makes — so every reading flow still passes through the
+ * real prompt and proves its accept lets the read go ahead. The count of
+ * prompts accepted this way is on window.__priReaderPermissionAccepted.
+ * client/test/tour-ink-reader-permission.js is the flow about the prompt
+ * itself and opts out (flow.readerPermission = 'ask').
+ */
+export function acceptReaderPermissionOnSight() {
+  const accept = () => {
+    const button = document.querySelector('[data-reader-permission="accept"]');
+    if (!button || button.dataset.priAccepted) return;
+    button.dataset.priAccepted = '1';
+    globalThis.__priReaderPermissionAccepted = (globalThis.__priReaderPermissionAccepted || 0) + 1;
+    setTimeout(() => button.click(), 0);
+  };
+  new MutationObserver(accept).observe(document, { childList: true, subtree: true });
+}
+
 /** Install the stand-in reader on a fresh context's page. */
 export async function useFakeServerReader(page, base, ctx = page.context()) {
   // `confidence` scripts how sure the stand-in is of every line (default 0.97,

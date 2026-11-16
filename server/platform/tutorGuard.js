@@ -618,3 +618,44 @@ export function solutionSpans(question) {
   for (const s of mathSpans(question?.answer)) spans.add(s);
   return spans;
 }
+
+// ── Diagnosis grounding ──────────────────────────────────────────────────────
+
+const PROSE_SYMBOLS = /[=+\-−–×÷*/^<>≤≥√π%∫∑\\{}]/;
+// "one" is the commonest pronoun in English prose ("the one you wrote"); read as
+// a number it would refuse almost every diagnosis. It is dropped from the prose
+// check unless it is the start of a fraction or a product. The answer guard
+// (leakedExpressions) still reads it as 1, so an open attempt is protected.
+const PRONOUN_ONE = /\bone\b(?!\s*(?:-|and|half|halves|third|thirds|quarter|quarters|fourth|fifth|sixth|seventh|eighth|ninth|tenth|over|by|times|point|hundred|thousand|lakh|crore))/gi;
+
+/**
+ * Where a diagnosis may not be shown, or an empty list when it may.
+ *
+ * A diagnosis may say more than a nudge — after resolution it may name the
+ * answer — but it may never INVENT mathematics. Every $…$ span in it must be,
+ * after normalisation, a whole span (or a part of one) of the verified
+ * solution, of the question, or of one of the student's own lines. Outside the
+ * spans: words only — no digit (number words included) and no operator.
+ */
+export function diagnosisGroundingIssues(text, { question, studentLines = [] } = {}) {
+  const value = String(text ?? '');
+  if (value.length > MAX_GUARD_CHARS) return [`length:${value.length}`];
+  const issues = [];
+  if ((value.match(/\$/g) || []).length % 2) issues.push('unbalanced-span');
+  const sources = [
+    ...solutionSpans(question),
+    ...mathSpans(question?.prompt),
+    String(question?.prompt ?? ''),
+    ...(studentLines || []).map(l => String(l ?? ''))
+  ].map(normalizeMath).filter(Boolean);
+  for (const span of mathSpans(value)) {
+    const n = normalizeMath(span);
+    if (!n) continue;
+    if (!sources.some(src => src === n || src.includes(n))) issues.push(`span:${n.slice(0, 40)}`);
+  }
+  const prose = value.replace(MATH_SPAN, ' ').replace(/(?<=\p{L})[-'’](?=\p{L})/gu, '');
+  const read = wordsToDigits(prose.replace(PRONOUN_ONE, ' '));
+  if (/[0-9०-९]/.test(read)) issues.push('prose:number');
+  if (PROSE_SYMBOLS.test(prose)) issues.push('prose:symbol');
+  return issues;
+}

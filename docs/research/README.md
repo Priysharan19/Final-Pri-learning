@@ -228,6 +228,9 @@ SDT, mathematics gamification second-order evidence, intrinsic/extrinsic motivat
 ### CBSE_NCERT_CURRICULUM_ASSESSMENT_AUTHORITY_V7.md
 Live 2026–27 CBSE/NCERT authority, CBE/SAFAL, current sample-paper/marking-scheme sources, Class X two-board-examination policy, curriculum/version contracts and exam-blueprint freshness gates.
 
+### NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md
+Prithagoras counterpart (ADR-0002, plan G1, 13 November 2026): NESA Mathematics K–10 (2022) and Stage 6 11–12 (2024) authority and timeline (2027 HSC first examined under 2024), outcome-code schemes, HSC marking guidelines/criteria and band alignment, NESA copyright limits for a commercial provider, the `curriculum.js` subtopic crosswalk, India→NSW transportability limits and G2/G3/G6 recommendations.
+
 ### TRANSFER_GENERALISATION_ANALOGY_DEEP_DIVE_V7.md
 T0–T7 transfer taxonomy, variability, analogical comparison, strategy recognition, representation/context transfer, protected banks, structural fingerprints and transfer-aware learner-state evidence.
 
@@ -313,6 +316,7 @@ Execution-grade science programme: semantic instrumentation → adjudicated gold
 | AI literacy, critical questioning, Audit-the-AI, AI reliance | AI_LITERACY_EPISTEMIC_AGENCY_AUDIT_THE_AI_V7.md |
 | streaks, leaderboards, rewards, motivation, math anxiety | MOTIVATION_GAMIFICATION_MATH_ANXIETY_DEEP_DIVE_V7.md |
 | current CBSE/NCERT syllabus, exam policy, SQP/MS authority | CBSE_NCERT_CURRICULUM_ASSESSMENT_AUTHORITY_V7.md |
+| current NSW/NESA syllabus versions, outcome codes, HSC marking guidelines, NESA copyright, Prithagoras crosswalk | NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md |
 | transfer, analogy, generalization, protected outcome banks | TRANSFER_GENERALISATION_ANALOGY_DEEP_DIVE_V7.md |
 | formative marking, feedback timing/dose/type, feed-forward | FORMATIVE_ASSESSMENT_FEEDBACK_DEEP_DIVE_V7.md |
 

@@ -100,7 +100,13 @@ const lineState = page => page.evaluate(() => [...document.querySelectorAll('[da
 })));
 
 /** The page's own issue request, answered by the real server binding the desk's sealed token. */
-async function serveOwnersQuestion(ctx, online, accountId) {
+// Installed before the profile exists. Creating and signing in the profile
+// lands on /practice, which issues a question at once for the default topic;
+// when that topic was the owner's subtopic, the later /practice?subtopic= visit
+// reused it and sent no new issue, so a route installed after sign-in never
+// steered it (about 1 run in 5, on main too). The account is read from the
+// request itself (the client names the linked account), else the session.
+async function serveOwnersQuestion(ctx, online) {
   const { encryptDeliveryToken } = await import('../../server/platform/deliveryCrypto.js');
   await ctx.route('**/v1/practice/issue', async route => {
     let body = null;
@@ -112,6 +118,8 @@ async function serveOwnersQuestion(ctx, online, accountId) {
     const prepared = encryptDeliveryToken(JSON.stringify({
       g: OWNER.generator, d: OWNER.difficulty, s: OWNER.seed, m: 'practice', x: Date.now() + 60 * 60 * 1000, n: randomUUID()
     }), 'practice-prepared-v1');
+    const accountId = body?.account ?? online.account?.id;
+    if (!accountId) return route.continue();
     const response = await route.fetch({ postData: JSON.stringify({ prepared, account: String(accountId) }) });
     return route.fulfill({ response });
   });
@@ -127,13 +135,13 @@ export const ownerPageFlow = {
     const { reader } = online;
     try {
       reader.lines = OWNER_TRANSCRIPT; reader.confidence = 0.88; reader.down = false;
+      await serveOwnersQuestion(ctx, online);
       await goto('/');
       await createProfile({ name: 'Photo Page', course: 'in', year: 11 });
       const account = await online.signIn({ name: 'Photo Page' });
       // Let the account panel's own requests finish before leaving Settings:
       // WebKit reports a fetch cut off by a navigation as a page error.
       await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-      await serveOwnersQuestion(ctx, online, account.id);
       await page.goto(`${base}/practice?subtopic=${OWNER.generator}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
       const prompt = await mathText('.q-prompt');

@@ -91,3 +91,16 @@ export function scheduleOfflineWarm(scope = window) {
   scope.navigator.serviceWorker.ready.then(() => whenIdle(ask), () => { });
   scope.navigator.serviceWorker.addEventListener('controllerchange', () => whenIdle(ask), { once: true });
 }
+
+// ── Mid-task detection ────────────────────────────────────────────────────────
+// Used by callers that defer optional work: an ink surface on screen or an
+// aria-busy control means "later". (The instrument's Map, Report and Scripts
+// tabs used to be prefetched here at idle while vite.config.js kept them on
+// demand; they are in the warm pass now, so that prefetch is gone — #658.)
+
+/** Is the student mid-task right now (inking, or a Check in flight)? */
+export function studentBusy(scope = typeof window === 'undefined' ? {} : window) {
+  const doc = scope.document;
+  if (!doc?.querySelector) return false;
+  return Boolean(doc.querySelector('.ink-stage, [aria-busy="true"]'));
+}

@@ -64,7 +64,8 @@ python3 tools/jee-question-department/pack.py approved.jsonl
 node client/test/jee-question-department-check.mjs
 python3 tools/jee-question-department/test_pipeline.py
 npm run build
-node scripts/sync-ios.mjs --check
+npm run sync:ios      # the iOS bundles are generated from the build, never committed
+npm run check:ios
 ```
 
 The packer is fail-closed. If even one publish record violates the gate, no archive shards are written.

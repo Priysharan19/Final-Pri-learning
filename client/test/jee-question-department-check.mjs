@@ -2,6 +2,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+// This suite certifies the reviewed JEE department catalog itself. Past papers
+// are OFF for students by default (engine/pastPapers.js, decision D23), and
+// past-papers-flag-check.mjs pins that default; here the switch is turned on so
+// the catalog's own wiring stays proven while it waits for the rights opinion.
+process.env.PRI_PAST_PAPERS = '1';
 import {
   asJeePyqPayload,
   buildJeePyqBank,

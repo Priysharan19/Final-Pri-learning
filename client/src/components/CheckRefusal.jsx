@@ -3,7 +3,8 @@
 // and next step for each reason a check was refused. Presentation only —
 // account linking, eligibility and marking stay with the platform modules.
 import React, { useEffect, useRef, useState } from 'react';
-import { Link, useInRouterContext } from 'react-router-dom';
+import { useInRouterContext } from 'react-router-dom';
+import PageLink from './PageLink.jsx';
 import { useLanguage, useT } from '../i18n/index.js';
 import { checkRefusalCopy } from './checkAccess.js';
 import { completeInkOtpRecovery, inkRecoveryWords } from './signedOutInkRecovery.js';
@@ -123,10 +124,10 @@ export function CheckRefusal({
       )}
       {copy.action !== 'sign-in' && <div className="row" style={{ marginTop: 10 }}>
         {copy.action === 'account' && (inRouter
-          ? <Link to="/settings" {...settings}>{t('app.accountSettings')}</Link>
+          ? <PageLink to="/settings" {...settings}>{t('app.accountSettings')}</PageLink>
           : <a href="/settings" {...settings}>{t('app.accountSettings')}</a>)}
         {copy.action === 'premium' && (inRouter
-          ? <Link to="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</Link>
+          ? <PageLink to="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</PageLink>
           : <a href="/settings#cloud-account-title" {...settings}>{t('freeCap.seePremium')}</a>)}
         {onRetry && (copy.action === 'retry' || copy.action === 'account') && (
           <button type="button" className="btn btn-ghost btn-sm" data-check-retry disabled={busy} onClick={onRetry}>

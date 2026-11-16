@@ -223,7 +223,8 @@ export const IN_CURRICULUM = [
   {
     grade: 8,
     title: 'Class 8',
-    caption: 'NCERT Class 8 — rationals, identities, mensuration and first graphs',
+    // The honest label Class 8 carries until the Ganita Prakash rebuild (D24).
+    caption: 'NCERT Class 8 — follows the earlier NCERT book (Reprint 2024–25): rationals, identities, mensuration and first graphs',
     chapters: [
       C('c8-rational-numbers', 'Rational Numbers', 'Number & Arithmetic', 10, [
         'Use closure, commutativity, associativity and distributivity',

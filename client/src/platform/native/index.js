@@ -87,32 +87,19 @@ function viaBridge(cap, op, payload, opts) {
 
 // ── capabilities ─────────────────────────────────────────────────────────────
 
-// Answer-blind by construction: only these keys may reach a native
-// recogniser/surface. Expected answers, solutions, marks or any question
-// metadata cannot be posted, whatever a caller passes (docs §4.4 item 7).
-const INK_OPS = new Set(['mount', 'layout', 'unmount', 'appearance', 'tool', 'enabled', 'undo', 'redo', 'clear', 'setStrokes', 'foundationRecognize', 'recognize']);
-const INK_KEYS = new Set(['op', 'reqId', 'frame', 'clip', 'scrollX', 'scrollY', 'ink', 'penWidth', 'tool', 'finger', 'enabled', 'strokes', 'overrides']);
-// Overrides are the student's own symbol corrections, keyed by stroke-group id
-// (e.g. `h3_101_102_103`, `w0_s12`). Validate each entry by shape and drop a
-// malformed one rather than refusing the whole message: refusing would silently
-// switch native recognition off for the rest of the sheet.
-const OVERRIDE_KEY = /^[A-Za-z0-9_]{1,256}$/;
-const MAX_OVERRIDES = 512;
-function sanitizeOverrides(overrides) {
-  if (!overrides || typeof overrides !== 'object' || Array.isArray(overrides)) return {};
-  const out = {};
-  let n = 0;
-  for (const [key, value] of Object.entries(overrides)) {
-    if (n >= MAX_OVERRIDES) break;
-    if (OVERRIDE_KEY.test(key) && typeof value === 'string' && value.length <= 32) { out[key] = value; n += 1; }
-  }
-  return out;
-}
+// Answer-blind by construction: only these keys may reach the native writing
+// surface, and there is no read op at all — the shell captures ink, the server
+// reads it (owner decision 2026-10-02, default D16). Expected answers,
+// solutions, marks or any question metadata cannot be posted, whatever a
+// caller passes (docs §4.4 item 7). client/test/native-ink-check.mjs keeps
+// this set equal to the cases InkBridge.swift handles.
+const INK_OPS = new Set(['mount', 'layout', 'unmount', 'appearance', 'tool', 'enabled', 'undo', 'redo', 'clear', 'setStrokes']);
+const INK_KEYS = new Set(['op', 'frame', 'clip', 'scrollX', 'scrollY', 'ink', 'penWidth', 'tool', 'finger', 'enabled', 'strokes']);
 /** Returns the message to post, or null when it may not be posted at all. */
 function answerBlindInkMessage(message) {
   if (!message || typeof message !== 'object' || !INK_OPS.has(message.op)) return null;
   if (!Object.keys(message).every(key => INK_KEYS.has(key))) return null;
-  return message.overrides === undefined ? message : { ...message, overrides: sanitizeOverrides(message.overrides) };
+  return message;
 }
 
 const ink = Object.freeze({
@@ -138,18 +125,14 @@ const ink = Object.freeze({
   },
 });
 
+// Photos come in through the page's own file input and are read on the
+// server (client/src/ink/cloudReader.js readPhotoWithCloud). No shell offers an
+// on-device photo reader any more: the Apple Vision OCR bridge was removed with
+// the on-device ink readers (owner decision 2026-10-02, default D16), so `ocr`
+// is a capability fact that is false on every host and there is no read op.
 const photo = Object.freeze({
   available: () => !!capOf('photo'),
   ocr: () => capOf('photo')?.ocr === true,
-  recognize(dataURL, { timeoutMs = 12_000, signal = null } = {}) {
-    const c = capOf('photo');
-    if (!c) return unsupported('photo', 'recognize');
-    if (typeof dataURL !== 'string' || !/^data:image\//.test(dataURL)) {
-      return Promise.reject(new PriNativeError('BAD_REQUEST', 'The selected photo could not be prepared for handwriting recognition.'));
-    }
-    if (c.transport === 'legacy') return getRuntime().legacy.photo.recognize(dataURL, { timeoutMs, signal });
-    return viaBridge('photo', 'recognize', { dataURL }, { timeoutMs, signal });
-  },
 });
 
 const BILLING_ACTIONS = new Set(['products', 'purchase', 'unfinished', 'restore', 'finish']);

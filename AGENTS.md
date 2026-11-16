@@ -13,6 +13,7 @@ The canonical definitions are:
 - `docs/architecture/repository-authority.md` — production repository/branch authority and predecessor classification.
 - `docs/architecture/authoritative-architecture.md` — current online-first web/server/native runtime authority.
 - `docs/architecture/adr-0001-online-first-runtime.md` — online-first decision (Railway, Supabase Mumbai, OpenAI) and its migration phases.
+- `docs/architecture/adr-0002-one-platform-two-editions.md` — one platform, two regional editions (Priyabhata · India, Prithagoras · Australia); edition vs course; build once, certify per edition.
 - `docs/release/release-policy.md` — reviewed integration, required CI and release identity policy.
 - `.pri-os/fleet.json` — agents, specificity-resolved primary ownership, reviewer overlays, typed gates and risk classes.
 - `.pri-os/mission-control.json` — persistent GitHub-Issue mission ledger, state machine, writer lease, retry ceiling and deterministic priority policy.
@@ -53,7 +54,7 @@ Critical categories preempt normal feature work in this order:
 
 ### Specialist writer
 
-Exactly one specialist holds the writer lease. New autonomous branches must be:
+Each mission has exactly one primary writer. A bounded pool of missions may write at once: at most `lease.max_writers` in `.pri-os/mission-control.json` (2 today, falling back to 1), and only when `node scripts/pri-mission-control.mjs can-run-concurrently` proves them disjoint (distinct owners, the same base SHA, no overlapping or serial path, no shared derived root or sensitive class). New autonomous branches must be:
 
 `agent/mission/<agent-id>/<mission-id>`
 
@@ -77,13 +78,15 @@ The writer may not declare its own work release-ready.
 
 GitHub Issues are the durable mission ledger. A managed issue contains the canonical markers defined in `.pri-os/mission-control.json`, including mission ID, status, agent, branch, risk, base SHA, attempt count and failure fingerprint.
 
-Only one mission may be in a writer-holding state at a time. The lease expires after 12 hours without progress and must then be released/retriaged rather than silently remaining locked forever.
+`.pri-os/mission-control.json` is the single source of truth for the writer pool and the state sets. `scripts/pri-mission-control.mjs` reads them from it, and `tools/governance-text.test.mjs` (run by `npm run test:release:prep`) fails when this file, the control file and the script disagree.
 
-Writer-holding states are:
+- **Writer-holding states** (`lease.writer_holding_states`): `ACTIVE`, `IMPLEMENTING`, `TESTING`, `REPAIR`. A mission in one of these occupies a writer slot and must carry a fresh progress heartbeat: `Pri-Lease-Heartbeat-At` inside the TTL, `Pri-Lease-Heartbeat-Ref` equal to the exact PR head, `Pri-Lease-Heartbeat-By` equal to the agent.
+- **Review states** (`lease.review_states`): `REVIEW`, `CI`, `MERGE_READY`, `REPAIR_PENDING`. A mission in one of these holds no writer slot; it must pin `Pri-Review-Head` to the exact PR head under review.
+- **Writer pool**: at most `lease.max_writers` (2) missions may be in a writer-holding state at once, and only when they are provably disjoint; `fallback_max_writers` is 1. A lease expires after `lease.ttl_hours` (12) without a heartbeat and must then be released/retriaged rather than silently remaining locked forever.
 
-`ACTIVE`, `IMPLEMENTING`, `TESTING`, `REVIEW`, `CI`, `REPAIR`, `MERGE_READY`.
+Autonomous PR governance (`.github/workflows/pri-agent-governance.yml`, `validate-ledger`) verifies that the PR's mission is an open managed issue in a writer-holding or review state, that its mission/agent/branch/risk match the PR, that its required markers are well-formed, that its heartbeat reference or review head equals the exact PR head, and that the writer pool is within its cap. Every call passes the exact head SHA as the sixth argument.
 
-Future autonomous PR governance verifies that exactly one active managed issue exists, that its mission/agent/branch/risk match the PR, that its required markers are well-formed, and that the issue has been updated inside the configured lease TTL.
+The signed-admission programme (`admit`, the `pri-writer-admissions` rulesets, `scripts/pri-admission-*.mjs`, `scripts/pri-trusted-*.mjs`) stays dormant (owner default D26, 1 November 2026): `admit` denies every candidate by design, no GitHub App or control store is provisioned, and the branches that would activate it (#626, #647, #681) do not merge. The governance that applies is the smallest one: a `task/*`, `feature/*` or `agent/mission/*` branch, a pull request into `main`, the four required CI contexts with strict up-to-date checking and conversation resolution (lane pull requests run those and the always-on gates; the heavy workflows run on `task/train-*` pull requests, so only trains merge into `main`; Main Integrity fails any other merge after the fact, which withholds its staging proof and so its production promotion — `docs/release/ci-lanes.md`), a recorded independent review on the exact head of every R4 change, one serial merger, and production promoted only by the owner's fast-forward of `deploy/production` (`docs/release/release-policy.md`).
 
 ## Failure handling
 
@@ -109,11 +112,12 @@ The diff-derived risk is authoritative. A PR may declare a higher risk, never a 
 - Synthetic/simulator evidence stays explicitly separate from real-human/physical evidence.
 - Handwriting recognition remains answer-blind. Never use hidden expected answers/solutions/marks to improve transcription.
 - AI proposes, the deterministic engine decides: a model output never sets a mark. Marking is online-only and server-authoritative (ADR-0001 amendment 2026-10-10): the server runs the deterministic engine on a question it issued, for a verified eligible signed-in account. Nothing is checked, marked or revealed signed out or offline; the student's typed and written work is kept on the device until it can be checked. The engine stays bundled in the client for question generation, notation preview and reading attempts recorded by earlier versions — never to mark a new answer.
-- Preserve profile/data isolation: Row-Level Security plus server authorization on every client-reachable record.
+- Preserve profile/data isolation: server authorization on every client-reachable record, with Row-Level Security as defence in depth. RLS confines account-scope transactions to the caller's rows; system-scope handlers (auth, billing, MFA) rely on server authorization alone, and RLS is no boundary against a compromised `pri_server` credential — see `docs/security/threat-model.md` §7.
 - Model-provider and database service credentials live only in server environment variables, never in the client, the repo or chat.
 - Security regressions are release-blocking.
 - Add a deterministic regression test for every production bug when feasible.
 - Do not make unsupported competitor-superiority, accuracy, syllabus-complete or production-ready claims.
+- One platform, two editions (ADR-0002): build every learning feature once in the shared platform and verify it against both Priyabhata and Prithagoras. Editions differ only in curriculum, presentation, language, commercial configuration and legal requirements — never in marking, OCR, feedback or examination behaviour. Certification gates (e.g. #499) bind both brands.
 - Work through branch + PR. Never directly update `main`.
 - Destructive production operations, irreversible migrations, secret rotation, payment-provider actions, App Store publishing and legal/privacy sign-off require explicit external authority even when the code is ready.
 

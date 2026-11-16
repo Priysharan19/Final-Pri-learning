@@ -1,6 +1,7 @@
 name: JEE Question Department
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'tools/jee-question-department/**'
@@ -30,6 +31,8 @@ concurrency:
 
 jobs:
   gate:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -63,8 +66,12 @@ jobs:
           tools/jee-question-department/extract_official.py
           tools/jee-question-department/review_official.py
           tools/jee-question-department/test_official_pipeline.py
-      - name: Build + iOS sync guarantee
+      # The iOS bundles are generated from the build, never tracked (decision
+      # D28): generate, then prove the copy is complete.
+      - name: Build + iOS bundle generation guarantee
         run: |
+          set -euo pipefail
           npm ci --prefix client
           npm run build
-          node scripts/sync-ios.mjs --check
+          npm run sync:ios
+          npm run check:ios

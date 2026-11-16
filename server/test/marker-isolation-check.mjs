@@ -43,6 +43,14 @@ const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLI
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-marker-isolation-'));
 process.env.NODE_ENV = 'test';
+// D15: a production server never issues a bank outside the India covers
+// (server/platform/indiaBanks.js). This suite says so explicitly because it uses NSW Year 7 banks (y7-algebra, a practice paper) as the vehicle for worker-pool isolation;
+// india-banks-check.mjs pins the refusal itself. Refused under NODE_ENV=production.
+(await import('../platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
+// D12: method marks are off by default — production marks the final answer only
+// until an examiner signs (#499). This suite pins the method rubric itself, so it
+// turns the server switch on; marking-policy-check.mjs pins the default.
+process.env.PRI_METHOD_MARKS = 'on';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = 'a7'.repeat(32);
 // This suite is about marking, not the free plan: its accounts are issued far
@@ -61,6 +69,9 @@ const {
   TOO_COMPLEX_MESSAGE, WORKING_NOT_READ_NOTE
 } = await import('../platform/markerPool.js');
 const { MARKER_OPS, stepMetaFor, tutorEvidence } = await import('../platform/markerOps.js');
+// The pool puts the server's marking policy (D12) into every operation, so the
+// in-process reference is run under the same policy.
+const { markingPolicy } = await import('../platform/markingPolicy.js');
 const { issuedQuestionForTutor } = await import('../platform/practice.js');
 const { setLogSink } = await import('../platform/observability.js');
 const { metrics } = await import('../platform/metrics.js');
@@ -101,7 +112,7 @@ const practiceArgs = (answer, working = '', evidenceIfWrong = true) => ({ q: Q, 
   // The same input, the same verdict — through a worker or not.
   for (const [answer, working] of [['x^2+2x+1', ''], ['(x+1)^2', ''], ['x^2+1', '(x+1)(x+1)\nx^2+x+x+1'], ['', 'x^2+2x+1'], ['??', ''], ['x^2+2x+2', '']]) {
     const viaPool = await pool.run('practice', practiceArgs(answer, working), { key: 'determinism' });
-    const inline = MARKER_OPS.practice(practiceArgs(answer, working), () => {});
+    const inline = MARKER_OPS.practice({ ...practiceArgs(answer, working), policy: markingPolicy() }, () => {});
     c.ok(viaPool.ok, `pool: ${JSON.stringify(answer)} is marked`);
     c.deq(viaPool.value, inline, `pool: ${JSON.stringify(answer)} gets exactly the verdict the engine gives in-process`);
   }
@@ -121,7 +132,7 @@ const practiceArgs = (answer, working = '', evidenceIfWrong = true) => ({ q: Q, 
   // A stage that finished before the deadline is kept.
   const half = await pool.run('practice', practiceArgs('x^2+1', `x^2+2x+1 ${magic('spin')}`), { key: 'attacker' });
   c.deq([half.ok, half.code], [false, MARKING_TOO_COMPLEX], 'pool: working that never finishes is stopped too');
-  c.deq(half.partials, [{ result: MARKER_OPS.practice(practiceArgs('x^2+1', '', false), () => {}).result }], 'pool: and the answer verdict it had already reached is kept, exactly');
+  c.deq(half.partials, [{ result: MARKER_OPS.practice({ ...practiceArgs('x^2+1', '', false), policy: markingPolicy() }, () => {}).result }], 'pool: and the answer verdict it had already reached is kept, exactly');
 
   // A worker that dies is a deadline by another name.
   const died = await pool.run('practice', practiceArgs(magic('exit')), { key: 'attacker' });
@@ -508,7 +519,7 @@ try {
     const sealed = JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [who.account.id, t.q.id])).response_json);
     c.deq(await issued.workEvidence(lines), tutorEvidence(sealed, lines), 'tutor: the Step Check through the pool is exactly the in-process one');
     const stuck = await timed(issued.workEvidence([`x = ${t.root} ${magic('spin')}`]));
-    c.deq(stuck.value, { firstBreak: -1, verifiedLines: 0, misconception: null }, 'tutor: a Step Check that is cut off is silence — no line verified, no first mistake');
+    c.deq(stuck.value, { firstBreak: -1, verifiedLines: 0, misconception: null, unchecked: true }, 'tutor: a Step Check that is cut off is silence — no line verified, no first mistake — marked as not checked');
     c.ok(stuck.ms < 250 + MARGIN, 'tutor: at the deadline');
   }
 

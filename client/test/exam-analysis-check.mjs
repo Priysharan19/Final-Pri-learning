@@ -55,6 +55,21 @@ eq(a1.sections.map(s => [s.ms, s.msPerQuestion]), [[50000, 16667], [150000, 7500
 // chapters: x 1/3 (lost 2), y 3/4, z 2/8 (lost 6), w 3/4 → weak: z then x
 eq(a1.weakChapters.map(c => [c.id, c.marks, c.awarded, c.lost, c.unattempted]), [['z', 8, 2, 6, 1], ['x', 3, 1, 2, 1]], 'CBSE: weak chapters, most marks lost first');
 eq(a1.negativeMarking, undefined, 'CBSE: no negative-marking section on a CBSE paper');
+// Where the marks went (the result headline): 19 − 9 = 10 lost; D lost 5 (all
+// blank), A lost 2 (1 blank); blank marks on the paper 1 + 5 = 6.
+eq(a1.lost, { marks: 10, blankMarks: 6, sections: [{ id: 'D', label: 'Section D', lost: 5, blankMarks: 5 }, { id: 'A', label: 'Section A', lost: 2, blankMarks: 1 }] }, 'CBSE: marks lost, by the two sections that lost most, with the blanks');
+eq([a1.focus.kind, a1.focus.chapters.map(c => c.id)], ['weak', ['z', 'x']], 'CBSE: with chapters under half marks, the next step is those chapters');
+// No chapter below half: the next step still names the chapters that lost most.
+const strong = [
+  q({ id: 'k1', order: 1, section: 'A', marks: 4, awarded: 3, chapterId: 'tri', subtopicName: 'Triangles' }),
+  q({ id: 'k2', order: 2, section: 'A', marks: 4, awarded: 4, chapterId: 'poly', subtopicName: 'Polynomials' }),
+  q({ id: 'k3', order: 3, section: 'B', marks: 6, awarded: 4, chapterId: 'stat', subtopicName: 'Statistics' })
+];
+const a5 = analyseExam({ detail: strong, indiaExam: { track: 'cbse', sections: [{ id: 'A', label: 'Section A' }, { id: 'B', label: 'Section B' }] } });
+eq(a5.weakChapters, [], 'strong paper: no chapter is under half marks');
+eq([a5.focus.kind, a5.focus.chapters.map(c => [c.id, c.lost])], ['mostLost', [['stat', 2], ['tri', 1]]], 'strong paper: the next step is the chapters that lost the most, never empty');
+const full = analyseExam({ detail: [q({ id: 'f1', order: 1, section: 'A', marks: 2, awarded: 2, chapterId: 'tri' })], indiaExam: { track: 'cbse', sections: [{ id: 'A' }] } });
+eq([full.lost.marks, full.focus.kind], [0, 'none'], 'full marks: nothing lost, no chapter named');
 
 // ── JEE Main ─────────────────────────────────────────────────────────────────
 // A (MCQ +4/−1): 3 right (+12), 1 wrong (−1), 1 blank
@@ -79,6 +94,7 @@ eq([a2.timed, a2.sections[0].ms, a2.totals.ms], [false, null, null], 'JEE Main: 
 // chapters: calc 16/16, vec −1/8 (lost 9), prob −1/4 (lost 5)
 eq(a2.weakChapters.map(c => [c.id, c.lost]), [['vec', 9], ['prob', 5]], 'JEE Main: weak chapters count negative marks as marks lost');
 eq(a2.partialMarking, undefined, 'JEE Main: no partial-marking section');
+eq([a2.lost.marks, a2.lost.sections.map(s => [s.id, s.lost])], [14, [['A', 9], ['B', 5]]], 'JEE Main: a negative mark counts as a mark lost in the headline (28 − 14)');
 
 // ── JEE Advanced ─────────────────────────────────────────────────────────────
 // 1 (single +3/−1): 3, −1
