@@ -794,7 +794,8 @@ async function run() {
     const { checkAnswer } = await import(`${SRC}engine/checker.js`);
     const { cloudLinkRowId } = await import(`${SRC}platform/cloudAccount.js`);
     const { subtopicsForYear } = await import(`${SRC}engine/curriculum.js`);
-    const topics = subtopicsForYear(10).map(t => t.id);
+    const { nswIssuedLevels } = await import(`${SRC}engine/nswOffer.js`);
+    const topics = subtopicsForYear(10).map(t => t.id).filter(id => nswIssuedLevels(id).length > 0);   // only what the server issues is offered
     let turn = 0;
     /** Any open question, as served. */
     async function anyQuestion() {
