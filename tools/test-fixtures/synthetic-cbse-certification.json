@@ -1,0 +1,22 @@
+{
+  "fixture": true,
+  "schemaVersion": 1,
+  "jurisdiction": "cbse",
+  "syllabusVersions": ["cbse-mathematics-2026-27"],
+  "dossierDigest": "0000000000000000000000000000000000000000000000000000000000000000",
+  "commit": "0000000000000000000000000000000000000000",
+  "examiners": [
+    {
+      "name": "Synthetic Examiner One",
+      "qualification": "SYNTHETIC FIXTURE — not a person",
+      "affiliation": "SYNTHETIC FIXTURE",
+      "date": "2026-11-01",
+      "independent": true,
+      "independenceStatement": "SYNTHETIC FIXTURE — this text was written by a test, not signed by anyone.",
+      "conflicts": "none (synthetic)"
+    }
+  ],
+  "decisions": {},
+  "signedOriginal": { "heldBy": "nobody (synthetic)", "location": "nowhere (synthetic)", "receivedOn": "2026-11-01" },
+  "recordedBy": "Synthetic Test Harness"
+}
