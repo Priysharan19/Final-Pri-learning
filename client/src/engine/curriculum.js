@@ -16,7 +16,7 @@ export const STRANDS = [
   'Calculus'
 ];
 
-const CODES = {"y7-integers": "MA4 · Number", "y7-fractions": "MA4 · Number", "y7-decimals-perc": "MA4 · Number", "y7-ratio": "MA4 · Number", "y7-algebra": "MA4 · Algebra", "y7-equations": "MA4 · Algebra", "y7-angles": "MA4 · Geometry", "y7-area": "MA4 · Measurement", "y7-data": "MA4 · Statistics", "y8-indices": "MA4 · Number", "y8-percentages": "MA4 · Financial", "y8-algebra": "MA4 · Algebra", "y8-equations": "MA4 · Algebra", "y8-linear": "MA4 · Linear", "y8-circles": "MA4 · Measurement", "y8-volume": "MA4 · Measurement", "y8-rates": "MA4 · Number", "y8-probability": "MA4 · Probability", "y9-pythagoras": "MA5 · Measurement", "y9-indices-sci": "MA5 · Number", "y9-algebra": "MA5 · Algebra", "y9-linear": "MA5 · Linear", "y9-trig": "MA5 · Trigonometry", "y9-surface-area": "MA5 · Measurement", "y9-simint": "MA5 · Financial", "y9-data": "MA5 · Statistics", "y9-probability": "MA5 · Probability", "y10-quadratics": "MA5 · Algebra", "y10-nonlinear": "MA5 · Non-linear", "y10-simeq": "MA5 · Algebra", "y10-trig": "MA5 · Trigonometry", "y10-surds": "MA5 · Number", "y10-compound": "MA5 · Financial", "y10-similarity": "MA5 · Geometry", "y10-stats": "MA5 · Statistics", "y10-probability": "MA5 · Probability", "y11-functions": "MA-F1", "y11-quadfunc": "MA-F1", "y11-polynomials": "MA-F1", "y11-lines": "MA-F1", "y11-trigfunc": "MA-T1/T2", "y11-sine-cosine-rule": "MA-T1", "y11-explog": "MA-E1", "y11-diff": "MA-C1", "y11-probability": "MA-S1", "y12-diff": "MA-C2", "y12-appdiff": "MA-C3", "y12-integration": "MA-C4", "y12-trigcalc": "MA-T3/C2", "y12-explogcalc": "MA-E1/C2", "y12-series": "MA-M1", "y12-financial": "MA-M1", "y12-stats": "MA-S3", "y12-motion": "MA-C3/C4", "y12-integral-calc": "MA-C4", "y12-random-var": "MA-S3", "y12-fin-exact": "MA-M1", "y12-trig-model": "MA-T3", "y12-func-model": "MA-E1/C3"};
+const CODES = {"y7-integers": "MA4 · Number", "y7-fractions": "MA4 · Number", "y7-decimals-perc": "MA4 · Number", "y7-ratio": "MA4 · Number", "y7-algebra": "MA4 · Algebra", "y7-equations": "MA4 · Algebra", "y7-angles": "MA4 · Geometry", "y7-area": "MA4 · Measurement", "y7-data": "MA4 · Statistics", "y8-indices": "MA4 · Number", "y8-percentages": "MA4 · Financial", "y8-algebra": "MA4 · Algebra", "y8-equations": "MA4 · Algebra", "y8-linear": "MA4 · Linear", "y8-circles": "MA4 · Measurement", "y8-volume": "MA4 · Measurement", "y8-rates": "MA4 · Number", "y8-probability": "MA4 · Probability", "y9-pythagoras": "MA5 · Measurement", "y9-indices-sci": "MA5 · Number", "y9-algebra": "MA5 · Algebra", "y9-linear": "MA5 · Linear", "y9-trig": "MA5 · Trigonometry", "y9-surface-area": "MA5 · Measurement", "y9-simint": "MA5 · Financial", "y9-data": "MA5 · Statistics", "y9-probability": "MA5 · Probability", "y10-quadratics": "MA5 · Algebra", "y10-nonlinear": "MA5 · Non-linear", "y10-simeq": "MA5 · Algebra", "y10-trig": "MA5 · Trigonometry", "y10-surds": "MA5 · Number", "y10-compound": "MA5 · Financial", "y10-similarity": "MA5 · Geometry", "y10-stats": "MA5 · Statistics", "y10-probability": "MA5 · Probability", "y11-functions": "MA-F1", "y11-quadfunc": "MA-F1", "y11-polynomials": "MA-F1", "y11-lines": "MA-F1", "y11-trigfunc": "MA-T1/T2", "y11-sine-cosine-rule": "MA-T1", "y11-explog": "MA-E1", "y11-diff": "MA-C1", "y11-probability": "MA-S1", "y12-diff": "MA-C2", "y12-appdiff": "MA-C3", "y12-integration": "MA-C4", "y12-trigcalc": "MA-T3/C2", "y12-explogcalc": "MA-E1/C2", "y12-series": "MA-M1", "y12-financial": "MA-M1", "y12-stats": "MA-S3", "y12-motion": "MA-C3/C4", "y12-integral-calc": "MA-C4", "y12-random-var": "MA-S3", "y12-fin-exact": "MA-M1", "y12-trig-model": "MA-T3", "y12-func-model": "MA-E1/C3", "y8-geo-figures": "MA4 · Geometry", "y9-nonlinear-a": "MA5 · Algebra", "y9-variation": "MA5 · Algebra", "y9-rate-change": "MA5 · Algebra", "y9-surface-solids": "MA5 · Measurement", "y9-volume-solids": "MA5 · Measurement", "y9-data-inquiry": "MA5 · Statistics", "y10-indices-neg": "MA5 · Number", "y10-functions": "MA5 · Algebra", "y10-logarithms": "MA5 · Number", "y10-polynomials": "MA5 · Algebra", "y10-trig-nonright": "MA5 · Trigonometry", "y10-trig-any-angle": "MA5 · Trigonometry", "y10-geometry-proof": "MA5 · Geometry", "y10-circle-geometry": "MA5 · Geometry", "y10-networks": "MA5 · Statistics"};
 // A subtopic authored for the Prithagoras (NSW) bank carries the legacy exam-weight average (100/9: nine
 // subtopics a year sum to 100), so the Australian exam-weight pools keep their average, every legacy
 // share and the "high exam weight" cut-off at 12. Kept a few ulps under 100/9 so that a legacy weight
@@ -126,6 +126,11 @@ export const CURRICULUM = [
         'Probability of single events with equally likely outcomes',
         'Complementary events',
         'Relative frequency and expected number of outcomes'
+      ]),
+      S('y8-geo-figures', 'Properties of Geometrical Figures', 'Measurement & Geometry', AUTHORED_WEIGHT, [
+        'Find angles using the angle sum of a triangle',
+        'Find angles with exterior angles and parallel lines',
+        'Use the interior angle of a regular polygon'
       ])
     ]
   },
@@ -178,6 +183,36 @@ export const CURRICULUM = [
         'List outcomes with tables and tree diagrams',
         'Probability of two-step events with and without replacement',
         'Use arrays to count outcomes'
+      ]),
+      S('y9-nonlinear-a', 'Non-linear Relationships: Parabolas and Hyperbolas', 'Algebra', AUTHORED_WEIGHT, [
+        'Evaluate the rule of a parabola or hyperbola',
+        'Find the minimum value of a parabola',
+        'Solve simple equations from a parabola'
+      ]),
+      S('y9-variation', 'Direct and Inverse Variation', 'Algebra', AUTHORED_WEIGHT, [
+        'Find a constant of variation',
+        'Use direct variation',
+        'Use inverse variation'
+      ]),
+      S('y9-rate-change', 'Rates of Change', 'Algebra', AUTHORED_WEIGHT, [
+        'Find an average rate of change',
+        'Compare rates of change',
+        'Use rates to find an amount'
+      ]),
+      S('y9-surface-solids', 'Surface Area of Cones, Spheres and Pyramids', 'Measurement & Geometry', AUTHORED_WEIGHT, [
+        'Find the surface area of a sphere',
+        'Find the surface area of a cone',
+        'Find the surface area of a pyramid'
+      ]),
+      S('y9-volume-solids', 'Volume of Cones, Spheres and Pyramids', 'Measurement & Geometry', AUTHORED_WEIGHT, [
+        'Find the volume of a sphere or hemisphere',
+        'Find the volume of a cone',
+        'Find the volume of a pyramid'
+      ]),
+      S('y9-data-inquiry', 'Summary Statistics and Statistical Inquiry', 'Statistics & Probability', AUTHORED_WEIGHT, [
+        'Find the mean from a frequency table',
+        'Use quartiles and the interquartile range',
+        'Judge the effect of a new value on the mean'
       ])
     ]
   },
@@ -230,6 +265,51 @@ export const CURRICULUM = [
         'Use Venn diagrams and two-way tables',
         'Calculate conditional probabilities',
         'Independent and mutually exclusive events'
+      ]),
+      S('y10-indices-neg', 'Indices with Negative Powers', 'Algebra', AUTHORED_WEIGHT, [
+        'Multiply powers with negative indices',
+        'Raise a power to a power',
+        'Divide algebraic terms with negative indices'
+      ]),
+      S('y10-functions', 'Functions and Function Notation', 'Functions', AUTHORED_WEIGHT, [
+        'Evaluate a function',
+        'Solve f(x) = k',
+        'Find a composite function value'
+      ]),
+      S('y10-logarithms', 'Logarithms', 'Number', AUTHORED_WEIGHT, [
+        'Evaluate a logarithm',
+        'Use the logarithm laws',
+        'Solve an exponential equation'
+      ]),
+      S('y10-polynomials', 'Polynomials', 'Algebra', AUTHORED_WEIGHT, [
+        'Find the degree of a product of polynomials',
+        'Evaluate a polynomial',
+        'Expand a product of polynomials'
+      ]),
+      S('y10-trig-nonright', 'Trigonometry of Non-right-angled Triangles', 'Trigonometry', AUTHORED_WEIGHT, [
+        'Find the area of a triangle from two sides and the included angle',
+        'Use the cosine rule',
+        'Use the sine rule'
+      ]),
+      S('y10-trig-any-angle', 'Trigonometric Functions of Any Angle', 'Trigonometry', AUTHORED_WEIGHT, [
+        'Use exact values for 30°, 45° and 60°',
+        'Find trigonometric ratios of angles up to 360°',
+        'Solve simple trigonometric equations'
+      ]),
+      S('y10-geometry-proof', 'Deductive Geometry', 'Measurement & Geometry', AUTHORED_WEIGHT, [
+        'Use the properties of isosceles triangles',
+        'Use the properties of parallelograms and rhombuses',
+        'Use congruent triangles'
+      ]),
+      S('y10-circle-geometry', 'Circle Geometry', 'Measurement & Geometry', AUTHORED_WEIGHT, [
+        'Use the angle at the centre',
+        'Use the properties of cyclic quadrilaterals',
+        'Use the properties of tangents'
+      ]),
+      S('y10-networks', 'Introduction to Networks', 'Statistics & Probability', AUTHORED_WEIGHT, [
+        'Count edges and degrees',
+        'Find a shortest path',
+        'Find a minimum spanning tree'
       ])
     ]
   },
@@ -443,6 +523,61 @@ export const STREAM_CURRICULUM = {
         'Sine rule for sides and angles',
         'Cosine rule for sides and angles',
         'Area of a triangle A = ½ab sin C'
+      ]),
+      T('ms12-algebraic', 'Algebraic Relationships in Practice', 'Algebra', 8, 'MS-A3/A4', [
+        'Solve problems with two linear models (break-even and equal-cost points)',
+        'Use exponential models',
+        'Interpret linear graphs of practical situations'
+      ]),
+      T('ms12-invest-loans', 'Investment, Loans & Depreciation: Exact Results', 'Financial Maths', 8, 'MS-F4', [
+        'Find the value of a compound-interest investment',
+        'Track the balance of a loan with interest and repayments',
+        'Find the value of a declining-balance asset'
+      ]),
+      T('ms12-annuity-table', 'Annuities from Table Factors', 'Financial Maths', 8, 'MS-F5', [
+        'Find the future value of an annuity from a given table factor',
+        'Find the present value of an annuity from a given table factor',
+        'Find the interest earned by an annuity'
+      ]),
+      T('ms12-rates', 'Ratios & Rates in Practice', 'Number', 8, 'MS-M4/M7', [
+        'Convert between units of a rate',
+        'Calculate with rates',
+        'Share a quantity in a given ratio'
+      ]),
+      T('ms12-network-flow', 'Network Flow', 'Statistics & Probability', 8, 'MS-N2', [
+        'Find the capacity of a cut',
+        'Find the maximum flow through a network',
+        'Use the minimum cut'
+      ]),
+      T('ms12-critical-path', 'Critical Path Analysis', 'Statistics & Probability', 8, 'MS-N3', [
+        'Find earliest start times',
+        'Find the minimum completion time of a project',
+        'Find the float time of an activity'
+      ]),
+      T('ms12-bivariate-fit', 'Lines of Fit: Exact Predictions', 'Statistics & Probability', 8, 'MS-S4', [
+        'Predict from a line of best fit',
+        'Interpret the gradient of a line of fit',
+        'Use a line of fit through two points'
+      ]),
+      T('ms12-normal-exact', 'The Normal Distribution: Exact Results', 'Statistics & Probability', 8, 'MS-S5', [
+        'Find a z-score',
+        'Use the 68–95–99.7 rule to count values',
+        'Find a value from its z-score'
+      ]),
+      T('ms12-simple-interest', 'Investment: Simple Interest', 'Financial Maths', 8, 'MS-F2', [
+        'Calculate simple interest',
+        'Find the value of a simple-interest investment',
+        'Find the rate or the time from the interest earned'
+      ]),
+      T('ms12-depreciation', 'Depreciation & Loans: Exact Results', 'Financial Maths', 8, 'MS-F3', [
+        'Find the value of an asset using straight-line depreciation',
+        'Find the annual depreciation of an asset',
+        'Find the interest paid on a loan repaid in equal instalments'
+      ]),
+      T('ms12-right-triangle', 'Right-Angled Triangles: Exact Results', 'Trigonometry', 8, 'MS-M3', [
+        'Use Pythagoras’ theorem to find a side',
+        'Use a special-angle ratio to find a side',
+        'Find an acute angle from an exact ratio'
       ])
     ]
   },
@@ -690,6 +825,7 @@ export const DOTPOINT_FORMS = Object.freeze({
   'y8-volume': [[0], [0], [1], [0, 2]],
   'y8-rates': [[2], [0], [1], [0]],
   'y8-probability': [[0], [1], [2], [2]],
+  'y8-geo-figures': [[0], [1], [1], [2]],
   // ── Year 9 ────────────────────────────────────────────────────────────────
   'y9-pythagoras': [[0], [1], [0], [1, 2]],
   'y9-indices-sci': [[0], [1], [2], [0]],
@@ -700,6 +836,12 @@ export const DOTPOINT_FORMS = Object.freeze({
   'y9-simint': [[0], [0], [1], [2]],
   'y9-data': [[0], [0], [1], [2]],
   'y9-probability': [[0], [0, 2], [1], [0, 1]],
+  'y9-nonlinear-a': [[0], [1], [2], [0]],
+  'y9-variation': [[0], [1], [2], [1]],
+  'y9-rate-change': [[0], [0], [1], [2]],
+  'y9-surface-solids': [[0], [1], [2], [1]],
+  'y9-volume-solids': [[0], [1], [2], [0]],
+  'y9-data-inquiry': [[0], [1], [1], [2]],
   // ── Year 10 ───────────────────────────────────────────────────────────────
   'y10-quadratics': [[1], [0], [0, 1], [2]],
   'y10-nonlinear': [[0, 1], [0], [0], [2]],
@@ -710,6 +852,15 @@ export const DOTPOINT_FORMS = Object.freeze({
   'y10-similarity': [[0], [1], [2], [0]],
   'y10-stats': [[0], [0, 1], [2], [0, 1]],
   'y10-probability': [[0], [0, 1], [1], [2]],
+  'y10-indices-neg': [[0], [1], [0], [2]],
+  'y10-functions': [[0], [1], [2], [1]],
+  'y10-logarithms': [[0], [1], [2], [1]],
+  'y10-polynomials': [[0], [1], [2], [1]],
+  'y10-trig-nonright': [[0], [1], [2], [1]],
+  'y10-trig-any-angle': [[0], [1], [2], [2]],
+  'y10-geometry-proof': [[0], [1], [1], [2]],
+  'y10-circle-geometry': [[0], [1], [2], [2]],
+  'y10-networks': [[0], [0], [1], [2]],
   // ── Year 11 Advanced ──────────────────────────────────────────────────────
   'y11-functions': [[0], [2], [1], [0]],
   'y11-quadfunc': [[1], [0], [2], [1]],
@@ -749,6 +900,17 @@ export const DOTPOINT_FORMS = Object.freeze({
   'ms12-normal': [[0], [1], [0, 2], [0]],
   'ms12-bivariate': [[0], [1], [1], [1, 2]],
   'ms12-nonright': [[0], [1], [2], [1]],
+  'ms12-algebraic': [[1], [2], [0], [0]],
+  'ms12-invest-loans': [[0], [0], [1], [2]],
+  'ms12-annuity-table': [[0], [1], [2], [0]],
+  'ms12-rates': [[0], [1], [2], [1]],
+  'ms12-network-flow': [[0], [0], [1], [2]],
+  'ms12-critical-path': [[0], [1], [2], [1]],
+  'ms12-bivariate-fit': [[0], [1], [2], [0]],
+  'ms12-normal-exact': [[0], [2], [1], [1]],
+  'ms12-simple-interest': [[0], [1], [2], [2]],
+  'ms12-depreciation': [[0], [1], [2], [0]],
+  'ms12-right-triangle': [[0], [0], [1], [2]],
   // ── Extension 1 · Year 11 ─────────────────────────────────────────────────
   'me11-poly': [[0], [0], [1], [2]],
   'me11-functions': [[0], [1], [0], [2]],
