@@ -567,7 +567,7 @@ reset();
   };
   try {
     // Clock advances after the server answer, forcing noteCloudClock to write.
-    const heldOffline = anotherTab.offlineGraceFor(pid, Date.now() + 10_000);
+    const heldOffline = anotherTab.offlineGraceFor(pid, Date.now() + 1);
     await paused;
     server.guardian = () => ({ status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } });
     const revoked = await gate(pid, { sync: false });
