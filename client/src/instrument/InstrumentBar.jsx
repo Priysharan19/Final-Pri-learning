@@ -6,6 +6,9 @@ import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
 import CommandBar from './CommandBar.jsx';
 import Glyph from './Glyph.jsx';
+import { featureEnabled } from '../platform/features.js';
+
+const LIBRARY_ON = featureEnabled('library');
 import { setBarSlot } from './BarSlot.jsx';
 import { BrandWordmark } from '../components/BrandMark.jsx';
 
@@ -58,6 +61,11 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
 
   useEffect(() => {
     const key = e => {
+      // "/" opens the bar from anywhere that is not a field, only where the
+      // library is on (plan F2); with it off the bar is exactly as it was.
+      const slash = LIBRARY_ON && e.key === '/' && !e.metaKey && !e.ctrlKey && !e.altKey && !e.isComposing &&
+        !e.target?.closest?.('input, textarea, select, [contenteditable="true"], .ink-stage, [data-ink-surface], [data-instrument-command]');
+      if (slash) { e.preventDefault(); setOpen(true); return; }
       if (!(e.metaKey || e.ctrlKey) || e.altKey || e.key.toLowerCase() !== 'k' || e.isComposing) return;
       // Inside a field the student is typing or writing in, the chord belongs
       // to that field; the bar's own button stays the way in from there.

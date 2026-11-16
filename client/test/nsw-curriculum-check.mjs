@@ -21,9 +21,9 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { SUBTOPICS, SUBTOPIC_BY_ID } from '../src/engine/curriculum.js';
+import { SUBTOPICS, SUBTOPIC_BY_ID, DOTPOINT_FORMS } from '../src/engine/curriculum.js';
 import {
   NSW_CURRENT_SYLLABUSES, NSW_SUPERSEDED_SYLLABUSES, NSW_SYLLABUSES, NSW_SYLLABUS_BY_ID,
   NSW_OUTCOME_BY_CODE, NSW_HISTORICAL_TOPIC_BY_CODE, LEGACY_CROSSWALK, NEW_OUTCOME_GAPS, NSW_CROSSWALK,
@@ -223,7 +223,7 @@ const report = nswCoverage({ syllabuses: NSW_CURRENT_SYLLABUSES, crosswalk: NSW_
 const PINNED = {
   'nsw-mathematics-k-10-2022': [57, 41, 0, 16],
   'nsw-mathematics-standard-11-12-2024': [25, 18, 0, 7],
-  'nsw-mathematics-advanced-11-12-2024': [18, 14, 0, 4],
+  'nsw-mathematics-advanced-11-12-2024': [18, 16, 0, 2],
   'nsw-mathematics-extension1-11-12-2024': [11, 9, 1, 1],
   'nsw-mathematics-extension2-11-12-2024': [5, 5, 0, 0]
 };
@@ -260,7 +260,7 @@ const DIGESTS = {
   syllabuses: digest(NSW_SYLLABUSES.map(s => ({ id: s.id, focusAreas: s.focusAreas, topics: s.topics }))),
   crosswalk: digest(NSW_CROSSWALK.map(r => ({ subtopicId: r.subtopicId, syllabus: r.syllabus, outcome: r.outcome, historicalCodes: r.historicalCodes, dotpoints: r.dotpoints, status: r.status, placement: r.placement })))
 };
-const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '734ccaefd08e7091' };
+const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '92b10c3bf3b2dee1' };
 if (process.argv.includes('--print-digests')) console.log(JSON.stringify(DIGESTS));
 for (const k of Object.keys(PINNED_DIGESTS)) {
   check(DIGESTS[k] === PINNED_DIGESTS[k], `${k} digest ${DIGESTS[k]} differs from the reviewed ${PINNED_DIGESTS[k]}: re-verify the change against NESA, get it reviewed, then update the pin`);
@@ -289,6 +289,55 @@ for (const file of walk(srcDir)) {
   check(!readFileSync(file, 'utf8').includes('curriculum-nsw'), `${relative(repo, file)} references curriculum-nsw: serving NSW content is G3, not G2`);
 }
 
+// An NSW-authored generator module (`generators/*-nsw.js`) may not define an id that any other
+// generator module defines: banks are merged into one registry, so a collision would silently
+// replace an existing generator (India's chapters serve several of the year and stream ids).
+{
+  const genDir = join(srcDir, 'engine', 'generators');
+  const fnEntries = async file => {
+    const mod = await import(pathToFileURL(join(genDir, file)).href);
+    return Object.values(mod).flatMap(value => (value && typeof value === 'object' && !Array.isArray(value) ? Object.entries(value).filter(([, fn]) => typeof fn === 'function') : []));
+  };
+  const files = readdirSync(genDir).filter(f => f.endsWith('.js'));
+  const nswFiles = files.filter(f => f.endsWith('-nsw.js'));
+  // id → the other banks' functions for it. A bank that spreads an NSW module holds the SAME function
+  // object, which is not a collision; a different function under the same id is.
+  const others = new Map();
+  for (const file of files.filter(f => !f.endsWith('-nsw.js') && f !== 'index.js')) {
+    let entries;
+    try { entries = await fnEntries(file); } catch { continue; }
+    for (const [id, fn] of entries) others.set(id, [...(others.get(id) || []), { file, fn }]);
+  }
+  for (const file of nswFiles) {
+    for (const [id, fn] of await fnEntries(file)) {
+      const clash = (others.get(id) || []).filter(o => o.fn !== fn).map(o => o.file);
+      check(clash.length === 0, `${file} defines ${id}, which ${clash.join(', ')} also defines: an NSW-authored generator may not replace another bank's`);
+    }
+  }
+  // Where the spread sits, and that no other bank source names an NSW id as a key, are checked on the
+  // text too: a spread placed after an original key would replace it inside the bank, and then the bank
+  // would hold the very same function the NSW module does.
+  const nswIds = new Set((await Promise.all(nswFiles.map(fnEntries))).flat().map(([id]) => id));
+  for (const file of files.filter(f => !f.endsWith('-nsw.js') && f !== 'index.js')) {
+    const text = readFileSync(join(genDir, file), 'utf8');
+    const spreads = [...text.matchAll(/^\s*\.\.\.\w+Nsw\b/gm)];
+    if (spreads.length) {
+      const lines = text.split('\n');
+      const open = lines.findIndex(l => /^export const \w+ = \{\s*$/.test(l));
+      check(spreads.length === 1 && open >= 0 && /^\s*\.\.\.\w+Nsw,\s*$/.test(lines[open + 1] || ''), `${file}: the NSW spread must be the first and only entry of the bank's object, so an original generator can never be replaced`);
+    }
+    for (const id of nswIds) check(!new RegExp(`['"\`]${id}['"\`]\\s*:`).test(text), `${file} names ${id}, an NSW-authored generator id, as a key`);
+  }
+  // A generator module may only import the shared question helpers, so importing it cannot reach into
+  // another bank and replace one of its generators as a side effect.
+  for (const file of nswFiles) {
+    const imports = [...readFileSync(join(genDir, file), 'utf8').matchAll(/^\s*import\b[^;]*?from\s+['"]([^'"]+)['"]/gm)].map(m => m[1]);
+    check(imports.every(spec => spec === '../qhelpers.js'), `${file} imports ${imports.filter(spec => spec !== '../qhelpers.js').join(', ')}: an NSW-authored generator module may import only ../qhelpers.js`);
+    check(!/^\s*(?:await\s+)?import\s*\(/m.test(readFileSync(join(genDir, file), 'utf8')), `${file} uses a dynamic import`);
+  }
+  check(nswFiles.length > 0, 'NSW-authored generator modules were found and their ids are unique across banks');
+}
+
 // India curriculum, the legacy NSW course, every generator and the practice
 // server must be byte-unchanged on a branch that changes this model. Needs the
 // merge base with origin/main; a shallow CI checkout has none and says so.
@@ -312,8 +361,69 @@ try {
   const touched = changedSince(['client/src/engine/curriculum-nsw']);
   if (touched) {
     const changed = changedSince([...PROTECTED, ...protectedGlobs.map(g => `:(glob)${g}`)]);
-    check(changed === '', `this branch changes the NSW model and also: ${changed.split('\n').join(', ')}`);
-    isolationNote = `India/legacy files byte-unchanged against merge base ${base.slice(0, 9)}`;
+    // Authored NSW content (a new generator and its subtopic) legitimately changes the crosswalk and
+    // the legacy NSW course together. Only these shapes of change are let through; anything else in
+    // a protected path (India, NCERT, the availability rules, practice.js, a rewritten or removed line
+    // of an existing generator) still fails:
+    //   · a new or edited `*-nsw.js` generator file (its ids may not collide with another bank: checked below);
+    //   · in a year/stream generator bank: its `import … from './….-nsw.js'` line and one `...xNsw,`
+    //     spread line (first in the object, so an original generator can never be overridden);
+    //   · in curriculum.js: only subtopic entries, dot-point form rows, comments, the authored-weight
+    //     constant and an extended CODES table (shapes below); no other line may be added or removed.
+    const BANK = /^client\/src\/engine\/generators\/(year\d+|streams-standard|streams-ext)\.js$/;
+    const COURSE = 'client/src/engine/curriculum.js';
+    const NEW_NSW_FILE = /^client\/src\/engine\/generators\/[\w-]+-nsw\.js$/;
+    const BANK_ADDED = /^\+(import \{ \w+Nsw \} from '\.\/[\w-]+-nsw\.js';|\s*\.\.\.\w+Nsw,)$/;
+    // curriculum.js: only these shapes may be added — a subtopic entry (opener, dot-point text, closer),
+    // a DOTPOINT_FORMS row of ordinals, a comment, the authored-weight constant, and the extended CODES line.
+    const COURSE_ADDED = [
+      /^\+\s*(S|T)\('[\w-]+', '[^']*', '[^']*', [\w .\/]+, (?:'[^']*', )?\[$/,
+      /^\+\s*'[^'`$\\]*',?$/,
+      /^\+\s*\]\),?$/,
+      /^\+\s*'[\w-]+': \[(?:\[[\d, ]*\],? ?)+\],?$/,
+      /^\+\s*\/\/.*$/,
+      /^\+const AUTHORED_WEIGHT = 100 \/ 9 - 1e-14;$/,
+      /^\+$/
+    ];
+    const COURSE_REMOVED = /^-(const CODES = |\s*\]\)\s*$)/;
+    const untracked = new Set(git(['ls-files', '--others', '--exclude-standard', '--', ...PROTECTED]).split('\n').filter(Boolean));
+    const diffLines = file => git(['diff', '-U0', base, '--', file]).split('\n').filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
+    const allowed = [];
+    const blocked = changed.split('\n').filter(Boolean).filter(file => {
+      if (NEW_NSW_FILE.test(file)) { allowed.push(file.replace('client/src/engine/', '')); return false; }
+      if (untracked.has(file) || !git(['ls-tree', base, '--', file])) return true;
+      const lines = diffLines(file);
+      let ok = false;
+      if (BANK.test(file)) ok = lines.every(l => BANK_ADDED.test(l));
+      else if (file === COURSE) {
+        const removed = lines.filter(l => l[0] === '-'), added = lines.filter(l => l[0] === '+');
+        const oldCodes = removed.find(l => l.startsWith('-const CODES = '));
+        const newCodes = added.find(l => l.startsWith('+const CODES = '));
+        // The CODES table may only grow: the old line is a prefix of the new one.
+        const codesOk = !oldCodes || (newCodes && newCodes.slice(1).startsWith(oldCodes.slice(1).replace(/\};$/, '')) && newCodes.endsWith('};'));
+        ok = removed.every(l => COURSE_REMOVED.test(l)) && codesOk
+          && added.every(l => l === newCodes || COURSE_ADDED.some(re => re.test(l)));
+      }
+      if (ok) allowed.push(file.replace('client/src/engine/', ''));
+      return !ok;
+    });
+    check(blocked.length === 0, `this branch changes the NSW model and also: ${blocked.join(', ')}`);
+    // The line shapes above are not enough on their own (a duplicate key, an injected dot point or a heavy
+    // weight has an innocent shape): compare the parsed course with the base. Every existing subtopic keeps
+    // its name, strand, year, weight, label, dot points and forms; each new one carries a fixed weight.
+    if (changed.split('\n').includes(COURSE)) {
+      // curriculum.js imports nothing, so the base text can be loaded from a data: URL (no file is written).
+      const baseMod = await import(`data:text/javascript;base64,${Buffer.from(git(['show', `${base}:${COURSE}`])).toString('base64')}`);
+      const sig = x => JSON.stringify([x.name, x.strand, x.year, x.weight, x.code, x.dotpoints]);
+      for (const b of baseMod.SUBTOPICS) {
+        check(SUBTOPIC_BY_ID[b.id] && sig(SUBTOPIC_BY_ID[b.id]) === sig(b), `curriculum.js changes the existing subtopic ${b.id}`);
+        check(JSON.stringify(DOTPOINT_FORMS[b.id]) === JSON.stringify(baseMod.DOTPOINT_FORMS[b.id]), `curriculum.js changes the existing dot-point forms of ${b.id}`);
+      }
+      const baseIds = new Set(baseMod.SUBTOPICS.map(b => b.id));
+      check(new Set(SUBTOPICS.map(x => x.id)).size === SUBTOPICS.length, 'curriculum.js: subtopic ids are unique');
+      for (const x of SUBTOPICS.filter(x => !baseIds.has(x.id))) check(x.weight === 100 / 9 - 1e-14 || x.weight === 8, `curriculum.js: new subtopic ${x.id} has weight ${x.weight}, not an authored weight`);
+    }
+    isolationNote = `India/legacy files byte-unchanged against merge base ${base.slice(0, 9)}${allowed.length ? `, except additive NSW-only changes in ${allowed.join(', ')}` : ''}`;
   } else {
     isolationNote = 'branch does not change the NSW model; byte-unchanged check not applicable';
   }

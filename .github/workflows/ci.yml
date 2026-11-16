@@ -360,6 +360,10 @@ jobs:
           # only, the server's own edition only; the seed equals the migration's.
           node server/test/resources-check.mjs 2>&1 | tee resources.log
           node tools/ci-check-counts.mjs verify platform/resources.log
+          # Saved library resources (plan F2): the `resource-bookmark` sync kind,
+          # account-scoped, capped, in the export and gone with the account.
+          node server/test/resource-bookmark-sync-check.mjs 2>&1 | tee resource-bookmark.log
+          node tools/ci-check-counts.mjs verify platform/resource-bookmark.log
           # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.

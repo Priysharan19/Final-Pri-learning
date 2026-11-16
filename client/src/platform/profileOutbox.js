@@ -21,7 +21,7 @@ const PROFILE_ID = /^[A-Za-z0-9._-]{1,100}$/;
 // teacher/student permissions can be enforced explicitly.
 const CLOUD_KINDS = new Set([
   'profile', 'practice-progress', 'exam', 'rush-history', 'match-history',
-  'bookmark', 'favorite'
+  'bookmark', 'favorite', 'resource-bookmark'
 ]);
 const APPEND_KINDS = new Set(['practice-progress', 'exam', 'rush-history', 'match-history']);
 const RESCAN = Object.freeze({ seq: 0, kind: 'full-rescan', entityId: 'all', operation: 'upsert', initial: true });
