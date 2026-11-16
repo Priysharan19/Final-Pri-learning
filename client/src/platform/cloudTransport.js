@@ -672,7 +672,10 @@ export const cloud = Object.freeze({
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
   linkIdentity: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/link`, { method: 'POST', body }),
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),
-  syncPull: cursor => cloudRequest(`/v1/sync/pull/${Math.max(0, Number(cursor) || 0)}`),
+  // A bound pull cannot silently switch accounts between /me and a later
+  // pagination request. The last path segment stays the numeric cursor for
+  // legacy callers and test fixtures; the server checks the preceding id.
+  syncPull: (cursor, accountId = null) => cloudRequest(`/v1/sync/pull/${accountId == null ? '' : `${pathId(accountId, 'account id')}/`}${Math.max(0, Number(cursor) || 0)}`),
   entitlements: () => cloudRequest('/v1/entitlements'),
   billingConfig: () => cloudRequest('/v1/billing/config'),
   billingStatus: () => cloudRequest('/v1/billing/status'),
