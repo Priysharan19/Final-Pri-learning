@@ -71,12 +71,11 @@ try {
   await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
   await createVerifiedProfile(page, platform, { name: 'NSW Practice Student', year: 10, fromPicker: await page.getByTestId('picker-create-account').count() > 0 });
-  // Close any earlier India-course issuance before the syllabus change.
-  // Saving the NSW profile itself may initiate or resume the NSW question
-  // before switchSyllabus returns, so the observer MUST start before Save.
-  await online.settled();
-  const nswFrom = issueBodies.length;
   await switchSyllabus(page, platform, { course: 'nsw', year: 10 });
+  // Since E3 a Prithagoras sign-up is an NSW profile from the start, so EVERY
+  // issue request this page makes names NSW and the server issues every one.
+  // (Counting only from the switch missed the run where the first question was
+  // issued before it and resumed after: no new request, an empty list.)
 
   await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
@@ -100,16 +99,16 @@ try {
   }
 
   await online.settled();
-  // Await the actual response for every NSW issue request. An async event
-  // listener can still be parsing its JSON when the assertion runs.
-  const nswReplies = await Promise.all(issueRequests.slice(nswFrom).map(async request => {
+  // Prithagoras begins with an NSW profile. Capture *all* its issue
+  // requests, including the one pre-fetched during onboarding, and await
+  // completed replies rather than racing an async page.on('response') handler.
+  const nswReplies = await Promise.all(issueRequests.map(async request => {
     const response = await request.response();
-    if (!response) return { status: null, code: 'NO_RESPONSE', generator: null };
+    if (!response) return { status: null, code: 'NO_RESPONSE' };
     const failure = await response.finished();
     let body = null;
-    try { body = await response.json(); } catch { /* status below remains authoritative */ }
-    return {
-      status: failure ? null : response.status(),
+    try { body = await response.json(); } catch { /* status remains authoritative */ }
+    return { status: failure ? null : response.status(),
       code: failure ? String(failure) : (body?.error?.code || body?.code || null),
       generator: (() => { try { return JSON.parse(request.postData()).generator; } catch { return null; } })()
     };
@@ -118,7 +117,7 @@ try {
   const shown = await online.shownRow();
   check('practice shows a question the server issued, not a draft', shown?.checkState === 'issued', JSON.stringify(shown));
   check('no "cannot be marked" draft notice is on the card', !/cannot be marked/i.test(await page.locator('.qpage').innerText()));
-  check('every issue request named the NSW course', issueBodies.length > nswFrom && issueBodies.slice(nswFrom).every(b => b?.curriculum === 'nsw'), JSON.stringify(issueBodies.slice(nswFrom).map(b => b?.curriculum)));
+  check('every issue request named the NSW course', issueBodies.length > 0 && issueBodies.every(b => b?.curriculum === 'nsw'), JSON.stringify(issueBodies.map(b => b?.curriculum)));
   const submit = page.getByRole('button', { name: /Submit answer/ });
   check('Submit is offered', await submit.count() === 1);
   check('a typed question the server issued was reached', !!known, 'no issued typed question within the bounded search');

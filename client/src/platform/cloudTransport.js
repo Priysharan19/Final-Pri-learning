@@ -222,8 +222,21 @@ function cookie(name) {
 }
 
 function requestId() {
-  try { return globalThis.crypto?.randomUUID?.() || `req-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
-  catch { return `req-${Date.now()}`; }
+  // A request correlation ID travels across the native/Web API boundary.
+  // Never downgrade its unpredictability to Math.random or a timestamp if
+  // randomUUID is unavailable in a supported WebView.
+  const crypto = globalThis.crypto;
+  try {
+    if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+    if (typeof crypto?.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return 'req-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch { /* fail closed below when secure randomness is unavailable */ }
+  const error = new Error('Secure cloud request identifiers are unavailable.');
+  error.code = 'SECURE_RANDOM_UNAVAILABLE';
+  throw error;
 }
 
 function byteLength(text) {

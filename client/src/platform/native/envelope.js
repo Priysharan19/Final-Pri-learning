@@ -25,12 +25,18 @@ export function byteLength(text) {
   try { return new TextEncoder().encode(text).byteLength; } catch { return String(text).length * 2; }
 }
 
-let counter = 0;
 export function newRequestId() {
-  let id = '';
-  try { id = globalThis.crypto?.randomUUID?.() || ''; } catch { id = ''; }
-  if (!id) id = `${Date.now().toString(36)}-${(counter++).toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  return id.slice(0, MAX_ID_LENGTH);
+  // Native bridge request IDs must remain unpredictable without randomUUID.
+  const crypto = globalThis.crypto;
+  try {
+    if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID().slice(0, MAX_ID_LENGTH);
+    if (typeof crypto?.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('').slice(0, MAX_ID_LENGTH);
+    }
+  } catch { /* fail closed below */ }
+  throw new Error('Secure native request identifiers are unavailable.');
 }
 
 export function envelopeLimit(cap) {

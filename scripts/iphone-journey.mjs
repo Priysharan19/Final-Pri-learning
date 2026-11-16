@@ -289,6 +289,21 @@ for (const line of first) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`)
 const second = launchAndRead(udid, bundleId, '--journey-relaunch', 'relaunch');
 for (const line of second) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 
+// The fixture server's log lives in a temp folder CI never uploads, so a
+// failing phase prints the server's last requests (route, status, ms) and its
+// errors. Train editions-11's iOS 27 cloudSignIn showed only the card's "No
+// connection", which the client also shows when a request times out (12 s);
+// without the server side, a slow or failing server and a device that cannot
+// reach it look the same.
+function serverTail(logPath, n = 20) {
+  try {
+    const rows = readFileSync(logPath, 'utf8').trim().split('\n').slice(-400).map(l => { try { return JSON.parse(l); } catch { return { raw: l }; } });
+    return rows.filter(r => r.event === 'http_request' || r.level === 'error' || r.level === 'warn' || r.raw).slice(-n).map(r => r.event === 'http_request'
+      ? `${String(r.ts || '').slice(11, 23)} ${r.method} ${r.route} ${r.status} ${r.ms} ms${r.code ? ' ' + r.code : ''}`
+      : `${String(r.ts || '').slice(11, 23)} ${r.level || ''} ${r.event || ''} ${String(r.raw || r.message || r.error || '').slice(0, 160)}`);
+  } catch (e) { return [`(server log unreadable: ${String(e?.code || e?.message || e).slice(0, 60)})`]; }
+}
+
 // Successful logouts in the fixture server's request log (null when unknown).
 function serverLogouts(fixture) {
   try {
@@ -348,7 +363,13 @@ if (WANT_CLOUD) try {
   try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
   try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
   installApp(udid, app);
-  const show = lines => { for (const line of lines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`); };
+  const show = lines => {
+    for (const line of lines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+    if (fixture.PRI_CLOUD_SERVER_LOG && (!lines.length || lines.some(l => l.startsWith('PRIJOURNEY FAIL')))) {
+      console.log('  server log (last requests):');
+      for (const row of serverTail(fixture.PRI_CLOUD_SERVER_LOG)) console.log(`    ${row}`);
+    }
+  };
   const port = Number(fixture.PRI_CLOUD_PORT || new URL(fixture.PRI_CLOUD_ORIGIN).port);
   console.log(`\nCloud journey against ${fixture.PRI_CLOUD_ORIGIN} (real Pri server, fixture accounts) …`);
   if (childEnv.PRI_JOURNEY_NEW_EMAIL) {

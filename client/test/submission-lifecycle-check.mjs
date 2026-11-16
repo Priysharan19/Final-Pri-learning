@@ -52,7 +52,10 @@ const idb = await import('../src/local/idb.js');
 const { checkAnswer } = await import('../src/engine/checker.js');
 const { loadAllBanks } = await import('../src/engine/generators/index.js');
 const { subtopicsForYear } = await import('../src/engine/curriculum.js');
-const YEAR10 = subtopicsForYear(10).map(t => t.id);
+// Only subtopics the server issues are offered (engine/nswOffer.js): a topic it
+// issues nothing from is refused, never drawn.
+const { nswIssuedLevels } = await import('../src/engine/nswOffer.js');
+const YEAR10 = subtopicsForYear(10).map(t => t.id).filter(id => nswIssuedLevels(id).length > 0);
 let topicTurn = 0;
 const { classifyMutation } = await import('../src/local/outbox.js');
 const { recordProfileMutation } = await import('../src/platform/profileOutbox.js');

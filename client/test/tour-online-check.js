@@ -581,6 +581,22 @@ async function findTyped(page, settle) {
   return false;
 }
 
+/**
+ * Next question until a typed one that is only PREPARED is on screen. Right
+ * after sign-in the app issues a first question; when it lands in the tour's
+ * chapter Practice correctly resumes it, already issued, and no issue call is
+ * ever refused. That question is moved past: the armed route then refuses the
+ * next issue, so the question served instead is the prepared one.
+ */
+async function findPreparedTyped(page, settle, online) {
+  for (let skips = 0; skips <= MAX_SKIPS; skips++) {
+    if (!await findTyped(page, settle)) return false;
+    if ((await online.shownRow())?.checkState === 'prepared') return true;
+    await nextQuestion(page, settle);
+  }
+  return false;
+}
+
 /** Next question until the server has issued a typed question whose answer the oracle knows. */
 async function findIssuedTyped(page, settle, online) {
   const typeTab = page.getByRole('button', { name: 'Answer by typing' });
@@ -680,12 +696,12 @@ export const preparedTaken = {
   id: 'prepared-taken',
   name: 'Prepared · taken up by another account: not marked here, work kept, next one is',
   online: true,
-  inspectNetwork: true, // request interception must bypass service-worker routing
+  inspectNetwork: true, // interception must not be short-circuited by the service worker
 
   async run({ page, ctx, base, check, goto, createProfile, mathText, settle, online }) {
     await goto('/');
-    // The verified onboarding helper signs the profile in and may pre-issue
-    // Practice before returning. Arm before it, not after createProfile().
+    // Attach the interceptor before onboarding can issue or prefetch the
+    // first question; otherwise the route cannot prove the prepared fallback.
     // While armed, a fresh issue (no prepared token) fails at the route, so
     // serveQuestion falls back to a prepared question for this signed-in student.
     let armed = true;
@@ -701,7 +717,7 @@ export const preparedTaken = {
     const account = await online.signIn({ name: 'Late Binder' });
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
-    const found = await findTyped(page, settle);
+    const found = await findPreparedTyped(page, settle, online);
     armed = false;
     const shownBefore = await online.shownRow();
     const qid = await shownId(page);
