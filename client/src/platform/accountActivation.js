@@ -86,6 +86,31 @@ async function persistDenial(pid, accountId) {
   await advanceDeviceDenialGeneration(denialRowId(pid, accountId));
 }
 
+// An independently persisted account-scoped fence makes a recoverable
+// IndexedDB denial-write failure fail closed across tabs and after reload.
+// It holds no contact details, credentials or permission, only random bytes.
+// A genuine new server approval records the current fence on the link row.
+const RECOVERY_PREFIX = 'pri-activation-denial-recovery-v1:';
+const recoveryKey = accountId => `${RECOVERY_PREFIX}${String(accountId)}:`;
+function recoveryFence(accountId) {
+  if (!accountId || !globalThis.localStorage) return null;
+  return globalThis.localStorage.getItem(recoveryKey(accountId));
+}
+function writeRecoveryFence(accountId) {
+  if (!accountId || !globalThis.localStorage) return false;
+  try {
+    const bytes = new Uint32Array(4);
+    globalThis.crypto.getRandomValues(bytes);
+    globalThis.localStorage.setItem(recoveryKey(accountId),
+      [...bytes].map(x => x.toString(16).padStart(8, '0')).join(''));
+    return true;
+  } catch {
+    // IndexedDB generation is the primary durable fence. If both persistence
+    // mechanisms fail, the request is blocked, never granted offline access.
+    return false;
+  }
+}
+
 /** True when an offline entry verified at `verifiedAt` may no longer stay open (a missing time counts as expired). */
 export function offlineGraceExpired(verifiedAt, now = Date.now()) {
   const at = Number(verifiedAt);
@@ -108,16 +133,30 @@ export async function offlineGraceFor(pid, now = Date.now()) {
   try { link = await cloudAccountLink(pid, { strict: true }); } catch { return null; }
   if (!link?.accountId || !link.lastSyncAt || !link.activatedAt) return null;
   if (String(link.activatedAccountId) !== String(link.accountId)) return null;
-  // Only an online permission confirmed within the current account-wide
-  // denial generation can supply offline grace, even after a reload/tab swap.
-  try { if ((await latestDenialGeneration(pid, link.accountId)) !== link.activatedGeneration) return null; }
-  catch { return null; }
+  // Both independent account-wide denial fences must still match the grant.
+  // Another tab can revoke while the clock update is awaiting IndexedDB.
+  let fence;
+  try {
+    fence = recoveryFence(link.accountId);
+    if ((link.activatedRecoveryFence ?? null) !== fence ||
+        (await latestDenialGeneration(pid, link.accountId)) !== link.activatedGeneration) return null;
+  } catch { return null; }
   const age = now - link.activatedAt;
-  // A timestamp from the future is a clock that moved, not a fresh answer;
-  // so is a clock earlier than the latest time this device has already shown.
   if (!(age >= 0 && age < OFFLINE_GRACE_MS)) return null;
   if (link.clockSeenAt && now < link.clockSeenAt) return null;
-  try { await noteCloudClock(pid, now); } catch { return null; }
+  try {
+    await noteCloudClock(pid, now);
+    // Recheck account affinity, grant and BOTH fences at the final return
+    // boundary. A stale in-flight offline read never overrides a withdrawal.
+    const current = await cloudAccountLink(pid, { strict: true });
+    if (!current || String(current.accountId) !== String(link.accountId) ||
+        String(current.activatedAccountId) !== String(link.accountId) ||
+        current.activatedAt !== link.activatedAt ||
+        current.activatedGeneration !== link.activatedGeneration ||
+        (current.activatedRecoveryFence ?? null) !== fence ||
+        (await latestDenialGeneration(pid, link.accountId)) !== link.activatedGeneration ||
+        recoveryFence(link.accountId) !== fence) return null;
+  } catch { return null; }
   return { profileId: pid, accountId: String(link.accountId), guardian: null, offline: true, verifiedAt: link.activatedAt };
 }
 
@@ -142,10 +181,13 @@ function activationState(pid) {
   }
   return state;
 }
-function queueActivationRecord(state, pid, accountId, startedAtDenials, at = Date.now(), generation = null) {
+function queueActivationRecord(state, pid, accountId, startedAtDenials, at = Date.now(), generation = null, fence = null, strict = false) {
   const write = state.writes.then(async () => {
     if (accountId && state.denials !== startedAtDenials) return false;
-    await recordCloudActivation(pid, accountId, at, generation).catch(() => {});
+    // Unlike optimistic online bookkeeping, a denial clear must report a
+    // storage error rather than quietly declaring a write successful.
+    if (strict) await recordCloudActivation(pid, accountId, at, generation, fence);
+    else await recordCloudActivation(pid, accountId, at, generation, fence).catch(() => {});
     return true;
   });
   // A failed IndexedDB operation must not poison subsequent consent clears.
@@ -162,6 +204,7 @@ export async function ensureAccountActivated(pid, options = {}) {
   // older generation cannot return a usable approval, even in another tab.
   let linkedAccount;
   let requestGeneration;
+  let requestFence;
   try {
     linkedAccount = (await cloudAccountLink(pid, { strict: true }))?.accountId || null;
   } catch (cause) {
@@ -171,6 +214,7 @@ export async function ensureAccountActivated(pid, options = {}) {
   }
   try {
     requestGeneration = await latestDenialGeneration(pid, linkedAccount);
+    requestFence = recoveryFence(linkedAccount);
   } catch (cause) {
     throw new ActivationBlocked('CONSENT_UNAVAILABLE', { cause, retryable: true });
   }
@@ -180,14 +224,15 @@ export async function ensureAccountActivated(pid, options = {}) {
       throw new ActivationBlocked('ACCOUNT_MISMATCH');
     }
     const latest = await latestDenialGeneration(pid, ready.accountId);
-    if (latest !== requestGeneration) {
+    if (latest !== requestGeneration || recoveryFence(ready.accountId) !== requestFence) {
       throw new ActivationBlocked('CONSENT_UNAVAILABLE', { retryable: true });
     }
     // The timestamp must be the genuine online approval time, not the
     // generation or a monotonic clockSeenAt from a different local profile.
-    const current = await queueActivationRecord(state, pid, ready.accountId, startedAtDenials, Date.now(), requestGeneration);
+    const current = await queueActivationRecord(state, pid, ready.accountId, startedAtDenials, Date.now(), requestGeneration, requestFence);
     if (!current || state.denials !== startedAtDenials ||
-        (await latestDenialGeneration(pid, ready.accountId)) !== requestGeneration) {
+        (await latestDenialGeneration(pid, ready.accountId)) !== requestGeneration ||
+        recoveryFence(ready.accountId) !== requestFence) {
       // A newer authoritative refusal wins over an older online success.
       // Never hand stale activation to App or to an offline-grace caller.
       throw new ActivationBlocked('CONSENT_UNAVAILABLE', { retryable: true });
@@ -197,10 +242,23 @@ export async function ensureAccountActivated(pid, options = {}) {
     if (!(error instanceof ActivationBlocked)) throw error;
     if (isActivationDenied(error)) {
       state.denials++;
-      // Atomic increments fence older requests in every tab. A future
-      // clockSeenAt is unrelated to permission ordering and must not be used.
-      await persistDenial(pid, linkedAccount);
-      await queueActivationRecord(state, pid, null, state.denials, Date.now());
+      // Persist an independent fence BEFORE touching the IndexedDB denial
+      // transaction. Even if its transaction aborts and the old link survives
+      // a reload, no old grant can match the new fence.
+      const fallbackWritten = writeRecoveryFence(linkedAccount);
+      let generationFailure = null;
+      try { await persistDenial(pid, linkedAccount); }
+      catch (cause) { generationFailure = cause; }
+      // Always attempt to clear an old grant, even after generation failure.
+      // Do not swallow a failed security write as successful bookkeeping.
+      let clearFailure = null;
+      try { await queueActivationRecord(state, pid, null, state.denials, Date.now(), null, null, true); }
+      catch (cause) { clearFailure = cause; }
+      if (generationFailure && !fallbackWritten) {
+        throw new ActivationBlocked('CONSENT_UNAVAILABLE', {
+          cause: generationFailure || clearFailure, retryable: true
+        });
+      }
       throw error;
     }
     if (options.offlineGrace && serverUnreachable(error) && state.denials === startedAtDenials) {

@@ -252,7 +252,7 @@ export async function markCloudSynced(pid, at = Date.now()) {
  * Record (at) or clear (null) the server's last full "this account may enter"
  * for this profile. Written only by platform/accountActivation.js.
  */
-export async function recordCloudActivation(pid, accountId, at = Date.now(), generation = null) {
+export async function recordCloudActivation(pid, accountId, at = Date.now(), generation = null, fence = undefined) {
   const id = linkRowId(pid);
   const prior = await get('device', id);
   if (!prior) return;
@@ -260,6 +260,7 @@ export async function recordCloudActivation(pid, accountId, at = Date.now(), gen
   await put('device', {
     ...prior, activatedAt: accountId ? at : null, activatedAccountId: accountId ? String(accountId) : null,
     activatedGeneration: accountId ? (generation === null ? Number(prior.activatedGeneration) || 0 : generation) : 0,
+    activatedRecoveryFence: accountId ? (fence === undefined ? (prior.activatedRecoveryFence ?? null) : fence) : null,
     clockSeenAt: Math.max(Number(prior.clockSeenAt) || 0, at)
   });
 }

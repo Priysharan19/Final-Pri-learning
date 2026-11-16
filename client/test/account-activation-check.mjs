@@ -527,6 +527,97 @@ reset();
     (await cloudAccountLink('p-multitab')).activatedGeneration, nextGeneration);
 }
 
+
+// ── 14 · offline grant paused across ANOTHER TAB'S guardian withdrawal ──
+reset();
+{
+  const pid = 'p-offline-inflight';
+  await put('profiles', { id: pid, name: 'Isha', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+  await loginCloudAccount(pid, { email: 'a@example.test', password: 'test-password-only' });
+  ok('offline race begins with a genuine approved server grant', !!(await gate(pid)).ready);
+  const anotherTab = await import('../src/platform/accountActivation.js?step05-offline-inflight');
+  const db = globalThis.indexedDB.open().result;
+  const actualTransaction = db.transaction;
+  let signalPaused, releasePaused;
+  const paused = new Promise(resolve => { signalPaused = resolve; });
+  const resume = new Promise(resolve => { releasePaused = resolve; });
+  let intercepted = false;
+  db.transaction = function (name, mode) {
+    const tr = actualTransaction.call(this, name, mode);
+    if (name === 'device' && mode === 'readwrite' && !intercepted) {
+      intercepted = true;
+      const nativeStore = tr.objectStore.bind(tr);
+      tr.objectStore = function (key) {
+        const handle = nativeStore(key);
+        const nativePut = handle.put.bind(handle);
+        handle.put = (...args) => {
+          const req = nativePut(...args);
+          let callback = null;
+          Object.defineProperty(req, 'onsuccess', {
+            configurable: true,
+            get: () => callback,
+            set: fn => { callback = event => { signalPaused(); resume.then(() => fn(event)); }; }
+          });
+          return req;
+        };
+        return handle;
+      };
+    }
+    return tr;
+  };
+  try {
+    // Clock advances after the server answer, forcing noteCloudClock to write.
+    const heldOffline = anotherTab.offlineGraceFor(pid, Date.now() + 10_000);
+    await paused;
+    server.guardian = () => ({ status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } });
+    const revoked = await gate(pid, { sync: false });
+    eq('other tab commits authoritative guardian withdrawal', revoked.code, 'GUARDIAN_CONSENT_WITHDRAWN');
+    releasePaused();
+    eq('an in-flight offline request cannot return an old grant after cross-tab withdrawal', await heldOffline, null);
+    eq('the withdrawn account stays offline-blocked after a reload', await anotherTab.offlineGraceFor(pid), null);
+  } finally {
+    releasePaused();
+    db.transaction = actualTransaction;
+  }
+  reset();
+  ok('normal 72-hour grace recovers after fresh online consent', !!(await gate(pid, { sync: false })).ready && !!(await anotherTab.offlineGraceFor(pid))?.offline);
+}
+
+// ── 15 · aborted IndexedDB denial writes cannot resurrect old offline grant ──
+reset();
+{
+  const pid = 'p-aborted-denial';
+  await put('profiles', { id: pid, name: 'Meera', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+  await loginCloudAccount(pid, { email: 'a@example.test', password: 'test-password-only' });
+  ok('failed-denial fixture has a legitimate pre-existing grant', !!(await gate(pid)).ready);
+  const oldLink = await cloudAccountLink(pid);
+  const markerKey = 'pri-activation-denial-recovery-v1:acct-A:';
+  const oldMarker = globalThis.localStorage.getItem(markerKey);
+  const db = globalThis.indexedDB.open().result;
+  const nativeTransaction = db.transaction;
+  let failuresToInject = 2;
+  db.transaction = function (name, mode) {
+    if (name === 'device' && mode === 'readwrite' && failuresToInject > 0) {
+      failuresToInject--;
+      throw new DOMException('IndexedDB transaction aborted', 'AbortError');
+    }
+    return nativeTransaction.call(this, name, mode);
+  };
+  server.guardian = () => ({ status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } });
+  let blocked;
+  try { blocked = await gate(pid, { sync: false }); }
+  finally { db.transaction = nativeTransaction; }
+  eq('authoritative withdrawal still refuses access when BOTH IDB writes abort', blocked.code, 'GUARDIAN_CONSENT_WITHDRAWN');
+  eq('the forced generation and clearing transactions both aborted', failuresToInject, 0);
+  const survivingLink = await cloudAccountLink(pid);
+  eq('the test preserves the earlier durable grant despite the aborted writes', survivingLink.activatedAt, oldLink.activatedAt);
+  ok('independent durable denial fence records the withdrawal', !!globalThis.localStorage.getItem(markerKey) && globalThis.localStorage.getItem(markerKey) !== oldMarker);
+  const reloaded = await import('../src/platform/accountActivation.js?step05-abort-reload');
+  eq('after storage recovers and module reloads, prior offline grant cannot be reused', await reloaded.offlineGraceFor(pid), null);
+  reset();
+  ok('new genuine online approval restores bounded offline access after failed persistence', !!(await gate(pid, { sync: false })).ready && !!(await reloaded.offlineGraceFor(pid))?.offline);
+}
+
 if (failures.length) {
   console.log(`ACCOUNT ACTIVATION: FAIL — ${failures.length} of ${pass + failures.length} checks failed`);
   for (const f of failures) console.log(`  · ${f}`);
