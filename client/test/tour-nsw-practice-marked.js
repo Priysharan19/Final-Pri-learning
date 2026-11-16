@@ -71,10 +71,12 @@ try {
   await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
   await createVerifiedProfile(page, platform, { name: 'NSW Practice Student', year: 10, fromPicker: await page.getByTestId('picker-create-account').count() > 0 });
-  await switchSyllabus(page, platform, { course: 'nsw', year: 10 });
-  // Before E3 a Prithagoras sign-up starts on the India course; only what the
-  // NSW profile asks after the switch is this tour's subject.
+  // Close any earlier India-course issuance before the syllabus change.
+  // Saving the NSW profile itself may initiate or resume the NSW question
+  // before switchSyllabus returns, so the observer MUST start before Save.
+  await online.settled();
   const nswFrom = issueBodies.length;
+  await switchSyllabus(page, platform, { course: 'nsw', year: 10 });
 
   await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
