@@ -1948,7 +1948,7 @@ const scratch = [];
   const workerSrc = read('client/src/platform/syncWorker.js');
   ok(/row\.kind !== 'graded-attempt' \|\| row\.deviceId !== 'server-grader' \|\|\s*row\.eventId !== row\.payload\?\.attemptId \|\|\s*row\.entityId !== row\.payload\?\.questionId/.test(workerSrc) && /eventId: event\.id/.test(workerSrc),
     'the app\'s History counts only server-grader graded-attempt rows keyed by their attempt and question — the filter returnedAttempts mirrors');
-  ok(/const raw = await cloud\.syncPull\(cursor\);/.test(workerSrc) && /if \(!raw\.hasMore\) break;/.test(workerSrc) && /for \(let page = 0; page < 100; page\+\+\)/.test(workerSrc), 'the app pulls from its cursor while hasMore, at most 100 pages — the walk S6 makes');
+  ok(/const raw = await cloud\.syncPull\(cursor, state\.accountId\);/.test(workerSrc) && /await assertActiveSyncAccount\(pid, state\.accountId\);/.test(workerSrc) && /if \(!raw\.hasMore\) break;/.test(workerSrc) && /for \(let page = 0; page < 100; page\+\+\)/.test(workerSrc), 'the app pulls from an account-bound cursor, verifies its live profile link, and stops after hasMore clears or 100 pages — the walk S6 makes');
   const readme = read('tools/acceptance/README.md');
   ok(/# Staging acceptance S0–S8/.test(readme) && /HUMAN STEP/.test(readme) && /SYNTHETIC/.test(readme), 'tools/acceptance/README.md documents the staging acceptance and its evidence classes');
   ok(!/acceptance A–[DF]|steps 0, A/.test(readme) && /Gates A–D/.test(readme), 'the README names the steps S0–S8, never by letter, and says why (issue #686\'s Gates A–D)');

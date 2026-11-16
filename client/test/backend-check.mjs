@@ -2236,16 +2236,39 @@ async function run() {
       }
     }
 
-    const retryable = history.items.find(i => i.canRetry);
-    if (retryable) {
+    // A random exam generator is not guaranteed to have an NSW Practice
+    // bank. Test the historic no-server-id path with a deterministic legacy
+    // fixture copied from a real generator the server issued earlier.
+    const retrySource = practised[0]?.row;
+    const retryLegacy = retrySource && {
+      ...retrySource, id: `${retrySource.id}-legacy-retry`,
+      serverQuestionId: null, serverReceipt: null, prepared: null,
+      repeatOf: null, retryOf: null, examId: null, mode: 'practice',
+      answered: 1, generator: retrySource.generator || retrySource.subtopic,
+      createdAt: Date.now() - 10_000
+    };
+    if (retryLegacy) await idb.put('questions', retryLegacy);
+    const offeredHistory = retryLegacy ? await POST('/history/list', { pageSize: 1000 }) : null;
+    const retryable = offeredHistory?.items.find(i => i.id === retryLegacy.id);
+    ok('a legacy question from a genuinely issued bank still offers Retry', retryable?.canRetry === true, show(retryable));
+    if (retryLegacy) {
+      // Retired generators remain visible in History but cannot issue
+      // markable questions. The UI must not promise Retry for those rows.
+      const unavailable = { ...retryLegacy, id: `${retryLegacy.id}-retired`, generator: 'retired-unissued-math-topic' };
+      await idb.put('questions', unavailable);
+      const unofferedHistory = await POST('/history/list', { pageSize: 1000 });
+      const retired = unofferedHistory.items.find(i => i.id === unavailable.id);
+      eq('History hides Retry for retired NSW generators', retired?.canRetry, false);
+      await rejects('direct retry for retired NSW content refuses an unmarkable draft',
+        POST(`/history/${unavailable.id}/retry`, { variant: 'fresh' }), { status: 409, code: 'PRACTICE_NOT_OFFERED' });
+    }
+    if (retryable?.canRetry) {
       const original = await idb.get('questions', retryable.id);
       const same = await POST(`/history/${retryable.id}/retry`, { variant: 'same' });
       ok('retry issues a new question row', same.question.id !== retryable.id, 'the same id came back');
       eq('retry keeps the subtopic', same.question.subtopic, original.subtopic);
-      // "The same question again" is the server re-issuing a question it
-      // holds. The newest retryable row here is an exam question, which the
-      // server never issued, so the student gets a fresh one and is told so.
-      // (The server-marked practice row below is repeated exactly.)
+      // This historic no-server-id fixture must obtain a fresh markable
+      // question; the real server-issued practice repeat was checked above.
       eq('a question the server never issued cannot be repeated', !!original.serverQuestionId, false);
       eq('— retry "same" says it is a fresh question instead', same.variant, 'fresh');
       eq('— one that can be marked', same.question.checkState, 'issued');
