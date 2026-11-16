@@ -30,7 +30,7 @@
 import { cloud, cloudAvailable, discoverCloudOrigin, lastCloudProbe } from './cloudTransport.js';
 import { cloudAccountLink, noteCloudClock, recordCloudActivation, verifyCloudSession } from './cloudAccount.js';
 import { decideOnboardingAuthority } from '../components/onboardingAuthority.js';
-import { add, all, uuid } from '../local/idb.js';
+import { advanceDeviceDenialAt, get } from '../local/idb.js';
 
 export class ActivationBlocked extends Error {
   constructor(code, { cause = null, retryable = false } = {}) {
@@ -73,32 +73,17 @@ export const OFFLINE_GRACE_MS = 72 * 60 * 60 * 1000;
 // row: unlike the account-link row it cannot be overwritten by a concurrent
 // sync stamp, session refresh, or a stale activation from a second tab.
 const DENIAL_PREFIX = 'pri-activation-denial-v1:';
-// The denial belongs to the cloud account, not one local profile: a second
-// profile linked to the same child must not regain an older offline grant.
-const denialPrefix = (_pid, accountId) => `${DENIAL_PREFIX}${String(accountId)}:`;
+// One durable row per cloud account; the IndexedDB writer advances its time
+// within a single readwrite transaction, never by separate get()/put() calls.
+const denialRowId = (_pid, accountId) => `${DENIAL_PREFIX}${String(accountId)}:`;
 async function latestDenialAt(pid, accountId) {
   if (!pid || !accountId) return 0;
-  const prefix = denialPrefix(pid, accountId);
-  const rows = await all('device');
-  return rows.reduce((at, row) => row?.id?.startsWith?.(prefix) && Number.isFinite(row.deniedAt)
-    ? Math.max(at, row.deniedAt) : at, 0);
+  const row = await get('device', denialRowId(pid, accountId));
+  return Number(row?.deniedAt) || 0;
 }
 async function persistDenial(pid, accountId, at) {
   if (!pid || !accountId) return;
-  const rows = await all('device');
-  const prefix = denialPrefix(pid, accountId);
-  const latestRefusal = rows.reduce((max, row) => row?.id?.startsWith?.(prefix) && Number.isFinite(row.deniedAt)
-    ? Math.max(max, row.deniedAt) : max, 0);
-  const latestApproval = rows.reduce((max, row) =>
-    String(row?.accountId || '') === String(accountId) &&
-      String(row?.activatedAccountId || '') === String(accountId)
-      ? Math.max(max, Number(row.activatedAt) || 0) : max, 0);
-  // A pending/withdrawn account may recheck many times while blocked. One
-  // durable denial is enough until a genuinely newer online approval occurs.
-  // Keep immutable evidence to survive concurrent writes from another tab,
-  // without growing one record for every unsuccessful poll.
-  if (latestRefusal > 0 && latestApproval <= latestRefusal) return;
-  await add('device', { id: `${prefix}${uuid()}`, deniedAt: at });
+  await advanceDeviceDenialAt(denialRowId(pid, accountId), at);
 }
 
 /** True when an offline entry verified at `verifiedAt` may no longer stay open (a missing time counts as expired). */
