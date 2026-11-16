@@ -106,6 +106,10 @@ export function classifyMutation(method, path, result = null, body = null) {
   m = key.match(/^POST \/history\/([A-Za-z0-9._-]+)\/bookmark$/);
   if (m) return { kind: 'bookmark', entityId: safeId(m[1]), operation: result?.bookmarked === false ? 'delete' : 'upsert' };
 
+  // A saved library resource (plan F2): its own kind, never `bookmark`.
+  m = key.match(/^POST \/library\/([a-z0-9][a-z0-9-]{2,119})\/bookmark$/);
+  if (m) return { kind: 'resource-bookmark', entityId: m[1], operation: result?.saved === false ? 'delete' : 'upsert' };
+
   if (key === 'POST /custom-questions') return { kind: 'custom-question', entityId: safeId(result?.question?.id), operation: 'upsert' };
   m = key.match(/^POST \/custom-questions\/([A-Za-z0-9._-]+)\/delete$/);
   if (m) return { kind: 'custom-question', entityId: safeId(m[1]), operation: 'delete' };

@@ -1184,6 +1184,17 @@ async function run() {
       await wait(page, 600);
     });
 
+    // Plan F2: the command bar with its Library group (the flag is on in this
+    // walk), opened from the keyboard on the library page and searched.
+    await step('library · command bar, Library group', '/library', async () => {
+      await goTo(page, BASE, '/library');
+      await page.waitForSelector('.lib-page h1', { timeout: 20000 });
+      await page.keyboard.down('Control'); await page.keyboard.press('k'); await page.keyboard.up('Control');
+      await page.waitForSelector('[data-instrument-command] input[role="combobox"]', { timeout: 10000 });
+      await page.keyboard.type('paper');
+      await wait(page, 600);
+    });
+
     // The Exam Desk (ADR-0002 §8 plan F4b): built only with PRI_FEATURE_EXAM_DESK=1
     // (and the library), which this walk sets. Unmarked practice on a library
     // paper: the import page, then one attempt from before it starts to the

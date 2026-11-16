@@ -28,3 +28,9 @@
 .lib-disclaimer { padding: 12px 14px; border: 1px solid var(--in-edge-2); border-radius: 8px; }
 .lib-disclaimer h2 { margin: 0 0 4px; font-size: 1em; }
 .lib-disclaimer p { margin: 0; }
+
+.lib-filter-saved { align-self: flex-end; min-height: 44px; display: flex; align-items: center; }
+.lib-check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+.lib-save { min-height: 44px; min-width: 44px; margin-top: 6px; }
+.lib-save.is-on { color: var(--in-tx); border-color: var(--in-edge-2); }
+.lib-save-row { margin: 8px 0 0; }

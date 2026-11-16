@@ -34,7 +34,7 @@ const HISTORIC_FALLBACK_BASE = 6_000_000_000_000_000;
 // The same boundary holds on the way back in: cloudSyncRestore applies only the
 // append-only learning kinds this worker itself publishes (practice, exam, Rush,
 // Match) and nothing shared.
-const CLIENT_ENTITY_KINDS = new Set(['profile', 'bookmark', 'favorite']);
+const CLIENT_ENTITY_KINDS = new Set(['profile', 'bookmark', 'favorite', 'resource-bookmark']);
 
 // A push the server refused because an entity's baseVersion was stale. The
 // worker recovers from it in place: pull to learn the authoritative versions,
@@ -227,6 +227,7 @@ async function entityForOutbox(item, pid, state) {
   let body = null;
   if (kind === 'profile') body = safeProfile(await get('profiles', pid));
   else if (kind === 'bookmark' || kind === 'favorite') body = { present: true, questionId: String(item.entityId) };
+  else if (kind === 'resource-bookmark') body = { present: true };
   if (!body) return null;
   return { kind, entityId, operation: 'upsert', baseVersion, body };
 }
@@ -279,6 +280,15 @@ async function fullRescanEntities(pid, state) {
       kind: 'bookmark', entityId: questionId, operation: 'upsert',
       baseVersion: safeInt(state.entityVersions[`bookmark:${questionId}`]),
       body: { present: true, questionId }
+    });
+  }
+  for (const row of await byIndex('resourceBookmarks', 'pid', pid).catch(() => [])) {
+    const resourceId = row?.resourceId || String(row?.key || '').split(':').slice(1).join(':');
+    if (!resourceId) continue;
+    entities.push({
+      kind: 'resource-bookmark', entityId: resourceId, operation: 'upsert',
+      baseVersion: safeInt(state.entityVersions[`resource-bookmark:${resourceId}`]),
+      body: { present: true }
     });
   }
   entities.sort((a, b) => `${a.kind}:${a.entityId}`.localeCompare(`${b.kind}:${b.entityId}`));
@@ -349,6 +359,10 @@ async function localEntity(pid, entity, version) {
       body: row ? { present: true, questionId: entity.entityId } : null, tombstone: !row
     };
   }
+  if (entity.kind === 'resource-bookmark') {
+    const row = await get('resourceBookmarks', `${pid}:${entity.entityId}`).catch(() => null);
+    return { kind: entity.kind, entityId: entity.entityId, version, body: row ? { present: true } : null, tombstone: !row };
+  }
   return null;
 }
 
@@ -401,6 +415,12 @@ async function applyRemoteEntity(pid, entity, state, unpublished) {
     const keyId = `${pid}:${entity.entityId}`;
     if (entity.tombstone || entity.body?.present === false) await del('bookmarks', keyId).catch(() => {});
     else await put('bookmarks', { key: keyId, pid, questionId: entity.entityId, createdAt: entity.updatedAt || Date.now() });
+  }
+
+  if (entity.kind === 'resource-bookmark' && /^[a-z0-9][a-z0-9-]{2,119}$/.test(String(entity.entityId))) {
+    const keyId = `${pid}:${entity.entityId}`;
+    if (entity.tombstone || entity.body?.present === false) await del('resourceBookmarks', keyId).catch(() => {});
+    else await put('resourceBookmarks', { key: keyId, pid, resourceId: entity.entityId, createdAt: entity.updatedAt || Date.now() });
   }
 }
 
