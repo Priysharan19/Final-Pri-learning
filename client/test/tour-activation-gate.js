@@ -267,7 +267,8 @@ export const flow = {
     await page.getByRole('button', { name: 'Student', exact: true }).click();
     await page.locator('.auth-card .btn-primary').click();
     await page.waitForSelector('[data-onboarding-step="2"]', { timeout: 15000 });
-    await page.locator('#signup-track').selectOption('8');
+    // India's class/track select, or the Prithagoras year select (plan E6).
+    await page.locator('#signup-track, #signup-year').first().selectOption('8');
     await page.locator('.auth-card .btn-primary').click();
     await page.waitForSelector('[data-onboarding-step="3"]', { timeout: 15000 });
     await page.locator('#signup-name').fill('Kabir Child');

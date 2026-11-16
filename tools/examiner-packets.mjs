@@ -44,7 +44,9 @@ export const NOT_REVIEWED = '> **Not yet reviewed by a human examiner.** This pa
 
 // ── CBSE: read the dossier the CI already pins (its digest and bank table) ──
 const cbseText = readFileSync(path.join(ROOT, CBSE_DOSSIER), 'utf8');
-const cbseDigest = cbseText.match(/\*\*Rubric digest \(sha256\): `([0-9a-f]{64})`\*\*/)?.[1] || fail('no digest in the CBSE dossier');
+const cbseDigestMatch = cbseText.match(/\*\*Rubric digest \(sha256\): `([0-9a-f]{64})`\*\*/);
+if (!cbseDigestMatch) fail('no digest in the CBSE dossier');
+const cbseDigest = cbseDigestMatch[1];
 const cbseBanks = [...cbseText.matchAll(/^\| `([a-z0-9-]+)` \| D(\d) \| (\d+) \| ([^|]+) \| ([^|]+) \| \d+ \|/gm)].map(m => ({ id: `${m[1]}/D${m[2]}`, generator: m[1], difficulty: Number(m[2]), marks: Number(m[3]), shape: m[4].trim(), ecf: m[5].trim() }));
 if (!cbseBanks.length) fail('no rubric bank rows in the CBSE dossier');
 const CBSE_POLICY_ITEMS = [
@@ -102,7 +104,6 @@ const JURISDICTIONS = [
   }
 ];
 
-const verdictCell = v => (v === null || v === undefined ? '—' : v);
 function casesPage(j) {
   const L = [`# ${j.title}: worked answer cases`, '', NOT_REVIEWED, '', `Dossier digest: \`${j.digest}\` (\`${j.dossier}\`).`, '',
     'For each item, one issued question (seed shown) and the pages a student might hand in, with the engine\'s verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.', ''];
