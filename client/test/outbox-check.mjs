@@ -82,6 +82,11 @@ same('profile patch is syncable', classifyMutation('PATCH', '/me', { user: { id:
   { kind: 'profile', entityId: 'p1', operation: 'upsert' });
 same('profile delete keeps only its opaque id', classifyMutation('POST', '/profiles/delete', { ok: true }, { id: 'p1', password: 'DO NOT COPY' }),
   { kind: 'profile', entityId: 'p1', operation: 'delete' });
+same('saving a library resource is its own kind, never a question bookmark', classifyMutation('POST', '/library/nsw-2024-paper/bookmark', { saved: true }),
+  { kind: 'resource-bookmark', entityId: 'nsw-2024-paper', operation: 'upsert' });
+same('un-saving it is a delete of that kind', classifyMutation('POST', '/library/nsw-2024-paper/bookmark', { saved: false }),
+  { kind: 'resource-bookmark', entityId: 'nsw-2024-paper', operation: 'delete' });
+same('a malformed resource id is not queued', classifyMutation('POST', '/library/..%2Fx/bookmark', { saved: true }), null);
 same('profile delete without a valid id is not queued', classifyMutation('POST', '/profiles/delete', { ok: true }, { id: '../bad' }), null);
 same('password changes never enter sync outbox', classifyMutation('POST', '/profiles/password', { ok: true }), null);
 same('profile selection never enters sync outbox', classifyMutation('POST', '/profiles/select', { ok: true }), null);
