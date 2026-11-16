@@ -702,6 +702,27 @@
     },
     {
       "method": "GET",
+      "path": "/v1/sync/pull/:expectedAccountId/:cursor",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "account ID in URL is a constraint only: reject when it differs from the authenticated session account; all queries remain keyed by the session account ID; cursor pages only within that account",
+      "rateLimits": [
+        {
+          "key": "sync-pull",
+          "limit": 180,
+          "windowMs": 60000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/sync/pull/:cursor",
       "auth": "session",
       "roles": null,
