@@ -413,6 +413,46 @@ export const STREAM_CURRICULUM = {
         'Sine rule for sides and angles',
         'Cosine rule for sides and angles',
         'Area of a triangle A = ½ab sin C'
+      ]),
+      T('ms12-algebraic', 'Algebraic Relationships in Practice', 'Algebra', 8, 'MS-A3', [
+        'Solve problems with two linear models (break-even and equal-cost points)',
+        'Use exponential models',
+        'Interpret linear graphs of practical situations'
+      ]),
+      T('ms12-invest-loans', 'Investment, Loans & Depreciation: Exact Results', 'Financial Maths', 8, 'MS-F4', [
+        'Find the value of a compound-interest investment',
+        'Track the balance of a loan with interest and repayments',
+        'Find the value of a declining-balance asset'
+      ]),
+      T('ms12-annuity-table', 'Annuities from Table Factors', 'Financial Maths', 8, 'MS-F5', [
+        'Find the future value of an annuity from a given table factor',
+        'Find the present value of an annuity from a given table factor',
+        'Find the interest earned by an annuity'
+      ]),
+      T('ms12-rates', 'Ratios & Rates in Practice', 'Number', 8, 'MS-M7', [
+        'Convert between units of a rate',
+        'Calculate with rates',
+        'Share a quantity in a given ratio'
+      ]),
+      T('ms12-network-flow', 'Network Flow', 'Statistics & Probability', 8, 'MS-N2', [
+        'Find the capacity of a cut',
+        'Find the maximum flow through a network',
+        'Use the minimum cut'
+      ]),
+      T('ms12-critical-path', 'Critical Path Analysis', 'Statistics & Probability', 8, 'MS-N3', [
+        'Find earliest start times',
+        'Find the minimum completion time of a project',
+        'Find the float time of an activity'
+      ]),
+      T('ms12-bivariate-fit', 'Lines of Fit: Exact Predictions', 'Statistics & Probability', 8, 'MS-S4', [
+        'Predict from a line of best fit',
+        'Interpret the gradient of a line of fit',
+        'Use a line of fit through two points'
+      ]),
+      T('ms12-normal-exact', 'The Normal Distribution: Exact Results', 'Statistics & Probability', 8, 'MS-S5', [
+        'Find a z-score',
+        'Use the 68–95–99.7 rule to count values',
+        'Find a value from its z-score'
       ])
     ]
   },
@@ -714,6 +754,14 @@ export const DOTPOINT_FORMS = Object.freeze({
   'ms12-normal': [[0], [1], [0, 2], [0]],
   'ms12-bivariate': [[0], [1], [1], [1, 2]],
   'ms12-nonright': [[0], [1], [2], [1]],
+  'ms12-algebraic': [[1], [2], [0], [0]],
+  'ms12-invest-loans': [[0], [0], [1], [2]],
+  'ms12-annuity-table': [[0], [1], [2], [0]],
+  'ms12-rates': [[0], [1], [2], [1]],
+  'ms12-network-flow': [[0], [0], [1], [2]],
+  'ms12-critical-path': [[0], [1], [2], [1]],
+  'ms12-bivariate-fit': [[0], [1], [2], [0]],
+  'ms12-normal-exact': [[0], [2], [1], [1]],
   // ── Extension 1 · Year 11 ─────────────────────────────────────────────────
   'me11-poly': [[0], [0], [1], [2]],
   'me11-functions': [[0], [1], [0], [2]],

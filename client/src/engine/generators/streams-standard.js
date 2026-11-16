@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, rs, nz, Frac, mcq, moneyPlain, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
 import { figNetwork } from '../figures.js';
+import { streamsStandardNsw } from './streams-standard-nsw.js';
 
 // ── Statistical displays ─────────────────────────────────────────────────────
 // engine/figures.js draws a box plot but neither a histogram nor a dot plot.
@@ -102,6 +103,7 @@ function randomNetwork(rng, n, extra, wLo = 2, wHi = 9) {
 }
 
 export const streamsStandard = {
+  ...streamsStandardNsw,
 
   // ── MS-F1 · Earning & managing money ─────────────────────────────────────
   'ms11-earning': (rng, diff) => {

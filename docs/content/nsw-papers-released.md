@@ -8,12 +8,12 @@ Prithagoras offers timed papers shaped like an HSC examination, each an "Answer-
 - Otherwise a **partial** paper (only the slots that can be filled) is released when at least 75% of the course's Year 12 outcomes (from the G2 model) are covered. It is titled "Practice paper — N of M Year 12 outcomes", never an HSC paper or a trial; its marks and working time are scaled to what it examines; and the Exams page, the paper and the result name every outcome it leaves out.
 - Below that floor the paper is refused.
 
-The pool today: 267 approved forms. Blueprint structures (times, marks, section sizes) follow NESA's published HSC examination specifications for the 2024 syllabuses, first examined in 2027 (`docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md` §5.3). Which outcome each slot is on is Pri's own design: every Year 12 outcome of the examined course has slots. No NESA paper, question, marking guideline or reference sheet is reproduced. The platform has no authored formula sheet yet, so none is shown.
+The pool today: 299 approved forms. Blueprint structures (times, marks, section sizes) follow NESA's published HSC examination specifications for the 2024 syllabuses, first examined in 2027 (`docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md` §5.3). Which outcome each slot is on is Pri's own design: every Year 12 outcome of the examined course has slots. No NESA paper, question, marking guideline or reference sheet is reproduced. The platform has no authored formula sheet yet, so none is shown.
 
 | Paper | State | Year 12 outcomes covered | Sat as | Omitted outcomes |
 | --- | --- | --- | --- | --- |
 | Mathematics Standard 1 | refused | 1 of 7 (14%) | designed: 44 questions, 80 marks, 10 + 120 min | Algebraic relationships (MST-12-S1-01); Investment (MST-12-S1-02); Depreciation and loans (MST-12-S1-03); Right-angled triangles (MST-12-S1-04); Ratios and rates (MST-12-S1-05); Bivariate data analysis (MST-12-S1-06); Linear relationships (MST-11-02); Earning money (MST-11-03); Managing money (MST-11-04); Applications of measurement (MST-11-05); Time and location (MST-11-06) |
-| Mathematics Standard 2 | refused | 2 of 10 (20%) | designed: 51 questions, 100 marks, 10 + 150 min | Algebraic relationships (MST-12-S2-01); Investment and loans (MST-12-S2-02); Annuities (MST-12-S2-03); Ratios and rates (MST-12-S2-05); Network flow (MST-12-S2-06); Critical path analysis (MST-12-S2-07); Bivariate data analysis (MST-12-S2-08); The normal distribution (MST-12-S2-10); Earning money (MST-11-03); Applications of measurement (MST-11-05); Time and location (MST-11-06); Linear relationships (MST-11-02); Managing money (MST-11-04) |
+| Mathematics Standard 2 | released (partial) | 10 of 10 (100%) | "Mathematics Standard 2 · Practice paper — 10 of 10 Year 12 outcomes": 42 questions, 86 marks, 10 min reading + 130 min | Earning money (MST-11-03); Applications of measurement (MST-11-05); Time and location (MST-11-06); Linear relationships (MST-11-02); Managing money (MST-11-04) |
 | Mathematics Advanced | refused | 3 of 8 (38%) | designed: 47 questions, 100 marks, 10 + 180 min | Further graph transformations and modelling (MAV-12-01); Integral calculus (MAV-12-05); Random variables (MAV-12-07); Further graph transformations and modelling (MAV-12-02); Financial mathematics (MAV-12-08); Working with functions (MAV-11-01); Graph transformations (MAV-11-03); Trigonometric identities and equations (MAV-11-05); Exponential and logarithmic functions (MAV-11-08); Probability and data (MAV-11-10) |
 | Mathematics Extension 1 | released (partial) | 5 of 6 (83%) | "Mathematics Extension 1 · Practice paper — 5 of 6 Year 12 outcomes": 27 questions, 58 marks, 10 min reading + 100 min | The binomial theorem (ME1-11-05); Further calculus skills (ME1-12-04) |
 | Mathematics Extension 2 | released (partial) | 4 of 5 (80%) | "Mathematics Extension 2 · Practice paper — 4 of 5 Year 12 outcomes": 38 questions, 81 marks, 10 min reading + 145 min | Further work with vectors (ME2-12-02) |
@@ -46,16 +46,16 @@ Source: Mathematics Standard 11–12 Syllabus (2024): HSC examinations — https
 
 | Outcome | Focus area | Year | Slots | Marks | Approved forms | Covered |
 | --- | --- | --- | --- | --- | --- | --- |
-| MST-12-S2-01 | Algebraic relationships | 12 | 3 | 6 | 0 | no |
-| MST-12-S2-02 | Investment and loans | 12 | 4 | 9 | 0 | no |
-| MST-12-S2-03 | Annuities | 12 | 4 | 9 | 0 | no |
+| MST-12-S2-01 | Algebraic relationships | 12 | 3 | 6 | 4 | yes |
+| MST-12-S2-02 | Investment and loans | 12 | 4 | 9 | 4 | yes |
+| MST-12-S2-03 | Annuities | 12 | 4 | 9 | 4 | yes |
 | MST-12-S2-04 | Trigonometry | 12 | 4 | 9 | 4 | yes |
-| MST-12-S2-05 | Ratios and rates | 12 | 3 | 6 | 0 | no |
-| MST-12-S2-06 | Network flow | 12 | 3 | 6 | 0 | no |
-| MST-12-S2-07 | Critical path analysis | 12 | 4 | 9 | 0 | no |
-| MST-12-S2-08 | Bivariate data analysis | 12 | 4 | 9 | 1 | no |
+| MST-12-S2-05 | Ratios and rates | 12 | 3 | 6 | 4 | yes |
+| MST-12-S2-06 | Network flow | 12 | 3 | 6 | 4 | yes |
+| MST-12-S2-07 | Critical path analysis | 12 | 4 | 9 | 4 | yes |
+| MST-12-S2-08 | Bivariate data analysis | 12 | 4 | 9 | 5 | yes |
 | MST-12-S2-09 | Relative frequency and probability | 12 | 3 | 6 | 4 | yes |
-| MST-12-S2-10 | The normal distribution | 12 | 4 | 9 | 2 | no |
+| MST-12-S2-10 | The normal distribution | 12 | 4 | 9 | 6 | yes |
 | MST-11-01 | Formulas and equations | 11 | 3 | 4 | 4 | yes |
 | MST-11-03 | Earning money | 11 | 2 | 3 | 0 | no |
 | MST-11-05 | Applications of measurement | 11 | 3 | 4 | 2 | no |
