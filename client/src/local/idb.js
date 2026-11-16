@@ -1364,33 +1364,36 @@ export async function put(store, value) {
   return written;
 }
 /**
- * Advance an account's durable guardian-denial high-water mark as ONE
- * IndexedDB readwrite transaction. Transactions on the same object store
- * serialize even across independent browser tabs; separate get()/put()
- * calls do not. Never reduce an already-recorded refusal.
- *
- * This row is deliberately unsealed device metadata and contains only an
- * opaque account-scoped id and a millisecond timestamp (no tokens/contact).
+ * Increment an account's guardian-denial generation in one IndexedDB
+ * readwrite transaction. Transactions on the device store serialize across
+ * tabs. A generation is an ordering fence, NEVER a wall-clock timestamp:
+ * clock rollback, future test times and sync clockSeenAt cannot affect it.
+ * One account-scoped row is retained regardless of denial/recheck count.
  */
-export async function advanceDeviceDenialAt(id, at) {
-  if (typeof id !== 'string' || !id.startsWith('pri-activation-denial-v1:') ||
-      !Number.isSafeInteger(at) || at <= 0) throw new Error('Invalid activation denial stamp');
+export async function advanceDeviceDenialGeneration(id) {
+  if (typeof id !== 'string' || !id.startsWith('pri-activation-denial-v1:')) {
+    throw new Error('Invalid activation denial key');
+  }
   await ready();
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const tr = db.transaction('device', 'readwrite');
     const store = tr.objectStore('device');
-    let committedAt = 0;
+    let generation = 0;
     let failure = null;
-    tr.oncomplete = () => resolve(committedAt);
+    tr.oncomplete = () => resolve(generation);
     tr.onerror = event => { failure ||= tr.error || event?.target?.error || null; };
     tr.onabort = () => reject(failure || tr.error || new Error('Activation-denial transaction aborted'));
     try {
       const req = store.get(id);
       req.onsuccess = () => {
-        const prev = Number(req.result?.deniedAt) || 0;
-        committedAt = Math.max(prev, at);
-        const write = store.put({ id, deniedAt: committedAt });
+        const previous = Number(req.result?.generation) || 0;
+        if (!Number.isSafeInteger(previous) || previous < 0 || previous >= Number.MAX_SAFE_INTEGER) {
+          try { tr.abort(); } catch { /* already aborted */ }
+          return;
+        }
+        generation = previous + 1;
+        const write = store.put({ id, generation });
         write.onerror = () => { failure ||= write.error || null; };
       };
       req.onerror = () => { failure ||= req.error || null; };
