@@ -155,6 +155,16 @@ export const LEGACY_CROSSWALK = Object.freeze([
   row('y12-stats', ADV, ['MA-S3'], same('MAV-12-07'), 'mapped', 'as-labelled'),
   row('y12-motion', ADV, ['MA-C3', 'MA-C4'], [['MAV-11-06', 'MAV-12-06'], ['MAV-11-06'], ['MAV-11-06', 'MAV-12-06']], 'mapped', 'elsewhere-in-part',
     'Velocity as a derivative and motion graphs are Year 11 (The derivative as a rate of change).'),
+  row('y12-integral-calc', ADV, ['MA-C4'], same('MAV-12-05'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms (whole-number or exact-expression answers only).'),
+  row('y12-random-var', ADV, ['MA-S3'], same('MAV-12-07'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms: expected value, variance, z-scores and the 68–95–99.7 rule.'),
+  row('y12-fin-exact', ADV, ['MA-M1'], same('MAV-12-08'), 'mapped', 'as-labelled',
+    'Pri-authored forms with rates and periods chosen so every amount is a whole number of dollars.'),
+  row('y12-trig-model', ADV, ['MA-T3'], same('MAV-12-01'), 'mapped', 'as-labelled',
+    'Trigonometric transformations and periodic models (the "Transformations of trigonometric functions" content group).'),
+  row('y12-func-model', ADV, ['MA-E1', 'MA-C3'], same('MAV-12-02'), 'mapped', 'as-labelled',
+    'Modelling with functions (the "Modelling with functions" content group): exponential models and a quadratic optimisation.'),
 
   // ── Standard (streams) → Mathematics Standard 11–12 (2024) ────────────────
   row('ms11-earning', STD, ['MS-F1'], same('MST-11-03'), 'mapped', 'as-labelled'),
@@ -235,8 +245,6 @@ export const NEW_OUTCOME_GAPS = Object.freeze([
   gap(STD, 'MST-12-S2-07', 'Critical path analysis (Standard 2).'),
   gap(ADV, 'MAV-11-03', 'Graph transformations (Year 11).'),
   gap(ADV, 'MAV-11-10', 'Probability and data: the Data content groups (Year 11).'),
-  gap(ADV, 'MAV-12-01', 'Further graph transformations and modelling: trigonometric functions (Year 12).'),
-  gap(ADV, 'MAV-12-02', 'Further graph transformations and modelling: modelling with functions (Year 12).'),
   gap(EXT1, 'ME1-11-05', 'The binomial theorem (Year 11).'),
 ]);
 

@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Year 12 generators (HSC Advanced)
 // ─────────────────────────────────────────────────────────────────────────────
+import { year12Nsw } from './year12-nsw.js';
 import { ri, rc, rs, nz, gcd, Frac, mcq, term, poly, sgn, moneyPlain, r1, r2, r3, NAMES } from '../qhelpers.js';
 
 // ── Motion graph ─────────────────────────────────────────────────────────────
@@ -1055,4 +1056,6 @@ export const year12 = {
       ]
     };
   }
+  ,
+  ...year12Nsw
 };

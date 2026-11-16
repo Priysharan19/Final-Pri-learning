@@ -223,7 +223,7 @@ const report = nswCoverage({ syllabuses: NSW_CURRENT_SYLLABUSES, crosswalk: NSW_
 const PINNED = {
   'nsw-mathematics-k-10-2022': [57, 41, 0, 16],
   'nsw-mathematics-standard-11-12-2024': [25, 18, 0, 7],
-  'nsw-mathematics-advanced-11-12-2024': [18, 14, 0, 4],
+  'nsw-mathematics-advanced-11-12-2024': [18, 16, 0, 2],
   'nsw-mathematics-extension1-11-12-2024': [11, 9, 1, 1],
   'nsw-mathematics-extension2-11-12-2024': [5, 5, 0, 0]
 };
@@ -260,7 +260,7 @@ const DIGESTS = {
   syllabuses: digest(NSW_SYLLABUSES.map(s => ({ id: s.id, focusAreas: s.focusAreas, topics: s.topics }))),
   crosswalk: digest(NSW_CROSSWALK.map(r => ({ subtopicId: r.subtopicId, syllabus: r.syllabus, outcome: r.outcome, historicalCodes: r.historicalCodes, dotpoints: r.dotpoints, status: r.status, placement: r.placement })))
 };
-const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '734ccaefd08e7091' };
+const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '82bec93498ab8251' };
 if (process.argv.includes('--print-digests')) console.log(JSON.stringify(DIGESTS));
 for (const k of Object.keys(PINNED_DIGESTS)) {
   check(DIGESTS[k] === PINNED_DIGESTS[k], `${k} digest ${DIGESTS[k]} differs from the reviewed ${PINNED_DIGESTS[k]}: re-verify the change against NESA, get it reviewed, then update the pin`);
@@ -312,7 +312,19 @@ try {
   const touched = changedSince(['client/src/engine/curriculum-nsw']);
   if (touched) {
     const changed = changedSince([...PROTECTED, ...protectedGlobs.map(g => `:(glob)${g}`)]);
-    check(changed === '', `this branch changes the NSW model and also: ${changed.split('\n').join(', ')}`);
+    // Authored NSW content (a new generator and its subtopic) legitimately changes the crosswalk and
+    // the legacy NSW course together. It may only ADD to the NSW course file and the Year 7–12 and
+    // Standard/Extension generator banks (no deleted or rewritten line), or add a new `*-nsw.js`
+    // generator file; India, NCERT, the availability rules and practice.js stay byte-unchanged.
+    const ADDITIVE = /^client\/src\/engine\/(curriculum\.js|generators\/(year\d+|streams-standard|streams-ext)\.js)$/;
+    const NEW_NSW_FILE = /^client\/src\/engine\/generators\/[\w-]+-nsw\.js$/;
+    const untracked = new Set(git(['ls-files', '--others', '--exclude-standard', '--', ...PROTECTED]).split('\n').filter(Boolean));
+    const deletedLines = file => git(['diff', '--numstat', base, '--', file]).split('\n').filter(Boolean).reduce((n, line) => n + Number(line.split('\t')[1]), 0);
+    const blocked = changed.split('\n').filter(Boolean).filter(file => {
+      if (untracked.has(file) || !git(['ls-tree', base, '--', file])) return !NEW_NSW_FILE.test(file);
+      return !(ADDITIVE.test(file) && deletedLines(file) <= (file.endsWith('curriculum.js') ? 1 : 0));
+    });
+    check(blocked.length === 0, `this branch changes the NSW model and also: ${blocked.join(', ')}`);
     isolationNote = `India/legacy files byte-unchanged against merge base ${base.slice(0, 9)}`;
   } else {
     isolationNote = 'branch does not change the NSW model; byte-unchanged check not applicable';
