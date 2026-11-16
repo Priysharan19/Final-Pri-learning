@@ -42,7 +42,7 @@ globalThis.fetch = async (url, options = {}) => {
   server.calls.push(`${options.method || 'GET'} ${path}`);
   if (path === '/v1/account/login') return json({ account: ACCOUNT_A });
   if (path === '/v1/account/me') { const r = server.me(); return r.status === 200 ? json(r.body) : refusal(r.status, r.code || 'AUTH_REQUIRED'); }
-  if (path === '/v1/account/guardian/state') { const r = server.guardian(); return r.status === 200 ? json(r.body) : refusal(r.status, r.code || 'SERVICE_UNAVAILABLE'); }
+  if (path === '/v1/account/guardian/state') { const r = await server.guardian(); return r.status === 200 ? json(r.body) : refusal(r.status, r.code || 'SERVICE_UNAVAILABLE'); }
   if (path === '/v1/account/logout') return json({ ok: true });
   if (path === '/v1/entitlements') return json({ entitlement: { plan: 'free', status: 'free', provider: 'none', sourceVersion: 0 } });
   if (path.startsWith('/v1/sync/pull/')) {
@@ -424,6 +424,43 @@ reset();
   ok('an offline entry with no verification time is expired', offlineGraceExpired(null, now) && offlineGraceExpired(undefined, now) && offlineGraceExpired(0, now) && offlineGraceExpired('x', now));
   ok('one verified an hour ago is not', !offlineGraceExpired(now - 60 * 60 * 1000, now));
   ok('one verified 72 hours ago, or in the future, is', offlineGraceExpired(now - OFFLINE_GRACE_MS, now) && offlineGraceExpired(now + 1000, now));
+}
+
+
+// ── 12 · concurrent guardian checks: an older success cannot undo denial ────
+// The actual activation function is used with two controlled HTTP replies.
+// Old code let the delayed success record a fresh 72-hour offline grant after
+// the newer withdrawn response had already cleared it.
+reset();
+{
+  await put('profiles', { id: 'p-race', name: 'Devika', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+  await loginCloudAccount('p-race', { email: 'a@example.test', password: 'test-password-only' });
+  ok('race fixture begins with a real approved activation', !!(await gate('p-race')).ready);
+  let enterOld, releaseOld;
+  const oldEntered = new Promise(resolve => { enterOld = resolve; });
+  const oldHeld = new Promise(resolve => { releaseOld = resolve; });
+  let calls = 0;
+  server.guardian = async () => {
+    if (++calls === 1) {
+      enterOld();
+      await oldHeld;
+      return { status: 200, body: { accountId: 'acct-A', required: false, state: 'not-required', eligible: true, emailVerified: true, blockerCode: null } };
+    }
+    return { status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } };
+  };
+  const oldRequest = gate('p-race', { sync: false });
+  await oldEntered;
+  const denied = await gate('p-race', { sync: false });
+  eq('the newer authoritative withdrawal is not delayed by the older request', denied.code, 'GUARDIAN_CONSENT_WITHDRAWN');
+  ok('denial clears the saved offline grant immediately', (await cloudAccountLink('p-race')).activatedAt === null);
+  releaseOld();
+  const stale = await oldRequest;
+  ok('the older successful HTTP answer cannot return a usable activation', !stale.ready && stale.code === 'CONSENT_UNAVAILABLE' && stale.retryable === true, JSON.stringify(stale));
+  ok('the older success cannot restore the withdrawn account offline-grace record', (await cloudAccountLink('p-race')).activatedAt === null);
+  eq('withdrawal leaves no offline grace on a subsequent offline reload', await offlineGraceFor('p-race'), null);
+  reset();
+  ok('a fresh guardian-approved recheck after withdrawal can recover normally', !!(await gate('p-race', { sync: false })).ready);
+  ok('that fresh approval is now recorded for the same account', (await cloudAccountLink('p-race')).activatedAccountId === 'acct-A' && Number((await cloudAccountLink('p-race')).activatedAt) > 0);
 }
 
 if (failures.length) {
