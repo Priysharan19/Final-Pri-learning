@@ -328,6 +328,13 @@ for (const file of walk(srcDir)) {
     }
     for (const id of nswIds) check(!new RegExp(`['"\`]${id}['"\`]\\s*:`).test(text), `${file} names ${id}, an NSW-authored generator id, as a key`);
   }
+  // A generator module may only import the shared question helpers, so importing it cannot reach into
+  // another bank and replace one of its generators as a side effect.
+  for (const file of nswFiles) {
+    const imports = [...readFileSync(join(genDir, file), 'utf8').matchAll(/^\s*import\b[^;]*?from\s+['"]([^'"]+)['"]/gm)].map(m => m[1]);
+    check(imports.every(spec => spec === '../qhelpers.js'), `${file} imports ${imports.filter(spec => spec !== '../qhelpers.js').join(', ')}: an NSW-authored generator module may import only ../qhelpers.js`);
+    check(!/^\s*(?:await\s+)?import\s*\(/m.test(readFileSync(join(genDir, file), 'utf8')), `${file} uses a dynamic import`);
+  }
   check(nswFiles.length > 0, 'NSW-authored generator modules were found and their ids are unique across banks');
 }
 
