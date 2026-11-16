@@ -17,7 +17,7 @@
 //   ms12-bivariate-fit MST-12-S2-08  Bivariate data analysis
 //   ms12-normal-exact  MST-12-S2-10  The normal distribution
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz } from '../qhelpers.js';
+import { ri, rc } from '../qhelpers.js';
 
 const trim = v => String(Number(v.toFixed(6)));
 const dollars = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
