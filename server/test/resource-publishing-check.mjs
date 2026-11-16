@@ -100,9 +100,6 @@ try {
   c.deq([r.status, r.data?.error?.code], [400, 'RESOURCE_INCOMPLETE'], 'a draft without a rights basis cannot leave draft');
   c.ok((r.data?.error?.problems || []).some(p => /rightsBasis/.test(p)), 'and the problem names it');
   await call(author, 'PATCH', `/${R}/revisions/1`, { body: body() });
-  r = await call(reviewer, 'PATCH', `/${R}/revisions/1`, { body: body({ title: 'Edited by an admin' }) });
-  c.eq(r.status, 200, 'an administrator may edit another author\'s draft');
-  await call(author, 'PATCH', `/${R}/revisions/1`, { body: body() });
   c.eq((await call(author, 'POST', `/${R}/revisions/1/submit`)).data.revision.state, 'in_review', 'submit moves it to in_review');
   c.eq((await call(author, 'PATCH', `/${R}/revisions/1`, { body: body() })).data?.error?.code, 'REVISION_NOT_DRAFT', 'nothing is edited in place after it leaves draft');
   r = await call(author, 'POST', `/${R}/revisions/1/approve`);
@@ -168,6 +165,15 @@ try {
   await call(author, 'POST', `/${R}/revisions/4/submit`);
   r = await call(reviewer, 'POST', `/${R}/revisions/4/reject`, { reason: 'Needs another look at the disclaimer.' });
   c.eq(r.data.revision?.state, 'draft', 'a reviewer can send it back with a reason');
+  // Two-person rule holds over the bytes: an admin who edits another's draft becomes its author and cannot approve it.
+  await call(reviewer, 'PATCH', `/${R}/revisions/4`, { body: body({ title: 'Changed by the administrator' }) });
+  await call(reviewer, 'POST', `/${R}/revisions/4/submit`);
+  r = await call(reviewer, 'POST', `/${R}/revisions/4/approve`);
+  c.eq(r.data?.error?.code, 'INDEPENDENT_REVIEW_REQUIRED', 'an administrator who edited another\'s draft cannot approve it');
+  r = await call(author, 'POST', `/${R}/revisions/4/approve`);
+  c.eq(r.data.revision?.state, 'approved', 'the original author may review the administrator\'s change');
+  await call(author, 'POST', `/${R}/revisions/4/reject`, { reason: 'Test: back to draft.' });
+  await call(author, 'PATCH', `/${R}/revisions/4`, { body: body() });
   const audits = await app.db.all("SELECT action FROM audit_log WHERE target_kind='resource-revision' ORDER BY id");
   c.ok(['resource.draft.create', 'resource.submit', 'resource.approve', 'resource.publish', 'resource.rollback', 'resource.withdraw', 'resource.reject'].every(a => audits.some(x => x.action === a)), 'every step wrote an audit row');
   c.eq(Number((await app.db.get("SELECT COUNT(*) AS n FROM resource_revisions WHERE reviewer_account_id=author_account_id")).n), 0, 'no revision was ever reviewed by its own author');

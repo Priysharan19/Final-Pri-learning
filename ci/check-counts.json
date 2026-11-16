@@ -304,7 +304,7 @@
       "job": "platform-contracts",
       "log": "resource-publishing.log",
       "pins": [
-        {"has":"resource-publishing-check (sqlite): 92 checks passed"}
+        {"has":"resource-publishing-check (sqlite): 93 checks passed"}
       ]
     },
     "platform/resources.log": {

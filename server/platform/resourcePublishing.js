@@ -28,7 +28,8 @@
 // FILES. A hosted PDF is uploaded in parts of at most 512 KiB, each inside the
 // platform's 1 MiB JSON transport limit (no route carries a bigger body), and
 // assembled on the server: PDF only (`%PDF-` at byte 0, `%%EOF` in the last
-// KiB, no embedded script or launch action), at most 25 MiB, sha256 computed
+// KiB, no obvious script, launch action or embedded file — a heuristic filter, not
+// a sanitiser: the real containment is that files are only ever downloaded), at most 25 MiB, sha256 computed
 // here. It is stored under a server-made key in the deployment's own region
 // (objectStorage.js) and handed to students only as a short-lived signed URL
 // that forces a download. No caller-supplied name ever reaches storage.
@@ -100,7 +101,7 @@ export function pdfProblems(bytes) {
   if (bytes.subarray(0, 5).toString('latin1') !== '%PDF-') p.push('the file does not start with %PDF- (nothing may come before it)');
   if (!bytes.subarray(Math.max(0, bytes.length - 1024)).toString('latin1').includes('%%EOF')) p.push('the file has no %%EOF trailer');
   const text = bytes.toString('latin1');
-  if (/\/(JavaScript|JS|Launch|EmbeddedFile)\b/.test(text)) p.push('the file carries script, a launch action or an embedded file');
+  if (/\/(JavaScript|JS|Launch|EmbeddedFile|OpenAction|SubmitForm|URI)\b|\/J#|\/Launc#/.test(text)) p.push('the file carries script, an automatic action, a launch action or an embedded file');
   return p;
 }
 
@@ -125,6 +126,15 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
   const bad = (res, status, code, message) => res.status(status).json({ error: { code, message } });
   const rowOf = (resourceId, n) => db.get('SELECT * FROM resource_revisions WHERE resource_id=? AND revision=?', [resourceId, n]);
   const assetOf = (resourceId, n) => db.get('SELECT * FROM resource_assets WHERE resource_id=? AND revision=?', [resourceId, n]);
+  // Whoever last changes a draft's content (edit, file) becomes its author, so an
+  // administrator who edits someone else's draft cannot then also approve it:
+  // the two-person rule holds over the bytes that are published, not the first draft.
+  const takeOver = async (row, req) => {
+    if (row.author_account_id !== req.platformSession.account_id) {
+      await db.run("UPDATE resource_revisions SET author_account_id=? WHERE resource_id=? AND revision=? AND state='draft'", [req.platformSession.account_id, row.resource_id, row.revision]);
+      await audit(req.platformSession.account_id, 'resource.author.change', `${row.resource_id}@${row.revision}`, { from: row.author_account_id });
+    }
+  };
   const canEdit = (row, req) => row.author_account_id === req.platformSession.account_id || req.platformSession.role === 'admin';
   // Answers are decided inside the transaction and sent after COMMIT.
   const run = (fn) => async (req, res) => {
@@ -198,6 +208,7 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     if (!canEdit(row, req)) return err(403, 'FORBIDDEN', 'Only the author or an administrator can edit this draft.');
     let body;
     try { body = cleanBody(req.body?.body); } catch (e) { return err(e.status, e.code, e.message); }
+    await takeOver(row, req);
     await db.run("UPDATE resource_revisions SET body_json=? WHERE resource_id=? AND revision=? AND state='draft'", [JSON.stringify(body), resourceId, n]);
     await audit(req.platformSession.account_id, 'resource.draft.edit', `${resourceId}@${n}`);
     return [200, { revision: revisionPublic(await rowOf(resourceId, n)) }];
@@ -209,7 +220,8 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     if (!canEdit(row, req)) return err(403, 'FORBIDDEN', 'Only the author or an administrator can submit this draft.');
     const problems = publishingProblems(resourceId, JSON.parse(row.body_json), assetPublic(await assetOf(resourceId, n)), { edition });
     if (problems.length) return [400, { error: { code: 'RESOURCE_INCOMPLETE', message: 'The resource cannot leave draft yet.', problems } }];
-    await db.run("UPDATE resource_revisions SET state='in_review', submitted_at=? WHERE resource_id=? AND revision=?", [now(), resourceId, n]);
+    await takeOver(row, req);
+    await db.run("UPDATE resource_revisions SET state='in_review', submitted_at=? WHERE resource_id=? AND revision=? AND state='draft'", [now(), resourceId, n]);
     await audit(req.platformSession.account_id, 'resource.submit', `${resourceId}@${n}`);
     return [200, { revision: revisionPublic(await rowOf(resourceId, n)) }];
   }));
@@ -220,7 +232,7 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     if (!row || !['in_review', 'approved'].includes(row.state)) return err(409, 'REVISION_TRANSITION_INVALID', 'Only a revision in review or approved can be sent back.');
     const reason = String(req.body?.reason || '').trim().slice(0, 500);
     if (!reason) return err(400, 'REASON_REQUIRED', 'Say why it is being sent back.');
-    await db.run("UPDATE resource_revisions SET state='draft', reviewer_account_id=NULL, reviewed_at=NULL, submitted_at=NULL, reason=? WHERE resource_id=? AND revision=?", [reason, resourceId, n]);
+    await db.run("UPDATE resource_revisions SET state='draft', reviewer_account_id=NULL, reviewed_at=NULL, submitted_at=NULL, reason=? WHERE resource_id=? AND revision=? AND state IN ('in_review','approved')", [reason, resourceId, n]);
     await audit(req.platformSession.account_id, 'resource.reject', `${resourceId}@${n}`, { reason });
     return [200, { revision: revisionPublic(await rowOf(resourceId, n)) }];
   }));
@@ -231,7 +243,7 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     if (row.author_account_id === req.platformSession.account_id) {
       return err(409, 'INDEPENDENT_REVIEW_REQUIRED', 'The author cannot approve their own revision. A different reviewer is required.');
     }
-    await db.run("UPDATE resource_revisions SET state='approved', reviewer_account_id=?, reviewed_at=? WHERE resource_id=? AND revision=?", [req.platformSession.account_id, now(), resourceId, n]);
+    await db.run("UPDATE resource_revisions SET state='approved', reviewer_account_id=?, reviewed_at=? WHERE resource_id=? AND revision=? AND state='in_review'", [req.platformSession.account_id, now(), resourceId, n]);
     await audit(req.platformSession.account_id, 'resource.approve', `${resourceId}@${n}`);
     return [200, { revision: revisionPublic(await rowOf(resourceId, n)) }];
   }));
@@ -263,7 +275,7 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     if (problems.length) return [400, { error: { code: 'RESOURCE_INCOMPLETE', message: 'The resource cannot be published as it stands.', problems } }];
     const at = now();
     await db.run("UPDATE resource_revisions SET state='superseded' WHERE resource_id=? AND state='published'", [resourceId]);
-    await db.run("UPDATE resource_revisions SET state='published', published_at=? WHERE resource_id=? AND revision=?", [at, resourceId, n]);
+    await db.run("UPDATE resource_revisions SET state='published', published_at=? WHERE resource_id=? AND revision=? AND state='approved'", [at, resourceId, n]);
     await release(resourceId, row, at);
     await audit(req.platformSession.account_id, 'resource.publish', `${resourceId}@${n}`, { revision: n });
     return [200, { revision: revisionPublic(await rowOf(resourceId, n)) }];
@@ -291,8 +303,12 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     if (await db.get("SELECT 1 FROM resource_revisions WHERE resource_id=? AND state IN ('draft','in_review','approved')", [resourceId])) {
       return err(409, 'REVISION_OPEN', 'Finish or reject the revision being prepared first.');
     }
+    // A withdrawn revision was taken down for a reason that may still stand: it returns only as a new, reviewed revision.
+    if (source.state === 'withdrawn') return err(409, 'ROLLBACK_SOURCE_WITHDRAWN', 'A withdrawn revision cannot be rolled back to; start a new revision from it and have it reviewed.');
     const body = JSON.parse(source.body_json);
     const sourceAsset = await assetOf(resourceId, n);
+    const stale = publishingProblems(resourceId, body, assetPublic(sourceAsset), { edition });
+    if (stale.length) return [400, { error: { code: 'RESOURCE_INCOMPLETE', message: 'That revision no longer meets the publishing rules.', problems: stale } }];
     if (body.availability === 'hosted' && (!sourceAsset || !storage)) return err(409, 'ROLLBACK_FILE_UNAVAILABLE', 'The hosted file for that revision is not available.');
     const next = Number((await db.get('SELECT MAX(revision) AS n FROM resource_revisions WHERE resource_id=?', [resourceId]))?.n || 0) + 1;
     const at = now();
@@ -372,14 +388,19 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
       return res.status(400).json({ error: { code: 'UPLOAD_REFUSED', message: 'That file cannot be hosted.', problems } });
     }
     const key = assetKey(resourceId, n);
-    await atomically(async () => {
+    const stillDraft = await atomically(async () => {
+      const again = await rowOf(resourceId, n);
+      if (!again || again.state !== 'draft') return false;
+      await takeOver(again, req);
       await db.run('DELETE FROM resource_assets WHERE resource_id=? AND revision=?', [resourceId, n]);
       await storage.put(key, bytes);
       await db.run('INSERT INTO resource_assets(id,resource_id,revision,sha256,byte_length,storage_key,region,uploaded_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)',
         [newId('rast'), resourceId, n, digest, bytes.length, key, storage.region, req.platformSession.account_id, now()]);
       await audit(req.platformSession.account_id, 'resource.asset.upload', `${resourceId}@${n}`, { sha256: digest, bytes: bytes.length });
+      return true;
     });
     for (let i = 0; i < count; i++) await storage.delete(partKey(resourceId, n, i));
+    if (!stillDraft) { await storage.delete(key); return bad(res, 409, 'REVISION_NOT_DRAFT', 'Files can be changed on a draft only.'); }
     res.status(201).json({ asset: assetPublic(await assetOf(resourceId, n)) });
   });
 
