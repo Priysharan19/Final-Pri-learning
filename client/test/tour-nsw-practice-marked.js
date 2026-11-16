@@ -60,17 +60,11 @@ try {
   const page = await ctx.newPage();
   const online = platform.session(ctx, page);
   const issueBodies = [];
+  const issueRequests = [];
   page.on('request', request => {
     if (request.method() === 'POST' && new URL(request.url()).pathname === '/v1/practice/issue') {
+      issueRequests.push(request);
       try { issueBodies.push(JSON.parse(request.postData() || '{}')); } catch { issueBodies.push(null); }
-    }
-  });
-
-  const issueReplies = [];
-  page.on('response', async response => {
-    if (response.request().method() === 'POST' && new URL(response.url()).pathname === '/v1/practice/issue') {
-      let body = null; try { body = await response.json(); } catch {}
-      issueReplies.push({ status: response.status(), code: body?.error?.code || body?.code || null, generator: (() => { try { return JSON.parse(response.request().postData()).generator; } catch { return null; } })() });
     }
   });
   await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
@@ -102,7 +96,23 @@ try {
     }, leaving, { timeout: 30000 });
   }
 
-  const nswReplies = issueReplies.slice(nswFrom);
+  // The prior async page.on('response') listener did not await its own
+  // response.json() before this assertion. A real issued/marked question could
+  // therefore produce [] even though the request and response both existed.
+  // Follow each captured NSW request to its actual completed HTTP reply;
+  // never infer success from the displayed card or skip a missing response.
+  const nswReplies = await Promise.all(issueRequests.slice(nswFrom).map(async request => {
+    const response = await request.response();
+    if (!response) return { status: null, code: 'NO_RESPONSE', generator: null };
+    const failure = await response.finished();
+    let body = null;
+    try { body = await response.json(); } catch { /* reported by status below */ }
+    return {
+      status: failure ? null : response.status(),
+      code: failure ? String(failure) : (body?.error?.code || body?.code || null),
+      generator: (() => { try { return JSON.parse(request.postData()).generator; } catch { return null; } })()
+    };
+  }));
   check(`the server issued what the NSW profile asked for (${CHAPTER})`, nswReplies.length > 0 && nswReplies.every(r => r.status === 201), JSON.stringify(nswReplies));
   const shown = await online.shownRow();
   check('practice shows a question the server issued, not a draft', shown?.checkState === 'issued', JSON.stringify(shown));
