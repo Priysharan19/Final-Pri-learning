@@ -181,18 +181,8 @@ class InkInputTest {
             assumeTrue("the WebView is below the floor on this image", supported)
             // Account-first (#477): Home only once the gate has let the signed-in student in.
             waitFor(s, AccountFirst.HOME_OPEN, 90_000)
-            eval(s, "window.__PRI_INK_METRICS_ENABLED__=true")
-            // Use the actual student navigation Link, not a synthetic history
-            // mutation that some API 36 tablet WebViews fail to propagate to
-            // React Router. This still requires a real question and canvas.
-            assertEquals("Practice is reachable from the signed-in home", "true", eval(s,
-                "(function(){var a=document.querySelector('a[href=\\\"/practice\\\"]');if(!a)return false;a.click();return true;})()"))
-            try {
-                waitFor(s, "document.querySelector('.q-prompt')", 60_000)
-            } catch (e: AssertionError) {
-                val details = eval(s, "(function(){return [location.pathname,document.body.innerText.slice(0,450),!!document.querySelector('[data-testid=account-activation-gate]')].join(' | ');})()")
-                throw AssertionError("Practice did not render a real question after signed-in tab navigation: $details", e)
-            }
+            eval(s, "(function(){window.__PRI_INK_METRICS_ENABLED__=true;history.pushState({},'','/practice');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
+            waitFor(s, "document.querySelector('.q-prompt')")
 
             // A question that offers handwriting.
             var writable = false

@@ -28,6 +28,7 @@ export const ENTITY_POLICIES = Object.freeze({
   settings: SYNC_POLICY.OPTIMISTIC,
   bookmark: SYNC_POLICY.SET_UNION,
   favorite: SYNC_POLICY.SET_UNION,
+  'resource-bookmark': SYNC_POLICY.SET_UNION,
   task: SYNC_POLICY.OPTIMISTIC,
   'custom-question': SYNC_POLICY.OPTIMISTIC,
   class: SYNC_POLICY.SERVER_AUTHORITY,

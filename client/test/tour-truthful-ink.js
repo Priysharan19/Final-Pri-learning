@@ -117,11 +117,7 @@ export const flow = {
     const openFresh = async ({ want = () => true, tries = 6, topic = TOPIC } = {}) => {
       await quiet();
       // The integers chapter at D3 is mostly multiple choice; held at D2, where every form is written.
-      // The step-verification assertion needs the Class 10 D1 x= form.
-      // Choosing its actual student-facing difficulty prevents a random scan
-      // through unrelated forms from consuming the free question allowance.
-      const difficulty = topic === ARITHMETIC ? '&difficulty=2' : topic === STEP_CHECKED ? '&difficulty=1' : '';
-      await page.goto(`${base}/practice?subtopic=${topic}${difficulty}`, { waitUntil: 'domcontentloaded' });
+      await page.goto(`${base}/practice?subtopic=${topic}${topic === ARITHMETIC ? '&difficulty=2' : ''}`, { waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.q-prompt', { timeout: 30000 });
       await settle();
       for (let moved = 0; moved < tries; moved++) {

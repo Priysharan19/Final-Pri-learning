@@ -20,6 +20,18 @@ export const libraryApi = Object.freeze({
   }
 });
 
+// The command bar searches the edition's list on the device (no query string
+// reaches the transport), so it is read once per page load and kept; a failure
+// is never kept. Dropped by `forgetLibraryList` when the signed-in account changes.
+let listed = null;
+let listedFor = null;
+export const cachedLibraryList = (owner = '') => {
+  if (listedFor !== owner) { listed = null; listedFor = owner; }
+  if (!listed) listed = libraryApi.list().catch(err => { listed = null; throw err; });
+  return listed;
+};
+export const forgetLibraryList = () => { listed = null; };
+
 export const isResourceId = (id) => ID.test(String(id || ''));
 
 // The i18n keys, written out so client/test/i18n-check.mjs can see each one.

@@ -686,7 +686,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "own account only: every query is keyed by the authenticated session account id; optional request accountId is a match constraint and never a selector; deviceId must equal the session device; idempotency keys are scoped per account",
+      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; deviceId must equal the session device; idempotency keys are scoped per account",
       "rateLimits": [
         {
           "key": "sync-push",
@@ -699,27 +699,6 @@
       "origin": "enforced",
       "bodyLimit": "1mb",
       "innerLimits": "≤100 items; event payload ≤256 KiB; entity body ≤512 KiB"
-    },
-    {
-      "method": "GET",
-      "path": "/v1/sync/pull/:expectedAccountId/:cursor",
-      "auth": "session",
-      "roles": null,
-      "verifiedEmail": false,
-      "guardianConsent": true,
-      "mfa": false,
-      "ownership": "account ID in URL is a constraint only: reject when it differs from the authenticated session account; all queries remain keyed by the session account ID; cursor pages only within that account",
-      "rateLimits": [
-        {
-          "key": "sync-pull",
-          "limit": 180,
-          "windowMs": 60000,
-          "identity": "account"
-        }
-      ],
-      "csrf": "not-applicable",
-      "origin": "not-applicable",
-      "bodyLimit": "no-body"
     },
     {
       "method": "GET",
@@ -3024,6 +3003,48 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/public/resources/",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "the list: anonymous and read-only, OFF unless PRI_PUBLIC_CATALOGUE=on (the router is not mounted otherwise); only published rows with an https external link offered to THIS server's edition (PRI_EDITION; no request field selects it), in the resourcePublic shape: no account data, no hosted-file URL, no review or edition internals; reads and sets no cookie; Access-Control-Allow-Origin only for an exact origin in PRI_PUBLIC_CATALOGUE_ORIGINS, never credentials; public, max-age=300 with an ETag; nothing written",
+      "rateLimits": [
+        {
+          "key": "public-resources-list",
+          "limit": 300,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/public/resources/:id",
+      "auth": "none",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": false,
+      "ownership": "one resource: anonymous and read-only, OFF unless PRI_PUBLIC_CATALOGUE=on (the router is not mounted otherwise); only published rows with an https external link offered to THIS server's edition (PRI_EDITION; no request field selects it), in the resourcePublic shape: no account data, no hosted-file URL, no review or edition internals; reads and sets no cookie; Access-Control-Allow-Origin only for an exact origin in PRI_PUBLIC_CATALOGUE_ORIGINS, never credentials; public, max-age=300 with an ETag; nothing written; an unknown id, a draft, a withdrawn row and another edition's row are the same 404 (no-store)",
+      "rateLimits": [
+        {
+          "key": "public-resources-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "ip"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
     }
   ]
 }
