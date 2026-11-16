@@ -686,7 +686,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; deviceId must equal the session device; idempotency keys are scoped per account",
+      "ownership": "own account only: every query is keyed by the authenticated session account id; optional request accountId is a match constraint and never a selector; deviceId must equal the session device; idempotency keys are scoped per account",
       "rateLimits": [
         {
           "key": "sync-push",
