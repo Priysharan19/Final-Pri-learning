@@ -346,7 +346,7 @@
       "job": "platform-contracts",
       "log": "region-isolation.log",
       "pins": [
-        {"has":"REGION ISOLATION (H2): PASS — 429 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes."}
+        {"has":"REGION ISOLATION (H2): PASS — 432 checks (sqlite)","note":"423 → 429 (plan F6a public catalogue routes); +3 Step 15 authenticated sync ownership route controls. Route checks and all assertions are retained."}
       ]
     },
     "platform/practice-http.log": {
