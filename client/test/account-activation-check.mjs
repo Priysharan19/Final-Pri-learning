@@ -502,6 +502,13 @@ reset();
   const firstDenials = await markerCount();
   eq('an additional withdrawn recheck remains denied', (await gate('p-multitab', { sync: false })).code, 'GUARDIAN_CONSENT_WITHDRAWN');
   eq('repeated denied rechecks do not accumulate unbounded device rows', await markerCount(), firstDenials);
+  const { advanceDeviceDenialAt } = await import('../src/local/idb.js');
+  const denialRow = 'pri-activation-denial-v1:acct-A:';
+  const deniedAt = (await readDeviceRows('device')).find(row => row?.id === denialRow)?.deniedAt;
+  ok('the account has a durable refusal high-water mark', Number.isSafeInteger(deniedAt) && deniedAt > 0);
+  await advanceDeviceDenialAt(denialRow, Math.max(1, deniedAt - 1000));
+  eq('an older refusal arriving later cannot lower the cross-tab denial watermark',
+    (await readDeviceRows('device')).find(row => row?.id === denialRow)?.deniedAt, deniedAt);
   reset();
   ok('a new authorized request can recover even with the durable denial stamp', !!(await gate('p-multitab', { sync: false })).ready);
 }
