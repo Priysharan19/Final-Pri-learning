@@ -77,7 +77,14 @@ const SITES = {
   'pages/PractisePhoto.jsx': 1,
   'instrument/IndexPage.jsx': 1,
   'instrument/MapPage.jsx': 1,
-  'instrument/ReportHead.jsx': 1
+  'instrument/ReportHead.jsx': 1,
+  // UI-IND-2: the remaining skeletons and loading spots, and the exam room's save line and pending check (16 px only there)
+  'pages/ExamRoom.jsx': 2,
+  'pages/Exams.jsx': 2,
+  'pages/History.jsx': 1,
+  'pages/Tasks.jsx': 1,
+  'pages/Favorites.jsx': 1,
+  'pages/PracticeBase.jsx': 1
 };
 const sites = [];
 for (const f of sources.filter(f => f !== 'instrument/Working.jsx')) {

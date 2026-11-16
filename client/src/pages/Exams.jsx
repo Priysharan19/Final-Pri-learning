@@ -14,6 +14,7 @@ import Icon from '../components/Icon.jsx';
 import { BLUEPRINT_KEYS } from '../lib/blueprintKeys.js';
 import { featureEnabled } from '../platform/features.js';
 import { omittedNames } from '../local/nswExamBackend.js';
+import Working from '../instrument/Working.jsx';
 
 const CLAIM_KEYS = {
   'official-mathematics-section': 'exams.claim.officialSection',
@@ -164,7 +165,7 @@ function NswPapers({ busy, start }) {
     <section className="card" style={{ gridColumn: '1 / -1' }} data-nsw-papers aria-labelledby="nsw-papers-title">
       <h2 className="card-title" id="nsw-papers-title">{t('exams.nsw.heading')}</h2>
       <p className="sub" style={{ marginBottom: 14 }}>{t('exams.nsw.intro')}</p>
-      {list === null && <p className="muted">{t('exams.nsw.loading')}</p>}
+      {list === null && <p className="muted" role="status"><Working pending={list === null} size={24} />{t('exams.nsw.loading')}</p>}
       {list && !list.papers.length && <p className="muted" data-nsw-papers-none>{t('exams.nsw.none')}</p>}
       {list && list.papers.length > 0 && <ul className="nsw-papers" style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
         {list.papers.map(p => (
@@ -255,7 +256,7 @@ function PaperHistory({ exams, openPaper, nav, india = false }) {
   return (
     <div className="card">
       <div className="card-title">{t('exams.yourPapers')}</div>
-      {!exams && <div className="skeleton" style={{ height: 160 }} />}
+      {!exams && <div className="skeleton" style={{ height: 160 }} aria-hidden="true"><Working pending={!exams} size={24} /></div>}
       {exams && !exams.length && <p className="muted">{t('exams.noExams')}</p>}
       {exams && exams.map(e => {
         const pct = e.finished_at && e.total ? Math.round(100 * e.score / e.total) : null;
