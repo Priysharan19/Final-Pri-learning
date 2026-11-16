@@ -77,11 +77,36 @@ try {
   ok(JSON.stringify(ids({ type: 'notes' })) === JSON.stringify(['b-notes']) && JSON.stringify(ids({ year: '2027' })) === JSON.stringify([SEED.id]), 'type and year filters');
   ok(JSON.stringify(ids({ subject: 'mathematics advanced', course: 'nsw' })) === JSON.stringify([SEED.id]), 'subject (any case) and course filters');
   ok(api.safeExternalUrl('http://example.org') === null && api.safeExternalUrl('https://u:p@example.org') === null && api.safeExternalUrl(SEED.url) === SEED.url, 'only plain https links are opened');
+  // Saved resources (plan F2): the toggle, its pending state, and the pure helpers.
+  const saved = await server.ssrLoadModule('/src/library/savedResources.js');
+  for (const lang of ['en', 'hi']) {
+    await i18n.setLanguage(lang);
+    const t = (key, vars) => i18n.translate(key, vars);
+    const btn = map => renderToStaticMarkup(React.createElement(view.SaveButton, { r: sent, saved: map, onToggle: () => {}, t }));
+    const off = btn(new Map());
+    ok(off.includes('aria-pressed="false"') && off.includes('data-save-state="off"') && off.includes(escapeHtml(t('library.save'))), `${lang}: an unsaved resource offers Save, not pressed`);
+    const done = btn(new Map([[sent.id, { pending: false }]]));
+    ok(done.includes('aria-pressed="true"') && done.includes('data-save-state="saved"') && done.includes(escapeHtml(t('library.savedState'))), `${lang}: a saved resource is pressed and says Saved`);
+    const wait = btn(new Map([[sent.id, { pending: true }]]));
+    ok(wait.includes('data-save-state="pending"') && wait.includes(escapeHtml(t('library.savedPending'))) && !wait.includes(`>${escapeHtml(t('library.savedState'))}<`), `${lang}: until the account has it, the button says so and never says Saved`);
+    ok(off.includes('lib-save') && off.includes(escapeHtml(t('library.saveLabel', { title: sent.title }))), `${lang}: the accessible name carries the resource title`);
+    ok(btn(null) === '', `${lang}: no control is drawn until the saved set is known`);
+    const hidden = t('library.savedHidden', { count: 1, n: 1 });
+    ok(typeof hidden === 'string' && hidden.includes('1'), `${lang}: the hidden-count line reads for one item`);
+    ok(renderToStaticMarkup(React.createElement(view.ResourceView, { r: sent, t, save: React.createElement(view.SaveButton, { r: sent, saved: new Map(), onToggle() {}, t }) })).includes('data-save-resource'), `${lang}: the detail page carries the toggle`);
+  }
+  const rs = [{ id: 'a-paper' }, { id: 'b-paper' }, { id: 'c-paper' }];
+  ok(saved.savedFirst(rs, new Set(['c-paper'])).map(r => r.id).join() === 'c-paper,a-paper,b-paper', 'saved resources list first, order otherwise kept');
   ok(api.workingTime(90)?.key === 'library.minutes' && api.workingTime(120)?.n === 2 && api.workingTime(0) === null, 'working time: hours when whole, otherwise minutes');
   ok(api.isResourceId(SEED.id) && !api.isResourceId('../admin') && !api.isResourceId('A'), 'only well-formed ids are requested');
 } finally {
   await server.close();
 }
+
+const savedSrc = read('src/library/savedResources.js');
+ok(/api\.get\('\/library\/saved'\)/.test(savedSrc) && /api\.post\(`\/library\/\$\{id\}\/bookmark`/.test(savedSrc) && !/fetch\(/.test(savedSrc), 'saving goes through the local API (and the sync outbox), never a direct fetch');
+const backendSrc = read('src/local/backend.js');
+ok(/'POST \/library\/:id\/bookmark'/.test(backendSrc) && /resourceBookmarks/.test(backendSrc) && !/'POST \/library[^']*'[\s\S]{0,600}'bookmarks'/.test(backendSrc), 'the route writes resourceBookmarks and never the question bookmarks store');
 
 // Wiring: the audited transport, and dark by default.
 const apiSrc = read('src/library/libraryApi.js');

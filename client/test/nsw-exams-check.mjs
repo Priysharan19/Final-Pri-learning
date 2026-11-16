@@ -134,12 +134,12 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
   const ordered = formsForSlot(slot, [{ generator: 'a', difficulty: 1, outcomes: [outcomes[0]], types: ['numeric'] }, { generator: 'b', difficulty: 4, outcomes: [outcomes[0]], types: ['numeric'] }]);
   check(ordered.map(f => f.generator).join() === 'b,a', 'a slot lists its preferred difficulties first, and still counts the others');
 }
-// PINNED against the current pool (G3 + Standard 2 Year 12 forms, 299 forms; CTO decision 13 Nov 2026).
+// PINNED against the current pool (G3 + Advanced and Standard 2 Year 12 forms, 319 forms; CTO decision 13 Nov 2026).
 // A content change that moves any of these must update this table on purpose.
 const PINNED = {
   'nsw-hsc-standard-1-2027': { released: false, covered: 1, total: 7 },
   'nsw-hsc-standard-2-2027': { released: true, full: false, covered: 10, total: 10, omitted: ['MST-11-03', 'MST-11-05', 'MST-11-06', 'MST-11-02', 'MST-11-04'], title: 'Mathematics Standard 2 · Practice paper — 10 of 10 Year 12 outcomes', marks: 86, workingMin: 130 },
-  'nsw-hsc-advanced-2027': { released: false, covered: 3, total: 8 },
+  'nsw-hsc-advanced-2027': { released: true, full: false, covered: 8, total: 8, omitted: ['MAV-11-01', 'MAV-11-03', 'MAV-11-05', 'MAV-11-08', 'MAV-11-10'], title: 'Mathematics Advanced · Practice paper — 8 of 8 Year 12 outcomes', marks: 92, workingMin: 165 },
   'nsw-hsc-extension-1-2027': { released: true, full: false, covered: 5, total: 6, omitted: ['ME1-11-05', 'ME1-12-04'], title: 'Mathematics Extension 1 · Practice paper — 5 of 6 Year 12 outcomes', marks: 58, workingMin: 100 },
   'nsw-hsc-extension-2-2027': { released: true, full: false, covered: 4, total: 5, omitted: ['ME2-12-02'], title: 'Mathematics Extension 2 · Practice paper — 4 of 5 Year 12 outcomes', marks: 81, workingMin: 145 }
 };
@@ -155,7 +155,7 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
     check(r.included.length === 0 && r.omittedOutcomes.length > 0, `pinned: ${b.id} sets nothing and lists its gaps (${r.omittedOutcomes.length})`);
   }
 }
-check(NSW_EXAM_POOL.length === 299, `the pool the pins were taken on: 299 approved forms (got ${NSW_EXAM_POOL.length})`);
+check(NSW_EXAM_POOL.length === 319, `the pool the pins were taken on: 319 approved forms (got ${NSW_EXAM_POOL.length})`);
 
 // On G3's pool, released exactly above the floor (no hand-entered list).
 for (const b of NSW_EXAM_BLUEPRINTS) {

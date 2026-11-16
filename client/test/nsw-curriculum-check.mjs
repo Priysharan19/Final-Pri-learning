@@ -223,7 +223,7 @@ const report = nswCoverage({ syllabuses: NSW_CURRENT_SYLLABUSES, crosswalk: NSW_
 const PINNED = {
   'nsw-mathematics-k-10-2022': [57, 41, 0, 16],
   'nsw-mathematics-standard-11-12-2024': [25, 21, 0, 4],
-  'nsw-mathematics-advanced-11-12-2024': [18, 14, 0, 4],
+  'nsw-mathematics-advanced-11-12-2024': [18, 16, 0, 2],
   'nsw-mathematics-extension1-11-12-2024': [11, 9, 1, 1],
   'nsw-mathematics-extension2-11-12-2024': [5, 5, 0, 0]
 };
@@ -260,7 +260,7 @@ const DIGESTS = {
   syllabuses: digest(NSW_SYLLABUSES.map(s => ({ id: s.id, focusAreas: s.focusAreas, topics: s.topics }))),
   crosswalk: digest(NSW_CROSSWALK.map(r => ({ subtopicId: r.subtopicId, syllabus: r.syllabus, outcome: r.outcome, historicalCodes: r.historicalCodes, dotpoints: r.dotpoints, status: r.status, placement: r.placement })))
 };
-const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '88b6bb4138368cf2' };
+const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '807d3b6e4bfccaee' };
 if (process.argv.includes('--print-digests')) console.log(JSON.stringify(DIGESTS));
 for (const k of Object.keys(PINNED_DIGESTS)) {
   check(DIGESTS[k] === PINNED_DIGESTS[k], `${k} digest ${DIGESTS[k]} differs from the reviewed ${PINNED_DIGESTS[k]}: re-verify the change against NESA, get it reviewed, then update the pin`);

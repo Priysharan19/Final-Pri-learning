@@ -8,13 +8,13 @@ Prithagoras offers timed papers shaped like an HSC examination, each an "Answer-
 - Otherwise a **partial** paper (only the slots that can be filled) is released when at least 75% of the course's Year 12 outcomes (from the G2 model) are covered. It is titled "Practice paper — N of M Year 12 outcomes", never an HSC paper or a trial; its marks and working time are scaled to what it examines; and the Exams page, the paper and the result name every outcome it leaves out.
 - Below that floor the paper is refused.
 
-The pool today: 299 approved forms. Blueprint structures (times, marks, section sizes) follow NESA's published HSC examination specifications for the 2024 syllabuses, first examined in 2027 (`docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md` §5.3). Which outcome each slot is on is Pri's own design: every Year 12 outcome of the examined course has slots. No NESA paper, question, marking guideline or reference sheet is reproduced. The platform has no authored formula sheet yet, so none is shown.
+The pool today: 319 approved forms. Blueprint structures (times, marks, section sizes) follow NESA's published HSC examination specifications for the 2024 syllabuses, first examined in 2027 (`docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md` §5.3). Which outcome each slot is on is Pri's own design: every Year 12 outcome of the examined course has slots. No NESA paper, question, marking guideline or reference sheet is reproduced. The platform has no authored formula sheet yet, so none is shown.
 
 | Paper | State | Year 12 outcomes covered | Sat as | Omitted outcomes |
 | --- | --- | --- | --- | --- |
 | Mathematics Standard 1 | refused | 1 of 7 (14%) | designed: 44 questions, 80 marks, 10 + 120 min | Algebraic relationships (MST-12-S1-01); Investment (MST-12-S1-02); Depreciation and loans (MST-12-S1-03); Right-angled triangles (MST-12-S1-04); Ratios and rates (MST-12-S1-05); Bivariate data analysis (MST-12-S1-06); Linear relationships (MST-11-02); Earning money (MST-11-03); Managing money (MST-11-04); Applications of measurement (MST-11-05); Time and location (MST-11-06) |
 | Mathematics Standard 2 | released (partial) | 10 of 10 (100%) | "Mathematics Standard 2 · Practice paper — 10 of 10 Year 12 outcomes": 42 questions, 86 marks, 10 min reading + 130 min | Earning money (MST-11-03); Applications of measurement (MST-11-05); Time and location (MST-11-06); Linear relationships (MST-11-02); Managing money (MST-11-04) |
-| Mathematics Advanced | refused | 3 of 8 (38%) | designed: 47 questions, 100 marks, 10 + 180 min | Further graph transformations and modelling (MAV-12-01); Integral calculus (MAV-12-05); Random variables (MAV-12-07); Further graph transformations and modelling (MAV-12-02); Financial mathematics (MAV-12-08); Working with functions (MAV-11-01); Graph transformations (MAV-11-03); Trigonometric identities and equations (MAV-11-05); Exponential and logarithmic functions (MAV-11-08); Probability and data (MAV-11-10) |
+| Mathematics Advanced | released (partial) | 8 of 8 (100%) | "Mathematics Advanced · Practice paper — 8 of 8 Year 12 outcomes": 42 questions, 92 marks, 10 min reading + 165 min | Working with functions (MAV-11-01); Graph transformations (MAV-11-03); Trigonometric identities and equations (MAV-11-05); Exponential and logarithmic functions (MAV-11-08); Probability and data (MAV-11-10) |
 | Mathematics Extension 1 | released (partial) | 5 of 6 (83%) | "Mathematics Extension 1 · Practice paper — 5 of 6 Year 12 outcomes": 27 questions, 58 marks, 10 min reading + 100 min | The binomial theorem (ME1-11-05); Further calculus skills (ME1-12-04) |
 | Mathematics Extension 2 | released (partial) | 4 of 5 (80%) | "Mathematics Extension 2 · Practice paper — 4 of 5 Year 12 outcomes": 38 questions, 81 marks, 10 min reading + 145 min | Further work with vectors (ME2-12-02) |
 
@@ -75,18 +75,18 @@ Source: Mathematics Advanced 11–12 Syllabus (2024): HSC examinations — https
 | MAV-11-04 | Trigonometry and measure of angles | 11 | 2 | 3 | 6 | yes |
 | MAV-11-07 | Exponential and logarithmic functions | 11 | 2 | 2 | 4 | yes |
 | MAV-11-09 | Probability and data | 11 | 2 | 2 | 3 | yes |
-| MAV-12-01 | Further graph transformations and modelling | 12 | 4 | 8 | 0 | no |
+| MAV-12-01 | Further graph transformations and modelling | 12 | 4 | 8 | 4 | yes |
 | MAV-12-03 | Sequences and series | 12 | 4 | 8 | 3 | yes |
 | MAV-12-04 | Differential calculus | 12 | 5 | 11 | 7 | yes |
-| MAV-12-05 | Integral calculus | 12 | 5 | 13 | 3 | no |
-| MAV-12-06 | Applications of calculus | 12 | 5 | 15 | 12 | yes |
-| MAV-12-07 | Random variables | 12 | 4 | 8 | 1 | no |
-| MAV-12-02 | Further graph transformations and modelling | 12 | 3 | 9 | 0 | no |
-| MAV-12-08 | Financial mathematics | 12 | 3 | 8 | 0 | no |
+| MAV-12-05 | Integral calculus | 12 | 5 | 13 | 6 | yes |
+| MAV-12-06 | Applications of calculus | 12 | 5 | 15 | 13 | yes |
+| MAV-12-07 | Random variables | 12 | 4 | 8 | 5 | yes |
+| MAV-12-02 | Further graph transformations and modelling | 12 | 3 | 9 | 4 | yes |
+| MAV-12-08 | Financial mathematics | 12 | 3 | 8 | 4 | yes |
 | MAV-11-01 | Working with functions | 11 | 1 | 1 | 1 | no |
 | MAV-11-03 | Graph transformations | 11 | 1 | 2 | 0 | no |
 | MAV-11-05 | Trigonometric identities and equations | 11 | 1 | 2 | 1 | no |
-| MAV-11-06 | Introduction to differentiation | 11 | 1 | 2 | 13 | yes |
+| MAV-11-06 | Introduction to differentiation | 11 | 1 | 2 | 14 | yes |
 | MAV-11-08 | Exponential and logarithmic functions | 11 | 1 | 2 | 2 | no |
 | MAV-11-10 | Probability and data | 11 | 1 | 1 | 0 | no |
 

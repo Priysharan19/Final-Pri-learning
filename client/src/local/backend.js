@@ -61,7 +61,7 @@ import {
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { featureEnabled } from '../platform/features.js';
-import { stageAttemptProgress } from '../platform/profileOutbox.js';
+import { stageAttemptProgress, pendingProfileMutations } from '../platform/profileOutbox.js';
 import { requestLineCheck, requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
@@ -5084,6 +5084,38 @@ const routes = {
     if (existing) { await del('bookmarks', key); return { bookmarked: false }; }
     await put('bookmarks', { key, pid: p.id, questionId: params.id, createdAt: Date.now() });
     return { bookmarked: true };
+  },
+
+  // Saved library resources (plan F2). The ids are the public catalogue's, kept
+  // per profile and synced as the account's `resource-bookmark` entities. A
+  // resource counts as `pending` until the cloud has acknowledged it: it is
+  // never shown as saved before the server has it.
+  'GET /library/saved': async () => {
+    const p = await requireProfile();
+    const rows = await byIndex('resourceBookmarks', 'pid', p.id);
+    // A failed read, or a queue as long as the read allows, says nothing is
+    // acknowledged: every saved resource then shows as pending, never as saved.
+    const asked = 500;
+    const pendingAll = await pendingProfileMutations(p.id, asked).catch(() => null);
+    const queued = new Map((pendingAll || [])
+      .filter(item => item.kind === 'resource-bookmark' || item.kind === 'full-rescan')
+      .map(item => [item.kind === 'full-rescan' ? '*' : item.entityId, item.operation]));
+    const everything = queued.has('*') || !pendingAll || pendingAll.length >= asked;
+    return {
+      items: rows.map(r => ({ id: r.resourceId, at: r.createdAt || 0, pending: everything || queued.has(r.resourceId) }))
+        .filter(r => typeof r.id === 'string').sort((a, b) => b.at - a.at)
+    };
+  },
+
+  'POST /library/:id/bookmark': async (body, params) => {
+    const p = await requireProfile();
+    if (!/^[a-z0-9][a-z0-9-]{2,119}$/.test(String(params.id || ''))) throw Object.assign(new Error('Unknown resource.'), { status: 404 });
+    const key = `${p.id}:${params.id}`;
+    if (await get('resourceBookmarks', key)) { await del('resourceBookmarks', key); return { saved: false }; }
+    const held = await byIndex('resourceBookmarks', 'pid', p.id);
+    if (held.length >= 500) throw Object.assign(new Error('You have saved as many resources as one account can hold.'), { status: 422, code: 'RESOURCE_BOOKMARK_LIMIT' });
+    await put('resourceBookmarks', { key, pid: p.id, resourceId: params.id, createdAt: Date.now() });
+    return { saved: true };
   },
 
   'POST /history/:id/retry': async (body, params) => {
