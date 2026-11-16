@@ -367,7 +367,7 @@
       "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
-        {"has":"NSW PRACTICE (G3): PASS — 164/164 checks"}
+        {"has":"NSW PRACTICE (G3): PASS — 163/163 checks"}
       ]
     },
     "platform/practice-http.log#6": {
