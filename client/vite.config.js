@@ -551,7 +551,7 @@ export const SHIPPABLE_FEATURE_FLAGS = Object.freeze(['TUTOR']);
 // flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
 // to it, but its value comes from client/interface.config.mjs in every build and
 // on the development server alike.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK', 'NSW_EXAMS']);
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK', 'EXPORTS', 'NSW_EXAMS']);
 //   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
 //   everywhere, the dev server included: off until a rights opinion exists
 //   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
@@ -566,6 +566,9 @@ export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HAN
 //   "Practise at the desk" on a library paper; ADR-0002 §8 plan F4b). Off in a
 //   production build until the owner's GO; it needs LIBRARY too. The server's
 //   /v1/desk routes answer a signed-in student whatever the flag says.
+//   EXPORTS — "Export" and "Print or save as PDF" on the Exam Desk and the
+//   Progress page (plan F5). Off in a production build; files are made on the
+//   device, so no server route is behind it.
 //   NSW_EXAMS — Prithagoras's HSC-style timed papers on the Exams page (plan
 //   G4). Off in a production build; the server has its own switch
 //   (PRI_NSW_EXAMS=on), also off by default.
@@ -588,6 +591,7 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport),
     __PRI_FEATURE_LIBRARY__: JSON.stringify(states.library),
     __PRI_FEATURE_EXAM_DESK__: JSON.stringify(states.examDesk),
+    __PRI_FEATURE_EXPORTS__: JSON.stringify(states.exports),
     __PRI_FEATURE_NSW_EXAMS__: JSON.stringify(states.nswExams),
     __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
     __PRI_EDITION__: JSON.stringify(states.edition),
