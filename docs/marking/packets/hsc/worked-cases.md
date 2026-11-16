@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `8682450039d85014ba0806e7ce80fccd9eedb74626bacf43a1438112e2b8a01b` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `6bf68bc7e474485367354803dad03990f9b352c490c0341779c424dfb457a1cc` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2563,7 +2563,7 @@ Final answer: 6
 
 ## `nsw-final:ms12-annuity-table/D2` — seed 1009
 
-> The table factor for the present value of an annuity of \\$1 for 3 years at 5% per annum is 2.72. What is the present value of an annuity of \\$700 per year for 3 years, in dollars?
+> The table factor for the present value of an annuity of \\$1 per year for 3 years at 5% per annum is 2.72. What is the present value of an annuity of \\$700 per year for 3 years, in dollars? Use the factor as given.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2596,14 +2596,14 @@ Final answer: 6
 
 ## `nsw-final:ms12-rates/D1` — seed 1009
 
-> A runner on a treadmill travels at $144$ kilometres per hour. What is this speed in metres per second?
+> A delivery van travels at $90$ kilometres per hour. What is this speed in metres per second?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `40` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `40.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `41` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `41` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `25` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `25.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `26` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `26` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-rates/D2` — seed 1009
 
@@ -2666,10 +2666,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `15` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `15.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `16` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `16` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `15` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `15.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `16` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `16` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-network-flow/D4` — seed 1009
 
@@ -2677,10 +2677,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `21` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `21.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `22` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `22` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `21` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `21.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `22` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `22` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-critical-path/D1` — seed 1009
 
@@ -2717,14 +2717,14 @@ Final answer: 6
 
 ## `nsw-final:ms12-critical-path/D4` — seed 1009
 
-> A project has these activities: A (7 days, no predecessor); B (5 days, no predecessor); C (5 days, after A); D (7 days, after B); E (4 days, after C and D); F (7 days, after E). What is the minimum time to complete the whole project, in days?
+> A project has these activities: A (7 days, no predecessor); B (5 days, no predecessor); C (5 days, after A); D (7 days, after B); E (4 days, after C and D); F (7 days, after E). How many of the activities have a float time of zero (so that delaying any of them delays the whole project)?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `23` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `23.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `24` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `24` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `6` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `6.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `7` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-bivariate-fit/D1` — seed 1009
 
@@ -2772,7 +2772,7 @@ Final answer: 6
 
 ## `nsw-final:ms12-normal-exact/D1` — seed 1009
 
-> Heights in a group are normally distributed with mean $75$ cm and standard deviation $6$ cm. What is the $z$-score of a height of $93$ cm?
+> Scores on a test are normally distributed with mean $75$ and standard deviation $6$. What is the $z$-score of a score of $93$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2794,7 +2794,7 @@ Final answer: 6
 
 ## `nsw-final:ms12-normal-exact/D3` — seed 1009
 
-> A normally distributed variable has mean $75$ and standard deviation $6$. In a sample of $4000$ values, about how many are expected to lie between $63$ and $87$?
+> A normally distributed variable has mean $75$ and standard deviation $6$. In a sample of $4000$ values, using the 68–95–99.7 rule, about how many are expected to lie between $63$ and $87$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2805,7 +2805,7 @@ Final answer: 6
 
 ## `nsw-final:ms12-normal-exact/D4` — seed 1009
 
-> A normally distributed variable has mean $75$ and standard deviation $6$. In a sample of $4000$ values, about how many are expected to be greater than $87$?
+> A normally distributed variable has mean $75$ and standard deviation $6$. In a sample of $4000$ values, using the 68–95–99.7 rule, about how many are expected to be greater than $87$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|

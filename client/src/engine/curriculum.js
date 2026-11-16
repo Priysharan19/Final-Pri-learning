@@ -414,7 +414,7 @@ export const STREAM_CURRICULUM = {
         'Cosine rule for sides and angles',
         'Area of a triangle A = ½ab sin C'
       ]),
-      T('ms12-algebraic', 'Algebraic Relationships in Practice', 'Algebra', 8, 'MS-A3', [
+      T('ms12-algebraic', 'Algebraic Relationships in Practice', 'Algebra', 8, 'MS-A4', [
         'Solve problems with two linear models (break-even and equal-cost points)',
         'Use exponential models',
         'Interpret linear graphs of practical situations'

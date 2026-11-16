@@ -212,8 +212,13 @@ try {
   const partials = list.data.papers.filter(p => p.released && p.partial);
   c.ok(partials.length > 0, `partial papers released on G3's pool: ${partials.map(p => `${p.id} (${p.year12.covered}/${p.year12.total})`).join(', ')}`);
   for (const [i, entry] of partials.entries()) {
-    const jar = more[i]?.jar;
-    assert.ok(jar, 'an account per partial paper');
+    // One account per partial paper: more partial papers release as the pool grows, so the pool's own seven are topped up.
+    let student = more[i];
+    if (!student) {
+      student = await registerAccount(h, { email: `nsw.exam.partial.${i}@example.test`, deviceId: `ipad-nsw-exam-partial-${i}` });
+      assert.equal((await verifyEmail(h, student.account.id)).status, 200, 'a verified account per partial paper');
+    }
+    const jar = student.jar;
     const made = await create(jar, { kind: 'nsw', blueprint: { id: entry.id } });
     assert.equal(made.status, 201, `${entry.id} starts`);
     const ex = made.data.exam;

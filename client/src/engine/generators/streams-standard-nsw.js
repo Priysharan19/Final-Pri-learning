@@ -24,6 +24,12 @@ const dollars = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 const D = v => `\\$${dollars(v)}`;
 
 // ── Graph helpers ────────────────────────────────────────────────────────────
+/** The arcs from the source side of a cut to the other side, as text with its capacity. */
+function cutText(arcs, side) {
+  const cut = arcs.filter(([u, v]) => side.has(u) && !side.has(v));
+  return { text: cut.map(([u, v, c]) => `${u}\\to ${v}$ (${c})`).join(', $'), total: cut.reduce((n, [, , c]) => n + c, 0), set: [...side].join(', ') };
+}
+
 function maxFlow(nodes, arcs, s, t) {
   const cap = new Map();
   for (const [u, v, c] of arcs) cap.set(`${u}>${v}`, (cap.get(`${u}>${v}`) || 0) + c);
@@ -36,7 +42,7 @@ function maxFlow(nodes, arcs, s, t) {
       const u = queue.shift();
       for (const v of nodes) if (!prev.has(v) && residual(u, v) > 0) { prev.set(v, u); queue.push(v); }
     }
-    if (!prev.has(t)) return flow;
+    if (!prev.has(t)) return { flow, side: new Set(prev.keys()) };
     let add = Infinity;
     for (let v = t; prev.get(v) != null; v = prev.get(v)) add = Math.min(add, residual(prev.get(v), v));
     for (let v = t; prev.get(v) != null; v = prev.get(v)) {
@@ -186,7 +192,7 @@ const raw = {
       const [n, r, f] = rc(rng, PV);
       const val = Math.round(M * f);
       return {
-        prompt: `The table factor for the present value of an annuity of ${D(1)} for ${n} years at ${r}% per annum is ${f}. What is the present value of an annuity of ${D(M)} per year for ${n} years, in dollars?`,
+        prompt: `The table factor for the present value of an annuity of ${D(1)} per year for ${n} years at ${r}% per annum is ${f}. What is the present value of an annuity of ${D(M)} per year for ${n} years, in dollars? Use the factor as given.`,
         answerType: 'numeric', answer: { value: val },
         traps: [{ value: M * n, why: 'Money received later is worth less today, so the present value is below the total of the payments.' }],
         hints: ['Present value $= \\text{payment}\\times\\text{table factor}$.', `$${M}\\times ${f}$.`, 'Use the factor from the question.'],
@@ -229,7 +235,7 @@ const raw = {
   // ── Ratios and rates ───────────────────────────────────────────────────────
   'ms12-rates': (rng, diff) => {
     if (diff === 1) {
-      const v = 18 * ri(rng, 2, 10), who = rc(rng, ['cyclist', 'train', 'delivery van', 'runner on a treadmill', 'ferry']);
+      const vehicle = rc(rng, [['cyclist', 2, 3], ['ferry', 2, 4], ['delivery van', 3, 6], ['train', 4, 10]]), who = vehicle[0], v = 18 * ri(rng, vehicle[1], vehicle[2]);
       return {
         prompt: `A ${who} travels at $${v}$ kilometres per hour. What is this speed in metres per second?`,
         answerType: 'numeric', answer: { value: v * 5 / 18 }, answerSuffix: 'm/s',
@@ -305,24 +311,26 @@ const raw = {
     }
     if (diff === 3) {
       const arcs = [['S', 'A', cap()], ['S', 'B', cap()], ['A', 'T', cap()], ['B', 'T', cap()], ['A', 'B', cap()]];
-      const val = maxFlow(['S', 'A', 'B', 'T'], arcs, 'S', 'T');
+      const { flow: val, side } = maxFlow(['S', 'A', 'B', 'T'], arcs, 'S', 'T');
+      const cut = cutText(arcs, side);
       return {
         prompt: `A network has source $S$, sink $T$ and the directed arcs (with capacities) ${arcs.map(([u, v, c]) => `${u}→${v} ${c}`).join(', ')}. What is the maximum flow from $S$ to $T$?`,
         answerType: 'numeric', answer: { value: val },
         traps: [{ value: arcs[0][2] + arcs[1][2], why: 'The flow is also limited by the arcs into $T$; the maximum flow equals the smallest cut.' }].filter(t => t.value !== val),
         hints: ['Maximum flow equals the capacity of the minimum cut.', 'List the possible cuts and take the smallest.', 'Check that your flow respects every arc.'],
-        steps: [{ h: 'Minimum cut', d: `The smallest cut has capacity $${val}$, so the maximum flow is $${val}$` }]
+        steps: [{ h: 'A minimum cut', d: `Separate $\\{${cut.set}\\}$ from the rest: the arcs crossing it are $${cut.text}, with total capacity $${cut.total}$` }, { h: 'Max-flow min-cut', d: `No flow can beat the smallest cut, and this one is reached by the flow, so the maximum flow is $${val}$` }]
       };
     }
     const nodes = ['S', 'A', 'B', 'C', 'T'];
     const arcs = [['S', 'A', cap()], ['S', 'B', cap()], ['A', 'C', cap()], ['B', 'C', cap()], ['A', 'T', cap()], ['C', 'T', cap()], ['B', 'T', cap()]];
-    const val = maxFlow(nodes, arcs, 'S', 'T');
+    const { flow: val, side } = maxFlow(nodes, arcs, 'S', 'T');
+    const cut = cutText(arcs, side);
     return {
       prompt: `A network has source $S$, sink $T$ and the directed arcs (with capacities) ${arcs.map(([u, v, c]) => `${u}→${v} ${c}`).join(', ')}. What is the capacity of a minimum cut?`,
       answerType: 'numeric', answer: { value: val },
       traps: [{ value: arcs[0][2] + arcs[1][2], why: 'That cut is only one of several; the minimum cut is the smallest of them all.' }].filter(t => t.value !== val),
       hints: ['The minimum cut equals the maximum flow.', 'Push flow along paths until no path has spare capacity.', 'The total flow reaching $T$ is the answer.'],
-      steps: [{ h: 'Max-flow min-cut', d: `The maximum flow is $${val}$, so the minimum cut has capacity $${val}$` }]
+      steps: [{ h: 'A minimum cut', d: `Separate $\\{${cut.set}\\}$ from the rest: the arcs crossing it are $${cut.text}, with total capacity $${cut.total}$` }, { h: 'Max-flow min-cut', d: `This cut is full when the flow is maximal, so the minimum cut has capacity $${val}$` }]
     };
   },
 
@@ -350,7 +358,17 @@ const raw = {
           steps: [{ h: 'Forward pass', d: `${acts.map(x => `${x.id}: start ${sch.es[x.id]}, finish ${sch.ef[x.id]}`).join('; ')}` }, { h: 'Read it', d: `Earliest start of ${a.id} $= ${sch.es[a.id]}$ days` }]
         };
       }
-      if (diff === 2 || diff === 4) {
+      if (diff === 4) {
+        const critical = acts.filter(a => sch.float[a.id] === 0);
+        return {
+          prompt: `${head} How many of the activities have a float time of zero (so that delaying any of them delays the whole project)?`,
+          answerType: 'numeric', answer: { value: critical.length },
+          traps: [{ value: acts.length, why: 'Only the activities on a critical path have no float; the others can be delayed a little.' }].filter(t => t.value !== critical.length),
+          hints: ['Float $=$ latest start $-$ earliest start.', 'Do a forward pass, then a backward pass.', 'Count the activities whose float is $0$.'],
+          steps: [{ h: 'Float of each activity', d: acts.map(a => `${a.id}: ${sch.float[a.id]}`).join('; ') }, { h: 'Count the zeros', d: `${critical.map(a => a.id).join(', ')} — ${critical.length} activities` }]
+        };
+      }
+      if (diff === 2) {
         return {
           prompt: `${head} What is the minimum time to complete the whole project, in days?`,
           answerType: 'numeric', answer: { value: sch.end }, answerSuffix: 'days',
@@ -377,7 +395,7 @@ const raw = {
   'ms12-bivariate-fit': (rng, diff) => {
     const a = ri(rng, 5, 40), b = ri(rng, 2, 9);
     const ctx = rc(rng, [
-      { x: 'hours of study', y: 'exam mark', u: 'hours' },
+      { x: 'hours of practice', y: 'questions answered correctly', u: 'hours' },
       { x: 'advertising spend (thousands of dollars)', y: 'weekly sales (thousands of dollars)', u: 'thousand dollars' },
       { x: 'daily maximum temperature (°C)', y: 'cold drinks sold', u: '°C' }
     ]);
@@ -432,9 +450,9 @@ const raw = {
       const z = rc(rng, [1, 2, 3, -1, -2, -3]);
       const x = mu + z * sd;
       return {
-        prompt: `Heights in a group are normally distributed with mean $${mu}$ cm and standard deviation $${sd}$ cm. What is the $z$-score of a height of $${x}$ cm?`,
+        prompt: `Scores on a test are normally distributed with mean $${mu}$ and standard deviation $${sd}$. What is the $z$-score of a score of $${x}$?`,
         answerType: 'numeric', answer: { value: z },
-        traps: [{ value: -z, why: 'A value below the mean has a negative $z$-score.' }],
+        traps: [{ value: -z, why: z > 0 ? 'A value above the mean has a positive $z$-score.' : 'A value below the mean has a negative $z$-score.' }],
         hints: ['$z = \\dfrac{x - \\mu}{\\sigma}$.', `$${x} - ${mu} = ${x - mu}$.`, `Divide by $${sd}$.`],
         steps: [{ h: 'Formula', d: `$z = \\dfrac{${x} - ${mu}}{${sd}} = ${z}$` }]
       };
@@ -454,7 +472,7 @@ const raw = {
       const pct = { 1: 68, 2: 95, 3: 99.7 }[k];
       const N = { 1: rc(rng, [500, 1000, 2500]), 2: rc(rng, [1000, 2000, 4000]), 3: rc(rng, [1000, 2000, 5000]) }[k];
       return {
-        prompt: `A normally distributed variable has mean $${mu}$ and standard deviation $${sd}$. In a sample of $${N}$ values, about how many are expected to lie between $${mu - k * sd}$ and $${mu + k * sd}$?`,
+        prompt: `A normally distributed variable has mean $${mu}$ and standard deviation $${sd}$. In a sample of $${N}$ values, using the 68–95–99.7 rule, about how many are expected to lie between $${mu - k * sd}$ and $${mu + k * sd}$?`,
         answerType: 'numeric', answer: { value: Math.round(N * pct * 10) / 1000 },
         traps: [{ value: Math.round(N * pct * 5) / 1000, why: 'The 68–95–99.7 percentages already cover both sides of the mean.' }],
         hints: [`These limits are $${k}$ standard deviation${k > 1 ? 's' : ''} either side of the mean.`, `That is about ${pct}% of the values.`, `${pct}% of $${N}$.`],
@@ -465,7 +483,7 @@ const raw = {
     const pct = { 1: 16, 2: 2.5, 3: 0.15 }[k];
     const N = { 1: rc(rng, [500, 1000, 2500]), 2: rc(rng, [2000, 4000]), 3: rc(rng, [2000, 4000, 10000]) }[k];
     return {
-      prompt: `A normally distributed variable has mean $${mu}$ and standard deviation $${sd}$. In a sample of $${N}$ values, about how many are expected to be greater than $${mu + k * sd}$?`,
+      prompt: `A normally distributed variable has mean $${mu}$ and standard deviation $${sd}$. In a sample of $${N}$ values, using the 68–95–99.7 rule, about how many are expected to be greater than $${mu + k * sd}$?`,
       answerType: 'numeric', answer: { value: Math.round(N * pct * 10) / 1000 },
       traps: [{ value: Math.round(N * (100 - pct) * 10) / 1000, why: 'The question asks for the values above the limit, not below it.' }],
       hints: [`$${mu + k * sd}$ is $${k}$ standard deviation${k > 1 ? 's' : ''} above the mean.`, `About ${pct}% of values lie above that.`, `${pct}% of $${N}$.`],
