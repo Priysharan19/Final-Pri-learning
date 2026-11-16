@@ -538,6 +538,12 @@ reset();
   const anotherTab = await import('../src/platform/accountActivation.js?step05-offline-inflight');
   const db = globalThis.indexedDB.open().result;
   const actualTransaction = db.transaction;
+  // Prepare the clock fixture BEFORE installing the interception hook:
+  // otherwise the test's own preparation write would be paused.
+  const { get: readDevice } = await import('../src/local/idb.js');
+  const linkKey = `pri-cloud-account-link-v1:${pid}`;
+  const linkRow = await readDevice('device', linkKey);
+  await put('device', { ...linkRow, clockSeenAt: Date.now() - 30_000 });
   let signalPaused, releasePaused;
   const paused = new Promise(resolve => { signalPaused = resolve; });
   const resume = new Promise(resolve => { releasePaused = resolve; });
@@ -566,13 +572,6 @@ reset();
     return tr;
   };
   try {
-    // Force a real asynchronous clock write without inventing a future
-    // activation time. The fixture's stored clock can otherwise already
-    // equal now and no write occurs, leaving this interleaving unexercised.
-    const { get: readDevice } = await import('../src/local/idb.js');
-    const linkKey = `pri-cloud-account-link-v1:${pid}`;
-    const linkRow = await readDevice('device', linkKey);
-    await put('device', { ...linkRow, clockSeenAt: Date.now() - 30_000 });
     const heldOffline = anotherTab.offlineGraceFor(pid);
     await Promise.race([
       paused,
@@ -606,14 +605,19 @@ reset();
   const db = globalThis.indexedDB.open().result;
   const nativeTransaction = db.transaction;
   let failuresToInject = 2;
-  db.transaction = function (name, mode) {
+  const denialWriteFailure = function (name, mode) {
     if (name === 'device' && mode === 'readwrite' && failuresToInject > 0) {
       failuresToInject--;
       throw new DOMException('IndexedDB transaction aborted', 'AbortError');
     }
     return nativeTransaction.call(this, name, mode);
   };
-  server.guardian = () => ({ status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } });
+  // Inject failures only AFTER the real guardian endpoint has replied with
+  // withdrawal. Earlier sync/session bookkeeping must not consume the faults.
+  server.guardian = () => {
+    db.transaction = denialWriteFailure;
+    return { status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } };
+  };
   let blocked;
   try { blocked = await gate(pid, { sync: false }); }
   finally { db.transaction = nativeTransaction; }
