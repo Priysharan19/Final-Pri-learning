@@ -254,6 +254,24 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
   ok(/'scripts\/simulator-fleet\.mjs'/.test(wf), 'the shared simulator rule is in the lane\'s path filter');
 }
 
+{
+  // All three native harnesses must run on the lane's pinned iOS runtime.
+  // The bridge used to pick the newest installed instead of the pinned iOS 27,
+  // which could cold-boot another phone and invalidate the journey evidence.
+  for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfcheck.mjs', 'scripts/ink-native-check.mjs']) {
+    const content = src(script);
+    ok(/pickSimulator\(listing, \{[^}]*\bruntime:/.test(content) && /requiredRuntime\(\)/.test(content),
+      `${script}: picks a simulator through the shared pinned-runtime selector`);
+  }
+  const wf = src('.github/workflows/native-journey-ios27.yml');
+  const sequence = [...wf.matchAll(/--family (ipad|iphone)/g)].map(x => x[1]);
+  const firstPhone = sequence.indexOf('iphone');
+  ok(firstPhone > 0 && sequence.slice(firstPhone).every(f => f === 'iphone'),
+    `iOS 27: both iPad bridge and journey finish before the first iPhone boot (${sequence.join(' → ')})`);
+  ok((wf.match(/timeout-minutes: 35/g) || []).length >= 1 && (wf.match(/timeout-minutes: 25/g) || []).length >= 1,
+    'iOS 27: the full journeys retain bounded step limits and never weaken their assertions');
+}
+
 // ── The page's WebContent process ends (native-bridge-selfcheck.mjs) ──
 // The leg kills the app's real WebContent process with ink on the native
 // surface; the verdict is judged here on recorded lines, both ways.
