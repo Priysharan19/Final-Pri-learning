@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `5b30d6c1c5c93b8c60b2dccb78acf5d49f5a4d03df7dd6b8293d9e119d5b7dba` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `883815b86545c68fe3cf944ee9bf751a89aa986f7c01ce76c34ca0c53596c342` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -1596,14 +1596,14 @@ Final answer: 0
 
 ## `nsw-final:y9-nonlinear-a/D4` — seed 1009
 
-> A hyperbola has the rule $y = \\dfrac{k}{x}$ and passes through the point $(3, 12)$. Find $y$ when $x = 4$.
+> A hyperbola has the rule $y = \\dfrac{k}{x}$ and passes through the point $(3, 20)$. Find $y$ when $x = 4$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `9` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `9.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `15` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `15.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `16` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `16` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-variation/D1` — seed 1009
 
@@ -1706,47 +1706,47 @@ Final answer: 0
 
 ## `nsw-final:y9-surface-solids/D2` — seed 1009
 
-> A cone has base radius $16$ cm and slant height $34$ cm. Its curved surface area is $k\\pi$ cm². Find $k$.
+> A cone has base radius $24$ cm and slant height $51$ cm. Its curved surface area is $k\\pi$ cm². Find $k$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `544` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `544.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `545` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `545` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1224` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `1224.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `1225` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1225` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-surface-solids/D3` — seed 1009
 
-> A square pyramid has a base of side $11$ cm and each of its four triangular faces has slant height $11$ cm. Find its total surface area, in cm².
+> A square pyramid has a base of side $11$ cm and each of its four triangular faces has slant height $12$ cm. Find its total surface area, in cm².
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `363` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `363.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `364` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `364` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `385` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `385.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `386` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `386` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-surface-solids/D4` — seed 1009
 
-> A cone has base radius $16$ cm and slant height $34$ cm. Its total surface area (including the base) is $k\\pi$ cm². Find $k$.
+> A cone has base radius $24$ cm and slant height $51$ cm. Its total surface area (including the base) is $k\\pi$ cm². Find $k$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `800` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `800.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `801` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `801` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1800` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `1800.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `1801` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1801` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-volume-solids/D1` — seed 1009
 
-> A solid ball has radius $12$ cm. Its volume is $k\\pi$ cm³. Find $k$.
+> A solid ball has radius $15$ cm. Its volume is $k\\pi$ cm³. Find $k$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2304` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `2304.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `2305` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2305` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4500` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `4500.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `4501` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4501` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-volume-solids/D2` — seed 1009
 
@@ -1772,14 +1772,14 @@ Final answer: 0
 
 ## `nsw-final:y9-volume-solids/D4` — seed 1009
 
-> A hemispherical dome has radius $12$ cm. Its volume is $k\\pi$ cm³. Find $k$.
+> A hemispherical dome has radius $15$ cm. Its volume is $k\\pi$ cm³. Find $k$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1152` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `1152.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `1153` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1153` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2250` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `2250.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `2251` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2251` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-data-inquiry/D1` — seed 1009
 
@@ -1849,7 +1849,7 @@ Final answer: 0
 
 ## `nsw-final:y10-indices-neg/D3` — seed 1009
 
-> Simplify $4x^{3}\\times 4x^{2}$.
+> Simplify $4x^{3}\\times 5x^{2}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -1904,14 +1904,14 @@ Final answer: 0
 
 ## `nsw-final:y10-functions/D4` — seed 1009
 
-> $f(x) = x^2 - 49$. Find the positive value of $x$ for which $f(x) = 0$.
+> $f(x) = x^2 - 81$. Find the positive value of $x$ for which $f(x) = 0$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `7` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `7.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `8` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `8` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `9` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `9.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `10` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `10` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-logarithms/D1` — seed 1009
 
@@ -1970,7 +1970,7 @@ Final answer: 0
 
 ## `nsw-final:y10-polynomials/D2` — seed 1009
 
-> $P(x) = 3x^3 + 1x - 1$. Find $P(-1)$.
+> $P(x) = 3x^3 + x - 1$. Find $P(-1)$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -1992,7 +1992,7 @@ Final answer: 0
 
 ## `nsw-final:y10-polynomials/D4` — seed 1009
 
-> $P(x) = 3x^2 + 1x$ and $Q(x) = x^3 - 1$. Find $P(2) + Q(2)$.
+> $P(x) = 3x^2 + x$ and $Q(x) = x^3 - 1$. Find $P(2) + Q(2)$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2179,18 +2179,18 @@ Final answer: 0
 
 ## `nsw-final:y10-networks/D1` — seed 1009
 
-> A network has 6 vertices with degrees 2, 1, 3, 3, 1, 4. How many edges does it have?
+> A simple network (no loops, no repeated edges) has 6 vertices: A has degree 1, B has degree 3, C has degree 1, D has degree 1, E has degree 1, F has degree 1. How many edges does it have?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `7` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `7.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `8` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `8` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-networks/D2` — seed 1009
 
-> A connected network has vertices with degrees 4, 3, 3, 4, 2, 4. How many vertices have an odd degree?
+> A connected simple network has 6 vertices: A has degree 2, B has degree 4, C has degree 2, D has degree 2, E has degree 3, F has degree 1. How many vertices have an odd degree?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|

@@ -13,7 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, nz } from '../qhelpers.js';
 
-const TRIPLES = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [6, 8, 10]];
+const TRIPLES = [[3, 4, 5], [5, 12, 13], [8, 15, 17]];
 
 export const year9Nsw = {
   // ── Non-linear relationships A ─────────────────────────────────────────────
@@ -25,7 +25,7 @@ export const year9Nsw = {
         prompt: `A parabola has the rule $y = ${a === 1 ? '' : a}x^2 ${c >= 0 ? '+' : '-'} ${Math.abs(c)}$. Find the value of $y$ when $x = ${x}$.`,
         answerType: 'numeric', answer: { value: y },
         traps: [{ value: (a * x) ** 2 + c, why: 'Square $x$ first, then multiply by $a$: only $x$ is squared.' }].filter(t => t.value !== y),
-        hints: ['Substitute $x$, square it first, then multiply.', `$${x}^2 = ${x * x}$.`, `$${a}\\times ${x * x} ${c >= 0 ? '+' : '-'} ${Math.abs(c)}$.`],
+        hints: ['Substitute $x$, square it first, then multiply.', `$(${x})^2 = ${x * x}$.`, `$${a}\\times ${x * x} ${c >= 0 ? '+' : '-'} ${Math.abs(c)}$.`],
         steps: [{ h: 'Substitute', d: `$y = ${a}(${x})^2 ${c >= 0 ? '+' : '-'} ${Math.abs(c)} = ${a * x * x} ${c >= 0 ? '+' : '-'} ${Math.abs(c)} = ${y}$` }]
       };
     }
@@ -49,7 +49,7 @@ export const year9Nsw = {
         steps: [{ h: 'Isolate $x^2$', d: `$x^2 = \\dfrac{${a * m * m}}{${a}} = ${m * m}$` }, { h: 'Square root', d: `$x = ${m}$` }]
       };
     }
-    const k = ri(rng, 2, 8) * 6, x1 = rc(rng, [2, 3, 6]), x2 = rc(rng, [1, 4, 12]);
+    const k = ri(rng, 1, 6) * 12, x1 = rc(rng, [2, 3, 6]), x2 = rc(rng, [1, 4, 12]);
     const y1 = k / x1;
     return {
       prompt: `A hyperbola has the rule $y = \\dfrac{k}{x}$ and passes through the point $(${x1}, ${y1})$. Find $y$ when $x = ${x2}$.`,
@@ -84,7 +84,7 @@ export const year9Nsw = {
       };
     }
     if (diff === 3) {
-      const x1 = ri(rng, 2, 6), x2 = rc(rng, [1, 2, 3, 4, 6]);
+      const x1 = ri(rng, 2, 6), x2 = rc(rng, [1, 2, 3, 4, 6].filter(v => v !== x1));
       const c = x1 * x2 * ri(rng, 2, 6);
       const y1 = c / x1;
       return {
@@ -112,7 +112,7 @@ export const year9Nsw = {
       return {
         prompt: `A cyclist is $${d0}$ km from home at 1 pm and $${d0 + r * t}$ km from home ${t} hours later. What is the average rate of change of distance, in kilometres per hour?`,
         answerType: 'numeric', answer: { value: r }, answerSuffix: 'km/h',
-        traps: [{ value: (d0 + r * t) / t, why: 'Use the change in distance ($${r * t}$ km), not the final distance.' }].filter(x => x.value !== r),
+        traps: [{ value: (d0 + r * t) / t, why: `Use the change in distance ($${r * t}$ km), not the final distance.` }].filter(x => x.value !== r),
         hints: ['Average rate of change $=\\dfrac{\\text{change in distance}}{\\text{change in time}}$.', `Change in distance: $${d0 + r * t} - ${d0}$.`, `Divide by $${t}$ hours.`],
         steps: [{ h: 'Rate', d: `$\\dfrac{${d0 + r * t} - ${d0}}{${t}} = \\dfrac{${r * t}}{${t}} = ${r}$ km/h` }]
       };
@@ -160,7 +160,7 @@ export const year9Nsw = {
       };
     }
     if (diff === 2 || diff === 4) {
-      const [a, , c] = rc(rng, TRIPLES), m = ri(rng, 1, 3);
+      const [a, , c] = rc(rng, TRIPLES), m = ri(rng, 1, 4);
       const r = a * m, l = c * m;
       const curved = diff === 2;
       return {
@@ -171,7 +171,7 @@ export const year9Nsw = {
         steps: [{ h: 'Formula', d: curved ? `$A = \\pi r l = \\pi(${r})(${l}) = ${r * l}\\pi$` : `$A = \\pi r^2 + \\pi r l = ${r * r}\\pi + ${r * l}\\pi = ${r * r + r * l}\\pi$` }]
       };
     }
-    const s = ri(rng, 4, 14), l = ri(rng, 3, 15);
+    const s = ri(rng, 4, 14), l = ri(rng, Math.floor(s / 2) + 1, 15);
     return {
       prompt: `A square pyramid has a base of side $${s}$ cm and each of its four triangular faces has slant height $${l}$ cm. Find its total surface area, in cm².`,
       answerType: 'numeric', answer: { value: s * s + 2 * s * l }, answerSuffix: 'cm²',
@@ -184,7 +184,7 @@ export const year9Nsw = {
   // ── Volume of solids (coefficient of π, or whole cubic units) ──────────────
   'y9-volume-solids': (rng, diff) => {
     if (diff === 1 || diff === 4) {
-      const r = 3 * ri(rng, 1, 5);
+      const r = 3 * ri(rng, 1, 7);
       const hemi = diff === 4;
       const thing = hemi ? rc(rng, ['solid hemisphere', 'hemispherical dome', 'hemispherical bowl (solid)']) : rc(rng, ['sphere', 'solid ball', 'steel ball']);
       return {
@@ -259,7 +259,7 @@ export const year9Nsw = {
     return {
       prompt: `The mean of $${n}$ values is $${m}$. A sixth value of $${v}$ is added. What is the mean of the six values?`,
       answerType: 'numeric', answer: { value: newMean },
-      traps: [{ value: (m + v) / 2, why: 'The original mean stands for five values, so its total is $5\\times ${m}$, not one value.' }].filter(t => t.value !== newMean && Number.isFinite(t.value)),
+      traps: [{ value: (m + v) / 2, why: `The original mean stands for five values, so its total is $5\\times ${m}$, not one value.` }].filter(t => t.value !== newMean && Number.isFinite(t.value)),
       hints: [`The original total is $${n}\\times ${m} = ${n * m}$.`, `The new total is $${n * m} + ${v}$.`, 'Divide by 6.'],
       steps: [{ h: 'New total', d: `$${n}\\times ${m} + ${v} = ${n * m + v}$` }, { h: 'New mean', d: `$${n * m + v}\\div 6 = ${newMean}$` }]
     };

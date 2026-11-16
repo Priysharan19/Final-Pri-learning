@@ -38,7 +38,7 @@ export const year10Nsw = {
     const nzr = () => nz(rng, -6, 6);
     if (diff === 1) {
       let a, b;
-      do { a = nzr(); b = nzr(); } while (a + b === 0 || a + b === 1);
+      do { a = nzr(); b = nzr(); } while (a + b === 0 || a + b === 1 || a * b === a + b);
       return {
         prompt: `Simplify $x^{${pw(a)}}\\times x^{${pw(b)}}$. Leave the answer as a power of $x$.`,
         answerType: 'expression', answer: { expr: px(a + b) }, answerPrefix: '=',
@@ -49,7 +49,7 @@ export const year10Nsw = {
     }
     if (diff === 2) {
       let a, b;
-      do { a = nzr(); b = nz(rng, -4, 4); } while (a * b === 0 || a * b === 1);
+      do { a = nzr(); b = nz(rng, -4, 4); } while (a * b === 0 || a * b === 1 || a * b === a + b);
       return {
         prompt: `Simplify $\\left(x^{${pw(a)}}\\right)^{${pw(b)}}$. Leave the answer as a power of $x$.`,
         answerType: 'expression', answer: { expr: px(a * b) }, answerPrefix: '=',
@@ -61,7 +61,8 @@ export const year10Nsw = {
     if (diff === 3) {
       let a, b;
       do { a = nzr(); b = nzr(); } while (a + b === 0 || a + b === 1);
-      const c = ri(rng, 2, 7), d = ri(rng, 2, 7);
+      let c = ri(rng, 2, 7), d = ri(rng, 2, 7);
+      if (c === d) d = d === 7 ? 6 : d + 1;
       return {
         prompt: `Simplify $${c}x^{${pw(a)}}\\times ${d}x^{${pw(b)}}$.`,
         answerType: 'expression', answer: { expr: `${c * d}*${px(a + b)}` }, answerPrefix: '=',
@@ -115,14 +116,13 @@ export const year10Nsw = {
         steps: [{ h: 'Inner function', d: `$g(${a}) = ${g}$` }, { h: 'Outer function', d: `$f(${g}) = ${val}$` }]
       };
     }
-    const m = ri(rng, 2, 9), n = ri(rng, 1, 30);
+    const m = ri(rng, 2, 12);
     return {
-      prompt: `$f(x) = x^2 - ${n * 0 + m * m}$. Find the positive value of $x$ for which $f(x) = ${ri(rng, 0, 0)}$.`.replace('f(x) = 0', 'f(x) = 0'),
+      prompt: `$f(x) = x^2 - ${m * m}$. Find the positive value of $x$ for which $f(x) = 0$.`,
       answerType: 'numeric', answer: { value: m },
       traps: [{ value: m * m, why: 'Set $x^2 - k = 0$, then take the square root.' }],
       hints: ['Set $f(x) = 0$.', `$x^2 = ${m * m}$.`, 'Take the positive square root.'],
-      steps: [{ h: 'Solve', d: `$x^2 - ${m * m} = 0 \\Rightarrow x^2 = ${m * m} \\Rightarrow x = ${m}$` }],
-      _unused: n
+      steps: [{ h: 'Solve', d: `$x^2 - ${m * m} = 0 \\Rightarrow x^2 = ${m * m} \\Rightarrow x = ${m}$` }]
     };
   },
 
@@ -184,7 +184,7 @@ export const year10Nsw = {
       const a = ri(rng, 1, 3), b = nz(rng, -5, 5), c = nz(rng, -6, 6), x = ri(rng, -3, 3);
       const v = a * x ** 3 + b * x + c;
       return {
-        prompt: `$P(x) = ${a === 1 ? '' : a}x^3 ${b >= 0 ? '+' : '-'} ${Math.abs(b)}x ${c >= 0 ? '+' : '-'} ${Math.abs(c)}$. Find $P(${x})$.`,
+        prompt: `$P(x) = ${a === 1 ? '' : a}x^3 ${b >= 0 ? '+' : '-'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}x ${c >= 0 ? '+' : '-'} ${Math.abs(c)}$. Find $P(${x})$.`,
         answerType: 'numeric', answer: { value: v },
         traps: [{ value: a * 3 * x + b * x + c, why: '$x^3$ means $x\\times x\\times x$, not $3x$.' }].filter(t => t.value !== v),
         hints: ['Substitute and use brackets for negative values.', `$(${x})^3 = ${x ** 3}$.`, `$${a}(${x ** 3}) ${b >= 0 ? '+' : '-'} ${Math.abs(b)}(${x}) ${c >= 0 ? '+' : '-'} ${Math.abs(c)}$.`],
@@ -205,7 +205,7 @@ export const year10Nsw = {
     const a = ri(rng, 1, 4), b = nz(rng, -5, 5), x = ri(rng, 1, 3);
     const P = a * x * x + b * x, Q = x * x * x - b;
     return {
-      prompt: `$P(x) = ${a}x^2 ${b >= 0 ? '+' : '-'} ${Math.abs(b)}x$ and $Q(x) = x^3 ${-b >= 0 ? '+' : '-'} ${Math.abs(b)}$. Find $P(${x}) + Q(${x})$.`,
+      prompt: `$P(x) = ${a === 1 ? '' : a}x^2 ${b >= 0 ? '+' : '-'} ${Math.abs(b) === 1 ? '' : Math.abs(b)}x$ and $Q(x) = x^3 ${-b >= 0 ? '+' : '-'} ${Math.abs(b)}$. Find $P(${x}) + Q(${x})$.`,
       answerType: 'numeric', answer: { value: P + Q },
       traps: [{ value: P * Q, why: 'The question asks for the sum $P + Q$, not the product.' }].filter(t => t.value !== P + Q),
       hints: [`$P(${x}) = ${P}$.`, `$Q(${x}) = ${Q}$.`, 'Add the two values.'],
@@ -385,29 +385,30 @@ export const year10Nsw = {
 
   // ── Introduction to networks ───────────────────────────────────────────────
   'y10-networks': (rng, diff) => {
-    const V = ['A', 'B', 'C', 'D', 'E', 'F'];
-    if (diff === 1) {
+    const V = ['A', 'B', 'C', 'D', 'E', 'F', 'G'];
+    if (diff <= 2) {
+      // Degrees are read off a real simple graph, so the sequence can exist; level 2 is connected.
       const n = ri(rng, 4, 7);
-      let degs;
-      for (let tries = 0; tries < 400; tries++) { degs = Array.from({ length: n }, () => ri(rng, 1, 4)); if (degs.reduce((s, v) => s + v, 0) % 2 === 0) break; }
-      if (degs.reduce((s, v) => s + v, 0) % 2 !== 0) degs[0] += 1;
-      const sum = degs.reduce((s, v) => s + v, 0);
-      return {
-        prompt: `A network has ${n} vertices with degrees ${degs.join(', ')}. How many edges does it have?`,
-        answerType: 'numeric', answer: { value: sum / 2 },
-        traps: [{ value: sum, why: 'Each edge adds 1 to the degree of two vertices, so the degrees add to twice the number of edges.' }],
-        hints: ['The sum of the degrees is twice the number of edges.', `$${degs.join(' + ')} = ${sum}$.`, 'Halve it.'],
-        steps: [{ h: 'Degree sum', d: `$${degs.join(' + ')} = ${sum}$` }, { h: 'Edges', d: `$${sum}\\div 2 = ${sum / 2}$` }]
-      };
-    }
-    if (diff === 2) {
-      const degs = Array.from({ length: ri(rng, 4, 7) }, () => ri(rng, 1, 5));
-      if (degs.reduce((s, v) => s + v, 0) % 2 !== 0) degs[0] += 1;
+      const edges = [];
+      const has = (u, v) => edges.some(([x, y]) => (x === u && y === v) || (x === v && y === u));
+      if (diff === 2) for (let i = 1; i < n; i++) edges.push([ri(rng, 0, i - 1), i]);
+      for (let e = ri(rng, 2, n); e > 0; e--) { const u = ri(rng, 0, n - 1), v = ri(rng, 0, n - 1); if (u !== v && !has(u, v)) edges.push([u, v]); }
+      const degs = Array.from({ length: n }, (_, i) => edges.filter(([u, v]) => u === i || v === i).length);
+      const listed = degs.map((d, i) => `${V[i]} has degree ${d}`).join(', ');
+      if (diff === 1) {
+        return {
+          prompt: `A simple network (no loops, no repeated edges) has ${n} vertices: ${listed}. How many edges does it have?`,
+          answerType: 'numeric', answer: { value: edges.length },
+          traps: [{ value: edges.length * 2, why: 'Each edge adds 1 to the degree of two vertices, so the degrees add to twice the number of edges.' }],
+          hints: ['The sum of the degrees is twice the number of edges.', `$${degs.join(' + ')} = ${degs.reduce((x, y) => x + y, 0)}$.`, 'Halve it.'],
+          steps: [{ h: 'Degree sum', d: `$${degs.join(' + ')} = ${edges.length * 2}$` }, { h: 'Edges', d: `$${edges.length * 2}\\div 2 = ${edges.length}$` }]
+        };
+      }
       const odd = degs.filter(d => d % 2 === 1).length;
       return {
-        prompt: `A connected network has vertices with degrees ${degs.join(', ')}. How many vertices have an odd degree?`,
+        prompt: `A connected simple network has ${n} vertices: ${listed}. How many vertices have an odd degree?`,
         answerType: 'numeric', answer: { value: odd },
-        traps: [{ value: degs.length - odd, why: 'Count the odd degrees, not the even ones.' }].filter(t => t.value !== odd),
+        traps: [{ value: n - odd, why: 'Count the odd degrees, not the even ones.' }].filter(t => t.value !== odd),
         hints: ['A degree is odd if it is not divisible by 2.', `The degrees are ${degs.join(', ')}.`, 'Count the odd ones.'],
         steps: [{ h: 'Odd degrees', d: `${degs.filter(d => d % 2 === 1).join(', ') || 'none'}: ${odd} of them` }]
       };
