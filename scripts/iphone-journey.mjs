@@ -231,18 +231,6 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
       duringDone = true;
     } else if (tick) { for (let k = 0; k < 4; k++) { execSync('sleep 0.5'); tick(); } } else execSync('sleep 2');
     if (!duringDone && Date.now() - t0 >= duringAfterMs) { duringDone = true; during(); }
-    if (!startedSeen && !relaunched && Date.now() - launchedAt > STALL_MS) {
-      relaunched = true;
-      console.log(`  (${phase}: no "started" line in ${Math.round((Date.now() - launchedAt) / 1000)} s — launching once more)`);
-      const describe = (label, fn) => { try { console.log(`    ${label}: ${String(fn()).trim().split('\n').slice(0, 6).join(' | ').slice(0, 400) || '(none)'}`); } catch (e) { console.log(`    ${label}: unreadable (${String(e?.code || e?.signal || e?.message).slice(0, 50)})`); } };
-      describe('app process', () => run('xcrun', ['simctl', 'spawn', udid, 'launchctl', 'list'], { timeout: 30_000, killSignal: 'SIGKILL' }).split('\n').filter(l => l.includes(bundleId)).join('\n'));
-      describe('crash reports', () => run('/bin/sh', ['-c', 'ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i pri | head -3'], { timeout: 15_000 }));
-      try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* already gone */ }
-      launchApp(udid, bundleId, [flag], { env });
-      launchedAt = Date.now();
-      stalledDeadline = STALL_MS + 60_000;
-      continue;
-    }
     // One read is bounded: on a loaded machine `log show` inside a simulator
     // has hung for many minutes, and an unbounded read then hangs the whole
     // journey with nothing reported. A read that does not come back is not a
@@ -266,6 +254,22 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     const start = lines.lastIndexOf(`PRIJOURNEY started ${phase}`);
     lines = start >= 0 ? lines.slice(start) : [];
     if (lines.length) startedSeen = true;
+    // Only after a read, and only when the container file is the channel
+    // and exists (it does once any earlier phase has written): a phase that
+    // is merely unreadable (no file, `log show` timing out or throttled) is
+    // not a stall, and relaunching it could repeat a non-idempotent step.
+    if (!startedSeen && !relaunched && reportFile && existsSync(reportFile) && Date.now() - launchedAt > STALL_MS) {
+      relaunched = true;
+      console.log(`  (${phase}: no "started" line in ${Math.round((Date.now() - launchedAt) / 1000)} s — launching once more)`);
+      const describe = (label, fn) => { try { console.log(`    ${label}: ${String(fn()).trim().split('\n').slice(0, 6).join(' | ').slice(0, 400) || '(none)'}`); } catch (e) { console.log(`    ${label}: unreadable (${String(e?.code || e?.signal || e?.message).slice(0, 50)})`); } };
+      describe('app process', () => run('xcrun', ['simctl', 'spawn', udid, 'launchctl', 'list'], { timeout: 30_000, killSignal: 'SIGKILL' }).split('\n').filter(l => l.includes(bundleId)).join('\n'));
+      describe('crash reports', () => run('/bin/sh', ['-c', 'ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i pri | head -3'], { timeout: 15_000 }));
+      try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* already gone */ }
+      launchApp(udid, bundleId, [flag], { env });
+      launchedAt = Date.now();
+      stalledDeadline = STALL_MS + 60_000;
+      continue;
+    }
     if (lines.some(l => l.startsWith(`PRIJOURNEY summary ${phase}`))) { execSync('sleep 3'); break; } // let WebKit flush storage
     if (lines.some(l => /^PRIJOURNEY FAIL (script|unreadable)/.test(l))) break;
   }
