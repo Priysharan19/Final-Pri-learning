@@ -402,13 +402,18 @@ try {
   eq([featureStates('build', {}).examDesk, featureStates('build', { PRI_FEATURE_EXAM_DESK: '1' }).examDesk, featureStates('serve', {}).examDesk], [false, true, true], 'off in a production build without PRI_FEATURE_EXAM_DESK=1; on with it, and on the development server');
   ok(/examDesk: typeof __PRI_FEATURE_EXAM_DESK__ === 'boolean'/.test(read('src/platform/features.js')), 'features.js reads the build constant');
   const group = CHUNK_GROUPS.find(g => g.name === 'exam-desk');
-  ok(group && ['/x/src/desk/DeskPage.jsx', '/x/src/examShell/ClockFace.jsx', '/x/src/engine/deskClock.js', '/x/src/engine/deskImport.js'].every(f => group.test.test(f)) && !group.test.test('/x/src/pages/ExamRoom.jsx') && !group.test.test('/x/src/engine/examTime.js'),
-    'the desk, the shell and the desk\'s pure modules are one named chunk, and nothing else is');
+  ok(group && ['/x/src/desk/DeskPage.jsx', '/x/src/engine/deskClock.js', '/x/src/engine/deskImport.js'].every(f => group.test.test(f)) && !group.test.test('/x/src/pages/ExamRoom.jsx') && !group.test.test('/x/src/examShell/ConfirmSheet.jsx') && !group.test.test('/x/src/examShell/ClockFace.jsx') && !group.test.test('/x/src/engine/examTime.js'),
+    'the desk and its pure modules are one named chunk; the shell is not in it (F4c: the marked room, which works offline, imports it)');
   for (const file of ['assets/exam-desk-Bl2D7GYK.js', 'assets/exam-desk-BECvxl1c.css', 'assets/DeskPage-CSttVgzJ.js', 'assets/DeskImport-Bn-QSsVr.js', 'assets/DeskEntry-BCuXJmcw.js', 'assets/deskCache-C0ffee12.js']) {
     ok(ON_DEMAND.some(([re]) => re.test(file)), `${file} is fetched on demand, never installed`);
   }
-  // Moving the marked room onto the shell is plan F4c, not this mission.
-  ok(!/examShell/.test(read('src/pages/ExamRoom.jsx')) && !/examShell|\/desk\//.test(read('src/pages/Exams.jsx')), 'the marked exam room and the Exams page are untouched by the shell and the desk');
+  // F4c (reduced): the marked room shares only the shell's confirm sheet,
+  // announcer, shortcuts and shortcut list. Its navigator, clock and save chain
+  // stay its own, and it never imports the desk.
+  const room = read('src/pages/ExamRoom.jsx');
+  const shellImports = [...room.matchAll(/from '\.\.\/examShell\/([A-Za-z]+)\.jsx?'/g)].map(m => m[1]).sort();
+  eq(shellImports, ['ConfirmSheet', 'ShortcutsSheet', 'useAnnounce', 'useExamShortcuts'], 'the marked room imports only the shell\'s sheet, announcer and shortcuts');
+  ok(!/\/desk\/|useAutosave|ClockFace|QuestionNavigator|QuestionNotes/.test(room) && !/examShell|\/desk\//.test(read('src/pages/Exams.jsx')), 'the marked room keeps its own save chain, clock and navigator, and the Exams page is untouched');
 } finally {
   await server.close();
 }
