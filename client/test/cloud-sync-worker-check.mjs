@@ -10,6 +10,11 @@ globalThis.__PRI_CLOUD_ORIGIN__ = 'https://pri.example.test';
 
 const pushes = [];
 let account = { id: 'acct-A', email: 'a@example.test', name: 'A', role: 'student', emailVerified: true };
+const ACCOUNT_A = { ...account };
+const ACCOUNT_B = { id: 'acct-B', email: 'b@example.test', name: 'B', role: 'student', emailVerified: true };
+let swapDuringNextPush = false;
+let swapDuringNextPull = false;
+const remoteAcceptedAccounts = [];
 
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
   status,
@@ -22,11 +27,22 @@ globalThis.fetch = async (url, options = {}) => {
   if (path === '/v1/account/me') return json({ account });
   if (path === '/v1/entitlements') return json({ entitlement: { plan: 'free', status: 'free', provider: 'none', sourceVersion: 0 } });
   if (path.startsWith('/v1/sync/pull/')) {
-    return json({ schemaVersion: 1, cursor: Number(path.split('/').pop()) || 0, hasMore: false, events: [], entities: [] });
+    if (swapDuringNextPull) { swapDuringNextPull = false; account = ACCOUNT_B; }
+    const segments = path.split('/');
+    const boundAccount = segments.length === 6 ? segments[4] : null;
+    if (boundAccount && boundAccount !== account.id) return json({
+      error: { code: 'SYNC_ACCOUNT_MISMATCH', message: 'Cannot pull into another account.' }
+    }, 409);
+    return json({ schemaVersion: 1, cursor: Number(segments.at(-1)) || 0, hasMore: false, events: [], entities: [] });
   }
   if (path === '/v1/sync/push') {
     const body = JSON.parse(options.body || '{}');
     pushes.push({ body, headers: { ...(options.headers || {}) } });
+    if (swapDuringNextPush) { swapDuringNextPush = false; account = ACCOUNT_B; }
+    if (body.accountId && body.accountId !== account.id) return json({
+      error: { code: 'SYNC_ACCOUNT_MISMATCH', message: 'Cannot upload another account\'s work.' }
+    }, 409);
+    remoteAcceptedAccounts.push(account.id);
     let cursor = pushes.length * 100;
     return json({
       schemaVersion: 1,
@@ -112,6 +128,36 @@ await syncNow('p1');
 const isolationPayload = JSON.stringify(pushes.slice(beforeIsolation));
 ok('p1 sync never uploads p2 subtopic', !isolationPayload.includes('secret-p2-topic'), isolationPayload);
 ok('p1 sync never uploads p2 question id', !isolationPayload.includes('q-p2'), isolationPayload);
+
+// The device-wide cookie can change in another tab *after* /me succeeds.
+// The server must compare its current session against the expected account
+// on each push and pull, or p1's work may land under another student's account.
+await add('attempts', { pid: 'p1', questionId: 'q-swap-secret', subtopic: 'private-to-A', difficulty: 2, correct: 1,
+  ms: 900, hintsUsed: 0, mode: 'practice', viaInk: false, createdAt: 5000 });
+await recordProfileMutation('p1', 'POST', '/practice/q-swap-secret/submit', { correct: true });
+const beforeSwap = (await pendingProfileMutations('p1')).length;
+const acceptedBefore = remoteAcceptedAccounts.length;
+swapDuringNextPush = true;
+let pushError = null;
+try { await syncNow('p1'); } catch (error) { pushError = error; }
+same('a session switched to B inside a push is refused with a named account mismatch', pushError?.code, 'SYNC_ACCOUNT_MISMATCH');
+same('the local A queue is kept intact after an account-swapped push', (await pendingProfileMutations('p1')).length, beforeSwap);
+same('B never accepts A work during the switched push', remoteAcceptedAccounts.length, acceptedBefore);
+same('last successful sync retains A as the account', (await cloudSyncStatus('p1')).accountId, 'acct-A');
+
+account = ACCOUNT_A;
+await syncNow('p1');
+same('retry under A eventually delivers the preserved queue', (await pendingProfileMutations('p1')).length, 0);
+ok('the repaired push carries the expected account, not a client-selected destination',
+  pushes.at(-1)?.body.accountId === 'acct-A');
+
+swapDuringNextPull = true;
+let pullError = null;
+try { await syncNow('p1'); } catch (error) { pullError = error; }
+same('a session switched to B inside a pull is refused before restoring any remote events', pullError?.code, 'SYNC_ACCOUNT_MISMATCH');
+account = ACCOUNT_A;
+const restored = await syncNow('p1');
+ok('the same A profile can sync again after sign-in is restored', !!restored?.lastSyncAt);
 
 console.log(`\nCloud sync worker — ${pass}/${pass + fail} checks`);
 if (failures.length) {
