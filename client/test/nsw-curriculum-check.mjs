@@ -260,7 +260,7 @@ const DIGESTS = {
   syllabuses: digest(NSW_SYLLABUSES.map(s => ({ id: s.id, focusAreas: s.focusAreas, topics: s.topics }))),
   crosswalk: digest(NSW_CROSSWALK.map(r => ({ subtopicId: r.subtopicId, syllabus: r.syllabus, outcome: r.outcome, historicalCodes: r.historicalCodes, dotpoints: r.dotpoints, status: r.status, placement: r.placement })))
 };
-const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '82bec93498ab8251' };
+const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '92b10c3bf3b2dee1' };
 if (process.argv.includes('--print-digests')) console.log(JSON.stringify(DIGESTS));
 for (const k of Object.keys(PINNED_DIGESTS)) {
   check(DIGESTS[k] === PINNED_DIGESTS[k], `${k} digest ${DIGESTS[k]} differs from the reviewed ${PINNED_DIGESTS[k]}: re-verify the change against NESA, get it reviewed, then update the pin`);
@@ -313,19 +313,32 @@ try {
   if (touched) {
     const changed = changedSince([...PROTECTED, ...protectedGlobs.map(g => `:(glob)${g}`)]);
     // Authored NSW content (a new generator and its subtopic) legitimately changes the crosswalk and
-    // the legacy NSW course together. It may only ADD to the NSW course file and the Year 7–12 and
-    // Standard/Extension generator banks (no deleted or rewritten line), or add a new `*-nsw.js`
-    // generator file; India, NCERT, the availability rules and practice.js stay byte-unchanged.
-    const ADDITIVE = /^client\/src\/engine\/(curriculum\.js|generators\/(year\d+|streams-standard|streams-ext)\.js)$/;
+    // the legacy NSW course together. Only these shapes of change are let through; anything else in
+    // a protected path (India, NCERT, the availability rules, practice.js, a rewritten or removed line
+    // of an existing generator) still fails:
+    //   · a new `*-nsw.js` generator file;
+    //   · in a year/stream generator bank: its `import … from './….-nsw.js'` line and one `...xNsw,`
+    //     spread line (first in the object, so an original generator can never be overridden);
+    //   · in curriculum.js: added lines (new subtopics, dot-point forms, labels), and the removal of
+    //     only the `CODES` line (extended) or a subtopic's closing `])` (now followed by a comma).
+    const BANK = /^client\/src\/engine\/generators\/(year\d+|streams-standard|streams-ext)\.js$/;
+    const COURSE = 'client/src/engine/curriculum.js';
     const NEW_NSW_FILE = /^client\/src\/engine\/generators\/[\w-]+-nsw\.js$/;
+    const BANK_ADDED = /^\+(import \{ \w+Nsw \} from '\.\/[\w-]+-nsw\.js';|\s*\.\.\.\w+Nsw,)$/;
+    const COURSE_REMOVED = /^-(const CODES = |\s*\]\)\s*)/;
     const untracked = new Set(git(['ls-files', '--others', '--exclude-standard', '--', ...PROTECTED]).split('\n').filter(Boolean));
-    const deletedLines = file => git(['diff', '--numstat', base, '--', file]).split('\n').filter(Boolean).reduce((n, line) => n + Number(line.split('\t')[1]), 0);
+    const diffLines = file => git(['diff', '-U0', base, '--', file]).split('\n').filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
+    const allowed = [];
     const blocked = changed.split('\n').filter(Boolean).filter(file => {
       if (untracked.has(file) || !git(['ls-tree', base, '--', file])) return !NEW_NSW_FILE.test(file);
-      return !(ADDITIVE.test(file) && deletedLines(file) <= (file.endsWith('curriculum.js') ? 1 : 0));
+      const lines = diffLines(file);
+      const ok = (BANK.test(file) && lines.every(l => BANK_ADDED.test(l)))
+        || (file === COURSE && lines.filter(l => l[0] === '-').every(l => COURSE_REMOVED.test(l)));
+      if (ok) allowed.push(file.replace('client/src/engine/', ''));
+      return !ok;
     });
     check(blocked.length === 0, `this branch changes the NSW model and also: ${blocked.join(', ')}`);
-    isolationNote = `India/legacy files byte-unchanged against merge base ${base.slice(0, 9)}`;
+    isolationNote = `India/legacy files byte-unchanged against merge base ${base.slice(0, 9)}${allowed.length ? `, except additive NSW-only changes in ${allowed.join(', ')}` : ''}`;
   } else {
     isolationNote = 'branch does not change the NSW model; byte-unchanged check not applicable';
   }

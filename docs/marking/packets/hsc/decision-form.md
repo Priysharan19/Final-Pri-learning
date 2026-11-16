@@ -7,7 +7,7 @@ Complete one form per examiner. Return the signed original as the README says; t
 ```text
 Jurisdiction:                    nsw-hsc
 Syllabus version(s):             nsw-mathematics-advanced-11-12-2024@2024, nsw-mathematics-extension1-11-12-2024@2024, nsw-mathematics-extension2-11-12-2024@2024, nsw-mathematics-k-10-2022@2022, nsw-mathematics-standard-11-12-2024@2024
-Dossier digest reviewed:         a1734034204fe03f5f5721dd4ea34a5db00324b4df808c9141aba96d0e8dc680
+Dossier digest reviewed:         aef989ca483a460d1a2a446851c9455c0981bc429c6c7ba986c5f14ab431584e
 Repository commit reviewed:      ________________________________________
 Examiner full name:              ________________________________________
 Qualification:                   ________________________________________
@@ -216,7 +216,7 @@ Verdict per item: **A** approved as the engine behaves · **C** approved with ch
 | 193 | `nsw-final:y12-integral-calc/D1` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-12-05 |  |  |
 | 194 | `nsw-final:y12-integral-calc/D2` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-12-05 |  |  |
 | 195 | `nsw-final:y12-integral-calc/D3` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-12-05 |  |  |
-| 196 | `nsw-final:y12-integral-calc/D4` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-12-05 |  |  |
+| 196 | `nsw-final:y12-integral-calc/D4` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-06, MAV-12-06 |  |  |
 | 197 | `nsw-final:y12-random-var/D1` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-12-07 |  |  |
 | 198 | `nsw-final:y12-random-var/D2` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-12-07 |  |  |
 | 199 | `nsw-final:y12-random-var/D3` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-12-07 |  |  |

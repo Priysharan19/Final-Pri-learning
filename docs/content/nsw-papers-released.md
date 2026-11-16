@@ -78,15 +78,15 @@ Source: Mathematics Advanced 11–12 Syllabus (2024): HSC examinations — https
 | MAV-12-01 | Further graph transformations and modelling | 12 | 4 | 8 | 4 | yes |
 | MAV-12-03 | Sequences and series | 12 | 4 | 8 | 3 | yes |
 | MAV-12-04 | Differential calculus | 12 | 5 | 11 | 7 | yes |
-| MAV-12-05 | Integral calculus | 12 | 5 | 13 | 7 | yes |
-| MAV-12-06 | Applications of calculus | 12 | 5 | 15 | 12 | yes |
+| MAV-12-05 | Integral calculus | 12 | 5 | 13 | 6 | yes |
+| MAV-12-06 | Applications of calculus | 12 | 5 | 15 | 13 | yes |
 | MAV-12-07 | Random variables | 12 | 4 | 8 | 5 | yes |
 | MAV-12-02 | Further graph transformations and modelling | 12 | 3 | 9 | 4 | yes |
 | MAV-12-08 | Financial mathematics | 12 | 3 | 8 | 4 | yes |
 | MAV-11-01 | Working with functions | 11 | 1 | 1 | 1 | no |
 | MAV-11-03 | Graph transformations | 11 | 1 | 2 | 0 | no |
 | MAV-11-05 | Trigonometric identities and equations | 11 | 1 | 2 | 1 | no |
-| MAV-11-06 | Introduction to differentiation | 11 | 1 | 2 | 13 | yes |
+| MAV-11-06 | Introduction to differentiation | 11 | 1 | 2 | 14 | yes |
 | MAV-11-08 | Exponential and logarithmic functions | 11 | 1 | 2 | 2 | no |
 | MAV-11-10 | Probability and data | 11 | 1 | 1 | 0 | no |
 

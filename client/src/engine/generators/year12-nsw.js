@@ -20,8 +20,10 @@ const pn = v => v < 0 ? `(${v})` : String(v);
 const coef = (c, body) => c === 1 ? body : c === -1 ? `-${body}` : `${c}${body}`;
 const trim = v => String(Number(v.toFixed(6)));
 const dollars = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+/** The same amount inside $…$: KaTeX would space a bare comma, so brace it. */
+const dm = v => dollars(v).replace(/,/g, '{,}');
 
-export const year12Nsw = {
+const raw = {
   // ── Integral calculus ──────────────────────────────────────────────────────
   'y12-integral-calc': (rng, diff) => {
     if (diff === 1 || diff === 3) {
@@ -205,7 +207,7 @@ export const year12Nsw = {
         prompt: `A random variable $X$ takes the values $${xs.join(', ')}$ with probabilities $\\dfrac{${ps[0]}}{${tot}}, \\dfrac{${ps[1]}}{${tot}}, \\dfrac{${ps[2]}}{${tot}}$. Find $\\mathrm{Var}(X)$.`,
         answerType: 'numeric', answer: { value: val },
         traps: [{ value: Math.sqrt(val), why: 'That is the standard deviation, the square root of the variance.' }].filter(t => Number.isFinite(t.value) && t.value !== val),
-        hints: ['$E(X) = m$ by symmetry.', '$\\mathrm{Var}(X) = E\\big((X - \\mu)^2\\big)$.', `Deviations from the mean are $-${d}, 0, ${d}$.`],
+        hints: [`$E(X) = ${m}$ by symmetry.`, '$\\mathrm{Var}(X) = E\\big((X - \\mu)^2\\big)$.', `Deviations from the mean are $-${d}, 0, ${d}$.`],
         steps: [
           { h: 'Mean', d: `$\\mu = ${m}$ because the table is symmetric about $${m}$` },
           { h: 'Variance', d: `$\\mathrm{Var}(X) = \\dfrac{${ps[0]}(${d})^2 + ${ps[1]}(0)^2 + ${ps[2]}(${d})^2}{${tot}} = \\dfrac{${varNum}}{${tot}} = ${val}$` }
@@ -275,7 +277,7 @@ export const year12Nsw = {
         hints: ['$A = P(1 + r)^n$.', `$r = ${rate / 100}$ and $n = ${n}$.`, `$(${R.toFixed(2)})^{${n}} = ${trim(R ** n)}$.`],
         steps: [
           { h: 'Compound interest formula', d: `$A = P(1 + r)^n$` },
-          { h: 'Substitute', d: `$A = ${dollars(P)}(${R.toFixed(2)})^{${n}} = ${dollars(val)}$` }
+          { h: 'Substitute', d: `$A = ${dm(P)}(${R.toFixed(2)})^{${n}} = ${dm(val)}$` }
         ]
       };
     }
@@ -288,10 +290,10 @@ export const year12Nsw = {
         prompt: `A loan of \\$${dollars(B)} is charged ${rate}% interest per year, added at the end of each year. A repayment of \\$${dollars(M)} is made at the end of the first year, straight after the interest is added. Find the balance owing after the first repayment, in dollars.`,
         answerType: 'numeric', answer: { value: after },
         traps: [{ value: B - M, why: 'Interest is added before the repayment is taken off.' }],
-        hints: ['Balance $= B(1 + r) - M$.', `$${dollars(B)} \\times ${R.toFixed(2)} = ${dollars(Math.round(B * R))}$.`, `Subtract the repayment of \\$${dollars(M)}.`],
+        hints: ['Balance $= B(1 + r) - M$.', `$${dm(B)} \\times ${R.toFixed(2)} = ${dm(Math.round(B * R))}$.`, `Subtract the repayment of \\$${dollars(M)}.`],
         steps: [
-          { h: 'Add the interest', d: `$${dollars(B)} \\times ${R.toFixed(2)} = ${dollars(Math.round(B * R))}$` },
-          { h: 'Take off the repayment', d: `$${dollars(Math.round(B * R))} - ${dollars(M)} = ${dollars(after)}$` }
+          { h: 'Add the interest', d: `$${dm(B)} \\times ${R.toFixed(2)} = ${dm(Math.round(B * R))}$` },
+          { h: 'Take off the repayment', d: `$${dm(Math.round(B * R))} - ${dm(M)} = ${dm(after)}$` }
         ]
       };
     }
@@ -300,15 +302,15 @@ export const year12Nsw = {
       const B = (rate === 10 ? 5000 : 4000) * ri(rng, 2, 5);
       const M = (rate === 10 ? 1000 : 800) * ri(rng, 1, 3);
       const b1 = Math.round(B * R - M), b2 = Math.round(b1 * R - M);
-      if (b1 <= 0 || b2 <= 0) return year12Nsw['y12-fin-exact'](rng, diff);
+      if (b1 <= 0 || b2 <= 0) return raw['y12-fin-exact'](rng, diff);
       return {
         prompt: `A loan of \\$${dollars(B)} has ${rate}% interest per year added annually, with a repayment of \\$${dollars(M)} at the end of each year straight after the interest is added. Find the balance owing after the second repayment, in dollars.`,
         answerType: 'numeric', answer: { value: b2 },
         traps: [{ value: Math.round(B * R * R - 2 * M), why: 'Each repayment reduces the balance before the next year’s interest is charged, so the second year’s interest is on the smaller balance.' }].filter(t => t.value !== b2),
         hints: ['Apply “add the interest, then take off the repayment” twice.', `After year 1 the balance is \\$${dollars(b1)}.`, `Now repeat for year 2.`],
         steps: [
-          { h: 'End of year 1', d: `$A_1 = ${dollars(B)}(${R.toFixed(2)}) - ${dollars(M)} = ${dollars(b1)}$` },
-          { h: 'End of year 2', d: `$A_2 = ${dollars(b1)}(${R.toFixed(2)}) - ${dollars(M)} = ${dollars(b2)}$` }
+          { h: 'End of year 1', d: `$A_1 = ${dm(B)}(${R.toFixed(2)}) - ${dm(M)} = ${dm(b1)}$` },
+          { h: 'End of year 2', d: `$A_2 = ${dm(b1)}(${R.toFixed(2)}) - ${dm(M)} = ${dm(b2)}$` }
         ]
       };
     }
@@ -317,7 +319,7 @@ export const year12Nsw = {
     const M = (rate === 10 ? 100 : 400) * ri(rng, 2, 9);
     const mult = 1 + R + R * R;   // M(1 + R + R^2)
     const val = Math.round(M * mult * 100) / 100;
-    if (!Number.isInteger(val)) return year12Nsw['y12-fin-exact'](rng, diff);
+    if (!Number.isInteger(val)) return raw['y12-fin-exact'](rng, diff);
     return {
       prompt: `\\$${dollars(M)} is deposited at the end of each year for ${n} years into an account paying ${rate}% per annum, compounded annually. Find the value of the account immediately after the last deposit, in dollars.`,
       answerType: 'numeric', answer: { value: val },
@@ -325,14 +327,14 @@ export const year12Nsw = {
       hints: ['Treat each deposit separately: $M R^2 + M R + M$.', `$R = ${R.toFixed(2)}$.`, `$1 + ${R.toFixed(2)} + ${trim(R * R)} = ${trim(mult)}$.`],
       steps: [
         { h: 'Each deposit grows', d: `$FV = M R^2 + M R + M = M(1 + R + R^2)$ with $R = ${R.toFixed(2)}$` },
-        { h: 'Evaluate', d: `$FV = ${dollars(M)} \\times ${trim(mult)} = ${dollars(val)}$` }
+        { h: 'Evaluate', d: `$FV = ${dm(M)} \\times ${trim(mult)} = ${dm(val)}$` }
       ]
     };
   },
 
   // ── Transformations of trigonometric functions ─────────────────────────────
   'y12-trig-model': (rng, diff) => {
-    const a = ri(rng, 1, 4) * 2, c = ri(rng, 1, 9);
+    const a = ri(rng, 1, 4) * 2, c = a + ri(rng, 1, 6);
     if (diff === 1) {
       const m = ri(rng, 3, 6);
       const mx = a + c, mn = c - a;
@@ -405,7 +407,7 @@ export const year12Nsw = {
       return {
         prompt: `A culture of bacteria numbers $${N0}$ and doubles every $${T}$ hours, so $N(t) = ${N0}\\times 2^{t/${T}}$. How many bacteria are there after $${k * T}$ hours?`,
         answerType: 'numeric', answer: { value: val },
-        traps: [{ value: N0 * 2 * k, why: `In ${k * T} hours the culture doubles ${k} times, which multiplies by $2^{${k}}$, not by $2\\times${k}$.` }],
+        traps: [{ value: N0 + N0 * k, why: `In ${k * T} hours the culture doubles ${k} times: each doubling multiplies by 2, so the total is multiplied by $2^{${k}}$, not increased by ${k} lots of ${N0}.` }],
         hints: [`The exponent is $\\dfrac{${k * T}}{${T}} = ${k}$.`, `$2^{${k}} = ${2 ** k}$.`, `$${N0}\\times ${2 ** k}$.`],
         steps: [
           { h: 'The exponent', d: `$\\dfrac{t}{${T}} = \\dfrac{${k * T}}{${T}} = ${k}$` },
@@ -445,7 +447,7 @@ export const year12Nsw = {
     const m = ri(rng, 3, 12), p = ri(rng, 2, 6);
     return {
       prompt: `A school sells $n$ tickets to a fundraiser and the revenue, in dollars, is modelled by $R(n) = ${p}n(${2 * m} - n)$ for $0 \\le n \\le ${2 * m}$. Find the maximum revenue, in dollars.`,
-      answerType: 'numeric', answer: { value: p * m * m },
+      answerType: 'numeric', answer: { value: p * m * m }, answerPrefix: '$',
       traps: [{ value: m, why: 'That is the number of tickets that gives the maximum, not the maximum revenue itself.' }],
       hints: ['The parabola opens downward and is symmetric about the midpoint of its zeros.', `The zeros are $n = 0$ and $n = ${2 * m}$, so the maximum is at $n = ${m}$.`, `Substitute $n = ${m}$.`],
       steps: [
@@ -455,3 +457,16 @@ export const year12Nsw = {
     };
   }
 };
+
+// Every dollar answer is asked for in a box with a "$" prefix, as the older money cells are:
+// the marker reads a "$" typed with a money answer only when the question says it asks for money.
+const withDollarPrefix = fn => (rng, diff) => ({ ...fn(rng, diff), answerPrefix: '$' });
+
+// A misconception trap that equals the key is not a misconception: drop it.
+const dropKeyTraps = fn => (rng, diff) => {
+  const q = fn(rng, diff);
+  if (Array.isArray(q.traps) && typeof q.answer?.value === 'number') q.traps = q.traps.filter(t => !(typeof t.value === 'number' && t.value === q.answer.value));
+  return q;
+};
+
+export const year12Nsw = Object.freeze(Object.fromEntries(Object.entries(raw).map(([id, fn]) => [id, dropKeyTraps(id === 'y12-fin-exact' ? withDollarPrefix(fn) : fn)])));

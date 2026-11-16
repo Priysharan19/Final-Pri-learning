@@ -85,6 +85,7 @@ function piDeg(deg, scale = 1) {
 }
 
 export const year12 = {
+  ...year12Nsw,
 
   // ── Differentiation rules ────────────────────────────────────────────────
   'y12-diff': (rng, diff) => {
@@ -1056,6 +1057,4 @@ export const year12 = {
       ]
     };
   }
-  ,
-  ...year12Nsw
 };

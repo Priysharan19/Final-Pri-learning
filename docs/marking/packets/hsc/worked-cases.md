@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `a1734034204fe03f5f5721dd4ea34a5db00324b4df808c9141aba96d0e8dc680` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `aef989ca483a460d1a2a446851c9455c0981bc429c6c7ba986c5f14ab431584e` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2323,18 +2323,18 @@ Final answer: 0
 
 ## `nsw-final:y12-trig-model/D1` — seed 1009
 
-> Find the maximum value of $y = 6\\sin\\left(\\dfrac{\\pi x}{4}\\right) + 6$.
+> Find the maximum value of $y = 6\\sin\\left(\\dfrac{\\pi x}{4}\\right) + 10$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `12` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `12.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `13` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `13` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `16` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `16.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `17` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trig-model/D2` — seed 1009
 
-> Find the period of $y = 6\\cos\\left(\\dfrac{\\pi x}{5}\\right) - 6$.
+> Find the period of $y = 6\\cos\\left(\\dfrac{\\pi x}{5}\\right) - 10$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2345,25 +2345,25 @@ Final answer: 0
 
 ## `nsw-final:y12-trig-model/D3` — seed 1009
 
-> The depth of water at a jetty is modelled by $h(t) = 6 + 6\\sin\\left(\\dfrac{\\pi t}{6}\\right)$ metres, where $t$ is in hours after midnight. Find the depth at $t = 1$.
+> The depth of water at a jetty is modelled by $h(t) = 10 + 6\\sin\\left(\\dfrac{\\pi t}{6}\\right)$ metres, where $t$ is in hours after midnight. Find the depth at $t = 1$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `9` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `9.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `13` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `13.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `14` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `14` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trig-model/D4` — seed 1009
 
-> A quantity is modelled by $y = A\\cos(bt) + k$ with $b > 0$. Its maximum value is $12$ and its minimum value is $0$, its maximum occurs at $t = 0$, and its period is $12$. Find $y$ when $t = 2$.
+> A quantity is modelled by $y = A\\cos(bt) + k$ with $b > 0$. Its maximum value is $16$ and its minimum value is $4$, its maximum occurs at $t = 0$, and its period is $12$. Find $y$ when $t = 2$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `9` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `9.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `10` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `10` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `13` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `13.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `14` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `14` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-func-model/D1` — seed 1009
 
