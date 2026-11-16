@@ -43,7 +43,7 @@ export const year10Nsw = {
         prompt: `Simplify $x^{${pw(a)}}\\times x^{${pw(b)}}$. Leave the answer as a power of $x$.`,
         answerType: 'expression', answer: { expr: px(a + b) }, answerPrefix: '=',
         traps: [{ expr: px(a * b), why: 'When multiplying powers of the same base, add the indices.' }],
-        hints: ['$x^a\\times x^b = x^{a+b}$, also for negative indices.', `$${a} + ${pw(b) === String(b) ? b : `(${b})`}$.`, 'Check the sign of the sum.'],
+        hints: ['$x^a\\times x^b = x^{a+b}$, also for negative indices.', `$${a} + (${b})$.`, 'Check the sign of the sum.'],
         steps: [{ h: 'Add the indices', d: `$x^{${pw(a)}}\\times x^{${pw(b)}} = x^{${a} + (${b})} = x^{${pw(a + b)}}$` }]
       };
     }
@@ -199,7 +199,7 @@ export const year10Nsw = {
         answerType: 'numeric', answer: { value: a + b },
         traps: [{ value: a * b, why: 'The $x^2$ terms come from $x\\times bx$ and $a\\times x^2$: add them.' }].filter(t => t.value !== a + b),
         hints: ['Find which pairs of terms multiply to give $x^2$.', `$x\\times(${b}x)$ and $(${a})\\times x^2$.`, `$${b} + (${a})$.`],
-        steps: [{ h: 'The $x^2$ terms', d: `$x\\cdot ${b}x = ${b}x^2$ and $${a}\\cdot x^2 = ${a}x^2$` }, { h: 'Add', d: `$${b} + (${a}) = ${a + b}$` }]
+        steps: [{ h: 'The $x^2$ terms', d: `$x\\cdot(${b}x) = ${b}x^2$ and $(${a})\\cdot x^2 = ${a}x^2$` }, { h: 'Add', d: `$${b} + (${a}) = ${a + b}$` }]
       };
     }
     const a = ri(rng, 1, 4), b = nz(rng, -5, 5), x = ri(rng, 1, 3);
@@ -209,7 +209,7 @@ export const year10Nsw = {
       answerType: 'numeric', answer: { value: P + Q },
       traps: [{ value: P * Q, why: 'The question asks for the sum $P + Q$, not the product.' }].filter(t => t.value !== P + Q),
       hints: [`$P(${x}) = ${P}$.`, `$Q(${x}) = ${Q}$.`, 'Add the two values.'],
-      steps: [{ h: 'Each value', d: `$P(${x}) = ${P}$ and $Q(${x}) = ${Q}$` }, { h: 'Add', d: `$${P} + ${Q} = ${P + Q}$` }]
+      steps: [{ h: 'Each value', d: `$P(${x}) = ${P}$ and $Q(${x}) = ${Q}$` }, { h: 'Add', d: `$${P} ${Q < 0 ? '-' : '+'} ${Math.abs(Q)} = ${P + Q}$` }]
     };
   },
 
@@ -392,7 +392,7 @@ export const year10Nsw = {
       const edges = [];
       const has = (u, v) => edges.some(([x, y]) => (x === u && y === v) || (x === v && y === u));
       if (diff === 2) for (let i = 1; i < n; i++) edges.push([ri(rng, 0, i - 1), i]);
-      for (let e = ri(rng, 2, n); e > 0; e--) { const u = ri(rng, 0, n - 1), v = ri(rng, 0, n - 1); if (u !== v && !has(u, v)) edges.push([u, v]); }
+      for (let e = ri(rng, 3, n + 1), guard = 0; (e > 0 || edges.length < 3) && guard < 200; e--, guard++) { const u = ri(rng, 0, n - 1), v = ri(rng, 0, n - 1); if (u !== v && !has(u, v)) edges.push([u, v]); }
       const degs = Array.from({ length: n }, (_, i) => edges.filter(([u, v]) => u === i || v === i).length);
       const listed = degs.map((d, i) => `${V[i]} has degree ${d}`).join(', ');
       if (diff === 1) {
