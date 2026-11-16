@@ -29,6 +29,7 @@ import { reportSeries, needsAnotherLookIds, HISTORY_FILTERS, HISTORY_SORTS } fro
 import { attemptTotals, isCreditedCorrect, isRepeat as isRepeatAttempt, quotedTotals } from '../engine/progressTruth.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
+import { nswIssuedLevels, nswIssuedForms, nswOfferedCell } from '../engine/nswOffer.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { HINT_RUNGS, rungLevelOf, nextRungAfter, markWeightAfter, helpUnitsAfter } from '../engine/hintLadder.js';
@@ -60,7 +61,7 @@ import {
 } from './entitlementGate.js';
 import { ENTITLEMENTS } from '../platform/entitlements.js';
 import { featureEnabled } from '../platform/features.js';
-import { stageAttemptProgress } from '../platform/profileOutbox.js';
+import { stageAttemptProgress, pendingProfileMutations } from '../platform/profileOutbox.js';
 import { requestLineCheck, requestTutorHelp } from './tutorBridge.js';
 import { tutorDisabledError, tutorFeatureEnabled } from '../tutor/flag.js';
 import { priNative } from '../platform/native/index.js';
@@ -1173,7 +1174,11 @@ const INDIA_WHY = {
 async function practicePoolFor(profile, now = Date.now()) {
   if (profile.course !== 'in') {
     const { own, revision } = scopeForYear(profile.year, pathwayOf(profile));
-    return { india: false, entries: [...own, ...revision] };
+    // Rapid Fire and Match draw only from subtopics the server issues
+    // (engine/nswOffer.js); a scope with none has nothing to play.
+    const entries = [...own, ...revision].filter(s => nswIssuedLevels(s.id).length > 0);
+    if (!entries.length) throw practiceNotOffered();
+    return { india: false, entries };
   }
   const trackId = cleanIndiaTrack(profile.indiaTrack, profile.year);
   const ratings = await ratingsFor(profile.id);
@@ -2016,7 +2021,7 @@ async function createQuestion(pid, subtopic, difficulty, mode, examId = null, ta
   const out = await serveQuestion(pid, {
     generator: subtopic, difficulty, mode, dotpoint: want,
     trap: focus?.trapKey ? { owner: subtopic, key: focus.trapKey } : null
-  }, () => generateFocused(subtopic, difficulty, { ...(focus || {}), recent: recentlyServedContent(pid) }));
+  }, cell => generateFocused(subtopic, cell?.difficulty ?? difficulty, { ...(focus || {}), ...(cell ? { dotpointId: cell.dotpoint } : {}), recent: recentlyServedContent(pid) }));
   const q = out.q;
   const row = {
     id: uuid(), ...out.fields, pid, subtopic: q.subtopic || subtopic, difficulty: q.difficulty || 2, payload: q,
@@ -3391,14 +3396,18 @@ const routes = {
       return { country: 'in', years, streams, userYear: p.year, pathway: null, course: 'in', indiaTrack: trackId, aheadUnlocked, window: indiaDifficultyWindow(trackId, p.year) };
     }
     /** Dot points with their own mastery, and an honest `generated` flag. */
+    // Only what the server can issue is offered (engine/nswOffer.js): a dot
+    // point's levels, its `generated` flag and the `requestable` list the
+    // selectors read are the ISSUED cells, not every form the engine holds.
     const dotpointRows = (s, st) => dotpointsFor(s.id).map(dp => {
       const d = dpStateOf(st, dp.id);
       const m = d.attempts ? masteryOf(d.rating, d.attempts, d.last_at, now) : 0;
+      const issued = nswIssuedForms(s.id, dp.forms);
       return {
-        id: dp.id, key: dp.key, text: dp.text, difficulties: dp.forms,
+        id: dp.id, key: dp.key, text: dp.text, difficulties: issued, requestable: issued,
         mastery: Math.round(m * 100), band: d.attempts ? masteryBand(m) : 'unseen',
         attempts: d.attempts, correct: d.correct,
-        generated: dotpointIsGeneratable(dp)
+        generated: issued.length > 0
       };
     });
     const years = CURRICULUM.map(y => ({
@@ -3409,7 +3418,7 @@ const routes = {
         const m = st ? masteryOf(st.rating, st.attempts, st.last_at, now) : 0;
         return {
           id: s.id, name: s.name, strand: s.strand, weight: s.weight, code: s.code || null,
-          dotpoints: dotpointRows(s, st),
+          dotpoints: dotpointRows(s, st), requestable: [...nswIssuedLevels(s.id)],
           mastery: Math.round(m * 100), band: st ? masteryBand(m) : 'unseen',
           attempts: st?.attempts || 0, correct: st?.correct || 0,
           due: due.has(s.id), rating: st?.rating || null
@@ -3434,7 +3443,7 @@ const routes = {
           const m = st ? masteryOf(st.rating, st.attempts, st.last_at, now) : 0;
           return {
             id: s2.id, name: s2.name, strand: s2.strand, weight: s2.weight, code: s2.code,
-            dotpoints: dotpointRows(s2, st),
+            dotpoints: dotpointRows(s2, st), requestable: [...nswIssuedLevels(s2.id)],
             mastery: Math.round(m * 100), band: st ? masteryBand(m) : 'unseen',
             attempts: st?.attempts || 0, correct: st?.correct || 0,
             due: due.has(s2.id), rating: st?.rating || null
@@ -3582,6 +3591,14 @@ const routes = {
     let choice;
     if (mode === 'topic' && subtopic && SUBTOPIC_BY_ID[subtopic]) {
       const sub = SUBTOPIC_BY_ID[subtopic];
+      // A topic the server issues nothing from is not practised at all, and a
+      // level the student NAMED that it does not issue is answered with the
+      // levels it does — never moved silently, never a draft (engine/nswOffer.js).
+      const issuedLevels = nswIssuedLevels(subtopic);
+      if (!issuedLevels.length) throw practiceNotOffered();
+      if (difficulty && !issuedLevels.includes(Math.min(4, Math.max(1, Number(difficulty))))) {
+        throw difficultyUnavailable(Math.min(4, Math.max(1, Number(difficulty))), issuedLevels, { subtopic });
+      }
       const st = await getRating(p.id, subtopic);
       const asked = dotpointOf(subtopic, dotpoint);
       const real = dotpointIsGeneratable(asked);
@@ -3635,10 +3652,13 @@ const routes = {
       const ratings = await ratingsFor(p.id);
       const reviews = await byIndex('reviews', 'pid', p.id);
       const reviewsDue = reviews.filter(r => r.dueAt <= now).sort((a, b) => a.dueAt - b.dueAt);
+      // Smart practice chooses only among subtopics the server issues.
       choice = pickNext({
         ratings, reviewsDue, year: p.year, pathway: pathwayOf(p),
-        rand: Math.random(), recent: recentlyServed(p.id), nowMs: now
+        rand: Math.random(), recent: recentlyServed(p.id), nowMs: now,
+        offered: id => nswIssuedLevels(id).length > 0
       });
+      if (!choice) throw practiceNotOffered();
       if (difficulty) choice = { ...choice, difficulty: Math.min(4, Math.max(1, Number(difficulty))) };
       // Within the chosen subtopic, aim at the dot point that needs it most —
       // but only ever at one the bank can really produce.
@@ -5066,6 +5086,38 @@ const routes = {
     return { bookmarked: true };
   },
 
+  // Saved library resources (plan F2). The ids are the public catalogue's, kept
+  // per profile and synced as the account's `resource-bookmark` entities. A
+  // resource counts as `pending` until the cloud has acknowledged it: it is
+  // never shown as saved before the server has it.
+  'GET /library/saved': async () => {
+    const p = await requireProfile();
+    const rows = await byIndex('resourceBookmarks', 'pid', p.id);
+    // A failed read, or a queue as long as the read allows, says nothing is
+    // acknowledged: every saved resource then shows as pending, never as saved.
+    const asked = 500;
+    const pendingAll = await pendingProfileMutations(p.id, asked).catch(() => null);
+    const queued = new Map((pendingAll || [])
+      .filter(item => item.kind === 'resource-bookmark' || item.kind === 'full-rescan')
+      .map(item => [item.kind === 'full-rescan' ? '*' : item.entityId, item.operation]));
+    const everything = queued.has('*') || !pendingAll || pendingAll.length >= asked;
+    return {
+      items: rows.map(r => ({ id: r.resourceId, at: r.createdAt || 0, pending: everything || queued.has(r.resourceId) }))
+        .filter(r => typeof r.id === 'string').sort((a, b) => b.at - a.at)
+    };
+  },
+
+  'POST /library/:id/bookmark': async (body, params) => {
+    const p = await requireProfile();
+    if (!/^[a-z0-9][a-z0-9-]{2,119}$/.test(String(params.id || ''))) throw Object.assign(new Error('Unknown resource.'), { status: 404 });
+    const key = `${p.id}:${params.id}`;
+    if (await get('resourceBookmarks', key)) { await del('resourceBookmarks', key); return { saved: false }; }
+    const held = await byIndex('resourceBookmarks', 'pid', p.id);
+    if (held.length >= 500) throw Object.assign(new Error('You have saved as many resources as one account can hold.'), { status: 422, code: 'RESOURCE_BOOKMARK_LIMIT' });
+    await put('resourceBookmarks', { key, pid: p.id, resourceId: params.id, createdAt: Date.now() });
+    return { saved: true };
+  },
+
   'POST /history/:id/retry': async (body, params) => {
     const p = await requireProfile();
     const row = await get('questions', params.id);
@@ -5099,7 +5151,7 @@ const routes = {
     }
     if (!out) {
       const fresh = await serveQuestion(p.id, { generator, difficulty: row.difficulty, mode: 'practice' },
-        () => ({ q: generateQuestion(generator, row.difficulty), repeat: false }));
+        cell => ({ q: generateQuestion(generator, cell?.difficulty ?? row.difficulty), repeat: false }));
       out = { q: fresh.q, fields: fresh.fields, same: false };
     }
     // A retried Indian question keeps its chapter, or its evidence would fall
@@ -6164,8 +6216,26 @@ export function practiceCurriculumOf(profile) {
   return profile?.course === 'in' ? 'in' : 'nsw';
 }
 
-async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null, trap = null }, localDraft) {
+/** The honest answer when the server issues nothing for what was asked: never a draft that cannot be marked. */
+export function practiceNotOffered() {
+  return Object.assign(new Error('There are no questions for this topic yet.'), { status: 409, code: 'PRACTICE_NOT_OFFERED' });
+}
+const SERVER_BANK_REFUSALS = new Set(['PRACTICE_BANK_OUTSIDE_CURRICULUM', 'PRACTICE_CONTENT_UNSUPPORTED']);
+
+async function serveQuestion(pid, asked, localDraft) {
   const curriculum = practiceCurriculumOf(await get('profiles', pid).catch(() => null));
+  let { generator, difficulty, mode, dotpoint = null, trap = null } = asked;
+  // NSW: the request names only a cell the server issues (engine/nswOffer.js).
+  // A level the server does not issue is moved to the nearest it does; a
+  // generator it issues nothing from is refused here — and so is anything the
+  // server itself refuses as outside its bank. Neither becomes a local draft:
+  // a draft of a question the server will never issue can never be marked.
+  const nsw = curriculum === 'nsw' && generator !== 'custom';
+  if (nsw) {
+    const cell = nswOfferedCell({ generator, difficulty, dotpoint, dotpointForms: dotpoint ? dotpointOf(generator, dotpoint)?.forms : null });
+    if (!cell) throw practiceNotOffered();
+    ({ difficulty, dotpoint } = cell);
+  }
   const body = {
     generator, difficulty, curriculum, mode: SERVER_MODES.includes(mode) ? mode : 'practice',
     avoid: recentlyServedContent(pid).filter(h => typeof h === 'string' && /^[a-zA-Z0-9:_-]{6,96}$/.test(h)).slice(0, 40),
@@ -6189,6 +6259,7 @@ async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null
       // marked anyway.
       const gate = serverGateRefusal(cause);
       if (gate) throw gate;
+      if (nsw && SERVER_BANK_REFUSALS.has(cause?.code)) throw practiceNotOffered();
       /* not issuable right now: prepared or draft below */
     }
   }
@@ -6197,14 +6268,17 @@ async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null
     if (usable(out?.question) && typeof out.prepared === 'string' && out.prepared) {
       return { q: out.question, fields: { prepared: out.prepared, preparedExpiresAt: Number(out.expiresAt) || null }, trapDelivered: false, repeat: out.repeat === true };
     }
-  } catch { /* no server: an offline draft */ }
+  } catch (cause) {
+    if (nsw && SERVER_BANK_REFUSALS.has(cause?.code)) throw practiceNotOffered();
+    /* no server: an offline draft */
+  }
   // Requests cancelled because the page is navigating away fail exactly like a
   // dropped connection, and WebKit lets this code run on before the page goes.
   // A draft stored then could never be marked, though the student was online
   // all along: when the page has said it is leaving, wait — a page that really
   // unloads never gets here (client/src/local/pageLeaving.js).
   await settleIfLeaving();
-  const local = localDraft();
+  const local = localDraft(nsw ? { difficulty, dotpoint } : undefined);
   return { q: draftQuestion(local.q), fields: { draftOnly: true }, trapDelivered: false, repeat: !!local.repeat, local };
 }
 

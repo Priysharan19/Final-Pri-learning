@@ -77,15 +77,16 @@ try {
   await page.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
   await createVerifiedProfile(page, platform, { name: 'NSW Practice Student', year: 10, fromPicker: await page.getByTestId('picker-create-account').count() > 0 });
   await switchSyllabus(page, platform, { course: 'nsw', year: 10 });
-  // Before E3 a Prithagoras sign-up starts on the India course; only what the
-  // NSW profile asks after the switch is this tour's subject.
-  const nswFrom = issueBodies.length;
+  // Since E3 a Prithagoras sign-up is an NSW profile from the start, so EVERY
+  // issue request this page makes names NSW and the server issues every one.
+  // (Counting only from the switch missed the run where the first question was
+  // issued before it and resumed after: no new request, an empty list.)
 
   await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
   const answerBox = page.locator('.editor-body input.answer-input');
   let known = null;
-  for (let skips = 0; skips <= MAX_SKIPS && !known; skips++) {
+  for (let skips = 0; skips <= MAX_SKIPS; skips++) {
     const typeTab = page.locator('.mode-tab').first();
     if (await typeTab.count()) await typeTab.click();
     await online.settled();
@@ -102,12 +103,13 @@ try {
     }, leaving, { timeout: 30000 });
   }
 
-  const nswReplies = issueReplies.slice(nswFrom);
+  await online.settled();
+  const nswReplies = issueReplies;
   check(`the server issued what the NSW profile asked for (${CHAPTER})`, nswReplies.length > 0 && nswReplies.every(r => r.status === 201), JSON.stringify(nswReplies));
   const shown = await online.shownRow();
   check('practice shows a question the server issued, not a draft', shown?.checkState === 'issued', JSON.stringify(shown));
   check('no "cannot be marked" draft notice is on the card', !/cannot be marked/i.test(await page.locator('.qpage').innerText()));
-  check('every issue request named the NSW course', issueBodies.length > nswFrom && issueBodies.slice(nswFrom).every(b => b?.curriculum === 'nsw'), JSON.stringify(issueBodies.slice(nswFrom).map(b => b?.curriculum)));
+  check('every issue request named the NSW course', issueBodies.length > 0 && issueBodies.every(b => b?.curriculum === 'nsw'), JSON.stringify(issueBodies.map(b => b?.curriculum)));
   const submit = page.getByRole('button', { name: /Submit answer/ });
   check('Submit is offered', await submit.count() === 1);
   check('a typed question the server issued was reached', !!known, 'no issued typed question within the bounded search');

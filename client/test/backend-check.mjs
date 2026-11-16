@@ -988,7 +988,12 @@ async function run() {
     const topic = await nextQuestion({ mode: 'topic', subtopic: topicId, difficulty: 3 });
     eq('topic mode serves the topic asked for', topic.question.subtopic, topicId);
     eq('topic mode honours the difficulty', topic.question.difficulty, 3);
-    eq('an out-of-range difficulty is clamped', (await nextQuestion({ mode: 'topic', subtopic: topicId, difficulty: 99 })).question.difficulty, 4);
+    // 99 is clamped to D4. The server issues no D4 for this topic (y10-quadratics:
+    // server/platform/nswBanks.js), so the clamped level is answered with the
+    // levels that exist; a topic whose D4 is issued serves it.
+    eq('an out-of-range difficulty is clamped, and a level the server does not issue is refused by name',
+      await POST('/practice/next', { mode: 'topic', subtopic: topicId, difficulty: 99 }).then(() => 'served', e => `${e.code} D${e.detail?.difficultyRequested}`), 'DIFFICULTY_UNAVAILABLE D4');
+    eq('an out-of-range difficulty is clamped to a level that is issued', (await nextQuestion({ mode: 'topic', subtopic: 'y10-simeq', difficulty: 99 })).question.difficulty, 4);
 
     const missable = await answerableQuestion({ mode: 'topic', subtopic: topicId });
     if (!ok('a markable question was served', !!missable, 'no question yielded both a right and a wrong answer')) {
@@ -2115,6 +2120,16 @@ async function run() {
     ok('the bookmark filter finds it', marks.items.some(i => i.id === target.id), `bookmarked ${marks.total}`);
     eq('bookmarking again turns it off', (await POST(`/history/${target.id}/bookmark`, {})).bookmarked, false);
     eq('and the filter forgets it', (await POST('/history/list', { filter: 'bookmarked', pageSize: 100 })).items.filter(i => i.id === target.id).length, 0);
+    // Saved library resources (plan F2): a separate store, never the question bookmarks.
+    const savedBefore = (await GET('/library/saved')).items.length;
+    eq('saving a resource turns it on', (await POST('/library/nsw-2024-paper/bookmark', {})).saved, true);
+    const savedList = (await GET('/library/saved')).items;
+    eq('it is listed, once', savedList.filter(i => i.id === 'nsw-2024-paper').length, 1);
+    eq('and is not yet acknowledged by an account (pending)', savedList.find(i => i.id === 'nsw-2024-paper').pending, true);
+    eq('a question bookmark is not a saved resource', savedList.some(i => i.id === target.id), false);
+    eq('saving it again turns it off', (await POST('/library/nsw-2024-paper/bookmark', {})).saved, false);
+    eq('and the list is as before', (await GET('/library/saved')).items.length, savedBefore);
+    await rejects('an id that is not a resource id is refused', POST('/library/Not_A_Resource/bookmark', {}), { status: 404 });
     await POST(`/history/${target.id}/bookmark`, {});
 
     const detail = await GET(`/history/${target.id}/detail`);

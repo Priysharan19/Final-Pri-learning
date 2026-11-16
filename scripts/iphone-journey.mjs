@@ -169,6 +169,12 @@ function builtApp(derived) {
 // wait (#528). `duringDeadlineMs` bounds that hold; after it the log is read
 // as usual and the page reports its own failure.
 const PHASE_MIN_MS = 600_000;
+// A launch whose page never writes "started <phase>" within this long is
+// treated as a stalled launch: it is described, then terminated and launched
+// once more. The slowest healthy first line seen is 102 s (a cold first
+// launch on iOS 27). Train editions-12's iPad markingRelaunch printed
+// nothing for 632 s and failed the journey (run 43860746750).
+const STALL_MS = 180_000;
 const LOG_SHOW_EVERY_MS = 30_000;
 function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, duringWhen = null, duringDeadlineMs = 240_000, tick = null, loops = 75 } = {}) {
   const started = localStamp(new Date(Date.now() - 2000));
@@ -211,7 +217,8 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   const deadline = t0 + Math.max(loops * 2_000, PHASE_MIN_MS) + (during ? duringDeadlineMs : 0);
   let lastLogShow = 0;
   let via = 'nothing';
-  for (let i = 0; Date.now() < deadline; i++) {
+  let relaunched = false, launchedAt = Date.now(), stalledDeadline = 0, startedSeen = false;
+  for (let i = 0; Date.now() < deadline + stalledDeadline; i++) {
     // With an oracle to serve, look twice a second-and-a-half rather than
     // letting the page wait on the (slow) log read.
     if (duringWhen && !duringDone) {
@@ -246,6 +253,23 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // Only this launch: everything after its own "started <phase>" line.
     const start = lines.lastIndexOf(`PRIJOURNEY started ${phase}`);
     lines = start >= 0 ? lines.slice(start) : [];
+    if (lines.length) startedSeen = true;
+    // Only after a read, and only when the container file is the channel
+    // and exists (it does once any earlier phase has written): a phase that
+    // is merely unreadable (no file, `log show` timing out or throttled) is
+    // not a stall, and relaunching it could repeat a non-idempotent step.
+    if (!startedSeen && !relaunched && reportFile && existsSync(reportFile) && Date.now() - launchedAt > STALL_MS) {
+      relaunched = true;
+      console.log(`  (${phase}: no "started" line in ${Math.round((Date.now() - launchedAt) / 1000)} s — launching once more)`);
+      const describe = (label, fn) => { try { console.log(`    ${label}: ${String(fn()).trim().split('\n').slice(0, 6).join(' | ').slice(0, 400) || '(none)'}`); } catch (e) { console.log(`    ${label}: unreadable (${String(e?.code || e?.signal || e?.message).slice(0, 50)})`); } };
+      describe('app process', () => run('xcrun', ['simctl', 'spawn', udid, 'launchctl', 'list'], { timeout: 30_000, killSignal: 'SIGKILL' }).split('\n').filter(l => l.includes(bundleId)).join('\n'));
+      describe('crash reports', () => run('/bin/sh', ['-c', 'ls -t ~/Library/Logs/DiagnosticReports 2>/dev/null | grep -i pri | head -3'], { timeout: 15_000 }));
+      try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* already gone */ }
+      launchApp(udid, bundleId, [flag], { env });
+      launchedAt = Date.now();
+      stalledDeadline = STALL_MS + 60_000;
+      continue;
+    }
     if (lines.some(l => l.startsWith(`PRIJOURNEY summary ${phase}`))) { execSync('sleep 3'); break; } // let WebKit flush storage
     if (lines.some(l => /^PRIJOURNEY FAIL (script|unreadable)/.test(l))) break;
   }
@@ -288,6 +312,21 @@ const first = launchAndRead(udid, bundleId, '--journey-selfcheck', 'first', {}, 
 for (const line of first) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
 const second = launchAndRead(udid, bundleId, '--journey-relaunch', 'relaunch');
 for (const line of second) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+
+// The fixture server's log lives in a temp folder CI never uploads, so a
+// failing phase prints the server's last requests (route, status, ms) and its
+// errors. Train editions-11's iOS 27 cloudSignIn showed only the card's "No
+// connection", which the client also shows when a request times out (12 s);
+// without the server side, a slow or failing server and a device that cannot
+// reach it look the same.
+function serverTail(logPath, n = 20) {
+  try {
+    const rows = readFileSync(logPath, 'utf8').trim().split('\n').slice(-400).map(l => { try { return JSON.parse(l); } catch { return { raw: l }; } });
+    return rows.filter(r => r.event === 'http_request' || r.level === 'error' || r.level === 'warn' || r.raw).slice(-n).map(r => r.event === 'http_request'
+      ? `${String(r.ts || '').slice(11, 23)} ${r.method} ${r.route} ${r.status} ${r.ms} ms${r.code ? ' ' + r.code : ''}`
+      : `${String(r.ts || '').slice(11, 23)} ${r.level || ''} ${r.event || ''} ${String(r.raw || r.message || r.error || '').slice(0, 160)}`);
+  } catch (e) { return [`(server log unreadable: ${String(e?.code || e?.message || e).slice(0, 60)})`]; }
+}
 
 // Successful logouts in the fixture server's request log (null when unknown).
 function serverLogouts(fixture) {
@@ -348,7 +387,13 @@ if (WANT_CLOUD) try {
   try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
   try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
   installApp(udid, app);
-  const show = lines => { for (const line of lines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`); };
+  const show = lines => {
+    for (const line of lines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
+    if (fixture.PRI_CLOUD_SERVER_LOG && (!lines.length || lines.some(l => l.startsWith('PRIJOURNEY FAIL')))) {
+      console.log('  server log (last requests):');
+      for (const row of serverTail(fixture.PRI_CLOUD_SERVER_LOG)) console.log(`    ${row}`);
+    }
+  };
   const port = Number(fixture.PRI_CLOUD_PORT || new URL(fixture.PRI_CLOUD_ORIGIN).port);
   console.log(`\nCloud journey against ${fixture.PRI_CLOUD_ORIGIN} (real Pri server, fixture accounts) …`);
   if (childEnv.PRI_JOURNEY_NEW_EMAIL) {

@@ -226,7 +226,9 @@ export function manifestProblems(m) {
   if (!m.groups || typeof m.groups !== 'object') return ['the manifest has groups'];
   for (const [id, g] of Object.entries(m.groups)) {
     if (!/^[a-z0-9-]+\/[A-Za-z0-9._-]+\.log(#[0-9]+)?$/.test(id)) out.push(`group id "${id}" is <job>/<log>[#n]`);
-    if (!g || g.job !== id.split('/')[0] || g.log !== id.split('/')[1].replace(/#[0-9]+$/, '')) out.push(`group "${id}" names its own job and log`);
+    // The id is the group's stable identity (retire-check and the merge driver key on it); "job" is
+    // where it is verified today, so a group can move job without being retired and re-added.
+    if (!g || !/^[a-z0-9-]+$/.test(g.job || '') || g.log !== id.split('/')[1].replace(/#[0-9]+$/, '')) out.push(`group "${id}" names a job and its own log`);
     if (!Array.isArray(g?.pins) || !g.pins.length) { out.push(`group "${id}" has pins`); continue; }
     const texts = new Set();
     for (const pin of g.pins) {

@@ -111,6 +111,9 @@ async function saveAccount(pid, account, patch = {}) {
     activatedAt: prior?.accountId ? prior.activatedAt || null : null,
     activatedAccountId: prior?.accountId ? prior.activatedAccountId || null : null,
     activatedGeneration: prior?.accountId ? Number(prior.activatedGeneration) || 0 : 0,
+    // Preserve the denial witness on /me refresh of this same linked account.
+    // It is a veto, not affirmative consent, and is cleared for a new link.
+    activatedRecoveryFence: prior?.accountId ? (prior.activatedRecoveryFence ?? null) : null,
     clockSeenAt: prior?.clockSeenAt || null,
     ...patch
   };

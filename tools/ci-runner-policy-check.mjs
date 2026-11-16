@@ -478,7 +478,7 @@ for (const [id, name] of [
   assert.equal(ci.split(`\n    name: ${name}\n`).length - 1, 1, `exactly one CI job is the required check "${name}"`);
   assert.match(job(id), new RegExp(`^    name: ${name.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&')}\\n`), `the ${id} job carries the required check name "${name}"`);
 }
-for (const [id, shards] of [['suites', ['suites-shard', 'suites-contracts']], ['browser', ['browser-shard']]]) {
+for (const [id, shards] of [['suites', ['suites-shard', 'suites-contracts']], ['browser', ['browser-shard']], ['platform', ['platform-contracts', 'platform-postgres']]]) {
   const body = job(id);
   assert.match(body, new RegExp(`\\n    needs: \\[${shards.join(', ')}\\]\\n`), `${id} must need ${shards.join(', ')}`);
   assert.match(body, /\n    if: always\(\)\n/, `${id} must run always() so a failed or skipped shard fails the required check`);
@@ -496,6 +496,10 @@ assert.match(job('suites'), /test "\$\(ls -d suite-shards\/suites-shard-\* \| wc
   'the suites gate proves all four manifests together completed every npm test suite exactly once');
 assert.match(job('suites'), /- name: Exact coverage invariants\n/, 'the suites gate keeps the exact coverage invariants');
 assert.match(job('browser'), /- name: Browser coverage invariants\n/, 'the browser gate keeps the browser coverage invariants');
+// The platform halves: the Postgres suite runs on its own runner with its own throwaway Postgres.
+assert.match(job('platform-postgres'), /services:\n\s+postgres:\n\s+image: postgres:17\n/, 'the Postgres half has its own Postgres service');
+assert.match(job('platform-postgres'), /node scripts\/with-postgres\.mjs node server\/test\/run-platform-postgres\.mjs 2>&1 \| tee platform-postgres\.log\n\s+node tools\/ci-check-counts\.mjs verify platform\/platform-postgres\.log\n/, 'the Postgres half runs every engine-agnostic platform suite on real Postgres and verifies its pins');
+assert.doesNotMatch(job('platform-contracts'), /run-platform-postgres\.mjs/, 'the Postgres suite runs once, in its own half');
 // Every command of npm run test:e2e runs, in its order, in the browser groups.
 const e2eChain = pkg.scripts['test:e2e'].split('&&').map(s => s.trim());
 const browserCommands = [...job('browser-shard').matchAll(/^\s+((?:node|npm run) \S.*?) 2>&1 \| tee -a browser\.log$/gm)].map(m => m[1]);

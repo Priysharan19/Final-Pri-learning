@@ -30,7 +30,7 @@
 import { cloud, cloudAvailable, discoverCloudOrigin, lastCloudProbe } from './cloudTransport.js';
 import { cloudAccountLink, noteCloudClock, recordCloudActivation, verifyCloudSession } from './cloudAccount.js';
 import { decideOnboardingAuthority } from '../components/onboardingAuthority.js';
-import { advanceDeviceDenialGeneration, get } from '../local/idb.js';
+import { advanceDeviceDenialGeneration, readDeviceDenialRecoveryFence, advanceDeviceDenialRecoveryFence, get } from '../local/idb.js';
 
 export class ActivationBlocked extends Error {
   constructor(code, { cause = null, retryable = false } = {}) {
@@ -86,30 +86,9 @@ async function persistDenial(pid, accountId) {
   await advanceDeviceDenialGeneration(denialRowId(pid, accountId));
 }
 
-// An independently persisted account-scoped fence makes a recoverable
-// IndexedDB denial-write failure fail closed across tabs and after reload.
-// It holds no contact details, credentials or permission, only random bytes.
-// A genuine new server approval records the current fence on the link row.
-const RECOVERY_PREFIX = 'pri-activation-denial-recovery-v1:';
-const recoveryKey = accountId => `${RECOVERY_PREFIX}${String(accountId)}:`;
-function recoveryFence(accountId) {
-  if (!accountId || !globalThis.localStorage) return null;
-  return globalThis.localStorage.getItem(recoveryKey(accountId));
-}
-function writeRecoveryFence(accountId) {
-  if (!accountId || !globalThis.localStorage) return false;
-  try {
-    const bytes = new Uint32Array(4);
-    globalThis.crypto.getRandomValues(bytes);
-    globalThis.localStorage.setItem(recoveryKey(accountId),
-      [...bytes].map(x => x.toString(16).padStart(8, '0')).join(''));
-    return true;
-  } catch {
-    // IndexedDB generation is the primary durable fence. If both persistence
-    // mechanisms fail, the request is blocked, never granted offline access.
-    return false;
-  }
-}
+// A recovery witness only blocks old grants; it never grants permission.
+const recoveryFence = readDeviceDenialRecoveryFence;
+const writeRecoveryFence = advanceDeviceDenialRecoveryFence;
 
 /** True when an offline entry verified at `verifiedAt` may no longer stay open (a missing time counts as expired). */
 export function offlineGraceExpired(verifiedAt, now = Date.now()) {
@@ -254,7 +233,7 @@ export async function ensureAccountActivated(pid, options = {}) {
       let clearFailure = null;
       try { await queueActivationRecord(state, pid, null, state.denials, Date.now(), null, null, true); }
       catch (cause) { clearFailure = cause; }
-      if (generationFailure && !fallbackWritten) {
+      if (!fallbackWritten && (generationFailure || clearFailure)) {
         throw new ActivationBlocked('CONSENT_UNAVAILABLE', {
           cause: generationFailure || clearFailure, retryable: true
         });

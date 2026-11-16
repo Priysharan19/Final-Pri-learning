@@ -1,0 +1,11 @@
+.ex-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ex-sheet { display: none; }
+@media print {
+  body * { visibility: hidden; }
+  .ex-sheet, .ex-sheet * { visibility: visible; }
+  .ex-sheet { display: block; position: absolute; left: 0; top: 0; width: 100%; color: #000; background: #fff; font-size: 12pt; }
+  .ex-sheet h1 { margin: 28pt 0 8pt; font-size: 16pt; }
+  .ex-sheet .ex-line { position: fixed; top: 0; left: 0; right: 0; margin: 0; padding: 4pt 0; border-bottom: 1px solid #000; font-weight: 600; background: #fff; }
+  .ex-sheet dl { display: grid; grid-template-columns: max-content 1fr; gap: 2pt 12pt; }
+  .ex-sheet li { break-inside: avoid; }
+}

@@ -525,6 +525,14 @@ reset();
   ok('a new authorized request can recover after two independent refusals', !!recovered.ready);
   eq('the recovery records the current generation without synthetic future time',
     (await cloudAccountLink('p-multitab')).activatedGeneration, nextGeneration);
+  const beforeRefresh = await cloudAccountLink('p-multitab');
+  const { verifyCloudSession } = await import('../src/platform/cloudAccount.js');
+  await verifyCloudSession('p-multitab');
+  const afterRefresh = await cloudAccountLink('p-multitab');
+  eq('same-account /me refresh retains the denial recovery witness',
+    afterRefresh.activatedRecoveryFence, beforeRefresh.activatedRecoveryFence);
+  ok('server-approved reactivation keeps 72-hour offline access after session refresh',
+    (await secondTab.offlineGraceFor('p-multitab'))?.offline === true);
 }
 
 

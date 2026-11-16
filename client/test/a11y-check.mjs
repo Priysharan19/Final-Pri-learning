@@ -67,6 +67,17 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile, freshEmail, signInOnCard } from './support/verified-onboarding.mjs';
 import { acceptReaderPermissionOnSight } from './fakeServerReader.js';
+import { resolveEdition } from '../edition.config.mjs';
+
+// Plan E6: the walk runs per edition (PRI_EDITION, unset = Priyabhata). The
+// app is the same; the student is the edition's own: CBSE Class 10 on
+// Priyabhata, NSW Year 10 on Prithagoras. A step that exists only for an
+// India student (placement, the JEE room, the India chapter table) is recorded
+// as not applicable on Prithagoras, with its reason, never silently passed.
+const EDITION = resolveEdition(process.env);
+const INDIA = EDITION === 'priyabhata';
+const YEAR_SELECT = INDIA ? '#signup-track' : '#signup-year';
+const SECOND_STUDENT = INDIA ? 'Accessibility JEE Student' : 'Accessibility Year 12 Student';
 
 const CLIENT = fileURLToPath(new URL('../', import.meta.url));
 const APP_JSX = join(CLIENT, 'src', 'App.jsx');
@@ -535,6 +546,8 @@ async function run() {
   const routesSeen = new Set();
   const views = [];
   const skipped = [];
+  const notApplicable = [];
+  const notApplicableRoutes = new Set();
   let liveVerdict = null;
   let skipLink = null;
   let selfTest = null;
@@ -607,6 +620,7 @@ async function run() {
       return res;
     }
 
+    const indiaOnly = (view, why) => { notApplicable.push(`${view} — ${why}`); };
     const step = async (view, route, drive) => {
       try {
         await drive();
@@ -663,7 +677,7 @@ async function run() {
     });
 
     await step('login · onboarding protection', '/', async () => {
-      await page.locator('#signup-track').selectOption('10');
+      await page.locator(YEAR_SELECT).selectOption('10');
       await click(page, '.auth-card .btn-primary');
       await page.locator('#signup-name').fill('Accessibility Draft');
       await click(page, '.auth-card .btn-primary');
@@ -684,12 +698,13 @@ async function run() {
 
     // The walk's student is on the India course (D2), whose generator names
     // the second tab "Track" (home.catTrack) where Australia says "Course".
-    for (const label of ['Track', 'Topics', 'Dot Points', 'Difficulty']) {
+    const TRACK_TAB = INDIA ? 'Track' : 'Course';
+    for (const label of [TRACK_TAB, 'Topics', 'Dot Points', 'Difficulty']) {
       await step(`home · generator · ${label.toLowerCase()}`, '/', async () => {
         const tab = page.locator('.gen-cat', { hasText: label }).first();
         if (await tab.isDisabled()) {
           // walk far enough into the flow that this pane has something to show
-          await click(page, '.gen-cat', { text: 'Track' });
+          await click(page, '.gen-cat', { text: TRACK_TAB });
           await click(page, '.gen-pane .gen-opt');
           await click(page, '.gen-pane .gen-opt');
         }
@@ -1034,14 +1049,17 @@ async function run() {
       await goTo(page, BASE, '/progress');
       // An India student's Progress (Progress.jsx → IndiaProgress.jsx): the
       // chapter table is the page's content; the skeleton alone is not.
-      await page.waitForSelector('.pg-table', { timeout: 20000 });
+      if (INDIA) await page.waitForSelector('.pg-table', { timeout: 20000 });
+      // An NSW student's Progress: the page's heading with its loading skeleton gone.
+      else await page.waitForFunction(() => !document.querySelector('main .skeleton') && document.querySelector('main h1'), null, { timeout: 20000 });
       await wait(page, 900);
     });
 
     // The Australian Progress tabs (Priorities, Knowledge map) are never shown
     // to an India student, so this walk cannot reach them (D2: V1 is India
     // only). The India page's own control is a chapter's practise button.
-    await step('progress · a chapter opened in practice', '/practice', async () => {
+    if (!INDIA) indiaOnly('progress · a chapter opened in practice', 'the India chapter table (IndiaProgress.jsx) is not an NSW student\'s Progress');
+    else await step('progress · a chapter opened in practice', '/practice', async () => {
       await click(page, '.pg-table .btn');
       await page.waitForSelector('.q-prompt, .qpage', { timeout: 30000 });
       await wait(page, 600);
@@ -1072,7 +1090,14 @@ async function run() {
 
     await step('exams', '/exams', async () => { await goTo(page, BASE, '/exams'); });
 
-    await step('exam room · sitting a paper', '/exams/:id', async () => {
+    if (!INDIA) {
+      // D15 (server/platform/exams.js readSpec): the server composes no
+      // generated practice paper outside the India course yet; the NSW papers
+      // are G4's, walked by tour-nsw-exams.js. The refused start is still
+      // audited below ('exams · refused, session ended').
+      for (const view of ['exam room · sitting a paper', 'exam room · marked paper', 'exams · printable paper']) indiaOnly(view, 'the server composes no generated practice paper outside the India course (EXAM_KIND_OUTSIDE_CURRICULUM, D15)');
+      notApplicableRoutes.add('/exams/:id');
+    } else await step('exam room · sitting a paper', '/exams/:id', async () => {
       await goTo(page, BASE, '/exams');
       // The walk's student is CBSE Class 10 (D2): the paper they can sit is the
       // board mock (Exams.jsx, IndiaExams), not the JEE Main simulation.
@@ -1086,7 +1111,7 @@ async function run() {
       if (await wk.count()) { await wk.click(); await wait(page, SETTLE); }
     });
 
-    await step('exam room · marked paper', '/exams/:id', async () => {
+    if (INDIA) await step('exam room · marked paper', '/exams/:id', async () => {
       await click(page, '.exam-head .btn', { text: 'Review and submit' });
       await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
       await click(page, '[role="dialog"] button.btn-primary', { text: 'Submit paper' });
@@ -1094,7 +1119,7 @@ async function run() {
       await wait(page, 900);
     });
 
-    await step('exams · printable paper', '/exams', async () => {
+    if (INDIA) await step('exams · printable paper', '/exams', async () => {
       await goTo(page, BASE, '/exams');
       await click(page, '.prio-item .btn-quiet');
       await page.waitForSelector('.paper-overlay', { timeout: 20000 });
@@ -1154,7 +1179,19 @@ async function run() {
     });
     await step('library · one resource, or why it cannot be shown', '/library/:id', async () => {
       await goTo(page, BASE, '/library/2027-mathematics-advanced-assessment-1');
-      await page.waitForSelector('.lib-page [data-library-detail], .lib-page [data-library-error]', { timeout: 20000 });
+      // data-library-detail is on .lib-page itself; the error is inside it.
+      await page.waitForSelector('.lib-page[data-library-detail], .lib-page [data-library-error]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    // Plan F2: the command bar with its Library group (the flag is on in this
+    // walk), opened from the keyboard on the library page and searched.
+    await step('library · command bar, Library group', '/library', async () => {
+      await goTo(page, BASE, '/library');
+      await page.waitForSelector('.lib-page h1', { timeout: 20000 });
+      await page.keyboard.down('Control'); await page.keyboard.press('k'); await page.keyboard.up('Control');
+      await page.waitForSelector('[data-instrument-command] input[role="combobox"]', { timeout: 10000 });
+      await page.keyboard.type('paper');
       await wait(page, 600);
     });
 
@@ -1362,10 +1399,12 @@ async function run() {
       await click(page, 'button.btn-ghost', { text: 'Add another profile' });
       await page.getByRole('button', { name: 'Student', exact: true }).click();
       await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-track').selectOption('jee-main');
-      await page.locator('#signup-year').selectOption('12');
+      if (INDIA) {
+        await page.locator('#signup-track').selectOption('jee-main');
+        await page.locator('#signup-year').selectOption('12');
+      } else await page.locator('#signup-year').selectOption('12');
       await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-name').fill('Accessibility JEE Student');
+      await page.locator('#signup-name').fill(SECOND_STUDENT);
       await click(page, '.auth-card .btn-primary');
       await click(page, '.auth-card .btn-primary');
       await page.waitForSelector('[data-onboarding-step="5"]');
@@ -1375,11 +1414,11 @@ async function run() {
       await page.waitForSelector('[data-testid="account-activation-gate"] [data-signin-card="inline"]', { timeout: 30000 });
       await signInOnCard(page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]'), platform, { email: freshEmail('a11y-jee'), age: 18 });
       await page.waitForSelector('.shell', { timeout: 60000 });
-      await online.signIn({ name: 'Accessibility JEE Student' });
+      await online.signIn({ name: SECOND_STUDENT });
       // The session ended, a paper does not start: the refusal is the state audited here.
       await goTo(page, BASE, '/exams');
       endSession();
-      await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
+      await page.getByRole('button', { name: INDIA ? 'Start JEE Main Mathematics simulation' : 'Start practice paper' }).click();
       await page.waitForSelector('[data-exam-start-refused]', { timeout: 30000 });
       await wait(page, 400);
       refusals.exam = { ...(await refusalBlock('[data-exam-start-refused]')), room: await page.locator('.exam-nav').count() };
@@ -1401,7 +1440,8 @@ async function run() {
       }
     };
 
-    await step('placement · refused, session ended', '/placement', async () => {
+    if (!INDIA) indiaOnly('placement · refused, session ended', 'the placement check covers the India curriculum only (requirePlacementCourse)');
+    else await step('placement · refused, session ended', '/placement', async () => {
       // ?go=1 starts the check as the page mounts, so the session is ended
       // first and the page is then opened inside the app, without a reload.
       await insideLive('/');
@@ -1432,7 +1472,10 @@ async function run() {
 
     // The India student signs in where the paper was refused (a real account on
     // the real server), and the paper — issued and marked by the server — opens.
-    await step('india exam room · writing a numerical answer', '/exams/:id', async () => {
+    if (!INDIA) {
+      indiaOnly('india exam room · writing a numerical answer', 'a JEE Main paper exists only on the India course');
+      indiaOnly('india exam room · section analysis', 'a JEE Main paper exists only on the India course');
+    } else await step('india exam room · writing a numerical answer', '/exams/:id', async () => {
       await insideLive('/exams');
       endSession();
       await page.getByRole('button', { name: 'Start JEE Main Mathematics simulation' }).click();
@@ -1449,7 +1492,7 @@ async function run() {
       await wait(page, 700);
     });
 
-    await step('india exam room · section analysis', '/exams/:id', async () => {
+    if (INDIA) await step('india exam room · section analysis', '/exams/:id', async () => {
       await click(page, '.exam-head .btn', { text: 'Review and submit' });
       await page.waitForSelector('[role="dialog"]', { timeout: 10000 });
       await click(page, '[role="dialog"] button.btn-primary', { text: 'Submit paper' });
@@ -1466,7 +1509,7 @@ async function run() {
       await click(page, 'button.btn-ghost', { text: 'Add another profile' });
       await page.getByRole('button', { name: 'Teacher', exact: true }).click();
       await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-track').selectOption('10');
+      await page.locator(YEAR_SELECT).selectOption('10');
       await click(page, '.auth-card .btn-primary');
       await page.locator('#signup-name').fill('Accessibility Teacher');
       await click(page, '.auth-card .btn-primary');
@@ -1497,12 +1540,13 @@ async function run() {
     section('the walk');
     const declared = declaredRoutes();
     ok('the router declares routes to walk', declared.length > 0, `${declared.length} found in App.jsx`);
-    const missed = declared.filter(r => !routesSeen.has(r));
+    const missed = declared.filter(r => !routesSeen.has(r) && !notApplicableRoutes.has(r));
     ok('every route the router declares was rendered and audited', missed.length === 0,
       missed.length ? `never visited: ${missed.join(', ')}` : '');
     ok('the walk reached past the routes into their states', views.length >= declared.length + 12,
       `${views.length} views across ${declared.length} routes`);
     ok('every view opened', skipped.length === 0, skipped.join('\n      '));
+    if (notApplicable.length) console.log(`  not applicable on ${EDITION} (India-only): ${notApplicable.length}\n      ${notApplicable.join('\n      ')}`);
     ok('nothing threw while the app was driven', pageErrors.length === 0, pageErrors.slice(0, 4).join('\n      '));
     const handlers = views.reduce((n, v) => n + v.handlers, 0);
     ok('the handler scan is alive — React props were read on real nodes', handlers > 200,
@@ -1581,7 +1625,7 @@ async function run() {
 
     const announced = r => r?.kind === 'sign-in' && r.role === 'alert' && /\p{L}/u.test(r.iconWord || '') &&
       r.button?.tag === 'button' && /\p{L}/u.test(r.button.name) && r.button.expanded === 'false' && r.button.disabled === false;
-    ok('the session ended, a placement check that does not start is an alert in words (its icon named), with a real, named sign-in button in place',
+    if (INDIA) ok('the session ended, a placement check that does not start is an alert in words (its icon named), with a real, named sign-in button in place',
       announced(refusals.placement), JSON.stringify(refusals.placement));
     ok('the session ended, an exam paper that does not start is an alert in words with the same named sign-in — and no exam room opens',
       // (Its icon alone has no word yet — Exams.jsx:82, tracked under "owned elsewhere".)

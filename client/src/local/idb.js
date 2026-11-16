@@ -8,7 +8,7 @@ import {
 } from './auth.js';
 
 const DB_NAME = 'pri-learning';
-const DB_VERSION = 5;
+const DB_VERSION = 6;
 
 let dbPromise = null;
 let dbHandle = null;
@@ -62,6 +62,7 @@ export function openDB() {
       mk('customQs', { keyPath: 'id' }, [['ownerPid', 'ownerPid']]);
       mk('progressImports', { keyPath: 'id' }, [['teacherPid', 'teacherPid']]); // imported student progress files
       mk('bookmarks', { keyPath: 'key' }, [['pid', 'pid']]);                    // `${pid}:${questionId}`
+      mk('resourceBookmarks', { keyPath: 'key' }, [['pid', 'pid']]);            // `${pid}:${resourceId}` — saved library resources (plan F2)
       mk('device', { keyPath: 'id' });                                          // this install's own secrets
       mk('inkDrafts', { keyPath: 'id' }, [['pid', 'pid']]);                     // `${pid}:${questionId}` — handwriting waiting to be read (local/inkDrafts.js)
     };
@@ -228,6 +229,7 @@ const SEALED_STORES = {
   inkDrafts: { owner: 'pid', clear: ['id', 'pid'] },
   taskProgress: { owner: 'pid', clear: ['key', 'pid'], blind: 'tail' },
   bookmarks: { owner: 'pid', clear: ['key', 'pid'], blind: 'head' },
+  resourceBookmarks: { owner: 'pid', clear: ['key', 'pid'], blind: 'head' },
   progressImports: { owner: 'teacherPid', clear: ['id', 'teacherPid'] },
   classes: { owner: 'teacherPid', clear: ['id'], share: rollOf },
   tasks: { owner: 'ownerPid', clear: ['id'], share: readersOfTask },
@@ -1404,6 +1406,35 @@ export async function advanceDeviceDenialGeneration(id) {
   });
 }
 
+// A negative consent witness only: never permission to enter the app.
+// Written synchronously before an IndexedDB denial transaction may abort.
+// An approval is still granted only by the live server; offline requires
+// that this witness match the one attached to that server-approved record.
+const RECOVERY_DENIAL_PREFIX = 'pri-activation-denial-recovery-v1:';
+const recoveryDenialKey = account => RECOVERY_DENIAL_PREFIX + String(account) + ':';
+export function readDeviceDenialRecoveryFence(account) {
+  if (!account) return null;
+  try {
+    if (!globalThis.localStorage) throw new Error('Recovery witness unavailable');
+    return globalThis.localStorage.getItem(recoveryDenialKey(account));
+  } catch (cause) {
+    throw Object.assign(new Error('Recovery witness unavailable'), { cause });
+  }
+}
+export function advanceDeviceDenialRecoveryFence(account) {
+  if (!account) return false;
+  try {
+    if (!globalThis.localStorage || !globalThis.crypto?.getRandomValues) return false;
+    const words = new Uint32Array(4);
+    globalThis.crypto.getRandomValues(words);
+    const token = [...words].map(x => x.toString(16).padStart(8, '0')).join('');
+    globalThis.localStorage.setItem(recoveryDenialKey(account), token);
+    return readDeviceDenialRecoveryFence(account) === token;
+  } catch {
+    return false;
+  }
+}
+
 export async function del(store, key) {
   await ready();
   const at = await storedKey(store, key);
@@ -1520,7 +1551,7 @@ export async function rawByIndex(store, index, value) {
 const PROFILE_STORES = [
   ['ratings', 'pid'], ['attempts', 'pid'], ['questions', 'pid'], ['reviews', 'pid'],
   ['exams', 'pid'], ['badges', 'pid'], ['activity', 'pid'], ['rushRuns', 'pid'],
-  ['matchRuns', 'pid'], ['inks', 'pid'], ['inkDrafts', 'pid'], ['taskProgress', 'pid'], ['bookmarks', 'pid'],
+  ['matchRuns', 'pid'], ['inks', 'pid'], ['inkDrafts', 'pid'], ['taskProgress', 'pid'], ['bookmarks', 'pid'], ['resourceBookmarks', 'pid'],
   ['customQs', 'ownerPid'], ['progressImports', 'teacherPid']
 ];
 

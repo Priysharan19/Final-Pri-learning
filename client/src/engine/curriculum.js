@@ -16,7 +16,12 @@ export const STRANDS = [
   'Calculus'
 ];
 
-const CODES = {"y7-integers": "MA4 · Number", "y7-fractions": "MA4 · Number", "y7-decimals-perc": "MA4 · Number", "y7-ratio": "MA4 · Number", "y7-algebra": "MA4 · Algebra", "y7-equations": "MA4 · Algebra", "y7-angles": "MA4 · Geometry", "y7-area": "MA4 · Measurement", "y7-data": "MA4 · Statistics", "y8-indices": "MA4 · Number", "y8-percentages": "MA4 · Financial", "y8-algebra": "MA4 · Algebra", "y8-equations": "MA4 · Algebra", "y8-linear": "MA4 · Linear", "y8-circles": "MA4 · Measurement", "y8-volume": "MA4 · Measurement", "y8-rates": "MA4 · Number", "y8-probability": "MA4 · Probability", "y9-pythagoras": "MA5 · Measurement", "y9-indices-sci": "MA5 · Number", "y9-algebra": "MA5 · Algebra", "y9-linear": "MA5 · Linear", "y9-trig": "MA5 · Trigonometry", "y9-surface-area": "MA5 · Measurement", "y9-simint": "MA5 · Financial", "y9-data": "MA5 · Statistics", "y9-probability": "MA5 · Probability", "y10-quadratics": "MA5 · Algebra", "y10-nonlinear": "MA5 · Non-linear", "y10-simeq": "MA5 · Algebra", "y10-trig": "MA5 · Trigonometry", "y10-surds": "MA5 · Number", "y10-compound": "MA5 · Financial", "y10-similarity": "MA5 · Geometry", "y10-stats": "MA5 · Statistics", "y10-probability": "MA5 · Probability", "y11-functions": "MA-F1", "y11-quadfunc": "MA-F1", "y11-polynomials": "MA-F1", "y11-lines": "MA-F1", "y11-trigfunc": "MA-T1/T2", "y11-sine-cosine-rule": "MA-T1", "y11-explog": "MA-E1", "y11-diff": "MA-C1", "y11-probability": "MA-S1", "y12-diff": "MA-C2", "y12-appdiff": "MA-C3", "y12-integration": "MA-C4", "y12-trigcalc": "MA-T3/C2", "y12-explogcalc": "MA-E1/C2", "y12-series": "MA-M1", "y12-financial": "MA-M1", "y12-stats": "MA-S3", "y12-motion": "MA-C3/C4"};
+const CODES = {"y7-integers": "MA4 · Number", "y7-fractions": "MA4 · Number", "y7-decimals-perc": "MA4 · Number", "y7-ratio": "MA4 · Number", "y7-algebra": "MA4 · Algebra", "y7-equations": "MA4 · Algebra", "y7-angles": "MA4 · Geometry", "y7-area": "MA4 · Measurement", "y7-data": "MA4 · Statistics", "y8-indices": "MA4 · Number", "y8-percentages": "MA4 · Financial", "y8-algebra": "MA4 · Algebra", "y8-equations": "MA4 · Algebra", "y8-linear": "MA4 · Linear", "y8-circles": "MA4 · Measurement", "y8-volume": "MA4 · Measurement", "y8-rates": "MA4 · Number", "y8-probability": "MA4 · Probability", "y9-pythagoras": "MA5 · Measurement", "y9-indices-sci": "MA5 · Number", "y9-algebra": "MA5 · Algebra", "y9-linear": "MA5 · Linear", "y9-trig": "MA5 · Trigonometry", "y9-surface-area": "MA5 · Measurement", "y9-simint": "MA5 · Financial", "y9-data": "MA5 · Statistics", "y9-probability": "MA5 · Probability", "y10-quadratics": "MA5 · Algebra", "y10-nonlinear": "MA5 · Non-linear", "y10-simeq": "MA5 · Algebra", "y10-trig": "MA5 · Trigonometry", "y10-surds": "MA5 · Number", "y10-compound": "MA5 · Financial", "y10-similarity": "MA5 · Geometry", "y10-stats": "MA5 · Statistics", "y10-probability": "MA5 · Probability", "y11-functions": "MA-F1", "y11-quadfunc": "MA-F1", "y11-polynomials": "MA-F1", "y11-lines": "MA-F1", "y11-trigfunc": "MA-T1/T2", "y11-sine-cosine-rule": "MA-T1", "y11-explog": "MA-E1", "y11-diff": "MA-C1", "y11-probability": "MA-S1", "y12-diff": "MA-C2", "y12-appdiff": "MA-C3", "y12-integration": "MA-C4", "y12-trigcalc": "MA-T3/C2", "y12-explogcalc": "MA-E1/C2", "y12-series": "MA-M1", "y12-financial": "MA-M1", "y12-stats": "MA-S3", "y12-motion": "MA-C3/C4", "y12-integral-calc": "MA-C4", "y12-random-var": "MA-S3", "y12-fin-exact": "MA-M1", "y12-trig-model": "MA-T3", "y12-func-model": "MA-E1/C3"};
+// A subtopic authored for the Prithagoras (NSW) bank carries the legacy exam-weight average (100/9: nine
+// subtopics a year sum to 100), so the Australian exam-weight pools keep their average, every legacy
+// share and the "high exam weight" cut-off at 12. Kept a few ulps under 100/9 so that a legacy weight
+// of exactly 12 still clears the cut-off in floating point (client/test/india-exam-weight-check.mjs).
+const AUTHORED_WEIGHT = 100 / 9 - 1e-14;
 const S = (id, name, strand, weight, dotpoints) => ({ id, name, strand, weight, dotpoints, code: CODES[id] || '' });
 
 export const CURRICULUM = [
@@ -329,6 +334,31 @@ export const CURRICULUM = [
         'Displacement, velocity and acceleration by calculus',
         'Interpret motion graphs',
         'Solve rates-of-change problems'
+      ]),
+      S('y12-integral-calc', 'Integral Calculus: Exact Results', 'Calculus', AUTHORED_WEIGHT, [
+        'Find antiderivatives of exponential and trigonometric functions',
+        'Evaluate definite integrals of polynomial functions',
+        'Find displacement from a velocity function'
+      ]),
+      S('y12-random-var', 'Random Variables: Exact Results', 'Statistics & Probability', AUTHORED_WEIGHT, [
+        'Find the expected value of a discrete random variable',
+        'Find the variance of a discrete random variable',
+        'Use z-scores and the 68–95–99.7 rule for a normal distribution'
+      ]),
+      S('y12-fin-exact', 'Financial Mathematics: Exact Results', 'Financial Maths', AUTHORED_WEIGHT, [
+        'Find the value of a compound-interest investment',
+        'Track the balance of a reducing-balance loan',
+        'Find the future value of an annuity as a geometric series'
+      ]),
+      S('y12-trig-model', 'Trigonometric Graphs and Models', 'Trigonometry', AUTHORED_WEIGHT, [
+        'Find the maximum, minimum and amplitude of a transformed sine or cosine',
+        'Find the period of a transformed trigonometric function',
+        'Use a trigonometric model for a periodic situation'
+      ]),
+      S('y12-func-model', 'Modelling with Functions', 'Functions', AUTHORED_WEIGHT, [
+        'Use exponential growth and decay models',
+        'Solve for time in an exponential model',
+        'Optimise a quadratic model'
       ])
     ]
   }
@@ -700,6 +730,11 @@ export const DOTPOINT_FORMS = Object.freeze({
   'y12-financial': [[], [0, 1], [0, 1], [2]],
   'y12-stats': [[0], [0], [1], [2]],
   'y12-motion': [[0], [1], [0, 2], [0]],
+  'y12-integral-calc': [[0], [1], [0], [2]],
+  'y12-random-var': [[0], [1], [2], [2]],
+  'y12-fin-exact': [[0], [1], [1], [2]],
+  'y12-trig-model': [[0], [1], [2], [2]],
+  'y12-func-model': [[0], [0], [1], [2]],
   // ── Standard · Year 11 ────────────────────────────────────────────────────
   'ms11-earning': [[0], [0], [2], [1]],
   'ms11-formulas': [[0], [1], [0, 2], [0, 2]],

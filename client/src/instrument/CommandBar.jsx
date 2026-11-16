@@ -6,6 +6,11 @@ import { practiceHref } from '../lib/practiceLinks.js';
 import { colourFor, practiceTrack, scopeFor } from './chapters.js';
 import { MathText } from '../lib/latex.jsx';
 import Glyph from './Glyph.jsx';
+import { featureEnabled } from '../platform/features.js';
+import { cachedLibraryList, filterResources, typeKey } from '../library/libraryApi.js';
+
+// The Library group exists only where PRI_FEATURE_LIBRARY is on (plan F2).
+const LIBRARY_ON = featureEnabled('library');
 
 const PAGE_GLYPH = { '/': 'index', '/practice': 'pen', '/map': 'map', '/progress': 'chart', '/review': 'doc', '/history': 'doc' };
 
@@ -14,6 +19,15 @@ const PAGE_GLYPH = { '/': 'index', '/practice': 'pen', '/map': 'map', '/progress
 // focus returns to whatever opened it. A modal dialog, so the page behind is
 // inert to assistive tech while it is open.
 
+/** Resources matching the query (title, subject, year, type, tags), saved ones first; at most six. */
+export function libraryRows(resources, savedIds, q, t) {
+  const text = q.trimStart().startsWith('>') ? '' : q.trim();
+  if (!text) return [];
+  const typed = resources.map(r => ({ ...r, tags: [...(Array.isArray(r.tags) ? r.tags : []), t(typeKey(r.type)), String(r.year ?? '')] }));
+  const found = filterResources(typed, { q: text });
+  return [...found.filter(r => savedIds.has(r.id)), ...found.filter(r => !savedIds.has(r.id))].slice(0, 6);
+}
+
 export default function CommandBar({ open, onClose, user, pages, actions, returnFocus }) {
   const t = useT();
   const nav = useNavigate();
@@ -21,6 +35,8 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
   const [sel, setSel] = useState(0);
   const [chapters, setChapters] = useState([]);
   const [scripts, setScripts] = useState([]);
+  const [resources, setResources] = useState([]);
+  const [savedIds, setSavedIds] = useState(() => new Set());
   const input = useRef(null);
 
   useEffect(() => {
@@ -34,6 +50,12 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
       setChapters((scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, index: i, colour: colourFor(i) })));
     }).catch(() => { });
     api.post('/history/list', { page: 0, pageSize: 5 }).then(r => { if (live) setScripts(r?.items || []); }).catch(() => { });
+    // Read once when the bar opens, never per keystroke: the list is the
+    // edition's published library, kept for the page, and searched below.
+    if (LIBRARY_ON) {
+      cachedLibraryList(user?.id || '').then(d => { if (live) setResources(Array.isArray(d?.resources) ? d.resources : []); }).catch(() => { });
+      api.get('/library/saved').then(d => { if (live) setSavedIds(new Set((d?.items || []).map(i => i.id))); }).catch(() => { });
+    }
     // Focus goes back to whatever opened the bar (recorded by the opener,
     // since the field has already taken focus by the time this runs).
     return () => { live = false; cancelAnimationFrame(id); returnFocus?.current?.focus?.(); };
@@ -56,12 +78,16 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
         hint: Number.isInteger(s.marksPossible) && !s.repeat ? `${s.marksEarned}/${s.marksPossible}` : '', content: true,
         run: () => nav('/review')
       })) },
+      ...(LIBRARY_ON ? [{ key: 'library', label: t('inst.cmdLibrary'), rows: libraryRows(resources, savedIds, q, t).map(r => ({
+        id: `lib-${r.id}`, label: r.title, glyph: 'doc', content: true, meta: [r.year, r.subject].filter(Boolean).join(' · '),
+        hint: savedIds.has(r.id) ? t('inst.cmdSaved') : t(typeKey(r.type)), run: () => nav(`/library/${r.id}`)
+      })) }] : []),
       { key: 'pages', label: t('inst.cmdPages'), rows: pages.filter(p => match(p.label)).map(p => ({ id: `pg-${p.to}`, label: p.label, glyph: PAGE_GLYPH[p.to] || 'doc', run: () => nav(p.to) })) },
       { key: 'actions', label: t('inst.cmdActions'), rows: actions.filter(a => match(a.label)).map(a => ({ id: `ac-${a.id}`, label: a.label, glyph: 'gear', run: a.run })) }
     ];
     return groups.filter(g => g.rows.length && (!commands || g.key === 'actions'));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, chapters, scripts, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
+  }, [q, chapters, scripts, resources, savedIds, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
 
   const flat = items.flatMap(g => g.rows);
   useEffect(() => { setSel(s => Math.min(s, Math.max(0, flat.length - 1))); }, [flat.length]);
