@@ -46,6 +46,8 @@ export const EDITION_SUITES = [
   'client/test/library-ui-check.mjs',
   'client/test/desk-clock-check.mjs',
   'client/test/desk-import-check.mjs',
+  'client/test/export-file-check.mjs',
+  'client/test/progress-export-check.mjs',
   'client/test/desk-ui-check.mjs',
   // The server: edition agreement, billing per edition, budgets per region,
   // NSW practice and exams, the desk, the hardened production boundary.
