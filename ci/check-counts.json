@@ -314,6 +314,13 @@
         {"has":"resources-check (sqlite): 105 checks passed"}
       ]
     },
+    "platform/public-catalogue.log": {
+      "job": "platform-contracts",
+      "log": "public-catalogue.log",
+      "pins": [
+        {"has":"public-catalogue-check (sqlite): 51 checks passed"}
+      ]
+    },
     "platform/desk.log": {
       "job": "platform-contracts",
       "log": "desk.log",
@@ -339,7 +346,7 @@
       "job": "platform-contracts",
       "log": "region-isolation.log",
       "pins": [
-        {"has":"REGION ISOLATION (H2): PASS — 423 checks (sqlite)"}
+        {"has":"REGION ISOLATION (H2): PASS — 429 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes."}
       ]
     },
     "platform/practice-http.log": {
