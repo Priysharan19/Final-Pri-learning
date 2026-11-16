@@ -66,10 +66,22 @@ let PYQ_ARCHIVE_MEASURED = null;
 // ceiling (which includes the install) moved by the same amount the install
 // ceiling did — nothing else got looser. Raising one is a decision, and it
 // should read like one in the diff.
+//
+// Raised again 2026-11-14 (train editions-6, CTO under the same owner
+// decision, which also says to raise a ceiling "via an owner-approved PR
+// quoting the owner" when a needed feature hits it): FIRST_VISIT_RAW only,
+// 3,350,000 -> 3,400,000 bytes. main 997c4edb6 measured 3,271 kB, at the old
+// ceiling with no headroom; the Exam Desk UI (#877) and per-region AI budgets
+// (#879) bring the warm pass to 3,280 kB, and the NSW HSC-style papers (#880,
+// next train) add about 7.6 kB more. The other three ceilings were measured
+// under their limits and are unchanged (#880's merged head: install 1,725,132 /
+// 2,500,000 raw and 662,308 / 1,000,000 gzipped; warm pass 1,179,144 /
+// 1,290,000 gzipped), as are the banned-from-install list, render-from-install
+// and offline coverage.
 
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 3_350_000;
+const FIRST_VISIT_RAW_CEILING = 3_400_000;
 const FIRST_VISIT_GZIP_CEILING = 1_290_000;
 
 // Things that must never be in the install again, and what each one costs.

@@ -82,6 +82,13 @@ export const ENGINE_SUITES = [
   // An account's questions pass over content it has resolved, read from its
   // own records on whichever engine holds them (not the device's avoid list).
   'practice-seen-aware-pick-check.mjs',
+  // Plan G3: Prithagoras issues and marks NSW practice — the sealed curriculum
+  // identity, final-answer-only at the commit and the curriculum route, as
+  // pri_server under RLS; and Priyabhata unchanged beside it.
+  'nsw-practice-check.mjs',
+  // Plan G4: NSW HSC-style papers — sealed from issued NSW forms, reading time,
+  // final-answer-only marking and no band, as pri_server under RLS.
+  'nsw-exam-check.mjs',
   // D19: JEE Advanced's own questions are Premium, and a notebook twin is a
   // question of the free day — decided under the same lock and RLS scope.
   'premium-practice-content-check.mjs',
@@ -142,6 +149,12 @@ export const ENGINE_SUITES = [
   // The parent weekly report: account-scoped reads under RLS, the send ledger
   // and the lease on Postgres.
   'parent-report-check.mjs',
+  // The shared resource library (plan F1): its seed equals the migration's,
+  // the edition and review filters, and the schema-14 → 15 upgrade/rollback.
+  'resources-check.mjs',
+  // The Exam Desk (plan F4a): unmarked attempts under RLS, the server-stamped
+  // clock, the import, and the schema-15 → 16 upgrade/rollback.
+  'desk-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',
@@ -156,6 +169,12 @@ export const ENGINE_SUITES = [
   'apple-billing-check.mjs',
   'google-billing-check.mjs',
   'storekit-entitlement-state-machine-check.mjs',
+  // Plan E5: billing provider per edition — the same requests to a Priyabhata
+  // and a Prithagoras router, each on its own database as pri_server.
+  'billing-edition-check.mjs',
+  // Plan H7: the practice day per edition and the paid-call ceiling under each
+  // edition; its HTTP part runs a Prithagoras server as pri_server.
+  'edition-ai-budgets-check.mjs',
   'tutor-help-check.mjs',
   'tutor-device-journey-check.mjs',
   // The tutor grounded in the server's own escrowed question: the escrow read
@@ -184,7 +203,10 @@ export const ENGINE_SUITES = [
   'db-round-trips-check.mjs',
   // Round trips pinned per hot request on Postgres, the one-request ink Submit,
   // and no account scope leaking back to the pool (#441 port, #524 item 3).
-  'hot-path-budget-check.mjs'
+  'hot-path-budget-check.mjs',
+  // Plan H2: two regions over separate databases share nothing, and the
+  // database-to-edition binding holds on Postgres as pri_server.
+  'region-isolation-check.mjs'
 ];
 
 let failed = 0;

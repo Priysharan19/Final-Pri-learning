@@ -3,9 +3,13 @@ import react from '@vitejs/plugin-react';
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { applyDeploymentPrecedence, resolveReleaseIdentity } from '../release/release-identity.mjs';
 import { LANGUAGES, DEFAULT_LANGUAGE } from './src/i18n/languages.js';
 import { STUDENT_INTERFACE, STUDENT_INTERFACES, INTERFACE_SKIN, INTERFACE_SKINS } from './interface.config.mjs';
+import { editionOf, resolveEdition } from './edition.config.mjs';
+import { WEB_FILES, brandFile, brandIndexHtml, webManifest } from './brand/edition-brand.mjs';
+import { editionRecordModule } from './src/platform/edition-record.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Chunking
@@ -90,6 +94,10 @@ export const CHUNK_GROUPS = [
   // small and always wanted together, so they share one chunk rather than
   // costing the boot path five requests.
   { name: 'ncert-syllabus', test: /\/src\/engine\/ncert\/[a-z0-9-]+-syllabus\.js$/, priority: 40 },
+  // The Exam Desk and the exam shell it is built on (plan F4b): one chunk with
+  // a name of its own, so the service worker can leave it out of the install
+  // (see ON_DEMAND) and the budget check can prove it did.
+  { name: 'exam-desk', test: /\/src\/(?:(?:desk|examShell)\/[^?]*|engine\/desk(?:Clock|Import)\.js)$/, priority: 40 },
   { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//, priority: 30 },
   { name: 'vendor-katex', test: /\/node_modules\/katex\//, priority: 30 }
 ];
@@ -156,6 +164,27 @@ export const ON_DEMAND = [
   // in practice a stylus user has it before they ask.
   [/(^|\/)(ink-model|ink-engine|ink-personal|model-data|recognizer|InkAnswer|NativeInkCanvas|feedbackGeometry|InkPhysicalEvidenceSession)-[^/]*\.(js|css)$/, 'handwriting recogniser'],
   // (the .css is the handwriting surface's own styles, split from theme.css)
+
+  // The shared resource library's page (ADR-0002 plan F1, PRI_FEATURE_LIBRARY):
+  // behind import() in App.jsx, and online-only — every resource it lists comes
+  // from GET /v1/resources and opens on its publisher's site — so a copy kept
+  // for offline would only ever draw "needs a connection". Off in a production
+  // build, where the chunk is never reached at all.
+  // (libraryApi: the library's calls, a chunk of their own now that the Exam
+  // Desk reads a paper through them too.)
+  [/(^|\/)(Library|libraryApi)-[^/]*\.(js|css)$/, 'resource library (online-only)'],
+
+  // The Exam Desk (ADR-0002 §8 plan F4b, PRI_FEATURE_EXAM_DESK): the desk's
+  // pages, the shared exam shell they are built on and the desk's pure clock
+  // and import reader, in one named chunk behind import() in App.jsx and
+  // Library.jsx. Starting an attempt needs the server and every paper is a
+  // library resource, so a first visit offline could only say "needs a
+  // connection"; a student who has opened the desk once has the chunk from the
+  // runtime cache, and their attempt from the desk's own device cache. Off in
+  // a production build, where the chunk is never reached. When the marked exam
+  // room moves onto the shell (plan F4c) the shell leaves this chunk and is
+  // warmed with the room.
+  [/(^|\/)(exam-desk|Desk(Page|Import|Entry)|deskCache)-[^/]*\.(js|css)$/, 'exam desk (started online)'],
 
   // The live step coach's practice route (F1, #826): behind import() in
   // local/backend.js, reached only when the server has the coach on for this
@@ -439,10 +468,69 @@ function releaseIdentityManifest(identity) {
   };
 }
 
+// The edition's brand (plan E4, docs/brand/editions-decision.md): index.html's
+// %PRI_…% placeholders, manifest.webmanifest, the favicon, the splash and the
+// app icons all come from the edition this build resolved (PRI_EDITION), from
+// client/brand/<edition>/, and the build carries no other edition's files.
+// The app reads its own name, cut and wordmark from the edition record
+// (editionRecordPlugin below, plan E2), which carries them for this edition
+// alone, so no bundle holds the other edition's name, accent or wordmark.
+// The assets are emitted in generateBundle, before pri-precache's writeBundle
+// lists dist/, so the service worker installs them. The development server
+// serves the same files from the same place.
+const BRAND_TYPES = { '.svg': 'image/svg+xml', '.png': 'image/png' };
+export function editionBrand(edition) {
+  const manifest = `${JSON.stringify(webManifest(edition), null, 2)}\n`;
+  return {
+    name: 'pri-edition-brand',
+    transformIndexHtml: { order: 'pre', handler: html => brandIndexHtml(html, edition) },
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'manifest.webmanifest', source: manifest });
+      for (const rel of WEB_FILES) this.emitFile({ type: 'asset', fileName: rel, source: readFileSync(brandFile(edition, rel)) });
+    },
+    configureServer(server) {
+      server.middlewares.use((req, res, next) => {
+        const path = (req.url || '').split('?')[0].slice(1);
+        if (path === 'manifest.webmanifest') {
+          res.setHeader('Content-Type', 'application/manifest+json');
+          return res.end(manifest);
+        }
+        if (!WEB_FILES.includes(path)) return next();
+        res.setHeader('Content-Type', BRAND_TYPES[path.slice(path.lastIndexOf('.'))]);
+        return res.end(readFileSync(brandFile(edition, path)));
+      });
+    }
+  };
+}
+
+// The app's own edition record (plan E2). client/src/platform/edition-record.js
+// is the one module that reads the edition table; a build or dev server loads
+// this edition's record in its place, so a bundle knows its own edition's
+// defaults (course, languages, locale, currency) and nothing of the other's.
+// A real build passes mustLoad: if the replacement never happened (the module
+// moved, or its path stopped matching), the bundle would carry the default
+// edition's record and the whole table while features.json named this
+// edition, so the build stops instead.
+export const EDITION_RECORD_MODULE = fileURLToPath(new URL('./src/platform/edition-record.js', import.meta.url));
+export function editionRecordPlugin(edition, { mustLoad = false } = {}) {
+  let replaced = false;
+  return {
+    name: 'pri-edition-record',
+    load(id) {
+      if (id.split('?')[0] !== EDITION_RECORD_MODULE) return null;
+      replaced = true;
+      return editionRecordModule(edition);
+    },
+    buildEnd(error) {
+      if (mustLoad && !error && !replaced) this.error(`pri-edition-record: ${EDITION_RECORD_MODULE} was never loaded, so this build does not carry the ${edition} record`);
+    }
+  };
+}
+
 // Build-time feature flags (client/src/platform/features.js). A production
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
-export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR', 'AUSTRALIA']);
+export const FEATURE_FLAGS = Object.freeze(['PLACEMENT', 'TUTOR']);
 // The FEATURE_FLAGS a shipping build may turn on at an owner's GO, by building
 // with PRI_FEATURE_<NAME>=1. The generated iPad bundles must then carry exactly
 // what that build asked for: on only when the release environment says =1, off
@@ -463,30 +551,49 @@ export const SHIPPABLE_FEATURE_FLAGS = Object.freeze(['TUTOR']);
 // flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
 // to it, but its value comes from client/interface.config.mjs in every build and
 // on the development server alike.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT']);
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK', 'NSW_EXAMS']);
 //   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
 //   everywhere, the dev server included: off until a rights opinion exists
 //   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
 //   PARENT_REPORT — the parent weekly report's screens ("For parents" and the
 //   emailed confirm/stop page). Off until counsel has reviewed email about
 //   minors (owner default D22); the server is off too unless PRI_PARENT_REPORT=on.
+//   LIBRARY — the shared resource library's page (/library, ADR-0002 plan F1).
+//   Off in a production build: a new student surface outside the frozen V1
+//   scope ships dark until the owner turns it on. The read-only server routes
+//   (/v1/resources) answer whatever the flag says.
+//   EXAM_DESK — the Exam Desk's screens (/desk/:attemptId, /desk/import, and
+//   "Practise at the desk" on a library paper; ADR-0002 §8 plan F4b). Off in a
+//   production build until the owner's GO; it needs LIBRARY too. The server's
+//   /v1/desk routes answer a signed-in student whatever the flag says.
+//   NSW_EXAMS — Prithagoras's HSC-style timed papers on the Exams page (plan
+//   G4). Off in a production build; the server has its own switch
+//   (PRI_NSW_EXAMS=on), also off by default.
 const OPT_IN_FLAGS = new Set(['PAST_PAPERS']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
-  return { ...Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN };
+  // The regional edition (client/edition.config.mjs, ADR-0002) this build
+  // serves: PRI_EDITION, unset = Priyabhata. An unknown value stops the build.
+  return { ...Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN, edition: resolveEdition(env) };
 }
 export function featureDefines(command, env = process.env) {
   const states = featureStates(command, env);
   return {
     __PRI_FEATURE_PLACEMENT__: JSON.stringify(states.placement),
     __PRI_FEATURE_EXTENDED_TRACKS__: JSON.stringify(states.extendedTracks),
-    __PRI_FEATURE_AUSTRALIA__: JSON.stringify(states.australia),
     __PRI_FEATURE_EXAM_HANDWRITING__: JSON.stringify(states.examHandwriting),
     __PRI_FEATURE_INSTRUMENT__: JSON.stringify(states.instrument),
     __PRI_FEATURE_PAST_PAPERS__: JSON.stringify(states.pastPapers),
     __PRI_FEATURE_PARENT_REPORT__: JSON.stringify(states.parentReport),
-    __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin)
+    __PRI_FEATURE_LIBRARY__: JSON.stringify(states.library),
+    __PRI_FEATURE_EXAM_DESK__: JSON.stringify(states.examDesk),
+    __PRI_FEATURE_NSW_EXAMS__: JSON.stringify(states.nswExams),
+    __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
+    __PRI_EDITION__: JSON.stringify(states.edition),
+    // Plan E5: false in a build of an edition with no payment provider, so its
+    // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).
+    __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0)
   };
 }
 
@@ -516,7 +623,7 @@ export default defineConfig(({ command }) => {
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
       __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
     },
-    plugins: [react(), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
+    plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), editionBrand(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',

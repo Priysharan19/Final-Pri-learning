@@ -1,8 +1,8 @@
 import { useEffect, useRef } from 'react';
 
-// The Aurora skin's light pools (ported from #655, commit 70026a687): three
-// soft pools of light on the desk, drifting on the compositor (transform
-// only). App.jsx mounts this only where no question, ink or review surface is
+// The Aurora skin's light pool (ported from #655, commit 70026a687; one pool
+// in the edition's light since Lit Instrument D3): a soft pool of light on the
+// desk, drifting on the compositor (transform only). App.jsx mounts this only where no question, ink or review surface is
 // in view — the Index, the Map and Settings — and only when the setting's
 // skin is 'aurora'. While mounted it marks <html data-aurora-pools> so those
 // pages drop their own backdrop (aurora.css), and every surface holding
@@ -23,7 +23,7 @@ export default function Aurora() {
   }, []);
   return (
     <div ref={ref} className="a-aurora" aria-hidden="true" data-aurora-pools>
-      <i /><i /><i />
+      <i />
     </div>
   );
 }

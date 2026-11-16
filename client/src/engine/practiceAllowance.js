@@ -5,7 +5,8 @@
  * (server/platform/practiceAllowance.js at POST /v1/practice/issue and
  * POST /v1/practice/:id/repeat), counting its own issued questions per account.
  *
- * The server's day is the Indian calendar day: Asia/Kolkata, UTC+05:30, no
+ * The server's day is the edition's calendar day (practiceDayTimeZone below):
+ * for Priyabhata the Indian calendar day, Asia/Kolkata, UTC+05:30, no
  * daylight saving. The device's own pre-check uses the profile's calendar,
  * which for an India profile is Asia/Kolkata unless the student set another
  * zone — so the two agree for every India profile by default, and where they
@@ -16,6 +17,28 @@
  * fails at boot in the container (see examAllowance.js).
  */
 export const FREE_PRACTICE_ALLOWANCE = Object.freeze({ perDay: 20, timeZone: 'Asia/Kolkata' });
+
+/**
+ * The calendar each regional edition counts the free-practice day in (plan
+ * H7, ADR-0002): the edition's own timezone, daylight saving included.
+ * Priyabhata's is FREE_PRACTICE_ALLOWANCE.timeZone above, unchanged.
+ *
+ * A copy, not an import: the engine folder may not read the edition table
+ * (edition-config-check §5 allows one reader under client/src), so
+ * server/test/edition-ai-budgets-check.mjs holds every entry here equal to
+ * each edition's `timezone` in that table, and fails an edition that is
+ * missing.
+ */
+export const PRACTICE_DAY_TIME_ZONES = Object.freeze({
+  priyabhata: FREE_PRACTICE_ALLOWANCE.timeZone,
+  prithagoras: 'Australia/Sydney'
+});
+
+/** The timezone an edition's practice day is counted in; throws on an unknown edition. */
+export function practiceDayTimeZone(editionId) {
+  if (!Object.hasOwn(PRACTICE_DAY_TIME_ZONES, editionId)) throw new Error(`No practice day for edition ${JSON.stringify(editionId)}`);
+  return PRACTICE_DAY_TIME_ZONES[editionId];
+}
 
 /**
  * The issue modes the cap counts: the ones the Practice surface serves through

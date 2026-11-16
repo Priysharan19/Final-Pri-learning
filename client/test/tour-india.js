@@ -60,7 +60,7 @@ export const flow = {
     }
     await check('the landing screen IS the account sign-in: one card, an email first',
       await page.locator('[data-signin-card="page"] #signup-destination[type="email"]').count() === 1);
-    await check('the tab is titled after the app', (await page.title()) === 'Pri Learning',
+    await check('the tab is titled after the edition', (await page.title()) === 'Priyabhata',
       `title reads ${JSON.stringify(await page.title())}`);
     const description = (await page.locator('meta[name="description"]').getAttribute('content')) || '';
     await check('the page description is written for Indian students',
@@ -70,7 +70,7 @@ export const flow = {
       try { return await (await fetch('/manifest.webmanifest')).json(); } catch (err) { return { error: String(err) }; }
     });
     await check('the web app manifest describes the Indian product',
-      manifest.name === 'Pri Learning' && /NCERT/.test(manifest.description || '') && !/HSC|iPad/i.test(manifest.description || ''),
+      manifest.name === 'Priyabhata' && /NCERT/.test(manifest.description || '') && !/HSC|iPad/i.test(manifest.description || ''),
       `manifest reads ${JSON.stringify(manifest)}`);
 
     // ── 2 · account first: the card asks for a verified contact, not a local profile ─

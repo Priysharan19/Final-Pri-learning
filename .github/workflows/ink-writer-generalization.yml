@@ -1,6 +1,7 @@
 name: Pri Ink V17 writer generalization
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'tools/ink-foundation/data_v4.py'
@@ -41,6 +42,8 @@ permissions:
 
 jobs:
   writer-generalization-smoke:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

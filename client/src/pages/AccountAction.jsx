@@ -48,7 +48,7 @@ function Shell({ children }) {
   return (
     <div className="auth-wrap">
       <div className="card" style={{ width: 'min(520px, calc(100% - 32px))', margin: 'auto', padding: 28 }}>
-        <Wordmark large />
+        <Wordmark large byline />
         <div style={{ marginTop: 24 }}>{children}</div>
       </div>
     </div>

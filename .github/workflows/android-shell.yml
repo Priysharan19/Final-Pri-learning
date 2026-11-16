@@ -51,6 +51,8 @@ permissions:
 
 jobs:
   build:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Gradle build, lint, unit tests and web parity
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -99,6 +101,8 @@ jobs:
           if-no-files-found: warn
 
   emulator:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Shell on emulator (API ${{ matrix.api }}, ${{ matrix.profile }}, ${{ matrix.expect }})
     runs-on: ubuntu-latest
     timeout-minutes: 45

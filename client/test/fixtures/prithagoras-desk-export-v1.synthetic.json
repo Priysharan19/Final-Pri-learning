@@ -1,0 +1,41 @@
+{
+  "exportVersion": 1,
+  "createdAt": "2026-11-12T11:42:07.000Z",
+  "resource": {
+    "id": "2027-mathematics-advanced-assessment-1",
+    "title": "2027 HSC Mathematics Advanced — 100-Mark Practice Examination",
+    "year": 2027
+  },
+  "exam": {
+    "marks": 100,
+    "questions": 27,
+    "readingMinutes": 10,
+    "workingMinutes": 180
+  },
+  "session": {
+    "phase": "working",
+    "running": true,
+    "lastUpdated": "2026-11-12T11:41:55.000Z",
+    "remainingTimeSeconds": 4360
+  },
+  "counts": {
+    "done": 4,
+    "flagged": 2,
+    "unseen": 21
+  },
+  "statuses": {
+    "1": "done",
+    "2": "done",
+    "3": "flagged",
+    "5": "done",
+    "11": "done",
+    "14": "flagged"
+  },
+  "notes": {
+    "3": "check the domain before squaring",
+    "11": "used the chain rule; compare with the published solution",
+    "12": "",
+    "14": "I need to revisit the argument.\nTry the substitution u = x^2."
+  },
+  "notice": "Personal practice record only. Not a marked examination or official HSC result."
+}

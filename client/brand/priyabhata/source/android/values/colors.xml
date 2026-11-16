@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Priyabhata icon colours (day). Merge into android/app/src/main/res/values/colors.xml; pri_background stays as it is. -->
+<resources>
+    <color name="pri_icon_background">#FFF3EFE6</color>
+    <color name="pri_icon_ink">#FF1A1D21</color>
+    <color name="pri_icon_prime">#FFB8402A</color>
+    <color name="pri_icon_accent">#FF0A6670</color>
+</resources>

@@ -20,6 +20,7 @@ The canonical release identity is defined by `release/metadata.json` plus the ex
 | --- | --- | --- |
 | `Priysharan19/Final-Pri-learning` | current production repository | **authoritative** on `main` |
 | `Priysharan19/Pri-Learning-India` | historical/migration source | non-authoritative; code may be considered only by explicit SHA-level reconciliation. Its hosted shell at `pri-learning-staging.vercel.app` is a **retired host** (below) |
+| `Priysharan19/prithagoras-web` | feature source for the Prithagoras (Australia) edition; public resource-discovery site | non-authoritative for the learning app. Its library, bookmarks, publishing and Exam Desk are migrated into this repository through reviewed PRs (ADR-0002, `regional-editions-plan.md`); the static site may stay live as a public entry point |
 | `Priysharan19/Pri-Forge` | separate engineering/automation project | not a Pri Learning production predecessor |
 | `Priysharan19/Pri-money` | separate project | not a Pri Learning production predecessor |
 

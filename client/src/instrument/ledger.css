@@ -17,7 +17,7 @@ html.ui-instrument .hist-row.in-led-row.is-sel::before { content: ""; position: 
   display: grid; grid-template-columns: 10px 40px minmax(0, 1fr) 170px 112px 52px; gap: 16px; align-items: center;
   min-height: 52px; padding: 0 0 0 22px; border: 0; background: none; color: var(--in-tx); text-align: left; cursor: pointer; font: inherit;
 }
-.in-led-main:focus-visible { outline: 2px solid var(--in-signal); outline-offset: -2px; border-radius: 2px; }
+.in-led-main:focus-visible { outline: 2px solid var(--in-tx); outline-offset: -2px; border-radius: 2px; }
 .in-led-cc { width: 8px; height: 8px; border-radius: 2px; background: var(--cc); }
 .in-led-id, .in-led-tm { font: 500 12px var(--in-mono); color: var(--in-tx-3); }
 .in-led-tm { text-align: right; font-variant-numeric: tabular-nums; }

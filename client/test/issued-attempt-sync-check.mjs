@@ -267,7 +267,8 @@ Handle.get = plainGet;
     'POST /exams/:id/submit': 'exam-paper rows, under the exam lock', 'POST /rush/start': 'creates the run\'s rows',
     'POST /match/start': 'creates the match\'s rows', 'POST /history/:id/retry': 'creates a new row', 'POST /notebook/:id/twin': 'creates a new row'
   };
-  const writer = /put\('questions'|store: 'questions'|\bresolve\(|gradeOnServer\(|revealOnServer\(|requireServerIssue\(|adoptPaperResult\(/;
+  // storeServerPaper (plan G4) writes a freshly issued paper's question rows for POST /exams.
+  const writer = /put\('questions'|store: 'questions'|\bresolve\(|gradeOnServer\(|revealOnServer\(|requireServerIssue\(|adoptPaperResult\(|storeServerPaper\(/;
   const table = backend.slice(0, backend.indexOf('\n};\n', backend.indexOf("'POST /practice/:id/submit'")));
   const starts = [...table.matchAll(/^ {2}'((?:GET|POST|PUT|PATCH|DELETE) [^']+)': async/mg)];
   const unaccounted = [], writers = [];

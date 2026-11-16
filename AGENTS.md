@@ -13,6 +13,7 @@ The canonical definitions are:
 - `docs/architecture/repository-authority.md` — production repository/branch authority and predecessor classification.
 - `docs/architecture/authoritative-architecture.md` — current online-first web/server/native runtime authority.
 - `docs/architecture/adr-0001-online-first-runtime.md` — online-first decision (Railway, Supabase Mumbai, OpenAI) and its migration phases.
+- `docs/architecture/adr-0002-one-platform-two-editions.md` — one platform, two regional editions (Priyabhata · India, Prithagoras · Australia); edition vs course; build once, certify per edition.
 - `docs/release/release-policy.md` — reviewed integration, required CI and release identity policy.
 - `.pri-os/fleet.json` — agents, specificity-resolved primary ownership, reviewer overlays, typed gates and risk classes.
 - `.pri-os/mission-control.json` — persistent GitHub-Issue mission ledger, state machine, writer lease, retry ceiling and deterministic priority policy.
@@ -85,7 +86,7 @@ GitHub Issues are the durable mission ledger. A managed issue contains the canon
 
 Autonomous PR governance (`.github/workflows/pri-agent-governance.yml`, `validate-ledger`) verifies that the PR's mission is an open managed issue in a writer-holding or review state, that its mission/agent/branch/risk match the PR, that its required markers are well-formed, that its heartbeat reference or review head equals the exact PR head, and that the writer pool is within its cap. Every call passes the exact head SHA as the sixth argument.
 
-The signed-admission programme (`admit`, the `pri-writer-admissions` rulesets, `scripts/pri-admission-*.mjs`, `scripts/pri-trusted-*.mjs`) stays dormant (owner default D26, 1 November 2026): `admit` denies every candidate by design, no GitHub App or control store is provisioned, and the branches that would activate it (#626, #647, #681) do not merge. The governance that applies is the smallest one: a `task/*`, `feature/*` or `agent/mission/*` branch, a pull request into `main`, the four required CI contexts with strict up-to-date checking and conversation resolution, a recorded independent review on the exact head of every R4 change, one serial merger, and production promoted only by the owner's fast-forward of `deploy/production` (`docs/release/release-policy.md`).
+The signed-admission programme (`admit`, the `pri-writer-admissions` rulesets, `scripts/pri-admission-*.mjs`, `scripts/pri-trusted-*.mjs`) stays dormant (owner default D26, 1 November 2026): `admit` denies every candidate by design, no GitHub App or control store is provisioned, and the branches that would activate it (#626, #647, #681) do not merge. The governance that applies is the smallest one: a `task/*`, `feature/*` or `agent/mission/*` branch, a pull request into `main`, the four required CI contexts with strict up-to-date checking and conversation resolution (lane pull requests run those and the always-on gates; the heavy workflows run on `task/train-*` pull requests, so only trains merge into `main`; Main Integrity fails any other merge after the fact, which withholds its staging proof and so its production promotion — `docs/release/ci-lanes.md`), a recorded independent review on the exact head of every R4 change, one serial merger, and production promoted only by the owner's fast-forward of `deploy/production` (`docs/release/release-policy.md`).
 
 ## Failure handling
 
@@ -116,6 +117,7 @@ The diff-derived risk is authoritative. A PR may declare a higher risk, never a 
 - Security regressions are release-blocking.
 - Add a deterministic regression test for every production bug when feasible.
 - Do not make unsupported competitor-superiority, accuracy, syllabus-complete or production-ready claims.
+- One platform, two editions (ADR-0002): build every learning feature once in the shared platform and verify it against both Priyabhata and Prithagoras. Editions differ only in curriculum, presentation, language, commercial configuration and legal requirements — never in marking, OCR, feedback or examination behaviour. Certification gates (e.g. #499) bind both brands.
 - Work through branch + PR. Never directly update `main`.
 - Destructive production operations, irreversible migrations, secret rotation, payment-provider actions, App Store publishing and legal/privacy sign-off require explicit external authority even when the code is ready.
 

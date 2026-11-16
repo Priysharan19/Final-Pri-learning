@@ -208,7 +208,14 @@ const waitFor = (test, seconds) => {
   return null;
 };
 const contentLog = [];
-const kill = pid => { try { process.kill(pid, 'SIGKILL'); contentLog.push(`killed WebContent ${pid}`); return true; } catch { return false; } };
+const legStart = Date.now();
+const at = () => `${((Date.now() - legStart) / 1000).toFixed(1)} s`;
+const killed = new Set();
+const kill = pid => {
+  if (killed.has(pid)) return false;
+  try { process.kill(pid, 'SIGKILL'); killed.add(pid); contentLog.push(`killed WebContent ${pid} at ${at()}`); return true; } catch { return false; }
+};
+const endCount = () => readLines().filter(l => l.startsWith('PRIBRIDGE contentProcessEnded')).length;
 if (lines.some(l => l.startsWith('PRIBRIDGE summary'))) {
   if (!waitFor(() => readLines().includes('PRIBRIDGE ready for content process end'), 60)) contentLog.push('the app never armed the content-process leg');
   else {
@@ -216,14 +223,23 @@ if (lines.some(l => l.startsWith('PRIBRIDGE summary'))) {
     if (!first.length) contentLog.push('no WebContent process found under this device');
     first.forEach(kill);
     waitFor(() => readLines().some(l => l.startsWith('PRIBRIDGE recovery 1 summary')), 120);
-    // Crash loop: kill each new process as it starts, until the shell stops reloading.
-    let seen = new Set(first);
-    for (let k = 0; k < 4 && !readLines().some(l => /action=stopped/.test(l)); k++) {
-      const fresh = waitFor(() => { const now = webContentPids().filter(p => !seen.has(p)); return now.length ? now : null; }, 30);
-      if (!fresh) { contentLog.push('no new WebContent process started'); break; }
-      fresh.forEach(p => { seen.add(p); kill(p); });
-      waitFor(() => readLines().filter(l => l.startsWith('PRIBRIDGE contentProcessEnded')).length >= k + 2, 20);
+    // Crash loop: keep the page dying. Every WebContent process under this
+    // device is killed the moment it appears (polled every 0.25 s), so each
+    // reload's process ends a few seconds after the end before it, whatever
+    // the runner's speed. The shell's run is chained (an end counts when it
+    // comes within 30 s of the one before), so it must stop at the third end.
+    // The earlier harness killed one new pid, then waited up to 20 s for an
+    // end and up to 30 s for the next pid: on a slow iPhone simulator a kill
+    // that hit WebKit's spare process (no page, no end) let more than 30 s
+    // pass, the chain restarted (n=1,2,1,2) and the check failed on timing,
+    // not on the shell (Train editions-8, run 43460173992).
+    const loopStart = Date.now();
+    contentLog.push(`crash loop from ${at()}`);
+    while (Date.now() - loopStart < 90_000 && endCount() < 8 && !readLines().some(l => /action=stopped/.test(l))) {
+      webContentPids().forEach(kill);
+      execSync('sleep 0.25');
     }
+    contentLog.push(`crash loop ended at ${at()} after ${endCount()} end(s)`);
     waitFor(() => readLines().includes('PRIBRIDGE contentStopped shown'), 20);
   }
   lines = readLines();

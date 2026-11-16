@@ -1,0 +1,29 @@
+/* The Exam Desk (client/src/desk). Instrument tokens only; the shell's layout
+   is examShell.css. No result styling exists here: the desk has no result. */
+.dk-page { max-width: 1180px; margin: 0 auto; padding: 0 16px 64px; }
+.dk-import { max-width: 760px; display: grid; gap: 12px; justify-items: start; }
+.dk-back { margin: 8px 0; }
+/* Every control of the desk is a 44 px target, whatever the pointer: it is built for a hand and a Pencil. */
+.dk-page .btn, .dk-entry .btn, .dk-choose .input { min-height: 44px; }
+.dk-plate { display: inline-block; margin: 0; padding: 4px 8px; border-radius: 4px; box-shadow: inset 0 0 0 1px var(--in-edge-3); font: 500 0.68rem var(--in-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--in-tx-2); }
+.dk-status { display: flex; flex-wrap: wrap; gap: 4px 18px; margin: 0; min-height: 1.4em; font: 500 0.75rem var(--in-mono); color: var(--in-tx-2); }
+.dk-honest { padding: 12px 14px; border: 1px solid var(--in-edge-2); border-radius: 8px; }
+.dk-honest p { margin: 0 0 8px; }
+.dk-actions, .dk-clock-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.dk-clock-actions { padding-top: 12px; border-top: 1px solid var(--in-edge-2); }
+.dk-clock-actions .in-note { flex-basis: 100%; margin: 0; }
+.dk-keys { justify-self: start; }
+.dk-closed, .dk-entry, .dk-preview { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--in-edge-2); border-radius: 8px; background: var(--in-l1); }
+.dk-closed h2, .dk-entry h2, .dk-preview h2 { margin: 0; font-size: 1.1rem; }
+.dk-closed p, .dk-entry p, .dk-preview p { margin: 0; }
+.dk-entry { margin: 20px 0; justify-items: start; }
+.dk-entry h3 { margin: 6px 0 0; font-size: 0.95rem; }
+.dk-ledger { display: grid; gap: 8px; margin: 4px 0; }
+.dk-ledger div { display: grid; grid-template-columns: minmax(120px, 200px) 1fr; gap: 12px; }
+.dk-ledger dt { color: var(--in-tx-2); font-size: 0.85rem; }
+.dk-ledger dd { margin: 0; font-variant-numeric: tabular-nums; }
+.dk-history { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.dk-history li { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.dk-history a { display: inline-flex; align-items: center; min-height: 44px; color: var(--in-tx); }
+.dk-preview-paper { font-weight: 600; }
+.dk-choose { display: grid; gap: 6px; width: 100%; }

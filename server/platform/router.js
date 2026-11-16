@@ -18,6 +18,9 @@ import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
 import { createExamRouter } from './exams.js';
+import { createResourceRouter } from './resources.js';
+import { createDeskRouter } from './desk.js';
+import { createCurriculumRouter } from './curriculum.js';
 import { createWorkingRouter } from './working.js';
 import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
@@ -28,6 +31,7 @@ import { csrfGuard, originGuard } from './security.js';
 import { housekeepingStatus } from './housekeeping.js';
 import { operatorHealthDetail } from './operatorHealth.js';
 import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
+import { refuseOtherEdition, serverEdition } from './edition.js';
 import { readinessReport } from './readiness.js';
 import { createTestMailboxRouter } from './testMailbox.js';
 import { tagPolicy } from './routePolicy.js';
@@ -63,7 +67,7 @@ const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
 // and no cookie. Its token can only stop parent reports (parentReport.js).
 const ONE_CLICK_UNSUBSCRIBE = /^\/parent-report\/unsubscribe\/one-click$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {}, desk = {} } = {}) {
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
@@ -82,14 +86,19 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // Old native shells get a structured upgrade answer, not odd failures (CP-11).
   router.use(clientCompatibility());
 
+  // Resolved once, when the router is built: an unknown PRI_EDITION stops the
+  // server here rather than answering health checks under no edition.
+  const edition = serverEdition();
+
   // LIVENESS. Cheap, and up while the process is: a database outage is
   // reported here as a field, never as a failure of this endpoint, so an
   // orchestrator does not restart a healthy process in a loop. Readiness —
   // whether this replica can actually serve — is /v1/ready.
   //
   // EXPOSURE. Anonymous callers get the ok flag, the release identity, the
-  // schema versions, the engine name and whether the database answered — what
-  // an uptime check needs and nothing an attacker can act on. Which identity,
+  // regional edition, the schema versions, the engine name and whether the
+  // database answered — what an uptime check needs and nothing an attacker can
+  // act on. Which identity,
   // email and billing providers are configured, the Google notification
   // backlog and the housekeeping purge counts are operator detail: they are
   // answered only to the holder of PRI_METRICS_TOKEN (the /v1/metrics gate),
@@ -135,6 +144,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
       // so a native archive's release evidence can tell staging from
       // production behind https://app.prilearning.com. A short token, never a URL.
       environment: deploymentEnvironment(),
+      // Which regional edition this deployment serves (client/edition.config.mjs,
+      // ADR-0002): a short id, 'priyabhata' or 'prithagoras'.
+      edition,
       // The per-account storage cap every device is held to: two numbers a
       // client may show, never a per-account figure.
       syncQuota: { maxBytesPerAccount: quota.maxBytesPerAccount, maxEventsPerAccount: quota.maxEventsPerAccount },
@@ -154,6 +166,14 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     }
     res.json(report);
   });
+
+  // EDITION (ADR-0002, plan E2). A client that declares another edition in
+  // X-Pri-Edition is refused here (409 EDITION_MISMATCH) on everything below.
+  // /v1/health and /v1/ready above stay open, so a mismatched app can still
+  // read the health reply that tells it which service it reached. The header
+  // only ever refuses: it selects no data, brand, currency or authorization,
+  // and a request without it passes unchanged (edition.js).
+  router.use(refuseOtherEdition(edition));
 
   // OPERATIONAL SIGNALS. Counters, latency and evaluated alert rules for an
   // operator holding PRI_METRICS_TOKEN; closed in production without one.
@@ -236,6 +256,19 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // eligibility as checking one answer (session, verified email, student,
   // guardian consent), for the whole life of the paper.
   router.use('/exams', requireGuardianConsent(db), createExamRouter(db));
+  // The shared resource library (ADR-0002 plan F1): published resources of
+  // this server's edition, for signed-in accounts. Read-only.
+  router.use('/resources', requireGuardianConsent(db), createResourceRouter(db, resources));
+  // The Exam Desk (ADR-0002 §8 plan F4): the UNMARKED mode of the
+  // examination system — practice at a library paper under reading and
+  // working time, notes and flags, never a mark. A sibling of /exams that
+  // shares none of its marking, counting or allowance code (desk.js). Same
+  // eligibility as a marked paper; free on every plan.
+  router.use('/desk', requireGuardianConsent(db), createDeskRouter(db, { edition: resources.edition, ...desk }));
+  // The curriculum this edition teaches, with honest availability (plan G3):
+  // the current NSW outcomes on a Prithagoras server. Read-only; its own
+  // guards are on the route (curriculum.js).
+  router.use('/curriculum', createCurriculumRouter(db, { edition }));
   router.use('/forecast', requireGuardianConsent(db), createForecastRouter(db));
   router.use('/handwriting', requireGuardianConsent(db), createHandwritingRouter(db));
   router.use('/working', requireGuardianConsent(db), createWorkingRouter(db));

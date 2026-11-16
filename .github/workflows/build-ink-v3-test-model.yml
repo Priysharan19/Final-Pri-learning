@@ -8,6 +8,13 @@ on:
       - 'tools/ink-foundation/requirements.txt'
       - 'tools/ink-foundation/batching.py'
       - 'tools/ink-foundation/train_trimmed.py'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-ink-v3-test-model.yml'
+      - 'tools/ink-foundation/requirements.txt'
+      - 'tools/ink-foundation/batching.py'
+      - 'tools/ink-foundation/train_trimmed.py'
 
 permissions:
   contents: read
@@ -22,6 +29,8 @@ concurrency:
 
 jobs:
   train-model:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Train verified V3 DEBUG checkpoint
     runs-on: ubuntu-latest
     timeout-minutes: 55
@@ -107,6 +116,8 @@ jobs:
           retention-days: 1
 
   export-model:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Export and verify DEBUG Core ML artifact
     needs: train-model
     runs-on: macos-14

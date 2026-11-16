@@ -25,6 +25,7 @@
 //
 // Pure: no network, no storage, no DOM.
 // ─────────────────────────────────────────────────────────────────────────────
+import { limitClock } from '../lib/locale.js';
 
 /** How many times a reader that did not answer is tried again without being asked. */
 export const AUTO_RETRY_MAX = 3;
@@ -116,10 +117,23 @@ export function stoppedKey(key) {
   return key;
 }
 
-/** "at about 4:35 pm", in the student's language; '' when there is no time to give. */
-export function retryClock(retryAt, language = 'en') {
+/**
+ * "at about 4:35 pm", in the student's language; '' when there is no time to
+ * give. `profile` (optional) is the signed-in student: for a profile outside
+ * the India course (an NSW student of Prithagoras, plan H7) the time is
+ * written in that profile's locale (en-AU), on the timezone the profile has
+ * set or else the device's clock (lib/locale.js limitClock). An India
+ * profile, and a call with no profile, are written exactly as before: en-IN
+ * or hi-IN, on the device's clock.
+ */
+export function retryClock(retryAt, language = 'en', profile = null) {
   if (retryAt === null || retryAt === undefined || !Number.isFinite(Number(retryAt)) || Number(retryAt) <= 0) return '';
+  const hindi = String(language || 'en').toLowerCase().startsWith('hi');
+  const regional = hindi ? null : limitClock(profile);
   try {
-    return new Intl.DateTimeFormat(String(language || 'en').toLowerCase().startsWith('hi') ? 'hi-IN' : 'en-IN', { hour: 'numeric', minute: '2-digit' }).format(new Date(Number(retryAt)));
+    if (regional) {
+      return new Intl.DateTimeFormat(regional.locale, { hour: 'numeric', minute: '2-digit', ...(regional.timeZone ? { timeZone: regional.timeZone } : {}) }).format(new Date(Number(retryAt)));
+    }
+    return new Intl.DateTimeFormat(hindi ? 'hi-IN' : 'en-IN', { hour: 'numeric', minute: '2-digit' }).format(new Date(Number(retryAt)));
   } catch { return ''; }
 }

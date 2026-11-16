@@ -27,9 +27,6 @@
 //                             build still records it here as a constant so
 //                             code can branch on it, and it is true wherever
 //                             Vite builds or serves the app.
-//   PRI_FEATURE_AUSTRALIA=1   the onboarding link to the Australian syllabuses
-//                             (V1 is India-only; existing Australian profiles
-//                             keep working either way)
 //
 // client/vite.config.js turns each PRI_FEATURE_* environment variable into a
 // compile-time boolean (`__PRI_FEATURE_PLACEMENT__`). `vite build` without the
@@ -48,11 +45,11 @@
 import { INTERFACE_SKIN as SETTING_SKIN } from '../../interface.config.mjs';
 
 
-/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_AUSTRALIA__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__ */
+/* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__, __PRI_FEATURE_LIBRARY__, __PRI_FEATURE_EXAM_DESK__ */
+/* global __PRI_FEATURE_NSW_EXAMS__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
   extendedTracks: typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' ? __PRI_FEATURE_EXTENDED_TRACKS__ : null,
-  australia: typeof __PRI_FEATURE_AUSTRALIA__ === 'boolean' ? __PRI_FEATURE_AUSTRALIA__ : null,
   // PRI_FEATURE_EXAM_HANDWRITING=1 — handwriting input in timed exams. OFF by
   // default in a production build: a paper then offers Type only.
   examHandwriting: typeof __PRI_FEATURE_EXAM_HANDWRITING__ === 'boolean' ? __PRI_FEATURE_EXAM_HANDWRITING__ : null,
@@ -63,7 +60,20 @@ const BUILT = {
   // PRI_FEATURE_PARENT_REPORT=1 — the parent weekly report's screens. OFF in a
   // production build until counsel has reviewed email about minors (D22); the
   // server is off too unless PRI_PARENT_REPORT=on (server/platform/parentReport.js).
-  parentReport: typeof __PRI_FEATURE_PARENT_REPORT__ === 'boolean' ? __PRI_FEATURE_PARENT_REPORT__ : null
+  parentReport: typeof __PRI_FEATURE_PARENT_REPORT__ === 'boolean' ? __PRI_FEATURE_PARENT_REPORT__ : null,
+  // PRI_FEATURE_LIBRARY=1 — the shared resource library's page (/library,
+  // ADR-0002 plan F1). OFF in a production build: a new student surface outside
+  // the frozen V1 scope, so V1 behaviour is unchanged until the owner's GO.
+  library: typeof __PRI_FEATURE_LIBRARY__ === 'boolean' ? __PRI_FEATURE_LIBRARY__ : null,
+  // PRI_FEATURE_EXAM_DESK=1 — the Exam Desk (/desk/:attemptId, /desk/import;
+  // ADR-0002 §8 plan F4b): unmarked, timed practice on a library paper. OFF in
+  // a production build until the owner's GO. It is reached from a library
+  // paper, so it also needs PRI_FEATURE_LIBRARY (App.jsx holds both).
+  examDesk: typeof __PRI_FEATURE_EXAM_DESK__ === 'boolean' ? __PRI_FEATURE_EXAM_DESK__ : null,
+  // PRI_FEATURE_NSW_EXAMS=1 — Prithagoras's HSC-style timed papers on the
+  // Exams page (plan G4). OFF in a production build: it ships dark, and the
+  // server is off too unless PRI_NSW_EXAMS=on (server/platform/nswExamPool.js).
+  nswExams: typeof __PRI_FEATURE_NSW_EXAMS__ === 'boolean' ? __PRI_FEATURE_NSW_EXAMS__ : null
 };
 
 // The student interface as a build constant (client/interface.config.mjs).

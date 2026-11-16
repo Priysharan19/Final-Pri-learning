@@ -1,7 +1,9 @@
 name: Pri Ink Corpus Evidence
 
 on:
+  workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'tools/ink-foundation/corpus_policy.json'
       - 'tools/ink-foundation/audit_writer_diversity.py'
@@ -31,6 +33,8 @@ concurrency:
 
 jobs:
   evidence:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: V17.1 writer-disjoint corpus evidence firewall
     runs-on: ubuntu-latest
     timeout-minutes: 15

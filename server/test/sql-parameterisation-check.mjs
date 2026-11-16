@@ -29,6 +29,8 @@ const REVIEWED = {
   "db.greatest('billing_subscriptions.trial_claimed', 'excluded.trial_claimed')": 'store.js dialect helper on literal columns',
   "db.greatest('billing_payments.amount', 'excluded.amount')": 'same',
   'latest.filter': 'content.js: one of two constant WHERE fragments; its value is bound separately',
+  VISIBLE: 'resources.js: one constant WHERE fragment (published, external https, offered to this edition); the edition is bound as ?',
+  "where.join(' AND ')": 'resources.js: VISIBLE plus constant per-filter fragments chosen from closed sets; every filter and search value is bound as ?',
   sql: 'authDelivery.js boot-time ALTER TABLE from a literal column list',
   list: 'db.js boot-time migration from a literal column list',
   table: 'billingSchema.js/db.js boot-time ALTER TABLE on literal table names',

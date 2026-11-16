@@ -874,6 +874,11 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     // address is) and when each week's report was sent. Never the tokens.
     const parentLink = await db.get('SELECT recipient_email,status,requested_at,confirmed_at,stopped_at,stopped_by FROM parent_report_links WHERE account_id=?', [accountId]);
     const parentSends = await db.all('SELECT week_start,status,skip_reason,sent_at FROM parent_report_sends WHERE account_id=? ORDER BY week_start', [accountId]);
+    // Exam Desk attempts (desk.js): the student's own unmarked practice — the
+    // paper, the server-stamped clock, flags, done and notes. Never the
+    // idempotency key or request digests.
+    const deskRows = await db.all(`SELECT id,edition,mode,origin,resource_id,paper_json,clock_json,questions_json,state,imported_from_json,created_at,updated_at,finished_at
+      FROM desk_attempts WHERE account_id=? ORDER BY created_at, id`, [accountId]);
     // A receipt with no personal data: the format and how many rows each
     // section carried, so a bulk read of an account is visible in the audit
     // trail without copying any of it.
@@ -924,7 +929,16 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
           stoppedAt: parentLink.stopped_at == null ? null : Number(parentLink.stopped_at), stoppedBy: parentLink.stopped_by || null } : null,
         sends: parentSends.map(row => ({ weekStart: Number(row.week_start), status: row.status, skipReason: row.skip_reason || null,
           sentAt: row.sent_at == null ? null : Number(row.sent_at) }))
-      }
+      },
+      deskAttempts: deskRows.map(row => {
+        const json = (text, fallback) => { try { return JSON.parse(text); } catch { return fallback; } };
+        return {
+          id: row.id, mode: row.mode, edition: row.edition, origin: row.origin, resourceId: row.resource_id,
+          paper: json(row.paper_json, null), clock: json(row.clock_json, null), questions: json(row.questions_json, {}),
+          state: row.state, imported: row.imported_from_json ? json(row.imported_from_json, null) : null,
+          createdAt: Number(row.created_at), updatedAt: Number(row.updated_at), finishedAt: row.finished_at == null ? null : Number(row.finished_at)
+        };
+      })
     });
   });
 

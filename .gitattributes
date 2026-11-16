@@ -21,3 +21,9 @@
 *.woff binary
 *.woff2 binary
 *.ttf binary
+
+# The CI check-count manifest merges one pin at a time when the local driver is
+# configured (docs/release/ci-lanes.md):
+#   git config merge.pri-check-counts.driver 'node tools/ci-check-counts.mjs merge %O %A %B'
+# Without that config git falls back to its ordinary text merge.
+ci/check-counts.json merge=pri-check-counts

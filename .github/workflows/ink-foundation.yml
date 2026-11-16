@@ -1,7 +1,9 @@
 name: Ink Foundation
 
 on:
+  workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - 'tools/ink-foundation/**'
       - 'handwriting/v12/**'
@@ -23,10 +25,13 @@ permissions:
 
 concurrency:
   group: ink-foundation-${{ github.ref }}
-  cancel-in-progress: true
+  # Main's runs are evidence; only a superseded pull-request head is cancelled.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   tooling:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Model tooling and training contract
     runs-on: ubuntu-latest
     timeout-minutes: 20

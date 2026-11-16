@@ -253,6 +253,8 @@ const BODY_RULES = [
     requireObject(body, 'POST /exams'); optionalNumber(body, 'length'); optionalNumber(body, 'minutes'); optionalNumber(body, 'year');
     // WP india-exams: CBSE Class X Standard/Basic variant and a reproducible paper seed.
     optionalString(body, 'variant', 20); optionalNumber(body, 'seed'); optionalString(body, 'source', 20);
+    // Plan G4: an NSW paper is named by its blueprint id alone.
+    optionalString(body, 'nsw', 64);
   }],
   [/^POST \/exams\/[A-Za-z0-9._-]+\/submit$/, body => {
     requireObject(body, 'exam submit'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120); optionalNumber(body, 'ms');

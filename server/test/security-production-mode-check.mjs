@@ -40,6 +40,8 @@ const distDir = join(tmp, 'dist');
 mkdirSync(join(distDir, 'assets'), { recursive: true });
 writeFileSync(join(distDir, 'index.html'), '<!doctype html><html><head><title>Pri</title><script type="module" src="/assets/app.js"></script></head><body></body></html>\n');
 writeFileSync(join(distDir, 'assets', 'app.js'), 'export {};\n');
+// As a real build does (vite.config.js featureManifest): the server only serves a client of its own edition.
+writeFileSync(join(distDir, 'features.json'), JSON.stringify({ edition: 'priyabhata' }));
 
 const h = await startApp({ dist: distDir });
 const inventory = loadInventory();

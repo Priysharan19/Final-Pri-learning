@@ -79,6 +79,8 @@ env:
 
 jobs:
   native-journey-ios27:
+    # Lane gate: on a pull request only task/train-* heads run this job; main, dispatch and trains always do (docs/release/ci-lanes.md).
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Capture gate and student journey on iOS 27 (iPhone + iPad)
     runs-on: xcode-27
     timeout-minutes: 60

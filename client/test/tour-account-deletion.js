@@ -112,7 +112,7 @@ export const flows = [
         sms.clearTestOutbox();
 
         await page.goto(`${base}/account/delete-request`, { waitUntil: 'domcontentloaded' });
-        await page.getByRole('heading', { name: 'Delete your Pri Learning account' }).waitFor({ timeout: 20000 });
+        await page.getByRole('heading', { name: 'Delete your Priyabhata account' }).waitFor({ timeout: 20000 });
         await check('the public page opens with no profile and no session',
           !(await ctx.cookies()).some(cookie => /session/i.test(cookie.name)));
         await check('it tells the reader how to delete inside the app, for every sign-in method',
@@ -125,11 +125,11 @@ export const flows = [
           await page.locator('a[href="/privacy"]').count() === 1);
 
         await page.getByTestId('delete-request-lang-hi').click();
-        await page.getByRole('heading', { name: 'अपना Pri Learning खाता मिटाएँ' }).waitFor({ timeout: 10000 });
+        await page.getByRole('heading', { name: 'अपना प्रियभट खाता मिटाएँ' }).waitFor({ timeout: 10000 });
         await check('the page reads in Hindi too', await page.getByText('ऐप में', { exact: true }).isVisible());
         await shot('hindi');
         await page.getByTestId('delete-request-lang-en').click();
-        await page.getByRole('heading', { name: 'Delete your Pri Learning account' }).waitFor({ timeout: 10000 });
+        await page.getByRole('heading', { name: 'Delete your Priyabhata account' }).waitFor({ timeout: 10000 });
 
         await page.locator('#delete-request-email').fill('Leaver@Example.test');
         await page.getByTestId('delete-request-send').click();

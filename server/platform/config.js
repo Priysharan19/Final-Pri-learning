@@ -7,6 +7,8 @@ import { googleBillingConfigStatus } from './googleBilling.js';
 import { spendCeilingMissing } from './spendCeiling.js';
 import { mfaKeyConfigured, mfaKeyMalformed } from './mfa.js';
 import { sessionMaxAgeMs } from './security.js';
+import { serverEdition } from './edition.js';
+import { editionBilling, editionBillingProblems } from './billingProviders.js';
 
 function nonEmpty(name) {
   return !!String(process.env[name] || '').trim();
@@ -419,10 +421,19 @@ export function platformConfigStatus() {
   for (const name of spendCeilingMissing(env)) missing.push(name);
   if (production && !nonEmpty('PRI_TRUSTED_PROXY_HOPS')) missing.push('PRI_TRUSTED_PROXY_HOPS');
 
+  // Plan E5: which providers this deployment may sell through is its edition's
+  // decision (billingProviders.js). In production a variable of a provider the
+  // edition does not list, or a display currency that is not the edition's,
+  // stops the boot by name. An unknown PRI_EDITION throws here, as it does
+  // when the router is built.
+  const billing = editionBilling(serverEdition(env));
+  const sells = provider => billing.providers.includes(provider);
+  if (production) missing.push(...editionBillingProblems(billing.edition, env));
+
   const webMonthly = webMonthlyConfigured();
   const webAnnual = webAnnualConfigured();
   const webProducts = webMonthly || webAnnual;
-  if (production && webProducts) {
+  if (production && webProducts && sells('razorpay')) {
     for (const name of ['PRI_RAZORPAY_KEY_ID', 'PRI_RAZORPAY_KEY_SECRET', 'PRI_RAZORPAY_WEBHOOK_SECRET']) {
       if (!nonEmpty(name)) missing.push(name);
     }
@@ -431,16 +442,16 @@ export function platformConfigStatus() {
   }
 
   const appleProducts = nonEmpty('PRI_APPLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_APPLE_ANNUAL_PRODUCT_ID');
-  if (production && appleProducts) {
+  if (production && appleProducts && sells('apple')) {
     if (!appleTrustConfigured()) missing.push('PRI_APPLE_ROOT_CA_PEM or PRI_APPLE_ROOT_CA_FILE');
     if (!nonEmpty('PRI_APPLE_APP_ID')) missing.push('PRI_APPLE_APP_ID');
   }
 
-  const webBillingProviderConfigured = webProducts &&
+  const webBillingProviderConfigured = sells('razorpay') && webProducts &&
     nonEmpty('PRI_RAZORPAY_KEY_ID') && nonEmpty('PRI_RAZORPAY_KEY_SECRET') && nonEmpty('PRI_RAZORPAY_WEBHOOK_SECRET') &&
     (!webMonthly || nonEmpty('PRI_RAZORPAY_MONTHLY_TOTAL_COUNT')) &&
     (!webAnnual || nonEmpty('PRI_RAZORPAY_ANNUAL_TOTAL_COUNT'));
-  const appleBillingProviderConfigured = appleProducts && appleTrustConfigured() &&
+  const appleBillingProviderConfigured = sells('apple') && appleProducts && appleTrustConfigured() &&
     (!production || nonEmpty('PRI_APPLE_APP_ID'));
   // Google Play: product ids alone are not a provider. It is configured only
   // with a parseable Play Developer API service account (googleBilling.js), and
@@ -448,7 +459,7 @@ export function platformConfigStatus() {
   // holds and refunds would never reach the server.
   const googleBilling = googleBillingConfigStatus();
   const googleProducts = nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID');
-  if (production && googleProducts) {
+  if (production && googleProducts && sells('google')) {
     if (!googleBilling.credentialsConfigured) missing.push('PRI_GOOGLE_SERVICE_ACCOUNT_JSON or PRI_GOOGLE_SERVICE_ACCOUNT_FILE');
     if (!googleBilling.notificationsConfigured) missing.push('PRI_GOOGLE_RTDN_AUDIENCE and PRI_GOOGLE_RTDN_SERVICE_ACCOUNT');
   }
@@ -473,10 +484,12 @@ export function platformConfigStatus() {
     appleBillingProductsConfigured: appleProducts,
     appleBillingProviderConfigured,
     googleBillingProductsConfigured: nonEmpty('PRI_GOOGLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
-    googleBillingProviderConfigured: googleBilling.configured && (googleBilling.notificationsConfigured || !production),
-    googleBillingNotificationsConfigured: googleBilling.configured && googleBilling.notificationsConfigured,
+    googleBillingProviderConfigured: sells('google') && googleBilling.configured && (googleBilling.notificationsConfigured || !production),
+    googleBillingNotificationsConfigured: sells('google') && googleBilling.configured && googleBilling.notificationsConfigured,
     webBillingProductsConfigured: webProducts,
-    webBillingProviderConfigured
+    webBillingProviderConfigured,
+    edition: billing.edition,
+    billingProviders: billing.providers
   });
 }
 

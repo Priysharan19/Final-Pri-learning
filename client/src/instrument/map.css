@@ -37,7 +37,7 @@
 .in-map-list { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; }
 .in-map-list li { position: absolute; transform: translate(-50%, -50%); }
 .in-map-hit { display: block; width: 44px; height: 44px; border-radius: 50%; border: 0; background: transparent; cursor: pointer; }
-.in-map-hit:focus-visible { outline: 2px solid var(--in-signal); outline-offset: 0; }
+.in-map-hit:focus-visible { outline: 2px solid var(--in-tx); outline-offset: 0; }
 .in-map-hit-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .in-map-hit-dot { display: none; }
 /* Narrow screens: the drawing would crowd the 44px targets, so the map becomes

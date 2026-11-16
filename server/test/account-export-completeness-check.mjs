@@ -33,7 +33,8 @@ const COVERED = {
   'idempotency_keys.account_id': 'receipts',
   'account_phones.account_id': 'phones',
   'parent_report_links.account_id': 'parentReport',
-  'parent_report_sends.account_id': 'parentReport'
+  'parent_report_sends.account_id': 'parentReport',
+  'desk_attempts.account_id': 'deskAttempts'
 };
 // table.column → why it is not in the export.
 const EXCLUDED = {
@@ -127,6 +128,10 @@ try {
       [id, now - 7 * 86400000, `${tag}-PROVIDER-ID`, now, now, now]);
     const receipt = (scope, key, body) => db.run('INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)',
       [id, scope, key, JSON.stringify(body), `${tag}-DIGEST-${scope}-${key}`, now, now + 86400000]);
+    await db.run(`INSERT INTO desk_attempts(id,account_id,edition,mode,origin,resource_id,paper_json,clock_json,questions_json,state,rev,create_key,create_digest,created_at,updated_at)
+      VALUES (?,?,'prithagoras','unmarked','desk','2027-mathematics-advanced-assessment-1',?,?,?,'idle',0,?,?,?,?)`,
+    [`00000000-0000-4000-8000-00000000000${tag === 'ALICE' ? 1 : 2}`, id, JSON.stringify({ title: 'Paper', questionCount: 27 }), JSON.stringify({ v: 1, events: [] }),
+      JSON.stringify({ 3: { note: `${tag}-DESK-NOTE`, noteRev: 1 } }), `${tag}-DESK-KEY-SECRET`, `${tag}-DESK-DIGEST-SECRET`, now, now]);
     await receipt('exam-paper', `${tag}-exam-open`, { answer: `${tag}-PAPER-OPEN-SECRET` });
     await receipt('exam-answers', `${tag}-exam-open`, { answers: `${tag}-MY-EXAM-ANSWERS` });
     await receipt('exam-paper', `${tag}-exam-done`, { answer: `${tag}-PAPER-DONE` });
@@ -158,7 +163,7 @@ try {
 
   // Every covered table's seeded row is there.
   for (const marker of ['ALICE-EVENT', 'ALICE-ENTITY', 'ALICE-SUBMISSION', 'ALICE-FEEDBACK', 'ALICE-REPORT', 'ALICE-SURFACE',
-    'ALICE-MY-EXAM-ANSWERS', 'ALICE-PAPER-DONE', 'ALICE-EXAM-RESULT', 'ALICE-ANSWER-DONE', 'ALICE-COMPLETION', 'ALICE-TRANSCRIPT']) {
+    'ALICE-MY-EXAM-ANSWERS', 'ALICE-PAPER-DONE', 'ALICE-EXAM-RESULT', 'ALICE-ANSWER-DONE', 'ALICE-COMPLETION', 'ALICE-TRANSCRIPT', 'ALICE-DESK-NOTE']) {
     c.ok(text.includes(marker), `the export carries Alice's ${marker}`);
   }
   c.ok(x.classes.some(row => row.id === 'class-1'), 'the class membership is exported');
@@ -180,7 +185,7 @@ try {
 
   // ── Redacted: secrets and sealed answers ───────────────────────────────────
   const secrets = ['ALICE-UNSUB-HASH-SECRET', 'ALICE-UNSUB-ENVELOPE-SECRET', 'alice.parent@example.test', 'ALICE-PROVIDER-ID', 'ALICE-PAPER-OPEN-SECRET', 'ALICE-ANSWER-OPEN-SECRET', 'ALICE-LAYOUT-SEED-SECRET', 'ALICE-DIGEST', 'ALICE-TOTP-CIPHERTEXT',
-    'ALICE-RECOVERY-HASH', 'ALICE-OTP-HASH', 'ALICE-DEST-HMAC', 'join-code-hash-SECRET'];
+    'ALICE-RECOVERY-HASH', 'ALICE-OTP-HASH', 'ALICE-DEST-HMAC', 'join-code-hash-SECRET', 'ALICE-DESK-KEY-SECRET', 'ALICE-DESK-DIGEST-SECRET'];
   const realHashes = [
     ...(await db.all('SELECT password_hash AS v FROM accounts WHERE id=?', [A])),
     ...(await db.all('SELECT token_hash AS v FROM account_sessions WHERE account_id=?', [A])),

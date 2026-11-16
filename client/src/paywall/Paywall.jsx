@@ -6,7 +6,7 @@ import PageLink from '../components/PageLink.jsx';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { cloudAccountLink, verifyCloudSession } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, hasEntitlement } from '../platform/entitlements.js';
-import { nativeBillingStore } from '../platform/nativeBilling.js';
+import { nativeBillingStore, PREMIUM_ON_SALE } from '../platform/nativeBilling.js';
 import { useStoreKitPurchase } from './useStoreKitPurchase.js';
 import { useGooglePlayPurchase } from './useGooglePlayPurchase.js';
 import { planOffers, aboutPerMonth, yearlySavingPercent } from './pricing.js';
@@ -165,8 +165,11 @@ export default function Paywall() {
           </div>
         )}
 
-        {!premium && !apple && !google && (
-          <p style={{ marginTop: 'var(--space-4)' }} data-paywall-in-app>{t('paywall.inAppOnly')}</p>
+        {/* An edition with no payment provider (plan E5) has nothing to buy
+            anywhere: it says so, and names no store, price or plan. */}
+        {!premium && !apple && !google && (PREMIUM_ON_SALE
+          ? <p style={{ marginTop: 'var(--space-4)' }} data-paywall-in-app>{t('paywall.inAppOnly')}</p>
+          : <p style={{ marginTop: 'var(--space-4)' }} data-paywall-not-on-sale>{t('paywall.notOnSale')}</p>
         )}
 
         {(apple || google) && (

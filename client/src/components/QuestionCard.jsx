@@ -49,6 +49,7 @@ import { blockedInkRecovery, canOpenInkSignIn, inkRecoveryWords } from './signed
 import './inkAccountRecovery.css';
 import { useFormFactor } from '../platform/formFactor.js';
 import Icon from './Icon.jsx';
+import Working from '../instrument/Working.jsx';
 import TypedAnswerFields from './TypedAnswerFields.jsx';
 import VerifiedMarkBreakdown from './VerifiedMarkBreakdown.jsx';
 import { finalAnswerGuidance, moveToWorking, workingAreaMode } from './typedAnswerGuide.js';
@@ -2234,7 +2235,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {WhyStep && whyStep === i && tutorEnabled && resolved && (
                 <TutorBoundary fallback={t('tutor.unavailable')}>
-                  <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.why.asking')}</div>}>
+                  <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.why.asking')}</div>}>
                     <WhyStep questionId={question.id} stepIndex={i} locale={language === 'hi' ? 'hi' : 'en'} onClose={() => setWhyStep(null)} />
                   </React.Suspense>
                 </TutorBoundary>
@@ -2531,7 +2532,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                           : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={dropPhoto}>✕</button></div>}
                         <div style={{ flex: 1 }} role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
-                            <span className="muted">{t('verdict.readingWork')}</span>
+                            <span className="muted"><Working pending={photoOCR.phase === 'reading'} label={t('verdict.readingWork')} /></span>
                           )}
                           {photoOCR.phase === 'done' && (
                             <>
@@ -2566,7 +2567,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                              photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && sessionEnded
                                ? <span className="verdict-body" data-photo-session-ended>{t('check.sessionEnded')}</span>
                                : <span className="verdict-body" data-photo-reading-problem={photoOCR.block?.kind || (photoOCR.unreadable ? 'unreadable' : 'failed')}>
-                                   {photoOCR.blockedKey ? t(photoOCR.blockedKey, { time: retryClock(photoOCR.block?.retryAt, language) }) : photoOCR.error}
+                                   {photoOCR.blockedKey ? t(photoOCR.blockedKey, { time: retryClock(photoOCR.block?.retryAt, language, user) }) : photoOCR.error}
                                  </span>
                            )}
                           {/* A reading problem is never a verdict: it comes with a retry
@@ -2833,7 +2834,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         )}
         {showTutor && !resolved && tutorEnabled && !diagnostic && TutorHelp && (
           <TutorBoundary fallback={t('tutor.unavailable')}>
-            <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.asking')}</div>}>
+            <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.asking')}</div>}>
               <TutorHelp
                 question={{ ...question, tutorLevel: tutorUsed }}
                 work={{
@@ -2876,7 +2877,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               </div>
               {open && (
                 <TutorBoundary fallback={t('tutor.unavailable')}>
-                  <React.Suspense fallback={<div className="hintbox" role="status">{t('tutor.diagnose.asking')}</div>}>
+                  <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.diagnose.asking')}</div>}>
                     <MistakeDiagnosis
                       questionId={question.id}
                       work={{ lines, typed: isMcq ? '' : String(answer || '').slice(0, 300) }}
@@ -2925,7 +2926,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <div data-reader-block={state.res.readerBlock.kind}>
                   <div className="verdict-title">{t('verdict.readerNotCheckedTitle')}</div>
                   <div className="verdict-body">
-                    {t(state.res.viaInk ? state.res.readerBlock.inkKey : state.res.readerBlock.key, { time: retryClock(state.res.readerBlock.retryAt, language) })}{' '}
+                    {t(state.res.viaInk ? state.res.readerBlock.inkKey : state.res.readerBlock.key, { time: retryClock(state.res.readerBlock.retryAt, language, user) })}{' '}
                     <span className="muted">{t('verdict.readerNotCheckedNote')}</span>
                   </div>
                   <div style={{ marginTop: 10, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -3172,7 +3173,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
-            {statusState !== 'idle' && <span className="dot" aria-hidden="true" />}
+            {statusState !== 'idle' && <span className="status-mark" aria-hidden="true"><Working pending={statusState === 'working'} />{statusState !== 'working' && <span className="dot" />}</span>}
             {writeMode && shownAnswerLine && !inkStale && !needsCheck && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
               : statusText}
@@ -3201,7 +3202,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     setLineCheck({ message: null, key: e?.code === 'LINE_CHECK_LIMIT' ? 'tutor.lineCheck.limit' : 'tutor.lineCheck.unavailable', status: 'none', checksLeft: e?.code === 'LINE_CHECK_LIMIT' ? 0 : (lineCheck?.checksLeft ?? 2) });
                   } finally { setLineCheckBusy(false); }
                 }}>
-                {lineCheckBusy ? t('tutor.lineCheck.asking') : t('tutor.lineCheck.button')}
+                <Working pending={lineCheckBusy} />{lineCheckBusy ? t('tutor.lineCheck.asking') : t('tutor.lineCheck.button')}
               </button>
             </span>
           )}

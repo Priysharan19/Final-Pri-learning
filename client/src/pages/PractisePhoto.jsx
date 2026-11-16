@@ -10,6 +10,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useT } from '../i18n/index.js';
+import Working from '../instrument/Working.jsx';
 import { useApp } from '../App.jsx';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 // The same account component used by Practice, never an alternate sign-in
@@ -132,7 +133,7 @@ export default function PractisePhoto() {
         </button>
       </div>
 
-      {busy && <p role="status" className="muted" style={{ marginTop: 12 }}>{t('snap.reading')}</p>}
+      {busy && <p role="status" className="muted" style={{ marginTop: 12 }}><Working pending={busy} size={24} label={t('snap.reading')} /></p>}
 
       {result && result.state !== 'ok' && (
         <div className="error-box" role="alert" style={{ marginTop: 12 }} data-photo-practise-state={result.state}>

@@ -26,6 +26,7 @@ import { recordHttpResponse, recordRouteTiming, recordServerError } from './plat
 import { captureError } from './platform/errorSink.js';
 import { staticCacheHeaders } from './platform/staticCache.js';
 import { releaseShaForLogs } from './platform/releaseIdentity.js';
+import { assertEditionAgreement, bindDatabaseEdition, serverEdition } from './platform/edition.js';
 import { rejectUnsafeText } from './platform/text.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -92,8 +93,18 @@ export async function createServerApp(db, {
   legacy = !production,
   requestLog = true,
   log,
-  parentReport = {}
+  parentReport = {},
+  // { edition } for the resource library (resources.js); default: PRI_EDITION.
+  resources = {},
+  // { edition, now } for the Exam Desk (desk.js); default: PRI_EDITION, Date.now.
+  desk = {}
 } = {}) {
+  // The built client this app will serve must have been made for this
+  // server's edition (platform/edition.js). Throws before anything is mounted.
+  assertEditionAgreement({ dist, production });
+  // The database must belong to this edition too (plan H2): a service pointed
+  // at the other region's database stops here, before any route is mounted.
+  await bindDatabaseEdition(asStore(db), serverEdition());
   const app = express();
   // How much of X-Forwarded-For to believe is deployment configuration with no
   // default, because req.ip is the identity the anonymous rate limiters count
@@ -145,7 +156,9 @@ export async function createServerApp(db, {
     billingCheckout: webBilling.checkout,
     billingNative: { ...appleBilling.native, ...googleBilling.native },
     billingLifecycle: webBilling.lifecycle,
-    parentReport
+    parentReport,
+    resources,
+    desk
   }));
 
   if (legacy && !production) {

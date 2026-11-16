@@ -17,11 +17,13 @@
 //     purchase on the website, and the web client offers Razorpay checkout
 //     whenever this route reports it configured (CloudAccountPanel.jsx);
 //   · with --engine, the database driver is the one the cutover step expects.
+//   · with --edition, the deployment is that regional edition, server and
+//     client alike (see the opt-in checks below).
 //
 //   node tools/verify-deployment.mjs --origin https://learn.example.com \
 //     --sha <40-hex main SHA> [--engine postgres|sqlite]
 //
-// Two OPT-IN checks, for a production release (docs/operations/production-config-v1.md).
+// Three OPT-IN checks, for a production release (docs/operations/production-config-v1.md).
 // Without them the tool sends exactly the three GETs above and prints exactly
 // the rows it always has (tools/verify-deployment.test.mjs pins that byte for byte):
 //
@@ -36,6 +38,13 @@
 //                           the manifest Markdown (the block between the
 //                           pri-expected-public-config markers) or a .json file.
 //
+//   --edition <id>          the deployment serves this regional edition
+//                           (client/edition.config.mjs: priyabhata | prithagoras),
+//                           on both sides: /v1/health `edition` must be it, and so
+//                           must the `edition` in the /features.json the shipped
+//                           web client was built with (one more GET). A server of
+//                           one edition shipping the other's client never passes.
+//
 // Run it from a checkout at the nominated SHA, so the expected schema versions
 // are the ones that build was compiled against.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,6 +52,7 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { isDeepStrictEqual } from 'node:util';
 import { BILLING_SCHEMA_VERSION, SCHEMA_VERSION } from '../server/platform/schemaVersions.js';
+import { EDITION_IDS } from '../client/edition.config.mjs';
 
 const SHA = /^[0-9a-f]{40}$/;
 // A hanging origin fails the check rather than holding the operator's terminal.
@@ -52,7 +62,7 @@ export const HANDWRITING_REREADS = 3;
 export const HANDWRITING_REREAD_MS = 2_000;
 
 export function parseArgs(argv) {
-  const args = { origin: null, sha: null, engine: null, allowHttp: false, persistentStorageProven: false, authEmailProven: false, requireHandwriting: false, expectConfig: null };
+  const args = { origin: null, sha: null, engine: null, edition: null, allowHttp: false, persistentStorageProven: false, authEmailProven: false, requireHandwriting: false, expectConfig: null };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
     if (flag === '--allow-http') { args.allowHttp = true; continue; }
@@ -60,7 +70,7 @@ export function parseArgs(argv) {
     // A real deployment (staging, production): email must be proven, not merely configured.
     if (flag === '--auth-email-proven') { args.authEmailProven = true; continue; }
     if (flag === '--require-handwriting') { args.requireHandwriting = true; continue; }
-    if (!['--origin', '--sha', '--engine', '--expect-config'].includes(flag)) throw new Error(`Unknown argument: ${flag}`);
+    if (!['--origin', '--sha', '--engine', '--edition', '--expect-config'].includes(flag)) throw new Error(`Unknown argument: ${flag}`);
     const value = argv[i + 1];
     if (value === undefined || value.startsWith('--')) throw new Error(`${flag} needs a value`);
     args[flag === '--expect-config' ? 'expectConfig' : flag.slice(2)] = value;
@@ -204,7 +214,7 @@ export function probeMismatches(probe, answer) {
  * Returns { ok, results: [{ ok, label, detail? }] }. Never throws for a failed
  * check; a network error becomes a failed check with its message.
  */
-export async function verifyDeployment({ origin, sha, engine = null, allowHttp = false, persistentStorageProven = false, authEmailProven = false, requireHandwriting = false, expectedConfig = null, fetchImpl = globalThis.fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
+export async function verifyDeployment({ origin, sha, engine = null, edition = null, allowHttp = false, persistentStorageProven = false, authEmailProven = false, requireHandwriting = false, expectedConfig = null, fetchImpl = globalThis.fetch, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
   const results = [];
   const check = (ok, label, detail) => { results.push({ ok: !!ok, label, ...(detail ? { detail } : {}) }); return !!ok; };
 
@@ -212,6 +222,7 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
   const expectedSha = String(sha || '').toLowerCase();
   if (!check(SHA.test(expectedSha), 'nominated SHA is a full 40-hex commit', sha)) return { ok: false, results };
   if (engine !== null && !['postgres', 'sqlite'].includes(engine)) throw new Error('--engine must be postgres or sqlite');
+  if (edition !== null && !EDITION_IDS.includes(edition)) throw new Error(`--edition must be one of ${EDITION_IDS.join(', ')}`);
   if (expectedConfig) {
     const problems = expectedConfigProblems(expectedConfig);
     if (problems.length) throw new Error(`expected config: ${problems.join('; ')}`);
@@ -279,6 +290,20 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
     'web checkout is off, as the terms and refund policy say',
     billing.status === 200 ? `configured ${billing.body?.webCheckout?.configured}` : `status ${billing.status}`);
 
+  // ── opt-in: the deployment is one edition, server and client (--edition) ──
+  let features = null;
+  if (edition) {
+    const serverEdition = h.edition;
+    check(serverEdition === edition, `server edition is ${edition}`, `/v1/health edition ${show(serverEdition)}`);
+    try { features = await getJson(fetchImpl, `${base}/features.json`); }
+    catch (error) { features = { error: error?.message || String(error) }; }
+    const clientEdition = features.error ? undefined : features.body?.edition;
+    check(!features.error && features.status === 200 && clientEdition === edition, `web client was built for ${edition}`,
+      features.error || (features.status === 200 ? `/features.json edition ${show(clientEdition)}` : `status ${features.status}`));
+    check(serverEdition !== undefined && serverEdition === clientEdition, 'server and web client are the same edition',
+      `server ${show(serverEdition)}, client ${show(clientEdition)}`);
+  }
+
   // ── opt-in: the server reader is up (--require-handwriting) ───────────────
   if (requireHandwriting) {
     let reader = r.checks?.handwriting || {};
@@ -296,6 +321,7 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
   if (expectedConfig) {
     // The four reads above (#752's three, plus main's /v1/billing/config) are reused; every other path is one more GET.
     const answers = new Map([['/v1/health', health], ['/v1/ready', ready], ['/release.json', web], ['/v1/billing/config', billing]]);
+    if (features) answers.set('/features.json', features);
     for (const probe of expectedConfig.probes) {
       if (!answers.has(probe.path)) {
         try { answers.set(probe.path, await getJson(fetchImpl, `${base}${probe.path}`)); }
@@ -329,7 +355,7 @@ export async function verifyDeployment({ origin, sha, engine = null, allowHttp =
 
 async function main() {
   let args;
-  const usage = 'Usage: node tools/verify-deployment.mjs --origin https://… --sha <40-hex> [--engine postgres|sqlite] [--persistent-storage-proven] [--auth-email-proven] [--require-handwriting] [--expect-config <manifest>]';
+  const usage = 'Usage: node tools/verify-deployment.mjs --origin https://… --sha <40-hex> [--engine postgres|sqlite] [--edition priyabhata|prithagoras] [--persistent-storage-proven] [--auth-email-proven] [--require-handwriting] [--expect-config <manifest>]';
   let report;
   try {
     args = parseArgs(process.argv.slice(2));

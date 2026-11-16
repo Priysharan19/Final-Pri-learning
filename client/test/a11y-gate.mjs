@@ -11,6 +11,8 @@ import { chromium } from '@playwright/test';
 import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { EDITIONS, resolveEdition } from '../edition.config.mjs';
+import { brandIndexHtml } from '../brand/edition-brand.mjs';
 
 const SUITE = fileURLToPath(new URL('./a11y-check.mjs', import.meta.url));
 const INDEX = fileURLToPath(new URL('../index.html', import.meta.url));
@@ -52,7 +54,11 @@ function check(name, condition, detail = '') {
 try {
   browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
-  await page.setContent(readFileSync(INDEX, 'utf8'), { waitUntil: 'domcontentloaded' });
+  // The page this build's edition serves (PRI_EDITION, unset = Priyabhata):
+  // index.html's %PRI_…% placeholders are filled from client/edition.config.mjs
+  // by client/brand/edition-brand.mjs, as the build does (plan E4).
+  const edition = resolveEdition(process.env);
+  await page.setContent(brandIndexHtml(readFileSync(INDEX, 'utf8'), edition), { waitUntil: 'domcontentloaded' });
 
   const meta = await page.evaluate(() => ({
     lang: document.documentElement.getAttribute('lang') || '',
@@ -61,7 +67,7 @@ try {
   }));
 
   check('the document declares a spoken language', /^en(?:-|$)/i.test(meta.lang.trim()), `lang=${JSON.stringify(meta.lang)}`);
-  check('the browser tab has a meaningful product title', /pri\s+learning/i.test(meta.title) && meta.title.trim().length >= 5,
+  check(`the browser tab has a meaningful product title: the edition's brand (${edition})`, meta.title === EDITIONS[edition].brand && meta.title.trim().length >= 5,
     `title=${JSON.stringify(meta.title)}`);
   check('the mobile viewport does not disable user zoom',
     !/user-scalable\s*=\s*no/i.test(meta.viewport) && !/(?:^|,)\s*maximum-scale\s*=\s*1(?:\.0+)?\s*(?:,|$)/i.test(meta.viewport),

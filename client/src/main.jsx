@@ -22,7 +22,8 @@ import './instrument/aurora.css';
 import AccountAction from './pages/AccountAction.jsx';
 import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
 import { parseParentEmailFragment } from './parent/parentReportApi.js';
-import { discoverCloudOrigin } from './platform/cloudTransport.js';
+import { checkServerEdition, discoverCloudOrigin, editionMismatch, onEditionMismatch } from './platform/cloudTransport.js';
+import EditionMismatch from './components/EditionMismatch.jsx';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
@@ -163,8 +164,19 @@ if (PARENT_EMAIL_MODE) {
   // costs the first paint at most that long and never the app: it starts with
   // the cloud not found, and every screen that needs the server says so in its
   // own words, as it does when the connection drops later.
+  //
+  // One app, one edition (plan E2). The probe above also hears which edition
+  // the serving server is. A server of the other edition gets the blocking
+  // screen in place of the app, with no sign-in form: at once when the probe
+  // heard it, and otherwise as soon as it is known (a native shell or an
+  // injected origin reads /v1/health once, after the first paint, so a
+  // matching or unreachable server never delays a start).
+  const showEditionMismatch = conflict => root.render(<EditionMismatch conflict={conflict} />);
   void discoverCloudOrigin().catch(() => null).then(() => {
     bootPhase('render');
+    onEditionMismatch(showEditionMismatch);
+    if (editionMismatch()) { showEditionMismatch(editionMismatch()); return; }
+    void checkServerEdition();
     // The root boundary sits outside the router so that everything is covered —
     // the boot screen, the whole Login and cold-start path, the topbar, the account
     // menu, the sidebar, the toasts and the mobile nav, not only the routes.

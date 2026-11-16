@@ -74,7 +74,9 @@ import {
   finishOnServer, reconcileWithServer, noteReconciled, pendingView, localResult, serverFinal, finishedAtOf, fetchRemotePaper,
   markPendingLines, recoverHandwriting, retryHandwriting, confirmExamPagesSaved
 } from './serverExam.js';
+import { nswExamsFor, nswExamSpec, namedOutcomes } from './nswExamBackend.js';
 import { pendingSummary } from './examPages.js';
+import { settleIfLeaving } from './pageLeaving.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
 
@@ -3085,7 +3087,11 @@ async function serverReviewQueue(p) {
       // The history the estimate rests on, as the server counted it.
       attempts: Math.max(0, Number(r.attempts) || 0), correct: Math.max(0, Number(r.correct) || 0), lastAt: Number(r.lastAt) || 0 };
   };
-  return { due: (out?.due || []).map(decorate), upcoming: (out?.upcoming || []).map(decorate), dueCount: Number(out?.dueCount) || 0, counted: Number(out?.counted) || 0 };
+  // Due today on the server's spaced ladder (engine/spacedReview.js).
+  const today = (Array.isArray(out?.spaced?.today) ? out.spaced.today : []).map(r => ({ ...decorate(r),
+    intervalDays: Math.max(0, Number(r.intervalDays) || 0), dueAt: Number(r.dueAt) || 0 }));
+  return { due: (out?.due || []).map(decorate), upcoming: (out?.upcoming || []).map(decorate), dueCount: Number(out?.dueCount) || 0, counted: Number(out?.counted) || 0,
+    today, todayCount: Number(out?.spaced?.todayCount) || today.length };
 }
 
 const routes = {
@@ -4306,6 +4312,13 @@ const routes = {
   // their answers until it has marked the paper. Nothing here marks an answer.
   'POST /exams': async (body) => {
     const p = await requireProfile();
+    // An NSW HSC-style paper (plan G4): named by its blueprint, composed and
+    // marked by the server. Stored like any other server paper below.
+    if (body?.nsw !== undefined) {
+      if (!nswExamsFor(p)) throw Object.assign(new Error('These papers are not available here.'), { status: 404, code: 'EXAM_KIND_UNAVAILABLE' });
+      const issued = await issueServerExam(p.id, nswExamSpec(body.nsw), `nsw:${body.nsw}`);
+      return storeServerPaper(p, issued, { year: 12, pathway: null, title: issued.title, readingMin: issued.readingMin, nsw: issued.nsw });
+    }
     const length = [10, 15, 20].includes(Number(body?.length)) ? Number(body.length) : 10;
     const minutes = Math.round(Math.min(90, Math.max(10, Number(body?.minutes) || (length * 3))));
     const year = Math.min(12, Math.max(7, Math.round(Number(body?.year) || p.year)));
@@ -4334,30 +4347,7 @@ const routes = {
     const issued = await issueServerExam(p.id, {
       kind: 'practice-paper', paper: { year, minutes, ...(examPw ? { pathway: examPw } : {}) }, slots
     }, `practice-paper:${year}:${examPw || ''}:${length}:${minutes}`);
-
-    const examId = String(issued.id);
-    const now = Date.now();
-    const qids = [];
-    try {
-      for (const sq of issued.questions) {
-        const row = paperRowOf(p.id, examId, sq, now);
-        await put('questions', row);
-        qids.push(row.id);
-      }
-    } catch (err) {
-      await Promise.all(qids.map(id => del('questions', id).catch(() => {})));
-      throw err;
-    }
-    const exam = {
-      id: examId, pid: p.id, year, pathway: examPw, title, durationMin: issued.durationMin, questionIds: qids,
-      createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null,
-      paperVersion: issued.paperVersion,
-      server: serverFieldOf(issued, await profileCloudAccountId(p.id).catch(() => null))
-    };
-    startExamClock(exam, localStartOf(issued, now));
-    await put('exams', exam);
-    noteReconciled(exam.id);
-    return { exam: await examFor(p.id, examId) };
+    return storeServerPaper(p, issued, { year, pathway: examPw, title });
   },
   'GET /exams': async () => {
     const p = await requireProfile();
@@ -5546,7 +5536,7 @@ async function servePlacementQuestion(pid, cfg, probe, index) {
   if (!linkedAccount) throw checkUnavailable('sign-in');
   let out;
   try {
-    out = await cloud.issuePractice({ generator: target.generator, difficulty: target.difficulty, curriculum: 'in', mode: 'placement', written: true, account: linkedAccount });
+    out = await cloud.issuePractice({ generator: target.generator, difficulty: target.difficulty, curriculum: practiceCurriculumOf(await get('profiles', pid).catch(() => null)), mode: 'placement', written: true, account: linkedAccount });
   } catch (cause) {
     throw checkUnavailable(cause?.status === 401 ? 'sign-in' : cause?.status === 403 || cause?.status === 426 ? 'refused'
       : !cause?.status || cause.status >= 500 || cause.status === 429 || cause?.code === 'CLOUD_DISABLED' ? 'offline' : 'unavailable', cause);
@@ -5739,7 +5729,43 @@ async function examFor(pid, examId) {
     if (!row) continue;
     questions.push(sanitize(row.payload, row));
   }
-  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e) };
+  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e), ...(e.nsw ? { nsw: e.nsw } : {}) };
+}
+
+/**
+ * Store a paper the server has just issued — a practice paper or an NSW
+ * paper (plan G4) — as this profile's open paper: its public questions, the
+ * server's clock, and for an NSW paper its reading time and what it is.
+ */
+async function storeServerPaper(p, issued, { year, pathway, title, readingMin = null, nsw = null }) {
+  const examId = String(issued.id);
+  const now = Date.now();
+  const qids = [];
+  try {
+    for (const sq of issued.questions) {
+      const row = paperRowOf(p.id, examId, sq, now);
+      await put('questions', row);
+      qids.push(row.id);
+    }
+  } catch (err) {
+    await Promise.all(qids.map(id => del('questions', id).catch(() => {})));
+    throw err;
+  }
+  const exam = {
+    id: examId, pid: p.id, year, pathway, title, durationMin: issued.durationMin, questionIds: qids,
+    createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null,
+    paperVersion: issued.paperVersion,
+    ...(Number.isFinite(Number(readingMin)) && Number(readingMin) > 0 ? { readingMin: Number(readingMin) } : {}),
+    ...(nsw && typeof nsw === 'object' ? { nsw: {
+      label: String(nsw.label || ''), markingNote: String(nsw.markingNote || ''), blueprintId: String(nsw.blueprintId || ''), course: String(nsw.course || ''),
+      partial: nsw.partial === true, omittedOutcomes: namedOutcomes(nsw.omittedOutcomes)
+    } } : {}),
+    server: serverFieldOf(issued, await profileCloudAccountId(p.id).catch(() => null))
+  };
+  startExamClock(exam, localStartOf(issued, now));
+  await put('exams', exam);
+  noteReconciled(exam.id);
+  return { exam: await examFor(p.id, examId) };
 }
 
 /** The device's row for one server-issued practice-paper question: the public payload only. */
@@ -6124,9 +6150,24 @@ async function requireCheckableSession(pid) {
  *    on. A draft was never the server's, so it cannot be marked later.
  * Returns { q, fields, trapDelivered, repeat }; `fields` go on the row.
  */
+/**
+ * The course a server-issued request names: the profile's own (`in` for an
+ * India profile, `nsw` for an NSW one). The server issues only its edition's
+ * course and refuses any other (server/platform/editionBanks.js), so a
+ * hard-coded 'in' left every NSW student on a Prithagoras server with
+ * unmarkable drafts. A profile with no course, or a course no server issues,
+ * names NSW.
+ */
+export function practiceCurriculumOf(profile) {
+  // Only the two courses a server issues (editionBanks.js): any other course
+  // the device knows (vic, qld, wa, sa, ib) is no server's, and names NSW.
+  return profile?.course === 'in' ? 'in' : 'nsw';
+}
+
 async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null, trap = null }, localDraft) {
+  const curriculum = practiceCurriculumOf(await get('profiles', pid).catch(() => null));
   const body = {
-    generator, difficulty, curriculum: 'in', mode: SERVER_MODES.includes(mode) ? mode : 'practice',
+    generator, difficulty, curriculum, mode: SERVER_MODES.includes(mode) ? mode : 'practice',
     avoid: recentlyServedContent(pid).filter(h => typeof h === 'string' && /^[a-zA-Z0-9:_-]{6,96}$/.test(h)).slice(0, 40),
     ...(dotpoint ? { dotpoint: String(dotpoint) } : {})
   };
@@ -6157,6 +6198,12 @@ async function serveQuestion(pid, { generator, difficulty, mode, dotpoint = null
       return { q: out.question, fields: { prepared: out.prepared, preparedExpiresAt: Number(out.expiresAt) || null }, trapDelivered: false, repeat: out.repeat === true };
     }
   } catch { /* no server: an offline draft */ }
+  // Requests cancelled because the page is navigating away fail exactly like a
+  // dropped connection, and WebKit lets this code run on before the page goes.
+  // A draft stored then could never be marked, though the student was online
+  // all along: when the page has said it is leaving, wait — a page that really
+  // unloads never gets here (client/src/local/pageLeaving.js).
+  await settleIfLeaving();
   const local = localDraft();
   return { q: draftQuestion(local.q), fields: { draftOnly: true }, trapDelivered: false, repeat: !!local.repeat, local };
 }

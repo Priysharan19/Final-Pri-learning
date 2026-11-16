@@ -47,25 +47,44 @@ export function resetOtpLimits(platform) {
   platform.h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'otp-%'").run();
 }
 
-/** The card element itself, whether `scope` is it, contains it, or is the page. */
-async function cardOf(scope) {
-  if (typeof scope.getAttribute === 'function' && typeof scope.page === 'function') {
-    const own = await scope.getAttribute('data-signin-card').catch(() => null);
-    if (own) return scope;
-  }
-  return scope.locator('[data-signin-card]').first();
+/**
+ * The card element itself, whether `scope` is it, contains it, or is the page:
+ * a locator, so nothing is read here. It holds while the card is briefly off
+ * the page (a remount) and once it has gone for good.
+ */
+function cardOf(scope) {
+  return scope.locator('xpath=descendant-or-self::*[@data-signin-card]').first();
 }
+
+/**
+ * Where the card stands, read in ONE look that never waits:
+ * { present: false } once the card has left the page, else { present: true,
+ * step }. Never `count()` and then `getAttribute()`: a returning address is
+ * signed in the moment its code is right, the gate replaces the card with the
+ * shell between those two calls, and `getAttribute` then waits its full
+ * timeout for an element that is never coming back (CI's intermittent
+ * "locator.getAttribute: Timeout 30000ms exceeded" on the gate's inline card).
+ */
+export async function cardStep(card) {
+  return card.evaluateAll(els => els.length
+    ? { present: true, step: els[0].getAttribute('data-signup-step') }
+    : { present: false, step: null });
+}
+
+/** The card's refusal, read in one look that never waits; null when none is shown. */
+const errorText = scope => scope.locator('[data-testid="signup-error"]').evaluateAll(els => els.length ? els[0].innerText : null);
 
 /** Wait until the card (its root carries the step) stands on `step`. */
 export async function waitForStep(scope, step, { timeout = 20000 } = {}) {
-  const card = await cardOf(scope);
+  const card = cardOf(scope);
   const page = typeof scope.page === 'function' ? scope.page() : scope;
   for (const deadline = Date.now() + timeout; Date.now() < deadline;) {
-    if (await card.count() && (await card.getAttribute('data-signup-step')) === step) return;
+    if ((await cardStep(card)).step === step) return;
     await page.waitForTimeout(100);
   }
-  const now = await card.count() ? await card.getAttribute('data-signup-step') : 'no card on screen';
-  const refused = await scope.locator('[data-testid="signup-error"]').innerText().catch(() => '');
+  const seen = await cardStep(card);
+  const now = seen.present ? seen.step : 'no card on screen';
+  const refused = await errorText(scope);
   throw new Error(`the card did not reach the "${step}" step within ${timeout} ms (it is at "${now}"${refused ? `; it says: ${refused.trim()}` : ''})`);
 }
 
@@ -93,18 +112,20 @@ export async function signInOnCard(scope, platform, { email, name = null, age = 
   await scope.locator('#signup-code-0').waitFor({ timeout: 20000 });
   const code = lastEmailCode(platform, email);
   if (!code) throw new Error(`the real server did not send a six-digit email code to ${email}`);
-  await typeCode(scope, code);
-  // A new address is asked who it is; a returning one is signed in at once
-  // (and the card may then be gone, replaced by the shell).
-  const card = await cardOf(scope);
+  // Resolved before the code goes in: a returning address is signed in at
+  // once, and the card may then be gone, replaced by the shell.
+  const card = cardOf(scope);
   const page = typeof scope.page === 'function' ? scope.page() : scope;
+  await typeCode(scope, code);
+  // A new address is asked who it is; a returning one is signed in at once.
   let step = 'code';
   for (const deadline = Date.now() + 30000; Date.now() < deadline;) {
-    if (!(await card.count())) { step = null; break; }
-    step = await card.getAttribute('data-signup-step');
+    const seen = await cardStep(card);
+    if (!seen.present) { step = null; break; }
+    step = seen.step;
     if (step !== 'code') break;
-    const refused = scope.locator('[data-testid="signup-error"]');
-    if (await refused.count()) throw new Error(`the code was refused: ${(await refused.innerText()).trim()}`);
+    const refused = await errorText(scope);
+    if (refused !== null) throw new Error(`the code was refused: ${refused.trim()}`);
     await page.waitForTimeout(100);
   }
   if (step === 'age') {

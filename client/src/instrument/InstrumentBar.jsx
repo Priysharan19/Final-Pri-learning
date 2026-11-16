@@ -7,6 +7,7 @@ import { useT } from '../i18n/index.js';
 import CommandBar from './CommandBar.jsx';
 import Glyph from './Glyph.jsx';
 import { setBarSlot } from './BarSlot.jsx';
+import { BrandWordmark } from '../components/BrandMark.jsx';
 
 // The v1.1 shell bar: the mark, five tabs, the command field and the online
 // state. It replaces the rail and the old top bar when the instrument flag is
@@ -97,7 +98,7 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
     <>
       <header className="in-bar no-print" data-instrument-bar>
         <button type="button" className="in-mark" onClick={() => nav('/', { replace: isCurrentUrl('/') })} aria-label={t('inst.home')}>
-          <span className="in-mark-glyph" aria-hidden="true">P<em>′</em></span>Pri
+          <BrandWordmark height={18} />
         </button>
         <nav className="in-tabs" aria-label={t('nav.primary')}>
           {tabs.map(tab => (
