@@ -368,13 +368,23 @@ try {
     //   · a new or edited `*-nsw.js` generator file (its ids may not collide with another bank: checked below);
     //   · in a year/stream generator bank: its `import … from './….-nsw.js'` line and one `...xNsw,`
     //     spread line (first in the object, so an original generator can never be overridden);
-    //   · in curriculum.js: added lines (new subtopics, dot-point forms, labels), and the removal of
-    //     only the `CODES` line (extended) or a subtopic's closing `])` (now followed by a comma).
-    //     Added lines are not inspected here; the id and form checks above and below are what bind them.
+    //   · in curriculum.js: only subtopic entries, dot-point form rows, comments, the authored-weight
+    //     constant and an extended CODES table (shapes below); no other line may be added or removed.
     const BANK = /^client\/src\/engine\/generators\/(year\d+|streams-standard|streams-ext)\.js$/;
     const COURSE = 'client/src/engine/curriculum.js';
     const NEW_NSW_FILE = /^client\/src\/engine\/generators\/[\w-]+-nsw\.js$/;
     const BANK_ADDED = /^\+(import \{ \w+Nsw \} from '\.\/[\w-]+-nsw\.js';|\s*\.\.\.\w+Nsw,)$/;
+    // curriculum.js: only these shapes may be added — a subtopic entry (opener, dot-point text, closer),
+    // a DOTPOINT_FORMS row of ordinals, a comment, the authored-weight constant, and the extended CODES line.
+    const COURSE_ADDED = [
+      /^\+\s*(S|T)\('[\w-]+', '[^']*', '[^']*', [\w .\/]+, (?:'[^']*', )?\[$/,
+      /^\+\s*'[^'`$\\]*',?$/,
+      /^\+\s*\]\),?$/,
+      /^\+\s*'[\w-]+': \[(?:\[[\d, ]*\],? ?)+\],?$/,
+      /^\+\s*\/\/.*$/,
+      /^\+const AUTHORED_WEIGHT = 100 \/ 9 - 1e-14;$/,
+      /^\+$/
+    ];
     const COURSE_REMOVED = /^-(const CODES = |\s*\]\)\s*$)/;
     const untracked = new Set(git(['ls-files', '--others', '--exclude-standard', '--', ...PROTECTED]).split('\n').filter(Boolean));
     const diffLines = file => git(['diff', '-U0', base, '--', file]).split('\n').filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
@@ -383,8 +393,17 @@ try {
       if (NEW_NSW_FILE.test(file)) { allowed.push(file.replace('client/src/engine/', '')); return false; }
       if (untracked.has(file) || !git(['ls-tree', base, '--', file])) return true;
       const lines = diffLines(file);
-      const ok = (BANK.test(file) && lines.every(l => BANK_ADDED.test(l)))
-        || (file === COURSE && lines.filter(l => l[0] === '-').every(l => COURSE_REMOVED.test(l)));
+      let ok = false;
+      if (BANK.test(file)) ok = lines.every(l => BANK_ADDED.test(l));
+      else if (file === COURSE) {
+        const removed = lines.filter(l => l[0] === '-'), added = lines.filter(l => l[0] === '+');
+        const oldCodes = removed.find(l => l.startsWith('-const CODES = '));
+        const newCodes = added.find(l => l.startsWith('+const CODES = '));
+        // The CODES table may only grow: the old line is a prefix of the new one.
+        const codesOk = !oldCodes || (newCodes && newCodes.slice(1).startsWith(oldCodes.slice(1).replace(/\};$/, '')) && newCodes.endsWith('};'));
+        ok = removed.every(l => COURSE_REMOVED.test(l)) && codesOk
+          && added.every(l => l === newCodes || COURSE_ADDED.some(re => re.test(l)));
+      }
       if (ok) allowed.push(file.replace('client/src/engine/', ''));
       return !ok;
     });
