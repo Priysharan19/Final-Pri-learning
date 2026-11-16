@@ -41,6 +41,7 @@ export const EDITION_SUITES = [
   // NSW curriculum, practice banks and exams; the library and the Exam Desk.
   'client/test/nsw-curriculum-check.mjs',
   'client/test/nsw-bank-quality-check.mjs',
+  'client/test/nsw-offer-check.mjs',
   'client/test/nsw-exams-check.mjs',
   'client/test/library-ui-check.mjs',
   'client/test/desk-clock-check.mjs',
