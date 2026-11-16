@@ -76,7 +76,8 @@ await check('serveQuestion imports the guard and awaits it after prepare fails a
   const fn = body.slice(0, body.indexOf('\n}\n') + 2);
   const prepareFailed = fn.indexOf('cloud.preparePractice(');
   const guard = fn.indexOf('await settleIfLeaving()');
-  const draft = fn.indexOf('localDraft()');
+  // The draft call may carry the cell the server issues (engine/nswOffer.js).
+  const draft = fn.indexOf('localDraft(');
   assert(/import \{[^}]*\bsettleIfLeaving\b[^}]*\} from '\.\/pageLeaving\.js'/.test(BACKEND), 'backend.js does not import settleIfLeaving from ./pageLeaving.js');
   assert(prepareFailed > 0 && guard > prepareFailed && draft > guard,
     `in serveQuestion: prepare at ${prepareFailed}, guard at ${guard}, draft at ${draft} — the guard must sit between them`);
