@@ -169,6 +169,7 @@ function queueActivationRecord(state, pid, accountId, startedAtDenials, at = Dat
 }
 
 export async function ensureAccountActivated(pid, options = {}) {
+  if (!pid) throw new ActivationBlocked('PROFILE_MISSING');
   const state = activationState(pid);
   const startedAtDenials = state.denials;
   // Read the durable refusal boundary BEFORE contacting the server. A fresh
