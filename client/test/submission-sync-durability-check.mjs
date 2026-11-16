@@ -99,7 +99,9 @@ database.transaction = (stores, mode) => {
   return tr;
 };
 
-const YEAR10 = subtopicsForYear(10).map(t => t.id);
+// Only subtopics the server issues are offered (engine/nswOffer.js).
+const { nswIssuedLevels } = await import('../src/engine/nswOffer.js');
+const YEAR10 = subtopicsForYear(10).map(t => t.id).filter(id => nswIssuedLevels(id).length > 0);
 let turn = 0;
 function canonical(q) {
   const a = q?.answer; if (!a) return null;
