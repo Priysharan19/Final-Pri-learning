@@ -30,6 +30,7 @@
 import { cloud, cloudAvailable, discoverCloudOrigin, lastCloudProbe } from './cloudTransport.js';
 import { cloudAccountLink, noteCloudClock, recordCloudActivation, verifyCloudSession } from './cloudAccount.js';
 import { decideOnboardingAuthority } from '../components/onboardingAuthority.js';
+import { add, all, uuid } from '../local/idb.js';
 
 export class ActivationBlocked extends Error {
   constructor(code, { cause = null, retryable = false } = {}) {
@@ -67,6 +68,24 @@ export const isActivationDenied = (error) => ACTIVATION_DENIED_CODES.includes(er
  */
 export const OFFLINE_GRACE_MS = 72 * 60 * 60 * 1000;
 
+// A revocation observed in another browser tab must also fence out responses
+// that were already in flight here. Each denial is a distinct immutable device
+// row: unlike the account-link row it cannot be overwritten by a concurrent
+// sync stamp, session refresh, or a stale activation from a second tab.
+const DENIAL_PREFIX = 'pri-activation-denial-v1:';
+const denialPrefix = (pid, accountId) => `${DENIAL_PREFIX}${String(pid)}:${String(accountId)}:`;
+async function latestDenialAt(pid, accountId) {
+  if (!pid || !accountId) return 0;
+  const prefix = denialPrefix(pid, accountId);
+  const rows = await all('device');
+  return rows.reduce((at, row) => row?.id?.startsWith?.(prefix) && Number.isFinite(row.deniedAt)
+    ? Math.max(at, row.deniedAt) : at, 0);
+}
+async function persistDenial(pid, accountId, at) {
+  if (!pid || !accountId) return;
+  await add('device', { id: `${denialPrefix(pid, accountId)}${uuid()}`, deniedAt: at });
+}
+
 /** True when an offline entry verified at `verifiedAt` may no longer stay open (a missing time counts as expired). */
 export function offlineGraceExpired(verifiedAt, now = Date.now()) {
   const at = Number(verifiedAt);
@@ -89,6 +108,10 @@ export async function offlineGraceFor(pid, now = Date.now()) {
   try { link = await cloudAccountLink(pid, { strict: true }); } catch { return null; }
   if (!link?.accountId || !link.lastSyncAt || !link.activatedAt) return null;
   if (String(link.activatedAccountId) !== String(link.accountId)) return null;
+  // A later authoritative refusal always defeats a previously in-flight
+  // successful check, including after reload and across separate browser tabs.
+  try { if ((await latestDenialAt(pid, link.accountId)) >= link.activatedAt) return null; }
+  catch { return null; }
   const age = now - link.activatedAt;
   // A timestamp from the future is a clock that moved, not a fresh answer;
   // so is a clock earlier than the latest time this device has already shown.
@@ -119,10 +142,10 @@ function activationState(pid) {
   }
   return state;
 }
-function queueActivationRecord(state, pid, accountId, startedAtDenials) {
+function queueActivationRecord(state, pid, accountId, startedAtDenials, at = Date.now()) {
   const write = state.writes.then(async () => {
     if (accountId && state.denials !== startedAtDenials) return false;
-    await recordCloudActivation(pid, accountId).catch(() => {});
+    await recordCloudActivation(pid, accountId, at).catch(() => {});
     return true;
   });
   // A failed IndexedDB operation must not poison subsequent consent clears.
@@ -133,10 +156,29 @@ function queueActivationRecord(state, pid, accountId, startedAtDenials) {
 export async function ensureAccountActivated(pid, options = {}) {
   const state = activationState(pid);
   const startedAtDenials = state.denials;
+  // Read the durable refusal boundary BEFORE contacting the server. A fresh
+  // request may legitimately reauthorize after withdrawal; an older one may
+  // not, even if its slow success eventually arrives from another browser tab.
+  let linkedAccount = null;
+  let requestAt = Date.now();
+  try {
+    linkedAccount = (await cloudAccountLink(pid, { strict: true }))?.accountId || null;
+    requestAt = Math.max(Date.now(), (await latestDenialAt(pid, linkedAccount)) + 1);
+  } catch (cause) {
+    throw new ActivationBlocked('CONSENT_UNAVAILABLE', { cause, retryable: true });
+  }
   try {
     const ready = await activateOnline(pid, options);
-    const current = await queueActivationRecord(state, pid, ready.accountId, startedAtDenials);
-    if (!current || state.denials !== startedAtDenials) {
+    if (linkedAccount && String(linkedAccount) !== String(ready.accountId)) {
+      throw new ActivationBlocked('ACCOUNT_MISMATCH');
+    }
+    const latest = await latestDenialAt(pid, ready.accountId);
+    if (latest >= requestAt) {
+      throw new ActivationBlocked('CONSENT_UNAVAILABLE', { retryable: true });
+    }
+    const current = await queueActivationRecord(state, pid, ready.accountId, startedAtDenials, requestAt);
+    if (!current || state.denials !== startedAtDenials ||
+        (await latestDenialAt(pid, ready.accountId)) >= requestAt) {
       // A newer authoritative refusal wins over this older online success.
       // Do not hand a stale activation to App or to an offline-grace caller.
       throw new ActivationBlocked('CONSENT_UNAVAILABLE', { retryable: true });
@@ -146,7 +188,13 @@ export async function ensureAccountActivated(pid, options = {}) {
     if (!(error instanceof ActivationBlocked)) throw error;
     if (isActivationDenied(error)) {
       state.denials++;
-      if (pid) await queueActivationRecord(state, pid, null, state.denials);
+      if (pid) {
+        // Separate immutable denial rows cannot be undone by an old promise
+        // or by a concurrent account-link/sync write from another browser tab.
+        const at = Math.max(Date.now(), requestAt, (await cloudAccountLink(pid).catch(() => null))?.clockSeenAt || 0);
+        await persistDenial(pid, linkedAccount, at);
+        await queueActivationRecord(state, pid, null, state.denials, at);
+      }
       throw error;
     }
     if (options.offlineGrace && serverUnreachable(error) && state.denials === startedAtDenials) {
