@@ -268,9 +268,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // storage configuration (a region outside the edition's) stops the boot here.
   const publishing = resources.publishing ?? resourcePublishingEnabled(process.env);
   const libraryEdition = resources.edition ?? serverEdition(process.env);
-  const storage = resources.storage !== undefined ? resources.storage : (publishing ? createObjectStorage(process.env, libraryEdition) : null);
-  if (publishing) router.use('/resources/admin', createResourcePublishingRouter(db, { edition: libraryEdition, storage, now: resources.now }));
-  router.use('/resources', requireGuardianConsent(db), createResourceRouter(db, { ...resources, storage: publishing ? storage : null }));
+  const fileStore = resources.storage !== undefined ? resources.storage : (publishing ? createObjectStorage(process.env, libraryEdition) : null);
+  if (publishing) router.use('/resources/admin', createResourcePublishingRouter(db, { edition: libraryEdition, fileStore, now: resources.now }));
+  router.use('/resources', requireGuardianConsent(db), createResourceRouter(db, { ...resources, fileStore: publishing ? fileStore : null }));
   // The Exam Desk (ADR-0002 §8 plan F4): the UNMARKED mode of the
   // examination system — practice at a library paper under reading and
   // working time, notes and flags, never a mark. A sibling of /exams that

@@ -105,7 +105,7 @@ export function pdfProblems(bytes) {
   return p;
 }
 
-export function createResourcePublishingRouter(db, { edition = serverEdition(process.env), storage = null, now = Date.now } = {}) {
+export function createResourcePublishingRouter(db, { edition = serverEdition(process.env), fileStore: storage = null, now = Date.now } = {}) {
   db = asStore(db);
   if (!EDITION_IDS.includes(edition)) throw new Error(`resource publishing: unknown edition ${JSON.stringify(edition)}`);
   const router = asyncRouter();

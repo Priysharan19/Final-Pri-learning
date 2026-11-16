@@ -339,7 +339,7 @@
       "job": "platform-contracts",
       "log": "region-isolation.log",
       "pins": [
-        {"has":"REGION ISOLATION (H2): PASS — 423 checks (sqlite)"}
+        {"has":"REGION ISOLATION (H2): PASS — 461 checks (sqlite)"}
       ]
     },
     "platform/practice-http.log": {

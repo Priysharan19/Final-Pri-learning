@@ -3653,5 +3653,5 @@ export default {
   "staffLib.basis.linkOnly": "केवल लिंक (प्रति नहीं रखी)",
   "library.download": "PDF डाउनलोड करें",
   "library.downloadFailed": "फ़ाइल नहीं मिल सकी। थोड़ी देर बाद फिर कोशिश करें।",
-  "library.hostedNote": "Pri Learning द्वारा होस्ट की गई। लिंक कुछ मिनट चलता है और फ़ाइल आपके डिवाइस में सहेजता है।",
+  "library.hostedNote": "यहीं होस्ट की गई। लिंक कुछ मिनट चलता है और फ़ाइल आपके डिवाइस में सहेजता है।",
 };

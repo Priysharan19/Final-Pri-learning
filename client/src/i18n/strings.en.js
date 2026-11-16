@@ -3598,5 +3598,5 @@ export default {
   "staffLib.basis.linkOnly": "Link only (no copy kept)",
   "library.download": "Download the PDF",
   "library.downloadFailed": "The file could not be fetched. Try again in a moment.",
-  "library.hostedNote": "Hosted by Pri Learning. The link works for a few minutes and saves the file to your device.",
+  "library.hostedNote": "Hosted here. The link works for a few minutes and saves the file to your device.",
 };

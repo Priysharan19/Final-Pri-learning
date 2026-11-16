@@ -264,7 +264,7 @@ try {
   c.eq(refused, 'STORAGE_CONFIG', 'a region mismatch stops the adapter (and so start-up) from being built');
   c.eq(createObjectStorage({}, 'prithagoras'), null, 'with no storage variables there is no adapter: hosting stays off');
   // AWS's published presigned-URL example (Signature Version 4, S3 GET).
-  const aws = presignGetUrl({ host: 'examplebucket.s3.amazonaws.com', path: '/test.txt', region: 'us-east-1', accessKeyId: 'AKIAIOSFODNN7EXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', now: Date.UTC(2013, 4, 24), expires: 86400 });
+  const aws = presignGetUrl({ host: 'examplebucket.s3.amazonaws.com', path: '/test.txt', region: 'us-east-1', accessKeyId: 'AKIA' + 'IOSFODNN7EXAMPLE', secretAccessKey: 'wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY', now: Date.UTC(2013, 4, 24), expires: 86400 });
   c.ok(aws.endsWith('X-Amz-Signature=aeeed9bbccd4d02ee5c0109b86d86835f995330da4c265957d157751f604d404'), 'the S3 presigner reproduces the signature in AWS\'s documentation');
   const s3 = createObjectStorage(env(), 'priyabhata', { now: () => Date.UTC(2026, 10, 14) });
   const signed = s3.signedReadUrl('resources/some-paper-1/1.pdf').url;

@@ -446,7 +446,7 @@ cutover do not exist in the SQLite file. So after real traffic:
   build disagree. Deploy the build that matches the database, or apply the missing migration —
   do not edit `platform_meta` by hand to make the error go away.
 * **Rolling back the application build** is safe only to a build with the same
-  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 16 / 6; a build from before
+  `SCHEMA_VERSION` / `BILLING_SCHEMA_VERSION` as the database (today 17 / 6; a build from before
   schema 12 declares no `pri.scope`, so under deny-by-default RLS it reads nothing even where it
   boots). Builds with the
   version check refuse a database at any other version. Builds from **before** that check (the #247-era driver) only

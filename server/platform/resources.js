@@ -64,7 +64,7 @@ export const VISIBLE = `r.review_state='published'
  * The library router. `edition` defaults to the server's own (PRI_EDITION);
  * tests pass one to prove the other edition's rows stay out.
  */
-export function createResourceRouter(db, { edition = serverEdition(process.env), storage = null } = {}) {
+export function createResourceRouter(db, { edition = serverEdition(process.env), fileStore: storage = null } = {}) {
   db = asStore(db);
   if (!EDITION_IDS.includes(edition)) throw new Error(`resource library: unknown edition ${JSON.stringify(edition)}`);
   const router = asyncRouter();
