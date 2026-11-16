@@ -77,6 +77,7 @@ import { resolveEdition } from '../edition.config.mjs';
 const EDITION = resolveEdition(process.env);
 const INDIA = EDITION === 'priyabhata';
 const YEAR_SELECT = INDIA ? '#signup-track' : '#signup-year';
+const SECOND_STUDENT = INDIA ? 'Accessibility JEE Student' : 'Accessibility Year 12 Student';
 
 const CLIENT = fileURLToPath(new URL('../', import.meta.url));
 const APP_JSX = join(CLIENT, 'src', 'App.jsx');
@@ -1100,9 +1101,7 @@ async function run() {
       await goTo(page, BASE, '/exams');
       // The walk's student is CBSE Class 10 (D2): the paper they can sit is the
       // board mock (Exams.jsx, IndiaExams), not the JEE Main simulation.
-      if (INDIA) await page.locator('[data-exam-board-mock]').click({ timeout: 30000 });
-      // An NSW student sits the generated practice paper.
-      else await page.getByRole('button', { name: 'Start practice paper' }).click({ timeout: 30000 });
+      await page.locator('[data-exam-board-mock]').click({ timeout: 30000 });
       await wait(page, SETTLE);
       await page.waitForSelector('.exam-nav', { timeout: 60000 }).catch(async err => {
         throw new Error(`${String(err.message).split('\n')[0]} · on screen: ${JSON.stringify((await page.locator('[role="alert"]').allInnerTexts()).map(t => t.replace(/\s+/g, ' ').slice(0, 200)))} · last server calls ${JSON.stringify(online.calls.slice(-4).map(c => `${c.status} ${c.path}`))}`);
@@ -1394,7 +1393,7 @@ async function run() {
         await page.locator('#signup-year').selectOption('12');
       } else await page.locator('#signup-year').selectOption('12');
       await click(page, '.auth-card .btn-primary');
-      await page.locator('#signup-name').fill('Accessibility JEE Student');
+      await page.locator('#signup-name').fill(SECOND_STUDENT);
       await click(page, '.auth-card .btn-primary');
       await click(page, '.auth-card .btn-primary');
       await page.waitForSelector('[data-onboarding-step="5"]');
@@ -1404,7 +1403,7 @@ async function run() {
       await page.waitForSelector('[data-testid="account-activation-gate"] [data-signin-card="inline"]', { timeout: 30000 });
       await signInOnCard(page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]'), platform, { email: freshEmail('a11y-jee'), age: 18 });
       await page.waitForSelector('.shell', { timeout: 60000 });
-      await online.signIn({ name: 'Accessibility JEE Student' });
+      await online.signIn({ name: SECOND_STUDENT });
       // The session ended, a paper does not start: the refusal is the state audited here.
       await goTo(page, BASE, '/exams');
       endSession();
