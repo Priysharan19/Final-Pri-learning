@@ -400,7 +400,8 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
       return true;
     });
     for (let i = 0; i < count; i++) await storage.delete(partKey(resourceId, n, i));
-    if (!stillDraft) { await storage.delete(key); return bad(res, 409, 'REVISION_NOT_DRAFT', 'Files can be changed on a draft only.'); }
+    // Only the staging parts are ours to delete here: the final key may hold the live file of a revision that moved on.
+    if (!stillDraft) { return bad(res, 409, 'REVISION_NOT_DRAFT', 'Files can be changed on a draft only.'); }
     res.status(201).json({ asset: assetPublic(await assetOf(resourceId, n)) });
   });
 
