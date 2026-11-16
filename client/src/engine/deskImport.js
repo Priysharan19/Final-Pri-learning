@@ -63,6 +63,7 @@ function bytesOf(obj) {
  */
 export function readDeskExport(obj, resource) {
   if (!plain(obj) || bytesOf(obj) > MAX_EXPORT_BYTES) return refuse('DESK_IMPORT_NOT_A_DESK_FILE', 'This isn\'t an Exam Desk export.');
+  if (obj.exportVersion === 2) return refuse('DESK_IMPORT_VERSION', 'This is an export made by this app. It is your own copy of an attempt already in your account, so there is nothing to bring across.');
   if (obj.exportVersion !== EXPORT_VERSION) return refuse('DESK_IMPORT_VERSION', 'This export is from a newer or older desk we can\'t read.');
   const resourceId = exportResourceId(obj);
   if (!resourceId || !resource || resource.id !== resourceId || resource.type !== 'paper') {
