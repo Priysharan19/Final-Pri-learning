@@ -78,7 +78,11 @@ try {
   const { createElement: h } = React;
   const draw = (spec, interactive = false) => renderToStaticMarkup(h(reg.default, { spec, interactive }));
 
-  ok(reg.DIAGRAM_KINDS.length === 28, `28 diagram kinds are registered (${reg.DIAGRAM_KINDS.length})`);
+  // The registry and the React-free name list (diagrams/kinds.js, read by node tools) agree exactly:
+  // the 28 core kinds plus every pack kind.
+  const names = await server.ssrLoadModule('/src/diagrams/kinds.js');
+  const listed = [...names.STATIC_KIND_NAMES, ...names.INTERACTIVE_KIND_NAMES];
+  ok(listed.length >= 28 && reg.DIAGRAM_KINDS.length === listed.length && listed.every(k => reg.DIAGRAM_KINDS.includes(k)), `every listed kind is registered and nothing else (${reg.DIAGRAM_KINDS.length} registered, ${listed.length} listed)`);
   for (const k of ['function', 'trig', 'unitCircle', 'triangle', 'polygon', 'circleTheorem', 'numberLine', 'tree', 'venn', 'table', 'histogram', 'boxPlot', 'normal', 'vector', 'sequence', 'compound', 'timeline', 'secantTangent', 'riemann']) ok(reg.DIAGRAM_KINDS.includes(k), `kind ${k} is covered`);
 
   for (const [name, spec] of Object.entries(SPECS)) {

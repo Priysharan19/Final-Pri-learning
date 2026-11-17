@@ -28,7 +28,7 @@ export default {
       { front: 'LCM rule from prime factors', back: 'All primes that appear, each with its largest power.' },
       { front: 'Can $6^n$ end in the digit 0?', back: 'No. Ending in 0 needs the prime 5 in the factorisation, but $6^n = 2^n 3^n$ has no 5. Write this reason in full in the board exam.' },
       { front: 'Opening line of an irrationality proof', back: 'Assume the opposite: the number is rational, $\\dfrac{p}{q}$ with $p, q$ co-prime and $q \\ne 0$.' },
-      { front: 'Does HCF × LCM = product work for three numbers?', back: 'Not in general. Use it only for two numbers.' },
+      { front: 'Does $\\text{HCF} \\times \\text{LCM} = \\text{product}$ work for three numbers?', back: 'Not in general. Use it only for two numbers.' },
       { front: 'Quick check on an HCF/LCM answer', back: 'The HCF must divide the LCM exactly.' },
       { front: 'Board tip on factorisation', back: 'Show the factor tree or division ladder and the final power form; method marks depend on it.' }
     ],
@@ -334,7 +334,7 @@ export default {
       { front: 'Can $\\sin A$ exceed 1?', back: 'No. The hypotenuse is the longest side, so $0 \\le \\sin A, \\cos A \\le 1$.' },
       { front: 'Given one ratio, find the rest', back: 'Draw a right triangle with those two sides, find the third by Pythagoras, then read off every ratio.' },
       { front: 'Strategy for proving identities', back: 'Start from the more complicated side, convert to $\\sin$ and $\\cos$, and use $\\sin^2 A + \\cos^2 A = 1$.' },
-      { front: 'Board tip', back: 'Do not work on both sides at once in a proof; transform one side into the other and write LHS = ... = RHS.' }
+      { front: 'Board tip', back: 'Do not work on both sides at once in a proof; transform one side into the other and write $\\text{LHS} = \\cdots = \\text{RHS}$.' }
     ],
     mistakes: [
       { wrong: 'Treating $\\sin A$ as $\\sin \\times A$ and cancelling: $\\dfrac{\\sin A}{A} = \\sin$.', right: '$\\sin A$ is a single value depending on $A$; it cannot be split.' },
@@ -437,7 +437,7 @@ export default {
     concepts: [
       { title: 'Sector as a fraction', body: 'A central angle $\\theta$ takes $\\dfrac{\\theta}{360}$ of the full turn, so the sector has that fraction of the circle’s area and its arc has that fraction of the circumference.' },
       { title: 'Minor and major', body: 'The smaller sector (angle $\\theta$) is the minor sector; the rest of the circle (angle $360^\\circ - \\theta$) is the major sector. The same idea applies to segments.' },
-      { title: 'Segment = sector − triangle', body: 'The minor segment is the minor sector minus the triangle formed by the two radii and the chord.' },
+      { title: 'Segment equals sector minus triangle', body: 'The minor segment is the minor sector minus the triangle formed by the two radii and the chord.' },
       { title: 'Triangle areas for standard angles', body: 'At $60^\\circ$ the triangle is equilateral with area $\\dfrac{\\sqrt{3}}{4}r^2$. At $90^\\circ$ it is a right isosceles triangle with area $\\dfrac{1}{2}r^2$. At $120^\\circ$ its area is $\\dfrac{\\sqrt{3}}{4}r^2$ as well, using $\\dfrac{1}{2}r^2\\sin 120^\\circ$.' },
       { title: 'Perimeter of a sector', body: 'The boundary is two radii plus the arc: $2r + \\dfrac{\\theta}{360} \\times 2\\pi r$.' }
     ],
@@ -452,8 +452,8 @@ export default {
       { label: 'Length of an arc', tex: 'l = \\dfrac{\\theta}{360^\\circ} \\times 2\\pi r' },
       { label: 'Perimeter of a sector', tex: 'P = 2r + \\dfrac{\\theta}{360^\\circ} \\times 2\\pi r' },
       { label: 'Area of a minor segment', tex: '\\text{Segment} = \\dfrac{\\theta}{360^\\circ}\\pi r^2 - \\text{area of }\\triangle OAB' },
-      { label: 'Triangle for 60° or 120°', tex: '\\triangle OAB = \\dfrac{\\sqrt{3}}{4} r^2' },
-      { label: 'Triangle for 90°', tex: '\\triangle OAB = \\dfrac{1}{2} r^2' },
+      { label: 'Triangle for $60^\\circ$ or $120^\\circ$', tex: '\\triangle OAB = \\dfrac{\\sqrt{3}}{4} r^2' },
+      { label: 'Triangle for $90^\\circ$', tex: '\\triangle OAB = \\dfrac{1}{2} r^2' },
       { label: 'Major segment', tex: '\\pi r^2 - \\text{minor segment}' }
     ],
     points: [
@@ -466,7 +466,7 @@ export default {
     mistakes: [
       { wrong: 'Using $\\dfrac{\\theta}{180}$ instead of $\\dfrac{\\theta}{360}$.', right: 'A full circle is $360^\\circ$, so the fraction is $\\theta/360$.' },
       { wrong: 'Taking the segment area equal to the sector area.', right: 'Subtract the triangle formed by the radii and the chord.', misconception: 'term-dropped' },
-      { wrong: 'Perimeter of a sector = arc length only.', right: 'Add the two radii: $2r + l$.', misconception: 'term-dropped' },
+      { wrong: 'The perimeter of a sector is the arc length only.', right: 'Add the two radii: $2r + l$.', misconception: 'term-dropped' },
       { wrong: 'Using the diameter as $r$.', right: 'Halve the diameter before squaring.' }
     ],
     examples: [
@@ -482,7 +482,7 @@ export default {
       { title: 'Building blocks', body: 'The solids used are the cuboid, cube, cylinder, cone, sphere and hemisphere. Know each one’s curved surface area, total surface area and volume.' },
       { title: 'Surface area of a combination', body: 'Add only the faces you can touch from outside. Where two solids are joined, the joining face is hidden and is not counted.' },
       { title: 'Volume of a combination', body: 'The total volume is the sum of the volumes of the parts. If a part is scooped out, subtract its volume.' },
-      { title: 'Shared measurements', body: 'Joined solids usually share a radius. Find each part’s own height carefully, for example cone height = total height − hemisphere radius.' },
+      { title: 'Shared measurements', body: 'Joined solids usually share a radius. Find each part’s own height carefully, for example the cone’s height is the total height minus the hemisphere’s radius.' },
       { title: 'Slant height', body: 'For a cone, the slant height is $l = \\sqrt{r^2 + h^2}$; it is needed for the curved surface area.' }
     ],
     definitions: [
