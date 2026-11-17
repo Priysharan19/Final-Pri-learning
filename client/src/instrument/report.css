@@ -61,3 +61,9 @@
 @media (prefers-reduced-motion: reduce) { .in-chart-area, .in-chart-line, .in-chart-dot { animation: none; } }
 
 .in-chart-empty { box-shadow: var(--in-sh-1); background: var(--in-l1); color: var(--in-tx-2); }
+
+/* Empty chart: the grid steps back and the message says what to do next. */
+.in-chart[data-report-chart="empty"] .in-chart-grid { opacity: 0.45; }
+.in-chart-empty-link { display: inline-flex; align-items: center; min-height: 32px; margin-left: 4px; color: var(--in-action); font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
+.in-chart-empty-link:focus-visible { outline: 2px solid var(--in-action); outline-offset: 2px; border-radius: 3px; }
+@media (pointer: coarse) { .in-chart-empty-link { min-height: 44px; } }

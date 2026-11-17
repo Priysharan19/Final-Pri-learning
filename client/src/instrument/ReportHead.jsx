@@ -103,7 +103,7 @@ function Chart({ series, labels, t, spoken, failed }) {
         {labels.map((l, i) => (i % every === 0 || i === n - 1) && <span key={i} className="in-chart-tick" style={{ left: `${(X(i) / CW) * 100}%` }}>{l}</span>)}
       </div>
       <div className="in-chart-lg" aria-hidden="true"><span><i className="is-method" />{t('inst.chartMethod')}</span><span><i className="is-accuracy" />{t('inst.chartAccuracy')}</span></div>
-      {!any && !failed && <p className="in-chart-empty" data-chart-empty>{t('inst.chartEmpty')}</p>}
+      {!any && !failed && <p className="in-chart-empty" data-chart-empty>{t('inst.chartEmpty')} <PageLink to="/practice" className="in-chart-empty-link" data-chart-empty-practice>{t('nav.practice')}</PageLink></p>}
     </div>
   );
 }
