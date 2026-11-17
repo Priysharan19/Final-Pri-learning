@@ -25,7 +25,7 @@
     "nsw:banks": "node client/test/nsw-bank-quality-check.mjs --ledger",
     "nsw:coverage": "node tools/nsw-curriculum-coverage.mjs",
     "test:notes:nsw": "node client/test/nsw-notes-content-check.mjs && node client/test/nsw-notes-bands-check.mjs && node client/test/nsw-notes-no-india-check.mjs",
-    "test:diagrams": "node client/test/diagram-geometry-check.mjs && node client/test/diagram-render-check.mjs && node client/test/diagram-pack-algebra-check.mjs && node client/test/diagram-pack-plane-check.mjs",
+    "test:diagrams": "node client/test/diagram-geometry-check.mjs && node client/test/diagram-render-check.mjs && node client/test/diagram-pack-algebra-check.mjs && node client/test/diagram-pack-plane-check.mjs && node client/test/diagram-pack-space-check.mjs",
     "test:notes:nsw:browser": "node client/test/nsw-notes-visual-check.mjs",
     "test:diagrams:browser": "node client/test/diagram-kit-browser-check.mjs",
     "test:notes": "node client/test/notes-content-check.mjs && node client/test/notes-expansion-depth-check.mjs && node client/test/notes-diagram-content-check.mjs && node client/test/notes-visual-wave5-check.mjs && node client/test/notes-visual-wave6-check.mjs && node client/test/notes-visual-wave7-check.mjs && node client/test/notes-visual-wave8-check.mjs && node client/test/notes-resource-shelf-check.mjs && node client/test/study-journey-check.mjs && npm run test:notes:e3",
