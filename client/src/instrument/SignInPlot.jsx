@@ -75,6 +75,13 @@ export default function SignInPlot() {
       ctx.moveTo(0, Math.round(py(0)) + 0.5); ctx.lineTo(w, Math.round(py(0)) + 0.5);
       ctx.moveTo(Math.round(px(0)) + 0.5, 0); ctx.lineTo(Math.round(px(0)) + 0.5, h);
       ctx.stroke();
+      // The curve, in a chart colour — never the edition accent.
+      ctx.strokeStyle = tok('--in-c2', '#a7701f');
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      for (let x = X_MIN; x <= X_MAX + 0.001; x += 0.05) { if (x === X_MIN) ctx.moveTo(px(x), py(fn.f(x))); else ctx.lineTo(px(x), py(fn.f(x))); }
+      ctx.stroke();
       ctx.font = `500 11px ${tok('--in-mono', 'ui-monospace, monospace')}`;
       ctx.textBaseline = 'top';
       ctx.textAlign = 'center';
@@ -84,13 +91,6 @@ export default function SignInPlot() {
       ctx.textAlign = 'right';
       ctx.textBaseline = 'middle';
       for (let y = Math.ceil(yLo); y <= Math.floor(yHi); y++) if (y !== 0 && y % 2 === 0) { ctx.fillStyle = axis; ctx.fillRect(px(0) - 3, Math.round(py(y)), 6, 1); label(String(y).replace('-', '−'), px(0) - 8, py(y)); }
-      // The curve, in a chart colour — never the edition accent.
-      ctx.strokeStyle = tok('--in-c2', '#a7701f');
-      ctx.lineWidth = 2.5;
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      for (let x = X_MIN; x <= X_MAX + 0.001; x += 0.05) { if (x === X_MIN) ctx.moveTo(px(x), py(fn.f(x))); else ctx.lineTo(px(x), py(fn.f(x))); }
-      ctx.stroke();
       // The tracer: one pass (there and back) every 14 s, eased at the ends.
       if (!still) { clock += last ? Math.min(100, (now || 0) - last) : 0; last = now || 0; }
       const phase = (clock / PASS_MS) % 1;
