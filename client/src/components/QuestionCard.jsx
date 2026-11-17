@@ -2288,6 +2288,86 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     && String(judged.lines[judged.lines.length - 1]).trim() !== String(judged.answer).trim();
   const otherComments = (inkComments || []).filter(c => c !== firstBad && c.kind !== 'good');
 
+  // Phone (≤ 560 px): the ladder folds into one row after the writing surface;
+  // the full ladder (and any opened hint) is read in a bottom sheet.
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 560px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.('(max-width: 560px)');
+    if (!mq) return undefined;
+    const on = () => setNarrow(mq.matches);
+    on(); mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
+  const [hintSheet, setHintSheet] = useState(false);
+  const hintSheetRef = useRef(null);
+  const sheetOpener = useRef(null);
+  const ladderShown = !!(INSTRUMENT && ladderOffered && (!resolved || hints.length > 0));
+  const narrowLadder = narrow && ladderShown;
+  const hintCountSeen = useRef(hints.length);
+  useEffect(() => {
+    // A rung opened from the row shows its text in the sheet.
+    if (narrowLadder && hints.length > hintCountSeen.current) { sheetOpener.current = document.activeElement; setHintSheet(true); }
+    hintCountSeen.current = hints.length;
+  }, [hints.length, narrowLadder]);
+  useEffect(() => { if (!narrowLadder && hintSheet) setHintSheet(false); }, [narrowLadder, hintSheet]);
+  const closeHintSheet = () => { setHintSheet(false); const el = sheetOpener.current; sheetOpener.current = null; setTimeout(() => el?.focus?.(), 0); };
+  useEffect(() => {
+    if (!hintSheet) return undefined;
+    const node = hintSheetRef.current;
+    node?.querySelector('[data-hint-sheet-close]')?.focus();
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.stopPropagation(); closeHintSheet(); return; }
+      if (e.key !== 'Tab' || !node) return;
+      const f = [...node.querySelectorAll('button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')];
+      if (!f.length) return;
+      const first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [hintSheet]);
+  const sheetTouchY = useRef(null);
+  const renderLadder = (inSheet = false) => (
+          <section className={`hints-block in-ladder${inSheet ? ' in-sheet' : ''}`} aria-label={t('verdict.hints')} data-hint-ladder={`${hintLevel}/${HINT_RUNGS.length}`}>
+            <div className="hints-block-title">{t('inst.ladderHead', { used: rungLevelUsed, total: HINT_RUNGS.length })}</div>
+            {HINT_RUNGS.map((rung, i) => {
+              const cost = rung === 'solution' ? t('inst.rungEnds') : t('inst.rungCost', { percent: Math.round(RUNG_COST[rung] * 100) });
+              const shown = hints.find(h => h.rung === rung);
+              if (shown) {
+                return (
+                  <div className="hintbox in-rung is-open" key={rung} data-hint-shown={rung}>
+                    <span className="h-n">{t(RUNG_KEY[rung])}<small className="in-rung-cost">{cost}</small></span>
+                    {shown.text ? <MathText text={shown.text} /> : <span className="muted">{t('verdict.rungThin')}</span>}
+                  </div>
+                );
+              }
+              if (!resolved && rung === nextRung) {
+                const label = rung === 'solution'
+                  ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
+                  : t('verdict.rungLabel', { n: i + 1, rung: t(RUNG_KEY[rung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
+                return (
+                  <button type="button" className={`in-rung is-next${solutionRungArmed && rung === 'solution' ? ' is-armed' : ''}`} key={rung}
+                    data-hint-rung-open={rung} disabled={busy} aria-label={label} onClick={getHint}>
+                    <span className="in-rung-k" aria-hidden="true">{i + 1}</span>
+                    <b>{solutionRungArmed && rung === 'solution' ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY[rung])}</b>
+                    <small>{cost}</small>
+                  </button>
+                );
+              }
+              return (
+                <div className={`in-rung ${i < hintLevel ? 'is-used' : 'is-locked'}`} key={rung} data-hint-rung-locked={i < hintLevel ? undefined : rung}>
+                  <span className="in-rung-k" aria-hidden="true">{i + 1}</span>
+                  <b>{t(RUNG_KEY[rung])}</b>
+                  <small>{cost}</small>
+                  {i >= hintLevel && <span className="sr-only"> {t('inst.rungLocked')}</span>}
+                </div>
+              );
+            })}
+            {!resolved && hintLevel > 0 && <div className="hints-block-title">{t('verdict.markWeightLeft', { percent: Math.round(credit * 100) })}</div>}
+          </section>
+  );
+
   return (
     <div className={`qpage ws ${split ? 'ws-split' : 'ws-single'}`} data-phase={state.phase} data-mode={isMcq ? 'mcq' : mode} data-question-id={question.id}>
       {/* ── The question: the page's reference object ── */}
@@ -2330,43 +2410,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           // v1.1 instrument: every rung of the ladder, the locked ones closed.
           // Each states the charge the server's table makes (engine/hintLadder.js);
           // opening the next rung is getHint(), exactly as the toolbar's bulb.
-          <section className="hints-block in-ladder" aria-label={t('verdict.hints')} data-hint-ladder={`${hintLevel}/${HINT_RUNGS.length}`}>
-            <div className="hints-block-title">{t('inst.ladderHead', { used: rungLevelUsed, total: HINT_RUNGS.length })}</div>
-            {HINT_RUNGS.map((rung, i) => {
-              const cost = rung === 'solution' ? t('inst.rungEnds') : t('inst.rungCost', { percent: Math.round(RUNG_COST[rung] * 100) });
-              const shown = hints.find(h => h.rung === rung);
-              if (shown) {
-                return (
-                  <div className="hintbox in-rung is-open" key={rung} data-hint-shown={rung}>
-                    <span className="h-n">{t(RUNG_KEY[rung])}<small className="in-rung-cost">{cost}</small></span>
-                    {shown.text ? <MathText text={shown.text} /> : <span className="muted">{t('verdict.rungThin')}</span>}
-                  </div>
-                );
-              }
-              if (!resolved && rung === nextRung) {
-                const label = rung === 'solution'
-                  ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
-                  : t('verdict.rungLabel', { n: i + 1, rung: t(RUNG_KEY[rung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
-                return (
-                  <button type="button" className={`in-rung is-next${solutionRungArmed && rung === 'solution' ? ' is-armed' : ''}`} key={rung}
-                    data-hint-rung-open={rung} disabled={busy} aria-label={label} onClick={getHint}>
-                    <span className="in-rung-k" aria-hidden="true">{i + 1}</span>
-                    <b>{solutionRungArmed && rung === 'solution' ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY[rung])}</b>
-                    <small>{cost}</small>
-                  </button>
-                );
-              }
-              return (
-                <div className={`in-rung ${i < hintLevel ? 'is-used' : 'is-locked'}`} key={rung} data-hint-rung-locked={i < hintLevel ? undefined : rung}>
-                  <span className="in-rung-k" aria-hidden="true">{i + 1}</span>
-                  <b>{t(RUNG_KEY[rung])}</b>
-                  <small>{cost}</small>
-                  {i >= hintLevel && <span className="sr-only"> {t('inst.rungLocked')}</span>}
-                </div>
-              );
-            })}
-            {!resolved && hintLevel > 0 && <div className="hints-block-title">{t('verdict.markWeightLeft', { percent: Math.round(credit * 100) })}</div>}
-          </section>
+          narrowLadder ? null : renderLadder()
         ) : hints.length > 0 && (
           <div className="hints-block">
             <div className="hints-block-title">{t('verdict.hints')}</div>
@@ -3170,6 +3214,43 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </div>
         )}
 
+        {narrowLadder && (
+          <div className="in-hintrow no-print" data-hint-row={`${hintLevel}/${HINT_RUNGS.length}`}>
+            <div className="in-hintrow-head">
+              <span className="in-meter" aria-hidden="true">{HINT_RUNGS.map((r, i) => <i key={r} className={i < hintLevel ? 'is-used' : undefined} />)}</span>
+              <span className="in-hintrow-label">{t('inst.ladderRow', { used: rungLevelUsed, total: HINT_RUNGS.length })}</span>
+              <button type="button" className="in-hintrow-all" data-hint-all
+                onClick={(e) => { sheetOpener.current = e.currentTarget; setHintSheet(true); }}>{t('inst.allHints')}</button>
+            </div>
+            {!resolved && nextRung && (() => {
+              const i = HINT_RUNGS.indexOf(nextRung);
+              const solution = nextRung === 'solution';
+              const label = solution
+                ? (solutionRungArmed ? t('verdict.rungSolutionConfirm') : t('verdict.rungSolutionTitle'))
+                : t('verdict.rungLabel', { n: i + 1, rung: t(RUNG_KEY[nextRung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
+              const cost = solution ? t('inst.rungEnds') : t('inst.rungCost', { percent: Math.round(RUNG_COST[nextRung] * 100) });
+              return (
+                <button type="button" className={`in-rung is-next in-hintrow-next${solution && solutionRungArmed ? ' is-armed' : ''}`}
+                  data-hint-rung-open={nextRung} disabled={busy} aria-label={label} onClick={getHint}>
+                  <b>{solution && solutionRungArmed ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY[nextRung])}</b>
+                  <small>{cost}</small>
+                </button>
+              );
+            })()}
+          </div>
+        )}
+        {narrowLadder && hintSheet && (
+          <>
+            <button type="button" className="in-hintsheet-scrim" aria-label={t('inst.hintSheetClose')} tabIndex={-1} onClick={closeHintSheet} />
+            <div className="in-hintsheet" ref={hintSheetRef} role="dialog" aria-modal="true" aria-label={t('verdict.hints')}
+              onTouchStart={(e) => { sheetTouchY.current = e.touches[0].clientY; }}
+              onTouchEnd={(e) => { const y0 = sheetTouchY.current; sheetTouchY.current = null; if (y0 != null && e.changedTouches[0].clientY - y0 > 60) closeHintSheet(); }}>
+              {renderLadder(true)}
+              <button type="button" className="btn btn-quiet in-hintsheet-close" data-hint-sheet-close onClick={closeHintSheet}>{t('inst.hintSheetClose')}</button>
+            </div>
+          </>
+        )}
+
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
@@ -3255,11 +3336,20 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             {!resolved && diagnostic && (
               <button className="btn btn-quiet" onClick={dontKnow} disabled={busy}>{t('placement.dontKnow')}</button>
             )}
-            {!resolved && !diagnostic && !unmarkable && (
-              <button className={`btn ${revealArmed ? 'btn-ghost' : 'btn-quiet'}`} onClick={reveal} disabled={busy} aria-live="polite">
-                {revealArmed ? t('verdict.showSolutionConfirm') : t('verdict.showSolution')}
-              </button>
-            )}
+            {!resolved && !diagnostic && !unmarkable && (() => {
+              const showBtn = (
+                <button className={`btn ${revealArmed ? 'btn-ghost' : 'btn-quiet'}`} onClick={reveal} disabled={busy} aria-live="polite">
+                  {revealArmed ? t('verdict.showSolutionConfirm') : t('verdict.showSolution')}
+                </button>
+              );
+              // Phone: Show solution leaves the action row for "More"; its two-press confirmation is unchanged.
+              return narrow ? (
+                <details className="ws-more" open={revealArmed || undefined}>
+                  <summary className="btn btn-quiet">{t('nav.more')}</summary>
+                  <div className="ws-more-menu">{showBtn}</div>
+                </details>
+              ) : showBtn;
+            })()}
             {resolved && !diagnostic && <button className="btn btn-quiet redo-chip" onClick={() => onRedo ? onRedo() : onNext?.()}>{t('verdict.redoQuestion')}</button>}
             {/* A placement answer is advanced by the placement page itself. */}
             {replaceArmed && !resolved && (
