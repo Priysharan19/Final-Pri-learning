@@ -25,7 +25,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../i18n/index.js';
 import { cloud } from '../platform/cloudTransport.js';
-import { fetchedPhase, markBoxes, openOriginal, pointsUntil, readingLayer, strokePath, timeline } from './originalWorkModel.js';
+import { fetchedPhase, markBoxes, openOriginal, pointsUntil, readingParts, strokePath, timeline } from './originalWorkModel.js';
 import './OriginalWork.css';
 
 const reducedMotion = () => typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
@@ -52,7 +52,7 @@ export default function OriginalWork({ original, marks = [], showReading = true,
   const page = opened?.ok && opened.kind === 'strokes' ? opened.page : null;
   const boxes = useMemo(() => (page ? markBoxes(page, original?.lines || [], marks) : []), [page, original, marks]);
   const span = useMemo(() => (page ? timeline(page) : null), [page]);
-  const reading = showReading ? readingLayer(original?.reading) : null;
+  const readingLine = showReading ? readingParts(original?.reading) : [];
   const name = label || t('ow.label');
 
   const replay = () => {
@@ -120,16 +120,15 @@ export default function OriginalWork({ original, marks = [], showReading = true,
             </button>
           )}
         </div>
-        {reading && reading.confirmed && (
+        {readingLine.length > 0 && (
           <p className="ow-reading">
-            <span className="ow-reading-label">{t('ow.whatPriRead')}</span>{' '}
-            <span className="ow-reading-text">{reading.corrected ? reading.read : reading.confirmed}</span>
-            {reading.corrected && (
-              <>
-                {' · '}<span className="ow-reading-label">{t('ow.youConfirmed')}</span>{' '}
-                <span className="ow-reading-text">{reading.confirmed}</span>
-              </>
-            )}
+            {readingLine.map((part, i) => (
+              <React.Fragment key={part.label}>
+                {i > 0 && ' · '}
+                <span className="ow-reading-label">{part.label === 'whatPriRead' ? t('ow.whatPriRead') : t('ow.youConfirmed')}</span>{' '}
+                <span className="ow-reading-text">{part.text}</span>
+              </React.Fragment>
+            ))}
           </p>
         )}
         <p className="ow-proof">{t('ow.keptWithMark', { digest: opened.sha256.slice(0, 8) })}</p>

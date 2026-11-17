@@ -106,3 +106,19 @@ export function readingLayer(reading) {
   return { read, confirmed, corrected: read !== null && (reading.corrected === true || read !== confirmed),
     edits: Array.isArray(reading.edits) ? reading.edits.length : 0 };
 }
+
+/**
+ * The reading line's parts, each text under its own label:
+ *   what Pri read          — only the server's own record of the read;
+ *   what the student confirmed — shown when it differs from that, or when the
+ *                             server no longer holds the read.
+ * The student's confirmed text is never shown under "What Pri read".
+ */
+export function readingParts(reading) {
+  const layer = readingLayer(reading);
+  if (!layer || !layer.confirmed) return [];
+  if (layer.read === null) return [{ label: 'youConfirmed', text: layer.confirmed }];
+  return layer.corrected
+    ? [{ label: 'whatPriRead', text: layer.read }, { label: 'youConfirmed', text: layer.confirmed }]
+    : [{ label: 'whatPriRead', text: layer.read }];
+}

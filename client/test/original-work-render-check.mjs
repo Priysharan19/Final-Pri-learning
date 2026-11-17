@@ -67,12 +67,15 @@ eq(model.readingLayer(view.reading), { read: 'x = 9', confirmed: '9', corrected:
 eq(model.readingLayer({ read: '9', confirmed: '9' }).corrected, false, 'agreement is not a correction');
 
 // ── A fetched record is shown only as the page the mark names ─────────────────
+const marked = readFileSync(new URL('../src/components/OriginalWork.jsx', import.meta.url), 'utf8');
 eq(model.fetchedPhase(view, view.sha256), 'ready', 'the record carrying the mark\'s digest is shown');
 eq(model.fetchedPhase(view, 'e'.repeat(64)), 'mismatch', 'a record with another digest is refused as this mark\'s work');
 eq(model.fetchedPhase(view, null), 'none', 'no digest named: not shown (a record is never trusted on its own say-so)');
 eq(model.fetchedPhase(null, view.sha256), 'none', 'no record: nothing shown');
-eq(model.readingLayer({ read: null, confirmed: '9', corrected: true }).corrected, false, 'a correction whose reading the server no longer holds is not shown as a reading');
-const marked = readFileSync(new URL('../src/components/OriginalWork.jsx', import.meta.url), 'utf8');
+eq(model.readingParts({ read: 'x = 9', confirmed: '9', corrected: true }), [{ label: 'whatPriRead', text: 'x = 9' }, { label: 'youConfirmed', text: '9' }], 'a correction: what Pri read, then what the student confirmed, each under its own label');
+eq(model.readingParts({ read: '9', confirmed: '9' }), [{ label: 'whatPriRead', text: '9' }], 'agreement: what Pri read alone');
+eq(model.readingParts({ read: null, confirmed: '9', corrected: true }), [{ label: 'youConfirmed', text: '9' }], 'no stored read: the confirmed text is shown only as the student\'s, never under "What Pri read"');
+ok(/readingParts\(original\?\.reading\)/.test(marked) && /part\.label === 'whatPriRead' \? t\('ow\.whatPriRead'\) : t\('ow\.youConfirmed'\)/.test(marked), 'the component labels each part from readingParts');
 ok(/export function MarkedOriginal\(\{ originalId, sha256, /.test(marked) && /fetchedPhase\(original, sha256\)/.test(marked), 'MarkedOriginal decides with fetchedPhase and has no default digest');
 
 // ── Replay ────────────────────────────────────────────────────────────────────
