@@ -42,7 +42,7 @@ ok('the rating update gives a hinted success less than a clean one, more than a 
 const { generateQuestion, loadBanksFor } = await import(`${SRC}engine/generators/index.js`);
 await loadBanksFor(['y8-indices', 'y10-quadratics', 'c10-quadratic-roots']);
 {
-  const q = generateQuestion('y8-indices', 2, 4242);
+  const q = generateQuestion('y8-indices', 2, 4243);
   const ladder = L.buildHintLadder(q);
   eq('a real question builds four rungs', ladder.map(r => r.rung), L.HINT_RUNGS);
   eq('the nudge is the first authored hint', ladder[0].text, q.hints[0]);
