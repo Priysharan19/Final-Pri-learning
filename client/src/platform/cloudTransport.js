@@ -236,6 +236,20 @@ function pathId(value, label = 'id') {
   return id;
 }
 
+const QUERY_KEY = /^[a-z]{1,16}$/;
+/** `?k=v&…` (or `.csv`) for a browser GET: plain-id keys and values only, or it throws. */
+function webOnlySuffix(verb, query, csv) {
+  if (verb !== 'GET') throw new Error('Cloud query is not allowed');
+  let out = csv ? '.csv' : '';
+  const pairs = Object.entries(query || {});
+  if (pairs.length > 4) throw new Error('Cloud query is not allowed');
+  for (const [k, v] of pairs) {
+    if (!QUERY_KEY.test(k) || !SAFE_ID.test(String(v ?? ''))) throw new Error('Cloud query is not allowed');
+  }
+  if (pairs.length) out += '?' + pairs.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
+  return out;
+}
+
 function parseJson(text) {
   if (!text) return null;
   try { return JSON.parse(text); }
@@ -283,11 +297,16 @@ const PROOF_KINDS = new Set(['password', 'otp', 'google', 'apple']);
 const proofList = list => list.filter(kind => typeof kind === 'string' && PROOF_KINDS.has(kind)).slice(0, PROOF_KINDS.size);
 
 export async function cloudRequest(path, {
-  method = 'GET', body = undefined, idempotencyKey = null, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null
+  method = 'GET', body = undefined, idempotencyKey = null, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null,
+  query = null, csv = false
 } = {}) {
   if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
   const verb = String(method || 'GET').toUpperCase();
   if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(verb)) throw new Error('Cloud method is not allowed');
+  // A query string and a CSV export are never part of PATH (the native bridges
+  // refuse both): they are added here, to a GET in a browser only, from named
+  // parameters whose keys and values are plain ids.
+  const extra = (query || csv) ? webOnlySuffix(verb, query, csv) : '';
 
   let payload;
   if (body !== undefined) {
@@ -297,6 +316,11 @@ export async function cloudRequest(path, {
 
   const rid = requestId();
   if (nativeCloudAvailable()) {
+    if (extra) {
+      const err = new Error('This needs Pri in a web browser for now.');
+      err.code = 'CLOUD_WEB_ONLY';
+      throw err;
+    }
     const result = await nativeRequest(path, {
       method: verb, payload, idempotencyKey, timeoutMs, signal, serverRequestId: rid
     });
@@ -343,7 +367,7 @@ export async function cloudRequest(path, {
     throw err;
   }
 
-  const headers = { Accept: 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION };
+  const headers = { Accept: csv ? 'text/csv, application/json' : 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION };
   const csrf = cookie('pri_csrf');
   if (csrf && verb !== 'GET') headers['X-Pri-CSRF'] = csrf;
   if (idempotencyKey) headers['Idempotency-Key'] = String(idempotencyKey).slice(0, 160);
@@ -358,7 +382,7 @@ export async function cloudRequest(path, {
   }
 
   try {
-    const response = await fetch(`${origin}${path}`, {
+    const response = await fetch(`${origin}${path}${extra}`, {
       method: verb,
       headers,
       body: payload,
@@ -369,6 +393,8 @@ export async function cloudRequest(path, {
     });
     const text = await response.text();
     if (byteLength(text) > MAX_RESPONSE_BYTES) throw new Error('Cloud response exceeded safety limit');
+    // A CSV export answers with the file itself; its refusals are JSON like any other.
+    if (csv && response.ok) return text;
     const data = parseJson(text);
     if (!response.ok) {
       const err = new Error(data?.error?.message || data?.error || `Cloud request failed (${response.status})`);
@@ -724,6 +750,19 @@ export const cloud = Object.freeze({
   assignmentDetails: (classId, assignmentId) => cloudRequest(`/v1/assignments/${pathId(classId, 'class id')}/${pathId(assignmentId, 'assignment id')}`),
   updateSubmission: (classId, assignmentId, body) => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/submission`, { method: 'PATCH', body }),
   returnSubmission: (classId, assignmentId, studentId, feedback = {}) => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/submissions/${pathId(studentId, 'student id')}/return`, { method: 'POST', body: { feedback } }),
+  classJoinCode: classId => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/join-code`),
+  // The teacher workspace (server/platform/classroom.js, classBoard.js). Engine
+  // marks and teacher marks arrive in separate fields and stay separate here.
+  classroomVisibility: () => cloudRequest('/v1/classroom/visibility'),
+  classroomMine: () => cloudRequest('/v1/classroom/mine'),
+  handInPaper: (classId, assignmentId, examId) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/hand-in`, { method: 'POST', body: { examId: String(examId || '') } }),
+  boardCourses: () => cloudRequest('/v1/classroom/board/courses'),
+  classBoard: (classId, course, node = null) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/board`, { query: node ? { course, node } : { course } }),
+  paperResults: (classId, assignmentId) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/results`),
+  paperResultsCsv: (classId, assignmentId) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/results`, { csv: true }),
+  classReviewQueue: (classId, state = 'open') => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/review`, ['decided', 'all'].includes(state) ? { query: { state } } : {}),
+  classReviewDecide: (classId, itemId, body) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/review/${pathId(itemId, 'review item id')}`, { method: 'POST', body }),
+  classReviewHistory: (classId, itemId) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/review/${pathId(itemId, 'review item id')}/history`),
   contentRevisions: () => cloudRequest('/v1/content/admin/revisions'),
   createContentDraft: body => cloudRequest('/v1/content/drafts', { method: 'POST', body }),
   updateContentDraft: (revisionId, body) => cloudRequest(`/v1/content/drafts/${pathId(revisionId, 'revision id')}`, { method: 'PATCH', body }),

@@ -1,9 +1,33 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { assignmentSubmissions } from '../platform/assignmentReview.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { tLater, useT } from '../i18n/index.js';
 import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
+
+// The class board, papers and review queue: loaded only when a teacher opens a class on /teach.
+const TeacherWorkspace = React.lazy(() => import('../classroom/TeacherWorkspace.jsx'));
+
+/** A class's join code, large, with a copy button (onboarding: one step from name to code). */
+function JoinCode({ code, fresh = false }) {
+  const t = useT();
+  const [copied, setCopied] = useState('');
+  async function copy() {
+    try { await navigator.clipboard.writeText(code); setCopied(tLater('tw.join.copied')); }
+    catch { setCopied(tLater('tw.join.copyFailed')); }
+  }
+  return (
+    <div className="tw-join" data-join-code={code}>
+      <div className="tw-join-label">{fresh ? t('tw.join.ready') : t('classroom.joinCodeLabel')}</div>
+      <div className="tw-join-row">
+        <code className="tw-join-code" aria-label={t('tw.join.codeAria', { code: code.split('').join(' ') })}>{code}</code>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={copy}>{t('tw.join.copy')}</button>
+      </div>
+      <p className="tw-note" style={{ margin: 0 }}>{t('tw.join.how')}</p>
+      <div aria-live="polite" className="tw-note">{copied}</div>
+    </div>
+  );
+}
 
 function niceDate(t, value) {
   if (!value) return t('classroom.noDueDate');
@@ -23,7 +47,7 @@ function stateLabel(t, state) {
   return t('classroom.notStarted');
 }
 
-export default function ClassroomPanel() {
+export default function ClassroomPanel({ workspace = false }) {
   const t = useT();
   const enabled = cloudAvailable();
   const [account, setAccount] = useState(null);
@@ -33,6 +57,9 @@ export default function ClassroomPanel() {
   const [students, setStudents] = useState([]);
   const [className, setClassName] = useState('');
   const [joinCode, setJoinCode] = useState('');
+  const [createdCode, setCreatedCode] = useState(null);
+  const [shownCode, setShownCode] = useState(null);
+  const practiceForm = useRef(null);
   const [assignment, setAssignment] = useState({ title: '', instructions: '', questions: 10, due: '' });
   const [review, setReview] = useState(null);
   const [feedbackDraft, setFeedbackDraft] = useState({});
@@ -116,7 +143,25 @@ export default function ClassroomPanel() {
     return () => { live = false; stop(); };
   }, [enabled]);
 
+  async function showJoinCode() {
+    if (!selectedId) return;
+    setBusy('code'); setError('');
+    try {
+      const r = await cloud.classJoinCode(selectedId);
+      setShownCode(r?.joinCode ? { classId: selectedId, code: String(r.joinCode) } : null);
+    } catch (err) { setError(err.message || tLater('tw.join.loadFailed')); }
+    finally { setBusy(''); }
+  }
+
+  function focusPracticeForm() {
+    const el = practiceForm.current;
+    if (!el) return;
+    el.scrollIntoView?.({ block: 'start' });
+    el.querySelector('input')?.focus();
+  }
+
   useEffect(() => {
+    setShownCode(null);
     setReview(null);
     setFeedbackDraft({});
     if (!selectedId || !account) {
@@ -131,11 +176,11 @@ export default function ClassroomPanel() {
     e.preventDefault();
     const name = className.trim();
     if (!name) return;
-    setBusy('class'); setError(''); setMessage(''); setJoinCode('');
+    setBusy('class'); setError(''); setMessage(''); setCreatedCode(null);
     try {
       const result = await cloud.createClass(name);
       setClassName('');
-      setJoinCode(result?.joinCode || '');
+      setCreatedCode(result?.joinCode ? { classId: result?.class?.id || '', code: String(result.joinCode) } : null);
       await loadClasses({ keepSelection: false });
       if (result?.class?.id) setSelectedId(result.class.id);
       setMessage(tLater('classroom.classCreated'));
@@ -231,7 +276,8 @@ export default function ClassroomPanel() {
                 <input value={className} maxLength={120} onChange={e => setClassName(e.target.value)} placeholder={t('classroom.classNamePlaceholder')} />
               </label>
               <button className="btn btn-primary btn-sm" disabled={busy === 'class'}>{busy === 'class' ? t('classroom.creating') : t('classroom.createClass')}</button>
-              {joinCode && <div className="notice" style={{ marginTop: 10 }}><strong>{t('classroom.joinCodeLabel')}</strong> <code>{joinCode}</code><br /><span className="muted">{t('classroom.joinCodeNote')}</span></div>}
+              <p className="tw-note" style={{ marginTop: 8 }}>{t('tw.join.free')}</p>
+              {createdCode && <JoinCode code={createdCode.code} fresh />}
             </form>
           ) : (
             <form onSubmit={joinClass} className="card" style={{ padding: 14 }}>
@@ -262,10 +308,15 @@ export default function ClassroomPanel() {
           {selected && detail && <>
             <div className="spread" style={{ gap: 10 }}>
               <div><strong>{detail.class?.name || selected.name}</strong><div className="muted">{staff ? t('classroom.studentCount', { count: students.length, n: students.length }) : t('classroom.studentView')}</div></div>
+              {staff && !(createdCode?.classId === selectedId) && !(shownCode?.classId === selectedId) && (
+                <button type="button" className="btn btn-quiet btn-sm" disabled={busy === 'code'} onClick={showJoinCode} data-show-join-code>{t('tw.join.show')}</button>
+              )}
             </div>
+            {staff && shownCode?.classId === selectedId && <JoinCode code={shownCode.code} />}
 
-            {staff && <form onSubmit={createAssignment} className="card" style={{ padding: 14, marginTop: 12 }}>
+            {staff && <form onSubmit={createAssignment} className="card" style={{ padding: 14, marginTop: 12 }} ref={practiceForm} id="classroom-practice-form">
               <strong>{t('classroom.publishAssignment')}</strong>
+              <p className="tw-note" style={{ margin: '4px 0 0' }}>{t('tw.paper.practiceIsUntimed')}</p>
               <label className="field" style={{ marginTop: 10 }}><span>{t('classroom.assignmentTitle')}</span><input value={assignment.title} maxLength={160} onChange={e => setAssignment(v => ({ ...v, title: e.target.value }))} placeholder={t('classroom.titlePlaceholder')} /></label>
               <label className="field"><span>{t('classroom.instructions')}</span><textarea rows={3} value={assignment.instructions} onChange={e => setAssignment(v => ({ ...v, instructions: e.target.value }))} placeholder={t('classroom.instructionsPlaceholder')} /></label>
               <div className="grid-2" style={{ gap: 10 }}>
@@ -336,6 +387,12 @@ export default function ClassroomPanel() {
           </>}
         </div>
       </div>
+
+      {workspace && staff && account.role === 'teacher' && selected && (
+        <Suspense fallback={<p className="muted" style={{ marginTop: 16 }}>{t('common.loading')}</p>}>
+          <TeacherWorkspace key={selected.id} classId={selected.id} className={detail?.class?.name || selected.name} onUntimed={focusPracticeForm} />
+        </Suspense>
+      )}
     </section>
   );
 }
