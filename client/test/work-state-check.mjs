@@ -12,7 +12,7 @@ const stateOfKey = key => {
   const m = /^workstate\.failed\.(.+)$/.exec(key); if (m) return 'failed';
   const bare = key.replace(/^workstate\./, '');
   if (WORK_STATES.includes(bare)) return bare;
-  return ({ waitingSignIn: 'waiting-to-upload', waitingPhoto: 'waiting-to-upload', waitingKept: 'waiting-to-upload', waitingSignedOut: 'waiting-to-upload',
+  return ({ offlineReadable: 'offline-readable', savedOnDevice: 'saved-on-device', waitingToUpload: 'waiting-to-upload', beingRead: 'being-read', needsConfirmation: 'needs-confirmation', waitingSignIn: 'waiting-to-upload', waitingPhoto: 'waiting-to-upload', waitingKept: 'waiting-to-upload', waitingSignedOut: 'waiting-to-upload',
     savedOffline: 'saved-on-device', savedPhoto: 'saved-on-device', markingMethod: 'marking' })[bare];
 };
 

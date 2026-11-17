@@ -940,6 +940,8 @@ jobs:
             # misread page with a typed final answer, working the server did and did
             # not check, and annotations that die with the revision they were about.
             node client/test/tour-truthful-ink.js --no-build 2>&1 | tee -a browser.log
+            # Standard #43: writing, typing and navigation stay responsive on a slow or failing cloud (no long task over 50 ms; the work is kept).
+            node client/test/tour-responsive-cloud.js --no-build 2>&1 | tee -a browser.log
             # The Instrument's own shell, Index, command bar and first-offline
             # tabs (#658). Every build ships it (client/interface.config.mjs),
             # so it runs on this group's build like the tours above.

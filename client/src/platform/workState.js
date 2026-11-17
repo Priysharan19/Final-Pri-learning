@@ -32,15 +32,26 @@ export const WORK_STATES = Object.freeze([
 
 export const FAIL_REASONS = Object.freeze(['save', 'offline', 'reader-unavailable', 'usage-limit', 'read-failed', 'sync']);
 
+// Literal keys, so the catalogue's reachability check can see every one is used.
+const STATE_KEYS = Object.freeze({
+  'cached': 'workstate.cached', 'offline-readable': 'workstate.offlineReadable', 'saving': 'workstate.saving',
+  'saved-on-device': 'workstate.savedOnDevice', 'waiting-to-upload': 'workstate.waitingToUpload', 'uploaded': 'workstate.uploaded',
+  'being-read': 'workstate.beingRead', 'needs-confirmation': 'workstate.needsConfirmation', 'marking': 'workstate.marking', 'marked': 'workstate.marked'
+});
+const FAILED_KEYS = Object.freeze({
+  'save': 'workstate.failed.save', 'offline': 'workstate.failed.offline', 'reader-unavailable': 'workstate.failed.readerUnavailable',
+  'usage-limit': 'workstate.failed.usageLimit', 'read-failed': 'workstate.failed.readFailed', 'sync': 'workstate.failed.sync'
+});
+const VARIANT_KEYS = Object.freeze([
+  'workstate.waitingSignIn', 'workstate.waitingPhoto', 'workstate.savedOffline', 'workstate.savedPhoto',
+  'workstate.markingMethod', 'workstate.waitingKept', 'workstate.waitingSignedOut'
+]);
+
 /** The catalogue key for a state (and, for `failed`, its reason). */
-export const stateKey = (state, reason = null) => (state === 'failed' ? `workstate.failed.${reason || 'save'}` : `workstate.${state}`);
+export const stateKey = (state, reason = null) => (state === 'failed' ? FAILED_KEYS[reason || 'save'] : STATE_KEYS[state]);
 
 /** Every catalogue key the vocabulary can emit, for the catalogue and parity tests. */
-export const ALL_STATE_KEYS = Object.freeze([
-  ...WORK_STATES.filter(s => s !== 'failed').map(s => stateKey(s)),
-  ...FAIL_REASONS.map(r => stateKey('failed', r)),
-  ...Object.keys({ waitingSignIn: 1, waitingPhoto: 1, savedOffline: 1, savedPhoto: 1, markingMethod: 1, waitingKept: 1, waitingSignedOut: 1 }).map(v => `workstate.${v}`)
-]);
+export const ALL_STATE_KEYS = Object.freeze([...Object.values(STATE_KEYS), ...Object.values(FAILED_KEYS), ...VARIANT_KEYS]);
 
 /**
  * The state of one question's work on the practice card, from the facts the
