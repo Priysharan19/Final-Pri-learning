@@ -8,15 +8,15 @@ Prithagoras offers timed papers shaped like an HSC examination, each an "Answer-
 - Otherwise a **partial** paper (only the slots that can be filled) is released when at least 75% of the course's Year 12 outcomes (from the G2 model) are covered. It is titled "Practice paper — N of M Year 12 outcomes", never an HSC paper or a trial; its marks and working time are scaled to what it examines; and the Exams page, the paper and the result name every outcome it leaves out.
 - Below that floor the paper is refused.
 
-The pool today: 395 approved forms. Blueprint structures (times, marks, section sizes) follow NESA's published HSC examination specifications for the 2024 syllabuses, first examined in 2027 (`docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md` §5.3). Which outcome each slot is on is Pri's own design: every Year 12 outcome of the examined course has slots. No NESA paper, question, marking guideline or reference sheet is reproduced. The platform has no authored formula sheet yet, so none is shown.
+The pool today: 447 approved forms. Blueprint structures (times, marks, section sizes) follow NESA's published HSC examination specifications for the 2024 syllabuses, first examined in 2027 (`docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md` §5.3). Which outcome each slot is on is Pri's own design: every Year 12 outcome of the examined course has slots. No NESA paper, question, marking guideline or reference sheet is reproduced. The platform has no authored formula sheet yet, so none is shown.
 
 | Paper | State | Year 12 outcomes covered | Sat as | Omitted outcomes |
 | --- | --- | --- | --- | --- |
-| Mathematics Standard 1 | released (partial) | 7 of 7 (100%) | "Mathematics Standard 1 · Practice paper — 7 of 7 Year 12 outcomes": 32 questions, 63 marks, 10 min reading + 95 min | Linear relationships (MST-11-02); Earning money (MST-11-03); Managing money (MST-11-04); Applications of measurement (MST-11-05); Time and location (MST-11-06) |
-| Mathematics Standard 2 | released (partial) | 10 of 10 (100%) | "Mathematics Standard 2 · Practice paper — 10 of 10 Year 12 outcomes": 42 questions, 86 marks, 10 min reading + 130 min | Earning money (MST-11-03); Applications of measurement (MST-11-05); Time and location (MST-11-06); Linear relationships (MST-11-02); Managing money (MST-11-04) |
-| Mathematics Advanced | released (partial) | 8 of 8 (100%) | "Mathematics Advanced · Practice paper — 8 of 8 Year 12 outcomes": 42 questions, 92 marks, 10 min reading + 165 min | Working with functions (MAV-11-01); Graph transformations (MAV-11-03); Trigonometric identities and equations (MAV-11-05); Exponential and logarithmic functions (MAV-11-08); Probability and data (MAV-11-10) |
-| Mathematics Extension 1 | released (partial) | 5 of 6 (83%) | "Mathematics Extension 1 · Practice paper — 5 of 6 Year 12 outcomes": 27 questions, 58 marks, 10 min reading + 100 min | The binomial theorem (ME1-11-05); Further calculus skills (ME1-12-04) |
-| Mathematics Extension 2 | released (partial) | 4 of 5 (80%) | "Mathematics Extension 2 · Practice paper — 4 of 5 Year 12 outcomes": 38 questions, 81 marks, 10 min reading + 145 min | Further work with vectors (ME2-12-02) |
+| Mathematics Standard 1 | released | 7 of 7 (100%) | "Mathematics Standard 1 · Answer-checked practice paper": 44 questions, 80 marks, 10 min reading + 120 min | — |
+| Mathematics Standard 2 | released | 10 of 10 (100%) | "Mathematics Standard 2 · Answer-checked practice paper": 51 questions, 100 marks, 10 min reading + 150 min | — |
+| Mathematics Advanced | released | 8 of 8 (100%) | "Mathematics Advanced · Answer-checked practice paper": 47 questions, 100 marks, 10 min reading + 180 min | — |
+| Mathematics Extension 1 | released | 6 of 6 (100%) | "Mathematics Extension 1 · Answer-checked practice paper": 33 questions, 70 marks, 10 min reading + 120 min | — |
+| Mathematics Extension 2 | released | 5 of 5 (100%) | "Mathematics Extension 2 · Answer-checked practice paper": 47 questions, 100 marks, 10 min reading + 180 min | — |
 
 ## Mathematics Standard 1
 
@@ -32,11 +32,11 @@ Source: Mathematics Standard 11–12 Syllabus (2024): HSC examinations — https
 | MST-12-S1-06 | Bivariate data analysis | 12 | 4 | 9 | 5 | yes |
 | MST-12-S1-07 | Relative frequency and probability | 12 | 3 | 6 | 4 | yes |
 | MST-11-01 | Formulas and equations | 11 | 2 | 3 | 4 | yes |
-| MST-11-02 | Linear relationships | 11 | 2 | 3 | 0 | no |
-| MST-11-03 | Earning money | 11 | 3 | 4 | 0 | no |
-| MST-11-04 | Managing money | 11 | 3 | 4 | 0 | no |
-| MST-11-05 | Applications of measurement | 11 | 2 | 3 | 2 | no |
-| MST-11-06 | Time and location | 11 | 2 | 3 | 0 | no |
+| MST-11-02 | Linear relationships | 11 | 2 | 3 | 4 | yes |
+| MST-11-03 | Earning money | 11 | 3 | 4 | 4 | yes |
+| MST-11-04 | Managing money | 11 | 3 | 4 | 4 | yes |
+| MST-11-05 | Applications of measurement | 11 | 2 | 3 | 6 | yes |
+| MST-11-06 | Time and location | 11 | 2 | 3 | 4 | yes |
 | MST-11-07 | Networks, paths and trees | 11 | 2 | 2 | 4 | yes |
 | MST-11-08 | Data analysis | 11 | 3 | 4 | 3 | yes |
 
@@ -57,12 +57,12 @@ Source: Mathematics Standard 11–12 Syllabus (2024): HSC examinations — https
 | MST-12-S2-09 | Relative frequency and probability | 12 | 3 | 6 | 4 | yes |
 | MST-12-S2-10 | The normal distribution | 12 | 4 | 9 | 6 | yes |
 | MST-11-01 | Formulas and equations | 11 | 3 | 4 | 4 | yes |
-| MST-11-03 | Earning money | 11 | 2 | 3 | 0 | no |
-| MST-11-05 | Applications of measurement | 11 | 3 | 4 | 2 | no |
-| MST-11-06 | Time and location | 11 | 2 | 3 | 0 | no |
+| MST-11-03 | Earning money | 11 | 2 | 3 | 4 | yes |
+| MST-11-05 | Applications of measurement | 11 | 3 | 4 | 6 | yes |
+| MST-11-06 | Time and location | 11 | 2 | 3 | 4 | yes |
 | MST-11-08 | Data analysis | 11 | 2 | 2 | 3 | yes |
-| MST-11-02 | Linear relationships | 11 | 1 | 2 | 0 | no |
-| MST-11-04 | Managing money | 11 | 1 | 2 | 0 | no |
+| MST-11-02 | Linear relationships | 11 | 1 | 2 | 4 | yes |
+| MST-11-04 | Managing money | 11 | 1 | 2 | 4 | yes |
 | MST-11-07 | Networks, paths and trees | 11 | 1 | 2 | 4 | yes |
 
 ## Mathematics Advanced
@@ -83,12 +83,12 @@ Source: Mathematics Advanced 11–12 Syllabus (2024): HSC examinations — https
 | MAV-12-07 | Random variables | 12 | 4 | 8 | 5 | yes |
 | MAV-12-02 | Further graph transformations and modelling | 12 | 3 | 9 | 4 | yes |
 | MAV-12-08 | Financial mathematics | 12 | 3 | 8 | 4 | yes |
-| MAV-11-01 | Working with functions | 11 | 1 | 1 | 1 | no |
-| MAV-11-03 | Graph transformations | 11 | 1 | 2 | 0 | no |
-| MAV-11-05 | Trigonometric identities and equations | 11 | 1 | 2 | 1 | no |
+| MAV-11-01 | Working with functions | 11 | 1 | 1 | 5 | yes |
+| MAV-11-03 | Graph transformations | 11 | 1 | 2 | 4 | yes |
+| MAV-11-05 | Trigonometric identities and equations | 11 | 1 | 2 | 5 | yes |
 | MAV-11-06 | Introduction to differentiation | 11 | 1 | 2 | 14 | yes |
-| MAV-11-08 | Exponential and logarithmic functions | 11 | 1 | 2 | 2 | no |
-| MAV-11-10 | Probability and data | 11 | 1 | 1 | 0 | no |
+| MAV-11-08 | Exponential and logarithmic functions | 11 | 1 | 2 | 6 | yes |
+| MAV-11-10 | Probability and data | 11 | 1 | 1 | 4 | yes |
 
 ## Mathematics Extension 1
 
@@ -100,10 +100,10 @@ Source: Mathematics Extension 1 11–12 Syllabus (2024): HSC examinations — ht
 | ME1-11-02 | Polynomials | 11 | 3 | 6 | 8 | yes |
 | ME1-11-03 | Further trigonometry | 11 | 2 | 3 | 4 | yes |
 | ME1-11-04 | Permutations and combinations | 11 | 2 | 3 | 3 | yes |
-| ME1-11-05 | The binomial theorem | 11 | 2 | 2 | 0 | no |
+| ME1-11-05 | The binomial theorem | 11 | 2 | 2 | 4 | yes |
 | ME1-12-02 | Introduction to vectors | 12 | 4 | 10 | 12 | yes |
 | ME1-12-03 | Inverse trigonometric functions | 12 | 3 | 6 | 4 | yes |
-| ME1-12-04 | Further calculus skills | 12 | 4 | 10 | 0 | no |
+| ME1-12-04 | Further calculus skills | 12 | 4 | 10 | 4 | yes |
 | ME1-12-05 | Further applications of calculus | 12 | 4 | 9 | 3 | yes |
 | ME1-12-06 | The binomial distribution and sampling distribution of the mean | 12 | 4 | 9 | 3 | yes |
 | ME1-12-01 | Proof by mathematical induction | 12 | 2 | 7 | 3 | yes |
@@ -115,7 +115,7 @@ Source: Mathematics Extension 2 11–12 Syllabus (2024): HSC examinations — ht
 | Outcome | Focus area | Year | Slots | Marks | Approved forms | Covered |
 | --- | --- | --- | --- | --- | --- | --- |
 | ME2-12-01 | The nature of proof | 12 | 9 | 19 | 4 | yes |
-| ME2-12-02 | Further work with vectors | 12 | 9 | 19 | 1 | no |
+| ME2-12-02 | Further work with vectors | 12 | 9 | 19 | 5 | yes |
 | ME2-12-03 | Introduction to complex numbers | 12 | 10 | 22 | 8 | yes |
 | ME2-12-04 | Further integration | 12 | 10 | 22 | 4 | yes |
 | ME2-12-05 | Applications of calculus to mechanics | 12 | 9 | 18 | 4 | yes |

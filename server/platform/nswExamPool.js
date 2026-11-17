@@ -23,8 +23,8 @@
 // NSW_TEST_BLUEPRINT with `useNswTestBlueprintForTests(true)` (in-process;
 // refused unless NODE_ENV is 'test') or PRI_NSW_EXAMS_TEST_BLUEPRINT=on under
 // NODE_ENV=test (a server process a tour starts). It is a short Extension 1
-// paper with one slot on every Year 12 outcome, so on G3's pool it releases as
-// a PARTIAL paper (5 of 6: Further calculus skills has no approved form) with
+// paper with one slot on every Year 12 outcome, so on a pool with an outcome that has
+// no approved form it releases as a PARTIAL paper (on today's pool every outcome has forms, so it is whole) with
 // a one-minute reading time — drawn and marked by exactly the path every
 // blueprint uses, through the same release check. It cites no NESA
 // specification, says `test: true` everywhere, and is never listed or created

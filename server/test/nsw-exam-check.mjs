@@ -211,7 +211,8 @@ try {
 
   // ── A partial paper on G3's real pool: what it sets, and what it omits ────
   const partials = list.data.papers.filter(p => p.released && p.partial);
-  c.ok(partials.length > 0, `partial papers released on G3's pool: ${partials.map(p => `${p.id} (${p.year12.covered}/${p.year12.total})`).join(', ')}`);
+  // Once every slot of a course has enough approved forms its paper is full, not partial; a partial paper, if any is left, is sealed here.
+  c.ok(partials.every(p => p.year12.covered / p.year12.total >= NSW_RELEASE_FLOOR), `partial papers released on the pool: ${partials.map(p => `${p.id} (${p.year12.covered}/${p.year12.total})`).join(', ') || 'none left (every paper is full)'}`);
   for (const [i, entry] of partials.entries()) {
     // One account per partial paper: more partial papers release as the pool grows, so the pool's own seven are topped up.
     let student = more[i];
@@ -248,9 +249,9 @@ try {
   c.deq([exam.kind, exam.readingMin, exam.reading, exam.readingEndsAt - exam.startedAt, exam.deadline - exam.startedAt],
     ['nsw', 1, true, 60000, (1 + testRelease.workingMin) * 60000], 'reading time leads, and the deadline is reading plus working time, on the server clock');
   c.deq([exam.nsw.label, exam.nsw.markingScope, exam.nsw.test, exam.nsw.partial, exam.title],
-    [NSW_EXAM_LABEL, 'final-answer-only', true, true, `${NSW_TEST_BLUEPRINT.label} · Practice paper — 5 of 6 Year 12 outcomes`],
+    [NSW_EXAM_LABEL, 'final-answer-only', true, !testRelease.full, testRelease.full ? `${NSW_TEST_BLUEPRINT.label} · ${NSW_EXAM_LABEL}` : `${NSW_TEST_BLUEPRINT.label} · Practice paper — ${testRelease.year12.covered} of ${testRelease.year12.total} Year 12 outcomes`],
     'the paper says what it is and how it is marked; its title is the server\'s, and a partial paper says how much it covers');
-  c.deq(exam.nsw.omittedOutcomes, [{ code: 'ME1-12-04', name: 'Further calculus skills', year: 12 }], 'it names the outcome it leaves out');
+  c.deq(exam.nsw.omittedOutcomes.map(o => o.code), testRelease.omittedOutcomes, 'it names exactly the outcomes it leaves out (none, once every slot has approved forms)');
   c.deq(leaks(started.data), [], 'no answer, step, criterion, plan, seed or sealed identity leaves at the start');
   c.deq(bandKeys(started.data), [], 'and no band');
   const kept = new Set(testRelease.included.map(slot => slot.number));
@@ -299,7 +300,7 @@ try {
   c.eq(done.status, 200, 'the paper is finished');
   const result = done.data;
   const marks = paper.questions.map(sq => sq.marking.correct);
-  c.deq(result.detail.map(line => line.awarded), [marks[0], 0, marks[2], 0, 0], 'right earns the slot\'s marks; wrong earns 0 even with working and the method switch on; blank earns 0');
+  c.deq(result.detail.map(line => line.awarded), marks.map((m, i) => (i === 0 || i === 2 ? m : 0)), 'right earns the slot\'s marks; wrong earns 0 even with working and the method switch on; blank earns 0');
   c.eq(result.score, marks[0] + marks[2], `score ${result.score} of ${result.total}`);
   c.ok(result.detail.every(line => !line.partial && ['objective', 'final-answer'].includes(line.markingScheme)), 'no line carries a part mark or a method scheme');
   // The seal itself, apart from the edition switch: every sealed question, marked by the exam
@@ -315,7 +316,7 @@ try {
   c.deq(result.detail.map(line => line.syllabusOutcome), slots.map(s => s.outcome), 'each line names its slot\'s syllabus outcome');
   c.deq([result.nsw.label, result.nsw.markingScope, result.nsw.markingNote.includes('final answer only')], [NSW_EXAM_LABEL, 'final-answer-only', true], 'the result is an answer-checked practice paper and says how it was marked');
   c.deq(bandKeys(result), [], 'the result has no band, grade, ATAR, HSC mark or prediction at any depth');
-  c.deq(result.nsw.omittedOutcomes.map(o => o.name), ['Further calculus skills'], 'the result names what the paper did not include');
+  c.deq(result.nsw.omittedOutcomes.map(o => o.code), testRelease.omittedOutcomes, 'the result names what the paper did not include (nothing, once every slot has approved forms)');
   const replay = await finish(a.jar, exam.id, { answers: {} });
   c.deq([replay.status, replay.data.score, replay.data.finishedAt], [200, result.score, result.finishedAt], 'a replayed finish returns the stored result unchanged');
   const attempts = (await h.db.all("SELECT payload_json FROM learning_events WHERE account_id=? AND kind='graded-attempt'", [a.account.id])).map(r => JSON.parse(r.payload_json));

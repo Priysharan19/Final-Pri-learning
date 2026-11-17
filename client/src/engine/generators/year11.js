@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Year 11 generators (Advanced foundations)
 // ─────────────────────────────────────────────────────────────────────────────
+import { year11Nsw } from './year11-nsw.js';
 import { ri, rc, rs, nz, Frac, mcq, term, poly, sgn, surdLatex, surdStr, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
@@ -36,6 +37,7 @@ function solveTrigDegY11(fn, v, lo, hi) {
 }
 
 export const year11 = {
+  ...year11Nsw,
 
   // ── Functions & relations ────────────────────────────────────────────────
   'y11-functions': (rng, diff) => {
