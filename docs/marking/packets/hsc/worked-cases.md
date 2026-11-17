@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `bca1886da2f8116254eeeb1a02dba86c1877b4a60704c5b35399306ee043f242` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `40c405457ff1b6cd1ec5c3b431e4731ebc72cdd28053a4934caf79eddbc92f37` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -4221,6 +4221,182 @@ Final answer: 6
 | alternative | `411/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
 | common wrong | `421/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `421/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-induction-forms/D1` — seed 1009
+
+> In the inductive step of the proof of $\\sum_{i=1}^{n}i(i+11) = \\dfrac{n(n+1)(2n+34)}{6}$ we assume the result for $n = k$ and add the next term to both sides. Find the value of that next term, $(k+1)(k+12)$, when $k = 6$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `126` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `126.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `127` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `127` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-induction-forms/D2` — seed 1009
+
+> A proof that $7^{n} + 5^{n}$ has a given property starts at $n = 2$. Find the value of $7^{2} + 5^{2}$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `74` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `74.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `75` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `75` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-induction-forms/D3` — seed 1009
+
+> The statement $2^{n} > 26n+26$ is to be proved by induction for all integers $n \\ge N$. Find the smallest positive integer $N$ for which the statement is true for **every** $n \\ge N$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `8` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `8.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `9` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-induction-forms/D4` — seed 1009
+
+> It has been proved by induction that $10^{n} - 1$ is divisible by $9$ for all integers $n \\ge 1$. Find the integer $M$ such that $10^{5} - 1 = 9M$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `11111` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `11111.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `11112` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11112` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-vectors-forms/D1` — seed 1009
+
+> Find the magnitude $\|\\underline{v}\|$ of the vector $\\underline{v} = \\begin{pmatrix}-12\\\\9\\end{pmatrix}$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `15` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `15.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `16` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `16` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-vectors-forms/D2` — seed 1009
+
+> $OABC$ is a parallelogram with $O$ at the origin, as shown. $A$ is the point $(8, -1)$ and $C$ is the point $(-1, 9)$. Find the $x$-coordinate of $B$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-vectors-forms/D3` — seed 1009
+
+> $OABC$ is a parallelogram with $O$ at the origin, $A(12, -2)$ and $C(-2, 12)$, as shown. Its diagonals meet at $M$. Find the $x$-coordinate of $M$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-vectors-forms/D4` — seed 1009
+
+> Find the scalar projection of $\\underline{a} = \\begin{pmatrix}12\\\\-66\\end{pmatrix}$ onto $\\underline{b} = \\begin{pmatrix}-18\\\\24\\end{pmatrix}$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-60` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `-60.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `-59` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-59` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-projectile-forms/D1` — seed 1009
+
+> A javelin is thrown horizontally at $21$ m/s from the top of a cliff $80$ m above level ground, as shown. Find the time $T$, in seconds, until it lands. Take $g = 10$ m/s² and ignore air resistance.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-projectile-forms/D2` — seed 1009
+
+> A javelin is launched from level ground with horizontal velocity $27$ m/s and vertical velocity $55$ m/s. Find the greatest height $H$ reached, in metres. Take $g = 10$ m/s² and ignore air resistance.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `605/4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `605/4` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `609/4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `609/4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-projectile-forms/D3` — seed 1009
+
+> A javelin is thrown horizontally at $21$ m/s from the top of a cliff $80$ m above level ground. How far $d$ from the base of the cliff does it land, in metres? Take $g = 10$ m/s² and ignore air resistance.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `84` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `84.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `85` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `85` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-projectile-forms/D4` — seed 1009
+
+> A javelin is launched from level ground with horizontal velocity $39$ m/s and vertical velocity $90$ m/s. Find the first time, in seconds, at which it is $400$ m above the ground. Take $g = 10$ m/s² and ignore air resistance.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `8` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `8.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `9` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-binomial-forms/D1` — seed 1009
+
+> A café finds that each of its customers independently succeeds (the item buys a coffee) with probability $0.05$. Let $X$ be the number of successes among $172$ customers. Find $E(X)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `43/5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `43/5` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `48/5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `48/5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-binomial-forms/D2` — seed 1009
+
+> $X \\sim \\text{Bin}(129, 0.05)$. Find $\\text{Var}(X)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2451/400` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `2451/400` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `2851/400` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2851/400` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-binomial-forms/D3` — seed 1009
+
+> A binomial random variable has success probability $0.05$ and variance $8.17$. Find the number of trials.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `172` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `172.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `173` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `173` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-binomial-forms/D4` — seed 1009
+
+> A café finds that each of its customers independently succeeds (the item buys a coffee) with probability $0.05$. Find the probability that **at least one** of $2$ customers succeeds. Give the exact decimal.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `39/400` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `39/400` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `439/400` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `439/400` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-proof/D1` — seed 1009
 

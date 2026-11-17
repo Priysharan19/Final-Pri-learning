@@ -55,7 +55,9 @@
 // 2026.11.17 — Advanced Year 12 generators widened into explicit forms (direct, reverse, missing-parameter,
 // multi-step, context): y12-random-var, y12-fin-exact, y12-trig-model, y12-func-model and wider parameters in
 // y12-integral-calc; the skill, answer type and difficulty ladder of each cell are unchanged in kind.
-export const CONTENT_VERSION = '2026.11.17';
+// 2026.11.18 — Extension 1 Year 12 original forms with figures: me12-induction-forms, me12-vectors-forms, me12-projectile-forms,
+// me12-binomial-forms (ME1-12-01, -02, -06).
+export const CONTENT_VERSION = '2026.11.18';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */
