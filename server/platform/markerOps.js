@@ -82,7 +82,7 @@ export function stepEvidence(q, answer, steps, result) {
   if (meta && steps && !report) {
     // The prompt lets a true line about another unknown of the question be
     // verified against the system it gives, instead of being left unjudged.
-    try { report = stepCheck(meta, steps, { prompt: q.prompt }); } catch { report = null; }
+    try { report = stepCheck(meta, steps, { prompt: q.prompt, traps: q.traps }); } catch { report = null; }
   }
   let partial = null;
   // A blank final-answer box may still carry verified mathematical method
@@ -213,7 +213,7 @@ export function examAnswerStage(q, given, working, grid) {
     // answer point by checkAnswer, each working point only by its own line.
     const meta = stepMetaFor(q);
     let report = null;
-    if (meta && !blank(working)) { try { report = stepCheck(meta, String(working), { prompt: q.prompt }); } catch { report = null; } }
+    if (meta && !blank(working)) { try { report = stepCheck(meta, String(working), { prompt: q.prompt, traps: q.traps }); } catch { report = null; } }
     const b = boardAward(q, meta, report, correct);
     const earned = Math.max(0, Math.min(marks, correct ? b.awarded : Math.min(marks - 1, b.method)));
     return { final: true, response: { unanswered: false, correct, awarded: earned, feedback: feedback.slice(0, 3000),
@@ -279,7 +279,7 @@ export function tutorEvidence(q, lines) {
   const meta = stepMetaFor(q);
   if (!meta || !Array.isArray(lines) || !lines.length) return evidence;
   try {
-    const report = stepCheck(meta, lines.join('\n'), { prompt: q.prompt });
+    const report = stepCheck(meta, lines.join('\n'), { prompt: q.prompt, traps: q.traps });
     const judged = report?.lines || [];
     // The engine's own misconception id for the break (audit D1), as a stable
     // id only — never free text — exactly as the device reads it (tutorWork).
@@ -393,7 +393,7 @@ export function stepCoachEvidence(q, lines, answerText) {
   const open = attemptAt >= 0 ? list.slice(0, attemptAt) : list;
   let judged = [];
   if (meta && open.length) {
-    try { judged = stepCheck(meta, open.join('\n'), { prompt: q.prompt })?.lines || []; } catch { return allFinal(); }
+    try { judged = stepCheck(meta, open.join('\n'), { prompt: q.prompt, traps: q.traps })?.lines || []; } catch { return allFinal(); }
   }
   // "Doesn't follow from the line above" is said only where there IS a line
   // above that the engine verified: a first line, or one under a line the

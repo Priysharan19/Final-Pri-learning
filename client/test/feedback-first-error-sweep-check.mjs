@@ -197,7 +197,7 @@ for (const code of ['int-no-divide', 'int-divide-old-power', 'int-wrong-divisor'
 }
 
 // ── B · first-error location over every other Step Check topic ──────────────
-const coverage = { cells: 0, withCheck: new Set(), noCheck: new Set(), items: 0, located: 0, named: 0, generic: {}, controls: 0, controlsClean: 0, laterItems: 0 };
+const coverage = { namedDerived: 0, designedNamed: 0, cells: 0, withCheck: new Set(), noCheck: new Set(), items: 0, located: 0, named: 0, generic: {}, controls: 0, controlsClean: 0, laterItems: 0 };
 const GENERIC = new Set([undefined, null, 'counterexample', 'antiderivative-check', 'derivative-check', 'derivative-error', 'one-side-only', 'sides-mismatched']);
 for (const [generator, levels] of Object.entries(NSW_ISSUED_CELLS)) {
   for (const d of levels) {
@@ -249,7 +249,14 @@ for (const [generator, levels] of Object.entries(NSW_ISSUED_CELLS)) {
         checked++;
         const located = r.firstBreak === 1 && r.lines[0].status !== 'break';
         if (located) coverage.located++; else fail(`${tag}: flagged line ${r.firstBreak + 1} of [${start}] [${wrong}] — ${JSON.stringify(r.lines.map(l => l.status))}`);
-        const code = r.lines[1]?.diagnosis?.code;
+        // Derived: what the diagnoser reads from the working alone. With traps: the server also hands
+        // the question's own designed wrong answers, so a line that IS one is told its modelled slip.
+        const rt = stepCheck(meta, [start, wrong].join('\n'), { prompt: q.prompt, traps: q.traps });
+        ok(rt.firstBreak === r.firstBreak && JSON.stringify(rt.lines.map(l => l.status)) === JSON.stringify(r.lines.map(l => l.status)) && rt.completedStages === r.completedStages, `MARKS: naming a designed slip changed a status or the first break (${tag})`);
+        const derivedCode = r.lines[1]?.diagnosis?.code;
+        if (!GENERIC.has(derivedCode)) coverage.namedDerived++;
+        const code = rt.lines[1]?.diagnosis?.code;
+        if (code === 'designed-slip') coverage.designedNamed++;
         if (!GENERIC.has(code)) coverage.named++; else coverage.generic[generator] = (coverage.generic[generator] || 0) + 1;
         if (rightLine) {
           const later = report(meta, q.prompt, [start, rightLine, wrong]);
@@ -276,7 +283,7 @@ const genericTopics = Object.entries(coverage.generic).sort((a, b) => b[1] - a[1
 const specificCells = catalogue.cells.size;
 console.log(`catalogue: ${catalogue.cases} slips over ${catalogue.questions} calculus questions in ${specificCells} cells; every one flagged on the slip line, restatement untouched, and named (${Object.entries(catalogue.byCode).map(([k, v]) => `${k} ${v}`).join(', ')})`);
 console.log(`location: ${coverage.located}/${coverage.items} designed wrong answers flagged on the wrong line; ${coverage.controlsClean}/${coverage.controls} correct pages left alone; ${coverage.laterItems} later-slip pages`);
-console.log(`specific messages outside calculus: ${coverage.named}/${coverage.items} flagged lines carry a named, specific diagnosis; ${coverage.items - coverage.named} still get a generic or counterexample message`);
+console.log(`specific messages outside calculus: ${coverage.named}/${coverage.items} flagged lines carry a named, specific diagnosis (${coverage.namedDerived} derived from the working alone, ${coverage.designedNamed} by matching the question's own designed wrong answer); ${coverage.items - coverage.named} still get a generic or counterexample message`);
 console.log(`coverage: of ${coverage.cells} issued cells, ${specificCells} have the calculus catalogue, ${coverage.withCheck.size} more have a Step Check by designed wrong answers, and ${coverage.cells - specificCells - coverage.withCheck.size} have no line-by-line check at all (their working is read but not judged line by line)`);
 console.log(`topics with a Step Check still on generic feedback (${genericTopics.length}): ${genericTopics.map(([g, n]) => `${g} ${n}`).join(', ') || 'none'}`);
 console.log(`topics with no line-by-line check (${noCheckTopics.size}): ${[...noCheckTopics].sort().join(', ')}`);

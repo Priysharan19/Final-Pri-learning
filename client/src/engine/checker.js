@@ -1598,7 +1598,52 @@ function stepCheckPlan(meta, workingText) {
  * equations the question gives; without it, such a line is a note.
  */
 export function stepCheck(meta, workingText, options = null) {
-  return withEvaluationBudget(EVALUATION_BUDGET, () => nameChangedTerm(stepCheckWithinBudget(meta, workingText, options)));
+  return withEvaluationBudget(EVALUATION_BUDGET, () => nameDesignedSlip(nameChangedTerm(stepCheckWithinBudget(meta, workingText, options)), meta, options?.traps));
+}
+
+/**
+ * A designed wrong answer is a misconception someone modelled on purpose: its
+ * `why` says what the student did. When a flagged line the diagnoser could only
+ * call generic IS one of the question's designed wrong answers, the line is
+ * told that slip, in the question's own numbers. Feedback only (AI proposes,
+ * the engine decides; nothing here is a model): `status`, `firstBreak` and the
+ * marks are untouched, and `traps` is supplied only by the server that issued
+ * the question and only after the student has submitted.
+ */
+const GENERIC_CODES = new Set([undefined, null, 'counterexample', 'antiderivative-check', 'derivative-check', 'derivative-error', 'one-side-only', 'sides-mismatched', 'arithmetic-slip']);
+function lineValueText(text) {
+  const s = String(text ?? '').replace(/[−–—]/g, '-').trim();
+  const parts = s.split('=').map(x => x.trim()).filter(Boolean);
+  return parts.length ? parts[parts.length - 1] : '';
+}
+function trapMatchesLine(trap, meta, text) {
+  const value = lineValueText(text);
+  if (!value) return false;
+  try {
+    if (Number.isFinite(trap?.value) && meta?.kind === 'equation') {
+      const v = evaluate(parse(normalize(value)), {});
+      return Number.isFinite(v) && Math.abs(v - trap.value) <= 1e-9 * Math.max(1, Math.abs(trap.value));
+    }
+    if (typeof trap?.expr === 'string' && meta?.kind !== 'equation') return exprEquivalent(value, trap.expr);
+  } catch { /* the line is not a value of that kind */ }
+  return false;
+}
+function nameDesignedSlip(report, meta, traps) {
+  if (!report || !Array.isArray(report.lines) || !Array.isArray(traps) || !traps.length) return report;
+  const usable = traps.filter(t => t && typeof t.why === 'string' && t.why.trim());
+  if (!usable.length) return report;
+  let changed = false;
+  const lines = report.lines.map(l => {
+    if (l?.status !== 'break' || !GENERIC_CODES.has(l.diagnosis?.code)) return l;
+    const trap = usable.find(t => trapMatchesLine(t, meta, l.text));
+    if (!trap) return l;
+    changed = true;
+    const why = trap.why.trim();
+    return { ...l, note: why, diagnosis: { code: 'designed-slip', title: 'A common slip', message: why, fix: null, confidence: 'high', detail: { designed: true } } };
+  });
+  if (!changed) return report;
+  const fb = report.firstBreak;
+  return { ...report, lines, diagnosis: fb >= 0 && lines[fb]?.diagnosis?.code === 'designed-slip' ? lines[fb].diagnosis : report.diagnosis };
 }
 
 /**
