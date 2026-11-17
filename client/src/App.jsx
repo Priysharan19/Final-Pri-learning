@@ -71,6 +71,11 @@ const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
     <Route path="/refunds" element={<Navigate to="/refund-policy" replace />} />
   </>
 ) : <Route path="/grievance" element={<Legal />} />;
+// The public landing (the verified page, §3) and its three plain pages are
+// signed-out web routes, each its own chunk: a student who opens the app never
+// downloads them.
+const Landing = React.lazy(() => import('./landing/Landing.jsx'));
+const PublicInfo = React.lazy(() => import('./landing/PublicInfo.jsx'));
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
 // The shared resource library (ADR-0002 plan F1): its own chunk, built only
@@ -553,6 +558,10 @@ export default function App() {
             <Route path="/refund-policy" element={<Legal />} />
             {LEGAL_ROUTES_EXTRA}
             <Route path="/third-party-notices" element={<Legal />} />
+            <Route path="/welcome" element={<Landing />} />
+            <Route path="/welcome/marking" element={<PublicInfo page="marking" />} />
+            <Route path="/welcome/syllabus" element={<PublicInfo page="syllabus" />} />
+            <Route path="/welcome/teachers" element={<PublicInfo page="teachers" />} />
             <Route path="*" element={<Login />} />
           </Routes>
         </React.Suspense>

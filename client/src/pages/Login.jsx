@@ -602,6 +602,10 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                 <summary>{t('login.privacyDetail')}</summary>
                 <p className="muted">{t('login.heroPrivacy')}</p>
               </details>
+              {/* The public landing's live demo: see a line checked before signing in. */}
+              <p style={{ marginTop: 6, textAlign: 'center', fontSize: 13 }}>
+                <PageLink to="/welcome" className="linklike" data-testid="hero-landing-link">{t('login.seeHowMarking')}</PageLink>
+              </p>
               {appleEntry}
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for

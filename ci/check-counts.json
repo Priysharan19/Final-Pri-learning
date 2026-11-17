@@ -640,6 +640,14 @@
         },
         {
           "has": "TOLERANCE POLICY: PASS — 221/221 checks"
+        },
+        {
+          "has": "LANDING HOME: PASS — 92/92 checks",
+          "note": "The verified page: the landing demo's statuses come from the real Step Check and mistakeView, the social-proof slots stay hidden, Home shows only evidence that exists."
+        },
+        {
+          "has": "I18N COVERAGE: PASS — 94/94 checks — 94 files scanned, 0 hard-coded strings",
+          "note": "93 → 94 files (the verified page: + landing/ and home/HomeVerified.jsx, re-derived by running the check). 92 → 93 files (see-why graph: + components/MistakeGraph.jsx, re-derived by running the check). 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason. 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt). 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770). 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree). 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards). 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check). 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost \"P\" and \"Pri Learning.\" and gained Priyabhata, Prithagoras, प्रियभट and \"by Pri Learning\". 80 → 89 files (plan F4b: + src/desk (DeskPage, DeskImport, DeskEntry) and src/examShell (six components), re-derived by running the check)."
         }
       ]
     },
