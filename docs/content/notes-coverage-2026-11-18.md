@@ -8,7 +8,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 ## Summary
 
-**141 of 196 chapters at standard.**
+**166 of 196 chapters at standard.**
 
 | Band | Chapters | With notes | At standard | Missing sections (count of chapters) | ≥2 diagrams | Interactive | KaTeX issues |
 |---|---|---|---|---|---|---|---|
@@ -21,8 +21,8 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 | Olympiad | 7 | 7 | 7 | — | 7 | 5 | 0 |
 | NSW Stage 4 (Years 7–8) | 16 | 16 | 16 | — | 16 | 14 | 0 |
 | NSW Stage 5 (Years 9–10) | 41 | 41 | 41 | — | 41 | 38 | 0 |
-| NSW Standard Year 11 | 8 | 8 | 0 | objective 8, intuition 8 | 1 | 0 | 0 |
-| NSW Standard Year 12 | 17 | 17 | 0 | objective 17, intuition 17 | 2 | 2 | 0 |
+| NSW Standard Year 11 | 8 | 8 | 8 | — | 8 | 6 | 0 |
+| NSW Standard Year 12 | 17 | 17 | 17 | — | 17 | 17 | 0 |
 | NSW Advanced Year 11 | 7 | 7 | 0 | objective 7, intuition 7 | 6 | 4 | 0 |
 | NSW Advanced Year 12 | 7 | 7 | 0 | objective 7, intuition 7 | 7 | 5 | 0 |
 | NSW Extension 1 Year 11 | 5 | 5 | 0 | objective 5, intuition 5 | 2 | 0 | 0 |
@@ -44,6 +44,8 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 - `ma5-mag-c-01` Numbers of any magnitude — Scientific notation and significant figures are place-value rules. Moving a slider would only redisplay a number; the conversions and the rounding are clearer worked on the page digit by digit.
 - `ma5-geo-p-02` Properties of geometrical figures C (Path) — A congruence proof is a chain of stated reasons about one fixed figure; moving a vertex changes the figure but does not teach which facts prove the triangles identical.
 - `ma5-net-p-01` Introduction to networks (Path) — These skills are counting and comparing on one fixed network; there is no quantity whose movement teaches more than the two highlighted networks with their weights.
+- `mst-11-06` Time and location — This topic rests on one fixed rate, $15^\circ$ of longitude per hour, and on offsets that each question states; there is no quantity to vary whose effect a slider would show more clearly than the two number lines.
+- `mst-11-07` Networks, paths and trees — Shortest paths and spanning trees come from step-by-step methods on one fixed network; nothing varies continuously, and the two highlighted diagrams show each result with its total.
 
 ## Every chapter
 
@@ -237,36 +239,36 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `mst-11-01` Formulas and equations | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-11-02` Linear relationships | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-11-03` Earning money | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-11-04` Managing money | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-11-05` Applications of measurement | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `mst-11-06` Time and location | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-11-07` Networks, paths and trees | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-11-08` Data analysis | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
+| `mst-11-01` Formulas and equations | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-11-02` Linear relationships | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-11-03` Earning money | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-11-04` Managing money | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-11-05` Applications of measurement | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `mst-11-06` Time and location | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | reason | 0 | ok | yes |
+| `mst-11-07` Networks, paths and trees | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | reason | 0 | ok | yes |
+| `mst-11-08` Data analysis | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
 
 ### NSW Standard Year 12
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `mst-12-s1-01` Algebraic relationships | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-02` Investment | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-03` Depreciation and loans | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-04` Right-angled triangles | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-05` Ratios and rates | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-06` Bivariate data analysis | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-07` Relative frequency and probability | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-01` Algebraic relationships | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-02` Investment and loans | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `mst-12-s2-03` Annuities | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-04` Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-05` Ratios and rates | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-06` Network flow | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-07` Critical path analysis | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-08` Bivariate data analysis | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-09` Relative frequency and probability | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-10` The normal distribution | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
+| `mst-12-s1-01` Algebraic relationships | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `mst-12-s1-02` Investment | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-12-s1-03` Depreciation and loans | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-12-s1-04` Right-angled triangles | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `mst-12-s1-05` Ratios and rates | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-12-s1-06` Bivariate data analysis | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `mst-12-s1-07` Relative frequency and probability | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-12-s2-01` Algebraic relationships | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-12-s2-02` Investment and loans | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-12-s2-03` Annuities | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-12-s2-04` Trigonometry | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-12-s2-05` Ratios and rates | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `mst-12-s2-06` Network flow | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `mst-12-s2-07` Critical path analysis | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `mst-12-s2-08` Bivariate data analysis | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-12-s2-09` Relative frequency and probability | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mst-12-s2-10` The normal distribution | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
 
 ### NSW Advanced Year 11
 
