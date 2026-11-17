@@ -212,6 +212,8 @@ export const saveTruthFlow = {
   name: 'Write · one true save state: ink survives reload, mode switch, resize, offline; a failed write says so and retries',
 
   async run({ page, ctx, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
+    // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     note(`${EVIDENCE}: "Write · one true save state…" [${browserName || 'chromium'}] is browser automation of the device store (a real IndexedDB in a Playwright ${browserName || 'chromium'} context, with write faults injected by the test); the page is read by the scripted stand-in reader and nothing is submitted. Not evidence about a physical device, Safari itself, a real provider or real handwriting.`);
     const { reader } = online;
     Object.assign(reader, { text: '5', lines: null, confidence: 0.97, down: false });
@@ -373,6 +375,8 @@ export const sessionEndedWriteFlow = {
   name: 'Write · session ended before reading: "sign in again" beside the work, then read, corrected and marked over two tries; a real outage still says so, with a retry',
 
   async run({ page, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
+    // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     note(`${EVIDENCE}: "Write · session ended…" [${browserName || 'chromium'}] ends a real server session (its row is deleted from the server's SQLite) and scripts the stand-in reader up and down; server, sign-in, recognise and grade routes are real. Not real-provider, real-handwriting, production or real-device evidence.`);
     const { reader } = online;
     reader.text = '12'; reader.confidence = 0.97; reader.down = false;
@@ -538,6 +542,8 @@ export const sessionEndedPhotoFlow = {
   name: 'Photo · session ended before reading: "sign in again" beside the photo, then the same photo is read and marked',
 
   async run({ page, ctx, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
+    // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     note(`${EVIDENCE}: "Photo · session ended…" [${browserName || 'chromium'}] ends the session by clearing the browser's cookies; the image is a 1×1 test PNG and the reader is the scripted stand-in. Not real-provider, real-photo, production or real-device evidence.`);
     const { reader } = online;
     reader.text = '12'; reader.confidence = 0.97; reader.down = false;
@@ -614,6 +620,8 @@ export const sessionEndedSubmitFlow = {
   name: 'Submit · session ended at Submit: work held, "sign in again", never a wrong-answer verdict; then marked exactly once',
 
   async run({ page, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
+    // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     note(`${EVIDENCE}: "Submit · session ended…" [${browserName || 'chromium'}] ends a real server session between the reading and Submit; the reader is the scripted stand-in. Not real-provider, real-handwriting, production or real-device evidence.`);
     const { reader } = online;
     reader.text = '12'; reader.confidence = 0.97; reader.down = false;
@@ -694,6 +702,8 @@ export const typedReloadFlow = {
   name: 'Type · typed answer and working survive a reload, then the same question is server-marked',
 
   async run({ page, base, check, goto, createProfile, mathText, settle, online }) {
+    // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     const WORKING = '2 + 2 = 4\n3 + 3 = 6';
     await goto('/');
     await createProfile({ name: 'Type Reload', course: 'in', year: 12 });

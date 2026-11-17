@@ -46,6 +46,8 @@ export const flow = {
   online: true,
 
   async run({ page, ctx, base, check, note, goto, createProfile, mathText, settle, online }) {
+    // These flows pin the press-to-read behaviour: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings. Auto mode has its own flow, tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     // Handwriting is read only by the server reader (owner decision), and only
     // the server marks. The profile is signed in to the real platform server;
     // the one synthetic part is the reader's provider hop, a stand-in that

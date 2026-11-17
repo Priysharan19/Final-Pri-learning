@@ -172,7 +172,7 @@ const reading = ({
       && /api\.post\(\`\/practice\/\$\{question\.id\}\/submit\`, body\)/.test(deliverBody),
     'CASE 5: corrected ink text flows to the same deterministic practice submit endpoint as any other answer');
 
-  const gateAt = submitBody.indexOf('if (needsCheck && vouchedNow !== reading)');
+  const gateAt = submitBody.indexOf('if (needsCheck && vouchedNow !== readingId)');
   const deliveryAt = submitBody.indexOf('await deliver(');
   ok(gateAt >= 0 && deliveryAt > gateAt && !/autoMarkedRef/.test(card) && !/inkResult\?\.afterWait/.test(card),
     'CASE 6: a reading that arrives after waiting is never submitted by the card; the student\'s Submit runs the surviving-uncertainty gate before any delivery/mark');

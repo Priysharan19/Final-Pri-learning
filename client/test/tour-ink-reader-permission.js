@@ -104,6 +104,8 @@ export const flow = {
   readerPermission: 'ask',
 
   async run({ page, base, check, note, goto, createProfile, settle, online, browserName }) {
+    // These flows pin the press-to-read behaviour: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings. Auto mode has its own flow, tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     const reader = online.reader;
     Object.assign(reader, { text: '1', lines: null, confidence: 0.97, down: false, gate: null });
     note(`${TAG} "${flow.name}" [${browserName || 'chromium'}]: a scripted stand-in reader, a simulated phone and tablet viewport, touch events from the browser's input pipeline. The server, sign-in, every read request, every mark and History are real. Not device, finger, Pencil, provider or student evidence.`);
@@ -303,6 +305,8 @@ export const photoAndOffline = {
   readerPermission: 'ask',
 
   async run({ page, ctx, base, check, note, goto, createProfile, settle, online, browserName }) {
+    // These flows pin the press-to-read behaviour: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings. Auto mode has its own flow, tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     const reader = online.reader;
     note(`${TAG} "${photoAndOffline.name}" [${browserName || 'chromium'}]: a 1×1 test image, a scripted stand-in reader and the browser's offline switch on a phone viewport. Not device, camera, provider or student evidence.`);
     const quiet = () => page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});

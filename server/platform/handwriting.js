@@ -16,7 +16,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { asyncRouter } from './asyncRouter.js';
 import { asStore } from './store.js';
-import { rateLimit, requireSession, requireVerifiedEmail } from './security.js';
+import { rateLimit, requireSession, requireVerifiedEmail, consumeRateLimit, sha256 } from './security.js';
 import { spendCeilingMissing } from './spendCeiling.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 import { issueReadReceipt } from './readReceipt.js';
@@ -39,6 +39,8 @@ export const FORBIDDEN_FIELDS = Object.freeze([
  * The body a client may send. Anything beyond this is refused rather than
  * ignored, so a future caller cannot quietly start leaking the answer.
  */
+const READ_QUESTION_LIMIT = Object.freeze({ limit: 60, windowMs: 24 * 60 * 60 * 1000 });
+
 export function validateRequestBody(body) {
   if (!body || typeof body !== 'object') {
     return { ok: false, code: 'HANDWRITING_BODY_INVALID', message: 'Send a JSON body with an image.' };
@@ -172,6 +174,17 @@ export function createHandwritingRouter(db, {
         validateImage(req.body.image);
       } catch (error) {
         return res.status(error.status || 400).json({ error: { code: error.code, message: error.message } });
+      }
+
+      // Per-question ceiling (the reader runs on its own after a pause): before any
+      // provider work, keyed by account and question.
+      const capQuestion = typeof req.body.questionId === 'string' && /^[0-9a-f-]{36}$/i.test(req.body.questionId) ? req.body.questionId : null;
+      if (capQuestion) {
+        const perQuestion = await consumeRateLimit(db, `handwriting-read-q:${sha256(`${req.platformSession.account_id}:${capQuestion}`).slice(0, 24)}`, READ_QUESTION_LIMIT);
+        if (!perQuestion.allowed) {
+          res.set('Retry-After', String(Math.max(1, Math.ceil((perQuestion.resetAt - Date.now()) / 1000))));
+          return res.status(429).json({ error: { code: 'RATE_LIMITED', message: 'This question has been read too many times today. Check the reading you have, or try tomorrow.' } });
+        }
       }
 
       // One paid read per picture (recognitionOps.js): the account's daily
