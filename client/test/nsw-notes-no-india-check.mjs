@@ -15,7 +15,7 @@
 //               with other content; and every topic of the NSW model appears;
 //   5. STRINGS  every notes.nsw.* string is free of India wording.
 // ─────────────────────────────────────────────────────────────────────────────
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -59,14 +59,15 @@ function walk(file) {
     walk(target);
   }
 }
-const entries = ['src/pages/NswNotes.jsx', 'src/notes/NotesParts.jsx', 'src/notes/nsw/nswNotesIndex.js', 'src/notes/nsw/notes-nsw-stage4.js'].map(p => join(root, p));
+const entries = ['src/pages/NswNotes.jsx', 'src/notes/NotesParts.jsx', 'src/notes/nsw/nswNotesIndex.js', ].map(p => join(root, p));
+for (const f of readdirSync(join(root, 'src/notes/nsw')).filter(f => /^notes-nsw-.*\.js$/.test(f))) entries.push(join(root, 'src/notes/nsw', f));
 for (const e of entries) walk(e);
 const graph = [...seen.keys()].map(f => f.slice(root.length));
 for (const f of graph) {
   for (const re of FORBIDDEN) ok(!re.test(f), `the NSW notes import graph reaches ${f} (matches ${re})`);
 }
 ok(graph.some(f => /curriculum-nsw\/index\.js$/.test(f)), 'the NSW notes are built from the NSW curriculum model');
-ok(graph.length > 6 && graph.length < 80, `the walked graph is the page and its parts (${graph.length} files)`);
+ok(graph.length > 6 && graph.length < 120, `the walked graph is the page and its parts (${graph.length} files)`);
 
 // ── 3 · the render ───────────────────────────────────────────────────────────
 const { createServer } = await import('vite');

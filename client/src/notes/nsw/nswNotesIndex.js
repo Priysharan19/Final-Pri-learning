@@ -79,13 +79,19 @@ export function mergePremium(base, premium) {
 
 // Stage 6 notes are written per course (each one an on-demand chunk of its own); their
 // modules are already complete (the premium layer is written into each topic).
+// A band is one base file plus its premium layer; a stage (or a Stage 6 course) loads its bands together.
+const bandsLoader = bands => async () => {
+  const merged = await Promise.all(bands.map(async load => { const [base, premium] = await load(); return mergePremium(base.default, premium.default); }));
+  return { default: Object.assign({}, ...merged) };
+};
+
 const LOADERS = Object.freeze({
   'six:advanced': () => import('./notes-nsw-stage6-advanced.js'),
   'six:standard': () => import('./notes-nsw-stage6-standard.js'),
-  4: async () => {
-    const [base, premium] = await Promise.all([import('./notes-nsw-stage4.js'), import('./notes-nsw-stage4-premium.js')]);
-    return { default: mergePremium(base.default, premium.default) };
-  }
+  4: bandsLoader([
+    () => Promise.all([import('./notes-nsw-stage4.js'), import('./notes-nsw-stage4-premium.js')]),
+    () => Promise.all([import('./notes-nsw-stage4b.js'), import('./notes-nsw-stage4b-premium.js')])
+  ])
 });
 
 /** The notes of every topic in a stage (an object keyed by topic id), or null when none are written yet. */
