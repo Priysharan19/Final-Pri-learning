@@ -402,6 +402,17 @@ const geoProof = [
         SSA: [`$AB = ${x}$ cm, $BC = ${y}$ cm and $\\angle A = ${D(Math.min(al, 80))}$ (not between the two sides)`, `$DE = ${x}$ cm, $EF = ${y}$ cm and $\\angle D = ${D(Math.min(al, 80))}$`, T.NONE]
       }[kind];
       const key = lines[2];
+      if (kind === 'SSA') {
+        // ambiguous case only: the angle is opposite the shorter side and that side is long enough to reach the base
+        let sx = x, sy = y, sa = Math.min(al, 80);
+        for (let g = 0; g < 200; g++) {
+          sx = s(); sa = ri(rng, 30, 80);
+          const lo = Math.floor(sx * Math.sin(sa * Math.PI / 180)) + 1;
+          if (lo + 1 <= sx - 1) { sy = ri(rng, lo + 1, sx - 1); break; }
+        }
+        lines[0] = `$AB = ${sx}$ cm, $BC = ${sy}$ cm and $\\angle A = ${D(sa)}$ (not between the two sides)`;
+        lines[1] = `$DE = ${sx}$ cm, $EF = ${sy}$ cm and $\\angle D = ${D(sa)}$`;
+      }
       const wrong = Object.values(T).filter(t => t !== key).map(text => ({ text, why: kind === 'AAA' ? 'Equal angles only show the triangles are similar; they could be different sizes.' : kind === 'SSA' ? 'The equal angle is not between the equal sides, so the triangle is not fixed.' : `Check which parts are given and where they sit: the matching test is ${key}.` }));
       return mcqQ(rng, `In triangles $ABC$ and $DEF$: triangle $ABC$ has ${lines[0]}; triangle $DEF$ has ${lines[1]}. Which statement is correct?`, key, rs(rng, wrong),
         ['Mark the equal parts on both triangles and note which are sides and which are angles.', 'Check the order: for SAS the angle must be BETWEEN the two sides; for AAS the side is NOT between the angles.', `The tests are SSS, SAS, ASA, AAS and RHS. AAA and SSA do not prove congruence.`],
@@ -647,22 +658,27 @@ const quads = [
       });
     }
   },
-  { // common factor / no constant term
+  { // trinomial rearranged to zero (both solutions non-zero)
     make: rng => {
-      if (rng() < 0.5) {
-        const a = ri(rng, 2, 9), t = nz(rng, -12, 12);
-        return setQ(`Solve $${a}x^2 ${sgn(a * t)}x = 0$.`, [0, -t].sort((u, v) => u - v), {
-          traps: [{ value: t, why: 'Factorise first: $ax(x + t) = 0$. The second solution is $-t$.' }, { value: a * t, why: 'Divide out the common factor before solving each bracket.' }].filter(t2 => t2.value !== 0 && t2.value !== -t),
-          hints: [`Take out the common factor $${a}x$.`, `$${a}x(x ${sgn(t)}) = 0$.`, 'Set each factor to zero.'],
-          steps: [{ h: 'Common factor', d: `$${a}x(x ${sgn(t)}) = 0$` }, { h: 'Null factor law', d: `$x = 0$ or $x = ${-t}$` }]
+      for (;;) {
+        const p = nz(rng, -12, 12), q = nz(rng, -12, 12);
+        if (p === q || p + q === 0) continue;
+        const S = p + q, P = p * q;
+        const traps = [{ value: -p, why: 'Move everything to one side and factorise: each bracket gives a solution of the opposite sign.' }, { value: S, why: 'The sum of the solutions is not a solution. Factorise to find them.' }].filter(t => t.value !== p && t.value !== q);
+        if (rng() < 0.5) {
+          return setQ(`Solve $x^2 = ${lin(S, -P)}$.`, [p, q].sort((u, v) => u - v), {
+            traps,
+            hints: ['Move every term to one side so the other side is zero.', `$${qd(1, -S, P)} = 0$.`, 'Factorise and set each factor to zero.'],
+            steps: [{ h: 'Rearrange', d: `$${qd(1, -S, P)} = 0$` }, { h: 'Factorise', d: `$(x ${sgn(-p)})(x ${sgn(-q)}) = 0$` }, { h: 'Null factor law', d: `$x = ${p}$ or $x = ${q}$` }]
+          });
+        }
+        const a = ri(rng, 2, 5);
+        return setQ(`Solve $${qd(a, -a * S, a * P)} = 0$.`, [p, q].sort((u, v) => u - v), {
+          traps,
+          hints: [`Divide every term by ${a} first.`, `$${qd(1, -S, P)} = 0$.`, 'Factorise and set each factor to zero.'],
+          steps: [{ h: 'Divide by the common factor', d: `$${qd(1, -S, P)} = 0$` }, { h: 'Factorise', d: `$(x ${sgn(-p)})(x ${sgn(-q)}) = 0$` }, { h: 'Null factor law', d: `$x = ${p}$ or $x = ${q}$` }]
         });
       }
-      const k = nz(rng, -15, 15);
-      return setQ(`Solve $x^2 = ${k}x$.`, [0, k].sort((u, v) => u - v), {
-        traps: [{ value: 0, why: 'Dividing both sides by $x$ loses the solution $x = 0$. Move everything to one side and factorise.' }].filter(t => t.value !== 0 || false),
-        hints: ['Move everything to one side: $x^2 - kx = 0$.', `$x(x ${sgn(-k)}) = 0$.`, 'Set each factor to zero.'],
-        steps: [{ h: 'Rearrange', d: `$x^2 ${sgn(-k)}x = 0$` }, { h: 'Factorise', d: `$x(x ${sgn(-k)}) = 0$, so $x = 0$ or $x = ${k}$` }]
-      });
     }
   },
   { // difference of two squares
@@ -715,8 +731,10 @@ const quads = [
     make: rng => {
       for (;;) {
         const p = nz(rng, -12, 12), q = nz(rng, -12, 12);
-        if (p === q) continue;
+        if (p === q || p + q === 0) continue;
         const b = p + q, c = p * q, f = (u, v) => `$(x ${sgn(u)})(x ${sgn(v)})$`;
+        const pk = (u, v) => [u, v].sort((m, n) => m - n).join(',');
+        if (new Set([pk(p, q), pk(-p, -q), pk(p, -q), pk(b, c)]).size < 4) continue;
         return mcqQ(rng, `Which is the factorised form of $${qd(1, b, c)}$?`, f(p, q), [
           { text: f(-p, -q), why: 'Check the signs: the numbers must multiply to the constant AND add to the $x$ coefficient.' },
           { text: f(p, -q), why: 'The two numbers must add to $' + b + '$.' },
@@ -904,7 +922,7 @@ const funcs = [
       const kind = rc(rng, ['taxi', 'gym']);
       if (kind === 'taxi') {
         const flag = ri(rng, 3, 9), rate = rc(rng, [1.5, 2, 2.5, 3, 3.5, 4, 4.5]), d = ri(rng, 3, 45), F = flag + rate * d;
-        const fmt = v => `$${v.toFixed(2)}`;
+        const fmt = v => `\\$${v.toFixed(2)}`;
         return numQ(`A Sydney taxi fare is a flagfall of ${fmt(flag)} plus ${fmt(rate)} per kilometre. A passenger pays ${fmt(F)}. How many kilometres did they travel?`, d, {
           suffix: 'km',
           traps: [{ value: F / rate, why: 'Take off the flagfall first: only the rest is charged per kilometre.' }, { value: F - flag, why: 'That is the distance charge in dollars. Divide by the rate per kilometre.' }],
@@ -913,7 +931,7 @@ const funcs = [
         });
       }
       const fee = ri(rng, 10, 60), per = ri(rng, 2, 9), n = ri(rng, 3, 30), C = fee + per * n;
-      return numQ(`A gym charges a joining fee of $${fee} plus $${per} per class. A member's total cost so far is $${C}. How many classes have they attended?`, n, {
+      return numQ(`A gym charges a joining fee of \\$${fee} plus \\$${per} per class. A member's total cost so far is \\$${C}. How many classes have they attended?`, n, {
         traps: [{ value: C / per, why: 'Take off the joining fee first: it is charged once, not per class.' }, { value: C - fee, why: 'That is the total spent on classes. Divide by the cost of one class.' }],
         hints: ['Write the cost as $C = \\text{fee} + \\text{price}\\times n$.', `$${C} = ${fee} + ${per}n$.`, 'Subtract the fee, then divide.'],
         steps: [{ h: 'Equation', d: `$${C} = ${fee} + ${per}n$` }, { h: 'Solve', d: `$${per}n = ${C - fee} \\Rightarrow n = ${n}$ classes` }]
@@ -945,7 +963,31 @@ const funcs = [
   }
 ];
 
-export const forms = {
+// ── presentation tidy: no bare coefficient 1 / exponent 1, singular units ────
+const SING = { seconds: 'second', minutes: 'minute', hours: 'hour', days: 'day', weeks: 'week', years: 'year', metres: 'metre', litres: 'litre', kilometres: 'kilometre' };
+export function tidyText(s) {
+  return s
+    .replace(/(\$1\$|(?<![\d.\w{^_\\]))1(\s+)(seconds|minutes|hours|days|weeks|years|metres|litres|kilometres)\b/g, (m, a, sp, u) => `${a}${sp}${SING[u]}`)
+    .replace(/\bA open/g, 'An open')
+    .replace(/(?<![\d.A-Za-z{^_\\])1([xtkbyn])(?![A-Za-z])/g, '$1')
+    .replace(/([A-Za-z)])\^\{1\}(?!\d)/g, '$1')
+    .replace(/([A-Za-z])\^1(?![\d{])/g, '$1')
+    .replace(/\(([a-z])\)\^\\circ/g, '$1^\\circ');
+}
+const SKIP = new Set(['answer', 'figure', 'expr', 'inputHint', 'correctIndex']);
+function tidyDeep(v) {
+  if (typeof v === 'string') return tidyText(v);
+  if (Array.isArray(v)) return v.map(tidyDeep);
+  if (v && typeof v === 'object') {
+    const o = {};
+    for (const k of Object.keys(v)) o[k] = SKIP.has(k) ? v[k] : tidyDeep(v[k]);
+    return o;
+  }
+  return v;
+}
+const tidyForms = list => list.map(f => ({ ...f, make: (rng, ...rest) => tidyDeep(f.make(rng, ...rest)) }));
+
+const rawForms = {
   'y10-trig-any-angle': trigAny,
   'y10-logarithms': logs,
   'y10-trig-nonright': trigNon,
@@ -956,3 +998,5 @@ export const forms = {
   'y10-similarity': similar,
   'y10-functions': funcs
 };
+
+export const forms = Object.fromEntries(Object.entries(rawForms).map(([k, v]) => [k, tidyForms(v)]));

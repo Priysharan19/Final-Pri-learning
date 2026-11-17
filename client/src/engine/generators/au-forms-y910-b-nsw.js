@@ -39,7 +39,31 @@ const E = (prompt, expr, traps, hints, steps) => ({ prompt, answerType: 'express
 const tm = (v, s = '') => (v === 0 ? '' : ` ${v < 0 ? '-' : '+'} ${Math.abs(v) === 1 && s ? '' : Math.abs(v)}${s}`);
 const phi = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\\,');
 
-export const forms = {
+// ── presentation tidy: no bare coefficient 1 / exponent 1, singular units ────
+const SING = { seconds: 'second', minutes: 'minute', hours: 'hour', days: 'day', weeks: 'week', years: 'year', metres: 'metre', litres: 'litre', kilometres: 'kilometre' };
+export function tidyText(s) {
+  return s
+    .replace(/(\$1\$|(?<![\d.\w{^_\\]))1(\s+)(seconds|minutes|hours|days|weeks|years|metres|litres|kilometres)\b/g, (m, a, sp, u) => `${a}${sp}${SING[u]}`)
+    .replace(/\bA open/g, 'An open')
+    .replace(/(?<![\d.A-Za-z{^_\\])1([xtkbyn])(?![A-Za-z])/g, '$1')
+    .replace(/([A-Za-z)])\^\{1\}(?!\d)/g, '$1')
+    .replace(/([A-Za-z])\^1(?![\d{])/g, '$1')
+    .replace(/\(([a-z])\)\^\\circ/g, '$1^\\circ');
+}
+const SKIP = new Set(['answer', 'figure', 'expr', 'inputHint', 'correctIndex']);
+function tidyDeep(v) {
+  if (typeof v === 'string') return tidyText(v);
+  if (Array.isArray(v)) return v.map(tidyDeep);
+  if (v && typeof v === 'object') {
+    const o = {};
+    for (const k of Object.keys(v)) o[k] = SKIP.has(k) ? v[k] : tidyDeep(v[k]);
+    return o;
+  }
+  return v;
+}
+const tidyForms = list => list.map(f => ({ ...f, make: (rng, ...rest) => tidyDeep(f.make(rng, ...rest)) }));
+
+const rawForms = {
   // ═══ y9-pythagoras ════════════════════════════════════════════════════════
   'y9-pythagoras': [
     { // rectangle diagonal
@@ -849,3 +873,5 @@ export const forms = {
     }
   ]
 };
+
+export const forms = Object.fromEntries(Object.entries(rawForms).map(([k, v]) => [k, tidyForms(v)]));

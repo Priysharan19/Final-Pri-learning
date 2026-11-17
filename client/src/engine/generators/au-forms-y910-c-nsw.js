@@ -724,9 +724,12 @@ const dataInquiry = [
   { // MCQ: median class
     make: (rng) => {
       const k = rc(rng, [4, 5]), w = rc(rng, [5, 10]), fs = Array.from({ length: k }, () => ri(rng, 3, 14));
-      const N_ = fs.reduce((s, v) => s + v, 0), pos = (N_ + 1) / 2;
-      let cum = 0, idx = 0;
-      for (let i = 0; i < k; i++) { cum += fs[i]; if (cum >= pos) { idx = i; break; } }
+      const tot = () => fs.reduce((s, v) => s + v, 0);
+      const clsAt = r => { let c = 0; for (let i = 0; i < k; i++) { c += fs[i]; if (c >= r) return i; } return k - 1; };
+      // keep the median class unambiguous: odd total, or both middle values in one class
+      for (let g = 0; g < 100 && tot() % 2 === 0 && clsAt(tot() / 2) !== clsAt(tot() / 2 + 1); g++) fs[ri(rng, 0, k - 1)] += 1;
+      const N_ = tot(), pos = (N_ + 1) / 2;
+      const idx = clsAt(Math.ceil(pos));
       const lab = i => `$${i * w}$–$${i * w + w - 1}$`;
       const modal = fs.indexOf(Math.max(...fs));
       const ds = [];
@@ -1015,7 +1018,31 @@ const probability = [
   }
 ];
 
-export const forms = {
+// ── presentation tidy: no bare coefficient 1 / exponent 1, singular units ────
+const SING = { seconds: 'second', minutes: 'minute', hours: 'hour', days: 'day', weeks: 'week', years: 'year', metres: 'metre', litres: 'litre', kilometres: 'kilometre' };
+export function tidyText(s) {
+  return s
+    .replace(/(\$1\$|(?<![\d.\w{^_\\]))1(\s+)(seconds|minutes|hours|days|weeks|years|metres|litres|kilometres)\b/g, (m, a, sp, u) => `${a}${sp}${SING[u]}`)
+    .replace(/\bA open/g, 'An open')
+    .replace(/(?<![\d.A-Za-z{^_\\])1([xtkbyn])(?![A-Za-z])/g, '$1')
+    .replace(/([A-Za-z)])\^\{1\}(?!\d)/g, '$1')
+    .replace(/([A-Za-z])\^1(?![\d{])/g, '$1')
+    .replace(/\(([a-z])\)\^\\circ/g, '$1^\\circ');
+}
+const SKIP = new Set(['answer', 'figure', 'expr', 'inputHint', 'correctIndex']);
+function tidyDeep(v) {
+  if (typeof v === 'string') return tidyText(v);
+  if (Array.isArray(v)) return v.map(tidyDeep);
+  if (v && typeof v === 'object') {
+    const o = {};
+    for (const k of Object.keys(v)) o[k] = SKIP.has(k) ? v[k] : tidyDeep(v[k]);
+    return o;
+  }
+  return v;
+}
+const tidyForms = list => list.map(f => ({ ...f, make: (rng, ...rest) => tidyDeep(f.make(rng, ...rest)) }));
+
+const rawForms = {
   'y9-nonlinear-a': nonlinearA,
   'y9-algebra': algebra,
   'y9-simint': simint,
@@ -1026,3 +1053,5 @@ export const forms = {
   'y9-data': data,
   'y9-probability': probability
 };
+
+export const forms = Object.fromEntries(Object.entries(rawForms).map(([k, v]) => [k, tidyForms(v)]));
