@@ -1,5 +1,5 @@
 import { Fragment, createElement, useMemo, useSyncExternalStore } from 'react';
-import { subscribeLanguage as subscribe, readLanguageSnapshot as readSnapshot, lookupString as lookup, selectString as select } from './core.js';
+import { subscribeLanguage as subscribe, readLanguageSnapshot as readSnapshot, lookupString as lookup, selectString as select, setLanguage } from './core.js';
 import { brandVars } from '../brand/edition.js';
 import { DEFAULT_LANGUAGE, cleanLanguage } from './languages.js';
 export * from './core.js';
