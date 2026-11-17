@@ -126,7 +126,11 @@ const NULLS = [
   // Second review, head 6bd0dc3: a line undefined near the origin was taken for an identity.
   ['the line before is undefined near the origin (sqrt)', 'sqrt(x-10)=x-12', 'x-10 = x^2+144'],
   ['the line before is undefined near the origin (log)', 'log(x-15)=x-20', 'x-15=x^2'],
-  ['the line before is undefined near the origin (sqrt of −x)', 'sqrt(-x-12)=x+20', '-x-12=x^2+40x+400']
+  ['the line before is undefined near the origin (sqrt of −x)', 'sqrt(-x-12)=x+20', '-x-12=x^2+40x+400'],
+  // Final review, head 46fcb00: true only on a half-line that covers the window is not an identity.
+  ['|x − 10| = 10 − x is an equation, not a chain of equals', 'abs(x-10)=10-x', 'x-10=-(10-x)'],
+  ['sqrt((x−10)^2) = 10 − x is an equation, not a chain of equals', 'sqrt((x-10)^2)=10-x', 'x-10=x-10'],
+  ['|x − 25| = 25 − x is an equation, not a chain of equals', 'abs(x-25)=25-x', 'x-25=x-24']
 ];
 for (const [label, before, yours] of NULLS) {
   ok(mistakeView({ prevText: before, brokenText: yours }) === null, `null: ${label}`);

@@ -32,7 +32,7 @@
 // Everything here is pure and deterministic: no DOM, no randomness, no model,
 // no network.
 // ─────────────────────────────────────────────────────────────────────────────
-import { parse, evaluate, normalize, variablesOf } from './expr.js';
+import { parse, evaluate, normalize, variablesOf, exprEquivalent } from './expr.js';
 import { tickStep } from './plot.js';
 
 const TRIG = new Set([
@@ -140,6 +140,25 @@ function isConstant(fn, value = null) {
   if (seen.length < 3) return false;
   const ref = value === null ? seen[0] : value;
   return seen.every(v => Math.abs(v - ref) <= 1e-9 * Math.max(1, Math.abs(ref), Math.abs(v)));
+}
+
+/**
+ * Is the equation L = R an identity — the engine's own equivalence, and the
+ * two sides defined at the same points and equal there, far beyond the window?
+ */
+function identity(eq, name) {
+  if (!exprEquivalent(eq.l, eq.r)) return false;
+  const L = asFunction(eq.l, name);
+  const R = asFunction(eq.r, name);
+  for (const mag of [0.37, 3.1, 13.7, 47.3, 211.9, 1009.3, 25013.7, 1.0007e6]) {
+    for (const x of [mag, -mag]) {
+      const l = L(x);
+      const r = R(x);
+      if (finite(l) !== finite(r)) return false;
+      if (finite(l) && differ(l, r)) return false;
+    }
+  }
+  return true;
 }
 
 /** Clearly different, not floating-point noise. */
@@ -285,6 +304,10 @@ export function mistakeView({ prevText = null, brokenText = null, meta = null } 
       const gap = name ? asFunction(minus(A), name) : null;
       if (gap && sparse(gap)) return null;
       if (gap && isConstant(gap, 0)) {
+        // True across the window is not enough: |x − 10| = 10 − x holds for
+        // every x below 10 and is still an equation. It is read as a chain of
+        // equals only when it is an identity everywhere it can be tested.
+        if (!identity(A, name)) return null;
         A = A.r;
         if (B.t === 'equation') B = B.r;
         rhs = true;
