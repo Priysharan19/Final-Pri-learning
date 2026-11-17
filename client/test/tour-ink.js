@@ -747,11 +747,11 @@ export const flow = {
       const readsBefore = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
       await ctx.setOffline(true);
       await page.getByRole('button', { name: 'Submit Answer' }).click();
-      await page.waitForTimeout(1500);
-      const reasonNow = ((await page.locator('.ink-status').innerText().catch(() => '')) + ' ' + (await page.locator('[data-submit-reason]').innerText().catch(() => ''))).trim();
+      await page.waitForFunction(() => /needs a connection/.test(document.body.innerText), null, { timeout: 10000 }).catch(() => {});
+      const reasonNow = await page.evaluate(() => (document.querySelector('.qpage')?.innerText || '').replace(/\s+/g, ' '));
       await check('stale + Submit while offline sends nothing, reads nothing, and shows the existing reason',
-        await submitCalls() === submitsBefore && (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length === readsBefore && /connection|offline|online/i.test(reasonNow) && await page.locator('[data-ink-stale]').count() === 1,
-        JSON.stringify(reasonNow));
+        await submitCalls() === submitsBefore && (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length === readsBefore && /needs a connection/.test(reasonNow) && await page.locator('[data-ink-stale]').count() === 1,
+        JSON.stringify(reasonNow.slice(-300)));
       await ctx.setOffline(false);
       await page.waitForTimeout(1500);
       // Undo the extra ink: the page is the one that was read again, so Submit sends directly.
