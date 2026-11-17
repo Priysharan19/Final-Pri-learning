@@ -15,9 +15,9 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 | CBSE Class 7 | 15 | 15 | 0 | objective 15, intuition 15, checkpoint 15 | 0 | 0 | 0 |
 | CBSE Class 8 | 13 | 13 | 0 | objective 13, intuition 13, checkpoint 13 | 0 | 0 | 0 |
 | CBSE Class 9 | 8 | 8 | 0 | objective 8, intuition 8, checkpoint 8 | 0 | 0 | 0 |
-| CBSE Class 10 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 13 |
-| CBSE Class 11 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 12 |
-| CBSE Class 12 | 13 | 13 | 0 | objective 13, intuition 13, checkpoint 13 | 0 | 0 | 12 |
+| CBSE Class 10 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 0 |
+| CBSE Class 11 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 0 |
+| CBSE Class 12 | 13 | 13 | 0 | objective 13, intuition 13, checkpoint 13 | 0 | 0 | 0 |
 | Olympiad | 7 | 0 | 0 | objective 7, prerequisites 7, intuition 7, formal 7, examples 7, misconceptions 7, checkpoint 7, practice 7 | 0 | 0 | 0 |
 | NSW Stage 4 (Years 7–8) | 16 | 16 | 0 | objective 16, intuition 16, practice 16 | 2 | 1 | 0 |
 | NSW Stage 5 (Years 9–10) | 41 | 41 | 0 | objective 41, intuition 41, practice 41 | 8 | 3 | 0 |
@@ -88,57 +88,57 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `c10-real-numbers` Real Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | **5** | **no** |
-| `c10-polynomials` Polynomials | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | **4** | **no** |
+| `c10-real-numbers` Real Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | ok | **no** |
+| `c10-polynomials` Polynomials | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | ok | **no** |
 | `c10-pair-linear-equations` Pair of Linear Equations in Two Variables | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 47 | ok | **no** |
-| `c10-quadratic-equations` Quadratic Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 20 | **5** | **no** |
-| `c10-arithmetic-progressions` Arithmetic Progressions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | **2** | **no** |
-| `c10-triangles` Triangles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 36 | **8** | **no** |
-| `c10-coordinate-geometry` Coordinate Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 71 | **2** | **no** |
-| `c10-trigonometry` Introduction to Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 1 | **2** | **no** |
-| `c10-trig-applications` Some Applications of Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | **3** | **no** |
-| `c10-circles` Circles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | **2** | **no** |
-| `c10-areas-circles` Areas Related to Circles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | **9** | **no** |
-| `c10-surface-volume` Surface Areas and Volumes | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | **8** | **no** |
-| `c10-statistics` Statistics | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 42 | **1** | **no** |
-| `c10-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 22 | **2** | **no** |
+| `c10-quadratic-equations` Quadratic Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 20 | ok | **no** |
+| `c10-arithmetic-progressions` Arithmetic Progressions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
+| `c10-triangles` Triangles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 36 | ok | **no** |
+| `c10-coordinate-geometry` Coordinate Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 71 | ok | **no** |
+| `c10-trigonometry` Introduction to Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 1 | ok | **no** |
+| `c10-trig-applications` Some Applications of Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | ok | **no** |
+| `c10-circles` Circles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
+| `c10-areas-circles` Areas Related to Circles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | ok | **no** |
+| `c10-surface-volume` Surface Areas and Volumes | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | ok | **no** |
+| `c10-statistics` Statistics | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 42 | ok | **no** |
+| `c10-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 22 | ok | **no** |
 
 ### CBSE Class 11
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `c11-sets` Sets | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | ok | **no** |
-| `c11-relations-functions` Relations and Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 31 | **6** | **no** |
-| `c11-trig-functions` Trigonometric Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 40 | **2** | **no** |
-| `c11-complex-numbers` Complex Numbers and Quadratic Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 4 | **51** | **no** |
-| `c11-linear-inequalities` Linear Inequalities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | **1** | **no** |
+| `c11-relations-functions` Relations and Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 31 | ok | **no** |
+| `c11-trig-functions` Trigonometric Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 40 | ok | **no** |
+| `c11-complex-numbers` Complex Numbers and Quadratic Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 4 | ok | **no** |
+| `c11-linear-inequalities` Linear Inequalities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | ok | **no** |
 | `c11-permutations-combinations` Permutations and Combinations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 38 | ok | **no** |
-| `c11-binomial-theorem` Binomial Theorem | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | **4** | **no** |
-| `c11-sequences-series` Sequences and Series | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | **3** | **no** |
-| `c11-straight-lines` Straight Lines | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 26 | **1** | **no** |
-| `c11-conic-sections` Conic Sections | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 32 | **5** | **no** |
-| `c11-3d-introduction` Introduction to Three Dimensional Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 7 | **1** | **no** |
-| `c11-limits-derivatives` Limits and Derivatives | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 51 | **5** | **no** |
-| `c11-statistics` Statistics | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 39 | **1** | **no** |
-| `c11-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 17 | **1** | **no** |
+| `c11-binomial-theorem` Binomial Theorem | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | ok | **no** |
+| `c11-sequences-series` Sequences and Series | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | ok | **no** |
+| `c11-straight-lines` Straight Lines | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 26 | ok | **no** |
+| `c11-conic-sections` Conic Sections | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 32 | ok | **no** |
+| `c11-3d-introduction` Introduction to Three Dimensional Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 7 | ok | **no** |
+| `c11-limits-derivatives` Limits and Derivatives | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 51 | ok | **no** |
+| `c11-statistics` Statistics | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 39 | ok | **no** |
+| `c11-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 17 | ok | **no** |
 
 ### CBSE Class 12
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `c12-relations-functions` Relations and Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 41 | **3** | **no** |
+| `c12-relations-functions` Relations and Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 41 | ok | **no** |
 | `c12-inverse-trigonometric` Inverse Trigonometric Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 20 | ok | **no** |
-| `c12-matrices` Matrices | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | **2** | **no** |
-| `c12-determinants` Determinants | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | **2** | **no** |
-| `c12-continuity-differentiability` Continuity and Differentiability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 21 | **3** | **no** |
-| `c12-applications-derivatives` Application of Derivatives | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 33 | **5** | **no** |
-| `c12-integrals` Integrals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | **7** | **no** |
-| `c12-applications-integrals` Application of Integrals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 46 | **5** | **no** |
-| `c12-differential-equations` Differential Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 23 | **5** | **no** |
-| `c12-vector-algebra` Vector Algebra | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 33 | **2** | **no** |
-| `c12-3d-geometry` Three Dimensional Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 10 | **5** | **no** |
-| `c12-linear-programming` Linear Programming | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 21 | **2** | **no** |
-| `c12-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 77 | **2** | **no** |
+| `c12-matrices` Matrices | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | ok | **no** |
+| `c12-determinants` Determinants | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | ok | **no** |
+| `c12-continuity-differentiability` Continuity and Differentiability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 21 | ok | **no** |
+| `c12-applications-derivatives` Application of Derivatives | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 33 | ok | **no** |
+| `c12-integrals` Integrals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | ok | **no** |
+| `c12-applications-integrals` Application of Integrals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 46 | ok | **no** |
+| `c12-differential-equations` Differential Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 23 | ok | **no** |
+| `c12-vector-algebra` Vector Algebra | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 33 | ok | **no** |
+| `c12-3d-geometry` Three Dimensional Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 10 | ok | **no** |
+| `c12-linear-programming` Linear Programming | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 21 | ok | **no** |
+| `c12-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 77 | ok | **no** |
 
 ### Olympiad
 
@@ -308,44 +308,4 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 | `me2-12-03` Introduction to complex numbers | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
 | `me2-12-04` Further integration | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | yes | 0 | ok | **no** |
 | `me2-12-05` Applications of calculus to mechanics | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-
-## Maths outside KaTeX (first offending string per chapter)
-
-- `c10-real-numbers` (5): `Does HCF × LCM = product work for three numbers?`
-- `c10-polynomials` (4): `For ax²+bx+c, the product is c/a and the sum is -b/a (provided a is not zero).`
-- `c10-quadratic-equations` (5): `For real a,b,c with a≠0: b²-4ac positive gives two distinct real roots, zero one repeated `
-- `c10-arithmetic-progressions` (2): `a20=7+19×3=64.`
-- `c10-triangles` (8): `When two triangles are similar with side-scale k, corresponding heights also scale by k. T`
-- `c10-coordinate-geometry` (2): `The vertical change is 7-(-1)=8.`
-- `c10-trigonometry` (2): `Hypotenuse = sqrt(3²+4²)=5.`
-- `c10-trig-applications` (3): `10sqrt(3) m`
-- `c10-circles` (2): `At a point of tangency, the radius is perpendicular to the tangent. If P is outside a circ`
-- `c10-areas-circles` (9): `Segment = sector − triangle`
-- `c10-surface-volume` (8): `Joined solids usually share a radius. Find each part’s own height carefully, for example c`
-- `c10-statistics` (1): `Compute weighted total 2×2+5×3+8×5=59.`
-- `c10-probability` (2): `For two fair independent dice there are 36 equally likely ordered pairs. A target sum can `
-- `c11-relations-functions` (6): `The function x↦x² on real numbers is not one-to-one because x and -x have the same image.`
-- `c11-trig-functions` (2): `Solve sin(2x)=0 for 0≤x<2pi and count the solutions.`
-- `c11-complex-numbers` (51): `(x-1)²+y²=(x+3)²+y² gives -2x+1=6x+9.`
-- `c11-linear-inequalities` (1): `If a<b, then b-a>0, so (-a)-(-b)=b-a>0 and -a>-b.`
-- `c11-binomial-theorem` (4): `Find the coefficient of x³ in (1+2x)^5.`
-- `c11-sequences-series` (3): `A sequence gives the nth object a_n. A series gives partial sums S_n. For a geometric prog`
-- `c11-straight-lines` (1): `Run =4-(-2)=6.`
-- `c11-conic-sections` (5): `For y²=12x, find the focal distance p and focus.`
-- `c11-3d-introduction` (1): `Distance²=2²+3²+6²=49.`
-- `c11-limits-derivatives` (5): `Evaluate lim(x→2) (x²-4)/(x-2).`
-- `c11-statistics` (1): `Group totals are 12×14=168 and 8×20=160.`
-- `c11-probability` (1): `Independence gives P(A and not B)=0.3×0.6 and P(not A and B)=0.7×0.4.`
-- `c12-relations-functions` (3): `Let f(x)=2x+1 and g(x)=x². Find f(g(3)) and g(f(3)).`
-- `c12-matrices` (2): `Top row: (1×2+2×1, 1×0+2×3)=(4,6).`
-- `c12-determinants` (2): `The determinant is t·t-1·4=t²-4.`
-- `c12-continuity-differentiability` (3): `Let f(x)=(x²-4)/(x-2) for x≠2 and f(2)=k. Find k for continuity.`
-- `c12-applications-derivatives` (5): `At a critical point, the first derivative test checks the sign change of   (+ to − is a ma`
-- `c12-integrals` (7): `The integral of x² is 2x.`
-- `c12-applications-integrals` (5): `Find the area between y=x and y=x² from x=0 to x=1.`
-- `c12-differential-equations` (5): `Solve dy/dx=3x² with y(0)=4; find y(2).`
-- `c12-vector-algebra` (2): `Multiply corresponding coordinates: 1×4,2×(-1),3×2.`
-- `c12-3d-geometry` (5): `A plane ax+by+cz=d has normal vector (a,b,c). Substitute the point into ax+by+cz-d and div`
-- `c12-linear-programming` (2): `Maximise 3x+2y subject to x+y≤4, x≤2, x≥0, y≥0.`
-- `c12-probability` (2): `True-positive probability is .01×.90=.009.`
 
