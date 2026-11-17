@@ -10,6 +10,7 @@ import { Ring } from '../components/Charts.jsx';
 import { readJSONFile } from '../lib/files.js';
 import { assignmentSections, defaultSectionKey, describeTaskTargets } from '../platform/assignmentTarget.js';
 import { useT } from '../i18n/index.js';
+import Working from '../instrument/Working.jsx';
 
 export default function Tasks() {
   const { user, toast } = useApp();
@@ -158,7 +159,7 @@ export default function Tasks() {
       )}
 
       <div className="card">
-        {!tasks && <div className="skeleton" style={{ height: 120 }} />}
+        {!tasks && <div className="skeleton" style={{ height: 120 }} aria-hidden="true"><Working pending={!tasks} size={24} /></div>}
         {tasks && !tasks.length && (
           <p className="muted">{t('tasks.empty')}</p>
         )}
