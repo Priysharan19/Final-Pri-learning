@@ -1,0 +1,105 @@
+{
+ "total": 13,
+ "findings": [
+  {
+   "href": "/notes/c12-relations-functions",
+   "katexErr": 0,
+   "hOverflow": false,
+   "uni": [
+    "→ <mrel>",
+    "→ <mrel>",
+    "→ <mrel>",
+    "→ <mrel>",
+    "→ <mrel>",
+    "→ <mrel>",
+    "→ <mrel>",
+    "Let f(x)=2x+1 and g(x)=x². Find f(g(3)) and g(f(3)). <nt-example-q>"
+   ],
+   "textOverlap": [],
+   "figures": 5
+  },
+  {
+   "href": "/notes/c12-determinants",
+   "katexErr": 0,
+   "hOverflow": false,
+   "uni": [
+    "→ <mrel>"
+   ],
+   "textOverlap": [],
+   "figures": 5
+  },
+  {
+   "href": "/notes/c12-continuity-differentiability",
+   "katexErr": 0,
+   "hOverflow": false,
+   "uni": [
+    "→ <mrel mtight>",
+    "→ <mrel mtight>",
+    "→ <mrel mtight>",
+    "Let f(x)=(x²-4)/(x-2) for x≠2 and f(2)=k. Find k for continuity. <nt-example-q>",
+    "Let f(x)=x² for x≤1 and f(x)=ax+b for x>1. Determine a and b for diffe <nt-example-q>"
+   ],
+   "textOverlap": [],
+   "figures": 5
+  },
+  {
+   "href": "/notes/c12-applications-derivatives",
+   "katexErr": 0,
+   "hOverflow": false,
+   "uni": [
+    "Find the minimum of f(x)=x²-6x+5 on the real line. <nt-example-q>",
+    "Parabola y=-2x²+(12)x+(-10), vertex V(3,8) <[object SVGAnimatedString]>",
+    "Parabola y=-2x²+(12)x+(-10), vertex V(3,8) <nt-sr>",
+    "Parabola y=2x²+(4)x+(-4), vertex V(-1,-6) <[object SVGAnimatedString]>",
+    "Parabola y=2x²+(4)x+(-4), vertex V(-1,-6) <nt-sr>"
+   ],
+   "textOverlap": [],
+   "figures": 5
+  },
+  {
+   "href": "/notes/c12-integrals",
+   "katexErr": 0,
+   "hOverflow": false,
+   "uni": [
+    "The integral of x² is 2x. <>",
+    "Differentiating x³/3 gives x²; the power increases before division. <>",
+    "Evaluate the integral from 0 to 2 of 3x²-4x+1. <nt-example-q>",
+    "Evaluate ∫ from 0 to 1 of 2x/(1+x²) dx. <nt-example-q>"
+   ],
+   "textOverlap": [],
+   "figures": 5
+  },
+  {
+   "href": "/notes/c12-applications-integrals",
+   "katexErr": 0,
+   "hOverflow": false,
+   "uni": [
+    "Find the area between y=x and y=x² from x=0 to x=1. <nt-example-q>",
+    "Find the geometric area between y=x² and y=1 over -2≤x≤2. <nt-example-q>"
+   ],
+   "textOverlap": [],
+   "figures": 5
+  },
+  {
+   "href": "/notes/c12-differential-equations",
+   "katexErr": 0,
+   "hOverflow": false,
+   "uni": [
+    "Solve dy/dx=3x² with y(0)=4; find y(2). <nt-example-q>"
+   ],
+   "textOverlap": [],
+   "figures": 5
+  },
+  {
+   "href": "/notes/c12-3d-geometry",
+   "katexErr": 0,
+   "hOverflow": false,
+   "uni": [
+    "A plane ax+by+cz=d has normal vector (a,b,c). Substitute the point int <>"
+   ],
+   "textOverlap": [],
+   "figures": 5
+  }
+ ],
+ "errs": []
+}
