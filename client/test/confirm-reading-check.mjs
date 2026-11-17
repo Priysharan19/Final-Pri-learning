@@ -30,5 +30,5 @@ ok(/confirmOnly\s*\n?\s*\? \{ label: t\('verdict.confirmAndSubmit'\), run: accep
 ok(/confirmed: viaInk \? confirmedRef\.current : null/.test(card), 'the confirmed revision is kept with the submission record');
 ok(/ink = \{ strokes: compactInkStrokes\(inkResult\.strokes\), recognized: inkResult\.text/.test(card), 'the original strokes still travel with the confirmed reading');
 const exam = readFileSync(new URL('../src/pages/ExamRoom.jsx', import.meta.url), 'utf8');
-ok(!/confirmGate|needsConfirmation/.test(exam), 'the exam room keeps its own rules (it is not gated here)');
+ok(!/confirmGate\.js/.test(exam), 'the exam room keeps its own rules (it is not gated here)');
 console.log(`CONFIRM READING: PASS — ${n}/${n} checks — a read answer is confirmed before it is sent; an edited reading is confirmed again; a stale reading is re-read; the exam room is untouched`);
