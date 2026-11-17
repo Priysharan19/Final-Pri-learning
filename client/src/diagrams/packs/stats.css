@@ -1,0 +1,39 @@
+/* The stats pack (stats.jsx). Instrument tokens only, through the kit's tones
+   (diagrams.css), so light and dark follow the theme. Colour is never the only
+   signal: a highlighted bar is also hatched, the theoretical probability is a
+   dashed line, a movable dot is an open ring. */
+.dgs-bar-2, .dgs-bar-hl { fill: color-mix(in srgb, var(--dg-accent) 22%, transparent); stroke: var(--dg-accent); }
+.dgs-hatch { stroke: none; pointer-events: none; }
+.dgs-hatch-line { stroke: var(--dg-accent); stroke-width: 1.4; fill: none; }
+.dgs-theory { stroke: var(--dg-accent); stroke-width: 2.6; stroke-dasharray: 6 3; stroke-linecap: butt; }
+.dgs-mean { stroke: var(--dg-good); stroke-width: 2; stroke-dasharray: 5 4; }
+.dgs-sector { stroke: var(--in-base, #fffdf7); stroke-width: 2; stroke-linejoin: round; }
+.dgs-sector.is-0 { fill: color-mix(in srgb, var(--dg-primary) 16%, transparent); }
+.dgs-sector.is-1 { fill: color-mix(in srgb, var(--dg-accent) 30%, transparent); }
+.dgs-sector.is-2 { fill: color-mix(in srgb, var(--dg-good) 30%, transparent); }
+.dgs-sector.is-3 { fill: color-mix(in srgb, var(--dg-primary) 36%, transparent); }
+.dgs-sector.is-4 { fill: color-mix(in srgb, var(--dg-accent) 55%, transparent); }
+.dgs-sector.is-5 { fill: color-mix(in srgb, var(--dg-good) 55%, transparent); }
+.dgs-leader { fill: none; stroke: var(--dg-ink-3); stroke-width: 1.2; }
+.dgs-hl-box { fill: color-mix(in srgb, var(--dg-accent) 14%, transparent); stroke: var(--dg-accent); stroke-width: 1.6; }
+.dgs-hl .dg-tex-in { font-weight: 700; }
+.dgs-cat .dg-tex-in { font-size: 13px; }
+.dgs-cat.is-mark .dg-tex-in { font-weight: 700; }
+.dgs-mark { stroke-width: 2; }
+.dgs-mark.is-mean { stroke: var(--dg-accent); stroke-dasharray: 6 4; }
+.dgs-mark.is-median { stroke: var(--dg-primary); }
+.dgs-mode { fill: var(--dg-good); }
+.dgs-dot-edit { fill: var(--in-base, #fffdf7); stroke: var(--dg-accent); stroke-width: 2.4; }
+.dgs-lane-line { stroke: var(--dg-ink-2); stroke-width: 1.8; }
+.dgs-lane.is-sd .dgs-lane-line { stroke: var(--dg-accent); }
+.dgs-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 0; padding: 0; list-style: none; color: var(--dg-ink-2); font-size: 0.88em; }
+.dgs-legend li { display: inline-flex; align-items: center; gap: 6px; }
+.dgs-swatch { width: 18px; height: 13px; flex: none; overflow: visible; }
+.dgi-buttons button:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (prefers-reduced-motion: no-preference) {
+  .dgi .dgs-hatch { transition: height 160ms ease-out, y 160ms ease-out; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dgi .dgs-hatch, .dgi .dg-bar { transition: none !important; }
+}
+.dgs-prob .dg-tex-in { font-size: 13px; color: var(--dg-ink-2); }
