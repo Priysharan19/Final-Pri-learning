@@ -62,6 +62,7 @@ import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../t
 import { INSTRUMENT_UI } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
 import { haptic } from '../platform/native/haptics.js';
+import UpgradeNote from '../paywall/UpgradeNote.jsx';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
@@ -3045,6 +3046,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     )}
                     <button type="button" className="btn btn-quiet btn-sm" data-type-instead onClick={() => { setState({ phase: 'answering' }); flipMode('type'); }}>{t('verdict.typeInstead')}</button>
                   </div>
+                  {/* Today's marked-work allowance is used: a value moment. The
+                      placement check is onboarding, so it never offers. */}
+                  {state.res.readerBlock.kind === 'allowance' && <UpgradeNote moment="marked-work-allowance" context={{ signUp: !!diagnostic }} />}
                 </div>
               ) : previousAttempt ? (
                 /* The page has changed since this was marked. The earlier

@@ -16,7 +16,11 @@
  * production image carries; a server import from anywhere else in client/src
  * fails at boot in the container (see examAllowance.js).
  */
-export const FREE_PRACTICE_ALLOWANCE = Object.freeze({ perDay: 20, timeZone: 'Asia/Kolkata' });
+import { PACKAGING } from './packaging.js';
+
+// perDay comes from the active packaging (engine/packaging.js); null means the
+// free plan's practice is not capped.
+export const FREE_PRACTICE_ALLOWANCE = Object.freeze({ perDay: PACKAGING.free.practicePerDay, timeZone: 'Asia/Kolkata' });
 
 /**
  * The calendar each regional edition counts the free-practice day in (plan
@@ -83,4 +87,4 @@ export function premiumCapabilityForGenerator(generator) {
  * deployment) and the Premium screen states it. Modelled figures, to be
  * revisited after real cost data.
  */
-export const READ_ALLOWANCE = Object.freeze({ free: 5, premium: 25 });
+export const READ_ALLOWANCE = Object.freeze({ free: PACKAGING.free.readsPerDay, premium: PACKAGING.premium.readsPerDay });

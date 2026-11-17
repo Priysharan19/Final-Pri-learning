@@ -43,5 +43,7 @@ export const AU_STRINGS = Object.freeze({
   'teach.newClassPlaceholder': 'New class name (e.g. Year 10 A)',
   'teach.rosterHelp': 'Roster files: one student per line — {format}. Names already on this device join; new names get a student profile.',
   'exams.indiaHeading': 'Exams',
-  'placement.provenance': 'The prerequisite map behind it is Pri’s own teaching judgement (version {version}), not a NESA publication.'
+  'placement.provenance': 'The prerequisite map behind it is Pri’s own teaching judgement (version {version}), not a NESA publication.',
+  'pricing.why.syllabus': "Built for the NSW Mathematics syllabuses, including the 2024 Stage 6 syllabuses first examined in the 2027 HSC.",
+  'upgrade.jeeAdvanced': "This part of the course is included with Premium."
 });

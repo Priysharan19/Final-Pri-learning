@@ -70,6 +70,10 @@ device can open a profile that has no password.
 
 ## What we collect if you create a cloud account
 
+- **Who invited whom**, if you use an invite link: we keep a record that your
+  account joined through another account's link (or that yours was used), your
+  invite code, and the dates of the free trial it gave. We never ask for or keep
+  a friend's email address or phone number; you share the link yourself.
 - **Your email address**, to sign you in and to send verification and password
   reset links and one-time sign-in codes. The app does not use SMS for sign-in; if
   that changes, this notice will describe it first.

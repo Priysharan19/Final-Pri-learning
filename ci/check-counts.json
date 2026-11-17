@@ -132,7 +132,7 @@
         {"has":"STUDY PLAN: PASS — 215/215 checks","note":"211 → 215 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
         {"has":"REMINDERS: PASS — 183/183 checks"},
         {"has":"I18N: PASS — 209/209 checks","note":"198 → 209 (Prithagoras Hindi trim, re-derived by running): six checks that an edition without Hindi ships no Hindi catalogue and Priyabhata is untouched, and five that run the languages.js a Prithagoras build really uses (an English-only list, a stored hi clamped to English, the table still knowing Hindi, and the build stopping if languages.js changes under the clamp). 200 → 198 (plan E4, re-derived by running): \"P\" and \"Pri Learning.\" (the brand tile) and \"Pri\" (the old bar label) left the literal allowlist; \"by Pri Learning\" joined it."},
-        {"has":"I18N COVERAGE: PASS — 94/94 checks — 97 files scanned, 0 hard-coded strings","note":"91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason. 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt). 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770). 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree). 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards). 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check). 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost \"P\" and \"Pri Learning.\" and gained Priyabhata, Prithagoras, प्रियभट and \"by Pri Learning\". 89 → 93 files (various; Paper Generator: + pages/PaperGenerator.jsx, re-derived by running); 80 → 89 files (plan F4b: + src/desk (DeskPage, DeskImport, DeskEntry) and src/examShell (six components), re-derived by running the check)."},
+        {"has":"I18N COVERAGE: PASS — 94/94 checks — 100 files scanned, 0 hard-coded strings","note":"91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason. 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt). 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770). 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree). 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards). 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check). 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost \"P\" and \"Pri Learning.\" and gained Priyabhata, Prithagoras, प्रियभट and \"by Pri Learning\". 89 → 93 files (various; Paper Generator: + pages/PaperGenerator.jsx, re-derived by running); 80 → 89 files (plan F4b: + src/desk (DeskPage, DeskImport, DeskEntry) and src/examShell (six components), re-derived by running the check)."},
         {"has":"READER PERMISSION (D17): PASS — 124/124 checks"},
         {"has":"PAGE LINK HISTORY: PASS — 39/39 checks"},
         {"has":"MISCONCEPTION TARGETING: PASS — 41/41 checks"},
@@ -235,7 +235,7 @@
       "job": "platform-contracts",
       "log": "stripe-billing.log",
       "pins": [
-        {"has":"STRIPE BILLING: PASS — 118/118 checks —"}
+        {"has":"STRIPE BILLING: PASS — 120/120 checks —","note":"118 → 120 (value packaging): the no-card trial is off by default, and with the owner's switch on it never leaves an unpaid invoice."}
       ]
     },
     "platform/billing-edition.log": {
@@ -361,7 +361,7 @@
       "job": "platform-contracts",
       "log": "region-isolation.log",
       "pins": [
-        {"has":"REGION ISOLATION (H2): PASS — 476 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables."}
+        {"has":"REGION ISOLATION (H2): PASS — 486 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables."}
       ]
     },
     "platform/practice-http.log": {
@@ -526,12 +526,14 @@
       "pins": [
         {"has":"✓ hot-path-budget-check.mjs"},
         {"has":"✓ region-isolation-check.mjs","note":"plan H2: two regions share nothing; the database binding, on Postgres."},
-        {"has":"PLATFORM ON POSTGRES: PASS — 96/96 suites","note":"train editions-22: 94 + Stripe (#941) + paper generator (#948) = 96. 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
+        {"has":"PLATFORM ON POSTGRES: PASS — 98/98 suites","note":"96 → 98 (value packaging): packaging enforcement and the invitation trial on Postgres. train editions-22: 94 + Stripe (#941) + paper generator (#948) = 96. 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
         {"has":"✓ nsw-practice-check.mjs"},
         {"has":"✓ nsw-exam-check.mjs"},
         {"has":"✓ paper-generator-check.mjs"},
         {"has":"✓ billing-edition-check.mjs"},
         {"has":"✓ stripe-billing-check.mjs"},
+        {"has":"✓ packaging-enforcement-check.mjs"},
+        {"has":"✓ referral-trial-check.mjs"},
         {"has":"✓ edition-ai-budgets-check.mjs"},
         {"has":"✓ resources-check.mjs"},
         {"has":"✓ resource-bookmark-sync-check.mjs"},

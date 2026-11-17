@@ -8,4 +8,6 @@
  * production image carries; a server import from anywhere else in client/src
  * fails at boot in the container.
  */
-export const FREE_EXAM_ALLOWANCE = Object.freeze({ examsPerWindow: 1, examWindowDays: 30 });
+import { PACKAGING } from './packaging.js';
+
+export const FREE_EXAM_ALLOWANCE = Object.freeze({ examsPerWindow: PACKAGING.free.examsPerWindow, examWindowDays: PACKAGING.free.examWindowDays });

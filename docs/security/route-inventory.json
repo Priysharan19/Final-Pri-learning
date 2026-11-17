@@ -817,6 +817,69 @@
       "bodyLimit": "1mb"
     },
     {
+      "method": "POST",
+      "path": "/v1/billing/cancel-feedback",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: accepted only when the session account asked to cancel in the last day; one closed-set reason, no free text",
+      "rateLimits": [
+        {
+          "key": "billing-cancel-feedback",
+          "limit": 6,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/referral/",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: the caller's own invite code and trial dates; a declared store app is offered no code",
+      "rateLimits": [
+        {
+          "key": "referral-read",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/referral/claim",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: the caller (a new, verified account) presents a code; the server resolves the inviter, refuses self-referral, grants each account at most one trial ever; no contact data is accepted or stored",
+      "rateLimits": [
+        {
+          "key": "referral-claim",
+          "limit": 5,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
       "method": "GET",
       "path": "/v1/billing/status",
       "auth": "session",
@@ -2034,6 +2097,29 @@
       "guardianConsent": false,
       "mfa": true,
       "ownership": "admin; aggregate counts only; also carries the operator health detail (provider flags, backlog counts, housekeeping)",
+      "rateLimits": [
+        {
+          "key": "admin",
+          "limit": 300,
+          "windowMs": 60000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/admin/funnel",
+      "auth": "session",
+      "roles": [
+        "admin"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "admin; aggregate counts only, cells under 10 suppressed; no account id, email or timestamp per person",
       "rateLimits": [
         {
           "key": "admin",
