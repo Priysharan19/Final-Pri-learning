@@ -3,6 +3,7 @@ import { printPage } from '../lib/files.js';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
+import { answerToTex } from '../engine/answerTex.js';
 import { MathText } from '../lib/latex.jsx';
 import { indiaExamBlueprint, indiaExamClaim } from '../engine/indiaExams.js';
 import { boardMockOf, MOCK_LABEL } from '../engine/boardMock.js';
@@ -356,14 +357,14 @@ export function PrintPaper({ paper, onClose }) {
               <div style={{ fontWeight: 700 }}>{t('exams.solutionStructured', { n: i + 1 })}</div>
               {q.parts.map(pt => (
                 <div key={pt.key} style={{ margin: '6px 0 8px' }}>
-                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{tx('exams.partAnswer', { key: pt.key, answer: <MathText text={pt.answerText} /> })} <span style={{ color: '#666', fontWeight: 400 }}>{t('exams.partMarks', { count: pt.marks, n: pt.marks })}</span></div>
+                  <div style={{ fontWeight: 600, fontSize: 13.5 }}>{tx('exams.partAnswer', { key: pt.key, answer: <MathText text={answerToTex(pt.answerText)} /> })} <span style={{ color: '#666', fontWeight: 400 }}>{t('exams.partMarks', { count: pt.marks, n: pt.marks })}</span></div>
                   {(pt.steps || []).map((s, j) => <div key={j} style={{ fontSize: 13, margin: '2px 0' }}><b><MathText text={s.h} />:</b> <MathText text={s.d} /></div>)}
                 </div>
               ))}
             </div>
           ) : (
             <div key={i} style={{ margin: '0 0 20px', breakInside: 'avoid' }}>
-              <div style={{ fontWeight: 700 }}>{tx('exams.questionAnswer', { n: i + 1, answer: <MathText text={q.answerText || ''} /> })}</div>
+              <div style={{ fontWeight: 700 }}>{tx('exams.questionAnswer', { n: i + 1, answer: <MathText text={answerToTex(q.answerText || '')} /> })}</div>
               {Array.isArray(q.criteria) && <ul style={{ margin: '4px 0 6px', paddingLeft: 20 }}>
                 {q.criteria.map((c, j) => <li key={j} style={{ fontSize: 13 }}>{tx('exams.criterionMarks', { count: Number(c.mark || 1), n: c.mark || 1, text: <MathText text={c.text} /> })}</li>)}
               </ul>}

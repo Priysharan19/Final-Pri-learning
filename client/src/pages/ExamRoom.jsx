@@ -30,6 +30,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
+import { answerToTex } from '../engine/answerTex.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { clearDraft, queueDraft, readDraft } from '../components/drafts.js';
@@ -837,7 +838,7 @@ export default function ExamRoom() {
                 {pt.pending && pendingNote(pt)}
                 <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14, marginTop: 4 }}>
                   <span>{tx('examRoom.yours', { answer: <b>{pt.answerType === 'mcq' ? (pt.given !== '' && pt.given != null ? 'ABCD'[Number(pt.given)] ?? '—' : '—') : (pt.given || '—')}</b> })}</span>
-                  {!pt.pending && pt.answerText !== undefined && <span>{tx('examRoom.correctShort', { answer: <b><MathText text={pt.answerText} /></b> })}</span>}
+                  {!pt.pending && pt.answerText !== undefined && <span>{tx('examRoom.correctShort', { answer: <b><MathText text={answerToTex(pt.answerText)} /></b> })}</span>}
                 </div>
                 {!pt.correct && pt.steps && (
                   <details style={{ marginTop: 6 }}>
@@ -887,7 +888,7 @@ export default function ExamRoom() {
             <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14 }}>
               <span>{t('history.yourAnswerWas')} <b>{givenText(d)}</b></span>
               {/* A pending answer carries no solution: nothing is shown to decide a retry by. */}
-              {d.solution && <span>{t('history.correctAnswerWas')} <b><MathText text={d.solution.answerText} /></b></span>}
+              {d.solution && <span>{t('history.correctAnswerWas')} <b><MathText text={answerToTex(d.solution.answerText)} /></b></span>}
             </div>
             {d.partial && (
               <div className="verdict" style={{ marginTop: 8, background: 'var(--brand-soft)', border: '1px solid var(--brand-1)' }}>

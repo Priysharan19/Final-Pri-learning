@@ -112,3 +112,29 @@ export function feedbackGeometry(line) {
     detachedCount: Math.max(0, ranked.length - 1)
   };
 }
+
+/**
+ * The one box that ENCLOSES the marked line: every recognised glyph of its
+ * dominant component (a tall ∫ or a raised power included) and, when nothing
+ * is detached from it, the recogniser's own line extent — with room all round
+ * that grows with the writing, and never past the top or left of the page.
+ *
+ * The verdict used to be painted as one bordered box per glyph, each only five
+ * pixels larger than its glyph: neighbouring boxes overlapped one another and
+ * the strokes between them, and a line near the top or left edge was clipped.
+ * Detached side work is still left out, exactly as in feedbackGeometry().
+ *
+ * @returns {{ x: number, y: number, w: number, h: number }|null}
+ */
+export function enclosingBox(line, { padX = 10, minPadY = 7 } = {}) {
+  const g = feedbackGeometry(line);
+  let box = g.anchor || null;
+  if (!box) return null;
+  if (!g.detached) {
+    const whole = lineBox(line);
+    if (whole) box = union([box, whole]);
+  }
+  const padY = Math.max(minPadY, Math.round(box.h * 0.28));
+  const x1 = Math.max(0, box.x1 - padX), y1 = Math.max(0, box.y1 - padY);
+  return { x: x1, y: y1, w: box.x2 + padX - x1, h: box.y2 + padY - y1 };
+}

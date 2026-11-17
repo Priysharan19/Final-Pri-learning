@@ -7,6 +7,7 @@
 import { confidenceFloorOf, isLowConfidence } from '../ink/readingCorrection.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
+import { answerToTex } from '../engine/answerTex.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import InkCanvas from '../ink/InkCanvas.jsx';
@@ -2252,7 +2253,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       {res.solution.answerText && (
         <div className="final-answer">
           <div className="sc-label" style={{ marginBottom: 8 }}>{t('verdict.finalAnswer')}</div>
-          <MathText text={res.solution.answerText} />
+          <MathText text={answerToTex(res.solution.answerText)} />
         </div>
       )}
       {/* What the marks are for, as the server's receipt states it. Read-only:
@@ -3134,7 +3135,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   <div data-working-evidence={workEvidence.kind}>{t(workEvidenceCopy.key, workEvidenceCopy.vars)}</div>
                 )}
                 {!verdictGood && res.solution && (
-                  <div className="eval-expected">{t('verdict.expected')} <b><MathText text={res.solution.answerText} /></b></div>
+                  <div className="eval-expected">{t('verdict.expected')} <b><MathText text={answerToTex(res.solution.answerText)} /></b></div>
                 )}
                 {res.stepReport && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}
                 {/* Only display the matched server receipt after resolution. */}
@@ -3436,7 +3437,7 @@ function StepReport({ report, instrument = false, correctAnswer = null }) {
         <div className="in-cmp" data-step-compare>
           <div className="in-cmp-yours"><small>{t('inst.yourLine')}</small><span className="in-cmp-e">{l.text}</span></div>
           <span className="in-cmp-arrow" aria-hidden="true">↵</span>
-          <div className="in-cmp-right"><small>{t('inst.correctLine')}</small><MathText text={correctAnswer} /></div>
+          <div className="in-cmp-right"><small>{t('inst.correctLine')}</small><MathText text={answerToTex(correctAnswer)} /></div>
         </div>
       )}
     </React.Fragment>

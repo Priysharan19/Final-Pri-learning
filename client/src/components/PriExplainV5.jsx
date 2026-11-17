@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { answerToTex } from '../engine/answerTex.js';
 import { MathText } from '../lib/latex.jsx';
 import { buildVisualTimeline, visualSummary } from '../explain/visualEngine.js';
 import { visualCuePlan, visualCueState, visualProgressForCue } from '../explain/choreography.js';
@@ -528,7 +529,7 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                 {atFinished && payload.solution?.answerText && (
                   <div className="pri-explain-final">
                     <span>{t('explain.finalAnswer')}</span>
-                    <strong><MathText text={payload.solution.answerText} /></strong>
+                    <strong><MathText text={answerToTex(payload.solution.answerText)} /></strong>
                     {teaching.shouldOfferFollowUp && onTrySimilar && (
                       <div className="pri-explain-followup">
                         <span>{t('explain.lockIn')}</span>

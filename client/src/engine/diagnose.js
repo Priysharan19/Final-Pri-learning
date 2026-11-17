@@ -29,6 +29,7 @@
 // hypothesis actually reproduces the student's line; nothing is guessed.
 // ─────────────────────────────────────────────────────────────────────────────
 import { parse, evaluate, exprEquivalent, variablesOf, normalize, numsClose } from './expr.js';
+import { CALCULUS_DIAGNOSIS_CODES } from './calculusSteps.js';
 
 const PREC = { '+': 1, '-': 1, '*': 2, '/': 2, '^': 4 };
 const KIDS = { bin: ['l', 'r'], equation: ['l', 'r'], group: ['v'], neg: ['v'], call: ['arg'] };
@@ -535,6 +536,12 @@ function opName(op) {
 }
 
 export const DIAGNOSIS_CODES = Object.keys(COPY);
+/**
+ * Every code a Step Check report can carry: diagnoseStep's own, and the
+ * calculus slips calculusSteps.js names (it writes the whole diagnosis, with
+ * the numbers of the line it is about, so they have no template here).
+ */
+export const ALL_DIAGNOSIS_CODES = Object.freeze([...DIAGNOSIS_CODES, ...CALCULUS_DIAGNOSIS_CODES]);
 
 function build(code, detail, confidence) {
   const copy = COPY[code];

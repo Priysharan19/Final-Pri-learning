@@ -1,6 +1,6 @@
 // Regression for the exact class of iPad feedback/recognition bug where
 // detached side working shares a vertical band with an equation.
-import { feedbackGeometry } from '../src/ink/feedbackGeometry.js';
+import { feedbackGeometry, enclosingBox } from '../src/ink/feedbackGeometry.js';
 import { recognizeWithoutDetachedSideWork } from '../src/ink/runtimeSpatial.js';
 
 let failures = 0;
@@ -44,6 +44,34 @@ const exponent = {
 };
 const power = feedbackGeometry(exponent);
 check('superscript geometry stays in the same feedback component', power.detached === false && power.boxes.length === 3);
+
+// The marked line is ENCLOSED by one box. It used to be one bordered box per
+// glyph, five pixels larger than the glyph: neighbours overlapped each other
+// and the strokes, and a line near the page edge was clipped.
+{
+  console.log('\nThe verdict box encloses the marked line\n');
+  // "∫16x⁷dx": a tall integral sign, ordinary digits and a raised power.
+  const integral = {
+    symbols: [sym(60, 40, 22, 74), sym(100, 62, 24, 34), sym(130, 62, 24, 34), sym(160, 62, 24, 34), sym(186, 48, 14, 18), sym(210, 66, 22, 30), sym(240, 62, 24, 34)],
+    box: { x: 60, y: 40, w: 204, h: 74 }
+  };
+  const around = enclosingBox(integral);
+  const allInside = integral.symbols.every(s => s.box.x1 >= around.x && s.box.y1 >= around.y && s.box.x2 <= around.x + around.w && s.box.y2 <= around.y + around.h);
+  check('every glyph, the tall integral sign and the raised power included, is inside the box', allInside);
+  check('with real room around the ink, not a hair', integral.symbols.every(s => s.box.y1 - around.y >= 7 && around.y + around.h - s.box.y2 >= 7 && s.box.x1 - around.x >= 8));
+  // Near the top-left corner of the page the box is clamped, never negative (clipped).
+  const corner = enclosingBox({ symbols: [sym(3, 2), sym(40, 2), sym(80, 2)], box: { x: 3, y: 2, w: 105, h: 34 } });
+  check('a line against the page edge is not pushed off it', corner.x >= 0 && corner.y >= 0);
+  // Detached side work stays outside, as for the glyph boxes.
+  const withSide = { symbols: [...[120, 160, 205, 250].map(x => sym(x, 100)), sym(980, 96, 24, 30)], box: { x: 120, y: 96, w: 884, h: 38 } };
+  const marked = enclosingBox(withSide);
+  check('detached side work is not enclosed', marked.x + marked.w < 600);
+  // The recogniser's own line extent (ascenders the glyph boxes miss) is enclosed when nothing is detached.
+  const tallLine = { symbols: [sym(100, 100, 28, 30), sym(140, 100, 28, 30)], box: { x: 96, y: 84, w: 80, h: 62 } };
+  const tall = enclosingBox(tallLine);
+  check('the line extent the reader reported is enclosed too', tall.y <= 84 && tall.y + tall.h >= 146);
+  check('a line with no geometry has no box', enclosingBox({ symbols: [] }) === null);
+}
 
 console.log('\nPri Ink V3 detached-side-work runtime guard\n');
 

@@ -37,7 +37,7 @@ import {
   mappedIdForTrap, misconceptionIdForTrap, trapShape, shapeHash, canonicalLedgerKey,
   migrateTrapLedger, migrateRatingRow, confirmCloudMisconception
 } from '../src/engine/misconceptions.js';
-import { DIAGNOSIS_CODES, diagnoseStep } from '../src/engine/diagnose.js';
+import { ALL_DIAGNOSIS_CODES, diagnoseStep } from '../src/engine/diagnose.js';
 import { misconceptionKey } from '../src/engine/adaptive.js';
 import { stepCheck } from '../src/engine/checker.js';
 import { GENERATORS, loadAllBanks, generateQuestion } from '../src/engine/generators/index.js';
@@ -85,8 +85,8 @@ ok(['verdict.lineMisconception', 'verdict.possibleMisconception'].every(k => en[
   'the "Line N: name" sentence carries both placeholders in both languages');
 
 const stepEntries = MISCONCEPTIONS.filter(m => m.detectors.includes('step-check')).map(m => m.id).sort();
-eq(stepEntries, [...DIAGNOSIS_CODES].sort(), 'every Step Check diagnosis code is an ontology entry, and every step-check entry is a code');
-ok(DIAGNOSIS_CODES.every(code => idForDiagnosisCode(code) === code), 'a diagnosis code maps to the ID of the same name');
+eq(stepEntries, [...ALL_DIAGNOSIS_CODES].sort(), 'every Step Check diagnosis code is an ontology entry, and every step-check entry is a code');
+ok(ALL_DIAGNOSIS_CODES.every(code => idForDiagnosisCode(code) === code), 'a diagnosis code maps to the ID of the same name');
 eq(idForDiagnosisCode('fraction-acros'), null, 'a misspelt code maps to nothing');
 eq(misconceptionById('counterexample')?.recordable, false, 'a bare counterexample is not a recordable misconception');
 eq(misconceptionIdForDiagnosis({ code: 'counterexample' }), null, 'so it never becomes a learner-state key');
