@@ -22,7 +22,15 @@ export const BILLING_NOT_AVAILABLE = 'BILLING_NOT_AVAILABLE_IN_EDITION';
 
 // The billing routes name their provider by route family; the web family is
 // Razorpay's (/checkout/web, /web/cancel, /restore/web, /webhook/web).
+// Which provider the web family is depends on the edition: Razorpay for an
+// edition that lists it (Priyabhata), Stripe for one that lists Stripe
+// (Prithagoras). webProviderOf() answers it; an edition lists at most one.
 export const ROUTE_FAMILY_PROVIDER = Object.freeze({ web: 'razorpay', apple: 'apple', google: 'google' });
+export const WEB_PROVIDERS = Object.freeze(['razorpay', 'stripe']);
+export function webProviderOf(edition) {
+  const listed = editionBilling(edition).providers;
+  return WEB_PROVIDERS.find(p => listed.includes(p)) || null;
+}
 
 // The deployment variables that exist only to sell through one provider.
 // Sign-in identifiers (PRI_APPLE_CLIENT_IDS, PRI_GOOGLE_CLIENT_IDS) are not
@@ -33,6 +41,9 @@ const PROVIDER_VARIABLES = Object.freeze({
     'PRI_RAZORPAY_MONTHLY_PLAN_ID', 'PRI_RAZORPAY_ANNUAL_PLAN_ID',
     'PRI_RAZORPAY_MONTHLY_TOTAL_COUNT', 'PRI_RAZORPAY_ANNUAL_TOTAL_COUNT',
     'PRI_WEB_MONTHLY_PRICE_ID', 'PRI_WEB_ANNUAL_PRICE_ID'
+  ]),
+  stripe: Object.freeze([
+    'PRI_STRIPE_SECRET_KEY', 'PRI_STRIPE_WEBHOOK_SECRET', 'PRI_STRIPE_MONTHLY_PRICE_ID', 'PRI_STRIPE_ANNUAL_PRICE_ID'
   ]),
   apple: Object.freeze(['PRI_APPLE_MONTHLY_PRODUCT_ID', 'PRI_APPLE_ANNUAL_PRODUCT_ID']),
   google: Object.freeze([
@@ -51,6 +62,7 @@ export function editionBilling(edition) {
 
 /** Whether an edition sells through a provider, named by id or by route family. */
 export function providerAllowed(edition, provider) {
+  if (provider === 'web') return webProviderOf(edition) !== null;
   const id = Object.hasOwn(ROUTE_FAMILY_PROVIDER, provider) ? ROUTE_FAMILY_PROVIDER[provider] : provider;
   return editionBilling(edition).providers.includes(id);
 }

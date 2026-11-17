@@ -161,7 +161,7 @@ ok('every arrival reason has copy in both languages', Object.values(ARRIVAL_KEYS
   for (const [lang, cat] of [['en', en], ['hi', hi]]) {
     ok(`the not-on-sale sentence (${lang}) promises no date, price or store`, typeof cat['paywall.notOnSale'] === 'string' && !/\d|₹|\$|soon|App Store|Google Play|Razorpay/i.test(cat['paywall.notOnSale']), cat['paywall.notOnSale']);
   }
-  ok('the edition table is where it is decided: Prithagoras lists no provider', /billing: Object\.freeze\(\{ providers: Object\.freeze\(\[\]\), currency: 'AUD' \}\)/.test(config));
+  ok('the edition table is where it is decided: Prithagoras lists Stripe only', /billing: Object\.freeze\(\{ providers: Object\.freeze\(\['stripe'\]\), currency: 'AUD' \}\)/.test(config));
 }
 
 // 5 · every way into it

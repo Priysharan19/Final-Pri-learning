@@ -231,11 +231,18 @@
         {"has":"CHILD ERASURE: PASS — 107/107 checks"}
       ]
     },
+    "platform/stripe-billing.log": {
+      "job": "platform-contracts",
+      "log": "stripe-billing.log",
+      "pins": [
+        {"has":"STRIPE BILLING: PASS — 115/115 checks —"}
+      ]
+    },
     "platform/billing-edition.log": {
       "job": "platform-contracts",
       "log": "billing-edition.log",
       "pins": [
-        {"has":"BILLING PER EDITION: PASS — 123/123 checks —"}
+        {"has":"BILLING PER EDITION: PASS — 121/121 checks —"}
       ]
     },
     "platform/tutor-diagnose.log": {
@@ -511,10 +518,11 @@
       "pins": [
         {"has":"✓ hot-path-budget-check.mjs"},
         {"has":"✓ region-isolation-check.mjs","note":"plan H2: two regions share nothing; the database binding, on Postgres."},
-        {"has":"PLATFORM ON POSTGRES: PASS — 94/94 suites","note":"59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
+        {"has":"PLATFORM ON POSTGRES: PASS — 95/95 suites","note":"59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
         {"has":"✓ nsw-practice-check.mjs"},
         {"has":"✓ nsw-exam-check.mjs"},
         {"has":"✓ billing-edition-check.mjs"},
+        {"has":"✓ stripe-billing-check.mjs"},
         {"has":"✓ edition-ai-budgets-check.mjs"},
         {"has":"✓ resources-check.mjs"},
         {"has":"✓ resource-bookmark-sync-check.mjs"},

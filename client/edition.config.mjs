@@ -81,7 +81,7 @@ export const CAPABILITIES = Object.freeze([
  * shown and the server refuses every purchase route and payment event
  * (server/platform/billingProviders.js).
  */
-export const BILLING_PROVIDERS = Object.freeze(['razorpay', 'apple', 'google']);
+export const BILLING_PROVIDERS = Object.freeze(['razorpay', 'stripe', 'apple', 'google']);
 
 const pending = text => Object.freeze({ pending: text });
 
@@ -156,8 +156,9 @@ export const EDITIONS = Object.freeze({
     locale: 'en-AU',
     timezone: 'Australia/Sydney',
     currency: 'AUD',
-    // No provider until owner decision O2 (plan H3): Premium is not on sale.
-    billing: Object.freeze({ providers: Object.freeze([]), currency: 'AUD' }),
+    // Owner decision O2 (plan H3): Stripe, in AUD. Razorpay is never accepted here,
+    // and Stripe is never accepted by Priyabhata (billingProviders.js).
+    billing: Object.freeze({ providers: Object.freeze(['stripe']), currency: 'AUD' }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,

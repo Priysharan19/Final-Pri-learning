@@ -4,7 +4,8 @@ import { applyVerifiedEntitlement } from './entitlements.js';
 import { declaredNativeClient, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { recordWebhook } from './metrics.js';
 import { serverEdition } from './edition.js';
-import { BILLING_NOT_AVAILABLE, ROUTE_FAMILY_PROVIDER, billingNotAvailable, editionBilling, providerAllowed } from './billingProviders.js';
+import { BILLING_NOT_AVAILABLE, ROUTE_FAMILY_PROVIDER, billingNotAvailable, editionBilling, providerAllowed, webProviderOf } from './billingProviders.js';
+import { stripeConfigStatus } from './stripe.js';
 
 const PROVIDERS = new Set(['apple', 'google', 'web']);
 // Lifecycle states in which a web (Razorpay) subscription still has a mandate
@@ -79,15 +80,15 @@ export function commercialConfig(edition = serverEdition()) {
       appleAnnual: product('apple', 'PRI_APPLE_ANNUAL_PRODUCT_ID'),
       googleMonthly: product('google', 'PRI_GOOGLE_MONTHLY_PRODUCT_ID'),
       googleAnnual: product('google', 'PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
-      webMonthly: product('razorpay', 'PRI_RAZORPAY_MONTHLY_PLAN_ID', 'PRI_WEB_MONTHLY_PRICE_ID'),
-      webAnnual: product('razorpay', 'PRI_RAZORPAY_ANNUAL_PLAN_ID', 'PRI_WEB_ANNUAL_PRICE_ID')
+      webMonthly: product('razorpay', 'PRI_RAZORPAY_MONTHLY_PLAN_ID', 'PRI_WEB_MONTHLY_PRICE_ID') || product('stripe', 'PRI_STRIPE_MONTHLY_PRICE_ID'),
+      webAnnual: product('razorpay', 'PRI_RAZORPAY_ANNUAL_PLAN_ID', 'PRI_WEB_ANNUAL_PRICE_ID') || product('stripe', 'PRI_STRIPE_ANNUAL_PRICE_ID')
     }),
     webCheckout: Object.freeze({
-      provider: sells('razorpay') ? 'razorpay' : null,
-      configured: sells('razorpay') && !!(
+      provider: webProviderOf(edition),
+      configured: (sells('razorpay') && !!(
         process.env.PRI_RAZORPAY_KEY_ID && process.env.PRI_RAZORPAY_KEY_SECRET && process.env.PRI_RAZORPAY_WEBHOOK_SECRET &&
         (process.env.PRI_RAZORPAY_MONTHLY_PLAN_ID || process.env.PRI_WEB_MONTHLY_PRICE_ID || process.env.PRI_RAZORPAY_ANNUAL_PLAN_ID || process.env.PRI_WEB_ANNUAL_PRICE_ID)
-      )
+      )) || (sells('stripe') && stripeConfigStatus().configured)
     }),
     platformRule: 'Native iOS/Android purchases must use the platform billing mechanism required for that storefront. The server consumes verified provider events and never trusts client premium flags.'
   });
@@ -141,7 +142,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   router.get('/manage', requireSession(db), async (req, res) => {
     const web = await webSubscriptionManageState(db, req.platformSession.account_id, {
       adapterAvailable: sold.web && typeof lifecycle.web?.cancel === 'function',
-      provider: sold.web ? 'razorpay' : null
+      provider: sold.web ? webProviderOf(edition) : null
     });
     res.set('Cache-Control', 'no-store');
     res.json(sold.apple ? { web, apple: { manageUrl: APPLE_MANAGE_URL } } : { web });
