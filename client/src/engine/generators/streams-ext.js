@@ -2,6 +2,7 @@
 // Pri Learning · Extension 1 & Extension 2 generators (ME / MEX)
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, rs, nz, gcd, Frac, mcq, poly, sgn, r1, r2, r3, rad } from '../qhelpers.js';
+import { identityProof } from './identityProofs.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 const nCr = (n, r) => Math.round(factorial(n) / (factorial(r) * factorial(n - r)));
@@ -620,6 +621,8 @@ export const streamsExt = {
         ]
       };
     }
+    // "Prove that …": an identity proved line by line (identityProofs.js).
+    if (rng() < 0.4) return identityProof(rng, 'nsw');
     const [o, a, h] = rc(rng, TRIPLES);
     const quad = rc(rng, [2, 3, 4]);
     const sS = quad === 2 ? 1 : -1;

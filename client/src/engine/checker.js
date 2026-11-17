@@ -207,6 +207,19 @@ function readSolutionList(raw, meta) {
   return { values: uniqueNumeric(values), invalid: false };
 }
 
+// ── A proof's "= RHS" ────────────────────────────────────────────────────────
+// A "prove LHS = RHS" item may state its two sides (stepMeta.sides). Only then
+// is a line that ends "= RHS" (or "= L.H.S.") read as that side's expression —
+// the expression the item states, never one inferred from the working. An
+// item without stated sides reads "RHS" as before.
+const SIDE_LABEL = /^\s*(l|r)\.?\s*h\.?\s*s\.?\s*$/i;
+function statedSide(candidate, meta) {
+  const m = SIDE_LABEL.exec(String(candidate ?? ''));
+  const sides = meta?.sides;
+  if (!m || !sides || typeof sides.lhs !== 'string' || typeof sides.rhs !== 'string') return candidate;
+  return m[1].toLowerCase() === 'l' ? sides.lhs : sides.rhs;
+}
+
 export function checkWorking(q, workingText) {
   return withEvaluationBudget(EVALUATION_BUDGET, () => checkWorkingWithinBudget(q, workingText));
 }
@@ -242,7 +255,7 @@ function checkWorkingWithinBudget(q, workingText) {
     } else {
       const cleaned = normalize(lastLine.text).replace(/^∴\s*/, '');
       if (ans.final?.kind === 'expr') {
-        const cand = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
+        const cand = statedSide(cleaned.includes('=') ? cleaned.split('=').pop() : cleaned, meta);
         reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly, isolatedDomain: true, strictDomain: ans.final.strictDomain === true });
       } else if (meta.kind === 'equation') {
         const re = new RegExp(`${meta.variable}\\s*=`);
@@ -816,7 +829,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           } else status = 'ok';
         }
       } else if (meta.kind === 'expression') {
-        const candidate = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
+        const candidate = statedSide(cleaned.includes('=') ? cleaned.split('=').pop() : cleaned, meta);
         const same = exprEquivalent(candidate, meta.canonical, { positiveOnly: meta.positiveOnly });
         status = same ? 'ok' : 'break';
         if (!same) note = 'This line is no longer equivalent to the expression you started with — the slip is here.';
