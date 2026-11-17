@@ -170,7 +170,7 @@ export const flow = {
     // ── 7b · answer first: the writing surface is in the first screen, and the
     // hint row opens a rung exactly as the ladder button did (UI3) ───────────
     const surfaceTop = await page.evaluate(() => {
-      const el = document.querySelector('.mcq, .ws-work canvas, .ws-work textarea, .ws-work input[type="text"], .ws-work [contenteditable], .ws-work .ink-surface');
+      const el = document.querySelector('.mcq, .ws-tools ~ .editor, .ws-tools + *, .ws-work canvas, .ws-work textarea, .ws-work input[type="text"], .ws-work [contenteditable], .ws-work .ink-surface');
       return el ? { top: Math.round(el.getBoundingClientRect().top), vh: innerHeight } : null;
     });
     await check('at 390×844 the writing surface starts within the first screen',
