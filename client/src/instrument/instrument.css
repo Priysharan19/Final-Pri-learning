@@ -514,25 +514,35 @@ html.ui-instrument .ink-comment { border-radius: 4px; }
 html.ui-instrument .status-line { font: 400 12.5px var(--in-ui); color: var(--in-tx-3); }
 html.ui-instrument .ws-answer-preview { color: var(--in-tx); font-variant-numeric: tabular-nums; }
 
-/* The scan: on Check, one signal line passes down the page. Animates `top`
-   and opacity once, on one small layer; off under reduced motion (the
-   existing rule hides it). */
-html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after {
-  inset: auto 0 auto 0; top: -90px; height: 90px; border-top: 0;
-  border-bottom: 1px solid var(--in-signal);
-  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--in-signal) 7%, transparent));
-  animation: in-scan 1200ms cubic-bezier(.45, 0, .2, 1) 1 both;
+/* ── UI5 · The Check sweep: one ink hairline, each line's mark stamps in as it
+   reaches the line. Marks the server already committed; MarginMarks.jsx mounts
+   the layer only with a receipt's verdicts, and only under data-marked="yes".
+   No gradient, no glow, no signal colour. Compositor-only (transform, opacity). */
+html.ui-instrument .editor-shell .ink-stage::after { display: none; }
+.in-sweep { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; display: none; }
+.editor-shell[data-marked="yes"] .in-sweep { display: block; }
+.in-sweep i {
+  position: absolute; left: 0; right: 0; top: 0; height: 1px; opacity: 0;
+  background: color-mix(in srgb, var(--in-tx) 55%, transparent);
+  animation: in-sweep var(--in-dur-sweep) cubic-bezier(.45, 0, .2, 1) 1 both;
 }
-/* `top` rather than a transform, so the line reaches the foot of a page of
-   any height (a tall iPad stage included); it is one small layer. */
-@keyframes in-scan {
-  0% { top: -90px; opacity: 1; }
-  90% { opacity: 1; }
-  100% { top: 100%; opacity: 0; }
+@keyframes in-sweep {
+  0% { transform: translateY(var(--y0)); opacity: 0; }
+  6% { opacity: 1; }
+  94% { opacity: 1; }
+  100% { transform: translateY(var(--y1)); opacity: 0; }
 }
+.editor-shell[data-marked="yes"] :is(.ink-verdict, .ink-linebox, .ink-underline) { animation: in-stamp 160ms var(--in-ease-spring) var(--d, 0ms) both; }
+.editor-shell[data-marked="yes"] .ink-underline { animation: in-ul 200ms var(--in-ease-out) var(--d, 0ms) both; transform-origin: left; }
+@keyframes in-stamp { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes in-ul { from { transform: scaleX(0); } to { transform: none; } }
+/* A marked page: the verdict mark replaces the reading chip beside the line. */
+.editor-shell[data-marked="yes"] .in-read-layer { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
-  html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after { animation: none; display: none; }
+  .in-sweep { display: none !important; }
+  .editor-shell[data-marked="yes"] :is(.ink-verdict, .ink-linebox, .ink-underline) { animation: in-fade 120ms linear both; }
 }
+@keyframes in-fade { from { opacity: 0; } to { opacity: 1; } }
 /* The line the engine marked as the slip carries the copper edge on its chip,
    and an earned line a faint green one — never on a line Pri read with low
    confidence: that keeps its indigo "unsure" edge whatever the verdict. */
@@ -1175,7 +1185,7 @@ html.ui-instrument .in-led-tools .in-led-bar { padding-bottom: 0; border-bottom:
 html.ui-instrument {
   --in-ease-out: cubic-bezier(.2, 0, 0, 1);
   --in-ease-spring: cubic-bezier(.2, 1.1, .4, 1);
-  --in-dur-1: 120ms; --in-dur-2: 200ms; --in-dur-3: 320ms;
+  --in-dur-1: 120ms; --in-dur-2: 200ms; --in-dur-3: 320ms; --in-dur-sweep: 900ms;
   --in-sh-1: 0 0 0 1px var(--in-edge), 0 1px 0 var(--in-edge);
   --in-sh-2: 0 0 0 1px var(--in-edge-2), 0 1px 2px var(--in-edge), 0 8px 24px -14px var(--in-shadow);
   --in-sh-3: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-3), 0 24px 64px -24px var(--in-shadow);

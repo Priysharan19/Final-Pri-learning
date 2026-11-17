@@ -3196,6 +3196,7 @@ export default {
   "inst.readStrip.cant": "{n} can't read",
   "inst.readThatsIt": "That's it",
   "inst.readThatsItAria": "Line {n}: keep this reading",
+  "inst.markedOnServer": "Marked on Pri's server, against the question it issued.",
   "inst.unsettledOne": "· 1 line unsettled",
   "inst.unsettledMany": "· {n} lines unsettled",
   "inst.qNumber": "Q{n}",
