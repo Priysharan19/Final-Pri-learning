@@ -3165,7 +3165,7 @@ export default {
   "inst.cmdLabel": "कमांड बार",
   "inst.cmdChapters": "अध्याय",
   "inst.cmdPages": "पन्ने",
-  "inst.cmdForms": "इस रूप वाले प्रश्न",
+  "inst.cmdForms": "इस रूप वाले विषय",
   "inst.cmdFormEcho": "रूप",
   "inst.cmdFormCount": "{n} विषय",
   "inst.cmdNotAi": "इस डिवाइस पर पाठ्यक्रम सूची से मिलान। कोई AI खोज नहीं।",

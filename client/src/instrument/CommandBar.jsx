@@ -168,8 +168,8 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
           <span><span className="in-kbd">↵</span>{t('inst.cmdOpen')}</span>
           <span><span className="in-kbd">esc</span>{t('inst.cmdClose')}</span>
           <span>{t('inst.cmdPrefixHint')}</span>
-          {!inExam && <span className="in-pal-foot-r" data-pal-honest>{t('inst.cmdNotAi')}</span>}
         </div>
+        {!inExam && <p className="in-pal-honest" data-pal-honest>{t('inst.cmdNotAi')}</p>}
       </div>
     </div>
   );

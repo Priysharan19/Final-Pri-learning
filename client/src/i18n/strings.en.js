@@ -3105,7 +3105,7 @@ export default {
   "inst.cmdLabel": "Command bar",
   "inst.cmdChapters": "Chapters",
   "inst.cmdPages": "Pages",
-  "inst.cmdForms": "Questions with this form",
+  "inst.cmdForms": "Topics with this form",
   "inst.cmdFormEcho": "form",
   "inst.cmdFormCount": "{n} topics",
   "inst.cmdNotAi": "Matched against the syllabus index on this device. No AI search.",
