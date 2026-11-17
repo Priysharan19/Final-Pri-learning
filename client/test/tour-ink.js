@@ -675,6 +675,8 @@ export const flow = {
     // (owner decision "Yes, change it".) The same server reader, consent and online gates as
     // "Read again", answer-blind as ever. Stale + Submit: read, show, send NOTHING; the next Submit
     // sends if the ink is unchanged since that read.
+    reader.lines = null;
+    reader.confidence = 0.97;
     const submitCalls = async () => (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length;
     const freshWrittenQuestion = async () => {
       await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
