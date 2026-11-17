@@ -567,7 +567,7 @@ function unreadLines(rawLines) {
 }
 const unreadNote = entry => entry;
 
-function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, calculus = null } = {}) {
+function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, calculus = null, named = false } = {}) {
   const calculusStage = { claimed: false };   // calculusSteps.js: has a line made a claim yet?
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const unread = unreadLines(rawLines);
@@ -676,7 +676,11 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       if (meta?.kind === 'derivative') {
         const assessed = namesAValue(proseClean, meta)
           ? { status: 'note', note: 'This gives a value, not a derivative, so it is not checked as one.' }
-          : refineDerivativeLine(proseClean, meta, assessDerivativeLine({ text: proseClean, meta }), calculusStage);
+          : (named
+            // Named slips only for a whole question's own working. A stage of a proof plan keeps
+            // reason-v2's diagnosis (its code is part of the plan's contract: pri-reason-v3-check).
+            ? refineDerivativeLine(proseClean, meta, assessDerivativeLine({ text: proseClean, meta }), calculusStage)
+            : assessDerivativeLine({ text: proseClean, meta }));
         status = assessed.status;
         note = assessed.note;
         lineDiagnosis = assessed.diagnosis || null;
@@ -1622,7 +1626,7 @@ function stepCheckWithinBudget(meta, workingText, options = null) {
   const prompt = typeof options?.prompt === 'string' ? options.prompt : '';
   let calculus = null;
   try { calculus = calculusContext(meta, prompt); } catch { calculus = null; }
-  return stepCheckSingle(meta, workingText, pinnedSystem(meta, prompt), { loneBranches: true, calculus });
+  return stepCheckSingle(meta, workingText, pinnedSystem(meta, prompt), { loneBranches: true, calculus, named: true });
 }
 
 // ── Method marks (marking-11) ────────────────────────────────────────────────
