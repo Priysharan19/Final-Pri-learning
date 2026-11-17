@@ -53,6 +53,14 @@ import './SignUpFlow.css';
 
 const CLASSES = [7, 8, 9, 10, 11, 12];
 const AGES = [11, 12, 13, 14, 15, 16, 17];
+// Prithagoras: the NSW Stage 6 maths courses a Year 11 or 12 student picks from.
+// Course names, written the same in every language (the profile's `pathway`).
+const AU_PATHWAYS = [
+  { key: 'standard', label: 'Standard' },
+  { key: 'advanced', label: 'Advanced' },
+  { key: 'ext1', label: 'Extension 1' },
+  { key: 'ext2', label: 'Extension 2' }
+];
 const TRACKS = [
   // Examination names, written the same in every language (as in Login.jsx).
   { key: 'cbse', label: 'CBSE' },
@@ -131,6 +139,7 @@ export default function SignUpFlow({
   const verifying = useRef(false);
   const sending = useRef(false);
   const finishing = useRef(false);
+  const [pathway, setPathway] = useState('advanced');
   const available = cloudAvailable();
 
   const needsParent = !!consent?.required && consent.state !== 'given';
@@ -478,7 +487,7 @@ export default function SignUpFlow({
           setError(tLater('signup.parentStillWaiting'));
           return;
         }
-        await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track });
+        await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track, ...(EDITION_ID === 'prithagoras' && year >= 11 ? { pathway } : {}) });
       } catch (err) { fail(err); }
       finally { setBusy(''); }
     })().finally(() => { finishing.current = null; });
@@ -659,7 +668,8 @@ export default function SignUpFlow({
       </>
     );
   } else if (step === 'class') {
-    const jee = track !== 'cbse';
+    const au = EDITION_ID === 'prithagoras';
+    const jee = !au && track !== 'cbse';
     const ready = year && (!jee || year >= 11);
     body = (
       <>
@@ -667,8 +677,20 @@ export default function SignUpFlow({
         <div className="signup-choices signup-choices-6" role="group" aria-label={t('signup.classLabel')}>
           {CLASSES.map(c => choice(year === c, String(c), () => { setYear(c); if (c < 11) setTrack('cbse'); }, `signup-class-${c}`))}
         </div>
-        <p className="signup-sublabel" id="signup-track-label">{t('signup.trackLabel')}</p>
-        <div className="signup-segment" role="radiogroup" aria-labelledby="signup-track-label">
+        {au && year !== null && year >= 11 && (
+          <>
+            <p className="signup-sublabel" id="signup-pathway-label">{t('signup.trackLabel')}</p>
+            <div className="signup-segment signup-segment-4" role="radiogroup" aria-labelledby="signup-pathway-label">
+              {AU_PATHWAYS.map(option => (
+                <button key={option.key} type="button" role="radio" aria-checked={pathway === option.key}
+                  className={`signup-seg${pathway === option.key ? ' is-selected' : ''}`} data-testid={`signup-pathway-${option.key}`}
+                  onClick={() => setPathway(option.key)}>{option.label}</button>
+              ))}
+            </div>
+          </>
+        )}
+        {!au && <p className="signup-sublabel" id="signup-track-label">{t('signup.trackLabel')}</p>}
+        {!au && <div className="signup-segment" role="radiogroup" aria-labelledby="signup-track-label">
           {TRACKS.map(option => {
             const disabled = option.key !== 'cbse' && year !== null && year < 11;
             return (
@@ -679,7 +701,7 @@ export default function SignUpFlow({
               </button>
             );
           })}
-        </div>
+        </div>}
         {jee && <p className="signup-hint">{t('signup.trackJeeHint')}</p>}
         <button type="button" className="btn btn-primary btn-lg signup-next" disabled={!ready || !!busy}
           onClick={() => (account ? (needsParent ? go('parent') : finish()) : completeDetails())}

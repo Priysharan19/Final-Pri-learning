@@ -46,6 +46,10 @@ export const AU_STRINGS = Object.freeze({
   'signup.noticeNot': "Until you confirm, Prithagoras’s server holds only what it needs to set up the account and reach you: the student’s name, year and contact details, and yours. Their answers are not checked, their handwriting and photos are not read, and nothing syncs.",
   'signup.noticeWithdraw': "You can withdraw at any time from the link in our email. Withdrawing stops everything at once: marking, handwriting and photo reading, exams and sync.",
   'guardianPage.withdrawHint': "You can withdraw later from the link in our email.",
+  'signup.classTitle': 'Which year are you in?',
+  'signup.classLabel': 'Year',
+  'signup.trackLabel': 'Which maths course?',
+  'signup.ageLead': 'If you are under 15, a parent or guardian approves your account once, by email, before answers can be checked or anything syncs. You can ask them on the next step.',
   'exams.indiaHeading': 'Exams',
   'placement.provenance': 'The prerequisite map behind it is Pri’s own teaching judgement (version {version}), not a NESA publication.'
 });

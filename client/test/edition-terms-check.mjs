@@ -120,6 +120,16 @@ check('parent features are Priyabhata only: the edition record, the sign-in link
   assert.match(read('main.jsx'), /PARENT_EMAIL_MODE = featureEnabled\('parentReport'\) && parentFeaturesOffered\(\)/);
   assert.match(read('platform/edition-record.js'), /family: Object\.freeze\(\{ parentFeatures: e\.family\.parentFeatures === true \}\)/);
 });
+check('Prithagoras onboarding: Year (not Class), NSW courses for Year 11 and 12, no CBSE/JEE tracks; the age is sent so the AU rule can decide', () => {
+  const src = readFileSync(fileURLToPath(new URL('../src/components/SignUpFlow.jsx', here)), 'utf8');
+  assert.match(src, /const AU_PATHWAYS = \[\s*\{ key: 'standard'[\s\S]*key: 'ext2'/);
+  assert.match(src, /\{!au && <div className="signup-segment" role="radiogroup" aria-labelledby="signup-track-label">/);
+  assert.match(src, /const jee = !au && track !== 'cbse';/);
+  assert.match(src, /isAdult: age === null \? undefined : age >= 18, age: age === null \? undefined : age/);
+  assert.equal(AU_STRINGS['signup.classTitle'], 'Which year are you in?');
+  assert.match(AU_STRINGS['signup.ageLead'], /under 15/);
+  assert.ok(!/under 18|class|CBSE/i.test(AU_STRINGS['signup.ageLead']));
+});
 check('every allowlist entry still matches a key (a dead entry is removed)', () => {
   for (const [re] of ALLOW) assert.ok(Object.keys(en).some(k => re.test(k)), `${re} matches no key`);
 });
