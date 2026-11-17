@@ -110,7 +110,7 @@ export default function InstrumentBar({ user, setUser, accountMenu, navItems }) 
         </button>
         <nav className="in-tabs" aria-label={t('nav.primary')}>
           {tabs.map(tab => (
-            <PageLink key={tab.to} to={tab.to} className="in-tab" aria-current={tab.match(loc.pathname, loc.hash) ? 'page' : undefined}>{t(tab.key)}</PageLink>
+            <PageLink key={tab.to} to={tab.to} className="in-tab" data-testid={`tab-${pathOf(tab.to).slice(1) || 'index'}`} aria-current={tab.match(loc.pathname, loc.hash) ? 'page' : undefined}>{t(tab.key)}</PageLink>
           ))}
         </nav>
         {more.length > 0 && <MoreMenu items={more} />}
