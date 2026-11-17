@@ -47,7 +47,11 @@
 //    RESTRICTIVE pri_account_scope), cascade with the account, no score or
 //    mark column, mode 'unmarked' only, at most one open attempt per account
 //    and paper (supabase/migrations/20261113010000_desk_attempts.sql).
-export const SCHEMA_VERSION = 16;
+// 17: resource publishing (ADR-0002, plan F3) — resource_revisions (immutable
+//    history and the review state machine) and resource_assets (hosted PDF
+//    records), both global under the fail-closed RLS policy
+//    (supabase/migrations/20261114000000_resource_publishing.sql).
+export const SCHEMA_VERSION = 17;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).

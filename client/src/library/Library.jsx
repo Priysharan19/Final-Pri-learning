@@ -105,9 +105,32 @@ function Detail({ id, t, desk }) {
   );
 }
 
+/** A hosted file (plan F3): a signed URL is fetched on the click, so it is fresh; the page never holds a storage key. */
+function HostedDownload({ id, t }) {
+  const [failed, setFailed] = useState(false);
+  const go = async () => {
+    setFailed(false);
+    try {
+      const { url } = await libraryApi.file(id);
+      // The server's own signed URL: https, short-lived, forced to download.
+      const safe = safeExternalUrl(url);
+      if (!safe) throw new Error('unsafe');
+      window.location.assign(safe);
+    } catch { setFailed(true); }
+  };
+  return (
+    <p className="lib-open">
+      <button type="button" className="btn btn-primary" onClick={go} data-testid="library-download">{t('library.download')}</button>
+      <span className="in-note lib-sub">{t('library.hostedNote')}</span>
+      {failed && <span className="lib-honest" role="alert">{t('library.downloadFailed')}</span>}
+    </p>
+  );
+}
+
 /** One resource, as drawn on its page. Exported for client/test/library-ui-check.mjs. */
 export function ResourceView({ r, t, save = null }) {
   const url = safeExternalUrl(r.url);
+  const hosted = r.availability === 'hosted';
   return (
     <article className="lib-detail" aria-labelledby="lib-detail-title">
       {/* i18n-exempt-start: a resource's own title, subtitle and description, as its publisher wrote them */}
@@ -124,6 +147,7 @@ export function ResourceView({ r, t, save = null }) {
           <span className="in-note lib-sub">{t('library.externalNote', { source: r.source })}</span>
         </p>
       )}
+      {hosted && <HostedDownload id={r.id} t={t} />}
       <dl className="lib-provenance">
         <div><dt>{t('library.syllabusLabel')}</dt><dd>{r.syllabusVersion || t('library.syllabusNone')}</dd></div>
         <div><dt>{t('library.sourceLabel')}</dt><dd>{r.source}</dd></div>

@@ -4,6 +4,7 @@ import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
+import Working from '../instrument/Working.jsx';
 
 export default function Favorites() {
   const [data, setData] = useState(null);
@@ -24,7 +25,7 @@ export default function Favorites() {
     nav('/practice', { state: { serve: r } });
   };
 
-  if (!data) return <div className="skeleton" style={{ height: 300 }} />;
+  if (!data) return <div className="skeleton" style={{ height: 300 }} aria-hidden="true"><Working pending={!data} size={24} /></div>;
 
   if (!data.items.length) {
     return (
