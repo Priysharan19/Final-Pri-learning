@@ -99,6 +99,23 @@ const PUBLISHING = pending('Resource publishing with review, version history and
 const EXAM_DESK = pending('The unmarked Exam Desk is built and ships dark behind the PRI_FEATURE_EXAM_DESK build flag; it is offered when the owner turns the flag on (plan F4).');
 const EXAM_DESK_AU = pending('The unmarked Exam Desk is built and ships dark behind the PRI_FEATURE_EXAM_DESK build flag; it is offered when the owner turns the flag on, once the Australian region exists to hold its attempts (plan F4, H1).');
 
+/** The marking policies an edition may declare. */
+export const MARKING_POLICIES = Object.freeze(['switchable', 'final-answer-only']);
+
+/**
+ * The ways the two editions are ALLOWED to differ in behaviour, each with its
+ * reason. edition-parity-check.mjs measures every facet in the running server and
+ * fails on a difference that is not declared here (and on a declaration that no
+ * longer differs). Learning features are built once; an edition may differ only
+ * in curriculum, presentation, language, commercial and legal configuration, and
+ * in a certification gate that one edition has passed and the other has not.
+ */
+export const PARITY_DECLARED = Object.freeze({
+  marking: 'Certification gate: method marks are certified for India (#499 process) and not for NSW (plan G6), so Prithagoras marks the final answer only.',
+  admission: 'Curriculum: NSW questions must pass the NSW quality gate and carry an outcome code before they are issued (nswBanks.js); India issues its covers as before.',
+  billingProviders: 'Commercial: each edition sells through its own providers (billingProviders.js).'
+});
+
 export const EDITIONS = Object.freeze({
   priyabhata: Object.freeze({
     id: 'priyabhata',
@@ -122,6 +139,14 @@ export const EDITIONS = Object.freeze({
     timezone: 'Asia/Kolkata',
     currency: 'INR',
     billing: Object.freeze({ providers: Object.freeze(['razorpay', 'apple', 'google']), currency: 'INR' }),
+    // How this edition marks (audit P0 #37). `switchable`: method marks follow the
+    // process-wide switch (markingPolicy.js, D12) and are on only with an independent
+    // examiner's signed result for THIS edition's rubric. Items are sealed with no
+    // marking limit. edition-parity-check.mjs holds this to the server's behaviour.
+    marking: Object.freeze({
+      policy: 'switchable',
+      reason: 'Method marks follow the process-wide switch (markingPolicy.js, D12): off until an independent examiner signs the India rubric result (#499), then switchable by the operator.'
+    }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,
@@ -159,6 +184,14 @@ export const EDITIONS = Object.freeze({
     // Owner decision O2 (plan H3): Stripe, in AUD. Razorpay is never accepted here,
     // and Stripe is never accepted by Priyabhata (billingProviders.js).
     billing: Object.freeze({ providers: Object.freeze(['stripe']), currency: 'AUD' }),
+    // Final answer only until a human HSC examiner certifies Australian rubrics (plan G6):
+    // the India examiner result certifies India's rubric only. Every issued item is sealed
+    // `final-answer-only` (editionBanks.js) and the method-mark switch is refused here in
+    // every environment (editionMarking.js UNCERTIFIED_EDITIONS).
+    marking: Object.freeze({
+      policy: 'final-answer-only',
+      reason: 'No certified Australian method rubric exists (plan G6); the India examiner result says nothing about NSW marking guidelines, so only the final answer is marked until an HSC examiner certifies one.'
+    }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,
@@ -254,6 +287,8 @@ export function editionProblems(editions = EDITIONS) {
       for (const p of providers) if (!BILLING_PROVIDERS.includes(p)) problems.push(`${key}: billing provider ${JSON.stringify(p)} is not one the platform has an adapter for`);
       if (new Set(providers).size !== providers.length) problems.push(`${key}: billing.providers lists a provider twice`);
     }
+    if (!MARKING_POLICIES.includes(e.marking?.policy)) problems.push(`${key}: marking.policy must be one of ${MARKING_POLICIES.join(', ')}`);
+    if (typeof e.marking?.reason !== 'string' || e.marking.reason.trim().length < 40) problems.push(`${key}: marking.reason must say why this edition marks as it does`);
     if (e.billing?.currency !== e.currency) problems.push(`${key}: billing.currency must be the edition's currency`);
     if (!e.courses?.includes(e.defaultCourse)) problems.push(`${key}: default course ${JSON.stringify(e.defaultCourse)} is not one of its courses`);
     for (const c of e.courses || []) courses.add(c);
