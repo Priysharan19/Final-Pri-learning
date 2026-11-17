@@ -1,7 +1,7 @@
 // Matrix-match and multiple-correct marking: deterministic, row by row, and
 // never crediting a malformed or near-miss response.
 // Run: node client/test/matrix-match-check.mjs
-import { markMatrixMatch, readMatrixGrid, checkMatrixMatch, matrixKey } from '../src/engine/matrixMatch.js';
+import { markMatrixMatch, matrixKey } from '../src/engine/matrixMatch.js';
 import { markMultiCorrect } from '../src/engine/indiaExams.js';
 import { checkAnswer } from '../src/engine/checker.js';
 import { markResponse } from '../../server/platform/markerOps.js';

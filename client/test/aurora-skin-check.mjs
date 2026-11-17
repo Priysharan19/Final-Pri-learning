@@ -148,7 +148,6 @@ ok(all.filter(r => /animation/.test(r.body)).every(r => /\.a-aurora i/.test(r.se
 
 // ── 5 · contrast ──────────────────────────────────────────────────────────────
 const hex = h => { const m = h.replace('#', ''); return [0, 2, 4].map(i => parseInt(m.slice(i, i + 2), 16)); };
-const rgba = s => { const m = s.match(/rgba?\(([^)]+)\)/); const [r, g, b, a = 1] = m[1].split(',').map(Number); return { c: [r, g, b], a }; };
 const over = (top, a, bottom) => top.map((v, i) => v * a + bottom[i] * (1 - a));
 const lum = c => { const [r, g, b] = c.map(v => v / 255).map(v => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4)); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
 const ratio = (a, b) => { const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x); return (hi + 0.05) / (lo + 0.05); };
