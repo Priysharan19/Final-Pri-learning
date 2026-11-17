@@ -689,7 +689,7 @@ export const writeFlow = {
       if (await check('the chapter just practised is on the map', await node.count() === 1)) {
         await node.focus();
         const shownMarks = await page.locator('[data-map-card="c7-integer-operations-current"] [data-map-marks]').getAttribute('data-map-marks');
-        await check('the map title states this month’s certified marks', (await page.locator('[data-map-subline]').textContent()).includes(`${reply.marksEarned} / ${reply.marksPossible} marks this month`), await page.locator('[data-map-subline]').textContent());
+        await check('the map title states this month’s certified marks', (await page.locator('[data-map-subline]').textContent()).includes(`${reply.marksEarned} of ${reply.marksPossible} marks this month`), await page.locator('[data-map-subline]').textContent());
         await check('its card shows the certified marks for that chapter', shownMarks === `${reply.marksEarned}/${reply.marksPossible}`, `${shownMarks} vs ${reply.marksEarned}/${reply.marksPossible}`);
       }
     }

@@ -34,7 +34,8 @@
 import { Fragment, createElement, useMemo, useSyncExternalStore } from 'react';
 import en from './strings.en.js';
 import { DEFAULT_LANGUAGE, LANGUAGES, cleanLanguage, htmlLangOf, pluralCategory } from './languages.js';
-import { brandVars } from '../brand/edition.js';
+import { brandVars, EDITION_ID } from '../brand/edition.js';
+import { AU_STRINGS } from './strings.au.js';
 
 export { LANGUAGES, DEFAULT_LANGUAGE, cleanLanguage, pluralCategory, speechTagsOf } from './languages.js';
 
@@ -139,7 +140,8 @@ function fill(template, vars, language) {
  * form covers 0 as well.
  */
 function select(strings, key, vars, language) {
-  let entry = strings[key];
+  // The Prithagoras edition's own wording (en-AU) replaces the shared English.
+  let entry = EDITION_ID === 'prithagoras' && language === 'en' && Object.hasOwn(AU_STRINGS, key) ? AU_STRINGS[key] : strings[key];
   if (entry === undefined) entry = en[key];
   if (entry === undefined) return key;
   if (typeof entry === 'string') return entry;
