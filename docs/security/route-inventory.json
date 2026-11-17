@@ -3432,6 +3432,153 @@
       "csrf": "not-applicable",
       "origin": "not-applicable",
       "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/visibility",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own session only: returns the fixed list of what a teacher can and cannot see (TEACHER_VISIBILITY); reads no record",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/mine",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: keyed by the session account id (student); the classes it is an active member of, its own hand-ins and the teacher marks on them; no teacher id",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/classroom/classes/:classId/assignments/:assignmentId/hand-in",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student: an active member of the class, a non-archived paper assignment of that class, and an exam result owned by the session account that matches the assignment template; otherwise 404/409",
+      "rateLimits": [
+        {
+          "key": "classroom-hand-in",
+          "limit": 30,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/classes/:classId/assignments/:assignmentId/results",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class (not archived) and the assignment; only active, consented members are listed; otherwise 404",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/classes/:classId/assignments/:assignmentId/results.csv",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class (not archived) and the assignment; only active, consented members; audited (assignment.results.export); otherwise 404",
+      "rateLimits": [
+        {
+          "key": "classroom-export",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/classes/:classId/review",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class (not archived); only items of active, consented members; otherwise 404",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/classes/:classId/review/:itemId/history",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class and the item, its student still an active, consented member; otherwise 404",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/classroom/classes/:classId/review/:itemId",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class and the item, its student still an active, consented member; marks capped by the item; append-only and audited; otherwise 404",
+      "rateLimits": [
+        {
+          "key": "classroom-teacher-mark",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
     }
   ]
 }

@@ -491,7 +491,10 @@ try {
     c.eq(exported.data.phones.length, ownPhones, 'export phones are exactly Alice\'s');
     const ownDesk = (await db.all('SELECT id FROM desk_attempts WHERE account_id=? ORDER BY created_at, id', [alice.id])).map(row => row.id);
     c.deq(exported.data.deskAttempts.map(row => row.id), ownDesk, 'export deskAttempts are exactly Alice\'s');
-    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'deskAttempts', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'parentReport', 'phones', 'receipts', 'telemetry'], 'the export has exactly the sections checked above');
+    const ownHandins = (await db.all('SELECT exam_id FROM assignment_handins WHERE student_account_id=? ORDER BY handed_in_at, assignment_id', [alice.id])).map(row => row.exam_id);
+    c.deq(exported.data.teacherWorkspace.handins.map(row => row.examId), ownHandins, 'export teacher-workspace hand-ins are exactly Alice\'s');
+    c.ok(exported.data.teacherWorkspace.teacherMarks.every(row => row.label === 'teacher' && !('teacherId' in row)), 'teacher marks are labelled teacher and carry no teacher id');
+    c.deq(Object.keys(exported.data).sort(), ['account', 'assignmentFeedback', 'assignmentSubmissions', 'classes', 'deskAttempts', 'entities', 'entitlement', 'exportedAt', 'format', 'guardianConsent', 'identities', 'issueReports', 'learningEvents', 'parentReport', 'phones', 'receipts', 'teacherWorkspace', 'telemetry'], 'the export has exactly the sections checked above');
     await db.run("DELETE FROM class_members WHERE class_id IN ('cls_export_bob','cls_export_alice')");
     await db.run("DELETE FROM classes WHERE id IN ('cls_export_bob','cls_export_alice')");
     c.eq((await h.request(`/v1/account/export?accountId=${bob.id}`, { jar: alice.jar })).data.account.id, alice.id, 'an accountId query parameter is ignored');
