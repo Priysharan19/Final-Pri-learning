@@ -100,10 +100,25 @@ let PYQ_ARCHIVE_MEASURED = null;
 // the Priyabhata capacity work. The gzip ceilings, the banned-from-install list,
 // render-from-install and offline coverage are unchanged and still pass.
 
+// Raised once for the whole Prithagoras capacity programme on 2026-11-18 (au-skills
+// bands #973/#975/#980 and the Advanced Year 11-12 / Extension 1-2 bands; CTO under
+// the same owner decision, "i dont care if the app is 10gb just make it properly end
+// to end", size not a constraint): FIRST_VISIT_RAW 3,900,000 -> 4,350,000 and
+// FIRST_VISIT_GZIP 1,290,000 -> 1,450,000 bytes. This is a projection for the merged
+// chain, not the size of this commit alone: a scratch tree combining every band
+// branch (either edition) measured 4,146 kB raw (4,245,000 bytes) and 1,373 kB
+// gzipped (1,406,000 bytes) install plus warm; this PR alone measures about 148 kB
+// raw / 43 kB gzipped above its parent (3,645 kB / 1,224 kB). Margins on the
+// projection are about 100 kB raw and 44 kB gzipped. The overlays (au-forms-*-nsw.js)
+// are dynamic imports loaded by course through au-forms.js, so a Year 7 session
+// imports none of the Extension 2 forms; the warm pass still precaches every chunk.
+// The install ceilings, the banned-from-install list, render-from-install and offline
+// coverage are unchanged and still pass.
+
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 3_900_000;
-const FIRST_VISIT_GZIP_CEILING = 1_290_000;
+const FIRST_VISIT_RAW_CEILING = 4_350_000;
+const FIRST_VISIT_GZIP_CEILING = 1_450_000;
 
 // Things that must never be in the install again, and what each one costs.
 const BANNED_FROM_INSTALL = [
