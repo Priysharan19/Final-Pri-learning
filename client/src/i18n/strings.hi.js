@@ -1362,7 +1362,6 @@ export default {
   // Workspace and handwriting
   'verdict.saveRetry': "फिर से सहेजें",
   'verdict.statusWriteHint': "हर चरण अलग पंक्ति में लिखें, फिर “मेरा उत्तर पढ़ें” दबाएँ",
-  'verdict.statusInkUnread': "यह लिखावट पढ़ी नहीं जा सकी — इसे साफ़ लिखें, फिर दोबारा पढ़वाएँ",
   'verdict.confirmAndSubmit': "पुष्टि करें और जाँचें",
   'verdict.confirmTitle': "देखें कि Pri ने क्या पढ़ा",
   'verdict.confirmEdit': "बदलें",
@@ -1371,7 +1370,6 @@ export default {
   'verdict.confirmWhich': "पंक्ति {n}: आपने कौन-सा लिखा?",
   'verdict.confirmThatsIt': "मैंने यही लिखा है",
   'verdict.confirmBlind': "Pri आपकी लिखावट को उत्तर देखे बिना पढ़ता है।",
-  'verdict.confirmReading': "पढ़े गए रूप की पुष्टि करें",
   'verdict.questionRegion': "प्रश्न",
   'verdict.workRegion': "आपका हल",
   'verdict.anotherMethod': "दूसरी विधि देखें",

@@ -1285,7 +1285,6 @@ export default {
   // Workspace and handwriting
   'verdict.saveRetry': "Save again",
   'verdict.statusWriteHint': "Write each step on its own line, then press Read my answer",
-  'verdict.statusInkUnread': "That writing couldn’t be read — rewrite it more clearly, then read it again",
   'verdict.confirmAndSubmit': "Confirm and mark",
   'verdict.confirmTitle': "Check what Pri read",
   'verdict.confirmEdit': "Edit",
@@ -1294,7 +1293,6 @@ export default {
   'verdict.confirmWhich': "Line {n}: which did you write?",
   'verdict.confirmThatsIt': "That’s what I wrote",
   'verdict.confirmBlind': "Pri reads your handwriting without seeing the answer.",
-  'verdict.confirmReading': "Confirm reading",
   'verdict.questionRegion': "Question",
   'verdict.workRegion': "Your working",
   'verdict.anotherMethod': "See another method",
