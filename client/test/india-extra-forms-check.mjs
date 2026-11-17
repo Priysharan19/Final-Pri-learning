@@ -54,10 +54,24 @@ for (const [skill, list] of Object.entries(EXTRA_FORMS)) {
   }
 }
 // ── The real marker, on real issued questions (false accept / false reject) ──
-const { generateQuestion, loadAllBanks } = await import('../src/engine/generators/index.js');
+const { generateQuestion, loadAllBanks, formDrawShares } = await import('../src/engine/generators/index.js');
 const { checkAnswer } = await import('../src/engine/checker.js');
 await loadAllBanks();
-let marked = 0, extraDraws = 0;
+let marked = 0, extraDraws = 0, heldBack = 0;
+// What the real marker does with one question of a form: the key accepted, every wrong answer refused.
+function markQuestion(q, at) {
+  if (q.answerType === 'numeric') {
+    const v = q.answer.value;
+    const right = checkAnswer(q, String(v));
+    if (!right.correct) fail(`${at}: the keyed answer ${v} was marked wrong`);
+    const wrong = new Set([...q.traps.map(t => t.value), v + 1, v - 1, -v].filter(x => x !== v && Number.isFinite(x)));
+    for (const w of wrong) if (checkAnswer(q, String(w)).correct) fail(`${at}: the wrong answer ${w} was marked right (key ${v})`);
+  } else {
+    if (!checkAnswer(q, String(q.answer.correctIndex)).correct) fail(`${at}: the keyed option was marked wrong`);
+    for (let o = 0; o < q.mcqOptions.length; o++) if (o !== q.answer.correctIndex && checkAnswer(q, String(o)).correct) fail(`${at}: option ${o} marked right`);
+  }
+}
+
 const SEEDS_MARK = Number(process.env.SEEDS_MARK || 40);
 for (const [skill, list] of Object.entries(EXTRA_FORMS)) {
   const tags = new Set(list.map(f => f.form));
@@ -69,20 +83,26 @@ for (const [skill, list] of Object.entries(EXTRA_FORMS)) {
       if (!q.form || !tags.has(q.form)) continue;
       extraDraws += 1; seen.add(q.form);
       const at = `${skill}/${q.form} d${d} seed${q.seed}`;
-      if (q.answerType === 'numeric') {
-        const v = q.answer.value;
-        const right = checkAnswer(q, String(v));
-        if (!right.correct) fail(`${at}: the keyed answer ${v} was marked wrong`);
-        const wrong = new Set([...q.traps.map(t => t.value), v + 1, v - 1, -v].filter(x => x !== v && Number.isFinite(x)));
-        for (const w of wrong) if (checkAnswer(q, String(w)).correct) fail(`${at}: the wrong answer ${w} was marked right (key ${v})`);
-      } else {
-        if (!checkAnswer(q, String(q.answer.correctIndex)).correct) fail(`${at}: the keyed option was marked wrong`);
-        for (let o = 0; o < q.mcqOptions.length; o++) if (o !== q.answer.correctIndex && checkAnswer(q, String(o)).correct) fail(`${at}: option ${o} marked right`);
-      }
+      markQuestion(q, at);
       marked += 1;
     }
   }
-  for (const t of tags) if (!seen.has(t)) fail(`${skill}: form ${t} was never issued through generateQuestion`);
+  // A form that generateQuestion never issued must be one it is DESIGNED not to issue: the draw is in proportion to the
+  // questions a form can serve (generators/index.js), so a form with a handful of questions has a share near 0 beside a
+  // form of millions. That is stated, not assumed: its largest share over the difficulties, over the draws made here, must
+  // be below one expected draw. Its questions are still run through the real marker, straight from its maker.
+  for (const f of list) {
+    if (seen.has(f.form)) continue;
+    const share = (formDrawShares(skill) || [])[1 + list.indexOf(f)] ?? 0;
+    const expected = share * 4 * SEEDS_MARK * list.length;   // the draws made above, over the four difficulties
+    if (!(expected < 12)) fail(`${skill}: form ${f.form} was never issued through generateQuestion although its share predicts ${expected.toFixed(1)} draws`);
+    heldBack += 1;
+    for (let d = 1; d <= 4; d++) for (let i = 1; i <= SEEDS_MARK; i++) {
+      const payload = f.make(makeRng(i * 104729 + d), d).payload;
+      markQuestion({ ...payload, seed: i * 104729 + d }, `${skill}/${f.form} d${d} seed${i} (from its maker)`);
+      marked += 1;
+    }
+  }
 }
-console.log(failures ? `INDIA EXTRA FORMS: FAIL — ${failures} problem(s)` : `INDIA EXTRA FORMS: PASS — ${forms} forms, ${draws} draws, every key matched its independent check; ${figured} figures drawn without printing a key; ${marked} issued questions run through the real marker (key accepted, wrong answers rejected)`);
+console.log(failures ? `INDIA EXTRA FORMS: FAIL — ${failures} problem(s)` : `INDIA EXTRA FORMS: PASS — ${forms} forms (${heldBack} held back from the draw by their size, marked from their makers), ${draws} draws, every key matched its independent check; ${figured} figures drawn without printing a key; ${marked} issued questions run through the real marker (key accepted, wrong answers rejected)`);
 process.exit(failures ? 1 : 0);

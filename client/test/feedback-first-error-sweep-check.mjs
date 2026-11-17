@@ -291,9 +291,7 @@ ok(coverage.controlsClean === coverage.controls, `correct working was left alone
 // is clean, a changed line is a break at that line, a restated prompt is never verified work.
 {
   const { sweepStepMarkingOfOtherForms } = await import('./support/extra-form-step-sweep.mjs');
-  const { directFormsOnly } = await import(`${SRC}engine/generators/index.js`);
   const other = sweepStepMarkingOfOtherForms({ cells: Object.keys(GENERATORS).map(id => ({ id })), seeds: Array.from({ length: Math.max(6, SEEDS) }, (_, i) => 1009 + i * 7919) });
-  directFormsOnly(false);
   checks += other.checks - other.failures.length;
   for (const text of other.failures) fail(`other forms: ${text}`);
   ok(other.stepMarked > 100, `the step marker was run over ${other.stepMarked} questions of other forms (${JSON.stringify(other.byKind)})`);

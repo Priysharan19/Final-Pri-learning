@@ -370,7 +370,6 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
 {
   const { sweepStepMarkingOfOtherForms } = await import('./support/extra-form-step-sweep.mjs');
   const other = sweepStepMarkingOfOtherForms({ cells: Object.keys(GENERATORS).map(id => ({ id })), seeds: [1009, 8928, 16847, 24766, 32685, 40604] });
-  (await import(`${SRC}engine/generators/index.js`)).directFormsOnly(false);
   groups['other-forms-step-marking'] = { pass: other.checks - other.failures.length, total: other.checks };
   for (const text of other.failures) failures.push(`other-forms-step-marking · ${text}`);
   if (other.stepMarked <= 100) failures.push(`other-forms-step-marking: only ${other.stepMarked} step-marked questions of other forms were reached (${JSON.stringify(other.byKind)})`);

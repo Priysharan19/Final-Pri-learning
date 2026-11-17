@@ -24,7 +24,10 @@
 const SRC = new URL('../src/', import.meta.url).href;
 const { checkAnswer } = await import(`${SRC}engine/checker.js`);
 const { exactRadical, sameRadical, compareRadical, rationalAsRadical, exactValue } = await import(`${SRC}engine/exact.js`);
-const { generateQuestion, loadAllBanks, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
+const { generateQuestion: generateAny, loadAllBanks, GENERATORS, directFormsOnly } = await import(`${SRC}engine/generators/index.js`);
+// Named by (skill, difficulty, seed): the skill's direct form. The sweep over every generator below draws every form.
+const pinned = (...args) => { const was = directFormsOnly(true); try { return generateAny(...args); } finally { directFormsOnly(was); } };
+const generateQuestion = (...args) => (args[3] === 'all' ? generateAny(...args.slice(0, 3)) : pinned(...args));
 await loadAllBanks();
 
 const groups = {};
@@ -41,7 +44,7 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
 // ── 2 · set, point and surd values are held to the numeric box ──────────────
 {
   const G = 'components';
-  const roots = generateQuestion('y10-quadratics', 1, 1104);    // Solve (x + 8)(x − 2) = 0
+  const roots = generateQuestion('y10-quadratics', 1, 1);       // Solve (x − 2)(x + 8) = 0
   for (const input of ['2, -8', 'x = 2, x = -8', '{-8, 2}']) check(G, verdict(roots, input).correct === true, `roots: "${input}" is credited`);
   for (const input of ['200%, -800%', '2 kg, -8 kg', '2 cm, -8 cm', '₹2, -8', '$2, -8']) {
     const r = verdict(roots, input);
@@ -61,7 +64,7 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
   // Every set and point question: the key with a % or a unit on each value is never credited.
   let seen = 0;
   for (const id of Object.keys(GENERATORS)) for (const d of [1, 2, 3, 4]) for (let s = 1; s <= 3; s++) {
-    let q; try { q = generateQuestion(id, d, s * 53 + d); } catch { continue; }
+    let q; try { q = generateQuestion(id, d, s * 53 + d, 'all'); } catch { continue; }
     if (q?.answerType === 'set' && Array.isArray(q.answer?.values) && q.answer.values.every(Number.isFinite)) {
       seen++;
       for (const tail of ['%', ' kg']) check(G, verdict(q, q.answer.values.map(v => fmt(v) + tail).join(', ')).correct !== true, `${id} d${d}: the set key with "${tail.trim()}" on each value is not credited`);

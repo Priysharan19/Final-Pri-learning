@@ -48,6 +48,7 @@ const bump = expr => `2*(${expr})`;
  */
 export function sweepStepMarkingOfOtherForms({ cells, seeds }) {
   const failures = [];
+  const mode = generators.directFormsOnly(true);   // put back on return: a suite that imports another keeps its own mode
   let checks = 0, questions = 0, stepMarked = 0;
   const byKind = {};
   const ok = (cond, label) => { checks++; if (!cond && failures.length < 60) failures.push(label); };
@@ -99,5 +100,6 @@ export function sweepStepMarkingOfOtherForms({ cells, seeds }) {
       }
     }
   }
+  generators.directFormsOnly(mode);
   return { checks, failures, questions, stepMarked, byKind };
 }
