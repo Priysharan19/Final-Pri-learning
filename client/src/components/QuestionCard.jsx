@@ -35,6 +35,7 @@ import { renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { canRetryPhotoReading, readerRefusalAtSubmit, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
+import { buildInkOriginal } from '../ink/originalWork.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
 import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusalForQuestion, refusedCheckState, retryActionFor, serverRevealReceipt, unmarkableNotice } from './checkAccess.js';
 import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
@@ -1413,6 +1414,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
+  const originalBuildRef = useRef(false);
   async function submit(vouchedNow) {
     setRereadAsked(false);
     if (inFlightRef.current || busy || resolved) return;
@@ -1458,6 +1460,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       given = answer;
       if (String(given).trim() === '') return;
       steps = (workingOpen || mode === 'photo') && working.trim() ? working : undefined;
+    }
+    // The student's own page goes with the answer, to be kept with the mark
+    // (standard #08): the pen samples as written, never the reading. Built
+    // from the full strokes, before they are compacted for the device's
+    // history, and before the pending record is written (nothing awaits
+    // between that write and the send). A page too large to keep stays on this device.
+    // Hashing takes a moment: a second press meanwhile is the same press.
+    if (ink && inkResult) {
+      if (originalBuildRef.current) return;
+      originalBuildRef.current = true;
+      try { ink.original = await buildInkOriginal(inkResult).catch(() => null); } finally { originalBuildRef.current = false; }
     }
     // D17: a photo the student did not allow to be read (declined, or never
     // asked) never leaves the device with the answer — "Type instead" sends

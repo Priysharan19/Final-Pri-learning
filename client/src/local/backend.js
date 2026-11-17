@@ -82,6 +82,8 @@ import { pendingSummary } from './examPages.js';
 import { settleIfLeaving } from './pageLeaving.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
+import { buildImageOriginal, buildInkOriginal, originalWireChars } from '../ink/originalWork.js';
+import { isPdf } from '../ink/pdfPage.js';
 
 // True in a production build made with the tutor off. tutorFeatureEnabled() is
 // then false on every device, so the ask route below is dead code; written as
@@ -6544,7 +6546,7 @@ function readerRefusal(cause) {
   return refusal;
 }
 
-async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow = false } = {}) {
+async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow = false, keepOriginal = true } = {}) {
   if (!row.serverQuestionId || !submissionId) {
     throw notMarked(Object.assign(new Error('An online-issued question and stable submission are required to mark.'), {
       status: 503, code: 'ONLINE_GRADE_REQUIRED'
@@ -6577,6 +6579,10 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
   // a picture too large to share a request body, and a kept read that has
   // expired while the draft still holds its signed read receipt.
   let picture = null;
+  // The student's original page, kept by the server with the mark (standard
+  // #08, server/platform/originalWork.js): the pen samples the card built
+  // before compacting the strokes, or — for a photo — the picture itself.
+  let original = null;
   // Reading the handwriting or photo comes before marking and is not marking:
   // a failure anywhere in it means the answer was not sent to be marked. (It
   // runs only while no marking request under this key has been sent: after
@@ -6597,9 +6603,23 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
     // The picture never travels with the marking request.
     const attested = mode === 'ink' ? body.ink?.attested : body.photoAttested;
     const workingChars = Array.isArray(body.steps) ? body.steps.join('\n').length : String(body.steps || '').length;
-    if (receiptFlow !== true && image.length + String(body.answer).length + workingChars + 2048 <= SINGLE_REQUEST_BODY_CHARS) {
+    if (mode === 'ink' && keepOriginal) {
+      const carried = body.ink?.original;
+      original = carried && typeof carried === 'object' && carried.kind === 'strokes' ? carried
+        // A page restored from this device's draft has only its drawn points
+        // (rounded, no timing): kept all the same, and marked as such inside
+        // the format (CONDITIONED), never presented as raw pen samples.
+        : await buildInkOriginal({ strokes: (body.ink?.strokes || []).map(s => ({ points: (s?.points || []).map(p => (Array.isArray(p) ? { x: p[0], y: p[1] } : p)) })) }).catch(() => null);
+    }
+    const originalChars = mode === 'ink' ? originalWireChars(original) : 0;
+    if (receiptFlow !== true && image.length + originalChars + String(body.answer).length + workingChars + 2048 <= SINGLE_REQUEST_BODY_CHARS) {
       picture = image;
+      // A photo's original is the picture this request already carries.
+      if (mode === 'photo' && keepOriginal) original = await buildImageOriginal(image, { origin: isPdf(body.photo) ? 'pdf-page' : 'photo', samePicture: true }).catch(() => null);
     } else {
+    // Without the picture in the body, a photo's original would not fit
+    // beside it: it stays on this device (the reply says it was not kept).
+    if (mode === 'photo') original = null;
     const read = await cloud.recognizePractice(row.serverQuestionId, mode, image, attested && typeof attested === 'object' ? attested : null).catch(cause => {
       throw readerRefusal(cause);
     });
@@ -6628,7 +6648,8 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
         // itself; this covers the offline fallback). One-way: it can only
         // make the attempt count as supported.
         // (the live step coach also records its reads on row.assistance)
-        ...(Number(row.tutorLevel) > 0 || row.assistance?.stepCoach?.reads > 0 ? { deviceHelp: true } : {})
+        ...(Number(row.tutorLevel) > 0 || row.assistance?.stepCoach?.reads > 0 ? { deviceHelp: true } : {}),
+        ...(original ? { original } : {})
       };
   // `at` lets a sync pull tell a grade in flight from one abandoned after the
   // server committed it (cloudSyncRestore: issued-here events).
@@ -6639,6 +6660,19 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
   await put('questions', row);
   let acknowledged;
   try { acknowledged = await cloud.gradePractice(row.serverQuestionId, payload); } catch (cause) {
+    // The server refused the ORIGINAL (it checks it before reading or marking
+    // anything): the answer is still the student's to have marked. This same
+    // press goes again under the same key without it; the page stays on this
+    // device and the reply says the server did not keep it.
+    // A server that does not take an original yet refuses the request by its
+    // shape (PRACTICE_SUBMISSION_INVALID) before reading or marking anything:
+    // the same press goes without it too.
+    if (payload.original && !sentBefore && Number(cause?.status) >= 400 && Number(cause?.status) < 500 && keepOriginal
+      && (/^ORIGINAL_/.test(String(cause?.code || '')) || cause?.code === 'PRACTICE_SUBMISSION_INVALID')) {
+      row.pendingGrade = null;
+      await put('questions', row).catch(() => {});
+      return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow, keepOriginal: false });
+    }
     if (typeof payload.image === 'string' && !sentBefore && Number(cause?.status) >= 400) {
       // A server that does not take a picture here yet refuses the request by
       // its shape, before reading or marking anything: use the receipt
@@ -6646,7 +6680,7 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
       if (cause.status === 400 && cause.code === 'PRACTICE_SUBMISSION_INVALID' && receiptFlow !== true) {
         row.pendingGrade = null;
         await put('questions', row).catch(() => {});
-        return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true });
+        return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true, keepOriginal });
       }
       // The server no longer keeps the read the student asked for, but the
       // draft holds its signed read receipt: prove the read with it (no new
@@ -6656,7 +6690,7 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
       if (cause.status === 409 && cause.code === 'RECOGNITION_READ_EXPIRED' && receiptFlow !== true && attestedRead && typeof attestedRead === 'object') {
         row.pendingGrade = null;
         await put('questions', row).catch(() => {});
-        return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true });
+        return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true, keepOriginal });
       }
       // The reading failed or was refused (a limit, an allowance, a reader
       // that did not answer, nothing legible). The server answers these

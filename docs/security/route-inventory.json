@@ -2848,7 +2848,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "student owns a sealed server-issued question; final answer or authenticated ink/photo receipt is marked server-side; stable idempotency key commits numerical marks and exactly-once progress; no client award authority. The graded attempt's support (independent / after-feedback / supported / revealed, support v2) is derived from the server's own records of the question; the closed body accepts no support claim, only deviceHelp: true (help shown offline), which can only lower it.",
+      "ownership": "student owns a sealed server-issued question; final answer or authenticated ink/photo receipt is marked server-side; stable idempotency key commits numerical marks and exactly-once progress; no client award authority. The graded attempt's support (independent / after-feedback / supported / revealed, support v2) is derived from the server's own records of the question; the closed body accepts no support claim, only deviceHelp: true (help shown offline), which can only lower it. A handwritten or photographed submission may carry its ORIGINAL (strokes pri-ink-v1 or the photographed page), checked against its SHA-256 before anything is read or marked, kept insert-once in the same transaction as the mark (attempt_originals, per-account quota), and named by digest in the reply and the graded-attempt event; never sent to any reader",
       "rateLimits": [
         {
           "key": "practice-grade",
@@ -3693,6 +3693,75 @@
         {
           "key": "resources-file",
           "limit": 300,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/originals/",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Original work (standard #08, originalWork.js): the strokes or photographed page a marked answer was read from, written ONLY by POST /v1/practice/:id/submit in the mark's own transaction and never here. Read-only; Cache-Control no-store; every read is keyed on (id, account_id, this server's edition) and the stored bytes are re-checked against their SHA-256 before they are served (500 ORIGINAL_CORRUPT otherwise). Unknown, malformed, another account's and another edition's ids are the same 404 ORIGINAL_NOT_FOUND. The student's own: ?attemptId= or ?questionId=&submissionId=, read inside a transaction declared for the account (RLS pri_account_scope on attempt_originals); any other query is 400.",
+      "rateLimits": [
+        {
+          "key": "original-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/originals/:id",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Original work (standard #08, originalWork.js): the strokes or photographed page a marked answer was read from, written ONLY by POST /v1/practice/:id/submit in the mark's own transaction and never here. Read-only; Cache-Control no-store; every read is keyed on (id, account_id, this server's edition) and the stored bytes are re-checked against their SHA-256 before they are served (500 ORIGINAL_CORRUPT otherwise). Unknown, malformed, another account's and another edition's ids are the same 404 ORIGINAL_NOT_FOUND. The student's own, read inside a transaction declared for the account (RLS pri_account_scope on attempt_originals).",
+      "rateLimits": [
+        {
+          "key": "original-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/originals/class/:classId/student/:studentId/:id",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Original work (standard #08, originalWork.js): the strokes or photographed page a marked answer was read from, written ONLY by POST /v1/practice/:id/submit in the mark's own transaction and never here. Read-only; Cache-Control no-store; every read is keyed on (id, account_id, this server's edition) and the stored bytes are re-checked against their SHA-256 before they are served (500 ORIGINAL_CORRUPT otherwise). Unknown, malformed, another account's and another edition's ids are the same 404 ORIGINAL_NOT_FOUND. Their teacher: server authorization first — the caller teaches an active (unarchived) class the student is an active member of, and the student's guardian consent is not blocked — and only then is the student's row read — and only one kept at or after the student joined that class (created_at >= joined_at: joining opens nothing done before) — at system scope (RLS confines account scope to the caller's own rows; the authorization is the boundary, as for every system-scope handler). A class the caller does not teach, a removed member and a blocked consent are the same 404.",
+      "rateLimits": [
+        {
+          "key": "original-read",
+          "limit": 600,
           "windowMs": 3600000,
           "identity": "account"
         }

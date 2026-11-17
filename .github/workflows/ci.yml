@@ -382,6 +382,11 @@ jobs:
           node server/test/classroom-check.mjs 2>&1 | tee classroom.log
           node server/test/class-board-check.mjs 2>&1 | tee -a classroom.log
           node tools/ci-check-counts.mjs verify platform/classroom.log
+          # The student's original work (standard #08): the strokes or photo kept
+          # with the mark by SHA-256, insert-once, answer-blind, isolated, exported,
+          # deleted with the account and expired after the edition's retention.
+          node server/test/original-work-check.mjs 2>&1 | tee original-work.log
+          node tools/ci-check-counts.mjs verify platform/original-work.log
           # The anonymous public resource catalogue (plan F6a): off by default,
           # published rows of this server's edition only, no cookie, CORS only
           # for a listed origin, rate-limited; the signed-in library stays signed in.

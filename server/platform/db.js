@@ -710,6 +710,35 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   // a new row that supersedes the last; the account's erasure still cascades.
   db.exec(`CREATE TRIGGER IF NOT EXISTS teacher_marks_no_update BEFORE UPDATE ON teacher_marks
     BEGIN SELECT RAISE(ABORT, 'teacher_marks is append-only'); END;`);
+  // Schema v19 — the student's original work (originalWork.js, standard #08):
+  // the strokes or photographed page a marked answer was read from, kept with
+  // the mark and bound to it by SHA-256. Insert-once (no column is ever
+  // updated); account-owned; cascades with the account; expires_at is the
+  // edition's retention. The reading layer (what was read, what the student
+  // confirmed, their edits) is reading_json, beside the original — never it.
+  db.exec(`CREATE TABLE IF NOT EXISTS attempt_originals (
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    edition TEXT NOT NULL CHECK(edition IN ('priyabhata','prithagoras')),
+    question_id TEXT NOT NULL,
+    submission_id TEXT NOT NULL,
+    attempt_id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('strokes','image')),
+    origin TEXT NOT NULL CHECK(origin IN ('ink','photo','pdf-page')),
+    format TEXT NOT NULL CHECK(format IN ('pri-ink-v1','image/png','image/jpeg','image/webp')),
+    encoding TEXT NOT NULL CHECK(encoding IN ('gzip','identity')),
+    sha256 TEXT NOT NULL CHECK(length(sha256) = 64),
+    byte_length INTEGER NOT NULL CHECK(byte_length >= 1 AND byte_length <= 1048576),
+    canonical_bytes INTEGER NOT NULL CHECK(canonical_bytes >= 1 AND canonical_bytes <= 1048576),
+    content BLOB NOT NULL,
+    lines_json TEXT NOT NULL,
+    reading_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL,
+    UNIQUE(account_id, question_id, submission_id)
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_attempt_originals_attempt ON attempt_originals(account_id, attempt_id);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_attempt_originals_expiry ON attempt_originals(expires_at);`);
 
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;

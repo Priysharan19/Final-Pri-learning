@@ -166,6 +166,8 @@ export const ENGINE_SUITES = [
   'classroom-check.mjs',
   // The class board: counts per outcome and state over visible students, re-teach, drill-down.
   'class-board-check.mjs',
+  // The student's original work (standard #08): kept with the mark under RLS, schema 19.
+  'original-work-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',

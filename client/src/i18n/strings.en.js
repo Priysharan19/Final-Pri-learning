@@ -623,6 +623,21 @@ export default {
 
   // ── Handwriting workspace (ink/InkAnswer, InkCanvas, NativeInkCanvas) ──────
   'ink.writingSpace': 'Writing space',
+  'ow.label': 'Your handwriting',
+  'ow.opening': 'Opening your handwriting…',
+  'ow.unavailable': 'Your handwriting for this answer is not kept on the server. It may still be on the device you wrote it on.',
+  'ow.digestMismatch': 'This page does not match the handwriting the mark was given on, so it is not shown.',
+  'ow.replay': 'Replay writing',
+  'ow.showCrossedOut': 'Show crossed-out work',
+  'ow.hideCrossedOut': 'Hide crossed-out work',
+  'ow.whatPriRead': 'What Pri read:',
+  'ow.youConfirmed': 'You confirmed:',
+  'ow.keptWithMark': 'Kept with the mark · {digest}',
+  'ow.status.checked': 'Checked',
+  'ow.status.firstError': 'First mistake',
+  'ow.status.follows': 'Follows from the mistake',
+  'ow.status.notVerified': 'Not verified',
+  'ow.status.unread': 'Not read',
 
   'verdict.removeAttachment': 'Remove attachment',
   'verdict.decodedOnDevice': 'Decoded on-device',

@@ -22,6 +22,7 @@ import { isCommonPassword } from './commonPasswords.js';
 import { PHONE_ACCOUNT_EMAIL_DOMAIN, verifyReauthCode } from './otp.js';
 import { maskPhone } from './otpCore.js';
 import { ERASURE_REASONS, scheduleErasure } from './childErasure.js';
+import { originalView } from './originalWork.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -892,6 +893,12 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       FROM teacher_review_items WHERE student_account_id=? ORDER BY created_at, id`, [accountId]);
     const teacherMarkRows = await db.all(`SELECT id,review_item_id,assignment_id,criterion,decision,marks,comment,engine_awarded,ink_digest,supersedes,created_at
       FROM teacher_marks WHERE student_account_id=? ORDER BY created_at, id`, [accountId]);
+    // The student's original work behind each mark (originalWork.js, #08): the
+    // strokes or photographed page itself, its digest, each line's strokes and
+    // the reading layer (what was read, what they confirmed, their edits).
+    const originalRows = await db.all('SELECT * FROM attempt_originals WHERE account_id=? ORDER BY created_at, id', [accountId]);
+    // The bytes as stored (gzip for strokes, `encoding` says so): not inflated here.
+    const originals = originalRows.map(row => originalView(row, { stored: true }));
     // A receipt with no personal data: the format and how many rows each
     // section carried, so a bulk read of an account is visible in the audit
     // trail without copying any of it.
@@ -900,7 +907,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       counts: {
         identities: identities.length, learningEvents: events.length, entities: entities.length, classes: classes.length,
         assignmentSubmissions: submissions.length, assignmentFeedback: feedback.length, telemetry: telemetry.length, issueReports: reports.length,
-        receipts: receipts.length, phones: phones.length
+        receipts: receipts.length, phones: phones.length, originals: originals.length
       }
     }, Date.now());
     res.set('Cache-Control', 'no-store');
@@ -965,7 +972,11 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
             criterion: row.criterion, decision: row.decision, marks: Number(row.marks), comment: row.comment || null,
             engineAwardedAtDecision: Number(row.engine_awarded), inkDigest: row.ink_digest || null, supersedes: row.supersedes || null, decidedAt: Number(row.created_at) }))
         };
-      })()
+      })(),
+      // Strokes are pri-ink-v1 bytes (client/src/engine/originalInk.js
+      // documents the format), gzip when `encoding` says so; an image's bytes
+      // are its own; both base64, with the SHA-256 of the canonical bytes.
+      originals
     });
   });
 
