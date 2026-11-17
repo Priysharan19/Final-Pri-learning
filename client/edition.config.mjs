@@ -165,6 +165,12 @@ export const EDITIONS = Object.freeze({
     // listPrice null: the price shown is the store's or the server's own
     // display configuration (PRI_DISPLAY_*), never a constant here.
     commerce: Object.freeze({ listPrice: null, differentiators: Object.freeze(['engineSteps', 'youConfirm', 'syllabus', 'examPapers']) }),
+    // Parent-facing features (the parent weekly report, its email links and the
+    // "I'm a parent or guardian" sign-in path). Priyabhata only: owner decision
+    // 2026-11-18, Prithagoras has no parent account. Legally required guardian
+    // consent is a separate rule (server/platform/guardianConsent.js) and is not
+    // turned off by this switch.
+    family: Object.freeze({ parentFeatures: true }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,
@@ -214,6 +220,10 @@ export const EDITIONS = Object.freeze({
     // policy and terms state them (docs/legal/au/*.md; packaging-check holds
     // the three equal). Changing a price is an owner action in Stripe first.
     commerce: Object.freeze({ listPrice: Object.freeze({ monthly: 9.99, annual: 99 }), differentiators: Object.freeze(['engineSteps', 'youConfirm', 'syllabus', 'examPapers']) }),
+    // No parent account, parent report or parent invite in Prithagoras (owner
+    // decision 2026-11-18). Guardian CONSENT for a young student is a legal rule,
+    // kept by the existing consent machinery; see Priyabhata above.
+    family: Object.freeze({ parentFeatures: false }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,

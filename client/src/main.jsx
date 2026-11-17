@@ -22,6 +22,7 @@ import './instrument/aurora.css';
 import AccountAction from './pages/AccountAction.jsx';
 import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
 import { parseParentEmailFragment } from './parent/parentReportApi.js';
+import { parentFeaturesOffered } from './platform/edition.js';
 import { checkServerEdition, discoverCloudOrigin, editionMismatch, onEditionMismatch } from './platform/cloudTransport.js';
 import EditionMismatch from './components/EditionMismatch.jsx';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
@@ -79,7 +80,7 @@ if (ACCOUNT_ACTION_MODE) {
 // The parent's own page for the weekly report email (confirm / stop): no
 // profile, no session; the token is in the fragment and stripped the same way.
 // Off in a production build until counsel has reviewed email about minors (D22).
-const PARENT_EMAIL_MODE = featureEnabled('parentReport') && window.location.pathname === '/parent/report-email';
+const PARENT_EMAIL_MODE = featureEnabled('parentReport') && parentFeaturesOffered() && window.location.pathname === '/parent/report-email';
 let parentEmailData = null;
 if (PARENT_EMAIL_MODE) {
   parentEmailData = parseParentEmailFragment(window.location.hash);

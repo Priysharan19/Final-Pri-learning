@@ -18,6 +18,7 @@ import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark, EditionByline } from './components/BrandMark.jsx';
 import { BRAND } from './brand/edition.js';
+import { parentFeaturesOffered } from './platform/edition.js';
 import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
@@ -91,7 +92,7 @@ const Insights = React.lazy(() => import('./insights/Insights.jsx'));
 const PLACEMENT_ON = featureEnabled('placement');
 // The parent weekly report's screen: off in a production build until counsel
 // has reviewed email about minors (D22, PRI_FEATURE_PARENT_REPORT).
-const PARENT_REPORT_ON = featureEnabled('parentReport');
+const PARENT_REPORT_ON = featureEnabled('parentReport') && parentFeaturesOffered();
 // The resource library's page: off in a production build (PRI_FEATURE_LIBRARY).
 const LIBRARY_ON = featureEnabled('library');
 // The Exam Desk is reached from a library paper, so it needs both flags.

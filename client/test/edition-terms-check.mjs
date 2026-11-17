@@ -118,6 +118,16 @@ check('the sign-in scenes: Prithagoras lists only scenes that are live there (no
   assert.match(src, /prithagoras'\) return \['hand', \.\.\.\(flags\.desk \? \['desk'\] : \[\]\), 'daily'\]/);
   assert.match(src, /return \['hand', 'papers', 'notes', 'daily'\]/);
 });
+check('parent features are Priyabhata only: the edition record, the sign-in link, the report nav and route, the report email page', async () => {
+  const cfg = await import('../edition.config.mjs');
+  assert.equal(cfg.EDITIONS.priyabhata.family.parentFeatures, true);
+  assert.equal(cfg.EDITIONS.prithagoras.family.parentFeatures, false);
+  const read = f => readFileSync(fileURLToPath(new URL(`../src/${f}`, here)), 'utf8');
+  assert.match(read('components/SignUpFlow.jsx'), /\{!inline && parentFeaturesOffered\(\) && \(\s*<div className="signup-alt signup-alt-quiet">/);
+  assert.match(read('App.jsx'), /PARENT_REPORT_ON = featureEnabled\('parentReport'\) && parentFeaturesOffered\(\)/);
+  assert.match(read('main.jsx'), /PARENT_EMAIL_MODE = featureEnabled\('parentReport'\) && parentFeaturesOffered\(\)/);
+  assert.match(read('platform/edition-record.js'), /family: Object\.freeze\(\{ parentFeatures: e\.family\.parentFeatures === true \}\)/);
+});
 check('every allowlist entry still matches a key (a dead entry is removed)', () => {
   for (const [re] of ALLOW) assert.ok(Object.keys(en).some(k => re.test(k)), `${re} matches no key`);
 });

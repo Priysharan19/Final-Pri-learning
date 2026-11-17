@@ -45,6 +45,7 @@ import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 import { priNative } from '../platform/native/index.js';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
 import { readOnboardingAuthority } from './onboardingAuthority.js';
+import { parentFeaturesOffered } from '../platform/edition.js';
 
 export { isNetworkFailure, signInErrorCopy };
 import './SignUpFlow.css';
@@ -557,7 +558,7 @@ export default function SignUpFlow({
             })}
           </p>
         )}
-        {!inline && (
+        {!inline && parentFeaturesOffered() && (
           <div className="signup-alt signup-alt-quiet">
             <button type="button" className="linklike" data-testid="signup-parent-link" onClick={() => go('parent-home')}>{t('signup.parentLink')}</button>
           </div>

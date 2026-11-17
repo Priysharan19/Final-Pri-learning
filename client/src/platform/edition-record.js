@@ -40,6 +40,7 @@ export function editionRecord(id) {
     currency: e.currency,
     // The pricing page's facts: list price and live differentiators (packaging proposal).
     commerce: editionCommerce(id),
+    family: Object.freeze({ parentFeatures: e.family.parentFeatures === true }),
     identity: Object.freeze({
       brandHi: e.identity.brandHi,
       cut: e.identity.cut,
