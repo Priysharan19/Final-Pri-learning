@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Year 10 generators
 // ─────────────────────────────────────────────────────────────────────────────
+import { year10Nsw } from './year10-nsw.js';
 import { ri, rc, rs, nz, distinct, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, rad, surdSimp, surdLatex, surdStr, NAMES } from '../qhelpers.js';
 import { figRightTriangle, figBearing, figParabola } from '../figures.js';
 
@@ -81,6 +82,7 @@ function figScatter({ pts, xMax, yMax, xLabel, yLabel, line }) {
 }
 
 export const year10 = {
+  ...year10Nsw,
 
   // ── Quadratic equations ──────────────────────────────────────────────────
   'y10-quadratics': (rng, diff) => {
