@@ -657,7 +657,9 @@ export function featureDefines(command, env = process.env) {
     __PRI_EDITION__: JSON.stringify(states.edition),
     // Plan E5: false in a build of an edition with no payment provider, so its
     // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).
-    __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0)
+    __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0),
+    // True where the edition lists the App Store or Google Play (Prithagoras sells on the web through Stripe only).
+    __PRI_STORE_BILLING__: JSON.stringify(editionOf(states.edition).billing.providers.some(p => p === 'apple' || p === 'google'))
   };
 }
 
