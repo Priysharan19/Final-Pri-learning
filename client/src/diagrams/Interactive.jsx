@@ -61,9 +61,16 @@ export function TransformSliders({ base = 'quadratic', title = null, initial = {
   const [h, setH] = useState(initial.h ?? 0);
   const [k, setK] = useState(initial.k ?? 0);
   const expr = useMemo(() => `(${a})*(${place(B.expr, `((${b})*(x-(${h})))`)})+(${k})`, [B, a, b, h, k]);
+  const coef = a === 1 ? '' : a === -1 ? '-' : `${a}`;
+  const bs = b === 1 ? '' : b === -1 ? '-' : `${b}`;
+  const inner = b === 1 && h === 0 ? 'x' : `${bs}(x${h === 0 ? '' : h > 0 ? `-${h}` : `+${-h}`})`;
+  const body = inner === 'x' ? B.name : ({
+    quadratic: `\\left(${inner}\\right)^2`, cubic: `\\left(${inner}\\right)^3`, abs: `\\left|${inner}\\right|`,
+    sin: `\\sin\\left(${inner}\\right)`, exponential: `2^{${inner}}`
+  }[base] || place(B.name, inner));
   const tex = base === 'linear'
-    ? `y=${a === 1 ? '' : a === -1 ? '-' : a}x${k === 0 ? '' : k > 0 ? `+${k}` : k}`
-    : `y=${a === 1 ? '' : a === -1 ? '-' : a}${place(B.name, b === 1 && h === 0 ? 'x' : `${b === 1 ? '' : b}(x${h === 0 ? '' : h > 0 ? `-${h}` : `+${-h}`})`)}${k === 0 ? '' : k > 0 ? `+${k}` : k}`;
+    ? `y=${coef}x${k === 0 ? '' : k > 0 ? `+${k}` : k}`
+    : `y=${coef}${base === 'exponential' && coef && coef !== '-' ? '\\cdot ' : ''}${body}${k === 0 ? '' : k > 0 ? `+${k}` : k}`;
   const reset = () => { setA(1); setB(1); setH(0); setK(0); };
   const fmt = v => r3(v, 2).toString();
   return (
@@ -97,7 +104,7 @@ export function UnitCircleDrag({ initial = 30, title = 'Drag the point around th
   };
   const onKey = e => {
     const big = e.shiftKey ? 15 : 1;
-    const moves = { ArrowRight: -big, ArrowUp: big, ArrowLeft: big, ArrowDown: -big, PageUp: 15, PageDown: -15 };
+    const moves = { ArrowRight: big, ArrowUp: big, ArrowLeft: -big, ArrowDown: -big, PageUp: 15, PageDown: -15 };
     if (e.key in moves) { e.preventDefault(); set(deg + moves[e.key]); }
     else if (e.key === 'Home') { e.preventDefault(); set(0); }
     else if (e.key === 'End') { e.preventDefault(); set(359); }
@@ -110,7 +117,7 @@ export function UnitCircleDrag({ initial = 30, title = 'Drag the point around th
         <div className="dgi-buttons" role="group" aria-label="Common angles">{[0, 30, 45, 60, 90, 120, 150, 180, 270].map(a => <button key={a} type="button" aria-pressed={Math.round(p.deg) === a} onClick={() => set(a)}>{a}°</button>)}</div>
       </>}>
       <UnitCircle deg={deg} showTan={showTan && p.tan !== null} title="The unit circle with a movable point"
-        svgProps={{ ref: svgRef, onPointerDown: e => { e.currentTarget.setPointerCapture?.(e.pointerId); fromPointer(e); }, onPointerMove: e => { if (e.buttons) fromPointer(e); } }}
+        svgProps={{ role: 'group', ref: svgRef, onPointerDown: e => { e.currentTarget.setPointerCapture?.(e.pointerId); fromPointer(e); }, onPointerMove: e => { if (e.buttons) fromPointer(e); } }}
         overlay={m => (
           <g className="dgi-handle" role="slider" tabIndex={0} aria-label="Point on the unit circle" aria-valuemin={0} aria-valuemax={359} aria-valuenow={Math.round(p.deg) % 360}
             aria-valuetext={`${p.deg} degrees, cosine ${p.cos}, sine ${p.sin}`} onKeyDown={onKey}>
@@ -180,10 +187,10 @@ export function CompoundInterestExplorer({ principal = 1000, initialRate = 5, in
   const [perYear, setPerYear] = useState(1);
   const m = compoundModel({ principal, rate: rate / 100, years, perYear });
   return (
-    <Shell title={title} readout={`$\\$${principal}$ at $${rate}\\%$ per year, compounded ${perYear === 1 ? 'yearly' : `${perYear} times a year`}, grows to $\\$${m.final}$ in ${years} years: interest $\\$${m.interest}$ (simple interest would give $\\$${m.simpleFinal}$).`}
+    <Shell title={title} readout={`$\\$${principal}$ at $${rate}\\%$ per year, compounded ${perYear === 1 ? 'yearly' : `${perYear} times a year`}, grows to $\\$${m.final}$ in ${years} ${years === 1 ? 'year' : 'years'}: interest $\\$${m.interest}$ (simple interest would give $\\$${m.simpleFinal}$).`}
       controls={<>
         <Slider label="Rate (% per year)" min={0} max={15} step={0.5} value={rate} onChange={setRate} format={v => `${v}%`} />
-        <Slider label="Time (years)" min={1} max={30} step={1} value={years} onChange={setYears} format={v => `${v} years`} />
+        <Slider label="Time (years)" min={1} max={30} step={1} value={years} onChange={setYears} format={v => `${v} ${v === 1 ? 'year' : 'years'}`} />
         <div className="dgi-buttons" role="group" aria-label="Compounding periods per year">{[[1, 'Yearly'], [2, 'Half-yearly'], [4, 'Quarterly'], [12, 'Monthly']].map(([v, l]) => <button key={v} type="button" aria-pressed={perYear === v} onClick={() => setPerYear(v)}>{l}</button>)}</div>
       </>}>
       <CompoundGrowth principal={principal} rate={rate / 100} years={years} perYear={perYear} />

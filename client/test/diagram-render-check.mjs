@@ -132,7 +132,7 @@ try {
     ok(/role="status" aria-live="polite"/.test(html), `${name}: changes are announced in a polite live region`);
     ok(!/<button(?![^>]*type="button")/.test(html), `${name}: every button is type="button"`);
     ok(!/NaN|undefined|Infinity/.test(html) && !/katex-error/.test(html), `${name}: clean markup and labels`);
-    ok(/<figure class="dg/.test(html) && /role="img"/.test(html), `${name}: the picture inside is an accessible figure`);
+    ok(/<figure class="dg/.test(html) && (name === "unitCircleDrag" ? /role="group"/ : /role="img"/).test(html), `${name}: the picture inside is an accessible figure`);
     // A question never gets an interactive diagram.
     const asked = draw(spec, false);
     ok(!/data-diagram-interactive|type="range"/.test(asked), `${name}: in a question (not interactive) there is no control`);
@@ -143,7 +143,7 @@ try {
   ok(draw({ kind: 'unitCircleDrag' }, false).includes('role="img"') && draw({ kind: 'transform' }, false) === '', 'a question gets the static unit circle, and nothing for a transformation slider');
   ok(draw({ kind: 'nope' }) === '' && draw(null) === '', 'an unknown spec draws nothing');
   const jsx = readFileSync(new URL('../src/diagrams/Interactive.jsx', import.meta.url), 'utf8');
-  ok(/ArrowRight|ArrowUp/.test(jsx) && /PageUp/.test(jsx) && /shiftKey/.test(jsx) && /Home/.test(jsx), 'the draggable point handles arrow, Shift, Page and Home/End keys');
+  ok(/ArrowRight: big/.test(jsx) && /ArrowLeft: -big/.test(jsx) && /ArrowRight|ArrowUp/.test(jsx) && /PageUp/.test(jsx) && /shiftKey/.test(jsx) && /Home/.test(jsx), 'the draggable point handles arrow, Shift, Page and Home/End keys');
   ok(/pointerdown|onPointerDown/i.test(jsx) && /setPointerCapture/.test(jsx), 'and pointer drag with capture');
 } finally {
   await server.close();
