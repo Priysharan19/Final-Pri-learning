@@ -5,13 +5,13 @@ export default {
   "c11-complex-numbers": {
     "examples": [
       {
-        "question": "Optional Complex Numbers geometry: find the exact locus |z-2|=2|z+1| in the Argand plane.",
+        "question": "Optional Complex Numbers geometry: find the exact locus $|z - 2| = 2|z + 1|$ in the Argand plane.",
         "steps": [
-          "Put z=x+iy and square both non-negative moduli: (x-2)²+y²=4((x+1)²+y²).",
-          "Expand and simplify to x²+4x+y²=0.",
-          "Complete the square: (x+2)²+y²=4, a circle with centre (-2,0) and radius 2."
+          "Put $z = x + iy$ and square both non-negative moduli: $(x-2)^2 + y^2 = 4\\bigl((x+1)^2 + y^2\\bigr)$.",
+          "Expand and simplify to $x^2 + 4x + y^2 = 0$.",
+          "Complete the square: $(x+2)^2 + y^2 = 4$, a circle with centre $(-2, 0)$ and radius 2."
         ],
-        "answer": "(x+2)²+y²=4 (centre -2, radius 2)",
+        "answer": "$(x+2)^2 + y^2 = 4$ (centre $-2$, radius 2)",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -31,13 +31,13 @@ export default {
         }
       },
       {
-        "question": "Optional Complex Numbers geometry: describe Re((z-1)/(z+1))=0, stating any excluded point.",
+        "question": "Optional Complex Numbers geometry: describe $\\operatorname{Re}\\left(\\dfrac{z-1}{z+1}\\right) = 0$, stating any excluded point.",
         "steps": [
-          "Let z=x+iy; the original quotient is undefined at z=-1.",
-          "After multiplying numerator and denominator by the conjugate of z+1, its real numerator is x²+y²-1.",
-          "Hence x²+y²=1, but omit (-1,0), where the quotient was undefined."
+          "Let $z = x + iy$; the quotient is undefined at $z = -1$.",
+          "After multiplying the numerator and denominator by the conjugate of $z + 1$, the real part of the numerator is $x^2 + y^2 - 1$.",
+          "Hence $x^2 + y^2 = 1$, but omit $(-1, 0)$, where the quotient was undefined."
         ],
-        "answer": "The unit circle x²+y²=1, excluding z=-1",
+        "answer": "The unit circle $x^2 + y^2 = 1$, excluding $z = -1$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -57,13 +57,13 @@ export default {
         }
       },
       {
-        "question": "Optional Complex Numbers geometry: minimise |z-3|+|z+3| subject to Re(z)=0.",
+        "question": "Optional Complex Numbers geometry: minimise $|z - 3| + |z + 3|$ subject to $\\operatorname{Re}(z) = 0$.",
         "steps": [
-          "Write z=iy because its real part is zero.",
-          "Both distances equal sqrt(9+y²), so the sum is 2sqrt(9+y²).",
-          "Since y²≥0, the minimum is 6 and is attained at z=0."
+          "Write $z = iy$, because its real part is zero.",
+          "Both distances equal $\\sqrt{9 + y^2}$, so the sum is $2\\sqrt{9 + y^2}$.",
+          "Since $y^2 \\ge 0$, the minimum is 6, attained at $z = 0$."
         ],
-        "answer": "Minimum 6 at z=0",
+        "answer": "Minimum 6 at $z = 0$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -79,13 +79,13 @@ export default {
         }
       },
       {
-        "question": "Optional Complex Numbers algebra: find all nonzero z for which z+1/z is real.",
+        "question": "Optional Complex Numbers algebra: find all non-zero $z$ for which $z + \\dfrac{1}{z}$ is real.",
         "steps": [
-          "Write z=x+iy with x²+y²>0 and 1/z=(x-iy)/(x²+y²).",
-          "The imaginary part is y(1-1/(x²+y²)), so it vanishes exactly when y=0 or x²+y²=1.",
-          "The solutions are all nonzero real z together with all points on the unit circle."
+          "Write $z = x + iy$ with $x^2 + y^2 > 0$, so $\\dfrac{1}{z} = \\dfrac{x - iy}{x^2 + y^2}$.",
+          "The imaginary part is $y\\left(1 - \\dfrac{1}{x^2 + y^2}\\right)$, which vanishes exactly when $y = 0$ or $x^2 + y^2 = 1$.",
+          "The solutions are all non-zero real $z$ together with all points of the unit circle."
         ],
-        "answer": "z real and nonzero, or |z|=1",
+        "answer": "$z$ real and non-zero, or $|z| = 1$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -101,13 +101,13 @@ export default {
         }
       },
       {
-        "question": "Optional Complex Numbers invariant: prove that |z-1|²+|z+1|²=4 when |z|=1.",
+        "question": "Optional Complex Numbers invariant: prove that $|z - 1|^2 + |z + 1|^2 = 4$ when $|z| = 1$.",
         "steps": [
-          "Write z=x+iy and use x²+y²=1.",
-          "Expand the left side: ((x-1)²+y²)+((x+1)²+y²)=2(x²+y²)+2.",
+          "Write $z = x + iy$ and use $x^2 + y^2 = 1$.",
+          "Expand the left side: $\\bigl((x-1)^2 + y^2\\bigr) + \\bigl((x+1)^2 + y^2\\bigr) = 2(x^2 + y^2) + 2$.",
           "Substitute the unit-circle condition to obtain 4."
         ],
-        "answer": "4 for every unit-modulus z",
+        "answer": "4 for every $z$ with $|z| = 1$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -119,11 +119,11 @@ export default {
         }
       },
       {
-        "question": "Optional roots of unity: for a non-real cube root ω of 1, find (1-ω)(1-ω²).",
+        "question": "Optional roots of unity: for a non-real cube root $\\omega$ of 1, find $(1 - \\omega)(1 - \\omega^2)$.",
         "steps": [
-          "Since ω³=1 and ω≠1, factor ω³-1 to deduce 1+ω+ω²=0.",
-          "Expand (1-ω)(1-ω²)=1-(ω+ω²)+ω³.",
-          "Insert ω+ω²=-1 and ω³=1 to obtain 3."
+          "Since $\\omega^3 = 1$ and $\\omega \\ne 1$, factorising $\\omega^3 - 1$ gives $1 + \\omega + \\omega^2 = 0$.",
+          "Expand: $(1 - \\omega)(1 - \\omega^2) = 1 - (\\omega + \\omega^2) + \\omega^3$.",
+          "Substitute $\\omega + \\omega^2 = -1$ and $\\omega^3 = 1$ to obtain 3."
         ],
         "answer": "3",
         "verify": {
@@ -133,13 +133,13 @@ export default {
         }
       },
       {
-        "question": "Optional Complex Numbers constraints: if Re(z)=2 and |z|=sqrt(13), find all possible values of Re(z²).",
+        "question": "Optional Complex Numbers constraints: if $\\operatorname{Re}(z) = 2$ and $|z| = \\sqrt{13}$, find all possible values of $\\operatorname{Re}(z^2)$.",
         "steps": [
-          "Let z=2+iy. Then 4+y²=13, so y=3 or -3.",
-          "For z²=(2+iy)², the real part is 4-y².",
-          "Both admissible values give Re(z²)=-5."
+          "Let $z = 2 + iy$. Then $4 + y^2 = 13$, so $y = 3$ or $y = -3$.",
+          "For $z^2 = (2 + iy)^2$, the real part is $4 - y^2$.",
+          "Both admissible values give $\\operatorname{Re}(z^2) = -5$."
         ],
-        "answer": "-5",
+        "answer": "$-5$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -155,13 +155,13 @@ export default {
         }
       },
       {
-        "question": "Optional triangle inequality: for z=3+4i and w=6+8i, establish |z+w|=|z|+|w|.",
+        "question": "Optional triangle inequality: for $z = 3 + 4i$ and $w = 6 + 8i$, show that $|z + w| = |z| + |w|$.",
         "steps": [
-          "Observe w=2z: the two nonzero vectors have the same direction.",
-          "Compute |z|=5 and |w|=10.",
-          "Their sum is 9+12i with modulus 15; equality holds in the triangle inequality."
+          "Observe that $w = 2z$: the two non-zero vectors point in the same direction.",
+          "Compute $|z| = 5$ and $|w| = 10$.",
+          "Their sum is $9 + 12i$, with modulus 15; equality holds in the triangle inequality."
         ],
-        "answer": "|z+w|=15=5+10",
+        "answer": "$|z + w| = 15 = 5 + 10$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -181,13 +181,13 @@ export default {
         }
       },
       {
-        "question": "Optional geometric transform: show |(z-i)/(z+i)|=1 for real z.",
+        "question": "Optional geometric transform: show that $\\left|\\dfrac{z - i}{z + i}\\right| = 1$ for real $z$.",
         "steps": [
-          "A real z=x gives conjugate denominators/numerators x+i and x-i.",
-          "Their moduli are equal, both sqrt(x²+1), and the denominator never vanishes for real x.",
+          "For real $z = x$, the numerator $x - i$ and the denominator $x + i$ are conjugates.",
+          "Their moduli are equal, both $\\sqrt{x^2 + 1}$, and the denominator is never zero for real $x$.",
           "Therefore the modulus of the quotient is 1."
         ],
-        "answer": "1 for every real z",
+        "answer": "1 for every real $z$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -203,13 +203,13 @@ export default {
         }
       },
       {
-        "question": "Optional argument branches: find the principal argument of (-1+i)³.",
+        "question": "Optional argument branches: find the principal argument of $(-1 + i)^3$.",
         "steps": [
-          "-1+i has argument 3π/4.",
-          "Cubing multiplies the angle by 3: 9π/4, which reduces by 2π to π/4.",
-          "Directly (-1+i)³=2+2i, confirming a first-quadrant argument."
+          "$-1 + i$ has argument $\\tfrac{3\\pi}{4}$.",
+          "Cubing multiplies the angle by 3, giving $\\tfrac{9\\pi}{4}$, which reduces by $2\\pi$ to $\\tfrac{\\pi}{4}$.",
+          "Directly, $(-1 + i)^3 = 2 + 2i$, which confirms a first-quadrant argument."
         ],
-        "answer": "π/4",
+        "answer": "$\\tfrac{\\pi}{4}$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -229,13 +229,13 @@ export default {
         }
       },
       {
-        "question": "Optional Argand intersections: determine z when |z-1|=2 and Re(z)=2.",
+        "question": "Optional Argand intersections: find $z$ when $|z - 1| = 2$ and $\\operatorname{Re}(z) = 2$.",
         "steps": [
-          "Write z=2+iy.",
-          "The circle equation becomes (2-1)²+y²=4.",
-          "Hence y²=3 and z=2±i sqrt(3)."
+          "Write $z = 2 + iy$.",
+          "The circle equation becomes $(2 - 1)^2 + y^2 = 4$.",
+          "Hence $y^2 = 3$ and $z = 2 \\pm i\\sqrt{3}$."
         ],
-        "answer": "z=2±i sqrt(3)",
+        "answer": "$z = 2 \\pm i\\sqrt{3}$",
         "verify": {
           "kind": "value",
           "expr": "(2-1)^2+3",
@@ -243,13 +243,13 @@ export default {
         }
       },
       {
-        "question": "Optional Complex Numbers locus: given |z-(1+i)|²+|z-(1-i)|²=10, find its centre and radius.",
+        "question": "Optional Complex Numbers locus: given $|z - (1+i)|^2 + |z - (1-i)|^2 = 10$, find the centre and radius of the locus.",
         "steps": [
-          "Let z=x+iy. Add the two squared distances to obtain 2(x-1)²+2y²+2.",
-          "Set the expression to 10: (x-1)²+y²=4.",
-          "The locus is a circle centred at (1,0) with radius 2."
+          "Let $z = x + iy$. Adding the two squared distances gives $2(x-1)^2 + 2y^2 + 2$.",
+          "Set the expression equal to 10: $(x-1)^2 + y^2 = 4$.",
+          "The locus is a circle with centre $(1, 0)$ and radius 2."
         ],
-        "answer": "Centre (1,0), radius 2",
+        "answer": "Centre $(1, 0)$, radius 2",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -265,10 +265,10 @@ export default {
         }
       },
       {
-        "question": "Optional reverse triangle inequality: if |z|=5, find the least and greatest values of |z-2|.",
+        "question": "Optional reverse triangle inequality: if $|z| = 5$, find the least and greatest values of $|z - 2|$.",
         "steps": [
-          "Use ||z|-2|≤|z-2|≤|z|+2, giving 3≤|z-2|≤7.",
-          "Both bounds are attained: z=5 gives distance 3 and z=-5 gives 7.",
+          "Use $\\bigl||z| - 2\\bigr| \\le |z - 2| \\le |z| + 2$, giving $3 \\le |z - 2| \\le 7$.",
+          "Both bounds are attained: $z = 5$ gives distance 3 and $z = -5$ gives 7.",
           "Thus the interval is exact, not merely a pair of loose estimates."
         ],
         "answer": "Minimum 3, maximum 7",
@@ -287,11 +287,11 @@ export default {
         }
       },
       {
-        "question": "Optional area with complex vectors: find the triangle area with vertices 0, 3+4i and -1+2i.",
+        "question": "Optional area with complex vectors: find the area of the triangle with vertices $0$, $3 + 4i$ and $-1 + 2i$.",
         "steps": [
-          "Treat the complex points as vectors (3,4) and (-1,2).",
-          "The signed parallelogram area is determinant 3×2-4×(-1)=10.",
-          "The triangle area is half the absolute determinant: 5."
+          "Treat the complex points as the vectors $(3, 4)$ and $(-1, 2)$.",
+          "The signed parallelogram area is the determinant $3 \\times 2 - 4 \\times (-1) = 10$.",
+          "The triangle's area is half the absolute value of the determinant: 5."
         ],
         "answer": "5 square units",
         "verify": {
@@ -301,13 +301,13 @@ export default {
         }
       },
       {
-        "question": "Optional equidistance locus: solve |z-1|=|z-i| geometrically.",
+        "question": "Optional equidistance locus: solve $|z - 1| = |z - i|$ geometrically.",
         "steps": [
-          "For z=x+iy, the distances are to the points (1,0) and (0,1).",
-          "Squaring gives (x-1)²+y²=x²+(y-1)².",
-          "Simplifying yields y=x: their perpendicular bisector."
+          "For $z = x + iy$, these are the distances to the points $(1, 0)$ and $(0, 1)$.",
+          "Squaring gives $(x-1)^2 + y^2 = x^2 + (y-1)^2$.",
+          "This simplifies to $y = x$, the perpendicular bisector of the two points."
         ],
-        "answer": "Im(z)=Re(z)",
+        "answer": "$\\operatorname{Im}(z) = \\operatorname{Re}(z)$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -323,13 +323,13 @@ export default {
         }
       },
       {
-        "question": "Optional roots of unity geometry: find the area of the triangle whose vertices are 1, ω and ω² (non-real cube roots).",
+        "question": "Optional roots of unity geometry: find the area of the triangle whose vertices are $1$, $\\omega$ and $\\omega^2$, where $\\omega$ is a non-real cube root of 1.",
         "steps": [
-          "Use 1=(1,0), ω=(-1/2,sqrt(3)/2), ω²=(-1/2,-sqrt(3)/2).",
-          "The segment joining ω and ω² is vertical of length sqrt(3); the distance from 1 to its line x=-1/2 is 3/2.",
-          "Area = (1/2)×sqrt(3)×(3/2)=3sqrt(3)/4."
+          "Use $1 = (1, 0)$, $\\omega = \\left(-\\tfrac{1}{2}, \\tfrac{\\sqrt{3}}{2}\\right)$, $\\omega^2 = \\left(-\\tfrac{1}{2}, -\\tfrac{\\sqrt{3}}{2}\\right)$.",
+          "The segment joining $\\omega$ and $\\omega^2$ is vertical with length $\\sqrt{3}$; the distance from 1 to its line $x = -\\tfrac{1}{2}$ is $\\tfrac{3}{2}$.",
+          "Area $= \\tfrac{1}{2} \\times \\sqrt{3} \\times \\tfrac{3}{2} = \\tfrac{3\\sqrt{3}}{4}$."
         ],
-        "answer": "3sqrt(3)/4",
+        "answer": "$\\tfrac{3\\sqrt{3}}{4}$",
         "verify": {
           "kind": "value",
           "expr": "sqrt(3)*(3/2)/2",

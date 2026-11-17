@@ -61,7 +61,9 @@ for(const group of IN_CURRICULUM) {
       } else if(f.type==='unitcircle'){
         assert.ok([0,30,45,60,90,120,135,150,180,210,225,240,270,300,315,330].includes(f.deg));
         const trig=ex.question.includes('sin(')?Math.sin(f.deg*Math.PI/180):Math.cos(f.deg*Math.PI/180);
-        assert.ok(close(trig,evalNumeric(ex.answer),1e-6),'trigonometric value not grounded in angle');
+        // The printed answer is TeX ($\tfrac{\sqrt{3}}{2}$); read it back into engine syntax before evaluating it.
+        const printed=ex.answer.replace(/^\$|\$$/g,'').replace(/\\tfrac\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}\{([^{}]*)\}/g,'($1)/($2)').replace(/\\sqrt\{([^{}]*)\}/g,'sqrt($1)');
+        assert.ok(close(trig,evalNumeric(printed),1e-6),'trigonometric value not grounded in angle');
       } else if(f.type==='sector'){
         assert.ok(f.r>0&&f.angle>0&&f.angle<360);
       } else if(f.type==='cuboid'){

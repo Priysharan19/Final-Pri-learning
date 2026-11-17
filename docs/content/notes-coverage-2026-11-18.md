@@ -12,12 +12,12 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Band | Chapters | With notes | At standard | Missing sections (count of chapters) | ≥2 diagrams | Interactive | KaTeX issues |
 |---|---|---|---|---|---|---|---|
-| CBSE Class 7 | 15 | 15 | 0 | objective 15, intuition 15, checkpoint 15 | 0 | 0 | 15 |
-| CBSE Class 8 | 13 | 13 | 0 | objective 13, intuition 13, checkpoint 13 | 0 | 0 | 13 |
-| CBSE Class 9 | 8 | 8 | 0 | objective 8, intuition 8, checkpoint 8 | 0 | 0 | 8 |
-| CBSE Class 10 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 14 |
-| CBSE Class 11 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 12 |
-| CBSE Class 12 | 13 | 13 | 0 | objective 13, intuition 13, checkpoint 13 | 0 | 0 | 13 |
+| CBSE Class 7 | 15 | 15 | 0 | objective 15, intuition 15, checkpoint 15 | 0 | 0 | 0 |
+| CBSE Class 8 | 13 | 13 | 0 | objective 13, intuition 13, checkpoint 13 | 0 | 0 | 0 |
+| CBSE Class 9 | 8 | 8 | 0 | objective 8, intuition 8, checkpoint 8 | 0 | 0 | 0 |
+| CBSE Class 10 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 0 |
+| CBSE Class 11 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 0 |
+| CBSE Class 12 | 13 | 13 | 0 | objective 13, intuition 13, checkpoint 13 | 0 | 0 | 0 |
 | Olympiad | 7 | 0 | 0 | objective 7, prerequisites 7, intuition 7, formal 7, examples 7, misconceptions 7, checkpoint 7, practice 7 | 0 | 0 | 0 |
 | NSW Stage 4 (Years 7–8) | 16 | 16 | 0 | objective 16, intuition 16, practice 16 | 2 | 1 | 0 |
 | NSW Stage 5 (Years 9–10) | 41 | 41 | 0 | objective 41, intuition 41, practice 41 | 8 | 3 | 0 |
@@ -37,108 +37,108 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `c7-large-numbers-current` Large Numbers Around Us | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | **7** | **no** |
-| `c7-arithmetic-expressions-current` Arithmetic Expressions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | **9** | **no** |
-| `c7-decimals-current` A Peek Beyond the Point | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | **2** | **no** |
-| `c7-letter-numbers-current` Expressions using Letter-Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | **6** | **no** |
-| `c7-parallel-intersecting-lines-current` Parallel and Intersecting Lines | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 7 | **2** | **no** |
-| `c7-number-play-current` Number Play | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 40 | **5** | **no** |
-| `c7-triangles-current` A Tale of Three Intersecting Lines | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 25 | **3** | **no** |
-| `c7-fractions-current` Working with Fractions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 10 | **10** | **no** |
-| `c7-geometric-twins-current` Geometric Twins | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 31 | **18** | **no** |
-| `c7-integer-operations-current` Operations with Integers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 7 | **14** | **no** |
-| `c7-common-ground-current` Finding Common Ground | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | **8** | **no** |
-| `c7-decimal-operations-current` Another Peek Beyond the Point | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | **6** | **no** |
-| `c7-connecting-dots-current` Connecting the Dots… | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 29 | **13** | **no** |
-| `c7-constructions-tilings-current` Constructions and Tilings | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | **4** | **no** |
-| `c7-finding-unknown-current` Finding the Unknown | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | **7** | **no** |
+| `c7-large-numbers-current` Large Numbers Around Us | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | ok | **no** |
+| `c7-arithmetic-expressions-current` Arithmetic Expressions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
+| `c7-decimals-current` A Peek Beyond the Point | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
+| `c7-letter-numbers-current` Expressions using Letter-Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
+| `c7-parallel-intersecting-lines-current` Parallel and Intersecting Lines | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 7 | ok | **no** |
+| `c7-number-play-current` Number Play | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 40 | ok | **no** |
+| `c7-triangles-current` A Tale of Three Intersecting Lines | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 25 | ok | **no** |
+| `c7-fractions-current` Working with Fractions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 10 | ok | **no** |
+| `c7-geometric-twins-current` Geometric Twins | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 31 | ok | **no** |
+| `c7-integer-operations-current` Operations with Integers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 7 | ok | **no** |
+| `c7-common-ground-current` Finding Common Ground | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | ok | **no** |
+| `c7-decimal-operations-current` Another Peek Beyond the Point | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | ok | **no** |
+| `c7-connecting-dots-current` Connecting the Dots… | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 29 | ok | **no** |
+| `c7-constructions-tilings-current` Constructions and Tilings | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | ok | **no** |
+| `c7-finding-unknown-current` Finding the Unknown | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | ok | **no** |
 
 ### CBSE Class 8
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `c8-rational-numbers` Rational Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | **10** | **no** |
-| `c8-linear-equations` Linear Equations in One Variable | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | **5** | **no** |
-| `c8-quadrilaterals` Understanding Quadrilaterals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 24 | **6** | **no** |
-| `c8-data-handling` Data Handling | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 76 | **13** | **no** |
-| `c8-squares-roots` Squares and Square Roots | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | **12** | **no** |
-| `c8-cubes-roots` Cubes and Cube Roots | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | **14** | **no** |
-| `c8-comparing-quantities` Comparing Quantities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 13 | **14** | **no** |
-| `c8-algebraic-identities` Algebraic Expressions and Identities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 1 | **14** | **no** |
-| `c8-mensuration` Mensuration | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 31 | **9** | **no** |
-| `c8-exponents` Exponents and Powers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | **15** | **no** |
-| `c8-proportions` Direct and Inverse Proportions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 6 | **5** | **no** |
-| `c8-factorisation` Factorisation | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | **17** | **no** |
-| `c8-graphs` Introduction to Graphs | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 48 | **13** | **no** |
+| `c8-rational-numbers` Rational Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | ok | **no** |
+| `c8-linear-equations` Linear Equations in One Variable | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
+| `c8-quadrilaterals` Understanding Quadrilaterals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 24 | ok | **no** |
+| `c8-data-handling` Data Handling | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 76 | ok | **no** |
+| `c8-squares-roots` Squares and Square Roots | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | ok | **no** |
+| `c8-cubes-roots` Cubes and Cube Roots | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | ok | **no** |
+| `c8-comparing-quantities` Comparing Quantities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 13 | ok | **no** |
+| `c8-algebraic-identities` Algebraic Expressions and Identities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 1 | ok | **no** |
+| `c8-mensuration` Mensuration | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 31 | ok | **no** |
+| `c8-exponents` Exponents and Powers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | ok | **no** |
+| `c8-proportions` Direct and Inverse Proportions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 6 | ok | **no** |
+| `c8-factorisation` Factorisation | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | ok | **no** |
+| `c8-graphs` Introduction to Graphs | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 48 | ok | **no** |
 
 ### CBSE Class 9
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `c9-coordinate-geometry` Orienting Yourself: The Use of Coordinates | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 80 | **40** | **no** |
-| `c9-linear-polynomials` Introduction to Linear Polynomials | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 35 | **38** | **no** |
-| `c9-number-systems` The World of Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | **8** | **no** |
-| `c9-algebraic-identities` Exploring Algebraic Identities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | **14** | **no** |
-| `c9-circles` I’m Up and Down, and Round and Round | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | **8** | **no** |
-| `c9-perimeter-area` Measuring Space: Perimeter and Area | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 26 | **23** | **no** |
-| `c9-probability` The Mathematics of Maybe: Introduction to Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 65 | **16** | **no** |
-| `c9-sequences-progressions` Predicting What Comes Next: Exploring Sequences and Progressions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 13 | **9** | **no** |
+| `c9-coordinate-geometry` Orienting Yourself: The Use of Coordinates | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 80 | ok | **no** |
+| `c9-linear-polynomials` Introduction to Linear Polynomials | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 35 | ok | **no** |
+| `c9-number-systems` The World of Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | ok | **no** |
+| `c9-algebraic-identities` Exploring Algebraic Identities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | ok | **no** |
+| `c9-circles` I’m Up and Down, and Round and Round | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
+| `c9-perimeter-area` Measuring Space: Perimeter and Area | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 26 | ok | **no** |
+| `c9-probability` The Mathematics of Maybe: Introduction to Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 65 | ok | **no** |
+| `c9-sequences-progressions` Predicting What Comes Next: Exploring Sequences and Progressions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 13 | ok | **no** |
 
 ### CBSE Class 10
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `c10-real-numbers` Real Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | **10** | **no** |
-| `c10-polynomials` Polynomials | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | **6** | **no** |
-| `c10-pair-linear-equations` Pair of Linear Equations in Two Variables | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 47 | **36** | **no** |
-| `c10-quadratic-equations` Quadratic Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 20 | **7** | **no** |
-| `c10-arithmetic-progressions` Arithmetic Progressions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | **2** | **no** |
-| `c10-triangles` Triangles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 36 | **66** | **no** |
-| `c10-coordinate-geometry` Coordinate Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 71 | **14** | **no** |
-| `c10-trigonometry` Introduction to Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 1 | **4** | **no** |
-| `c10-trig-applications` Some Applications of Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | **7** | **no** |
-| `c10-circles` Circles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | **5** | **no** |
-| `c10-areas-circles` Areas Related to Circles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | **18** | **no** |
-| `c10-surface-volume` Surface Areas and Volumes | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | **8** | **no** |
-| `c10-statistics` Statistics | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 42 | **5** | **no** |
-| `c10-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 22 | **9** | **no** |
+| `c10-real-numbers` Real Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | ok | **no** |
+| `c10-polynomials` Polynomials | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | ok | **no** |
+| `c10-pair-linear-equations` Pair of Linear Equations in Two Variables | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 47 | ok | **no** |
+| `c10-quadratic-equations` Quadratic Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 20 | ok | **no** |
+| `c10-arithmetic-progressions` Arithmetic Progressions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
+| `c10-triangles` Triangles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 36 | ok | **no** |
+| `c10-coordinate-geometry` Coordinate Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 71 | ok | **no** |
+| `c10-trigonometry` Introduction to Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 1 | ok | **no** |
+| `c10-trig-applications` Some Applications of Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | ok | **no** |
+| `c10-circles` Circles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
+| `c10-areas-circles` Areas Related to Circles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | ok | **no** |
+| `c10-surface-volume` Surface Areas and Volumes | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | ok | **no** |
+| `c10-statistics` Statistics | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 42 | ok | **no** |
+| `c10-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 22 | ok | **no** |
 
 ### CBSE Class 11
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | `c11-sets` Sets | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | ok | **no** |
-| `c11-relations-functions` Relations and Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 31 | **42** | **no** |
-| `c11-trig-functions` Trigonometric Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 40 | **6** | **no** |
-| `c11-complex-numbers` Complex Numbers and Quadratic Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 4 | **51** | **no** |
-| `c11-linear-inequalities` Linear Inequalities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | **1** | **no** |
+| `c11-relations-functions` Relations and Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 31 | ok | **no** |
+| `c11-trig-functions` Trigonometric Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 40 | ok | **no** |
+| `c11-complex-numbers` Complex Numbers and Quadratic Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 4 | ok | **no** |
+| `c11-linear-inequalities` Linear Inequalities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | ok | **no** |
 | `c11-permutations-combinations` Permutations and Combinations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 38 | ok | **no** |
-| `c11-binomial-theorem` Binomial Theorem | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | **4** | **no** |
-| `c11-sequences-series` Sequences and Series | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | **3** | **no** |
-| `c11-straight-lines` Straight Lines | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 26 | **29** | **no** |
-| `c11-conic-sections` Conic Sections | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 32 | **26** | **no** |
-| `c11-3d-introduction` Introduction to Three Dimensional Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 7 | **2** | **no** |
-| `c11-limits-derivatives` Limits and Derivatives | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 51 | **55** | **no** |
-| `c11-statistics` Statistics | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 39 | **39** | **no** |
-| `c11-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 17 | **6** | **no** |
+| `c11-binomial-theorem` Binomial Theorem | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | ok | **no** |
+| `c11-sequences-series` Sequences and Series | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | ok | **no** |
+| `c11-straight-lines` Straight Lines | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 26 | ok | **no** |
+| `c11-conic-sections` Conic Sections | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 32 | ok | **no** |
+| `c11-3d-introduction` Introduction to Three Dimensional Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 7 | ok | **no** |
+| `c11-limits-derivatives` Limits and Derivatives | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 51 | ok | **no** |
+| `c11-statistics` Statistics | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 39 | ok | **no** |
+| `c11-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 17 | ok | **no** |
 
 ### CBSE Class 12
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `c12-relations-functions` Relations and Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 41 | **70** | **no** |
-| `c12-inverse-trigonometric` Inverse Trigonometric Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 20 | **4** | **no** |
-| `c12-matrices` Matrices | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | **6** | **no** |
-| `c12-determinants` Determinants | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | **11** | **no** |
-| `c12-continuity-differentiability` Continuity and Differentiability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 21 | **17** | **no** |
-| `c12-applications-derivatives` Application of Derivatives | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 33 | **59** | **no** |
-| `c12-integrals` Integrals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | **18** | **no** |
-| `c12-applications-integrals` Application of Integrals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 46 | **35** | **no** |
-| `c12-differential-equations` Differential Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 23 | **16** | **no** |
-| `c12-vector-algebra` Vector Algebra | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 33 | **60** | **no** |
-| `c12-3d-geometry` Three Dimensional Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 10 | **5** | **no** |
-| `c12-linear-programming` Linear Programming | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 21 | **4** | **no** |
-| `c12-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 77 | **64** | **no** |
+| `c12-relations-functions` Relations and Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 41 | ok | **no** |
+| `c12-inverse-trigonometric` Inverse Trigonometric Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 20 | ok | **no** |
+| `c12-matrices` Matrices | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | ok | **no** |
+| `c12-determinants` Determinants | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | ok | **no** |
+| `c12-continuity-differentiability` Continuity and Differentiability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 21 | ok | **no** |
+| `c12-applications-derivatives` Application of Derivatives | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 33 | ok | **no** |
+| `c12-integrals` Integrals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | ok | **no** |
+| `c12-applications-integrals` Application of Integrals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 46 | ok | **no** |
+| `c12-differential-equations` Differential Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 23 | ok | **no** |
+| `c12-vector-algebra` Vector Algebra | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 33 | ok | **no** |
+| `c12-3d-geometry` Three Dimensional Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 10 | ok | **no** |
+| `c12-linear-programming` Linear Programming | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 21 | ok | **no** |
+| `c12-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 77 | ok | **no** |
 
 ### Olympiad
 
@@ -308,82 +308,4 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 | `me2-12-03` Introduction to complex numbers | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
 | `me2-12-04` Further integration | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | yes | 0 | ok | **no** |
 | `me2-12-05` Applications of calculus to mechanics | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-
-## Maths outside KaTeX (first offending string per chapter)
-
-- `c7-large-numbers-current` (7): `Total is 5×10^7+4×10^5+6×10^3+19.`
-- `c7-arithmetic-expressions-current` (9): `Are 3×(4+5) and 3×4+5 equal?`
-- `c7-decimals-current` (2): `Compute 18.40×(7+0.5).`
-- `c7-letter-numbers-current` (6): `Putting n=3 into n² means 3×2.`
-- `c7-parallel-intersecting-lines-current` (2): `At intersecting straight lines, vertically opposite angles are (7x−2)° and (5x+30)°. Find `
-- `c7-number-play-current` (5): `Since 27=3×9, the original integer is divisible by 9.`
-- `c7-triangles-current` (3): `Use the strict triangle inequality \|13−8\|<x<13+8.`
-- `c7-fractions-current` (10): `Material cost is (5/8)×48=30 tokens.`
-- `c7-geometric-twins-current` (18): `Point P(−3,4) is reflected in the y-axis. Find its image and the distance between the two `
-- `c7-integer-operations-current` (14): `Removing a negative change is an increase: a-(-5)=a+5.`
-- `c7-common-ground-current` (8): `Evaluate 2/3+3/5−1/2 using the least common denominator.`
-- `c7-decimal-operations-current` (6): `Why is 0.5×0.5 less than either factor?`
-- `c7-connecting-dots-current` (13): `The diagonal count is n(n−3)/2, so n(n−3)=70.`
-- `c7-constructions-tilings-current` (4): `A regular hexagon has 120° interior angles, and 3×120°=360°.`
-- `c7-finding-unknown-current` (7): `Solve (x−5)/3+4=10, and verify your result in the original equation.`
-- `c8-rational-numbers` (10): `Evaluate −7/12+5/18 in simplest form, keeping a positive common denominator.`
-- `c8-linear-equations` (5): `Solve 5(x−2)+3=2(x+7), showing both distributive steps.`
-- `c8-quadrilaterals` (6): `The signed doubled area is (7)(6)−(0)(2)=42.`
-- `c8-data-handling` (13): `Each category's fraction of all observations controls its sector angle: fraction×360 degre`
-- `c8-squares-roots` (12): `Every positive number has a positive and a negative solution of x²=a, but the symbol sqrt(`
-- `c8-cubes-roots` (14): `(-2)³=-8, while (+2)³=+8.`
-- `c8-comparing-quantities` (14): `They produce the factor 1.05²=1.1025, a 10.25% total increase.`
-- `c8-algebraic-identities` (14): `An identity such as (a+b)²=a²+2ab+b² is not one equation to solve; it is an equality for e`
-- `c8-mensuration` (9): `78 cm²`
-- `c8-exponents` (15): `For the same non-zero base, a^m×a^n=a^(m+n) and a^m/a^n=a^(m-n). Negative powers mean reci`
-- `c8-proportions` (5): `For a fixed amount of identical work and identical workers, increasing worker count decrea`
-- `c8-factorisation` (17): `To factor ax²+bx+c by grouping, choose two middle contributions whose sum is b and whose p`
-- `c8-graphs` (13): `Its gradient is (15−7)/(6−2)=8/4=2.`
-- `c9-coordinate-geometry` (40): `An ordered pair (x,y) describes a horizontal location followed by a vertical location. Qua`
-- `c9-linear-polynomials` (38): `a=6, zero −7/6`
-- `c9-number-systems` (8): `Irrational × irrational is...`
-- `c9-algebraic-identities` (14): `a³-b³ factors as (a-b)(a²+ab+b²). Expanding the right side cancels the mixed cubic contrib`
-- `c9-circles` (8): `Dropping the perpendicular from a circle's centre to a chord creates two congruent right t`
-- `c9-perimeter-area` (23): `A parallelogram has area base × height, and a triangle is half of that. The height must be`
-- `c9-probability` (16): `If a coin and a fair six-sided die are independently tossed, list pairs of coin state and `
-- `c9-sequences-progressions` (9): `Why are the first differences of n²+2n not constant?`
-- `c10-real-numbers` (10): `Does HCF × LCM = product work for three numbers?`
-- `c10-polynomials` (6): `For ax²+bx+c, the product is c/a and the sum is -b/a (provided a is not zero).`
-- `c10-pair-linear-equations` (36): `The two line equations are y=2x+(1) and y=-1x+(4).`
-- `c10-quadratic-equations` (7): `For real a,b,c with a≠0: b²-4ac positive gives two distinct real roots, zero one repeated `
-- `c10-arithmetic-progressions` (2): `a20=7+19×3=64.`
-- `c10-triangles` (66): `When two triangles are similar with side-scale k, corresponding heights also scale by k. T`
-- `c10-coordinate-geometry` (14): `The vertical change is 7-(-1)=8.`
-- `c10-trigonometry` (4): `Hypotenuse = sqrt(3²+4²)=5.`
-- `c10-trig-applications` (7): `10sqrt(3) m`
-- `c10-circles` (5): `At a point of tangency, the radius is perpendicular to the tangent. If P is outside a circ`
-- `c10-areas-circles` (18): `Segment = sector − triangle`
-- `c10-surface-volume` (8): `Joined solids usually share a radius. Find each part’s own height carefully, for example c`
-- `c10-statistics` (5): `Compute weighted total 2×2+5×3+8×5=59.`
-- `c10-probability` (9): `For two fair independent dice there are 36 equally likely ordered pairs. A target sum can `
-- `c11-relations-functions` (42): `The function x↦x² on real numbers is not one-to-one because x and -x have the same image.`
-- `c11-trig-functions` (6): `Solve sin(2x)=0 for 0≤x<2pi and count the solutions.`
-- `c11-complex-numbers` (51): `(x-1)²+y²=(x+3)²+y² gives -2x+1=6x+9.`
-- `c11-linear-inequalities` (1): `If a<b, then b-a>0, so (-a)-(-b)=b-a>0 and -a>-b.`
-- `c11-binomial-theorem` (4): `Find the coefficient of x³ in (1+2x)^5.`
-- `c11-sequences-series` (3): `A sequence gives the nth object a_n. A series gives partial sums S_n. For a geometric prog`
-- `c11-straight-lines` (29): `Run =4-(-2)=6.`
-- `c11-conic-sections` (26): `For y²=12x, find the focal distance p and focus.`
-- `c11-3d-introduction` (2): `Distance²=2²+3²+6²=49.`
-- `c11-limits-derivatives` (55): `Evaluate lim(x→2) (x²-4)/(x-2).`
-- `c11-statistics` (39): `Group totals are 12×14=168 and 8×20=160.`
-- `c11-probability` (6): `Independence gives P(A and not B)=0.3×0.6 and P(not A and B)=0.7×0.4.`
-- `c12-relations-functions` (70): `Let f(x)=2x+1 and g(x)=x². Find f(g(3)) and g(f(3)).`
-- `c12-inverse-trigonometric` (4): `The curve is y=1 sin(1x), drawn across one 2π-wide window.`
-- `c12-matrices` (6): `Top row: (1×2+2×1, 1×0+2×3)=(4,6).`
-- `c12-determinants` (11): `The determinant is t·t-1·4=t²-4.`
-- `c12-continuity-differentiability` (17): `Let f(x)=(x²-4)/(x-2) for x≠2 and f(2)=k. Find k for continuity.`
-- `c12-applications-derivatives` (59): `At a critical point, the first derivative test checks the sign change of   (+ to − is a ma`
-- `c12-integrals` (18): `The integral of x² is 2x.`
-- `c12-applications-integrals` (35): `Find the area between y=x and y=x² from x=0 to x=1.`
-- `c12-differential-equations` (16): `Solve dy/dx=3x² with y(0)=4; find y(2).`
-- `c12-vector-algebra` (60): `Multiply corresponding coordinates: 1×4,2×(-1),3×2.`
-- `c12-3d-geometry` (5): `A plane ax+by+cz=d has normal vector (a,b,c). Substitute the point into ax+by+cz-d and div`
-- `c12-linear-programming` (4): `Maximise 3x+2y subject to x+y≤4, x≤2, x≥0, y≥0.`
-- `c12-probability` (64): `True-positive probability is .01×.90=.009.`
 
