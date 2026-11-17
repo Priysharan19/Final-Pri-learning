@@ -126,7 +126,7 @@ async function tour(edition) {
     // Sit it, submit it, then the guide.
     await page.locator('[data-gen-start]').click();
     await page.waitForURL(/\/exams\/[0-9a-f-]{36}$/, { timeout: 60000 });
-    await page.waitForSelector('.exam-nav, .exam-head', { timeout: 60000 });
+    await page.waitForSelector('.exam-nav, .exam-head', { timeout: 60000 }).catch(async e => { console.log('  on screen:', (await visibleText(page, 'body')).slice(0, 400)); throw e; });
     await page.waitForTimeout(800);
     await page.screenshot({ path: join(SHOTS, `${edition}-sitting.png`) });
     await page.locator('.exam-head').getByRole('button', { name: en['exam.reviewSubmit'] }).click();
