@@ -38,6 +38,7 @@ export function editionRecord(id) {
     courses: Object.freeze([...e.courses]),
     languages: Object.freeze([...e.languages]),
     currency: e.currency,
+    family: Object.freeze({ parentFeatures: e.family.parentFeatures === true }),
     identity: Object.freeze({
       brandHi: e.identity.brandHi,
       cut: e.identity.cut,

@@ -122,6 +122,12 @@ export const EDITIONS = Object.freeze({
     timezone: 'Asia/Kolkata',
     currency: 'INR',
     billing: Object.freeze({ providers: Object.freeze(['razorpay', 'apple', 'google']), currency: 'INR' }),
+    // Parent-facing features (the parent weekly report, its email links and the
+    // "I'm a parent or guardian" sign-in path). Priyabhata only: owner decision
+    // 2026-11-18, Prithagoras has no parent account. Legally required guardian
+    // consent is a separate rule (server/platform/guardianConsent.js) and is not
+    // turned off by this switch.
+    family: Object.freeze({ parentFeatures: true }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,
@@ -158,6 +164,10 @@ export const EDITIONS = Object.freeze({
     currency: 'AUD',
     // No provider until owner decision O2 (plan H3): Premium is not on sale.
     billing: Object.freeze({ providers: Object.freeze([]), currency: 'AUD' }),
+    // No parent account, parent report or parent invite in Prithagoras (owner
+    // decision 2026-11-18). Guardian CONSENT for a young student is a legal rule,
+    // kept by the existing consent machinery; see Priyabhata above.
+    family: Object.freeze({ parentFeatures: false }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,

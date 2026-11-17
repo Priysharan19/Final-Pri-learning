@@ -42,7 +42,7 @@ const vite = await import('../vite.config.js');
   ok(helper.EDITION === table.DEFAULT_EDITION && helper.EDITION === 'priyabhata', 'outside a build the app is the default edition, Priyabhata');
   const e = helper.edition();
   const { identity, ...defaults } = e;
-  eq(defaults, { id: 'priyabhata', brand: 'Priyabhata', region: 'IN', defaultCourse: 'in', courses: ['in'], languages: ['en', 'hi'], currency: 'INR' }, 'edition() is the record: identity and defaults');
+  eq(defaults, { id: 'priyabhata', brand: 'Priyabhata', region: 'IN', defaultCourse: 'in', courses: ['in'], languages: ['en', 'hi'], currency: 'INR', family: { parentFeatures: true } }, 'edition() is the record: identity, defaults and the family switch');
   // Plan E4: the brand the app draws — Hindi name, cut, its path, the wordmark, the company line — and nothing more;
   // Lit Instrument D6 adds the working indicator's form for that same cut.
   eq(Object.keys(identity).sort(), ['brandHi', 'companyLine', 'company', 'cut', 'cutPath', 'wordmark', 'working'].sort(), 'record.identity holds exactly the brand the app draws');
