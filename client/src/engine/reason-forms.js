@@ -164,6 +164,31 @@ function overCommonDenominator(f, need) {
   return out;
 }
 
+// sin(u)^2 = 1 - cos(u)^2: the one trigonometric identity this prover knows.
+// Every sin atom with an integer power >= 2 is rewritten until none is left,
+// which gives each form a single normal form (sin has power 0 or 1).
+function reducePythagoras(f) {
+  let cur = f;
+  for (let round = 0; round < 12; round++) {
+    let target = null;
+    for (const t of cur.values()) {
+      for (const [k, e] of t.atoms) if (k.startsWith('sin[') && Number.isInteger(e) && e >= 2) { target = [t, k, e]; break; }
+      if (target) break;
+    }
+    if (!target) return cur;
+    const [term, key, e] = target;
+    const cosKey = 'cos[' + key.slice(4);
+    const rest = new Map(term.atoms); rest.set(key, e - 2);
+    const restForm = new Map([[monoKey(rest), { coef: term.coef, atoms: new Map([...rest].filter(([, x]) => Math.abs(x) > EPS)) }]]);
+    const oneMinusCos2 = addForms(constForm(1), powForm(atomForm(cosKey), 2), -1);
+    const replaced = mulForms(restForm, oneMinusCos2);
+    const without = new Map(cur); without.delete([...cur.entries()].find(([, v]) => v === term)[0]);
+    cur = replaced ? addForms(without, replaced) : null;
+    if (!cur) return null;
+  }
+  return null;
+}
+
 /** true only when both read as the same formal sum; null when this method cannot say. */
 export function sameFormalForm(a, b) {
   SUM_BASES.clear();   // the registry belongs to one comparison
@@ -172,6 +197,7 @@ export function sameFormalForm(a, b) {
     if (!fa || !fb) return null;
     const direct = addForms(fa, fb, -1);
     if (direct && direct.size === 0) return true;
+    if (direct) { const reduced = reducePythagoras(direct); if (reduced && reduced.size === 0) return true; }
     // Same sums over a common denominator of the many-term bases.
     const need = new Map();
     for (const f of [fa, fb]) for (const t of f.values()) for (const [k, e] of t.atoms) {

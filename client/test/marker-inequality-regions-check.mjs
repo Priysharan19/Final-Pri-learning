@@ -46,9 +46,27 @@ ok(allOk(run('(x-1)(x-2)(x-3)(x-4)<0', ['(x-1)(x-2)(x-3)(x-4)<0', 'x^4-10x^3+35x
 r = run('(x-1)(x-2)(x-3)(x-4)<0', ['(x-1)(x-2)(x-3)(x-4)<0', '(x-1)(x-2)(x-3)(x-5)<0']);
 ok(r.firstBreak === 1, 'a quartic with one root moved is a break');
 
-// Not polynomial: abstain, never guess.
-r = run('abs(x-2)<5', ['abs(x-2)<5', '(x-2)^2<25']);
-ok(r.lines.every(l => l.status !== 'break'), 'an absolute-value inequality is not decided by this method');
+// Absolute value: |Q| op P is cut at the roots of Q-P, -Q-P and Q.
+ok(allOk(run('abs(x-2)<5', ['abs(x-2)<5', '(x-2)^2<25', 'x^2-4x-21<0', '(x-7)(x+3)<0'])), 'abs(x-2)<5 squared and factorised keeps its region');
+r = run('abs(x-2)<5', ['abs(x-2)<5', 'x-2<5', 'x<7']);
+ok(r.firstBreak === 1, 'abs(x-2)<5 -> x-2<5 loses the other side: a break');
+r = run('abs(x-2)<5', ['abs(x-2)<5', 'x<7']);
+ok(r.firstBreak === 1, 'abs(x-2)<5 -> x<7 is a break');
+ok(allOk(run('abs(x)>=3', ['abs(x)>=3', 'x^2>=9', '(x-3)(x+3)>=0'])), 'abs(x)>=3 squared: non-strict boundaries kept');
+r = run('abs(x)>=3', ['abs(x)>=3', 'x>=3']);
+ok(r.firstBreak === 1, 'abs(x)>=3 -> x>=3 is a break');
+
+// An absolute value in another unknown is another region.
+r = stepCheck({ kind: 'inequality', variable: 'x', source: 'abs(x)<3' }, 'abs(x)<3\nabs(y)<3');
+ok(r.lines.every(l => l.status !== 'ok' || l.text === 'abs(x)<3'), 'abs(x)<3 then abs(y)<3 is not the same region');
+r = stepCheck({ kind: 'inequality', variable: 'x', source: 'abs(x)<3' }, 'abs(x)<3\ny^2<9');
+ok(r.lines.every(l => l.status !== 'ok' || l.text === 'abs(x)<3'), 'abs(x)<3 then y^2<9 is not the same region');
+r = stepCheck({ kind: 'inequality', variable: 'x', source: 'x<3' }, 'x<3\nabs(3)>y');
+ok(r.lines[1].status !== 'ok', 'abs of a constant against y is not x<3 (the unknown comes from the non-constant side)');
+
+// Not piecewise polynomial in one variable: abstain, never guess.
+r = run('abs(x)+abs(x-1)<3', ['abs(x)+abs(x-1)<3', 'x<2']);
+ok(r.lines.every(l => l.status !== 'break'), 'two absolute values are not decided by this method');
 
 console.log(`marker-inequality-regions-check: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks passed`);
 process.exit(fail ? 1 : 0);

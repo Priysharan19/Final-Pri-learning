@@ -44,7 +44,13 @@ ok(line('e^x cos(x)', 'e^x cos(x) + e^x sin(x)').status === 'break', 'a wrong pr
 ok(sameFormalForm(p('(x^2-1)/(x-1)'), p('x+1')) === true, 'equal over a common denominator (everywhere both are defined)');
 ok(sameFormalForm(p('1/(x+1)'), p('1/(x+2)')) === null, 'different many-term bases are different');
 ok(sameFormalForm(p('(x+1)^2'), p('x^2+2x+1')) === true, 'a squared sum is expanded');
-ok(sameFormalForm(p('sin(x)^2+cos(x)^2'), p('1')) === null, 'a trigonometric identity is not formal');
+ok(sameFormalForm(p('sin(x)^2+cos(x)^2'), p('1')) === true, 'sin^2 + cos^2 = 1 is the one identity the prover knows');
+ok(sameFormalForm(p('sin(x)^2+cos(x)^2'), p('2')) === null, 'sin^2 + cos^2 is not 2');
+ok(sameFormalForm(p('sin(x)^2'), p('cos(x)^2')) === null, 'sin^2 is not cos^2');
+ok(sameFormalForm(p('sin(x)^2+cos(2x)^2'), p('1')) === null, 'the identity needs the same argument');
+ok(sameFormalForm(p('1+tan(x)^2'), p('sec(x)^2')) === true, '1 + tan^2 = sec^2');
+ok(line('tan(x)', '1 + tan(x)^2').status === 'ok', 'd/dx tan x = 1 + tan^2 x is credited');
+ok(line('tan(x)', '1 + tan(x)^3').status === 'break', 'd/dx tan x = 1 + tan^3 x is a break');
 ok(sameFormalForm(p('x^(1/2)'), p('x^(-1/2)')) === null, 'different exponents are different');
 ok(sameFormalForm(p('sqrt(x^2)'), p('x')) === null, 'sqrt(x^2) is |x|, not x');
 ok(sameFormalForm(p('(x^4)^(1/4)'), p('x')) === null, '(x^4)^(1/4) is |x|, not x');
