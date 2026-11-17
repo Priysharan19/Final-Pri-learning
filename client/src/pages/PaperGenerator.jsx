@@ -19,6 +19,7 @@ const MINUTES_PER_MARK = 1.5;
 // Average marks a question carries under each mix: the estimate in the summary.
 const AVG_MARKS = { foundation: 1.6, standard: 2.4, challenge: 3.1, exam: 2.2 };
 const MIXES = ['foundation', 'standard', 'challenge', 'exam'];
+const MIX_KEYS = { foundation: 'gen.mix.foundation', standard: 'gen.mix.standard', challenge: 'gen.mix.challenge', exam: 'gen.mix.exam' };
 const MAX_TOPICS = 12;
 
 export default function PaperGenerator() {
@@ -179,7 +180,7 @@ export default function PaperGenerator() {
               {MIXES.map(m => (
                 <label key={m} className={`pg-pick${mix === m ? ' is-on' : ''}`}>
                   <input type="radio" name="gen-mix" checked={mix === m} onChange={() => setMix(m)} />
-                  <span>{t(`gen.mix.${m}`)}</span>
+                  <span>{t(MIX_KEYS[m])}</span>
                 </label>
               ))}
             </div>
@@ -194,7 +195,7 @@ export default function PaperGenerator() {
         <aside className="pg-summary" aria-label={t('gen.summaryLabel')}>
           <p className="pg-live" role="status" aria-live="polite" data-gen-summary>
             {topics.length
-              ? t('gen.summary', { marks, minutes, n: estimate, topics: list })
+              ? t('gen.summary', { marks, minutes, count: estimate, n: estimate, topics: list })
               : t('gen.chooseTopics')}
           </p>
           <p className={`pg-fit pg-fit-${fit.state}`} role="status" data-gen-fit={fit.state}>
@@ -203,10 +204,10 @@ export default function PaperGenerator() {
             {fit.state === 'premium' && t('gen.premiumWeak')}
             {fit.state === 'unknown' && t('gen.cannotCheck')}
             {fit.state === 'short' && (fit.nearest
-              ? <>{t('gen.short')} <button type="button" className="btn btn-ghost btn-sm" onClick={() => applyNearest(fit.nearest)}>{t('gen.applyNearest', { marks: fit.nearest.marks, mix: t(`gen.mix.${fit.nearest.mix || mix}`) })}</button></>
+              ? <>{t('gen.short')} <button type="button" className="btn btn-ghost btn-sm" onClick={() => applyNearest(fit.nearest)}>{t('gen.useNearest', { marks: fit.nearest.marks, mix: t(MIX_KEYS[fit.nearest.mix] || MIX_KEYS[mix]) })}</button></>
               : t('gen.shortNone'))}
           </p>
-          {fit.state === 'ready' && fit.repeats > 0 && <p className="muted">{t('gen.repeats', { n: fit.repeats })}</p>}
+          {fit.state === 'ready' && fit.repeats > 0 && <p className="muted">{t('gen.repeats', { count: fit.repeats, n: fit.repeats })}</p>}
           <div className="pg-actions">
             <button type="submit" className="btn btn-primary" disabled={!ready || !!busy} data-gen-start>{busy === 'start' ? t('exams.building') : t('gen.start')}</button>
             <button type="button" className="btn btn-ghost" onClick={print} disabled={!ready || !!busy} data-gen-print>{busy === 'print' ? t('gen.printing') : t('gen.print')}</button>
