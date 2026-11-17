@@ -260,7 +260,10 @@ export function speakMath(tex, locale = 'en') {
     if (name === 'neg' || name === 'lnot') return { say: L.not };
     if (name === 'land' || name === 'wedge') return { say: L.and };
     if (name === 'lor' || name === 'vee') return { say: L.or };
-    if (name === 'mid') return { say: L.suchThat };
+    if (name === 'mid') { // "such that" inside a set \\{ x \\mid ... \\}, else divisibility
+      let open = 0; for (let k = 0; k < pos; k++) { const q = toks[k]; if (q.t === 'cmd' && q.v === '{') open += 1; else if (q.t === 'cmd' && q.v === '}') open -= 1; }
+      return { say: open > 0 ? L.suchThat : L.divides };
+    }
     if (name === 'emptyset' || name === 'varnothing') return { say: L.emptySet };
     if (name === 'leftarrow' || name === 'Leftarrow') return { say: L.leftArrow };
     if (name === 'cong') return { say: L.congruent, op: true };
@@ -316,8 +319,10 @@ export function speakMath(tex, locale = 'en') {
     if (name === 'overset' || name === 'underset' || name === 'stackrel') { parseArg(); const b = parseArg(); return { say: b.say }; }
     if (name === 'mathbb') {
       const a = parseArg(); const m = { R: L.real, N: L.natural, Z: L.integers, Q: L.rationals, C: L.complex }[a.say];
-      if (m && startsScript() && toks[pos].v === '^' && toks[pos + 1] && toks[pos + 1].t === 'sym' && (toks[pos + 1].v === '+' || toks[pos + 1].v === '-')) {
-        const sign = toks[pos + 1].v; pos += 2;
+      const braced = toks[pos + 1] && toks[pos + 1].t === 'sym' && toks[pos + 1].v === '{' && toks[pos + 2] && toks[pos + 2].t === 'sym' && (toks[pos + 2].v === '+' || toks[pos + 2].v === '-') && toks[pos + 3] && toks[pos + 3].t === 'sym' && toks[pos + 3].v === '}';
+      const bare = toks[pos + 1] && toks[pos + 1].t === 'sym' && (toks[pos + 1].v === '+' || toks[pos + 1].v === '-');
+      if (m && a.say !== 'C' && startsScript() && toks[pos].v === '^' && (bare || braced)) {
+        const sign = braced ? toks[pos + 2].v : toks[pos + 1].v; pos += braced ? 4 : 2;
         const sets = { [L.real]: hi ? 'वास्तविक संख्याएँ' : 'real numbers', [L.integers]: hi ? 'पूर्णांक' : 'integers', [L.rationals]: hi ? 'परिमेय संख्याएँ' : 'rational numbers', [L.natural]: hi ? 'प्राकृत संख्याएँ' : 'natural numbers' };
         const noun = sets[m] || m;
         return { say: hi ? join([sign === '+' ? L.positive : L.negative, noun]) : `${sign === '+' ? L.positive : L.negative} ${noun}` };
