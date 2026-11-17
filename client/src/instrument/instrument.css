@@ -1477,7 +1477,7 @@ html[data-pushed] .shell .main { transform: scale(var(--in-push-scale)); transfo
 .pg-summary { position: sticky; top: 16px; display: grid; gap: 12px; padding: 18px; border: 1px solid var(--in-edge); border-radius: 8px; background: var(--in-l1); }
 .pg-live { margin: 0; font-family: var(--in-ui); font-size: 1.05rem; line-height: 1.45; color: var(--in-tx); }
 .pg-fit { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--in-tx-2); }
-.pg-fit-short { color: var(--in-slip); }
+.pg-fit-short { color: var(--in-tx); font-weight: 600; }
 .pg-actions { display: grid; gap: 8px; }
 @media (max-width: 760px) {
   .pg-body { grid-template-columns: 1fr; gap: 18px; }

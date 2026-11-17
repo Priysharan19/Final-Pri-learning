@@ -89,6 +89,8 @@ export const ENGINE_SUITES = [
   // Plan G4: NSW HSC-style papers — sealed from issued NSW forms, reading time,
   // final-answer-only marking and no band, as pri_server under RLS.
   'nsw-exam-check.mjs',
+  // The Paper Generator: assembled from the edition's issued banks, sealed and sat as any paper, as pri_server under RLS.
+  'paper-generator-check.mjs',
   // D19: JEE Advanced's own questions are Premium, and a notebook twin is a
   // question of the free day — decided under the same lock and RLS scope.
   'premium-practice-content-check.mjs',

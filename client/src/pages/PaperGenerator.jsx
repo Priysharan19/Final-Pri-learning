@@ -122,7 +122,7 @@ export default function PaperGenerator() {
     return <section className="card" aria-labelledby="gen-title"><h1 className="card-title" id="gen-title">{t('gen.title')}</h1><p className="sub" role="status">{t('gen.unavailable')}</p></section>;
   }
   if (!options) {
-    return <section className="card" aria-labelledby="gen-title"><h1 className="card-title" id="gen-title">{t('gen.title')}</h1><p className="muted" role="status"><Working pending size={24} /><span>{t('gen.loading')}</span></p></section>;
+    return <section className="card" aria-labelledby="gen-title"><h1 className="card-title" id="gen-title">{t('gen.title')}</h1><p className="muted" role="status"><Working pending={options === null} size={24} /><span>{t('gen.loading')}</span></p></section>;
   }
 
   return (
@@ -199,7 +199,7 @@ export default function PaperGenerator() {
               : t('gen.chooseTopics')}
           </p>
           <p className={`pg-fit pg-fit-${fit.state}`} role="status" data-gen-fit={fit.state}>
-            {fit.state === 'checking' && <><Working pending size={16} /><span>{t('gen.checking')}</span></>}
+            {fit.state === 'checking' && <><Working pending={fit.state === 'checking'} size={16} /><span>{t('gen.checking')}</span></>}
             {fit.state === 'ready' && t('gen.ready')}
             {fit.state === 'premium' && t('gen.premiumWeak')}
             {fit.state === 'unknown' && t('gen.cannotCheck')}

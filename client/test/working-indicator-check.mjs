@@ -84,7 +84,9 @@ const SITES = {
   'pages/History.jsx': 1,
   'pages/Tasks.jsx': 1,
   'pages/Favorites.jsx': 1,
-  'pages/PracticeBase.jsx': 1
+  'pages/PracticeBase.jsx': 1,
+  // The Paper Generator: the options load and the question-bank check
+  'pages/PaperGenerator.jsx': 2
 };
 const sites = [];
 for (const f of sources.filter(f => f !== 'instrument/Working.jsx')) {
