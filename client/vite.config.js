@@ -316,11 +316,15 @@ export const ON_DEMAND = [
   //     teacherOnly(), which redirects every other role before the lazy route
   //     is ever rendered, and only TEACHER_NAV links to it. A teacher's first
   //     open fetches it and the runtime rule keeps it from then on.
+  //   · TeacherWorkspace — a teacher's class board, papers and review queue
+  //     (client/src/classroom/). ClassroomPanel imports it lazily and draws it
+  //     only for a signed-in account whose role is teacher; a student's
+  //     inbox uses StudentClassroom, which stays in the install.
   //   · StaffOperationsPanel — the content-operations and admin console.
   //     Settings.jsx asks for it only once the signed-in cloud account reports
   //     a support or admin role, and the server authorises every call it makes
   //     regardless.
-  [/(^|\/)(Teach|StaffOperationsPanel|MfaPanel)-[^/]*\.js$/, 'staff-only screen'],
+  [/(^|\/)(Teach|TeacherWorkspace|StaffOperationsPanel|MfaPanel)-[^/]*\.js$/, 'staff-only screen'],
 
   // The placement check: its page, the adaptive engine and the Pri-authored
   // prerequisite graph. A student opens it once after onboarding and perhaps
