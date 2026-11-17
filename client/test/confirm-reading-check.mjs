@@ -26,7 +26,7 @@ ok(JSON.stringify(Object.keys(confirmedRevision({ reading: 'a' })).sort()) === J
 const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.meta.url), 'utf8');
 ok(/needsConfirmation\(\{ writeMode, resolved, reading, stale: inkStale, vouched \}\)/.test(card), 'the card gates on the pure rule with the current reading and the vouched one');
 ok(/if \(needsCheck && vouchedNow !== reading\) \{ if \(doubt\) setChecking\(true\); return; \}/.test(card), 'every submit path still stops on an unconfirmed reading');
-ok(/confirmOnly\s*\n?\s*\? \{ label: t\('verdict.confirmAndSubmit'\), run: acceptReading/.test(card), 'the primary is the combined Confirm and submit');
+ok(/confirmOnly\s*\n?\s*\? \{ label: t\('verdict.confirmAndSubmit'\), run: acceptReading/.test(card), 'the primary is the combined Confirm and mark');
 ok(/confirmed: viaInk \? confirmedRef\.current : null/.test(card), 'the confirmed revision is kept with the submission record');
 ok(/ink = \{ strokes: compactInkStrokes\(inkResult\.strokes\), recognized: inkResult\.text/.test(card), 'the original strokes still travel with the confirmed reading');
 ok(/doubt\?\.weakest\?\.id/.test(card) && /if \(doubt\) setChecking\(true\); return;/.test(card), 'a no-argument submit on an undoubted reading neither throws nor opens the doubt panel');
