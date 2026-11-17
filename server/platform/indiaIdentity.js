@@ -21,8 +21,15 @@ import { practicePapersAllowed } from './indiaBanks.js';
 import { hasPyqGenerator } from '../../client/src/engine/pyq/pyqIndex.js';
 import { hasJeePyqGenerator } from '../../client/src/engine/generators/jee-pyq-runtime.js';
 
-/** The CBSE syllabus year the product's Indian course declares (the class-10 provenance uses the same string). */
+/** The CBSE syllabus year the repository has source evidence for (the class-10 provenance uses the same string). */
 export const INDIA_SYLLABUS_VERSION = 'CBSE-2026-27';
+/**
+ * Classes whose 2026-27 syllabus the repository actually carries (client/src/engine/ncert/
+ * class7-2026-27-*, class9-2026-27-*, class10-2026-27-production). Classes 8, 11 and 12 have no
+ * 2026-27 audit, so their identity names the board, class and chapter and leaves the year null
+ * rather than claiming one.
+ */
+export const INDIA_VERSIONED_CLASSES = Object.freeze([7, 9, 10]);
 const TRACKS = Object.freeze(['jee-advanced', 'jee-main', 'olympiad', 'cbse']);
 
 const CHAPTER_BY_ID = new Map(IN_CHAPTERS.map(c => [c.id, c]));
@@ -42,7 +49,7 @@ function chapterRecord(chapter, extra = {}) {
     board: graded ? 'CBSE' : null,
     class: graded ? chapter.grade : null,
     syllabus: graded ? `cbse-mathematics-class-${chapter.grade}` : 'olympiad',
-    syllabusVersion: graded ? INDIA_SYLLABUS_VERSION : null,
+    syllabusVersion: graded && INDIA_VERSIONED_CLASSES.includes(chapter.grade) ? INDIA_SYLLABUS_VERSION : null,
     source: graded && /^c\d+-/.test(chapter.id) ? 'NCERT' : null,
     chapterId: chapter.id,
     chapterName: text(chapter.name),

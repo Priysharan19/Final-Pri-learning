@@ -1,7 +1,7 @@
 // Pri Learning · edition parity truth (audit P0 #37, #38).
 //
 //   #37  Every way the two editions mark differently is DECLARED, with its reason, in
-//        client/edition.config.mjs, and the running server is held to the declaration:
+//        client/edition.config.mjs, and the server modules are held to the declaration (constants and policy functions, not an HTTP round trip):
 //        the config's marking policy, the policy sealed on issued items
 //        (editionBanks.js) and the method-mark switch (editionMarking.js) agree; any
 //        facet that differs between editions and is not declared fails, and so does a
@@ -23,7 +23,7 @@ const { UNCERTIFIED_EDITIONS, editionMarkingPolicy } = await import('../../serve
 const { FINAL_ANSWER_ONLY } = await import('../../server/platform/markingPolicy.js');
 const { indiaBank } = await import('../../server/platform/indiaBanks.js');
 const { nswBank } = await import('../../server/platform/nswBanks.js');
-const { INDIA_SYLLABUS_VERSION } = await import('../../server/platform/indiaIdentity.js');
+const { INDIA_SYLLABUS_VERSION, INDIA_VERSIONED_CLASSES } = await import('../../server/platform/indiaIdentity.js');
 const { GENERATORS, generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
 await loadAllBanks();
 let checks = 0; const failures = [];
@@ -81,7 +81,7 @@ for (const g of Object.keys(GENERATORS)) {
         if (r.sealed && id && id.jurisdiction === 'IN' && id.chapterId && id.generator === g) stats.priyabhata.sealed++;
         else ok(false, `priyabhata ${g} D${d}: issued with no usable curriculum identity (${JSON.stringify(id)})`);
         if (id?.class) classes.add(id.class); if (id?.chapterId) chapters.add(id.chapterId);
-        if (id && !(id.board === 'CBSE' ? id.class && id.syllabusVersion === INDIA_SYLLABUS_VERSION && id.syllabus && id.chapterName : true)) ok(false, `priyabhata ${g}: a CBSE identity names class, syllabus and syllabus year`);
+        if (id && !(id.board === 'CBSE' ? id.class && id.syllabus && id.chapterName && id.syllabusVersion === (INDIA_VERSIONED_CLASSES.includes(id.class) ? INDIA_SYLLABUS_VERSION : null) : true)) ok(false, `priyabhata ${g}: a CBSE identity names class, syllabus and chapter, and a syllabus year only where the repository has one`);
         if (id && JSON.stringify(JSON.parse(JSON.stringify(id))) !== JSON.stringify(id)) ok(false, `priyabhata ${g}: identity is plain JSON`);
       }
     }
