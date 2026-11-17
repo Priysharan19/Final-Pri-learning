@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `2c13172754f840c993f7388d5304061b60e79133cb69f34c5b63418cb9467d88` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `489c789cdd50465b2923760515d8977d53000c2a5b191e4d186a7973e935e0db` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -1043,23 +1043,23 @@ Final answer: 37
 ```
 </details>
 
-## `cbse-bank:ms11-formulas/D2` — seed 1009
+## `cbse-bank:ms11-formulas/D2` — seed 32685
 
-> Using $C = 49n + 107$, find the number of hours $n$ for which the charge is \\$352.00.
+> Using $C = 54n + 60$, find the number of hours $n$ for which the charge is \\$438.00.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 6
+Final answer: 8
 ```
 </details>
 

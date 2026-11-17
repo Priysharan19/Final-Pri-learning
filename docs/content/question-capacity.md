@@ -6,13 +6,11 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 
 ## Prithagoras
 
-107 skills measured; **17** meet both targets; **90** are below at least one.
+107 skills measured; **33** meet both targets; **74** are below at least one.
 
 | Skill (generator) | Cells | Distinct instances | Structural forms | Below target |
 | --- | --- | --- | --- | --- |
-| `ms12-right-triangle` | 4 | 79 | 4 | instances + forms |
 | `y10-trig-any-angle` | 4 | 89 | 5 | instances |
-| `ms12-invest-loans` | 4 | 94 | 2 | instances + forms |
 | `y12-fin-exact` | 4 | 97 | 2 | instances + forms |
 | `y9-volume-solids` | 4 | 114 | 3 | instances + forms |
 | `y12-stats` | 1 | 129 | 1 | instances + forms |
@@ -20,11 +18,8 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y9-surface-solids` | 4 | 153 | 1 | instances + forms |
 | `y11-trigfunc` | 2 | 154 | 12 | instances |
 | `y10-trig-nonright` | 4 | 155 | 1 | instances + forms |
-| `ms12-networks` | 4 | 180 | 6 | instances |
 | `y10-circle-geometry` | 4 | 199 | 1 | instances + forms |
 | `y9-pythagoras` | 4 | 200 | 3 | instances + forms |
-| `ms12-rates` | 4 | 217 | 4 | instances + forms |
-| `ms12-annuity-table` | 4 | 240 | 2 | instances + forms |
 | `y8-circles` | 4 | 304 | 2 | instances + forms |
 | `y12-func-model` | 4 | 386 | 1 | instances + forms |
 | `y7-decimals-perc` | 4 | 407 | 26 | instances |
@@ -46,7 +41,6 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y9-probability` | 4 | 1.0k | 35 | instances |
 | `y8-volume` | 3 | 1.0k | 1 | instances + forms |
 | `y9-nonlinear-a` | 4 | 1.1k | 4 | instances + forms |
-| `ms12-simple-interest` | 4 | 1.1k | 2 | instances + forms |
 | `me11-trigid` | 4 | 1.1k | 18 | instances |
 | `y8-percentages` | 4 | 1.1k | 16 | instances |
 | `me12-binomial` | 3 | 1.2k | 1 | instances + forms |
@@ -60,16 +54,13 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y12-integral-calc` | 4 | 2.1k | 6 | instances |
 | `y12-appdiff` | 3 | 2.1k | 8 | instances |
 | `y9-simint` | 2 | 2.2k | 26 | instances |
-| `ms11-measure` | 3 | 2.3k | 12 | instances |
 | `y10-functions` | 4 | 2.5k | 4 | instances + forms |
 | `y10-polynomials` | 4 | 2.7k | 16 | instances |
 | `y11-quadfunc` | 3 | 3.0k | 28 | instances |
-| `ms12-depreciation` | 4 | 3.1k | 2 | instances + forms |
 | `y7-algebra` | 3 | 3.2k | 296 | instances |
 | `y9-rate-change` | 4 | 3.4k | 1 | instances + forms |
 | `y7-area` | 4 | 3.4k | 2 | instances + forms |
 | `me11-rates` | 4 | 3.5k | 8 | instances |
-| `ms12-algebraic` | 4 | 3.5k | 2 | instances + forms |
 | `y11-explog` | 4 | 4.2k | 3 | instances + forms |
 | `y7-equations` | 4 | 4.2k | 26 | instances |
 | `y12-random-var` | 4 | 4.6k | 2 | instances + forms |
@@ -85,7 +76,8 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y12-series` | 3 | 9.5k | 3 | instances + forms |
 | `y8-rates` | 3 | 9.6k | 26 | instances |
 | `y11-lines` | 4 | 9.8k | 32 | instances |
-| `ms12-normal-exact` | 4 | 10.0k | 1 | instances + forms |
+| `ms12-right-triangle` | 4 | 10.0k | 24 | — |
+| `ms12-rates` | 4 | 11.0k | 34 | — |
 | `y8-equations` | 3 | 14.7k | 26 | — |
 | `y10-simeq` | 4 | 17.0k | 6 | — |
 | `y10-probability` | 4 | 20.4k | 1 | forms |
@@ -94,27 +86,35 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y10-nonlinear` | 4 | 22.8k | 12 | — |
 | `y11-functions` | 4 | 22.9k | 51 | — |
 | `y9-indices-sci` | 4 | 23.6k | 2 | forms |
-| `ms12-bivariate-fit` | 4 | 29.2k | 3 | forms |
+| `ms12-invest-loans` | 4 | 24.5k | 16 | — |
+| `ms11-measure` | 3 | 26.3k | 32 | — |
 | `y7-integers` | 4 | 30.4k | 10 | — |
+| `ms12-depreciation` | 4 | 30.4k | 22 | — |
 | `me12-vectors` | 4 | 33.6k | 4 | forms |
 | `y9-linear` | 4 | 34.1k | 20 | — |
 | `y11-polynomials` | 4 | 34.7k | 95 | — |
+| `ms12-algebraic` | 4 | 38.5k | 17 | — |
+| `ms11-relfreq` | 3 | 44.6k | 53 | — |
 | `y10-stats` | 4 | 46.1k | 15 | — |
-| `ms11-formulas` | 4 | 57.5k | 1 | forms |
+| `ms12-networks` | 4 | 47.9k | 999 | — |
+| `ms12-simple-interest` | 4 | 55.0k | 16 | — |
 | `y11-sine-cosine-rule` | 4 | 63.3k | 1 | forms |
-| `ms12-nonright` | 4 | 64.1k | 1 | forms |
-| `ms11-relfreq` | 3 | 139.8k | 3 | forms |
-| `ms12-normal` | 2 | 141.7k | 1 | forms |
+| `ms12-normal-exact` | 4 | 77.1k | 155 | — |
+| `ms12-network-flow` | 4 | 95.8k | 33 | — |
+| `ms12-annuity-table` | 4 | 97.2k | 19 | — |
+| `ms12-normal` | 2 | 103.0k | 20 | — |
+| `ms11-formulas` | 4 | 129.1k | 18 | — |
 | `me11-functions` | 3 | 159.7k | 92 | — |
+| `ms12-bivariate-fit` | 4 | 164.5k | 33 | — |
 | `mex-vectors` | 4 | 206.6k | 1 | forms |
 | `ms11-data` | 3 | 283.9k | 50 | — |
 | `ms12-bivariate` | 1 | 338.3k | 11 | — |
 | `y7-ratio` | 4 | 563.1k | 866 | — |
 | `y7-angles` | 4 | 569.0k | 3 | forms |
+| `ms12-nonright` | 4 | 987.6k | 9 | — |
 | `ms12-critical-path` | 4 | 1.5M | 13 | — |
 | `y9-data-inquiry` | 4 | ≥ 10.9M | 1 | forms |
 | `y7-data` | 4 | ≥ 10.9M | 60 | — |
-| `ms12-network-flow` | 4 | 16.4M | 1 | forms |
 | `y10-networks` | 4 | ≥ 18.7M | 7835 | — |
 | `y9-data` | 4 | ≥ 18.7M | 3 | forms |
 
