@@ -54,7 +54,7 @@ const CASES = [
   { name: 'india-olymp-number-theory', page: 'in', path: '/notes/olymp-number-theory', id: 'olymp-number-theory', notes: olympiad['olymp-number-theory'] || null,
     practice: '/practice?subtopic=olymp-number-theory&track=olympiad', order: IN_ORDER, resources: false },
   { name: 'india-index-olympiad', page: 'in', path: '/notes?class=olympiad', index: true },
-  ...[['nsw-mav-11-01', 'mav-11-01'], ['nsw-ma4-frc-c-01', 'ma4-frc-c-01'], ['nsw-mav-11-03', 'mav-11-03']].map(([name, id]) => ({ name, page: 'nsw', id, path: `/notes/${id}`, nsw: true }))
+  ...[['nsw-mav-11-01', 'mav-11-01'], ['nsw-ma4-frc-c-01', 'ma4-frc-c-01'], ['nsw-mav-11-03', 'mav-11-03'], ['nsw-ma5-fin-c-02', 'ma5-fin-c-02']].map(([name, id]) => ({ name, page: 'nsw', id, path: `/notes/${id}`, nsw: true }))
 ];
 for (const c of CASES.filter(x => x.nsw)) {
   const topic = NSW_NOTES_TOPIC_BY_ID[c.id];
@@ -64,7 +64,10 @@ for (const c of CASES.filter(x => x.nsw)) {
   c.exactPractice = !!sub;
   c.order = NSW_ORDER;
 }
-ok(CASES.find(c => c.id === 'mav-11-03').exactPractice === false, 'mav-11-03 (Graph transformations) has no issued practice subtopic, so it exercises the fallback');
+// Graph transformations (MAV-11-03) is taught by an issued subtopic (y11-transform: Year 11 Advanced, every difficulty), so
+// its practice link is that subtopic's. The fallback to plain /practice is exercised by a topic no issued subtopic reaches.
+ok(CASES.find(c => c.id === 'mav-11-03').exactPractice === true && CASES.find(c => c.id === 'mav-11-03').practice === '/practice?subtopic=y11-transform', 'mav-11-03 (Graph transformations) links to its issued subtopic y11-transform');
+ok(CASES.find(c => c.id === 'ma5-fin-c-02').exactPractice === false, 'ma5-fin-c-02 has no issued practice subtopic, so it exercises the fallback');
 
 function expectedSections(c) {
   const n = c.notes;

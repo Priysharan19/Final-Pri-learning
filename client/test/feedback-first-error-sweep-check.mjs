@@ -284,6 +284,22 @@ ok(coverage.located === coverage.items, `the first flagged line was the wrong on
 ok(coverage.named / coverage.items >= 0.9, `at least 90% of flagged lines outside calculus carry a named, specific diagnosis (${coverage.named} of ${coverage.items})`);
 ok(coverage.controlsClean === coverage.controls, `correct working was left alone in ${coverage.controlsClean} of ${coverage.controls} cases`);
 
+// ── B2 · the forms a pinned seed does not name, step-marked too ──────────────
+// The slip catalogues above are designed against each skill's direct form. Every other form of the same
+// cells (the Prithagoras overlays, the Priyabhata extra forms) is drawn from the same seeds here and held to
+// the invariants that hold for any step-marked question (support/extra-form-step-sweep.mjs): the model line
+// is clean, a changed line is a break at that line, a restated prompt is never verified work.
+{
+  const { sweepStepMarkingOfOtherForms } = await import('./support/extra-form-step-sweep.mjs');
+  const { directFormsOnly } = await import(`${SRC}engine/generators/index.js`);
+  const other = sweepStepMarkingOfOtherForms({ cells: Object.keys(GENERATORS).map(id => ({ id })), seeds: Array.from({ length: Math.max(6, SEEDS) }, (_, i) => 1009 + i * 7919) });
+  directFormsOnly(false);
+  checks += other.checks - other.failures.length;
+  for (const text of other.failures) fail(`other forms: ${text}`);
+  ok(other.stepMarked > 100, `the step marker was run over ${other.stepMarked} questions of other forms (${JSON.stringify(other.byKind)})`);
+  console.log(`other forms: ${other.stepMarked} step-marked questions of ${other.questions} drawn (${JSON.stringify(other.byKind)}), ${other.checks} checks`);
+}
+
 // ── C · honest coverage ─────────────────────────────────────────────────────
 const noCheckTopics = new Set([...coverage.noCheck].map(c => c.split('|')[0]));
 const genericTopics = Object.entries(coverage.generic).sort((a, b) => b[1] - a[1]);

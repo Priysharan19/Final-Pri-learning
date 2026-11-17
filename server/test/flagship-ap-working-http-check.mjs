@@ -49,6 +49,9 @@ process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
 delete process.env.PRI_PUBLIC_ORIGIN;
 const { startApp, checks, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
+// Named by (skill, difficulty, seed): the skill's direct form (client/test/support/direct-forms.mjs). Other forms are
+// marked by the sweeps over every issued question.
+(await import('../../client/src/engine/generators/index.js')).directFormsOnly(true);
 
 const SAMPLE = { generator: 'c10-arithmetic-progressions', difficulty: 3, seed: 5401, curriculum: 'in' };
 const PROMPT = 'In the arithmetic progression with first term $16$ and common difference $-6$, which term is equal to $-122$? Give the term number.';

@@ -112,8 +112,16 @@ const byCategory = {};
 for (const m of MISCONCEPTIONS) byCategory[m.category] = P.causeClassOf({ firstBreak: 0, diagnosis: { code: m.id, confidence: 'high' }, category: m.category }).class;
 eq('ontology categories map onto cause classes', byCategory, {
   'equation-balance': 'concept', expansion: 'concept', notation: 'notation', indices: 'concept', functions: 'concept', fractions: 'concept', solutions: 'concept',
-  'coordinate-geometry': 'concept', probability: 'concept', copying: 'arithmetic', arithmetic: 'arithmetic', unclassified: 'unverified'
+  'coordinate-geometry': 'concept', probability: 'concept', copying: 'arithmetic', arithmetic: 'arithmetic', calculus: 'concept', factorising: 'concept', surds: 'concept', unclassified: 'unverified'
 });
+// Every category of the ontology is named in the table (a new category is a decision, not a silent default), and the
+// table names no category the ontology lacks.
+eq('every ontology category has an explicit cause class', Object.keys(byCategory).filter(c => !Object.hasOwn(P.CATEGORY_CAUSE, c)), []);
+eq('the cause-class table names no category the ontology lacks', Object.keys(P.CATEGORY_CAUSE).filter(c => !(c in byCategory)), []);
+for (const [category, cls] of [['calculus', 'concept'], ['factorising', 'concept'], ['surds', 'concept']]) {
+  eq(`a high-confidence ${category} diagnosis names a ${cls} cause`, P.causeClassOf({ firstBreak: 2, diagnosis: { code: 'x', confidence: 'high' }, category }), { class: cls, line: 3, confidence: 'high' });
+  eq(`a medium-confidence ${category} diagnosis is still unverified`, P.causeClassOf({ firstBreak: 2, diagnosis: { code: 'x', confidence: 'medium' }, category }).class, 'unverified');
+}
 
 // ── Fading ──────────────────────────────────────────────────────────────────
 section('fading');

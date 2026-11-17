@@ -363,6 +363,19 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   expect(G, 'XFAIL-sin(x)+x^30/1e90', { answerType: 'expression', answer: { expr: 'sin(x)' } }, 'sin(x)+x^30/1e90', true);
 }
 
+// ── The forms a pinned seed does not name, step-marked too ───────────────────
+// Everything above is written against each skill's direct form. Every other form of the same cells (the
+// Prithagoras overlays, the Priyabhata extra forms) is drawn from the same seeds and held to the invariants
+// that hold for any step-marked question (support/extra-form-step-sweep.mjs).
+{
+  const { sweepStepMarkingOfOtherForms } = await import('./support/extra-form-step-sweep.mjs');
+  const other = sweepStepMarkingOfOtherForms({ cells: Object.keys(GENERATORS).map(id => ({ id })), seeds: [1009, 8928, 16847, 24766, 32685, 40604] });
+  (await import(`${SRC}engine/generators/index.js`)).directFormsOnly(false);
+  groups['other-forms-step-marking'] = { pass: other.checks - other.failures.length, total: other.checks };
+  for (const text of other.failures) failures.push(`other-forms-step-marking · ${text}`);
+  if (other.stepMarked <= 100) failures.push(`other-forms-step-marking: only ${other.stepMarked} step-marked questions of other forms were reached (${JSON.stringify(other.byKind)})`);
+}
+
 // ── Counts are part of the contract ─────────────────────────────────────────
 const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 75, 'sympy-oracle-2026-11-18-controls': 1091, 'formerly-XFAIL-exact-probe': 5, 'noise-floor-and-XFAIL': 7 };
 for (const [g, n] of Object.entries(EXPECTED)) if (groups[g]?.total !== n) failures.push(`${g}: built ${groups[g]?.total} cases, the corpus has ${n}`);

@@ -38,6 +38,9 @@ process.env.PRI_AUTH_DELIVERY_KEY = 'e7'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;
 const { startApp, checks, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
+// Named by (skill, difficulty, seed): the skill's direct form (client/test/support/direct-forms.mjs). Other forms are
+// marked by the sweeps over every issued question.
+(await import('../../client/src/engine/generators/index.js')).directFormsOnly(true);
 
 const LEAST = { generator: 'c11-relations-functions', difficulty: 3, seed: 301, curriculum: 'in' };
 const AP = { generator: 'c10-arithmetic-progressions', difficulty: 3, seed: 5401, curriculum: 'in' };

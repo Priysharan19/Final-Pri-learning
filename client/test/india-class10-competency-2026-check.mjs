@@ -7,7 +7,7 @@ import { indiaClass10 as originalBank } from '../src/engine/generators/india-cla
 import { indiaClass10 } from '../src/engine/generators/india-class10.js';
 import { indiaClass10Core } from '../src/engine/generators/india-class10-core.js';
 import { currentQuadraticContext } from '../src/engine/generators/india-class10-quadratic-context.js';
-import { loadAllBanks, generateQuestion, bankOf } from '../src/engine/generators/index.js';
+import { loadAllBanks, generateQuestion, bankOf, directFormsOnly } from '../src/engine/generators/index.js';
 import { checkAnswer, methodMarks, stepCheck } from '../src/engine/checker.js';
 import { marksPossibleFor, stepEvidence } from '../../server/platform/markerOps.js';
 import { publicQuestionFields } from '../src/engine/publicQuestion.js';
@@ -113,6 +113,10 @@ x=${oracle}`
   };
 }
 
+// The standalone families are named by (skill, difficulty, seed) and solved by an oracle written for the
+// family: the skill's DIRECT form. Its extra structural forms are drawn from the same seeds, so they are
+// swept in their own loop below with the assertions that hold for every form.
+directFormsOnly(true);
 for (const { id, family } of families) {
   assert.equal(bankOf(id), 'india-class10-competency', 'new content is lazy loaded outside base Class 10');
   assert.ok(!Object.hasOwn(indiaClass10, id), 'old Class 10 generator remains byte-for-byte unchanged');
@@ -173,6 +177,40 @@ for (const { id, family } of families) {
   assert.equal(found, 1600, `new standalone Class X bank is always available (${id})`);
   assert.ok(prompts.size > 150, `meaningful variation in ${id}: ${prompts.size}`);
   unique[id] = { newlyServed: found, distinctPrompts: prompts.size };
+}
+
+// ── The extra structural forms of the same skills ───────────────────────────
+// Same seeds, extra forms on: no oracle of the family applies, so each question is held to what every
+// issued question must satisfy: its own skill and difficulty in live coverage, an unpublished key and
+// marking source, a clean inspection, the real checker accepting the key and refusing +1, -1 and the sign
+// slip, a replay that is the same item, and no hint that states the answer.
+{
+  directFormsOnly(false);
+  let swept = 0;
+  for (const { id, family } of families) {
+    for (let seed = 1; seed <= 1600; seed++) {
+      const s = seed * 311 + 17;
+      const q = generateQuestion(id, 3, s);
+      if (!q.form || q.contentFamily === family) continue;
+      swept++;
+      assert.equal(q.subtopic, id);
+      assert.equal(q.difficulty, 3);
+      const publicIssue = publicQuestionFields(q);
+      assert.ok(!Object.hasOwn(publicIssue, 'answer') && !Object.hasOwn(publicIssue, 'stepcheck') && !Object.hasOwn(publicIssue, 'seed'), `issued prompt excludes the key and marking source (${id} ${q.form})`);
+      assert.deepEqual(inspect(q), [], `question inspection ${id} ${q.form} seed ${s}`);
+      assert.deepEqual(q, generateQuestion(id, 3, s), 'same seed yields same complete item');
+      if (q.answerType === 'numeric' && Number.isFinite(q.answer?.value) && q.answer.tol == null) {
+        const v = q.answer.value;
+        assert.equal(checkAnswer(q, String(v)).correct, true, `real checker accepts the key (${id} ${q.form} seed ${s})`);
+        assert.equal(checkAnswer(q, String(v + 1)).correct, false, `real checker rejects +1 (${id} ${q.form})`);
+        assert.equal(checkAnswer(q, String(v - 1)).correct, false, `real checker rejects -1 (${id} ${q.form})`);
+        if (v !== 0) assert.equal(checkAnswer(q, String(-v)).correct, false, `real checker rejects the sign slip (${id} ${q.form})`);
+        for (const hint of q.hints || []) assert.ok(!hint.includes(`$${v}$`) && !hint.endsWith(`=${v}$`), 'hint does not give the final answer');
+      }
+    }
+  }
+  directFormsOnly(true);
+  console.log(`extra forms of the standalone Class X families swept: ${swept} questions`);
 }
 
 // No regression in ANY existing D1–D4 generator output. New families use

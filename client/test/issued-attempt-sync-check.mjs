@@ -142,8 +142,16 @@ const claimOf = async q => `${me.id}:resolved:${await blindHash(`practice-resolu
   const backendSource = (await import('node:fs')).readFileSync(new URL('../src/local/backend.js', import.meta.url), 'utf8');
   ok(/registerIssuedAttemptRecorder\(\(pid, rowId, event\) => withMutationLock\(`question:\$\{rowId\}`/.test(backendSource),
     'the recorder runs under the same question lock a submit holds');
-  ok(/key === 'POST \/practice\/:id\/submit'[\s\S]{0,400}withMutationLock\(`question:\$\{params\.id\}`/.test(backendSource),
+  // Found structurally, not within a character window: the routes that run under the question lock are the
+  // alternatives of the one condition whose body is `withMutationLock(`question:${params.id}`, work)`, and the
+  // lock is taken in runGated, before any handler (which is what reads the row) runs.
+  const gated = backendSource.match(/async function runGated\([^)]*\) \{([\s\S]*?)\n\}\n/)?.[1] || '';
+  const lockedRoutes = gated.match(/if \(params\?\.id && \(([\s\S]*?)\)\) return withMutationLock\(`question:\$\{params\.id\}`, work\)/)?.[1] || '';
+  ok(/'POST \/practice\/:id\/submit'/.test(lockedRoutes),
     'and submit takes that lock before it reads the row');
+  ok(gated.indexOf('withMutationLock(`question:${params.id}`') !== -1 && gated.indexOf('await handler(body, params)') !== -1
+    && gated.indexOf('await handler(body, params)') < gated.indexOf('withMutationLock(`question:${params.id}`') && /const work = async/.test(gated),
+    'the handler runs only inside the locked `work` closure, so no route reads the row first');
 }
 
 // 3h · a pull that lands while a submit holds the question writes nothing until

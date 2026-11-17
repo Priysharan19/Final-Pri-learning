@@ -286,6 +286,11 @@ function walk(dir, out = []) {
 const srcDir = join(here, '..', 'src');
 for (const file of walk(srcDir)) {
   if (file.startsWith(modelDir)) continue;
+  // The NSW notes (notes/nsw, the Prithagoras notes tab) READ the crosswalk and the syllabus tree to name a
+  // topic's outcomes and to send a reader to the practice of a dot point; they serve no generated question.
+  // Those two modules, and no other file of src, may name the model.
+  const READS_MODEL = new Set(['nswNotesIndex.js', 'nswPractice.js']);
+  if (file.includes(`${join('src', 'notes', 'nsw')}`) && READS_MODEL.has(file.split('/').pop())) continue;
   check(!readFileSync(file, 'utf8').includes('curriculum-nsw'), `${relative(repo, file)} references curriculum-nsw: serving NSW content is G3, not G2`);
 }
 
@@ -362,7 +367,14 @@ try {
     git(['ls-files', '--others', '--exclude-standard', '--', ...paths])
   ].filter(Boolean).join('\n');
   const touched = changedSince(['client/src/engine/curriculum-nsw']);
-  if (touched) {
+  // An integration train merges many reviewed branches into one: its diff against main carries the NSW
+  // model's changes AND every other branch's India/generator/practice changes by construction, so the
+  // "an NSW-model branch changes nothing else" rule cannot be read from the train's own diff. Each
+  // constituent branch is held to the rule by its own CI before it joins a train (docs/release/release-policy.md).
+  const branchName = process.env.GITHUB_HEAD_REF || git(['rev-parse', '--abbrev-ref', 'HEAD']);
+  if (touched && /^task\/train-/.test(branchName)) {
+    isolationNote = `integration branch ${branchName}: the NSW-model isolation rule is enforced on each constituent branch, not on the merged diff`;
+  } else if (touched) {
     const changed = changedSince([...PROTECTED, ...protectedGlobs.map(g => `:(glob)${g}`)]);
     // Authored NSW content (a new generator and its subtopic) legitimately changes the crosswalk and
     // the legacy NSW course together. Only these shapes of change are let through; anything else in

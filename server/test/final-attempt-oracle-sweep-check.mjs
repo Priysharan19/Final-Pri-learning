@@ -19,7 +19,7 @@
 //
 //   node server/test/final-attempt-oracle-sweep-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
-import { GENERATORS, loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
+import { GENERATORS, loadAllBanks, generateQuestion, directFormsOnly } from '../../client/src/engine/generators/index.js';
 import { lineCheckEvidence, stepMetaFor } from '../platform/markerOps.js';
 import { isConstantAnswer, stripUnits } from '../platform/finalAttempt.js';
 import { answerTextFor } from '../platform/practice.js';
@@ -29,6 +29,11 @@ const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 
 await loadAllBanks?.();
+// The plan banks are the skills' direct forms: no extra structural form carries a working plan (stepMetaFor is
+// null for every one), so there is nothing for this sweep to judge in them. With the extra forms on, a seed lands on
+// one of them in most cells and the population of plan questions this sweep is sized on falls fivefold; it is
+// swept on the direct forms, as on train 24, and the extra forms are held to the final-attempt contract below.
+directFormsOnly(true);
 
 const SEEDS = [1, 2, 3, 5, 8, 11, 13, 21];
 const fmt = n => (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(4))));
@@ -111,6 +116,7 @@ for (const id of Object.keys(GENERATORS)) {
 // brackets, sqrt, abs, factorial, sci notation, LaTeX \text/\frac, arrows,
 // emoji, quotes, Devanagari digits, subscripts. Every pair must be identical.
 let r4 = 0;
+let zeroStructural = 0;
 {
   const sci = v => { const e = Math.floor(Math.log10(Math.abs(v) || 1)); return `${+(v / 10 ** e).toPrecision(12)}e${e}`; };
   const SH = (w, v) => [
@@ -121,8 +127,15 @@ let r4 = 0;
     `${w} = |${v}|`, `${w} = sqrt(${v * v})`, `${w} = √${v * v}`, `${w} = ${v}^1`, `${w} = 1*${v}`, `so ${w} = ${v}`, `∴ ${w} = ${v}`, `hence ${w} is ${v}`, `${w} = ${v} units`,
     `${w}=${v} (ans)`, `${w}≅${v}`, `${w} ~ ${v}`, `${w} = ${v}…`, `${w} = '${v}'`, `${w} = "${v}"`, `${w} = [${v}]`, `${w} = {${v}}`, `${w}₁ = ${v}`, `${w}' = ${v}`
   ];
-  for (const id of Object.keys(GENERATORS)) for (const d of [1, 2, 3, 4]) for (const seed of [7, 11, 23]) {
-    let q; try { q = generateQuestion(id, d, seed); } catch { continue; }
+  // Two passes over the same cells and seeds: the direct forms, then every OTHER form (the Prithagoras overlays carry a
+  // few plans of their own, e.g. y11-diff's gradient at a point, whose key can be 0).
+  for (const otherForms of [false, true]) for (const id of Object.keys(GENERATORS)) for (const d of [1, 2, 3, 4]) for (const seed of [7, 11, 23]) {
+    let q;
+    try {
+      directFormsOnly(!otherForms);
+      q = generateQuestion(id, d, seed);
+      if (otherForms) { directFormsOnly(true); if (generateQuestion(id, d, seed).prompt === q.prompt) continue; }
+    } catch { continue; } finally { directFormsOnly(true); }
     const meta = q && stepMetaFor(q);
     if (meta?.kind !== 'plan' || q.answerType !== 'numeric') continue;
     const v = Number(q.answer.value);
@@ -138,14 +151,29 @@ let r4 = 0;
           r4 += 1;
           const a = JSON.stringify(lineCheckEvidence(q, [...P, line], answerText));
           const b = JSON.stringify(lineCheckEvidence(q, [...P, wrong[i]], answerText));
-          if (a !== b) failures.push(`round-4 shape ${i} ${JSON.stringify(line)} (${id} D${d} seed ${seed}, after ${P.length} lines): ${a} | ${b}`);
-          else pass += 1;
+          if (a !== b) {
+            // A key of 0 is structural, not a leak: "m=0 (ans)" is 0 times a note, the constant 0, while
+            // "m=7 (ans)" is 7 times three free letters. The two lines differ in what they SAY, not in
+            // whether they are right. That is proved, not assumed: the same line must read the same whatever
+            // the escrowed answer is, so it cannot tell the right value from a wrong one (a wrong 0 reads
+            // identically). Any other difference stays a failure.
+            const independent = v === 0 && [1, 7, -3].every(other => JSON.stringify(lineCheckEvidence(q, [...P, line], String(other))) === a);
+            if (independent) { zeroStructural += 1; pass += 1; }
+            else failures.push(`round-4 shape ${i} ${JSON.stringify(line)} (${id} D${d} seed ${seed}, after ${P.length} lines): ${a} | ${b}`);
+          } else pass += 1;
         });
       }
     }
   }
 }
 ok(r4 >= 100000, `the round-4 shape set ran (${r4} probes)`);
+ok(zeroStructural > 0, `the zero-key case was reached on another form (${zeroStructural} probes)`);
+// Regression (train 25): a key of 0 makes "w=0 (ans)" the constant 0; it is an attempt whatever the escrowed answer is.
+{
+  const probe = lineCheckEvidence(generateQuestion('y11-diff', 3, 23), ['m=0 (ans)'], '0');
+  const other = lineCheckEvidence(generateQuestion('y11-diff', 3, 23), ['m=0 (ans)'], '7');
+  ok(JSON.stringify(probe) === JSON.stringify(other), 'a zero-times-a-note line reads the same against a key of 0 and a key of 7');
+}
 
 // ── Round 5 (probes826/r5sweep.mjs): givens are constants ────────────────────
 // "S = -59.5*n" with n fixed by the question is "S = <number>". Every letter

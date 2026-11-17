@@ -4,8 +4,13 @@
 // Sweeps every issued question of the trigonometry and functions topics (the
 // generators both editions draw from) and holds the slip catalogue to:
 //
-//   A · COVERAGE. Of the question's designed wrong answers (its traps), the share
-//       the catalogue names with a specific, number-bearing sentence. Target ≥ 80%.
+//   A · COVERAGE, two measures over the same draws (every form the issuing code can serve):
+//       A1 · of the designed wrong answers (traps) of the skills' DIRECT forms, which the catalogue is written
+//            against, the share it names with a specific, number-bearing sentence: ≥ 80%.
+//       A2 · of the designed wrong answers of EVERY form (the direct forms, the Prithagoras capacity overlays),
+//            the share a student is actually given a specific explanation for: by the catalogue, or else by the
+//            trap's own authored explanation through the real checker (which every form authors with its
+//            traps): ≥ 99%. The catalogue has no entries for the overlays' prompt shapes, so A1 is not asked of them.
 //   B · NEVER ON CORRECT WORK. The right answer is never reported as a slip.
 //   C · SPECIFIC. Every sentence is plain, in en, hi and en-AU, and carries a number
 //       from the question or the slip's own working (none is a generic template).
@@ -16,7 +21,7 @@
 // here (the marking suites assert that). Usage: node smart-trig-functions-check.mjs [seeds]
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
-const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
+const { generateQuestion, loadAllBanks, directFormsOnly } = await import(`${SRC}engine/generators/index.js`);
 const { diagnoseWith, sayIn, LANGS, slipTolerance } = await import(`${SRC}engine/misconceptions/slipKit.js`);
 const trigMod = await import(`${SRC}engine/misconceptions/topics/trigonometry.js`);
 const trig = trigMod.entries;
@@ -36,7 +41,7 @@ const ok = (c, t) => { checks++; if (!c) fail(t); };
 
 const shapeOf = p => String(p).replace(/\$[^$]*\$/g, '$').replace(/[-\d.]+/g, '#').slice(0, 90);
 const rows = [];
-let totalTraps = 0, totalNamed = 0, slipChecks = 0, slipNamed = 0, viaChecker = 0, named2 = 0;
+let totalTraps = 0, totalNamed = 0, allTraps = 0, allExplained = 0, otherTraps = 0, otherCatalogue = 0, slipChecks = 0, slipNamed = 0, viaChecker = 0, named2 = 0;
 const missed = new Map();
 const leaks = new Map();
 
@@ -45,7 +50,16 @@ for (const [group, topics, entries] of [['trigonometry', TRIG, trig], ['function
     let traps = 0, named = 0, qn = 0;
     for (let d = 1; d <= 4; d++) {
       for (let i = 1; i <= SEEDS; i++) {
-        let q; try { q = generateQuestion(topic, d, i * 104729 + d * 31); } catch { continue; }
+        // The catalogue is written against each skill's DIRECT form: q is that form at this seed. The same seed
+        // drawn with every form on may be another form (an overlay); it is swept after the direct form (A2).
+        let q, other = null;
+        try {
+          directFormsOnly(true);
+          q = generateQuestion(topic, d, i * 104729 + d * 31);
+          directFormsOnly(false);
+          const any = generateQuestion(topic, d, i * 104729 + d * 31);
+          if (any.prompt !== q.prompt) other = any;
+        } catch { continue; } finally { directFormsOnly(false); }
         qn++;
         const right = Number(q.answer?.value);
         // B · the right answer is never a slip
@@ -82,8 +96,12 @@ for (const [group, topics, entries] of [['trigonometry', TRIG, trig], ['function
         for (const t of q.traps || []) {
           const v = Number(t.value);
           if (!Number.isFinite(v)) continue;
-          traps++;
           const hit = diagnoseWith(entries, q, v);
+          // A2 · what the student is given for this wrong answer: the catalogue's sentence, or the trap's own explanation.
+          allTraps++;
+          if (hit) allExplained++;
+          else { const r = checkAnswer(q, String(v)); if (r.correct === false && typeof r.feedback === 'string' && r.feedback.trim().length > 20) allExplained++; else fail(`${topic}: the designed wrong answer ${v} is given no explanation for "${String(q.prompt).slice(0, 70)}"`); }
+          traps++;
           if (hit) {
             named++;
             for (const lang of LANGS) {
@@ -106,6 +124,18 @@ for (const [group, topics, entries] of [['trigonometry', TRIG, trig], ['function
             missed.set(k, (missed.get(k) || 0) + 1);
           }
         }
+        // A2 for the same seed's other form: every designed wrong answer is explained, and no designed wrong
+        // answer is the right one.
+        for (const t of other?.traps || []) {
+          const v = Number(t.value);
+          if (!Number.isFinite(v)) continue;
+          allTraps++; otherTraps++;
+          const hit = diagnoseWith(entries, other, v);
+          if (hit) { allExplained++; otherCatalogue++; continue; }
+          const r = checkAnswer(other, String(v));
+          if (r.correct === false && typeof r.feedback === 'string' && r.feedback.trim().length > 20) allExplained++;
+          else fail(`${topic}: the designed wrong answer ${v} is given no explanation for "${String(other.prompt).slice(0, 70)}"`);
+        }
       }
     }
     totalTraps += traps; totalNamed += named;
@@ -117,9 +147,13 @@ for (const r of rows) console.log(`${r.group.padEnd(13)} ${r.topic.padEnd(22)} $
 console.log(`CHECKER ${named2}/${viaChecker} catalogued slips that are not authored traps came back from checkAnswer named (verdict unchanged: never correct)`);
 console.log(`CATALOGUE ${slipNamed}/${slipChecks} wrong answers a catalogued slip produces are named when entered`);
 const pct = totalTraps ? (100 * totalNamed) / totalTraps : 100;
-console.log(`TOTAL ${totalNamed}/${totalTraps} designed wrong answers named with a specific sentence (${pct.toFixed(1)}%)`);
+const pctAll = allTraps ? (100 * allExplained) / allTraps : 100;
+console.log(`TOTAL ${totalNamed}/${totalTraps} designed wrong answers of the direct forms named with a specific catalogue sentence (${pct.toFixed(1)}%)`);
+console.log(`ALL FORMS ${allExplained}/${allTraps} designed wrong answers given a specific explanation (${pctAll.toFixed(1)}%); of the ${otherTraps} on the overlays, ${otherCatalogue} also named by the catalogue`);
 if (process.argv.includes('--missed')) for (const [k, n] of [...missed].sort((a, b) => b[1] - a[1]).slice(0, 60)) console.log(`  missed ×${n}: ${k}`);
 for (const [k, n] of leaks) fail(`the sentence for ${k} states the right answer (${n} time(s))`);
-ok(pct >= 80, `only ${pct.toFixed(1)}% of designed wrong answers are named (need ≥ 80%)`);
+ok(pct >= 80, `only ${pct.toFixed(1)}% of the direct forms' designed wrong answers are named by the catalogue (need ≥ 80%)`);
+ok(pctAll >= 99, `only ${pctAll.toFixed(1)}% of all forms' designed wrong answers are given an explanation (need ≥ 99%)`);
+ok(otherTraps > 500, `the overlay forms were swept (${otherTraps} designed wrong answers)`);
 if (failures.length) { console.error(`SMART TRIG + FUNCTIONS: FAIL — ${failures.length} problem(s)\n  ${failures.join('\n  ')}`); process.exit(1); }
-console.log(`SMART TRIG + FUNCTIONS: PASS — ${checks} checks — ${pct.toFixed(1)}% of designed wrong answers named, none on a right answer. [SYNTHETIC]`);
+console.log(`SMART TRIG + FUNCTIONS: PASS — ${checks} checks — ${pct.toFixed(1)}% of the direct forms' designed wrong answers named by the catalogue, ${pctAll.toFixed(1)}% of every form's explained, none on a right answer. [SYNTHETIC]`);

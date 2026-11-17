@@ -17,7 +17,7 @@
 //
 //   node server/test/line-check-constant-pin-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
-import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
+import { loadAllBanks, generateQuestion, directFormsOnly } from '../../client/src/engine/generators/index.js';
 import { lineCheckEvidence } from '../platform/markerOps.js';
 import { answerForm, firstFinalAttempt, isConstantAnswer, statesAConstant, stripUnits } from '../platform/finalAttempt.js';
 import { answerTextFor } from '../platform/practice.js';
@@ -28,6 +28,9 @@ const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label} — expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`);
 
 await loadAllBanks?.();
+// Named by (skill, difficulty, seed): the skill's direct form (client/test/support/direct-forms.mjs). Other forms are
+// marked by the sweeps over every issued question.
+directFormsOnly(true);
 
 // ── 1 · Units and constant answers ───────────────────────────────────────────
 eq(['36036 cm³', '₹ 450', '12.5 %', '7 m/s', '24 sq cm'].map(stripUnits), ['36036', '450', '12.5', '7', '24'], 'units and currency are stripped from a number');

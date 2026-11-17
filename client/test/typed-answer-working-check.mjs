@@ -40,12 +40,16 @@ globalThis.localStorage = localStorage;
 if (!globalThis.window) globalThis.window = { localStorage, addEventListener() {}, removeEventListener() {} };
 if (!globalThis.document) globalThis.document = { documentElement: { lang: 'en' }, cookie: '', addEventListener() {}, removeEventListener() {} };
 
-const { generateQuestion, loadAllBanks } = await import('../src/engine/generators/index.js');
+const { generateQuestion, loadAllBanks, directFormsOnly } = await import('../src/engine/generators/index.js');
 const { checkAnswer, stepCheck, methodMarks } = await import('../src/engine/checker.js');
 const { areaPlan, assessAreaLine } = await import('../src/engine/reason-area.js');
 const en = (await import('../src/i18n/strings.en.js')).default;
 const hi = (await import('../src/i18n/strings.hi.js')).default;
 await loadAllBanks();
+// The reported question is named by its seed and the plan sweep below asserts the area plan: both are the
+// skill's direct form. The skill's extra forms are swept separately (section 2b) with the assertions that
+// apply to every form.
+directFormsOnly(true);
 
 const GENERATOR = 'c12-applications-integrals';
 const keyOf = q => q.answer.simplestFraction ? `${q.answer.simplestFraction.n}/${q.answer.simplestFraction.d}` : String(q.answer.value);
@@ -173,6 +177,40 @@ const award = (q, working, marks = marksOf(q)) =>
   eq(areaPlan({ integrand: 'nonsense(', antiderivative: 'x', lower: 0, upper: 1, value: 1 }), null, 'unreadable metadata refuses the plan');
   eq(assessAreaLine({ text: '343/6', meta: { kind: 'evaluation' } }).status, 'note', 'a foreign stage kind is never credited by the area verifier');
   eq(assessAreaLine({ text: 'x = 0, 7', meta: { kind: 'area-limits', variable: 'x', values: [0, 7] } }).status, 'note', 'the limits stage fails closed without the exact equation verifier');
+}
+
+// ── 2b · The skill's extra forms, the same sweep where it applies ─────────────
+// The extra structural forms have no area plan (their working, if any, is their own), so the plan
+// assertions above do not apply to them. What does apply to every form is checked here over the same
+// seeds: the key is correct, a wrong answer is not, working typed into the answer field is invalid, the
+// public hint never carries the key, and an authored working plan, when the form has one, is
+// self-consistent (a keyed final stage) and never reads a bare restatement of the prompt as a method.
+{
+  directFormsOnly(false);
+  let extra = 0;
+  for (const difficulty of [1, 2, 3, 4]) {
+    for (let seed = 0; seed < 40; seed++) {
+      const q = generateQuestion(GENERATOR, difficulty, seed);
+      if (!q.form) continue;
+      extra++;
+      const bad = [];
+      const key = keyOf(q);
+      if (q.answerType === 'numeric') {
+        if (checkAnswer(q, key).correct !== true) bad.push('keyed answer correct');
+        if (checkAnswer(q, String(Number(q.answer.value) + 1)).correct === true) bad.push('a different value is not correct');
+        if (checkAnswer(q, '∫4x+3').invalid !== true) bad.push('working in the answer field is invalid');
+      }
+      if (q.inputHint && String(q.inputHint).includes(key) && String(key).length > 2) bad.push('hint is not the answer');
+      if (q.stepcheck?.kind === 'plan') {
+        const restated = [...q.prompt.matchAll(/\$([^$]+)\$/g)].map(m => m[1]).filter(t => /=/.test(t)).join('\n');
+        if (award(q, restated) !== 0) bad.push('restating the prompt earns nothing');
+        if (award(q, key) !== 0 && q.stepcheck.stages.length > 1) bad.push('the bare answer in the working is not a method');
+      }
+      if (bad.length) failures.push(`extra form ${q.form} D${difficulty} seed ${seed}: ${bad.join('; ')}`); else pass++;
+    }
+  }
+  directFormsOnly(true);
+  ok(extra > 0, `the skill's extra forms were swept (${extra} questions)`);
 }
 
 // ── 3 · Guidance for the final-answer field ──────────────────────────────────

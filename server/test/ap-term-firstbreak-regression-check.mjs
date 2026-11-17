@@ -31,11 +31,14 @@
 // model, no clock.
 // ─────────────────────────────────────────────────────────────────────────────
 import assert from 'node:assert/strict';
-import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
+import { loadAllBanks, generateQuestion, directFormsOnly } from '../../client/src/engine/generators/index.js';
 import { checkAnswer, stepCheck } from '../../client/src/engine/checker.js';
 import { marksPossibleFor, stepEvidence } from '../platform/markerOps.js';
 
 await loadAllBanks();
+// The first loop pins the skill's DIRECT form (its givens a, d, n and a five-line plan); the skill's other forms
+// are swept after it with the assertions that hold for any form.
+directFormsOnly(true);
 let count = 0, checks = 0;
 let negatives = 0, positives = 0;
 const check = (fn, ...args) => { fn(...args); checks++; };
@@ -113,4 +116,26 @@ for (let seed = 10000; seed < 10120; seed++) {
   count++;
 }
 check(assert.ok, negatives >= 30 && positives >= 30, 'need both common-difference signs');
+
+// The same cell with the extra forms on. A form with no plan is final-answer only: its key is correct, a different value is not, and it grants no method mark.
+{
+  directFormsOnly(false);
+  let other = 0, planned = 0;
+  for (const diff of [1, 2, 3, 4]) for (let seed = 10000; seed < 10120; seed++) {
+    const q = generateQuestion('c10-arithmetic-progressions', diff, seed);
+    if (!q.form) continue;
+    other++;
+    if (typeof q.answer?.value === 'number') {
+      check(assert.equal, checkAnswer(q, String(q.answer.value)).correct, true, `extra form ${q.form}: the key is correct (D${diff} seed ${seed})`);
+      check(assert.equal, checkAnswer(q, String(q.answer.value + 1)).correct, false, `extra form ${q.form}: a different value is not (D${diff} seed ${seed})`);
+    }
+    const meta = q.stepcheck;
+    if (meta?.kind !== 'plan') { check(assert.equal, stepEvidence(q, String((q.answer?.value ?? 0) + 1), 'I used the formula.', checkAnswer(q, String((q.answer?.value ?? 0) + 1)))?.partial?.awarded ?? 0, 0, `extra form ${q.form}: no plan, no method mark (D${diff} seed ${seed})`); continue; }
+    planned++;
+    // No extra form carries a plan today. One that gains a plan owes this suite its first-break assertions.
+    check(assert.fail, `extra form ${q.form} gained a working plan: add its first-break contract to this sweep (D${diff} seed ${seed})`);
+  }
+  directFormsOnly(true);
+  check(assert.ok, other > 0, `the skill's extra forms were swept (${other} questions, ${planned} with a plan)`);
+}
 console.log(`AP FIRST-BREAK REGRESSION: PASS — ${checks}/${checks} checks over ${count} seeds (${negatives} negative, ${positives} positive common differences) — proof, rubric, copying and formula slips carried forward once, prose and correction checked`);

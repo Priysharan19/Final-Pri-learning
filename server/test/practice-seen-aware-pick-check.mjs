@@ -39,7 +39,9 @@ process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
 delete process.env.PRI_PUBLIC_ORIGIN;
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
-const { loadAllBanks, generateQuestion } = await import('../../client/src/engine/generators/index.js');
+const { loadAllBanks, generateQuestion, directFormsOnly } = await import('../../client/src/engine/generators/index.js');
+// The cell under test is the skill's direct form: it holds exactly seven questions (the pick's budget is sized on that).
+directFormsOnly(true);
 const engine = requestedEngine();
 console.log(`engine: ${engine}`);
 const h = await startApp({ engine });

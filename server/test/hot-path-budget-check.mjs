@@ -429,17 +429,28 @@ try {
   // (#537, practiceAllowance.js) reads the entitlement snapshot and today's
   // count, then counts the issue, inside the issue transaction — 7 -> 11 on
   // sqlite and 9 -> 13 on postgres, measured with --report on both engines.
+  // Train 25 (attempt support, help plan, original work), re-measured with --report on both engines.
+  // The submit path gained these reads inside its committing transaction: the tutor-help marker
+  // (attemptSupport helpRecordsFor), the tutor-policy offers (practice-help-plan, read twice: once for the
+  // support, once for policyAssistance), the two per-question rate-limit buckets (line-check and step-coach
+  // witnesses) and one read per tried-content key (help on another copy): 26 on sqlite, unbatched. They are now
+  // read in fewer statements than on train 24: the marker, the offers and the hint rungs are read by the gate's existing statement
+  // (recordsOf, run in the forecast and again under the lock: the hint rungs were two separate statements,
+  // one in each), and the buckets and the copy rows are ONE UNION ALL statement (helpRecordsFor). Net against
+  // the previous pins: -1 on every submit path (-2 hint-rung reads, +1 union), on both engines. The original-work
+  // keep (originalWork.js) adds nothing here: a typed answer keeps none, and the ink paths' keep is inside the
+  // statements the pins below already count.
   const PINS = {
     sqlite: {
       'POST /v1/practice/issue': 11,                                     // was 13 (7 before the #537 cap)
       // Train 10, --report on both engines: +2 per submit for the server-charged
       // hint ladder (#584, the rung served so far) and misconception targeting
       // (#586) — 17 -> 19 sqlite, 19 -> 21 postgres; the ink paths likewise.
-      'POST /v1/practice/:id/submit (typed, resolves)': 19,              // was 34
+      'POST /v1/practice/:id/submit (typed, resolves)': 18,              // 19 on train 24; was 34
       // #440 read on request: the paid read is Read my answer (/handwriting/transcribe,
       // not counted here); /recognize at Submit replays it — 45 -> 35, --report on sqlite.
-      'ink Submit, three requests (recognize + confirm + submit)': 37,   // was 86
-      'ink Submit, one request (picture with the submission)': 21,       // 29 before #440 (the read moved to Read my answer); was 86
+      'ink Submit, three requests (recognize + confirm + submit)': 36,   // 37 on train 24; was 86
+      'ink Submit, one request (picture with the submission)': 20,       // 21 on train 24; 29 before #440 (the read moved to Read my answer); was 86
       'POST /v1/sync/push (5 events + 1 entity)': 32,                    // was 37
       'GET /v1/sync/pull/0': 9,                                          // was 14
       'GET /v1/account/me': 1,                                           // was 1
@@ -447,11 +458,11 @@ try {
     },
     postgres: {
       'POST /v1/practice/issue': 13,                                     // was 15 (9 before the #537 cap)
-      'POST /v1/practice/:id/submit (typed, resolves)': 21,              // was 37
+      'POST /v1/practice/:id/submit (typed, resolves)': 20,              // 21 on train 24; was 37
       // #440 moved the paid read to Read my answer (its sqlite pins fell 10);
       // postgres measured here with the train-10 +2: 51 -> 43 and 31 -> 23.
-      'ink Submit, three requests (recognize + confirm + submit)': 43,   // was 94
-      'ink Submit, one request (picture with the submission)': 23,       // was 94 (three requests)
+      'ink Submit, three requests (recognize + confirm + submit)': 42,   // 43 on train 24; was 94
+      'ink Submit, one request (picture with the submission)': 22,       // 23 on train 24; was 94 (three requests)
       'POST /v1/sync/push (5 events + 1 entity)': 34,                    // was 39
       'GET /v1/sync/pull/0': 9,                                          // was 14
       'GET /v1/account/me': 1,                                           // was 1

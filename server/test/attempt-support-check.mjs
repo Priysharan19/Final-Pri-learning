@@ -30,6 +30,9 @@ delete process.env.PRI_HANDWRITING_API_KEY;   // the tutor is on but has no prov
 delete process.env.PRI_TUTOR_ENDPOINT;
 delete process.env.PRI_PUBLIC_ORIGIN;
 (await import('../platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
+// The suite issues questions by (skill, seed) and solves them from the prompt it knows: the skill's direct form
+// (client/test/support/direct-forms.mjs). The other forms are marked by the sweeps over all issued questions.
+(await import('../../client/src/engine/generators/index.js')).directFormsOnly(true);
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const S = await import('../platform/attemptSupport.js');

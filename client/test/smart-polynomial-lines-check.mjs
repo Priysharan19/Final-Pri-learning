@@ -14,7 +14,7 @@
 const SRC = new URL('../src/', import.meta.url).href;
 const { diagnoseTopicLine, registeredTopics, topicDiagnosisCodes } = await import(`${SRC}engine/misconceptions/topics/index.js`);
 const { polynomialOf } = await import(`${SRC}engine/misconceptions/topics/polynomial-lines.js`);
-const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
+const { generateQuestion, loadAllBanks, directFormsOnly } = await import(`${SRC}engine/generators/index.js`);
 const { stepCheck, checkAnswer } = await import(`${SRC}engine/checker.js`);
 const { NSW_ISSUED_CELLS } = await import(`${SRC}engine/nswIssuedCells.js`);
 const { checkWorking } = await import(`${SRC}engine/checker.js`);
@@ -22,6 +22,10 @@ const nsw = await import(`${SRC}engine/curriculum-nsw/index.js`);
 const { exprEquivalent } = await import(`${SRC}engine/expr.js`);
 const { stepMetaFor } = await import('../../server/platform/markerOps.js');
 await loadAllBanks();
+// Questions here are named by (skill, difficulty, seed) and the designed wrong answers are their authored traps: the
+// skills' direct forms (client/test/support/direct-forms.mjs). The other forms are step-marked by the sweeps in
+// marker-adversarial-corpus-check and feedback-first-error-sweep-check (support/extra-form-step-sweep.mjs).
+directFormsOnly(true);
 
 const failures = []; let checks = 0;
 const ok = (c, t) => { checks++; if (!c && failures.length < 40) failures.push(t); };
@@ -36,8 +40,8 @@ const probe = (previous, line, meta = sample) => diagnoseTopicLine({ line, previ
 
 // B · designed slips, each named by its own code (the question's numbers drive the message)
 const DESIGNED = [
-  ['4*n^3 - 4*n', '= 4*n*(n^2 + 1)', 'poly-term-sign', /term in n has the opposite sign/],
-  ['(4n+8)^2', '= 16n^2 + 64', 'poly-term-missing', /no term|has none/],
+  ['4*n^3 - 4*n', '= 4*n^3 + 4*n', 'poly-term-sign', /term in n has the opposite sign/],
+  ['x^3 + 6x^2 + 9x', '= x^3 + 9x', 'poly-term-missing', /no term|has none/],
   ['5x^2 + 2x + 3', '= 5x^2 + 2x + 1', 'poly-constant-off', /Only the constant term changed/],
   ['x^3 + 2x^2 - 5x + 6', '= x^3 + 2x^2 - 5x + 7', 'poly-constant-off', /not right/],
   ['x^2 + 6x + 9', '= x^2 + 5x + 9', 'poly-coefficient-off', /coefficient 5, but the line above gives 6/],
@@ -50,6 +54,15 @@ for (const [prev, line, code, re] of DESIGNED) {
   ok(r && re.test(r.message), `${prev} → ${line}: message ${JSON.stringify(r?.message)}`);
   ok(r && typeof r.messages.hi === 'string' && r.messages.hi.length > 20 && /[ऀ-ॿ]/.test(r.messages.hi) && !!r.messages['en-AU'], `${code}: hi and en-AU messages`);
   ok(r && /^[a-z0-9-]+#mistakes$/.test(r.notesSectionId || ''), `${code}: Notes link ${r?.notesSectionId}`);
+}
+// The registry names a line by the FIRST registered topic that recognises it, and this catalogue is the fallback for
+// lines nothing earlier names (polynomial-lines.js). Two lines it used to name first are now named, with the cause,
+// by the algebra catalogue registered before it: a factorisation that does not expand back, and a squared bracket
+// whose cross term is missing. Their specific messages are the better ones; that they win is pinned here.
+for (const [prev, line, code] of [['4*n^3 - 4*n', '= 4*n*(n^2 + 1)', 'factorise-fails-when-expanded'], ['(4n+8)^2', '= 16n^2 + 64', 'power-of-sum']]) {
+  const r = probe(prev, line);
+  ok(r?.code === code && r.topic === 'algebra', `${prev} → ${line}: the algebra catalogue names it ${code}, got ${r?.code} (${r?.topic})`);
+  ok(r && typeof r.messages.hi === 'string' && r.message.length > 20 && !/undefined|NaN/.test(r.message), `${code}: a real message, in hi too`);
 }
 // The first line of a working, nothing above it: described, never quantified.
 const FIRST = [['= 4*n*(n^2 + 1)', 'poly-final-term-sign'], ['= 16*n^2 + 64', 'poly-final-term-missing'], ['= 8*n^2 + 4*n', 'poly-final-coefficient']];

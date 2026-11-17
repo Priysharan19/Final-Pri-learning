@@ -210,6 +210,17 @@ function auditPage() {
   const interactive = (el) => {
     const role = el.getAttribute('role');
     if (role && INTERACTIVE_ROLES.has(role)) return true;
+    // A listbox is a composite widget: ONE tab stop that owns its options. It counts as interactive only when it
+    // keeps that contract: a name, role="option" children, and a key handler (the arrow keys move the active
+    // option, named by aria-activedescendant) or options that are themselves in the tab order (roving tabindex).
+    if (role === 'listbox') {
+      const named = !!((el.getAttribute('aria-label') || '').trim() || el.getAttribute('aria-labelledby'));
+      const options = el.querySelectorAll('[role="option"]');
+      const keyed = typeof reactProps(el)?.onKeyDown === 'function' || (!el.hasAttribute('aria-activedescendant') && [...options].some(o => o.hasAttribute('tabindex')));
+      const active = el.getAttribute('aria-activedescendant');
+      const activeOk = !active || !!el.querySelector(`[id="${CSS.escape(active)}"][role="option"]`);
+      return named && options.length > 0 && keyed && activeOk;
+    }
     if (el.matches(NATIVELY_FOCUSABLE)) return !(el.tagName === 'A' && !el.hasAttribute('href'));
     return el.isContentEditable;
   };

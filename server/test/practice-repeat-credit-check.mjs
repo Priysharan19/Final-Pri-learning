@@ -18,6 +18,9 @@ process.env.NODE_ENV = 'test'; // fixed seeds: the same content on demand
 // (server/platform/indiaBanks.js). This suite says so explicitly because it uses NSW banks (y7-equations, y10-stats, a practice paper) as the vehicle for repeat credit;
 // india-banks-check.mjs pins the refusal itself. Refused under NODE_ENV=production.
 (await import('../platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
+// Every question here is issued by (skill, difficulty, seed) and read back from its prompt: the skill's direct form
+// (client/test/support/direct-forms.mjs); the other forms are covered by the sweeps over all issued questions.
+(await import('../../client/src/engine/generators/index.js')).directFormsOnly(true);
 // D12: method marks are off by default — production marks the final answer only
 // until an examiner signs (#499). This suite pins the method rubric itself, so it
 // turns the server switch on; marking-policy-check.mjs pins the default.
