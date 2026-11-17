@@ -34,7 +34,7 @@ import std from '../src/notes/nsw/notes-nsw-stage6-standard.js';
 const CLIENT = fileURLToPath(new URL('..', import.meta.url));
 const SHOTS_DIR = fileURLToPath(new URL('../../docs/design/nsw-notes-screens/', import.meta.url));
 const WRITE_SHOTS = process.argv.includes('--shots');
-const SHOT_TOPICS = ['ma4-frc-c-01', 'ma4-pyt-c-01']; // a Year 7 and a Year 8 chapter
+const SHOT_TOPICS = ['ma4-frc-c-01', 'ma4-pyt-c-01', 'mav-12-05', 'mst-12-s2-07']; // a Year 7 and a Year 8 chapter, then an Advanced and a Standard 2 chapter
 let pass = 0;
 const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };

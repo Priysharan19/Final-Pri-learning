@@ -146,10 +146,16 @@ ok(stage4Topics.length === 16, 'the model lists 16 Stage 4 focus areas');
 ok(covered.length >= 14, `at least 14 of 16 Stage 4 focus areas have notes (${covered.length})`);
 ok(Object.keys(stage4).every(id => stage4Topics.some(t => t.id === id)), 'every note belongs to a Stage 4 focus area');
 
+for (const [course, floor] of [['advanced', 14], ['standard', 25]]) {
+  const topics6 = NSW_NOTES_TOPICS.filter(t => t.stage === 6 && t.course === course);
+  const done = topics6.filter(t => Object.hasOwn(course === 'advanced' ? six6a : six6s, t.id));
+  ok(topics6.length === floor && done.length === floor, `every Year 11–12 ${course} focus area has notes (${done.length} of ${topics6.length})`);
+}
+
 if (failures.length) {
   console.error(`NSW NOTES CONTENT: FAIL — ${failures.length} of ${pass + failures.length} checks failed`);
   for (const f of failures.slice(0, 40)) console.error(`  · ${f}`);
   process.exit(1);
 }
 const examples = all.reduce((n, [, t]) => n + t.examples.length, 0);
-console.log(`NSW NOTES CONTENT: PASS — ${pass}/${pass} checks — ${all.length} Stage 4 topics, ${examples} worked examples engine-verified, every formula rendered, no India wording`);
+console.log(`NSW NOTES CONTENT: PASS — ${pass}/${pass} checks — ${all.length} topics, ${examples} worked examples engine-verified, every formula rendered, no India wording`);

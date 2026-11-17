@@ -62,7 +62,7 @@ function Axes({ m, grid = true, labels = true, xLabel = null, yLabel = null }) {
   );
 }
 export function Defs() {
-  return <defs><marker id="dg-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" className="dg-arrowhead" /></marker></defs>;
+  return <defs><marker id="dg-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" className="dg-arrowhead" /></marker><marker id="dg-arrow-s" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 1 L10 5 L0 9 z" className="dg-arrowhead" /></marker></defs>;
 }
 
 const sentence = (...parts) => parts.filter(Boolean).join(' ');
@@ -401,7 +401,7 @@ export function Network({ nodes, edges, path = [], directed = false, title = 'A 
       <Defs />
       {m.edges.map((e, i) => (
         <g key={i}>
-          <line className={`dg-edge${e.inPath ? ' is-path' : ''}`} x1={e.start[0]} y1={e.start[1]} x2={e.end[0]} y2={e.end[1]} markerEnd={directed ? 'url(#dg-arrow)' : undefined} />
+          <line className={`dg-edge${e.inPath ? ' is-path' : ''}`} x1={e.start[0]} y1={e.start[1]} x2={e.end[0]} y2={e.end[1]} markerEnd={directed ? 'url(#dg-arrow-s)' : undefined} />
           {e.label && <Tex x={e.labelAt[0]} y={e.labelAt[1]} tex={e.label} w={56} h={20} className={e.inPath ? 'is-mark' : ''} />}
         </g>
       ))}
