@@ -1,6 +1,6 @@
 // Deterministic checks for the Today set, the retest timing and edition string parity.
 import assert from 'node:assert/strict';
-import { buildTodaySet, interleave, ITEM_MINUTES, MAX_MINUTES, TARGET_MINUTES } from '../src/today/todaySet.js';
+import { unassisted, buildTodaySet, interleave, ITEM_MINUTES, MAX_MINUTES, TARGET_MINUTES } from '../src/today/todaySet.js';
 import { buildNotebook, reviewFor } from '../src/engine/mistakeNotebook.js';
 import { spacedSchedule } from '../src/engine/spacedReview.js';
 import en from '../src/i18n/strings.en.js';
@@ -73,6 +73,12 @@ ok('no-repeat: the retest is drawn by the server twin route, never the original 
   const s = buildTodaySet({ notebook: book([wrong('a', 'alg', 3)]), now });
   assert.equal(s.items[0].questionId, undefined);
   assert.equal(JSON.stringify(s.items[0]).includes('qa'), false);
+});
+
+ok('a Today retest is unassisted: no hint ladder on the served question', () => {
+  const q = unassisted({ id: 'x', hintLadder: 3, prompt: 'p' });
+  assert.equal(q.hintLadder, 0); assert.equal(q.id, 'x');
+  assert.equal(unassisted(null), null);
 });
 
 ok('edition parity: every Today and error-log string exists in en (en-AU shares it) and hi, same plural shape', () => {

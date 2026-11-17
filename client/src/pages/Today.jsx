@@ -6,6 +6,7 @@ import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 import { isEntitlementGate } from '../local/entitlementGate.js';
 import { PAYWALL_ROUTE } from '../paywall/route.js';
+import { unassisted } from '../today/todaySet.js';
 import { useToday } from '../today/useToday.js';
 
 // Today: a short mixed set of retests of recent mistakes (a fresh instance,
@@ -23,7 +24,7 @@ export default function Today() {
     setBusy(true);
     try {
       const r = await api.post(`/notebook/${item.attemptId}/twin`, {});
-      nav('/practice', { state: { serve: { question: r.question, reason: 'retry', why: t('today.whyRetest') } } });
+      nav('/practice', { state: { serve: { question: unassisted(r.question), reason: 'retry', why: t('today.whyRetest') } } });
     } catch (e) {
       if (isEntitlementGate(e)) nav(PAYWALL_ROUTE, { state: { from: 'practice' } });
       else toast(<span>{t('today.retestFailed')}</span>);

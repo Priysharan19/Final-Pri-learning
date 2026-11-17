@@ -10,8 +10,8 @@
 //     (1 day after the miss, then 3: the "1 to 3 days later" retest). The
 //     question is drawn fresh by the server (POST /notebook/:id/twin: a new
 //     instance of the same generator, never the original's content, checked
-//     against the account's seen records) and is unassisted: no hint is
-//     offered before the first answer.
+//     against the account's seen records) and is unassisted: the hint ladder is
+//     withheld (unassisted() sets hintLadder to 0 on the served question).
 //   · REVIEW — a dot point due on the spaced ladder (engine/spacedReview.js).
 //   · Retests come first (a recent miss is the most perishable), then the most
 //     overdue review. The chosen items are INTERLEAVED so no two neighbours
@@ -28,6 +28,9 @@ export const MAX_MINUTES = 15;
 const DAY = 86_400_000;
 
 const str = v => (typeof v === 'string' && v ? v : '');
+
+/** A retest is unassisted: the hint ladder is not offered on the served question (QuestionCard offers it only when hintLadder > 0). */
+export const unassisted = q => (q && typeof q === 'object' ? { ...q, hintLadder: 0 } : q);
 
 /** Retest candidates from a normalized notebook (notebook/notebookView.js). */
 export function retestCandidates(book, now = Date.now()) {
