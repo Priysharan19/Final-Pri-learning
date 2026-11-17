@@ -478,8 +478,8 @@ html.ui-instrument .ink-line-math.is-uncertain {
 }
 html.ui-instrument .ink-line-low { background: none; }
 html.ui-instrument .ink-line-doubt { border-color: var(--in-unc); color: var(--in-unc); border-style: dashed; }
-html.ui-instrument .ink-correct-btn { border-radius: 4px; border: 0; box-shadow: 0 0 0 1px var(--in-edge-2); background: var(--in-l3); color: var(--in-tx-2); font: 500 12.5px var(--in-ui); }
-html.ui-instrument .ink-correct-btn:hover { background: var(--in-l4); color: var(--in-tx); }
+html.ui-instrument .ink-correct-btn, html.ui-instrument .ink-accept-btn { border-radius: 4px; border: 0; box-shadow: 0 0 0 1px var(--in-edge-2); background: var(--in-l3); color: var(--in-tx-2); font: 500 12.5px var(--in-ui); }
+html.ui-instrument .ink-correct-btn:hover, html.ui-instrument .ink-accept-btn:hover { background: var(--in-l4); color: var(--in-tx); }
 html.ui-instrument .ink-line-verdict.good { color: var(--in-good); }
 html.ui-instrument .ink-line-verdict.bad { color: var(--in-slip); }
 
@@ -1422,3 +1422,22 @@ html[data-pushed] .shell .main { transform: scale(var(--in-push-scale)); transfo
   .in-pager-n { font: 500 12px var(--in-mono); color: var(--in-tx-3); }
   .in-ch { grid-template-columns: 32px 1fr auto auto; }
 }
+
+/* ── UI4 · Reading strip v2: read, check this, can't read ── */
+.in-read { background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2), 0 6px 18px -12px var(--in-shadow); border-radius: 6px; }
+.in-read.is-check { box-shadow: 0 0 0 1.5px var(--in-unc), 0 6px 18px -12px var(--in-shadow); transition: box-shadow var(--in-dur-2) var(--in-ease-out); }
+.in-read.is-cant { box-shadow: none; border: 1px dashed var(--in-tx-3); }
+.in-read-cf { width: auto; height: 3px; display: inline-flex; gap: 2px; background: none; overflow: visible; }
+.in-read-cf i { display: block; width: 7px; height: 3px; border-radius: 1px; background: var(--in-l5); }
+.in-read-cf i.on { background: var(--in-tx-2); }
+.in-read.is-check .in-read-cf i.on { background: var(--in-unc); }
+.in-read-tg { font: 500 10.5px var(--in-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--in-tx-3); }
+.in-read.is-check .in-read-tg { color: var(--in-unc); }
+.in-rstate { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; font: 500 10.5px var(--in-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--in-tx-3); }
+.in-rstate i, .in-strip-i i { flex: none; width: 9px; height: 9px; border-radius: 2px; background: var(--in-tx-2); }
+[data-read-state="check"] > i { background: var(--in-unc); }
+[data-read-state="cant"] > i { background: none; border: 1px dashed var(--in-tx-3); box-sizing: border-box; }
+.in-rstate[data-read-state="check"] { color: var(--in-unc); }
+.in-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; min-height: 40px; padding: 8px 12px; margin-top: 10px; border-radius: 6px; background: var(--in-l1); box-shadow: 0 -1px 0 var(--in-edge-2); font: 400 11.5px var(--in-mono); color: var(--in-tx-2); }
+.in-strip-i { display: inline-flex; align-items: center; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .in-read.is-check { transition: none; } }
