@@ -333,6 +333,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // each { rung, text }, and the level the server has committed so far.
   const [hints, setHints] = useState([]);
   const inkControlRef = useRef(null);
+  // Submit pressed on stale ink reads the page again instead of sending (see rereadFromSubmit).
+  const [rereadAsked, setRereadAsked] = useState(false);
   const [hintLevel, setHintLevel] = useState(question.hintLevel || 0);
   // The last rung is the whole solution: like Show solution it takes two presses.
   const [solutionRungArmed, setSolutionRungArmed] = useState(false);
@@ -1322,6 +1324,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
   async function submit(vouchedNow) {
+    setRereadAsked(false);
     if (inFlightRef.current || busy || resolved) return;
     // A question that can never be marked is not sent to be marked.
     if (unmarkable) return;
@@ -2043,6 +2046,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const instrumentScore = INSTRUMENT && !!shownGrade && Number.isFinite(Number(shownGrade.awarded))
     && Number(shownGrade.possible) > 0 && Number(shownGrade.awarded) >= 0 && Number(shownGrade.awarded) <= Number(shownGrade.possible);
 
+  const firstBad = inkComments?.find(c => c.kind === 'bad') || null;
+  // One message after a wrong answer with a marked line: that line is where it went wrong. The server's
+  // "checked when this question is finished" note would contradict it, so it is not shown beside it.
+  const markedLineFix = !!(state.res?.stepReport?.lines?.some(l => l.status === 'break') || firstBad);
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
   const verdictSpeech = useMemo(() => {
@@ -2053,7 +2060,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (previousAttempt) return `${t(state.res?.invalid ? 'verdict.previousAttemptUnread' : 'verdict.previousAttemptWrong')} ${t('verdict.newWorkNotChecked')}`;
       return state.res?.invalid
         ? t('verdict.speechUnreadable', { feedback: state.res.feedback || '' })
-        : t('verdict.speechRetry', { feedback: state.res?.feedback || t('verdict.oneMoreGo') });
+        : t('verdict.speechRetry', { feedback: (markedLineFix && /checked when this question is finished/.test(String(state.res?.feedback || ''))) ? '' : (state.res?.feedback || t('verdict.oneMoreGo')) });
     }
     if (!resolved) return '';
     const marks = shownGrade
@@ -2063,7 +2070,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (verdictGood) return marks ? t('verdict.speechCorrect', { marks }) : t('verdict.correct');
     return (marks ? t('verdict.speechIncorrect', { marks }) : t('verdict.notThisTime'))
       + (res.solution?.answerText ? t('verdict.speechExpected', { answer: res.solution.answerText }) : '');
-  }, [state.phase, state.res, resolved, res, verdictGood, shownGrade?.awarded, shownGrade?.possible, previousAttempt, t]);
+  }, [state.phase, state.res, resolved, res, verdictGood, shownGrade?.awarded, shownGrade?.possible, previousAttempt, markedLineFix, t]);
 
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
@@ -2143,6 +2150,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     || (mode === 'photo' && !!photo && photoOCR.phase === 'idle'));
   // Why Submit is not available, said beside it — never a dead button.
   const submitReasonKey = resolved || isMcq || busy ? null
+    : writeMode && inkHasStrokes && rereadAsked && inkReadable ? 'ink.submitReadAgainDone'
     : writeMode && inkHasStrokes && inkStale && inkReadExpired ? 'ink.submitReadExpired'
     : mode === 'photo' && photoInUse && photoReadExpired ? 'photo.readExpired'
     : writeMode && inkHasStrokes && inkStale ? 'ink.submitReadAgain'
@@ -2184,6 +2192,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     ? inkResult.lines.filter(l => !String(l?.text ?? '').trim() || isLowConfidence(l, confidenceFloorOf(inkResult))).length : 0;
 
   // ── The one dominant next move ─────────────────────────────────────────────
+  // Stale ink + Submit: the same read as "Read again" (same server reader, consent and online gates,
+  // answer-blind), shown to the student. Nothing is sent: the reading must be seen first, and a
+  // second Submit sends it only if the ink is unchanged since that read (inkStale is false then).
+  // A reader that is already known to be blocked (signed out, a limit, the service down) has its own
+  // reason and action beside the work, so Submit waits there instead of being a press that cannot read.
+  const rereadable = INSTRUMENT && writeMode && !isMcq && !resolved && inkHasStrokes && inkStale && !inkAccountBlocked && !inkBlockKey;
+  const rereadFromSubmit = () => { setRereadAsked(true); inkControlRef.current?.read?.(); };
   const primary = resolved || state.res?.conflict
     ? { label: t('practice.nextQuestion'), run: () => onNext?.(), disabled: false }
     : unmarkable
@@ -2197,7 +2212,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         ? { label: t('verdict.checkReadingFirst'), run: () => submit(), disabled: busy || !canSubmit }
         : {
           label: t(busy ? 'verdict.marking' : 'verdict.submit') + (unsettledLines === 1 ? ' ' + t('inst.unsettledOne') : unsettledLines > 1 ? ' ' + t('inst.unsettledMany', { n: unsettledLines }) : ''),
-          run: () => submit(), disabled: busy || !canSubmit
+          run: () => (rereadable ? rereadFromSubmit() : submit()), disabled: busy || (!canSubmit && !rereadable)
         };
 
   // v1.1 instrument: ⌘↵ / Ctrl+↵ presses the primary action while it is a
@@ -2277,7 +2292,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     </div>
   ) : null;
 
-  const firstBad = inkComments?.find(c => c.kind === 'bad') || null;
   // Once submitted, the bar shows the answer the attempt was marked on; a
   // reading that lands later can redraw the panel but never this line.
   // It is the answer the student CONFIRMED and the server marked — never the
@@ -3005,6 +3019,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       ? <>{t('verdict.workIsSafe')} <span className="muted">{state.res.feedback}</span></>
                       : invalidRetry && answerGuidance
                       ? <span data-final-answer-verdict>{t(answerGuidance.titleKey)} {t(answerGuidance.bodyKey)}{answerGuidance.workingKey ? ' ' + t(answerGuidance.workingKey) : ''}</span>
+                      : markedLineFix && /checked when this question is finished/.test(String(state.res.feedback || '')) ? null
                       : <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />}
                   </div>
                 </>
@@ -3015,7 +3030,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {!previousAttempt && state.res?.authoritative !== true && state.res?.partial && <LostMarks lost={state.res.partial.lost} t={t} />}
               {!previousAttempt && state.res.stepReport && <StepReport report={state.res.stepReport} />}
               {!previousAttempt && !checkRefused && !state.res?.readerBlock && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
-                : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
+                : markedLineFix ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
             </div>
           </div>
         )}

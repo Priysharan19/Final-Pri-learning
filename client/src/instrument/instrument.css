@@ -1484,3 +1484,7 @@ html[data-pushed] .shell .main { transform: scale(var(--in-push-scale)); transfo
   .pg-summary { position: static; order: -1; }
   .pg-topics { grid-template-columns: 1fr; }
 }
+
+/* A line the engine marked wrong: the reading is one tap from a correction. */
+.ink-line-recheck { font-size: 12.5px; }
+html.ui-instrument .ink-correct-btn.is-emph { background: var(--in-l1); color: var(--in-tx); box-shadow: 0 0 0 1.5px var(--in-tx-2); font-weight: 600; }

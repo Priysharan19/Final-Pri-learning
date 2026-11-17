@@ -538,7 +538,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // v1.1 instrument: the footer's Reset is the toolbar's Clear (with its undo).
   useEffect(() => {
     if (!controlRef) return undefined;
-    controlRef.current = { clear: () => act('clear')() };
+    controlRef.current = { clear: () => act('clear')(), read: () => readNow() };
     return () => { controlRef.current = null; };
   });
 
@@ -785,8 +785,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {/* Every line of the reading is the student's to correct before
                   Submit, not only the ones the reader doubted: a confident
                   misread is still a misread, and it is their page. */}
+              {!disabled && !stale && correcting?.index !== li && lineVerdicts?.[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && line.corrected !== true && (
+                <span className="ink-line-recheck muted">{t('ink.checkReadingEdit')}</span>
+              )}
               {!disabled && !stale && correcting?.index !== li && (
-                <button type="button" className="ink-correct-btn" aria-label={t('ink.iWroteAria', { n: li + 1 })}
+                <button type="button" className={`ink-correct-btn${lineVerdicts?.[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && line.corrected !== true ? ' is-emph' : ''}`} aria-label={t('ink.iWroteAria', { n: li + 1 })}
                   data-line-doubt={isLowConfidence(line, lineConfidenceFloor) ? 'low' : undefined}
                   onClick={() => setCorrecting({ index: li, text: line.text })}>{isLowConfidence(line, lineConfidenceFloor) ? t('ink.iWrote') : t('ink.editLine')}</button>
               )}

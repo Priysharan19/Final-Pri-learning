@@ -153,9 +153,9 @@ export const flow = {
     await page.waitForTimeout(2600);
     // The ink changed after it was read: the transcript stays, labelled as
     // from earlier writing; it cannot be submitted; nothing was re-read.
-    await check('editing the ink after a read marks the transcript stale: still shown, labelled, Submit unavailable with the reason, "Read again" offered — and no read sent',
+    await check('editing the ink after a read marks the transcript stale: still shown, labelled, Submit enabled to read it again (sends nothing) with the reason, "Read again" offered — and no read sent',
       (await reading(page))[0] === '1' && await page.locator('[data-ink-stale]').isVisible() && /earlier writing/i.test(await page.locator('[data-ink-stale]').innerText()) &&
-        await page.getByRole('button', SUBMIT).isDisabled() && await page.locator('[data-submit-reason="ink.submitReadAgain"]').isVisible() &&
+        await page.getByRole('button', SUBMIT).isEnabled() && await page.locator('[data-submit-reason="ink.submitReadAgain"]').isVisible() &&
         (await page.locator('[data-ink-read="again"]').innerText()).trim() === 'Read again' &&
         reader.requests.length === callsBeforeRewrite && (await readCalls()).length === pageReadsBeforeRewrite,
       `read ${JSON.stringify(await reading(page))}; provider calls +${reader.requests.length - callsBeforeRewrite}`);
@@ -668,6 +668,103 @@ export const flow = {
         await check('and the student\'s typed answer is what the server marks, correct, with the two lines as working',
           graded?.body?.answer === right.text && graded.body.steps === '2 + 3 = 5\nso x = 1 or x = 2' && graded.json?.correct === true,
           JSON.stringify({ body: graded?.body, correct: graded?.json?.correct }));
+      }
+    }
+
+    // ── 8 · Submit on stale ink reads the page again; it never sends one the student has not seen ──
+    // (owner decision "Yes, change it".) The same server reader, consent and online gates as
+    // "Read again", answer-blind as ever. Stale + Submit: read, show, send NOTHING; the next Submit
+    // sends if the ink is unchanged since that read.
+    reader.lines = null;
+    reader.confidence = 0.97;
+    const submitCalls = async () => (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length;
+    const freshWrittenQuestion = async () => {
+      await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.q-prompt', { timeout: 30000 });
+      for (let n = 0; n < MAX_QUESTIONS; n++) {
+        if (await typeTab.count()) await typeTab.click();
+        await settle();
+        if (await answerBox.count() === 1) {
+          const known = await online.answerOf();
+          if (known.kind === 'text' && /^\d{1,3}$/.test(String(known.text))) {
+            await page.getByRole('button', { name: 'Answer by handwriting' }).click();
+            await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
+            return { text: String(known.text), box: await page.locator('.ink-canvas-live').boundingBox() };
+          }
+        }
+        const leaving = (await online.shownRow())?.id;
+        await page.locator('.ctx-next').click();
+        await page.waitForFunction(id => {
+          const el = document.querySelector('.qpage[data-question-id]');
+          return el && el.getAttribute('data-question-id') !== id && el.querySelector('.q-prompt');
+        }, leaving, { timeout: 30000 });
+      }
+      return null;
+    };
+    const flourish = async (box) => {            // more ink on the same line: the page is no longer the one that was read
+      await page.mouse.move(box.x + 96, box.y + 108);
+      await page.mouse.down();
+      await page.mouse.move(box.x + 128, box.y + 108);
+      await page.mouse.up();
+      await page.waitForTimeout(700);
+    };
+    const writeAndRead = async (q) => {
+      reader.text = q.text;
+      await handwrite(page, q.box, q.text, { x: 85, y: 65 });
+      await page.waitForTimeout(2600);
+      await pressRead(page);
+      await readingArrives(page);
+    };
+
+    const qa = await freshWrittenQuestion();
+    if (await check('a second question with a short whole-number answer was found for the re-read scenarios', !!qa)) {
+      await writeAndRead(qa);
+      await flourish(qa.box);
+      await page.waitForSelector('[data-ink-stale]', { timeout: 15000 }).catch(() => {});
+      const submitsBefore = await submitCalls();
+      const readsBefore = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
+      await check('stale ink: Submit is offered and the reason says it will read the page again',
+        await page.getByRole('button', { name: 'Submit Answer' }).isEnabled() && await page.locator('[data-submit-reason="ink.submitReadAgain"]').isVisible());
+      await page.getByRole('button', { name: 'Submit Answer' }).click();
+      await page.waitForSelector('[data-submit-reason="ink.submitReadAgainDone"]', { timeout: 20000 }).catch(() => {});
+      const readsAfter = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
+      await check('stale + Submit reads the page again (exactly one more read) and sends NOTHING; the new reading is on screen and the status asks to check it and press Submit again',
+        readsAfter === readsBefore + 1 && await submitCalls() === submitsBefore && (await reading(page)).length >= 1 &&
+          await page.locator('[data-ink-stale]').count() === 0 && /check the reading, then press Submit again/i.test(await page.locator('[data-submit-reason="ink.submitReadAgainDone"]').innerText().catch(() => '')),
+        `reads ${readsBefore}→${readsAfter}; submits ${submitsBefore}→${await submitCalls()}; reason ${await page.locator('[data-submit-reason]').getAttribute('data-submit-reason').catch(() => null)}`);
+      await page.getByRole('button', { name: 'Submit Answer' }).click();
+      await page.waitForSelector('.eval-card, .verdict', { timeout: 30000 }).catch(() => {});
+      await check('the second Submit sends the page it was read from (one submit, no extra read)',
+        await submitCalls() === submitsBefore + 1 && (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length === readsAfter);
+    }
+
+    const qb = await freshWrittenQuestion();
+    if (await check('a third question was found for the offline and undo scenarios', !!qb)) {
+      await writeAndRead(qb);
+      await flourish(qb.box);
+      await page.waitForSelector('[data-ink-stale]', { timeout: 15000 }).catch(() => {});
+      const submitsBefore = await submitCalls();
+      const readsBefore = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
+      await ctx.setOffline(true);
+      // The page knows it is offline: Submit may already be waiting with the reason (a press, if it is offered, still sends nothing).
+      await page.getByRole('button', { name: 'Submit Answer' }).click({ timeout: 3000 }).catch(() => {});
+      await page.waitForFunction(() => /needs a connection/.test(document.body.innerText), null, { timeout: 10000 }).catch(() => {});
+      const reasonNow = await page.evaluate(() => (document.querySelector('.qpage')?.innerText || '').replace(/\s+/g, ' '));
+      await check('stale + Submit while offline sends nothing, reads nothing, and shows the existing reason',
+        await submitCalls() === submitsBefore && (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length === readsBefore && /needs a connection/.test(reasonNow) && await page.locator('[data-ink-stale]').count() === 1,
+        JSON.stringify(reasonNow.slice(-300)));
+      await ctx.setOffline(false);
+      await page.waitForTimeout(1500);
+      // Undo the extra ink: the page is the one that was read again, so Submit sends directly.
+      await page.getByRole('button', { name: 'Undo last stroke' }).click();
+      await page.waitForFunction(() => !document.querySelector('[data-ink-stale]'), null, { timeout: 15000 }).catch(() => {});
+      const readsBeforeUndoSubmit = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
+      const submit = page.getByRole('button', { name: 'Submit Answer' });
+      if (await check('undoing back to the page that was read clears the stale state', await page.locator('[data-ink-stale]').count() === 0 && await submit.isEnabled())) {
+        await submit.click();
+        await page.waitForSelector('.eval-card, .verdict', { timeout: 30000 }).catch(() => {});
+        await check('and Submit then sends directly, with no new read',
+          await submitCalls() === submitsBefore + 1 && (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length === readsBeforeUndoSubmit);
       }
     }
     reader.lines = null;
