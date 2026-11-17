@@ -60,6 +60,10 @@ export const flow = {
     const inWindow = async (label, body) => { await page.evaluate(l => { window.__window = l; }, label); await body(); await page.evaluate(() => { window.__window = null; }); };
     const longIn = label => page.evaluate(l => window.__long.filter(t => t.window === l && t.ms >= 50), label);
 
+    // The detector is alive: a 120 ms block on the main thread is seen, so "none" below means none.
+    await inWindow('selftest', async () => { await page.evaluate(() => new Promise(r => setTimeout(() => { const t = performance.now(); while (performance.now() - t < 120); r(); }, 0))); await page.waitForTimeout(200); });
+    await check('the long-task detector sees a deliberate 120 ms block', (await longIn('selftest')).length >= 1);
+
     const driveInput = async phase => {
       const box = await page.locator('.ink-canvas-live').boundingBox();
       await inWindow(`${phase}:write`, async () => { await handwrite(page, box, '12'); });
