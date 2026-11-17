@@ -340,6 +340,9 @@ try {
     const area = { id: 'g', name: 'G', state: 'recheck', year: 12, nodes: [{ id: 'MAV-12-04', code: 'MAV-12-04', state: 'not-started', practise: { subtopic: 'other', dotpoint: 0 } }] };
     const AD = draw(view.AreaDetail, { area, india: false, priority: card });
     ok(AD.includes('data-board-practise'), `${lang}: a priority area offers Practise this`);
+    eq(view.practiseTarget(area, card), card.practise, `${lang}: it goes to the card's own target, not the area's first untouched outcome`);
+    eq(view.practiseTarget(area, null), { subtopic: 'other', dotpoint: 0 }, `${lang}: without a card, the weakest outcome with practice`);
+    eq(view.practiseTarget({ nodes: [{ state: 'retained', practise: { subtopic: 'y', dotpoint: 0 } }] }, null), null, `${lang}: never an outcome already held after a gap`);
     const held = draw(view.AreaDetail, { area: { ...area, state: 'retained', nodes: [{ id: 'x', code: 'MAV-12-04', state: 'retained', practise: { subtopic: 'y', dotpoint: 0 } }] }, india: false });
     ok(!held.includes('data-board-practise') && held.includes(esc(t('board.noPractice'))), `${lang}: an area held after a gap, and not a priority, sends nobody back to it`);
 

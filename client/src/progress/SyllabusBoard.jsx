@@ -286,13 +286,17 @@ export function nswOutcomeDescription(code) {
 // the weakest outcome with practice, never one already held after a gap.
 const PRACTISE_ORDER = ['recheck', 'assisted', 'thin', 'seen', 'not-started', 'independent'];
 
+/** Where an area's "Practise this" goes: the card's own target when it is a priority, so the button does what the card says. */
+export function practiseTarget(area, priority = null) {
+  return priority?.practise
+    || [...area.nodes].filter(n => n.practise && PRACTISE_ORDER.includes(n.state))
+      .sort((a, b) => PRACTISE_ORDER.indexOf(a.state) - PRACTISE_ORDER.indexOf(b.state))[0]?.practise || null;
+}
+
 export function AreaDetail({ area, india, track, priority = null }) {
   const t = useT();
   const nav = useNavigate();
-  // The card's own target when the area is a priority, so the button does what the card says.
-  const target = priority?.practise
-    || [...area.nodes].filter(n => n.practise && PRACTISE_ORDER.includes(n.state))
-      .sort((a, b) => PRACTISE_ORDER.indexOf(a.state) - PRACTISE_ORDER.indexOf(b.state))[0]?.practise || null;
+  const target = practiseTarget(area, priority);
   return (
     <div className="sb-area" data-board-area={area.id}>
       <span className="sb-label">{area.year ? t('common.yearNumber', { n: area.year }) : area.stage ? t('board.stage', { n: area.stage }) : ''}{!india && ` · ${area.nodes.map(n => n.code).join(', ')}`}</span>
