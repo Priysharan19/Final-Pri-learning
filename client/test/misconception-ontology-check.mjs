@@ -37,7 +37,9 @@ import {
   mappedIdForTrap, misconceptionIdForTrap, trapShape, shapeHash, canonicalLedgerKey,
   migrateTrapLedger, migrateRatingRow, confirmCloudMisconception
 } from '../src/engine/misconceptions.js';
-import { ALL_DIAGNOSIS_CODES, diagnoseStep } from '../src/engine/diagnose.js';
+import { ALL_DIAGNOSIS_CODES as ENGINE_CODES, diagnoseStep } from '../src/engine/diagnose.js';
+import { topicDiagnosisCodes } from '../src/engine/misconceptions/topics/index.js';
+const ALL_DIAGNOSIS_CODES = [...new Set([...ENGINE_CODES, ...topicDiagnosisCodes()])];
 import { misconceptionKey } from '../src/engine/adaptive.js';
 import { stepCheck } from '../src/engine/checker.js';
 import { GENERATORS, loadAllBanks, generateQuestion } from '../src/engine/generators/index.js';

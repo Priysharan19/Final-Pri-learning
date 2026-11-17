@@ -300,7 +300,7 @@
     "test:writing-hand": "node client/test/writing-hand-check.mjs",
     "test:palette:form": "node client/test/palette-form-check.mjs",
     "test:haptics": "node client/test/haptics-boundary-check.mjs",
-    "test:feedback": "node client/test/feedback-first-error-sweep-check.mjs && node client/test/answer-tex-check.mjs",
+    "test:feedback": "node client/test/feedback-first-error-sweep-check.mjs && node client/test/topics-algebra-check.mjs && node client/test/answer-tex-check.mjs",
     "test:ink:smooth": "node client/test/ink-smooth-check.mjs"
   }
 }
