@@ -390,7 +390,7 @@ const bivariate = [
       }
       if (kind === 1) {
         return num(`A line of best fit for ${c.y} ($y$) against ${c.x} ($x$) is $${line}$. For what value of $x$ does the line predict $y = ${y}$?`, x, {
-          traps: [{ value: (a + y) / b, why: 'Subtract $y$ from $' + a + '$: $' + a + ' - ' + b + 'x = ' + y + '$.' }, { value: y / b, why: 'Deal with the constant $' + a + '$ before dividing.' }],
+          traps: [{ value: (a + y) / b, why: 'Subtract $y$ from $' + a + '$: $' + a + ' - ' + bx(b) + ' = ' + y + '$.' }, { value: y / b, why: 'Deal with the constant $' + a + '$ before dividing.' }],
           hints: ['Set $y$ equal to the value and solve for $x$.', `$${a} - ${bx(b)} = ${y}$.`, `$${bx(b)} = ${a - y}$.`],
           steps: [{ h: 'Solve', d: `$${a} - ${bx(b)} = ${y} \\Rightarrow ${bx(b)} = ${a - y} \\Rightarrow x = ${x}$` }]
         });
