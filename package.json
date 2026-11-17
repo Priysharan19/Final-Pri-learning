@@ -45,6 +45,8 @@
     "test:india:difficulty": "node client/test/india-difficulty-truth-check.mjs && node tools/india-difficulty-coverage.mjs --check",
     "test:india:hardest": "node client/test/india-hardest-forms-check.mjs",
     "test:india:distinct": "node tools/distinct-questions.mjs --check",
+    "content:capacity": "node tools/question-capacity.mjs",
+    "content:capacity:check": "node tools/question-capacity.mjs --check",
     "test:india:forms": "node client/test/india-class10-algebra-forms-check.mjs",
     "test:variants": "node client/test/question-variants-check.mjs",
     "test:marker:false-positive": "node client/test/false-positive-sweep-check.mjs",
