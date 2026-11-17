@@ -437,6 +437,8 @@ jobs:
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-dna-check.mjs 2>&1 | tee -a practice-http.log
+          # F7 (L5): official JEE questions by recorded-working band, Premium only; India edition, refused on Prithagoras.
+          node server/test/jee-band-practice-check.mjs 2>&1 | tee -a practice-http.log
           node tools/ci-check-counts.mjs verify platform/practice-http.log#5
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
         run: |
