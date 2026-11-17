@@ -610,9 +610,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             <span>{t('ink.pageLabel', { n: i + 2 })}</span>
           </div>
         ))}
+        {INSTRUMENT_PLOT && lineVerdicts && <MarginMarks lines={rec.lines} lineVerdicts={lineVerdicts} />}
         {lineVerdicts && rec.lines.some(l => l.box) && (
           <div className="ink-verdict-layer" aria-hidden="true">
-            {INSTRUMENT_PLOT && <MarginMarks lines={rec.lines} lineVerdicts={lineVerdicts} />}
             {(() => {
               let noted = false;
               const span = sweepSpan(rec.lines, lineVerdicts);
