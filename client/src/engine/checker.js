@@ -722,7 +722,6 @@ function flagUnfinishedFinalLine(out, meta) {
   }
 }
 
-const sameRootSet = (a, b) => a.length === b.length && a.every(x => b.some(y => numsClose(x, y)));
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, prompt = '' } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const unread = unreadLines(rawLines);
@@ -1074,10 +1073,10 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               // roots it names; whether the working keeps the rest is settled
               // once every line has been read.
               // A VALUE line (x = 5) written straight under a branch (x - 3 = 0)
-              // must be what that branch gives: a true root of the question that
+              // must be one of the roots that branch gives: a true root of the question that
               // the line above does not produce is a slip, however true it is.
               const above = branchLines[branchLines.length - 1];
-              if (valued && above && above.index === i - 1 && !above.valued && !sameRootSet(above.covered, held)) {
+              if (valued && above && above.index === i - 1 && !above.valued && !held.every(h => above.covered.some(c => numsClose(h, c)))) {
                 status = 'break';
                 lineDiagnosis = {
                   code: 'branch-value-mismatch', title: 'This value does not follow from the line above',

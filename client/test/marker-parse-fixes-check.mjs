@@ -40,6 +40,12 @@ ok(r.firstBreak === -1, 'a listed pair of roots is unchanged');
 r = run(['(x-3)(x-5)=0', 'x-3=0', 'x=4']);
 ok(r.firstBreak === 2, 'a value that is no root is still a break at its line');
 
+// A branch with several roots may be split into value lines.
+r = stepCheck({ kind: 'equation', variable: 'x', solutions: [0, 3, -3] }, ['x(x^2-9)=0', 'x=0', 'x^2-9=0', 'x^2=9', 'x=3', 'x=-3'].join('\n'));
+ok(r.firstBreak === -1, 'x^2=9 then x=3 then x=-3 is correct');
+r = stepCheck({ kind: 'equation', variable: 'x', solutions: [0, 3, -3] }, ['x(x^2-9)=0', 'x=0', 'x^2=9', 'x=5'].join('\n'));
+ok(r.firstBreak === 3, 'x^2=9 then x=5 is a break at the value line');
+
 // 4. `e` as the variable.
 r = stepCheck({ kind: 'derivative', variable: 'e', source: 'e^2' }, '2e');
 ok(r.lines[0].status !== 'ok' && r.lines[0].status !== 'break', 'differentiating in e is not read with e as Euler\'s number: it abstains');
