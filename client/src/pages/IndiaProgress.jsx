@@ -2,14 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
-import { predictionSentence } from '../engine/markPredictor.js';
 import { tLater, useT } from '../i18n/index.js';
-import TermGloss from '../components/TermGloss.jsx';
 import PageLink from '../components/PageLink.jsx';
-import { PROGRESS_THRESHOLDS, accuracyClaim } from '../engine/progressTruth.js';
+import EvidenceProgress from '../progress/EvidenceProgress.jsx';
 import { indiaProgressPracticeHref } from '../lib/practiceLinks.js';
-import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
-import { blueprintLabel } from '../lib/blueprintKeys.js';
+import { featureEnabled } from '../platform/features.js';
 
 function scopeFor(curriculum, user) {
   if (!curriculum) return null;
@@ -20,66 +17,39 @@ function scopeFor(curriculum, user) {
     || null;
 }
 
-function rowsFor(scope) {
-  return scope?.chapters || scope?.subtopics || [];
-}
+const rowsFor = scope => scope?.chapters || scope?.subtopics || [];
 
-// A chapter's accuracy is printed only once it rests on enough answers
-// (engine/progressTruth.js, docs/product/progress-metrics.md): one right
-// answer in a chapter is one right answer, not "100%".
-function evidenceOf(row) {
-  const attempts = Number(row.attempts || row.evidence?.attempts || 0);
-  const correct = Number(row.correct || row.evidence?.correct || 0);
-  const claim = accuracyClaim(correct, attempts, PROGRESS_THRESHOLDS.chapterAccuracy);
-  return { attempts, correct, accuracy: claim.value, enough: claim.enough };
-}
-
+/**
+ * A Priyabhata student's Progress: the shared evidence page over their own
+ * track's chapters (progress/EvidenceProgress.jsx). Nothing on it stands in for
+ * a mark; chapters name themselves and Practise opens that chapter.
+ */
 export default function IndiaProgress() {
   const { user } = useApp();
   const nav = useNavigate();
   const t = useT();
   const [curriculum, setCurriculum] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [evidence, setEvidence] = useState(null);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([api.get('/curriculum'), api.get('/stats')])
-      .then(([c, s]) => { setCurriculum(c); setStats(s); })
+    Promise.all([api.get('/curriculum'), api.get('/progress/evidence')])
+      .then(([c, e]) => { setCurriculum(c); setEvidence(e); })
       .catch(err => setError(err.message || tLater('progress.couldNotLoad')));
   }, [t]);
 
   const scope = useMemo(() => scopeFor(curriculum, user), [curriculum, user]);
-  const rows = useMemo(() => rowsFor(scope), [scope]);
-  const chapterEvidence = useMemo(() => rows.map(row => ({ row, evidence: evidenceOf(row) })), [rows]);
-  const started = chapterEvidence.filter(x => x.evidence.attempts > 0).length;
-  const practiced = chapterEvidence.filter(x => x.evidence.attempts >= PROGRESS_THRESHOLDS.chapterPractised).length;
-  const totals = stats?.totals || {};
-  const prediction = stats?.examPrediction || null;
-  // Accuracy is over learning evidence only (games excluded), and withheld
-  // below the sample floor — the server computes it from the attempt rows.
-  const accuracy = totals.accuracy || accuracyClaim(totals.evidence?.correct, totals.evidence?.attempts, PROGRESS_THRESHOLDS.overallAccuracy);
-  const supportedCorrect = Number(totals.evidence?.supportedCorrect || 0);
-  // "JEE Main" and "JEE Advanced" are the examining bodies' own names, printed
-  // that way on the Hindi paper too, so they are not translated. The CBSE label
-  // is built from a word that is, hence the catalogue key around the class.
+  const rows = useMemo(() => rowsFor(scope).map(r => ({ id: r.id, name: r.name || r.title, strand: r.strand })), [scope]);
+  // "JEE Main" and "JEE Advanced" are the examining bodies' own names and stay untranslated.
   const trackName = user.indiaTrack === 'jee-main' ? 'JEE Main'
     : user.indiaTrack === 'jee-advanced' ? 'JEE Advanced'
       : `${t('common.classNumber', { n: user.year })} CBSE / NCERT`;
 
   if (error) return <div className="card" role="alert">{error}</div>;
-  if (!curriculum || !stats) return <div className="skeleton" style={{ height: 420 }} />;
+  if (!curriculum || !evidence) return <div className="skeleton" style={{ height: 420 }} />;
 
   return (
-    <div className="pg">
-      {/* One column, read top to bottom: what the evidence says, where the marks
-          are, then the syllabus itself. Sections are separated by space and
-          hairlines; the paper estimate is the only sheet on the page. */}
-      <header className="pg-head">
-        {/* Under the instrument the Report above carries the page's h1. */}
-        {INSTRUMENT_UI ? <h2 className="pg-title">{t('progress.title', { track: trackName })}</h2> : <h1>{t('progress.title', { track: trackName })}</h1>}
-        <p className="sub">{t('progress.evidenceSub')}</p>
-      </header>
-
+    <>
       {featureEnabled('placement') && <div className="card" data-placement-entry>
         <div className="spread" style={{ gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
           <div style={{ maxWidth: 640 }}>
@@ -89,127 +59,14 @@ export default function IndiaProgress() {
           <button className="btn btn-ghost" onClick={() => nav('/placement')}>{t('placement.seeResult')}</button>
         </div>
       </div>}
-
-      {prediction && (
-        <section className="pg-sheet" aria-labelledby="pg-paper">
-          <div className="spread" style={{ alignItems: 'flex-start', gap: 16 }}>
-            <div>
-              <h2 className="sc-label" id="pg-paper">{t('progress.ifYouSatTomorrow')}</h2>
-              <p className="sub" style={{ margin: 0 }}>{blueprintLabel(t, prediction.blueprintId, prediction.label)}</p>
-            </div>
-            {prediction.show && (
-              <div style={{ textAlign: 'right' }}>
-                <div className="big" style={{ lineHeight: 1.1 }}>
-                  {prediction.expected}<span className="muted" style={{ fontSize: '0.5em' }}>/{prediction.coveredMarks}</span>
-                </div>
-                <div className="muted" style={{ fontSize: 12 }}>{t('progress.likelyRange', { low: prediction.low, high: prediction.high })}</div>
-              </div>
-            )}
-          </div>
-
-          <p className="pg-sentence">{predictionSentence(prediction)}</p>
-
-          {/* Coverage is drawn, not just stated: the practised share of the paper
-              against the whole, so an impressive number over a quarter of the
-              paper cannot be mistaken for an impressive number over all of it. */}
-          <div className="pg-coverage">
-            <div className="pg-coverage-track"
-              role="img" aria-label={t('progress.marksPractised', { covered: prediction.coveredMarks, total: prediction.totalMarks })}>
-              <div style={{ width: `${Math.round(prediction.coverage * 100)}%` }} />
-            </div>
-            <div className="muted pg-coverage-note">
-              {t('progress.marksPractised', { covered: prediction.coveredMarks, total: prediction.totalMarks })}
-              {prediction.unseenMarks > 0 && t('progress.marksUntouched', { n: prediction.unseenMarks })}
-            </div>
-          </div>
-
-          <p className="pg-coverage-note"><PageLink to="/insights" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }} data-insights-link>{t('insights.open')} →</PageLink></p>
-
-          {prediction.priorities.length > 0 && (
-            <div className="pg-priorities">
-              <div className="sc-label">{t('progress.whereTheMarksAre')}</div>
-              {prediction.priorities.slice(0, 4).map(unit => (
-                <div key={unit.unitId} className="set-row">
-                  <span className="set-k">
-                    {/* Unit names are curriculum data, English by design (as in
-                        the chapter table below), with their Hindi terms glossed. */}
-                    <span lang="en"><TermGloss text={unit.name} /></span>
-                    <span className="muted" style={{ display: 'block', fontSize: 12, marginTop: 2 }}>
-                      {unit.covered
-                        ? t('progress.unitCovered', { count: unit.attempts, n: unit.attempts, expected: Math.round(unit.expected), marks: unit.marks })
-                        : t('progress.unitUntouched', { marks: unit.marks })}
-                    </span>
-                  </span>
-                  {/* Whole marks: a tenth of a mark is precision the evidence does not have. */}
-                  <span className="set-v">{unit.atStake > 0 && unit.atStake < 0.5 ? '<1' : `+${Math.round(unit.atStake)}`}</span>
-                </div>
-              ))}
-              <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{t('progress.rankedByMarks')}</p>
-            </div>
-          )}
-        </section>
-      )}
-
-      <div className="grid cols-4 pg-facts">
-        <div className="card" data-metric="started"><div className="sc-label">{t('progress.chaptersStarted')}</div><div className="big" data-value={started}>{started}<span className="muted">/{rows.length}</span></div></div>
-        <div className="card" data-metric="practised"><div className="sc-label">{t('progress.chaptersPractised')}</div><div className="big" data-value={practiced}>{practiced}</div><div className="muted">{t('progress.fivePlusAttempts')}</div></div>
-        <div className="card" data-metric="answered"><div className="sc-label">{t('progress.questionsAnswered')}</div><div className="big" data-value={Number(totals.attempts || 0)}>{Number(totals.attempts || 0).toLocaleString()}</div></div>
-        <div className="card" data-metric="accuracy">
-          <div className="sc-label">{t('progress.demonstratedAccuracy')}</div>
-          {accuracy.enough
-            ? <div className="big" data-value={accuracy.value}>{t('common.percent', { n: accuracy.value })}</div>
-            : <div className="big" style={{ fontSize: '1.05rem', lineHeight: 1.3 }} data-value="">{t('progress.notEnoughEvidence')}</div>}
-          <div className="muted">
-            {accuracy.enough ? t('progress.acrossAttempts') : t('progress.accuracyNeeds', { count: accuracy.needed, n: accuracy.needed })}
-          </div>
-          {accuracy.enough && supportedCorrect > 0 && (
-            <div className="muted" style={{ fontSize: 12, marginTop: 4 }} data-metric="supported">{t('progress.withHelp', { count: supportedCorrect, n: supportedCorrect })}</div>
-          )}
-        </div>
-      </div>
-
-      <section aria-labelledby="pg-syllabus">
-        <div className="spread pg-section-head">
-          <h2 className="sc-label" id="pg-syllabus">{t('progress.syllabusEvidence', { scope: scope?.title || trackName })}</h2>
-          <span className="muted">{t('progress.rowCount', { count: rows.length, n: rows.length })}</span>
-        </div>
-        {!rows.length ? <p className="muted" style={{ marginTop: 16 }}>{t('progress.noRows')}</p> : (
-          <div className="table-scroll">
-            <table className="syl-table pg-table">
-              <thead><tr><th scope="col">{t('progress.colChapter')}</th><th scope="col">{t('common.attempts')}</th><th scope="col">{t('progress.colCorrect')}</th><th scope="col">{t('common.accuracy')}</th><th scope="col"><span className="sr-only">{t('progress.colAction')}</span></th></tr></thead>
-              <tbody>
-                {chapterEvidence.map(({ row, evidence }) => (
-                  <tr key={row.id || row.name} data-chapter={row.id} data-attempts={evidence.attempts} data-correct={evidence.correct}>
-                    <td style={{ textAlign: 'left' }}>
-                      {/* Chapter and unit names are curriculum data and stay English by
-                          design; lang="en" lets a screen reader on a Hindi page voice them
-                          in English (TermGloss marks its Hindi terms lang="hi"). */}
-                      <div className="pg-chapter" lang="en"><TermGloss text={row.name || row.title} /></div>
-                      {row.strand && <div className="muted" lang="en" style={{ fontSize: 12 }}><TermGloss text={row.strand} /></div>}
-                    </td>
-                    <td>{evidence.attempts}</td>
-                    <td>{evidence.correct}</td>
-                    <td>{evidence.attempts === 0 ? t('common.none') : evidence.enough ? t('common.percent', { n: evidence.accuracy }) : <span className="muted">{t('progress.tooFewAnswers')}</span>}</td>
-                    <td>
-                      <button className="btn btn-quiet btn-sm" onClick={() => nav(indiaProgressPracticeHref(row, user.indiaTrack))}>
-                        {t('progress.practise')}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-
-      {/* What this page does and does not claim, said once, where a careful
-          reader looks for it. */}
-      <footer className="pg-notes">
-        <h2 className="sc-label">{t('progress.howToRead')}</h2>
-        <p className="muted"><b>{t('progress.noPercentile')}.</b> {t('progress.honesty')}</p>
-        <p className="muted">{t('progress.howToReadBody')}</p>
-      </footer>
-    </div>
+      <EvidenceProgress
+        evidence={evidence}
+        rows={rows}
+        scope={scope?.title || trackName}
+        practiseTo={row => indiaProgressPracticeHref(row, user.indiaTrack)}
+        teacher={user.role === 'teacher'}
+      />
+      <p className="pg-coverage-note"><PageLink to="/insights" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }} data-insights-link>{t('insights.open')} →</PageLink></p>
+    </>
   );
 }

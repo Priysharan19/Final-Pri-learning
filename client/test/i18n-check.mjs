@@ -113,8 +113,6 @@ const read = rel => readFileSync(join(ROOT, rel), 'utf8');
 // card, the app's own D1–D4 shorthand, and a bare number-and-percent format.
 // ─────────────────────────────────────────────────────────────────────────────
 const SAME_IN_BOTH = new Map([
-  ['common.percent', 'a number and a percent sign; there is nothing in it to translate'],
-  ['common.none', 'an em dash standing in for "no value"'],
   ['home.difficultyChip', 'D1–D4 is the app’s own shorthand and is read as a code, not a word'],
 ]);
 
