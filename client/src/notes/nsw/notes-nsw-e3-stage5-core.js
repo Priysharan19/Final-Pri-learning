@@ -45,7 +45,7 @@ export default {
       },
       {
         title: 'Change the cylinder, watch the surface area',
-        spec: { kind: 'solidExplorer', shape: 'cylinder', dims: { r: 3, h: 8 } },
+        spec: { kind: 'solidExplorer', shape: 'cylinder', r: 3, h: 8 },
         note: 'At $r=3$ and $h=8$ the surface area is $2\\pi\\times3^2+2\\pi\\times3\\times8=66\\pi\\approx207.3$. Double the height and only the curved part doubles; double the radius and the two circles grow four times.'
       }
     ]
@@ -288,8 +288,8 @@ export default {
       },
       {
         title: 'Elevation from $40$ m away',
-        spec: { kind: 'triangleExplorer', mode: 'trigRatios', initial: { angle: 35, adj: 40 } },
-        note: 'With the observer $40$ m from the base and an angle of elevation of $35^\\circ$, the height is $40\\tan35^\\circ\\approx28.0$ m. Raise the angle and the height grows faster and faster.'
+        spec: { kind: 'triangleExplorer', mode: 'trigRatios', initial: { angle: 35, hyp: 10 } },
+        note: 'At $35^\\circ$ the readout shows $\\tan35^\\circ\\approx0.7002$, whatever the size of the triangle. An observer $40$ m from the base is $40$ times as far across as a triangle with adjacent side $1$, so the height is $40\\times0.7002\\approx28.0$ m. Raise the angle and the height grows faster and faster.'
       }
     ]
   },
@@ -310,7 +310,7 @@ export default {
       },
       {
         title: 'Change the cone, watch the volume',
-        spec: { kind: 'solidExplorer', shape: 'cone', dims: { r: 5, h: 12 } },
+        spec: { kind: 'solidExplorer', shape: 'cone', r: 5, h: 12 },
         note: 'At $r=5$ and $h=12$ the volume is $100\\pi\\approx314.2$. Doubling the height doubles the volume, but doubling the radius multiplies it by $4$, because the radius is squared.'
       }
     ]
