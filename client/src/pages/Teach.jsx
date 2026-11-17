@@ -661,7 +661,7 @@ export default function Teach() {
 
       {/* Cloud classes live here too, so a teacher is not sent to Settings to
           find the join code, publish an assignment or review submissions. */}
-      <ClassroomPanel />
+      <ClassroomPanel workspace />
 
       {sheet?.kind === 'class' && analytics && <ClassReport analytics={analytics} onClose={() => setSheet(null)} />}
       {sheetStudent && <StudentReport analytics={analytics} student={sheetStudent} onClose={() => setSheet(null)} />}

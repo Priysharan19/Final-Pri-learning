@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { tLater, useT } from '../i18n/index.js';
+import { PaperAssignment, WhatTeacherSees, useClassroomMine } from '../classroom/StudentClassroom.jsx';
+import { isPaperAssignment } from '../classroom/classroomWords.js';
 
 function dueText(t, value) {
   if (!value) return t('classroom.noDueDate');
@@ -23,6 +25,9 @@ export default function AssignmentInboxPanel() {
   const [role, setRole] = useState(null);
   const [assignments, setAssignments] = useState([]);
   const [error, setError] = useState('');
+  const [refresh, setRefresh] = useState(0);
+  const mine = useClassroomMine(enabled, role, refresh);
+  const handins = new Map((mine?.handins || []).map(h => [h.assignmentId, h]));
 
   useEffect(() => {
     let live = true;
@@ -76,6 +81,22 @@ export default function AssignmentInboxPanel() {
 
       <div style={{ display: 'grid', gap: 10, marginTop: assignments.length ? 14 : 0 }}>
         {assignments.map(row => {
+          if (isPaperAssignment(row)) {
+            const handin = handins.get(row.id) || null;
+            return (
+              <div className="card" key={row.id} style={{ padding: 14 }}>
+                <div className="spread" style={{ gap: 10 }}>
+                  <div>
+                    <strong>{row.title}</strong>
+                    <div className="muted" style={{ marginTop: 3 }}>{row.className} · {dueText(t, row.dueAt)}</div>
+                  </div>
+                  <span className={`tag ${handin ? 'tag-brand' : ''}`}>{handin ? t('tw.student.handedInTag') : t('tw.student.paperTag')}</span>
+                </div>
+                {row.specification?.instructions && <p style={{ margin: '10px 0 0' }}>{String(row.specification.instructions)}</p>}
+                <PaperAssignment row={row} handin={handin} onHandedIn={() => setRefresh(n => n + 1)} />
+              </div>
+            );
+          }
           const count = Math.max(1, Math.min(50, Number(row.specification?.questionCount) || 10));
           const state = row.submission?.state || null;
           return (
@@ -96,6 +117,7 @@ export default function AssignmentInboxPanel() {
           );
         })}
       </div>
+      <WhatTeacherSees mine={mine} />
     </section>
   );
 }

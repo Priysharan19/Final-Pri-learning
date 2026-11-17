@@ -40,6 +40,7 @@ const ALLOW = [
   [/^home\.next\.firstIndia$/, 'first-step copy for Indian courses'],
   [/^login\.olympiadTrack$/, 'Indian track chooser at sign-up'],
   [/^signup\.trackJeeHint$/, 'Indian track chooser at sign-up'],
+  [/^tw\.paper\.(cbse10Standard|cbse10Basic|cbse11|cbse12|jeeMain|jeeAdvanced|indiaOther)$/, 'the India paper templates a teacher sets (classroom/classroomWords.js INDIA_PAPERS); TeacherWorkspace.jsx offers them only when the edition\'s default course is not NSW, and a Prithagoras server refuses an india paper (server/platform/paperAssignments.js paperKindsForEdition)'],
   [/^board\.prio\.sourceIndia$/, 'the CBSE unit-weightage note under syllabus-board priorities (progress/SyllabusBoard.jsx draws it only when india is true, i.e. an Indian course)']
 ];
 
