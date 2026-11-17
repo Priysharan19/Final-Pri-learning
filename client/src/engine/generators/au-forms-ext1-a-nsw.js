@@ -4,18 +4,20 @@
 // me11-inversetrig and me11-rates. Every key is computed in code from the
 // numbers the prompt shows; AI never sets a key. See au-forms-apply.js.
 //
-// 2024 syllabus placement (the Extension 1 2024 course model):
-//   Polynomials ME1-11-02 (remainder/factor theorems, sums and products of zeroes);
-//   multiplicity of zeroes sits in Further applications of calculus ME1-12-05;
-//   Further trigonometry ME1-11-03; Inverse trigonometric functions ME1-12-03
-//   (Year 12); Further rates of change ME1-12-05. The t-formulae and the
-//   Newton-cooling form are authored from the topic names and are not
-//   dot-point verified against NESA text.
+// Placement: each form's `diffs` follow the cell -> dot point map
+// DOTPOINT_FORMS in client/src/engine/curriculum.js, so a form only appears in
+// the cell(s) whose dot point it exercises. The repo's Extension 1 model
+// (the Extension 1 2024 course model) lists focus areas and content groups only:
+// NO form here is dot-point verified against NESA text. In particular the
+// t-formulae and Newton-cooling forms are not supported by that model; they are
+// correct mathematics kept as practice items and make no syllabus-placement claim.
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, nz, gcd, Frac, mcq, poly, term, sgn, r1, r2, r3 } from '../qhelpers.js';
 
 const fa = f => ({ value: f.value, simplestFraction: { n: f.n, d: f.d } });
-const keep = (key, list) => list.filter(t => Number.isFinite(t.value) && Math.abs(t.value - key) > 1e-9);
+const keep = (key, list) => list.filter((t, i, arr) => Number.isFinite(t.value) && Math.abs(t.value - key) > 1e-9 && arr.findIndex(u => Math.abs(u.value - t.value) < 1e-9) === i);
+const nx = n => (n === 1 ? 'x' : `${n}x`);
+const secs = n => (n === 1 ? 'second' : 'seconds');
 const evalFrac = (cs, x) => cs.reduce((acc, c) => acc.mul(x).add(new Frac(c)), new Frac(0));
 const pn = v => v < 0 ? `(${v})` : String(v);
 const lineMcq = (rng, errIdx, n, whys) => {
@@ -79,6 +81,7 @@ const polyForms = [
       const a = diff === 1 ? 1 : nz(rng, 1, 3);
       const b = ri(rng, -7, 7), c = nz(rng, -9, 9), d = nz(rng, -12, 12), r = nz(rng, -5, 5);
       const q1 = b + a * r, q0 = c + r * q1, rem = d + r * q0;
+      if (q1 === 0 || q0 === 0 || rem === 0) return polyForms[1].make(rng, diff);
       const ask = rc(rng, ['x', 'const', 'rem']);
       const P = poly([a, b, c, d]);
       const quot = `${term(a, 'x', 2)} + px + q`;
@@ -132,7 +135,7 @@ const polyForms = [
   },
   // MCQ: which linear expression is a factor of a monic cubic with integer zeroes.
   {
-    diffs: [1, 2, 3],
+    diffs: [1, 2],
     make: (rng) => {
       for (let g = 0; g < 80; g++) {
         const zs = [nz(rng, -5, 5), nz(rng, -5, 5), nz(rng, -5, 5)];
@@ -164,7 +167,7 @@ const polyForms = [
   },
   // Two unknown coefficients from two conditions (remainder / factor theorem).
   {
-    diffs: [3],
+    diffs: [2],
     make: (rng) => {
       for (let g = 0; g < 80; g++) {
         const a = nz(rng, -6, 6), b = nz(rng, -6, 6);
@@ -172,9 +175,10 @@ const polyForms = [
         if (ra === rb) continue;
         const mode = ri(rng, 0, 2);
         let c = nz(rng, -9, 9);
-        if (mode >= 1) { c = -(ra ** 3 + a * ra * ra + b * ra); if (c === 0) continue; }
+        const rf = mode === 2 ? rb : ra;           // the root that is made a factor
+        if (mode >= 1) { c = -(rf ** 3 + a * rf * rf + b * rf); if (c === 0) continue; }
         const P = x => x ** 3 + a * x * x + b * x + c;
-        const Ra = P(ra), Rb = mode === 2 ? 0 : P(rb);
+        const Ra = P(ra), Rb = P(rb);
         const clause = (r, R) => R === 0 ? `$(x ${sgn(-r)})$ is a factor of $P(x)$` : `the remainder when $P(x)$ is divided by $(x ${sgn(-r)})$ is $${R}$`;
         const ask = rc(rng, ['a', 'b', 'a + b']);
         const key = ask === 'a' ? a : ask === 'b' ? b : a + b;
@@ -201,7 +205,7 @@ const polyForms = [
   },
   // Which line of a worked factor-theorem solution contains the first error?
   {
-    diffs: [2, 3],
+    diffs: [2],
     make: (rng) => {
       for (let g = 0; g < 120; g++) {
         const r = nz(rng, -4, 4), b = nz(rng, -6, 6), c = nz(rng, -9, 9);
@@ -280,46 +284,16 @@ const polyForms = [
       return polyForms[0].make(rng, 2);
     }
   },
-  // A repeated zero: P(r) = 0 and P'(r) = 0.
-  {
-    diffs: [3],
-    make: (rng) => {
-      for (let g = 0; g < 120; g++) {
-        const r = nz(rng, -4, 4), s = nz(rng, -7, 7);
-        if (s === r) continue;
-        const b = -(2 * r + s), c = r * r + 2 * r * s, k = -r * r * s;
-        if (b === 0 || c === 0) continue;
-        const ask = rc(rng, ['c', 'k', 's']);
-        const key = ask === 'c' ? c : ask === 'k' ? k : s;
-        const what = ask === 's' ? 'the third zero of $P(x)$' : `the value of $${ask}$`;
-        return {
-          prompt: `The polynomial $P(x) = x^3 ${b < 0 ? '-' : '+'} ${term(Math.abs(b), 'x', 2)} + cx + k$ has a repeated zero at $x = ${r}$ (so $(x ${sgn(-r)})^2$ is a factor). Find ${what}.`,
-          answerType: 'numeric', answer: { value: key },
-          traps: keep(key, ask === 'c' ? [{ value: 3 * r * r + 2 * b * r, why: 'A repeated zero means $P(r) = 0$ **and** $P\'(r) = 0$. Check the sign when substituting into $P\'(x) = 3x^2 + 2bx + c$.' }, { value: -c, why: 'Check the sign of $c$ after solving $P\'(r) = 0$.' }]
-            : ask === 'k' ? [{ value: -k, why: 'Use $P(r) = 0$ with the value of $c$ already found, and watch the sign.' }, { value: r * r * s, why: 'The constant term is $-\\,r^2 s$ for zeroes $r, r, s$.' }]
-              : [{ value: r, why: `The repeated zero $x = ${r}$ counts twice in the sum of zeroes.` }, { value: -s, why: 'The sum of the three zeroes is $-b$, so the third zero is $-b - 2r$.' }]),
-          hints: ['A zero of multiplicity 2 is a zero of both $P$ and $P\'$.', `$P'(x) = 3x^2 + 2(${b})x + c$.`, `Solve $P'(${r}) = 0$ for $c$, then $P(${r}) = 0$ for $k$.`],
-          steps: [
-            { h: 'Zeroes $r, r, s$', d: `sum of zeroes $= ${-b}$, so $s = ${-b} - 2(${r}) = ${s}$` },
-            { h: 'Coefficients', d: `$c = r^2 + 2rs = ${c}$, $\\ k = -r^2 s = ${k}$` },
-            { h: 'Answer', d: `$${key}$` }
-          ]
-        };
-      }
-      return polyForms[0].make(rng, 2);
-    }
-  },
   // Real-world: break-even is a zero, so (x - r) is a factor.
   {
     diffs: [2],
     make: (rng) => {
-      const r = ri(rng, 1, 6), b = ri(rng, -8, 8), c = nz(rng, -12, 12);
+      const r = ri(rng, 1, 6), b = nz(rng, -8, 8), c = nz(rng, -12, 12);
       const kk = -(r ** 3 + b * r * r + c * r);
       if (kk === 0) return polyForms[0].make(rng, 2);
-      const who = rc(rng, ['Bondi surf school', 'Newcastle kayak hire', 'Manly ferry-ticket kiosk', 'Parramatta cricket academy']);
-      const unit = rc(rng, ['lessons', 'bookings', 'sessions']);
+      const [who, unit] = rc(rng, [['Bondi surf school', 'lessons'], ['Newcastle kayak hire', 'bookings'], ['Manly ferry kiosk', 'ticket packs'], ['Parramatta cricket academy', 'coaching sessions']]);
       return {
-        prompt: `The weekly profit, in thousands of dollars, of a ${who} that sells $x$ hundred ${unit} is modelled by $P(x) = x^3 ${b === 0 ? '' : `${b < 0 ? '-' : '+'} ${term(Math.abs(b), 'x', 2)}`} ${c < 0 ? '-' : '+'} ${term(Math.abs(c), 'x')} + k$. The business breaks even (profit is zero) when $x = ${r}$. Find $k$.`,
+        prompt: `The weekly profit, in thousands of dollars, of the ${who} when it sells $x$ hundred ${unit} is modelled by $P(x) = ${poly([1, b, c, 0])} + k$. The business breaks even (profit is zero) when $x = ${r}$. Find $k$.`,
         answerType: 'numeric', answer: { value: kk }, answerPrefix: 'k =',
         traps: keep(kk, [{ value: -kk, why: `Set $P(${r}) = 0$ and take care with the sign when isolating $k$.` }, { value: r ** 3 + b * r * r + c * r + r, why: `Break-even means $P(${r}) = 0$ exactly.` }]),
         hints: ['Breaking even means $P(x) = 0$.', `That makes $(x ${sgn(-r)})$ a factor, so $P(${r}) = 0$.`, 'Solve the resulting equation for $k$.'],
@@ -390,7 +364,7 @@ const trigidForms = [
         hints: ['Spot the compound-angle expansion.', `$${f.rule}$.`, `Here $A = ${A}x$ and $B = ${B}x$.`],
         steps: [
           { h: 'Recognise the pattern', d: `$${f.rule}$` },
-          { h: 'Combine', d: `$${f.expr} = \\${f.fn}(${f.n}x)$` },
+          { h: 'Combine', d: `$${f.expr} = \\${f.fn}(${nx(f.n)})$` },
           { h: 'Answer', d: `$n = ${f.n}$` }
         ]
       };
@@ -402,7 +376,7 @@ const trigidForms = [
     make: (rng) => {
       const B = ri(rng, 2, 24), A = ri(rng, B + 1, 25);
       const kind = ri(rng, 0, 3);
-      const T = (fn, n) => `$\\${fn}(${n}x)$`;
+      const T = (fn, n) => `$\\${fn}(${nx(n)})$`;
       const spec = [
         { expr: `\\sin ${A}x\\cos ${B}x + \\cos ${A}x\\sin ${B}x`, key: T('sin', A + B) },
         { expr: `\\sin ${A}x\\cos ${B}x - \\cos ${A}x\\sin ${B}x`, key: T('sin', A - B) },
@@ -429,17 +403,17 @@ const trigidForms = [
   },
   // tan(A ± B) from two rational tangents; or the reverse (find tan B).
   {
-    diffs: [2, 3, 4],
+    diffs: [1, 2],
     make: (rng, diff) => {
       for (let g = 0; g < 100; g++) {
-        const t1 = posTan(rng, diff === 2 ? 6 : 9), t2 = posTan(rng, diff === 2 ? 6 : 9);
+        const t1 = posTan(rng, diff === 1 ? 6 : 9), t2 = posTan(rng, diff === 1 ? 6 : 9);
         const plus = rng() < 0.5;
         const den = plus ? one.sub(t1.mul(t2)) : one.add(t1.mul(t2));
         if (den.n === 0) continue;
         const T = (plus ? t1.add(t2) : t1.sub(t2)).div(den);
         if (T.n === 0) continue;
         const [x, y] = rc(rng, [['A', 'B'], ['x', 'y'], ['\\alpha', '\\beta'], ['P', 'Q']]);
-        const reverse = diff >= 3 && rng() < 0.5;
+        const reverse = diff === 2 && rng() < 0.5;
         const op = plus ? '+' : '-';
         if (!reverse) {
           const wrong = plus ? (one.add(t1.mul(t2)).n === 0 ? null : t1.add(t2).div(one.add(t1.mul(t2)))) : (one.sub(t1.mul(t2)).n === 0 ? null : t1.sub(t2).div(one.sub(t1.mul(t2))));
@@ -476,7 +450,7 @@ const trigidForms = [
   },
   // Double-angle values from one rational ratio.
   {
-    diffs: [2, 3, 4],
+    diffs: [3, 4],
     make: (rng, diff) => {
       const kinds = diff === 2 ? ['cosFromSin', 'cosFromCos', 'tan2'] : ['cosFromSin', 'cosFromCos', 'tan2', 'cosFromTan', 'sinFromTan'];
       const kind = rc(rng, kinds);
@@ -566,7 +540,7 @@ const trigidForms = [
   },
   // Which line of a worked sin(A ± B) solution contains the first error?
   {
-    diffs: [3, 4],
+    diffs: [1, 2],
     make: (rng) => {
       for (let g = 0; g < 200; g++) {
         let [o1, a1, h1] = rc(rng, TRI), [o2, a2, h2] = rc(rng, TRI);
@@ -611,7 +585,7 @@ const trigidForms = [
   },
   // Both sin and cos given (Pythagorean triple): double-angle in context-free form.
   {
-    diffs: [1, 2],
+    diffs: [3, 4],
     make: (rng) => {
       let [o, a, h] = rc(rng, TRI);
       if (rng() < 0.5) [o, a] = [a, o];
@@ -654,7 +628,7 @@ const rangeTex = (type, A, B) => {
 const inverseTrigForms = [
   // Greatest / least value of x in the domain of f(x) = sin^-1(ax + b) or cos^-1(ax + b).
   {
-    diffs: [1, 2],
+    diffs: [2, 4],
     make: (rng) => {
       for (let g = 0; g < 100; g++) {
         const fn = rc(rng, ['sin', 'cos']);
@@ -670,7 +644,7 @@ const inverseTrigForms = [
           answerType: 'numeric', answer: fa(key), inputHint: 'e.g. -4/3',
           traps: keep(key.value, [
             { value: other.value, why: `The domain runs from $${lo.latex()}$ to $${hi.latex()}$. ${a < 0 ? 'Dividing by a negative number reverses the inequality.' : 'Check which end of the interval you want.'}` },
-            { value: new Frac(greatest ? 1 + b : -1 + b, a).value, why: `Solve $${lin(a, b)} = ${greatest === (a > 0) ? 1 : -1}$ by subtracting $${b}$ (not adding) before dividing by ${a}.` }
+            ...(b === 0 ? [] : [{ value: new Frac(greatest ? 1 + b : -1 + b, a).value, why: `Solve $${lin(a, b)} = ${greatest === (a > 0) ? 1 : -1}$ by moving the constant to the other side with the opposite sign before dividing by ${a}.` }])
           ]),
           hints: [`$${INV[fn]}(u)$ needs $-1 \\le u \\le 1$.`, `So $-1 \\le ${lin(a, b)} \\le 1$.`, `Solve the inequality for $x$${a < 0 ? ' (the inequality reverses when dividing by a negative)' : ''}.`],
           steps: [
@@ -685,7 +659,7 @@ const inverseTrigForms = [
   },
   // MCQ: range of a transformed inverse trig function.
   {
-    diffs: [1, 2],
+    diffs: [2, 4],
     make: (rng) => {
       for (let g = 0; g < 100; g++) {
         const type = rc(rng, ['sin', 'cos', 'tan']);
@@ -774,9 +748,9 @@ const inverseTrigForms = [
   },
   // Solve an equation  inverse-trig(ax + b) = special angle.
   {
-    diffs: [2, 3],
+    diffs: [1, 2],
     make: (rng) => {
-      const SP = { sin: [[-1, 2, 0, 1, -1], [-1, 6, -1, 2, -1 / 2], [0, 1, 0, 1, 0], [1, 6, 1, 2, 1 / 2], [1, 2, 1, 1, 1]], cos: [[0, 1, 1, 1, 1], [1, 3, 1, 2, 1 / 2], [1, 2, 0, 1, 0], [2, 3, -1, 2, -1 / 2], [1, 1, -1, 1, -1]], tan: [[-1, 4, -1, 1, -1], [0, 1, 0, 1, 0], [1, 4, 1, 1, 1]] };
+      const SP = { sin: [[-1, 2, -1, 1, -1], [-1, 6, -1, 2, -1 / 2], [0, 1, 0, 1, 0], [1, 6, 1, 2, 1 / 2], [1, 2, 1, 1, 1]], cos: [[0, 1, 1, 1, 1], [1, 3, 1, 2, 1 / 2], [1, 2, 0, 1, 0], [2, 3, -1, 2, -1 / 2], [1, 1, -1, 1, -1]], tan: [[-1, 4, -1, 1, -1], [0, 1, 0, 1, 0], [1, 4, 1, 1, 1]] };
       for (let g = 0; g < 100; g++) {
         const fn = rc(rng, ['sin', 'cos', 'tan']);
         const [pn_, pd, vn, vd] = rc(rng, SP[fn]);
@@ -844,7 +818,7 @@ const inverseTrigForms = [
   },
   // Identities: sin^-1 x + cos^-1 x = pi/2, cos^-1(-x) = pi - cos^-1 x, sin^-1(-x) = -sin^-1 x, tan^-1 x + tan^-1(1/x) = pi/2.
   {
-    diffs: [2, 3],
+    diffs: [3, 4],
     make: (rng) => {
       for (let g = 0; g < 100; g++) {
         const kind = rc(rng, ['sinToCos', 'cosToSin', 'negCos', 'negSin', 'recipTan']);
@@ -879,7 +853,7 @@ const piC = f => (f.d === 1 && f.n === 1 ? '\\pi' : `${f.latex()}\\pi`);
 const ratesForms = [
   // Rectangle whose sides change: dA/dt = w dl/dt + l dw/dt.
   {
-    diffs: [1, 2],
+    diffs: [3],
     make: (rng) => {
       for (let g = 0; g < 100; g++) {
         const l = ri(rng, 5, 40), w = ri(rng, 5, 40), p = ri(rng, 1, 6), q = nz(rng, -6, 6);
@@ -899,7 +873,7 @@ const ratesForms = [
   },
   // Related rates with exact answers: dA/dt etc. given as a multiple of pi, find dr/dt.
   {
-    diffs: [2, 3],
+    diffs: [3],
     make: (rng) => {
       const kind = rc(rng, ['circle', 'sphereV', 'sphereS', 'square']);
       const k = ri(rng, 2, 80), r = ri(rng, 2, 20);
@@ -920,7 +894,7 @@ const ratesForms = [
   },
   // Related rates: inverted cone, radius = depth / m.
   {
-    diffs: [3, 4],
+    diffs: [3],
     make: (rng) => {
       const m = rc(rng, [2, 3, 4]), k = ri(rng, 1, 60), h = ri(rng, 2, 12);
       const key = new Frac(m * m * k, h * h);
@@ -935,7 +909,7 @@ const ratesForms = [
   },
   // Sliding ladder.
   {
-    diffs: [3, 4],
+    diffs: [3],
     make: (rng) => {
       let [o, a, h] = rc(rng, TRI);
       if (rng() < 0.5) [o, a] = [a, o];
@@ -982,7 +956,7 @@ const ratesForms = [
   },
   // Exponential: time to reach a target, or k from two readings.
   {
-    diffs: [2, 3],
+    diffs: [1, 2],
     make: (rng) => {
       for (let g = 0; g < 200; g++) {
         if (rng() < 0.5) {
@@ -1038,7 +1012,7 @@ const ratesForms = [
   },
   // Newton-cooling form: T = P + (T0 - P)e^{-kt}.
   {
-    diffs: [3, 4],
+    diffs: [2],
     make: (rng) => {
       for (let g = 0; g < 200; g++) {
         const P = ri(rng, 15, 30), T0 = ri(rng, 60, 95), k = ri(rng, 2, 15) / 100, t = ri(rng, 5, 40);
@@ -1073,7 +1047,7 @@ const ratesForms = [
   },
   // Motion from a cubic displacement: velocity, acceleration, average velocity.
   {
-    diffs: [1, 2, 3],
+    diffs: [4],
     make: (rng) => {
       for (let g = 0; g < 100; g++) {
         const a = nz(rng, -3, 3), b = nz(rng, -9, 9), c = nz(rng, -12, 12), t0 = ri(rng, 1, 6);
@@ -1081,7 +1055,7 @@ const ratesForms = [
         const key = ask === 'v' ? 3 * a * t0 * t0 + 2 * b * t0 + c : ask === 'a' ? 6 * a * t0 + 2 * b : a * t0 * t0 + b * t0 + c;
         if (key === 0) continue;
         const x = `${term(a, 't', 3)} ${b < 0 ? '-' : '+'} ${term(Math.abs(b), 't', 2)} ${c < 0 ? '-' : '+'} ${term(Math.abs(c), 't')}`;
-        const q = ask === 'v' ? `its velocity at $t = ${t0}$` : ask === 'a' ? `its acceleration at $t = ${t0}$` : `its average velocity over the first $${t0}$ seconds`;
+        const q = ask === 'v' ? `its velocity at $t = ${t0}$` : ask === 'a' ? `its acceleration at $t = ${t0}$` : `its average velocity over the first $${t0}$ ${secs(t0)}`;
         return {
           prompt: `A cyclist riding along a straight path in Centennial Park has displacement $x = ${x}$ metres from a marker at time $t$ seconds. Find ${q}.`,
           answerType: 'numeric', answer: { value: key }, answerSuffix: ask === 'a' ? 'm/s²' : 'm/s',
@@ -1095,7 +1069,7 @@ const ratesForms = [
   },
   // v given as a function of position: a = v dv/dx.
   {
-    diffs: [2, 3, 4],
+    diffs: [4],
     make: (rng) => {
       for (let g = 0; g < 100; g++) {
         const p = rc(rng, [-5, -4, -3, -2, -1, 1, 2, 3, 4, 5]), q = nz(rng, -9, 9), x0 = ri(rng, -6, 6);
@@ -1114,7 +1088,7 @@ const ratesForms = [
   },
   // Total distance travelled when the particle turns round.
   {
-    diffs: [3, 4],
+    diffs: [4],
     make: (rng) => {
       const t1 = ri(rng, 1, 4), t2 = ri(rng, t1 + 1, 6), m = ri(rng, 1, 3);
       const x = t => 2 * m * t ** 3 - 3 * m * (t1 + t2) * t * t + 6 * m * t1 * t2 * t;
@@ -1131,7 +1105,7 @@ const ratesForms = [
   },
   // MCQ: chain rule value of a rate (sizes as multiples of pi).
   {
-    diffs: [2, 3],
+    diffs: [3],
     make: (rng) => {
       const kind = rc(rng, ['sphereV', 'sphereS', 'circle']);
       const r = ri(rng, 2, 15), u = ri(rng, 2, 9);
@@ -1151,6 +1125,277 @@ const ratesForms = [
     }
   }
 ];
+
+// ── additional forms placed by cell (see DOTPOINT_FORMS) ─────────────────────
+const lead = m => (m === 1 ? '' : String(m));
+// me11-poly, dot point 2 (relationships between roots and coefficients) -> cell 3
+polyForms.push(
+  { // build the coefficients from the zeroes
+    diffs: [3],
+    make: (rng) => {
+      for (let g = 0; g < 100; g++) {
+        const z = [nz(rng, -6, 6), nz(rng, -6, 6), nz(rng, -6, 6)];
+        if (new Set(z).size < 3) continue;
+        const m = rc(rng, [1, 2, 3, 4]);
+        const s1 = z[0] + z[1] + z[2], s2 = z[0] * z[1] + z[0] * z[2] + z[1] * z[2], s3 = z[0] * z[1] * z[2];
+        const ask = rc(rng, ['b', 'c', 'd']);
+        const key = ask === 'b' ? -m * s1 : ask === 'c' ? m * s2 : -m * s3;
+        if (key === 0) continue;
+        return {
+          prompt: `A cubic polynomial $P(x) = ${lead(m)}x^3 + bx^2 + cx + d$ has zeroes $${z[0]}$, $${z[1]}$ and $${z[2]}$. Find the value of $${ask}$.`,
+          answerType: 'numeric', answer: { value: key },
+          traps: keep(key, [{ value: -key, why: 'Check the sign: $\\sum\\alpha = -\\dfrac{b}{a}$, $\\ \\sum\\alpha\\beta = \\dfrac{c}{a}$, $\\ \\alpha\\beta\\gamma = -\\dfrac{d}{a}$.' }, { value: key / m, why: `Multiply by the leading coefficient ${m}: the relationships give $\\dfrac{b}{a}$, $\\dfrac{c}{a}$, $\\dfrac{d}{a}$.` }]),
+          hints: ['Use the sum and products of the zeroes.', `$\\alpha + \\beta + \\gamma = ${s1}$, $\\ \\alpha\\beta + \\beta\\gamma + \\gamma\\alpha = ${s2}$, $\\ \\alpha\\beta\\gamma = ${s3}$.`, 'Then multiply by the leading coefficient and fix the sign.'],
+          steps: [{ h: 'Sums and products', d: `$${s1}$, $${s2}$, $${s3}$` }, { h: 'Relate to coefficients', d: `$b = -a\\sum\\alpha$, $c = a\\sum\\alpha\\beta$, $d = -a\\alpha\\beta\\gamma$ with $a = ${m}$` }, { h: 'Answer', d: `$${ask} = ${key}$` }]
+        };
+      }
+      return polyForms[0].make(rng, 1);
+    }
+  },
+  { // third zero / constant term from two zeroes and b
+    diffs: [3],
+    make: (rng) => {
+      for (let g = 0; g < 100; g++) {
+        const p = nz(rng, -7, 7), q = nz(rng, -7, 7), r = nz(rng, -7, 7);
+        const b = -(p + q + r);
+        if (b === 0 || p === q) continue;
+        const ask = rc(rng, ['r', 'd']);
+        const key = ask === 'r' ? r : -p * q * r;
+        return {
+          prompt: `Two of the zeroes of $P(x) = x^3 ${b < 0 ? '-' : '+'} ${term(Math.abs(b), 'x', 2)} + cx + d$ are $${p}$ and $${q}$. Find ${ask === 'r' ? 'the third zero' : 'the value of $d$'}.`,
+          answerType: 'numeric', answer: { value: key },
+          traps: keep(key, ask === 'r' ? [{ value: b - p - q, why: 'The three zeroes add to $-b$, so the third is $-b - p - q$.' }] : [{ value: p * q * r, why: 'For a cubic the product of the zeroes is $-\\dfrac{d}{a}$, so $d$ has the opposite sign.' }, { value: -p * q, why: 'Find the third zero first, then use all three in the product.' }]),
+          hints: ['The sum of the three zeroes is $-\\dfrac{b}{a}$.', `The third zero is $${-b} - (${p}) - (${q})$.`, ask === 'r' ? 'Evaluate.' : 'Then $d = -$ (product of the three zeroes).'],
+          steps: [{ h: 'Third zero', d: `$r = ${-b} - (${p}) - (${q}) = ${r}$` }, ...(ask === 'd' ? [{ h: 'Constant term', d: `$d = -(${p})(${q})(${r}) = ${key}$` }] : [])]
+        };
+      }
+      return polyForms[0].make(rng, 1);
+    }
+  },
+  { // MCQ: which ratio of coefficients
+    diffs: [3],
+    make: (rng) => {
+      for (let g = 0; g < 100; g++) {
+        const a = nz(rng, -4, 4), b = nz(rng, -9, 9), c = nz(rng, -9, 9), d = nz(rng, -9, 9);
+        const ask = rc(rng, ['sum', 'pairs', 'prod']);
+        const pool = { sum: [new Frac(-b, a), new Frac(b, a)], pairs: [new Frac(c, a), new Frac(-c, a)], prod: [new Frac(-d, a), new Frac(d, a)] };
+        const key = pool[ask][0];
+        const others = [...pool[ask].slice(1), ...Object.entries(pool).filter(([k]) => k !== ask).map(([, v]) => v[0])];
+        if (new Set([key, ...others].map(f => f.str())).size < 4) continue;
+        const m = mcq(rng, `$${key.latex()}$`, others.map(f => ({ text: `$${f.latex()}$`, why: 'Compare with $-\\dfrac{b}{a}$ (sum), $\\dfrac{c}{a}$ (pairs) and $-\\dfrac{d}{a}$ (product) — match both the ratio and the sign.' })));
+        const name = ask === 'sum' ? '\\alpha + \\beta + \\gamma' : ask === 'pairs' ? '\\alpha\\beta + \\beta\\gamma + \\gamma\\alpha' : '\\alpha\\beta\\gamma';
+        return {
+          prompt: `The zeroes of $${poly([a, b, c, d])}$ are $\\alpha$, $\\beta$ and $\\gamma$. Which value is $${name}$?`,
+          answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+          hints: ['Use the root–coefficient relationships for a cubic.', `Here $a = ${a}$, $b = ${b}$, $c = ${c}$, $d = ${d}$.`, 'Watch the sign.'],
+          steps: [{ h: 'Relationship', d: ask === 'sum' ? '$\\sum\\alpha = -\\dfrac{b}{a}$' : ask === 'pairs' ? '$\\sum\\alpha\\beta = \\dfrac{c}{a}$' : '$\\alpha\\beta\\gamma = -\\dfrac{d}{a}$' }, { h: 'Evaluate', d: `$${key.latex()}$` }]
+        };
+      }
+      return polyForms[0].make(rng, 1);
+    }
+  },
+  { // quadratic: symmetric functions of the two zeroes
+    diffs: [3],
+    make: (rng) => {
+      for (let g = 0; g < 100; g++) {
+        const p = nz(rng, -8, 8), q = nz(rng, -8, 8);
+        if (p === q) continue;
+        const m = rc(rng, [1, 2, 3, 5]);
+        const s = p + q, pr = p * q;
+        const ask = rc(rng, ['sq', 'recip', 'diff']);
+        const key = ask === 'sq' ? new Frac(s * s - 2 * pr) : ask === 'recip' ? new Frac(s, pr) : new Frac(s * s - 4 * pr);
+        if (key.n === 0) continue;
+        const expr = ask === 'sq' ? '\\alpha^2 + \\beta^2' : ask === 'recip' ? '\\dfrac{1}{\\alpha} + \\dfrac{1}{\\beta}' : '(\\alpha - \\beta)^2';
+        const wr = ask === 'sq' ? [s * s, s * s + 2 * pr] : ask === 'recip' ? [-s / pr, s] : [s * s, s * s - 2 * pr];
+        return {
+          prompt: `The zeroes of $${poly([m, -m * s, m * pr])}$ are $\\alpha$ and $\\beta$. Without solving, find $${expr}$${ask === 'recip' ? ' as a fraction in simplest form' : ''}.`,
+          answerType: 'numeric', answer: ask === 'recip' ? fa(key) : { value: key.value }, ...(ask === 'recip' ? { inputHint: 'e.g. -3/10' } : {}),
+          traps: keep(key.value, wr.map(v => ({ value: v, why: 'Rewrite the target using $\\alpha + \\beta$ and $\\alpha\\beta$: for example $\\alpha^2 + \\beta^2 = (\\alpha + \\beta)^2 - 2\\alpha\\beta$.' }))),
+          hints: ['For $ax^2 + bx + c$: $\\alpha + \\beta = -\\dfrac{b}{a}$ and $\\alpha\\beta = \\dfrac{c}{a}$.', `Here $\\alpha + \\beta = ${s}$ and $\\alpha\\beta = ${pr}$.`, 'Rewrite the expression using those two values.'],
+          steps: [{ h: 'Sum and product', d: `$${s}$ and $${pr}$` }, { h: 'Rewrite and evaluate', d: `$${expr} = ${key.latex()}$` }]
+        };
+      }
+      return polyForms[0].make(rng, 1);
+    }
+  }
+);
+
+// me11-inversetrig: dot point 0 (exact values) -> cells 1-2; dot point 2 (simplify) -> cells 3-4
+const PRIN = [
+  { fn: 'sin', tex: '\\dfrac{1}{2}', t: 2 }, { fn: 'sin', tex: '\\dfrac{\\sqrt{2}}{2}', t: 3 }, { fn: 'sin', tex: '\\dfrac{\\sqrt{3}}{2}', t: 4 },
+  { fn: 'cos', tex: '\\dfrac{\\sqrt{3}}{2}', t: 2 }, { fn: 'cos', tex: '\\dfrac{\\sqrt{2}}{2}', t: 3 }, { fn: 'cos', tex: '\\dfrac{1}{2}', t: 4 },
+  { fn: 'tan', tex: '\\dfrac{\\sqrt{3}}{3}', t: 2 }, { fn: 'tan', tex: '1', t: 3 }, { fn: 'tan', tex: '\\sqrt{3}', t: 4 }
+];
+inverseTrigForms.push(
+  { // MCQ: principal value (misconception: other solution, complement)
+    diffs: [1, 2],
+    make: (rng) => {
+      for (let g = 0; g < 60; g++) {
+        const e = rc(rng, PRIN), deg = rng() < 0.5;
+        const val = t => (deg ? `$${t * 15}°$` : `$${piTex(t, 12)}$`);
+        const key = val(e.t);
+        const other = e.fn === 'sin' ? 12 - e.t : e.fn === 'cos' ? 24 - e.t : 12 + e.t;
+        const cands = [
+          { text: val(other), why: `That is another angle with the same $\\${e.fn}$ value, but outside the principal range of $${INV[e.fn]}$.` },
+          { text: val(6 - e.t), why: 'That is the complementary angle: you have swapped sine and cosine (or reversed the tangent ratio).' },
+          { text: val(-e.t), why: 'The input is positive, so the principal value is not negative here.' },
+          { text: val(e.t === 3 ? 2 : 3), why: 'Match the exact ratio to its special angle.' }
+        ].filter(o => o.text !== key);
+        if (new Set(cands.map(o => o.text)).size < 3) continue;
+        const m = mcq(rng, key, cands);
+        return {
+          prompt: `What is the principal value of $${INV[e.fn]}\\left(${e.tex}\\right)$ in ${deg ? 'degrees' : 'radians'}?`,
+          answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+          hints: [`Which angle has $\\${e.fn} = ${e.tex}$?`, `The principal range of $${INV[e.fn]}$ is ${e.fn === 'cos' ? '$[0, \\pi]$' : '$\\left[-\\dfrac{\\pi}{2}, \\dfrac{\\pi}{2}\\right]$'}.`, `The angle is $${e.t * 15}°$.`],
+          steps: [{ h: 'Special angle', d: `$\\${e.fn}(${e.t * 15}°) = ${e.tex}$` }, { h: 'Check the range', d: `$${e.t * 15}°$ lies in the principal range` }, { h: 'Answer', d: key }]
+        };
+      }
+      return inverseTrigForms[0].make(rng, 1);
+    }
+  },
+  { // evaluate a combination of two principal values, in degrees
+    diffs: [1, 2],
+    make: (rng) => {
+      const POOL = [
+        ...[['1/2', '\\dfrac{1}{2}', 2], ['\\sqrt{2}/2', '\\dfrac{\\sqrt{2}}{2}', 3], ['\\sqrt{3}/2', '\\dfrac{\\sqrt{3}}{2}', 4], ['1', '1', 6], ['-1/2', '-\\dfrac{1}{2}', -2], ['-\\sqrt{2}/2', '-\\dfrac{\\sqrt{2}}{2}', -3], ['-\\sqrt{3}/2', '-\\dfrac{\\sqrt{3}}{2}', -4], ['-1', '-1', -6]].map(([, tex, t]) => ({ fn: 'sin', tex, t })),
+        ...[['\\sqrt{3}/2', '\\dfrac{\\sqrt{3}}{2}', 2], ['\\sqrt{2}/2', '\\dfrac{\\sqrt{2}}{2}', 3], ['1/2', '\\dfrac{1}{2}', 4], ['0', '0', 6], ['-1/2', '-\\dfrac{1}{2}', 8], ['-\\sqrt{2}/2', '-\\dfrac{\\sqrt{2}}{2}', 9], ['-\\sqrt{3}/2', '-\\dfrac{\\sqrt{3}}{2}', 10], ['-1', '-1', 12]].map(([, tex, t]) => ({ fn: 'cos', tex, t })),
+        ...[['\\sqrt{3}/3', '\\dfrac{\\sqrt{3}}{3}', 2], ['1', '1', 3], ['\\sqrt{3}', '\\sqrt{3}', 4], ['-\\sqrt{3}/3', '-\\dfrac{\\sqrt{3}}{3}', -2], ['-1', '-1', -3], ['-\\sqrt{3}', '-\\sqrt{3}', -4]].map(([, tex, t]) => ({ fn: 'tan', tex, t }))
+      ];
+      for (let g = 0; g < 100; g++) {
+        const e1 = rc(rng, POOL), e2 = rc(rng, POOL), a = rc(rng, [1, 2, 3]), b = rc(rng, [1, 2, 3]), plus = rng() < 0.5;
+        const key = a * 15 * e1.t + (plus ? 1 : -1) * b * 15 * e2.t;
+        if (key === 0) continue;
+        const wrong = a * 15 * e1.t - (plus ? 1 : -1) * b * 15 * e2.t;
+        return {
+          prompt: `Evaluate $${lead(a)}${INV[e1.fn]}\\left(${e1.tex}\\right) ${plus ? '+' : '-'} ${lead(b)}${INV[e2.fn]}\\left(${e2.tex}\\right)$ in degrees.`,
+          answerType: 'numeric', answer: { value: key }, answerSuffix: '°',
+          traps: keep(key, [{ value: wrong, why: `Use the sign between the two terms (${plus ? 'add' : 'subtract'}) after finding each principal value.` }]),
+          hints: ['Find each principal value separately.', `$${INV[e1.fn]}\\left(${e1.tex}\\right) = ${e1.t * 15}°$ and $${INV[e2.fn]}\\left(${e2.tex}\\right) = ${e2.t * 15}°$.`, 'Multiply by the coefficients and combine.'],
+          steps: [{ h: 'Principal values', d: `$${e1.t * 15}°$ and $${e2.t * 15}°$` }, { h: 'Combine', d: `$${a}(${e1.t * 15}°) ${plus ? '+' : '-'} ${b}(${e2.t * 15}°) = ${key}°$` }]
+        };
+      }
+      return inverseTrigForms[0].make(rng, 1);
+    }
+  },
+  { // inverse of a trig value outside the principal range
+    diffs: [3, 4],
+    make: (rng) => {
+      for (let g = 0; g < 100; g++) {
+        const fn = rc(rng, ['sin', 'cos', 'tan']), k = nz(rng, -18, 18);
+        if (fn === 'tan' && Math.abs(k) % 6 === 3) continue;
+        const th = k * Math.PI / 6;
+        const r = fn === 'sin' ? Math.asin(Math.sin(th)) : fn === 'cos' ? Math.acos(Math.cos(th)) : Math.atan(Math.tan(th));
+        const kp = Math.round(r / (Math.PI / 6));
+        if (Math.abs(r - kp * Math.PI / 6) > 1e-9 || kp === 0) continue;
+        const key = piFrac(kp, 6), arg = piFrac(k, 6);
+        return {
+          prompt: `Evaluate $${INV[fn]}\\left(\\${fn}\\left(${arg.tex}\\right)\\right)$ exactly. Remember the principal range of $${INV[fn]}$.`,
+          answerType: 'numeric', answer: { value: key.val, requireExact: true, canonicalInput: key.typed }, inputHint: 'e.g. pi/6',
+          traps: keep(key.val, [{ value: arg.val, why: `$${arg.tex}$ is not necessarily in the principal range of $${INV[fn]}$; find the in-range angle with the same $\\${fn}$ value.`, tol: 0.001 }]),
+          hints: [`$${INV[fn]}$ only returns angles in ${fn === 'cos' ? '$[0, \\pi]$' : fn === 'sin' ? '$\\left[-\\dfrac{\\pi}{2}, \\dfrac{\\pi}{2}\\right]$' : '$\\left(-\\dfrac{\\pi}{2}, \\dfrac{\\pi}{2}\\right)$'}.`, `Use a reference angle for $${arg.tex}$.`, 'Choose the angle in the range with the same ratio.'],
+          steps: [{ h: 'Reference angle', d: `reduce $${arg.tex}$ using the quadrant of the angle` }, { h: 'Principal value', d: `$${key.tex}$` }]
+        };
+      }
+      return inverseTrigForms[0].make(rng, 1);
+    }
+  },
+  { // show that cos(sin^-1(p/q)) = sqrt(n)/q: find n
+    diffs: [3, 4],
+    make: (rng) => {
+      for (let g = 0; g < 100; g++) {
+        const q = ri(rng, 3, 24), p = ri(rng, 1, q - 1);
+        if (gcd(p, q) !== 1) continue;
+        const kind = rc(rng, ['cosSin', 'sinCos', 'tanCos']);
+        const n = q * q - p * p;
+        if (Number.isInteger(Math.sqrt(n))) continue;
+        const den = kind === 'tanCos' ? p : q;
+        const lhs = kind === 'cosSin' ? `\\cos\\left(${INV.sin}\\dfrac{${p}}{${q}}\\right)` : kind === 'sinCos' ? `\\sin\\left(${INV.cos}\\dfrac{${p}}{${q}}\\right)` : `\\tan\\left(${INV.cos}\\dfrac{${p}}{${q}}\\right)`;
+        return {
+          prompt: `Show that $${lhs}$ can be written as $\\dfrac{\\sqrt{n}}{${den}}$ for a whole number $n$, and find $n$.`,
+          answerType: 'numeric', answer: { value: n },
+          traps: keep(n, [{ value: q * q + p * p, why: 'In the right-angled triangle the missing side is found by subtracting: $q^2 - p^2$.' }, { value: q - p, why: 'Use Pythagoras with squares: $n = q^2 - p^2$.' }]),
+          hints: ['Let $\\theta$ be the inverse trig value and draw a right-angled triangle.', `Two sides are ${kind === 'tanCos' ? `${p} (adjacent) and ${q} (hypotenuse)` : `${p} and ${q}`}.`, `The third side is $\\sqrt{${q}^2 - ${p}^2}$.`],
+          steps: [{ h: 'Triangle', d: `hypotenuse ${q}, one side ${p}` }, { h: 'Missing side', d: `$\\sqrt{${q * q} - ${p * p}} = \\sqrt{${n}}$` }, { h: 'Answer', d: `$n = ${n}$` }]
+        };
+      }
+      return inverseTrigForms[0].make(rng, 1);
+    }
+  }
+);
+
+// me11-rates: dot point 1 (exponential growth and decay) -> cells 1-2; dot point 2 (motion) -> cell 4
+ratesForms.push(
+  { // MCQ: the differential equation for a described growth or decay
+    diffs: [1, 2],
+    make: (rng) => {
+      const p = ri(rng, 1, 40), k = p / 100, decay = rng() < 0.5;
+      const sub = rc(rng, ['a koala colony', 'a bacterial culture', 'a radioactive sample', 'water in a leaking tank']);
+      const kk = String(k);
+      const s = decay ? '-' : '';
+      const m = mcq(rng, `$\\dfrac{dN}{dt} = ${s}${kk}N$`, [
+        { text: `$\\dfrac{dN}{dt} = ${s}${kk}$`, why: 'That rate is constant. Here the rate is proportional to the current size $N$.' },
+        { text: `$\\dfrac{dN}{dt} = ${s}${p}N$`, why: `$${p}\\%$ means $${kk}$, not $${p}$.` },
+        { text: `$\\dfrac{dN}{dt} = ${decay ? '' : '-'}${kk}N$`, why: `The size is ${decay ? 'decreasing' : 'increasing'}, so check the sign of $k$.` }
+      ]);
+      return {
+        prompt: `The size $N$ of ${sub} ${decay ? 'decreases' : 'increases'} at a rate proportional to its current size, by $${p}\\%$ of $N$ per hour. Which equation models this?`,
+        answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
+        hints: ['Proportional means $\\dfrac{dN}{dt} = kN$.', `Write ${p}% as a decimal.`, decay ? 'For decay, $k$ is negative.' : 'For growth, $k$ is positive.'],
+        steps: [{ h: 'Model', d: '$\\dfrac{dN}{dt} = kN$' }, { h: 'Value of k', d: `$k = ${s}${kk}$` }]
+      };
+    }
+  },
+  { // rate of change from N = A e^{kt}
+    diffs: [1, 2],
+    make: (rng) => {
+      for (let g = 0; g < 100; g++) {
+        const A = 100 * ri(rng, 1, 20), k = nz(rng, -20, 20) / 100, n = 25 * ri(rng, 2, 40);
+        const key = Math.round(k * n * 100) / 100;
+        return {
+          prompt: `A quantity is modelled by $N = ${A}e^{${k}t}$, where $t$ is in hours. Find the rate of change of $N$ at the instant $N = ${n}$.`,
+          answerType: 'numeric', answer: { value: key, tol: 0.0051 }, answerSuffix: 'per hour',
+          traps: keep(key, [{ value: Math.round(k * A * 100) / 100, why: '$\\dfrac{dN}{dt} = kN$ uses the current size $N = ' + n + '$, not the starting size.', tol: 0.0051 }, { value: Math.round(-k * n * 100) / 100, why: 'Keep the sign of $k$: it shows growth or decay.', tol: 0.0051 }]),
+          hints: ['Differentiate: $\\dfrac{dN}{dt} = kN$.', `Here $k = ${k}$.`, `Multiply $k$ by $${n}$.`],
+          steps: [{ h: 'Differentiate', d: `$\\dfrac{dN}{dt} = ${k}\\times ${A}e^{${k}t} = ${k}N$` }, { h: 'Substitute', d: `$${k}\\times ${n} = ${key}$` }]
+        };
+      }
+      return ratesForms[0].make(rng, 3);
+    }
+  },
+  { // find the starting amount
+    diffs: [1, 2],
+    make: (rng) => {
+      for (let g = 0; g < 200; g++) {
+        const N = 50 * ri(rng, 2, 60), k = nz(rng, -15, 15) / 100, t = ri(rng, 2, 15);
+        const N0 = N * Math.exp(-k * t);
+        if (N0 < 10 || Math.abs(N0 % 1 - 0.5) < 0.05) continue;
+        const key = Math.round(N0);
+        return {
+          prompt: `A population is modelled by $N = N_0e^{${k}t}$ with $t$ in years. After $${t}$ years the population is $${N}$. Find $N_0$, to the nearest whole number.`,
+          answerType: 'numeric', answer: { value: key, tol: 1.01 },
+          traps: keep(key, [{ value: Math.round(N * Math.exp(k * t)), why: `Divide by $e^{${k}\\times${t}}$ to go back to $t = 0$; do not multiply.`, tol: 1.01 }]),
+          hints: [`$${N} = N_0e^{${k}\\times ${t}}$.`, `$e^{${fmt1(k * t)}}$ is a number you can evaluate.`, 'Divide both sides by it.'],
+          steps: [{ h: 'Substitute', d: `$${N} = N_0e^{${fmt1(k * t)}}$` }, { h: 'Solve', d: `$N_0 = ${N}e^{${fmt1(-k * t)}} \\approx ${key}$` }]
+        };
+      }
+      return ratesForms[0].make(rng, 3);
+    }
+  },
+  { // simple harmonic motion: maximum speed or acceleration
+    diffs: [4],
+    make: (rng) => {
+      const A = ri(rng, 2, 20), n = ri(rng, 2, 9), fn = rc(rng, ['sin', 'cos']), acc = rng() < 0.5;
+      const key = acc ? A * n * n : A * n;
+      return {
+        prompt: `A particle moves so that its displacement is $x = ${A}\\${fn}(${n}t)$ metres at time $t$ seconds. Find its maximum ${acc ? 'acceleration' : 'speed'}.`,
+        answerType: 'numeric', answer: { value: key }, answerSuffix: acc ? 'm/s²' : 'm/s',
+        traps: keep(key, [{ value: acc ? A * n : A, why: acc ? `Differentiating twice brings down $${n}$ twice: the amplitude is $${A}\\times${n}^2$.` : `Differentiating brings down a factor of $${n}$ from the chain rule.` }, { value: A * n * n * n, why: 'Differentiate only as many times as needed.' }]),
+        hints: [acc ? '$a = \\dfrac{d^2x}{dt^2}$.' : '$v = \\dfrac{dx}{dt}$.', `$${acc ? `a = ${fn === 'sin' ? '-' : '-'}${A * n * n}\\${fn}(${n}t)` : `v = ${fn === 'sin' ? '' : '-'}${A * n}\\${fn === 'sin' ? 'cos' : 'sin'}(${n}t)`}$.`, 'The sine or cosine factor has maximum absolute value 1.'],
+        steps: [{ h: 'Differentiate', d: acc ? `$a = -${A * n * n}\\${fn}(${n}t)$` : `$v = ${fn === 'sin' ? '' : '-'}${A * n}\\${fn === 'sin' ? 'cos' : 'sin'}(${n}t)$` }, { h: 'Maximum', d: `$${key}$ ${acc ? 'm/s²' : 'm/s'}` }]
+      };
+    }
+  }
+);
 
 export const forms = {
   'me11-poly': polyForms,

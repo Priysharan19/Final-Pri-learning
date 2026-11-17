@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `461f74dcd6f34af338908b2ffbb3203587db3cc35bb9f450f095a66f2fa3edfe` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `f9a52086c8f64db6b12ce8fde458006ea3ab240c3cba1e3658346707a3454d3a` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -3874,7 +3874,18 @@ Final answer: 0
 
 ## `nsw-final:me11-poly/D2` — seed 1009
 
-> Which of the following is a factor of $P(x) = x^3 - x^2 - 4x + 4$?
+> The polynomial $P(x) = x^3 + ax^2 + bx + 2$ is such that the remainder when $P(x)$ is divided by $(x + 1)$ is $4$, and the remainder when $P(x)$ is divided by $(x - 1)$ is $4$. Find the value of $b$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me11-poly/D3` — seed 1009
+
+> The zeroes of $x^3 - 2x^2 - x + 4$ are $\\alpha$, $\\beta$ and $\\gamma$. Which value is $\\alpha + \\beta + \\gamma$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -3882,17 +3893,6 @@ Final answer: 0
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:me11-poly/D3` — seed 1009
-
-> The zeroes of $P(x) = 2x^3 - 4x^2 - 18x + 36$ are $\\alpha$, $\\beta$ and $\\gamma$. Without finding them, evaluate $\\alpha^2 + \\beta^2 + \\gamma^2$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `22` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `22.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `23` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `23` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-functions/D1` — seed 1009
 
@@ -3929,25 +3929,25 @@ Final answer: 0
 
 ## `nsw-final:me11-trigid/D1` — seed 1009
 
-> Which single ratio is equal to $\\sin 20x\\cos 16x - \\cos 20x\\sin 16x$?
+> $\\alpha$ and $\\beta$ are acute angles with $\\tan \\alpha = \\frac{3}{4}$ and $\\tan \\beta = \\frac{5}{3}$. Find $\\tan(\\alpha + \\beta)$ as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-29/3` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `-29/3` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `-26/3` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-26/3` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-trigid/D2` — seed 1009
 
-> Given $\\cos x = \\frac{3}{8}$, find $\\cos 2x$ as a fraction in simplest form.
+> $P$ and $Q$ are acute angles with $\\tan P = \\frac{7}{4}$ and $\\tan(P + Q) = \\frac{32}{9}$. Find $\\tan Q$ as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-23/32` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-23/32` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `9/32` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `9/32` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1/4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `1/4` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5/4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5/4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-trigid/D3` — seed 1009
 
@@ -3973,7 +3973,7 @@ Final answer: 0
 
 ## `nsw-final:me11-inversetrig/D1` — seed 1009
 
-> Which interval is the range of $f(x) = -2\\cos^{-1}(x) - 1$?
+> What is the principal value of $\\cos^{-1}\\left(\\dfrac{1}{2}\\right)$ in degrees?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -3995,69 +3995,69 @@ Final answer: 0
 
 ## `nsw-final:me11-inversetrig/D3` — seed 1009
 
-> Solve $\\cos^{-1}(-2x + 4) = \\frac{\\pi}{2}$ for $x$. Give your answer as a fraction in simplest form.
+> Evaluate $\\cos^{-1}\\left(\\cos\\left(\\frac{-\\pi}{2}\\right)\\right)$ exactly. Remember the principal range of $\\cos^{-1}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `2.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1.570796` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | `1.570796` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
+| common wrong | `2.570796` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2.570796` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-inversetrig/D4` — seed 1009
 
-> Find the exact value of $\\sin\\left(\\cos^{-1}\\dfrac{45}{53} + \\sin^{-1}\\dfrac{20}{29}\\right)$ as a fraction in simplest form.
+> Given that $\\sin^{-1}(x) = \\frac{2\\pi}{11}$, find the exact value of $\\sin^{-1}(-x)$ in radians.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1488/1537` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `1488/1537` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `3025/1537` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3025/1537` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-0.571199` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| alternative | `-0.571199` | no | 0/3 | 0/3 | The same value written in another equivalent form. |
+| common wrong | `0.428801` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0.428801` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-rates/D1` — seed 1009
 
-> Growth is modelled by $\\dfrac{dN}{dt} = 0.16N$, where $N$ is the number of koalas on an island. The population is growing at $140.8$ per week. Find $N$.
+> The size $N$ of a bacterial culture decreases at a rate proportional to its current size, by $26\\%$ of $N$ per hour. Which equation models this?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `880` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `880.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `881` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `881` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-rates/D2` — seed 1009
 
-> A cyclist riding along a straight path in Centennial Park has displacement $x = t^3 - 2t^2 - 2t$ metres from a marker at time $t$ seconds. Find its velocity at $t = 5$.
+> The size $N$ of a bacterial culture decreases at a rate proportional to its current size, by $26\\%$ of $N$ per hour. Which equation models this?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `53` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `53.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `54` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `54` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-rates/D3` — seed 1009
 
-> A cyclist riding along a straight path in Centennial Park has displacement $x = t^3 - 2t^2 - 2t$ metres from a marker at time $t$ seconds. Find its velocity at $t = 5$.
+> A ladder 106 metres long leans against a vertical wall. The foot of the ladder is pulled away from the wall along level ground at $6$ m/s. How fast is the top of the ladder sliding down the wall at the instant the foot is $56$ metres from the wall? Give your answer in m/s as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `53` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `53.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `54` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `54` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `56/15` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `56/15` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `71/15` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `71/15` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-rates/D4` — seed 1009
 
-> A particle moves along a straight line so that its velocity is $v = 2x - 2$ m/s, where $x$ is its displacement in metres. Find its acceleration when $x = -1$.
+> A particle moves along a straight line with displacement $x = 4t^3 - 48t^2 + 180t$ metres from the origin at time $t$ seconds. Find the total distance it travels in the first $5$ seconds.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-8` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `-8.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `-7` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-7` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `232` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `232.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `233` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `233` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-induction/D1` — seed 1009
 
@@ -4182,14 +4182,14 @@ Final answer: 0
 
 ## `nsw-final:me12-projectile/D2` — seed 1009
 
-> A ball is fired from level ground at $30°$ above the horizontal and is in the air for exactly $5.5$ seconds. Take $g = 10$ m/s². Find its launch speed.
+> Two balls are kicked from level ground. Ball A is kicked at $25$ m/s at $54°$; ball B at $28$ m/s at $11°$ (both above the horizontal). Take $g = 10$ m/s². How much longer than ball B is ball A in the air? Give your answer in seconds, correct to 2 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `55` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `55.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `56` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `56` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `149/50` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `149/50` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `199/50` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `199/50` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-projectile/D3` — seed 1009
 

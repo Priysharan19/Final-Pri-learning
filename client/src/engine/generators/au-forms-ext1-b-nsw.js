@@ -36,7 +36,18 @@ function mc(rng, prompt, correct, ds, hints, steps) {
   return { prompt, answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options, hints, steps };
 }
 const pv = v => (/^\w$/.test(v) ? v : `(${v})`);
-const cn = (c, v) => (c === 1 ? v : `${c}${v}`);
+const cn = (c, v) => (c === 1 ? v : c === -1 ? `-${v}` : `${c}${v}`);
+/** Singular/plural noun for a count, and English ordinals (1st, 2nd, 3rd, 4th, 11th, 21st…). */
+const pl = (n, w) => (n === 1 ? w : `${w}s`);
+const ord = n => { const t = n % 100, u = n % 10; return `${n}${t >= 11 && t <= 13 ? 'th' : u === 1 ? 'st' : u === 2 ? 'nd' : u === 3 ? 'rd' : 'th'}`; };
+/** (base) raised to e, with no ^{1}. */
+const pw = (b, e) => (e === 1 ? `(${b})` : `(${b})^{${e}}`);
+/** c·v + k and k + c·v written without 1k or '+ -'. */
+const lin = (c, v, k) => `${cn(c, v)} ${k < 0 ? '-' : '+'} ${Math.abs(k)}`;
+const cl = (k, c, v) => `${k} ${c < 0 ? '-' : '+'} ${Math.abs(c) === 1 ? '' : Math.abs(c)}${v}`;
+/** true when every value differs from every other by more than 1e-9 (MCQ options must not coincide). */
+const distinct = vals => vals.every((x, i) => vals.every((y, j) => i === j || Math.abs(x - y) > 1e-9));
+const sc = (k, s) => (k === 1 ? s : k === -1 ? `-${s}` : `${k}${s}`);
 const col = (x, y) => `\\begin{pmatrix} ${x} \\\\ ${y} \\end{pmatrix}`;
 const A = '\\underset{\\sim}{a}';
 const B = '\\underset{\\sim}{b}';
@@ -90,9 +101,9 @@ const makeI1a = (rng) => go(() => {
   if (F.rhs(m + 2) > 1e12) return null;
   const v = F.term(m + 1);
   return num(`Mathematical induction is used to prove that $${F.claim}$ for all positive integers $n$. In the step from $n = ${m}$ to $n = ${m + 1}$, what is the value of the term added to the left side?`, v, {
-    traps: [{ value: F.term(m), why: `The term added going to $n = ${m + 1}$ is the ${m + 1}th term, not the ${m}th.` }, { value: F.term(m + 2), why: `Stop at the ${m + 1}th term — that is the one the step adds.` }],
-    hints: ['The step adds exactly one new term to the left side.', `The new term is the ${m + 1}th term of the series.`, 'Substitute that position into the general term.'],
-    steps: [{ h: 'Identify the new term', d: `The left side gains its ${m + 1}th term.` }, { h: 'Evaluate', d: `$${v}$` }]
+    traps: [{ value: F.term(m), why: `The term added going to $n = ${m + 1}$ is the ${ord(m + 1)} term, not the ${ord(m)}.` }, { value: F.term(m + 2), why: `Stop at the ${ord(m + 1)} term — that is the one the step adds.` }],
+    hints: ['The step adds exactly one new term to the left side.', `The new term is the ${ord(m + 1)} term of the series.`, 'Substitute that position into the general term.'],
+    steps: [{ h: 'Identify the new term', d: `The left side gains its ${ord(m + 1)} term.` }, { h: 'Evaluate', d: `$${v}$` }]
   });
 });
 const makeI1b = (rng) => {
@@ -141,7 +152,7 @@ const makeI2a = (rng) => {
     const c = a + 2 * b;
     for (let n = 1; n <= 8; n++) { let s = 0; for (let i = 1; i <= n; i++) s += a * i + b; if (s !== n * (a * n + c) / 2) throw new Error('induction I2a'); }
     return num(`Show that $${a + b} + ${2 * a + b} + \\cdots + (${cn(a, 'n')} + ${b}) = \\dfrac{n}{2}\\left(${cn(a, 'n')} + c\\right)$ for all positive integers $n$. Find the constant $c$.`, c, {
-      traps: [{ value: a + b, why: `$${a + b}$ is only the first term. Check $n = 1$: the right side must equal ${a + b}$.` }, { value: 2 * b, why: 'Test $n = 1$ and $n = 2$ to pin down the constant.' }],
+      traps: [{ value: a + b, why: `$${a + b}$ is only the first term. Check $n = 1$: the right side must equal $${a + b}$.` }, { value: 2 * b, why: 'Test $n = 1$ and $n = 2$ to pin down the constant.' }],
       hints: ['Put $n = 1$: the right side must equal the first term.', `$\\dfrac{1}{2}(${a} + c) = ${a + b}$.`, 'Solve for $c$.'],
       steps: [{ h: 'Test n = 1', d: `$\\dfrac{1}{2}(${a} + c) = ${a + b}$` }, { h: 'Solve', d: `$c = ${2 * (a + b)} - ${a} = ${c}$` }, { h: 'Check n = 2', d: `$\\dfrac{2}{2}(${2 * a} + ${c}) = ${2 * a + c}$ and $${a + b} + ${2 * a + b} = ${3 * a + 2 * b}$ ✓` }]
     });
@@ -171,7 +182,7 @@ const makeI2c = (rng) => go(() => {
   if (v !== F.rhs(m + 1)) throw new Error('induction I2c');
   return num(`In the inductive step for $${F.claim}$, assume the result for $n = k$ and add the $(k + 1)$th term to the right side. When $k = ${m}$, evaluate this sum.`, v, {
     traps: [{ value: F.rhs(m), why: 'You must add the next term to the assumed right side.' }],
-    hints: [`Evaluate the closed form at $n = ${m}$.`, `Find the term added next: the ${m + 1}th term.`, 'Add the two values; the total should match the closed form at $n = k + 1$.'],
+    hints: [`Evaluate the closed form at $n = ${m}$.`, `Find the term added next: the ${ord(m + 1)} term.`, 'Add the two values; the total should match the closed form at $n = k + 1$.'],
     steps: [{ h: 'Assumed value', d: `$${F.rhs(m)}$` }, { h: 'Next term', d: `$${F.term(m + 1)}$` }, { h: 'Sum', d: `$${v}$ — equal to the closed form at $n = ${m + 1}$ ✓` }]
   });
 });
@@ -270,10 +281,10 @@ const makeB1a = (rng) => go(() => {
   const q = ri(rng, 5, 95) / 100, p = q2(q), n = ri(rng, 4, 15), k = ri(rng, 1, n - 1);
   const v = pmf(n, k, p);
   if (!okP(v)) return null;
-  return num(`In netball, a goal shooter misses on any attempt with probability $${q}$, independently of other attempts. In $${n}$ attempts, find the probability that she scores exactly $${k}$ goals, correct to 4 decimal places.`, P4(v), {
+  return num(`In netball, a goal shooter misses on any attempt with probability $${q}$, independently of other attempts. In $${n}$ attempts, find the probability that she scores exactly $${k}$ ${pl(k, "goal")}, correct to 4 decimal places.`, P4(v), {
     tol: T4, traps: [{ value: P4(pmf(n, k, q)), why: `The probability of a success is $1 - ${q} = ${p}$, not ${q}.` }, { value: P4(p ** k * q ** (n - k)), why: `Include the $\\binom{${n}}{${k}}$ ways to choose which attempts score.` }],
-    hints: [`A goal has probability $1 - ${q} = ${p}$.`, `$P = \\binom{${n}}{${k}}(${p})^{${k}}(${q})^{${n - k}}$.`, 'Evaluate and round to 4 decimal places.'],
-    steps: [{ h: 'Success probability', d: `$p = 1 - ${q} = ${p}$` }, { h: 'Binomial formula', d: `$P(X = ${k}) = \\binom{${n}}{${k}}(${p})^{${k}}(${q})^{${n - k}}$` }, { h: 'Evaluate', d: `$\\approx ${P4(v)}$` }]
+    hints: [`A goal has probability $1 - ${q} = ${p}$.`, `$P = \\binom{${n}}{${k}}${pw(p, k)}${pw(q, n - k)}$.`, 'Evaluate and round to 4 decimal places.'],
+    steps: [{ h: 'Success probability', d: `$p = 1 - ${q} = ${p}$` }, { h: 'Binomial formula', d: `$P(X = ${k}) = \\binom{${n}}{${k}}${pw(p, k)}${pw(q, n - k)}$` }, { h: 'Evaluate', d: `$\\approx ${P4(v)}$` }]
   });
 });
 const makeB1b = (rng) => go(() => {
@@ -281,9 +292,9 @@ const makeB1b = (rng) => go(() => {
   const v = pmf(n, k, p);
   if (!okP(v)) return null;
   return num(`An AFL player converts $${pc}\\%$ of his set shots at goal, independently. Of his next $${n}$ set shots, find the probability that exactly $${k}$ are converted, correct to 4 decimal places.`, P4(v), {
-    tol: T4, traps: [{ value: P4(p ** k), why: 'Include the failures and the number of arrangements too.' }, { value: P4(pmf(n, n - k, p)), why: `Exactly ${k} successes needs $p^{${k}}$, not $p^{${n - k}}$.` }],
-    hints: [`Write the percentage as a probability: $p = ${p}$.`, `$P = \\binom{${n}}{${k}}(${p})^{${k}}(${q2(p)})^{${n - k}}$.`, 'Evaluate and round.'],
-    steps: [{ h: 'Probability', d: `$p = ${p}$, $q = ${q2(p)}$` }, { h: 'Binomial formula', d: `$\\binom{${n}}{${k}}(${p})^{${k}}(${q2(p)})^{${n - k}}$` }, { h: 'Evaluate', d: `$\\approx ${P4(v)}$` }]
+    tol: T4, traps: [{ value: P4(p ** k), why: 'Include the failures and the number of arrangements too.' }, { value: P4(pmf(n, n - k, p)), why: `Exactly $${k}$ ${k === 1 ? "success" : "successes"} needs the exponent $${k}$ on $p$, not $${n - k}$.` }],
+    hints: [`Write the percentage as a probability: $p = ${p}$.`, `$P = \\binom{${n}}{${k}}${pw(p, k)}${pw(q2(p), n - k)}$.`, 'Evaluate and round.'],
+    steps: [{ h: 'Probability', d: `$p = ${p}$, $q = ${q2(p)}$` }, { h: 'Binomial formula', d: `$\\binom{${n}}{${k}}${pw(p, k)}${pw(q2(p), n - k)}$` }, { h: 'Evaluate', d: `$\\approx ${P4(v)}$` }]
   });
 });
 const makeB1c = (rng) => go(() => {
@@ -316,14 +327,14 @@ const makeB1d = (rng) => {
 };
 const makeB1e = (rng) => go(() => {
   const n = ri(rng, 5, 15), k = ri(rng, 1, n - 1), p = ri(rng, 10, 90) / 100, q = q2(p);
-  if (k === n - k) return null;
-  return mc(rng, `A fair-minded umpire records that each ball in a cricket over is a dot ball with probability $${p}$, independently. In $${n}$ balls, which expression gives $P(\\text{exactly } ${k} \\text{ dot balls})$?`,
-    `$\\dbinom{${n}}{${k}}(${p})^{${k}}(${q})^{${n - k}}$`,
-    [{ text: `$(${p})^{${k}}(${q})^{${n - k}}$`, why: 'This omits the number of ways of choosing which balls are dot balls.' },
-      { text: `$\\dbinom{${n}}{${k}}(${p})^{${n - k}}(${q})^{${k}}$`, why: 'The exponents are swapped: $p$ goes with the number of successes.' },
-      { text: `$\\dbinom{${n}}{${k}}(${p})^{${k}}(${q})^{${k}}$`, why: `The failure exponent is $n - k = ${n - k}$, not ${k}.` }],
+  if (k === n - k || p === 0.5) return null;
+  return mc(rng, `A fair-minded umpire records that each ball in a cricket over is a dot ball with probability $${p}$, independently. In $${n}$ balls, which expression gives $P(\\text{exactly } ${k} \\text{ ${pl(k, 'dot ball')}})$?`,
+    `$\\dbinom{${n}}{${k}}${pw(p, k)}${pw(q, n - k)}$`,
+    [{ text: `$${pw(p, k)}${pw(q, n - k)}$`, why: 'This omits the number of ways of choosing which balls are dot balls.' },
+      { text: `$\\dbinom{${n}}{${k}}${pw(p, n - k)}${pw(q, k)}$`, why: 'The exponents are swapped: $p$ goes with the number of successes.' },
+      { text: `$\\dbinom{${n}}{${k}}${pw(p, k)}${pw(q, k)}$`, why: `The failure exponent is $n - k = ${n - k}$, not ${k}.` }],
     ['Binomial: $\\binom{n}{k}p^k(1-p)^{n-k}$.', `Here $n = ${n}$ and $k = ${k}$.`, `$1 - p = ${q}$.`],
-    [{ h: 'Formula', d: `$\\binom{${n}}{${k}}(${p})^{${k}}(${q})^{${n - k}}$` }]);
+    [{ h: 'Formula', d: `$\\binom{${n}}{${k}}${pw(p, k)}${pw(q, n - k)}$` }]);
 });
 
 const makeB3a = (rng) => go(() => {
@@ -395,7 +406,7 @@ const makeB4b = (rng) => go(() => {
   return num(`Each of $${n}$ players in a social cricket team independently turns up with probability $${p}$. Find the probability that **at most ${k}** turn up, correct to 4 decimal places.`, P4(v), {
     tol: T4, traps: [{ value: P4(pmf(n, k, p)), why: `“At most ${k}” includes every case from 0 to ${k}.` }],
     hints: [`$P(X \\le ${k}) = P(0) + \\cdots + P(${k})$.`, 'Use $\\binom{n}{r}p^r(1 - p)^{n - r}$ for each term.', 'Add and round.'],
-    steps: [{ h: 'Sum the cases', d: `$P(X \\le ${k}) = \\sum_{r=0}^{${k}}\\binom{${n}}{r}(${p})^r(${q2(p)})^{${n} - r}$` }, { h: 'Evaluate', d: `$\\approx ${P4(v)}$` }]
+    steps: [{ h: 'Sum the cases', d: `$P(X \\le ${k}) = P(X = 0) + \\cdots + P(X = ${k})$, each term $\\binom{${n}}{r}(${p})^r(${q2(p)})^{${n} - r}$` }, { h: 'Evaluate', d: `$\\approx ${P4(v)}$` }]
   });
 });
 const makeB4c = (rng) => go(() => {
@@ -432,6 +443,7 @@ const makeB4e = (rng) => go(() => {
 });
 const makeB4f = (rng) => go(() => {
   const n = ri(rng, 3, 12), p = ri(rng, 10, 60) / 100, q = q2(p);
+  if (p === 0.5) return null;
   return mc(rng, `A trainee surfer stands up on a wave with probability $${p}$, independently, on each of $${n}$ waves. Which expression gives $P(\\text{at least one stand-up})$?`,
     `$1 - (${q})^{${n}}$`,
     [{ text: `$(${q})^{${n}}$`, why: 'That is the probability of **no** stand-ups.' }, { text: `$1 - (${p})^{${n}}$`, why: `The probability of no success each time is $${q}$, not $${p}$.` }, { text: `$${n}(${p})$`, why: 'That is the expected number of stand-ups, not a probability.' }],
@@ -443,7 +455,7 @@ const makeB4f = (rng) => go(() => {
 
 const G = 'Take $g = 10$ m/s².';
 const sn = th => Math.sin(rad(th)), cs = th => Math.cos(rad(th));
-const vTh = rng => [ri(rng, 10, 60), ri(rng, 10, 80)];
+const vTh = (rng, ok = () => true) => { for (let i = 0; i < 400; i++) { const r = [ri(rng, 10, 60), ri(rng, 10, 80)]; if (ok(r[0], r[1])) return r; } throw new Error("vTh: no valid draw"); };
 
 const makeP1a = (rng) => go(() => {
   const [v, th] = vTh(rng), y = v * sn(th);
@@ -476,14 +488,14 @@ const makeP1c = (rng) => go(() => {
 const makeP1d = (rng) => go(() => {
   const [v, th] = vTh(rng), t = ri(rng, 2, 8), x = v * cs(th) * t;
   if (!safe(x, 1)) return null;
-  return num(`A ball is kicked at $${v}$ m/s at $${th}°$ above the horizontal. ${G} Ignoring air resistance, how far has it travelled horizontally after $${t}$ seconds? Give your answer correct to 1 decimal place.`, rnd(x, 1), {
+  return num(`A ball is kicked at $${v}$ m/s at $${th}°$ above the horizontal. ${G} Ignoring air resistance, how far has it travelled horizontally after $${t}$ ${pl(t, "second")}? Give your answer correct to 1 decimal place.`, rnd(x, 1), {
     tol: 0.005, suffix: 'm', traps: [{ value: rnd(v * sn(th) * t, 1), why: 'Horizontal motion uses the cosine component.' }, { value: rnd(v * t, 1), why: 'Only the horizontal component carries the ball sideways.' }],
     hints: ['The horizontal velocity stays constant.', `$v_x = ${v}\\cos(${th}°)$.`, `$x = v_x \\times ${t}$.`],
     steps: [{ h: 'Horizontal velocity', d: `$v_x = ${v}\\cos(${th}°) \\approx ${rnd(v * cs(th), 2)}$ m/s` }, { h: 'Distance', d: `$x = v_x t \\approx ${rnd(x, 1)}$ m` }]
   });
 });
 const makeP1e = (rng) => {
-  const [v, th] = vTh(rng);
+  const [v, th] = vTh(rng, (v, th) => th !== 45);
   return mc(rng, `A ball is kicked at $${v}$ m/s at $${th}°$ above the horizontal. Which pair gives the (horizontal, vertical) components of its initial velocity?`,
     `$\\left(${v}\\cos ${th}°,\\ ${v}\\sin ${th}°\\right)$`,
     [{ text: `$\\left(${v}\\sin ${th}°,\\ ${v}\\cos ${th}°\\right)$`, why: 'The components are swapped: horizontal uses cos, vertical uses sin.' },
@@ -520,7 +532,7 @@ const makeP2a = (rng) => go(() => {
 const makeP2b = (rng) => go(() => {
   const [v, th] = vTh(rng), t = ri(rng, 1, 6), y = v * sn(th) - 10 * t;
   if (Math.abs(y) < 0.5 || !safe(y, 1)) return null;
-  return num(`A projectile is launched at $${v}$ m/s at $${th}°$ above the horizontal. ${G} Find its vertical velocity component after $${t}$ seconds, correct to 1 decimal place. Take upwards as positive.`, rnd(y, 1), {
+  return num(`A projectile is launched at $${v}$ m/s at $${th}°$ above the horizontal. ${G} Find its vertical velocity component after $${t}$ ${pl(t, "second")}, correct to 1 decimal place. Take upwards as positive.`, rnd(y, 1), {
     tol: 0.005, suffix: 'm/s', traps: [{ value: rnd(-y, 1), why: 'Take upwards as positive: a downward velocity is negative.' }, { value: rnd(v * sn(th) + 10 * t, 1), why: 'Gravity reduces the upward velocity: $v_y = v\\sin\\theta - gt$.' }],
     hints: ['Constant acceleration $-10$ m/s² vertically.', '$v_y = v\\sin\\theta - gt$.', `$${v}\\sin(${th}°) - 10(${t})$.`],
     steps: [{ h: 'Initial vertical', d: `$${v}\\sin(${th}°) \\approx ${rnd(v * sn(th), 2)}$` }, { h: 'After ' + t + ' s', d: `$v_y \\approx ${rnd(y, 1)}$ m/s` }]
@@ -554,7 +566,7 @@ const makeP2e = (rng) => go(() => {
   });
 });
 const makeP2f = (rng) => {
-  const [v, th] = vTh(rng);
+  const [v, th] = vTh(rng, (v, th) => distinct([2 * sn(th), sn(th), 2 * cs(th), sn(2 * th)]));
   return mc(rng, `A ball is kicked from level ground at $${v}$ m/s at $${th}°$ above the horizontal. ${G} Which calculation gives its time of flight in seconds?`,
     `$\\dfrac{2 \\times ${v}\\sin ${th}°}{10}$`,
     [{ text: `$\\dfrac{${v}\\sin ${th}°}{10}$`, why: 'That is the time to the top of the flight only.' },
@@ -614,7 +626,7 @@ const makeP3e = (rng) => go(() => {
   });
 });
 const makeP3f = (rng) => {
-  const [v, th] = vTh(rng);
+  const [v, th] = vTh(rng, (v, th) => distinct([v * v * sn(2 * th), v * v * sn(th), v * sn(2 * th), 2 * v * sn(th)]));
   return mc(rng, `A ball is kicked from level ground at $${v}$ m/s at $${th}°$ above the horizontal. ${G} Which calculation gives the range in metres?`,
     `$\\dfrac{${v}^2\\sin ${2 * th}°}{10}$`,
     [{ text: `$\\dfrac{${v}^2\\sin ${th}°}{10}$`, why: 'The range formula uses $\\sin 2\\theta$.' },
@@ -645,7 +657,7 @@ const makeP4b = (rng) => go(() => {
   if (t >= T) return null;
   const y = v * sn(th) * t - 5 * t * t;
   if (y < 1 || !safe(y, 1)) return null;
-  return num(`A ball is thrown from level ground at $${v}$ m/s at $${th}°$ above the horizontal. ${G} How high above the ground is it after $${t}$ seconds? Give your answer correct to 1 decimal place.`, rnd(y, 1), {
+  return num(`A ball is thrown from level ground at $${v}$ m/s at $${th}°$ above the horizontal. ${G} How high above the ground is it after $${t}$ ${pl(t, "second")}? Give your answer correct to 1 decimal place.`, rnd(y, 1), {
     tol: 0.005, suffix: 'm', traps: [{ value: rnd(v * sn(th) * t, 1), why: 'Gravity pulls it down: subtract $\\dfrac{1}{2}gt^2 = 5t^2$.' }],
     hints: ['Vertical displacement: $y = v\\sin\\theta\\,t - \\dfrac{1}{2}gt^2$.', `$y = ${v}\\sin(${th}°)(${t}) - 5(${t})^2$.`, 'Evaluate.'],
     steps: [{ h: 'Vertical displacement', d: `$y = ${v}\\sin(${th}°)(${t}) - 5(${t * t})$` }, { h: 'Evaluate', d: `$\\approx ${rnd(y, 1)}$ m` }]
@@ -716,8 +728,7 @@ const makeV1c = (rng) => go(() => {
   const a = [nz(rng, -6, 6), nz(rng, -6, 6)], b = [nz(rng, -6, 6), nz(rng, -6, 6)], p = nz(rng, -4, 4), q = nz(rng, -4, 4);
   const cx = p * a[0] + q * b[0], cy = p * a[1] + q * b[1], m = hyp(cx, cy);
   if (m < 1 || !safe(m, 2)) return null;
-  const sc = (k, s) => (k === 1 ? s : k === -1 ? `-${s}` : `${k}${s}`);
-  return num(`Given $${A} = ${col(a[0], a[1])}$ and $${B} = ${col(b[0], b[1])}$, find $\\left|${sc(p, A)} + (${q})${B}\\right|$, correct to 2 decimal places.`, rnd(m, 2), {
+  return num(`Given $${A} = ${col(a[0], a[1])}$ and $${B} = ${col(b[0], b[1])}$, find $\\left|${sc(p, A)} ${q < 0 ? "-" : "+"} ${Math.abs(q) === 1 ? "" : Math.abs(q)}${B}\\right|$, correct to 2 decimal places.`, rnd(m, 2), {
     tol: 0.0005, traps: [{ value: rnd(Math.abs(p) * hyp(...a) + Math.abs(q) * hyp(...b), 2), why: 'The magnitude of a sum is not the sum of the magnitudes — combine the components first.' }],
     hints: ['Find the combined vector component by component.', `$x$: $${p}(${a[0]}) + (${q})(${b[0]}) = ${cx}$.`, `Then $\\sqrt{x^2 + y^2}$.`],
     steps: [{ h: 'Combine', d: `$${col(cx, cy)}$` }, { h: 'Magnitude', d: `$\\sqrt{${cx * cx} + ${cy * cy}} \\approx ${rnd(m, 2)}$` }]
@@ -783,15 +794,15 @@ const makeV2b = (rng) => go(() => {
   return num(`The vectors $\\underset{\\sim}{p} = \\begin{pmatrix} k \\\\ ${a2} \\end{pmatrix}$ and $\\underset{\\sim}{q} = ${col(b[0], b[1])}$ are perpendicular. Find $k$.`, k, {
     traps: [{ value: -k, why: 'Perpendicular vectors have dot product zero: $kq_x + ' + a2 + 'q_y = 0$.' }],
     hints: ['Perpendicular means the dot product is $0$.', `$k(${b[0]}) + (${a2})(${b[1]}) = 0$.`, 'Solve for $k$.'],
-    steps: [{ h: 'Dot product zero', d: `$${b[0]}k + ${a2 * b[1]} = 0$` }, { h: 'Solve', d: `$k = ${k}$` }]
+    steps: [{ h: 'Dot product zero', d: `$${lin(b[0], "k", a2 * b[1])} = 0$` }, { h: 'Solve', d: `$k = ${k}$` }]
   });
 });
 const makeV2c = (rng) => go(() => {
   const a = [nz(rng, -7, 7), nz(rng, -7, 7)], b1 = nz(rng, -7, 7), k = nz(rng, -9, 9), D = a[0] * b1 + a[1] * k;
   return num(`$${A} = ${col(a[0], a[1])}$ and $${B} = \\begin{pmatrix} ${b1} \\\\ k \\end{pmatrix}$ satisfy $\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} = ${D}$. Find $k$.`, k, {
     traps: [{ value: D - a[0] * b1, why: `Divide by the $y$-component of $\\underset{\\sim}{a}$, which is ${a[1]}.` }],
-    hints: ['Write out the dot product with the unknown.', `$${a[0]}(${b1}) + ${a[1]}k = ${D}$.`, 'Solve the linear equation.'],
-    steps: [{ h: 'Dot product', d: `$${a[0] * b1} + ${a[1]}k = ${D}$` }, { h: 'Solve', d: `$k = \\dfrac{${D - a[0] * b1}}{${a[1]}} = ${k}$` }]
+    hints: ['Write out the dot product with the unknown.', `$${cl(`${a[0]}(${b1})`, a[1], 'k')} = ${D}$.`, 'Solve the linear equation.'],
+    steps: [{ h: 'Dot product', d: `$${cl(a[0] * b1, a[1], "k")} = ${D}$` }, { h: 'Solve', d: `$k = \\dfrac{${D - a[0] * b1}}{${a[1]}} = ${k}$` }]
   });
 });
 const makeV2d = (rng) => go(() => {
@@ -799,7 +810,7 @@ const makeV2d = (rng) => go(() => {
   if (rng() < 0.5) {
     const p = nz(rng, -4, 4), q = nz(rng, -4, 4), v = (p * a[0]) * (q * b[0]) + (p * a[1]) * (q * b[1]);
     if (v === 0) return null;
-    return num(`Given $${A} = ${col(a[0], a[1])}$ and $${B} = ${col(b[0], b[1])}$, find $(${p}${A})\\cdot(${q}${B})$.`, v, {
+    return num(`Given $${A} = ${col(a[0], a[1])}$ and $${B} = ${col(b[0], b[1])}$, find $(${sc(p, A)})\\cdot(${sc(q, B)})$.`, v, {
       traps: [{ value: p + q + (a[0] * b[0] + a[1] * b[1]), why: 'Scalars multiply the dot product: $(p\\underset{\\sim}{a})\\cdot(q\\underset{\\sim}{b}) = pq(\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b})$.' }],
       hints: ['Scalar multiples can be taken outside the dot product.', `$\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} = ${a[0] * b[0] + a[1] * b[1]}$.`, `Multiply by $${p}\\times ${q}$.`],
       steps: [{ h: 'Dot product', d: `$\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} = ${a[0] * b[0] + a[1] * b[1]}$` }, { h: 'Scale', d: `$(${p})(${q})(${a[0] * b[0] + a[1] * b[1]}) = ${v}$` }]
@@ -906,6 +917,7 @@ const makeV3f = (rng) => go(() => {
   const a = [nz(rng, -6, 6), nz(rng, -6, 6)], b = [nz(rng, -6, 6), nz(rng, -6, 6)];
   const D = a[0] * b[0] + a[1] * b[1], A2 = a[0] ** 2 + a[1] ** 2, B2 = b[0] ** 2 + b[1] ** 2;
   if (D === 0 || a[0] * b[1] - a[1] * b[0] === 0) return null;
+  if (!distinct([Math.acos(D / Math.sqrt(A2 * B2)), Math.acos(D / (Math.sqrt(A2) + Math.sqrt(B2))), Math.asin(D / Math.sqrt(A2 * B2)), Math.acos(D / (A2 * B2))])) return null;
   return mc(rng, `For $${A} = ${col(a[0], a[1])}$ and $${B} = ${col(b[0], b[1])}$, which expression gives the angle $\\theta$ between them?`,
     `$\\cos^{-1}\\!\\left(\\dfrac{${D}}{\\sqrt{${A2}}\\,\\sqrt{${B2}}}\\right)$`,
     [{ text: `$\\cos^{-1}\\!\\left(\\dfrac{${D}}{\\sqrt{${A2}} + \\sqrt{${B2}}}\\right)$`, why: 'Divide by the product of the magnitudes, not their sum.' },
@@ -993,8 +1005,8 @@ export const forms = {
   ],
   'me12-projectile': [
     { diffs: [1], make: makeP1a }, { diffs: [1], make: makeP1b }, { diffs: [1], make: makeP1c }, { diffs: [1], make: makeP1d }, { diffs: [1], make: makeP1e }, { diffs: [1], make: makeP1f },
-    { diffs: [2], make: makeP2a }, { diffs: [2], make: makeP2b }, { diffs: [2], make: makeP2c }, { diffs: [2], make: makeP2d }, { diffs: [2], make: makeP2e }, { diffs: [2], make: makeP2f },
-    { diffs: [3], make: makeP3a }, { diffs: [3], make: makeP3b }, { diffs: [3], make: makeP3c }, { diffs: [3], make: makeP3d }, { diffs: [3], make: makeP3e }, { diffs: [3], make: makeP3f },
+    { diffs: [4], make: makeP2a }, { diffs: [2], make: makeP2c }, { diffs: [2], make: makeP2d }, { diffs: [2], make: makeP2e }, { diffs: [2], make: makeP2f },
+    { diffs: [3], make: makeP3a }, { diffs: [3], make: makeP3b }, { diffs: [3], make: makeP3c }, { diffs: [3], make: makeP3d }, { diffs: [4], make: makeP3e }, { diffs: [3], make: makeP3f },
     { diffs: [4], make: makeP4a }, { diffs: [4], make: makeP4b }, { diffs: [4], make: makeP4c }, { diffs: [4], make: makeP4d }, { diffs: [4], make: makeP4e }, { diffs: [4], make: makeP4f }
   ],
   'me12-vectors': [

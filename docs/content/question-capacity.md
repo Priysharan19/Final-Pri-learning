@@ -72,10 +72,10 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms12-right-triangle` | 4 | 10.0k | 24 | — |
 | `ms12-rates` | 4 | 11.0k | 34 | — |
 | `me12-induction` | 3 | 13.2k | 34 | — |
-| `me11-trigid` | 4 | 13.3k | 130 | — |
 | `y8-equations` | 3 | 14.7k | 26 | — |
+| `me11-trigid` | 4 | 15.9k | 81 | — |
 | `y10-simeq` | 4 | 17.0k | 6 | — |
-| `me11-inversetrig` | 4 | 19.2k | 223 | — |
+| `me11-inversetrig` | 4 | 20.3k | 399 | — |
 | `y10-probability` | 4 | 20.4k | 1 | forms |
 | `y8-algebra` | 4 | 21.6k | 25 | — |
 | `mex-complex` | 4 | 21.8k | 28 | — |
@@ -86,9 +86,9 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms11-measure` | 3 | 26.3k | 32 | — |
 | `y7-integers` | 4 | 30.4k | 10 | — |
 | `ms12-depreciation` | 4 | 30.4k | 22 | — |
-| `me12-projectile` | 4 | 32.3k | 8 | — |
+| `me12-projectile` | 4 | 30.4k | 11 | — |
 | `y9-linear` | 4 | 34.1k | 20 | — |
-| `me12-binomial` | 3 | 34.7k | 7 | — |
+| `me12-binomial` | 3 | 34.7k | 9 | — |
 | `y11-polynomials` | 4 | 34.7k | 95 | — |
 | `ms12-algebraic` | 4 | 38.5k | 17 | — |
 | `ms11-relfreq` | 3 | 44.6k | 53 | — |
@@ -96,8 +96,8 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms12-networks` | 4 | 47.9k | 999 | — |
 | `ms12-simple-interest` | 4 | 55.0k | 16 | — |
 | `y11-sine-cosine-rule` | 4 | 63.3k | 1 | forms |
-| `me12-vectors` | 4 | 69.5k | 33 | — |
-| `me11-rates` | 4 | 70.9k | 94 | — |
+| `me11-rates` | 4 | 66.1k | 99 | — |
+| `me12-vectors` | 4 | 69.5k | 54 | — |
 | `ms12-normal-exact` | 4 | 77.1k | 155 | — |
 | `ms12-network-flow` | 4 | 95.8k | 33 | — |
 | `ms12-annuity-table` | 4 | 97.2k | 19 | — |
@@ -105,7 +105,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms11-formulas` | 4 | 129.1k | 18 | — |
 | `me11-functions` | 3 | 159.7k | 92 | — |
 | `ms12-bivariate-fit` | 4 | 164.5k | 33 | — |
-| `me11-poly` | 3 | 180.0k | 498 | — |
+| `me11-poly` | 3 | 173.7k | 486 | — |
 | `mex-vectors` | 4 | 206.6k | 1 | forms |
 | `ms11-data` | 3 | 283.9k | 50 | — |
 | `ms12-bivariate` | 1 | 338.3k | 11 | — |
