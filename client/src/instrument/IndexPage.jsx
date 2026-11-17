@@ -300,13 +300,6 @@ export default function IndexPage() {
                 );
               })}
             </ul>
-            <div className="in-thumbs" aria-hidden="true">
-              {chapters.map(c => (
-                <button key={c.row.id} type="button" tabIndex={-1} className="in-thumb" style={{ '--cc': `var(${c.colour})` }}
-                  aria-current={current?.row.id === c.row.id ? 'true' : undefined}
-                  onMouseEnter={() => setPick(c.row.id)} onClick={() => setPick(c.row.id)}><span>{c.index + 1}</span></button>
-              ))}
-            </div>
           </nav>
         )}
       </div>
