@@ -114,13 +114,20 @@ seven days.
 
 ## Known limits
 
-- The NSW (Australian) progress page is not part of V1. Its multipart-exam path
-  writes its attempt and activity rows outside the shared transaction.
+- Both editions' Progress is one evidence page (`client/src/progress/EvidenceProgress.jsx`,
+  reading `engine/progressEvidence.js` through `GET /progress/evidence`). It draws
+  words and bands: how often answers were right, how many were unaided (the
+  attempt's `support`), whether right answers held after a gap of two days or
+  more, whether they carried to another kind of question, and what the spaced
+  schedule says is due. Each dimension has a floor (`EVIDENCE_FLOORS`) and says
+  "not enough evidence yet" below it. It shows no mastery figure, percentage,
+  predicted mark or band. The floors and cut-points are Pri product choices for
+  wording, not research thresholds. The NSW multipart-exam path still writes its
+  attempt and activity rows outside the shared transaction.
 - Per-day activity rows are written in the answer's transaction rather than
   derived on read. The truth suite asserts they equal the ledger's per-day counts.
   A restored backup carries both from the same file.
-- `GET /report` and the NSW legacy progress page (`ProgressLegacy.jsx`, its only
-  student consumer, out of V1) still print accuracy without the sample floor or the
+- `GET /report` (and `GET /stats`, whose `examPrediction` field no page now draws) still print accuracy without the sample floor or the
   game exclusion: `/report`'s per-chapter `accuracy` (`indiaChapterRows`, also read
   by teacher analytics) is a plain correct/attempts on rating rows. No India V1
   student surface reads it; the truth suite audits `/report`'s counts, not those
