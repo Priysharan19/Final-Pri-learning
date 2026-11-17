@@ -34,7 +34,11 @@ for (const [text, tex] of [
   ['3/4', '$\\frac{3}{4}$'],
   ['(x - 1)/(x + 2)', '$\\frac{x - 1}{x + 2}$'],
   ['4x^3 + -15x^2', '$4x^{3} - 15x^{2}$'],
-  ['2*pi*r', '$2 \\cdot \\pi r$']
+  ['2*pi*r', '$2 \\cdot \\pi r$'],
+  ['2*3^x', '$2 \\cdot 3^{x}$'],
+  ['2*10^3', '$2 \\cdot 10^{3}$'],
+  ['3*2^(n-1)', '$3 \\cdot 2^{n - 1}$'],
+  ['x*2^n', '$x \\cdot 2^{n}$']
 ]) eq(`typeset ${text}`, answerToTex(text), tex);
 for (const text of ['6', '-2.5', '6 % p.a.', 'Δ = 97', 'x ≥ -1', '$x^2$', '1.5 cm', '(-3, 4)', 'Reflection in the x-axis', '3 : 5', '2, -3', '']) {
   eq(`left alone: ${JSON.stringify(text)}`, answerToTex(text), text);

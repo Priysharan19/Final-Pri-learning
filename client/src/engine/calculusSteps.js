@@ -176,6 +176,7 @@ export function calculusContext(meta, prompt) {
 }
 
 // ── Reading a line ──────────────────────────────────────────────────────────
+const FUNCTION_LABEL = /^(?:y|f|g|F|[a-z]\s*\(\s*[a-z]\s*\))$/;
 const LABEL = /^(?:y|f|g|F|[a-z]\s*\(\s*[a-z]\s*\)|[a-z]\s*['′]\s*(?:\(\s*[a-z]\s*\))?|d\s*[a-z]\s*\/\s*d\s*[a-z]|d\s*\/\s*d\s*[a-z])$/;
 
 /** Top-level '=' split ('<', '>', '≤', '≥', '≠' are not equals). */
@@ -236,7 +237,11 @@ function readSegment(text, ctx) {
   const parts = [];
   let operators = 0, constants = 0;
   for (const t of terms) {
-    if (CONSTANT_TERM.test(t.text)) { constants++; continue; }
+    if (CONSTANT_TERM.test(t.text)) {
+      // A constant of integration belongs to an antiderivative, once, added. Anywhere else the line is not read.
+      if (ctx.relation !== 'antiderivative' || t.sign < 0 || ++constants > 1) return null;
+      continue;
+    }
     const integral = INTEGRAL_TERM.exec(t.text);
     const deriv = DERIV_TERM.exec(t.text);
     if (integral) {
@@ -321,7 +326,7 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
   // The question written out again is the START only at the start: before any
   // line has made a claim, and not as a continuation ("= …") of an earlier line.
   // The same expression later on is a claim, and judged as one.
-  const startAllowed = !stage.claimed && !/^\s*=/.test(String(line));
+  const startAllowed = !/^\s*=/.test(String(line));
   try {
     const segs = segmentsOf(line).filter(s => s !== '');
     if (!segs.length) return null;
@@ -336,14 +341,18 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
     if (!real.length) return null;
     const target = ctx.relation === 'antiderivative' ? x => valueAt(ctx.given, x, ctx.variable) : null;
 
-    // The answer test the checker has always applied: the last '='-segment, with a constant of integration set aside.
-    const last = real[real.length - 1];
-    const lastText = termsOf(last.text).filter(t => !CONSTANT_TERM.test(t.text)).map((t, i) => `${t.sign < 0 ? '-' : (i ? '+' : '')}${t.text}`).join(' ') || last.text;
+    // The answer test the checker has always applied, EXACTLY (marks hang on it): the last
+    // '='-segment of the line, as the line is cleaned, equivalent to the final answer. A
+    // constant of integration is therefore not part of it: "2x⁸ + C" is a true line, not the answer.
+    const cleanedLine = normalize(String(line)).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '');
+    const answerCandidate = cleanedLine.includes('=') ? cleanedLine.split('=').pop() : cleanedLine;
     let isAnswer = false;
-    try { isAnswer = exprEquivalent(lastText, meta.canonical, { positiveOnly: meta.positiveOnly }); } catch { isAnswer = false; }
+    try { isAnswer = exprEquivalent(answerCandidate, meta.canonical, { positiveOnly: meta.positiveOnly }); } catch { isAnswer = false; }
 
     const verdicts = real.map((seg, position) => {
-      const mayRestate = startAllowed && position === 0 && !read.slice(0, read.indexOf(seg)).some(s => !s.label);
+      // A label that says "this is the derivative / the answer" (dy/dx, f′(x), F) makes the line a claim.
+      const labelsOk = ctx.relation === 'derivative' ? read.every(r => !r.label || FUNCTION_LABEL.test(r.text)) : read.every(r => !r.label);
+      const mayRestate = startAllowed && labelsOk && position === 0 && !read.slice(0, read.indexOf(seg)).some(r => !r.label);
       if (ctx.relation === 'antiderivative') {
         // The question's own integral, or its integrand: the start.
         if (seg.kind === 'operator' && seg.parts[0].kind === 'integral' && sameFunction(x => valueAt(seg.parts[0].body, x, ctx.variable), target)) return 'start';
@@ -362,7 +371,6 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
       return sameFunction(seg.asFunction, expected, seg.approx.used ? 1e-4 : 1e-7) ? 'valid' : 'invalid';
     });
     if (verdicts.includes('unread')) return null;
-    if (verdicts.some(v => v !== 'start')) stage.claimed = true;
 
     if (isAnswer) return { status: 'ok' };
     const firstInvalid = verdicts.indexOf('invalid');
@@ -596,7 +604,8 @@ export function refineDerivativeLine(text, meta, assessed, stage = { claimed: fa
     const asts = segs.map(t => (termsOf(t).length && !/∫|\\int|d\s*\/\s*d/.test(t) ? tryParse(t) : null));
     if (asts.some(a => !a)) return assessed;
     const sameAs = (a, b) => sameFunction(x => valueAt(a, x, variable), x => valueAt(b, x, variable));
-    if (!stage.claimed && !/^\s*=/.test(String(text)) && asts.length === 1 && sameAs(asts[0], source)) return { status: 'note', restates: true };
+    const allLabels = segmentsOf(text).filter(t => t !== '' && LABEL.test(t));
+    if (!/^\s*=/.test(String(text)) && allLabels.every(l => FUNCTION_LABEL.test(l)) && asts.length === 1 && sameAs(asts[0], source)) return { status: 'note', restates: true };
     const last = asts[asts.length - 1];
     const named = derivativeSlip({ given: source, canonical, student: last, variable });
     return named ? { status: 'break', note: named.message, diagnosis: named } : assessed;

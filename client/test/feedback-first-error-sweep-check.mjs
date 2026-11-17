@@ -163,11 +163,37 @@ for (const code of ['int-no-divide', 'int-divide-old-power', 'int-wrong-divisor'
   const good = stepCheck(meta, '∫16x⁷dx\n= 16x⁸/8\n= 2x⁸', { prompt });
   ok(good.firstBreak === -1, 'correct working with a true middle line is not flagged');
   const withC = stepCheck(meta, '∫16x⁷dx = 2x⁸ + C', { prompt });
-  ok(withC.firstBreak === -1 && withC.lines[0].status === 'ok', 'the answer with + C, on the same line as the integral, is accepted');
+  ok(withC.firstBreak === -1 && withC.lines[0].status === 'note', 'the answer with + C is a true line, not flagged — and not "ok": ok is the old rule, which decides method marks');
   const split = stepCheck({ kind: 'expression', canonical: '2*x^8 + -8*x' }, '∫16x⁷dx - ∫8dx\n= 2x⁸ - 8x', { prompt: 'Find $\\displaystyle\\int \\left(16x^{7} - 8\\right)\\,dx$.' });
   ok(split.firstBreak === -1, 'a term-by-term integral, ∫16x⁷dx − ∫8dx, is a true step');
   const wrongStart = stepCheck(meta, '∫15x⁷dx\n= 2x⁸', { prompt });
   ok(wrongStart.firstBreak === 0, 'a mis-copied integrand (15 for 16) is still caught on line 1');
+}
+
+// ── MARKS: a line is `ok` only where the old rule said ok ───────────────────
+// stepCheck without the prompt reads no calculus, so it IS the old rule. Whatever the new
+// reading calls ok must be ok there too, or a method mark could be earned that was not.
+{
+  const prompt = 'Find $\\displaystyle\\int 16x^{7}\\,dx$. (You may omit the $+C$.)';
+  const meta = { kind: 'expression', canonical: '2*x^8' };
+  const dprompt = 'Differentiate $y = (4x - 6)^{5}$.';
+  const dmeta = { kind: 'expression', canonical: '20(4x + -6)^4' };
+  const lines = ['∫16x⁷dx', '2x⁸', '2x⁸ + C', '2x⁸ + C + C', '2x⁸ - C', '16x⁸/8', '16x⁸/8 + C', '∫16x⁷dx = 2x⁸ + C', '= 2x⁸ + 5', '= 2x⁸', 'y = 2x⁸', 'dy/dx = 2x⁸', '20(4x-6)^4', '20(4x-6)^4 + C', 'dy/dx = 20(4x-6)^4 + C', '= 20(4x-6)^4 + C + C', 'y=(4x-6)^5', 'dy/dx = (4x-6)^5', 'y = 6x^5'];
+  let compared = 0, newOk = 0;
+  for (const [m, pr] of [[meta, prompt], [dmeta, dprompt]]) for (const text of lines) {
+    const withPrompt = stepCheck(m, text, { prompt: pr }).lines[0]?.status;
+    const old = stepCheck(m, text).lines[0]?.status;
+    compared++;
+    if (withPrompt === 'ok') { newOk++; ok(old === 'ok', `MARKS: ${JSON.stringify(text)} is ok under the calculus reading but ${old} under the old rule`); }
+  }
+  ok(compared === lines.length * 2 && newOk >= 4, `the ok-implies-old-ok check ran over ${compared} lines (${newOk} ok)`);
+  // The two ways a restatement could hide a slip.
+  const hid = stepCheck({ kind: 'expression', canonical: '20(4x + -6)^4' }, 'y=(4x-6)^5\ndy/dx=(4x-6)^5', { prompt: dprompt });
+  ok(hid.firstBreak === 1, 'dy/dx = the function itself is a claim, and flagged — not taken for the restated question');
+  const hid2 = stepCheck(meta, '∫6x^5dx\ny = 6x^5', { prompt: 'Find $\\displaystyle\\int 6x^{5}\\,dx$.' });
+  ok(hid2.firstBreak === 1, '∫6x⁵dx then y = 6x⁵ is a claim (the integral is not its integrand), and flagged');
+  const claimC = stepCheck({ kind: 'expression', canonical: '20(4x + -6)^4' }, 'y=(4x-6)^5\ndy/dx=20(4x-6)^4 + C', { prompt: dprompt });
+  ok(claimC.lines[1].status === 'break', 'a constant added to a derivative is a slip, and not ok');
 }
 
 // ── B · first-error location over every other Step Check topic ──────────────

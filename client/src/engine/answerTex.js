@@ -44,6 +44,8 @@ function tidy(node) {
   return t;
 }
 
+const leadsWithNumber = node => (node.t === 'num' ? true : node.t === 'bin' && '^*/'.includes(node.op) ? leadsWithNumber(node.l) : node.t === 'group' ? false : false);
+
 function tex(node) {
   switch (node.t) {
     case 'num': return numText(node);
@@ -67,6 +69,8 @@ function tex(node) {
           return `${l} + ${r}`;
         case '-': return `${l} - ${r}`;
         case '*':
+          // A number beside a number-led factor (2·3ˣ, 2·10³) must not read as one number.
+          if (leadsWithNumber(node.r) && (node.l.t === 'num' || tight(node.l))) return `${l} \\cdot ${r}`;
           if (node.l.t === 'num' && node.r.t === 'num') return `${l} \\cdot ${r}`;
           if (node.l.t === 'num' && tight(node.r)) return `${l}${r}`;
           if (tight(node.l) && tight(node.r)) return `${l}${r}`;
