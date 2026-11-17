@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `489c789cdd50465b2923760515d8977d53000c2a5b191e4d186a7973e935e0db` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `c2cda40c910c960e429d8e84554c54677802dee22f3ace42fa6fc4d0a771048d` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -1123,9 +1123,9 @@ Final answer: 0
 ```
 </details>
 
-## `cbse-bank:y11-diff/D1` — seed 1009
+## `cbse-bank:y11-diff/D1` — seed 32685
 
-> Differentiate $y = 4x^{7}$.
+> Differentiate $y = 6x^{2}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -1143,9 +1143,9 @@ Final answer: 0
 ```
 </details>
 
-## `cbse-bank:y11-diff/D2` — seed 1009
+## `cbse-bank:y11-diff/D2` — seed 32685
 
-> Differentiate $f(x) = 3x^3 + x^2 - x - 1$.
+> Differentiate $f(x) = 3x^3 - 4x^2 + 3x - 3$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -1163,29 +1163,29 @@ Final answer: 0
 ```
 </details>
 
-## `cbse-bank:y11-diff/D3` — seed 1009
+## `cbse-bank:y11-diff/D3` — seed 32685
 
-> Find the gradient of the tangent to $y = 3x^2 + 2x - 1$ at the point where $x = -1$.
+> Find the gradient of the tangent to $y = 3x^2 - 5x + 4$ at the point where $x = -1$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `-3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-3` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `-11` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-11.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `-10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-10` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: -3
+Final answer: -10
 ```
 </details>
 
-## `cbse-bank:y11-diff/D4` — seed 1009
+## `cbse-bank:y11-diff/D4` — seed 32685
 
-> Find the point on the curve $y = x^2 + 3x + 2$ where the gradient equals $-1$.
+> Find the point on the curve $y = x^2 + 3x - 6$ where the gradient equals $-3$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -1203,23 +1203,23 @@ Final answer: 0
 ```
 </details>
 
-## `cbse-bank:y11-explog/D3` — seed 1009
+## `cbse-bank:y11-explog/D3` — seed 32685
 
-> Solve $6^{x + 1} = 216$.
+> Solve $6^{x - 3} = 1296$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `2.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `3` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `7` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 3
+Final answer: 8
 ```
 </details>
 
