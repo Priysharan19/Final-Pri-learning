@@ -21,6 +21,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import InkCanvas from '../../src/ink/InkCanvas.jsx';
+import { createStrokeSignature } from '../../src/ink/strokeSignature.js';
 
 const params = new URLSearchParams(window.location.search);
 const HEIGHT = Number(params.get('height')) || 300;
@@ -35,7 +36,14 @@ function Fixture() {
 
   // Deliberately a new function every render: InkAnswer's onStrokesChange has
   // the same property whenever `rec.lines.length` changes.
+  // The parent's per-pen-up work as the app does it (InkAnswer and the card:
+  // the incremental page signature), timed so ink-smooth-check can bound it.
+  const signatureOf = useRef(null);
+  if (!signatureOf.current) signatureOf.current = createStrokeSignature();
   const changed = current => {
+    const t0 = performance.now();
+    signatureOf.current(current);
+    window.__parentMs = Math.max(window.__parentMs || 0, performance.now() - t0);
     setStrokes(current.length);
     setReports(n => n + 1);
   };
