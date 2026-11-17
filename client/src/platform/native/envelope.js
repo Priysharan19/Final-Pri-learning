@@ -126,6 +126,8 @@ const REPLY_SCHEMAS = Object.freeze({
   'notifications.requestPermission': { granted: bool },
   'notifications.schedule': { scheduled: v => Number.isInteger(v) && v >= 0 && v <= 64 },
   'notifications.cancelAll': {},
+  // Touch feedback (haptics v1): nothing to report back.
+  'haptics.fire': {},
 });
 
 export function validateReply(cap, op, result) {

@@ -59,7 +59,7 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 import {
-  APPROVAL_EVIDENCE_CLASS, DEFAULT_READER_EVAL_DIR, DEFAULT_REPO, ENGINES, GREEN, PRODUCTION_ORIGIN, STAGING_ORIGIN,
+  APPROVAL_EVIDENCE_CLASS, DEFAULT_READER_EVAL_DIR, DEFAULT_REPO, ENGINES, PRODUCTION_ORIGIN, STAGING_ORIGIN,
   dataYesMarker, defaultGhGraphql, deviceEvidence, evaluateRuns, getJson, ghAll, goMarker, nominate, readerEvidence, verifyApproval
 } from './release-nominate.mjs';
 import { DEFAULT_LEDGER, NOT_A_HUMAN, reportMarkdown } from './device-matrix-record.mjs';
