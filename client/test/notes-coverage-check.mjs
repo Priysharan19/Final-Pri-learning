@@ -10,7 +10,7 @@ import { readFileSync } from 'node:fs';
 import { collect, render, REPORT_PATH } from '../../tools/notes-coverage.mjs';
 
 // Raised as bands land. REMAINING === null means "not yet frozen": only the floor is enforced.
-const FLOOR = 180;
+const FLOOR = 196;
 const REMAINING = null;
 
 let pass = 0;
