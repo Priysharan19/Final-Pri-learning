@@ -179,14 +179,19 @@ export function syllabusBoard(groups, attempts = [], { located = null, now = Dat
 }
 
 /**
- * A focus area's (or chapter's) state on the map: its weakest outcome's.
- * An area reads "shown on your own" only when every outcome in it is; an
- * area none of whose outcomes has evidence is "not started".
+ * A focus area's (or chapter's) state on the map. An area none of whose
+ * outcomes has evidence is "not started". Otherwise it is its weakest
+ * outcome WITH evidence — but an area with an untouched outcome is at most
+ * "not enough evidence yet": part of it has not been tried, so it is never
+ * read as shown on your own.
  */
 export const STATE_RANK = Object.freeze(['not-started', 'seen', 'assisted', 'recheck', 'thin', 'independent', 'retained']);
 export function groupState(nodes) {
-  if (!nodes.length || nodes.every(n => n.state === 'not-started')) return 'not-started';
-  return nodes.reduce((worst, n) => (STATE_RANK.indexOf(n.state) < STATE_RANK.indexOf(worst) ? n.state : worst), 'retained');
+  const tried = nodes.filter(n => n.state !== 'not-started');
+  if (!tried.length) return 'not-started';
+  const rank = s => STATE_RANK.indexOf(s);
+  const worst = tried.reduce((w, n) => (rank(n.state) < rank(w) ? n.state : w), 'retained');
+  return tried.length < nodes.length && rank(worst) > rank('thin') ? 'thin' : worst;
 }
 
 /** Node count per state, plus the total. */
@@ -258,8 +263,15 @@ export function forecastAreas(board, forecast, courseKey) {
     const lo = Number(r?.low), hi = Number(r?.high);
     return Number.isFinite(lo) && Number.isFinite(hi) && lo >= 0 && hi >= lo && hi <= 1 ? { low: lo * P, high: hi * P } : null;
   };
-  const all = Object.fromEntries(board.groups.flatMap(g => g.nodes).map(n => [n.id, range(n.id)]).filter(([, r]) => r));
-  if (!Object.keys(all).length) return null;
+  const nodes = board.groups.flatMap(g => g.nodes);
+  const all = Object.fromEntries(nodes.map(n => [n.id, range(n.id)]).filter(([, r]) => r));
+  // The forecast must cover exactly the board's outcomes (one without a range would count
+  // as 0 marks; one the board lacks would hide marks), and its lows and highs must bracket
+  // the whole paper — the bounds below rest on both.
+  if (!nodes.length || Object.keys(all).length !== nodes.length) return null;
+  if (Object.keys(ranges).some(code => !Object.hasOwn(all, code))) return null;
+  const sumLo = Object.values(all).reduce((n, r) => n + r.low, 0), sumHi = Object.values(all).reduce((n, r) => n + r.high, 0);
+  if (sumLo > P + 1e-6 || sumHi < P - 1e-6) return null;
   const areas = board.groups.map(g => ({
     id: g.id, name: g.name, nodeIds: g.nodes.map(n => n.id), marks: null,
     nodeRanges: Object.fromEntries(g.nodes.filter(n => all[n.id]).map(n => [n.id, all[n.id]]))
@@ -280,6 +292,7 @@ export function setBounds(ids, ranges, paper) {
   for (const [id, r] of Object.entries(ranges)) {
     if (inSet.has(id)) { lo += r.low; hi += r.high; } else { restLo += r.low; restHi += r.high; }
   }
+  if (!Number.isFinite(paper)) return { low: lo, high: hi };
   return { low: Math.max(lo, paper - restHi, 0), high: Math.min(hi, paper - restLo, paper) };
 }
 
@@ -319,7 +332,7 @@ export function boardPriorities(board, { areas, paperMarks = null, ranges = null
       // hsc-forecast: the outcomes' low–high marks, bounded by the paper, rounded outwards.
       const pick = states => nodes.filter(x => states.includes(x.state) && area.nodeRanges[x.id]).map(x => x.id);
       const all = ranges || area.nodeRanges;
-      const lo = setBounds(pick(SURE), all, paperMarks ?? Infinity).low, hi = setBounds(pick([...SURE, 'thin']), all, paperMarks ?? Infinity).high;
+      const lo = setBounds(pick(SURE), all, paperMarks ?? NaN).low, hi = setBounds(pick([...SURE, 'thin']), all, paperMarks ?? NaN).high;
       stake = { low: Math.floor(lo + 1e-9), high: Math.ceil(hi - 1e-9) };
     } else if (area.marks != null && n) {
       if (area.nodeMarks) {
@@ -336,8 +349,9 @@ export function boardPriorities(board, { areas, paperMarks = null, ranges = null
       .sort((a, b) => order.indexOf(a.state) - order.indexOf(b.state))[0] || null;
     // Why, in plain words (progress/SyllabusBoard.jsx turns this into a sentence).
     const started = n - t['not-started'];
+    const own = t.independent + t.retained;
     const why = t.recheck > 0 ? { key: 'slipped', n: t.recheck }
-      : action === 'learn' ? (started ? { key: 'learnSome', started, n } : { key: 'learnNone' })
+      : action === 'learn' ? (!started ? { key: 'learnNone' } : own ? { key: 'learnPart', own, n } : { key: 'learnSome', started, n })
         : action === 'consolidate' ? { key: 'consolidate', gap: maybe, n }
           : action === 'retain' ? { key: 'retain' } : { key: 'extend' };
     return {

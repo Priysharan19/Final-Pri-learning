@@ -216,7 +216,18 @@ const groups = B.indiaBoardGroups(chapters);
   } else ok(true, 'hsc-forecast (#1003) is not in this tree; its fixture shape is tested above');
   // Area roll-up: shown on your own only when every outcome is.
   eq(B.groupState([{ state: 'retained' }, { state: 'independent' }]), 'independent', 'an area is as strong as its weakest outcome');
-  eq(B.groupState([{ state: 'retained' }, { state: 'not-started' }]), 'not-started', 'an untouched outcome keeps the area from reading as shown');
+  eq(B.groupState([{ state: 'retained' }, { state: 'not-started' }]), 'thin', 'an untouched outcome keeps the area from reading as shown, without calling it not started (review finding 2)');
+  eq(B.groupState([{ state: 'seen' }, { state: 'not-started' }]), 'seen', 'a partly tried area reads as its weakest tried outcome');
+  // A forecast that misses an outcome is not used (it would count that outcome as 0 marks).
+  const partial = Object.fromEntries(codes.slice(1).map(c => [c, { low: 0.03, mid: 0.05, high: 0.08 }]));
+  eq(B.forecastAreas(adv, { topicWeightRanges: () => partial, forecastMeta: () => meta }, 'advanced'), null, 'a forecast without a range for every outcome falls back to the blueprint');
+  eq(B.forecastAreas(adv, { topicWeightRanges: () => ({ ...ranges, 'MAV-99-99': { low: 0, mid: 0, high: 0.01 } }), forecastMeta: () => meta }, 'advanced'), null, 'a forecast with an outcome the board lacks is not used');
+  const low = Object.fromEntries(codes.map(c => [c, { low: 0.01, mid: 0.02, high: 0.03 }]));
+  eq(B.forecastAreas(adv, { topicWeightRanges: () => low, forecastMeta: () => meta }, 'advanced'), null, 'ranges whose highs cannot reach the paper are not used (the bounds rest on it)');
+  eq(B.setBounds(['a'], { a: { low: 1, high: 4 } }, NaN), { low: 1, high: 4 }, 'without a paper total, only the set\'s own lows and highs');
+  // The reason never says "none shown" when some are (review finding 1).
+  const mixedArea = { groups: [{ id: 'g', name: 'G', nodes: ['not-started', 'not-started', 'independent', 'retained'].map((s, i) => ({ id: `n${i}`, state: s })) }] };
+  eq(B.boardPriorities(mixedArea, { areas: [{ id: 'g', name: 'G', marks: 8, nodeIds: ['n0', 'n1', 'n2', 'n3'] }], paperMarks: 8 }).items[0].why, { key: 'learnPart', own: 2, n: 4 }, '2 untouched, 1 own, 1 held: "2 of 4 shown on your own", not "none shown"');
   eq(B.groupState([{ state: 'not-started' }, { state: 'not-started' }]), 'not-started', 'an untouched area is not started');
   eq(B.groupState([{ state: 'independent' }, { state: 'recheck' }]), 'recheck', 'a slipped outcome shows on its area');
 }
@@ -322,7 +333,15 @@ try {
     ok(/<ol class="sb-cards">/.test(prio) && prio.includes('data-board-stake=') && /class="sb-card-why"/.test(prio), `${lang}: priorities are cards with the reason and the marks at stake`);
     ok(prio.includes(esc(t('board.prio.sourceNsw'))), `${lang}: blueprint marks say they are Pri's paper design, not NESA's`);
     const fc = draw(view.PrioritiesView, { priorities: nswPrio, source: 'forecast', disclaimer: 'FORECAST-DISCLAIMER' });
-    ok(fc.includes('FORECAST-DISCLAIMER') && !fc.includes(esc(t('board.prio.sourceNsw'))), `${lang}: forecast marks carry hsc-forecast's own disclaimer`);
+    ok(fc.includes('FORECAST-DISCLAIMER') && fc.includes(esc(t('board.prio.sourceForecast'))) && !fc.includes(esc(t('board.prio.sourceNsw'))), `${lang}: forecast marks say so in this language, with hsc-forecast's own disclaimer`);
+    ok(draw(view.PrioritiesView, { priorities: nswPrio, source: 'forecast', disclaimer: '' }).includes(esc(t('board.prio.sourceForecast'))), `${lang}: the source is said even when the disclaimer is empty`);
+    // "Practise this" follows the card (review finding 3).
+    const card = { id: 'g', practise: { subtopic: 'card-target', dotpoint: 4 } };
+    const area = { id: 'g', name: 'G', state: 'recheck', year: 12, nodes: [{ id: 'MAV-12-04', code: 'MAV-12-04', state: 'not-started', practise: { subtopic: 'other', dotpoint: 0 } }] };
+    const AD = draw(view.AreaDetail, { area, india: false, priority: card });
+    ok(AD.includes('data-board-practise'), `${lang}: a priority area offers Practise this`);
+    const held = draw(view.AreaDetail, { area: { ...area, state: 'retained', nodes: [{ id: 'x', code: 'MAV-12-04', state: 'retained', practise: { subtopic: 'y', dotpoint: 0 } }] }, india: false });
+    ok(!held.includes('data-board-practise') && held.includes(esc(t('board.noPractice'))), `${lang}: an area held after a gap, and not a priority, sends nobody back to it`);
 
     // Exam readiness.
     const few = draw(view.ReadinessView, { readiness: B.paperReadiness([]), edition: 'nsw' });
@@ -352,12 +371,18 @@ try {
 // ── 7. The guard: nothing offers a predicted or scaled mark ─────────────────
 const BANNED = /predicted (scaled )?mark|scaled mark|predicted score|predicted band|band prediction|\bATAR\b/i;
 for (const file of ['src/i18n/strings.en.js', 'src/i18n/strings.hi.js', 'src/i18n/strings.au.js']) {
-  // The honesty box names the ATAR only to say why none is predicted (reviewed copy).
-  const hits = read(file).split('\n').filter(line => /^\s*'[^']+':/.test(line) && !/^\s*'board\.ready\.whyNsw':/.test(line) && BANNED.test(line));
+  // The honesty box names the ATAR only to say UAC scales it: that exact clause is
+  // removed from that one key before the whole guard runs on the rest of the line.
+  const ATAR_CLAUSE = /the ATAR is scaled separately by UAC|ATAR को UAC अलग से स्केल करता है/;
+  const hits = read(file).split('\n')
+    .map(line => (/^\s*'board\.ready\.whyNsw':/.test(line) ? line.replace(ATAR_CLAUSE, '') : line))
+    .filter(line => /^\s*'[^']+':/.test(line) && BANNED.test(line));
   eq(hits, [], `${file}: no catalogue string offers a predicted or scaled mark, ATAR or band`);
 }
 const boardSrc = read('src/progress/SyllabusBoard.jsx');
-ok(!/predict|scaled|atar/i.test(boardSrc.replace(/^\s*\/\/.*$/gm, '').replace(/^\s*\/?\*.*$/gm, '').replace(/'board\.[a-zA-Z.]+'/g, '')), 'the board component computes and draws no prediction');
+ok(!/predict|scaled|atar/i.test(boardSrc.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/'board\.[a-zA-Z.]+'/g, '')), 'the board component computes and draws no prediction');
+// The clause itself is checked, so it cannot drift into a claim.
+ok(/'board\.ready\.whyNsw': '[^']*the ATAR is scaled separately by UAC, so no single predicted number would be honest/.test(read('src/i18n/strings.en.js')), 'en: the ATAR is named only to say no single predicted number would be honest');
 
 // ── 7b. No NESA wording anywhere in the client or the build (CTO review) ─────
 // NESA syllabus text is Crown copyright and not licensed to Pri (research §5.7).

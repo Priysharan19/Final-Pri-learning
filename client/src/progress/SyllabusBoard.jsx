@@ -51,7 +51,7 @@ const STATE_HELP = {
 const ACTION_WORD = { learn: 'board.action.learn', consolidate: 'board.action.consolidate', retain: 'board.action.retain', extend: 'board.action.extend' };
 const WHY = {
   slipped: 'board.why.slipped', learnSome: 'board.why.learnSome', learnNone: 'board.why.learnNone',
-  consolidate: 'board.why.consolidate', retain: 'board.why.retain', extend: 'board.why.extend'
+  consolidate: 'board.why.consolidate', retain: 'board.why.retain', extend: 'board.why.extend', learnPart: 'board.why.learnPart'
 };
 const TREND_WORD = { up: 'board.ready.trendUp', down: 'board.ready.trendDown', level: 'board.ready.trendLevel' };
 
@@ -128,7 +128,14 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
   const lift = useRef(new Map());
   const hits = useRef([]);
   const [size, setSize] = useState({ w: 0, h: 0 });
-  const reduce = useMemo(() => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches, []);
+  const [reduce, setReduce] = useState(() => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)');
+    if (!mq) return undefined;
+    const on = () => setReduce(mq.matches);
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
 
   useLayoutEffect(() => {
     const el = ref.current;
@@ -144,13 +151,15 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
     let raf = 0;
     const draw = () => {
       const dpr = Math.min(2, window.devicePixelRatio || 1), w = size.w, h = size.h;
-      if (cv.width !== w * dpr || cv.height !== h * dpr) { cv.width = w * dpr; cv.height = h * dpr; }
+      const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+      if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
       const ctx = cv.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
       const ink = cssVar(cv, '--ink', '#1c1b18'), ink2 = cssVar(cv, '--ink-2', '#48463f'), ink3 = cssVar(cv, '--ink-3', '#6b675e');
       const accent = cssVar(cv, '--accent', '#1b1a17'), bg = cssVar(cv, '--surface', '#ffffff'), hair = cssVar(cv, '--hairline-strong', 'rgba(0,0,0,.18)');
       const font = cssVar(cv, '--font', 'sans-serif'), mono = cssVar(cv, '--font-mono', 'monospace');
-      // The canvas's own CSS colour is the selection light (the edition's, under the Aurora skin).
+      // The canvas's own CSS colour is the selection light (the edition's, under the Aurora skin):
+      // the selection ring and the selected area's links only. Text and stems stay ink.
       const lit = getComputedStyle(cv).color || accent;
       const cols = Math.max(...areas.map(a => a.col)) + 1, rows = Math.max(...areas.map(a => a.row)) + 1;
       const padX = phone ? 34 : 80, padY = phone ? 40 : 64, tilt = 0.62, R = phone ? 7 : 9;
@@ -182,9 +191,9 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
       // Stems under raised areas.
       for (const [, p] of pos) {
         if (p.lift <= 1) continue;
-        ctx.strokeStyle = lit; ctx.globalAlpha = 0.7; ctx.setLineDash([2, 3]);
+        ctx.strokeStyle = ink2; ctx.globalAlpha = 0.7; ctx.setLineDash([2, 3]);
         ctx.beginPath(); ctx.moveTo(p.x, p.base); ctx.lineTo(p.x, p.y); ctx.stroke(); ctx.setLineDash([]);
-        ctx.fillStyle = lit; ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.ellipse(p.x, p.base, 7, 2.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
+        ctx.fillStyle = ink3; ctx.globalAlpha = 0.35; ctx.beginPath(); ctx.ellipse(p.x, p.base, 7, 2.5, 0, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1;
       }
       hits.current = [];
       const colW = (w - 2 * padX) / Math.max(1, cols - 1) - 14;
@@ -202,7 +211,7 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
         }
         const stake = raised.get(a.id);
         if (p.lift > 1 && stake) {
-          ctx.font = `500 11px ${mono}`; ctx.fillStyle = lit;
+          ctx.font = `500 11px ${mono}`; ctx.fillStyle = ink;
           const half = ctx.measureText(stake).width / 2 + 4;   // kept inside the canvas
           ctx.fillText(stake, Math.max(half, Math.min(w - half, p.x)), p.y - R - 12);
         }
@@ -273,11 +282,17 @@ export function nswOutcomeDescription(code) {
     .map(([id]) => dotpointById(id)?.text).filter(Boolean);
 }
 
-export function AreaDetail({ area, india, track }) {
+// Where "Practise this" goes when the area is not one of the ranked priorities:
+// the weakest outcome with practice, never one already held after a gap.
+const PRACTISE_ORDER = ['recheck', 'assisted', 'thin', 'seen', 'not-started', 'independent'];
+
+export function AreaDetail({ area, india, track, priority = null }) {
   const t = useT();
   const nav = useNavigate();
-  const target = [...area.nodes].sort((a, b) => ['not-started', 'seen', 'assisted', 'recheck', 'thin', 'independent', 'retained'].indexOf(a.state)
-    - ['not-started', 'seen', 'assisted', 'recheck', 'thin', 'independent', 'retained'].indexOf(b.state)).find(n => n.practise) || null;
+  // The card's own target when the area is a priority, so the button does what the card says.
+  const target = priority?.practise
+    || [...area.nodes].filter(n => n.practise && PRACTISE_ORDER.includes(n.state))
+      .sort((a, b) => PRACTISE_ORDER.indexOf(a.state) - PRACTISE_ORDER.indexOf(b.state))[0]?.practise || null;
   return (
     <div className="sb-area" data-board-area={area.id}>
       <span className="sb-label">{area.year ? t('common.yearNumber', { n: area.year }) : area.stage ? t('board.stage', { n: area.stage }) : ''}{!india && ` · ${area.nodes.map(n => n.code).join(', ')}`}</span>
@@ -310,7 +325,7 @@ export function AreaDetail({ area, india, track }) {
       </ul>
       {!india && area.contentGroups?.length > 0 && <p className="sb-label"><span>{t('board.contentGroups')}:</span> <span lang="en">{area.contentGroups.join(' · ')}</span></p>}
       {target
-        ? <button className="btn btn-primary btn-sm sb-practise" data-board-practise onClick={() => nav(practiceHref({ subtopic: target.practise.subtopic, dotpoint: target.practise.dotpoint, track: india ? track : null }))}>{t('board.practiseThis')}</button>
+        ? <button className="btn btn-primary btn-sm sb-practise" data-board-practise onClick={() => nav(practiceHref({ subtopic: target.subtopic, dotpoint: target.dotpoint, track: india ? track : null }))}>{t('board.practiseThis')}</button>
         : <p className="sb-label">{t('board.noPractice')}</p>}
     </div>
   );
@@ -346,7 +361,7 @@ export function PrioritiesView({ priorities, onSelect, source, disclaimer = '', 
         </ol>
       )}
       <p className="sb-label sb-note" data-board-source={source}>
-        {source === 'forecast' ? <span lang="en">{disclaimer}</span>
+        {source === 'forecast' ? <>{t('board.prio.sourceForecast')}{disclaimer && <> <span lang="en">{disclaimer}</span></>}</>
           : source === 'blueprint-nsw' ? t('board.prio.sourceNsw')
             : source === 'blueprint-in' ? t('board.prio.sourceIndia') : t('board.prio.noWeights')}
       </p>
@@ -364,7 +379,7 @@ export function ReadinessView({ readiness, edition = 'nsw', courseName = '', onS
   const papers = ready ? readiness.papers : [];
   const firstNo = ready ? readiness.count - papers.length + 1 : 1;
   const [pick, setPick] = useState(papers.length - 1);
-  const P = papers[Math.min(pick, papers.length - 1)] || null;
+  const P = papers[Math.max(0, Math.min(pick, papers.length - 1))] || null;
   const prev = P ? papers[papers.indexOf(P) - 1] : null;
   const oneTotal = papers.length > 0 && papers.every(p => p.total === papers[0].total);
   // The chart: only when every paper shown is out of the same total, on that paper's own scale.
@@ -496,7 +511,7 @@ export function BoardView({ board, priorities, links = null, india, track, cours
           <p className="sr-only" aria-live="polite">{area ? `${area.name}: ${t(STATE_WORD[area.state])}` : ''}</p>
         </div>
         <aside className="sb-aside">
-          {area && <AreaDetail area={area} india={india} track={track} />}
+          {area && <AreaDetail area={area} india={india} track={track} priority={priorities.items.find(i => i.id === area.id) || null} />}
           <PrioritiesView priorities={priorities} onSelect={setSel} source={source} disclaimer={disclaimer} paperName={paperName} />
           <p className="sb-label">{t('board.statesNote')}{!india && ` ${t('board.nswWording')}`}</p>
         </aside>
@@ -582,7 +597,7 @@ export default function SyllabusBoard({ user, india, trackName = '' }) {
       )}
       <BoardView key={courseKey || 'in'} board={view.board} priorities={view.priorities} links={view.links} india={india} track={data.track}
         courseLabel={view.label} phone={phone} source={view.source} disclaimer={view.disclaimer} paperName={view.paperName} />
-      <ReadinessView readiness={view.readiness} edition={india ? 'in' : 'nsw'} courseName={view.courseName || trackName} onSit={() => nav('/exams')} />
+      <ReadinessView key={courseKey || 'in'} readiness={view.readiness} edition={india ? 'in' : 'nsw'} courseName={view.courseName || trackName} onSit={() => nav('/exams')} />
     </div>
   );
 }

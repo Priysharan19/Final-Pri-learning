@@ -72,7 +72,7 @@ const AURORA_PLACES = [
   '.in-pal-item[aria-selected="true"]',
   // The syllabus map's selected focus area (verified-page spec §2, CTO-approved
   // 18 Nov 2026): the list's selected row, and the canvas, whose CSS colour is
-  // the selection ring, the lit links and the raised priorities it draws.
+  // the selection ring and the selected area's links (never text or fills).
   '.sb-opt[aria-selected="true"]',
   '.sb-canvas',
   '.xs-nav--rail .xs-q.is-current',
