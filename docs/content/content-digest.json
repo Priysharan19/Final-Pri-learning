@@ -1,5 +1,5 @@
 {
- "contentVersion": "2026.11.41",
+ "contentVersion": "2026.11.42",
  "draws": 6,
  "generators": {
   "c10-ap-daily-life-reasoning": "89254f1516b2b89a",
@@ -129,7 +129,7 @@
   "c12-inverse-trig-branch-reasoning": "5c5460586eb8b335",
   "c12-inverse-trig-evaluate-reasoning": "6c4ca41cc325b91d",
   "c12-inverse-trigonometric": "a62ceebe522a3571",
-  "c12-linear-programming": "e1b824a5245ada7e",
+  "c12-linear-programming": "79c7755fe179d93e",
   "c12-matrices": "834ceda2e9a57315",
   "c12-monotonic-tangent-reasoning": "e2c3282c9402d727",
   "c12-optimisation-reasoning": "e49739aacb26cc23",
@@ -203,7 +203,7 @@
   "c7-triangles-current": "7c67ed62034c4d4b",
   "c8-algebraic-identities-ncert-mastery": "df108f69e746ed4e",
   "c8-area-decomposition-reasoning": "d5a5626a4459e067",
-  "c8-bar-graph-reasoning": "aabcbc5010c5a297",
+  "c8-bar-graph-reasoning": "084c219ec87e1035",
   "c8-common-factor-reasoning": "64f097672ec2b4e2",
   "c8-comparing-quantities-ncert-mastery": "fd9109cd5f047f56",
   "c8-cube-multiplier-reasoning": "6c6eeb0287506525",

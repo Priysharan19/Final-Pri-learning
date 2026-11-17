@@ -23,12 +23,23 @@ export function groupedFrequency(q) {
   return D.barChart({ bars: m.map(x => ({ label: `${x[1]}–${x[2]}`, value: +x[3], show: true })) });
 }
 
+/** True when every point is a vertex of the convex hull and no three of them are collinear on its boundary. */
+export function strictlyConvex(pts) {
+  const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+  const sorted = [...pts].sort((a, b) => a.x - b.x || a.y - b.y);
+  const half = list => { const h = []; for (const q of list) { while (h.length >= 2 && cross(h[h.length - 2], h[h.length - 1], q) <= 0) h.pop(); h.push(q); } return h; };
+  const lower = half(sorted), upper = half([...sorted].reverse());
+  return lower.length + upper.length - 2 === pts.length;
+}
+
 /** "… corner points (0, 0), (9, 0), (0, 7), (3, 4) …" → the feasible region, corners labelled by their coordinates. */
 export function feasibleRegion(q) {
   const t = clean(q.prompt), m = t.match(new RegExp(`corner points ((?:\\(${NUM}, ?${NUM}\\)(?:, | and |,? and )?)+)`));
   if (!m) return null;
   const pts = [...m[1].matchAll(new RegExp(`\\((${NUM}), ?(${NUM})\\)`, 'g'))].map(x => ({ x: +x[1], y: +x[2] }));
   if (pts.length < 3 || pts.length > 6) return null;
+  // A feasible region is convex: draw it only when every stated point is a strict vertex of the convex hull.
+  if (!strictlyConvex(pts)) return null;
   const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length, cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
   const ordered = [...pts].sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
   return D.coordPlane({ points: ordered.map(p => ({ ...p, label: `(${p.x}, ${p.y})` })), polygon: true, segments: ordered.map((_, i) => [i, (i + 1) % ordered.length]) });
@@ -82,7 +93,7 @@ export function curveAtPoint(q) {
   return D.coordPlane({ points: [{ x: a, y: f(a), label: 'P' }], curves: [{ fn: f, x0: a - 4, x1: a + 4, label: 'y' }] });
 }
 
-const SERIES = /([A-Za-z][A-Za-z ]*?): ([a-z]+) (\d+), ([a-z]+) (\d+)/g;
+const SERIES = /([A-Za-z0-9][A-Za-z0-9 ]*?): ([a-z]+) (\d+), ([a-z]+) (\d+)/g;
 /** "Class VI: boys 54, girls 42; Class VII: …" → grouped bars. */
 export function doubleBars(q) {
   const t = clean(q.prompt);

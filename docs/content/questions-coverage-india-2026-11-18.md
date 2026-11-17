@@ -129,7 +129,7 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | --- | --- | --- | --- | --- |
 | `c8-algebraic-identities-ncert-mastery` | 27.3k | 19 | 0% | — |
 | `c8-area-decomposition-reasoning` | 38.9k | 18 | 72% | — |
-| `c8-bar-graph-reasoning` | ≥ 42.7M | 40 | 55% | — |
+| `c8-bar-graph-reasoning` | ≥ 42.7M | 40 | 100% | — |
 | `c8-common-factor-reasoning` | 219.5k | 45 | 0% | — |
 | `c8-comparing-quantities-ncert-mastery` | 10.7k | 56 | 0% | — |
 | `c8-cube-multiplier-reasoning` | 11.7k | 25 | 0% | — |
@@ -205,7 +205,7 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | `c12-inverse-trig-branch-reasoning` | 17.9k | 39 | 0% | — |
 | `c12-inverse-trig-evaluate-reasoning` | 14.1k | 38 | 0% | — |
 | `c12-inverse-trigonometric` | 14.5k | 17 | 0% | — |
-| `c12-linear-programming` | 805.8k | 16 | 53% | — |
+| `c12-linear-programming` | 805.8k | 16 | 43% | — |
 | `c12-matrices` | 77.1k | 9 | 0% | — |
 | `c12-monotonic-tangent-reasoning` | 12.5k | 71 | 43% | — |
 | `c12-optimisation-reasoning` | 33.1k | 40 | 0% | — |

@@ -611,7 +611,8 @@ export function generateQuestion(subtopicId, difficulty, seed, dotpointId) {
   const pick = extra ? Math.floor(makeRng((s ^ 0x2f6b9c1d) >>> 0)() * (extra.length + 1)) : 0;
   let payload = pick === 0 ? gen(rng, d) : extra[pick - 1].make(rng, d).payload;
   if (!payload.figure && Object.hasOwn(FIGURE_FOR, subtopicId)) {
-    const drawn = FIGURE_FOR[subtopicId](payload);
+    let drawn = null;
+    try { drawn = FIGURE_FOR[subtopicId](payload); } catch { drawn = null; }   // an odd prompt leaves the question without a figure, never without a question
     if (drawn) payload = { ...payload, figure: drawn.svg };
   }
   const q = { seed: s, subtopic: subtopicId, difficulty: d, ...payload };

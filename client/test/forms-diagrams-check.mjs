@@ -215,6 +215,15 @@ for (let i = 1; i <= 200; i++) {
       prompts[id] += 1; drawn += 1;
       const g = fig.geom, text = tx(q.prompt), at = `${id}: "${text.slice(0, 50)}"`;
       framed(id, fig);
+      // The same figure comes out of the real question path (the generateQuestion hook), and never prints the key.
+      ok(q.figure === fig.svg, `${at}: generateQuestion carries the decorator's figure`);
+      if (!/Coordinate plane|Bar chart|Grouped bar/.test(fig.svg) && q.answer && q.answer.value != null) {
+        const keyText = String(q.answer.value), nums = new Set((text.match(/-?\d+(?:\.\d+)?/g) || []));
+        for (const m of fig.svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)) ok(!(m[1].trim() === keyText && !nums.has(keyText)), `${at}: the figure prints the key ${keyText}`);
+      }
+      if (id === 'c12-linear-programming') ok(fig.geom.points.length >= 3, `${at}: a feasible region has at least three corners`);
+      if (id === 'c8-pie-chart-reasoning') for (const m of fig.svg.matchAll(/<text[^>]*>([A-Za-z ]+) (\d+)°<\/text>/g)) ok(new RegExp(`${m[1]} ${m[2]}°`).test(text), `${at}: slice label "${m[1]} ${m[2]}°" is in the question`);
+      if (id === 'c8-bar-graph-reasoning') { const labels = [...fig.svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map(m => m[1].trim()); const yearLike = /\b(19|20)\d\d: /.test(text); ok(g.series.length === 2 && (!yearLike || labels.some(l => /^(19|20)\d\d$/.test(l))), `${at}: group labels are the stated classes or years`); }
       if (id === 'c10-statistics') {
         const freqs = text.split(',').map(s => s.match(/\d+[–-]\d+: (\d+)/)).filter(Boolean).map(m => +m[1]);
         ok(freqs.length === g.rects.length && freqs.every((f, k) => f === g.rects[k].value), `${at}: histogram bars are the stated frequencies`);
@@ -222,6 +231,7 @@ for (let i = 1; i <= 200; i++) {
       } else if (id === 'c12-linear-programming') {
         const seg = text.slice(text.indexOf('corner points') + 13), pts = [...seg.matchAll(/\((-?\d+), ?(-?\d+)\)/g)].map(m => [+m[1], +m[2]]);
         const drawnPts = g.points.map(p => [p.x, p.y]);
+        { const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); const ch = g.points.map(p => [p.x, p.y]); let sign = 0, convex = true; for (let a = 0; a < ch.length; a++) { const c = cr(ch[a], ch[(a + 1) % ch.length], ch[(a + 2) % ch.length]); if (c === 0) convex = false; else if (sign && Math.sign(c) !== sign) convex = false; else sign = Math.sign(c); } ok(convex, `${at}: the drawn feasible region is strictly convex`); }
         ok(pts.length === drawnPts.length && pts.every(p => drawnPts.some(d2 => d2[0] === p[0] && d2[1] === p[1])), `${at}: the corners are the stated corner points`);
         g.points.forEach(p => ok(near(p.X, g.origin[0] + p.x * g.scale) && near(p.Y, g.origin[1] - p.y * g.scale), `${at}: corners at their true pixels`));
       } else if (id === 'c12-monotonic-tangent-reasoning') {
