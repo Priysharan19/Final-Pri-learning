@@ -72,6 +72,8 @@ Every request is recorded under the `practice-help-plan` scope and copied onto t
 - **Assignment:** SHA-256 of (salt, account id), stable and recomputable.
 - **Stamping:** while an experiment is active, each graded-attempt event carries `experiment: { assignments, family, ms }`. With none active, events are unchanged.
 
+The v1 digests were reset twice on this PR, before any activation, while review findings were addressed. This is not a precedent: once an experiment has been activated, any change needs a new version.
+
 Two experiments are defined:
 
 - `aa-assignment-v1`: an A/A test with identical arms. It must pass before anything else is read (`RESEARCH_TO_BUILD_V7` V7-24).

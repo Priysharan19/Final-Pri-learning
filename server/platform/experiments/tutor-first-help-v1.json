@@ -75,7 +75,8 @@
     "The different-family outcome uses ordinary practice items until a protected outcome bank exists, so outcome items may have been seen in tutoring.",
     "Time on task is device-reported, not server-measured.",
     "Complaint reports have no product channel yet; the guardrail is manual until one exists.",
-    "Results transport only to Pri students who ask for help in untimed practice; nothing here is evidence about exams, other products or other populations."
+    "Results transport only to Pri students who ask for help in untimed practice; nothing here is evidence about exams, other products or other populations.",
+    "The panel differs between arms: in control it hides after the first press, so control students may ask for help less often. Items with a help request are excluded in both arms by the same rule, but the request rate itself can differ by arm; the readout reports it per arm and a large gap is read as a threat to the outcome comparison, not as an effect."
   ],
   "claims": "None. Nothing about this experiment may appear in product copy, marketing or reports as evidence that the tutor policy works, until a fixed-horizon readout meets the decision rule above."
 }

@@ -153,13 +153,14 @@ export function readout(def, rows, { now = Date.now() } = {}) {
     if (!byAccount.has(e.accountId)) byAccount.set(e.accountId, { arm: expected, events: [] });
     byAccount.get(e.accountId).events.push(e);
   }
-  const arms = Object.fromEntries(def.arms.map(a => [a.id, { assigned: 0, observed: 0, successes: 0, resolved: 0, reveals: 0, ms: [] }]));
+  const arms = Object.fromEntries(def.arms.map(a => [a.id, { assigned: 0, observed: 0, successes: 0, resolved: 0, reveals: 0, helpAsked: 0, ms: [] }]));
   for (const { arm, events: evs } of byAccount.values()) {
     const s = arms[arm];
     s.assigned += 1;
     for (const e of evs) {
       s.resolved += 1;
       if (e.revealed === true) s.reveals += 1;
+      if (policyHelped(e)) s.helpAsked += 1;
       if (Number.isSafeInteger(e.experiment?.ms) && e.revealed !== true) s.ms.push(e.experiment.ms);
     }
     const o = primaryOutcomeOf(evs, def.primaryOutcome.delayHours);
@@ -187,7 +188,7 @@ export function readout(def, rows, { now = Date.now() } = {}) {
 
   const minimum = def.minimumSample.perArm;
   const short = def.arms.filter(a => arms[a.id].observed < minimum).map(a => a.id);
-  const counts = Object.fromEntries(Object.entries(arms).map(([k, v]) => [k, { assigned: v.assigned, observedOutcomes: v.observed, resolvedAttempts: v.resolved }]));
+  const counts = Object.fromEntries(Object.entries(arms).map(([k, v]) => [k, { assigned: v.assigned, observedOutcomes: v.observed, resolvedAttempts: v.resolved, helpRequestRate: v.resolved ? v.helpAsked / v.resolved : null }]));
   const base = { experiment: def.id, version: def.version, generatedAt: new Date(now).toISOString(), minimumPerArm: minimum,
     integrity: { mismatchedArms: mismatched }, srm, outcomeObservation: observation, counts, guardrails, manualGuardrails: manual };
 

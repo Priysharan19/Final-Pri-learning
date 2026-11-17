@@ -46,7 +46,7 @@ console.log(`verdict: ${r.verdict}`);
 console.log(r.message);
 console.log(`arm integrity: ${r.integrity.mismatchedArms} mismatched event(s)`);
 console.log(`sample ratio: chi² ${r.srm.chi2.toFixed(3)}, p ${r.srm.p.toPrecision(3)}${r.srm.mismatch ? '  ← MISMATCH' : ''}`);
-for (const [arm, c] of Object.entries(r.counts)) console.log(`  ${arm}: ${c.assigned} accounts, ${c.observedOutcomes} observed outcomes (minimum ${r.minimumPerArm}), ${c.resolvedAttempts} resolved attempts`);
+for (const [arm, c] of Object.entries(r.counts)) console.log(`  ${arm}: ${c.assigned} accounts, ${c.observedOutcomes} observed outcomes (minimum ${r.minimumPerArm}), ${c.resolvedAttempts} resolved attempts, help asked on ${pct(c.helpRequestRate)}`);
 for (const g of r.guardrails) {
   const shown = g.id === 'time-on-task' ? `median ms ${g.control ?? '—'} vs ${g.treatment ?? '—'}` : `reveal share ${pct(g.control)} vs ${pct(g.treatment)}`;
   console.log(`guardrail ${g.id}: ${shown}${g.breached ? '  ← BREACHED' : ''}`);

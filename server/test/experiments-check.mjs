@@ -107,6 +107,7 @@ eq([small.verdict, small.primary], ['insufficient-sample', null], 'twelve accoun
 ok(/Refused/.test(small.message) && !/better|worse|winner/i.test(small.message), 'the refusal names no direction or winner');
 ok(!('difference' in small) && !JSON.stringify(small).includes('interval95'), 'no interval or difference is reported below the minimum');
 eq(small.counts.control.assigned + small.counts.policy.assigned, 12, 'counts are still shown');
+ok('helpRequestRate' in small.counts.control && 'helpRequestRate' in small.counts.policy, 'the help-request rate is reported per arm');
 
 // At the minimum: an interval, and the decision rule.
 const big = ids.slice(0, 1200).flatMap((id, i) => pair(id, assignArm(tutor, id) === 'policy' ? i % 10 < 7 : i % 10 < 5));
