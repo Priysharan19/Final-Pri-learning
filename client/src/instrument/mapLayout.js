@@ -1,28 +1,30 @@
-// Pri Learning · v1.1 instrument — the syllabus map's constellation layout.
+// Pri Learning · the syllabus map's layered layout.
 //
 // Pure and deterministic (no randomness, no clock): the same chapters and
-// prerequisite edges always give the same picture. A chapter's column is its
-// prerequisite depth inside this syllabus (the longest chain of in-scope
-// chapters it builds on); within a depth, chapters keep syllabus order, and a
-// crowded depth is split over several columns. Alternate columns are offset by
-// half a row and each node gets a small fixed nudge from its syllabus index,
-// so the drawing reads as a constellation rather than a grid. Labels sit to the
-// right of the node, as the design draws them. Every node's box (dot, ring and
-// both label lines) is then checked against every box already placed and
-// against the reserved areas (the title at top left, the floating card at top
-// right, the legend at bottom left); a colliding node moves down until it is
-// clear, so no two labels or nodes overlap.
+// prerequisite edges always give the same picture.
+//   · A chapter's LAYER (its column, left to right) is its prerequisite depth
+//     inside this syllabus: the longest chain of in-scope chapters it builds
+//     on. Layer 0 builds on nothing here.
+//   · A chapter's LANE (its row band) is its strand. Lanes keep the order the
+//     strands first appear in the syllabus; chapters in one lane and layer
+//     stack in syllabus order.
+//   · Each node is a dot, with its name and a plain status line centred under
+//     it, so a link drawn from dot to dot never crosses its own label.
+// Every node's box (ring and both text lines) is checked against every box
+// already placed and against the reserved area (the floating card at top
+// right); a node that would collide moves down until it is clear.
 
 export const MAP_W = 1200;
-const LEFT = 70;
-const TOP = 130;          // under the title
-const ROW = 118;
-const PER_COL = 3;
+const LEFT = 56;
+const RIGHT = 36;
+const LANE_HEAD = 34;     // the strand's label, above its row
+const LANE_GAP = 26;
+const ROW = 138;          // dot, two name lines, one status line
 const LABEL_CH = 7.4;     // px per character of the 13.5px label (estimated generously)
 const LABEL_MAX = 24;     // characters per label line before it wraps
-const GAP = 10;
+const GAP = 8;
 
-export const radiusFor = mastery => 10 + (Math.max(0, Math.min(100, mastery)) / 100) * 18;
+export const radiusFor = mastery => 9 + (Math.max(0, Math.min(100, mastery)) / 100) * 15;
 
 /** A chapter name in at most two lines of LABEL_MAX characters. */
 export function wrapLabel(name, max = LABEL_MAX) {
@@ -39,23 +41,16 @@ export function wrapLabel(name, max = LABEL_MAX) {
 
 const hit = (a, b) => a.x1 < b.x2 && b.x1 < a.x2 && a.y1 < b.y2 && b.y1 < a.y2;
 
-/** The box a node takes: its ring and its label lines to the right. */
+/** The box a node takes: its ring, and its name lines and status line centred beneath. */
 export function nodeBox(x, y, r, lines) {
-  const ring = r + 7;
-  const textW = Math.max(...lines.map(l => l.length), 8) * LABEL_CH;
-  const textTop = y - 12;
-  const textBottom = y + 3 + (lines.length - 1) * 17 + 22;
-  return { x1: x - ring - GAP, y1: Math.min(y - ring, textTop) - GAP, x2: x + r + 14 + textW + GAP, y2: Math.max(y + ring, textBottom) + GAP };
+  const ring = r + 6;
+  const textW = Math.max(...lines.map(l => l.length), 14) * LABEL_CH;
+  return { x1: x - Math.max(ring, textW / 2) - GAP, y1: y - ring - GAP, x2: x + Math.max(ring, textW / 2) + GAP, y2: y + ring + 8 + lines.length * 17 + 18 + GAP };
 }
 
-/**
- * @param chapters [{ id, name, mastery }] in syllabus order
- * @param prereqOf id → [prerequisite id] (any scope; out-of-scope ids are ignored)
- * @param reserve  { card: {w, h} | null } — the card's area at the top right, in map units
- */
-export function constellation(chapters, prereqOf, reserve = {}) {
+/** Each chapter's layer: the longest chain of in-scope prerequisites under it. */
+export function layersOf(chapters, prereqOf) {
   const ids = new Set(chapters.map(c => c.id));
-  const order = new Map(chapters.map((c, i) => [c.id, i]));
   const depth = new Map();
   const depthOf = (id, seen = new Set()) => {
     if (depth.has(id)) return depth.get(id);
@@ -67,43 +62,51 @@ export function constellation(chapters, prereqOf, reserve = {}) {
     return d;
   };
   chapters.forEach(c => depthOf(c.id));
-  const levels = [...new Set(chapters.map(c => depth.get(c.id)))].sort((a, b) => a - b);
-  const columns = [];
-  for (const lv of levels) {
-    const members = chapters.filter(c => depth.get(c.id) === lv).sort((a, b) => order.get(a.id) - order.get(b.id));
-    const count = Math.ceil(members.length / PER_COL);
-    const size = Math.ceil(members.length / count);
-    for (let k = 0; k < count; k++) columns.push(members.slice(k * size, (k + 1) * size));
-  }
-  const longest = Math.max(8, ...chapters.map(c => Math.max(...wrapLabel(c.name).map(l => l.length))));
-  const lastW = 28 + 14 + longest * LABEL_CH + 20;
-  // Columns always fit MAP_W: the last column keeps room for its label.
-  const colW = columns.length > 1 ? Math.max(0, (MAP_W - LEFT - lastW) / (columns.length - 1)) : 0;
-  const blocked = [];
-  if (reserve.card) blocked.push({ x1: MAP_W - reserve.card.w, y1: 0, x2: MAP_W + 1, y2: reserve.card.h });
-  blocked.push({ x1: 0, y1: 0, x2: 560, y2: TOP - 40 });   // the title
-  const placed = [];
-  const nodes = [];
-  columns.forEach((col, c) => {
-    col.forEach((ch, k) => {
-      const i = order.get(ch.id);
-      const r = radiusFor(ch.mastery);
-      const lines = wrapLabel(ch.name);
-      const x = LEFT + c * colW + ((i * 37) % 5 - 2) * 6;
-      let y = TOP + (c % 2) * (ROW / 2) + k * ROW + ((i * 53) % 7 - 3) * 4;
-      let box = nodeBox(x, y, r, lines);
-      for (let guard = 0; guard < 400 && [...placed, ...blocked].some(b => hit(b, box)); guard++) {
-        y += 8; box = nodeBox(x, y, r, lines);
-      }
-      placed.push(box);
-      nodes.push({ id: ch.id, x, y, r, lines, box, depth: depth.get(ch.id) });
-    });
-  });
-  const height = Math.max(TOP + ROW * 2, ...placed.map(b => b.y2)) + 56;   // room for the legend
-  return { nodes, height, width: MAP_W };
+  return depth;
 }
 
-/** True when no two node boxes overlap (the probe and the unit check use it). */
+/**
+ * @param chapters [{ id, name, mastery, strand }] in syllabus order
+ * @param prereqOf id → [prerequisite id] (any scope; out-of-scope ids are ignored)
+ * @param opts     { width, card: {w, h} | null } — the drawing's width in map units
+ *                 (less than MAP_W when a floating card takes the right edge)
+ */
+export function layered(chapters, prereqOf, { width = MAP_W, card = null } = {}) {
+  const order = new Map(chapters.map((c, i) => [c.id, i]));
+  const depth = layersOf(chapters, prereqOf);
+  const layerCount = Math.max(1, ...chapters.map(c => depth.get(c.id) + 1));
+  const lanes = [...new Set(chapters.map(c => c.strand))];
+  const colW = (width - LEFT - RIGHT) / layerCount;
+  const cell = (lane, layer) => chapters.filter(c => c.strand === lane && depth.get(c.id) === layer).sort((a, b) => order.get(a.id) - order.get(b.id));
+  const laneBands = [];
+  const placed = [];
+  const nodes = [];
+  const blocked = card ? [{ x1: MAP_W - card.w, y1: 0, x2: MAP_W + 1, y2: card.h }] : [];
+  let top = 8;
+  for (const lane of lanes) {
+    const rows = Math.max(1, ...Array.from({ length: layerCount }, (_, l) => cell(lane, l).length));
+    const band = { strand: lane, top, height: LANE_HEAD + rows * ROW };
+    for (let layer = 0; layer < layerCount; layer++) {
+      cell(lane, layer).forEach((ch, k) => {
+        const r = radiusFor(ch.mastery);
+        const lines = wrapLabel(ch.name);
+        const x = LEFT + layer * colW + colW / 2 - 8;
+        let y = top + LANE_HEAD + k * ROW + 26;
+        let box = nodeBox(x, y, r, lines);
+        for (let guard = 0; guard < 400 && [...placed, ...blocked].some(b => hit(b, box)); guard++) { y += 6; box = nodeBox(x, y, r, lines); }
+        placed.push(box);
+        nodes.push({ id: ch.id, x, y, r, lines, box, layer, lane });
+        band.height = Math.max(band.height, box.y2 - top);
+      });
+    }
+    laneBands.push(band);
+    top += band.height + LANE_GAP;
+  }
+  // A node pushed below its lane by the card never overlaps the next lane's.
+  return { nodes, lanes: laneBands, layerCount, colW, height: Math.max(top, card ? card.h : 0) + 52, width };
+}
+
+/** True when no two node boxes overlap. */
 export function overlaps(boxes) {
   const out = [];
   for (let i = 0; i < boxes.length; i++) for (let j = i + 1; j < boxes.length; j++) if (hit(boxes[i], boxes[j])) out.push([i, j]);

@@ -3703,4 +3703,11 @@ export default {
   'login.plotTurning': 'मोड़ बिंदु (1, −4) पर',
   'login.plotAltP': 'p(x) = x² − 2x − 8 का आलेख',
   'login.plotAltY': 'y = x² − 2x − 3 का आलेख',
+  'inst.mapTitleCourse': '{year} {course}',
+  'inst.mapMetaNew': 'शुरू नहीं हुआ',
+  'inst.mapMetaTopics': '{total} में से {n} विषय अभ्यास किए',
+  'inst.mapMetaAnswers': { one: 'अब तक {n} उत्तर', other: 'अब तक {n} उत्तर' },
+  'inst.mapBuildsOn': 'इन पर आधारित: {names}',
+  'inst.mapLayerFirst': 'चरण 1 / {total} · इस वर्ष की नींव',
+  'inst.mapLayerN': 'चरण {n} / {total} · पिछले चरणों पर आधारित',
 };

@@ -15,9 +15,12 @@
 /* The open constellation: no box, the drawing sits on the page itself. */
 .in-map-graph { position: relative; padding: 0; }
 .in-map-graph svg { display: block; width: 100%; height: auto; overflow: visible; }
-.in-map-stars rect { fill: var(--in-tx-4); opacity: 0.5; animation: in-map-twinkle 6.3s ease-in-out infinite alternate; }
-@keyframes in-map-twinkle { from { opacity: 0.35; } to { opacity: 0.65; } }
-.in-map-edge { fill: none; stroke: var(--in-edge-3); stroke-width: 1.4; }
+.in-map-lane line { stroke: var(--in-edge); stroke-width: 1; }
+.in-map-edge { fill: none; stroke: var(--in-edge-3); stroke-width: 1; transition: stroke 120ms, opacity 120ms; }
+.in-map-edge.is-lit { stroke: var(--in-tx-2); stroke-width: 1.6; }
+.in-map-graph[data-lit] .in-map-edge:not(.is-lit) { opacity: 0.35; }
+.in-map-node { transition: opacity 120ms; }
+.in-map-node.is-dim { opacity: 0.4; }
 .in-map-edge.is-earlier { stroke-dasharray: 2 4; }
 .in-map-strand { font: 500 10.5px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; fill: var(--in-tx-3); }
 .in-map-strand.is-col { fill: var(--in-tx-4); }
@@ -28,15 +31,18 @@
 .in-map-node.is-on .in-map-ring { stroke-opacity: 1; stroke-width: 2; animation: in-map-breathe 2.1s ease-in-out infinite alternate; }
 @keyframes in-map-breathe { from { transform: scale(0.95); } to { transform: scale(1.05); } }
 .in-map-name { font: 500 13.5px var(--in-ui); fill: var(--in-tx); }
-.in-map-label { font: 400 11.5px var(--in-mono); fill: var(--in-tx-3); }
+.in-map-label { font: 400 11.5px var(--in-ui); fill: var(--in-tx-3); }
 .in-map-legend { position: absolute; left: 24px; bottom: 22px; display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0; padding: 0; list-style: none; font: 500 11.5px var(--in-mono); color: var(--in-tx-3); }
 .in-map-legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
 .in-map-legend i.is-secure { background: var(--in-tx); }
 .in-map-legend i.is-building { background: var(--in-tx-3); }
 .in-map-legend i.is-new { background: var(--in-tx-4); }
-.in-map-list { list-style: none; margin: 0; padding: 0; position: absolute; inset: 0; }
+.in-map-layers { position: absolute; inset: 0; pointer-events: none; }
+.in-map-layer { display: contents; }
+.in-map-layer-h { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; margin: 0; }
+.in-map-list { list-style: none; margin: 0; padding: 0; display: contents; }
 .in-map-list li { position: absolute; transform: translate(-50%, -50%); }
-.in-map-hit { display: block; width: 44px; height: 44px; border-radius: 50%; border: 0; background: transparent; cursor: pointer; }
+.in-map-hit { display: block; width: 44px; height: 44px; border-radius: 50%; border: 0; background: transparent; cursor: pointer; pointer-events: auto; }
 .in-map-hit:focus-visible { outline: 2px solid var(--in-tx); outline-offset: 0; }
 .in-map-hit-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .in-map-hit-dot { display: none; }
@@ -45,16 +51,18 @@
 @media (max-width: 640px) {
   .in-map-graph { padding: 0; }
   .in-map-graph svg, .in-map-legend { display: none; }
-  .in-map-list { position: static; display: grid; gap: 2px; }
+  .in-map-layers { position: static; display: grid; gap: 18px; pointer-events: auto; }
+  .in-map-layer { display: block; }
+  .in-map-layer-h { position: static; width: auto; height: auto; clip: auto; white-space: normal; margin: 0 0 4px; padding: 0 10px; font: 500 11px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
+  .in-map-list { display: grid; gap: 2px; }
   .in-map-list li { position: static; transform: none; }
   .in-map-hit { width: 100%; height: auto; min-height: 44px; border-radius: 4px; text-align: left; padding: 8px 10px; color: var(--in-tx); }
   .in-map-hit[aria-current="true"] { background: var(--in-l3); box-shadow: inset 0 1px 0 var(--in-hi); }
-  .in-map-hit-name { position: static; width: auto; height: auto; clip: auto; display: flex; align-items: baseline; gap: 10px; font: 500 14px var(--in-ui); white-space: normal; }
+  .in-map-hit-name { position: static; width: auto; height: auto; clip: auto; display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 2px 10px; font: 500 14px var(--in-ui); white-space: normal; }
   .in-map-hit-dot { display: inline-block; flex: none; align-self: center; width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 1px var(--cc);
     background: color-mix(in srgb, var(--cc) calc(var(--f) * 100%), transparent); }
-  .in-map-hit-name b { font: 500 12px var(--in-mono); color: var(--in-tx-3); }
-  .in-map-hit-name em { margin-left: auto; font: 500 11.5px var(--in-mono); font-style: normal; color: var(--in-tx-2); font-variant-numeric: tabular-nums; }
-  .in-map-hit-name small { width: 92px; flex: none; text-align: right; font: 500 10.5px var(--in-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--in-tx-3); }
+  .in-map-hit-name em { grid-column: 2; font: 400 12px var(--in-ui); font-style: normal; color: var(--in-tx-2); }
+  .in-map-hit-name small { grid-column: 2; font: 400 12px var(--in-ui); color: var(--in-tx-3); }
 }
 .in-map-card {
   position: absolute; right: 24px; top: 24px; width: 310px; z-index: 2; display: grid; gap: 12px; padding: 18px; border-radius: 6px; background: var(--in-l2);
@@ -75,6 +83,6 @@
 .in-map-foot { font-size: 12.5px; max-width: 72ch; }
 .in-map-graph-wrap:not(.is-floating) .in-map-card { position: static; width: auto; margin-top: 18px; }
 .in-map-graph-wrap:not(.is-floating) .in-map-card .in-btn { justify-self: stretch; min-height: 44px; }
-@media (prefers-reduced-motion: reduce) { .in-map-stars rect, .in-map-node.is-on .in-map-ring { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .in-map-node.is-on .in-map-ring { animation: none; } .in-map-edge, .in-map-node { transition: none; } }
 
-.in-map-graph.is-still .in-map-stars rect, .in-map-graph.is-still .in-map-ring { animation-play-state: paused; }
+.in-map-graph.is-still .in-map-ring { animation-play-state: paused; }
