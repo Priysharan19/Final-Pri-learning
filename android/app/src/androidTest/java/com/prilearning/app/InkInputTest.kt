@@ -135,21 +135,42 @@ class InkInputTest {
         // that window throws, rather than reaching the shared canvas at all.
         // Recenter before the real input and fail with coordinates if the full
         // stroke would still leave the WebView: never fabricate page events.
-        assertEquals("the ink canvas can be brought into view", "true", eval(s,
-            "(function(){var c=[].slice.call(document.querySelectorAll('.ink-canvas')).pop();if(!c)return false;c.scrollIntoView({block:'center',inline:'nearest'});return true;})()"))
-        Thread.sleep(180)
-        val rect = waitFor(s, "(function(){var c=[].slice.call(document.querySelectorAll('.ink-canvas')).pop();var r=c.getBoundingClientRect();return [r.left,r.top,r.width,r.height,window.devicePixelRatio].join(',');})()")
-        val (l, t, w, h, dpr) = rect.trim('"').split(',').map { it.toFloat() }
         val loc = IntArray(2)
         val viewSize = IntArray(2)
-        s.onActivity { val web = it.webView!!; web.getLocationOnScreen(loc); viewSize[0] = web.width; viewSize[1] = web.height }
-        val x0 = loc[0] + (l + w * fx0) * dpr
-        val x1 = loc[0] + (l + w * fx1) * dpr
-        val y0 = loc[1] + (t + h * fy - 4f) * dpr
-        val y1 = loc[1] + (t + h * fy + 4f) * dpr
-        assertTrue("canvas input bounds exceed app WebView: x=$x0..$x1, y=$y0..$y1, window=${loc[0]},${loc[1]}+${viewSize[0]}x${viewSize[1]}",
-            minOf(x0, x1) >= loc[0] && maxOf(x0, x1) < loc[0] + viewSize[0] &&
-            y0 >= loc[1] && y1 < loc[1] + viewSize[1])
+        var l = 0f
+        var t = 0f
+        var w = 0f
+        var h = 0f
+        var dpr = 1f
+        var x0 = 0f
+        var x1 = 0f
+        var y0 = 0f
+        var y1 = 0f
+        // On API 33, the WebView may retain its landscape CSS rectangle for
+        // several frames after Activity reports portrait. Wait for the live
+        // rectangle to fit the actual WebView before injecting MotionEvents.
+        // A persistently offscreen canvas still FAILS with both coordinate
+        // spaces in the diagnostic: no fake events and no skipped strokes.
+        val deadline = System.currentTimeMillis() + 20_000
+        var fits = false
+        var layout = ""
+        do {
+            assertEquals("the ink canvas can be brought into view", "true", eval(s,
+                "(function(){var c=[].slice.call(document.querySelectorAll('.ink-canvas')).pop();if(!c)return false;c.scrollIntoView({block:'center',inline:'center'});return true;})()"))
+            Thread.sleep(250)
+            val rect = waitFor(s, "(function(){var c=[].slice.call(document.querySelectorAll('.ink-canvas')).pop();var r=c.getBoundingClientRect();return [r.left,r.top,r.width,r.height,window.devicePixelRatio,window.innerWidth,window.innerHeight].join(',');})()")
+            val parts = rect.trim('"').split(',').map { it.toFloat() }
+            l = parts[0]; t = parts[1]; w = parts[2]; h = parts[3]; dpr = parts[4]
+            layout = "cssViewport=${parts[5]}x${parts[6]}, canvas=$rect"
+            s.onActivity { val web = it.webView!!; web.getLocationOnScreen(loc); viewSize[0] = web.width; viewSize[1] = web.height }
+            x0 = loc[0] + (l + w * fx0) * dpr
+            x1 = loc[0] + (l + w * fx1) * dpr
+            y0 = loc[1] + (t + h * fy - 4f) * dpr
+            y1 = loc[1] + (t + h * fy + 4f) * dpr
+            fits = minOf(x0, x1) >= loc[0] && maxOf(x0, x1) < loc[0] + viewSize[0] &&
+                y0 >= loc[1] && y1 < loc[1] + viewSize[1]
+        } while (!fits && System.currentTimeMillis() < deadline)
+        assertTrue("canvas input bounds exceed app WebView after reflow: x=$x0..$x1, y=$y0..$y1, window=${loc[0]},${loc[1]}+${viewSize[0]}x${viewSize[1]}; $layout", fits)
         val stylus = tool == MotionEvent.TOOL_TYPE_STYLUS || tool == MotionEvent.TOOL_TYPE_ERASER
         val props = arrayOf(MotionEvent.PointerProperties().apply { id = 0; toolType = tool })
         val source = if (stylus) InputDevice.SOURCE_STYLUS or InputDevice.SOURCE_TOUCHSCREEN else InputDevice.SOURCE_TOUCHSCREEN
@@ -193,7 +214,7 @@ class InkInputTest {
                 return true;
             })()""")
             try {
-                waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice'")
+                waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice'", 60_000)
             } catch (e: AssertionError) {
                 val state = eval(s, """(function(){
                     var gate=document.querySelector('[data-testid="account-activation-gate"]');

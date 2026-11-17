@@ -227,6 +227,12 @@ export function createSyncRouter(db) {
   // account it may not own; pull stays open so a device can still read back.
   router.post('/push', requireVerifiedEmail, rateLimit(db, 'sync-push', { limit: 120, windowMs: 60 * 1000 }), async (req, res) => {
     const body = req.body || {};
+    if (body.accountId != null && body.accountId !== req.platformSession.account_id) {
+      // The submitted account is a constraint, never an account selector. A
+      // second tab can change the device-wide session between the client's
+      // initial /me and this push; do not file account A's work under B.
+      return res.status(409).json({ error: { code: 'SYNC_ACCOUNT_MISMATCH', message: 'Sync request does not belong to the signed-in account.' } });
+    }
     if (body.schemaVersion !== SCHEMA) return res.status(409).json({ error: { code: 'SYNC_SCHEMA_UNSUPPORTED', message: `Expected sync schema ${SCHEMA}.` } });
     const deviceId = String(body.deviceId || '');
     if (!ID.test(deviceId) || deviceId !== req.platformSession.device_id) return res.status(400).json({ error: { code: 'SYNC_DEVICE_MISMATCH', message: 'Sync device does not match this session.' } });
@@ -346,12 +352,21 @@ export function createSyncRouter(db) {
     }
   });
 
-  router.get('/pull/:cursor', rateLimit(db, 'sync-pull', { limit: 180, windowMs: 60 * 1000 }), async (req, res) => {
+  const pull = async (req, res) => {
     const accountId = req.platformSession.account_id;
+    // New clients bind the cursor to the account they verified before
+    // starting the sync. Preserve /pull/:cursor for older installed clients.
+    // This identifier is a match constraint: the server still selects rows
+    // solely by the authenticated session.
+    if (req.params.expectedAccountId != null && req.params.expectedAccountId !== accountId) {
+      return res.status(409).json({ error: { code: 'SYNC_ACCOUNT_MISMATCH', message: 'Sync request does not belong to the signed-in account.' } });
+    }
     const page = await syncPullPage(db, accountId, req.params.cursor, MAX_PULL);
     res.set('Cache-Control', 'no-store');
     res.json(page);
-  });
+  };
+  router.get('/pull/:expectedAccountId/:cursor', rateLimit(db, 'sync-pull', { limit: 180, windowMs: 60 * 1000 }), pull);
+  router.get('/pull/:cursor', rateLimit(db, 'sync-pull', { limit: 180, windowMs: 60 * 1000 }), pull);
 
   return router;
 }

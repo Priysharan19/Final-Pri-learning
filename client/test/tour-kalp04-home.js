@@ -223,6 +223,11 @@ export const flow = {
     await page.locator('.task-row .btn').first().click();
     await page.waitForSelector('.q-prompt', { timeout: 30000 });
     await goto('/');
+    // Home loads the authoritative task and resume context asynchronously.
+    // The shell or an earlier generic recommendation can render first; the
+    // test must wait for the real task-specific action, not accept a fallback.
+    await page.locator('[data-home-primary][data-kind="task-resume"], [data-home-primary][data-kind="task"]')
+      .first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
     await check('unfinished task context becomes the primary resume action',
       ['task-resume', 'task'].includes(await page.locator('[data-home-primary]').getAttribute('data-kind')));
     await check('task primary CTA preserves the task query context',

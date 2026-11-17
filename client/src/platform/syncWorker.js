@@ -110,6 +110,16 @@ async function loadState(pid) {
   };
 }
 
+async function assertActiveSyncAccount(pid, expectedAccountId) {
+  // A failed device-storage read is not permission to import or acknowledge
+  // remote work. This also prevents an in-flight A reply from being filed
+  // after a second tab explicitly unlinks the profile or links it to B.
+  const link = await cloudAccountLink(pid, { strict: true });
+  if (!link?.accountId || String(link.accountId) !== String(expectedAccountId)) {
+    throw Object.assign(new Error('Sync account changed while a request was in flight.'), { code: 'SYNC_ACCOUNT_MISMATCH' });
+  }
+}
+
 async function saveState(pid, state) {
   await put('device', {
     id: syncStateId(pid), cursor: safeInt(state.cursor),
@@ -465,8 +475,9 @@ async function pullAll(pid, deviceId, state, unpublished, { fromCursor = null } 
   let pulledEntities = 0;
   let restoredEvents = 0;
   for (let page = 0; page < 100; page++) {
-    const raw = await cloud.syncPull(cursor);
+    const raw = await cloud.syncPull(cursor, state.accountId);
     validatePullEnvelope(raw);
+    await assertActiveSyncAccount(pid, state.accountId);
     const foreign = [];
     for (const event of raw.events) {
       if (event.deviceId !== deviceId) {
@@ -576,7 +587,7 @@ async function pushFullRescan(pid, deviceId, marker, state, coveredBelow, recove
     let chunk = entities.slice(offset, offset + MAX_PUSH_ITEMS);
     const sent = new Set(chunk.map(row => versionKey(row.kind, row.entityId)));
     const push = rows => cloud.syncPush(
-      createPushEnvelope({ deviceId, baseCursor: state.cursor, entities: rows, fullRescan: true }),
+      createPushEnvelope({ deviceId, accountId: state.accountId, baseCursor: state.cursor, entities: rows, fullRescan: true }),
       rescanKey('rescan-ent', deviceId, offset / MAX_PUSH_ITEMS, rows)
     );
     let result;
@@ -594,6 +605,7 @@ async function pushFullRescan(pid, deviceId, marker, state, coveredBelow, recove
       result = validatePushResult(await push(chunk));
       recovery.recovered++;
     }
+    await assertActiveSyncAccount(pid, state.accountId);
     for (const row of result.acceptedEntities) {
       const key = versionKey(row.kind, row.entityId);
       if (!sent.has(key)) continue;
@@ -606,15 +618,17 @@ async function pushFullRescan(pid, deviceId, marker, state, coveredBelow, recove
   for (let offset = 0; offset < historical.length; offset += MAX_PUSH_ITEMS) {
     const chunk = historical.slice(offset, offset + MAX_PUSH_ITEMS);
     const sent = new Set(chunk.map(event => event.id));
-    const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, events: chunk, fullRescan: true });
+    const envelope = createPushEnvelope({ deviceId, accountId: state.accountId, baseCursor: state.cursor, events: chunk, fullRescan: true });
     const result = validatePushResult(await cloud.syncPush(envelope, rescanKey('rescan-hist', deviceId, offset / MAX_PUSH_ITEMS, chunk)));
     const committed = result.acceptedEvents.filter(row => sent.has(row.id)).length;
+    await assertActiveSyncAccount(pid, state.accountId);
     pushedEvents += committed;
     if (committed < chunk.length) complete = false;
   }
 
   if (!complete) return { pushedEvents, pushedEntities, acknowledged: 0, blocked: [{ seq: marker.seq, kind: marker.kind, reason: 'rescan-not-fully-committed' }] };
 
+  await assertActiveSyncAccount(pid, state.accountId);
   await acknowledgeProfileMutations(pid, [marker.seq]);
   // Acking the marker is what makes the rest of the queue visible:
   // pendingProfileMutations answers with the marker alone until the initial
@@ -684,7 +698,7 @@ async function syncNowOnce(pid) {
       let batch = await buildNormalBatch(pending, pid, deviceId, state);
       if (batch.events.length || batch.entities.length) {
         const send = rows => {
-          const envelope = createPushEnvelope({ deviceId, baseCursor: state.cursor, events: rows.events, entities: rows.entities });
+          const envelope = createPushEnvelope({ deviceId, accountId: state.accountId, baseCursor: state.cursor, events: rows.events, entities: rows.entities });
           const first = Math.min(...rows.represented);
           const last = Math.max(...rows.represented);
           const key = `sync-${deviceId}-${first}-${last}-${contentDigest({ events: rows.events, entities: rows.entities })}`;
@@ -709,6 +723,9 @@ async function syncNowOnce(pid) {
           result = validatePushResult(await send(batch));
           recovery.recovered++;
         }
+        // Never drain A's queue from a reply obtained after a profile was
+        // unlinked or retargeted in another tab.
+        await assertActiveSyncAccount(pid, state.accountId);
         // Acknowledge what the server COMMITTED, never what this device sent.
         // Dropping a queue entry is the one irreversible act in a sync: the
         // local rows stay, but nothing will ever look at them again, so an
@@ -747,10 +764,11 @@ async function syncNowOnce(pid) {
     // Whatever is still queued after the push is still unpublished, so the second
     // pull protects it on the same terms the first one did.
     const postPull = await pullAll(pid, deviceId, state, unpublishedEntities(await pendingProfileMutations(pid, MAX_OUTBOX_ITEMS)));
+    await assertActiveSyncAccount(pid, state.accountId);
     state.lastSyncAt = Date.now();
     state.lastError = null;
     await saveState(pid, state);
-    await markCloudSynced(pid, state.lastSyncAt);
+    await markCloudSynced(pid, state.lastSyncAt, state.accountId);
     const after = await profileOutboxStats(pid);
     const pulled = sumPulls(prePull, postPull, ...recovery.pulls);
     return {
@@ -769,7 +787,10 @@ async function syncNowOnce(pid) {
     };
   } catch (error) {
     state.lastError = error?.code || error?.message || 'sync-failed';
-    await saveState(pid, state).catch(() => {});
+    // Disconnect removes old account replica state. A late in-flight failure
+    // must not recreate that replica under the newly linked account.
+    const current = await cloudAccountLink(pid, { strict: true }).catch(() => null);
+    if (current?.accountId === state.accountId) await saveState(pid, state).catch(() => {});
     throw error;
   }
 }
@@ -784,7 +805,7 @@ export async function cloudSyncStatus(pid) {
     cursor: state.cursor,
     pending: outbox.pending,
     requiresFullRescan: outbox.requiresFullRescan,
-    lastSyncAt: state.lastSyncAt || link?.lastSyncAt || null,
+    lastSyncAt: state.accountId && state.accountId !== link?.accountId ? null : (state.lastSyncAt || link?.lastSyncAt || null),
     lastError: state.lastError || null
   };
 }

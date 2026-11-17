@@ -67,7 +67,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { openServerDesk } from './journey-oracle.mjs';
-import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
+import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime, selectedSimulatorRuntimeEvidence } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -662,17 +662,18 @@ if (steps.nativeInk.ok && !steps.nativeInk.detail.startsWith(wantFacts)) {
 }
 const passed = Object.values(steps).filter(s => s.ok).length;
 const total = Object.keys(steps).length;
-let os = '';
-try { os = run('xcrun', ['simctl', 'list', 'runtimes']).split('\n').find(l => /iOS/.test(l))?.trim() || ''; } catch { /* informational */ }
+// This exact runtime was observed when pickDevice() selected this UDID
+// from simctl's runtime-grouped list, before any test assertions ran.
+// Do not infer it from the environment pin or query hung CoreSimulator again
+// at postflight. Missing/mismatched live-selection evidence fails closed.
+const os = selectedSimulatorRuntimeEvidence(sim, PINNED_RUNTIME);
+const META_TIMEOUT_MS = 10_000;
+const metadataRun = (command, args, opts = {}) =>
+  run(command, args, { timeout: META_TIMEOUT_MS, killSignal: 'SIGKILL', ...opts });
 let sha = '';
 let dirty = null;
-try { sha = run('git', ['rev-parse', 'HEAD'], { cwd: ROOT }).trim(); } catch { /* not a checkout */ }
-try { dirty = run('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ROOT }).trim().length > 0; } catch { /* not a checkout */ }
-// The device's own runtime, not the first one installed.
-try {
-  const devices = JSON.parse(run('xcrun', ['simctl', 'list', 'devices', '-j'])).devices;
-  for (const [runtime, list] of Object.entries(devices)) if (list.some(d => d.udid === udid)) os = runtime.replace(/^com\.apple\.CoreSimulator\.SimRuntime\./, '');
-} catch { /* informational */ }
+try { sha = metadataRun('git', ['rev-parse', 'HEAD'], { cwd: ROOT }).trim(); } catch { /* not a checkout */ }
+try { dirty = metadataRun('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ROOT }).trim().length > 0; } catch { /* not a checkout */ }
 
 const evidence = {
   schemaVersion: 1,

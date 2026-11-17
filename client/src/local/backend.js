@@ -4929,6 +4929,13 @@ const routes = {
     if (!Object.hasOwn(HISTORY_SORTS, sort)) throw Object.assign(new Error('sort must be newest, oldest or marks'), { status: 400 });
     const allRows = await byIndex('questions', 'pid', p.id);
     const rows = allRows.filter(r => r.answered);
+    // Historic exam questions can name NSW generators no longer issued as
+    // markable Practice. Do not advertise an impossible Retry action; a
+    // server-issued question can still be replayed by its source id.
+    const nswHistory = practiceCurriculumOf(p) === 'nsw';
+    const canRetryFromBank = r => !nswHistory || !!nswOfferedCell({
+      generator: r.generator || r.subtopic, difficulty: r.difficulty
+    });
     const attempts = await attemptsInOrder(p.id);
     const attemptByQ = {};
     for (const a of attempts) attemptByQ[a.questionId] = a;   // latest wins (answer order)
@@ -4962,7 +4969,7 @@ const routes = {
         viaInk: !!a?.viaInk, hasInk: !!(ink && ink.strokes?.length), hasPhoto: !!ink?.photo, hasScribble: !!(ink?.scribble?.length),
         bookmarked: marked.has(r.id),
         needsLook: needsLook.has(r.id),
-        canRetry: !q.custom && !q.multipart,
+        canRetry: !q.custom && !q.multipart && (!!r.serverQuestionId || canRetryFromBank(r)),
         answeredAt: a?.createdAt || r.createdAt,
         // The server-certified mark and its step rows, when the server sent one.
         ...(() => { const m = certifiedMarksOfRow(r); return m ? { marksEarned: m.earned, marksPossible: m.possible, markRows: m.markRows, ...(m.repeat || r.repeatOf ? { repeat: true } : {}) } : {}; })()
