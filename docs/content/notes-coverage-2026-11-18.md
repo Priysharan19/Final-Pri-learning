@@ -8,7 +8,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 ## Summary
 
-**57 of 196 chapters at standard.**
+**71 of 196 chapters at standard.**
 
 | Band | Chapters | With notes | At standard | Missing sections (count of chapters) | ≥2 diagrams | Interactive | KaTeX issues |
 |---|---|---|---|---|---|---|---|
@@ -16,7 +16,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 | CBSE Class 8 | 13 | 13 | 13 | — | 13 | 13 | 0 |
 | CBSE Class 9 | 8 | 8 | 8 | — | 8 | 8 | 0 |
 | CBSE Class 10 | 14 | 14 | 14 | — | 14 | 13 | 0 |
-| CBSE Class 11 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 0 |
+| CBSE Class 11 | 14 | 14 | 14 | — | 14 | 12 | 0 |
 | CBSE Class 12 | 13 | 13 | 0 | objective 13, intuition 13, checkpoint 13 | 0 | 0 | 0 |
 | Olympiad | 7 | 7 | 7 | — | 7 | 5 | 0 |
 | NSW Stage 4 (Years 7–8) | 16 | 16 | 0 | objective 16, intuition 16 | 2 | 1 | 0 |
@@ -35,6 +35,8 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 - `c7-parallel-intersecting-lines-current` Parallel and Intersecting Lines — Turning the transversal would help, but the diagram kit draws parallel lines as a fixed figure; three figures at different transversal angles show the same equalities instead.
 - `c10-real-numbers` Real Numbers — Every idea in this chapter is about whole numbers and exact divisibility, so there is no continuous quantity to slide; the rectangle of squares and the prime-power chart show each argument whole.
+- `c11-sets` Sets — Sets are about membership and counting regions. A Venn diagram with every region filled in already shows each count. Nothing in the chapter varies continuously, so a slider would have nothing to teach.
+- `c11-3d-introduction` Introduction to Three Dimensional Geometry — The ideas here are read from a fixed drawing: octants, the distance formula and the section formula. The kit has no rotatable three-dimensional view, and moving a slider would not teach these formulas better than the two figures.
 - `olymp-number-theory` Number Theory — Congruence arguments are about remainders of whole numbers; the cycle of residues is read completely from one static chart, and no slider over a continuous quantity would show the reason a cycle exists.
 - `olymp-functional-equations` Functional Equations — A functional equation is decided by substitutions on paper; sliding a parameter on a graph shows a candidate but never why it is the only one, so a moving picture here would mislead.
 
@@ -114,20 +116,20 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `c11-sets` Sets | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | ok | **no** |
-| `c11-relations-functions` Relations and Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 31 | ok | **no** |
-| `c11-trig-functions` Trigonometric Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 40 | ok | **no** |
-| `c11-complex-numbers` Complex Numbers and Quadratic Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 4 | ok | **no** |
-| `c11-linear-inequalities` Linear Inequalities | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | ok | **no** |
-| `c11-permutations-combinations` Permutations and Combinations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 38 | ok | **no** |
-| `c11-binomial-theorem` Binomial Theorem | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | ok | **no** |
-| `c11-sequences-series` Sequences and Series | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | ok | **no** |
-| `c11-straight-lines` Straight Lines | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 26 | ok | **no** |
-| `c11-conic-sections` Conic Sections | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 32 | ok | **no** |
-| `c11-3d-introduction` Introduction to Three Dimensional Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 7 | ok | **no** |
-| `c11-limits-derivatives` Limits and Derivatives | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 51 | ok | **no** |
-| `c11-statistics` Statistics | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 39 | ok | **no** |
-| `c11-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 17 | ok | **no** |
+| `c11-sets` Sets | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | reason | 8 | ok | yes |
+| `c11-relations-functions` Relations and Functions | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 31 | ok | yes |
+| `c11-trig-functions` Trigonometric Functions | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 40 | ok | yes |
+| `c11-complex-numbers` Complex Numbers and Quadratic Equations | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 4 | ok | yes |
+| `c11-linear-inequalities` Linear Inequalities | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 9 | ok | yes |
+| `c11-permutations-combinations` Permutations and Combinations | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 38 | ok | yes |
+| `c11-binomial-theorem` Binomial Theorem | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 2 | ok | yes |
+| `c11-sequences-series` Sequences and Series | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 11 | ok | yes |
+| `c11-straight-lines` Straight Lines | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 26 | ok | yes |
+| `c11-conic-sections` Conic Sections | yes | yes | yes | yes | yes | yes | yes | yes | yes | 4 | yes | 32 | ok | yes |
+| `c11-3d-introduction` Introduction to Three Dimensional Geometry | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | reason | 7 | ok | yes |
+| `c11-limits-derivatives` Limits and Derivatives | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 51 | ok | yes |
+| `c11-statistics` Statistics | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 39 | ok | yes |
+| `c11-probability` Probability | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 17 | ok | yes |
 
 ### CBSE Class 12
 
