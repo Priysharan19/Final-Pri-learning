@@ -90,7 +90,7 @@ for (const [skill, list] of Object.entries(EXTRA_FORMS)) {
   // A form that generateQuestion never issued must be one it is DESIGNED not to issue: the draw is in proportion to the
   // questions a form can serve (generators/index.js), so a form with a handful of questions has a share near 0 beside a
   // form of millions. That is stated, not assumed: its largest share over the difficulties, over the draws made here, must
-  // be below one expected draw. Its questions are still run through the real marker, straight from its maker.
+  // be under 12 expected draws (the threshold below). Its questions are still run through the real marker, straight from its maker.
   for (const f of list) {
     if (seen.has(f.form)) continue;
     const share = (formDrawShares(skill) || [])[1 + list.indexOf(f)] ?? 0;
