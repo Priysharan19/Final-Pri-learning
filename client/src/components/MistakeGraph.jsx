@@ -123,9 +123,6 @@ export function MistakeGraphView({ view }) {
           <g className="mg-axes">
             <line x1={left} x2={right} y1={Y0} y2={Y0} />
             <line x1={X0} x2={X0} y1={top} y2={bottom} />
-            {xTicks.filter(v => v !== 0).map(v => <text key={`tx${v}`} x={project.x(v)} y={xLabelY} textAnchor="middle">{formatValue(v)}</text>)}
-            {yTicks.filter(v => v !== 0).map(v => <text key={`ty${v}`} x={yLabelX} y={project.y(v) + 4} textAnchor="end">{formatValue(v)}</text>)}
-            <text x={Math.max(left + 10, X0 - 6)} y={Math.min(bottom - 4, Y0 + 16)} textAnchor="end">0</text>
           </g>
           <g clipPath={`url(#${clip}-c)`}>
             {curves.before.map((p, i) => <path key={`b${i}`} className="mg-curve mg-before" d={p.d} data-curve="before" />)}
@@ -134,6 +131,12 @@ export function MistakeGraphView({ view }) {
             {inY(b) && inY(y) && <line className="mg-gap" x1={mx} x2={mx} y1={project.y(b)} y2={project.y(y)} />}
             {inY(b) && <circle className="mg-dot mg-before" cx={mx} cy={project.y(b)} r="5" />}
             {inY(y) && <rect className="mg-dot mg-yours" x={mx - 4.5} y={project.y(y) - 4.5} width="9" height="9" />}
+          </g>
+          {/* Labels after the curves, each on a paper halo, so a curve never runs through one. */}
+          <g className="mg-axes">
+            {xTicks.filter(v => v !== 0).map(v => <text key={`tx${v}`} x={project.x(v)} y={xLabelY} textAnchor="middle">{formatValue(v)}</text>)}
+            {yTicks.filter(v => v !== 0).map(v => <text key={`ty${v}`} x={yLabelX} y={project.y(v) + 4} textAnchor="end">{formatValue(v)}</text>)}
+            <text x={Math.max(left + 10, X0 - 6)} y={Math.min(bottom - 4, Y0 + 16)} textAnchor="end">0</text>
           </g>
           <path className="mg-handle" d={`M${mx - 7} ${bottom + 9} L${mx} ${bottom + 1} L${mx + 7} ${bottom + 9} Z`} />
         </svg>
