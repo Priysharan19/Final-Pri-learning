@@ -12,7 +12,7 @@
 // same line (ADR-0001: AI proposes, the deterministic engine decides).
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const MISCONCEPTION_ONTOLOGY_VERSION = 1;
+export const MISCONCEPTION_ONTOLOGY_VERSION = 2;
 
 /** The value a model returns when the mistake is real but not in the ontology. */
 export const OTHER_MISCONCEPTION = 'other';

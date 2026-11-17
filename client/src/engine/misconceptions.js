@@ -40,7 +40,7 @@ import { misconceptionKey, misconceptionLabel } from './adaptive.js';
 import { diagnoseStep } from './diagnose.js';
 
 /** Bumped when an ID is added. IDs are never removed or renamed. */
-export const ONTOLOGY_VERSION = 1;
+export const ONTOLOGY_VERSION = 2;
 
 const STEP = 'step-check';
 const AUTHORED = 'authored';
@@ -124,9 +124,47 @@ export const MISCONCEPTIONS = Object.freeze([
   { id: 'arithmetic-slip', category: 'arithmetic', detectors: [STEP, CLOUD],
     name: 'misconception.arithmeticSlip.name', explain: 'misconception.arithmeticSlip.explain' },
 
+  // ── Calculus: the power rule, integration and the chain rule (calculusSteps.js) ──
+  { id: 'int-no-divide', category: 'calculus', detectors: [STEP],
+    name: 'misconception.intNoDivide.name', explain: 'misconception.intNoDivide.explain' },
+  { id: 'int-divide-old-power', category: 'calculus', detectors: [STEP],
+    name: 'misconception.intDivideOldPower.name', explain: 'misconception.intDivideOldPower.explain' },
+  { id: 'int-wrong-divisor', category: 'calculus', detectors: [STEP],
+    name: 'misconception.intWrongDivisor.name', explain: 'misconception.intWrongDivisor.explain' },
+  { id: 'int-power-not-raised', category: 'calculus', detectors: [STEP],
+    name: 'misconception.intPowerNotRaised.name', explain: 'misconception.intPowerNotRaised.explain' },
+  { id: 'int-constant-not-integrated', category: 'calculus', detectors: [STEP],
+    name: 'misconception.intConstantNotIntegrated.name', explain: 'misconception.intConstantNotIntegrated.explain' },
+  { id: 'int-differentiated', category: 'calculus', detectors: [STEP],
+    name: 'misconception.intDifferentiated.name', explain: 'misconception.intDifferentiated.explain' },
+  { id: 'int-sign', category: 'calculus', detectors: [STEP],
+    name: 'misconception.intSign.name', explain: 'misconception.intSign.explain' },
+  { id: 'int-linear-inner-not-divided', category: 'calculus', detectors: [STEP],
+    name: 'misconception.intLinearInnerNotDivided.name', explain: 'misconception.intLinearInnerNotDivided.explain' },
+  { id: 'int-linear-inner-multiplied', category: 'calculus', detectors: [STEP],
+    name: 'misconception.intLinearInnerMultiplied.name', explain: 'misconception.intLinearInnerMultiplied.explain' },
+  { id: 'diff-no-multiply', category: 'calculus', detectors: [STEP],
+    name: 'misconception.diffNoMultiply.name', explain: 'misconception.diffNoMultiply.explain' },
+  { id: 'diff-wrong-multiplier', category: 'calculus', detectors: [STEP],
+    name: 'misconception.diffWrongMultiplier.name', explain: 'misconception.diffWrongMultiplier.explain' },
+  { id: 'diff-power-not-lowered', category: 'calculus', detectors: [STEP],
+    name: 'misconception.diffPowerNotLowered.name', explain: 'misconception.diffPowerNotLowered.explain' },
+  { id: 'diff-constant-kept', category: 'calculus', detectors: [STEP],
+    name: 'misconception.diffConstantKept.name', explain: 'misconception.diffConstantKept.explain' },
+  { id: 'diff-integrated', category: 'calculus', detectors: [STEP],
+    name: 'misconception.diffIntegrated.name', explain: 'misconception.diffIntegrated.explain' },
+  { id: 'diff-sign', category: 'calculus', detectors: [STEP],
+    name: 'misconception.diffSign.name', explain: 'misconception.diffSign.explain' },
+  { id: 'diff-chain-inner-missing', category: 'calculus', detectors: [STEP],
+    name: 'misconception.diffChainInnerMissing.name', explain: 'misconception.diffChainInnerMissing.explain' },
+
   // ── Not a misconception: the line is false and nothing more is known ──────
   { id: 'counterexample', category: 'unclassified', detectors: [STEP], recordable: false,
-    name: 'misconception.counterexample.name', explain: 'misconception.counterexample.explain' }
+    name: 'misconception.counterexample.name', explain: 'misconception.counterexample.explain' },
+  { id: 'antiderivative-check', category: 'unclassified', detectors: [STEP], recordable: false,
+    name: 'misconception.antiderivativeCheck.name', explain: 'misconception.antiderivativeCheck.explain' },
+  { id: 'derivative-check', category: 'unclassified', detectors: [STEP], recordable: false,
+    name: 'misconception.derivativeCheck.name', explain: 'misconception.derivativeCheck.explain' }
 ].map(m => Object.freeze({ aliases: [], recordable: true, ...m, detectors: Object.freeze([...m.detectors]) })));
 
 const BY_ID = new Map(MISCONCEPTIONS.map(m => [m.id, m]));
