@@ -188,7 +188,7 @@ export default {
       { question: 'Series $X$ has mean $40$ and standard deviation $8$; series $Y$ has mean $50$ and standard deviation $9$. Which is more variable?', answer: '$\\text{CV}_X=\\tfrac{8}{40}\\times100=20$ and $\\text{CV}_Y=\\tfrac{9}{50}\\times100=18$, so $X$ is more variable although its standard deviation is smaller.', verify: { kind: 'values', pairs: [['8/40*100', '20'], ['9/50*100', '18']] } }
     ],
     diagrams: [
-      { title: 'Same mean, different spread', spec: { kind: 'barChart', categories: ['2', '4', '6', '8', '10'], values: [1, 3, 6, 3, 1], dual: { values: [3, 2, 4, 2, 3], label: 'B' }, yLabel: 'Frequency' }, note: 'Both distributions have $N=14$ and mean $6$. In the first most values sit at $6$, and $\\sigma=2$. In $B$ more weight lies at $2$ and $10$, and $\\sigma=2\\sqrt2\\approx2.83$.' },
+      { title: 'Same mean, different spread', spec: { kind: 'barChart', categories: ['2', '4', '6', '8', '10'], values: [1, 3, 6, 3, 1], label: 'A', dual: { values: [3, 2, 4, 2, 3], label: 'B' }, yLabel: 'Frequency' }, note: 'Both distributions have $N=14$ and mean $6$. In $A$ most values sit at $6$, and $\\sigma=2$. In $B$ more weight lies at $2$ and $10$, and $\\sigma=2\\sqrt2\\approx2.83$.' },
       { title: 'What moves when one value moves', spec: { kind: 'dataExplorer', data: [3, 7, 8, 10, 12], editable: [4], show: ['mean', 'median', 'sd'] }, note: 'These are the data of the mean deviation example: mean $8$, median $8$, $\\sigma=\\sqrt{9.2}\\approx3.03$. Drag the largest value up from $12$: the mean and the standard deviation grow with it, but the median stays at $8$.' }
     ]
   },
