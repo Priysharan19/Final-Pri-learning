@@ -407,9 +407,9 @@ function bankLoader(name) {
   };
 }
 
-/** Extra structural forms ride with the Indian banks only (india-forms-extra.js), as their own chunk. */
-function extraFormsFor(name) {
-  return String(name).startsWith('india-') ? import('./india-forms-extra.js').then(m => m.EXTRA_FORMS) : Promise.resolve({});
+/** Extra structural forms ride with the Indian banks only, one chunk per class (forms/loader.js). */
+function extraFormsFor(name, ids) {
+  return String(name).startsWith('india-') ? import('./forms/loader.js').then(m => m.loadExtraForms(ids)) : Promise.resolve({});
 }
 
 function loadBank(name) {
@@ -417,7 +417,8 @@ function loadBank(name) {
   if (!loader || loaded.has(name)) return Promise.resolve();
   let job = inflight.get(name);
   if (!job) {
-    job = Promise.all([loader(), extraFormsFor(name)]).then(([bank, extra]) => {
+    job = loader().then(async bank => {
+      const extra = await extraFormsFor(name, Object.keys(bank));
       Object.assign(GENERATORS, bank);
       Object.assign(EXTRA_FORMS, extra);
       loaded.add(name);

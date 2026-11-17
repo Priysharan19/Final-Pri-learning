@@ -116,7 +116,9 @@ ok(draws > 50000, `drew every V1 generator ${DRAWS} times at each difficulty (${
 // (2, 3 or 4) was; the hint now names k, and it matches the worked step.
 {
   let checked = 0, wrong = 0;
-  for (let i = 0; i < 200; i++) {
+  // The skill now also serves extra forms (generators/forms), so the collinearity form is a
+  // smaller share of draws: draw enough seeds to still see 150 of it.
+  for (let i = 0; i < 2000 && checked < 150 + 50; i++) {
     const q = generateQuestion('c10-coordinate-geometry', 4, 0x57e96000 + i);
     const hint = (q.hints || []).find(h => /x-step/.test(h));
     const step = (q.steps || []).find(s => /Scale the y-step/.test(s?.h || ''));
