@@ -533,6 +533,7 @@ export const writeFlow = {
     await check('a wrong answer gets the slip verdict panel, not the failure one', await verdict.evaluate(el => el.classList.contains('verdict-bad') && !el.classList.contains('verdict-technical')));
     await page.waitForTimeout(1300);
     writeFileSync(join(outDir, 'write-marked-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+    writeFileSync(join(outDir, 'write-swept-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     const slipChip = page.locator('[data-reading-chips] .in-read[data-read-state]');
     await check('the reading chip names only what was read (no slip tag, UI4) and the slipped line is underlined', await slipChip.count() >= 1 && await page.locator('[data-reading-chips] .in-read-tg').filter({ hasText: /slip|checks/i }).count() === 0 && await page.locator('.ink-verdict-layer .ink-underline').count() >= 1, `${await slipChip.count()} chips`);
     await shootAll(page, outDir, 'marked', SIZES.filter(sz => sz.id === 'web'));
