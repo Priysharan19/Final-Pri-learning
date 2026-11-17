@@ -619,31 +619,39 @@ function realRootsOf(co) {
   }
   return z.filter(r => Math.abs(r.im) < 1e-6 * Math.max(1, Math.abs(r.re))).map(r => r.re);
 }
-function holds(fit, t) {
+// Membership at a point. A ROOT sample is "zero" only if it is within a tight
+// relative tolerance of one of this polynomial's own roots (never by the size
+// of its value, which is meaningless far from the origin); any other sample is
+// judged by the exact sign of the value.
+const degreeOf = co => { let d = co.length - 1; while (d > 0 && co[d] === 0) d--; return d; };
+function holds(fit, t, atRoot) {
   const val = fit.f(t);
-  const tol = 1e-9 * fit.scale * Math.pow(Math.abs(t) + 1, 4);
-  const zero = Math.abs(val) <= tol;
+  const roots = atRoot ? realRootsOf(fit.co) : [];
+  const tol = degreeOf(fit.co) > 2 ? 1e-7 : 1e-10;
+  const zero = atRoot && roots.some(r => Math.abs(r - t) <= tol * Math.max(1, Math.abs(r)));
   if (fit.op === '<') return !zero && val < 0;
   if (fit.op === '>') return !zero && val > 0;
-  if (fit.op === '<=') return zero || val < 0;
-  return zero || val > 0;
+  if (fit.op === '<=') return zero || val <= 0;
+  return zero || val >= 0;
 }
 function sameRegion(a, b) {
   const fa = polyFit(a), fb = polyFit(b);
   if (!fa || !fb) return null;
   if (fa.co.length > 1 && fb.co.length > 1 && fa.v !== fb.v) return null;
+  const tol = Math.max(degreeOf(fa.co), degreeOf(fb.co)) > 2 ? 1e-7 : 1e-10;
   const cuts = [...realRootsOf(fa.co), ...realRootsOf(fb.co)].filter(Number.isFinite).sort((x, y) => x - y);
   const uniq = [];
-  for (const r of cuts) if (!uniq.length || Math.abs(r - uniq[uniq.length - 1]) > 1e-6 * Math.max(1, Math.abs(r))) uniq.push(r);
-  const samples = [];
-  samples.push(uniq.length ? uniq[0] - 1 - Math.abs(uniq[0]) : -1);
+  for (const r of cuts) if (!uniq.length || Math.abs(r - uniq[uniq.length - 1]) > tol * Math.max(1, Math.abs(r))) uniq.push(r);
+  const samples = []; // [t, isRoot]
+  samples.push([uniq.length ? uniq[0] - 1 - Math.abs(uniq[0]) : -1, false]);
   uniq.forEach((r, i) => {
-    samples.push(r);
-    samples.push(i + 1 < uniq.length ? (r + uniq[i + 1]) / 2 : r + 1 + Math.abs(r));
+    samples.push([r, true]);
+    samples.push([i + 1 < uniq.length ? (r + uniq[i + 1]) / 2 : r + 1 + Math.abs(r), false]);
   });
-  if (!uniq.length) samples.push(0, 1);
-  return samples.every(t => holds(fa, t) === holds(fb, t));
+  if (!uniq.length) samples.push([0, false], [1, false]);
+  return samples.every(([t, root]) => holds(fa, t, root) === holds(fb, t, root));
 }
+
 export function assessRelationLine({ text, previous = null, previousTrusted = false, meta = null } = {}) {
   const rel = typeof text === 'string' ? parseRelation(text) : text;
   if (!rel) return { status: 'note', trusted: false, relation: null, note: 'Skipped — I couldn’t parse this inequality safely.' };
