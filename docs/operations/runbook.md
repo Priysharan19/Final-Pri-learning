@@ -168,3 +168,27 @@ needs that notice updated and legal sign-off first.
 | Change a threshold here or in `alerts.md` | a reviewed PR; `observability-check.mjs` pins the numbers to the code |
 
 An alert that has never fired in a drill is not an alert: see `alerts.md` §5.
+
+
+## Library: taking a resource down, and hosted-file storage (plan F3)
+
+**Switch.** Publishing is `PRI_RESOURCE_PUBLISHING=on` (default off). Off, the staff write routes do not exist (404)
+and a `hosted` resource cannot be created. Turning it on is the owner's act per deployment.
+
+**Takedown (a rights query, a wrong file).** In the staff console, Library publishing → **Withdraw** (admin, fresh
+second factor, a reason). The resource leaves `GET /v1/resources` and its file stops being handed out at once; the
+revision history keeps what was published and who approved it. If the console is unavailable, an operator with
+database access sets `resources.review_state='withdrawn'` for the id: that alone stops serving it. A withdrawn file
+stays in storage until deleted; to remove the object too, delete the key `resources/<id>/<revision>.pdf` from the bucket
+(an owner/operator action; the key is never shown to students or staff in the UI).
+
+**Storage.** `PRI_RESOURCE_STORAGE=s3` with `PRI_RESOURCE_STORAGE_ENDPOINT` (https), `_BUCKET`, `_REGION`,
+`_ACCESS_KEY_ID`, `_SECRET_ACCESS_KEY`. The region must be one of the edition's own (`server/platform/objectStorage.js`
+`EDITION_STORAGE_REGIONS`: Priyabhata `ap-south-1`/`ap-south-2`; Prithagoras `ap-southeast-2`/`ap-southeast-4`); a
+mismatch stops the server from starting. **There is no Australian bucket yet, so hosted files stay off for Prithagoras
+until O1.** The credential needs get/put/delete on the one bucket and nothing else; the bucket must be private (students
+only ever receive a 5-minute signed URL). `local` storage is for development and tests and is refused in production.
+
+**Rights.** NESA papers, marking guidelines and sample answers are not hostable without NESA's written permission; the
+console requires its reference to be recorded and refuses to submit a NESA-sourced hosted file without it. The software
+records permission; it cannot obtain it.

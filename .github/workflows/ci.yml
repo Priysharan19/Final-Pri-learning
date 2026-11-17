@@ -360,6 +360,11 @@ jobs:
           # only, the server's own edition only; the seed equals the migration's.
           node server/test/resources-check.mjs 2>&1 | tee resources.log
           node tools/ci-check-counts.mjs verify platform/resources.log
+          # Resource publishing (ADR-0002 plan F3): off by default; on, draft → review →
+          # publish through two staff accounts with MFA, history, hosted PDFs and the
+          # region rule; and the schema-17 migration with its rollback (Postgres job).
+          node server/test/resource-publishing-check.mjs 2>&1 | tee resource-publishing.log
+          node tools/ci-check-counts.mjs verify platform/resource-publishing.log
           # Saved library resources (plan F2): the `resource-bookmark` sync kind,
           # account-scoped, capped, in the export and gone with the account.
           node server/test/resource-bookmark-sync-check.mjs 2>&1 | tee resource-bookmark.log

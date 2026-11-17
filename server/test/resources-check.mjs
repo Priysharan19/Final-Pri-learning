@@ -263,7 +263,7 @@ try {
       const file = join(dir, 'platform.db');
       const first = createPlatformDb(file);
       const names = () => first.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'resource%' ORDER BY name").all().map(r => r.name);
-      c.deq([names(), first.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value], [['resource_editions', 'resources'], String(SCHEMA_VERSION)], 'SQLite: the build creates both tables at its schema version');
+      c.deq([names(), first.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value], [['resource_assets', 'resource_editions', 'resource_revisions', 'resources'], String(SCHEMA_VERSION)], 'SQLite: the build creates both library tables (and, since schema 17, the publishing history\'s two) at its schema version');
       const row = first.prepare('SELECT * FROM resources WHERE id=?').get(SEED.id);
       c.deq(Object.values(row), resourceRowValues(SEED), 'SQLite: the seeded row equals RESOURCE_SEED');
       first.prepare("UPDATE resources SET title='kept' WHERE id=?").run(SEED.id);
