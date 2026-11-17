@@ -183,6 +183,16 @@ for (let i = 1; i <= 300; i++) {
   ok(near(dist(S2[0], S2[1]) / dist(S1[0], S1[1]), bg / sm) && near(dist(S2[0], S2[2]) / dist(S1[0], S1[2]), bg / sm), 'similar triangles: the second is the first scaled by big / small, on one scale');
   framed('similarTriangles', st);
 }
+for (let i = 1; i <= 200; i++) {
+  const rng = makeRng(i * 4177);
+  const tot = ri(rng, 20, 170), ab2 = D.angleBisector({ total: tot, shown: { total: `${tot}°`, half: '?' } }), g = ab2.geom;
+  const an = (o, p, q) => (Math.acos(dot(o, p, q) / (dist(o, p) * dist(o, q))) * 180) / Math.PI;
+  ok(near(an(g.O, g.P1, g.P2), tot, 1e-6) && near(an(g.O, g.P1, g.M), tot / 2, 1e-6) && near(an(g.O, g.M, g.P2), tot / 2, 1e-6), `angle bisector: ${tot}° split into two equal halves`);
+  framed('angleBisector', ab2);
+  const ab = ri(rng, 4, 40), pa = ab / 2 + ri(rng, 2, 30), pf = D.perpBisectorFigure({ ab, pa, shown: { ab: `${ab} cm`, pa: `${pa} cm`, pb: '?' } }), q = pf.geom;
+  ok(near(dist(q.P, q.A), dist(q.P, q.B)) && near(dist(q.P, q.A) / dist(q.A, q.B), pa / ab) && Math.abs(dot(q.M, q.P, q.B)) < 1e-6 * 1e3, 'perpendicular bisector: P is equidistant from A and B, to scale, and PM is perpendicular to AB');
+  framed('perpBisector', pf);
+}
 // ── the labels on a figure sit on the sides the question names (regression: ratio-from-3-4-5) ──
 {
   const { EXTRA_FORMS } = await import('../src/engine/generators/india-forms-extra.js');

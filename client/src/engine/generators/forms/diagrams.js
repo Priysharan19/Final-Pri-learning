@@ -505,3 +505,30 @@ export function similarTriangles({ small, big, shown = {} }) {
   void total;
   return cv.out('Two similar triangles', { T1, T2, small, big, scale: sc });
 }
+
+/** An angle of `total` degrees at O with its bisector dashed; labels for the whole angle and the half. */
+export function angleBisector({ total, shown = {} }) {
+  const cv = new Canvas();
+  const r = 130, O = [PAD + 20, H - PAD - 20], a = (total * Math.PI) / 180;
+  const P1 = [O[0] + r, O[1]], P2 = [O[0] + r * Math.cos(a), O[1] - r * Math.sin(a)], M = [O[0] + r * Math.cos(a / 2), O[1] - r * Math.sin(a / 2)];
+  cv.line(O[0], O[1], P1[0], P1[1]); cv.line(O[0], O[1], P2[0], P2[1]); cv.line(O[0], O[1], M[0], M[1], { dash: true, stroke: ACCENT });
+  const ar = 42;
+  cv.add(`<path d="M ${N(O[0] + ar)} ${N(O[1])} A ${ar} ${ar} 0 0 0 ${N(O[0] + ar * Math.cos(a))} ${N(O[1] - ar * Math.sin(a))}"/>`);
+  cv.label(O[0] - 10, O[1] + 14, 'O', { dx: -1, dy: 1 });
+  if (shown.total != null) cv.label(O[0] + ar + 18, O[1] - 14 * Math.sin(a / 2) - 4, lab(shown.total), { dx: 1, size: 12, accent: unk(shown.total) });
+  if (shown.half != null) cv.label(M[0] + 8, M[1] - 8, lab(shown.half), { dx: 1, dy: -1, size: 12, accent: unk(shown.half), anchor: 'start' });
+  return cv.out('An angle with its bisector', { O, P1, P2, M, total });
+}
+
+/** A segment AB with P on its perpendicular bisector, to scale (PA = pa, AB = ab); the midpoint M marked. */
+export function perpBisectorFigure({ ab, pa, shown = {} }) {
+  const cv = new Canvas();
+  const h = Math.sqrt(pa * pa - (ab / 2) * (ab / 2)), sc = Math.min((W - 2 * PAD) / ab, (H - 2 * PAD) / h), A = [W / 2 - (ab * sc) / 2, H - PAD - 6], B = [W / 2 + (ab * sc) / 2, H - PAD - 6], M = [W / 2, H - PAD - 6], P = [W / 2, H - PAD - 6 - h * sc];
+  cv.line(A[0], A[1], B[0], B[1]); cv.line(P[0], P[1], M[0], M[1], { dash: true }); cv.line(P[0], P[1], A[0], A[1], { stroke: ACCENT }); cv.line(P[0], P[1], B[0], B[1], { stroke: ACCENT });
+  cv.rightMark(M[0], M[1], 1, 0, 0, -1, 8);
+  cv.label(A[0] - 10, A[1] + 16, 'A', { dx: -1, dy: 1 }); cv.label(B[0] + 10, B[1] + 16, 'B', { dx: 1, dy: 1 }); cv.label(M[0] + 2, M[1] + 16, 'M', { dy: 1 }); cv.label(P[0], P[1] - 10, 'P', { dy: -1 });
+  if (shown.ab != null) cv.label(M[0] + (ab * sc) / 4, A[1] + 16, lab(shown.ab), { dy: 1, accent: unk(shown.ab) });
+  if (shown.pa != null) cv.label((P[0] + A[0]) / 2 - 8, (P[1] + A[1]) / 2, lab(shown.pa), { dx: -1, anchor: 'end', accent: unk(shown.pa) });
+  if (shown.pb != null) cv.label((P[0] + B[0]) / 2 + 8, (P[1] + B[1]) / 2, lab(shown.pb), { dx: 1, anchor: 'start', accent: unk(shown.pb) });
+  return cv.out('Point on the perpendicular bisector of a segment', { A, B, M, P, scale: sc, ab, pa });
+}

@@ -503,27 +503,33 @@ const CONSTR = () => [
   mk('bisect-angle', (rng, d) => {
     const x = 2 * ri(rng, 10, 85);
     return { p: `An angle of $${x}^\\circ$ is bisected with a compass and ruler. How large is each of the two equal parts, in degrees?`, v: x / 2, h: ['A bisector splits an angle into two equal parts.', 'Divide the angle by $2$.', 'The two parts add back to the whole angle.'], s: [{ h: 'Halve', d: `$${x}\\div 2$` }],
+      f: D.angleBisector({ total: x, shown: { total: `${x}°`, half: '?' } }),
       t: [{ value: x * 2, why: 'Bisecting halves the angle; it does not double it.' }], c: () => { for (let a = 1; a <= 90; a++) if (a + a === x) return a; return NaN; } };
   }),
   mk('midpoint-length', (rng, d) => {
     const m = ri(rng, 3, 40 * d + 20);
     return { p: `The perpendicular bisector of segment $AB$ of length $${2 * m}$ cm meets it at $M$. Find $AM$ in cm.`, v: m, h: ['The perpendicular bisector passes through the midpoint.', 'So $AM = MB$.', 'Halve the length of $AB$.'], s: [{ h: 'Halve', d: `$${2 * m}\\div 2$` }],
+      f: D.segmentLine({ points: [{ name: 'A', at: 0 }, { name: 'M', at: m }, { name: 'B', at: 2 * m }], labels: [{ from: 'A', to: 'B', text: `${2 * m} cm` }, { from: 'A', to: 'M', text: '?' }] }),
       t: [{ value: 2 * m, why: '$M$ is the midpoint, so $AM$ is half of $AB$.' }], c: () => { for (let x = 1; x <= 80 * d + 40; x++) if (x + x === 2 * m) return x; return NaN; } };
   }),
   mk('equal-distance', (rng, d) => {
     const pa = ri(rng, 4, 40 * d + 20), ab = ri(rng, 6, 60);
+    if (pa <= ab / 2 + 1) throw RETRY;
     return { p: `$P$ lies on the perpendicular bisector of a segment $AB$ of length $${ab}$ cm, and $PA = ${pa}$ cm. Find $PB$ in cm.`, v: pa, h: ['Every point on the perpendicular bisector is the same distance from both ends.', 'So $PA = PB$.', 'The length of $AB$ is not needed.'], s: [{ h: 'Property', d: '$PA = PB$' }],
+      f: D.perpBisectorFigure({ ab, pa, shown: { ab: `${ab} cm`, pa: `${pa} cm`, pb: '?' } }),
       t: [{ value: ab - pa, why: 'The distance from $P$ to each end is the same; it is not found by subtracting from $AB$.' }].filter(t => t.value !== pa && t.value > 0), c: () => pa };
   }),
   mk('corresponding-side', (rng, d) => {
     const [a, b, c] = distinct(rng, 3, 12 + 6 * d, 3);
     return { p: `Triangle $ABC$ is congruent to triangle $PQR$ with $A \\to P$, $B \\to Q$, $C \\to R$. If $AB = ${a}$ cm, $BC = ${b}$ cm and $CA = ${c}$ cm, find $QR$ in cm.`, v: b, h: ['Congruent triangles have equal corresponding sides.', '$QR$ corresponds to $BC$.', 'Read the correspondence from the order of the letters.'], s: [{ h: 'Correspondence', d: '$B \\to Q$ and $C \\to R$, so $BC \\to QR$' }],
+      f: D.triangle({ a: b, b: c, c: a, shown: { c: `${a} cm`, a: `${b} cm`, b: `${c} cm` } }),
       t: [{ value: a, why: '$QR$ corresponds to $BC$; $PQ$ corresponds to $AB$.' }], c: () => { const map = { A: 'P', B: 'Q', C: 'R' }; const len = { AB: a, BC: b, CA: c }; for (const k of Object.keys(len)) if (map[k[0]] + map[k[1]] === 'QR') return len[k]; return NaN; } };
   }),
   mk('perimeter-congruent', (rng, d) => {
     const [a, b, c] = distinct(rng, 3, 12 + 6 * d, 3);
     if (a + b <= c || a + c <= b || b + c <= a) throw RETRY;
     return { p: `Triangle $ABC$ with sides $${a}$ cm, $${b}$ cm and $${c}$ cm is congruent to triangle $PQR$. Find the perimeter of $PQR$ in cm.`, v: a + b + c, h: ['Congruent triangles are identical in size and shape.', 'So their perimeters are equal.', 'Add the sides of $ABC$.'], s: [{ h: 'Perimeter', d: `$${a} + ${b} + ${c}$` }],
+      f: D.triangle({ a: b, b: c, c: a, shown: { c: `${a} cm`, a: `${b} cm`, b: `${c} cm` } }),
       t: [{ value: a * b * c, why: 'The perimeter is the sum of the sides, not their product.' }], c: () => a + b + c };
   }),
   mk('angle-congruent', (rng, d) => {
@@ -616,6 +622,7 @@ const HERON = () => [
   mk('isosceles-height', (rng, d) => {
     const t = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25]][ri(rng, 0, 3)], k = ri(rng, 1, 4 + d);
     return { p: `An isosceles triangle has two equal sides of $${t[2] * k}$ cm and a base of $${2 * t[0] * k}$ cm. Find its height on the base, in cm.`, v: t[1] * k, h: ['The height from the apex bisects the base.', 'Half the base, the height and an equal side form a right triangle.', 'Use Pythagoras.'], s: [{ h: 'Half base', d: `$${t[0] * k}$` }],
+      f: D.triangle({ a: 2 * t[0] * k, b: t[2] * k, c: t[2] * k, shown: { a: `${2 * t[0] * k} cm`, b: `${t[2] * k} cm`, c: `${t[2] * k} cm` } }),
       t: [{ value: t[0] * k, why: 'That is half the base, not the height.' }], c: () => Math.round(Math.sqrt((t[2] * k) ** 2 - (t[0] * k) ** 2)) };
   }),
   mk('area-base-height', (rng, d) => {

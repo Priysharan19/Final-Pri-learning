@@ -251,6 +251,7 @@ const DATA = () => [
     const total = [20, 24, 30, 36, 40, 45, 60, 72][ri(rng, 0, 7)], part = ri(rng, 1, total - 1);
     void d;
     return { p: `In a survey of ${total} families in ${place(rng)}, ${part} own a bicycle. In a pie chart, what angle in degrees represents these families?`, v: r6((part / total) * 360), h: ['A pie chart is a full circle of $360^\\circ$.', 'Find the fraction of families.', 'Multiply by $360^\\circ$.'], s: [{ h: 'Angle', d: `$\\dfrac{${part}}{${total}}\\times 360$` }],
+      f: D.pieChart({ slices: [{ label: `${part}`, value: part, accent: true }, { label: 'others', value: total - part }] }),
       t: [{ value: r6((part / total) * 100), why: 'That is the percentage, not the angle.' }].filter(t => t.value !== r6((part / total) * 360)), c: () => r6((360 * part) / total) };
   }),
   mk('mean-from-total', (rng, d) => {
@@ -262,6 +263,7 @@ const DATA = () => [
     const [a, b] = distinct(rng, 10, 90 * d, 2);
     if (Math.abs(a - b) < 2) throw RETRY;
     return { p: `A bar chart shows ${a} students in Class VIII-A and ${b} in Class VIII-B. How many more students are in the larger class?`, v: Math.abs(a - b), h: ['Read both bar heights.', 'Subtract the smaller from the larger.', 'The answer is a positive number.'], s: [{ h: 'Subtract', d: `$${Math.max(a, b)} - ${Math.min(a, b)}$` }],
+      f: D.barChart({ bars: [{ label: 'VIII-A', value: a, show: true }, { label: 'VIII-B', value: b, show: true }] }),
       t: [{ value: a + b, why: 'The question asks for the difference, not the total.' }], c: () => Math.max(a, b) - Math.min(a, b) };
   }),
   mk('median-even', (rng, d) => {
@@ -276,6 +278,7 @@ const AREA_MORE = () => [
   mk('l-shape', (rng, d) => {
     const L = ri(rng, 8, 20 + 5 * d), W = ri(rng, 6, 15 + 3 * d), a = ri(rng, 2, L - 2), b = ri(rng, 2, W - 2);
     return { p: `A rectangular lawn $${L}$ m by $${W}$ m has a rectangular corner of $${a}$ m by $${b}$ m cut off for a path. Find the area of the remaining L-shaped lawn in square metres.`, v: L * W - a * b, h: ['Find the area of the whole rectangle.', 'Find the area of the cut-off corner.', 'Subtract.'], s: [{ h: 'Subtract', d: `$${L}\\times ${W} - ${a}\\times ${b}$` }],
+      f: D.rectangleFigure({ l: L, w: W, shown: { l: `${L} m`, w: `${W} m` }, cut: { a, b } }),
       t: [{ value: L * W + a * b, why: 'The corner is removed, so subtract its area.' }], c: () => { let n = 0; for (let i = 0; i < L; i++) for (let j = 0; j < W; j++) if (!(i >= L - a && j >= W - b)) n += 1; return n; } };
   }),
   mk('path-around', (rng, d) => {
