@@ -9,9 +9,9 @@
 // recomputes every figure independently, and compares it with what India
 // Progress and Home actually render:
 //
-//   · Questions answered, Chapters started, Chapters practised
-//   · Demonstrated accuracy — withheld ("Not enough evidence yet", with how
-//     many answers are still needed) below ten answers, the exact ratio above
+//   · Questions answered, Chapters started
+//   · Overall — withheld ("Not enough evidence yet", with how many answers
+//     are still needed) below ten answers, a word above; never a percentage
 //   · every row of the chapter table (attempts, correct)
 //   · Home's daily-goal ring and streak line
 //
@@ -108,7 +108,7 @@ export const flow = {
       const shown = await page.evaluate(() => {
         const v = sel => document.querySelector(`[data-metric="${sel}"] [data-value]`)?.getAttribute('data-value');
         return {
-          answered: Number(v('answered')), started: Number(v('started')), practised: Number(v('practised')),
+          answered: Number(v('answered')), started: Number(v('started')),
           accuracy: v('accuracy'),
           accuracyText: document.querySelector('[data-metric="accuracy"]')?.innerText || '',
           rows: [...document.querySelectorAll('tr[data-chapter]')].map(tr => ({
@@ -124,17 +124,17 @@ export const flow = {
       await check(`${label}: every attempt row is one the server completed — no device-only marks`,
         held.completions === L.answered, `server completions ${held.completions} vs attempt rows ${L.answered}`);
       await check(`${label}: Chapters started = chapters with evidence`, shown.started === L.started, `${shown.started} vs ${L.started}`);
-      await check(`${label}: Chapters practised = chapters with 5+ answers`, shown.practised === L.practised, `${shown.practised} vs ${L.practised}`);
       const drift = shown.rows.filter(r => (L.byCh[r.id]?.attempts || 0) !== r.attempts || (L.byCh[r.id]?.correct || 0) !== r.correct);
       await check(`${label}: every chapter row = the ledger for that chapter`, drift.length === 0, JSON.stringify(drift.slice(0, 3)));
       const thin = shown.rows.filter(r => r.attempts > 0 && r.attempts < 5);
-      await check(`${label}: a chapter with under five answers shows no percentage`, thin.every(r => /Too few answers/.test(r.text) && !/\d%/.test(r.text)), JSON.stringify(thin.slice(0, 2).map(r => r.text)));
+      await check(`${label}: a chapter with under five answers says "not enough evidence yet" and shows no percentage`, thin.every(r => /Not enough evidence yet/.test(r.text) && !/\d%/.test(r.text)), JSON.stringify(thin.slice(0, 2).map(r => r.text)));
+      await check(`${label}: nothing on the page is a percentage or a predicted mark`, !/\d%|predicted/i.test(await page.locator('[data-progress-evidence]').innerText()), 'a percentage or prediction was drawn');
       if (L.accuracy == null) {
-        await check(`${label}: accuracy is withheld below ten answers`, shown.accuracy === '' && /Not enough evidence yet/.test(shown.accuracyText), shown.accuracyText);
+        await check(`${label}: overall is withheld below ten answers`, /Not enough evidence yet/.test(shown.accuracyText), shown.accuracyText);
         const need = 10 - L.evidence;
         await check(`${label}: …and says how many answers it still needs`, new RegExp(`Shown after ${need} more answers?`).test(shown.accuracyText), shown.accuracyText);
       } else {
-        await check(`${label}: accuracy = correct / answers over the ledger`, Number(shown.accuracy) === L.accuracy, `${shown.accuracy} vs ${L.accuracy}`);
+        await check(`${label}: overall is a word once there are ten answers`, /Mostly right|Getting there|Still shaky/.test(shown.accuracyText), shown.accuracyText);
       }
       await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
       // Home's week card carries today's count (the goal ring it replaced was

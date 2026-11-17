@@ -1050,19 +1050,15 @@ async function run() {
 
     await step('progress · overview', '/progress', async () => {
       await goTo(page, BASE, '/progress');
-      // An India student's Progress (Progress.jsx → IndiaProgress.jsx): the
-      // chapter table is the page's content; the skeleton alone is not.
-      if (INDIA) await page.waitForSelector('.pg-table', { timeout: 20000 });
-      // An NSW student's Progress: the page's heading with its loading skeleton gone.
-      else await page.waitForFunction(() => !document.querySelector('main .skeleton') && document.querySelector('main h1'), null, { timeout: 20000 });
+      // Either edition's Progress (Progress.jsx → the shared evidence page): the
+      // topic table is the page's content; the skeleton alone is not.
+      await page.waitForSelector('.pg-table', { timeout: 20000 });
       await wait(page, 900);
     });
 
-    // The Australian Progress tabs (Priorities, Knowledge map) are never shown
-    // to an India student, so this walk cannot reach them (D2: V1 is India
-    // only). The India page's own control is a chapter's practise button.
-    if (!INDIA) indiaOnly('progress · a chapter opened in practice', 'the India chapter table (IndiaProgress.jsx) is not an NSW student\'s Progress');
-    else await step('progress · a chapter opened in practice', '/practice', async () => {
+    // Both editions' Progress is the shared evidence page (progress/EvidenceProgress.jsx):
+    // a topic's Practise button opens that topic in practice.
+    await step('progress · a topic opened in practice', '/practice', async () => {
       await click(page, '.pg-table .btn');
       await page.waitForSelector('.q-prompt, .qpage', { timeout: 30000 });
       await wait(page, 600);

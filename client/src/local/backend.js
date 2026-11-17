@@ -32,6 +32,7 @@ import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { nswIssuedLevels, nswIssuedForms, nswOfferedCell } from '../engine/nswOffer.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
+import { evidenceProgress } from '../engine/progressEvidence.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { HINT_RUNGS, rungLevelOf, nextRungAfter, markWeightAfter, helpUnitsAfter } from '../engine/hintLadder.js';
 import { contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
@@ -4698,6 +4699,12 @@ const routes = {
       examCount: exams.filter(e => e.finishedAt).length, inkCount, recent,
       streak: await streakFor(pid, now, timezoneOf(p))
     };
+  },
+  // What the student's own record supports, in words and bands (engine/progressEvidence.js):
+  // no mastery figure, percentage, predicted mark or band, for either edition.
+  'GET /progress/evidence': async () => {
+    const p = await requireProfile();
+    return evidenceProgress(await attemptsInOrder(p.id), { now: Date.now() });
   },
   'GET /badges': async () => {
     const p = await requireProfile();

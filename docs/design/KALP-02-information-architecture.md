@@ -76,8 +76,8 @@ becoming dead navigation.
   Review's bookmarked filter.
 - Progress.jsx is canonical. IndiaProgress.jsx and ProgressAustralia.jsx remain
   course-specific implementation branches behind it.
-- ProgressLegacy.jsx is not a release destination; it remains an implementation dependency
-  where still imported by the Australia wrapper rather than a second route.
+- The legacy Australian progress page is gone: both wrappers render the shared evidence page
+  (progress/EvidenceProgress.jsx).
 - Settings.jsx is canonical. SettingsLegacy.jsx is an implementation layer composed into
   Settings, not another destination.
 - Practice.jsx is canonical. PracticeBase.jsx is its heavy workspace implementation, not a
