@@ -1339,11 +1339,11 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
 /* ── UI3 · Answer first on phones: the hint ladder folds into one row ── */
 .in-hintrow { display: none; }
 .ws-more { position: relative; }
-.ws-more > summary { list-style: none; cursor: pointer; min-height: 44px; display: inline-flex; align-items: center; }
+.ws-more > summary { list-style: none; min-height: 44px; }
 .ws-more > summary::-webkit-details-marker { display: none; }
 @media (max-width: 560px) {
   .in-hintrow {
-    display: flex; flex-direction: column; gap: 8px; min-height: 52px;
+    display: grid; gap: 8px; min-height: 52px;
     padding: 10px 12px; border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2);
   }
   .in-hintrow-head { display: flex; align-items: center; gap: 10px; }
@@ -1364,7 +1364,7 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
     animation: in-hs-rise var(--in-dur-3) var(--in-ease-out);
   }
   .in-hintsheet .hints-block { display: grid; gap: 8px; margin: 0 0 12px; }
-  .in-hintsheet-close { width: 100%; min-height: 44px; }
+  .in-hintsheet-close { width: 100%; }
   .ws-more-menu { position: absolute; left: 0; bottom: 100%; z-index: 5; width: 220px; padding: 6px; border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); }
   .ws-more-menu .btn { width: 100%; min-height: 44px; white-space: normal; }
 }
