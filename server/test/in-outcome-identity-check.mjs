@@ -77,13 +77,23 @@ try {
   const sealed = await sealedOf(r.data.question.id);
   c.ok(sealed._curriculum?.board === 'CBSE' && sealed._curriculum.class === 10 && sealed._curriculum.chapterId === 'c10-arithmetic-progressions' && sealed._curriculum.syllabusVersion === 'CBSE-2026-27' && sealed._curriculum.outcomes.length >= 1, 'it is sealed with board, class, chapter, outcome and the class-10 syllabus year');
   c.ok(!keysOf(r.data).some(k => ['_curriculum', 'curriculum', 'outcomes', 'chapterId', 'syllabusVersion'].includes(k)), 'and the device is not sent the identity');
-  // A forged identity in the submit body is not read.
+  const rightAnswer = sq => (sq.answerType === 'mcq' ? String(sq.answer.correctIndex)
+    : sq.answerType === 'numeric' ? (sq.answer.canonicalInput || String(sq.answer.value))
+      : sq.answerType === 'expression' ? sq.answer.expr
+        : sq.answerType === 'point' ? `(${sq.answer.x}, ${sq.answer.y})`
+          : sq.answerType === 'set' ? sq.answer.values.join(', ') : `${sq.answer.a}:${sq.answer.b}`);
+  // A forged identity in the submit body is refused outright and records nothing.
+  const forged = await h.request(`/v1/practice/${r.data.question.id}/submit`, { method: 'POST', jar: a.jar, headers: { 'Idempotency-Key': 'in-outcome-forged' },
+    body: { submissionId: 'in-outcome-forged', answer: '999999', mode: 'typed', curriculum: { board: 'FORGED', class: 1, chapterId: 'forged' }, chapterId: 'forged', outcomes: [{ code: 'forged#1' }] } });
+  c.eq(forged.status, 400, 'a submit that carries an identity of its own is refused');
+  c.deq(await eventsOf(r.data.question.id, 'graded-attempt'), [], 'and records no attempt');
+  // A valid submit records the identity the SERVER sealed.
   const sub = await h.request(`/v1/practice/${r.data.question.id}/submit`, { method: 'POST', jar: a.jar, headers: { 'Idempotency-Key': 'in-outcome-sub-1' },
-    body: { submissionId: 'in-outcome-sub-1', answer: '999999', mode: 'typed', curriculum: { board: 'FORGED', class: 1, chapterId: 'forged' }, chapterId: 'forged', outcomes: [{ code: 'forged#1' }] } });
-  c.ok([200, 201, 400, 422].includes(sub.status), `the submit is answered (${sub.status})`);
+    body: { submissionId: 'in-outcome-sub-1', answer: rightAnswer(sealed), mode: 'typed' } });
+  c.eq(sub.status, 200, 'a valid submit is graded');
   const graded = await eventsOf(r.data.question.id, 'graded-attempt');
-  if (graded.length) c.deq(graded[0].curriculum, sealed._curriculum, 'the graded attempt records the identity the SERVER sealed, not the forged one');
-  else c.ok(sub.status >= 400, 'a refused forged body records no attempt');
+  c.eq(graded.length, 1, 'one graded attempt is recorded (the right answer resolves it)');
+  c.deq(graded[0].curriculum, sealed._curriculum, 'the graded attempt records exactly the identity the SERVER sealed');
 
   let r2 = { status: 0 };
   for (const ch of IN_CHAPTERS.filter(x => x.grade === 9)) for (const cv of ch.covers) {

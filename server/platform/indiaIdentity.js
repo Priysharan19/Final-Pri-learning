@@ -66,7 +66,10 @@ export function indiaQuestionIdentity(q, generator = q?._generator ?? q?.subtopi
   const placed = COVERS_BY_GENERATOR.get(generator);
   if (placed?.length) {
     const difficulty = Number(q.difficulty);
-    const hit = placed.find(p => p.cover.diff?.includes(difficulty)) || placed[0];
+    // The cover that serves this difficulty; failing that the nearest one below it (then the lowest).
+    const nearest = [...placed].filter(p => Array.isArray(p.cover.diff) && p.cover.diff.length)
+      .sort((x, y) => Math.abs(Math.min(...x.cover.diff.map(d => Math.abs(d - difficulty))) - 0) - Math.abs(Math.min(...y.cover.diff.map(d => Math.abs(d - difficulty))) - 0))[0];
+    const hit = placed.find(p => p.cover.diff?.includes(difficulty)) || nearest || placed[0];
     const indexes = (hit.cover.dp || []).filter(i => Number.isInteger(i) && text(hit.chapter.dotpoints?.[i]));
     const topics = indexes.map(i => text(hit.chapter.dotpoints[i]));
     // The learning outcomes the curriculum itself states for the chapter (its dot points), coded
