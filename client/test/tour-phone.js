@@ -167,6 +167,26 @@ export const flow = {
     await check('it sits clear of the bottom navigation bar', nextBtn?.clearOfBar === true, JSON.stringify(nextBtn));
     await check('and inside the screen', nextBtn?.insideScreen === true, JSON.stringify(nextBtn));
 
+    // ── 7b · answer first: the writing surface is in the first screen, and the
+    // hint row opens a rung exactly as the ladder button did (UI3) ───────────
+    const surfaceTop = await page.evaluate(() => {
+      const el = document.querySelector('.mcq, .ws-tools ~ .editor, .ws-tools + *, .ws-work canvas, .ws-work textarea, .ws-work input[type="text"], .ws-work [contenteditable], .ws-work .ink-surface');
+      return el ? { top: Math.round(el.getBoundingClientRect().top), vh: innerHeight } : null;
+    });
+    await check('at 390×844 the writing surface starts within the first screen',
+      !!surfaceTop && surfaceTop.top < surfaceTop.vh - 120, JSON.stringify(surfaceTop));
+    await check('the hint ladder is one row, not four cards, on a phone',
+      await page.locator('[data-hint-row]').count() === 1 && await page.locator('section.in-ladder:visible').count() === 0);
+    const hintReqs = [];
+    page.on('request', r => { if (r.method() === 'POST' && /\/practice\/[^/]+\/hint$/.test(r.url())) hintReqs.push(r.postData()); });
+    await page.locator('[data-hint-row] [data-hint-rung-open]').click();
+    await page.waitForSelector('.in-hintsheet [data-hint-shown]', { timeout: 15000 }).catch(() => null);
+    await check('opening a hint through the row sends the same request as the ladder button',
+      hintReqs.length === 1 && JSON.parse(hintReqs[0] || '{}').rung === 'nudge', JSON.stringify(hintReqs));
+    await check('and its text appears in the hint sheet', await page.locator('.in-hintsheet [data-hint-shown="nudge"]').count() === 1);
+    await page.keyboard.press('Escape');
+    await check('Escape closes the sheet', await page.locator('.in-hintsheet').count() === 0);
+
     // ── 8 · answering targets a finger can land on ───────────────────────────
     // The tabs that switch between typing, writing and photographing an answer,
     // the pen and eraser, and the hint bulbs were 28–36 px on a device whose

@@ -3263,6 +3263,7 @@ export default {
   "inst.hint": "संकेत",
   "inst.reset": "साफ़ करें",
   "inst.ladderHead": "संकेत सीढ़ी · {total} में से {used} इस्तेमाल",
+  "inst.allHints": "सभी संकेत",
   "inst.rungCost": "अंकों का −{percent}%",
   "inst.rungEnds": "प्रयास समाप्त करता है",
   "inst.rungLocked": "पिछला पायदान खुलने तक बंद",

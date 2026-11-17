@@ -3206,6 +3206,7 @@ export default {
   "inst.hint": "Hint",
   "inst.reset": "Reset",
   "inst.ladderHead": "Hint ladder · {used} of {total} used",
+  "inst.allHints": "All hints",
   "inst.rungCost": "−{percent}% of marks",
   "inst.rungEnds": "ends the attempt",
   "inst.rungLocked": "locked until the rung before it is open",
