@@ -3229,7 +3229,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 : t('verdict.rungLabel', { n: i + 1, rung: t(RUNG_KEY[nextRung]), percent: Math.round(markWeightAfter(hintLevel + 1) * 100) });
               const cost = solution ? t('inst.rungEnds') : t('inst.rungCost', { percent: Math.round(RUNG_COST[nextRung] * 100) });
               return (
-                <button type="button" className={`in-rung is-next in-hintrow-next${solution && solutionRungArmed ? ' is-armed' : ''}`}
+                <button type="button" className="btn btn-ghost in-hintrow-next"
                   data-hint-rung-open={nextRung} disabled={busy} aria-label={label} onClick={getHint}>
                   <b>{solution && solutionRungArmed ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY[nextRung])}</b>
                   <small>{cost}</small>

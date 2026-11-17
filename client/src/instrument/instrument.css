@@ -1355,10 +1355,7 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
     min-height: 44px; padding: 0 4px; border: 0; background: none; cursor: pointer;
     font: 500 13px var(--in-ui); color: var(--in-tx); text-decoration: underline;
   }
-  .in-hintrow-next {
-    display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 0 14px;
-    border: 0; border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); color: var(--in-tx); font: 500 14px var(--in-ui);
-  }
+  .in-hintrow-next { width: 100%; min-height: 44px; justify-content: space-between; }
   .in-hintrow-next small { font: 500 11px var(--in-mono); color: var(--in-tx-3); }
   .in-hintsheet-scrim {
     position: fixed; inset: 0; z-index: 60; border: 0; padding: 0; background: rgba(0, 0, 0, 0.4);
