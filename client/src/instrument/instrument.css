@@ -1488,3 +1488,9 @@ html[data-pushed] .shell .main { transform: scale(var(--in-push-scale)); transfo
 /* A line the engine marked wrong: the reading is one tap from a correction. */
 .ink-line-recheck { font-size: 12.5px; }
 html.ui-instrument .ink-correct-btn.is-emph { background: var(--in-l1); color: var(--in-tx); box-shadow: 0 0 0 1.5px var(--in-tx-2); font-weight: 600; }
+
+/* Marked work: the "See another method" disclosure is a quiet row with a real target and a visible focus ring. */
+.solution-panel > summary { display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; cursor: pointer; list-style: none; font: 500 14px var(--in-ui); color: var(--in-tx); border: 1px solid var(--in-edge); border-radius: 6px; background: var(--in-l1); }
+.solution-panel > summary::-webkit-details-marker { display: none; }
+.solution-panel > summary:focus-visible { outline: 2px solid var(--in-action); outline-offset: 2px; }
+.solution-panel[open] > summary { margin-bottom: 12px; }
