@@ -166,6 +166,8 @@ for (const m of ["I'm stuck on step 2", 'I feel ill, can you help with 3x + 5?',
 for (const t of ["I'm your friend and I really care about you.", "I'll always be here for you, more than anyone.", "I’m your best friend", 'I care about you so much', "You're the only one I talk to"]) {
   ok(safetyOutputIssues(t).length > 0, `relational reply refused through a contraction: ${t}`);
 }
+for (const t of ["You're the only one who understands me", 'I care about you to the moon', 'I love you more than anyone']) ok(safetyOutputIssues(t).length > 0, `relational reply refused (#1001 review 2): ${t}`);
+for (const t of ['This matters more than anyone realises: check the sign.', 'I see it more than anyone could explain it: look at line 2.', 'I care about you to check each step.']) ok(safetyOutputIssues(t).length === 0, `ordinary tutoring passes (#1001 review 2): ${t}`);
 for (const t of ['Remember, more than anyone else, the gradient matters.', 'You are the only one who can solve this, so try the next step.', 'I care about you getting this right: check the sign.']) {
   ok(safetyOutputIssues(t).length === 0, `ordinary tutoring passes (#1001 review): ${t}`);
 }

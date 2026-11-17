@@ -134,9 +134,9 @@ const OUTPUT = [
   /\bi (am|m) your (friend|buddy|bestie|best friend|bff|girlfriend|boyfriend|companion|teacher friend)\b/, /\b(we are|were) (friends|best friends)\b/,
   /\bi (love|miss|adore) you\b/, /\bi (will|ll) (always )?(be (here|there|with you)|never leave you)\b/, /\byou can (always )?(rely|depend|count) on me\b/,
   /\byou (dont|do not) need (anyone|anybody|your (friends|parents|family))\b/,
-  /\bi (really |truly |do |so )?(care (about|for)|love) you\b(?! (getting|get|to|understand|solv|learn|work|practi))/,
-  /\b(i|me) [a-z ]{0,30}more than anyone\b|\bmore than anyone (else )?(does|could|ever|in your life)\b/,
-  /\b(only|just) one (i|you) (talk|can talk|trust) to\b|\byou are the only one i\b/, /\bi (will|am) always (be )?(here|there) for you\b/, /\b(only|just) i (understand|care)\b/, /\bcome back (to me )?(whenever|when) you (feel|are) (sad|lonely|alone|down)\b/,
+  /\bi (really |truly |do |so )?(care (about|for)|love) you\b(?! (getting|get|to (solve|get|understand|learn|work|practi|check|try|find)|understand|solv|learn|work|practi))/,
+  /\bi (love|care about|like|need|miss|want|understand) you [a-z ]{0,20}more than anyone\b|\bmore than anyone (else )?(ever (could|will|has)|in your life)\b/,
+  /\b(only|just) one (i|you) (talk|can talk|trust) to\b|\byou are the only one i\b|\byou are the only one who (understands|gets|knows|cares about) me\b|\bi am the only one who (understands|gets|cares about) you\b/, /\bi (will|am) always (be )?(here|there) for you\b/, /\b(only|just) i (understand|care)\b/, /\bcome back (to me )?(whenever|when) you (feel|are) (sad|lonely|alone|down)\b/,
   // personal questions
   /\b(what is|whats|tell me|share) your (full )?(name|age|address|phone number|phone|email|school|city|password|birthday)\b/, /\bwhere do you (live|study|go to school)\b/,
   /\b(send|share|show) me (a |your )?(photo|picture|selfie|video|number|address)\b/, /\b(whatsapp|instagram|snapchat|telegram|discord) (me|number|id|handle)\b/,
