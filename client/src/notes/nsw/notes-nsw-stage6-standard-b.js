@@ -184,16 +184,16 @@ export default {
       },
       {
         question: 'Find the present value of an annuity of $\\$2000$ a year for $5$ years at $5\\%$ p.a.',
-        steps: ['$M=2000$, $r=0.05$, $n=5$.', '$PV=2000\\times\\dfrac{1-1.05^{-5}}{0.05}$.', '$1-1.05^{-5}=0.216474$ and $\\dfrac{0.216474}{0.05}=4.32948$.', '$2000\\times4.32948=8658.95$.'],
+        steps: ['$M=2000$, $r=0.05$, $n=5$.', '$PV=2000\\times\\dfrac{1-1.05^{-5}}{0.05}$.', '$1-1.05^{-5}=0.216474$ and $\\dfrac{0.216474}{0.05}\\approx4.329477$.', '$2000\\times4.329477\\approx8658.95$.'],
         answer: '$\\$8658.95$',
-        working: '\\begin{aligned}PV&=2000\\times\\dfrac{1-1.05^{-5}}{0.05}\\\\&=2000\\times4.32948\\\\&=8658.95\\end{aligned}',
+        working: '\\begin{aligned}PV&=2000\\times\\dfrac{1-1.05^{-5}}{0.05}\\\\&\\approx2000\\times4.329477\\\\&\\approx8658.95\\end{aligned}',
         verify: { kind: 'value', expr: '2000*(1-1.05^-5)/0.05', answer: '8658.953341261646' }
       },
       {
         question: 'Natalie saves $\\$500$ at the end of every quarter for $2$ years at $8\\%$ p.a. compounded quarterly. Find the future value.',
-        steps: ['Quarterly rate: $r=0.08\\div4=0.02$.', 'Number of payments: $n=2\\times4=8$.', '$FV=500\\times\\dfrac{1.02^{8}-1}{0.02}$.', '$\\dfrac{1.02^8-1}{0.02}=8.58297$, so $FV=4291.48$.'],
+        steps: ['Quarterly rate: $r=0.08\\div4=0.02$.', 'Number of payments: $n=2\\times4=8$.', '$FV=500\\times\\dfrac{1.02^{8}-1}{0.02}$.', '$\\dfrac{1.02^8-1}{0.02}\\approx8.582969$, so $FV\\approx4291.48$.'],
         answer: '$\\$4291.48$',
-        working: '\\begin{aligned}FV&=500\\times\\dfrac{1.02^{8}-1}{0.02}\\\\&=500\\times8.58297\\\\&=4291.48\\end{aligned}',
+        working: '\\begin{aligned}FV&=500\\times\\dfrac{1.02^{8}-1}{0.02}\\\\&\\approx500\\times8.582969\\\\&\\approx4291.48\\end{aligned}',
         verify: { kind: 'value', expr: '500*(1.02^8-1)/0.02', answer: '4291.484525056643' }
       }
     ],
@@ -389,7 +389,7 @@ export default {
         verify: { kind: 'values', pairs: [['10+6', '16'], ['6+3+7', '16'], ['10+8', '18'], ['7+8', '15']] }
       },
       {
-        question: 'In the same network, $9$ units arrive at $A$ and $7$ leave along $A\\to T$. How much flows along $A\\to B$, and what is the flow into $T$ if $B\\to T$ is full?',
+        question: 'In the same network, $S\\to B$ carries its full $6$ units, $9$ units arrive at $A$ and $7$ leave along $A\\to T$. How much flows along $A\\to B$, and what is the flow into $T$ if $B\\to T$ is full?',
         steps: ['Flow in equals flow out at $A$: $9=7+x$, so $x=2$.', 'The inflow at $B$ is $6+2=8$, which equals the capacity of $B\\to T$.', 'Flow into $T$: $7+8=15$, matching the minimum cut.'],
         answer: '$2$ units along $A\\to B$; the flow into $T$ is $15$.',
         working: '\\begin{aligned}9&=7+x\\\\x&=2\\\\\\text{into }T&=7+8=15\\end{aligned}',
@@ -416,7 +416,7 @@ export default {
     prereqs: ['mst-12-s2-06'],
     concepts: [
       { title: 'The activity network', body: 'Each activity is an edge from the event where it starts to the event where it ends, labelled with its duration. An activity cannot start until every activity leading into its start has finished.' },
-      { title: 'Earliest start times', body: 'Work forward from the start. The earliest time at an event is the largest total along any route into it, because everything must be done first. Here the earliest finish is $11$ days.' },
+      { title: 'Earliest start times', body: 'Work forward from the start. The earliest time at an event is the largest total along any route into it, because everything must be done first. In the example below the earliest finish is $11$ days.' },
       { title: 'The critical path', body: 'The critical path is the longest route from start to finish. Its length is the minimum completion time, and a delay to any critical activity delays the whole project.' },
       { title: 'Latest times and float', body: 'Work backward from the finish to get the latest time at each event. The float of an activity is the latest finish minus the earliest start minus its duration: how long it can be delayed without delaying the project. Critical activities have zero float.' }
     ],
@@ -471,7 +471,7 @@ export default {
       'When a duration is changed, the critical path is re-checked, since a second path can become critical.'
     ],
     diagrams: [
-      { title: 'The critical path $A,C,E$', spec: { kind: 'network', directed: true, nodes: [{ id: '1', x: 0, y: 1 }, { id: '2', x: 2, y: 2 }, { id: '3', x: 2, y: 0 }, { id: '4', x: 4, y: 1 }, { id: '5', x: 6, y: 1 }], edges: [{ from: '1', to: '2', weight: 3, label: 'A' }, { from: '1', to: '3', weight: 4, label: 'B' }, { from: '2', to: '4', weight: 5, label: 'C' }, { from: '3', to: '4', weight: 2, label: 'D' }, { from: '4', to: '5', weight: 3, label: 'E' }], path: ['1', '2', '4', '5'] }, note: 'The highlighted route $A,C,E$ takes $3+5+3=11$ days. The route $B,D,E$ takes $9$ days, so $B$ and $D$ each have $2$ days of float.' }
+      { title: 'The critical path $A,C,E$', spec: { kind: 'network', directed: true, nodes: [{ id: '1', x: 0, y: 1 }, { id: '2', x: 2, y: 2 }, { id: '3', x: 2, y: 0 }, { id: '4', x: 4, y: 1 }, { id: '5', x: 6, y: 1 }], edges: [{ from: '1', to: '2', weight: 3, label: 'A\\,(3)' }, { from: '1', to: '3', weight: 4, label: 'B\\,(4)' }, { from: '2', to: '4', weight: 5, label: 'C\\,(5)' }, { from: '3', to: '4', weight: 2, label: 'D\\,(2)' }, { from: '4', to: '5', weight: 3, label: 'E\\,(3)' }], path: ['1', '2', '4', '5'] }, note: 'The highlighted route $A,C,E$ takes $3+5+3=11$ days. The route $B,D,E$ takes $9$ days, so $B$ and $D$ each have $2$ days of float.' }
     ],
     check: [
       { question: 'Two paths take $4+6+2$ days and $5+3+3$ days. What is the minimum completion time?', answer: '$12$ days', verify: { kind: 'values', pairs: [['4+6+2', '12'], ['5+3+3', '11']] } },
@@ -571,7 +571,7 @@ export default {
       { front: 'What range does a probability take?', back: 'From $0$ (impossible) to $1$ (certain).' },
       { front: '$P(\\text{at least one})$ in terms of the complement?', back: '$1-P(\\text{none})$.' },
       { front: 'Do probabilities along a path in a tree add or multiply?', back: 'Multiply along a path; add the end results of different paths for "or".' },
-      { front: 'What happens to the second-stage probabilities when sampling without replacement?', back: 'The numerator and the denominator change, because one item has been taken out.' },
+      { front: 'What happens to the second-stage probabilities when sampling without replacement?', back: 'The denominator always falls by one, and the numerator falls only if the item taken was the type you want.' },
       { front: 'Why can relative frequency differ from theoretical probability?', back: 'Chance variation: fewer trials means a bigger difference. More trials usually brings them closer.' }
     ],
     mistakes: [

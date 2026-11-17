@@ -88,7 +88,7 @@ export default {
     prereqs: ['mav-11-01'],
     concepts: [
       { title: 'Translations', body: 'Adding $k$ outside, $y=f(x)+k$, moves the graph $k$ up. Replacing $x$ by $x-h$ moves it $h$ to the right. The shift in the bracket goes the opposite way to the sign, so $y=(x-3)^2$ moves $y=x^2$ three units right.' },
-      { title: 'Dilations', body: '$y=af(x)$ stretches vertically by a factor of $a$ and points on the $x$-axis stay fixed. $y=f(bx)$ squeezes horizontally by a factor of $\\tfrac{1}{b}$, and points on the $y$-axis stay fixed.' },
+      { title: 'Dilations', body: '$y=af(x)$ dilates vertically by a factor of $|a|$, a stretch when $|a|>1$ and a squeeze when $0<|a|<1$; points on the $x$-axis stay fixed. $y=f(bx)$ dilates horizontally by a factor of $\\tfrac{1}{|b|}$, a squeeze when $|b|>1$; points on the $y$-axis stay fixed.' },
       { title: 'Reflections', body: '$y=-f(x)$ reflects in the $x$-axis and $y=f(-x)$ reflects in the $y$-axis. $y=-(x+1)^2+4$ is $y=x^2$ reflected, then moved $1$ left and $4$ up.' },
       { title: 'Applying them to a point', body: 'To move a point $(x,y)$ on $y=f(x)$ to its image on $y=af(x-h)+k$, the new $x$ is $x+h$ and the new $y$ is $ay+k$. Do the stretch before the shift.' }
     ],
@@ -296,7 +296,7 @@ export default {
     concepts: [
       { title: 'Gradient as a limit', body: 'The gradient of the secant through $(x,f(x))$ and $(x+h,f(x+h))$ is $\\dfrac{f(x+h)-f(x)}{h}$. As $h\\to0$ the secant becomes the tangent, and the limit is the derivative $f\'(x)$. This is differentiation from first principles.' },
       { title: 'The power rule', body: 'For $y=x^n$, $\\dfrac{dy}{dx}=nx^{n-1}$. Constants multiply through and a sum is differentiated term by term, so $y=4x^3-6x^2+5x-7$ has $y\'=12x^2-12x+5$. Write roots and reciprocals as powers first: $\\dfrac{1}{x^2}=x^{-2}$.' },
-      { title: 'Tangents and normals', body: 'The tangent at $x=a$ passes through $(a,f(a))$ with gradient $f\'(a)$. The normal is perpendicular, so its gradient is $-\\dfrac{1}{f\'(a)}$. Use $y-y_1=m(x-x_1)$ for both.' }
+      { title: 'Tangents and normals', body: 'The tangent at $x=a$ passes through $(a,f(a))$ with gradient $f\'(a)$. The normal is perpendicular, so its gradient is $-\\dfrac{1}{f\'(a)}$. Use $y-y_1=m(x-x_1)$ for both. If $f\'(a)=0$ the tangent is horizontal and the normal is the vertical line $x=a$.' }
     ],
     definitions: [
       { term: 'Derivative', meaning: 'The function $f\'(x)$ giving the gradient of $y=f(x)$ at each point; the limit of the secant gradient as $h\\to0$.' },
@@ -386,7 +386,7 @@ export default {
     mistakes: [
       { wrong: '$\\log(x+y)=\\log x+\\log y$.', right: 'The product law is $\\log(xy)=\\log x+\\log y$. There is no law for a logarithm of a sum.' },
       { wrong: 'Keeping both solutions of $x^2-2x-8=0$ when it came from $\\log_2x+\\log_2(x-2)=3$.', right: '$x=-2$ makes $\\log_2x$ undefined, so only $x=4$ is valid.' },
-      { wrong: '$\\dfrac{\\log_a x}{\\log_a y}=\\log_a x-\\log_a y$.', right: 'A quotient of logarithms is not the logarithm of a quotient: $\\log_a\\dfrac{x}{y}=\\log_ax-\\log_ay$ only.' }
+      { wrong: '$\\dfrac{\\log_a x}{\\log_a y}=\\log_a x-\\log_a y$.', right: '$\\dfrac{\\log_a x}{\\log_a y}$ is a quotient of logarithms and cannot be simplified. The quotient law is $\\log_a\\dfrac{x}{y}=\\log_ax-\\log_ay$.' }
     ],
     examples: [
       {
@@ -570,7 +570,7 @@ export default {
       { title: 'Arithmetic sequences', body: 'Consecutive terms differ by a common difference $d$. The $n$th term is $T_n=a+(n-1)d$ and the sum of the first $n$ terms is $S_n=\\dfrac n2\\big(2a+(n-1)d\\big)=\\dfrac n2(a+l)$ where $l$ is the last term.' },
       { title: 'Geometric sequences', body: 'Consecutive terms are multiplied by a common ratio $r$. The $n$th term is $T_n=ar^{n-1}$, and the sum is $S_n=\\dfrac{a(r^n-1)}{r-1}$ for $r\\neq1$. Use whichever form has a positive denominator.' },
       { title: 'Limiting sum', body: 'When $|r|<1$ the terms shrink and the sum approaches $S_\\infty=\\dfrac{a}{1-r}$. The series $12+6+3+\\cdots$ has $a=12$, $r=\\tfrac12$, so $S_\\infty=24$. If $|r|\\ge1$ there is no limiting sum.' },
-      { title: 'Recognising the type', body: 'Test the pattern: a constant difference is arithmetic, a constant ratio is geometric. Applications such as regular savings, depreciation and repeated percentage change are geometric; fixed increments are arithmetic.' }
+      { title: 'Recognising the type', body: 'Test the pattern: a constant difference is arithmetic, a constant ratio is geometric. Applications such as the growth of a single deposit, depreciation and repeated percentage change are geometric, and regular savings are a geometric series; fixed increments are arithmetic.' }
     ],
     definitions: [
       { term: 'Sequence', meaning: 'An ordered list of numbers, $T_1,T_2,T_3,\\ldots$.' },
@@ -951,7 +951,7 @@ export default {
       { front: 'What are $r$ and $n$ for $6\\%$ p.a. compounded monthly for $3$ years?', back: '$r=0.005$ and $n=36$.' },
       { front: 'How does depreciation differ from compound growth?', back: 'The factor is $(1-r)$, not $(1+r)$.' },
       { front: 'When is a loan repaid?', back: 'When the balance after the last repayment is $0$.' },
-      { front: 'Why does a larger $n$ in compound interest give more than simple interest?', back: 'Interest is earned on earlier interest, so growth is geometric, not linear.' }
+      { front: 'Why does compound interest exceed simple interest after more than one period?', back: 'Interest is earned on earlier interest, so growth is geometric, not linear.' }
     ],
     mistakes: [
       { wrong: 'Using $r=0.06$ and $n=3$ for $6\\%$ p.a. compounded monthly over $3$ years.', right: 'Match the period: $r=0.005$ and $n=36$.' },

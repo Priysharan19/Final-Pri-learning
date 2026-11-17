@@ -242,7 +242,7 @@ export default {
       'Money is given to two decimal places with the dollar sign, and a budget answer says whether it is a surplus or a deficit.'
     ],
     diagrams: [
-      { title: 'Simple interest rises in equal steps', spec: { kind: 'sequence', type: 'arithmetic', first: 6000, step: 312, n: 6 }, note: 'Each year adds $6000\\times0.052=\\$312$. After $2.5$ years the interest is $\\$780$.' }
+      { title: 'The balance with simple interest rises in equal steps', spec: { kind: 'sequence', type: 'arithmetic', first: 6000, step: 312, n: 6 }, note: 'Each year adds $6000\\times0.052=\\$312$.' }
     ],
     check: [
       { question: 'A $\\$80$ pair of shoes has $15\\%$ off. Find the sale price.', answer: '$\\$68.00$', verify: { kind: 'value', expr: '80*0.85', answer: '68' } },
@@ -328,7 +328,7 @@ export default {
     ],
     formulas: [
       { label: 'Time difference from longitude', tex: '\\Delta t\\ \\text{(hours)}=\\dfrac{\\Delta\\text{longitude}}{15}' },
-      { label: 'Arrival in local time', tex: 't_{\\text{local}}=t_{\\text{depart}}+\\text{flight time}-\\text{time difference}', note: 'The time difference is destination ahead of departure; use $+$ if the destination is behind.' }
+      { label: 'Arrival in local time', tex: 't_{\\text{local}}=t_{\\text{depart}}+\\text{flight time}-\\text{time difference}', note: 'Here the time difference is how many hours the destination is behind the departure place, so it is subtracted. If the destination is ahead, add it instead.' }
     ],
     points: [
       { front: 'Degrees of longitude per hour', back: '$15^{\\circ}$, because $360\\div24=15$.' },
@@ -364,7 +364,7 @@ export default {
       'Times are written in clock form, such as $11{:}50$ am, with the time zone named, and daylight saving is only applied if the question says so.'
     ],
     diagrams: [
-      { title: 'Two cities on a line of longitude', spec: { kind: 'numberLine', min: 110, max: 155, points: [{ value: 116, label: '\\text{Perth }116^{\\circ}\\text{E}' }, { value: 151, label: '\\text{Sydney }151^{\\circ}\\text{E}' }] }, note: 'The cities are $35^{\\circ}$ apart. At $15^{\\circ}$ an hour that is $2$ h $20$ min of solar time.' }
+      { title: 'Two cities by longitude', spec: { kind: 'numberLine', min: 110, max: 155, points: [{ value: 116, label: '\\text{Perth }116^{\\circ}\\text{E}' }, { value: 151, label: '\\text{Sydney }151^{\\circ}\\text{E}' }] }, note: 'The cities are $35^{\\circ}$ apart. At $15^{\\circ}$ an hour that is $2$ h $20$ min of solar time.' }
     ],
     check: [
       { question: 'It is $8$ pm in Sydney (UTC+10). What is the hour in Perth (UTC+8) on the $24$-hour clock?', answer: '$18{:}00$, which is $6$ pm', verify: { kind: 'value', expr: '20-2', answer: '18' } },
@@ -376,7 +376,7 @@ export default {
     summary: 'A network is a set of vertices joined by weighted edges. You find the shortest path between two vertices, the minimum spanning tree that joins every vertex for the least total weight, and use degrees to decide whether a trail can cover every edge once.',
     prereqs: ['mst-11-04'],
     concepts: [
-      { title: 'Shortest path', body: 'Start at the first vertex with distance $0$. Label each neighbour with the best total found so far, always extending from the unlabelled vertex with the smallest label. In the network below, the shortest route $A$ to $F$ is $A\\to C\\to E\\to F$ with length $2+7+3=12$.' },
+      { title: 'Shortest path', body: 'Start at the first vertex with distance $0$. Label each neighbour with the best total found so far, always extending from the unvisited vertex with the smallest label. In the network below, the shortest route $A$ to $F$ is $A\\to C\\to E\\to F$ with length $2+7+3=12$.' },
       { title: 'Trees and spanning trees', body: 'A tree is connected with no cycles, so $v$ vertices have exactly $v-1$ edges. A spanning tree reaches every vertex of a connected network.' },
       { title: 'Minimum spanning tree (Kruskal)', body: 'List the edges by weight. Add the smallest edge that does not close a cycle, and stop at $v-1$ edges. Here the edges $BC\\,(1)$, $AC\\,(2)$, $DE\\,(2)$, $EF\\,(3)$ and $BD\\,(6)$ give a total of $14$.' },
       { title: 'Degree and Euler paths', body: 'The degree of a vertex is the number of edges at it. A connected graph has an Euler circuit when every degree is even, and an Euler path when exactly two degrees are odd.' }
@@ -399,7 +399,7 @@ export default {
     ],
     mistakes: [
       { wrong: 'Choosing the path that begins with the smallest edge as the shortest path.', right: 'Compare the total weight of every route. A small first edge can lead to heavy edges later.' },
-      { wrong: 'Adding $BD\\,(6)$ and $CD\\,(8)$ as well in the spanning tree.', right: 'A spanning tree on $6$ vertices stops at $5$ edges. A sixth edge would close a cycle.' },
+      { wrong: 'Adding $CD\\,(8)$ and $DF\\,(6)$ as well in the spanning tree.', right: 'A spanning tree on $6$ vertices stops at $5$ edges. A sixth edge would close a cycle.' },
       { wrong: 'Finding the shortest path length but not naming the route.', right: 'Give the route as a list of vertices and its total weight.' }
     ],
     examples: [
@@ -412,7 +412,7 @@ export default {
       },
       {
         question: 'Use Kruskal\'s method to find the minimum spanning tree of the same network and its total weight.',
-        steps: ['In order: $BC\\,1$, $AC\\,2$, $DE\\,2$, $EF\\,3$ are all accepted.', '$AB\\,4$ would close the cycle $ABC$, so it is rejected. Accept $BD\\,6$, which joins the two parts.', 'That is $5$ edges for $6$ vertices, so stop. Total: $1+2+2+3+6=14$.'],
+        steps: ['In order: $BC\\,1$, $AC\\,2$, $DE\\,2$, $EF\\,3$ are all accepted.', '$AB\\,4$ would close the cycle $ABC$, so it is rejected. $BD\\,6$ joins the two parts, so it is accepted. $DF\\,6$ would close the cycle $DEF$, so it is rejected.', 'That is $5$ edges for $6$ vertices, so stop. Total: $1+2+2+3+6=14$.'],
         answer: 'Edges $BC$, $AC$, $DE$, $EF$, $BD$, total weight $14$',
         working: '\\begin{aligned}\\text{Total}&=BC+AC+DE+EF+BD\\\\&=1+2+2+3+6\\\\&=14\\end{aligned}',
         verify: { kind: 'value', expr: '1+2+2+3+6', answer: '14' }
@@ -486,7 +486,7 @@ export default {
       'A comparison uses a measure of centre and a measure of spread, named, and is written in the context of the question.'
     ],
     diagrams: [
-      { title: 'Box plot of the data', spec: { kind: 'boxPlot', data: [3, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 25] }, note: 'The five numbers are $3$, $6.5$, $8.5$, $12.5$ and $25$. The long upper whisker is the outlier $25$.' }
+      { title: 'Box plot of the data', spec: { kind: 'boxPlot', data: [3, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 25] }, note: 'The five numbers are $3$, $6.5$, $8.5$, $12.5$ and $25$. This plot draws the whisker to the maximum; by the fence test above, $25$ is an outlier.' }
     ],
     check: [
       { question: 'Find the mean of $4,8,9,15$.', answer: '$9$', verify: { kind: 'value', expr: '(4+8+9+15)/4', answer: '9' } },
