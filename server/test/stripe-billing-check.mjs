@@ -227,7 +227,7 @@ subscriptions = {};
   eq([r.status, s.status, s.current_period_end], [200, 'active', (T0 + 31 * DAY) * 1000], 'customer.subscription.updated active keeps Premium to the period end');
 
   clock += 60_000;
-  r = await deliver(evt('customer.subscription.updated', subObject({ cancel_at_period_end: true, current_period_end: T0 + 31 * DAY })));
+  await deliver(evt('customer.subscription.updated', subObject({ cancel_at_period_end: true, current_period_end: T0 + 31 * DAY })));
   s = await snapshot();
   eq([s.status, s.plan], ['active', 'premium'], 'a cancel at period end leaves Premium on until the period ends');
   ok((await db.get("SELECT cancel_mode FROM billing_subscriptions WHERE provider_subscription_id=?", [SUB])).cancel_mode === 'cycle-end', 'and is recorded on the binding');
@@ -248,7 +248,7 @@ subscriptions = {};
     eq([noPeriod.status, await snapshot()], [200, before], 'a paid invoice that names no period grants nothing');
   }
   clock += 60_000;
-  r = await deliver(evt('customer.subscription.updated', subObject({ status: 'past_due', current_period_end: T0 + 31 * DAY })));
+  await deliver(evt('customer.subscription.updated', subObject({ status: 'past_due', current_period_end: T0 + 31 * DAY })));
   s = await snapshot();
   eq(s.status, 'grace', 'a past_due subscription is grace (PRI_WEB_GRACE_DAYS) while it lasts');
 
@@ -260,7 +260,7 @@ subscriptions = {};
   eq(nr.code, 'BILLING_WEBHOOK_SIGNATURE_INVALID', '(an unsigned delivery to a second adapter is refused)');
 
   clock += 60_000;
-  r = await deliver(evt('invoice.paid', invoice({ id: 'in_AuInvoice0003', payment_intent: 'pi_AuPayment0002', period_start: T0 + 31 * DAY, lines: { data: [{ period: { start: T0 + 31 * DAY, end: T0 + 61 * DAY } }] } })));
+  await deliver(evt('invoice.paid', invoice({ id: 'in_AuInvoice0003', payment_intent: 'pi_AuPayment0002', period_start: T0 + 31 * DAY, lines: { data: [{ period: { start: T0 + 31 * DAY, end: T0 + 61 * DAY } }] } })));
   s = await snapshot();
   eq([s.status, s.grace_until], ['active', null], 'a later paid invoice restores active and clears grace');
 
@@ -308,19 +308,19 @@ subscriptions = {};
   eq([r.status, (await db.get('SELECT trial_claimed FROM billing_subscriptions WHERE provider_subscription_id=?', [SUB2])).trial_claimed], [200, 1], 'a trial session binds with the trial recorded (and grants nothing until paid)');
   clock += 60_000;
   const trialing = evt('customer.subscription.updated', subObject({ id: SUB2, status: 'trialing', trial_end: T0 + 7 * DAY, current_period_end: T0 + 7 * DAY }));
-  r = await deliver(trialing);
+  await deliver(trialing);
   let s = await snapshot();
   eq([s.status, s.current_period_end], ['trialing', (T0 + 7 * DAY) * 1000], 'a trialing subscription is trialing until the trial end');
   clock += 60_000;
-  r = await deliver(evt('invoice.paid', invoice({ id: 'in_TrialInv0001', subscription: SUB2, amount_paid: 0, payment_intent: null, lines: { data: [{ period: { start: T0, end: T0 + 7 * DAY } }] } })));
+  await deliver(evt('invoice.paid', invoice({ id: 'in_TrialInv0001', subscription: SUB2, amount_paid: 0, payment_intent: null, lines: { data: [{ period: { start: T0, end: T0 + 7 * DAY } }] } })));
   eq((await snapshot()).status, 'trialing', 'a zero-amount paid invoice is the trial, not a payment');
   eq(Number((await db.get("SELECT COUNT(*) AS n FROM billing_payments WHERE provider_subscription_id=?", [SUB2])).n), 1, '(and is recorded under its invoice id)');
   clock += 60_000;
-  r = await deliver(evt('customer.subscription.updated', subObject({ id: SUB2, status: 'unpaid', current_period_end: T0 + 40 * DAY })));
+  await deliver(evt('customer.subscription.updated', subObject({ id: SUB2, status: 'unpaid', current_period_end: T0 + 40 * DAY })));
   s = await snapshot();
   eq([s.status, s.grace_until], ['past_due', null], 'an unpaid subscription is past_due with no grace (collection has stopped)');
   clock += 60_000;
-  r = await deliver(evt('customer.subscription.updated', subObject({ id: SUB2, status: 'paused', current_period_end: T0 + 40 * DAY })));
+  await deliver(evt('customer.subscription.updated', subObject({ id: SUB2, status: 'paused', current_period_end: T0 + 40 * DAY })));
   eq((await snapshot()).status, 'paused', 'a paused subscription is paused');
   clock += 60_000;
   r = await deliver(evt('customer.subscription.updated', subObject({ id: SUB2, status: 'incomplete', current_period_end: T0 + 40 * DAY })));

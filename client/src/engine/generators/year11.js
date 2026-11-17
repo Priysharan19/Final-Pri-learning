@@ -2,7 +2,7 @@
 // Pri Learning · Year 11 generators (Advanced foundations)
 // ─────────────────────────────────────────────────────────────────────────────
 import { year11Nsw } from './year11-nsw.js';
-import { ri, rc, rs, nz, Frac, mcq, term, poly, sgn, surdLatex, surdStr, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
+import { ri, rc, nz, Frac, mcq, term, poly, sgn, surdLatex, surdStr, r1, r2, r3, rad } from '../qhelpers.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 const nCr = (n, r) => Math.round(factorial(n) / (factorial(r) * factorial(n - r)));
@@ -896,7 +896,7 @@ export const year11 = {
         ]
       };
     }
-    const a = 1, b = nz(rng, -6, 6), c = nz(rng, -8, 8);
+    const b = nz(rng, -6, 6), c = nz(rng, -8, 8);
     const targetGrad = nz(rng, -6, 6);
     const x0v = (targetGrad - b) / 2;
     if (!Number.isInteger(x0v)) return year11['y11-diff'](rng, diff);

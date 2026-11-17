@@ -361,7 +361,6 @@ for (const lang of LANGUAGES) {
 // catalogue must say exactly what the engine says.
 // ─────────────────────────────────────────────────────────────────────────────
 const exams = await import('../src/engine/indiaExams.js');
-const examsPage = read('src/pages/Exams.jsx');
 // The keys live in lib/blueprintKeys.js, shared by Exams and Progress.
 const blueprintKeySource = read('src/lib/blueprintKeys.js');
 const blueprintKeys = Object.fromEntries([...blueprintKeySource.matchAll(/'([a-z0-9-]+)': \['(exams\.bp\.\w+)', '(exams\.bp\.\w+)'\]/g)].map(m => [m[1], [m[2], m[3]]]));

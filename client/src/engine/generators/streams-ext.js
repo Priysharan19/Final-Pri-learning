@@ -2,7 +2,7 @@
 // Pri Learning · Extension 1 & Extension 2 generators (ME / MEX)
 // ─────────────────────────────────────────────────────────────────────────────
 import { streamsExtNsw } from './streams-ext-nsw.js';
-import { ri, rc, rs, nz, gcd, Frac, mcq, poly, sgn, r1, r2, r3, rad } from '../qhelpers.js';
+import { ri, rc, nz, gcd, Frac, mcq, poly, sgn, r1, r2, r3, rad } from '../qhelpers.js';
 import { identityProof } from './identityProofs.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
@@ -1916,7 +1916,7 @@ export const streamsExt = {
       };
     }
     const den = c * c + d * d;
-    const re = new Frac(a * c + b * d, den), im = new Frac(b * c - a * d, den);
+    const re = new Frac(a * c + b * d, den);
     return {
       prompt: `Find $\\dfrac{${a} ${sgn(b)}i}{${c} ${sgn(d)}i}$ in the form $x + yi$. Enter the **real part** as a fraction in simplest form.`,
       answerType: 'numeric', answer: { value: re.value, simplestFraction: re.d === 1 ? undefined : { n: re.n, d: re.d } },

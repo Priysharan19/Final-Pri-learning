@@ -47,7 +47,6 @@ function constantNumber(node) {
 }
 
 function nearZero(v) { return Math.abs(v) <= EPS; }
-function nearOne(v) { return Math.abs(v - 1) <= EPS; }
 
 function stableKey(node) {
   node = unwrap(node);

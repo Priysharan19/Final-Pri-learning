@@ -1081,7 +1081,6 @@ function checkAnswerWithinBudget(question, rawInput) {
         if (!question.answerSuffix && !angleUnit && typeof rawInput === 'string') {
           const got = writtenUnit(rawInput);
           if (got && got !== '°' && got !== 'rad') {
-            const wanted = askedDimensions(question);
             // Stated in the same unit, at any power: an area asked from lengths
             // in cm is in cm²; a rate must be stated whole.
             if (!unitFits(question, got)) {

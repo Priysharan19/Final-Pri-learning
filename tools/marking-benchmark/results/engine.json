@@ -270,17 +270,17 @@
  },
  "ca-037": {
   "verdicts": [
-   "invalid"
+   "abstain"
   ],
-  "solution": "incorrect",
-  "firstBreak": 0
+  "solution": "abstain",
+  "firstBreak": null
  },
  "ca-038": {
   "verdicts": [
-   "invalid"
+   "abstain"
   ],
-  "solution": "incorrect",
-  "firstBreak": 0
+  "solution": "abstain",
+  "firstBreak": null
  },
  "ca-039": {
   "verdicts": [
@@ -362,10 +362,10 @@
  },
  "ca-050": {
   "verdicts": [
-   "invalid"
+   "abstain"
   ],
-  "solution": "incorrect",
-  "firstBreak": 0
+  "solution": "abstain",
+  "firstBreak": null
  },
  "ca-051": {
   "verdicts": [

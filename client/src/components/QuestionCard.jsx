@@ -41,7 +41,7 @@ import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusalForQu
 import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
-import { strokeSignature, createStrokeSignature } from '../ink/strokeSignature.js';
+import { createStrokeSignature } from '../ink/strokeSignature.js';
 import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
 import { practiceWorkState } from '../platform/workState.js';
@@ -641,7 +641,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setPdfPageCount(0);
     // Even a rejected, signed-out replacement invalidates an older in-flight
     // provider response; authentication state cannot revive the old image.
-    const generation = ++photoReadGeneration.current;
+    ++photoReadGeneration.current;
     if (!cloudReadingEnabled(user)) {
       const block = readerBlock(user);
       setPhotoOCR({

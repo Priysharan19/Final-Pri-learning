@@ -18,7 +18,6 @@
 // SYNTHETIC: generated questions and a test account.
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
-import assert from 'node:assert/strict';
 const { startApp, checks, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { bankPolicy, sealForEdition } = await import('../platform/editionBanks.js');
 const { indiaBank } = await import('../platform/indiaBanks.js');

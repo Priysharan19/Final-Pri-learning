@@ -773,12 +773,6 @@ export const STREAM_CURRICULUM = {
   }
 };
 
-const streamKeyFor = (pathway, year) => {
-  if (pathway === 'standard') return `standard-${year}`;
-  if (pathway === 'ext1' || pathway === 'ext2') return `ext1-${year}`;
-  return null;
-};
-
 export function streamSubtopics(key) {
   const st = STREAM_CURRICULUM[key];
   if (!st) return [];

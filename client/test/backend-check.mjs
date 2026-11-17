@@ -500,9 +500,6 @@ const crashed = err => ok('the group ran to the end', false, `threw: ${err?.stac
 const eq = (name, actual, expected) =>
   ok(name, JSON.stringify(actual) === JSON.stringify(expected), `expected ${show(expected)}, got ${show(actual)}`);
 
-const near = (name, actual, expected, tol) =>
-  ok(name, Math.abs(actual - expected) <= tol, `expected ${expected} ±${tol}, got ${actual}`);
-
 /** Assert a call rejects, and that the rejection carries the right shape. */
 async function rejects(name, promise, want = {}) {
   let err = null;

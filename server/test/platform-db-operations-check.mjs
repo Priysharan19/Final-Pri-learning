@@ -42,10 +42,6 @@ function accountCount(path) {
   const db = new Database(path, { readonly: true, fileMustExist: true });
   try { return db.prepare('SELECT COUNT(*) AS n FROM accounts').get().n; } finally { db.close(); }
 }
-function columns(path, table) {
-  const db = new Database(path, { readonly: true, fileMustExist: true });
-  try { return db.pragma(`table_info('${table}')`).map(row => row.name); } finally { db.close(); }
-}
 
 async function runServerAndSignal(dbPath, signal) {
   const env = { ...process.env, PRI_PLATFORM_DB: dbPath, PORT: '0', PRI_SHUTDOWN_DEADLINE_MS: '5000', PRI_AUTH_DELIVERY_KEY: '55'.repeat(32) };

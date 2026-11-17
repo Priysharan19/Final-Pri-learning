@@ -2,7 +2,7 @@
 // Pri Learning · Year 10 generators
 // ─────────────────────────────────────────────────────────────────────────────
 import { year10Nsw } from './year10-nsw.js';
-import { ri, rc, rs, nz, distinct, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, rad, surdSimp, surdLatex, surdStr, NAMES } from '../qhelpers.js';
+import { ri, rc, nz, distinct, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, rad, surdSimp, surdLatex } from '../qhelpers.js';
 import { figRightTriangle, figBearing, figParabola } from '../figures.js';
 
 // ── Curves and scatterplots ──────────────────────────────────────────────────

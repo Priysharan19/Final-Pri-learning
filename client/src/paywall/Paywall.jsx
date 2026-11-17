@@ -6,7 +6,7 @@ import PageLink from '../components/PageLink.jsx';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { cloudAccountLink, verifyCloudSession } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, hasEntitlement } from '../platform/entitlements.js';
-import { nativeBillingStore, PREMIUM_ON_SALE } from '../platform/nativeBilling.js';
+import { nativeBillingStore } from '../platform/nativeBilling.js';
 import { useBillingConfig, sellsPremium } from './useSaleAvailable.js';
 import { useStoreKitPurchase } from './useStoreKitPurchase.js';
 import { useGooglePlayPurchase } from './useGooglePlayPurchase.js';

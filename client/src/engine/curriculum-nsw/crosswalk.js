@@ -304,9 +304,6 @@ export const LEGACY_CROSSWALK = Object.freeze([
     'Pri-authored exact-answer forms.')
 ]);
 
-/** Current outcomes that no legacy subtopic reaches: the content gap with no generator. */
-const gap = (syllabus, outcome, note = '') => Object.freeze({ subtopicId: null, syllabus, outcome, status: 'new-no-generator', note });
-
 export const NEW_OUTCOME_GAPS = Object.freeze([
 ]);
 
