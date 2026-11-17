@@ -41,7 +41,7 @@ const { stepMetaFor } = await import('../../server/platform/markerOps.js');
 const { parse, normalize, evaluate, exprEquivalent } = await import(`${SRC}engine/expr.js`);
 await loadAllBanks();
 
-const SEEDS = Number(process.argv[2]) || 8;
+const SEEDS = Number(process.argv.slice(2).find(a => /^\d+$/.test(a))) || 8;
 const failures = [];
 const fail = text => { if (failures.length < 60) failures.push(text); };
 let checks = 0;
@@ -250,6 +250,7 @@ for (const [generator, levels] of Object.entries(NSW_ISSUED_CELLS)) {
         const located = r.firstBreak === 1 && r.lines[0].status !== 'break';
         if (located) coverage.located++; else fail(`${tag}: flagged line ${r.firstBreak + 1} of [${start}] [${wrong}] — ${JSON.stringify(r.lines.map(l => l.status))}`);
         const code = r.lines[1]?.diagnosis?.code;
+        if (GENERIC.has(code) && process.argv.includes('--list-generic')) console.log(`GENERIC ${generator} D${d} :: ${start}  →  ${wrong}  [${code}] :: ${String(r.lines[1]?.note).slice(0,70)}`);
         if (!GENERIC.has(code)) coverage.named++; else coverage.generic[generator] = (coverage.generic[generator] || 0) + 1;
         if (rightLine) {
           const later = report(meta, q.prompt, [start, rightLine, wrong]);
@@ -268,6 +269,7 @@ for (const [generator, levels] of Object.entries(NSW_ISSUED_CELLS)) {
 }
 ok(coverage.items > 100, `the location sweep ran over ${coverage.items} designed wrong answers`);
 ok(coverage.located === coverage.items, `the first flagged line was the wrong one in ${coverage.located} of ${coverage.items} cases`);
+ok(coverage.named / coverage.items >= 0.9, `at least 90% of flagged lines outside calculus carry a named, specific diagnosis (${coverage.named} of ${coverage.items})`);
 ok(coverage.controlsClean === coverage.controls, `correct working was left alone in ${coverage.controlsClean} of ${coverage.controls} cases`);
 
 // ── C · honest coverage ─────────────────────────────────────────────────────
