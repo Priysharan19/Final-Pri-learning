@@ -650,6 +650,67 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     FOREIGN KEY(resource_id, revision) REFERENCES resource_revisions(resource_id, revision) ON DELETE CASCADE
   );`);
 
+  // Schema v18 — the teacher workspace (classroom.js): papers a student hands
+  // in for an assignment, the items a teacher may judge on them, and the
+  // append-only TEACHER marks, kept apart from every engine mark.
+  db.exec(`CREATE TABLE IF NOT EXISTS assignment_handins (
+    assignment_id TEXT NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+    student_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    teacher_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    exam_id TEXT NOT NULL,
+    paper_kind TEXT NOT NULL,
+    score INTEGER NOT NULL CHECK(score >= 0),
+    total INTEGER NOT NULL CHECK(total >= 0),
+    questions_json TEXT NOT NULL,
+    handed_in_at INTEGER NOT NULL,
+    PRIMARY KEY(assignment_id, student_account_id),
+    UNIQUE(student_account_id, exam_id)
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_assignment_handins_class ON assignment_handins(class_id, handed_in_at);`);
+  db.exec(`CREATE TABLE IF NOT EXISTS teacher_review_items (
+    id TEXT PRIMARY KEY,
+    assignment_id TEXT NOT NULL,
+    class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    student_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    teacher_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    exam_id TEXT NOT NULL,
+    question_key TEXT NOT NULL,
+    question_order INTEGER NOT NULL,
+    outcome_code TEXT,
+    subtopic TEXT,
+    marks_possible INTEGER NOT NULL CHECK(marks_possible >= 2),
+    engine_awarded INTEGER NOT NULL CHECK(engine_awarded >= 0),
+    criterion TEXT NOT NULL CHECK(criterion IN ('method','follow-through')),
+    available INTEGER NOT NULL CHECK(available >= 1 AND engine_awarded + available < marks_possible),
+    evidence_json TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE(assignment_id, student_account_id, question_key, criterion),
+    FOREIGN KEY(assignment_id, student_account_id) REFERENCES assignment_handins(assignment_id, student_account_id) ON DELETE CASCADE
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_teacher_review_items_class ON teacher_review_items(class_id, teacher_account_id, created_at);`);
+  db.exec(`CREATE TABLE IF NOT EXISTS teacher_marks (
+    id TEXT PRIMARY KEY,
+    review_item_id TEXT NOT NULL REFERENCES teacher_review_items(id) ON DELETE CASCADE,
+    class_id TEXT NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+    assignment_id TEXT NOT NULL REFERENCES assignments(id) ON DELETE CASCADE,
+    student_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    teacher_account_id TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+    criterion TEXT NOT NULL CHECK(criterion IN ('method','follow-through')),
+    decision TEXT NOT NULL CHECK(decision IN ('award','decline')),
+    marks INTEGER NOT NULL CHECK((decision = 'decline' AND marks = 0) OR (decision = 'award' AND marks >= 1)),
+    comment TEXT CHECK(comment IS NULL OR length(comment) <= 1000),
+    engine_awarded INTEGER NOT NULL CHECK(engine_awarded >= 0),
+    ink_digest TEXT CHECK(ink_digest IS NULL OR length(ink_digest) = 64),
+    supersedes TEXT UNIQUE REFERENCES teacher_marks(id) ON DELETE CASCADE,
+    created_at INTEGER NOT NULL
+  );`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_teacher_marks_item ON teacher_marks(review_item_id, created_at);`);
+  // Append-only: a teacher mark is never edited in place. A change of mind is
+  // a new row that supersedes the last; the account's erasure still cascades.
+  db.exec(`CREATE TRIGGER IF NOT EXISTS teacher_marks_no_update BEFORE UPDATE ON teacher_marks
+    BEGIN SELECT RAISE(ABORT, 'teacher_marks is append-only'); END;`);
+
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;
 }

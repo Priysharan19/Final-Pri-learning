@@ -293,6 +293,41 @@ export function tutorEvidence(q, lines) {
   return evidence;
 }
 
+/**
+ * The teacher's view of one handed-in written answer (classroom.js): the
+ * deterministic Step Check's verdict on each line, the first break and the
+ * engine's own diagnosis code. FEEDBACK ONLY: it awards nothing, reads no
+ * answer key and never runs methodMarks — a teacher decides any mark the
+ * engine could not, and the engine's mark is left exactly as it was.
+ * Statuses are a closed set: 'ok' (verified), 'break' (the first line that
+ * does not follow), 'unsure' (anything else). A checker fault fails closed:
+ * every line 'unsure', no break, no diagnosis.
+ */
+export const REVIEW_LINE_STATUSES = Object.freeze(['ok', 'break', 'unsure']);
+export function reviewEvidence(q, lines) {
+  const list = (Array.isArray(lines) ? lines : []).map(line => String(line ?? '')).slice(0, 40);
+  const silent = { lines: list.map(() => 'unsure'), firstBreak: -1, verifiedLines: 0, diagnosis: null };
+  if (!q || typeof q !== 'object' || !list.length) return silent;
+  try {
+    const meta = stepMetaFor(q);
+    if (!meta) return silent;
+    const report = stepCheck(meta, list.join('\n'), { prompt: q.prompt });
+    const judged = Array.isArray(report?.lines) ? report.lines : [];
+    let firstBreak = -1;
+    const statuses = list.map((_, i) => {
+      const s = judged[i]?.status;
+      if (s === 'break' && firstBreak < 0) { firstBreak = i; return 'break'; }
+      return s === 'ok' ? 'ok' : 'unsure';
+    });
+    const code = report?.diagnosis?.code;
+    return {
+      lines: statuses, firstBreak,
+      verifiedLines: statuses.filter(s => s === 'ok').length,
+      diagnosis: typeof code === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(code) && report?.diagnosis?.confidence === 'high' ? code : null
+    };
+  } catch { return silent; }
+}
+
 // ── The operations a worker serves ──────────────────────────────────────────
 // Each takes its plain-data arguments and `emit`, which reports a completed
 // stage to the request thread BEFORE the next stage starts. If the deadline
@@ -339,6 +374,10 @@ export const MARKER_OPS = Object.freeze({
   },
   tutor({ q, lines }) {
     return { evidence: tutorEvidence(q, lines) };
+  },
+  /** A handed-in answer's line verdicts for the teacher's review (feedback only, never a mark). */
+  review({ q, lines }) {
+    return { evidence: reviewEvidence(q, lines) };
   },
   /**
    * "Check this line so far": where the first final-answer attempt is (by

@@ -12,6 +12,7 @@
 // summaries: per student, per assignment and per targeted chapter, with the
 // intervention flags a teacher acts on and the plain-language reason for each.
 // No answer, prompt, working or handwriting ever exists in this data.
+import { validatePaperAssignment } from './paperAssignments.js';
 import { IN_CHAPTER_BY_ID, IN_TRACKS } from './india-syllabus.generated.js';
 import { sanitizeAssignmentSummary } from './assignmentProgress.js';
 import { asStore } from './store.js';
@@ -51,8 +52,11 @@ function integer(value) {
  */
 export function validateAssignmentSpecification(input) {
   if (!plain(input)) return invalid('Assignment specification must be an object.');
+  // A paper assignment (teacher workspace): a template of a server-issued
+  // paper, checked against this edition's papers (paperAssignments.js).
+  if (input.kind === 'paper') return validatePaperAssignment(input);
   const spec = { kind: 'practice' };
-  if (input.kind !== undefined && input.kind !== 'practice') return invalid('Only practice assignments are supported.');
+  if (input.kind !== undefined && input.kind !== 'practice') return invalid('Assignments are practice sets or papers.');
 
   if (input.instructions !== undefined && input.instructions !== null) {
     if (typeof input.instructions !== 'string') return invalid('Instructions must be text.');

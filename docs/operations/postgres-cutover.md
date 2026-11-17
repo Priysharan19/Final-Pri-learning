@@ -66,6 +66,7 @@ back-to-back operation (§2.6).
 | **schema 15** | `20261113000000_resource_library.sql` (ADR-0002 plan F1) | the shared resource library: `resources` (papers, solutions and notes linked where they are published, each with course, syllabus version, certification state, source, attribution, rights note, disclaimer and review state) and `resource_editions` (which editions offer each); both global, under RLS with the fail-closed `pri_scope_required` only (no account owns a row); seeded with the one published Prithagoras paper | `docs/release/rollback/20261113000000_resource_library.rollback.sql` (drops both tables; no account data) |
 | **schema 16** | `20261113010000_desk_attempts.sql` (ADR-0002 §8 plan F4a) | the Exam Desk: `desk_attempts`, unmarked practice attempts at library papers — the frozen paper configuration, a log of server-stamped clock events, per-question done/flagged/notes; no score or mark column, `mode` 'unmarked' only, at most one open attempt per account and paper (partial unique index); account-scoped under RLS (`pri_scope_required` + RESTRICTIVE `pri_account_scope`), cascades with the account | `docs/release/rollback/20261113010000_desk_attempts.rollback.sql` (drops the table: **deletes every desk attempt, students' notes included** — backup first, owner-approved only) |
 | **schema 17** | `20261114000000_resource_publishing.sql` (ADR-0002 plan F3) | resource publishing: `resource_revisions` (immutable revision history and the review state machine) and `resource_assets` (hosted PDF records), both global under the fail-closed RLS policy; `PRI_RESOURCE_PUBLISHING` ships off | `docs/release/rollback/20261114000000_resource_publishing.rollback.sql` deletes the publishing history |
+| **schema 18** | `20261118000000_teacher_workspace.sql` (teacher workspace) | `assignment_handins` (a finished, server-marked paper a student hands in for a class assignment), `teacher_review_items` (the method / follow-through criteria the engine leaves to a human under D12, with the evidence shown) and `teacher_marks` (append-only TEACHER decisions: pri_server may INSERT/SELECT only), all three account-scoped under RESTRICTIVE RLS (student or teacher column) | written with the teacher-workspace PR; apply on staging, Neon India production and both Neon AU databases before a schema-18 server is deployed to each |
 
 Applied on staging: all eleven up to schema 13, in this order (schema 12 on 2026-10-18 by §2.5; schema 13 after train 10). Observed
 live on 2026-11-07, read-only: staging `GET /v1/health` reports `schemaVersion "13"`, `billingSchemaVersion "6"`, Postgres, release
@@ -177,7 +178,8 @@ npx supabase@latest link --project-ref orudxrckgxyyraopyzmn
 #        20261113000000_resource_library.sql             (schema 15: the shared resource library, global tables, fail-closed RLS)
 #        20261113010000_desk_attempts.sql                (schema 16: Exam Desk attempts, account-scoped RLS, never a mark)
 #        20261114000000_resource_publishing.sql          (schema 17: resource revision history and hosted-file records, global fail-closed RLS)
-#      The list must end at the versions schemaVersions.js states (schema 17 / billing 6);
+#        20261118000000_teacher_workspace.sql            (schema 18: hand-ins, review items, append-only teacher marks, account-scoped RLS)
+#      The list must end at the versions schemaVersions.js states (schema 18 / billing 6);
 #      `ls supabase/migrations/` at the deployed commit is the authority if this comment lags.
 npx supabase@latest migration list
 npx supabase@latest db push --dry-run
@@ -461,7 +463,7 @@ cutover do not exist in the SQLite file. So after real traffic:
 ### 5.2a Undoing migration `20261002010000_tutor_cache`
 
 Only for a build that predates the AI tutor, and before undoing anything older (migrations come
-off newest first: `20261114000000_resource_publishing` (schema 17; rollback `docs/release/rollback/20261114000000_resource_publishing.rollback.sql`, which deletes the publishing history), `20261113010000_desk_attempts` (schema 16; rollback
+off newest first: `20261118000000_teacher_workspace` (schema 18; rollback `docs/release/rollback/20261118000000_teacher_workspace.rollback.sql`, which deletes every hand-in and teacher mark), `20261114000000_resource_publishing` (schema 17; rollback `docs/release/rollback/20261114000000_resource_publishing.rollback.sql`, which deletes the publishing history), `20261113010000_desk_attempts` (schema 16; rollback
 `docs/release/rollback/20261113010000_desk_attempts.rollback.sql`, which deletes every desk attempt), `20261113000000_resource_library` (schema 15; rollback
 `docs/release/rollback/20261113000000_resource_library.rollback.sql`, which deletes the library rows), `20261022000000_parent_report` (schema 14; rollback
 `docs/release/rollback/20261022000000_parent_report.rollback.sql`, which deletes the report links and send ledger), `20261019000000_rls_account_coverage` (schema 13; rollback

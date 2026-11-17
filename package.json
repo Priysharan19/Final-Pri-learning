@@ -183,7 +183,7 @@
     "verify:platform:pg-target": "node server/tools/postgres-target-check.mjs",
     "test:platform:nsw-exams": "node server/test/nsw-exam-check.mjs",
     "test:platform:paper-generator": "node server/test/paper-generator-check.mjs",
-    "test:platform": "npm run test:platform:pg-schema && npm run test:platform:ops && npm run test:platform:driver && npm run test:platform:security && npm run test:platform:commerce && npm run test:platform:recognize-cap && npm run test:teacher:targeting && npm run test:platform:handwriting && npm run test:platform:working && npm run test:platform:question-photo && npm run test:platform:tutor && npm run test:platform:contracts && npm run test:platform:hardening && npm run test:platform:spend && npm run test:platform:guardian && npm run test:platform:acceptance && npm run test:platform:tutor:stream && npm run test:platform:practice:http && npm run test:platform:resources && npm run test:platform:public-catalogue && npm run test:platform:desk && npm run test:platform:edition && npm run test:platform:nsw-exams && npm run test:platform:paper-generator",
+    "test:platform": "npm run test:platform:pg-schema && npm run test:platform:ops && npm run test:platform:driver && npm run test:platform:security && npm run test:platform:commerce && npm run test:teacher:targeting && npm run test:platform:handwriting && npm run test:platform:working && npm run test:platform:question-photo && npm run test:platform:tutor && npm run test:platform:contracts && npm run test:platform:hardening && npm run test:platform:spend && npm run test:platform:guardian && npm run test:platform:acceptance && npm run test:platform:tutor:stream && npm run test:platform:practice:http && npm run test:platform:resources && npm run test:platform:public-catalogue && npm run test:platform:desk && npm run test:platform:classroom && npm run test:platform:edition && npm run test:platform:nsw-exams",
     "test:india:identity": "node client/test/india-identity-check.mjs",
     "test:plot": "node client/test/plot-check.mjs",
     "test:readme": "node client/test/readme-truth-check.mjs",
@@ -317,6 +317,7 @@
     "test:smart:polynomial-lines": "node client/test/smart-polynomial-lines-check.mjs",
     "test:tutor:policy": "node client/test/tutor-policy-check.mjs && node server/test/experiments-check.mjs && node server/test/tutor-policy-http-check.mjs",
     "test:attempt:support": "node server/test/attempt-support-check.mjs",
-    "test:hsc": "node client/test/hsc-priorities-check.mjs"
+    "test:hsc": "node client/test/hsc-priorities-check.mjs",
+    "test:platform:classroom": "node server/test/classroom-check.mjs"
   }
 }

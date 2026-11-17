@@ -848,6 +848,10 @@
         {
           "has": "REGION ISOLATION (H2): PASS — 476 checks (sqlite)",
           "note": "423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables."
+        },
+        {
+          "has": "REGION ISOLATION (H2): PASS — 489 checks (sqlite)",
+          "note": "423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables. 467 → 489 (teacher workspace, re-derived by running): the check walks the route inventory, which now lists the eight /v1/classroom routes."
         }
       ]
     },
@@ -1041,8 +1045,8 @@
           "has": "admin-mfa-class-routes-check: 77/77 checks passed (sqlite)"
         },
         {
-          "has": "account-export-completeness-check (sqlite): 82 checks passed",
-          "note": "78 → 82 (plan F4a): the Exam Desk's attempts are exported, never their idempotency key or digest."
+          "has": "account-export-completeness-check (sqlite): 86 checks passed",
+          "note": "78 → 82 (plan F4a): the Exam Desk's attempts are exported, never their idempotency key or digest. 82 → 86 (teacher workspace): hand-ins, review items and teacher marks are exported to the student."
         },
         {
           "has": "RLS ACCOUNT COVERAGE: PASS — 20/20 checks"
@@ -1315,6 +1319,10 @@
         },
         {
           "has": "DB ROUND TRIPS: PASS — 10/10 checks"
+        },
+        {
+          "has": "PLATFORM ON POSTGRES: PASS — 95/95 suites",
+          "note": "94 → 95 (teacher workspace): classroom-check on Postgres (RLS, migration 18). 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."
         }
       ]
     },
@@ -1718,6 +1726,15 @@
         {
           "has": "E2E SUITE PASSED — 120/120 checks across 4 flows",
           "note": "The Exam Desk sitting, import and desk journeys on Prithagoras."
+        }
+      ]
+    },
+    "platform/classroom.log": {
+      "job": "platform-contracts",
+      "log": "classroom.log",
+      "pins": [
+        {
+          "has": "classroom-check (sqlite): 124 checks passed"
         }
       ]
     }

@@ -427,7 +427,21 @@ export function createClassRouter(db) {
       const checked = validateAssignmentSpecification(body.specification);
       if (!checked.ok) return res.status(400).json({ error: { code: checked.code, message: checked.message } });
       const encoded = JSON.stringify(checked.spec);
-      if (encoded !== row.specification_json) { specificationJson = encoded; edited.push('specification'); }
+      let priorKind = null;
+      try { priorKind = JSON.parse(row.specification_json || '{}')?.kind || null; } catch { priorKind = null; }
+      // A practice set never becomes a paper (or back): a paper's "set after"
+      // date is when it was created as a paper.
+      if ((checked.spec.kind === 'paper') !== (priorKind === 'paper')) {
+        return res.status(409).json({ error: { code: 'ASSIGNMENT_KIND_CHANGE', message: 'A practice set cannot become a paper, or a paper a practice set. Set a new assignment instead.' } });
+      }
+      if (encoded !== row.specification_json) {
+        // A paper's template is what hand-ins were checked against: once any
+        // student has handed one in, it cannot be retargeted (classroom.js).
+        if (await db.get('SELECT 1 FROM assignment_handins WHERE assignment_id=? LIMIT 1', [assignmentId])) {
+          return res.status(409).json({ error: { code: 'ASSIGNMENT_HANDED_IN', message: 'Papers have been handed in for this assignment, so it can no longer be changed. Set a new assignment instead.' } });
+        }
+        specificationJson = encoded; edited.push('specification');
+      }
     }
     if (body.dueAt !== undefined) {
       if (body.dueAt !== null && !Number.isFinite(Number(body.dueAt))) return res.status(400).json({ error: { code: 'ASSIGNMENT_INVALID', message: 'Assignment due date is invalid.' } });
@@ -480,8 +494,13 @@ export function createClassRouter(db) {
     const assignmentId = String(req.params.assignmentId || '');
     const studentId = req.platformSession.account_id;
     const member = await db.get('SELECT 1 FROM class_members WHERE class_id=? AND student_account_id=? AND removed_at IS NULL', [classId, studentId]);
-    const assignment = await db.get('SELECT id FROM assignments WHERE id=? AND class_id=? AND archived_at IS NULL', [assignmentId, classId]);
+    const assignment = await db.get('SELECT id,specification_json FROM assignments WHERE id=? AND class_id=? AND archived_at IS NULL', [assignmentId, classId]);
     if (!member || !assignment) return res.status(404).json({ error: { code: 'ASSIGNMENT_NOT_FOUND', message: 'Assignment not found.' } });
+    // A paper is submitted only by handing in the server-marked paper
+    // (classroom.js hand-in), never by a summary the device writes.
+    let kind = null;
+    try { kind = JSON.parse(assignment.specification_json || '{}')?.kind || null; } catch { kind = null; }
+    if (kind === 'paper') return res.status(409).json({ error: { code: 'ASSIGNMENT_IS_A_PAPER', message: 'Hand in the paper you sat instead.' } });
     const state = ['started', 'submitted'].includes(req.body?.state) ? req.body.state : null;
     if (!state) return res.status(400).json({ error: { code: 'SUBMISSION_INVALID', message: 'Submission state is invalid.' } });
     try {

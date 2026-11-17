@@ -1683,7 +1683,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
 // ── Handwriting read after the paper closed ─────────────────────────────────
 
 /** A frozen page as it stands now: past the recovery window it is a person's to resolve. */
-function pageView(page, handwriting, now) {
+export function pageView(page, handwriting, now) {
   if (page.state === 'resolved') return { ...page, triesLeft: 0, canRetry: false, retryAt: null };
   const triesLeft = Math.max(0, HANDWRITING_MAX_ATTEMPTS - Number(page.attempts || 0));
   if (now > Number(handwriting.windowEndsAt)) return { ...page, state: 'needs-review', reason: 'window-closed', nextAttemptAt: null, triesLeft: 0, canRetry: false, retryAt: null };
