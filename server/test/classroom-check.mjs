@@ -230,6 +230,7 @@ const inked = queue.data.items.filter(i => i.question.key === inkKey);
 c.ok(inked.length >= 1 && inked.every(i => i.evidence.inputMode === 'ink' && i.evidence.ink?.digest === INK), 'a handwritten answer carries the digest of the original page the teacher judges');
 c.ok(queue.data.items.filter(i => i.question.key !== inkKey).every(i => i.evidence.inputMode === 'typed' && i.evidence.ink === null), 'typed answers carry no ink');
 const item = inked[0] || queue.data.items[0];
+c.ok(queue.data.items.some(i => i.question.key === origLine.id), 'the answer with a stored original has a review item');
 c.ok(queue.data.items.filter(i => i.question.key === origLine.id).every(i => JSON.stringify(i.evidence.original) === JSON.stringify(ORIGINAL))
   && queue.data.items.filter(i => i.question.key !== origLine.id).every(i => i.evidence.original === null), 'the stored original the teacher judges is named on its item, and only there');
 // The input mode is the server's record of the marked answer, never an autosave's.

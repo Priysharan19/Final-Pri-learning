@@ -60,6 +60,10 @@ export const TEACHER_VISIBILITY = Object.freeze({
     'teacher-marks'      // the teacher's own marks and comments
   ]),
   never: Object.freeze([
+    // 'photos-and-handwriting-images' is true while no teacher route serves a
+    // stored original. When the original-work route (#1018) shows a handed-in
+    // answer's ink to its teacher, this entry moves to `sees` as
+    // 'handed-in-handwriting' IN THE SAME RELEASE: students are shown this list.
     'email', 'guardian', 'plan', 'notes', 'tutor-and-ai-chats', 'practice-working',
     'photos-and-handwriting-images', 'papers-not-handed-in', 'other-classes'
   ])
@@ -263,7 +267,7 @@ export async function handIn(db, { classId, assignmentId, studentId, examId, now
       if (mode === 'ink' || mode === 'typed') modeByAttempt.set(row.id, mode);
       const o = payload?.original;
       if (plain(o) && typeof o.id === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(o.id) && typeof o.sha256 === 'string' && /^[0-9a-f]{64}$/i.test(o.sha256)) {
-        originalByAttempt.set(row.id, { id: o.id, sha256: o.sha256.toLowerCase(), kind: typeof o.kind === 'string' ? clipText(o.kind, 20) : null });
+        originalByAttempt.set(row.id, { id: o.id, sha256: o.sha256.toLowerCase(), kind: ['ink', 'photo'].includes(o.kind) ? o.kind : null });
       }
     }
   }
