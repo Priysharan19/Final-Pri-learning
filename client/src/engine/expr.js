@@ -681,32 +681,53 @@ const domainEnv = ({ e, pi, ...env }) => env;
 /** Do two sampled values differ beyond rounding? */
 const apart = (u, v) => abs(u - v) > 1e-6 * Math.max(1, abs(u), abs(v));
 /**
- * …or beyond binary64 evaluation noise alone (the final-answer probe). The noise
- * of a sum is set by the size of its terms, not of its result: an expanded
- * (2x + 7)⁷ near its root is a difference of terms near 10⁸ and carries ~10⁻⁸ of
- * rounding, so the band also covers 1e-11 of the reference side's term magnitude.
+ * Running rounding-error bound for one evaluation (the final-answer probe).
+ * Returns [value, bound]: the value exactly as `evaluate` computes it, and a
+ * first-order bound on the binary64 error it carries, propagated through every
+ * operation (a sum carries both errors, a quotient its denominator's relative
+ * error, a function the change in its value across its argument's error). A
+ * difference of large terms therefore carries their rounding, whichever side of
+ * the comparison wrote it, and an answer padded with a huge zero (+ 10²⁰ − 10²⁰)
+ * carries a bound that says its value cannot be read (PR #992 review).
  */
-const apartTight = (u, v, scale) => abs(u - v) > Math.max(1e-9 * Math.max(1, abs(u), abs(v)), 1e-11 * scale);
-
-/**
- * An upper bound on the size of the terms an evaluation adds up: every + and −
- * adds magnitudes, × and ÷ and whole powers carry them, and anything else
- * contributes the size of its value.
- */
-function magnitude(ast, env) {
+const EPS = Number.EPSILON;
+function withError(ast, env) {
   switch (ast.t) {
-    case 'group': case 'neg': return magnitude(ast.v, env);
+    case 'group': return withError(ast.v, env);
+    case 'neg': { const [v, e] = withError(ast.v, env); return [-v, e]; }
+    case 'num': { const v = ast.v; return [v, Number.isSafeInteger(v) ? 0 : abs(v) * EPS]; }   // a whole literal is exact
     case 'bin': {
-      if (ast.op === '+' || ast.op === '-') return magnitude(ast.l, env) + magnitude(ast.r, env);
-      if (ast.op === '*') return magnitude(ast.l, env) * magnitude(ast.r, env);
-      if (ast.op === '/') return magnitude(ast.l, env) / abs(evaluate(ast.r, env));
       if (ast.op === '^') {
-        const r = evaluate(ast.r, env);
-        return Number.isInteger(r) && r >= 0 ? magnitude(ast.l, env) ** r : abs(evaluate(ast, env));
+        const [l, el] = withError(ast.l, env);
+        const [r, er] = withError(ast.r, env);
+        const v = evaluate(ast, env);
+        const shift = (dl, dr) => abs(evaluate({ t: 'bin', op: '^', l: { t: 'num', v: l + dl }, r: { t: 'num', v: r + dr } }, env) - v);
+        const dl = el ? Math.max(shift(el, 0), shift(-el, 0)) : 0, dr = er ? Math.max(shift(0, er), shift(0, -er)) : 0;
+        return [v, dl + dr + abs(v) * 2 * EPS];
       }
-      return abs(evaluate(ast, env));
+      const [l, el] = withError(ast.l, env);
+      const [r, er] = withError(ast.r, env);
+      switch (ast.op) {
+        case '+': { const v = l + r; return [v, el + er + abs(v) * EPS]; }
+        case '-': { const v = l - r; return [v, el + er + abs(v) * EPS]; }
+        case '*': { const v = l * r; return [v, abs(r) * el + abs(l) * er + el * er + abs(v) * EPS]; }
+        case '/': {
+          if (r === 0) return [NaN, NaN];
+          const v = l / r;
+          return [v, (el + abs(v) * er) / Math.max(abs(r) - er, 0) + abs(v) * EPS];
+        }
+        default: { const v = evaluate(ast, env); return [v, abs(v) * EPS]; }
+      }
     }
-    default: return abs(evaluate(ast, env));
+    case 'call': {
+      const v = evaluate(ast, env);
+      if (Array.isArray(ast.args) || !Object.hasOwn(FUNCTIONS, ast.fn)) return [v, abs(v) * 1e-13];   // sums, counting: Lanczos-level
+      const [a, ea] = withError(ast.arg, env);
+      const f = FUNCTIONS[ast.fn];
+      return [v, (ea ? Math.max(abs(f(a + ea) - v), abs(f(a - ea) - v)) : 0) + abs(v) * 2 * EPS];
+    }
+    // a probe variable is exact by construction; π and e are rounded once
+    default: { const v = evaluate(ast, env); return [v, ast.t === 'var' && Object.hasOwn(env, ast.v) ? 0 : abs(v) * EPS]; }
   }
 }
 
@@ -719,14 +740,18 @@ function probeSeed(a, b) {
 }
 
 /**
- * Do the two sides agree at six further points drawn from `seed` (xorshift32),
+ * Do the two sides agree at six further readable points drawn from `seed` (mulberry32),
  * to within evaluation noise? A point where either side is undefined says
  * nothing and is skipped; the domain probe judges definedness.
  */
 function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed) {
   let x = seed >>> 0;
-  const next = () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
-  for (let k = 0; k < 6; k++) {
+  // mulberry32: xorshift32's first draws from nearby seeds bunch together
+  const next = () => { x = (x + 0x6D2B79F5) >>> 0; let t = x; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  let readable = 0, unreadable = 0;
+  // Up to 24 draws for 6 readable points: near a root an expanded form loses its
+  // digits honestly, and such a point is replaced, not counted against it.
+  for (let k = 0; k < 24 && readable < 6; k++) {
     const env = {};
     for (const n of names) {
       const u = next();
@@ -734,19 +759,18 @@ function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed)
       env[n] = domain[0] + u * (domain[1] - domain[0]);
       if (positiveOnly) env[n] = abs(env[n]) + 0.3;
     }
-    const va = evaluate(astA, env), vb = evaluate(astB, env);
-    if (!fin(va) || !fin(vb)) continue;
-    // The noise scale is the REFERENCE's (the key's: every marking call passes
-    // the answer first and the key second), never the answer's. An answer that
-    // set its own scale could pad itself with zero of any size — x² + 0.0000001x
-    // + (10²⁰ − 10²⁰) — and widen the band until anything passed (PR #992 review).
-    // A factored key bounds the terms of its own expansion, so (2x + 7)⁷ written
-    // out is still judged within its real rounding.
-    const scale = magnitude(astB, env);
-    if (!fin(scale)) continue;                  // no bound on the noise: this point says nothing
-    if (apartTight(va, vb, scale)) return false;
+    const [va, ea] = withError(astA, env), [vb, eb] = withError(astB, env);
+    if (!fin(va) || !fin(vb)) continue;                       // undefined here: the domain probe's question
+    const size = Math.max(1, abs(va), abs(vb));
+    const noise = 64 * (ea + eb);
+    // A point whose own rounding could hide a difference of one part in a
+    // million cannot be read: it says nothing either way.
+    if (!(noise <= 1e-6 * size)) { unreadable++; continue; }
+    readable++;
+    if (abs(va - vb) > Math.max(1e-9 * size, noise)) return false;
   }
-  return true;
+  // An answer whose value cannot be read at most points (+ 10²⁰ − 10²⁰) is not shown equal.
+  return readable >= 3 || unreadable <= readable;
 }
 
 // Guard kinds, one letter each because they ship in the install bundle:

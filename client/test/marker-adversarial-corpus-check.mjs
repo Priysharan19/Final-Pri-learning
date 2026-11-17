@@ -250,7 +250,7 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   for (const w of ['0.3333333333', '0.33333333']) expect(G, `third-wrong-${w}`, thirdExact, w, false);
 }
 
-// ── The probe keeps right answers right · 542 cases ─────────────────────────
+// ── The probe keeps right answers right · 1087 cases ─────────────────────────
 // Independent review of the probe above (PR #992): an expanded high-degree
 // polynomial is a difference of large terms and carries their rounding, so a
 // band on the result alone refused (2x + 7)⁷ written out. Every expansion of
@@ -270,11 +270,40 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
     expect(G, `expanded-(${a}x+${b})^${n}`, { answerType: 'expression', answer: { expr: `(${a}x + ${b})^${n}` } }, expand(a, b, n), true);
   }
   expect(G, 'expanded-(2x+7)^7-review', { answerType: 'expression', answer: { expr: '(2x + 7)^7' } }, '128x^7 + 3136x^6 + 32928x^5 + 192080x^4 + 672280x^3 + 1411788x^2 + 1647086x + 823543', true);
+  // …and the reverse (key expanded, answer factored), and keys whose noise is in
+  // a denominator, an abs or a root (third review of #992).
+  for (let n = 2; n <= 7; n++) for (let a = 1; a <= 5; a++) for (const b of [-9, -8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    expect(G, `factored-(${a}x+${b})^${n}`, { answerType: 'expression', answer: { expr: expand(a, b, n) } }, `(${a}x + ${b})^${n}`, true);
+  }
+  for (const [key, answer, extra] of [
+    ['abs(2x + 7)^7', expand(2, 7, 7)], ['abs(2x - 5)^8', expand(2, -5, 8)], ['sqrt((2x - 5)^16)', expand(2, -5, 8)],
+    ['(2x + 7)^(-7)', `1/(${expand(2, 7, 7)})`], ['1/(x - 3)^4', '1/(x^4 - 12x^3 + 54x^2 - 108x + 81)', { positiveOnly: true }]
+  ]) expect(G, `noise-in-${key}`, { answerType: 'expression', answer: { expr: key, ...(extra || {}) } }, answer, true);
   expect(G, 'expanded-(x-3)^10-positive', { answerType: 'expression', answer: { expr: '(x - 3)^10', positiveOnly: true } }, expand(1, -3, 10), true);
 }
 
+// ── XFAIL · residual below the probe's resolution · 5 cases ──────────────────
+// KNOWN FALSE CREDIT, pinned so it cannot silently disappear or spread. Each is
+// the key plus a deliberately appended term smaller than one part in 10⁹ of the
+// answer's value at every probe point (64x⁷ + 0.0000001x near |x| = 3). Sampled
+// binary64 evaluation cannot tell these apart; only an exact polynomial
+// comparison can (follow-up: "exact-polynomial-path" for final-answer
+// expressions). When that lands these flip to refused: change `true` to
+// `false` here and move them into the oracle group above. No plausible slip
+// produces them; each needs a hand-made perturbation of relative size ≤ 1e-9.
+{
+  const G = 'XFAIL-exact-polynomial-path';
+  for (const [id, d, seed, input] of [
+    ['me12-calc', 1, 7001, '(x^2 + 9)^3 + 0.0000001*x'],
+    ['me12-calc', 1, 7002, '(x^2 + 9)^6/3 + 0.0000001*x'],
+    ['me12-calc', 1, 7002, '(x^2 + 9)^6/3 + 0.00001*x'],
+    ['y11-diff', 1, 7002, '64*x^7 + 0.0000001*x'],
+    ['y12-diff', 1, 7001, '20*(5*x - 6)^3 + 0.0000001*x']
+  ]) expect(G, `XFAIL-${id}-${input.slice(0, 30)}`, generateQuestion(id, d, seed), input, true);
+}
+
 // ── Counts are part of the contract ─────────────────────────────────────────
-const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 43, 'sympy-oracle-2026-11-18-controls': 542 };
+const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 43, 'sympy-oracle-2026-11-18-controls': 1087, 'XFAIL-exact-polynomial-path': 5 };
 for (const [g, n] of Object.entries(EXPECTED)) if (groups[g]?.total !== n) failures.push(`${g}: built ${groups[g]?.total} cases, the corpus has ${n}`);
 
 const pass = Object.values(groups).reduce((s, g) => s + g.pass, 0);
