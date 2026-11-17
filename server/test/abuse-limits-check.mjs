@@ -33,7 +33,7 @@ const c = checks();
 // like every other route's, so it is switched on here.
 // The anonymous public catalogue (plan F6a) is off by default; its declared rate limits are reviewed like every other route's.
 process.env.PRI_PUBLIC_CATALOGUE = 'on';
-const h = await startApp({ engine: requestedEngine(), parentReport: { enabled: true } });
+const h = await startApp({ engine: requestedEngine(), parentReport: { enabled: true }, resources: { publishing: true, storage: null } });
 const db = h.db;
 const inventory = loadInventory();
 const resetLimits = () => db.run('DELETE FROM rate_limits');
