@@ -5,6 +5,7 @@ import { useApp } from '../App.jsx';
 import { tLater, useT } from '../i18n/index.js';
 import PageLink from '../components/PageLink.jsx';
 import EvidenceProgress from '../progress/EvidenceProgress.jsx';
+import SyllabusBoard from '../progress/SyllabusBoard.jsx';
 import { indiaProgressPracticeHref } from '../lib/practiceLinks.js';
 import { featureEnabled } from '../platform/features.js';
 
@@ -65,7 +66,9 @@ export default function IndiaProgress() {
         scope={scope?.title || trackName}
         practiseTo={row => indiaProgressPracticeHref(row, user.indiaTrack)}
         teacher={user.role === 'teacher'}
-      />
+      >
+        {featureEnabled('syllabusBoard') && <SyllabusBoard user={user} india trackName={scope?.title || trackName} />}
+      </EvidenceProgress>
       <p className="pg-coverage-note"><PageLink to="/insights" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44 }} data-insights-link>{t('insights.open')} →</PageLink></p>
     </>
   );

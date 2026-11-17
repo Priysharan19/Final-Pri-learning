@@ -32,9 +32,11 @@ function Word({ band, map, t }) {
 
 /**
  * @param {{ evidence: object, rows: {id:string,name:string,strand?:string}[], scope: string,
- *           practiseTo: (row) => string, teacher?: boolean, ownHeading?: boolean }} props
+ *           practiseTo: (row) => string, teacher?: boolean, ownHeading?: boolean,
+ *           children?: React.ReactNode }} props
+ *   children  drawn under the headline facts (the syllabus board, when on).
  */
-export default function EvidenceProgress({ evidence, rows, scope, practiseTo, teacher = false, ownHeading = false }) {
+export default function EvidenceProgress({ evidence, rows, scope, practiseTo, teacher = false, ownHeading = false, children = null }) {
   const t = useT();
   const nav = useNavigate();
   const byId = new Map(evidence.topics.map(x => [x.id, x]));
@@ -68,6 +70,8 @@ export default function EvidenceProgress({ evidence, rows, scope, practiseTo, te
           {overall.accuracy !== 'thin' && <div className="muted" data-metric="independence"><Word band={overall.independence} map={INDEPENDENCE} t={t} /></div>}
         </div>
       </div>
+
+      {children}
 
       <section aria-labelledby="pg-first" data-review-first>
         <h2 className="sc-label" id="pg-first">{t('progressEv.lookFirst')}</h2>
