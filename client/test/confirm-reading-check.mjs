@@ -32,9 +32,18 @@ ok(/if \(toConfirm > 0\) return;/.test(card), 'accepting is refused while any li
 ok(/confirmed: viaInk \? confirmedRef\.current : null/.test(card), 'the confirmed revision is kept with the submission record');
 ok(/ink = \{ strokes: compactInkStrokes\(inkResult\.strokes\), recognized: inkResult\.text/.test(card), 'the original strokes still travel with the confirmed reading');
 ok(/needsCheck && doubt \? \(doubt\.weakest\?\.id/.test(card), 'the focused symbol is read only when there is a doubt');
-ok(/setVouched\(null\); confirmedRef\.current = null;/.test(card) && /photoKey\]\);/.test(card), 'a confirmation is dropped when the transcript, the ink or the photo reading changes');
+ok(/setVouched\(null\); setAckedDoubt\(null\); confirmedRef\.current = null;/.test(card) && /photoKey, question\.id\]\);/.test(card) && /setAckedDoubt\(null\)/.test(card), 'a confirmation and any doubt acknowledgement are dropped when the transcript, the ink or the photo reading changes');
 const css = readFileSync(new URL('../src/workspace.css', import.meta.url), 'utf8');
 ok(/@media \(prefers-reduced-motion: no-preference\) \{ \.ws-confirm-line\.is-unsure \{ animation/.test(css) && /\.ws-confirm-line\.is-unsure \{ outline: 1\.5px dashed/.test(css), 'the pulse exists only when motion is allowed; the static dashed outline and the words always carry the state');
+// Photo/PDF: confirming an unchanged line resolves it, and indices are the transcript's own (an excluded line before it does not shift them).
+const { confirmLine, editLine, linesToCheck, reviveTranscript } = await import('../src/photo/transcript.js');
+const tr = { lines: [{ text: 'a', read: 'a', check: false, excluded: true, why: 'student', edited: false }, { text: 'x+1', read: 'x+1', check: true, excluded: false, edited: false }, { text: 'y', read: 'y', check: true, excluded: false, edited: false }], undecided: false, anchor: null };
+ok(linesToCheck(tr) === 2, 'two photo lines ask to be checked');
+const c1 = confirmLine(tr, 1);
+ok(linesToCheck(c1) === 1 && c1.lines[1].text === 'x+1' && c1.lines[0].text === 'a' && c1.lines[2].text === 'y', 'confirming photo line 1 resolves only that line and rewrites none');
+ok(linesToCheck(confirmLine(c1, 2)) === 0, 'once every flagged photo line is confirmed nothing is left to check');
+ok(reviveTranscript(c1).lines[1].confirmed === true, 'a confirmation survives a kept draft');
+ok(editLine(c1, 1, 'x+2').lines[1].confirmed === false && editLine(c1, 1, 'x+2').lines[1].edited === true, 'an edit replaces the confirmation with the edit');
 const exam = readFileSync(new URL('../src/pages/ExamRoom.jsx', import.meta.url), 'utf8');
 ok(!/confirmGate\.js/.test(exam), 'the exam room keeps its own rules (it is not gated here)');
 console.log(`CONFIRM READING: PASS — ${n}/${n} checks — a read answer is confirmed before it is sent; an edited reading is confirmed again; a stale reading is re-read; the exam room is untouched`);

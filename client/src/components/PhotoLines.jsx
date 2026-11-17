@@ -33,7 +33,7 @@ export default function PhotoLines({ transcript, disabled = false, onEdit, onExc
   const lines = transcript?.lines || [];
   if (!lines.length) return null;
   const leftOut = defaultExclusions(transcript);
-  const anyCheck = lines.some(l => l.check && !l.edited && !l.excluded);
+  const anyCheck = lines.some(l => l.check && !l.edited && !l.confirmed && !l.excluded);
   return (
     <div className="photo-lines" data-photo-lines>
       <div className="sc-label" id={`${uid}-title`}>{t('photo.linesTitle')}</div>
@@ -48,7 +48,7 @@ export default function PhotoLines({ transcript, disabled = false, onEdit, onExc
       <ol className="photo-lines-list" aria-labelledby={`${uid}-title`}>
         {lines.map((line, i) => {
           const noteId = `${uid}-note-${i}`;
-          const asks = line.check && !line.edited && !line.excluded;
+          const asks = line.check && !line.edited && !line.confirmed && !line.excluded;
           const mark = Array.isArray(marks) && marks[i] && MARK_GLYPH[marks[i].kind] ? marks[i] : null;
           return (
             <li key={i} className={`photo-line${line.excluded ? ' is-out' : ''}${asks ? ' is-check' : ''}${mark ? ` is-marked pm-${mark.kind}` : ''}`}

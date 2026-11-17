@@ -25,7 +25,7 @@ import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js'
 import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
-import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
+import { buildTranscript, confirmLine, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import PhotoLines from './PhotoLines.jsx';
@@ -1274,9 +1274,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // is confirmed as written, changed to what they wrote, or (photo) left out.
   const [ackedDoubt, setAckedDoubt] = useState(null);
   const unsureLines = writeMode
-    ? (inkResult?.lines || []).map((l, i) => (isLowConfidence(inkResult?.lineMeta?.[i] || { conf: 1 }, confidenceFloorOf(inkResult)) ? i : -1)).filter(i => i >= 0)
-    : photoInUse ? (photoLines.lines || []).map((l, i) => (l.check && !l.edited && !l.excluded ? i : -1)).filter(i => i >= 0) : [];
-  const doubtOnly = writeMode && !!doubt && unsureLines.length === 0 && ackedDoubt !== readingId;
+    ? (inkResult?.lines || []).map((l, i) => (isLowConfidence(inkResult?.lineMeta?.[i] || { conf: 0 }, confidenceFloorOf(inkResult)) ? i : -1)).filter(i => i >= 0)
+    : photoInUse ? (photoLines.lines || []).map((l, i) => (l.check && !l.edited && !l.confirmed && !l.excluded ? i : -1)).filter(i => i >= 0) : [];
+  const ackKey = `${readingId}|${inkResult?.text ?? ''}|${inkSignature ?? ''}`;
+  const doubtOnly = writeMode && !!doubt && unsureLines.length === 0 && ackedDoubt !== ackKey;
   const toConfirm = unsureLines.length + (doubtOnly ? 1 : 0);
   const confirmOnly = needsCheck;
   // The page as it stands now. Submit records it; a graded result is shown as
@@ -1391,7 +1392,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const confirmedRef = useRef(null);
   // A confirmation belongs to the exact page and reading it was given for: if
   // the transcript or the ink changes (a re-read, an edit), it is asked again.
-  useEffect(() => { setVouched(null); confirmedRef.current = null; }, [inkResult?.text, inkSignature, photoKey]);
+  useEffect(() => { setVouched(null); setAckedDoubt(null); confirmedRef.current = null; }, [inkResult?.text, inkSignature, photoKey, question.id]);
 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
@@ -2937,13 +2938,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             </div>
             <p className="ws-confirm-blind muted">{t('verdict.confirmBlind')}</p>
             <div className="ws-confirm-lines">
-              {(writeMode ? (inkResult?.lines || []) : (photoLines?.lines || []).filter(l => !l.excluded)).map((l, i) => {
-                const unsure = writeMode ? isLowConfidence(inkResult?.lineMeta?.[i] || { conf: 1 }, confidenceFloorOf(inkResult)) : !!(l.check && !l.edited);
+              {(writeMode ? (inkResult?.lines || []).map((l, idx) => ({ l, idx })) : (photoLines?.lines || []).map((l, idx) => ({ l, idx })).filter(r => !r.l.excluded)).map(({ l, idx: i }, shown) => {
+                const unsure = writeMode ? isLowConfidence(inkResult?.lineMeta?.[i] || { conf: 0 }, confidenceFloorOf(inkResult)) : !!(l.check && !l.edited && !l.confirmed);
                 const text = String(typeof l === 'string' ? l : l?.text ?? '');
                 const swaps = writeMode && unsure ? relationChoices({ ...(inkResult?.lineMeta?.[i] || {}), text }) : null;
                 return (
                   <div key={i} className={`ws-confirm-line${unsure ? ' is-unsure' : ''}`} data-confirm-line={i} data-unsure={unsure ? 'true' : undefined}>
-                    <span className="ws-confirm-n" aria-hidden="true">{i + 1}</span>
+                    <span className="ws-confirm-n" aria-hidden="true">{shown + 1}</span>
                     <span className="ws-confirm-math ws-cm"><MathText text={`$${texOf(text)}$`} /></span>
                     {unsure && (
                       <div className="ws-confirm-ask" role="group" aria-label={t('verdict.confirmWhich', { n: i + 1 })}>
@@ -2965,7 +2966,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <div className="ws-confirm-line is-unsure" data-confirm-doubt>
                   <div className="ws-confirm-ask" role="group" aria-label={checkCopy}>
                     <span className="ws-confirm-unsure">{checkCopy}</span>
-                    <button type="button" className="btn btn-quiet btn-sm" data-confirm-keep="all" onClick={() => setAckedDoubt(readingId)}>{t('verdict.confirmThatsIt')}</button>
+                    <button type="button" className="btn btn-quiet btn-sm" data-confirm-keep="all" onClick={() => setAckedDoubt(ackKey)}>{t('verdict.confirmThatsIt')}</button>
                     <button type="button" className="btn btn-quiet btn-sm" data-confirm-edit onClick={() => inkControlRef.current?.edit?.(-1)}>{t('verdict.confirmEdit')}</button>
                   </div>
                 </div>
@@ -3386,7 +3387,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         <div className="ws-actions editor-foot no-print">
           <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="status-mark" aria-hidden="true"><Working pending={statusState === 'working'} />{statusState !== 'working' && <span className="dot" />}</span>}
-            {writeMode && shownAnswerLine && !inkStale && true && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
+            {writeMode && shownAnswerLine && !inkStale && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
               : statusText}
             {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}
