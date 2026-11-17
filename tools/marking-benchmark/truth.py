@@ -67,7 +67,12 @@ def parse_line(text, local):
 
 def sol_set(rel, lhs, rhs, var):
     if rel == '=':
-        return sp.solveset(sp.Eq(lhs, rhs), var, domain=sp.S.Reals)
+        S = sp.solveset(sp.Eq(lhs, rhs), var, domain=sp.S.Reals)
+        # SymPy solves ln(x) + ln(x-3) = ln(10) as {-2, 5}: keep only the
+        # solutions where every log and even root in THIS line is defined.
+        if isinstance(S, sp.FiniteSet):
+            S = sp.FiniteSet(*[s for s in S if _defined(lhs, {var: s}) and _defined(rhs, {var: s})])
+        return S
     ops = {'<': sp.Lt, '<=': sp.Le, '>': sp.Gt, '>=': sp.Ge}
     return sp.solveset(ops[rel](lhs, rhs), var, domain=sp.S.Reals)
 
@@ -95,6 +100,22 @@ def _defined(e, pts):
         if not _real(v) or (v.real <= 0 if strict else v.real < 0):
             return False
     return True
+
+
+def _undefined_at(lhs, rhs, var, v):
+    pts = {var: v}
+    for side in (lhs, rhs):
+        if side is None:
+            continue
+        if not _defined(side, pts):
+            return True
+        try:
+            val = side.subs(pts)
+            if val.has(sp.zoo, sp.nan, sp.oo, -sp.oo) or val is sp.nan:
+                return True
+        except Exception:
+            return True
+    return False
 
 
 def expr_equal(a, b, syms):
@@ -195,6 +216,17 @@ def step(prev, cur, var, syms, kind, item):
         return 'unknown'
     if same_set(A, B):
         return 'valid'
+    # From an equation with no real solution, writing one that has solutions is
+    # the error an examiner marks (|3x+2| = -4 -> 3x+2 = -4), even though an
+    # empty set is vacuously contained in anything.
+    if A == sp.S.EmptySet and B != sp.S.EmptySet:
+        # ...unless every new value makes the line before UNDEFINED (a zero
+        # denominator, a log or root outside its domain): then it is the usual
+        # extraneous root from clearing denominators, an implied step whose
+        # error is keeping the root, which the final answer catches.
+        if isinstance(B, sp.FiniteSet) and all(_undefined_at(pl, prr, var, v) for v in B):
+            return 'implied'
+        return 'invalid'
     if pr == '=' and cr == '=' and subset_by_value(A, B):
         return 'implied'
     # Rejecting extraneous roots after checking them: the new set is exactly the

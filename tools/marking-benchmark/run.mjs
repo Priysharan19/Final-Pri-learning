@@ -51,7 +51,7 @@ const excluded = pool.filter(i => truth[i.id]?.status !== 'judged');
 
 // ── Contender 1: the deterministic engine ───────────────────────────────────
 const { stepCheck } = await import(join(ROOT, 'client', 'src', 'engine', 'checker.js'));
-function engineMark(item) {
+function engineMark(item, opts = {}) {
   const rep = stepCheck(item.meta, item.lines.join('\n'), { prompt: item.prompt });
   const st = (rep?.lines || []).map(l => l?.status);
   // A ticked line whose note tells the student a solution is still missing
@@ -62,7 +62,7 @@ function engineMark(item) {
   const verdicts = item.lines.map((_, i) => {
     if (i === 0 && item.kind !== 'derivative') return 'given';
     const s = st[i];
-    if (s === 'ok' && incomplete[i]) return 'invalid';
+    if (s === 'ok' && incomplete[i] && !opts.ignoreIncompleteNote) return 'invalid';
     return s === 'ok' ? 'valid' : s === 'break' ? 'invalid' : 'abstain';
   });
   const anyBreak = verdicts.includes('invalid');
@@ -81,23 +81,27 @@ For each numbered line, decide:
 - "cannot_verify": you genuinely cannot decide.
 Line 1 of a non-differentiation task is the student's starting statement: judge only whether it correctly restates the question.
 After the first invalid line, still judge each later line only against the line immediately before it.
-Then give the 1-based number of the first invalid line (or null), whether the final answer is correct, and whether the whole solution is fully correct (no invalid line AND a correct final answer).`;
+You are given the correct final answer, as an examiner has the marking guidelines. A final line that is mathematically equivalent to the correct answer counts as a correct final answer even if it is not fully simplified or fully solved (for example (x-2)(x-3)=0 for x = 2 or x = 3).
+Then give the 1-based number of the first invalid line (or null), whether the final answer is correct, and a solution verdict: "fully_correct" (no invalid line AND a correct final answer), "not_fully_correct", or "cannot_verify" if you genuinely cannot decide.`;
 
 function userPrompt(item) {
   const task = item.kind === 'derivative' ? `${item.prompt} (Each line below is the student's expression for the derivative.)` : item.prompt;
-  return `Question: ${task}\n\nStudent's working:\n${item.lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}`;
+  const k = item.key || {};
+  const answer = k.solutions ? (k.solutions.length ? `${item.variable || 'x'} = ${k.solutions.join(' or ')}` : 'no real solution')
+    : k.set ? k.set : k.expr ? (item.kind === 'derivative' ? `the derivative is ${k.expr}` : item.kind === 'identity' ? `the expression equals ${k.expr} (prove LHS = RHS)` : k.expr) : 'not given';
+  return `Question: ${task}\nCorrect final answer (marking guideline): ${answer}\n\nStudent's working:\n${item.lines.map((l, i) => `${i + 1}. ${l}`).join('\n')}`;
 }
 
 const schema = {
   type: 'object',
   additionalProperties: false,
-  required: ['lines', 'first_invalid_line', 'final_answer_correct', 'solution_fully_correct'],
+  required: ['lines', 'first_invalid_line', 'final_answer_correct', 'solution_verdict'],
   properties: {
     lines: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['line', 'verdict'],
       properties: { line: { type: 'integer' }, verdict: { type: 'string', enum: ['valid', 'invalid', 'cannot_verify'] } } } },
     first_invalid_line: { type: ['integer', 'null'] },
     final_answer_correct: { type: 'boolean' },
-    solution_fully_correct: { type: 'boolean' },
+    solution_verdict: { type: 'string', enum: ['fully_correct', 'not_fully_correct', 'cannot_verify'] },
   },
 };
 
@@ -108,7 +112,7 @@ function readVerdict(item, out, ms, usage) {
     const v = byLine[i + 1];
     return v === 'valid' ? 'valid' : v === 'invalid' ? 'invalid' : 'abstain';
   });
-  return { ms, usage, verdicts, solution: out.solution_fully_correct ? 'correct' : 'incorrect',
+  return { ms, usage, verdicts, solution: out.solution_verdict === 'fully_correct' ? 'correct' : out.solution_verdict === 'cannot_verify' ? 'abstain' : 'incorrect',
     firstBreak: typeof out.first_invalid_line === 'number' ? out.first_invalid_line - 1 : null };
 }
 
@@ -160,17 +164,7 @@ async function llmMark(model, item) {
   const text = res.content.filter(b => b.type === 'text').map(b => b.text).join('');
   let out;
   try { out = JSON.parse(text); } catch { return { parseError: true, ms, usage, verdicts: item.lines.map(() => 'abstain'), solution: 'abstain', firstBreak: null }; }
-  const byLine = Object.fromEntries((out.lines || []).map(l => [l.line, l.verdict]));
-  const verdicts = item.lines.map((_, i) => {
-    if (i === 0 && item.kind !== 'derivative') return 'given';
-    const v = byLine[i + 1];
-    return v === 'valid' ? 'valid' : v === 'invalid' ? 'invalid' : 'abstain';
-  });
-  return {
-    ms, usage, verdicts,
-    solution: out.solution_fully_correct ? 'correct' : 'incorrect',
-    firstBreak: typeof out.first_invalid_line === 'number' ? out.first_invalid_line - 1 : null,
-  };
+  return readVerdict(item, out, ms, usage);
 }
 
 async function runPool(tasks, n) {
@@ -186,7 +180,8 @@ async function runPool(tasks, n) {
 function score(name, marks) {
   const s = { name, items: 0, wrongSolutions: 0, correctSolutions: 0, falseCreditSolutions: 0, falseRejectSolutions: 0,
     abstainOnCorrect: 0, abstainOnWrong: 0, firstBreakExact: 0, firstBreakTotal: 0,
-    invalidLines: 0, falseCreditLines: 0, validLines: 0, falseRejectLines: 0, abstainLines: 0, examples: [] };
+    invalidLines: 0, falseCreditLines: 0, validLines: 0, falseRejectLines: 0, abstainLines: 0,
+    laterErrorLines: 0, laterErrorLinesTicked: 0, examples: [] };
   for (const item of judged) {
     const m = marks[item.id]; if (!m) continue;
     const t = truth[item.id];
@@ -205,7 +200,12 @@ function score(name, marks) {
       if (lab === 'given') return;
       const v = m.verdicts[i];
       // Before the first break, a line is either a valid/implied step or the break itself.
-      if (t.firstBreak !== null && i > t.firstBreak) return;
+      // After the first break, a line SymPy calls invalid is a SECOND error
+      // (it does not follow from the line before). Counted separately.
+      if (t.firstBreak !== null && i > t.firstBreak) {
+        if (lab === 'invalid') { s.laterErrorLines++; if (v === 'valid') s.laterErrorLinesTicked++; }
+        return;
+      }
       if (lab === 'invalid') { s.invalidLines++; if (v === 'valid') s.falseCreditLines++; }
       else { s.validLines++; if (v === 'invalid') s.falseRejectLines++; }
       if (v === 'abstain') s.abstainLines++;
@@ -216,6 +216,8 @@ function score(name, marks) {
     falseCreditSolutions: pct(s.falseCreditSolutions, s.wrongSolutions),
     falseRejectSolutions: pct(s.falseRejectSolutions, s.correctSolutions),
     firstBreakExact: pct(s.firstBreakExact, s.firstBreakTotal),
+    firstBreakExactOfAllWrong: pct(s.firstBreakExact, s.wrongSolutions),
+    laterErrorLinesTicked: pct(s.laterErrorLinesTicked, s.laterErrorLines),
     falseCreditLines: pct(s.falseCreditLines, s.invalidLines),
     falseRejectLines: pct(s.falseRejectLines, s.validLines),
     abstainOnCorrect: pct(s.abstainOnCorrect, s.correctSolutions),
@@ -230,6 +232,8 @@ const report = { date: new Date().toISOString().slice(0, 10), commit: execFileSy
 
 const engineMarks = Object.fromEntries(judged.map(i => [i.id, engineMark(i)]));
 report.contenders.push(score('Pri deterministic engine', engineMarks));
+const strictMarks = Object.fromEntries(judged.map(i => [i.id, engineMark(i, { ignoreIncompleteNote: true })]));
+report.engineWithoutIncompleteRule = score('Engine, scoring a ticked "still to find" line as credit', strictMarks).rates;
 writeFileSync(join(HERE, 'results', 'engine.json'), JSON.stringify(engineMarks, null, 1));
 
 if (!flag('engine-only')) {
@@ -242,13 +246,14 @@ if (!flag('engine-only')) {
   const conc = Number(arg('concurrency', 6));
   for (const name of names) {
     const model = MODELS[name];
-    const cacheFile = join(HERE, 'results', `${name}.run1.jsonl`);
+    const cacheFile = join(HERE, 'results', `${name}.v2.run1.jsonl`);
     const done = existsSync(cacheFile) ? Object.fromEntries(readFileSync(cacheFile, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)).map(r => [r.id, r])) : {};
     const todo = judged.filter(i => !done[i.id]);
     console.error(`${model.label}: ${todo.length} to mark (${Object.keys(done).length} cached)`);
+    const failed = [];
     await runPool(todo.map(item => async () => {
       try { const r = { id: item.id, ...(await llmMark(model, item)) }; appendFileSync(cacheFile, JSON.stringify(r) + '\n'); done[item.id] = r; }
-      catch (e) { console.error(`${model.label} ${item.id}: ${e?.status || ''} ${String(e?.message || e).slice(0, 160)}`); }
+      catch (e) { failed.push(item.id); console.error(`${model.label} ${item.id}: ${e?.status || ''} ${String(e?.message || e).slice(0, 160)}`); }
     }), conc);
     const sc = score(model.label, done);
     const tokens = Object.values(done).reduce((a, r) => ({ input: a.input + (r.usage?.input || 0), output: a.output + (r.usage?.output || 0) }), { input: 0, output: 0 });
@@ -257,15 +262,19 @@ if (!flag('engine-only')) {
     const lat = Object.values(done).map(r => r.ms).filter(Boolean).sort((a, b) => a - b);
     sc.latencyMs = { median: lat[Math.floor(lat.length / 2)] || null, p90: lat[Math.floor(lat.length * 0.9)] || null };
     sc.refusals = Object.values(done).filter(r => r.refusal).length;
+    sc.failedCalls = failed.length;
+    sc.unmarked = judged.length - Object.keys(done).length;
     sc.parseErrors = Object.values(done).filter(r => r.parseError).length;
 
     // Consistency: re-mark a fixed sample and compare solution verdicts.
     const reruns = Number(arg('reruns', 1));
     if (reruns > 1) {
-      const sample = judged.slice(0, Number(arg('rerun-sample', 30)));
+      // A seeded random sample across all areas (not the first, easiest items).
+      let seed = 20261118; const rnd = () => (seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648;
+      const sample = [...judged].map(i => [rnd(), i]).sort((a, b) => a[0] - b[0]).slice(0, Number(arg('rerun-sample', 30))).map(x => x[1]);
       let same = 0, total = 0;
       for (let r = 2; r <= reruns; r++) {
-        const rf = join(HERE, 'results', `${name}.run${r}.jsonl`);
+        const rf = join(HERE, 'results', `${name}.v2.run${r}.jsonl`);
         const prev = existsSync(rf) ? Object.fromEntries(readFileSync(rf, 'utf8').split('\n').filter(Boolean).map(l => JSON.parse(l)).map(x => [x.id, x])) : {};
         await runPool(sample.filter(i => !prev[i.id]).map(item => async () => {
           try { const x = { id: item.id, ...(await llmMark(model, item)) }; appendFileSync(rf, JSON.stringify(x) + '\n'); prev[item.id] = x; } catch {}

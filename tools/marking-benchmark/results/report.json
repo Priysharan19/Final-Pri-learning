@@ -1,6 +1,6 @@
 {
  "date": "2026-11-17",
- "commit": "5d21291d5",
+ "commit": "354e8a70a",
  "corpus": {
   "total": 248,
   "judged": 248,
@@ -17,12 +17,14 @@
    "abstainOnCorrect": 21,
    "abstainOnWrong": 29,
    "firstBreakExact": 126,
-   "firstBreakTotal": 148,
-   "invalidLines": 148,
+   "firstBreakTotal": 149,
+   "invalidLines": 149,
    "falseCreditLines": 0,
-   "validLines": 273,
+   "validLines": 271,
    "falseRejectLines": 0,
-   "abstainLines": 94,
+   "abstainLines": 93,
+   "laterErrorLines": 26,
+   "laterErrorLinesTicked": 25,
    "examples": [
     {
      "kind": "FALSE-CREDIT",
@@ -32,7 +34,9 @@
    "rates": {
     "falseCreditSolutions": "0.6%",
     "falseRejectSolutions": "0.0%",
-    "firstBreakExact": "85.1%",
+    "firstBreakExact": "84.6%",
+    "firstBreakExactOfAllWrong": "80.8%",
+    "laterErrorLinesTicked": "96.2%",
     "falseCreditLines": "0.0%",
     "falseRejectLines": "0.0%",
     "abstainOnCorrect": "22.8%",
@@ -43,6 +47,84 @@
     "usd": 0,
     "note": "runs on our own server"
    }
+  },
+  {
+   "name": "OpenAI gpt-5.6-terra (Pri server model)",
+   "items": 248,
+   "wrongSolutions": 156,
+   "correctSolutions": 92,
+   "falseCreditSolutions": 2,
+   "falseRejectSolutions": 3,
+   "abstainOnCorrect": 0,
+   "abstainOnWrong": 0,
+   "firstBreakExact": 145,
+   "firstBreakTotal": 149,
+   "invalidLines": 149,
+   "falseCreditLines": 4,
+   "validLines": 271,
+   "falseRejectLines": 5,
+   "abstainLines": 0,
+   "laterErrorLines": 26,
+   "laterErrorLinesTicked": 2,
+   "examples": [
+    {
+     "kind": "FALSE-CREDIT",
+     "id": "eq-026"
+    },
+    {
+     "kind": "FALSE-CREDIT",
+     "id": "eq-034"
+    },
+    {
+     "kind": "false-reject",
+     "id": "ex-082"
+    },
+    {
+     "kind": "false-reject",
+     "id": "ex-pr1005-domain"
+    },
+    {
+     "kind": "false-reject",
+     "id": "ex-pr1005-foreign"
+    }
+   ],
+   "rates": {
+    "falseCreditSolutions": "1.3%",
+    "falseRejectSolutions": "3.3%",
+    "firstBreakExact": "97.3%",
+    "firstBreakExactOfAllWrong": "92.9%",
+    "laterErrorLinesTicked": "7.7%",
+    "falseCreditLines": "2.7%",
+    "falseRejectLines": "1.8%",
+    "abstainOnCorrect": "0.0%",
+    "abstainOnWrong": "0.0%"
+   },
+   "cost": {
+    "input": 117698,
+    "output": 28288,
+    "usd": null,
+    "note": "price not recorded; tokens only"
+   },
+   "latencyMs": {
+    "median": 3065,
+    "p90": 4566
+   },
+   "refusals": 0,
+   "failedCalls": 0,
+   "unmarked": 0,
+   "parseErrors": 0,
+   "consistency": "100.0% of 60 re-marks gave the same solution verdict"
   }
- ]
+ ],
+ "engineWithoutIncompleteRule": {
+  "falseCreditSolutions": "3.2%",
+  "falseRejectSolutions": "0.0%",
+  "firstBreakExact": "81.9%",
+  "firstBreakExactOfAllWrong": "78.2%",
+  "laterErrorLinesTicked": "96.2%",
+  "falseCreditLines": "2.7%",
+  "falseRejectLines": "0.0%",
+  "abstainOnCorrect": "22.8%",
+  "abstainOnWrong": "18.6%"
+ }
 }
