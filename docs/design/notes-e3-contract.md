@@ -130,7 +130,8 @@ unless stated. Every interactive kind has a static counterpart for questions and
 - `vectorExplorer` (interactive; counterpart `vector`) — `{ a: [x,y], b: [x,y], mode: 'sum'|'difference'|'scalar'|'dot'|'projection' }`.
 - `matrix2d` (static) and `matrixTransform` (interactive) — `{ m: [[a,b],[c,d]] }`: the unit square and its image; area = $|\det|$.
 - `space3d` (static) — `{ points: [{ x, y, z, label }], vectors: [{ from, to, label }], lines?: [{ point, dir, label }], planes?: [{ n: [a,b,c], d }], box? }`
-  in oblique projection with labelled axes.
+  in oblique projection with labelled axes. A plane `{ n: [a,b,c], d }` is $\vec n\cdot\vec r=d$, i.e. $ax+by+cz=d$ (not $+d=0$);
+  it is drawn as the patch where it crosses the box of the axes, and its axis intercepts are stated in the description.
 - `solidExplorer` (interactive; counterpart `solid`) — `{ shape: 'rectPrism'|'cylinder'|'cone'|'sphere'|'pyramid'|'hemisphere', dims sliders }`:
   volume and surface area with the numbers substituted.
 
