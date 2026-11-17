@@ -106,9 +106,16 @@ let PYQ_ARCHIVE_MEASURED = null;
 // sign-in that follows. Notes fonts and the diagram kit stay on demand. The
 // other three ceilings are unchanged.
 
+// Raised again 2026-11-18 (train editions-24, CTO under the same owner
+// decision): FIRST_VISIT_RAW only, 3,600,000 -> 3,700,000 bytes. The train-24
+// tree (21 branches: Progress rebuilt around evidence and the syllabus board,
+// Check-what-Pri-read, auto-read handwriting, sign-in design, passkey work)
+// measured 3,543 kB (about 3,628,000 bytes) against the 3,516 kB ceiling. The
+// new ceiling leaves about 70 kB. The other three ceilings are unchanged.
+
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 3_600_000;
+const FIRST_VISIT_RAW_CEILING = 3_700_000;
 const FIRST_VISIT_GZIP_CEILING = 1_290_000;
 
 // Things that must never be in the install again, and what each one costs.
