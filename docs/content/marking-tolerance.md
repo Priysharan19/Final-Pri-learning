@@ -26,7 +26,7 @@ Equivalent exact forms (`1/2`, `0.5`, `2/4`, `√8`, `2√2`, `2 1/2`) are all r
 
 | Flag on `answer` | Rule |
 |---|---|
-| `requireExact: true` | the value must match the exact band even when written as a decimal: `1/3` and `0.333333333333` pass, `0.333` does not ("this question wants an exact value") |
+| `requireExact: true` | a decimal is the exact value only when it is that value to binary64 precision — within `max(1e-12, |t|·8ε)`: `1/3`, `0.333333333333` and `6.283185307179586` (for `2π`) pass; `0.333`, a calculator's display such as `2.3561944902` for `3π/4`, `28.2743338823` for `9π`, and `4.0000000001` for `4` do not ("this question wants an exact value"). The same band holds for a whole-number key that demands a fraction (`requireFraction`). Found by the SymPy differential oracle (`docs/evidence/sympy-oracle-2026-11-18.md`) |
 | `simplestFraction: {n, d}` | the fraction must be in lowest terms when the prompt asks for a fraction; where the prompt never asked, the exact decimal passes but a rounded one does not |
 | `surdForm: {k, r}` | `k√r` exactly; an equivalent unsimplified surd is refused with its reason |
 | `percent: true` | `25`, `25%` and `0.25` are one answer; the `%` sign alone is never a second chance (`0.25%` is wrong). Without the flag, a prompt that asks for a *percentage* still reads the written `%` (`25%` passes) but a bare `0.25` is not 25 |

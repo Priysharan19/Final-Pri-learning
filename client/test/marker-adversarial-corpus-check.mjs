@@ -204,8 +204,44 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   else failures.push(`${G} · c10-arithmetic-progressions D2 seed 1009: normal [${normal}] vs slow clock [${slow}]`);
 }
 
+// ── SymPy differential oracle, 2026-11-18 · 34 cases ────────────────────────
+// tools/math-oracle found the checker crediting each wrong answer below
+// (docs/evidence/sympy-oracle-2026-11-18.md): a calculator display of an exact
+// value on a question that demands the exact value, and final-answer
+// expressions that agree with the key only at the published sample points or
+// only within the 1e-6 sampling band. Each sits beside a right answer the
+// repair must keep. Not covered, and recorded as residual in the report: a
+// perturbation below binary64 noise of a large expression ((x² + 9)⁶/3 +
+// 0.0000001x), which sampling cannot see; that needs an exact polynomial path.
+{
+  const G = 'sympy-oracle-2026-11-18';
+  const exprQ = (expr, extra = {}) => ({ answerType: 'expression', answer: { expr, ...extra } });
+  const vanishing = '(x - 0.7)(x - 1.3)(x + 0.6)(x - 2.1)(x + 1.7)(x - 0.35)(x - 3.4)(x + 2.3)';
+  for (const [id, d, seed, right, wrong] of [
+    ['me11-inversetrig', 4, 28001, ['3pi/4', '2.356194490192345'], ['2.3561944902', '2.356194490', '2.35619449']],
+    ['me12-calc', 3, 21002, ['1400pi/3'], ['1466.076572', '1466.0765716752']],
+    ['me12-calc', 3, 21001, ['9pi'], ['28.2743338823']],
+    ['y11-trigfunc', 1, 7001, ['4', '4.0'], ['4.0000000001']],
+    ['y12-trigcalc', 3, 21001, ['-1'], ['-0.9999999999']],
+    ['c8-rational-numbers-distributivity', 4, 28001, ['0'], ['0.0000000001']],
+    ['y9-algebra', 3, 21001, ['(x - 13)(x + 13)'], ['x^2 - 169 + 0.0000001*x', `x^2 - 169 + ${vanishing}`]],
+    ['mex-proof', 3, 21001, ['32n'], ['32*n + 0.00001*n']],
+    ['y11-diff', 1, 7001, ['18x'], ['18*x + 0.00001*x']]
+  ]) {
+    const q = generateQuestion(id, d, seed);
+    for (const r of right) expect(G, `${id}-right-${r}`, q, r, true);
+    for (const w of wrong) expect(G, `${id}-wrong-${w.slice(0, 24)}`, q, w, false);
+  }
+  const square = exprQ('x^2');
+  for (const r of ['x*x', '(-x)^2', 'x^2']) expect(G, `x^2-right-${r}`, square, r, true);
+  for (const w of ['x^2 + 0.0000001x', `x^2 + ${vanishing}`, 'x^2 + 0.000001x^3']) expect(G, `x^2-wrong-${w.slice(0, 24)}`, square, w, false);
+  const thirdExact = { answerType: 'numeric', prompt: 'Find the exact value.', answer: { value: 1 / 3, requireExact: true } };
+  for (const r of ['1/3', '0.333333333333']) expect(G, `third-right-${r}`, thirdExact, r, true);
+  for (const w of ['0.3333333333', '0.33333333']) expect(G, `third-wrong-${w}`, thirdExact, w, false);
+}
+
 // ── Counts are part of the contract ─────────────────────────────────────────
-const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11 };
+const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 34 };
 for (const [g, n] of Object.entries(EXPECTED)) if (groups[g]?.total !== n) failures.push(`${g}: built ${groups[g]?.total} cases, the corpus has ${n}`);
 
 const pass = Object.values(groups).reduce((s, g) => s + g.pass, 0);

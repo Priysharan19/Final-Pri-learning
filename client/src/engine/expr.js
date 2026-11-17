@@ -680,6 +680,39 @@ const domainEval = (ast, env) => evaluate(ast, env, DOMAIN_EVAL);
 const domainEnv = ({ e, pi, ...env }) => env;
 /** Do two sampled values differ beyond rounding? */
 const apart = (u, v) => abs(u - v) > 1e-6 * Math.max(1, abs(u), abs(v));
+/** …or beyond binary64 evaluation noise alone (the final-answer probe). */
+const apartTight = (u, v) => abs(u - v) > 1e-9 * Math.max(1, abs(u), abs(v));
+
+/** FNV-1a over both sides as written: the probe points follow from the answer, not from a published table. */
+function probeSeed(a, b) {
+  const text = `${typeof a === 'string' ? a : JSON.stringify(a)}\u0000${typeof b === 'string' ? b : JSON.stringify(b)}`;
+  let h = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+  return h || 1;
+}
+
+/**
+ * Do the two sides agree at six further points drawn from `seed` (xorshift32),
+ * to within evaluation noise? A point where either side is undefined says
+ * nothing and is skipped; the domain probe judges definedness.
+ */
+function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed) {
+  let x = seed >>> 0;
+  const next = () => { x ^= x << 13; x >>>= 0; x ^= x >>> 17; x ^= x << 5; x >>>= 0; return x / 4294967296; };
+  for (let k = 0; k < 6; k++) {
+    const env = {};
+    for (const n of names) {
+      const u = next();
+      if (integers.has(n)) { env[n] = 1 + Math.floor(u * 8); continue; }
+      env[n] = domain[0] + u * (domain[1] - domain[0]);
+      if (positiveOnly) env[n] = abs(env[n]) + 0.3;
+    }
+    const va = evaluate(astA, env), vb = evaluate(astB, env);
+    if (!fin(va) || !fin(vb)) continue;
+    if (apartTight(va, vb)) return false;
+  }
+  return true;
+}
 
 // Guard kinds, one letter each because they ship in the install bundle:
 // 'z' must be nonzero (a denominator, a tan/sec/cosec/cot pole), 'p' must be
@@ -1007,6 +1040,13 @@ function exprEquivalentUncached(a, b, opts) {
     }
   }
   if (!(valid >= Math.min(3, needed) && matches === valid)) return false;
+  // A final answer is also checked at points the student cannot know in
+  // advance, and there to within rounding noise only. The fixed samples above
+  // are published in this file, so a polynomial that vanishes at all of them
+  // (x² + (x − 0.7)(x − 1.3)…(x + 2.3)) agreed with x² there, and the 1e-6 band
+  // forgave a coefficient written one part in ten million off (x² + 0.0000001x).
+  // Both were marked right for x² (SymPy differential oracle, 2026-11-18).
+  if (finalAnswer && !agreesAtProbes(astA, astB, names, integers, domain, opts.positiveOnly, probeSeed(a, b))) return false;
   if (finalAnswer) {
     // Without an authored domain, look along the whole real line: a hole at
     // x = 25 is as real as one at x = 1.
