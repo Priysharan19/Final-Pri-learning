@@ -252,7 +252,11 @@ export function workingOf(transcript) { return includedLines(transcript).join('\
 /** The student's own edit of one line. The reader's text stays in `read`. */
 export function editLine(transcript, index, text) {
   const value = markerText(String(text ?? '').replace(/\n/g, ' '));
-  return { ...transcript, lines: transcript.lines.map((l, i) => (i === index ? { ...l, text: value, edited: value.trim() !== String(l.read).trim() } : l)) };
+  return { ...transcript, lines: transcript.lines.map((l, i) => (i === index ? { ...l, text: value, edited: value.trim() !== String(l.read).trim(), confirmed: false } : l)) };
+}
+/** The student says the reader's text for this line is what they wrote (nothing changed). */
+export function confirmLine(transcript, index) {
+  return { ...transcript, lines: transcript.lines.map((l, i) => (i === index ? { ...l, confirmed: true } : l)) };
 }
 /** Leave one line out of the answer, or bring it back. Chosen by the student from here on. */
 export function setLineExcluded(transcript, index, excluded) {
@@ -264,7 +268,7 @@ export function includeAll(transcript) {
 }
 export const defaultExclusions = transcript => (transcript?.lines || []).filter(l => l.excluded && l.why !== 'student').length;
 /** Lines that still ask to be checked: doubted by the reader and neither edited nor left out. */
-export const linesToCheck = transcript => (transcript?.lines || []).filter(l => l.check && !l.edited && !l.excluded).length;
+export const linesToCheck = transcript => (transcript?.lines || []).filter(l => l.check && !l.edited && !l.confirmed && !l.excluded).length;
 
 /** A stored transcript is data from disk: keep only what this module wrote. */
 export function reviveTranscript(value) {
@@ -277,7 +281,8 @@ export function reviveTranscript(value) {
     gapBefore: l?.gapBefore === true,
     excluded: l?.excluded === true,
     why: ['before-question', 'after-break', 'student'].includes(l?.why) ? l.why : null,
-    edited: l?.edited === true
+    edited: l?.edited === true,
+    confirmed: l?.confirmed === true
   }));
   return lines.length ? { lines, undecided: value.undecided === true, anchor: Number.isInteger(value.anchor) ? value.anchor : null } : null;
 }
