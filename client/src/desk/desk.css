@@ -27,3 +27,8 @@
 .dk-history a { display: inline-flex; align-items: center; min-height: 44px; color: var(--in-tx); }
 .dk-preview-paper { font-weight: 600; }
 .dk-choose { display: grid; gap: 6px; width: 100%; }
+
+/* Quieter desk: secondary controls are medium weight, the paper's provenance is small print, and the clock keeps the weight. */
+.xs-room .btn-ghost { font-weight: 500; }
+.xs-room .xs-paper-source, .xs-room .xs-paper-disclaimer, .xs-room .xs-paper-note { font-size: 0.8125rem; line-height: 1.5; max-width: 68ch; }
+.xs-room .xs-paper-link { align-self: flex-start; }
