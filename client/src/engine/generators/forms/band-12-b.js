@@ -167,7 +167,8 @@ const proofs = [
 // ── olymp-combinatorics ──────────────────────────────────────────────────────
 const combos = [
   { form: 'either-or', make(rng, d) {
-    const a = ri(rng, 2, 25), b = ri(rng, 2, 25), N = ri(rng, 40, 400 * d);
+    let a = 0, b = 0; do { a = ri(rng, 2, 25); b = ri(rng, 2, 25); } while (a === b);
+    const N = ri(rng, 40, 400 * d);
     return {
       payload: numeric('either-or', `How many integers from $1$ to $${N}$ are divisible by $${a}$ or by $${b}$ (or both)?`, Math.floor(N / a) + Math.floor(N / b) - Math.floor(N / lcm(a, b)), {
         hints: ['Count the multiples of each number separately.', 'Numbers divisible by both are counted twice; they are the multiples of the lowest common multiple.', 'Subtract that overlap once.'],
@@ -178,7 +179,8 @@ const combos = [
     };
   } },
   { form: 'neither', make(rng, d) {
-    const a = ri(rng, 2, 25), b = ri(rng, 2, 25), N = ri(rng, 40, 400 * d);
+    let a = 0, b = 0; do { a = ri(rng, 2, 25); b = ri(rng, 2, 25); } while (a === b);
+    const N = ri(rng, 40, 400 * d);
     return {
       payload: numeric('neither', `How many integers from $1$ to $${N}$ are divisible by neither $${a}$ nor $${b}$?`, N - (Math.floor(N / a) + Math.floor(N / b) - Math.floor(N / lcm(a, b))), {
         hints: ['Count the numbers that are divisible by at least one of them first.', 'Use inclusion–exclusion, subtracting the multiples of the lowest common multiple once.', 'The numbers divisible by neither are everything that is left.'],
@@ -219,7 +221,9 @@ function factorial(n) { return n <= 1 ? 1 : n * factorial(n - 1); }
 // ── c12-random-variable ──────────────────────────────────────────────────────
 const dist = [
   { form: 'weighted-mean', make(rng, d) {
-    const v = [ri(rng, 0, R(d)), ri(rng, 0, R(d)), ri(rng, 0, R(d))], p1 = ri(rng, 1, 8), p2 = ri(rng, 1, 9 - p1), p3 = 10 - p1 - p2, p = [p1, p2, p3];
+    const v = [];
+    while (v.length < 3) { const x = ri(rng, 0, R(d)); if (!v.includes(x)) v.push(x); }
+    const p1 = ri(rng, 1, 8), p2 = ri(rng, 1, 9 - p1), p3 = 10 - p1 - p2, p = [p1, p2, p3];
     return {
       payload: numeric('weighted-mean', `A random variable $X$ takes the values $${v[0]}$, $${v[1]}$ and $${v[2]}$ with probabilities $${p1 / 10}$, $${p2 / 10}$ and $${p3 / 10}$. Find $E(X)$.`, r6(v.reduce((s, x, i) => s + x * p[i], 0) / 10), {
         hints: ['Check that the probabilities add to $1$.', 'Multiply each value by its probability.', 'Add the three products.'],
@@ -230,7 +234,7 @@ const dist = [
     };
   } },
   { form: 'missing-probability', make(rng, d) {
-    const a = ri(rng, 1, 3), b = ri(rng, 1, 3), c = ri(rng, 1, 3), k = 10 - a - b - c, vals = [1, 2, 3, 4].map(x => x * ri(rng, 1, 1 + d));
+    const a = ri(rng, 1, 3), b = ri(rng, 1, 3), c = ri(rng, 1, 3), k = 10 - a - b - c, vals = [1, 2, 3, 4].map(x => x * 5 + ri(rng, 0, d));
     return {
       payload: numeric('missing-probability', `The distribution of $X$ is $P(X = ${vals[0]}) = ${a / 10}$, $P(X = ${vals[1]}) = ${b / 10}$, $P(X = ${vals[2]}) = ${c / 10}$ and $P(X = ${vals[3]}) = k$. Find $k$.`, r6(k / 10), {
         hints: ['The probabilities of all values of a random variable add to $1$.', 'Add the three given probabilities.', 'Subtract the total from $1$.'],
@@ -384,9 +388,10 @@ const geom = [
     };
   } },
   { form: 'coordinate-area', make(rng, d) {
-    const R2 = 5 + 4 * d, pts = Array.from({ length: 3 }, () => [ri(rng, -R2, R2), ri(rng, -R2, R2)]);
-    const area2 = Math.abs(pts[0][0] * (pts[1][1] - pts[2][1]) + pts[1][0] * (pts[2][1] - pts[0][1]) + pts[2][0] * (pts[0][1] - pts[1][1]));
-    if (area2 === 0) pts[2][0] += 1;
+    const R2 = 5 + 4 * d;
+    let pts;
+    const cross = p => Math.abs(p[0][0] * (p[1][1] - p[2][1]) + p[1][0] * (p[2][1] - p[0][1]) + p[2][0] * (p[0][1] - p[1][1]));
+    do { pts = Array.from({ length: 3 }, () => [ri(rng, -R2, R2), ri(rng, -R2, R2)]); } while (cross(pts) === 0);
     const a2 = Math.abs(pts[0][0] * (pts[1][1] - pts[2][1]) + pts[1][0] * (pts[2][1] - pts[0][1]) + pts[2][0] * (pts[0][1] - pts[1][1]));
     return {
       payload: numeric('coordinate-area', `Find the area of the triangle with vertices $(${pts[0]})$, $(${pts[1]})$ and $(${pts[2]})$, in square units.`, a2 / 2, {

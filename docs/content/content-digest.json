@@ -1,5 +1,5 @@
 {
- "contentVersion": "2026.11.18",
+ "contentVersion": "2026.11.19",
  "draws": 6,
  "generators": {
   "c10-ap-daily-life-reasoning": "89254f1516b2b89a",
@@ -135,8 +135,8 @@
   "c12-optimisation-reasoning": "e49739aacb26cc23",
   "c12-principal-value-reasoning": "292d5340b746f097",
   "c12-probability-bayes": "b7d48318c9d9f723",
-  "c12-random-variable": "0f1a98599f7d605c",
-  "c12-rate-approximation-reasoning": "f1e93d98196f7f99",
+  "c12-random-variable": "b430e521a923643e",
+  "c12-rate-approximation-reasoning": "e9923620814f3fd7",
   "c12-related-rates-reasoning": "500a9960fd6c8cbd",
   "c12-relations-equivalence": "ea85a631a2083e76",
   "c12-vector-algebra": "769ddbc912fd1810",

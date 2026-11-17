@@ -287,7 +287,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `c11-complex-quadratic-jee-reasoning` | 4 | 47.3k | 101 | — |
 | `c7-angle-pair-reasoning` | 4 | 47.8k | 34 | — |
 | `c12-continuity-mvt` | 4 | 48.8k | 44 | — |
-| `olymp-number-theory` | 4 | 49.6k | 21 | — |
+| `olymp-number-theory` | 4 | 49.7k | 21 | — |
 | `c11-line-equation-jee-reasoning` | 4 | 50.8k | 6 | — |
 | `c8-gst-reasoning` | 4 | 55.4k | 357 | — |
 | `c12-differentiation-rules` | 4 | 55.4k | 47 | — |

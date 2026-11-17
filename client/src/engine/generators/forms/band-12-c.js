@@ -153,7 +153,9 @@ const numTheory = [
     };
   } },
   { form: 'gcd-built', make(rng, d) {
-    const g = ri(rng, 2, R(d)), u = ri(rng, 2, 20), v = ri(rng, 2, 20);
+    let u = 0, v = 0;
+    do { u = ri(rng, 2, 20); v = ri(rng, 2, 20); } while (u === v);
+    const g = ri(rng, 2, R(d));
     let a = u, b = v; while (b) [a, b] = [b, a % b];
     const A = g * u / a, B = g * v / a; // gcd(A,B) = g
     return {
@@ -384,7 +386,7 @@ const approx = [
     let a, e;
     do { a = ri(rng, 2, R(d)); e = ri(rng, 1, 99) / 100; } while (Math.abs((((e / (2 * a)) * 1000) % 1) - 0.5) < 0.01);
     return {
-      payload: numeric('root-approx', `Using differentials, approximate $\\sqrt{${a * a + e}}$ correct to $3$ decimal places, using $\\sqrt{${a * a}} = ${a}$.`, r6(Math.round((a + e / (2 * a)) * 1000) / 1000), {
+      payload: numeric('root-approx', `Using the linear approximation (the differential) from $\\sqrt{${a * a}} = ${a}$, estimate $\\sqrt{${a * a + e}}$, giving the estimate to $3$ decimal places.`, r6(Math.round((a + e / (2 * a)) * 1000) / 1000), {
         hints: ['Treat $\\sqrt{x}$ near $x = ' + a * a + '$ as a linear function.', "The derivative of $\\sqrt{x}$ is $\\dfrac{1}{2\\sqrt{x}}$.", 'Add (derivative $\\times$ change) to the known root.'],
         steps: [{ h: 'Differential', d: `$d(\\sqrt{x}) = \\dfrac{dx}{2\\sqrt{x}} = \\dfrac{${e}}{${2 * a}}$` }, { h: 'Add', d: `$${a} + $ that` }],
         traps: [{ value: a + e, why: 'The root changes by $dx/(2\\sqrt x)$, not by $dx$.' }]
