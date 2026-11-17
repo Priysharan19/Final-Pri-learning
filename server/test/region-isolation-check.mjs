@@ -233,7 +233,8 @@ try {
   const countRows = async (store, table) => { try { return Number((await store.get(`SELECT count(*) AS n FROM ${table}`)).n); } catch { return null; } };
   const before = await countRows(storeB, 'billing_events');
   const hook = await b('/v1/billing/webhook/web', { method: 'POST', body: { event: 'subscription.activated', payload: { subscription: { entity: { id: 'sub_region_a', notes: { accountId: studentA.account.id } } } } }, headers: { 'X-Razorpay-Signature': '00'.repeat(32) } });
-  c.ok(hook.status >= 400 && hook.status < 500, `B refuses a Razorpay webhook meant for A (${hook.status} ${errorCode(hook)})`);
+  // B's web provider is Stripe: a Razorpay delivery is a 4xx (bad signature), or, on a server with no Stripe configuration at all, a 503 "not configured". Either way it is not applied (rows checked below).
+  c.ok((hook.status >= 400 && hook.status < 500) || (hook.status === 503 && errorCode(hook) === 'BILLING_PROVIDER_NOT_CONFIGURED'), `B refuses a Razorpay webhook meant for A (${hook.status} ${errorCode(hook)})`);
   c.eq(await countRows(storeB, 'billing_events'), before, 'and writes no billing event');
   c.eq(Number((await storeB.get('SELECT count(*) AS n FROM entitlement_snapshots WHERE account_id = ?', [studentA.account.id])).n), 0, 'and grants A\'s account nothing in B');
 
