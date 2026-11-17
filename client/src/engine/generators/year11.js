@@ -497,7 +497,7 @@ export const year11 = {
     const x = nz(rng, -4, 5), y = ri(rng, -5, 6);
     const m1 = nz(rng, -3, 3);
     let m2 = nz(rng, -3, 3);
-    if (m2 === m1) m2 = m1 === 3 ? -3 : m1 + 1;
+    if (m2 === m1) m2 = m1 === 3 ? -3 : m1 === -1 ? 1 : m1 + 1;   // distinct and never 0, which would print as "y =  + 2"
     const c1 = y - m1 * x, c2 = y - m2 * x;
     return {
       prompt: `Find the point of intersection of $y = ${term(m1)} ${sgn(c1)}$ and $y = ${term(m2)} ${sgn(c2)}$.`,

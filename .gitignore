@@ -68,3 +68,6 @@ __pycache__/
 # never committed; review work-in-progress stays local too.
 tools/jee-question-department/cache/
 tools/jee-question-department/work/
+
+# Examiner kit zips are build output (node tools/examiner-kits.mjs)
+artifacts/examiner-kits/
