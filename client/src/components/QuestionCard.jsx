@@ -641,7 +641,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setPdfPageCount(0);
     // Even a rejected, signed-out replacement invalidates an older in-flight
     // provider response; authentication state cannot revive the old image.
-    ++photoReadGeneration.current;
+    const generation = ++photoReadGeneration.current;
     if (!cloudReadingEnabled(user)) {
       const block = readerBlock(user);
       setPhotoOCR({
