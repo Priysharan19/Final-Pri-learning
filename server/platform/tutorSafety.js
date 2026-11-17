@@ -51,8 +51,17 @@ const COPY = Object.freeze({
 });
 
 // ── Reading the student's own words ─────────────────────────────────────────
+// Contractions are expanded BEFORE apostrophes go: stripping them first turned
+// "I'm hopeless" into "im hopeless" and "I'll always be here" into "ill always
+// be here", which no "i am" / "i will" pattern read (AI red-team, 2026-11-18).
+// A bare "im" (typed without the apostrophe) is "i am" too; "ill" alone stays a word.
 const norm = value => String(value ?? '').normalize('NFKC').toLowerCase()
-  .replace(/[​-‍﻿­]/g, '').replace(/['’`´]/g, '')
+  .replace(/[​-‍﻿­]/g, '')
+  .replace(/\b(i)['’`´]m\b/g, 'i am').replace(/\bim\b/g, 'i am')
+  .replace(/\b(i|you|we|they|he|she)['’`´]ll\b/g, '$1 will')
+  .replace(/\b(you|we|they)['’`´]re\b/g, '$1 are').replace(/\byoure\b/g, 'you are')
+  .replace(/\b(i|you|we|they)['’`´]ve\b/g, '$1 have')
+  .replace(/['’`´]/g, '')
   .replace(/[^\p{L}\p{M}\p{N}]+/gu, ' ').replace(/\s+/g, ' ').trim();
 
 // Linear patterns on the normalised text: every alternation is bounded, none nests a quantifier.
@@ -69,6 +78,7 @@ const DISTRESS = [
   /\b(better|best) off (dead|without me)\b/, /\bwish i (was|were) (dead|never born)\b/,
   /\bi (hate|cant stand) myself\b/, /\bnobody (cares|loves me) (about me)?\b/,
   /\bi (am|m|feel|feeling) (so |really )?(hopeless|worthless|depressed)\b/,
+  /\bi am (feeling|so|really|very) (so |really |very )?(hopeless|worthless|depressed|alone)\b/,
   /\b(someone|somebody|he|she|they|my [a-z]+) (is |are |keeps )?(hitting|beating|hurting|touching|abusing|threatening) me\b/,
   /\bwish i (wasnt|was not|werent|were not) (here|born|alive|around)\b/, /\b(dont|do not) want to go on\b/, /\bi hate my (own )?life\b/, /\bkill me\b/, /\bno point (anymore|any more|in anything)\b/, /\bdont see the point( anymore| any more)?\b/,
   /\b(want|wanna|going) to (sleep|go to sleep) forever\b/, /\bsleep forever\b/, /\btook too many (pills|tablets)\b/, /\b(overdose|overdosing)\b/, /\bending (everything|my pain)\b/, /\bend everything\b/,
@@ -123,7 +133,9 @@ const OUTPUT = [
   // relationship, friendship, dependency
   /\bi (am|m) your (friend|buddy|bestie|best friend|bff|girlfriend|boyfriend|companion|teacher friend)\b/, /\b(we are|were) (friends|best friends)\b/,
   /\bi (love|miss|adore) you\b/, /\bi (will|ll) (always )?(be (here|there|with you)|never leave you)\b/, /\byou can (always )?(rely|depend|count) on me\b/,
-  /\byou (dont|do not) need (anyone|anybody|your (friends|parents|family))\b/, /\b(only|just) i (understand|care)\b/, /\bcome back (to me )?(whenever|when) you (feel|are) (sad|lonely|alone|down)\b/,
+  /\byou (dont|do not) need (anyone|anybody|your (friends|parents|family))\b/,
+  /\bi (really |truly |do |so )?(care (about|for)|love) you\b/, /\b(more|better) than anyone( else)?\b/,
+  /\b(only|just) one (i|you) (talk|can talk|trust) to\b|\byou are the only one (i|who)\b/, /\bi (will|am) always (be )?(here|there) for you\b/, /\b(only|just) i (understand|care)\b/, /\bcome back (to me )?(whenever|when) you (feel|are) (sad|lonely|alone|down)\b/,
   // personal questions
   /\b(what is|whats|tell me|share) your (full )?(name|age|address|phone number|phone|email|school|city|password|birthday)\b/, /\bwhere do you (live|study|go to school)\b/,
   /\b(send|share|show) me (a |your )?(photo|picture|selfie|video|number|address)\b/, /\b(whatsapp|instagram|snapchat|telegram|discord) (me|number|id|handle)\b/,

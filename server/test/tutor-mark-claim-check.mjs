@@ -1,7 +1,7 @@
 // A model explanation never states or implies a mark, and the existing guards still hold.
 import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
-import { markClaimIssues } from '../platform/tutorGuard.js';
+import { markClaimIssues, replyMarkClaimIssues, buildGuard, leakedExpressions, statedRanges } from '../platform/tutorGuard.js';
 import { diagnosisIssues, deterministicDiagnosis } from '../platform/tutor.js';
 
 let n = 0; const ok = (c, m) => { assert.ok(c, m); n += 1; };
@@ -31,9 +31,25 @@ for (const resolved of [false, true]) {
     ok(issues.includes('mark-claim'), `a mark claim in ${field} is refused (resolved=${resolved})`);
   }
 }
+// Hints, "why" and streamed replies refuse a mark claim too (AI red-team, 2026-11-18);
+// on a percentage question "percent" is the mathematics, not a score.
+const linear = { prompt: 'Solve 3x + 5 = 20.' }, pct = { prompt: 'What is 20% of 50?' };
+ok(replyMarkClaimIssues('Great work — that earns you full marks for this step!', linear).length === 1, 'a hint claiming full marks is refused');
+ok(replyMarkClaimIssues('That would score well.', linear).length === 1, 'a hint claiming a score is refused');
+ok(replyMarkClaimIssues('Think about what percent means here: per hundred.', pct).length === 0, 'percent on a percentage question is maths');
+ok(replyMarkClaimIssues('You got 100% of the marks.', pct).length === 1, 'a mark claim on a percentage question is still refused');
+// A range that brackets the answer, in any wording, is a leak.
+const g = buildGuard({ prompt: 'Solve 3x + 5 = 20.', steps: [{ h: 'Subtract 5', d: '$3x = 15$' }, { h: 'Divide by 3', d: '$x = 5$' }], answer: 'x = 5', hints: [] });
+for (const r of ['x is somewhere from 4 to 6.', 'It lies 4 to 6.', 'उत्तर 4 से 6 के बीच है।', 'उत्तर 4 से 6 तक है।', 'between 4 and 6']) {
+  ok(leakedExpressions(r, g, { prompt: 'Solve 3x + 5 = 20.' }).some(l => l.startsWith('range')), `range leak caught: ${r}`);
+}
+ok(leakedExpressions('It lies from 6 to 9.', g, { prompt: 'Solve 3x + 5 = 20.' }).every(l => !l.startsWith('range')), 'a range that does not bracket the answer is not a leak');
+ok(statedRanges('from 1 to 2').length === 1 && statedRanges('add 3 to both sides').length === 0, 'ranges are read only between two numbers');
+const t1 = Date.now(); statedRanges(`${'1 to '.repeat(4000)}1`); ok(Date.now() - t1 < 200, 'range reading stays linear');
+
 // The deterministic message never speaks of a mark either.
 for (const locale of ['en', 'hi']) {
   const d = deterministicDiagnosis({ ...request(true), locale });
   ok(markClaimIssues([d.didRight, d.wentWrong, d.nextStep].join(' ')).length === 0, `the deterministic ${locale} message states no mark`);
 }
-console.log(`TUTOR MARK CLAIM: PASS — ${n}/${n} checks — a model explanation never states a mark, linear time, deterministic message unchanged`);
+console.log(`TUTOR MARK CLAIM: PASS — ${n}/${n} checks — a model explanation or hint never states a mark, a bracketing range in any wording is a leak, linear time, deterministic message unchanged`);

@@ -349,6 +349,13 @@ export function statedValues(text) {
 const NUM = String.raw`(-?(?<!\d)\d+(?:\.\d+)?(?:\s*\/\s*\d+)?)`;
 const RANGES = [
   new RegExp(String.raw`between\s+${NUM}\s+(?:and|&)\s+${NUM}`, 'gi'),
+  // "from 4 to 6", "4 to 6", "4 से 6 तक": the same bracket in other words. (A dash
+  // range, 4–6, reaches here as subtraction and is not read; a known gap.)
+  // (AI red-team, docs/evidence/ai-redteam-2026-11-18.md: "x is somewhere from
+  // 4 to 6" reached the student). Errs towards refusal: "add 3 to 12" in a reply
+  // about a different number costs one regenerated message.
+  new RegExp(String.raw`${NUM}\s+(?:to|till|until|through|thru)\s+${NUM}`, 'gi'),
+  new RegExp(String.raw`${NUM}\s+से\s+${NUM}\s+(?:के\s+बीच|तक)`, 'g'),
   new RegExp(String.raw`${NUM}\s+(?:और|तथा)\s+${NUM}\s+के\s+बीच`, 'g'),
   new RegExp(String.raw`(?:more|greater|bigger|larger)\s+than\s+${NUM}\s+(?:and|but)\s+(?:less|smaller|fewer)\s+than\s+${NUM}`, 'gi'),
   new RegExp(String.raw`${NUM}\s*(?:<|<=|≤)\s*[a-z]\s*(?:<|<=|≤)\s*${NUM}`, 'gi'),
@@ -666,8 +673,15 @@ export function diagnosisGroundingIssues(text, { question, studentLines = [] } =
 // percentages, "out of N", "full credit", and their Hindi and Devanagari-digit
 // forms. Linear in the text; a hit sends the student the deterministic message.
 const MARK_WORDS = /\b(?:mark(?:s|ed|ing)|scor(?:e|es|ed|ing)|grad(?:e|es|ed|ing)|percent|full credit|partial credit|passed|failed)\b|[0-9०-९]\s*points?\b|(?<![ऀ-ॿ])अंक(?![ऀ-ॿ])|ग्रेड|उत्तीर्ण|अनुत्तीर्ण|[0-9०-९]\s*%/iu;
-export function markClaimIssues(text) {
+export function markClaimIssues(text, { percentIsMaths = false } = {}) {
   const s = String(text ?? '');
   if (s.length > 20_000) return ['mark-claim'];
-  return MARK_WORDS.test(s) || /\bout of\b\s*[0-9०-९]/i.test(s) ? ['mark-claim'] : [];
+  // On a question about percentages "percent" and "%" are its mathematics, not a score.
+  const t = percentIsMaths ? s.replace(/\bpercent\b|[0-9०-९]\s*%/giu, ' ') : s;
+  return MARK_WORDS.test(t) || /\bout of\b\s*[0-9०-९]/i.test(t) ? ['mark-claim'] : [];
+}
+
+/** A help, "why" or streamed reply: the same mark-claim rule, with percent read as maths where the question is about it. */
+export function replyMarkClaimIssues(text, question) {
+  return markClaimIssues(text, { percentIsMaths: /%|percent/i.test(String(question?.prompt ?? '')) });
 }
