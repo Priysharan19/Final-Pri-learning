@@ -204,7 +204,7 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   else failures.push(`${G} · c10-arithmetic-progressions D2 seed 1009: normal [${normal}] vs slow clock [${slow}]`);
 }
 
-// ── SymPy differential oracle, 2026-11-18 · 43 cases ────────────────────────
+// ── SymPy differential oracle, 2026-11-18 · 51 cases ────────────────────────
 // tools/math-oracle found the checker crediting each wrong answer below
 // (docs/evidence/sympy-oracle-2026-11-18.md, PR #993): a calculator display of an exact
 // value on a question that demands the exact value, and final-answer
@@ -243,8 +243,16 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
     [y9, 'x^2 - 169 + 0.0000001*x + (10^20 - 10^20)'], [y9, 'x^2 - 169 + 0.0000001*x + (x^12 - x^12)'],
     [y9, `x^2 - 169 + ${vanishing} + (10^20-10^20)`],
     [generateQuestion('mex-proof', 3, 21001), '32*n + 0.00001*n + (10^20 - 10^20)'],
-    [generateQuestion('y11-diff', 1, 7001), '18*x + 0.00001*x + (10^20 - 10^20)']
-  ]) expect(G, `padded-${w.slice(0, 40)}`, q, w, false);
+    [generateQuestion('y11-diff', 1, 7001), '18*x + 0.00001*x + (10^20 - 10^20)'],
+    // round 4: a zero padded just under the readability limit, and a zero
+    // defined only near the published sample points
+    [square, 'x^2 + 0.0000001x + (20000000.5 - 20000000.5)'], [square, 'x^2 + 0.0000001x + (1.1-1.1)*15000000'],
+    [y9, 'x^2 - 169 + 0.0000001*x + (1.1-1.1)*10^9'],
+    [generateQuestion('mex-proof', 3, 21001), '32n + 0.00001n + (1.1-1.1)*640000000n'],
+    [generateQuestion('mex-proof', 3, 21001), '32n + 0.000001n + 12! - 12!'],
+    [generateQuestion('y11-diff', 1, 7001), '18x + 0.00001x + (1.1-1.1)*450000000x'],
+    [square, `x^2 + 0.0000001x + 0*sqrt(0.0001 - (${vanishing})^2)`], [square, `x^2 + 0.0000001x + 0*ln(0.0001 - (${vanishing})^2)`]
+  ]) expect(G, `padded-${w.slice(0, 48)}`, q, w, false);
   const thirdExact = { answerType: 'numeric', prompt: 'Find the exact value.', answer: { value: 1 / 3, requireExact: true } };
   for (const r of ['1/3', '0.333333333333']) expect(G, `third-right-${r}`, thirdExact, r, true);
   for (const w of ['0.3333333333', '0.33333333']) expect(G, `third-wrong-${w}`, thirdExact, w, false);
@@ -303,7 +311,7 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
 }
 
 // ── Counts are part of the contract ─────────────────────────────────────────
-const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 43, 'sympy-oracle-2026-11-18-controls': 1087, 'XFAIL-exact-polynomial-path': 5 };
+const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 51, 'sympy-oracle-2026-11-18-controls': 1087, 'XFAIL-exact-polynomial-path': 5 };
 for (const [g, n] of Object.entries(EXPECTED)) if (groups[g]?.total !== n) failures.push(`${g}: built ${groups[g]?.total} cases, the corpus has ${n}`);
 
 const pass = Object.values(groups).reduce((s, g) => s + g.pass, 0);

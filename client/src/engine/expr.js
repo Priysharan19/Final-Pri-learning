@@ -688,7 +688,8 @@ const apart = (u, v) => abs(u - v) > 1e-6 * Math.max(1, abs(u), abs(v));
  * error, a function the change in its value across its argument's error). A
  * difference of large terms therefore carries their rounding, whichever side of
  * the comparison wrote it, and an answer padded with a huge zero (+ 10²⁰ − 10²⁰)
- * carries a bound that says its value cannot be read (PR #992 review).
+ * carries a bound that says its value cannot be read (PR #992 review). Odd
+ * roots are read as real, as the domain probe reads them: (−x)^(1/3) is −x^(1/3).
  */
 const EPS = Number.EPSILON;
 function withError(ast, env) {
@@ -700,8 +701,8 @@ function withError(ast, env) {
       if (ast.op === '^') {
         const [l, el] = withError(ast.l, env);
         const [r, er] = withError(ast.r, env);
-        const v = evaluate(ast, env);
-        const shift = (dl, dr) => abs(evaluate({ t: 'bin', op: '^', l: { t: 'num', v: l + dl }, r: { t: 'num', v: r + dr } }, env) - v);
+        const v = evaluate(ast, env, DOMAIN_EVAL);
+        const shift = (dl, dr) => abs(evaluate({ t: 'bin', op: '^', l: { t: 'num', v: l + dl }, r: { t: 'num', v: r + dr } }, env, DOMAIN_EVAL) - v);
         const dl = el ? Math.max(shift(el, 0), shift(-el, 0)) : 0, dr = er ? Math.max(shift(0, er), shift(0, -er)) : 0;
         return [v, dl + dr + abs(v) * 2 * EPS];
       }
@@ -716,18 +717,18 @@ function withError(ast, env) {
           const v = l / r;
           return [v, (el + abs(v) * er) / Math.max(abs(r) - er, 0) + abs(v) * EPS];
         }
-        default: { const v = evaluate(ast, env); return [v, abs(v) * EPS]; }
+        default: { const v = evaluate(ast, env, DOMAIN_EVAL); return [v, abs(v) * EPS]; }
       }
     }
     case 'call': {
-      const v = evaluate(ast, env);
+      const v = evaluate(ast, env, DOMAIN_EVAL);
       if (Array.isArray(ast.args) || !Object.hasOwn(FUNCTIONS, ast.fn)) return [v, abs(v) * 1e-13];   // sums, counting: Lanczos-level
       const [a, ea] = withError(ast.arg, env);
       const f = FUNCTIONS[ast.fn];
       return [v, (ea ? Math.max(abs(f(a + ea) - v), abs(f(a - ea) - v)) : 0) + abs(v) * 2 * EPS];
     }
     // a probe variable is exact by construction; π and e are rounded once
-    default: { const v = evaluate(ast, env); return [v, ast.t === 'var' && Object.hasOwn(env, ast.v) ? 0 : abs(v) * EPS]; }
+    default: { const v = evaluate(ast, env, DOMAIN_EVAL); return [v, ast.t === 'var' && Object.hasOwn(env, ast.v) ? 0 : abs(v) * EPS]; }
   }
 }
 
@@ -748,7 +749,7 @@ function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed)
   let x = seed >>> 0;
   // mulberry32: xorshift32's first draws from nearby seeds bunch together
   const next = () => { x = (x + 0x6D2B79F5) >>> 0; let t = x; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  let readable = 0, unreadable = 0;
+  let readable = 0, unreadable = 0, gaps = 0;
   // Up to 24 draws for 6 readable points: near a root an expanded form loses its
   // digits honestly, and such a point is replaced, not counted against it.
   for (let k = 0; k < 24 && readable < 6; k++) {
@@ -760,17 +761,24 @@ function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed)
       if (positiveOnly) env[n] = abs(env[n]) + 0.3;
     }
     const [va, ea] = withError(astA, env), [vb, eb] = withError(astB, env);
-    if (!fin(va) || !fin(vb)) continue;                       // undefined here: the domain probe's question
+    if (!fin(vb)) continue;                                   // the reference is undefined here: nothing to compare
+    if (!fin(va)) { gaps++; continue; }                        // the answer is undefined where the reference is not
     const size = Math.max(1, abs(va), abs(vb));
-    const noise = 64 * (ea + eb);
-    // A point whose own rounding could hide a difference of one part in a
-    // million cannot be read: it says nothing either way.
-    if (!(noise <= 1e-6 * size)) { unreadable++; continue; }
+    // Only the REFERENCE's rounding widens the band (the second argument: the
+    // key, in every marking call). The answer's own rounding can only make a
+    // point unreadable: otherwise an answer could pad itself with a zero just
+    // under any limit and widen its own band (#992 review, round 4).
+    const band = Math.max(1e-9 * size, 64 * eb);
+    if (!(64 * eb <= 1e-6 * size) || !(64 * ea <= band)) { unreadable++; continue; }
     readable++;
-    if (abs(va - vb) > Math.max(1e-9 * size, noise)) return false;
+    if (abs(va - vb) > band) return false;
   }
-  // An answer whose value cannot be read at most points (+ 10²⁰ − 10²⁰) is not shown equal.
-  return readable >= 3 || unreadable <= readable;
+  if (readable >= 3) return true;
+  // Too few readable points. An answer that cannot be read, or is undefined,
+  // where the reference can (+ 10²⁰ − 10²⁰, + 0·sqrt(tiny − …²)) is not shown
+  // equal; a reference that is itself undefined almost everywhere leaves the
+  // judgement to the sampling above.
+  return unreadable + gaps < 3;
 }
 
 // Guard kinds, one letter each because they ship in the install bundle:
