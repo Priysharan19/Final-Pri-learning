@@ -332,7 +332,10 @@ for (const file of walk(srcDir)) {
   // another bank and replace one of its generators as a side effect.
   for (const file of nswFiles) {
     const imports = [...readFileSync(join(genDir, file), 'utf8').matchAll(/^\s*import\b[^;]*?from\s+['"]([^'"]+)['"]/gm)].map(m => m[1]);
-    check(imports.every(spec => spec === '../qhelpers.js'), `${file} imports ${imports.filter(spec => spec !== '../qhelpers.js').join(', ')}: an NSW-authored generator module may import only ../qhelpers.js`);
+    // The capacity overlays (au-forms-*-nsw.js) draw diagrams for their variants, so they may also read the pure
+    // SVG builders in ../figures.js; every other NSW module stays on ../qhelpers.js alone.
+    const allowed = spec => spec === '../qhelpers.js' || (file.startsWith('au-forms-') && spec === '../figures.js');
+    check(imports.every(allowed), `${file} imports ${imports.filter(spec => !allowed(spec)).join(', ')}: an NSW-authored generator module may import only ../qhelpers.js${file.startsWith('au-forms-') ? ' (and ../figures.js for overlays)' : ''}`);
     check(!/^\s*(?:await\s+)?import\s*\(/m.test(readFileSync(join(genDir, file), 'utf8')), `${file} uses a dynamic import`);
   }
   check(nswFiles.length > 0, 'NSW-authored generator modules were found and their ids are unique across banks');

@@ -91,8 +91,10 @@ function measureCell(gen, diff) {
 
 const editionOf = id => (/^(c\d+|olymp|pyq|jee)-/.test(id) ? 'Priyabhata' : Object.hasOwn(NSW_ISSUED_CELLS, id) ? 'Prithagoras' : null);
 
+const ONLY = (process.argv.find(a => a.startsWith('--only=')) || '').slice(7).split(',').filter(Boolean);
 const rows = [];
 for (const id of Object.keys(GENERATORS).sort()) {
+  if (ONLY.length && !ONLY.includes(id)) continue;
   const edition = editionOf(id);
   if (!edition) continue;
   let instances = 0, lower = false, forms = new Set(), cells = 0;
@@ -108,6 +110,10 @@ for (const id of Object.keys(GENERATORS).sort()) {
   rows.push({ id, edition, cells, instances, lower, forms: Math.max(...forms) });
 }
 
+if (ONLY.length) {   // probe: print only, never write the report
+  for (const r of rows) console.log(`${r.id}\tcells=${r.cells}\tinstances=${r.lower ? '>=' : ''}${r.instances}\tforms=${r.forms}`);
+  process.exit(0);
+}
 const below = (r) => r.instances < TARGET_INSTANCES || r.forms < TARGET_FORMS;
 const fmt = n => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
 let md = `# Question capacity — distinct instances and structural forms per skill
