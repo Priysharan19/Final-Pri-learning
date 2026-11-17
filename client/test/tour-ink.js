@@ -26,7 +26,8 @@ import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 const TOPIC = 'c7-finding-unknown-current';
 const MAX_QUESTIONS = 8;
 
-const SUBMIT = { name: 'Submit Answer' };
+// After a reading the primary button is the combined "Confirm and submit" (P0 #11); before one it is "Submit Answer".
+const SUBMIT = { name: /^(Submit answer|Confirm and submit)/i };
 
 /** What the reading panel says it read, line by line. */
 const reading = (page) => readLines(page);
@@ -724,15 +725,15 @@ export const flow = {
       const submitsBefore = await submitCalls();
       const readsBefore = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
       await check('stale ink: Submit is offered and the reason says it will read the page again',
-        await page.getByRole('button', { name: 'Submit Answer' }).isEnabled() && await page.locator('[data-submit-reason="ink.submitReadAgain"]').isVisible());
-      await page.getByRole('button', { name: 'Submit Answer' }).click();
+        await page.getByRole('button', SUBMIT).isEnabled() && await page.locator('[data-submit-reason="ink.submitReadAgain"]').isVisible());
+      await page.getByRole('button', SUBMIT).click();
       await page.waitForSelector('[data-submit-reason="ink.submitReadAgainDone"]', { timeout: 20000 }).catch(() => {});
       const readsAfter = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
       await check('stale + Submit reads the page again (exactly one more read) and sends NOTHING; the new reading is on screen and the status asks to check it and press Submit again',
         readsAfter === readsBefore + 1 && await submitCalls() === submitsBefore && (await reading(page)).length >= 1 &&
           await page.locator('[data-ink-stale]').count() === 0 && /check the reading, then press Submit again/i.test(await page.locator('[data-submit-reason="ink.submitReadAgainDone"]').innerText().catch(() => '')),
         `reads ${readsBefore}→${readsAfter}; submits ${submitsBefore}→${await submitCalls()}; reason ${await page.locator('[data-submit-reason]').getAttribute('data-submit-reason').catch(() => null)}`);
-      await page.getByRole('button', { name: 'Submit Answer' }).click();
+      await page.getByRole('button', SUBMIT).click();
       await page.waitForSelector('.eval-card, .verdict', { timeout: 30000 }).catch(() => {});
       await check('the second Submit sends the page it was read from (one submit, no extra read)',
         await submitCalls() === submitsBefore + 1 && (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length === readsAfter);
@@ -747,7 +748,7 @@ export const flow = {
       const readsBefore = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
       await ctx.setOffline(true);
       // The page knows it is offline: Submit may already be waiting with the reason (a press, if it is offered, still sends nothing).
-      await page.getByRole('button', { name: 'Submit Answer' }).click({ timeout: 3000 }).catch(() => {});
+      await page.getByRole('button', SUBMIT).click({ timeout: 3000 }).catch(() => {});
       await page.waitForFunction(() => /needs a connection/.test(document.body.innerText), null, { timeout: 10000 }).catch(() => {});
       const reasonNow = await page.evaluate(() => (document.querySelector('.qpage')?.innerText || '').replace(/\s+/g, ' '));
       await check('stale + Submit while offline sends nothing, reads nothing, and shows the existing reason',
@@ -759,7 +760,7 @@ export const flow = {
       await page.getByRole('button', { name: 'Undo last stroke' }).click();
       await page.waitForFunction(() => !document.querySelector('[data-ink-stale]'), null, { timeout: 15000 }).catch(() => {});
       const readsBeforeUndoSubmit = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
-      const submit = page.getByRole('button', { name: 'Submit Answer' });
+      const submit = page.getByRole('button', SUBMIT);
       if (await check('undoing back to the page that was read clears the stale state', await page.locator('[data-ink-stale]').count() === 0 && await submit.isEnabled())) {
         await submit.click();
         await page.waitForSelector('.eval-card, .verdict', { timeout: 30000 }).catch(() => {});

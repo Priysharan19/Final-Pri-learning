@@ -2276,7 +2276,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // check (never Next, never a confirmation the student has to read). No other
   // shortcut in the app uses a modifier with Enter; Enter alone keeps its
   // field behaviour.
-  const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable && !needsCheck;
+  const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable && !(needsCheck && checking);
   const checkKeyRef = useRef(null);
   checkKeyRef.current = instrumentCheckKey && !primary.disabled ? primary.run : null;
   useEffect(() => {

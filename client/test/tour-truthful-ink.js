@@ -40,7 +40,8 @@ const ARITHMETIC = 'c7-integer-operations-current';
 // D1/D2 forms ask for x (or y) by name.
 const STEP_CHECKED = 'c10-linear-pair-methods';
 const WHOLE = /^-?\d{1,4}$/;
-const SUBMIT = { name: 'Submit Answer' };
+// After a reading the primary button is the combined "Confirm and submit" (P0 #11); before one it is "Submit Answer".
+const SUBMIT = { name: /^(Submit answer|Confirm and submit)/i };
 const TAG = '[SYNTHETIC-READER EVIDENCE]';
 const flat = s => String(s || '').replace(/\s+/g, ' ').trim();
 const english = (key, vars = {}) => {

@@ -150,7 +150,7 @@ export const flow = {
         await page.getByRole('button', { name: 'Confirm reading' }).click();
         return 'confirmed';
       }
-      await page.getByRole('button', { name: 'Submit Answer' }).click();
+      await page.getByRole('button', { name: /^(Submit answer|Confirm and submit)/i }).click();
       return 'submitted';
     };
 
