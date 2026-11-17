@@ -10,7 +10,7 @@ Target (owner, Nov 2026): **≥ 10^8 distinct questions per class**. Status belo
 | Class 8 | 126 | ≥ 4.17×10^8 | 3 | 79 | met |
 | Class 9 | 32 | ≥ 2.43×10^8 | 2 | 9 | met |
 | Class 10 | 110 | ≥ 1.46×10^8 | 1 | 76 | met |
-| Class 11 | 102 | ≥ 4.07×10^8 | 2 | 47 | met |
+| Class 11 | 102 | ≥ 4.07×10^8 | 2 | 46 | met |
 | Class 12 | 93 | ≥ 3.85×10^8 | 2 | 48 | met |
 
 A class can clear 10^8 through a few very large cells while many of its cells stay thin; the thin-cell count above is the breadth measure, and both are reported so neither hides the other.
@@ -290,30 +290,30 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c11-limits-derivatives` | 2 | 2000 | 64 | 64 |
 | `c11-straight-lines` | 3 | 2000 | 72 | 72 |
 | `c11-permutations-combinations` | 1 | 2000 | 959 | 2078 |
-| `c11-trig-functions` | 1 | 2000 | 964 | 2642 |
-| `c11-trig-functions` | 2 | 2000 | 1081 | 2832 |
+| `c11-trig-functions` | 1 | 2000 | 962 | 2595 |
+| `c11-binomial-theorem` | 1 | 2000 | 841 | 2753 |
+| `c11-trig-functions` | 2 | 2000 | 1079 | 2791 |
 | `c11-trig-general-solution-reasoning` | 3 | 2000 | 1316 | 2857 |
-| `c11-binomial-theorem` | 1 | 2000 | 850 | 2967 |
-| `c11-trig-functions` | 3 | 2000 | 1198 | 3051 |
-| `c11-limit-reasoning` | 3 | 2000 | 1267 | 3116 |
-| `c11-trig-functions` | 4 | 2000 | 1195 | 3120 |
+| `c11-trig-functions` | 3 | 2000 | 1196 | 3012 |
+| `c11-limit-reasoning` | 3 | 2000 | 1265 | 3059 |
+| `c11-trig-functions` | 4 | 2000 | 1193 | 3083 |
 | `c11-probability` | 3 | 2000 | 1190 | 3169 |
 | `c11-straight-lines` | 2 | 2000 | 1524 | 3429 |
 | `c11-trig-identity-reasoning` | 4 | 2000 | 961 | 3460 |
-| `c11-arrangement-jee-reasoning` | 4 | 2000 | 683 | 3762 |
 | `c11-sets` | 2 | 2000 | 1590 | 4117 |
 | `c11-permutations-combinations` | 2 | 2000 | 1185 | 4269 |
-| `c11-limit-jee-reasoning` | 4 | 2000 | 1478 | 4333 |
+| `c11-limit-jee-reasoning` | 4 | 2000 | 1475 | 4293 |
 | `c11-linear-inequalities` | 3 | 2000 | 1570 | 4390 |
-| `c11-radian-unit-circle-reasoning` | 3 | 2000 | 1359 | 4558 |
-| `c11-arrangement-reasoning` | 3 | 2000 | 866 | 4574 |
-| `c11-binomial-expansion-jee-reasoning` | 4 | 2000 | 1181 | 4692 |
+| `c11-arrangement-jee-reasoning` | 4 | 2000 | 726 | 4493 |
+| `c11-radian-unit-circle-reasoning` | 3 | 2000 | 1357 | 4493 |
+| `c11-binomial-expansion-jee-reasoning` | 4 | 2000 | 1167 | 4601 |
 | `c11-complex-polar-reasoning` | 4 | 2000 | 1217 | 4791 |
+| `c11-arrangement-reasoning` | 3 | 2000 | 872 | 4814 |
 | `c11-conic-sections` | 1 | 2000 | 1097 | 5006 |
 | `c11-sequences-series` | 3 | 2000 | 1513 | 5110 |
+| `c11-binomial-theorem` | 2 | 2000 | 855 | 5418 |
+| `c11-binomial-middle-term-jee-reasoning` | 4 | 2000 | 1200 | 5642 |
 | `c11-sequences-series` | 4 | 2000 | 1460 | 5651 |
-| `c11-binomial-middle-term-jee-reasoning` | 4 | 2000 | 1214 | 5737 |
-| `c11-binomial-theorem` | 2 | 2000 | 858 | 5779 |
 | `c11-conic-sections` | 3 | 2000 | 1082 | 6176 |
 | `c11-parabola-jee-reasoning` | 4 | 2000 | 1428 | 6266 |
 | `c11-mean-deviation-jee-reasoning` | 4 | 2000 | 1069 | 6321 |
@@ -327,7 +327,6 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c11-radian-circle-reasoning` | 4 | 2000 | 1695 | 8310 |
 | `c11-complex-quadratic-reasoning` | 3 | 2000 | 1665 | 9140 |
 | `c11-relations-functions` | 2 | 2000 | 1331 | 9659 |
-| `c11-sequence-means` | 1 | 2000 | 1803 | 9888 |
 
 ### Class 12
 

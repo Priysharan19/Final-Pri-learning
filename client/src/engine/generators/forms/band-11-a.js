@@ -53,7 +53,9 @@ const trigFns = [
     };
   } },
   { form: 'period', make(rng) {
-    const a = DIV360[ri(rng, 0, DIV360.length - 1)], b = DIV360[ri(rng, 0, DIV360.length - 1)];
+    const a = DIV360[ri(rng, 0, DIV360.length - 1)];
+    let b = a;
+    while (b === a) b = DIV360[ri(rng, 0, DIV360.length - 1)];
     return {
       payload: numeric('period', `Find the smallest positive period, in degrees, of $\\sin(${a}x) + \\cos(${b}x)$.`, (() => { const p = 360 / a, q = 360 / b; return (p / gcd(p, q)) * q; })(), {
         hints: ['$\\sin(ax)$ repeats every $\\dfrac{360^\\circ}{a}$.', 'The sum repeats when both parts repeat together.', 'Take the lowest common multiple of the two periods.'],
@@ -116,7 +118,7 @@ const pnc = [
 // ── c11-arrangement-reasoning ────────────────────────────────────────────────
 const arrange = [
   { form: 'digit-even', make(rng, d) {
-    const k = ri(rng, 2, 5), m = ri(rng, k + 1, 9), digits = [];
+    const k = ri(rng, 2, 5), m = ri(rng, k + 1, 9), digits = [2 * ri(rng, 0, 4)];
     while (digits.length < m) { const x = ri(rng, 0, 9); if (!digits.includes(x)) digits.push(x); }
     digits.sort((a, b) => a - b);
     void d;
@@ -194,9 +196,12 @@ const arrange = [
 
 // ── c11-statistics ───────────────────────────────────────────────────────────
 function dataset(rng, n, spread) {
-  const mean = ri(rng, 10, 60), xs = Array.from({ length: n - 1 }, () => mean + ri(rng, -spread, spread));
-  const last = mean * n - xs.reduce((s, x) => s + x, 0);
-  return [...xs, last];
+  // Positive, all different observations, so no variance or deviation is zero and no list repeats a value.
+  for (;;) {
+    const mean = ri(rng, 25, 70), xs = Array.from({ length: n - 1 }, () => mean + ri(rng, -spread, spread));
+    const last = mean * n - xs.reduce((s, x) => s + x, 0), all = [...xs, last];
+    if (all.every(x => x > 0) && new Set(all).size === n) return all;
+  }
 }
 const stats = [
   { form: 'mean-deviation', make(rng, d) {
@@ -260,7 +265,9 @@ const bino = [
     };
   } },
   { form: 'sum-of-coefficients', make(rng, d) {
-    const n = ri(rng, 3, 5 + d), a = ri(rng, 1, 9 + 4 * d), b = ri(rng, -9 - 4 * d, 9 + 4 * d);
+    const n = ri(rng, 3, 5 + d);
+    let a = 0, b = 0;
+    do { a = ri(rng, 1, 9 + 4 * d); b = ri(rng, -9 - 4 * d, 9 + 4 * d); } while (Math.abs(a + b) <= 1);
     return {
       payload: numeric('sum-of-coefficients', `Find the sum of all the coefficients in the expansion of $(${a}x ${b < 0 ? '-' : '+'} ${Math.abs(b)})^{${n}}$.`, (a + b) ** n, {
         hints: ['Every power of $x$ becomes $1$ if you substitute $x = 1$.', 'Then the polynomial equals the sum of its coefficients.', 'Evaluate the bracket at $x = 1$ and raise it to the power.'],

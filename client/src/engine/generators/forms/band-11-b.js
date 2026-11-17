@@ -7,6 +7,7 @@ const pascal = (n, k) => { const row = [1]; for (let i = 1; i <= n; i++) for (le
 const fact = n => (n <= 1 ? 1 : n * fact(n - 1));
 const rad = x => (x * Math.PI) / 180;
 const TRIPLES = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25], [20, 21, 29], [9, 40, 41], [12, 35, 37], [11, 60, 61]];
+const ord = n => `${n}${n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10 > 3 ? 0 : n % 10]}`;
 const sgn = v => (v < 0 ? `- ${-v}` : `+ ${v}`);
 
 // ── sample space (c11-sample-space-reasoning, c11-sample-space-jee-reasoning) ─
@@ -122,7 +123,9 @@ const means = [
     };
   } },
   { form: 'geometric-mean', make(rng, d) {
-    const p = ri(rng, 1, 9), u = ri(rng, 1, R(d)), v = ri(rng, 1, R(d));
+    const p = ri(rng, 1, 9);
+    let u = 0, v = 0;
+    do { u = ri(rng, 1, R(d)); v = ri(rng, 1, R(d)); } while (u === v);
     return {
       payload: numeric('geometric-mean', `Find the geometric mean of $${p * u * u}$ and $${p * v * v}$.`, p * u * v, {
         hints: ['The geometric mean of $a$ and $b$ is $\\sqrt{ab}$.', 'Multiply the two numbers.', 'The product is a perfect square.'],
@@ -133,7 +136,9 @@ const means = [
     };
   } },
   { form: 'harmonic-mean', make(rng, d) {
-    const m = ri(rng, 1, 9), n = ri(rng, 1, 9), t = ri(rng, 1, R(d));
+    let m = 0, n = 0;
+    do { m = ri(rng, 1, 9); n = ri(rng, 1, 9); } while (m === n);
+    const t = ri(rng, 1, R(d));
     const a = (m + n) * t * m, b = (m + n) * t * n;
     return {
       payload: numeric('harmonic-mean', `Find the harmonic mean of $${a}$ and $${b}$.`, 2 * t * m * n, {
@@ -145,7 +150,10 @@ const means = [
     };
   } },
   { form: 'reverse', make(rng, d) {
-    const a = ri(rng, -R(d), R(d)), b = ri(rng, -R(d), R(d)), M = (a + b) / 2;
+    const a = ri(rng, -R(d), R(d));
+    let b = a;
+    while (b === a) b = ri(rng, -R(d), R(d));
+    const M = (a + b) / 2;
     return {
       payload: numeric('reverse', `The arithmetic mean of $${a}$ and $b$ is $${M}$. Find $b$.`, b, {
         hints: ['The arithmetic mean of two numbers is half their sum.', 'Multiply the mean by $2$ to get the sum.', 'Subtract the known number.'],
@@ -173,7 +181,9 @@ function limitForms() {
       };
     } },
     { form: 'sine-ratio', make(rng, d) {
-      const b = NICE[ri(rng, 0, NICE.length - 1)], a = ri(rng, 1, R(d));
+      const b = NICE[ri(rng, 0, NICE.length - 1)];
+      let a = b;
+      while (a === b) a = ri(rng, 1, R(d));
       return {
         payload: numeric('sine-ratio', `Evaluate $\\displaystyle\\lim_{x\\to 0} \\dfrac{\\sin ${a}x}{\\sin ${b}x}$.`, r6(a / b), {
           hints: ['Use $\\lim_{x\\to 0}\\dfrac{\\sin kx}{x} = k$.', 'Divide numerator and denominator by $x$.', 'Take the ratio of the two limits.'],
@@ -258,7 +268,7 @@ const general = [
   { form: 'reverse', make(rng, d) {
     const a = ri(rng, 2, 12 + d), t = ri(rng, 1, Math.floor(180 / a));
     return {
-      payload: numeric('reverse', `The smallest positive solution of $\\cos(kx) = \\cos ${a * t}^\\circ$ is $x = ${t}^\\circ$. Find $k$.`, a, {
+      payload: numeric('reverse', `For a positive number $k$, the smallest positive solution of $\\cos(kx) = \\cos ${a * t}^\\circ$ is $x = ${t}^\\circ$. Find $k$.`, a, {
         hints: ['At the smallest solution, $kx$ equals the angle on the right.', `So $k\\times ${t}^\\circ = ${a * t}^\\circ$.`, 'Solve for $k$.'],
         steps: [{ h: 'Match', d: `$k\\cdot ${t} = ${a * t}$` }, { h: 'Solve', d: 'divide' }],
         traps: [{ value: a * t, why: 'That is the angle, not the multiplier $k$.' }]
@@ -380,7 +390,7 @@ const cPolar = [
     const th = ri(rng, 1, 179), n = ri(rng, 2, R(d));
     let v = (th * n) % 360; if (v > 180) v -= 360;
     return {
-      payload: numeric('power-argument', `A complex number has argument $${th}^\\circ$. Find the principal argument of its power with exponent $${n}$, in degrees (between $-180^\\circ$ and $180^\\circ$).`, v, {
+      payload: numeric('power-argument', `A complex number has argument $${th}^\\circ$. Find the principal argument of its power with exponent $${n}$, in degrees (greater than $-180^\\circ$ and at most $180^\\circ$).`, v, {
         hints: ['Raising to the power $n$ multiplies the argument by $n$.', 'Compute $n\\theta$.', 'Subtract multiples of $360^\\circ$ to land in $(-180^\\circ, 180^\\circ]$.'],
         steps: [{ h: 'Multiply', d: `$${n}\\times ${th}^\\circ = ${n * th}^\\circ$` }, { h: 'Reduce', d: 'subtract full turns' }],
         traps: [{ value: n * th, why: 'The argument is defined modulo $360^\\circ$; reduce it to the principal range.' }].filter(t => t.value !== v)
@@ -403,7 +413,7 @@ const cPolar = [
     const a = 15 * ri(rng, 1, 11), b = 15 * ri(rng, 1, 11);
     let v = (a + b) % 360; if (v > 180) v -= 360;
     return {
-      payload: numeric('product-argument', `$z_1$ has argument $${a}^\\circ$ and $z_2$ has argument $${b}^\\circ$. Find the principal argument of $z_1z_2$ in degrees.`, v, {
+      payload: numeric('product-argument', `$z_1$ has argument $${a}^\\circ$ and $z_2$ has argument $${b}^\\circ$. Find the principal argument of $z_1z_2$ in degrees (greater than $-180^\\circ$ and at most $180^\\circ$).`, v, {
         hints: ['Arguments add when complex numbers are multiplied.', 'Add the two arguments.', 'Bring the result into $(-180^\\circ, 180^\\circ]$.'],
         steps: [{ h: 'Add', d: `$${a}^\\circ + ${b}^\\circ$` }, { h: 'Reduce', d: 'subtract $360^\\circ$ if needed' }],
         traps: [{ value: a + b, why: 'The principal argument must lie in $(-180^\\circ, 180^\\circ]$.' }].filter(t => t.value !== v)
@@ -489,7 +499,7 @@ const radians = [
   { form: 'coterminal', make(rng, d) {
     const t = ri(rng, -2000 * d, 2000 * d);
     return {
-      payload: numeric('coterminal', `Find the angle between $0^\\circ$ and $360^\\circ$ that ends in the same position as $${t}^\\circ$.`, ((t % 360) + 360) % 360, {
+      payload: numeric('coterminal', `Find the angle from $0^\\circ$ up to, but not including, $360^\\circ$ that ends in the same position as $${t}^\\circ$.`, ((t % 360) + 360) % 360, {
         hints: ['Adding or subtracting $360^\\circ$ does not change the position.', 'Find the remainder after removing whole turns.', 'A negative angle needs turns added.'],
         steps: [{ h: 'Whole turns', d: 'divide by $360$' }, { h: 'Remainder', d: 'make it non-negative' }],
         traps: [{ value: t % 360, why: 'A negative remainder is not in $[0^\\circ, 360^\\circ)$; add $360^\\circ$.' }].filter(t2 => t2.value !== ((t % 360) + 360) % 360)
@@ -498,7 +508,8 @@ const radians = [
     };
   } },
   { form: 'reference-angle', make(rng) {
-    const t = ri(rng, 91, 359);
+    let t = 180;
+    while (t === 180 || t === 270) t = ri(rng, 91, 359);
     const refDeg = t <= 180 ? 180 - t : t <= 270 ? t - 180 : 360 - t;
     return {
       payload: numeric('reference-angle', `Find the reference angle, in degrees, for $${t}^\\circ$.`.replace('for $', 'for $'), refDeg, {
@@ -606,7 +617,12 @@ const arrJee = [
     };
   } },
   { form: 'dictionary-rank', make(rng, d) {
-    const n = ri(rng, 4, 6 + Math.min(d, 1)), letters = 'ABCDEFG'.slice(0, n).split(''), word = [...letters].sort(() => rng() - 0.5);
+    const n = ri(rng, 4, 6 + Math.min(d, 1)), letters = 'ABCDEFG'.slice(0, n).split(''), word = [...letters];
+    for (;;) {
+      for (let i = word.length - 1; i > 0; i--) { const j = ri(rng, 0, i); [word[i], word[j]] = [word[j], word[i]]; }
+      const s = word.join(''), asc = [...letters].join(''), desc = [...letters].reverse().join('');
+      if (s !== asc && s !== desc) break;
+    }
     return {
       payload: numeric('dictionary-rank', `All arrangements of the letters ${letters.join(', ')}, each used once, are listed in dictionary order. What is the position of ${word.join('')} in the list?`, rankOf(word, letters), {
         hints: ['Count the words that come before it, place by place.', 'For the first letter, count the letters that are earlier and multiply by the arrangements of the rest.', 'Repeat for the later places, then add one for the word itself.'],
@@ -632,7 +648,7 @@ const arrJee = [
 // ── binomial (c11-binomial-expansion-jee-reasoning, c11-binomial-middle-term-jee-reasoning) ──
 const binoJee = [
   { form: 'middle-term-coefficient', make(rng, d) {
-    const h = ri(rng, 1, 3 + d), a = ri(rng, 1, 9), b = ri(rng, 1, 9), n = 2 * h;
+    const h = ri(rng, 1, Math.min(6, 3 + d)), a = ri(rng, 1, 9), b = ri(rng, 1, 9), n = 2 * h;
     return {
       payload: numeric('middle-term-coefficient', `Find the coefficient of the middle term in the expansion of $(${a}x + ${b}y)^{${n}}$.`, pascal(n, h) * a ** h * b ** h, {
         hints: ['A binomial of even power $n$ has $n + 1$ terms; the middle one is the $(n/2 + 1)$-th.', 'Its binomial coefficient is $\\binom{n}{n/2}$.', 'Include the powers of both constants.'],
@@ -727,7 +743,7 @@ const seqs = [
   { form: 'terms-to-diff', make(rng, d) {
     const a = ri(rng, -R(d), R(d)), dd = ri(rng, 1, R(d)), p = ri(rng, 2, 10), q = p + ri(rng, 1, 10);
     return {
-      payload: numeric('terms-to-diff', `In an arithmetic progression the ${p}th term is $${a + (p - 1) * dd}$ and the ${q}th term is $${a + (q - 1) * dd}$. Find the common difference.`, dd, {
+      payload: numeric('terms-to-diff', `In an arithmetic progression the ${ord(p)} term is $${a + (p - 1) * dd}$ and the ${ord(q)} term is $${a + (q - 1) * dd}$. Find the common difference.`, dd, {
         hints: ['The difference of two terms is the common difference times the number of steps between them.', `There are $${q - p}$ steps from term $${p}$ to term $${q}$.`, 'Divide the difference in values by the number of steps.'],
         steps: [{ h: 'Difference in values', d: `$${(q - p) * dd}$` }, { h: 'Steps', d: `$${q} - ${p} = ${q - p}$` }, { h: 'Divide', d: 'value change per step' }],
         traps: [{ value: (q - p) * dd, why: 'That is the total change across $' + (q - p) + '$ steps, not one step.' }].filter(t => q - p > 1)
