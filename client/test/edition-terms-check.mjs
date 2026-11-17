@@ -92,6 +92,17 @@ check('the welcome page\'s hard-coded track kicker is not drawn in Prithagoras',
   const login = readFileSync(fileURLToPath(new URL('../src/pages/Login.jsx', here)), 'utf8');
   assert.match(login, /EDITION_ID === 'prithagoras' \? t\('login\.brandKicker'\) : featureEnabled\('extendedTracks'\)/);
 });
+check('the Prithagoras sign-in screen: its own eyebrow and value line, no language switch, no India footer links, one short note', () => {
+  assert.equal(AU_STRINGS['login.brandKicker'], 'NSW Years 7–10 · Stage 6 Standard, Advanced, Extension 1 & 2');
+  assert.match(AU_STRINGS['login.welcomeSub'], /HSC/);
+  assert.ok(!BAN.test(AU_STRINGS['login.welcomeSub']));
+  const login = readFileSync(fileURLToPath(new URL('../src/pages/Login.jsx', here)), 'utf8');
+  assert.match(login, /function LanguagePicker\(\) \{[\s\S]{0,260}if \(EDITION_ID === 'prithagoras'\) return null;/);
+  assert.match(login, /EDITION_ID !== 'prithagoras' && <> · <PageLink to="\/refund-policy">[\s\S]{0,160}\/grievance/);
+  assert.match(login, /t\('login\.heroNote'\)/);
+  assert.ok(!/t\('login\.heroSub'\)/.test(login) && /<details className="login-more">/.test(login), 'the marketing paragraph is gone and the data statement is folded, not a wall of text');
+  assert.ok(en['login.heroNote'].length < 120, 'the note stays one short line');
+});
 check('every allowlist entry still matches a key (a dead entry is removed)', () => {
   for (const [re] of ALLOW) assert.ok(Object.keys(en).some(k => re.test(k)), `${re} matches no key`);
 });

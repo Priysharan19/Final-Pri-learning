@@ -53,13 +53,13 @@ export default function SignInPlot() {
       ctx.clearRect(0, 0, w, h);
       const css = getComputedStyle(canvas);
       const tok = (name, fallback) => css.getPropertyValue(name).trim() || fallback;
-      // One unit is min(w, h) / 12, reduced when the curve would not fit.
+      // The unit is the largest that keeps the whole curve, its labels and the headline inside the frame.
       let yLo = Infinity;
       let yHi = -Infinity;
       for (let x = X_MIN; x <= X_MAX; x += 0.25) { const y = fn.f(x); yLo = Math.min(yLo, y); yHi = Math.max(yHi, y); }
-      const u = Math.min(Math.min(w, h) / 12, h / (yHi - yLo + 5), w / (X_MAX - X_MIN + 2));
+      const u = Math.min(h / (yHi - yLo + 8), w / (X_MAX - X_MIN + 1.6));
       const px = x => w / 2 + (x - (X_MIN + X_MAX) / 2) * u;
-      const py = y => h * 0.46 - (y - (yLo + yHi) / 2) * u;
+      const py = y => h * 0.47 - (y - (yLo + yHi) / 2) * u;
       // Grid: 1 px, one line per unit, aligned to the axes.
       ctx.strokeStyle = tok('--in-edge', 'rgba(128,128,128,.1)');
       ctx.lineWidth = 1;
@@ -75,13 +75,6 @@ export default function SignInPlot() {
       ctx.moveTo(0, Math.round(py(0)) + 0.5); ctx.lineTo(w, Math.round(py(0)) + 0.5);
       ctx.moveTo(Math.round(px(0)) + 0.5, 0); ctx.lineTo(Math.round(px(0)) + 0.5, h);
       ctx.stroke();
-      ctx.font = `500 11px ${tok('--in-mono', 'ui-monospace, monospace')}`;
-      ctx.textBaseline = 'top';
-      ctx.textAlign = 'center';
-      for (let x = X_MIN; x <= X_MAX; x++) if (x !== 0) { ctx.fillRect(Math.round(px(x)), py(0) - 3, 1, 6); ctx.fillText(String(x).replace('-', '−'), px(x), py(0) + 7); }
-      ctx.textAlign = 'right';
-      ctx.textBaseline = 'middle';
-      for (let y = Math.ceil(yLo); y <= Math.floor(yHi); y++) if (y !== 0 && y % 2 === 0) { ctx.fillRect(px(0) - 3, Math.round(py(y)), 6, 1); ctx.fillText(String(y).replace('-', '−'), px(0) - 8, py(y)); }
       // The curve, in a chart colour — never the edition accent.
       ctx.strokeStyle = tok('--in-c2', '#a7701f');
       ctx.lineWidth = 2.5;
@@ -89,6 +82,15 @@ export default function SignInPlot() {
       ctx.beginPath();
       for (let x = X_MIN; x <= X_MAX + 0.001; x += 0.05) { if (x === X_MIN) ctx.moveTo(px(x), py(fn.f(x))); else ctx.lineTo(px(x), py(fn.f(x))); }
       ctx.stroke();
+      ctx.font = `500 11px ${tok('--in-mono', 'ui-monospace, monospace')}`;
+      ctx.textBaseline = 'top';
+      ctx.textAlign = 'center';
+      // Labels carry a halo in the page colour, so a curve passing under one never makes it unreadable.
+      const label = (text, x, y) => { ctx.strokeStyle = tok('--in-void', '#111'); ctx.lineWidth = 4; ctx.lineJoin = 'round'; ctx.strokeText(text, x, y); ctx.fillStyle = axis; ctx.fillText(text, x, y); };
+      for (let x = X_MIN; x <= X_MAX; x++) if (x !== 0) { ctx.fillStyle = axis; ctx.fillRect(Math.round(px(x)), py(0) - 3, 1, 6); label(String(x).replace('-', '−'), px(x), py(0) + 7); }
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      for (let y = Math.ceil(yLo); y <= Math.floor(yHi); y++) if (y !== 0 && y % 2 === 0) { ctx.fillStyle = axis; ctx.fillRect(px(0) - 3, Math.round(py(y)), 6, 1); label(String(y).replace('-', '−'), px(0) - 8, py(y)); }
       // The tracer: one pass (there and back) every 14 s, eased at the ends.
       if (!still) { clock += last ? Math.min(100, (now || 0) - last) : 0; last = now || 0; }
       const phase = (clock / PASS_MS) % 1;
