@@ -4,30 +4,30 @@ export default {
     "concepts": [
       {
         "title": "Coordinates and axes are signs plus distances",
-        "body": "An ordered pair (x,y) describes a horizontal location followed by a vertical location. Quadrants are determined by signs, while distance from origin uses sqrt(x²+y²)."
+        "body": "An ordered pair $(x,y)$ describes a horizontal location followed by a vertical location. Quadrants are determined by signs, while distance from origin uses $\\sqrt{x^2+y^2}$."
       }
     ],
     "points": [
       {
-        "front": "Which quadrant contains a point with negative x and positive y?",
+        "front": "Which quadrant contains a point with negative $x$ and positive $y$?",
         "back": "The second quadrant."
       }
     ],
     "mistakes": [
       {
-        "wrong": "Swapping x and y preserves the location of a point.",
-        "right": "It usually reflects the point across the line y=x."
+        "wrong": "Swapping $x$ and $y$ preserves the location of a point.",
+        "right": "It usually reflects the point across the line $y=x$."
       }
     ],
     "examples": [
       {
-        "question": "Find the quadrant and distance from origin of P(-3,5).",
+        "question": "Find the quadrant and distance from origin of $P(-3,5)$.",
         "steps": [
-          "Negative x and positive y place P in Quadrant II.",
-          "Distance squared is (-3)²+5²=34.",
-          "Distance is sqrt(34)."
+          "Negative $x$ and positive $y$ place $P$ in Quadrant II.",
+          "Distance squared is $(-3)^2+5^2=34$.",
+          "Distance is $\\sqrt{34}$."
         ],
-        "answer": "Quadrant II, sqrt(34)",
+        "answer": "Quadrant II, $\\sqrt{34}$",
         "verify": {
           "kind": "value",
           "expr": "(-3)^2+5^2",
@@ -40,30 +40,30 @@ export default {
     "concepts": [
       {
         "title": "A zero is an input, not an output label",
-        "body": "The zero of a polynomial p(x) is the x-value that makes p(x)=0. On a graph it is the x-intercept when one exists; a non-zero constant polynomial has no zero."
+        "body": "The zero of a polynomial $p(x)$ is the $x$-value that makes $p(x)=0$. On a graph it is the $x$-intercept when one exists; a non-zero constant polynomial has no zero."
       }
     ],
     "points": [
       {
-        "front": "What does p(4)=0 tell you about the graph y=p(x)?",
-        "back": "The point (4,0) lies on the graph."
+        "front": "What does $p(4)=0$ tell you about the graph $y=p(x)$?",
+        "back": "The point $(4,0)$ lies on the graph."
       }
     ],
     "mistakes": [
       {
-        "wrong": "The zero of 5x-20 is -20.",
-        "right": "Solve 5x-20=0, which gives x=4."
+        "wrong": "The zero of $5x-20$ is $-20$.",
+        "right": "Solve $5x-20=0$, which gives $x=4$."
       }
     ],
     "examples": [
       {
-        "question": "Find the zero of p(x)=5x-20 and verify it.",
+        "question": "Find the zero of $p(x)=5x-20$ and verify it.",
         "steps": [
-          "Set 5x-20=0.",
-          "Add 20 and divide by 5, giving x=4.",
-          "Check p(4)=20-20=0."
+          "Set $5x-20=0$.",
+          "Add $20$ and divide by $5$, giving $x=4$.",
+          "Check $p(4)=20-20=0$."
         ],
-        "answer": "4",
+        "answer": "$4$",
         "verify": {
           "kind": "value",
           "expr": "5*4-20",
@@ -76,7 +76,7 @@ export default {
     "concepts": [
       {
         "title": "A repeating decimal can be converted using subtraction",
-        "body": "If x=0.272727..., then 100x=27.272727...; subtracting x cancels the repeated tail. This reveals that a recurring decimal represents a rational number."
+        "body": "If $x=0.272727\\ldots$, then $100x=27.272727\\ldots$; subtracting $x$ cancels the repeated tail. This reveals that a recurring decimal represents a rational number."
       }
     ],
     "points": [
@@ -93,13 +93,13 @@ export default {
     ],
     "examples": [
       {
-        "question": "Write 0.272727... as a fraction in simplest terms.",
+        "question": "Write $0.272727\\ldots$ as a fraction in simplest terms.",
         "steps": [
-          "Let x=0.272727... and multiply by 100.",
-          "100x-x=27.272727...-0.272727...=27.",
-          "99x=27, so x=27/99=3/11."
+          "Let $x=0.272727\\ldots$ and multiply by $100$.",
+          "$100x-x=27.272727\\ldots-0.272727\\ldots=27$.",
+          "$99x=27$, so $x=\\tfrac{27}{99}=\\tfrac{3}{11}$."
         ],
-        "answer": "3/11",
+        "answer": "$\\tfrac{3}{11}$",
         "verify": {
           "kind": "value",
           "expr": "27/99",
@@ -112,30 +112,30 @@ export default {
     "concepts": [
       {
         "title": "Difference of cubes follows from multiplication",
-        "body": "a³-b³ factors as (a-b)(a²+ab+b²). Expanding the right side cancels the mixed cubic contributions. Distinguish this from the sum-of-cubes identity where the middle sign changes."
+        "body": "$a^3-b^3$ factors as $(a-b)(a^2+ab+b^2)$. Expanding the right side cancels the mixed cubic contributions. Distinguish this from the sum-of-cubes identity where the middle sign changes."
       }
     ],
     "points": [
       {
-        "front": "Why is a³-b³ not simply (a-b)³?",
-        "back": "Cubing a difference introduces mixed terms that are absent from a³-b³."
+        "front": "Why is $a^3-b^3$ not simply $(a-b)^3$?",
+        "back": "Cubing a difference introduces mixed terms that are absent from $a^3-b^3$."
       }
     ],
     "mistakes": [
       {
-        "wrong": "a³-b³ equals (a-b)(a²-ab+b²).",
+        "wrong": "$a^3-b^3$ equals $(a-b)(a^2-ab+b^2)$.",
         "right": "The middle sign for a difference of cubes is positive."
       }
     ],
     "examples": [
       {
-        "question": "Compute 8³-2³ using factorisation.",
+        "question": "Compute $8^3-2^3$ using factorisation.",
         "steps": [
-          "Apply (8-2)(8²+8×2+2²).",
-          "This is 6(64+16+4)=6×84.",
-          "Result is 504."
+          "Apply $(8-2)(8^2+8\\times 2+2^2)$.",
+          "This is $6(64+16+4)=6\\times 84$.",
+          "Result is $504$."
         ],
-        "answer": "504",
+        "answer": "$504$",
         "verify": {
           "kind": "value",
           "expr": "(8-2)*(8^2+8*2+2^2)",
@@ -148,7 +148,7 @@ export default {
     "concepts": [
       {
         "title": "A perpendicular from the centre bisects a chord",
-        "body": "Dropping the perpendicular from a circle's centre to a chord creates two congruent right triangles. If the radius is r and perpendicular distance is d, half the chord is sqrt(r²-d²)."
+        "body": "Dropping the perpendicular from a circle's centre to a chord creates two congruent right triangles. If the radius is $r$ and the perpendicular distance is $d$, half the chord is $\\sqrt{r^2-d^2}$."
       }
     ],
     "points": [
@@ -159,19 +159,19 @@ export default {
     ],
     "mistakes": [
       {
-        "wrong": "A chord 5 cm from the centre of a circle radius 13 cm has length sqrt(13²-5²).",
+        "wrong": "A chord $5$ cm from the centre of a circle radius $13$ cm has length $\\sqrt{13^2-5^2}$.",
         "right": "That expression is only half the chord; double it for the full length."
       }
     ],
     "examples": [
       {
-        "question": "Find the length of a chord 5 cm from the centre of a circle of radius 13 cm.",
+        "question": "Find the length of a chord $5$ cm from the centre of a circle of radius $13$ cm.",
         "steps": [
           "Draw the perpendicular from centre to chord; it bisects the chord.",
-          "Half-length=sqrt(13²-5²)=sqrt(144)=12.",
-          "Full chord length=24 cm."
+          "Half-length $=\\sqrt{13^2-5^2}=\\sqrt{144}=12$.",
+          "Full chord length $=24$ cm."
         ],
-        "answer": "24 cm",
+        "answer": "$24$ cm",
         "verify": {
           "kind": "value",
           "expr": "2*sqrt(13^2-5^2)",
@@ -184,30 +184,30 @@ export default {
     "concepts": [
       {
         "title": "Heron's formula turns three sides into area",
-        "body": "For a triangle with sides a,b,c and semiperimeter s=(a+b+c)/2, Heron's formula gives sqrt(s(s-a)(s-b)(s-c)). Verify that the side lengths satisfy triangle inequalities before applying it."
+        "body": "For a triangle with sides $a$, $b$, $c$ and semiperimeter $s=\\tfrac{a+b+c}{2}$, Heron's formula gives $\\sqrt{s(s-a)(s-b)(s-c)}$. Verify that the side lengths satisfy triangle inequalities before applying it."
       }
     ],
     "points": [
       {
-        "front": "Why must a,b,c form a triangle before Heron's formula represents real area?",
+        "front": "Why must $a$, $b$, $c$ form a triangle before Heron's formula represents real area?",
         "back": "A degenerate or impossible set of sides does not bound a positive planar triangle."
       }
     ],
     "mistakes": [
       {
-        "wrong": "The semiperimeter of a triangle equals a+b+c.",
+        "wrong": "The semiperimeter of a triangle equals $a+b+c$.",
         "right": "Semiperimeter is half of the full perimeter."
       }
     ],
     "examples": [
       {
-        "question": "Find the area of a triangle with sides 13,14,15.",
+        "question": "Find the area of a triangle with sides $13,14,15$.",
         "steps": [
-          "Semiperimeter s=(13+14+15)/2=21.",
-          "Apply Heron: sqrt(21×8×7×6).",
-          "The square root of 7056 is 84."
+          "Semiperimeter $s=\\tfrac{13+14+15}{2}=21$.",
+          "Apply Heron: $\\sqrt{21\\times 8\\times 7\\times 6}$.",
+          "The square root of $7056$ is $84$."
         ],
-        "answer": "84 square units",
+        "answer": "$84$ square units",
         "verify": {
           "kind": "value",
           "expr": "sqrt(21*8*7*6)",
@@ -220,30 +220,30 @@ export default {
     "concepts": [
       {
         "title": "Combined experiments use a product sample space",
-        "body": "If a coin and a fair six-sided die are independently tossed, list pairs of coin state and die face. Each pair is equally likely and the total is 2×6=12."
+        "body": "If a coin and a fair six-sided die are independently tossed, list pairs of coin state and die face. Each pair is equally likely and the total is $2\\times 6=12$."
       }
     ],
     "points": [
       {
         "front": "Does choosing 'heads and even' mean adding separate probabilities?",
-        "back": "No. For independent events, multiply P(heads)×P(even)."
+        "back": "No. For independent events, multiply $P(\\text{heads})\\times P(\\text{even})$."
       }
     ],
     "mistakes": [
       {
         "wrong": "A coin and a die have eight combined outcomes.",
-        "right": "They have 2×6=12 ordered outcomes."
+        "right": "They have $2\\times 6=12$ ordered outcomes."
       }
     ],
     "examples": [
       {
-        "question": "A fair coin and fair die are tossed. Find P(heads and even number).",
+        "question": "A fair coin and fair die are tossed. Find $P(\\text{heads and an even number})$.",
         "steps": [
-          "There are 2×6=12 equally likely outcomes.",
-          "Heads together with 2,4,6 gives 3 favourable outcomes.",
-          "Probability is 3/12=1/4."
+          "There are $2\\times 6=12$ equally likely outcomes.",
+          "Heads together with $2,4,6$ gives $3$ favourable outcomes.",
+          "Probability is $\\tfrac{3}{12}=\\tfrac{1}{4}$."
         ],
-        "answer": "1/4",
+        "answer": "$\\tfrac{1}{4}$",
         "verify": {
           "kind": "value",
           "expr": "3/(2*6)",
@@ -261,8 +261,8 @@ export default {
     ],
     "points": [
       {
-        "front": "Why are the first differences of n²+2n not constant?",
-        "back": "The change between successive terms increases by 2 each time."
+        "front": "Why are the first differences of $n^2+2n$ not constant?",
+        "back": "The change between successive terms increases by $2$ each time."
       }
     ],
     "mistakes": [
@@ -273,13 +273,13 @@ export default {
     ],
     "examples": [
       {
-        "question": "For a_n=n²+2n, find the fifth term.",
+        "question": "For $a_n=n^2+2n$, find the fifth term.",
         "steps": [
-          "Substitute n=5 into the stated formula.",
-          "a5=5²+2×5=25+10.",
-          "The fifth term is 35."
+          "Substitute $n=5$ into the stated formula.",
+          "$a_5=5^2+2\\times 5=25+10$.",
+          "The fifth term is $35$."
         ],
-        "answer": "35",
+        "answer": "$35$",
         "verify": {
           "kind": "value",
           "expr": "5^2+2*5",
