@@ -63,6 +63,14 @@ function powForm(base, c) {
   if (base.size === 1) {
     const [t] = base.values();
     if (!Number.isInteger(c) && t.coef < 0) return null;
+    // A fractional power of an even power is an absolute value: sqrt(x^2) is
+    // |x|, not x. Such a base stays one opaque atom and merges with nothing.
+    if (!Number.isInteger(c) && [...t.atoms.values()].some(e => !(e > 0) || Number.isInteger(e) && e % 2 === 0)) {
+      const key = `|${monoKey(t.atoms)}|`;
+      const lead = Math.pow(t.coef, c);
+      if (!Number.isFinite(lead)) return null;
+      return new Map([[`${key}^${c}`, { coef: lead, atoms: new Map([[key, c]]) }]]);
+    }
     const coef = Math.pow(t.coef, c);
     if (!Number.isFinite(coef)) return null;
     const atoms = new Map();
@@ -158,6 +166,7 @@ function overCommonDenominator(f, need) {
 
 /** true only when both read as the same formal sum; null when this method cannot say. */
 export function sameFormalForm(a, b) {
+  SUM_BASES.clear();   // the registry belongs to one comparison
   try {
     const fa = toForm(a), fb = toForm(b);
     if (!fa || !fb) return null;

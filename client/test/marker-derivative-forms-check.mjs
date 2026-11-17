@@ -46,6 +46,16 @@ ok(sameFormalForm(p('1/(x+1)'), p('1/(x+2)')) === null, 'different many-term bas
 ok(sameFormalForm(p('(x+1)^2'), p('x^2+2x+1')) === true, 'a squared sum is expanded');
 ok(sameFormalForm(p('sin(x)^2+cos(x)^2'), p('1')) === null, 'a trigonometric identity is not formal');
 ok(sameFormalForm(p('x^(1/2)'), p('x^(-1/2)')) === null, 'different exponents are different');
+ok(sameFormalForm(p('sqrt(x^2)'), p('x')) === null, 'sqrt(x^2) is |x|, not x');
+ok(sameFormalForm(p('(x^4)^(1/4)'), p('x')) === null, '(x^4)^(1/4) is |x|, not x');
+ok(sameFormalForm(p('sqrt(4x^2)'), p('2x')) === null, 'sqrt(4x^2) is not 2x');
+ok(sameFormalForm(p('sqrt(x)*sqrt(x)'), p('x')) === true, 'sqrt(x)^2 is x where defined');
+// b^v derivatives.
+ok(line('2^x', '2^x * ln(2)').status === 'ok', 'd/dx 2^x = 2^x ln 2');
+ok(line('2^x', '2^x').status !== 'ok', 'd/dx 2^x is not 2^x');
+ok(line('x^x', 'x^x').status !== 'ok', 'x^x is outside the verified vocabulary and is never credited');
+ok(line('e^(3x)', '3e^(3x)').status === 'ok', 'd/dx e^(3x) = 3e^(3x)');
+ok(line('e^(3x)', 'e^(3x)').status !== 'ok', 'd/dx e^(3x) is not e^(3x)');
 
 console.log(`marker-derivative-forms-check: ${fail ? 'FAIL' : 'PASS'} — ${pass}/${pass + fail} checks passed`);
 process.exit(fail ? 1 : 0);
