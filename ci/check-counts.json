@@ -34,7 +34,7 @@
       "job": "suites",
       "log": "suites.log",
       "pins": [
-        {"has":"2944000/2944000 self-checks passed across 368 subtopics"},
+        {"has":"3160000/3160000 self-checks passed across 395 subtopics"},
         {"has":"21000/21000 multipart part-checks passed"},
         {"has":"✔ INDIA SUITE PASSED — 2726/2726 checks"},
         {"has":"STUDENT PLOT: PASS — 38/38 checks","note":"v1.1: step-mark rows say the engine's mark and never contradict it."},
@@ -52,7 +52,7 @@
         {"has":"DISTINCT QUESTIONS: Class 7 ≥ 2.98×10^8, Class 8 ≥ 4.17×10^8, Class 9 ≥ 2.43×10^8, Class 10 ≥ 1.46×10^8, Class 11 ≥ 4.01×10^8, Class 12 ≥ 3.83×10^8 — 6/6 classes at the 10^8 target"},
         {"has":"CLASS X ALGEBRA FORMS: PASS — 5 generators, 29 forms, 6000 items re-derived from the prompt by a second route","note":"Class X Algebra additional forms (L5): 5 generators × D1–D3 take 355 → 360 subtopics, 576 → 591 declared pairs and 2678 → 2708 India checks; every answer re-derived from its prompt by a second route."},
         {"has":"INDIA HARDEST FORMS: PASS — 647072/647072 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points"},
-        {"has":"PROMPT VARIABLE CONSISTENCY: PASS — 176644 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent"},
+        {"has":"PROMPT VARIABLE CONSISTENCY: PASS — 189604 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent"},
         {"has":"59400 questions from 594 declared (generator, difficulty) pairs × 100 draws — 59400 marked correct by their own marker, 59400 well formed"},
         {"has":"QUESTION VARIANTS: PASS — 594 generated seeds (0 cells skipped: seed not credited by its own key), 4742 variants verified by the marker and distinct by content hash, 2368/2376 bands filled, 1004/1184 same-band variants keep the seed","note":"Question variants (L5): every live India cell and every official CBSE record yields variants at each band, each credited by the deterministic marker on its own key and distinct by content hash. 576 → 594 seeds (Train 14: re-derived by running all 4 shards on main 0c655e4cf + #837 + #839)."},
         {"has":"shape; 81 official CBSE records → 314 Pri variants on their chapter (10 bands with no serving generator).","note":"28/110 → 80/310 records/variants (Train 15: #840, #845, #842 records, re-derived by running all 4 shards). 80/310 → 81/314 (#846: 65/2/1 Q24, re-derived by running all 4 shards on Train 15 + #846)."},
@@ -60,7 +60,7 @@
         {"has":"NCERT ANSWER FORMS: PASS — 481/481 checks","note":"L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three)."},
         {"has":"ADVERSARIAL CORPUS: PASS — 219/219 checks","note":"#723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count."},
         {"has":"EXACT BOUNDS: PASS — 107/107 checks"},
-        {"has":"STEP14 REVIEW FIXES: PASS — 41227/41227 checks","note":"39533 → 39547 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
+        {"has":"STEP14 REVIEW FIXES: PASS — 43915/43915 checks","note":"39533 → 39547 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
         {"has":"REVIEW FOLLOW-UPS: PASS — 415/415 checks"},
         {"has":"#680 SOURCED CASES: PASS — 91/91 cases"},
         {"has":"STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite"},
@@ -71,10 +71,10 @@
         {"has":"MARKING POLICY (D12): PASS — 68/68 checks"},
         {"has":"STEP COACH: PASS — 49/49 checks","note":"F1 live step coach (#826): no guess oracle, premium-only, off by default, capped."},
         {"has":"INTERIM MARKING POLICY (D13, D14): PASS — 11285/11285 checks","note":"10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same). 10855 → 10820 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree): the D13 sweep runs over generated questions, and #812's widened Class 9 generators change that sample (sweep 10481 → 10446); every check is still run and passes, none removed."},
-        {"has":"INDIA BANKS (D15): PASS — 129/129 checks","note":"124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124."},
-        {"has":"NSW BANK QUALITY: PASS — 80 generators, 287 cells issued","note":"Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render."},
+        {"has":"INDIA BANKS (D15): PASS — 156/156 checks","note":"124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124."},
+        {"has":"NSW BANK QUALITY: PASS — 107 generators, 395 cells issued","note":"Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render."},
         {"has":"NSW EXAM BLUEPRINTS (G4): PASS — 546 checks","note":"Plan G4: NSW HSC-style blueprints held to NESA's specification, the release check, and the exam-path false-positive sweep."},
-        {"has":"FALSE-POSITIVE SWEEP: PASS — 0 of 428134 wrong answers marked correct across 19488 questions","note":"133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit. 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree). 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree). 419741/18696 → 422759/19248 (Train 15: #838 widening + CBSE X/XII Section A (#840, #845) + JEE Main 2026 S2 (#842), re-derived by running all 4 shards on the merged tree). 422759/19248 → 422837/19248 (#846: CBSE XII 65/2/1 Q24, the first Section B record, restacked on Train 15)."},
+        {"has":"FALSE-POSITIVE SWEEP: PASS — 0 of 458334 wrong answers marked correct across 20784 questions","note":"133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit. 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree). 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree). 419741/18696 → 422759/19248 (Train 15: #838 widening + CBSE X/XII Section A (#840, #845) + JEE Main 2026 S2 (#842), re-derived by running all 4 shards on the merged tree). 422759/19248 → 422837/19248 (#846: CBSE XII 65/2/1 Q24, the first Section B record, restacked on Train 15)."},
         {"has":"CORRECT-ANSWER SWEEP: PASS — 0 of 33992 right answers over 12508 India questions (594 generator×difficulty cells × 24 seeds)","note":"The opposite direction: every right answer to every India question (the key, the box's unit in every spelling, ₹/Rs on an amount, the printed answer, the photo path's \"Ans:\" line) is credited, or refused only by D13."},
         {"has":"EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes","note":"Train 13 (#800 + #784 + the L1 marking types), re-derived by running all 4 shards on the merged tree: 355 → 363 subtopics, 576 → 594 pairs."},
         {"has":"WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels"},
@@ -108,7 +108,7 @@
         {"has":"ADAPTIVE SIMULATION: PASS — 77/77 checks"},
         {"has":"PROGRESS TRUTH: PASS — 147/147 checks"},
         {"has":"PLACEMENT: PASS — 291/291 checks"},
-        {"has":"INDIA EXAM WEIGHT: PASS — 633/633 checks"},
+        {"has":"INDIA EXAM WEIGHT: PASS — 658/658 checks"},
         {"has":"PLOTTING: PASS — 78/78 checks"},
         {"has":"README TRUTH: PASS — 16/16 checks"},
         {"has":"LEGAL PAGES: PASS — 383/383 checks","note":"364 (m-finish-16): the review switch, store-purchase wording, retention and crash-report disclosures, and the generated third-party notices page. 374 (L7): no notice makes a coverage claim D24 forbids, in either language. 375 (L7): the D18 wording matches the accounts stream's code (#736). 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737). 383 (L7, Train 4 truth): banner conditions walked, Practise-this and Hindi D18 pinned."},
@@ -374,7 +374,7 @@
       "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
-        {"has":"NSW PRACTICE (G3): PASS — 164/164 checks"}
+        {"has":"NSW PRACTICE (G3): PASS — 163/163 checks"}
       ]
     },
     "platform/practice-http.log#6": {
