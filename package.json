@@ -28,7 +28,7 @@
     "test:diagrams": "node client/test/diagram-geometry-check.mjs && node client/test/diagram-render-check.mjs",
     "test:notes:nsw:browser": "node client/test/nsw-notes-visual-check.mjs",
     "test:diagrams:browser": "node client/test/diagram-kit-browser-check.mjs",
-    "test:notes": "node client/test/notes-content-check.mjs && node client/test/notes-expansion-depth-check.mjs && node client/test/notes-diagram-content-check.mjs && node client/test/notes-visual-wave5-check.mjs && node client/test/notes-visual-wave6-check.mjs && node client/test/notes-visual-wave7-check.mjs && node client/test/notes-visual-wave8-check.mjs && node client/test/notes-resource-shelf-check.mjs && node client/test/study-journey-check.mjs",
+    "test:notes": "node client/test/notes-content-check.mjs && node client/test/notes-expansion-depth-check.mjs && node client/test/notes-diagram-content-check.mjs && node client/test/notes-visual-wave5-check.mjs && node client/test/notes-visual-wave6-check.mjs && node client/test/notes-visual-wave7-check.mjs && node client/test/notes-visual-wave8-check.mjs && node client/test/notes-resource-shelf-check.mjs && node client/test/study-journey-check.mjs && npm run test:notes:e3",
     "test:e2e:notes": "node client/test/tour-notes.js && node client/test/tour-study-journey.js",
     "test:content:cert": "node client/test/retarget-on-repeat-check.mjs && node client/test/content-certification-check.mjs && node client/test/content-certify.mjs && node client/test/content-report-fresh-check.mjs",
     "content:certify": "node client/test/content-certify.mjs --full",
@@ -300,6 +300,7 @@
     "test:ink:strip-blind": "node client/test/reading-strip-blind-check.mjs",
     "test:writing-hand": "node client/test/writing-hand-check.mjs",
     "test:palette:form": "node client/test/palette-form-check.mjs",
-    "test:haptics": "node client/test/haptics-boundary-check.mjs"
+    "test:haptics": "node client/test/haptics-boundary-check.mjs",
+    "test:notes:e3": "node client/test/notes-e3-check.mjs && node client/test/notes-coverage-check.mjs"
   }
 }

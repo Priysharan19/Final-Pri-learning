@@ -24,10 +24,9 @@ import six6s from '../src/notes/nsw/notes-nsw-stage6-standard.js';
 import { readFileSync } from 'node:fs';
 
 const stage4 = mergePremium(base4, premium4);
-// The kit's registry names, read from its source (a .jsx file cannot be imported by plain node).
-const kitSource = readFileSync(new URL('../src/diagrams/DiagramFromSpec.jsx', import.meta.url), 'utf8');
-const DIAGRAM_KINDS = [...kitSource.matchAll(/(?:STATIC_KINDS|INTERACTIVE_KINDS) = Object\.freeze\(\{([\s\S]*?)\}\);/g)]
-  .flatMap(m => [...m[1].matchAll(/(\w+):/g)].map(x => x[1]));
+// The kit's kind names (diagrams/kinds.js: the registry without React, so plain node can read it).
+import { STATIC_KIND_NAMES, INTERACTIVE_KIND_NAMES } from '../src/diagrams/kinds.js';
+const DIAGRAM_KINDS = [...STATIC_KIND_NAMES, ...INTERACTIVE_KIND_NAMES];
 const NO_DIAGRAM = new Set(['ma4-vol-c-01']); // no solid-figure kind in the diagram kit yet
 
 let pass = 0;

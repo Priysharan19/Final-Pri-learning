@@ -10,6 +10,7 @@
 // A topic is keyed by the lower-case NESA outcome code of its focus area (a
 // reference, never syllabus text). Years: Stage 4 is Years 7–8, Stage 5 is
 // Years 9–10, Stage 6 is Year 11 or 12 by course.
+import { mergeE3 } from '../e3.js';
 import {
   NSW_MATHEMATICS_K10_2022, NSW_MATHEMATICS_STANDARD_2024, NSW_MATHEMATICS_ADVANCED_2024,
   NSW_MATHEMATICS_EXTENSION1_2024, NSW_MATHEMATICS_EXTENSION2_2024
@@ -85,6 +86,17 @@ const bandsLoader = bands => async () => {
   return { default: Object.assign({}, ...merged) };
 };
 
+// The Experience 3 layer (objective, intuition, more teaching diagrams) of each stage or course:
+// notes/e3.js. Loaded with, and merged over, the notes it completes.
+const E3 = Object.freeze({
+  4: [() => import('./notes-nsw-e3-stage4.js')],
+  5: [() => import('./notes-nsw-e3-stage5-core.js'), () => import('./notes-nsw-e3-stage5-path.js')],
+  'six:standard': [() => import('./notes-nsw-e3-standard.js')],
+  'six:advanced': [() => import('./notes-nsw-e3-advanced.js')],
+  'six:ext1': [() => import('./notes-nsw-e3-ext1.js')],
+  'six:ext2': [() => import('./notes-nsw-e3-ext2.js')]
+});
+
 const LOADERS = Object.freeze({
   'six:advanced': () => import('./notes-nsw-stage6-advanced.js'),
   'six:standard': () => import('./notes-nsw-stage6-standard.js'),
@@ -99,9 +111,11 @@ const LOADERS = Object.freeze({
 
 /** The notes of every topic in a stage (an object keyed by topic id), or null when none are written yet. */
 export async function loadNswNotesForStage(stage, course = null) {
-  const load = stage === 6 ? LOADERS[`six:${course}`] : LOADERS[stage];
+  const key = stage === 6 ? `six:${course}` : stage;
+  const load = LOADERS[key];
   if (!load) return null;
-  return (await load()).default;
+  const [notes, ...layers] = await Promise.all([load(), ...(E3[key] || []).map(l => l())]);
+  return layers.reduce((n, l) => mergeE3(n, l.default, `NSW ${key}`), notes.default);
 }
 
 /** Whether a topic's stage has a notes module at all (the topic may still have none). */
