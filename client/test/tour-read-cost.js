@@ -40,6 +40,8 @@ export const flow = {
   name: 'Read on request · provider calls per handwritten answer, first stroke to verdict',
 
   async run({ page, base, check, goto, createProfile, settle, note, online }) {
+    // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     note(`${EVIDENCE}: "Read on request · provider calls…" counts requests from the real server's provider module to the scripted stand-in reader (which never escalates to a fallback model). The server, its kept-read dedupe and every mark are real.`);
     const { reader } = online;
     const costs = {};
