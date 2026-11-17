@@ -25,6 +25,7 @@ import { assessRelationChainLine, assessModulusInequalityLine, compareDomainAwar
 import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 import { lostMarks, ruleKeyFor } from './lost-marks.js';
+import { expLogSolutionSet, isExpLogLine, domainAt, domainFreeRoot, sameReducedForm } from './reason-explog.js';
 
 export { lostMarks, ruleKeyFor };
 
@@ -57,6 +58,27 @@ function checkAnswerWithinBudget(question, rawInput) {
     return { correct: false, feedback: 'Write the ratio with exactly two parts, like 2 : 3.' };
   }
   return coreCheckAnswer(question, rawInput);
+}
+
+const TEXT_SHAPE_CODES = new Set(['operator-swapped', 'one-side-only']);
+function expLogText(text, meta) {
+  if (typeof text !== 'string' || !meta?.variable) return false;
+  try { return isExpLogLine(parse(normalize(text)), meta.variable); } catch { return false; }
+}
+
+/**
+ * The same root, to floating-point noise. A proved root is computed, not
+ * written, so the rounded-decimal band of numsClose (0.973 for ln(7)/2) is
+ * not applied: an intermediate line is held to the value, as V1 holds it.
+ */
+function sameRoot(a, b) {
+  return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(a), Math.abs(b));
+}
+
+/** A root as the student would read it: a whole number when it is one, else ten significant figures. */
+function shownRoot(value) {
+  const rounded = Math.round(value);
+  return Math.abs(value - rounded) <= 1e-9 * Math.max(1, Math.abs(value)) ? rounded : Number(value.toPrecision(10));
 }
 
 function uniqueNumeric(values) {
@@ -415,14 +437,40 @@ function extraneousRootOf(ast, variable, wanted) {
 // and is otherwise a note: neither a mistake nor credit.
 
 /** The letters in `ast` that are neither the unknown nor in the authored equation. */
-function foreignLetters(ast, meta) {
+function foreignLetters(ast, meta, system = null) {
   if (!ast || meta?.kind !== 'equation' || !meta.variable) return [];
   const own = new Set([meta.variable]);
   for (const text of [meta.source, ...(Array.isArray(meta.sources) ? meta.sources : [])]) {
     if (typeof text !== 'string') continue;
     try { variablesOf(parse(normalize(text)), own); } catch { /* an unreadable source names no letters */ }
   }
+  // `e^(2x) = 7`, `x = e^2`: an e written only as the base of a power, in a
+  // question with no second unknown, is Euler's number, not another letter.
+  // Only on a line Pri can then read as one: an exponential or logarithmic
+  // equation, or the unknown set equal to a value.
+  if (!system && !own.has('e') && eOnlyAsBase(ast) && (isExpLogLine(ast, meta.variable) || namesValue(ast, meta.variable))) own.add('e');
   return [...variablesOf(ast)].filter(name => !own.has(name));
+}
+
+/** `x = value`: the unknown alone on one side, nothing but constants (e included) on the other. */
+function namesValue(ast, variable) {
+  if (!ast || ast.t !== 'equation') return false;
+  const alone = side => unwrapGroup(side)?.t === 'var' && unwrapGroup(side).v === variable;
+  const constant = side => [...variablesOf(side)].every(n => n === 'e');
+  return (alone(ast.l) && constant(ast.r)) || (alone(ast.r) && constant(ast.l));
+}
+
+/** Every `e` in the tree is the base of a power (and there is at least one). */
+function eOnlyAsBase(ast) {
+  let seen = false;
+  const walk = (node, asBase) => {
+    if (!node || typeof node !== 'object') return true;
+    if (node.t === 'var' && node.v === 'e') { seen = true; return asBase; }
+    if (Array.isArray(node.args)) return node.args.every(a => walk(a, false));
+    if (node.t === 'bin' && node.op === '^') return walk(node.l, true) && walk(node.r, false);
+    return ['l', 'r', 'v', 'arg'].every(k => walk(node[k], false));
+  };
+  return walk(ast, false) && seen;
 }
 
 const holdsWithin = (L, R) => Number.isFinite(L) && Number.isFinite(R)
@@ -638,7 +686,7 @@ function checkLinesAfterBreakAgainstPrevious(out, firstBreak, meta) {
   }
 }
 
-function stepCheckSingle(meta, workingText, system = null, { loneBranches = false } = {}) {
+function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, prompt = '' } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const unread = unreadLines(rawLines);
   const out = [];
@@ -649,6 +697,35 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
   let previousRelationTrusted = false;
   let branchesOpen = false;
   const branchLines = [];
+  // Exponential and logarithmic working (see reason-explog.js). `expLogAnchor`
+  // is the latest line whose complete solution set was proved to be exactly
+  // the question's; `pendingExtraneous` holds values a later line allows only
+  // because it dropped that line's logarithm domain, still to be rejected.
+  let expLogAnchor = null;
+  let expLogAnchorIndex = -1;
+  let expLogChain = false;
+  let expLogDecided = false;
+  let expLogPrevForm = null;
+  let pendingExtraneous = [];
+  let pendingIndex = -1;
+  // The question's own equation, reduced the same way (from its source or the
+  // equation in its prompt), read once when first needed.
+  let questionFormsRead = null;
+  const questionForms = () => {
+    if (questionFormsRead) return questionFormsRead;
+    questionFormsRead = [];
+    try {
+      const wanted = uniqueNumeric(meta?.solutions);
+      for (const claim of questionClaims(meta, prompt)) {
+        if (claim.kind !== 'equation') continue;
+        const form = expLogSolutionSet(claim.ast, meta.variable, wanted);
+        // Only a reading of the question that has exactly its solutions (a
+        // prompt Pri misreads gives none, and the first-line rule applies).
+        if (form && form.roots.length === wanted.length && wanted.every(w => form.roots.some(r => sameRoot(r, w)))) questionFormsRead.push(form);
+      }
+    } catch { /* a question Pri cannot read gives no form */ }
+    return questionFormsRead;
+  };
 
   rawLines.forEach((line, i) => {
     const skipped = unreadNote(unread[i]);
@@ -676,6 +753,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             note = lineDiagnosis.message;
           } else {
             status = 'ok';
+            pendingExtraneous = []; expLogChain = false;
           }
         }
         if (status === 'break' && firstBreak === -1) firstBreak = i;
@@ -788,7 +866,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       if (meta.kind === 'equation') {
         if (cleaned.includes('=')) {
           const ast = parse(cleaned);
-          if (ast.t === 'equation' && foreignLetters(ast, meta).length) {
+          if (ast.t === 'equation' && foreignLetters(ast, meta, system).length) {
             const assessed = assessOtherUnknownLine(ast, system);
             status = assessed.status;
             note = assessed.note;
@@ -799,22 +877,145 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           }
           if (ast.t === 'equation') {
             const wantedRoots = uniqueNumeric(meta.solutions);
+            // ── Exponential and logarithmic lines (reason-explog.js) ──────────
+            // Root consistency: a line is correct when its complete real
+            // solution set, on its own domain, is exactly the question's. Once
+            // such a line has been shown, every later line is held to the same
+            // proof first. Whatever cannot be proved falls through to the
+            // checks below, unchanged.
+            const expLogLine = isExpLogLine(ast, meta.variable);
+            const expLog = wantedRoots.length && (expLogAnchor || expLogLine)
+              ? expLogSolutionSet(ast, meta.variable, wantedRoots) : null;
+            const expLogCoversAll = !!expLog && wantedRoots.every(w => expLog.roots.some(r => sameRoot(r, w)));
+            if (expLogCoversAll) {
+              const v = meta.variable;
+              const extras = expLog.roots.filter(r => !wantedRoots.some(w => sameRoot(r, w)));
+              // The line above was decided here too, so its solution set is
+              // exactly the answer plus `pendingExtraneous`. A value this line
+              // allows that the line above did not is new.
+              const fresh = extras.filter(r => !(expLogChain && pendingExtraneous.some(p => sameRoot(r, p))));
+              const freshAbove = expLogChain && previousEquation ? fresh.map(r => domainAt(previousEquation, v, r)) : [];
+              if (fresh.length && freshAbove.some(s => s === 'defined')) {
+                // The line above is defined there and that value does not solve
+                // it: this step brought it in.
+                const inside = fresh[freshAbove.indexOf('defined')];
+                status = 'break';
+                lineDiagnosis = extraneousLineRootDiagnosis(v, shownRoot(inside));
+                note = lineDiagnosis.message;
+                if (firstBreak === -1) firstBreak = i;
+                out.push({ text: line, status, note, diagnosis: lineDiagnosis });
+                return;
+              }
+              // Two lines with the same solutions can still differ in roots
+              // that are not solutions (`(2^x − 4)(2^x + 2)` and `(2^x − 4)(2^x + 3)`
+              // both give only x = 2). Such a line is credited only when it
+              // reduces to the same polynomial as the line above, or, where the
+              // working starts, as the question (its source or the equation in
+              // its prompt; with neither, only as the very first line).
+              // Otherwise it falls through to the checks below.
+              const startsAsTheQuestion = () => {
+                const forms = questionForms();
+                return forms.length ? forms.some(f => sameReducedForm(f, expLog)) : i === 0;
+              };
+              const hiddenOk = !expLog.hidden
+                || (expLogChain && sameReducedForm(expLogPrevForm, expLog))
+                || (!expLogDecided && startsAsTheQuestion());
+              // A value let in by dropping a logarithm's domain: the line above
+              // and the verified log line are both undefined there, and it is a
+              // root of the polynomial the line above reduces to before its
+              // domain is applied (`ln x + ln(x − 3) = ln 10` allows −2 that
+              // way, never −3).
+              const freshOutside = fresh.length > 0 && freshAbove.length === fresh.length && freshAbove.every(s => s === 'undefined');
+              const domainDrop = freshOutside && expLogAnchor && isExpLogLine(expLogAnchor, v)
+                && fresh.every(r => domainFreeRoot(expLogPrevForm, r))
+                && fresh.every(r => domainAt(expLogAnchor, v, r) === 'undefined');
+              if (freshOutside && !domainDrop && typeof meta.source !== 'string') {
+                // Equivalent to the line above on its domain, but not a
+                // consequence of it once the domain is dropped (a wrong factor
+                // `(x − 5)(x + 3) = 0` straight after `ln x + ln(x − 3) = ln 10`).
+                // Neither credit nor a mistake. (With an authored source the
+                // established checks below decide it, as they always have.)
+                status = 'note';
+                note = `True for ${v} = ${wantedRoots.map(shownRoot).join(' or ')}, but it also allows ${fresh.map(r => `${v} = ${shownRoot(r)}`).join(' and ')}, which does not come from the line above. Pri cannot confirm this step, so it is not marked correct.`;
+                previousEquation = ast;
+                previousEquationTrusted = false;
+                expLogChain = false;
+                expLogPrevForm = null;
+                out.push({ text: line, status, note });
+                return;
+              }
+              if (hiddenOk && !extras.length) {
+                status = 'ok';
+                previousEquation = ast;
+                previousEquationTrusted = true;
+                expLogAnchor = ast;
+                expLogAnchorIndex = i;
+                expLogChain = true;
+                expLogDecided = true;
+                expLogPrevForm = expLog;
+                pendingExtraneous = [];
+                if (productEqualsZero(ast)) branchesOpen = true;
+                out.push({ text: line, status });
+                return;
+              }
+              if (hiddenOk && extras.length && (domainDrop || (!fresh.length && expLogChain))) {
+                // A true consequence of the line above that dropped a
+                // logarithm's domain (`ln x + ln(x − 3)` → `ln(x(x − 3))`), or a
+                // rearrangement that keeps exactly the values it let in. Each
+                // such value is one where the verified line is undefined. A
+                // valid step, but the value is still to be rejected; if the
+                // working ends before it is, the last such line is not credited.
+                status = 'ok';
+                note = `True for ${v} = ${wantedRoots.map(shownRoot).join(' or ')}. It also allows ${extras.map(r => `${v} = ${shownRoot(r)}`).join(' and ')}, but line ${expLogAnchorIndex + 1} is undefined there, so that is not a solution: reject it before giving the answer.`;
+                previousEquation = ast;
+                previousEquationTrusted = false;
+                expLogChain = true;
+                expLogDecided = true;
+                expLogPrevForm = expLog;
+                pendingExtraneous = extras;
+                pendingIndex = i;
+                out.push({ text: line, status, note, extraneousPending: extras.map(shownRoot) });
+                return;
+              }
+            }
+            expLogChain = false;
+            expLogPrevForm = null;
             // A line of lower degree than the equation — `x - 3 = 4` after
             // `(x - 3)^2 = 16`, one branch of the quadratic formula — names
             // one root and is true of it. It is a branch whether or not a
             // product was written first.
             const names = side => unwrapGroup(side)?.t === 'var' && unwrapGroup(side).v === meta.variable;
-            const valued = (names(ast.l) && !variablesOf(ast.r).size) || (names(ast.r) && !variablesOf(ast.l).size);
+            const valued = (names(ast.l) && !variablesOf(ast.r).size) || (names(ast.r) && !variablesOf(ast.l).size) || namesValue(ast, meta.variable);
+            // An exponential or logarithmic line whose whole solution set is
+            // proved to be some of the question's roots (`e^x = 1` when the
+            // roots are 0 and 2) names those roots, like `x − 3 = 0` does.
+            const expLogNames = expLogLine && !!expLog && expLog.roots.length > 0 && expLog.roots.length < wantedRoots.length
+              && expLog.roots.every(r => wantedRoots.some(w => sameRoot(r, w)));
             // (Only where the whole working is read at once: a stage of a plan
             // is checked a line at a time, and one limit is not the pair.)
-            const lone = loneBranches && !branchesOpen && wantedRoots.length > 1 && (valued || !!linearState({ kind: 'equation', ast }, meta.variable));
-            const held = (branchesOpen || lone) && wantedRoots.length > 1 ? solutionsSatisfying(ast, meta) : [];
+            const lone = loneBranches && !branchesOpen && wantedRoots.length > 1 && (valued || expLogNames || !!linearState({ kind: 'equation', ast }, meta.variable));
+            const held = (branchesOpen || lone || expLogLine) && wantedRoots.length > 1 ? solutionsSatisfying(ast, meta) : [];
             // A branch names roots of the question and nothing else. A line
             // of higher degree that is true of one root but also of a value
             // that solves nothing — `(x - 3)(x - 7) = 0` under
             // `(x - 3)(x - 5) = 0` — is a wrong factorisation, not a branch
             // of the right one (issue #510).
-            const extra = held.length && held.length < wantedRoots.length ? extraneousRootOf(ast, meta.variable, wantedRoots) : null;
+            const partial = held.length > 0 && held.length < wantedRoots.length;
+            let extra = partial ? extraneousRootOf(ast, meta.variable, wantedRoots) : null;
+            // An exponential or logarithmic branch (`2^x = 4` under
+            // `(2^x − 1)(2^x − 4) = 0`) is a branch only when its whole
+            // solution set is proved to be roots of the question.
+            let expLogBranchUnproved = false;
+            if (partial && extra === null && expLogLine) {
+              // Outside a branch context an exponential or logarithmic line
+              // true of some roots is never a mistake by default: it is a
+              // branch when proved, otherwise a note.
+              if (!expLog || (!branchesOpen && !lone)) expLogBranchUnproved = true;
+              else {
+                const stray = expLog.roots.find(r => !wantedRoots.some(w => sameRoot(r, w)));
+                if (stray !== undefined) extra = shownRoot(stray);
+              }
+            }
             if (extra !== null) {
               status = 'break';
               lineDiagnosis = extraneousLineRootDiagnosis(meta.variable, extra);
@@ -823,7 +1024,13 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               out.push({ text: line, status, note, diagnosis: lineDiagnosis });
               return;
             }
-            if (held.length && held.length < wantedRoots.length) {
+            if (expLogBranchUnproved) {
+              status = 'note';
+              note = `True for ${meta.variable} = ${held.map(shownRoot).join(' or ')}, but Pri cannot prove that this line allows no other value, so it is not marked correct.`;
+              out.push({ text: line, status, note });
+              return;
+            }
+            if (partial) {
               // One branch of a factorisation already shown. It is true of the
               // roots it names; whether the working keeps the rest is settled
               // once every line has been read.
@@ -873,6 +1080,9 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
                 if (assessed.trusted && productEqualsZero(ast)) branchesOpen = true;
               }
             }
+            // A line proved to have exactly the question's solutions has
+            // rejected any value an earlier line was still allowing.
+            if (status === 'ok' && previousEquationTrusted) pendingExtraneous = [];
           }
         } else {
           const v = parseNumericInput(cleaned).value;
@@ -885,7 +1095,10 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             status = 'break';
             lineDiagnosis = lostRootDiagnosis(meta.variable, v, wanted.length);
             note = lineDiagnosis.message;
-          } else status = 'ok';
+          } else {
+            status = 'ok';
+            pendingExtraneous = []; expLogChain = false;
+          }
         }
       } else if (meta.kind === 'expression') {
         const candidate = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
@@ -924,6 +1137,19 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     }
   }
 
+  // A logarithm domain was dropped and the value it let in was never rejected:
+  // the working stops short of the answer. The last line that still allows it
+  // is a true statement, but it is not credited as a finished solution.
+  if (pendingExtraneous.length && pendingIndex >= 0 && firstBreak === -1 && out[pendingIndex]?.status === 'ok') {
+    const values = pendingExtraneous.map(r => `${meta.variable} = ${shownRoot(r)}`).join(' and ');
+    out[pendingIndex] = {
+      ...out[pendingIndex],
+      status: 'note',
+      note: `True, but not finished: this still allows ${values}, which is not a solution because the original equation is undefined there. Reject it to complete the answer.`,
+      diagnosis: withConfidence({ ...extraneousLineRootDiagnosis(meta.variable, pendingExtraneous.map(shownRoot).join(' and ')), fix: 'Check every value against the original equation: a logarithm needs a positive argument, so reject any value that makes one zero or negative.' })
+    };
+  }
+
   if (firstBreak === -1) return { lines: out, firstBreak, diagnosis: null };
   for (let i = firstBreak + 1; i < out.length; i++) {
     if (out[i].status === 'break' || out[i].branch) {
@@ -942,7 +1168,13 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
   let diagnosis = out[firstBreak]?.diagnosis || null;
   if (!diagnosis || diagnosis.code === 'lost-solution' || diagnosis.code === 'system-line-false') {
     try {
-      const specific = diagnoseStep({ prevText, brokenText: out[firstBreak].text, meta });
+      let specific = diagnoseStep({ prevText, brokenText: out[firstBreak].text, meta });
+      // Across an exponential or logarithmic step the text-shape readings
+      // ("× in place of ^", "only one side changed") describe the symbols, not
+      // the mathematics, and mislead. The substitution of the answer is true.
+      if (specific && TEXT_SHAPE_CODES.has(specific.code) && [prevText, out[firstBreak].text].some(t => expLogText(t, meta))) {
+        specific = diagnoseStep({ prevText: null, brokenText: out[firstBreak].text, meta }) || specific;
+      }
       if (specific) diagnosis = specific;
     } catch { /* remain conservative */ }
   }
@@ -1674,9 +1906,32 @@ function nameChangedTerm(report) {
   });
   return changed ? { ...report, lines } : report;
 }
+/**
+ * An equation's authored solutions as numbers. A solution authored as an exact
+ * constant (`"ln(7)/2"`, `"e^2"`) is read as its value; one that is not a
+ * constant is left as it was, and is ignored as before.
+ */
+function numericSolutions(meta) {
+  if (meta?.kind !== 'equation' || !Array.isArray(meta.solutions) || !meta.solutions.some(s => typeof s === 'string')) return meta;
+  const solutions = meta.solutions.map(s => {
+    if (typeof s !== 'string' || Number.isFinite(Number(s))) return s;
+    // One value per entry: a list, a ± or a word is not read here.
+    if (/[,;±]|\b(or|and)\b|\d\s+[\d.]/i.test(s)) return s;
+    try {
+      const ast = parse(normalize(s));
+      if (ast.t === 'equation' || [...variablesOf(ast)].some(name => name !== 'e')) return s;
+      const value = evaluate(ast, {});
+      return Number.isFinite(value) ? value : s;
+    } catch { return s; }
+  });
+  return { ...meta, solutions };
+}
+
 function stepCheckWithinBudget(meta, workingText, options = null) {
+  meta = numericSolutions(meta);
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
-  return stepCheckSingle(meta, workingText, pinnedSystem(meta, typeof options?.prompt === 'string' ? options.prompt : ''), { loneBranches: true });
+  const prompt = typeof options?.prompt === 'string' ? options.prompt : '';
+  return stepCheckSingle(meta, workingText, pinnedSystem(meta, prompt), { loneBranches: true, prompt });
 }
 
 // ── Method marks (marking-11) ────────────────────────────────────────────────
