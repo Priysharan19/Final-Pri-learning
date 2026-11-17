@@ -18,6 +18,8 @@ import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRa
 import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
 import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
 import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById } from '../../client/src/engine/misconceptions.js';
+import { slipHint } from '../../client/src/engine/slipHint.js';
+import { slipPatterns } from '../../client/src/engine/slipPattern.js';
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
 import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/reviewQueue.js';
@@ -573,6 +575,13 @@ const HINT_WORK_TEXT = Object.freeze({
     unread: 'आपकी पंक्तियाँ अभी किसी चरण से मेल नहीं खा सकीं। नीचे का संकेत अब भी काम का है।'
   }
 });
+/** The line-check note, plus one Socratic question about the move that broke the line, when the engine named one. */
+export function stepNudge(work, move, locale = 'en') {
+  const note = hintWorkNote(work, locale);
+  const stepHint = work?.status === 'break' && note ? slipHint(move, locale) : null;
+  return { note: stepHint ? `${note} ${stepHint}` : note, stepHint };
+}
+
 export function hintWorkNote(work, locale = 'en') {
   const T = HINT_WORK_TEXT[locale] || HINT_WORK_TEXT.en;
   const fill = (s, v) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ''));
@@ -967,7 +976,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (evidence.unchecked) return { status: 'unchecked' };
     if (evidence.attemptAt >= 0) return { status: 'final' };
     const verifiedLines = Math.max(0, Math.min(lines.length, Number(evidence.verifiedLines) || 0));
-    if (evidence.firstBreak >= 0) return { charge: true, capBucket, reply: { status: 'break', verifiedLines, line: evidence.firstBreak + 1 } };
+    if (evidence.firstBreak >= 0) return { charge: true, capBucket, reply: { status: 'break', verifiedLines, line: evidence.firstBreak + 1 }, move: typeof evidence.misconception === 'string' ? evidence.misconception : null };
     if (verifiedLines > 0) return { charge: true, capBucket, reply: { status: 'held', verifiedLines } };
     return { status: 'unread' };
   }
@@ -1061,7 +1070,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       }
       const locale = body.locale === 'hi' ? 'hi' : 'en';
       result.response.work = shown;
-      result.response.workNote = hintWorkNote(shown, locale);
+      // The Socratic nudge about THIS step (engine/slipHint.js), only after a
+      // line check that ran and charged. The engine's id for the move stays here.
+      const stepped = stepNudge(shown, work.charge ? work.move : null, locale);
+      result.response.workNote = stepped.note;
+      if (stepped.stepHint) result.response.stepHint = stepped.stepHint;
     }
     if (result.status) {
       const message = result.code === 'HINT_RUNG_ORDER' ? 'Open the hint rungs in order.'
@@ -1622,6 +1635,25 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         groups: book.groups.map(g => ({ key: g.key, subtopic: g.subtopic, misconception: g.misconception, count: g.count, open: g.open, lastAt: g.lastAt,
           items: g.items.map(i => book.entries.find(e => e.id === i.id) || i) })) }
     });
+  });
+
+  // The same slip again: the one repeated move in this account's last marked
+  // answers per topic (engine/slipPattern.js, deterministic), with up to three
+  // of its own mistakes to drill by twin. Account-scoped, graded attempts only.
+  router.get('/slip-pattern', rateLimit(db, 'practice-slip-pattern', { limit: 240, windowMs: 3600000 }), async (req, res) => {
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const attempts = (await serverAttempts(accountId, NOTEBOOK_SCAN)).map(a => ({ ...a, attemptId: a.attemptId || a.id }));
+    const top = slipPatterns(attempts)[0] || null;
+    res.set('Cache-Control', 'no-store');
+    if (!top) return res.status(200).json({ pattern: null });
+    const byId = new Map(attempts.map(a => [a.attemptId, a]));
+    const prompts = await promptsOf(accountId, top.drillFrom.map(id => byId.get(id)?.questionId), now);
+    const drill = top.drillFrom.map(id => {
+      const q = prompts.get(byId.get(id)?.questionId) || null;
+      return { id, canTwin: !!q && !q.multipart && !q.custom };
+    });
+    return res.status(200).json({ pattern: { subtopic: top.subtopic, misconceptionId: top.misconceptionId, nameKey: top.nameKey, count: top.count, of: top.of, drill } });
   });
 
   // A twin: a NEW server-chosen question from the same generator, at the same

@@ -3952,4 +3952,7 @@ export default {
   'badge.sage.desc': 'स्तर 10 तक पहुँचिए।',
   'badge.extension.name': 'आगे की सोच',
   'badge.extension.desc': 'बिना संकेत के D4 परीक्षा-विस्तार प्रश्न सही हल कीजिए।',
+  'smart.slip.note': 'वही चूक, {move}, {topic} पर आपके पिछले {of} उत्तरों में से {n} में आई।',
+  'smart.slip.drill': 'इसी पर तीन प्रश्न:',
+  'smart.slip.try': 'प्रश्न {n}',
 };
