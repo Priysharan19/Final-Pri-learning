@@ -149,7 +149,7 @@ function buildApp() {
     // only passes where the CI job happens to export the variable.
     // (KALP-02 pins the four-flag env below; PARENT_REPORT (#743) is added on top so /parent-report is walked too,
     // and LIBRARY (plan F1) so /library and /library/:id are, and EXAM_DESK (plan F4b) so /desk/import and /desk/:attemptId are.)
-    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1', PRI_FEATURE_LIBRARY: '1', PRI_FEATURE_EXAM_DESK: '1' } });
+    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1', PRI_FEATURE_LIBRARY: '1', PRI_FEATURE_EXAM_DESK: '1', PRI_FEATURE_SYLLABUS_BOARD: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -695,6 +695,29 @@ async function run() {
     await online.signIn({ name: 'Accessibility Student' });
 
     await step('home', '/', async () => { await goTo(page, BASE, '/'); });
+
+    // ── the teacher workspace, the student's side (Settings) ────────────────
+    // TEST DESK: a teacher account and its class are made at the server's own
+    // routes; the student signed in on this page joins with the class code
+    // over the same route the app uses, carrying this page's own cookies.
+    await step('settings · a paper set by a teacher and what the teacher can see', '/settings', async () => {
+      const { registerAccount, verifyEmail, promoteRole } = await import('../../server/test/support/app-harness.mjs');
+      const h = platform.h;
+      h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'register%'").run();
+      const made = await registerAccount(h, { email: freshEmail('a11y-class-teacher'), name: 'A11y Class Teacher', deviceId: 'a11y-desk-teacher' });
+      await verifyEmail(h, made.account.id);
+      await promoteRole(h, made.jar, made.account.id, 'teacher');
+      const cls = await h.request('/v1/classes', { method: 'POST', jar: made.jar, body: { name: 'A11y class' } });
+      await h.request(`/v1/classes/${cls.data.class.id}/assignments`, { method: 'POST', jar: made.jar,
+        body: { title: 'Week 4 paper', specification: { kind: 'paper', paper: INDIA ? { kind: 'india', track: 'cbse', grade: 10 } : { kind: 'practice-paper', year: 7, minutes: 30 } } } });
+      const jar = Object.fromEntries((await ctx.cookies()).map(c => [c.name, c.value]));
+      const joined = await h.request('/v1/classes/join', { method: 'POST', jar, body: { code: cls.data.joinCode } });
+      if (joined.status !== 200) throw new Error(`the student could not join the desk's class (${joined.status} ${joined.text})`);
+      await goTo(page, BASE, '/settings');
+      await page.waitForSelector('[data-teacher-can-see]', { timeout: 30000 });
+      await page.waitForSelector('[data-paper-assignment]', { timeout: 30000 });
+      await wait(page, 600);
+    });
 
     await step('home · generator open', '/', async () => {
       await goTo(page, BASE, '/');
@@ -1524,6 +1547,7 @@ async function run() {
     });
 
     // ── teacher-only workspace, exercised under a real teacher profile ──────
+    const teacherEmail = freshEmail('a11y-teacher');
     await step('teacher studio', '/teach', async () => {
       await insideLive('/');
       await click(page, '.user-chip');
@@ -1541,7 +1565,7 @@ async function run() {
       await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
       // A teacher is a device role; the gate still asks for an account first.
       await page.waitForSelector('[data-testid="account-activation-gate"] [data-signin-card="inline"]', { timeout: 30000 });
-      await signInOnCard(page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]'), platform, { email: freshEmail('a11y-teacher'), age: 18 });
+      await signInOnCard(page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]'), platform, { email: teacherEmail, age: 18 });
       await page.waitForSelector('.teacher-workspace-head', { timeout: 60000 });
       await wait(page, 700);
     });
@@ -1556,6 +1580,38 @@ async function run() {
 
     await step('teacher studio · question builder', '/teach', async () => {
       await click(page, 'button.btn-ghost', { text: 'Write a question' });
+    });
+
+    // ── the teacher workspace (cloud classes): onboarding, board, papers ────
+    // TEST DESK: the account behind this teacher profile is given the teacher
+    // role in the database, as the bootstrap/CLI does (an invite code in production).
+    await step('teacher workspace · a class and its join code', '/teach', async () => {
+      platform.h.db.prepare("UPDATE accounts SET role='teacher' WHERE email=?").run(teacherEmail.toLowerCase());
+      await goTo(page, BASE, '/teach');
+      const form = page.locator('section[aria-labelledby="classroom-title"] form').first();
+      await form.waitFor({ timeout: 30000 });
+      await form.locator('input').first().fill('A11y 7MA');
+      await form.locator('button.btn-primary').click();
+      await page.waitForSelector('[data-join-code]', { timeout: 20000 });
+      await page.waitForSelector('[data-teacher-workspace]', { timeout: 30000 });
+      await wait(page, 700);
+    });
+
+    await step('teacher workspace · class board', '/teach', async () => {
+      await click(page, '[data-tw-view="board"]');
+      await page.waitForSelector('[data-class-board] table, [data-class-board-not-yet]', { timeout: 30000 });
+      await wait(page, 500);
+    });
+
+    await step('teacher workspace · papers and results', '/teach', async () => {
+      await click(page, '[data-tw-view="papers"]');
+      await page.waitForSelector('[data-paper-form]', { timeout: 20000 });
+      await page.locator('#tw-paper-title').fill('Week 4 paper');
+      await click(page, '[data-paper-form] button.btn-primary');
+      await page.waitForSelector('[data-open-results]', { timeout: 20000 });
+      await click(page, '[data-open-results]');
+      await page.waitForSelector('[data-paper-results] table', { timeout: 20000 });
+      await wait(page, 500);
     });
 
     // ── verdicts ─────────────────────────────────────────────────────────────

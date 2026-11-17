@@ -164,6 +164,8 @@ export const ENGINE_SUITES = [
   // The teacher workspace: hand-in, review queue and append-only teacher marks
   // under RLS (schema 18), engine marks byte-identical, isolation and removal.
   'classroom-check.mjs',
+  // The class board: counts per outcome and state over visible students, re-teach, drill-down.
+  'class-board-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',

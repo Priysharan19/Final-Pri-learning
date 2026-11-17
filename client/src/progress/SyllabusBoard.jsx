@@ -40,7 +40,7 @@ import { practiceHref } from '../lib/practiceLinks.js';
 const FORECAST = import.meta.glob('../engine/hsc/hscPriorities.js');
 
 // Explicit maps (not template keys) so the catalogue check sees every string.
-const STATE_WORD = {
+export const STATE_WORD = {
   'not-started': 'board.state.notStarted', seen: 'board.state.seen', assisted: 'board.state.assisted',
   thin: 'board.state.thin', recheck: 'board.state.recheck', independent: 'board.state.independent', retained: 'board.state.retained'
 };

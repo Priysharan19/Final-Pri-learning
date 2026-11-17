@@ -380,6 +380,7 @@ jobs:
           # queue, append-only TEACHER marks kept apart from engine marks, class
           # isolation, removal and guardian consent (R4).
           node server/test/classroom-check.mjs 2>&1 | tee classroom.log
+          node server/test/class-board-check.mjs 2>&1 | tee -a classroom.log
           node tools/ci-check-counts.mjs verify platform/classroom.log
           # The anonymous public resource catalogue (plan F6a): off by default,
           # published rows of this server's edition only, no cookie, CORS only

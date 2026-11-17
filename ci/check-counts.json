@@ -617,6 +617,29 @@
         {
           "has": "HSC PRIORITIES · 1437/1437 checks passed",
           "note": "Prithagoras HSC 2027 priorities: NESA mapping-grid metadata (no text), the old → new map held to the NSW model, the pinned ranking, the backtest evidence doc, edition isolation, en-AU copy and a render."
+        },
+        {
+          "has": "shape; 81 official CBSE records → 314 Pri variants on their chapter (10 bands with no serving generator).",
+          "note": "28/110 → 80/310 records/variants (Train 15: #840, #845, #842 records, re-derived by running all 4 shards). 80/310 → 81/314 (#846: 65/2/1 Q24, re-derived by running all 4 shards on Train 15 + #846)."
+        },
+        {
+          "has": "ADVERSARIAL CORPUS: PASS — 219/219 checks",
+          "note": "#723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count."
+        },
+        {
+          "has": "LEGAL PAGES: PASS — 383/383 checks",
+          "note": "364 (m-finish-16): the review switch, store-purchase wording, retention and crash-report disclosures, and the generated third-party notices page. 374 (L7): no notice makes a coverage claim D24 forbids, in either language. 375 (L7): the D18 wording matches the accounts stream's code (#736). 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737). 383 (L7, Train 4 truth): banner conditions walked, Practise-this and Hindi D18 pinned."
+        },
+        {
+          "has": "LEGAL PROMISES GATE: PASS — 19/19 checks",
+          "note": "16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination. 19 (L7): the D17 prompt promise."
+        },
+        {
+          "has": "CLOUD HANDWRITING CLIENT: PASS — 192/192 checks",
+          "note": "186 → 192 (#196): a remembered read is dropped when the cloud account changes, so account A's transcript and read receipt are never handed to account B on the same device."
+        },
+        {
+          "has": "TOLERANCE POLICY: PASS — 221/221 checks"
         }
       ]
     },
@@ -852,6 +875,10 @@
         {
           "has": "REGION ISOLATION (H2): PASS — 489 checks (sqlite)",
           "note": "423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables. 467 → 489 (teacher workspace, re-derived by running): the check walks the route inventory, which now lists the eight /v1/classroom routes."
+        },
+        {
+          "has": "REGION ISOLATION (H2): PASS — 504 checks (sqlite)",
+          "note": "423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables. 467 → 489 (teacher workspace, re-derived by running): the check walks the route inventory, which now lists the eight /v1/classroom routes. 489 → 504 on the board branch: the syllabus-board train routes and the two class-board routes."
         }
       ]
     },
@@ -891,6 +918,9 @@
       "pins": [
         {
           "has": "NSW PRACTICE (G3): PASS — 165/165 checks"
+        },
+        {
+          "has": "NSW PRACTICE (G3): PASS — 163/163 checks"
         }
       ]
     },
@@ -1323,6 +1353,10 @@
         {
           "has": "PLATFORM ON POSTGRES: PASS — 95/95 suites",
           "note": "94 → 95 (teacher workspace): classroom-check on Postgres (RLS, migration 18). 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."
+        },
+        {
+          "has": "PLATFORM ON POSTGRES: PASS — 98/98 suites",
+          "note": "96 → 98 (teacher workspace): classroom-check and class-board-check on Postgres (RLS, migration 18). train editions-22: 94 + Stripe (#941) + paper generator (#948) = 96. 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."
         }
       ]
     },
@@ -1681,6 +1715,13 @@
         },
         {
           "has": "EDITION SUITES (prithagoras): PASS — 34/34 suites"
+        },
+        {
+          "has": "EDITION SUITES COVERAGE: PASS — 33 listed, 3 exempt, 19 importers accounted for",
+          "note": "Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."
+        },
+        {
+          "has": "EDITION SUITES (prithagoras): PASS — 33/33 suites"
         }
       ]
     },
@@ -1735,6 +1776,9 @@
       "pins": [
         {
           "has": "classroom-check (sqlite): 124 checks passed"
+        },
+        {
+          "has": "class-board-check (sqlite): 23 checks passed"
         }
       ]
     }
