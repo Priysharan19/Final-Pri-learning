@@ -1,7 +1,7 @@
 // Assignment targets on the India syllabus — the one description of a target
 // that the teacher's publish form, the student's inbox card and Practice share.
 import { indiaProductSections, indiaChapter, indiaChapterGrade, indiaTrack } from '../engine/indiaProduct.js';
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 
 let sectionsCache = null;
 

@@ -21,7 +21,7 @@
 // Neither ever holds the expected answer, a solution or a mark.
 // ─────────────────────────────────────────────────────────────────────────────
 import { clearDraft, draftIdsIn, readDraft, saveDraft } from './drafts.js';
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 
 const PENDING = 'submit';
 const SUBMISSION_ID = /^[A-Za-z0-9_-]{8,80}$/;

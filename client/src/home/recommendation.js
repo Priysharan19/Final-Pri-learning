@@ -1,5 +1,5 @@
 import { practiceHref } from '../lib/practiceLinks.js';
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;

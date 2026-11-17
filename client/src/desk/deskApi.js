@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloudRequest } from '../platform/cloudTransport.js';
 import { editionDisplayName } from '../platform/edition.js';
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 
 /**
  * The public practice-desk website an attempt can be brought in from
