@@ -359,22 +359,68 @@ const PROTECTED = [
 const protectedGlobs = ['client/src/engine/curriculum-in*.js', 'client/src/engine/india*.js'];
 let isolationNote;
 try {
-  const git = args => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const git = args => execFileSync('git', args, { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 28 }).trim();
   const base = git(['merge-base', 'HEAD', 'origin/main']);
-  // Committed, staged and working-tree changes against the merge base, plus untracked files.
-  const changedSince = paths => [
-    git(['diff', '--name-only', base, '--', ...paths]),
-    git(['ls-files', '--others', '--exclude-standard', '--', ...paths])
-  ].filter(Boolean).join('\n');
-  const touched = changedSince(['client/src/engine/curriculum-nsw']);
-  // An integration train merges many reviewed branches into one: its diff against main carries the NSW
-  // model's changes AND every other branch's India/generator/practice changes by construction, so the
-  // "an NSW-model branch changes nothing else" rule cannot be read from the train's own diff. Each
-  // constituent branch is held to the rule by its own CI before it joins a train (docs/release/release-policy.md).
-  const branchName = process.env.GITHUB_HEAD_REF || git(['rev-parse', '--abbrev-ref', 'HEAD']);
-  if (touched && /^task\/train-/.test(branchName)) {
-    isolationNote = `integration branch ${branchName}: the NSW-model isolation rule is enforced on each constituent branch, not on the merged diff`;
-  } else if (touched) {
+  const BANK = /^client\/src\/engine\/generators\/(year\d+|streams-standard|streams-ext)\.js$/;
+  const COURSE = 'client/src/engine/curriculum.js';
+  const NEW_NSW_FILE = /^client\/src\/engine\/generators\/[\w-]+-nsw\.js$/;
+  const BANK_ADDED = /^\+(import \{ \w+Nsw \} from '\.\/[\w-]+-nsw\.js';|\s*\.\.\.\w+Nsw,)$/;
+  // curriculum.js: only these shapes may be added — a subtopic entry (opener, dot-point text, closer),
+  // a DOTPOINT_FORMS row of ordinals, a comment, the authored-weight constant, and the extended CODES line.
+  const COURSE_ADDED = [
+    /^\+\s*(S|T)\('[\w-]+', '[^']*', '[^']*', [\w .\/]+, (?:'[^']*', )?\[$/,
+    /^\+\s*'[^'`$\\]*',?$/,
+    /^\+\s*\]\),?$/,
+    /^\+\s*'[\w-]+': \[(?:\[[\d, ]*\],? ?)+\],?$/,
+    /^\+\s*\/\/.*$/,
+    /^\+const AUTHORED_WEIGHT = 100 \/ 9 - 1e-14;$/,
+    /^\+$/
+  ];
+  const COURSE_REMOVED = /^-(const CODES = |\s*\]\)\s*$)/;
+  const loadCourse = async ref => import(`data:text/javascript;base64,${Buffer.from(git(['show', `${ref}:${COURSE}`])).toString('base64')}`);
+
+  // The rule is held per unit of work, never on the merged diff of an integration branch (which carries the
+  // NSW model's changes and every other branch's changes by construction) and never by branch name. A unit is
+  // a list of ranges [from, to]; `to` null means the working tree (a plain branch, where the unit is the whole
+  // branch plus uncommitted and untracked files). On a branch that merges others:
+  //   · each merged branch is a unit: its own diff against the last origin/main commit it contains;
+  //   · a merge of something already in origin/main is skipped (main's own CI held it);
+  //   · all commits made directly on the branch together are one unit (a commit of NSW changes cannot be
+  //     excused by a second commit that restores the rest).
+  const mergeList = git(['rev-list', '--first-parent', '--merges', '--reverse', `${base}..HEAD`]).split('\n').filter(Boolean);
+  const units = [];
+  if (!mergeList.length) {
+    units.push({ label: 'this branch', ranges: [[base, null]] });
+  } else {
+    const inMain = c => { try { git(['merge-base', '--is-ancestor', c, 'origin/main']); return true; } catch { return false; } };
+    for (const m of mergeList) {
+      const [, ...others] = git(['rev-list', '--parents', '-n', '1', m]).split(' ');
+      const first = others[0];
+      for (const other of others.slice(1)) {
+        if (inMain(other)) continue;
+        units.push({ label: `merged ${other.slice(0, 9)} (${git(['log', '-1', '--format=%s', m])})`, ranges: [[git(['merge-base', other, 'origin/main']), other]] });
+      }
+    }
+    const direct = git(['rev-list', '--first-parent', '--no-merges', '--reverse', `${base}..HEAD`]).split('\n').filter(Boolean);
+    const dirty = git(['status', '--porcelain', '--', 'client/src/engine']);
+    const ranges = direct.map(c => [`${c}^`, c]);
+    if (dirty) ranges.push(['HEAD', null]);
+    if (ranges.length) units.push({ label: 'commits made directly on this branch', ranges, direct: true });
+  }
+
+  // The one place an integration branch may be excused: its own direct commits (conflict fixes, review fixes,
+  // regenerated files) cannot be split by merged branch. An entry names the pull request by number, with the
+  // reason, and covers only that unit; each merged branch is still held to the rule alone. The number comes
+  // from the CI ref (refs/pull/N/merge) or PRI_PR_NUMBER; no branch name can opt out.
+  const DIRECT_COMMIT_ALLOWANCES = {
+    1054: 'train editions-25: the integration commits that fix the merged tree (generator form draw, edition record, regenerated files) sit beside the NSW forms the AU branches added; reviewed as R4 on its exact head'
+  };
+  const prNumber = (process.env.PRI_PR_NUMBER || /^refs\/pull\/(\d+)\//.exec(process.env.GITHUB_REF || '')?.[1] || '').trim();
+  const evaluateUnit = async ({ label, ranges, direct }) => {
+    const diff = (extra, paths) => ranges.map(([from, to]) => git(['diff', ...extra, from, ...(to ? [to] : []), '--', ...paths])).filter(Boolean).join('\n');
+    const untrackedIn = paths => ranges.some(([, to]) => !to) ? git(['ls-files', '--others', '--exclude-standard', '--', ...paths]).split('\n').filter(Boolean) : [];
+    const changedSince = paths => [diff(['--name-only'], paths), ...untrackedIn(paths)].filter(Boolean).join('\n');
+    if (!changedSince(['client/src/engine/curriculum-nsw'])) return null;
     const changed = changedSince([...PROTECTED, ...protectedGlobs.map(g => `:(glob)${g}`)]);
     // Authored NSW content (a new generator and its subtopic) legitimately changes the crosswalk and
     // the legacy NSW course together. Only these shapes of change are let through; anything else in
@@ -384,29 +430,16 @@ try {
     //   · in a year/stream generator bank: its `import … from './….-nsw.js'` line and one `...xNsw,`
     //     spread line (first in the object, so an original generator can never be overridden);
     //   · in curriculum.js: only subtopic entries, dot-point form rows, comments, the authored-weight
-    //     constant and an extended CODES table (shapes below); no other line may be added or removed.
-    const BANK = /^client\/src\/engine\/generators\/(year\d+|streams-standard|streams-ext)\.js$/;
-    const COURSE = 'client/src/engine/curriculum.js';
-    const NEW_NSW_FILE = /^client\/src\/engine\/generators\/[\w-]+-nsw\.js$/;
-    const BANK_ADDED = /^\+(import \{ \w+Nsw \} from '\.\/[\w-]+-nsw\.js';|\s*\.\.\.\w+Nsw,)$/;
-    // curriculum.js: only these shapes may be added — a subtopic entry (opener, dot-point text, closer),
-    // a DOTPOINT_FORMS row of ordinals, a comment, the authored-weight constant, and the extended CODES line.
-    const COURSE_ADDED = [
-      /^\+\s*(S|T)\('[\w-]+', '[^']*', '[^']*', [\w .\/]+, (?:'[^']*', )?\[$/,
-      /^\+\s*'[^'`$\\]*',?$/,
-      /^\+\s*\]\),?$/,
-      /^\+\s*'[\w-]+': \[(?:\[[\d, ]*\],? ?)+\],?$/,
-      /^\+\s*\/\/.*$/,
-      /^\+const AUTHORED_WEIGHT = 100 \/ 9 - 1e-14;$/,
-      /^\+$/
-    ];
-    const COURSE_REMOVED = /^-(const CODES = |\s*\]\)\s*$)/;
-    const untracked = new Set(git(['ls-files', '--others', '--exclude-standard', '--', ...PROTECTED]).split('\n').filter(Boolean));
-    const diffLines = file => git(['diff', '-U0', base, '--', file]).split('\n').filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
+    //     constant and an extended CODES table (shapes above); no other line may be added or removed.
+    const untracked = new Set(untrackedIn(PROTECTED));
+    const existsBefore = file => ranges.every(([from]) => !!git(['ls-tree', from.replace(/\^$/, '^'), '--', file]));
+    const diffLines = file => diff(['-U0'], [file]).split('\n').filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
     const allowed = [];
     const blocked = changed.split('\n').filter(Boolean).filter(file => {
       if (NEW_NSW_FILE.test(file)) { allowed.push(file.replace('client/src/engine/', '')); return false; }
-      if (untracked.has(file) || !git(['ls-tree', base, '--', file])) return true;
+      if (untracked.has(file)) return true;
+      if (!direct && !existsBefore(file)) return true;
+      if (direct && !git(['ls-tree', ranges[0][0], '--', file])) return true;
       const lines = diffLines(file);
       let ok = false;
       if (BANK.test(file)) ok = lines.every(l => BANK_ADDED.test(l));
@@ -422,26 +455,39 @@ try {
       if (ok) allowed.push(file.replace('client/src/engine/', ''));
       return !ok;
     });
-    check(blocked.length === 0, `this branch changes the NSW model and also: ${blocked.join(', ')}`);
+    if (direct && blocked.length && DIRECT_COMMIT_ALLOWANCES[prNumber]) {
+      allowed.push(`excused by the allow-list entry for PR #${prNumber}: ${DIRECT_COMMIT_ALLOWANCES[prNumber]}`);
+    } else {
+      check(blocked.length === 0, `${label} changes the NSW model and also: ${[...new Set(blocked)].join(', ')}`);
+    }
     // The line shapes above are not enough on their own (a duplicate key, an injected dot point or a heavy
     // weight has an innocent shape): compare the parsed course with the base. Every existing subtopic keeps
     // its name, strand, year, weight, label, dot points and forms; each new one carries a fixed weight.
     if (changed.split('\n').includes(COURSE)) {
-      // curriculum.js imports nothing, so the base text can be loaded from a data: URL (no file is written).
-      const baseMod = await import(`data:text/javascript;base64,${Buffer.from(git(['show', `${base}:${COURSE}`])).toString('base64')}`);
+      const last = ranges[ranges.length - 1][1];
+      const baseMod = await loadCourse(ranges[0][0]);
+      const headMod = last ? await loadCourse(last) : { SUBTOPICS, SUBTOPIC_BY_ID, DOTPOINT_FORMS };
+      const byId = headMod.SUBTOPIC_BY_ID || Object.fromEntries(headMod.SUBTOPICS.map(x => [x.id, x]));
       const sig = x => JSON.stringify([x.name, x.strand, x.year, x.weight, x.code, x.dotpoints]);
       for (const b of baseMod.SUBTOPICS) {
-        check(SUBTOPIC_BY_ID[b.id] && sig(SUBTOPIC_BY_ID[b.id]) === sig(b), `curriculum.js changes the existing subtopic ${b.id}`);
-        check(JSON.stringify(DOTPOINT_FORMS[b.id]) === JSON.stringify(baseMod.DOTPOINT_FORMS[b.id]), `curriculum.js changes the existing dot-point forms of ${b.id}`);
+        check(byId[b.id] && sig(byId[b.id]) === sig(b), `${label}: curriculum.js changes the existing subtopic ${b.id}`);
+        check(JSON.stringify(headMod.DOTPOINT_FORMS[b.id]) === JSON.stringify(baseMod.DOTPOINT_FORMS[b.id]), `${label}: curriculum.js changes the existing dot-point forms of ${b.id}`);
       }
       const baseIds = new Set(baseMod.SUBTOPICS.map(b => b.id));
-      check(new Set(SUBTOPICS.map(x => x.id)).size === SUBTOPICS.length, 'curriculum.js: subtopic ids are unique');
-      for (const x of SUBTOPICS.filter(x => !baseIds.has(x.id))) check(x.weight === 100 / 9 - 1e-14 || x.weight === 8, `curriculum.js: new subtopic ${x.id} has weight ${x.weight}, not an authored weight`);
+      check(new Set(headMod.SUBTOPICS.map(x => x.id)).size === headMod.SUBTOPICS.length, `${label}: curriculum.js: subtopic ids are unique`);
+      for (const x of headMod.SUBTOPICS.filter(x => !baseIds.has(x.id))) check(x.weight === 100 / 9 - 1e-14 || x.weight === 8, `${label}: curriculum.js: new subtopic ${x.id} has weight ${x.weight}, not an authored weight`);
     }
-    isolationNote = `India/legacy files byte-unchanged against merge base ${base.slice(0, 9)}${allowed.length ? `, except additive NSW-only changes in ${allowed.join(', ')}` : ''}`;
-  } else {
-    isolationNote = 'branch does not change the NSW model; byte-unchanged check not applicable';
+    return allowed;
+  };
+
+  const notes = [];
+  for (const unit of units) {
+    const allowed = await evaluateUnit(unit);
+    if (allowed) notes.push(`${unit.label}${allowed.length ? ` (additive NSW-only changes in ${allowed.join(', ')})` : ''}`);
   }
+  isolationNote = notes.length
+    ? `India/legacy files byte-unchanged against each unit's merge base, except additive NSW-only changes; ${notes.length} unit(s) changed the NSW model and were each checked alone: ${notes.join('; ')}`
+    : 'branch does not change the NSW model; byte-unchanged check not applicable';
 } catch {
   isolationNote = 'byte-unchanged check not run: no origin/main merge base in this checkout';
 }
