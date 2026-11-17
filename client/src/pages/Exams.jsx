@@ -15,6 +15,7 @@ import { BLUEPRINT_KEYS } from '../lib/blueprintKeys.js';
 import { featureEnabled } from '../platform/features.js';
 import { omittedNames } from '../local/nswExamBackend.js';
 import Working from '../instrument/Working.jsx';
+import { generatedPapersFor } from '../local/generatedPaperBackend.js';
 
 const CLAIM_KEYS = {
   'official-mathematics-section': 'exams.claim.officialSection',
@@ -108,6 +109,7 @@ export default function Exams() {
   return (
     <div className="grid cols-2" style={{ alignItems: 'start' }}>
       {!paper && <h1 className="sr-only">{t('nav.exams')}</h1>}
+      {generatedPapersFor(user) && <GeneratorEntry nav={nav} />}
       {user.course === 'nsw' && featureEnabled('nswExams') && <NswPapers busy={busy} start={start} />}
       <div className="card">
         <div className="card-title">{t('exams.sitPaperTitle')}</div>
@@ -153,6 +155,18 @@ export default function Exams() {
 
 // Prithagoras's HSC-style papers (plan G4): the server's list, released or
 // not. A paper that is not released says what it lacks; it has no start.
+/** The way into the Paper Generator, on the Exams page of both editions. */
+function GeneratorEntry({ nav }) {
+  const t = useT();
+  return (
+    <section className="card" style={{ gridColumn: '1 / -1' }} data-paper-generator-entry aria-labelledby="gen-entry-title">
+      <h2 className="card-title" id="gen-entry-title">{t('gen.entry.title')}</h2>
+      <p className="sub" style={{ marginBottom: 14 }}>{t('gen.entry.body')}</p>
+      <button className="btn btn-primary btn-sm" onClick={() => nav('/paper-generator')}>{t('gen.entry.cta')}</button>
+    </section>
+  );
+}
+
 function NswPapers({ busy, start }) {
   const t = useT();
   const [list, setList] = useState(null);
@@ -195,6 +209,7 @@ function IndiaExams({ user, exams, blueprint, busy, error, startRefused, stillOp
   return (
     <div className="grid cols-2" style={{ alignItems: 'start' }}>
       {!paper && <h1 className="sr-only">{t('exams.indiaHeading')}</h1>}
+      <GeneratorEntry nav={nav} />
       <div className="card">
         <div className="card-title">{blueprint ? (BLUEPRINT_KEYS[blueprint.id] ? t(BLUEPRINT_KEYS[blueprint.id][0]) : blueprint.label) : t('exams.classPractice', { n: user.year })}</div>
         {jeeMainReady ? <>

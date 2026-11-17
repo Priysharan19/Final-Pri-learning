@@ -39,6 +39,7 @@ import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { freezePage, pendingSummary, unreadInkKeys } from '../local/examPages.js';
 import { featureEnabled } from '../platform/features.js';
 import { omittedNames } from '../local/nswExamBackend.js';
+import { saveBase64File } from '../lib/files.js';
 import { MOCK_LABEL } from '../engine/boardMock.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
@@ -781,6 +782,7 @@ export default function ExamRoom() {
           {exam.targeted && <WhyKey why={exam.why} />}
           {exam.nsw && <p className="muted" data-exam-nsw-note>{t('examRoom.nswMarkingNote')}</p>}
           {exam.nsw?.omittedOutcomes?.length > 0 && <p className="muted" data-exam-nsw-omits>{t('exams.nsw.omits', { outcomes: omittedNames(exam.nsw.omittedOutcomes) })}</p>}
+          {exam.generated && <GuideButton examId={exam.id} />}
           {/* The number is ink, never a traffic light; the sentence carries the meaning. */}
           <div className="hero-num exam-result-num">
             {shownPct}%<span className="sr-only"> {t(shownPct >= 80 ? 'examRoom.pctSrStrong' : shownPct >= 50 ? 'examRoom.pctSrFair' : 'examRoom.pctSrLow')}</span>
@@ -1271,4 +1273,25 @@ function givenText(d) {
   if (d.answerType === 'mcq') return 'ABCD'[Number(d.given)] ?? '—';
   if (d.answerType === 'multi-mcq') return String(d.given).split(',').filter(Boolean).map(i => 'ABCD'[Number(i)] ?? '?').join(', ') || '—';
   return d.given;
+}
+
+// A generated paper's marking guide (worked solutions): the server opens it only
+// once the paper has been submitted, and this button exists only on the result.
+function GuideButton({ examId }) {
+  const t = useT();
+  const [state, setState] = useState('idle');
+  async function open() {
+    setState('working');
+    try {
+      const r = await api.get(`/exams/${examId}/guide`);
+      await saveBase64File(r.pdfBase64, r.filename || 'pri-practice-paper-guide.pdf', 'application/pdf');
+      setState('idle');
+    } catch { setState('failed'); }
+  }
+  return (
+    <p style={{ marginTop: 10 }} data-exam-guide>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={open} disabled={state === 'working'}>{state === 'working' ? t('gen.guideWorking') : t('gen.guide')}</button>
+      {state === 'failed' && <span className="muted" role="status"> {t('gen.guideFailed')}</span>}
+    </p>
+  );
 }

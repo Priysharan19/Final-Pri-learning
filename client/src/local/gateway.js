@@ -255,6 +255,12 @@ const BODY_RULES = [
     optionalString(body, 'variant', 20); optionalNumber(body, 'seed'); optionalString(body, 'source', 20);
     // Plan G4: an NSW paper is named by its blueprint id alone.
     optionalString(body, 'nsw', 64);
+    // The Paper Generator: a request (year, topics, length, mix), never a question.
+    if (body.generated !== undefined && !plainObject(body.generated)) throw apiError('generated must be an object.', 400, 'INVALID_FIELD');
+  }],
+  [/^POST \/exams\/generator\/(check|pdf)$/, body => {
+    requireObject(body, 'generated paper request');
+    if (!plainObject(body.generated)) throw apiError('generated must be an object.', 400, 'INVALID_FIELD');
   }],
   [/^POST \/exams\/[A-Za-z0-9._-]+\/submit$/, body => {
     requireObject(body, 'exam submit'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120); optionalNumber(body, 'ms');

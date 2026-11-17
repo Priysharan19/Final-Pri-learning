@@ -315,6 +315,11 @@ export async function cloudRequest(path, {
       for (const k of ['nextAt', 'used', 'limit', 'windowDays', 'attemptsRemaining']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
       if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
+      // The Paper Generator's nearest valid paper when the banks cannot fill a request: numbers and a mix name only.
+      if (data?.error?.code === 'PAPER_BANK_INSUFFICIENT') {
+        const n = data.error.nearest;
+        err.nearest = n && Number.isInteger(n.marks) && /^[a-z]{4,12}$/.test(String(n.mix)) ? { marks: n.marks, minutes: Number(n.minutes) || 0, mix: String(n.mix), questions: Number(n.questions) || 0 } : null;
+      }
       if (Array.isArray(data?.error?.proofs)) err.proofs = proofList(data.error.proofs);
       // The plain-text reasons a publishing step was refused (plan F3), bounded.
       if (Array.isArray(data?.error?.problems)) err.problems = data.error.problems.filter(p => typeof p === 'string').slice(0, 12).map(p => p.slice(0, 300));
@@ -386,6 +391,11 @@ export async function cloudRequest(path, {
       for (const k of ['nextAt', 'used', 'limit', 'windowDays', 'attemptsRemaining']) if (Number.isFinite(Number(data?.error?.[k]))) err[k] = Number(data.error[k]);
       if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
+      // The Paper Generator's nearest valid paper when the banks cannot fill a request: numbers and a mix name only.
+      if (data?.error?.code === 'PAPER_BANK_INSUFFICIENT') {
+        const n = data.error.nearest;
+        err.nearest = n && Number.isInteger(n.marks) && /^[a-z]{4,12}$/.test(String(n.mix)) ? { marks: n.marks, minutes: Number(n.minutes) || 0, mix: String(n.mix), questions: Number(n.questions) || 0 } : null;
+      }
       if (Array.isArray(data?.error?.proofs)) err.proofs = proofList(data.error.proofs);
       // The plain-text reasons a publishing step was refused (plan F3), bounded.
       if (Array.isArray(data?.error?.problems)) err.problems = data.error.problems.filter(p => typeof p === 'string').slice(0, 12).map(p => p.slice(0, 300));
@@ -544,6 +554,11 @@ export const cloud = Object.freeze({
   examTargets: () => cloudRequest('/v1/exams/targets'),
   // The NSW papers this server lists (Prithagoras, plan G4): released or not, and why.
   nswExams: () => cloudRequest('/v1/exams/nsw'),
+  // The Paper Generator (both editions): the choices, a feasibility check, a printable paper, and the marking guide once the paper is submitted.
+  examGeneratorOptions: query => cloudRequest('/v1/exams/generator/options' + (query ? '?' + String(query).replace(/[^A-Za-z0-9=&_.-]/g, '') : '')),
+  examGeneratorCheck: body => cloudRequest('/v1/exams/generator/check', { method: 'POST', body }),
+  examGeneratorPdf: body => cloudRequest('/v1/exams/generator/pdf', { method: 'POST', body, timeoutMs: 30000 }),
+  examGuide: examId => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/guide'),
   createExam: (body, idempotencyKey) => cloudRequest('/v1/exams', { method: 'POST', body, idempotencyKey, timeoutMs: 30000 }),
   // PATCH, not PUT: the native iOS and Android bridges carry GET/POST/PATCH/DELETE.
   saveExamAnswers: (examId, body) => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/answers', { method: 'PATCH', body }),
