@@ -4074,6 +4074,8 @@ export default {
   'tw.review.err.range': 'Award a whole number of marks from 1 to {cap}.',
   'tw.review.err.overCap': 'This question can carry at most {cap} teacher marks in all, counting the other criterion.',
   'tw.review.err.saveFailed': 'The teacher mark could not be saved.',
+  'tw.review.err.gone': 'This student or item is no longer in your class, so it cannot be marked.',
+  'tw.review.historyFailed': 'The decision history could not be loaded. Your decision was saved if the message above says so.',
   'tw.review.history': 'Decision history',
   'tw.review.noHistory': 'No decision yet.',
   'tw.review.historyAward': { one: 'Awarded {n} mark on {when}', other: 'Awarded {n} marks on {when}' },

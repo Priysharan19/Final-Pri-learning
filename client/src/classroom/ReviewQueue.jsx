@@ -122,12 +122,13 @@ function Detail({ classId, item, onSaved, onClose }) {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState({ kind: '', text: '' });
   const [history, setHistory] = useState(null);
+  const [historyFailed, setHistoryFailed] = useState(false);
   const head = useRef(null);
   const cap = Math.max(1, Number(item.available) || 1);
 
   async function loadHistory() {
-    try { setHistory((await cloud.classReviewHistory(classId, item.id))?.history || []); }
-    catch { setHistory([]); }
+    try { setHistory((await cloud.classReviewHistory(classId, item.id))?.history || []); setHistoryFailed(false); }
+    catch { setHistoryFailed(true); setHistory(h => h || []); }
   }
   useEffect(() => { head.current?.focus(); loadHistory(); }, [item.id]);
 
@@ -145,7 +146,9 @@ function Detail({ classId, item, onSaved, onClose }) {
       await loadHistory();
       onSaved?.(item.id, r?.mark || null);
     } catch (err) {
-      const text = err?.code === 'TEACHER_MARK_OVER_CAP' ? tLater('tw.review.err.overCap', { cap }) : (err?.message || tLater('tw.review.err.saveFailed'));
+      const text = err?.code === 'TEACHER_MARK_OVER_CAP' ? tLater('tw.review.err.overCap', { cap })
+        : ['REVIEW_ITEM_NOT_FOUND', 'CLASS_NOT_FOUND'].includes(err?.code) ? tLater('tw.review.err.gone')
+          : tLater('tw.review.err.saveFailed');
       setStatus({ kind: 'error', text });
     } finally { setBusy(false); }
   }
@@ -218,7 +221,7 @@ function Detail({ classId, item, onSaved, onClose }) {
 
       <section aria-labelledby="rq-history-title">
         <h5 className="tw-h5" id="rq-history-title">{t('tw.review.history')}</h5>
-        {history === null ? <p className="muted">{t('common.loading')}</p> : !history.length ? <p className="muted">{t('tw.review.noHistory')}</p> : (
+        {history === null ? <p className="muted">{t('common.loading')}</p> : historyFailed ? <p className="muted" role="note">{t('tw.review.historyFailed')}</p> : !history.length ? <p className="muted">{t('tw.review.noHistory')}</p> : (
           <ol className="tw-plain" data-review-history>
             {history.map(h => (
               <li key={h.id}>
@@ -287,7 +290,13 @@ export default function ReviewQueue({ classId }) {
         </ul>
       )}
       {open && <Detail key={open.id} classId={classId} item={open} onClose={() => setOpen(null)}
-        onSaved={(id, mark) => setData(d => d ? { ...d, items: d.items.map(i => (i.id === id ? { ...i, teacherMark: mark } : i)) } : d)} />}
+        onSaved={(id, mark) => setData(d => {
+          if (!d) return d;
+          const was = d.items.find(i => i.id === id)?.teacherMark;
+          // The first decision on an item moves it from Open to Decided in the counts.
+          const counts = !was && mark ? { open: Math.max(0, (d.counts?.open ?? 1) - 1), decided: (d.counts?.decided ?? 0) + 1 } : d.counts;
+          return { ...d, counts, items: d.items.map(i => (i.id === id ? { ...i, teacherMark: mark } : i)) };
+        })} />}
     </div>
   );
 }

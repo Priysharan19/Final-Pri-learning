@@ -4122,6 +4122,8 @@ export default {
   'tw.review.err.range': '1 से {cap} तक पूरे अंक दें।',
   'tw.review.err.overCap': 'दूसरे मानदंड को मिलाकर इस प्रश्न पर शिक्षक के कुल अधिकतम {cap} अंक हो सकते हैं।',
   'tw.review.err.saveFailed': 'शिक्षक का अंक सहेजा नहीं जा सका।',
+  'tw.review.err.gone': 'यह विद्यार्थी या प्रश्न अब आपकी कक्षा में नहीं है, इसलिए इस पर अंक नहीं दिए जा सकते।',
+  'tw.review.historyFailed': 'निर्णयों का इतिहास लोड नहीं हो सका। यदि ऊपर का संदेश कहता है कि आपका निर्णय सहेजा गया, तो वह सहेजा गया है।',
   'tw.review.history': 'निर्णयों का इतिहास',
   'tw.review.noHistory': 'अभी कोई निर्णय नहीं।',
   'tw.review.historyAward': { one: '{when} को {n} अंक दिया', other: '{when} को {n} अंक दिए' },
