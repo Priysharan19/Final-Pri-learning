@@ -81,10 +81,12 @@ export const flow = {
     // student's "Confirm reading" is then the submit — as on staging.
     const primary = page.locator('.ws-actions .btn-primary').last();
     const submitNow = async () => {
-      const ask = page.getByRole('button', { name: 'Check this reading first' });
+      // The doubted reading asks "which did you write?": the student's tap on
+      // "That's what I wrote" resolves it, and Confirm and mark is then the submit.
+      const ask = page.locator('[data-confirm-keep]').first();
       if (await ask.count()) {
         await ask.click();
-        await page.getByRole('button', { name: 'Confirm reading' }).click();
+        await page.getByRole('button', SUBMIT).click();
         return 'confirmed';
       }
       await page.getByRole('button', SUBMIT).click();

@@ -460,8 +460,9 @@ export const flow = {
     await check('a line the reader was unsure of is highlighted as doubtful',
       await doubtful.count() === 1 && (await doubtful.first().getAttribute('data-confidence')) === '0.4',
       `${await doubtful.count()} doubtful line(s); confidence ${await page.locator('.ink-line').first().getAttribute('data-confidence')}`);
-    await check('no mark is given from it: the card is not auto-marked and Submit asks to check the reading first',
-      await page.locator('.eval-card, .verdict-bad').count() === 0 && await page.getByRole('button', { name: 'Check this reading first' }).count() === 1);
+    await check('no mark is given from it: the card is not auto-marked, the panel says "1 to confirm" and Confirm and mark waits until the line is resolved',
+      await page.locator('.eval-card, .verdict-bad').count() === 0 && (await page.locator('[data-confirm-count]').innerText()).includes('1') &&
+        await page.getByRole('button', { name: /^Confirm and mark/ }).isDisabled());
     // Relation swaps (relationSwap.js) appear only on a line with a relation
     // sign; this doubtful line reads "7", so it offers none.
     await check('a doubtful line with no relation sign offers no relation swaps', await page.locator('[data-relation-swaps]').count() === 0);
@@ -479,8 +480,8 @@ export const flow = {
       `corrected ${await correctedLine.count()}, text ${JSON.stringify(await correctedLine.getAttribute('data-text'))}`);
     await check('the correction did not go back to the reader — no second provider call', reader.requests.length === readsBeforeCorrection,
       `${reader.requests.length - readsBeforeCorrection} extra request(s)`);
-    await check('Submit is now a plain submit: the engine marks what the student wrote',
-      await page.getByRole('button', SUBMIT).count() === 1 && await page.getByRole('button', { name: 'Check this reading first' }).count() === 0);
+    await check('with the line resolved nothing is left to confirm and Confirm and mark is enabled: the engine marks what the student wrote',
+      await page.getByRole('button', SUBMIT).count() === 1 && await page.getByRole('button', SUBMIT).isEnabled() && (await page.locator('[data-confirm-count]').innerText()).toLowerCase().includes('all confirmed'));
     // The edit changed the reading, so it is confirmed again: nothing is sent
     // until the tap, and what is sent is the edited reading.
     const submitsBeforeEditedTap = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length;
