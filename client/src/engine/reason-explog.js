@@ -225,23 +225,34 @@ function proportional(a, b) {
   return a.every((c, i) => Math.abs(c - k * b[i]) <= 1e-9 * Math.max(1, Math.abs(c), Math.abs(k * b[i])));
 }
 
+/**
+ * Is `x` a root of the polynomial a solved line reduces to, before its domain
+ * is applied? For `ln x + ln(x − 3) = ln 10` that polynomial is x² − 3x − 10,
+ * so −2 is one and −3 is not. Only lines in the unknown itself are read.
+ */
+export function domainFreeRoot(form, x) {
+  if (!form || form.space !== 'x') return false;
+  const p = trimmed(form.poly);
+  return !!p && p.length > 1 && Math.abs(polyValue(p, x)) <= 1e-9 * Math.max(1e-300, polySize(p, x));
+}
+
 /** Do two solved lines reduce to the same polynomial in the same unknown? */
 export function sameReducedForm(a, b) {
   return !!a && !!b && a.space === b.space && proportional(a.poly, b.poly);
 }
 
 /** Small whole multiples of one unit: { unit, n } with Σ wᵢ = nᵢ·unit, or null. */
-function wholeMultiples(weights) {
+function wholeMultiples(weights, preferred = []) {
   const nonzero = weights.filter(w => Math.abs(w) > 1e-12);
   if (!nonzero.length) return null;
   const m = Math.min(...nonzero.map(Math.abs));
-  for (let d = 1; d <= MAX_POWER; d++) {
-    const unit = m / d;
+  const fits = unit => {
     const n = weights.map(w => w / unit);
-    if (n.every(v => Math.abs(v - Math.round(v)) <= 1e-9 * Math.max(1, Math.abs(v)) && Math.abs(Math.round(v)) <= MAX_POWER)) {
-      return { unit, n: n.map(v => (Math.abs(v) <= 1e-9 ? 0 : Math.round(v))) };
-    }
-  }
+    return n.every(v => Math.abs(v - Math.round(v)) <= 1e-9 * Math.max(1, Math.abs(v)) && Math.abs(Math.round(v)) <= MAX_POWER)
+      ? { unit, n: n.map(v => (Math.abs(v) <= 1e-9 ? 0 : Math.round(v))) } : null;
+  };
+  for (const unit of preferred) { const hit = fits(unit); if (hit) return hit; }
+  for (let d = 1; d <= MAX_POWER; d++) { const hit = fits(m / d); if (hit) return hit; }
   return null;
 }
 
@@ -401,7 +412,7 @@ function product(factors) {
   return factors.reduce((acc, f) => ({ t: 'bin', op: '*', l: acc, r: f }));
 }
 
-function logarithmicRoots(ast, variable, hints) {
+function logarithmicRoots(ast, variable, hints, written = true) {
   const a = logCombination(ast.l, variable), b = logCombination(ast.r, variable);
   if (!a || !b) return null;
   // Σ wᵢ ln Aᵢ + c = 0, merged by argument.
@@ -413,7 +424,9 @@ function logarithmicRoots(ast, variable, hints) {
   }
   if (!merged.length) return null;
   const c = a.c - b.c;
-  const multiples = wholeMultiples(merged.map(m => m.w));
+  // The written coefficients first (2 ln x = ln 9 is x^2 = 9, the form the
+  // power law gives), so the polynomial is the one the student's laws produce.
+  const multiples = wholeMultiples(merged.map(m => m.w), written ? [1, 1 / Math.LN10, 1 / Math.LN2] : []);
   if (!multiples) return null;
   const K = Math.exp(-c / multiples.unit);
   if (!Number.isFinite(K) || K <= 0) return null;
@@ -455,7 +468,7 @@ export function expLogSolutionSet(ast, variable, hints = []) {
   if (!mentions(ast, variable) || otherLetter(ast, variable)) return null;
   let solved = null;
   try {
-    if (isExpLogLine(ast, variable)) solved = exponentialRoots(ast, variable, hints) ?? logarithmicRoots(ast, variable, hints);
+    if (isExpLogLine(ast, variable)) solved = exponentialRoots(ast, variable, hints) ?? logarithmicRoots(ast, variable, hints) ?? logarithmicRoots(ast, variable, hints, false);
     else solved = rationalRoots(ast, variable, hints);
   } catch { solved = null; }
   if (!solved || !solved.poly) return null;

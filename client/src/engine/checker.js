@@ -25,7 +25,7 @@ import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v
 import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 import { lostMarks, ruleKeyFor } from './lost-marks.js';
-import { expLogSolutionSet, isExpLogLine, domainAt, sameReducedForm } from './reason-explog.js';
+import { expLogSolutionSet, isExpLogLine, domainAt, domainFreeRoot, sameReducedForm } from './reason-explog.js';
 
 export { lostMarks, ruleKeyFor };
 
@@ -595,7 +595,7 @@ function unreadLines(rawLines) {
 }
 const unreadNote = entry => entry;
 
-function stepCheckSingle(meta, workingText, system = null, { loneBranches = false } = {}) {
+function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, prompt = '' } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const unread = unreadLines(rawLines);
   const out = [];
@@ -617,6 +617,24 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
   let expLogPrevForm = null;
   let pendingExtraneous = [];
   let pendingIndex = -1;
+  // The question's own equation, reduced the same way (from its source or the
+  // equation in its prompt), read once when first needed.
+  let questionFormsRead = null;
+  const questionForms = () => {
+    if (questionFormsRead) return questionFormsRead;
+    questionFormsRead = [];
+    try {
+      const wanted = uniqueNumeric(meta?.solutions);
+      for (const claim of questionClaims(meta, prompt)) {
+        if (claim.kind !== 'equation') continue;
+        const form = expLogSolutionSet(claim.ast, meta.variable, wanted);
+        // Only a reading of the question that has exactly its solutions (a
+        // prompt Pri misreads gives none, and the first-line rule applies).
+        if (form && form.roots.length === wanted.length && wanted.every(w => form.roots.some(r => numsClose(r, w)))) questionFormsRead.push(form);
+      }
+    } catch { /* a question Pri cannot read gives no form */ }
+    return questionFormsRead;
+  };
 
   rawLines.forEach((line, i) => {
     const skipped = unreadNote(unread[i]);
@@ -799,13 +817,41 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               }
               // Two lines with the same solutions can still differ in roots
               // that are not solutions (`(2^x − 4)(2^x + 2)` and `(2^x − 4)(2^x + 3)`
-              // both give only x = 2). Such a line is credited only where the
-              // working starts, or when it reduces to the same polynomial as
-              // the line above; otherwise it falls through to the checks below.
-              const hiddenOk = !expLog.hidden || !expLogDecided || (expLogChain && sameReducedForm(expLogPrevForm, expLog));
-              const domainDrop = fresh.length > 0 && expLogAnchor && isExpLogLine(expLogAnchor, v)
-                && freshAbove.length === fresh.length && freshAbove.every(s => s === 'undefined')
+              // both give only x = 2). Such a line is credited only when it
+              // reduces to the same polynomial as the line above, or, where the
+              // working starts, as the question (its source or the equation in
+              // its prompt; with neither, only as the very first line).
+              // Otherwise it falls through to the checks below.
+              const startsAsTheQuestion = () => {
+                const forms = questionForms();
+                return forms.length ? forms.some(f => sameReducedForm(f, expLog)) : i === 0;
+              };
+              const hiddenOk = !expLog.hidden
+                || (expLogChain && sameReducedForm(expLogPrevForm, expLog))
+                || (!expLogDecided && startsAsTheQuestion());
+              // A value let in by dropping a logarithm's domain: the line above
+              // and the verified log line are both undefined there, and it is a
+              // root of the polynomial the line above reduces to before its
+              // domain is applied (`ln x + ln(x − 3) = ln 10` allows −2 that
+              // way, never −3).
+              const freshOutside = fresh.length > 0 && freshAbove.length === fresh.length && freshAbove.every(s => s === 'undefined');
+              const domainDrop = freshOutside && expLogAnchor && isExpLogLine(expLogAnchor, v)
+                && fresh.every(r => domainFreeRoot(expLogPrevForm, r))
                 && fresh.every(r => domainAt(expLogAnchor, v, r) === 'undefined');
+              if (freshOutside && !domainDrop) {
+                // Equivalent to the line above on its domain, but not a
+                // consequence of it once the domain is dropped (a wrong factor
+                // `(x − 5)(x + 3) = 0` straight after `ln x + ln(x − 3) = ln 10`).
+                // Neither credit nor a mistake.
+                status = 'note';
+                note = `True for ${v} = ${wantedRoots.map(shownRoot).join(' or ')}, but it also allows ${fresh.map(r => `${v} = ${shownRoot(r)}`).join(' and ')}, which does not come from the line above. Pri cannot confirm this step, so it is not marked correct.`;
+                previousEquation = ast;
+                previousEquationTrusted = false;
+                expLogChain = false;
+                expLogPrevForm = null;
+                out.push({ text: line, status, note });
+                return;
+              }
               if (hiddenOk && !extras.length) {
                 status = 'ok';
                 previousEquation = ast;
@@ -1783,7 +1829,8 @@ function numericSolutions(meta) {
 function stepCheckWithinBudget(meta, workingText, options = null) {
   meta = numericSolutions(meta);
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
-  return stepCheckSingle(meta, workingText, pinnedSystem(meta, typeof options?.prompt === 'string' ? options.prompt : ''), { loneBranches: true });
+  const prompt = typeof options?.prompt === 'string' ? options.prompt : '';
+  return stepCheckSingle(meta, workingText, pinnedSystem(meta, prompt), { loneBranches: true, prompt });
 }
 
 // ── Method marks (marking-11) ────────────────────────────────────────────────
