@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `17fdb5d1e995148c46af5d5ab2deb8d8add857f7566c4f6c34756fe4f2c9c5f8` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `764c11f0f41abc7e9fa367183cb664bec6741d68174dd19033bbfb9b5dedfb8d` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -52,91 +52,91 @@ For each item, one issued question (seed shown) and the pages a student might ha
 
 ## `nsw-final:y7-fractions/D1` — seed 1009
 
-> Simplify $\\dfrac{30}{25}$ fully.
+> Hana eats $\\frac{1}{2}$ of a family pizza and Yusuf eats $\\frac{1}{8}$ of the same pizza. What fraction of the pizza is left? Give your answer in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6/5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `6/5` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `11/5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `11/5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3/8` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `3/8` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `11/8` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11/8` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-fractions/D2` — seed 1009
 
-> Evaluate $\\frac{2}{5} - \\frac{3}{8}$, giving your answer as a fraction in simplest form.
+> Hana eats $\\frac{1}{2}$ of a family pizza and Yusuf eats $\\frac{1}{8}$ of the same pizza. What fraction of the pizza is left? Give your answer in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1/40` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `1/40` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `41/40` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `41/40` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3/8` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3/8` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `11/8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11/8` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-fractions/D3` — seed 1009
 
-> Evaluate $\\frac{4}{5} \\div 1\\frac{1}{2}$, giving your answer as a fraction in simplest form.
+> Hana eats $\\frac{1}{2}$ of a family pizza and Yusuf eats $\\frac{1}{8}$ of the same pizza. What fraction of the pizza is left? Give your answer in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `8/15` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `8/15` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `23/15` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `23/15` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3/8` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3/8` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `11/8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11/8` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-fractions/D4` — seed 1009
 
-> Leo downloads $150$ songs. They listen to $\\frac{1}{5}$ of them on Monday, then $\\frac{2}{3}$ of the *remaining* songs on Tuesday. How many songs are still unplayed?
+> Hana eats $\\frac{1}{2}$ of a family pizza and Yusuf eats $\\frac{1}{8}$ of the same pizza. What fraction of the pizza is left? Give your answer in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `40` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
-| alternative | `40.0` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
-| common wrong | `41` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `41` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3/8` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3/8` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `11/8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11/8` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-decimals-perc/D1` — seed 1009
 
-> Which decimal is equal to $\\dfrac{7}{10}$?
+> Lamb cutlets cost \\$9.10 per kilogram at the market. Find the cost of $2.7$ kg, in dollars.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2457/100` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `2457/100` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `2557/100` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2557/100` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-decimals-perc/D2` — seed 1009
 
-> Find $35\\%$ of \\$160.00.
+> Lamb cutlets cost \\$9.10 per kilogram at the market. Find the cost of $2.7$ kg, in dollars.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `56` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `56.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `57` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `57` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2457/100` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2457/100` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `2557/100` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2557/100` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-decimals-perc/D3` — seed 1009
 
-> In a spelling test, Kiri scored $14$ out of $60$. Express this as a percentage, rounded to 1 decimal place where needed.
+> Lamb cutlets cost \\$9.10 per kilogram at the market. Find the cost of $2.7$ kg, in dollars.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `233/10` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `233/10` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `243/10` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `243/10` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2457/100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `2457/100` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `2557/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2557/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-decimals-perc/D4` — seed 1009
 
-> $60\\%$ of the students at a chess club are in Year 7 — that's $96$ students. How many students are in the club altogether?
+> Lamb cutlets cost \\$9.10 per kilogram at the market. Find the cost of $2.7$ kg, in dollars.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `160` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `160.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `161` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `161` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2457/100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `2457/100` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `2557/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2557/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-ratio/D1` — seed 1009
 
@@ -184,213 +184,240 @@ For each item, one issued question (seed shown) and the pages a student might ha
 
 ## `nsw-final:y7-algebra/D1` — seed 1009
 
-> If $a = 4$ and $b = 3$, evaluate $5a + 5b$.
+> A Sydney taxi charges a flag fall of \\$11.00 plus \\$5.00 per kilometre. Write an expression for the cost, in dollars, of a trip of $n$ km.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `35` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `35.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `36` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `36` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-algebra/D3` — seed 1009
 
-> Leo is $y$ years old. Quinn is $7$ years older than Leo. Write an expression in simplest form for the **sum of their two ages in $4$ years' time**.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y7-algebra/D4` — seed 1009
-
-> Expand and simplify $4(x + 2) + 3(x - 1)$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `undefined` | no | 0/4 | 0/4 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y7-equations/D1` — seed 1009
-
-> Solve $4x = 24$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `6` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `6.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `7` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `7` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
-
-<details><summary>Pages</summary>
-
-partial:
-```text
-(working with the right method, ending in a wrong value)
-Final answer: 7
-```
-</details>
-
-## `nsw-final:y7-equations/D2` — seed 1009
-
-> Solve $4x - 2 = 22$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `6` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `6.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `7` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `7` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
-
-<details><summary>Pages</summary>
-
-partial:
-```text
-(working with the right method, ending in a wrong value)
-Final answer: 7
-```
-</details>
-
-## `nsw-final:y7-equations/D3` — seed 1009
-
-> Solve $3(x - 1) = 12$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
-
-<details><summary>Pages</summary>
-
-partial:
-```text
-(working with the right method, ending in a wrong value)
-Final answer: 6
-```
-</details>
-
-## `nsw-final:y7-equations/D4` — seed 1009
-
-> Leo thinks of a number, multiplies it by $4$, then adds $11$. The result is $103$. Let the number be $n$ — write an equation and solve it to find $n$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `23` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `23.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `24` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `24` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
-
-<details><summary>Pages</summary>
-
-partial:
-```text
-(working with the right method, ending in a wrong value)
-Final answer: 24
-```
-</details>
-
-## `nsw-final:y7-angles/D1` — seed 1009
-
-> Two angles are supplementary (they add to $180°$). One of them is $110°$. Find the other angle $\\theta$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `70` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `70.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `71` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `71` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y7-angles/D2` — seed 1009
-
-> Four angles meet at a point, as shown. Three of them are $96°$, $91°$ and $122°$. Find the fourth angle $\\theta$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `51` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `51.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `52` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `52` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y7-angles/D3` — seed 1009
-
-> In the diagram, two parallel lines are cut by a transversal. The marked angle is $106°$, and $\\theta$ is its **corresponding** angle. What is $\\theta$?
+> A Sydney taxi charges a flag fall of \\$11.00 plus \\$5.00 per kilometre. Write an expression for the cost, in dollars, of a trip of $n$ km.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | yes | 2/2 | 2/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | yes | 2/2 | 2/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-## `nsw-final:y7-angles/D4` — seed 1009
+## `nsw-final:y7-algebra/D4` — seed 1009
 
-> Two vertically opposite angles are $(3x + 15)°$ and $(1x + 81)°$. Find $x$.
+> A Sydney taxi charges a flag fall of \\$11.00 plus \\$5.00 per kilometre. Write an expression for the cost, in dollars, of a trip of $n$ km.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `33` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `33.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `34` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `34` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y7-equations/D1` — seed 1009
+
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `17` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 34
+Final answer: 18
 ```
 </details>
 
-## `nsw-final:y7-area/D1` — seed 1009
+## `nsw-final:y7-equations/D2` — seed 1009
 
-> The rectangle shown is $12$ cm long and $9$ cm wide. Find its area.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `108` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `108.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `109` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `109` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y7-area/D2` — seed 1009
-
-> Find the area of a parallelogram with base $14$ cm and height $8$ cm.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `112` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `112.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `113` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `113` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y7-area/D3` — seed 1009
-
-> The L-shaped room shown is a $16$ m × $12$ m rectangle with a $7$ m × $5$ m rectangular corner missing. Find the floor area of the room.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `157` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `157.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `158` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `158` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y7-area/D4` — seed 1009
-
-> A rectangular vegetable patch has area $170$ m² and width $10$ m. Fencing costs \\$11.00 per metre — but first, find the **length** of the patch.
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `17` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | `17.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
 | common wrong | `18` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `18` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| partial | `18` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 18
+```
+</details>
+
+## `nsw-final:y7-equations/D3` — seed 1009
+
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `17` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 18
+```
+</details>
+
+## `nsw-final:y7-equations/D4` — seed 1009
+
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `17` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 18
+```
+</details>
+
+## `nsw-final:y7-angles/D1` — seed 1009
+
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `22` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 23
+```
+</details>
+
+## `nsw-final:y7-angles/D2` — seed 1009
+
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `22` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 23
+```
+</details>
+
+## `nsw-final:y7-angles/D3` — seed 1009
+
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `22` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 23
+```
+</details>
+
+## `nsw-final:y7-angles/D4` — seed 1009
+
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `22` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 23
+```
+</details>
+
+## `nsw-final:y7-area/D1` — seed 1009
+
+> A bathroom floor measures $6$ m by $5$ m. It is covered with square tiles that are $25$ cm on each side. How many tiles are needed? (Ignore gaps and waste.)
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `480` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `480.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `481` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `481` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y7-area/D2` — seed 1009
+
+> A bathroom floor measures $6$ m by $5$ m. It is covered with square tiles that are $25$ cm on each side. How many tiles are needed? (Ignore gaps and waste.)
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `480` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `480.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `481` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `481` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y7-area/D3` — seed 1009
+
+> A bathroom floor measures $6$ m by $5$ m. It is covered with square tiles that are $25$ cm on each side. How many tiles are needed? (Ignore gaps and waste.)
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `480` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `480.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `481` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `481` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y7-area/D4` — seed 1009
+
+> A bathroom floor measures $6$ m by $5$ m. It is covered with square tiles that are $25$ cm on each side. How many tiles are needed? (Ignore gaps and waste.)
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `480` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `480.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `481` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `481` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-data/D1` — seed 1009
 
@@ -438,91 +465,91 @@ Final answer: 34
 
 ## `nsw-final:y8-indices/D1` — seed 1009
 
-> Evaluate $7^{3}$.
+> Which expression is equal to $(x^{3})^{3}$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `343` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `343.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `344` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `344` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-indices/D2` — seed 1009
 
-> Simplify $x^{10} \\div x^{7}$, giving your answer in index form.
+> Which expression is equal to $(x^{4})^{3}$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-indices/D3` — seed 1009
 
-> Simplify $(x^{4})^{4} \\times x^{3}$, giving your answer in index form.
+> Which expression is equal to $(x^{4})^{3}$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-indices/D4` — seed 1009
 
-> Simplify $\\dfrac{4x^{5} \\times 3x^{2}}{x^{7}}$.
+> Which expression is equal to $(x^{5})^{3}$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `12` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `12.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `13` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `13` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-percentages/D1` — seed 1009
 
-> Increase $150$ by $25\\%$.
+> A car salesperson earns a base wage of \\$400.00 a week plus $5\\%$ commission on the week's sales. In one week she sells \\$1,400.00 worth of cars. What does she earn that week?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `375/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `375/2` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `377/2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `377/2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `470` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `470.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `471` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `471` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-percentages/D2` — seed 1009
 
-> In a sale, a mountain bike priced at \\$990.00 is discounted by $20\\%$. What is the sale price?
+> A car salesperson earns a base wage of \\$700.00 a week plus $5\\%$ commission on the week's sales. In one week she sells \\$4,300.00 worth of cars. What does she earn that week?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `792` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `792.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `793` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `793` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `915` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `915.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `916` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `916` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-percentages/D3` — seed 1009
 
-> A retailer buys a cricket bat for \\$200.00 and sells it for \\$260.00. Find the percentage profit.
+> A car salesperson earns a base wage of \\$1,050.00 a week plus $5\\%$ commission on the week's sales. In one week she sells \\$12,500.00 worth of cars. What does she earn that week?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `30` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `30.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `31` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `31` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1675` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `1675.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `1676` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1676` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-percentages/D4` — seed 1009
 
-> A concert ticket costs \\$140.00. The price rises by $25\\%$, then the new price is discounted by $20\\%$. What is the final price?
+> A car salesperson earns a base wage of \\$1,350.00 a week plus $5\\%$ commission on the week's sales. In one week she sells \\$33,200.00 worth of cars. What does she earn that week?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `140` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `140.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `141` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `141` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3010` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3010.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `3011` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3011` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-algebra/D1` — seed 1009
 
@@ -621,29 +648,29 @@ Final answer: 6
 
 ## `nsw-final:y8-linear/D1` — seed 1009
 
-> A line has equation $y = 2x + 2$. Find $y$ when $x = 0$.
+> Which point lies on the line $y = x - 2$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `2.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `3` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-linear/D2` — seed 1009
 
-> Find the gradient of the line through $(1, 2)$ and $(4, -1)$.
+> Which point lies on the line $y = x - 2$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-linear/D3` — seed 1009
 
-> For the line $y = 2x + 2$, identify the gradient and the y-intercept.
+> Which point lies on the line $y = 2x - 2$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -654,84 +681,117 @@ Final answer: 6
 
 ## `nsw-final:y8-circles/D1` — seed 1009
 
-> The circle shown has radius $29$ cm. Find its circumference, correct to 1 decimal place.
+> A running track has two straight sides of $49$ m and two semicircular ends. The distance across the track between the straights is $26$ m. Find the length of one lap, correct to 1 decimal place.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `911/5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `911/5` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `916/5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `916/5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1797/10` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `1797/10` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `1807/10` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1807/10` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-circles/D2` — seed 1009
 
-> A circular pizza, shown below, has radius $29$ cm. Find its area, correct to 1 decimal place.
+> A running track has two straight sides of $72$ m and two semicircular ends. The distance across the track between the straights is $36$ m. Find the length of one lap, correct to 1 decimal place.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `26421/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `26421/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `26431/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `26431/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2571/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2571/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `2581/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2581/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-circles/D3` — seed 1009
 
-> Find the **perimeter** of a quarter circle with radius $29$ cm, correct to 1 decimal place. (Don't forget two straight radii.)
+> A running track has two straight sides of $88$ m and two semicircular ends. The distance across the track between the straights is $42$ m. Find the length of one lap, correct to 1 decimal place.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `518/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `518/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `523/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `523/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3079/10` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `3079/10` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `3089/10` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3089/10` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-circles/D4` — seed 1009
 
-> A circular running track has circumference $182.2$ m. Find its radius, correct to 1 decimal place.
+> A running track has two straight sides of $104$ m and two semicircular ends. The distance across the track between the straights is $52$ m. Find the length of one lap, correct to 1 decimal place.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `29` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `29.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `30` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `30` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1857/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `1857/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `1862/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1862/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-volume/D1` — seed 1009
 
-> Find the volume of a rectangular prism $9$ cm long, $7$ cm wide and $4$ cm high.
+> A cylindrical drink bottle has an internal radius of $3.5$ cm and an internal height of $14$ cm. How many millilitres does it hold when full? Give your answer to the nearest whole number. (1 cm³ = 1 mL)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `252` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `252.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `253` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `253` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `539` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `539.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `540` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `540` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-volume/D2` — seed 1009
 
-> A tent is a triangular prism. The triangular cross-section has base $10$ m and height $6$ m, and the tent is $9$ m long. Find its volume.
+> A cylindrical drink bottle has an internal radius of $4$ cm and an internal height of $19$ cm. How many millilitres does it hold when full? Give your answer to the nearest whole number. (1 cm³ = 1 mL)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `270` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `270.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `271` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `271` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `955` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `955.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `956` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `956` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-volume/D3` — seed 1009
 
-> A cylindrical water tank has radius $6$ m and height $11$ m. Find its volume, correct to 1 decimal place.
+> A cylindrical drink bottle has an internal radius of $5$ cm and an internal height of $23$ cm. How many millilitres does it hold when full? Give your answer to the nearest whole number. (1 cm³ = 1 mL)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `12441/10` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `12441/10` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `12451/10` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `12451/10` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1806` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `1806.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `1807` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1807` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-rates/D1` — seed 1009
 
-> A $400$ g pack of dog biscuits costs \\$6.32 and a $800$ g pack costs \\$12.96. Which is the better buy?
+> A cyclist rides at a steady $21$ km/h for $30$ minutes. How far does she ride, in kilometres?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `21/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `21/2` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `23/2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23/2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y8-rates/D2` — seed 1009
+
+> A cyclist rides at a steady $46$ km/h for $54$ minutes. How far does she ride, in kilometres?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `207/5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `207/5` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `212/5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `212/5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y8-rates/D4` — seed 1009
+
+> A cyclist rides at a steady $72$ km/h for $78$ minutes. How far does she ride, in kilometres?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `468/5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `468/5` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `473/5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `473/5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y8-probability/D1` — seed 1009
+
+> Which of these **cannot** be a probability?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -740,60 +800,27 @@ Final answer: 6
 | common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-## `nsw-final:y8-rates/D2` — seed 1009
-
-> A train travels at $85$ km/h for $0.5$ hours. How far does it go?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `85/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `85/2` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `87/2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `87/2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y8-rates/D4` — seed 1009
-
-> Sam cycles $70$ km at $50$ km/h, then rides an e-bike for $50$ km at $100$ km/h. Find the average speed for the whole trip, correct to 1 decimal place.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `316/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `316/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `321/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `321/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y8-probability/D1` — seed 1009
-
-> A bag contains $5$ red, $5$ blue and $3$ green marbles. One marble is drawn at random. Find $P(\\text{red})$ as a fraction in simplest form.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `5/13` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `5/13` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `18/13` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `18/13` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
 ## `nsw-final:y8-probability/D2` — seed 1009
 
-> The probability that it rains tomorrow is $\\frac{1}{6}$. Find the probability that it does **not** rain, as a fraction in simplest form.
+> Which of these **cannot** be a probability?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5/6` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5/6` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `11/6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `11/6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-probability/D3` — seed 1009
 
-> A spinner lands on gold with probability $\\frac{3}{8}$. If it is spun $112$ times, how many golds would you **expect**?
+> Which of these **cannot** be a probability?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `42` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `42.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `43` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `43` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-pythagoras/D1` — seed 1009
 
@@ -1519,47 +1546,47 @@ Final answer: 0
 
 ## `nsw-final:y8-geo-figures/D1` — seed 1009
 
-> Two angles of a triangle are $72^\\circ$ and $58^\\circ$. Find the third angle, in degrees.
+> The interior angles of a polygon add to $900^\\circ$. How many sides does it have?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `50` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `50.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `51` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `51` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `7` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-geo-figures/D2` — seed 1009
 
-> One side of a triangle is extended. The exterior angle formed is $109^\\circ$, and one of the two interior opposite angles is $56^\\circ$. Find the other interior opposite angle, in degrees.
+> The interior angles of a polygon add to $1260^\\circ$. How many sides does it have?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `53` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `53.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `54` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `54` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `9` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `9.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-geo-figures/D3` — seed 1009
 
-> Two parallel lines are cut by a transversal. Two co-interior (allied) angles lie between the lines on the same side of the transversal. One is $103^\\circ$. Find the other, in degrees.
+> The interior angles of a polygon add to $1440^\\circ$. How many sides does it have?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `77` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `77.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `78` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `78` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `10.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `11` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-geo-figures/D4` — seed 1009
 
-> What is the size of each interior angle of a regular polygon with $10$ sides, in degrees?
+> The interior angles of a polygon add to $1980^\\circ$. How many sides does it have?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `144` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `144.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `145` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `145` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `13` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `13.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `14` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `14` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-nonlinear-a/D1` — seed 1009
 

@@ -9,7 +9,7 @@
     "nsw-mathematics-standard-11-12-2024@2024"
   ],
   "dossier": "docs/marking/hsc-examiner-certification-dossier.md",
-  "dossierDigest": "17fdb5d1e995148c46af5d5ab2deb8d8add857f7566c4f6c34756fe4f2c9c5f8",
+  "dossierDigest": "764c11f0f41abc7e9fa367183cb664bec6741d68174dd19033bbfb9b5dedfb8d",
   "minExaminers": 2,
   "items": [
     "nsw-convention:final-answer-only",
@@ -416,6 +416,9 @@
     "nsw-method:y7-equations/D2",
     "nsw-method:y7-equations/D3",
     "nsw-method:y7-equations/D4",
+    "nsw-method:y7-angles/D1",
+    "nsw-method:y7-angles/D2",
+    "nsw-method:y7-angles/D3",
     "nsw-method:y7-angles/D4",
     "nsw-method:y8-equations/D2",
     "nsw-method:y8-equations/D3",

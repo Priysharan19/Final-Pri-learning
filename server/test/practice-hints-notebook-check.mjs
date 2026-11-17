@@ -24,7 +24,7 @@ import { join } from 'node:path';
 const scratch = mkdtempSync(join(tmpdir(), 'pri-hints-notebook-'));
 process.env.NODE_ENV = 'test'; // fixed seeds: the same content on demand
 // D15: a production server never issues a bank outside the India covers
-// (server/platform/indiaBanks.js). This suite says so explicitly because its notebook trap case is an NSW bank (y7-decimals-perc, seed 4242);
+// (server/platform/indiaBanks.js). This suite says so explicitly because its notebook trap case is an NSW bank (y7-decimals-perc, seed 2007);
 // india-banks-check.mjs pins the refusal itself. Refused under NODE_ENV=production.
 (await import('../platform/indiaBanks.js')).allowBanksOutsideIndiaForTests();
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
@@ -48,7 +48,7 @@ const hint = (jar, id, rung) => post(`/v1/practice/${id}/hint`, rung === undefin
 let n = 0;
 const grade = (jar, id, answer) => { const sid = `hints-notebook-${String(++n).padStart(4, '0')}`; return post(`/v1/practice/${id}/submit`, { submissionId: sid, answer: String(answer), mode: 'typed' }, jar, { 'Idempotency-Key': sid }); };
 const LINEAR = 'c8-linear-equations-both-sides';
-const PERCENT = 'y7-decimals-perc';       // seed 4242: 30% of 90; the trap answer 3 divides by 30
+const PERCENT = 'y7-decimals-perc';       // seed 2007: 30% of 90; the trap answer 3 divides by 30
 
 try {
   const a = await registerAccount(h, { email: 'hints.a@example.test', deviceId: 'ipad-hints-a' });
@@ -128,7 +128,7 @@ try {
   eq([(await verifyEmail(h, c.account.id)).status, (await verifyEmail(h, d.account.id)).status], [200, 200], 'two more verified accounts');
   eq((await get('/v1/practice/notebook', c.jar)).data.entries, [], 'an empty notebook to begin with');
 
-  const t = await issue(c.jar, PERCENT, 4242);
+  const t = await issue(c.jar, PERCENT, 2007);
   const tid = t.data.question.id;
   const tq = await sealed(tid);
   const trap = tq.traps.find(x => x.value !== undefined);

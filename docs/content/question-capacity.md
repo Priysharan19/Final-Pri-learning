@@ -6,7 +6,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 
 ## Prithagoras
 
-107 skills measured; **17** meet both targets; **90** are below at least one.
+107 skills measured; **31** meet both targets; **76** are below at least one.
 
 | Skill (generator) | Cells | Distinct instances | Structural forms | Below target |
 | --- | --- | --- | --- | --- |
@@ -25,15 +25,11 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y9-pythagoras` | 4 | 200 | 3 | instances + forms |
 | `ms12-rates` | 4 | 217 | 4 | instances + forms |
 | `ms12-annuity-table` | 4 | 240 | 2 | instances + forms |
-| `y8-circles` | 4 | 304 | 2 | instances + forms |
 | `y12-func-model` | 4 | 386 | 1 | instances + forms |
-| `y7-decimals-perc` | 4 | 407 | 26 | instances |
-| `y8-probability` | 3 | 440 | 2 | instances + forms |
 | `mex-proof` | 4 | 440 | 5 | instances |
 | `y9-variation` | 4 | 442 | 1 | instances + forms |
 | `mex-integration` | 4 | 459 | 12 | instances |
 | `me12-induction` | 3 | 499 | 7 | instances |
-| `y8-indices` | 4 | 532 | 2 | instances + forms |
 | `y10-geometry-proof` | 4 | 541 | 1 | instances + forms |
 | `y10-surds` | 4 | 559 | 2 | instances + forms |
 | `y12-trig-model` | 4 | 576 | 2 | instances + forms |
@@ -44,14 +40,11 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y12-integration` | 1 | 907 | 3 | instances + forms |
 | `y9-surface-area` | 4 | 916 | 2 | instances + forms |
 | `y9-probability` | 4 | 1.0k | 35 | instances |
-| `y8-volume` | 3 | 1.0k | 1 | instances + forms |
 | `y9-nonlinear-a` | 4 | 1.1k | 4 | instances + forms |
 | `ms12-simple-interest` | 4 | 1.1k | 2 | instances + forms |
 | `me11-trigid` | 4 | 1.1k | 18 | instances |
-| `y8-percentages` | 4 | 1.1k | 16 | instances |
 | `me12-binomial` | 3 | 1.2k | 1 | instances + forms |
 | `y9-algebra` | 4 | 1.2k | 5 | instances |
-| `y7-fractions` | 4 | 1.4k | 26 | instances |
 | `y12-diff` | 4 | 1.5k | 8 | instances |
 | `me12-projectile` | 4 | 1.8k | 1 | instances + forms |
 | `y12-explogcalc` | 4 | 2.0k | 5 | instances |
@@ -65,44 +58,52 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y10-polynomials` | 4 | 2.7k | 16 | instances |
 | `y11-quadfunc` | 3 | 3.0k | 28 | instances |
 | `ms12-depreciation` | 4 | 3.1k | 2 | instances + forms |
-| `y7-algebra` | 3 | 3.2k | 296 | instances |
 | `y9-rate-change` | 4 | 3.4k | 1 | instances + forms |
-| `y7-area` | 4 | 3.4k | 2 | instances + forms |
 | `me11-rates` | 4 | 3.5k | 8 | instances |
 | `ms12-algebraic` | 4 | 3.5k | 2 | instances + forms |
 | `y11-explog` | 4 | 4.2k | 3 | instances + forms |
-| `y7-equations` | 4 | 4.2k | 26 | instances |
 | `y12-random-var` | 4 | 4.6k | 2 | instances + forms |
 | `y9-trig` | 4 | 5.2k | 2 | instances + forms |
 | `y12-motion` | 4 | 5.6k | 31 | instances |
 | `y10-trig` | 4 | 5.7k | 1 | instances + forms |
-| `y8-geo-figures` | 4 | 5.9k | 1 | instances + forms |
 | `y11-probability` | 4 | 6.1k | 44 | instances |
 | `y10-indices-neg` | 4 | 6.8k | 1 | instances + forms |
 | `y11-diff` | 4 | 7.0k | 62 | instances |
 | `me11-poly` | 3 | 7.1k | 64 | instances |
-| `y8-linear` | 3 | 8.0k | 6 | instances |
 | `y12-series` | 3 | 9.5k | 3 | instances + forms |
-| `y8-rates` | 3 | 9.6k | 26 | instances |
 | `y11-lines` | 4 | 9.8k | 32 | instances |
 | `ms12-normal-exact` | 4 | 10.0k | 1 | instances + forms |
+| `y8-circles` | 4 | 13.2k | 16 | — |
 | `y8-equations` | 3 | 14.7k | 26 | — |
+| `y8-indices` | 4 | 14.7k | 17 | — |
+| `y8-volume` | 3 | 17.0k | 13 | — |
 | `y10-simeq` | 4 | 17.0k | 6 | — |
+| `y7-fractions` | 4 | 19.9k | 210 | — |
 | `y10-probability` | 4 | 20.4k | 1 | forms |
+| `y8-probability` | 3 | 21.0k | 18 | — |
 | `y8-algebra` | 4 | 21.6k | 25 | — |
 | `mex-complex` | 4 | 21.8k | 28 | — |
 | `y10-nonlinear` | 4 | 22.8k | 12 | — |
 | `y11-functions` | 4 | 22.9k | 51 | — |
+| `y7-decimals-perc` | 4 | 23.5k | 237 | — |
 | `y9-indices-sci` | 4 | 23.6k | 2 | forms |
 | `ms12-bivariate-fit` | 4 | 29.2k | 3 | forms |
+| `y8-geo-figures` | 4 | 29.7k | 27 | — |
 | `y7-integers` | 4 | 30.4k | 10 | — |
+| `y7-algebra` | 3 | 31.3k | 77 | — |
+| `y7-area` | 4 | 32.1k | 10 | — |
 | `me12-vectors` | 4 | 33.6k | 4 | forms |
 | `y9-linear` | 4 | 34.1k | 20 | — |
 | `y11-polynomials` | 4 | 34.7k | 95 | — |
+| `y8-percentages` | 4 | 39.7k | 89 | — |
 | `y10-stats` | 4 | 46.1k | 15 | — |
+| `y8-rates` | 3 | 46.5k | 42 | — |
 | `ms11-formulas` | 4 | 57.5k | 1 | forms |
 | `y11-sine-cosine-rule` | 4 | 63.3k | 1 | forms |
 | `ms12-nonright` | 4 | 64.1k | 1 | forms |
+| `y7-angles` | 4 | 68.2k | 14 | — |
+| `y7-equations` | 4 | 68.4k | 71 | — |
+| `y8-linear` | 3 | 133.1k | 24 | — |
 | `ms11-relfreq` | 3 | 139.8k | 3 | forms |
 | `ms12-normal` | 2 | 141.7k | 1 | forms |
 | `me11-functions` | 3 | 159.7k | 92 | — |
@@ -110,7 +111,6 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms11-data` | 3 | 283.9k | 50 | — |
 | `ms12-bivariate` | 1 | 338.3k | 11 | — |
 | `y7-ratio` | 4 | 563.1k | 866 | — |
-| `y7-angles` | 4 | 569.0k | 3 | forms |
 | `ms12-critical-path` | 4 | 1.5M | 13 | — |
 | `y9-data-inquiry` | 4 | ≥ 10.9M | 1 | forms |
 | `y7-data` | 4 | ≥ 10.9M | 60 | — |

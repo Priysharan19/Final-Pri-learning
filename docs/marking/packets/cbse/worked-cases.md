@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `2c13172754f840c993f7388d5304061b60e79133cb69f34c5b63418cb9467d88` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `c4c92944bf886854706e2d5fcca74c86f396c235ab7ee50820455920baf78e3b` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -1223,103 +1223,163 @@ Final answer: 3
 ```
 </details>
 
-## `cbse-bank:y7-angles/D4` — seed 1009
+## `cbse-bank:y7-angles/D1` — seed 1009
 
-> Two vertically opposite angles are $(3x + 15)°$ and $(1x + 81)°$. Find $x$.
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `33` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `33.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `34` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `34` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `22` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 34
+Final answer: 23
+```
+</details>
+
+## `cbse-bank:y7-angles/D2` — seed 1009
+
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `22` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 23
+```
+</details>
+
+## `cbse-bank:y7-angles/D3` — seed 1009
+
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `22` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 23
+```
+</details>
+
+## `cbse-bank:y7-angles/D4` — seed 1009
+
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `22` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 23
 ```
 </details>
 
 ## `cbse-bank:y7-equations/D1` — seed 1009
 
-> Solve $4x = 24$.
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `6.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `7` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `7` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `17` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 7
+Final answer: 18
 ```
 </details>
 
 ## `cbse-bank:y7-equations/D2` — seed 1009
 
-> Solve $4x - 2 = 22$.
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `6.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `7` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `7` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `17` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 7
+Final answer: 18
 ```
 </details>
 
 ## `cbse-bank:y7-equations/D3` — seed 1009
 
-> Solve $3(x - 1) = 12$.
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `17` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 6
+Final answer: 18
 ```
 </details>
 
 ## `cbse-bank:y7-equations/D4` — seed 1009
 
-> Leo thinks of a number, multiplies it by $4$, then adds $11$. The result is $103$. Let the number be $n$ — write an equation and solve it to find $n$.
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `23` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `23.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `24` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `24` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `17` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 24
+Final answer: 18
 ```
 </details>
 
