@@ -217,6 +217,16 @@ subscriptions = {};
   s = await snapshot();
   eq([r.status, s.status, s.current_period_end, s.grace_until], [200, 'grace', (T0 + 31 * DAY) * 1000, (T0 + 34 * DAY) * 1000], 'invoice.payment_failed enters grace from the last PAID period\'s end');
 
+  // A failed FIRST invoice grants nothing; an unpaid subscription gets no grace; a paid invoice with no period grants nothing.
+  {
+    const SUBF = 'sub_AuFirstFail01';
+    await deliver(evt('checkout.session.completed', session({ id: 'cs_test_FirstFail001', subscription: SUBF, payment_status: 'unpaid' })));
+    const before = await snapshot();
+    const failedFirst = await deliver(evt('invoice.payment_failed', invoice({ id: 'in_FirstFail001', subscription: SUBF, billing_reason: 'subscription_create', period_start: T0 + 31 * DAY })));
+    eq([failedFirst.status, await snapshot()], [200, before], 'a failed FIRST invoice grants no grace (nothing was ever paid)');
+    const noPeriod = await deliver(evt('invoice.paid', invoice({ id: 'in_NoPeriod0001', subscription: SUBF, lines: { data: [] } })));
+    eq([noPeriod.status, await snapshot()], [200, before], 'a paid invoice that names no period grants nothing');
+  }
   clock += 60_000;
   r = await deliver(evt('customer.subscription.updated', subObject({ status: 'past_due', current_period_end: T0 + 31 * DAY })));
   s = await snapshot();
@@ -285,6 +295,10 @@ subscriptions = {};
   r = await deliver(evt('invoice.paid', invoice({ id: 'in_TrialInv0001', subscription: SUB2, amount_paid: 0, payment_intent: null, lines: { data: [{ period: { start: T0, end: T0 + 7 * DAY } }] } })));
   eq((await snapshot()).status, 'trialing', 'a zero-amount paid invoice is the trial, not a payment');
   eq(Number((await db.get("SELECT COUNT(*) AS n FROM billing_payments WHERE provider_subscription_id=?", [SUB2])).n), 1, '(and is recorded under its invoice id)');
+  clock += 60_000;
+  r = await deliver(evt('customer.subscription.updated', subObject({ id: SUB2, status: 'unpaid', current_period_end: T0 + 40 * DAY })));
+  s = await snapshot();
+  eq([s.status, s.grace_until], ['past_due', null], 'an unpaid subscription is past_due with no grace (collection has stopped)');
   clock += 60_000;
   r = await deliver(evt('customer.subscription.updated', subObject({ id: SUB2, status: 'paused', current_period_end: T0 + 40 * DAY })));
   eq((await snapshot()).status, 'paused', 'a paused subscription is paused');

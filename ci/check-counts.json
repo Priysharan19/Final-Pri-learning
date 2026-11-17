@@ -235,7 +235,7 @@
       "job": "platform-contracts",
       "log": "stripe-billing.log",
       "pins": [
-        {"has":"STRIPE BILLING: PASS — 115/115 checks —"}
+        {"has":"STRIPE BILLING: PASS — 118/118 checks —"}
       ]
     },
     "platform/billing-edition.log": {

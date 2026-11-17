@@ -348,7 +348,7 @@ try {
     // A correctly signed Razorpay event for this very account is never applied.
     const hook = au.signedWebhook('evt-au-activated');
     const refused = await call('/billing/webhook/web', { method: 'POST', raw: hook.raw, headers: hook.headers });
-    check(refused.status >= 400 && refused.status < 600 && refused.data?.ok !== true, `Prithagoras: a correctly signed Razorpay webhook is not applied (${refused.status} ${refused.code})`);
+    check(refused.data?.ok !== true && ((refused.status === 401 && refused.code === 'BILLING_WEBHOOK_SIGNATURE_INVALID') || (refused.status === 503 && refused.code === 'BILLING_PROVIDER_NOT_CONFIGURED')), `Prithagoras: a correctly signed Razorpay webhook is not applied (${refused.status} ${refused.code})`);
     for (const provider of ['apple', 'google']) {
       const other = await call(`/billing/webhook/${provider}`, { method: 'POST', body: { signedPayload: 'x' }, headers: { authorization: 'Bearer aaa.bbb.ccc' } });
       check(other.status === 404 && other.code === REFUSED, `Prithagoras: a ${provider} payment event is refused (${other.status} ${other.code})`);

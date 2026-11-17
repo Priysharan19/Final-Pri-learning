@@ -212,9 +212,12 @@ function normalizeSubscription(cfg, sub, { accountId, eventId, eventType, payloa
   let plan = 'free', normalized = 'free', periodEnd = null, graceUntil = null, rank = 10;
   if (status === 'active') { plan = 'premium'; normalized = 'active'; periodEnd = end; rank = 50; }
   else if (status === 'trialing') { plan = 'premium'; normalized = 'trialing'; periodEnd = seconds(sub.trial_end) || end; rank = 40; }
-  else if ((status === 'past_due' || status === 'unpaid') && end && cfg.graceDays > 0) {
+  else if (status === 'past_due' && end && cfg.graceDays > 0) {
     plan = 'premium'; normalized = 'grace'; periodEnd = end; graceUntil = end + cfg.graceDays * DAY; rank = 65;
-  } else if (status === 'past_due' || status === 'unpaid') { plan = 'premium'; normalized = 'past_due'; periodEnd = end; rank = 60; }
+  } else if (status === 'past_due' || status === 'unpaid') {
+    // 'unpaid': Stripe has stopped collecting. Premium runs to the paid period's end and no further (no grace).
+    plan = 'premium'; normalized = 'past_due'; periodEnd = end; rank = 60;
+  }
   else if (status === 'paused') { plan = 'premium'; normalized = 'paused'; periodEnd = end; rank = 70; }
   else if (TERMINAL_STATUS.has(status)) { plan = 'premium'; normalized = 'expired'; periodEnd = seconds(sub.ended_at) || seconds(sub.canceled_at) || end; rank = 90; }
   // 'incomplete' (first payment not yet made) stays free until invoice.paid.
@@ -425,12 +428,17 @@ export function createStripeBilling(db, { fetchImpl = globalThis.fetch, now: clo
         if (type === 'invoice.paid') {
           const paymentId = [object.payment_intent, object.charge, object.id].map(v => String(v || '')).find(v => STRIPE_PAYMENT.test(v));
           await recordPayment(db, { paymentId, subscriptionId, accountId: binding.account_id, amount: object.amount_paid, currency: object.currency, status: 'paid', capturedAt: seconds(object.status_transitions?.paid_at) || effectiveAt, now });
+          // No period on any line: nothing says how long this paid for, so it grants nothing (the subscription events will).
+          if (!lineEnd) return acknowledgeEvent(db, { eventId, eventType: type, accountId: binding.account_id, payloadDigest, now });
           const free = minorUnits(object.amount_paid) === 0;
           return {
             verified: true, provider: 'web', eventId, accountId: binding.account_id, eventType: type, providerSubscriptionId: subscriptionId, productId: binding.product_id,
             billingCadence: binding.cadence, plan: 'premium', status: free ? 'trialing' : 'active', currentPeriodEnd: lineEnd, graceUntil: null, payloadDigest, effectiveAt, eventRank: free ? 40 : 50
           };
         }
+        // A failed FIRST invoice (subscription_create) means nothing was ever paid:
+        // there is no paid period to extend, so it grants nothing.
+        if (object.billing_reason === 'subscription_create') return acknowledgeEvent(db, { eventId, eventType: type, accountId: binding.account_id, payloadDigest, now });
         // The failed invoice's period_start is the end of the last PAID period.
         const paidEnd = seconds(object.period_start) || lineEnd;
         const grace = cfg.graceDays > 0 && paidEnd;
