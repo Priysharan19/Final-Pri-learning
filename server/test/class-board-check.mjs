@@ -106,4 +106,5 @@ const india = await classBoard(db, { classId: C1, course: COURSE, policy: { curr
 c.deq([india.status, india.code], [409, 'CLASS_BOARD_NOT_YET'], 'Priyabhata is refused, not drawn as all not-started');
 
 await h.close();
+console.log(`engine: ${h.engine}`);
 console.log(`class-board-check (${h.engine}): ${c.count()} checks passed`);

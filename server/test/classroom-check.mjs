@@ -333,4 +333,5 @@ for (const secret of ['S1-PRIVATE-NOTE', 'S1-AI-CHAT', 'S1-PRACTICE-TRANSCRIPT',
 }
 
 await h.close();
+console.log(`engine: ${h.engine}`);
 console.log(`classroom-check (${h.engine}): ${c.count()} checks passed`);

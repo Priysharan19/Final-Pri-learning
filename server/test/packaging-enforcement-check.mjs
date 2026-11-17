@@ -199,4 +199,5 @@ try {
 
 for (const k of keys) { if (before[k] === undefined) delete process.env[k]; else process.env[k] = before[k]; }
 rmSync(scratch, { recursive: true, force: true });
+console.log(`engine: ${h.engine}`);
 console.log(`PACKAGING ENFORCEMENT: PASS — ${c.count()}/${c.count()} checks`);
