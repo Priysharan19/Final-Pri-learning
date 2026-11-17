@@ -9,6 +9,7 @@
 // the drawing maths shows up here, not on a student's screen.
 // ─────────────────────────────────────────────────────────────────────────────
 import * as g from '../src/diagrams/geometry.js';
+import { place, crossings, boxOf } from '../src/diagrams/placement.js';
 
 let pass = 0;
 const failures = [];
@@ -174,6 +175,18 @@ const throws = (fn, label) => { let t = false; try { fn(); } catch { t = true; }
   const vols = ['rectPrism', 'cylinder', 'cone', 'sphere', 'pyramid'].map(shape => g.solidModel({ shape, l: 4, w: 3, h: 5, r: 2 }).volume);
   // By hand: 4*3*5 = 60; 20*pi; 20*pi/3; 32*pi/3; 4*3*5/3 = 20.
   ok(near(vols[0], 60) && near(vols[1], 20 * Math.PI, 1e-5) && near(vols[2], (20 * Math.PI) / 3, 1e-5) && near(vols[3], (32 * Math.PI) / 3, 1e-5) && near(vols[4], 20), 'solids: the volumes of the five shapes match their formulas');
+}
+// The curve fits its axes; labels are placed clear of strokes
+{
+  const r = g.riemannModel({ expr: 'x^2', a: 0, b: 3, n: 4, mode: 'left' });
+  // By hand: the plot spans x from -0.36 to 3.36, where x^2 reaches 11.2896, so the top of the axes is at least that.
+  ok(r.frame.ymax >= 3.36 ** 2 - 1e-9, `Riemann: the y range reaches the curve at the right edge of the plot (ymax ${r.frame.ymax}, f(3.36) = ${3.36 ** 2})`);
+  ok(r.curve.every(seg => seg.every(([, y]) => y >= r.frame.top - 0.01 && y <= r.frame.bottom + 0.01)), 'Riemann: no point of the curve is drawn outside the plot');
+  const wall = [[100, 0], [100, 200]];
+  const first = place('x', [[100, 50], [140, 50]], [wall]);
+  eq(first, [140, 50], 'placement: a label that would sit on a stroke moves to the first clear candidate');
+  eq(place('x', [[10, 50], [140, 50]], [wall]), [10, 50], 'placement: a clear first candidate is kept');
+  ok(crossings(boxOf('abc', [100, 50, 'middle']), [wall]) > 0 && crossings(boxOf('abc', [200, 50, 'middle']), [wall]) === 0, 'placement: crossings counts stroke points inside the label box');
 }
 // Pinned coordinates (one reference diagram per kind)
 {

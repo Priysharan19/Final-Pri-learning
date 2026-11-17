@@ -9,6 +9,7 @@
   --dg-grid: var(--in-edge, #e4e0d6);
   --dg-primary: var(--in-tx, #1d1b18);
   --dg-accent: var(--in-signal, #d4400c);
+  --dg-control: var(--accent, var(--in-action, #1b1a17));
   --dg-secondary: var(--in-tx-2, #55524c);
   --dg-good: var(--in-good, #2f7a4d);
   --dg-bad: var(--in-bad, #b0452e);
@@ -87,12 +88,12 @@
 .dgi-row { display: grid; grid-template-columns: minmax(4.5em, auto) 1fr minmax(3.5em, auto); align-items: center; gap: 10px; }
 .dgi-row label { color: var(--dg-ink-2); font-size: 0.9em; }
 .dgi-row output { font-variant-numeric: tabular-nums; text-align: right; font-size: 0.9em; }
-.dgi input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--dg-accent); margin: 0; }
+.dgi input[type="range"] { width: 100%; min-height: 44px; accent-color: var(--dg-control); margin: 0; }
 .dgi-readout { margin: 8px 0 0; color: var(--dg-ink-2); font-size: 0.92em; min-height: 1.4em; }
 .dgi-handle { cursor: grab; touch-action: none; }
 .dgi-handle:focus-visible { outline: none; }
 .dgi-handle:focus-visible .dgi-ring { stroke: var(--dg-ink); stroke-width: 3.5; }
-.dgi-ring { fill: var(--in-base, #fffdf7); stroke: var(--dg-accent); stroke-width: 2; }
+.dgi-ring { fill: var(--in-base, #fffdf7); stroke: var(--dg-control); stroke-width: 2; }
 .dgi-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .dgi-buttons button { min-height: 44px; min-width: 44px; padding: 0 14px; border: 1px solid var(--dg-edge); border-radius: 6px; background: transparent; color: var(--dg-ink); cursor: pointer; font: inherit; }
 .dgi-buttons button[aria-pressed="true"] { border-color: var(--dg-ink); background: var(--dg-fill); font-weight: 600; }

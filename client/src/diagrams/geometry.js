@@ -549,8 +549,10 @@ export function riemannModel({ expr = 'x^2', a = 0, b = 3, n = 6, mode = 'left',
   const heights = Array.from({ length: n }, (_, i) => f(mode === 'left' ? a + i * w : mode === 'right' ? a + (i + 1) * w : a + (i + 0.5) * w));
   const sum = heights.reduce((s, v) => s + v * w, 0);
   let ref = 0; const M = 4000; for (let i = 0; i < M; i++) ref += f(a + ((i + 0.5) * (b - a)) / M) * ((b - a) / M);
-  const top = Math.max(...heights, ...Array.from({ length: 60 }, (_, i) => f(a + ((b - a) * i) / 59)).filter(isNum));
-  const frame = makeFrame({ xmin: xmin ?? a - (b - a) * 0.12, xmax: xmax ?? b + (b - a) * 0.12, ymin, ymax: ymax ?? top * 1.15, width, height });
+  // The y range fits the curve over the whole x range that is DRAWN (a little beyond [a, b]), so it never leaves the axes.
+  const x0 = xmin ?? a - (b - a) * 0.12; const x1 = xmax ?? b + (b - a) * 0.12;
+  const top = Math.max(...heights, ...Array.from({ length: 80 }, (_, i) => f(x0 + ((x1 - x0) * i) / 79)).filter(isNum));
+  const frame = makeFrame({ xmin: x0, xmax: x1, ymin, ymax: ymax ?? top * 1.15, width, height });
   return { frame, expr, a, b, n, mode, width: r3(w, 6), sum: r3(sum, 4), area: r3(ref, 4), error: r3(Math.abs(sum - ref), 4), rects: heights.map((hv, i) => ({ x: r3(a + i * w, 6), height: r3(hv, 6), x1: frame.sx(a + i * w), x2: frame.sx(a + (i + 1) * w), y: frame.sy(Math.max(0, hv)), base: frame.sy(0) })),
     curve: sampleSegments(f, frame.xmin, frame.xmax, { ymin: frame.ymin, ymax: frame.ymax }).map(s => s.map(([x, y]) => [frame.sx(x), frame.sy(y)])), xTicks: niceTicks(frame.xmin, frame.xmax, 8).map(v => ({ value: v, px: frame.sx(v) })), yTicks: niceTicks(frame.ymin, frame.ymax, 6).map(v => ({ value: v, px: frame.sy(v) })) };
 }

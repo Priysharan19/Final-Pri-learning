@@ -152,7 +152,7 @@ export function RiemannSlider({ expr = 'x^2', a = 0, b = 3, initialN = 4, title 
   const [mode, setMode] = useState('left');
   const m = riemannModel({ expr, a, b, n, mode });
   return (
-    <Shell title={title} readout={`${n} ${mode}-point rectangles: total area $${m.sum}$; the area under the curve is $${m.area}$ (difference $${m.error}$). More rectangles fit the curve more closely.`}
+    <Shell title={title} readout={`${n} ${mode}-point rectangles: total area $${r3(m.sum, 2)}$; the area under the curve is $${r3(m.area, 2)}$ (difference $${r3(m.error, 2)}$). More rectangles fit the curve more closely.`}
       controls={<>
         <Slider label="n (number of rectangles)" min={1} max={60} step={1} value={n} onChange={setN} format={v => `n = ${v}`} />
         <div className="dgi-buttons" role="group" aria-label="Where each rectangle meets the curve">{['left', 'mid', 'right'].map(k => <button key={k} type="button" aria-pressed={mode === k} onClick={() => setMode(k)}>{k === 'mid' ? 'Midpoint' : `${k[0].toUpperCase()}${k.slice(1)} endpoint`}</button>)}</div>
