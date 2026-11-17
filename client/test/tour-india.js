@@ -44,9 +44,9 @@ export const flow = {
     // The full statement now sits behind "How your data is handled" (a folded
     // disclosure, owner feedback on the sign-in screen); the visible line above
     // it is the short note. Both must stay honest, so both are asserted.
-    const note = await page.locator('.auth-col .login-note').first().innerText();
+    const shortNote = await page.locator(".auth-col .login-note").first().innerText();
     await check('the short note on the landing screen says checking needs an account and a connection, and no ads',
-      /needs an account and a connection/i.test(note) && /no ads/i.test(note) && !/account is optional|offline-first|works offline/i.test(note), `note reads ${JSON.stringify(note)}`);
+      /needs an account and a connection/i.test(shortNote) && /no ads/i.test(shortNote) && !/account is optional|offline-first|works offline/i.test(shortNote), `note reads ${JSON.stringify(shortNote)}`);
     const privacy = (await page.locator('.auth-col .login-more p').first().textContent()) || '';
     // Owner decision 2026-10-10: the welcome line may no longer promise an
     // optional account or offline checking. What it must still say honestly is
