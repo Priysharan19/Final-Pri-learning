@@ -182,7 +182,8 @@ notCredited('(x−4)(x+1) straight after ln(x+4) − ln x = ln 2', eqMeta([4]), 
 notCredited('(x−5)(x−1) after ln(x(x−3)) = ln 10', eqMeta([5]), ['ln(x)+ln(x-3)=ln(10)', 'ln(x(x-3))=ln(10)', '(x-5)(x-1)=0', 'x=5'], 2);
 notCredited('an extra factor in a two-root question', eqMeta([1, 4]), ['ln(x)+ln(5-x)=ln(4)', '(x-1)(x-4)(x-6)=0', 'x=1 or x=4'], 1);
 notCredited('an extra factor x after ln(x^2) = ln 9', eqMeta([3, -3]), ['ln(x^2)=ln(9)', '(x-3)(x+3)x=0', 'x=3 or x=-3'], 1);
-notCredited('the same with the question as source', eqMeta([5], { source: 'ln(x)+ln(x-3)=ln(10)' }), ['ln(x)+ln(x-3)=ln(10)', '(x-5)(x+3)=0', 'x=5'], 1);
+// With an authored source the established checks decide it, as on main: a break.
+breaksAt('the same with the question as source', eqMeta([5], { source: 'ln(x)+ln(x-3)=ln(10)' }), ['ln(x)+ln(x-3)=ln(10)', '(x-5)(x+3)=0', 'x=5'], 1, 'extraneous-solution');
 notCredited('a wrong first line that is not the question', eqMeta([2], { source: '4^x-2*2^x-8=0' }), ['(2^x-4)(2^x+3)=0', '2^x=4', 'x=2'], 0);
 notCredited('a wrong first line against the question in the prompt', eqMeta([2]), ['(2^x-4)(2^x+3)=0', '2^x=4', 'x=2'], 0, { prompt: 'Solve $4^x - 2 \\cdot 2^x - 8 = 0$.' });
 {
@@ -204,6 +205,34 @@ breaksAt('a far negative root after 2^(−x) = 1/4', eqMeta([2]), ['2^(-x)=1/4',
   // A list-shaped authored solution is not read as one number ("2, 3" is not 23).
   const s3 = statuses(eqMeta(['2, 3']), ['x^2-5x+6=0', 'x=23']);
   ok(`"2, 3" is not read as 23, got ${JSON.stringify(s3)}`, s3[1] !== 'ok');
+}
+
+// Review of head 641d12f4e: e in a question with two roots is never a new
+// false rejection; an exponential line naming some roots is a branch.
+{
+  const E2 = Math.E ** 2;
+  let s = statuses(eqMeta([1, E2]), ['x=1', 'x=e^2']);
+  ok(`x = 1, x = e^2 for roots 1 and e^2: both verified, got ${JSON.stringify(s)}`, s.every(v => v === 'ok'));
+  s = statuses(eqMeta([1, E2]), ['x=1', 'x=e^2'], { prompt: 'Solve $(\\ln x)^2 = 2\\ln x$.' });
+  ok(`the same with a prompt, got ${JSON.stringify(s)}`, s.every(v => v === 'ok'));
+  s = statuses(eqMeta([Math.E, E2]), ['(ln(x))^2-3ln(x)+2=0', '(ln(x)-1)(ln(x)-2)=0', 'x=e', 'x=e^2']);
+  ok(`quadratic in ln x: no break, got ${JSON.stringify(s)}`, !s.includes('break'));
+  s = statuses(eqMeta([0, 2]), ['e^x=1', 'x=0', 'e^x=e^2', 'x=2']);
+  ok(`e^x = 1 and e^x = e^2 as branches: all verified, got ${JSON.stringify(s)}`, s.every(v => v === 'ok'));
+  s = statuses(eqMeta([0, 2]), ['e^x=1', 'x=0', 'e^x=e^2', 'x=2'], { prompt: 'Solve $(e^x-1)(e^x-e^2)=0$.' });
+  ok(`the same with a prompt, got ${JSON.stringify(s)}`, s.every(v => v === 'ok'));
+  const rep = report(eqMeta([0, Math.log(3)]), ['e^x=3', 'x=ln(3)']);
+  ok(`one root of two named alone: true, still to find, no break, got ${JSON.stringify(rep.lines.map(l => l.status))}`,
+    rep.firstBreak === -1 && rep.lines.every(l => l.status === 'ok' && /still to find/.test(l.note || '')));
+  s = statuses(eqMeta([0, 2]), ['2^x=4', '2^x=1']);
+  ok(`2^x = 4 then 2^x = 1 for roots 0 and 2: both branches, got ${JSON.stringify(s)}`, s.every(v => v === 'ok'));
+  s = statuses(eqMeta([1, 2]), ['e^2 x = 1e^2']);
+  ok(`e^2·x = e^2 with roots 1 and 2 is not a break, got ${JSON.stringify(s)}`, s[0] !== 'break');
+  // A rounded intermediate line is held to the value, as on main.
+  breaksAt('a rounded intermediate line', eqMeta([Math.log(3) / Math.log(2)]), ['2^x=3', '2x=3.17', 'x=1.585'], 1);
+  // "2 3" is not read as 23.
+  s = statuses(eqMeta(['2 3']), ['x=6', 'x=23']);
+  ok(`"2 3" is not read as 23, got ${JSON.stringify(s)}`, s[1] !== 'ok' && s[0] !== 'break');
 }
 
 // Abstain: lines outside the proved families are notes, never credit, never a break.
