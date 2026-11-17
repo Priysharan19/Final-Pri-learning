@@ -8,7 +8,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 ## Summary
 
-**166 of 196 chapters at standard.**
+**180 of 196 chapters at standard.**
 
 | Band | Chapters | With notes | At standard | Missing sections (count of chapters) | ≥2 diagrams | Interactive | KaTeX issues |
 |---|---|---|---|---|---|---|---|
@@ -23,8 +23,8 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 | NSW Stage 5 (Years 9–10) | 41 | 41 | 41 | — | 41 | 38 | 0 |
 | NSW Standard Year 11 | 8 | 8 | 8 | — | 8 | 6 | 0 |
 | NSW Standard Year 12 | 17 | 17 | 17 | — | 17 | 17 | 0 |
-| NSW Advanced Year 11 | 7 | 7 | 0 | objective 7, intuition 7 | 6 | 4 | 0 |
-| NSW Advanced Year 12 | 7 | 7 | 0 | objective 7, intuition 7 | 7 | 5 | 0 |
+| NSW Advanced Year 11 | 7 | 7 | 7 | — | 7 | 7 | 0 |
+| NSW Advanced Year 12 | 7 | 7 | 7 | — | 7 | 7 | 0 |
 | NSW Extension 1 Year 11 | 5 | 5 | 0 | objective 5, intuition 5 | 2 | 0 | 0 |
 | NSW Extension 1 Year 12 | 6 | 6 | 0 | objective 6, intuition 6 | 4 | 0 | 0 |
 | NSW Extension 2 Year 12 | 5 | 5 | 0 | objective 5, intuition 5 | 1 | 1 | 0 |
@@ -274,25 +274,25 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `mav-11-01` Working with functions | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `mav-11-03` Graph transformations | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `mav-11-04` Trigonometry and measure of angles | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `mav-11-05` Trigonometric identities and equations | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `mav-11-06` Introduction to differentiation | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `mav-11-07` Exponential and logarithmic functions | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `mav-11-09` Probability and data | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
+| `mav-11-01` Working with functions | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `mav-11-03` Graph transformations | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mav-11-04` Trigonometry and measure of angles | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mav-11-05` Trigonometric identities and equations | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mav-11-06` Introduction to differentiation | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mav-11-07` Exponential and logarithmic functions | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mav-11-09` Probability and data | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
 
 ### NSW Advanced Year 12
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `mav-12-01` Further graph transformations and modelling | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `mav-12-03` Sequences and series | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `mav-12-04` Differential calculus | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `mav-12-05` Integral calculus | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `mav-12-06` Applications of calculus | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `mav-12-07` Random variables | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `mav-12-08` Financial mathematics | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
+| `mav-12-01` Further graph transformations and modelling | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mav-12-03` Sequences and series | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `mav-12-04` Differential calculus | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mav-12-05` Integral calculus | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mav-12-06` Applications of calculus | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `mav-12-07` Random variables | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `mav-12-08` Financial mathematics | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
 
 ### NSW Extension 1 Year 11
 
