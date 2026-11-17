@@ -1,0 +1,88 @@
+// Pri Learning · NSW Notes — the topic index and loader.
+//
+// The notes page for the Prithagoras edition is built from the NSW curriculum
+// model (engine/curriculum-nsw/): one topic per focus area of a current
+// syllabus, so every topic NESA lists appears, with notes where they have been
+// written and an honest "coming soon" where they have not. NOTHING here (or in
+// the NSW notes page) imports the India curriculum or the India notes; a
+// Prithagoras build never shows them (client/test/nsw-notes-no-india-check.mjs).
+//
+// A topic is keyed by the lower-case NESA outcome code of its focus area (a
+// reference, never syllabus text). Years: Stage 4 is Years 7–8, Stage 5 is
+// Years 9–10, Stage 6 is Year 11 or 12 by course.
+import {
+  NSW_MATHEMATICS_K10_2022, NSW_MATHEMATICS_STANDARD_2024, NSW_MATHEMATICS_ADVANCED_2024,
+  NSW_MATHEMATICS_EXTENSION1_2024, NSW_MATHEMATICS_EXTENSION2_2024
+} from '../../engine/curriculum-nsw/index.js';
+
+export const NSW_NOTES_YEARS = Object.freeze([7, 8, 9, 10, 11, 12]);
+// The course order of the Year 11–12 tabs, with the syllabus each one reads.
+export const NSW_NOTES_COURSES = Object.freeze([
+  { id: 'standard', labelKey: 'notes.nsw.course.standard', syllabus: NSW_MATHEMATICS_STANDARD_2024 },
+  { id: 'advanced', labelKey: 'notes.nsw.course.advanced', syllabus: NSW_MATHEMATICS_ADVANCED_2024 },
+  { id: 'ext1', labelKey: 'notes.nsw.course.ext1', syllabus: NSW_MATHEMATICS_EXTENSION1_2024 },
+  { id: 'ext2', labelKey: 'notes.nsw.course.ext2', syllabus: NSW_MATHEMATICS_EXTENSION2_2024 }
+]);
+
+// K–10 strand names (NSW Mathematics K–10, 2022), by the three-letter code in a
+// focus area's outcome code. A code not listed shows no strand.
+const STRAND_KEYS = Object.freeze({
+  'number-algebra': 'notes.nsw.strand.numberAlgebra',
+  'measurement-space': 'notes.nsw.strand.measurementSpace',
+  'statistics-probability': 'notes.nsw.strand.statisticsProbability'
+});
+const STRAND_OF = Object.freeze({
+  ALG: 'number-algebra', EQU: 'number-algebra', FRC: 'number-algebra', IND: 'number-algebra', INT: 'number-algebra', LIN: 'number-algebra',
+  RAT: 'number-algebra', MAG: 'number-algebra', NLI: 'number-algebra', FIN: 'number-algebra', FNC: 'number-algebra', LOG: 'number-algebra', POL: 'number-algebra',
+  ANG: 'measurement-space', ARE: 'measurement-space', GEO: 'measurement-space', LEN: 'measurement-space', PYT: 'measurement-space', VOL: 'measurement-space', TRG: 'measurement-space', CIR: 'measurement-space',
+  DAT: 'statistics-probability', PRO: 'statistics-probability'
+});
+
+const idOf = code => String(code).toLowerCase();
+
+function k10Topics() {
+  return NSW_MATHEMATICS_K10_2022.focusAreas.map(fa => {
+    const code = fa.outcomes[0];
+    const strand = STRAND_OF[code.split('-')[1]] || null;
+    return Object.freeze({
+      id: idOf(code), name: fa.name, outcomes: fa.outcomes, course: null, stage: fa.stage,
+      years: fa.stage === 4 ? [7, 8] : [9, 10], strandKey: strand ? STRAND_KEYS[strand] : null, path: fa.kind === 'path'
+    });
+  });
+}
+function stage6Topics() {
+  return NSW_NOTES_COURSES.flatMap(({ id, syllabus }) => syllabus.focusAreas.map(fa => Object.freeze({
+    id: idOf(fa.outcomes[0]), name: fa.name, outcomes: fa.outcomes, course: id, stage: 6, years: [fa.year], strandKey: null, path: false
+  })));
+}
+
+/** Every topic of every current NSW syllabus, in syllabus order. */
+export const NSW_NOTES_TOPICS = Object.freeze([...k10Topics(), ...stage6Topics()]);
+export const NSW_NOTES_TOPIC_BY_ID = Object.freeze(Object.fromEntries(NSW_NOTES_TOPICS.map(t => [t.id, t])));
+
+/** The topics a Year tab shows (and, for Year 11–12, the chosen course). */
+export function topicsFor(year, course = null) {
+  return NSW_NOTES_TOPICS.filter(t => t.years.includes(year) && (year < 11 || t.course === course));
+}
+
+// One chunk per band of written notes. A band with no module yet has no
+// entry: its topics show "coming soon".
+const LOADERS = Object.freeze({
+  4: () => import('./notes-nsw-stage4.js')
+});
+
+/** The notes of every topic in a stage (an object keyed by topic id), or null when none are written yet. */
+export async function loadNswNotesForStage(stage) {
+  const load = LOADERS[stage];
+  if (!load) return null;
+  return (await load()).default;
+}
+
+/** Whether a topic's stage has a notes module at all (the topic may still have none). */
+export const stageHasNotes = stage => Object.hasOwn(LOADERS, stage);
+
+/** The year a student studies a topic in, for headings: the Year tab if given, else the topic's first year. */
+export const yearOfTopic = (topic, year = null) => (year && topic.years.includes(year) ? year : topic.years[0]);
+
+/** Text a search matches: the topic name, its outcome codes, its strand. */
+export const topicSearchText = topic => `${topic.name} ${topic.outcomes.join(' ')}`.toLowerCase();

@@ -16,6 +16,7 @@ import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark, EditionByline } from './components/BrandMark.jsx';
 import { BRAND } from './brand/edition.js';
+import { EDITION } from './platform/edition.js';
 import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
@@ -56,7 +57,11 @@ const Placement = React.lazy(() => import('./pages/Placement.jsx'));
 // /privacy is online, and the warm pass keeps it for offline, so it no longer
 // rides in the install every student downloads before the first screen.
 const Legal = React.lazy(() => import('./pages/Legal.jsx'));
-const Notes = React.lazy(() => import('./pages/Notes.jsx'));
+// The Prithagoras edition has its own NSW notes page, built from the NSW curriculum
+// model; it never loads or shows the India notes (client/test/nsw-notes-no-india-check.mjs).
+const Notes = EDITION === 'prithagoras'
+  ? React.lazy(() => import('./pages/NswNotes.jsx'))
+  : React.lazy(() => import('./pages/Notes.jsx'));
 const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
 // The shared resource library (ADR-0002 plan F1): its own chunk, built only
 // where PRI_FEATURE_LIBRARY is on.
