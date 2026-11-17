@@ -3662,6 +3662,7 @@ export default {
   "aw.scope.both": "in the numerator and the denominator",
   "aw.body.start": "The expression the working starts from.",
   "aw.body.startProof": "Starts from the left-hand side.",
+  "aw.body.startRhs": "Starts from the right-hand side.",
   "aw.body.same": "Rewrites line {n} without changing it.",
   "aw.body.unnamed": "Valid step (checked) from line {n}. No named rule is shown for it.",
   "aw.body.jump": "Valid step (checked) from line {n}, but it makes more than two moves at once, so no rule is named. Writing each move on its own line lets each one be checked and named.",

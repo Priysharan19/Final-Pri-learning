@@ -84,7 +84,7 @@ function CardBody({ card, model, t, renderBreakDetail }) {
       </>
     );
   }
-  if (card.start) return <p>{t(model.proof ? 'aw.body.startProof' : 'aw.body.start')}</p>;
+  if (card.start) return <p>{t(!model.proof ? 'aw.body.start' : card.startSide === 'rhs' ? 'aw.body.startRhs' : 'aw.body.startProof')}</p>;
   if (card.same) return <p>{t('aw.body.same', { n: card.n - 1 })}</p>;
   if (!card.rules.length) return <p>{t(card.more ? 'aw.body.jump' : 'aw.body.unnamed', { n: card.n - 1 })}</p>;
   return (

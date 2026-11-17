@@ -173,6 +173,12 @@ ok('an equation is not an expression step', justifyStep('x = 2', 'x = 2') === nu
 ok('csc stays \\csc', /\\csc/.test(justifyStep('csc(x)', '1/sin(x)')?.rules?.[0]?.latex || ''));
 ok('cosec is typeset as cosec', /cosec/.test(justifyStep('cosec(x)', '1/sin(x)')?.rules?.[0]?.latex || ''));
 ok('the identity uses the student\'s angle', /\\theta/.test(justifyStep('secθ', '1/cosθ')?.rules?.[0]?.latex || ''));
+// A one-letter angle is spaced from its function: \sec A, never \secA (KaTeX would show an error).
+ok('a letter angle is typeset \\sec A', /\\sec A = \\frac\{1\}\{\\cos A\}/.test(justifyStep('sec(A)', '1/cos(A)')?.rules?.[0]?.latex || ''));
+for (const [f, t] of [['sec(A)', '1/cos(A)'], ['tan(x)', 'sin(x)/cos(x)'], ['sin(2x)', '2sin(x)cos(x)'], ['1 + tan(A)^2', 'sec(A)^2']]) {
+  const tex = justifyStep(f, t)?.rules?.[0]?.latex || '';
+  ok(`${f} → ${t}: no function name runs into its argument (${tex})`, !/\\(sin|cos|tan|sec|cot|csc)[A-Za-z]/.test(tex));
+}
 
 // ── PROOFS ────────────────────────────────────────────────────────────────────
 const LEIBNIZ = '(secθ - cosθ)/(cscθ - sinθ) = tan^3θ';
@@ -189,6 +195,7 @@ const straight = ['LHS = (secθ - cosθ)/(cscθ - sinθ)', '= (1/cosθ - cosθ)/
   ok('meet in the middle: complete', m.proof?.complete === true && m.proof.mode === 'meet');
   ok('meet in the middle: the RHS chain starts a new chain, not a step from line 3', m.lines[3].steps.length === 0);
   ok('meet in the middle: the meeting lines are 3 and 5', same(m.proof?.meetLines, [2, 4]));
+  ok('meet in the middle: the RHS chain is marked as starting from the right-hand side', m.lines[3].side === 'rhs' && m.lines[0].side === 'lhs');
   const notMet = annotateWorking(['LHS = (secθ - cosθ)/(cscθ - sinθ)', '= (sin^2θ/cosθ)/(cos^2θ/sinθ)', 'RHS = tan^3θ', '= sin^3θ/cos^3θ'], { statement: LEIBNIZ });
   ok('two chains that end on different expressions do not complete the proof', notMet.proof?.complete === false);
   const broken = annotateWorking(['LHS = (secθ - cosθ)/(cscθ - sinθ)', '= (sin^2θ/cosθ)/(cos^2θ/sinθ)', '= sin^2θ/cos^3θ', '= tan^3θ'], { statement: LEIBNIZ });

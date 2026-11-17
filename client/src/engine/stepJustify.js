@@ -153,6 +153,9 @@ export const STEP_RULE_IDS = Object.freeze([...RULES.map(r => r.id), 'common-den
   'multiply-fractions', 'cancel-common-factor', 'index-product', 'index-power', 'index-quotient-power', 'expand', 'factorise',
   'difference-of-squares']);
 
+// Moves that restructure the fraction itself, so "in the numerator" would be untrue.
+const WHOLE_LINE_MOVES = new Set(['divide-fraction', 'multiply-fractions', 'cancel-common-factor', 'index-product', 'index-power', 'index-quotient-power']);
+
 function applyRules(n, rules) {
   let out = n;
   for (const r of rules) {
@@ -403,7 +406,7 @@ function texOf(id, ctx) {
   const u = ctx.arg || '\\theta';
   const csc = ctx.csc ? '\\csc' : '\\operatorname{cosec}';
   const lg = ctx.ln ? '\\ln' : '\\log';
-  const sp = u.length > 1 && !u.startsWith('\\') ? ` ${u}` : u;
+  const sp = u.startsWith('\\') ? u : ` ${u}`;
   const T = {
     reciprocal: [ctx.fns.has('sec') && `\\sec${sp} = \\frac{1}{\\cos${sp}}`, ctx.fns.has('cosec') && `${csc}${sp} = \\frac{1}{\\sin${sp}}`,
       ctx.fns.has('cot') && `\\cot${sp} = \\frac{1}{\\tan${sp}}`].filter(Boolean).join(',\\; ') || `\\sec${sp} = \\frac{1}{\\cos${sp}}`,
@@ -545,7 +548,9 @@ export function justifyStep(fromText, toText) {
     const shown = all.slice(0, 2);
     return {
       valid: true, same: false,
-      rules: shown.map(rule => ({ rule, latex: texOf(rule, ctx), scope })),
+      // An identity is applied to a part (the numerator, the denominator); an
+      // algebra move such as dividing by a fraction acts on the whole line.
+      rules: shown.map(rule => ({ rule, latex: texOf(rule, ctx), scope: WHOLE_LINE_MOVES.has(rule) ? 'whole' : scope })),
       more: ambiguous || all.length > shown.length
     };
   }
@@ -640,6 +645,7 @@ export function annotateWorking(lines, options = {}) {
       chain.endLine = index;
       chain.endSide = chain.endSide || sideOf(part.ast);
     }
+    entry.side = chain.start || null;
     return entry;
   });
 

@@ -72,6 +72,7 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
     return {
       n: i + 1, line: i, status,
       start: status === 'checked' && a.steps.length === 0,
+      startSide: a.side || null,
       rules: status === 'checked' || status === 'follows' ? merged.rules : [],
       more: status === 'checked' && merged.more,
       same: status === 'checked' && merged.same,
