@@ -93,7 +93,7 @@ export default {
   },
   'mst-11-07': {
     objective: 'Find the shortest path between two vertices of a weighted network, find a minimum spanning tree and its total weight, and use vertex degrees to decide whether an Euler path or circuit exists.',
-    intuition: 'A network keeps only what matters: places as vertices, connections as edges and costs as weights. A shortest path gets from one vertex to another; a minimum spanning tree connects every vertex as cheaply as possible, and it can use edges that no shortest path would. A trail that uses each edge once must leave every vertex it enters, which is why the degrees must be even except at its two ends.',
+    intuition: 'A network keeps only what matters: places as vertices, connections as edges and costs as weights. A shortest path gets from one vertex to another; a minimum spanning tree connects every vertex as cheaply as possible, and the two answers often use different edges. A trail that uses each edge once must leave every vertex it enters, which is why the degrees must be even except at its two ends.',
     diagrams: [
       {
         title: 'The minimum spanning tree',
@@ -330,7 +330,7 @@ export default {
           kind: 'paramGraph', expr: '(16+x+b-abs(x+b-16))/2', xmin: 0, xmax: 10, ymin: 0, ymax: 20, show: ['yIntercept'],
           params: [{ name: 'b', min: 5, max: 9, step: 1, initial: 8, label: 'capacity of B to T' }]
         },
-        note: 'Across is the capacity of $A\\to T$, and the height is the maximum flow, the smaller of $16$ and $x+b$, where $b$ is the capacity of $B\\to T$. With $b=8$ and a capacity of $7$ the flow is $15$. Raise it past $8$ and the flow stops at $16$: the cut around $S$ has become the bottleneck.'
+        note: 'The horizontal axis is the capacity of $A\\to T$, and the height is the maximum flow, the smaller of $16$ and $x+b$, where $b$ is the capacity of $B\\to T$. With $b=8$ and a capacity of $7$ the flow is $15$. Raise it past $8$ and the flow stops at $16$: the cut around $S$ has become the bottleneck.'
       }
     ]
   },
@@ -344,7 +344,7 @@ export default {
           kind: 'paramGraph', expr: '(13+x+d+abs(x-1-d))/2', xmin: 0, xmax: 10, ymin: 0, ymax: 18, show: ['yIntercept'],
           params: [{ name: 'd', min: 0, max: 6, step: 1, initial: 2, label: 'duration of D (days)' }]
         },
-        note: 'Across is the duration of $C$, and the height is the minimum completion time: the longer of $A,C,E$ and $B,D,E$. With $D$ taking $2$ days, $C$ taking $5$ gives $11$ days. Shortening $C$ to $3$ gives $9$ days, and shortening it further gains nothing, because $B,D,E$ is now critical.'
+        note: 'The horizontal axis is the duration of $C$, and the height is the minimum completion time: the longer of $A,C,E$ and $B,D,E$. With $D$ taking $2$ days, $C$ taking $5$ gives $11$ days. Shortening $C$ to $3$ gives $9$ days, and shortening it further gains nothing, because $B,D,E$ is now critical.'
       },
       {
         title: 'Float of each activity',
