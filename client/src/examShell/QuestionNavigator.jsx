@@ -52,7 +52,7 @@ export function rovingTarget(key, index, boxes) {
   return best ? best.i : index;
 }
 
-export default function QuestionNavigator({ groups, current, stateOf, onSelect, doneKey = 'shell.qDone' }) {
+export default function QuestionNavigator({ groups, current, stateOf, onSelect, doneKey = 'shell.qDone', variant = 'grid' }) {
   const t = useT();
   const ref = useRef(null);
   const onKeyDown = (e) => {
@@ -69,7 +69,7 @@ export default function QuestionNavigator({ groups, current, stateOf, onSelect, 
     buttons[to]?.focus();
   };
   return (
-    <nav className="xs-nav" aria-label={t('shell.questions')} ref={ref} onKeyDown={onKeyDown}>
+    <nav className={`xs-nav${variant === 'rail' ? ' xs-nav--rail' : ''}`} aria-label={t('shell.questions')} ref={ref} onKeyDown={onKeyDown}>
       {groups.map(group => (
         <div className="xs-nav-group" key={group.start} role="group" aria-label={group.label}>
           {/* i18n-exempt-start: a section's own label and format, as the paper's publisher recorded them */}
