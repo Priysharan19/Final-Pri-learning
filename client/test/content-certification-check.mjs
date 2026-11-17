@@ -166,7 +166,11 @@ for (const gen of ['c8-algebraic-identities-ncert-mastery', 'c8-exponents-ncert-
   eq(latexBad, 0, `${gen}: every option and prompt renders as balanced maths (was: keyed option unclosed)`);
 }
 {
+  // Pinned by its seed, so the skill's direct form (the extra forms draw from the same seeds).
+  const held = EXTRA_FORMS['c8-factorisation-ncert-mastery'];
+  delete EXTRA_FORMS['c8-factorisation-ncert-mastery'];
   const q = generateQuestion('c8-factorisation-ncert-mastery', 2, 626706219);
+  if (held) EXTRA_FORMS['c8-factorisation-ncert-mastery'] = held;
   ok(q.mcqOptions.every(o => (o.match(/\$/g) || []).length % 2 === 0), 'c8 factorisation seed 626706219: no option leaks the key by an unclosed $');
 }
 // (b) Class 10 trigonometry identity form wrote $\sinA$ — an undefined KaTeX
