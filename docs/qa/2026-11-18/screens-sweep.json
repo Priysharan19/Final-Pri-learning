@@ -1,0 +1,226 @@
+[
+ {
+  "view": "desktop-light",
+  "route": "/map",
+  "url": "/map",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [],
+  "unlabelled": [],
+  "clipped": [
+   "Step 1 of 3 · foundations in this year",
+   "Step 2 of 3 · builds on the steps before",
+   "Step 3 of 3 · builds on the steps before"
+  ],
+  "tiny": [
+   "<button type=\"button\" class=\"in-mark\" aria-label=\"Priyabhata, go to the Index\"><"
+  ],
+  "errs": []
+ },
+ {
+  "view": "desktop-light",
+  "route": "/practice",
+  "url": "/practice",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [],
+  "unlabelled": [],
+  "clipped": [
+   "Practice · Introduction to Trigonometry"
+  ],
+  "tiny": [
+   "<button class=\"editor-tool \" title=\"Symbol palette\" aria-label=\"Symbol palette\" "
+  ],
+  "errs": []
+ },
+ {
+  "view": "desktop-light",
+  "route": "/exams",
+  "url": "/exams",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [],
+  "unlabelled": [],
+  "clipped": [
+   "India exams"
+  ],
+  "tiny": [
+   "<button type=\"button\" class=\"in-mark\" aria-label=\"Priyabhata, go to the Index\"><"
+  ],
+  "errs": []
+ },
+ {
+  "view": "desktop-light",
+  "route": "/settings",
+  "url": "/settings",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [
+   "✓",
+   "✓"
+  ],
+  "unlabelled": [],
+  "clipped": [],
+  "tiny": [
+   "<button type=\"button\" class=\"in-mark\" aria-label=\"Priyabhata, go to the Index\"><"
+  ],
+  "errs": []
+ },
+ {
+  "view": "desktop-dark",
+  "route": "/map",
+  "url": "/map",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [],
+  "unlabelled": [],
+  "clipped": [
+   "Step 1 of 3 · foundations in this year",
+   "Step 2 of 3 · builds on the steps before",
+   "Step 3 of 3 · builds on the steps before"
+  ],
+  "tiny": [
+   "<button type=\"button\" class=\"in-mark\" aria-label=\"Priyabhata, go to the Index\"><"
+  ],
+  "errs": []
+ },
+ {
+  "view": "desktop-dark",
+  "route": "/practice",
+  "url": "/practice",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [],
+  "unlabelled": [],
+  "clipped": [
+   "Practice · Circles"
+  ],
+  "tiny": [
+   "<button class=\"editor-tool \" title=\"Symbol palette\" aria-label=\"Symbol palette\" "
+  ],
+  "errs": []
+ },
+ {
+  "view": "desktop-dark",
+  "route": "/exams",
+  "url": "/exams",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [],
+  "unlabelled": [],
+  "clipped": [
+   "India exams"
+  ],
+  "tiny": [
+   "<button type=\"button\" class=\"in-mark\" aria-label=\"Priyabhata, go to the Index\"><"
+  ],
+  "errs": []
+ },
+ {
+  "view": "desktop-dark",
+  "route": "/settings",
+  "url": "/settings",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [
+   "✓",
+   "✓"
+  ],
+  "unlabelled": [],
+  "clipped": [],
+  "tiny": [
+   "<button type=\"button\" class=\"in-mark\" aria-label=\"Priyabhata, go to the Index\"><"
+  ],
+  "errs": []
+ },
+ {
+  "view": "phone-light",
+  "route": "/practice",
+  "url": "/practice",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [],
+  "unlabelled": [
+   "<button class=\"btn btn-quiet\" aria-live=\"polite\">Show solution</button>"
+  ],
+  "clipped": [
+   "Practice · Triangles"
+  ],
+  "tiny": [],
+  "errs": []
+ },
+ {
+  "view": "phone-light",
+  "route": "/exams",
+  "url": "/exams",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [],
+  "unlabelled": [],
+  "clipped": [
+   "India exams"
+  ],
+  "tiny": [],
+  "errs": []
+ },
+ {
+  "view": "phone-light",
+  "route": "/settings",
+  "url": "/settings",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [
+   "✓",
+   "✓"
+  ],
+  "unlabelled": [],
+  "clipped": [],
+  "tiny": [],
+  "errs": []
+ },
+ {
+  "view": "phone-dark",
+  "route": "/practice",
+  "url": "/practice",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [],
+  "unlabelled": [
+   "<button class=\"btn btn-quiet\" aria-live=\"polite\">Show solution</button>"
+  ],
+  "clipped": [
+   "Practice · Triangles"
+  ],
+  "tiny": [],
+  "errs": []
+ },
+ {
+  "view": "phone-dark",
+  "route": "/exams",
+  "url": "/exams",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [],
+  "unlabelled": [],
+  "clipped": [
+   "India exams"
+  ],
+  "tiny": [],
+  "errs": []
+ },
+ {
+  "view": "phone-dark",
+  "route": "/settings",
+  "url": "/settings",
+  "overflowX": 0,
+  "katexErr": 0,
+  "uni": [
+   "✓",
+   "✓"
+  ],
+  "unlabelled": [],
+  "clipped": [],
+  "tiny": [],
+  "errs": []
+ }
+]
