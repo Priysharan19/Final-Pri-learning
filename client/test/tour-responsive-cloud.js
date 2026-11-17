@@ -75,8 +75,8 @@ export const flow = {
         await check(`${phase}: the typed answer is still in its field`, (await field.inputValue()) === '12345', await field.inputValue());
       } else note(`${phase}: no typing field on this form; typing check not applicable`);
       // The practice screen is a focus view: its way out is the Index link; the shell's tabs follow.
-      const hops = [{ path: '/', link: page.getByText('Index', { exact: true }).first() },
-        { path: '/progress', link: page.locator('a[href="/progress"]').first() }, { path: '/notes', link: page.locator('a[href="/notes"]').first() }];
+      const hops = [{ path: '/', link: page.locator('a:visible, button:visible', { hasText: /^Index$/ }).first() },
+        { path: '/progress', link: page.locator('a[href="/progress"]:visible').first() }, { path: '/notes', link: page.locator('a[href="/notes"]:visible').first() }];
       for (const { path, link } of hops) {
         if (!(await link.count())) { note(`${phase}: no visible link to ${path}`); continue; }
         const t0 = Date.now();
