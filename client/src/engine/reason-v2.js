@@ -544,28 +544,105 @@ function relationFault(a, b) {
   }
   return null;
 }
-// The solution region of a linear inequality in one variable: `a·v + b op 0`
-// read as `v op' bound`, the sign of a deciding whether op flips. Null unless
-// the relation is exactly linear in a single variable (checked at five points).
-function linearRegion(rel) {
+// The solution region of a polynomial inequality in one variable (degree <= 4),
+// compared by MEMBERSHIP on every piece the two relations' real roots cut the
+// line into: a polynomial has a constant sign on each piece, so agreement on a
+// representative of every piece and every root is exact agreement (up to the
+// roots' numeric precision). Null unless both are exactly polynomial in the one
+// variable (confirmed at nine points beyond the fit).
+function polyFit(rel) {
   if (!rel || rel.t !== 'relation') return null;
   const vars = new Set([...variablesOf(rel.l), ...variablesOf(rel.r)]);
-  if (vars.size !== 1) return null;
-  const v = [...vars][0];
+  if (vars.size > 1) return null;
+  const v = vars.size ? [...vars][0] : 'x';
   const f = t => { const env = { [v]: t }; return evaluate(rel.l, env) - evaluate(rel.r, env); };
   try {
-    const f0 = f(0), f1 = f(1), f2 = f(2), fm = f(-1), f7 = f(7);
-    if (![f0, f1, f2, fm, f7].every(Number.isFinite)) return null;
-    const a = f1 - f0;
-    const tol = 1e-9 * Math.max(1, Math.abs(f0), Math.abs(a));
-    if (Math.abs(a) < 1e-12 || Math.abs(f2 - (f0 + 2 * a)) > tol || Math.abs(fm - (f0 - a)) > tol || Math.abs(f7 - (f0 + 7 * a)) > tol) return null;
-    return { v, op: a > 0 ? rel.op : flipRelation(rel.op), bound: -f0 / a };
+    const xs = [0, 1, 2, 3, 4];
+    const ys = xs.map(f);
+    if (!ys.every(Number.isFinite)) return null;
+    // Newton forward differences -> monomial coefficients by solving Vandermonde.
+    const n = xs.length;
+    const M = xs.map((x, i) => [...xs.map((_, j) => Math.pow(x, j)), ys[i]]);
+    for (let c = 0; c < n; c++) {
+      let piv = c;
+      for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+      if (Math.abs(M[piv][c]) < 1e-12) return null;
+      [M[c], M[piv]] = [M[piv], M[c]];
+      for (let r = 0; r < n; r++) {
+        if (r === c) continue;
+        const k = M[r][c] / M[c][c];
+        for (let j = c; j <= n; j++) M[r][j] -= k * M[c][j];
+      }
+    }
+    const co = M.map((row, i) => row[n] / row[i]);
+    const evalPoly = t => co.reduce((acc, c, i) => acc + c * Math.pow(t, i), 0);
+    const scale = Math.max(1, ...co.map(Math.abs));
+    for (const t of [-1, -2, -3.5, 0.5, 1.5, 2.5, 5, 7, 11]) {
+      const want = f(t);
+      if (!Number.isFinite(want) || Math.abs(want - evalPoly(t)) > 1e-8 * Math.max(1, Math.abs(want), scale * Math.pow(Math.abs(t) + 1, 4))) return null;
+    }
+    const clean = co.map(c => (Math.abs(c) <= 1e-10 * scale ? 0 : c));
+    return { co: clean, v, op: rel.op, f: evalPoly, scale };
   } catch { return null; }
 }
-function sameLinearRegion(a, b) {
-  const ra = linearRegion(a), rb = linearRegion(b);
-  if (!ra || !rb || ra.v !== rb.v) return null;
-  return ra.op === rb.op && numsClose(ra.bound, rb.bound, 1e-9);
+function realRootsOf(co) {
+  const c = co.slice();
+  while (c.length > 1 && c[c.length - 1] === 0) c.pop();
+  const deg = c.length - 1;
+  if (deg <= 0) return [];
+  if (deg === 1) return [-c[0] / c[1]];
+  if (deg === 2) {
+    const d = c[1] * c[1] - 4 * c[2] * c[0];
+    if (d < 0) return [];
+    const q = Math.sqrt(d);
+    return [(-c[1] - q) / (2 * c[2]), (-c[1] + q) / (2 * c[2])];
+  }
+  // Durand–Kerner on the monic polynomial.
+  const a = c.map(x => x / c[deg]);
+  let z = Array.from({ length: deg }, (_, k) => ({ re: Math.cos(2 * Math.PI * k / deg + 0.4) * 3, im: Math.sin(2 * Math.PI * k / deg + 0.4) * 3 }));
+  const mul = (p, q) => ({ re: p.re * q.re - p.im * q.im, im: p.re * q.im + p.im * q.re });
+  const sub = (p, q) => ({ re: p.re - q.re, im: p.im - q.im });
+  const div = (p, q) => { const d = q.re * q.re + q.im * q.im; return { re: (p.re * q.re + p.im * q.im) / d, im: (p.im * q.re - p.re * q.im) / d }; };
+  for (let it = 0; it < 400; it++) {
+    let moved = 0;
+    z = z.map((zi, i) => {
+      let num = { re: 0, im: 0 }; // Horner
+      for (let k = deg; k >= 0; k--) { num = mul(num, zi); num.re += a[k]; }
+      let den = { re: 1, im: 0 };
+      z.forEach((zj, j) => { if (j !== i) den = mul(den, sub(zi, zj)); });
+      if (den.re === 0 && den.im === 0) return zi;
+      const next = sub(zi, div(num, den));
+      moved = Math.max(moved, Math.hypot(next.re - zi.re, next.im - zi.im));
+      return next;
+    });
+    if (moved < 1e-13) break;
+  }
+  return z.filter(r => Math.abs(r.im) < 1e-6 * Math.max(1, Math.abs(r.re))).map(r => r.re);
+}
+function holds(fit, t) {
+  const val = fit.f(t);
+  const tol = 1e-9 * fit.scale * Math.pow(Math.abs(t) + 1, 4);
+  const zero = Math.abs(val) <= tol;
+  if (fit.op === '<') return !zero && val < 0;
+  if (fit.op === '>') return !zero && val > 0;
+  if (fit.op === '<=') return zero || val < 0;
+  return zero || val > 0;
+}
+function sameRegion(a, b) {
+  const fa = polyFit(a), fb = polyFit(b);
+  if (!fa || !fb) return null;
+  if (fa.co.length > 1 && fb.co.length > 1 && fa.v !== fb.v) return null;
+  const cuts = [...realRootsOf(fa.co), ...realRootsOf(fb.co)].filter(Number.isFinite).sort((x, y) => x - y);
+  const uniq = [];
+  for (const r of cuts) if (!uniq.length || Math.abs(r - uniq[uniq.length - 1]) > 1e-6 * Math.max(1, Math.abs(r))) uniq.push(r);
+  const samples = [];
+  samples.push(uniq.length ? uniq[0] - 1 - Math.abs(uniq[0]) : -1);
+  uniq.forEach((r, i) => {
+    samples.push(r);
+    samples.push(i + 1 < uniq.length ? (r + uniq[i + 1]) / 2 : r + 1 + Math.abs(r));
+  });
+  if (!uniq.length) samples.push(0, 1);
+  return samples.every(t => holds(fa, t) === holds(fb, t));
 }
 export function assessRelationLine({ text, previous = null, previousTrusted = false, meta = null } = {}) {
   const rel = typeof text === 'string' ? parseRelation(text) : text;
@@ -596,7 +673,7 @@ export function assessRelationLine({ text, previous = null, previousTrusted = fa
     // Proportional residuals did not settle it (collecting terms moves the
     // coefficient's sign, or the sides were rearranged): compare the solution
     // regions themselves. A disproof needs a verified line above it.
-    const same = sameLinearRegion(previous, rel);
+    const same = sameRegion(previous, rel);
     if (same === true) {
       return previousTrusted
         ? { status: 'ok', trusted: true, relation: rel }
