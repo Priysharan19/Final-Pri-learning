@@ -572,7 +572,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
           <Logo large byline />
           {atStart && (
             <>
-              <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
+              <div className="hero-kicker">{!offersCourse('in') ? t('login.kickerNsw') : featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
               <h1 className="hero-title">{t('login.welcomeTitle')}</h1>
               <p className="hero-sub">{t('login.welcomeSub')}</p>
             </>

@@ -355,7 +355,10 @@ export const ON_DEMAND = [
   // read once online is there offline from then on. The one case this shows,
   // opening Notes for the first time with no connection, Notes.jsx reports by
   // name and offers a retry; practice, which needs none of it, is unaffected.
-  [/(^|\/)(Notes|notes-class(7|8|9|10|11|12))-[A-Za-z0-9_-]+\.(js|css)$/, 'chapter notes'],
+  // The Prithagoras edition's NSW notes page and its Stage data chunks are the same
+  // idea (pages/NswNotes.jsx, notes/nsw/): opened on demand, never installed.
+  [/(^|\/)cmu-serif-[^/]*\.woff2$/, 'CMU Serif, the NSW notes reading face: fetched with a chapter, then kept like the chapter itself'],
+  [/(^|\/)(Notes|NswNotes|notes-class(7|8|9|10|11|12)|notes-nsw-stage[0-9]+)-[A-Za-z0-9_-]+\.(js|css)$/, 'chapter notes'],
 
   // "Practise this": photograph a question and practise its skill. The page
   // cannot do anything without a connection — reading the photo is a server
