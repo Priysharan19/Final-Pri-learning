@@ -25,7 +25,7 @@
 //   · an India paper is refused, not served.
 //
 //   PRIYABHATA (PRI_EDITION unset) — unchanged
-//   · India banks are issued with no sealed identity or marking limit; NSW
+//   · India banks are issued with a sealed curriculum identity and no marking limit; NSW
 //     banks and the NSW course are refused exactly as before (D15);
 //     /v1/curriculum serves nothing (404 to a signed-in account).
 //
@@ -76,7 +76,7 @@ const PRIVATE = ['answer', 'answerText', 'correctIndex', 'solution', 'steps', 's
   c.eq(bankPolicy(), nsw, 'this process is a Prithagoras server (PRI_EDITION)');
   c.ok(nsw.issues('y7-integers') && !nsw.issues('c10-arithmetic-progressions') && india.issues('c10-arithmetic-progressions') && !india.issues('y7-integers'),
     'an NSW bank is Prithagoras\'s and an India bank Priyabhata\'s, never the other way');
-  c.deq([india.admits, india.identityOf, india.marking], [null, null, null], 'Priyabhata admits, seals and limits nothing: its questions are unchanged');
+  c.ok(india.admits === null && india.marking === null && typeof india.identityOf === 'function', 'Priyabhata admits everything its covers draw on and limits no marking, but seals a curriculum identity (audit P0 #38; edition-parity-check.mjs)');
   c.eq(nsw.marking, FINAL_ANSWER_MARKING, 'Prithagoras questions are limited to their final answer');
   assert.throws(() => bankPolicy('atlantis'), /No question banks/);
   c.ok(true, 'an unknown edition has no banks');
@@ -107,6 +107,13 @@ try {
   c.eq((await h.request('/v1/health')).data?.edition, 'prithagoras', '/v1/health reports the Prithagoras edition');
 
   const issue = (body, jar = a.jar) => h.request('/v1/practice/issue', { method: 'POST', jar, body });
+  // F7 parity: official JEE questions by band are an India-edition feature; this server refuses the catalogue and a band issue.
+  {
+    const bands = await h.request('/v1/practice/bands?track=jee-main', { jar: a.jar });
+    c.deq([bands.status, bands.data?.error?.code], [422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM'], 'the JEE band catalogue is refused on a Prithagoras server');
+    const banded = await issue({ generator: 'pyq-jee-main-c11-straight-lines', difficulty: 3, curriculum: 'nsw', mode: 'practice', band: 'short' });
+    c.deq([banded.status, banded.data?.error?.code], [422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM'], 'a JEE band issue is refused on a Prithagoras server');
+  }
   const submit = (qid, submissionId, answer, steps, jar = a.jar) => h.request(`/v1/practice/${qid}/submit`, {
     method: 'POST', jar, headers: { 'Idempotency-Key': submissionId }, body: { submissionId, answer, mode: 'typed', ...(steps ? { steps } : {}) } });
   const escrowCount = async accountId => Number((await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='practice-question'", [accountId]))?.n || 0);
@@ -342,7 +349,7 @@ try {
   const r = await issue({ generator: 'c10-arithmetic-progressions', difficulty: 2, seed: 7, curriculum: 'in' });
   c.eq(r.status, 201, 'Priyabhata: an India bank is issued');
   const sealed = JSON.parse((await india.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [a.account.id, r.data.question.id])).response_json);
-  c.ok(!('_curriculum' in sealed) && !('_marking' in sealed), 'Priyabhata: with no sealed identity or marking limit — the question is as it always was');
+  c.ok(sealed._curriculum?.jurisdiction === 'IN' && sealed._curriculum.board === 'CBSE' && sealed._curriculum.class === 10 && sealed._curriculum.chapterId === 'c10-arithmetic-progressions' && !('_marking' in sealed), 'Priyabhata: sealed with its curriculum identity (CBSE, Class 10, the AP chapter) and no marking limit (audit P0 #38)');
   for (const [label, body, status, code] of [
     ['an NSW bank', { generator: 'y7-integers', difficulty: 1, curriculum: 'in' }, 422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM'],
     ['the NSW course', { generator: 'y7-integers', difficulty: 1, curriculum: 'nsw' }, 400, 'PRACTICE_GENERATOR_INVALID'],

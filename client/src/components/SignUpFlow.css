@@ -60,9 +60,11 @@
   border-radius: 10px; color: var(--ink-2); font-variant-numeric: tabular-nums;
 }
 .signup-next { width: 100%; margin-top: var(--space-4); }
-.signup-or { display: flex; align-items: center; gap: var(--space-3); color: var(--ink-3); font-size: 12.5px; margin: var(--space-5) 0 var(--space-3); }
+.signup-or { display: flex; align-items: center; gap: var(--space-3); color: var(--ink-3); font-size: 12.5px; margin: var(--space-4) 0 var(--space-3); }
 .signup-or::before, .signup-or::after { content: ''; flex: 1; height: 1px; background: var(--hairline); }
 .signup-social { display: grid; grid-template-columns: 1fr; gap: var(--space-2); }
+.signup-social.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.signup-apple { flex: none; }
 /* Each provider is as wide and as tall as the primary button; the Google mark keeps its own colours. */
 .signup-provider { width: 100%; justify-content: center; gap: 10px; }
 .signup-google .signup-g { flex: none; }
@@ -91,7 +93,7 @@
 
 @media (max-width: 420px) {
   .signup-choices-6 { grid-template-columns: repeat(3, 1fr); }
-  .signup-social { grid-template-columns: 1fr; }
+  .signup-social, .signup-social.is-two { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

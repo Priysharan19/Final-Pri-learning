@@ -367,6 +367,23 @@ for (const [label, profile] of [
   refusesJm({ answerSource: jmSample.promptSource }, 'cites the question paper as its own key');
   refusesJm({ promptSource: 'cbse-2025-x-30-1-1-marking-scheme' }, 'reads its prompt from something other than a question paper');
 }
+// A record's text survives its own JS string: a single backslash in a quoted string is an escape, so \t becomes a tab and
+// \overline loses its backslash. No record string may hold a control character, and no math span may carry a LaTeX
+// command whose backslash was lost.
+{
+  const LOST = /(^|[^\\A-Za-z])(overline|dfrac|sqrt|cdot|theta|mathrm|begin\{|circ)\b/;
+  const mathSpans = text => [...String(text).matchAll(/\$([^$]*)\$/g)].map(m => m[1]);
+  const walkText = (v, f) => { if (typeof v === 'string') f(v); else if (v && typeof v === 'object') for (const k of Object.keys(v)) walkText(v[k], f); };
+  for (const rec of PYQ_RECORDS) {
+    let control = 0, lost = 0;
+    walkText(rec, text => {
+      if (/[\u0000-\u0009\u000b-\u001f]/.test(text)) control++;
+      if (mathSpans(text).some(span => LOST.test(span))) lost++;
+    });
+    ok(control === 0, `${rec.id}: no string holds a control character (a single backslash escape in its source)`);
+    ok(lost === 0, `${rec.id}: no math span has lost the backslash of a LaTeX command`);
+  }
+}
 await online.close();
 const snapshot = pyqArchiveSnapshot();
 const summary = Object.entries(snapshot.byExam).map(([exam, n]) => `${n} ${PYQ_EXAMS[exam].label}`).join(', ');

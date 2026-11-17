@@ -1,0 +1,12 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "A reply that follows the current ask-level prompt literally: redirects every off-topic message to the question.",
+  "replies": [
+    {
+      "message": "I can only help with this question. What could you do to both sides first?",
+      "references_step_index": -1,
+      "reveals_answer": false
+    }
+  ]
+}

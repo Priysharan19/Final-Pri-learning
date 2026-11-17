@@ -18,6 +18,8 @@ import { requireSession, requireVerifiedEmail, requireRole, rateLimit, consumeRa
 import { encryptDeliveryToken, decryptDeliveryToken } from './deliveryCrypto.js';
 import { opaqueContentId, opaqueContentHash, contentSeenEvidence, markContentSeen, contentTried, markContentTried, seenAmong, seenKeysOf, triedKeysOf, repeatEvidenceOf } from './contentSeen.js';
 import { misconceptionIdForTrap, misconceptionIdForDiagnosis, misconceptionById } from '../../client/src/engine/misconceptions.js';
+import { slipHint } from '../../client/src/engine/slipHint.js';
+import { slipPatterns } from '../../client/src/engine/slipPattern.js';
 import { misconceptionLabel } from '../../client/src/engine/adaptive.js';
 import { HINT_RUNGS, buildHintLadder, ladderAvailable, ladderEvidence, markWeightAfter, nextRungAfter, rungLevelOf } from '../../client/src/engine/hintLadder.js';
 import { dueDotpoints, reviewStateFromAttempts } from '../../client/src/engine/reviewQueue.js';
@@ -25,7 +27,7 @@ import { spacedSchedule, LADDER_DAYS, MISS_DROP } from '../../client/src/engine/
 import { buildNotebook, firstErrorOf, isMistake } from '../../client/src/engine/mistakeNotebook.js';
 import { PUBLIC_QUESTION_FIELDS } from '../../client/src/engine/publicQuestion.js';
 import { consentState, consentBlockerCode } from './guardianConsent.js';
-import { loadAllBanks, generateQuestion } from '../../client/src/engine/generators/index.js';
+import { loadAllBanks, loadBanksFor, generateQuestion } from '../../client/src/engine/generators/index.js';
 // The marker itself (checkAnswer, stepCheck, methodMarks) is never called on
 // this thread: markerOps.js holds the operations and markerPool.js runs them in
 // worker threads under a hard deadline. Only the two pure rubric helpers
@@ -53,6 +55,10 @@ import { verifyReadReceipt } from './readReceipt.js';
 import { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } from './editionBanks.js';
 import { courseAllowedForTests } from './indiaBanks.js';
 import { serverEdition } from './edition.js';
+import { serverEntitlementCapabilities } from './entitlements.js';
+import { PYQ_RECORDS } from '../../client/src/engine/pyq/pyqArchive.js';
+import { pyqPayload } from '../../client/src/engine/pyq/pyqSchema.js';
+import { JEE_BAND_IDS, jeeBandCatalog, jeeBandRecords } from '../../client/src/engine/pyq/jeeBands.js';
 import { figureHasExternalRef } from './figureRefs.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
@@ -62,7 +68,18 @@ const UUID = /^[0-9a-f-]{36}$/i;
 // grading a question the server refuses to issue could never be checked. The
 // name is only a lookup key; an unknown one fails generation with 422.
 const AUTHORED_BANK = /^[a-z][a-z0-9]{0,11}-[a-z0-9][a-z0-9-]{1,95}$/;
-const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written', 'account']);
+const ISSUE_FIELDS = new Set(['generator', 'difficulty', 'seed', 'curriculum', 'mode', 'prepared', 'avoid', 'trap', 'dotpoint', 'written', 'account', 'band']);
+// F7: practice of official JEE questions by length-of-working band (jeeBands.js).
+// Premium, decided by the server's entitlement record before anything is drawn.
+export const JEE_BAND_CAPABILITY = 'premium-exams';
+const JEE_PYQ = /^pyq-jee-(main|advanced)-[a-z0-9-]+$/;
+
+/** The band's own pick: one of its records, chosen by the question's seeded rng. */
+function bandPick(request) {
+  if (!request.band) return null;
+  const rows = jeeBandRecords(PYQ_RECORDS, request.generator, request.band);
+  return rng => pyqPayload(rows[Math.floor(Math.max(0, Math.min(0.999999999, Number(rng()))) * rows.length)]);
+}
 const PREPARE_FIELDS = new Set(['generator', 'difficulty', 'curriculum', 'mode', 'avoid', 'dotpoint']);
 const PRACTICE_MODES = ['practice', 'review', 'task', 'rush', 'match', 'placement'];
 // One answer settles the question in these modes.
@@ -407,7 +424,17 @@ function readQuestionRequest(body, fields, banks = bankPolicy()) {
   if (body.written !== undefined && typeof body.written !== 'boolean') {
     return { error: [400, 'PRACTICE_ISSUE_INVALID', 'Invalid answer-form preference.'] };
   }
-  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, trap, written: body.written === true };
+  let band = null;
+  if (body.band !== undefined) {
+    if (typeof body.band !== 'string' || !JEE_BAND_IDS.includes(body.band) || !JEE_PYQ.test(generator) || body.dotpoint !== undefined || body.trap !== undefined) {
+      return { error: [400, 'PRACTICE_BAND_INVALID', 'A band is chosen for an official JEE chapter only.'] };
+    }
+    if (!jeeBandRecords(PYQ_RECORDS, generator, body.band).length) {
+      return { error: [422, 'PRACTICE_BAND_EMPTY', 'This chapter has no official question in that band.'] };
+    }
+    band = body.band;
+  }
+  return { generator, difficulty, mode, avoid: new Set(avoid), dotpoint: body.dotpoint, trap, written: body.written === true, band };
 }
 
 /**
@@ -424,7 +451,9 @@ function readQuestionRequest(body, fields, banks = bankPolicy()) {
  * the earliest drawn. Every resolved question met adds to the budget exactly
  * as an avoided one does, since it rules out one more item of the pool.
  */
-function* seekQuestion({ generator, difficulty, dotpoint, avoid = new Set(), trap, written = false }, { draw, tries, batches, admits = null }) {
+function* seekQuestion(request, { draw, tries, batches, admits = null }) {
+  const { generator, difficulty, dotpoint, avoid = new Set(), trap, written = false } = request;
+  const pick = bandPick(request);
   // `written` asks for a form the student writes out; a multiple-choice
   // item can be guessed, which a diagnostic must avoid where it can.
   const springs = q => (!trap || carriesTrap(trap.owner, q, trap.key)) && (!written || (q.answerType !== 'mcq' && !q.multipart));
@@ -434,7 +463,7 @@ function* seekQuestion({ generator, difficulty, dotpoint, avoid = new Set(), tra
   for (let round = 0; drawn < budget(); round++) {
     const size = Math.min(batches[Math.min(round, batches.length - 1)], budget() - drawn);
     const batch = [];
-    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint));
+    for (let i = 0; i < size; i++, drawn++) batch.push(generateQuestion(generator, difficulty, draw(), dotpoint, pick));
     const resolved = yield batch;
     for (const [i, q] of batch.entries()) {
       // A form this edition does not issue (editionBanks.js `admits`) is never
@@ -471,7 +500,7 @@ function chooseQuestion(request, seed = null, { draw = () => randomInt(0x8000000
   // A bank outside this edition's is never drawn from, by any route (a twin included; D15 for India).
   if (!banks.issues(generator)) throw Object.assign(new Error(banks.outside.message), { code: banks.outside.code });
   if (seed !== null) {
-    const q = generateQuestion(generator, difficulty, seed, dotpoint);
+    const q = generateQuestion(generator, difficulty, seed, dotpoint, bandPick(request));
     if (banks.admits && !banks.admits(q, generator)) throw Object.assign(new Error('This form may not be issued.'), { code: 'PRACTICE_CONTENT_UNSUPPORTED' });
     return { q, repeat: false, trapDelivered: !!(trap && carriesTrap(trap.owner, q, trap.key)) };
   }
@@ -573,6 +602,13 @@ const HINT_WORK_TEXT = Object.freeze({
     unread: 'आपकी पंक्तियाँ अभी किसी चरण से मेल नहीं खा सकीं। नीचे का संकेत अब भी काम का है।'
   }
 });
+/** The line-check note, plus one Socratic question about the move that broke the line, when the engine named one. */
+export function stepNudge(work, move, locale = 'en') {
+  const note = hintWorkNote(work, locale);
+  const stepHint = work?.status === 'break' && note ? slipHint(move, locale) : null;
+  return { note: stepHint ? `${note} ${stepHint}` : note, stepHint };
+}
+
 export function hintWorkNote(work, locale = 'en') {
   const T = HINT_WORK_TEXT[locale] || HINT_WORK_TEXT.en;
   const fill = (s, v) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ''));
@@ -640,6 +676,15 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (request.error) return reject(res, ...request.error);
       const premiumGap = await premiumContentRefusal(db, { accountId, generator: request.generator, now });
       if (premiumGap) return refusePremiumContent(res, premiumGap);
+      if (request.band) {
+        const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
+        if (!serverEntitlementCapabilities(snapshot, now).includes(JEE_BAND_CAPABILITY)) {
+          res.set('Cache-Control', 'no-store');
+          return res.status(402).json({ error: { code: 'PREMIUM_REQUIRED', message: 'Practice by band is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.', capability: JEE_BAND_CAPABILITY, plan: 'free', retryable: false } });
+        }
+        // The archive's chapter bank is loaded on demand (it is not in loadAllBanks).
+        await loadBanksFor([request.generator]);
+      }
       let seed = null;
       if (body.seed !== undefined) {
         if (!fixedSeedsAllowed(env)) return reject(res, 400, 'PRACTICE_SEED_NOT_ALLOWED', 'The server chooses the question.');
@@ -654,6 +699,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       catch (error) { if (error?.pickerStore) throw error; return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = request.mode;
       q._generator = request.generator;
+      if (request.band) q._band = request.band;
     }
     // What this edition requires of every question it issues, sealed with it:
     // its curriculum identity and its marking limit (editionBanks.js). A
@@ -663,7 +709,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // network retries can opt into the same server question with a stable key.
     const idem = String(req.get('idempotency-key') || '');
     if (idem && !ID.test(idem)) return reject(res, 400, 'IDEMPOTENCY_INVALID', 'Invalid issuance idempotency key.');
-    const requestDigest = digest({ generator: q.subtopic, difficulty: q.difficulty, seed: seedGiven ? q.seed : null, prepared: preparedNonce, curriculum: banks.curriculum, mode: practiceMode });
+    const requestDigest = digest({ generator: q.subtopic, difficulty: q.difficulty, seed: seedGiven ? q.seed : null, prepared: preparedNonce, curriculum: banks.curriculum, mode: practiceMode, ...(q._band ? { band: q._band } : {}) });
     // The issuance mode is escrowed with the answer. A later submission cannot
     // falsely claim or downgrade the one-try Rush/Match policy.
     q._practiceMode = practiceMode;
@@ -967,7 +1013,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (evidence.unchecked) return { status: 'unchecked' };
     if (evidence.attemptAt >= 0) return { status: 'final' };
     const verifiedLines = Math.max(0, Math.min(lines.length, Number(evidence.verifiedLines) || 0));
-    if (evidence.firstBreak >= 0) return { charge: true, capBucket, reply: { status: 'break', verifiedLines, line: evidence.firstBreak + 1 } };
+    if (evidence.firstBreak >= 0) return { charge: true, capBucket, reply: { status: 'break', verifiedLines, line: evidence.firstBreak + 1 }, move: typeof evidence.misconception === 'string' ? evidence.misconception : null };
     if (verifiedLines > 0) return { charge: true, capBucket, reply: { status: 'held', verifiedLines } };
     return { status: 'unread' };
   }
@@ -1061,7 +1107,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       }
       const locale = body.locale === 'hi' ? 'hi' : 'en';
       result.response.work = shown;
-      result.response.workNote = hintWorkNote(shown, locale);
+      // The Socratic nudge about THIS step (engine/slipHint.js), only after a
+      // line check that ran and charged. The engine's id for the move stays here.
+      const stepped = stepNudge(shown, work.charge ? work.move : null, locale);
+      result.response.workNote = stepped.note;
+      if (stepped.stepHint) result.response.stepHint = stepped.stepHint;
     }
     if (result.status) {
       const message = result.code === 'HINT_RUNG_ORDER' ? 'Open the hint rungs in order.'
@@ -1423,12 +1473,16 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // matched, or a high-confidence Step Check diagnosis. Nothing is
       // inferred, and a slip that names neither is not filed.
       let misconception = null;
+      let slipCode = null;
       if (resolved && !result.correct && !invalid) {
         if (trapWhy) misconception = { id: misconceptionIdForTrap(q.subtopic, trapWhy), source: 'trap', label: misconceptionLabel(trapWhy) };
         else {
           const diagnosis = counted?.stepReport?.diagnosis;
           const id = diagnosis && diagnosis.confidence === 'high' && diagnosis.code !== 'counterexample' ? misconceptionIdForDiagnosis(diagnosis) : null;
           if (id) misconception = { id, source: 'step', label: misconceptionLabel(diagnosis.title || '') || null };
+          // A topic catalogue's own code (misconceptions/topics), kept beside the
+          // ontology id so "the same slip again" can read topic slips too.
+          if (diagnosis && typeof diagnosis.topic === 'string' && typeof diagnosis.code === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(diagnosis.code)) slipCode = diagnosis.code;
         }
       }
       const response = { authoritative: true, questionId: qid, submissionId, attemptId,
@@ -1525,6 +1579,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             ...ladder, creditedMarks,
             ...(misconception ? { misconception: misconception.id, misconceptionSource: misconception.source,
               ...(misconception.label ? { misconceptionLabel: misconception.label } : {}) } : {}),
+            ...(slipCode ? { slipCode } : {}),
             createdAt: now,
             serverAcknowledgedAt: now
           }), now, accountId]);
@@ -1579,6 +1634,19 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     return out;
   };
 
+  // F7: which bands each JEE chapter can be practised in — counts of official
+  // records by recorded working length, never a rank or a score. Readable on
+  // every plan (it is what the paywall shows); issuing by band is Premium.
+  router.get('/bands', rateLimit(db, 'practice-bands', { limit: 240, windowMs: 3600000 }), async (req, res) => {
+    // Official JEE questions belong to the India edition; Prithagoras has no such bank.
+    if (banks.curriculum !== 'in') return reject(res, banks.outside.status, banks.outside.code, banks.outside.message);
+    const catalog = jeeBandCatalog(PYQ_RECORDS, String(req.query.track || ''));
+    if (!catalog) return reject(res, 400, 'PRACTICE_BAND_TRACK_INVALID', 'Choose JEE Main or JEE Advanced.');
+    const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [req.platformSession.account_id]);
+    res.set('Cache-Control', 'no-store');
+    return res.status(200).json({ ...catalog, premium: serverEntitlementCapabilities(snapshot, Date.now()).includes(JEE_BAND_CAPABILITY), capability: JEE_BAND_CAPABILITY });
+  });
+
   router.get('/notebook', rateLimit(db, 'practice-notebook', { limit: 240, windowMs: 3600000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;
     const now = Date.now();
@@ -1622,6 +1690,25 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         groups: book.groups.map(g => ({ key: g.key, subtopic: g.subtopic, misconception: g.misconception, count: g.count, open: g.open, lastAt: g.lastAt,
           items: g.items.map(i => book.entries.find(e => e.id === i.id) || i) })) }
     });
+  });
+
+  // The same slip again: the one repeated move in this account's last marked
+  // answers per topic (engine/slipPattern.js, deterministic), with up to three
+  // of its own mistakes to drill by twin. Account-scoped, graded attempts only.
+  router.get('/slip-pattern', rateLimit(db, 'practice-slip-pattern', { limit: 240, windowMs: 3600000 }), async (req, res) => {
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const attempts = (await serverAttempts(accountId, NOTEBOOK_SCAN)).map(a => ({ ...a, attemptId: a.attemptId || a.id }));
+    const top = slipPatterns(attempts)[0] || null;
+    res.set('Cache-Control', 'no-store');
+    if (!top) return res.status(200).json({ pattern: null });
+    const byId = new Map(attempts.map(a => [a.attemptId, a]));
+    const prompts = await promptsOf(accountId, top.drillFrom.map(id => byId.get(id)?.questionId), now);
+    const drill = top.drillFrom.map(id => {
+      const q = prompts.get(byId.get(id)?.questionId) || null;
+      return { id, canTwin: !!q && !q.multipart && !q.custom };
+    });
+    return res.status(200).json({ pattern: { subtopic: top.subtopic, misconceptionId: top.misconceptionId, nameKey: top.nameKey, name: top.slipName || null, count: top.count, of: top.of, drill } });
   });
 
   // A twin: a NEW server-chosen question from the same generator, at the same

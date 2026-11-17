@@ -85,6 +85,11 @@ eq(toleranceFor(3, null), null, 'no policy → the default band (numsClose)');
   const exact = { answerType: 'numeric', prompt: 'Find the exact area.', answer: { value: 2 * Math.PI, requireExact: true } };
   accept(exact, '2π'); accept(exact, '2pi'); accept(exact, '6.283185307179586');
   reject(exact, '6.28'); reject(exact, '6.283'); reject(exact, '6.2832'); reject(exact, '6.3'); reject(exact, '2');
+  // A calculator's display is not the exact value (SymPy oracle, 2026-11-18):
+  // only the value written to binary64 precision is.
+  reject(exact, '6.283185307'); reject(exact, '6.2831853072'); accept(exact, '6.28318530717959');
+  const wholeExact = { answerType: 'numeric', prompt: 'Find the exact value.', answer: { value: 4, requireExact: true } };
+  accept(wholeExact, '4'); accept(wholeExact, '4.0'); reject(wholeExact, '4.0000000001'); reject(wholeExact, '3.9999999999');
 }
 
 // ── 5 · JEE numerical value, two decimals (nta-2dp) ──────────────────────────

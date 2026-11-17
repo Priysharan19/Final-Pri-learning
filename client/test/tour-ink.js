@@ -26,7 +26,8 @@ import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 const TOPIC = 'c7-finding-unknown-current';
 const MAX_QUESTIONS = 8;
 
-const SUBMIT = { name: 'Submit Answer' };
+// After a reading the primary button is the combined "Confirm and mark" (P0 #11); before one it is "Submit Answer".
+const SUBMIT = { name: /^(Submit answer|Confirm and mark)/i };
 
 /** What the reading panel says it read, line by line. */
 const reading = (page) => readLines(page);
@@ -45,6 +46,8 @@ export const flow = {
   online: true,
 
   async run({ page, ctx, base, check, note, goto, createProfile, mathText, settle, online }) {
+    // These flows pin the press-to-read behaviour: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings. Auto mode has its own flow, tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     // Handwriting is read only by the server reader (owner decision), and only
     // the server marks. The profile is signed in to the real platform server;
     // the one synthetic part is the reader's provider hop, a stand-in that
@@ -314,6 +317,13 @@ export const flow = {
     await page.waitForTimeout(2500);
     const markedByItself = await page.locator('.eval-card').count();
     const callsBeforeSubmit = reader.requests.length;
+    // P0 #11: a reading is confirmed before it is sent. The whole recognised
+    // answer is on screen, the primary is the one combined tap, and nothing has
+    // been sent to be marked yet.
+    await check('a read answer is confirmed first: the whole reading is on screen and the primary reads "Confirm and mark"',
+      await page.locator('[data-confirm-reading], .ink-line').count() > 0 && await page.getByRole('button', { name: /^Confirm and mark/ }).count() === 1,
+      `buttons ${JSON.stringify(await page.locator('.ws-actions .btn-primary').allInnerTexts())}`);
+    await check('nothing is sent to be marked before the confirming tap', (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === 0);
     await page.getByRole('button', SUBMIT).click();
     await page.waitForSelector('.eval-card', { timeout: 20000 }).catch(async () => {
       if (await confirm.count()) {
@@ -452,8 +462,9 @@ export const flow = {
     await check('a line the reader was unsure of is highlighted as doubtful',
       await doubtful.count() === 1 && (await doubtful.first().getAttribute('data-confidence')) === '0.4',
       `${await doubtful.count()} doubtful line(s); confidence ${await page.locator('.ink-line').first().getAttribute('data-confidence')}`);
-    await check('no mark is given from it: the card is not auto-marked and Submit asks to check the reading first',
-      await page.locator('.eval-card, .verdict-bad').count() === 0 && await page.getByRole('button', { name: 'Check this reading first' }).count() === 1);
+    await check('no mark is given from it: the card is not auto-marked, the panel says "1 to confirm" and Confirm and mark waits until the line is resolved',
+      await page.locator('.eval-card, .verdict-bad').count() === 0 && (await page.locator('[data-confirm-count]').innerText()).includes('1') &&
+        await page.getByRole('button', { name: /^Confirm and mark/ }).isDisabled());
     // Relation swaps (relationSwap.js) appear only on a line with a relation
     // sign; this doubtful line reads "7", so it offers none.
     await check('a doubtful line with no relation sign offers no relation swaps', await page.locator('[data-relation-swaps]').count() === 0);
@@ -471,8 +482,13 @@ export const flow = {
       `corrected ${await correctedLine.count()}, text ${JSON.stringify(await correctedLine.getAttribute('data-text'))}`);
     await check('the correction did not go back to the reader — no second provider call', reader.requests.length === readsBeforeCorrection,
       `${reader.requests.length - readsBeforeCorrection} extra request(s)`);
-    await check('Submit is now a plain submit: the engine marks what the student wrote',
-      await page.getByRole('button', SUBMIT).count() === 1 && await page.getByRole('button', { name: 'Check this reading first' }).count() === 0);
+    await check('with the line resolved nothing is left to confirm and Confirm and mark is enabled: the engine marks what the student wrote',
+      await page.getByRole('button', SUBMIT).count() === 1 && await page.getByRole('button', SUBMIT).isEnabled() && (await page.locator('[data-confirm-count]').innerText()).toLowerCase().includes('all confirmed'));
+    // The edit changed the reading, so it is confirmed again: nothing is sent
+    // until the tap, and what is sent is the edited reading.
+    const submitsBeforeEditedTap = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length;
+    await check('an edited reading is confirmed again: the primary reads "Confirm and mark" and nothing was sent by the edit',
+      await page.getByRole('button', { name: /^Confirm and mark/ }).count() === 1 && (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === submitsBeforeEditedTap);
     await page.getByRole('button', SUBMIT).click();
     await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 20000 });
     // Who decides: the server's deterministic engine, on what the STUDENT said
@@ -724,15 +740,15 @@ export const flow = {
       const submitsBefore = await submitCalls();
       const readsBefore = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
       await check('stale ink: Submit is offered and the reason says it will read the page again',
-        await page.getByRole('button', { name: 'Submit Answer' }).isEnabled() && await page.locator('[data-submit-reason="ink.submitReadAgain"]').isVisible());
-      await page.getByRole('button', { name: 'Submit Answer' }).click();
+        await page.getByRole('button', SUBMIT).isEnabled() && await page.locator('[data-submit-reason="ink.submitReadAgain"]').isVisible());
+      await page.getByRole('button', SUBMIT).click();
       await page.waitForSelector('[data-submit-reason="ink.submitReadAgainDone"]', { timeout: 20000 }).catch(() => {});
       const readsAfter = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
       await check('stale + Submit reads the page again (exactly one more read) and sends NOTHING; the new reading is on screen and the status asks to check it and press Submit again',
         readsAfter === readsBefore + 1 && await submitCalls() === submitsBefore && (await reading(page)).length >= 1 &&
           await page.locator('[data-ink-stale]').count() === 0 && /check the reading, then press Submit again/i.test(await page.locator('[data-submit-reason="ink.submitReadAgainDone"]').innerText().catch(() => '')),
         `reads ${readsBefore}→${readsAfter}; submits ${submitsBefore}→${await submitCalls()}; reason ${await page.locator('[data-submit-reason]').getAttribute('data-submit-reason').catch(() => null)}`);
-      await page.getByRole('button', { name: 'Submit Answer' }).click();
+      await page.getByRole('button', SUBMIT).click();
       await page.waitForSelector('.eval-card, .verdict', { timeout: 30000 }).catch(() => {});
       await check('the second Submit sends the page it was read from (one submit, no extra read)',
         await submitCalls() === submitsBefore + 1 && (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length === readsAfter);
@@ -747,7 +763,7 @@ export const flow = {
       const readsBefore = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
       await ctx.setOffline(true);
       // The page knows it is offline: Submit may already be waiting with the reason (a press, if it is offered, still sends nothing).
-      await page.getByRole('button', { name: 'Submit Answer' }).click({ timeout: 3000 }).catch(() => {});
+      await page.getByRole('button', SUBMIT).click({ timeout: 3000 }).catch(() => {});
       await page.waitForFunction(() => /needs a connection/.test(document.body.innerText), null, { timeout: 10000 }).catch(() => {});
       const reasonNow = await page.evaluate(() => (document.querySelector('.qpage')?.innerText || '').replace(/\s+/g, ' '));
       await check('stale + Submit while offline sends nothing, reads nothing, and shows the existing reason',
@@ -759,7 +775,7 @@ export const flow = {
       await page.getByRole('button', { name: 'Undo last stroke' }).click();
       await page.waitForFunction(() => !document.querySelector('[data-ink-stale]'), null, { timeout: 15000 }).catch(() => {});
       const readsBeforeUndoSubmit = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
-      const submit = page.getByRole('button', { name: 'Submit Answer' });
+      const submit = page.getByRole('button', SUBMIT);
       if (await check('undoing back to the page that was read clears the stale state', await page.locator('[data-ink-stale]').count() === 0 && await submit.isEnabled())) {
         await submit.click();
         await page.waitForSelector('.eval-card, .verdict', { timeout: 30000 }).catch(() => {});

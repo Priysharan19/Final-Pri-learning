@@ -136,11 +136,12 @@ async function snapshot(page, origin) {
   const attempts = await row.getAttribute('data-attempts');
   const correct = await row.getAttribute('data-correct');
   const attemptMatch = /^\d+$/.test(String(attempts)) && /^\d+$/.test(String(correct)) ? [null, attempts] : null;
-  const accuracyCell = clean(await row.locator('td').nth(3).textContent());
-  const accuracy = accuracyCell.match(/^(\d+)%$/);
-  const masteryMatch = accuracy || (accuracyCell === 'Too few answers' ? [null, null] : null);
+  // The page draws words, never a percentage: "How often right" is the second
+  // cell, and a thin record says "Not enough evidence yet". There is no mastery figure.
+  const accuracyCell = clean(await row.locator('td').nth(1).textContent());
+  const masteryMatch = /^(Mostly right|Getting there|Still shaky|Not enough evidence yet)$/.test(accuracyCell) ? [null, null] : null;
   assert.ok(attemptMatch, 'Progress row must expose a concrete attempt count: ' + progressText);
-  assert.ok(masteryMatch, 'Progress row must expose accuracy, or say there are too few answers: ' + progressText);
+  assert.ok(masteryMatch, 'Progress row must say how often the answers were right in words, or say there is not enough evidence yet: ' + progressText);
 
   return {
     history,

@@ -12,6 +12,7 @@ import { useT } from '../i18n/index.js';
 import { BrandMark } from '../components/BrandMark.jsx';
 import { CUT } from '../brand/edition.js';
 import { HANDS, readHand, writeHand } from '../lib/writingHand.js';
+import { autoReadEnabled, setAutoRead } from '../lib/autoRead.js';
 
 // The content-operations and admin console is for support and admin accounts
 // only, and the server enforces that on every call it makes. A student never
@@ -85,6 +86,23 @@ function WritingHand() {
   );
 }
 
+// Read my handwriting on its own after a pause (default on). Kept on this device.
+function AutoRead() {
+  const t = useT();
+  const [on, setOn] = useState(autoReadEnabled);
+  return (
+    <div className="card" data-auto-read style={{ marginTop: 18 }}>
+      <h2 style={{ marginBottom: 8 }}>{t('autoRead.title')}</h2>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <button type="button" role="switch" aria-checked={on} aria-label={t('autoRead.label')} className={`btn ${on ? 'btn-primary' : 'btn-ghost'}`}
+          style={{ minHeight: 44, minWidth: 64 }} data-auto-read-switch onClick={() => setOn(setAutoRead(!on))}>{on ? t('autoRead.on') : t('autoRead.off')}</button>
+        <span>{t('autoRead.label')}</span>
+      </div>
+      <p className="muted" style={{ margin: '8px 0 0' }}>{t('autoRead.note')}</p>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { user } = useApp();
   // The classroom product is outside public V1 (PRI_V1_RELEASE_SCOPE §11): a
@@ -100,6 +118,7 @@ export default function Settings() {
       {classroom && <AssignmentInboxPanel />}
       {classroom && <ClassroomPanel />}
       <WritingHand />
+      <AutoRead />
       <AboutEdition />
       <StaffOperations />
     </>

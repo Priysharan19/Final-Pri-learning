@@ -153,8 +153,8 @@ ok(JSON.stringify(later.units.map(u => u.sd)) !== JSON.stringify(advice.units.ma
   const NAMES_PREDICTOR = /(?:from\s*|import\s*\(\s*|import\s+)['"][^'"]*markPredictor(?:\.js)?['"]/;
   const rel = p => relative(ROOT, p).split('\\').join('/');
   const clientImporters = walk(join(ROOT, 'client/src')).filter(p => !p.endsWith('markPredictor.js') && NAMES_PREDICTOR.test(readFileSync(p, 'utf8'))).map(rel).sort();
-  eq(clientImporters, ['client/src/local/backend.js', 'client/src/pages/IndiaProgress.jsx'],
-    'only the progress summary and the progress page import the predictor — no checker, marker, sync or exam module');
+  eq(clientImporters, ['client/src/local/backend.js'],
+    'only the progress summary imports the predictor — no checker, marker, sync, exam module or progress page (the progress page draws no predicted mark)');
   const serverImporters = walk(join(ROOT, 'server')).filter(p => NAMES_PREDICTOR.test(readFileSync(p, 'utf8'))).map(rel);
   eq(serverImporters, [], 'the server, which decides every mark, never imports the predictor');
   ok(!NAMES_PREDICTOR.test('import { checkAnswer } from "./checker.js";') && NAMES_PREDICTOR.test("import { predictExamMark } from '../engine/markPredictor.js';"),
@@ -178,8 +178,7 @@ ok(JSON.stringify(later.units.map(u => u.sd)) !== JSON.stringify(advice.units.ma
   ok(fieldStart >= 0 && fieldEnd > fieldStart && callAt > fieldStart && callAt < fieldEnd,
     `and that place is the read-only examPrediction field of the progress summary (field ${fieldStart}..${fieldEnd}, call at ${callAt})`);
   const page = readFileSync(join(ROOT, 'client/src/pages/IndiaProgress.jsx'), 'utf8');
-  ok(/import\s*\{\s*predictionSentence\s*\}\s*from\s*'\.\.\/engine\/markPredictor\.js'/.test(page),
-    'the progress page takes only the sentence that describes a prediction');
+  ok(!/markPredictor|predictionSentence/.test(page), 'the progress page imports nothing from the predictor and draws no predicted mark');
 
   const freezeDeep = value => {
     if (value && typeof value === 'object' && !Object.isFrozen(value)) { Object.freeze(value); for (const v of Object.values(value)) freezeDeep(v); }

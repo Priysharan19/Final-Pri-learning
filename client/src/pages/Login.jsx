@@ -25,7 +25,7 @@ import { flushSync } from 'react-dom';
 
 // The instrument build's sign-in carries a decorative plot panel (design s10);
 // the flag-off build never loads it.
-const SignInPlot = INSTRUMENT_UI ? React.lazy(() => import('../instrument/SignInPlot.jsx')) : null;
+const SignInPlot = INSTRUMENT_UI ? React.lazy(() => import('../instrument/SignInScenes.jsx')) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
 const SignUpFlow = React.lazy(() => import('../components/SignUpFlow.jsx'));

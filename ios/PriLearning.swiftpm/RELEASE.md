@@ -135,6 +135,17 @@ xcodebuild archive -scheme PriLearning -destination 'generic/platform=iOS' \
 - `OTHER_LDFLAGS`: with Xcode 27.1, the SwiftPM app product stamps `LC_BUILD_VERSION sdk 16.0` (the deployment target) into the executable. App Store Connect then rejects the upload with error 90725 ("built with the iOS 16.0 SDK"). Passing the real SDK version (`xcodebuild -showsdks`) restores the correct stamp. Check it with `otool -l <app>/'Pri Learning' | grep -A4 LC_BUILD_VERSION`.
 - Export with `xcodebuild -exportArchive` (method `app-store-connect`, manual signing, "Apple Distribution" certificate, App Store profile for `com.prilearning.app`), then run `xcrun altool --validate-app` before uploading.
 
+## 6a. One package, two apps (ADR-0002)
+
+An SwiftPM app product carries one bundle id, so the two edition apps are produced from this one package by build settings, never a fork. `node scripts/archive-ios.mjs --edition priyabhata|prithagoras --out <dir> [--signed]` applies them (table: `EDITION_APPS` in `scripts/check-native-archive.mjs`):
+
+| edition | bundle id | display name | icon asset | server (`PRI_CLOUD_ORIGIN`) |
+|---|---|---|---|---|
+| Priyabhata | `com.prilearning.app` | Priyabhata | `AppIcon` | https://app.prilearning.com |
+| Prithagoras | `com.prilearning.prithagoras` | Prithagoras | `AppIconPrithagoras` | https://au.prilearning.com |
+
+Before each archive build the matching client (`PRI_EDITION=<edition> npm run build && npm run sync:ios`): the script refuses a `client/dist` of the other edition and runs the archive gate on the result (bundle id, display name, origin, the bundled client's edition, the release commit). The two archives are made one after the other, because the package holds one web bundle at a time. The icons come from `client/brand/<edition>/source/native/ios`. There is no per-edition launch-screen asset: the shell's launch presentation is the system default.
+
 ## 7. TestFlight evidence gate
 
 After a successful App Store Connect upload:

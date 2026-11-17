@@ -86,7 +86,14 @@ export const INK_ANSWER_PROPS = Object.freeze([
   // on the practice card and absent in the exam room. It only lets the "That's
   // it" accept button ask the shell for a selection tick; it carries nothing
   // about the question or its answer and never reaches the reader request.
-  'feedback'
+  'feedback',
+  // Reviewed 2026-11-18 (auto-read handwriting, train 24 integration): a
+  // boolean, exactly `!resolved` on the practice card. It only lets the surface
+  // read the page on its own once the pen rests, through the same readRef2 path
+  // as "Read my answer": the picture alone, after the student accepted the
+  // reader, and never a question-derived value. It carries nothing about the
+  // question or its answer and never reaches the reader request. Pinned below.
+  'autoRead'
 ]);
 /** Identifiers that must never appear inside a recognition-context expression. */
 export const FORBIDDEN_IDENTIFIERS = Object.freeze([
@@ -446,6 +453,10 @@ for (const file of files) {
   // liveRead is the coach's on/off switch and nothing else.
   for (const m of source.matchAll(/liveRead=\{([^}]*)\}/g)) {
     ok(/^coachOn && !resolved$/.test(m[1].trim()), `${rel}: liveRead must be exactly {coachOn && !resolved}, got {${m[1].trim()}}`);
+  }
+  // autoRead is the attempt-open switch and nothing else.
+  for (const m of source.matchAll(/autoRead=\{([^}]*)\}/g)) {
+    ok(/^!resolved$/.test(m[1].trim()), `${rel}: autoRead must be exactly {!resolved}, got {${m[1].trim()}}`);
   }
   for (const m of source.matchAll(/promptAsksInequality=\{([^}]*)\}/g)) {
     ok(PROMPT_ONLY_INEQUALITY.test(m[1].trim()), `${rel}: promptAsksInequality must be exactly asksForInequality(<question>.prompt), got {${m[1].trim()}}`);

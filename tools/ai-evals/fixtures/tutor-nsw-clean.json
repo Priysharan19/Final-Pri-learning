@@ -1,0 +1,12 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "A compliant nudge on a Prithagoras (NSW) gradient question.",
+  "replies": [
+    {
+      "message": "Gradient is rise over run. Which two differences do you need from the two points?",
+      "references_step_index": 0,
+      "reveals_answer": false
+    }
+  ]
+}

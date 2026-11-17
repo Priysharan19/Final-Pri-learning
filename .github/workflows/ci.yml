@@ -437,6 +437,8 @@ jobs:
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-dna-check.mjs 2>&1 | tee -a practice-http.log
+          # F7 (L5): official JEE questions by recorded-working band, Premium only; India edition, refused on Prithagoras.
+          node server/test/jee-band-practice-check.mjs 2>&1 | tee -a practice-http.log
           node tools/ci-check-counts.mjs verify platform/practice-http.log#5
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
         run: |
@@ -901,6 +903,8 @@ jobs:
             node client/test/tour-online-check.js --no-build 2>&1 | tee -a browser.log
             # D17 (L4): asked once, naming OpenAI, before the first read — phone finger, tablet, photo, offline ink.
             node client/test/tour-ink-reader-permission.js --no-build 2>&1 | tee -a browser.log
+            # Owner decision 2026-11-18: handwriting is read on its own after a pause; never marks, never before consent.
+            node client/test/tour-auto-read.js --no-build 2>&1 | tee -a browser.log
             # Task 02: mounted server-authoritative method credit and stale receipt rejection.
             node client/test/tour-verified-mark-breakdown.js --no-build 2>&1 | tee -a browser.log
             node client/test/tour-free-cap.js --no-build 2>&1 | tee -a browser.log
@@ -940,6 +944,8 @@ jobs:
             # misread page with a typed final answer, working the server did and did
             # not check, and annotations that die with the revision they were about.
             node client/test/tour-truthful-ink.js --no-build 2>&1 | tee -a browser.log
+            # Standard #43: writing, typing and navigation stay responsive on a slow or failing cloud (no long task over 50 ms; the work is kept).
+            node client/test/tour-responsive-cloud.js --no-build 2>&1 | tee -a browser.log
             # The Instrument's own shell, Index, command bar and first-offline
             # tabs (#658). Every build ships it (client/interface.config.mjs),
             # so it runs on this group's build like the tours above.
@@ -974,6 +980,9 @@ jobs:
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log
+            # The diagram kit (shared by Notes and questions) at phone width, in light and dark,
+            # by keyboard, with reduced motion.
+            node client/test/diagram-kit-browser-check.mjs 2>&1 | tee -a browser.log
             # Plan E5: a built Prithagoras client on a Prithagoras server shows
             # no price, plan or purchase control and reaches no store.
             node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log

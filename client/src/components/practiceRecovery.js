@@ -60,6 +60,7 @@ export function savePendingSubmission(questionId, rec, meta = {}) {
     sourceMode: rec.sourceMode === 'photo' ? 'photo' : rec.viaInk === true ? 'ink' : 'typed',
     ms: Math.max(0, Math.round(Number(rec.ms) || 0)),
     lines: cleanLines(rec.lines),
+    ...(rec.confirmed && typeof rec.confirmed === 'object' ? { confirmed: { reading: String(rec.confirmed.reading || '').slice(0, 400), signature: rec.confirmed.signature ? String(rec.confirmed.signature).slice(0, 80) : null, edited: rec.confirmed.edited === true, at: Math.round(Number(rec.confirmed.at) || 0) } } : {}),
     ...(rec.refused === true ? { refused: true } : {}),
     ...(rec.edited === true ? { edited: true } : {})
   }, { label: meta.label || '', note: translate('msg.answerBeingMarked'), path: '/practice' });

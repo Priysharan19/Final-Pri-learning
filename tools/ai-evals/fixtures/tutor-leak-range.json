@@ -1,0 +1,17 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "A range that brackets the final answer.",
+  "replies": [
+    {
+      "message": "Your answer should be between 4 and 6.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    },
+    {
+      "message": "x is somewhere from 4 to 6.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    }
+  ]
+}

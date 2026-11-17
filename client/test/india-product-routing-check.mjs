@@ -52,37 +52,24 @@ assert.match(legacyBackend, /HSC-style/,
 
 assert.match(progress, /user\?\.course === 'in' \? <IndiaProgress \/> : <ProgressAustralia \/>/,
   'India users must route to the India-native progress presentation');
-assert.match(australia, /ProgressLegacy/,
-  'Australian progress must remain available as the preserved legacy implementation');
-// The copy lives in the string catalogues now, so the page's job is to reach
-// for the right keys and the catalogue's job is to say the right thing. Both
-// are checked, because a page that drops the key and a catalogue that softens
-// the sentence are different failures with the same symptom.
-assert.match(indiaProgress, /progress\.noPercentile/,
-  'India progress must reach for the key that refuses percentile and rank');
-assert.match(indiaProgress, /progress\.honesty/,
-  'and for the key that says which predictions it will not make');
-
+assert.match(australia, /EvidenceProgress/,
+  'Australian progress is the shared evidence page, the same one India reads (the earlier legacy page drew a mastery percentage and a predicted mark)');
+assert.match(indiaProgress, /EvidenceProgress/,
+  'India progress is the shared evidence page');
+assert.doesNotMatch(australia, /ProgressLegacy|predicted|mastery/,
+  'the Australian progress page no longer carries the legacy prediction or mastery figures');
+const evidencePage = read('src/progress/EvidenceProgress.jsx');
+assert.match(evidencePage, /progressEv\.sub/, 'the shared page says up front that it predicts no mark or band');
+assert.match(evidencePage, /progressEv\.how/, 'and says how its words are earned');
+assert.doesNotMatch(evidencePage, /predictionSentence|markPredictor|mastery|\bpercent\b|%/,
+  'the shared evidence page imports no predictor and draws no mastery figure or percentage');
 for (const catalogue of ['src/i18n/strings.en.js', 'src/i18n/strings.hi.js']) {
   const src = read(catalogue);
-  for (const key of ['progress.noPercentile', 'progress.honesty']) {
+  for (const key of ['progressEv.sub', 'progressEv.how', 'progressEv.thin']) {
     const line = src.split(`'${key}':`)[1]?.split('\n')[0] || '';
     assert.ok(line.length > 0, `${catalogue} defines ${key}`);
   }
-  const coverage = src.split("'progress.marksPractised':")[1]?.split('\n')[0] || '';
-  assert.ok(/\{covered\}/.test(coverage) && /\{total\}/.test(coverage),
-    `${catalogue} states the coverage as a share of the paper, not a bare number`);
-  const honesty = src.split("'progress.honesty':")[1].split('\n')[0];
-  assert.match(honesty, /CBSE/, `${catalogue} names the CBSE percentage it will not claim`);
-  assert.match(honesty, /JEE/, `${catalogue} names the JEE percentile it will not claim`);
 }
-// A mark estimate over practised content is a different claim from a board
-// percentage, and it is only honest while it travels with its coverage.
-assert.match(indiaProgress, /progress\.marksPractised/,
-  'any mark estimate on this page must state how much of the paper it covers');
-// Targeted at the Australian UI itself, not at the words: this page has to be
-// able to SAY "percentile" and "rank" in order to refuse them, and an earlier
-// version of this assertion banned the vocabulary the refusal is written in.
 assert.doesNotMatch(indiaProgress, /Demonstrated Mark History|Band \(predicted\)|ProgressAustralia|scaledBand/,
   'the Australian scaled-band prediction UI must not leak into India progress');
 assert.doesNotMatch(indiaProgress, /your (?:predicted )?(?:percentile|rank) (?:is|would be)/i,

@@ -1,3 +1,4 @@
+import AiLabel from '../tutor/AiLabel.jsx';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { answerToTex } from '../engine/answerTex.js';
 import { MathText } from '../lib/latex.jsx';
@@ -474,7 +475,10 @@ export default function PriExplainV5({ questionId, questionPrompt, questionFigur
                   </div>
                   <h3><MathText text={headingOf(current)} /></h3>
                   {tutorCaptions[current.id] && (
-                    <p className="pri-explain-tutor-caption" data-tutor-caption><MathText text={tutorCaptions[current.id]} /></p>
+                    <div className="pri-explain-tutor-caption-wrap">
+                      <AiLabel labelKey={'tutor.fromTutor'} />
+                      <p className="pri-explain-tutor-caption" data-tutor-caption><MathText text={tutorCaptions[current.id]} /></p>
+                    </div>
                   )}
                   {whyStep && <div className="pri-explain-why-step"><b>{t('explain.whyMatters')}</b>{whyStep}</div>}
 

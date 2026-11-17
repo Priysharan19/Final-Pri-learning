@@ -571,7 +571,10 @@ function difficultyFor(dp, difficulty, seed) {
  * been loaded yet, which lets the API layer fetch that one bank and re-run the
  * request. Nothing is written before this point in any route that calls it.
  */
-export function generateQuestion(subtopicId, difficulty, seed, dotpointId) {
+// `pick` (server only, F7 band practice) replaces the generator's own draw: it is
+// handed the seeded rng and returns the payload of the one item it chose, which
+// is then stamped exactly as a drawn one. It may not be combined with a dot point.
+export function generateQuestion(subtopicId, difficulty, seed, dotpointId, pick = null) {
   // Own entries only: a subtopic id from a request such as "constructor" must
   // resolve to no generator, not to an inherited Object.prototype member.
   const gen = typeof subtopicId === 'string' && Object.hasOwn(GENERATORS, subtopicId) ? GENERATORS[subtopicId] : undefined;
@@ -592,9 +595,10 @@ export function generateQuestion(subtopicId, difficulty, seed, dotpointId) {
   }
   const rng = makeRng(s);
   const d = Math.min(4, Math.max(1, want | 0));
-  const payload = gen(rng, d);
-  const q = { seed: s, subtopic: subtopicId, difficulty: d, ...payload };
-  const { list, source, perQuestion } = dotpointsOf(gen, subtopicId, d, payload);
+  if (pick && dotpointId != null) throw new Error('A picked item has no requested dot point');
+  const payload = pick ? pick(rng) : gen(rng, d);
+  const q = { seed: s, subtopic: subtopicId, difficulty: pick ? payload.difficulty : d, ...payload };
+  const { list, source, perQuestion } = dotpointsOf(gen, subtopicId, q.difficulty, payload);
   q.dotpoints = list.map(dp => dp.id);
   q.dotpoint = list.length === 1 ? list[0].id : null;
   q.dotpointSource = source;

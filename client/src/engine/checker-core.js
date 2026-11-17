@@ -1182,11 +1182,22 @@ function checkAnswerWithinBudget(question, rawInput) {
             return { correct: true };
           }
         }
-        const exactTol = Math.max(1e-9, Math.abs(target) * 1e-9);
-        if (ok && ans.requireExact && looksLikeDecimalApprox(rawInput) && !numsClose(value, target, exactTol)) {
+        // An exact value written out as a decimal must agree with it to within
+        // 1e-12, or eight units of the target's last binary place when that is
+        // wider (above |t| ≈ 560): 6.283185307179586 for 2π and 0.333333333333
+        // for 1/3 pass, a ten-figure calculator display does not. Below that
+        // size a decimal to twelve places or more still passes. A 1e-9 band accepted 2.3561944902
+        // for 3π/4, 1466.076572 for 1400π/3 and 4.0000000001 for 4 on questions
+        // that demand the exact value (SymPy differential oracle, 2026-11-18).
+        const exactTol = Math.max(1e-12, Math.abs(target) * 8 * Number.EPSILON);
+        // The authored-fraction path below (no exact form demanded) keeps its own
+        // older band; only an explicit exact demand is tightened here.
+        const fractionValueTol = Math.max(1e-9, Math.abs(target) * 1e-9);
+        // A whole-number key that demands a fraction (0/1, 3/1) is an exact demand too.
+        if (ok && (ans.requireExact || ans.requireFraction) && looksLikeDecimalApprox(rawInput) && !numsClose(value, target, exactTol)) {
           return { correct: false, feedback: 'So close — but this question wants an exact value (leave it as a fraction, surd or multiple of π rather than a rounded decimal).' };
         }
-        if (ok && wantsExactValue && !numsClose(matched, target, exactTol)) {
+        if (ok && wantsExactValue && !numsClose(matched, target, fractionValueTol)) {
           return { correct: false, feedback: 'So close — but this question wants an exact value (leave it as a fraction, surd or multiple of π rather than a rounded decimal).' };
         }
         if (!ok) {

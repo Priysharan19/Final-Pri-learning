@@ -28,16 +28,31 @@ export function MathText({ text, block = false, className }) {
     // Split on unescaped $…$ so literal amounts written as \$4,000 stay text
     const parts = String(text).split(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g);
     let out = '';
+    // Punctuation that follows a formula travels with it: without this a line
+    // can break between "DEF" and the comma after it, leaving ", where P is…"
+    // at the start of the next line.
+    let math = null;
+    const flush = glue => {
+      if (math === null) return;
+      out += glue ? `<span class="mt-glue">${math}${glue}</span>` : math;
+      math = null;
+    };
     parts.forEach((part, i) => {
       if (i % 2 === 1) {
-        out += renderMath(part, false);
+        flush('');
+        math = renderMath(part, false);
       } else {
-        out += escapeHtml(part)
+        let rest = escapeHtml(part);
+        const lead = math === null ? null : /^[,.;:!?)\]]+/.exec(rest);
+        flush(lead ? lead[0] : '');
+        if (lead) rest = rest.slice(lead[0].length);
+        out += rest
           .replace(/\\\$/g, '$')
           .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
           .replace(/\*([^*]+)\*/g, '<em>$1</em>');
       }
     });
+    flush('');
     return out;
   }, [text]);
   const Tag = block ? 'div' : 'span';

@@ -82,7 +82,9 @@ import { asStore, sqliteHandle } from './store.js';
 import { consumeRateLimit, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import { issuedQuestionForTutor } from './practice.js';
-import { buildGuard, captionWordingOk, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
+import { distressReply, safetyOutputIssues } from './tutorSafety.js';
+import { serverEdition } from './edition.js';
+import { buildGuard, captionWordingOk, markClaimIssues, replyMarkClaimIssues, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
 import {
   MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_DIAGNOSE_LEVEL, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
   TUTOR_TURN_LEVEL, TUTOR_WHY_LEVEL, TutorProviderError, askTutorModel, providerConfig, streamTutorModel
@@ -576,6 +578,8 @@ export function deterministicDiagnosis(request) {
 export function diagnosisIssues(reply, request) {
   const parts = [reply.didRight, reply.wentWrong, reply.nextStep];
   const issues = parts.flatMap(part => diagnosisGroundingIssues(part, { question: request.question, studentLines: request.studentWork.lines }));
+  // A model explanation never states or implies a mark, open attempt or resolved.
+  for (const part of parts) issues.push(...markClaimIssues(part), ...safetyOutputIssues(part));
   if (!request.resolved) {
     if (reply.revealsAnswer) issues.push('declared');
     const guard = buildGuard(request.question, { studentLines: request.studentWork.lines, verifiedLines: request.studentWork.verifiedLines });
@@ -752,6 +756,13 @@ export function tutorFeatureEnabled(env = process.env) {
   return String(env.PRI_FEATURE_TUTOR || '').trim() === '1';
 }
 
+/** The free text of a raw (unvalidated) tutor body, in the shape distressReply reads. Never throws. */
+function rawStudentRequest(body) {
+  const b = body && typeof body === 'object' ? body : {};
+  const w = b.studentWork && typeof b.studentWork === 'object' ? b.studentWork : {};
+  return { level: typeof b.level === 'string' ? b.level : 'ask', locale: b.locale === 'hi' ? 'hi' : 'en', message: b.message, history: b.history, studentWork: { lines: w.lines, typedAnswer: w.typedAnswer } };
+}
+
 export function createTutorRouter(db, {
   ask = askTutorModel,
   stream = streamTutorModel,
@@ -817,7 +828,8 @@ export function createTutorRouter(db, {
       const reply = await ask(request, { env });
       model = reply.model || model;
       const leaked = leakedExpressions(reply.message, guard, { prompt: request.question.prompt });
-      if (reply.message && !reply.revealsAnswer && !leaked.length) {
+      // A hint never speaks of a mark either: only the engine marks (AI red-team, 2026-11-18).
+      if (reply.message && !reply.revealsAnswer && !leaked.length && !safetyOutputIssues(reply.message).length && !replyMarkClaimIssues(reply.message).length) {
         return {
           tutor: {
             level: request.level, message: reply.message, referencesStepIndex: reply.referencesStepIndex,
@@ -858,7 +870,7 @@ export function createTutorRouter(db, {
     }
     const issues = diagnosisIssues(reply, request);
     if (issues.length) {
-      const leak = issues.some(i => !i.startsWith('span:') && !i.startsWith('prose:') && i !== 'unbalanced-span');
+      const leak = issues.some(i => !i.startsWith('span:') && !i.startsWith('prose:') && i !== 'unbalanced-span' && i !== 'mark-claim');
       return fallback(leak ? 'TUTOR_ANSWER_GUARD' : 'TUTOR_GROUNDING_GUARD', reply.model || null);
     }
     // Which lines are credited and which is at fault are the ENGINE's, never the
@@ -924,7 +936,7 @@ export function createTutorRouter(db, {
       return fallback(error instanceof TutorProviderError ? error.code : 'TUTOR_FAILED');
     }
     const issues = reply?.message
-      ? diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines })
+      ? [...diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines }), ...safetyOutputIssues(reply.message), ...replyMarkClaimIssues(reply.message)]
       : ['empty'];
     if (issues.length) {
       // The student got the step itself, not an explanation: the try is given back.
@@ -949,7 +961,7 @@ export function createTutorRouter(db, {
     let rejected = 0;
     const captions = request.captions.map((caption, index) => {
       const proposed = reply.captions?.get?.(index);
-      if (proposed && proposed.length <= MAX_CAPTION_CHARS && captionWordingOk(proposed, caption.text, spans)) {
+      if (proposed && proposed.length <= MAX_CAPTION_CHARS && captionWordingOk(proposed, caption.text, spans) && !safetyOutputIssues(proposed).length) {
         return { id: caption.id, text: proposed, source: 'model' };
       }
       if (proposed) rejected += 1;
@@ -973,9 +985,17 @@ export function createTutorRouter(db, {
       if (size > MAX_TUTOR_BODY_BYTES) {
         return res.status(413).json({ error: { code: 'TUTOR_REQUEST_TOO_LARGE', message: `A tutor request is at most ${MAX_TUTOR_BODY_BYTES} bytes.` } });
       }
+      // Read the student's words BEFORE validation, so a long or non-maths message
+      // that validation would refuse still gets the support message (tutorSafety.js).
+      const earlyDistress = distressReply(rawStudentRequest(req.body), { edition: serverEdition(env) });
+      if (earlyDistress) { res.set('Cache-Control', 'no-store'); return res.json({ tutor: earlyDistress }); }
       const checked = validateTutorRequest(req.body);
       if (!checked.ok) return res.status(checked.status).json({ error: { code: checked.code, message: checked.message } });
 
+      // A student's own words are read first: distress is met with a calm message and the
+      // region's support line, no model call, no spend, no tutoring (tutorSafety.js).
+      const distress = distressReply(checked.request, { edition: serverEdition(env) });
+      if (distress) { res.set('Cache-Control', 'no-store'); return res.json({ tutor: distress }); }
       const at = now();
       const grounded = await groundIssued(db, req.platformSession.account_id, checked.request, at);
       if (!grounded.ok) return res.status(grounded.status).json({ error: { code: grounded.code, message: grounded.message } });
@@ -1169,6 +1189,15 @@ export function createTutorRouter(db, {
       res.status(413).json({ error: { code: 'TUTOR_REQUEST_TOO_LARGE', message: `A tutor request is at most ${MAX_TUTOR_BODY_BYTES} bytes.` } });
       return null;
     }
+    const early = distressReply(rawStudentRequest(req.body), { edition: serverEdition(env) });
+    if (early) {
+      // Only a `done` event: no text streams under an AI label before it settles.
+      const send = openStream(res);
+      send('meta', { level: early.level, source: 'safety', model: null, cached: false });
+      send('done', early);
+      res.end();
+      return null;
+    }
     const checked = validateTutorRequest(req.body);
     if (!checked.ok) { res.status(checked.status).json({ error: { code: checked.code, message: checked.message } }); return null; }
     if (!TUTOR_STREAM_LEVELS.includes(checked.request.level)) {
@@ -1247,7 +1276,7 @@ export function createTutorRouter(db, {
       req.on('close', onClose);
 
       const guard = buildGuard(request.question, { studentLines: request.studentWork.lines, verifiedLines: request.studentWork.verifiedLines });
-      const gate = createReleaseGate(guard, { prompt: request.question.prompt, maxChars: MAX_STREAM_CHARS });
+      const gate = createReleaseGate(guard, { prompt: request.question.prompt, maxChars: MAX_STREAM_CHARS, extraIssues: text => [...safetyOutputIssues(text), ...replyMarkClaimIssues(text)] });
       const model = providerConfig(env).model;
       send('meta', { level: request.level, source: 'model', model, cached: false });
 

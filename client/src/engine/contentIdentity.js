@@ -52,7 +52,15 @@
 // together; no single PR's version above describes the merged content.
 // 2026.11.16 — CBSE XII 2025 65/2/1 Q24, the first Section B record on the Board-scheme
 // contract (#846), restacked on Train 15.
-export const CONTENT_VERSION = '2026.11.16';
+// 2026.11.17 — CBSE X 2025 Set 30/2/2 Section A: 8 official questions not already
+// carried from 30/2/1 (#856).
+// 2026.11.18 — CBSE X 2025 Set 30/2/3 Section A: 6 official questions not already
+// carried from 30/2/1 (#859; its Q12 is 30/2/1 Q15 word for word).
+// 2026.11.19 — #856 and #859 together (salvaged from Train 18); neither PR's own version describes
+// the merged content.
+// 2026.11.20 — review fix: 30/2/3 prompts had single-backslash LaTeX (tab and lost-backslash
+// corruption), its Q12 duplicated 30/2/1 Q15 and is dropped, and a stray tab in 30/2/1 Q1's step is mended.
+export const CONTENT_VERSION = '2026.11.20';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

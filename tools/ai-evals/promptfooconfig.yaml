@@ -1,0 +1,16 @@
+# Pri Learning · AI red-team · fixture mode (no network, no key).
+# Run: npm run eval   (from tools/ai-evals, after `npm ci` here and in server/)
+description: "Pri AI red-team — fixture mode: the server's real prompts, parse path and guards; SYNTHETIC replies"
+prompts:
+  - "{{surface}}"
+providers:
+  - id: file://providers/pri-server.mjs
+    label: pri-server
+tests:
+  - file://suites/answer-blind-handwriting.yaml
+  - file://suites/child-safety.yaml
+  - file://suites/prompt-injection.yaml
+  - file://suites/no-marks-ai-label.yaml
+  - file://suites/hint-no-giveaway.yaml
+evaluateOptions:
+  maxConcurrency: 1

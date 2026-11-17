@@ -308,8 +308,11 @@ check('handwriting drafts live in one recovery store and are restored, never mar
 });
 
 check('a reading in doubt is confirmed in place, not by rewriting', () => {
-  assert.match(card, /needsCheck && checking\s*\? \{ label: t\('verdict\.confirmReading'\), run: acceptReading/);
-  assert.match(card, /className="ws-check"/);
+  // The in-place confirmation now lives in the Check-what-Pri-read panel: the
+  // primary becomes Confirm and mark and stays disabled until every doubted
+  // line is resolved (confirm-reading-check.mjs pins the same rule).
+  assert.match(card, /needsCheck\s*\n?\s*\? \{ label: t\('verdict\.confirmAndSubmit'\), run: acceptReading, disabled: busy \|\| !canSubmit \|\| toConfirm > 0 \}/);
+  assert.match(card, /className="ws-check ws-confirm"/);
 });
 
 check('mistakes, uncertainty and failures are three different states', () => {
@@ -469,13 +472,13 @@ check('the reading line runs once, only on a page the engine marked, and not und
   assert.match(themeCss, /@media \(prefers-reduced-motion: reduce\) \{\s*\.editor-shell\[data-marked="yes"\] \.ink-stage::after \{ animation: none; display: none; \}/);
 });
 
-check('the result states the mark once and Progress shows whole marks, no percentile', () => {
+check('the result states the mark once and Progress shows no predicted mark, percentage or percentile', () => {
   const head = card.slice(card.indexOf('<span className="eval-marks">'), card.indexOf('</span>', card.indexOf('<span className="eval-marks">')));
   assert.doesNotMatch(head, /%/);
   assert.match(card, /boardAward\.rows\.length > 1 && <b/);
-  assert.match(progressJsx, /Math\.round\(unit\.atStake\)/);
-  assert.doesNotMatch(progressJsx, /\+\{unit\.atStake\}/);
-  assert.doesNotMatch(progressJsx, /className="card"[^>]*>\s*<div className="card-title"/);
+  // Progress no longer shows marks at stake or any predicted mark: it draws words from the
+  // student's own record (progress/EvidenceProgress.jsx), so there is no figure to round.
+  assert.doesNotMatch(progressJsx, /atStake|predict|%/);
 });
 
 check('a symbol correction never outlives the strokes it was made on, and finger writing is always offered', () => {
