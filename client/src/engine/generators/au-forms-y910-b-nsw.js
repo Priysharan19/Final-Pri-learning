@@ -43,7 +43,7 @@ const phi = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\\,');
 const SING = { seconds: 'second', minutes: 'minute', hours: 'hour', days: 'day', weeks: 'week', years: 'year', metres: 'metre', litres: 'litre', kilometres: 'kilometre' };
 export function tidyText(s) {
   return s
-    .replace(/(\$1\$|(?<![\d.\w{^_\\]))1(\s+)(seconds|minutes|hours|days|weeks|years|metres|litres|kilometres)\b/g, (m, a, sp, u) => `${a}${sp}${SING[u]}`)
+    .replace(/(\$1\$|(?<![\d.\w{^_\\])1)(\s+)(seconds|minutes|hours|days|weeks|years|metres|litres|kilometres)\b/g, (m, a, sp, u) => `${a}${sp}${SING[u]}`)
     .replace(/\bA open/g, 'An open')
     .replace(/(?<![\d.A-Za-z{^_\\])1([xtkbyn])(?![A-Za-z])/g, '$1')
     .replace(/([A-Za-z)])\^\{1\}(?!\d)/g, '$1')

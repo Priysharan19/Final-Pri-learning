@@ -81,7 +81,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y10-surds` | 4 | 22.6k | 12 | — |
 | `y10-nonlinear` | 4 | 22.8k | 12 | — |
 | `y11-functions` | 4 | 22.9k | 51 | — |
-| `y9-rate-change` | 4 | 24.2k | 48 | — |
+| `y9-rate-change` | 4 | 24.2k | 66 | — |
 | `y10-circle-geometry` | 4 | 27.5k | 55 | — |
 | `ms12-bivariate-fit` | 4 | 29.2k | 3 | forms |
 | `y9-simint` | 2 | 29.5k | 136 | — |

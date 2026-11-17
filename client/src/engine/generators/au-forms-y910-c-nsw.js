@@ -844,7 +844,7 @@ const data = [
         const mn = ri(rng, 2, 15), q1 = mn + ri(rng, 3, 14), med = q1 + ri(rng, 2, 14), q3 = med + ri(rng, 2, 14), mx = q3 + ri(rng, 3, 20);
         const lower = med - q1, upper = q3 - med, tl = q1 - mn, tu = mx - q3;
         if (Math.abs(lower - upper) < 3) continue;
-        if ((lower < upper) !== (tl < tu)) continue;
+        if (tl === tu || (lower < upper) !== (tl < tu)) continue;
         const pos = lower < upper;
         return M(rng, `A box plot has min $${mn}$, $Q_1 = ${q1}$, median $${med}$, $Q_3 = ${q3}$, max $${mx}$. Describe the shape of the distribution.`,
           pos ? 'Positively skewed (longer tail to the right)' : 'Negatively skewed (longer tail to the left)', [
@@ -1022,7 +1022,7 @@ const probability = [
 const SING = { seconds: 'second', minutes: 'minute', hours: 'hour', days: 'day', weeks: 'week', years: 'year', metres: 'metre', litres: 'litre', kilometres: 'kilometre' };
 export function tidyText(s) {
   return s
-    .replace(/(\$1\$|(?<![\d.\w{^_\\]))1(\s+)(seconds|minutes|hours|days|weeks|years|metres|litres|kilometres)\b/g, (m, a, sp, u) => `${a}${sp}${SING[u]}`)
+    .replace(/(\$1\$|(?<![\d.\w{^_\\])1)(\s+)(seconds|minutes|hours|days|weeks|years|metres|litres|kilometres)\b/g, (m, a, sp, u) => `${a}${sp}${SING[u]}`)
     .replace(/\bA open/g, 'An open')
     .replace(/(?<![\d.A-Za-z{^_\\])1([xtkbyn])(?![A-Za-z])/g, '$1')
     .replace(/([A-Za-z)])\^\{1\}(?!\d)/g, '$1')
