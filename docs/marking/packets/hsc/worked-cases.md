@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `3c9f5e183281b665d8308acf745f69d74f3c79d06d0061cdb29ac02a2fd76248` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `bca1886da2f8116254eeeb1a02dba86c1877b4a60704c5b35399306ee043f242` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -3038,7 +3038,7 @@ Final answer: 0
 
 ## `nsw-final:y12-trig-model/D2` — seed 1009
 
-> The water level in a tidal creek, in metres varies sinusoidally with a maximum of $19$ and a minimum of $3$. What is the value of the midline (the constant added to the trigonometric term)?
+> Consider the water level in a tidal creek, in metres. It varies sinusoidally with a maximum of $19$ and a minimum of $3$. What is the value of the midline (the constant added to the trigonometric term)?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|

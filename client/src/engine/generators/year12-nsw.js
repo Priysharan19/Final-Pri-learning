@@ -465,7 +465,7 @@ const raw = {
       }
       const asks = form === 'amplitude-reverse' ? ['the amplitude', a, `$\\dfrac{${mx} - ${mn}}{2}$`] : ['the value of the midline (the constant added to the trigonometric term)', c, `$\\dfrac{${mx} + ${mn}}{2}$`];
       return {
-        formTag: 'reverse', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)} varies sinusoidally with a maximum of $${mx}$ and a minimum of $${mn}$. What is ${asks[0]}?`,
+        formTag: 'reverse', prompt: `Consider ${cx.thing}. It varies sinusoidally with a maximum of $${mx}$ and a minimum of $${mn}$. What is ${asks[0]}?`,
         answerType: 'numeric', answer: { value: asks[1] },
         traps: [{ value: form === 'amplitude-reverse' ? mx - mn : mx + mn, why: form === 'amplitude-reverse' ? 'The amplitude is half the distance between the maximum and the minimum.' : 'The midline is halfway between them: take the average, not the sum.' }],
         hints: ['The graph is symmetric about its midline.', asks[2], 'Evaluate.'],
