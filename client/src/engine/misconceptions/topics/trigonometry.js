@@ -263,7 +263,16 @@ const sineRuleAngle = {
 };
 
 // ── Exact values: k sin θ + m cos φ ──
-const EXACT = { sin: { 30: 0.5, 45: Math.SQRT1_2, 60: Math.sqrt(3) / 2, 0: 0, 90: 1 }, cos: { 30: Math.sqrt(3) / 2, 45: Math.SQRT1_2, 60: 0.5, 0: 1, 90: 0 } };
+// sin and cos at ANY angle in degrees (the any-angle forms ask for 120°, 180°, 240°, 270°, 360°), with the exact
+// zeros and ±1 returned exactly. A lookup table of the first quadrant left every other angle `undefined` in the
+// sentence the student reads.
+const exact = (f, degrees) => exactTrig(f === 'sin' ? Math.sin : Math.cos, Number(degrees));
+function exactTrig(fn, degrees) {
+  if (!Number.isFinite(degrees)) return NaN;
+  const v = fn((degrees * Math.PI) / 180);
+  if (Math.abs(v) < 1e-12) return 0;
+  return Math.abs(v - Math.round(v)) < 1e-12 ? Math.round(v) : v;
+}
 const exactSum = {
   id: 'trig-exact-sum',
   read(q) {
@@ -272,8 +281,8 @@ const exactSum = {
     return { k: num(m[1]), f1: m[2], t1: num(m[3]), m: num(m[4]), f2: m[5], t2: num(m[6]) };
   },
   slips({ k, f1, t1, m, f2, t2 }) {
-    const v1 = EXACT[f1][t1], v2 = EXACT[f2][t2];
-    const sw = (f, t) => EXACT[f === 'sin' ? 'cos' : 'sin'][t];
+    const v1 = exact(f1, t1), v2 = exact(f2, t2);
+    const sw = (f, t) => exact(f === 'sin' ? 'cos' : 'sin', t);
     return [
       { id: 'trig-exact-value-ratio-as-one', value: k + m, say: s(
         `${f1} ${t1}° = ${n4(v1)} and ${f2} ${t2}° = ${n4(v2)}, not 1: use ${n4(k)} × ${n4(v1)} + ${n4(m)} × ${n4(v2)}.`,

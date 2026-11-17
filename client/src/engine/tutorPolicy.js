@@ -74,9 +74,22 @@ export const FADE_AFTER_INDEPENDENT = 2;
  * The engine-diagnosis category (engine/misconceptions.js) → cause class.
  * Copying slips and arithmetic are execution slips; `notation` is the
  * notation category; `unclassified` (a bare counterexample: the line is false
- * but no cause is named) is unverified. Everything else names a concept.
+ * but no cause is named) is unverified. Every other category names a concept
+ * (a rule, a property or a definition the working got wrong).
+ *
+ * Every category of the ontology is listed, so that a category added to
+ * engine/misconceptions.js is a decision here and not a silent default: the
+ * tutor-policy suite fails on a category with no entry. `calculus` (the
+ * derivative and integral rules), `factorising` and `surds` joined the
+ * ontology after the first version of this table; each is a rule applied
+ * wrongly, so each is a concept cause.
  */
-const CATEGORY_CAUSE = Object.freeze({ copying: 'arithmetic', arithmetic: 'arithmetic', notation: 'notation', unclassified: 'unverified' });
+export const CATEGORY_CAUSE = Object.freeze({
+  'equation-balance': 'concept', expansion: 'concept', indices: 'concept', functions: 'concept', fractions: 'concept',
+  solutions: 'concept', 'coordinate-geometry': 'concept', probability: 'concept',
+  calculus: 'concept', factorising: 'concept', surds: 'concept',
+  copying: 'arithmetic', arithmetic: 'arithmetic', notation: 'notation', unclassified: 'unverified'
+});
 
 const DOSE = a => ACTIONS.indexOf(a);
 const clampInt = (v, lo, hi, d) => (Number.isInteger(v) ? Math.max(lo, Math.min(hi, v)) : d);

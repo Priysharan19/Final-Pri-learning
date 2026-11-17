@@ -91,29 +91,54 @@ export const markTutorHelp = (db, accountId, questionId, level, at = Date.now())
  * any other copy of its content) for this account. Read inside the committing
  * transaction, under the account's lock.
  */
-export async function helpRecordsFor(db, accountId, questionId, q = null) {
-  // One after another: a transaction's store runs one statement at a time.
-  const marker = await db.get('SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope=? AND key=?', [accountId, MARKER_SCOPE, questionId]);
-  const lineCheck = await db.get('SELECT count FROM rate_limits WHERE bucket = ?', [lineCheckBucket(accountId, questionId)]);
-  const stepCoach = await db.get('SELECT count FROM rate_limits WHERE bucket = ?', [stepCoachBucket(accountId, questionId)]);
-  const plan = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-help-plan' AND key=?", [accountId, questionId]);
+export async function helpRecordsFor(db, accountId, questionId, q = null, held = null) {
+  // ONE statement for what the server recorded beyond the rows the caller
+  // already holds: the content-helped rows of every copy of this item and the
+  // two per-question rate-limit buckets (a second witness for line checks and
+  // the step coach). The durable help marker and the tutor-policy offers are
+  // taken from `held` ({ marker, plan } rows) when the caller read them with
+  // its own statement (the submit path does); otherwise they join the same
+  // statement. A transaction's store runs one statement at a time and each is
+  // a database round trip on the submit path (hot-path-budget-check pins
+  // them), so this is a UNION ALL, not one read per record. Arms yield (src, k, v).
+  const tried = q ? triedKeysOf(q) : [];
+  const marks = tried.map(() => '?').join(',');
+  const lineBucket = lineCheckBucket(accountId, questionId);
+  const coachBucket = stepCoachBucket(accountId, questionId);
+  const arms = ["SELECT 'bucket' AS src, bucket AS k, CAST(count AS TEXT) AS v FROM rate_limits WHERE bucket IN (?,?)"];
+  const params = [lineBucket, coachBucket];
+  if (!held) {
+    arms.push("SELECT 'marker', key, response_json FROM idempotency_keys WHERE account_id=? AND scope=? AND key=?",
+      "SELECT 'plan', key, response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-help-plan' AND key=?");
+    params.push(accountId, MARKER_SCOPE, questionId, accountId, questionId);
+  }
+  if (tried.length) {
+    arms.push(`SELECT 'copy', key, response_json FROM idempotency_keys WHERE account_id=? AND scope=? AND key IN (${marks})`);
+    params.push(accountId, CONTENT_SCOPE, ...tried);
+  }
+  const rows = await db.all(arms.join(' UNION ALL '), params);
+  const marker = held ? (held.marker ? { v: held.marker.response_json } : null) : rows.find(r => r.src === 'marker');
+  const plan = held ? (held.plan ? { v: held.plan.response_json } : null) : rows.find(r => r.src === 'plan');
+  const count = bucket => Number(rows.find(r => r.src === 'bucket' && r.k === bucket)?.v) || 0;
   let kinds = [];
-  try { const was = marker ? JSON.parse(marker.response_json) : {}; kinds = was.kinds || (was.levels || []).map(l => `tutor:${l}`); } catch { kinds = []; }
+  try { const was = marker ? JSON.parse(marker.v) : {}; kinds = was.kinds || (was.levels || []).map(l => `tutor:${l}`); } catch { kinds = []; }
   let onCopy = false;
-  for (const key of q ? triedKeysOf(q) : []) {
-    const row = await db.get('SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope=? AND key=?', [accountId, CONTENT_SCOPE, key]);
-    try { if (row && JSON.parse(row.response_json).questionId !== questionId) onCopy = true; } catch { onCopy = true; }
+  for (const row of rows.filter(r => r.src === 'copy')) {
+    try { if (JSON.parse(row.v).questionId !== questionId) onCopy = true; } catch { onCopy = true; }
   }
   let served = [];
-  try { served = plan ? JSON.parse(plan.response_json).served || [] : []; } catch { served = []; }
+  try { served = plan ? JSON.parse(plan.v).served || [] : []; } catch { served = []; }
   return {
     tutor: kinds.some(k => k.startsWith('tutor:')),
     // The durable marker first; the per-question bucket (swept after a day) as a second witness.
-    lineChecks: Math.max(kinds.includes('line-check') ? 1 : 0, Number(lineCheck?.count) || 0),
-    stepCoach: Math.max(kinds.includes('step-coach') ? 1 : 0, Number(stepCoach?.count) || 0),
+    lineChecks: Math.max(kinds.includes('line-check') ? 1 : 0, count(lineBucket)),
+    stepCoach: Math.max(kinds.includes('step-coach') ? 1 : 0, count(coachBucket)),
     helpOnCopy: onCopy,
     helpPlanRequests: Array.isArray(served) ? served.length : 0,
-    causeShown: Array.isArray(served) && served.some(x => x?.causeShown === true)
+    causeShown: Array.isArray(served) && served.some(x => x?.causeShown === true),
+    // The tutor policy's offers on this item, oldest first (read here so the
+    // submit path does not read the same row twice); null when none.
+    policyServed: Array.isArray(served) && served.length ? served.map(x => ({ action: x.action, level: x.level, ...(x.causeShown === true ? { causeShown: true } : {}) })) : null
   };
 }
 

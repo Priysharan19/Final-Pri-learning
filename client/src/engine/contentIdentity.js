@@ -58,7 +58,11 @@
 // 2026.11.38 — Train editions-25 review fixes: no floating-point artefacts in the Years 9-10 overlays (variation,
 // scale drawings), no "${" at the start of a combinations span, and every extra form that states a number of
 // decimal places keys the matching tolerance band.
-export const CONTENT_VERSION = '2026.11.38';
+// 2026.11.39 — Train editions-25 independent-review fixes: a skill's forms are drawn in proportion to the questions each
+// can serve (the direct form no longer shadowed by small extra forms, which cut the distinct-question counts), a
+// designed wrong answer that equals the key is dropped, `N decimal places` reads every digit of N, and the
+// exact-value slips name any angle.
+export const CONTENT_VERSION = '2026.11.39';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

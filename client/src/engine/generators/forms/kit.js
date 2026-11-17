@@ -48,7 +48,7 @@ const WORD_DIGITS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
 const NEAREST = { whole: 0.5, integer: 0.5, tenth: 0.05, hundredth: 0.005, thousandth: 0.0005 };
 export function statedBand(prompt) {
   const text = String(prompt ?? '');
-  const dp = text.match(/\$?(\d|one|two|three|four|five|six)\$?\s*(?:decimal places?|d\.?p\.?)(?![a-z])/i);
+  const dp = text.match(/\$?(\d+|one|two|three|four|five|six)\$?\s*(?:decimal places?|d\.?p\.?)(?![a-z])/i);
   if (dp) return 0.5 * 10 ** -(WORD_DIGITS[dp[1].toLowerCase()] ?? Number(dp[1]));
   const near = text.match(/nearest (whole|tenth|hundredth|thousandth|integer)/i);
   if (near) return NEAREST[near[1].toLowerCase()];

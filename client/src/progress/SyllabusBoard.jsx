@@ -273,7 +273,7 @@ export function AreaList({ sections, selected, onSelect, label }) {
     if (flat[i]) onSelect(flat[i].id);
   };
   return (
-    <div role="listbox" tabIndex={0} aria-label={label} aria-activedescendant={selected ? `sb-opt-${selected}` : undefined} onKeyDown={key} className="sb-listbox" data-board-list>
+    <div role="listbox" tabIndex={0} aria-label={label} aria-activedescendant={at >= 0 ? `sb-opt-${selected}` : flat[0] ? `sb-opt-${flat[0].id}` : undefined} onKeyDown={key} className="sb-listbox" data-board-list>
       {sections.map(s => (
         <div role="group" aria-label={s.label} key={s.label}>
           <div className="sb-list-head" aria-hidden="true">{s.label}</div>

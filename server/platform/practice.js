@@ -1031,16 +1031,6 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     return { status: 'unread' };
   }
 
-  // The tutor policy's offers on this item (oldest first), or null when none.
-  async function policyAssistanceOf(accountId, qid) {
-    const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-help-plan' AND key=?", [accountId, qid]);
-    if (!row) return null;
-    try {
-      const served = JSON.parse(row.response_json).served;
-      return Array.isArray(served) && served.length ? served.map(x => ({ action: x.action, level: x.level, ...(x.causeShown === true ? { causeShown: true } : {}) })) : null;
-    } catch { return null; }
-  }
-
   async function hintLevelOf(accountId, qid) {
     const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-hints' AND key=?", [accountId, qid]);
     if (!row) return 0;
@@ -1270,7 +1260,13 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         { scope: 'practice-question', key: qid, live: true },
         ...(token ? [{ scope: 'practice-recognition', key: token, live: true }] : []),
         { scope: 'practice-completion', key: qid },
-        { scope: 'practice-tries', key: qid }]);
+        { scope: 'practice-tries', key: qid },
+        // The help the server served on this question and the hint rungs it
+        // charged: read with the rest, in this one statement, so the submit
+        // path adds no round trip for them (attemptSupport.js helpRecordsFor).
+        { scope: 'practice-tutor-help', key: qid },
+        { scope: 'practice-help-plan', key: qid },
+        { scope: 'practice-hints', key: qid }]);
       // Replay comes before the closed-question check: the reply to a request
       // that committed before a timeout remains available for safe recovery.
       const prior = held.get('practice-grade');
@@ -1312,11 +1308,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // two tries.
       const spent = tries >= 1 || (q._repeat !== true && triedKeys.some(key => known.has(key)));
       // The hint rungs served so far, as the server charged them.
-      const hintLevel = await hintLevelOf(accountId, qid);
+      let hintLevel = 0;
+      try { hintLevel = held.get('practice-hints') ? rungLevelOf(JSON.parse(held.get('practice-hints').response_json).level) : 0; } catch { hintLevel = 0; }
       // The reading receipt this answer stands on, for the original's reading
       // layer (what was read beside what the student confirmed).
       const readingProof = token && held.get('practice-recognition') ? JSON.parse(held.get('practice-recognition').response_json) : null;
-      return { sealedJson: sealed.response_json, q, priorTry, tries, spent, hintLevel, readingProof };
+      return { sealedJson: sealed.response_json, q, priorTry, tries, spent, hintLevel, readingProof, helpRows: { marker: held.get('practice-tutor-help') || null, plan: held.get('practice-help-plan') || null } };
     };
     const refuse = outcome => reject(res, outcome.status, outcome.code,
       outcome.code === 'QUESTION_NOT_FOUND' ? 'This question does not belong to this account.'
@@ -1447,7 +1444,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         const state = await gate();
         if (state.status || state.response) return state;
         if (state.sealedJson !== forecast.sealedJson) return { again: true };
-        const { q, priorTry, tries, spent, hintLevel, readingProof } = state;
+        const { q, priorTry, tries, spent, hintLevel, readingProof, helpRows } = state;
       // Only after submission may authored misconception feedback be revealed.
       // Never trust a caller-supplied explanation or make the device infer
       // correctness from a withheld canonical answer.
@@ -1628,10 +1625,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // account's sync lock, so no other writer of this stream can run.
         const cursor = await nextSyncCursor(db, accountId);
         // What the tutor policy offered on this item, if it was asked (helpPlan.js).
-        const policyAssistance = await policyAssistanceOf(accountId, qid);
+        // One read gives the help records and the policy's offers (attemptSupport.js).
+        const helpRecords = await helpRecordsFor(db, accountId, qid, q, helpRows);
+        const policyAssistance = helpRecords.policyServed;
         // What help this attempt had, from the server's own records of this
         // question (attemptSupport.js): never the device's word.
-        const support = deriveSupport({ hintLevel: ladder.hintLevel, records: { ...await helpRecordsFor(db, accountId, qid, q), deviceHelp: body.deviceHelp === true },
+        const support = deriveSupport({ hintLevel: ladder.hintLevel, records: { ...helpRecords, deviceHelp: body.deviceHelp === true },
           solutionSeen: q._repeat === true, priorTries: tries > 0 ? tries : (spent ? 1 : 0) });
         await db.run(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
           SELECT ?,?,?, 'server-grader', COALESCE(MAX(device_seq), 0) + 1, 'graded-attempt',?,?,?,?
