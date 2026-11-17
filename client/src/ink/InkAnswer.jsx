@@ -48,6 +48,7 @@ import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
 import { strokeSignature, createStrokeSignature } from './strokeSignature.js';
+import { autoReadEnabled } from '../lib/autoRead.js';
 import { askReaderPermission, PROMPT_ANSWER, READER_PERMISSION, readerPermission } from './readerPermission.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
@@ -198,7 +199,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   const liveFinishedRef = useRef(0);
   const liveTimerRef = useRef(null);
   const autoReadRef = useRef(!!autoRead);
-  autoReadRef.current = !!autoRead;
+  autoReadRef.current = !!autoRead && autoReadEnabled();
   const autoTimerRef = useRef(null);
   const autoCountRef = useRef(0);
   const autoTriedRef = useRef(null);
@@ -608,7 +609,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       ? t('ink.serverEmpty')
       : shownStatus?.kind === 'allowance'
         ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language, user) })
-        : shownStatus?.kind === 'waiting' && autoRead && shownStatus.block?.kind === 'offline'
+        : shownStatus?.kind === 'waiting' && autoReadRef.current && shownStatus.block?.kind === 'offline'
           ? t('ink.autoOffline')
         : shownStatus?.kind === 'waiting'
           ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language, user) })
@@ -795,7 +796,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             {t('ink.reading')}
             {/* A student always learns when their writing was read on the server. */}
             {shownEngineNote && <span className="ink-status muted">{shownEngineNote}</span>}
-            {autoRead && !stale && !disabled && (() => {
+            {autoReadRef.current && !stale && !disabled && (() => {
               const lines = rec.lines;
               const state = lines.some(l => !String(l?.text ?? '').trim()) ? 'cant' : lines.some(l => isLowConfidence(l, confidenceFloorOf(rec))) ? 'check' : 'read';
               return <span className="ink-status muted" role="status" data-auto-read-state={state}>{t(state === 'cant' ? 'ink.autoCant' : state === 'check' ? 'ink.autoReadCheck' : 'ink.autoRead')}</span>;
