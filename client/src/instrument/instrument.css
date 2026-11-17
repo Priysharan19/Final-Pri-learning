@@ -1458,3 +1458,7 @@ html[data-pushed] .shell .main { transform: scale(var(--in-push-scale)); transfo
 .in-pal-form { margin-left: auto; font: 500 10.5px var(--in-mono); letter-spacing: 0.04em; color: var(--in-tx-3); white-space: nowrap; }
 .in-pal-form b { font: 500 12px var(--in-mono); color: var(--in-tx-2); }
 .in-pal-honest { margin: 0; padding: 0 18px 10px; font: 400 11px var(--in-mono); color: var(--in-tx-3); text-align: right; }
+
+/* A line the engine marked wrong: the reading is one tap from a correction. */
+.ink-line-recheck { font-size: 12.5px; }
+html.ui-instrument .ink-correct-btn.is-emph { background: var(--in-l1); color: var(--in-tx); box-shadow: 0 0 0 1.5px var(--in-tx-2); font-weight: 600; }

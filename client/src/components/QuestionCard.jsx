@@ -2285,6 +2285,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   ) : null;
 
   const firstBad = inkComments?.find(c => c.kind === 'bad') || null;
+  // One message after a wrong answer with a marked line: that line is where it went wrong. The server's
+  // "checked when this question is finished" note would contradict it, so it is not shown beside it.
+  const markedLineFix = !!(state.res?.stepReport?.lines?.some(l => l.status === 'break') || firstBad);
   // Once submitted, the bar shows the answer the attempt was marked on; a
   // reading that lands later can redraw the panel but never this line.
   // It is the answer the student CONFIRMED and the server marked — never the
@@ -3012,6 +3015,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       ? <>{t('verdict.workIsSafe')} <span className="muted">{state.res.feedback}</span></>
                       : invalidRetry && answerGuidance
                       ? <span data-final-answer-verdict>{t(answerGuidance.titleKey)} {t(answerGuidance.bodyKey)}{answerGuidance.workingKey ? ' ' + t(answerGuidance.workingKey) : ''}</span>
+                      : markedLineFix && /checked when this question is finished/.test(String(state.res.feedback || '')) ? null
                       : <MathText text={state.res.feedback || t('verdict.oneMoreGo')} />}
                   </div>
                 </>
@@ -3022,7 +3026,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               {!previousAttempt && state.res?.authoritative !== true && state.res?.partial && <LostMarks lost={state.res.partial.lost} t={t} />}
               {!previousAttempt && state.res.stepReport && <StepReport report={state.res.stepReport} />}
               {!previousAttempt && !checkRefused && !state.res?.readerBlock && <div className="verdict-next">{state.res?.conflict ? t('verdict.nextAfterConflict') : t(technicalRetry ? 'verdict.nextTechnical' : invalidRetry ? 'verdict.nextUnreadable'
-                : (state.res.stepReport?.lines?.some(l => l.status === 'break') || firstBad) ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
+                : markedLineFix ? 'verdict.nextFix' : 'verdict.nextTryAgain')}</div>}
             </div>
           </div>
         )}
