@@ -573,6 +573,8 @@ async function run() {
     // D17: the walk's reads accept the one-time prompt naming OpenAI when it
     // appears (the prompt's own flow is tour-ink-reader-permission.js).
     await ctx.addInitScript(acceptReaderPermissionOnSight);
+    // The read-on-request states are the press-to-read surface; automatic reading (owner decision, 18 Nov 2026) is off here, as a student can switch it off in Settings.
+    await ctx.addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     const page = await ctx.newPage();
     const pageErrors = [];
     page.on('pageerror', e => pageErrors.push(e.message));

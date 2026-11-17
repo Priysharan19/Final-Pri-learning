@@ -48,6 +48,7 @@ import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
 import { strokeSignature, createStrokeSignature } from './strokeSignature.js';
+import { autoReadEnabled } from '../lib/autoRead.js';
 import { askReaderPermission, PROMPT_ANSWER, READER_PERMISSION, readerPermission } from './readerPermission.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
@@ -108,6 +109,10 @@ function knownBlockOf(who, isOnline) {
 const MAX_PAGES = 4;
 /** The pen rests this long on a new line before the line above is read (liveRead). */
 export const LIVE_READ_REST_MS = 1500;
+/** The pen rests this long before the page is read on its own (autoRead). */
+export const AUTO_READ_IDLE_MS = 1300;
+/** Automatic reads of one page in one visit to a question; the server caps it too. */
+export const AUTO_READ_MAX = 12;
 
 /** The three things a reading can say about one line: it never says right or wrong. */
 const READ_STATE_KEY = { read: 'inst.readState.read', check: 'inst.readState.check', cant: 'inst.readState.cant' };
@@ -117,7 +122,7 @@ function readStateOf(line, floor) {
   return isLowConfidence(line, floor) ? 'check' : 'read';
 }
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false, autoRead = false }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -193,6 +198,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // The finished-line count the last live read was for, and its pending timer.
   const liveFinishedRef = useRef(0);
   const liveTimerRef = useRef(null);
+  const autoReadRef = useRef(!!autoRead);
+  autoReadRef.current = !!autoRead && autoReadEnabled();
+  const autoTimerRef = useRef(null);
+  const autoCountRef = useRef(0);
+  const autoTriedRef = useRef(null);
   const onStrokesRef = useRef(onStrokes);
   useEffect(() => { onStrokesRef.current = onStrokes; }, [onStrokes]);
   useEffect(() => {
@@ -211,6 +221,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const sure = Number(r.confidence ?? (r.lines.length ? 0 : 1));
     onRecognized?.({
       lines: r.lines.map(l => l.text),
+      // What the reader said about each line (confidence, its own doubt, the
+      // student's correction): the card's confirmation lists the unsure ones.
+      lineMeta: r.lines.map(l => ({ conf: l.conf, doubt: l.doubt, corrected: l.corrected === true })),
       lineBoxes: r.lines.map(l => l.box),
       text: r.text,
       answerLine: r.lines.length ? r.lines[r.lines.length - 1].text : '',
@@ -245,12 +258,16 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     });
   }, [onRecognized]);
 
-  // ── Reading is asked for, never assumed ────────────────────────────────────
-  // Owner decision: a read is a paid operation and happens when the student
-  // presses "Read my answer" — once. Nothing else sends one: not a pause, a
-  // stroke, a focus, a re-render, a reload, coming back online or signing in.
-  // (The one other sender is "Try again" after a refusal or an outage, which
-  // is the same explicit press.) Reads stay single-flight.
+  // ── Reading, on its own after a pause ───────────────────────────────────────
+  // OWNER DECISION, 18 November 2026 (supersedes the earlier "reads only on a
+  // press" rule of #440/#942): "make it automatically read handwriting in the
+  // background, dont need to press read." So, where the student has already said
+  // yes to the reader (D17), is signed in and online, a page is read on its own
+  // once the pen has rested (AUTO_READ_IDLE_MS): single-flight, a superseded read
+  // is cancelled, an unchanged page is never read again, and a per-question cap
+  // bounds the cost. It never opens the permission prompt (only a press of "Read
+  // my answer" may), never marks, and sends the same answer-blind picture. The
+  // press stays as the manual fallback. Coming back online resumes a pending read.
 
   const knownBlock = who => knownBlockOf(who, typeof navigator === 'undefined' || navigator.onLine !== false);
 
@@ -406,6 +423,25 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
         }, LIVE_READ_REST_MS);
       }
     }
+    // Reading on its own once the pen rests (autoRead): the page as it stands
+    // when the pause ends is what is read. A read still out for an older page is
+    // superseded and cancelled.
+    if (autoReadRef.current && !disabledRef.current) {
+      clearTimeout(autoTimerRef.current);
+      if (!strokes.length) autoTriedRef.current = null;
+      else {
+        const pageSig = signatureOfRef.current(strokes);
+        if (flyingRef.current && flyingRef.current !== pageSig) abortRef.current?.abort?.();
+        if (pageSig !== readRef.current && pageSig !== autoTriedRef.current && autoCountRef.current < AUTO_READ_MAX
+          && readerPermission(userRef.current) === READER_PERMISSION.ACCEPTED) {
+          autoTimerRef.current = setTimeout(() => {
+            autoTriedRef.current = signatureOfRef.current(strokesRef.current);
+            autoCountRef.current += 1;
+            readRef2.current?.({ auto: true });
+          }, AUTO_READ_IDLE_MS);
+        }
+      }
+    }
     setCorrecting(null);
     // Kept the moment the pen lifts, whatever happens to reading: a page
     // written in the second before the app went away is still the student's.
@@ -435,7 +471,15 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   useEffect(() => {
     const clearIf = kinds => setStatus(prev => (prev?.kind === 'waiting' && kinds.includes(prev.block?.kind) ? null : prev));
     const stopSession = onCloudSessionChange(() => clearIf(['session', 'verify-email', 'guardian', 'mfa', 'not-allowed']));
-    const onOnline = () => { setOnline(true); clearIf(['offline']); };
+    const onOnline = () => {
+      setOnline(true); clearIf(['offline']);
+      // Back online: a page that waited for a connection is read now (autoRead).
+      if (autoReadRef.current && strokesRef.current.length && !disabledRef.current && signatureOfRef.current(strokesRef.current) !== readRef.current && autoCountRef.current < AUTO_READ_MAX) {
+        autoTriedRef.current = null;
+        clearTimeout(autoTimerRef.current);
+        autoTimerRef.current = setTimeout(() => { autoTriedRef.current = signatureOfRef.current(strokesRef.current); autoCountRef.current += 1; readRef2.current?.({ auto: true }); }, 600);
+      }
+    };
     const onOffline = () => setOnline(false);
     if (typeof window !== 'undefined') {
       window.addEventListener?.('online', onOnline);
@@ -505,6 +549,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   }, [disabled]);
   useEffect(() => () => {
     clearTimeout(liveTimerRef.current);
+    clearTimeout(autoTimerRef.current);
     readSeqRef.current += 1;
     abortRef.current?.abort?.();
   }, []);
@@ -542,7 +587,14 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // v1.1 instrument: the footer's Reset is the toolbar's Clear (with its undo).
   useEffect(() => {
     if (!controlRef) return undefined;
-    controlRef.current = { clear: () => act('clear')(), read: () => readNow() };
+    controlRef.current = {
+      clear: () => act('clear')(), read: () => readNow(),
+      // Confirm a line as the student wrote it, or change it to what they wrote.
+      correct: (index, text) => correctLine(index, text),
+      // "Edit" on the confirmation: open the correction for a line (the first
+      // doubted one, else the last, which carries the answer).
+      edit: (index) => { const lines = recRef.current.lines; if (!lines.length) return; const i = index >= 0 && index < lines.length ? index : lines.length - 1; setCorrecting({ index: i, text: lines[i].text }); }
+    };
     return () => { controlRef.current = null; };
   });
 
@@ -557,6 +609,8 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       ? t('ink.serverEmpty')
       : shownStatus?.kind === 'allowance'
         ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language, user) })
+        : shownStatus?.kind === 'waiting' && autoReadRef.current && shownStatus.block?.kind === 'offline'
+          ? t('ink.autoOffline')
         : shownStatus?.kind === 'waiting'
           ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language, user) })
           : checkingEarlier
@@ -742,6 +796,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             {t('ink.reading')}
             {/* A student always learns when their writing was read on the server. */}
             {shownEngineNote && <span className="ink-status muted">{shownEngineNote}</span>}
+            {autoReadRef.current && !stale && !disabled && (() => {
+              const lines = rec.lines;
+              const state = lines.some(l => !String(l?.text ?? '').trim()) ? 'cant' : lines.some(l => isLowConfidence(l, confidenceFloorOf(rec))) ? 'check' : 'read';
+              return <span className="ink-status muted" role="status" data-auto-read-state={state}>{t(state === 'cant' ? 'ink.autoCant' : state === 'check' ? 'ink.autoReadCheck' : 'ink.autoRead')}</span>;
+            })()}
             {stale && <span className="ink-status ink-stale" role="status" data-ink-stale={expired ? 'expired' : 'changed'}>{t(expired ? 'ink.readingExpired' : 'ink.readingStale')}</span>}
           </div>
           {rec.lines.map((line, li) => (

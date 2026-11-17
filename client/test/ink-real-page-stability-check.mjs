@@ -12,15 +12,21 @@ const backend = fs.readFileSync(new URL('../src/local/backend.js', import.meta.u
 assert.match(question, /compactInkStrokes\(inkResult\.strokes\)/, 'submit must use compact ink transport');
 assert.match(question, /points: .*\.map\(p => \[/s, 'transport points must be arrays, not {x,y} objects');
 assert.match(backend, /Array\.isArray\(pt\) \? pt\[0\]/, 'backend must decode compact point tuples');
-// Owner decision (read on request): a page is sent to the reader only when the
-// student presses "Read my answer" (or "Try again" after a refusal). No settle
-// timer exists any more, and a page that is being read is never sent again.
+// Owner decision (read on request, #440), SUPERSEDED on 18 November 2026 by the
+// owner's decision "make it automatically read handwriting in the background,
+// dont need to press read": a page is also read on its own after the pen rests
+// (autoRead, AUTO_READ_IDLE_MS), once the student has said yes to the reader.
+// The old settle window is still gone, a timer never calls readNow directly (it
+// goes through the auto path), and a page that is being read is never sent again.
 assert.doesNotMatch(ink, /SETTLE_MS/, 'no settle window may send a page to the reader');
-assert.doesNotMatch(ink, /setTimeout\([^;]*readNow/, 'no timer may send a page to the reader');
+assert.doesNotMatch(ink, /setTimeout\([^;]*readNow/, 'no timer calls readNow directly: timed reads go through the auto path only');
+assert.match(ink, /autoTimerRef\.current = setTimeout\(\(\) => \{[\s\S]*?readRef2\.current\?\.\(\{ auto: true \}\);[\s\S]*?\}, AUTO_READ_IDLE_MS\)/, 'the idle pause sends one auto read for the page as it stands');
+assert.match(ink, /pageSig !== readRef\.current && pageSig !== autoTriedRef\.current && autoCountRef\.current < AUTO_READ_MAX/, 'an unchanged page, a page already tried and a page past the cap are never read again');
 // Two explicit, user-initiated calls and no others: the Try again button, and
 // the control the card's Submit uses when the writing changed after it was read
 // (#942, owner-approved: Submit reads the page again and sends nothing until the
-// student has seen the new reading). Neither is a timer or an automatic read.
+// student has seen the new reading). Neither is a timer; the automatic reads are the
+// separate, counted `{ auto: true }` path above.
 assert.equal((ink.match(/\breadNow\(\)/g) || []).length, 2, 'readNow is called only by the explicit Try again and the Submit control');
 assert.equal((ink.match(/read: \(\) => readNow\(\)/g) || []).length, 1, 'the Submit control is the one other caller');
 assert.match(ink, /data-ink-read=\{[^}]+\} onClick=\{readNow\}/, 'a read is sent by the student pressing Read my answer');
