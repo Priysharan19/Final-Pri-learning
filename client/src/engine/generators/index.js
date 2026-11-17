@@ -366,7 +366,7 @@ const INDIA_BANK_OF = {
 export const GENERATORS = {};
 
 // Banks whose Australian skills carry extra structural forms (au-forms.js).
-const AU_OVERLAID = new Set(['streams-standard', 'year7', 'year8', 'year9', 'year10']);
+const AU_OVERLAID = new Set(['streams-standard', 'streams-ext', 'year7', 'year8', 'year9', 'year10', 'year11', 'year12']);
 
 const loaded = new Set();
 const inflight = new Map();
