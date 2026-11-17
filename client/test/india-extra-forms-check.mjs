@@ -7,7 +7,7 @@ import { makeRng } from '../src/engine/qhelpers.js';
 import { workedStepHits } from './support/typesetting-rules.mjs';
 
 const SEEDS = Number(process.env.SEEDS || 150);
-let failures = 0, forms = 0, draws = 0;
+let failures = 0, forms = 0, draws = 0, figured = 0;
 const fail = (m) => { failures += 1; if (failures <= Number(process.env.SHOW || 30)) console.error('FAIL', m); };
 
 for (const [skill, list] of Object.entries(EXTRA_FORMS)) {
@@ -24,6 +24,18 @@ for (const [skill, list] of Object.entries(EXTRA_FORMS)) {
         if (payload.form !== f.form) fail(`${at}: payload.form ${payload.form}`);
         if (!payload.prompt || /undefined|NaN|Infinity/.test(JSON.stringify(payload))) fail(`${at}: bad text`);
         if (!Array.isArray(payload.hints) || payload.hints.length < 3 || !Array.isArray(payload.steps) || !payload.steps.length) fail(`${at}: hints/steps missing`);
+        if (payload.figure) {
+          // A figure is drawn from the question's numbers and never prints the key: the unknown is '?'.
+          const texts = [...payload.figure.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map(m => m[1].trim());
+          if (!/<svg viewBox/.test(payload.figure) || /NaN|undefined/.test(payload.figure)) fail(`${at}: malformed figure`);
+          const plane = /Coordinate plane|Bar chart/.test(payload.figure);   // axis ticks are not data labels
+          if (payload.answerType === 'numeric' && !plane) {
+            const key = String(payload.answer.value), given = (payload.prompt.match(/-?\d+(?:\.\d+)?/g) || []);
+            const printed = texts.map(t => t.replace(/[^0-9.\-]/g, '')).filter(Boolean);
+            if (printed.includes(key) && !given.includes(key)) fail(`${at}: the figure prints the key ${key}`);
+          }
+          figured += 1;
+        }
         const got = check();
         const texts = [payload.prompt, ...(payload.mcqOptions || []), ...payload.hints, ...payload.steps.flatMap(x => [x.h, x.d])];
         for (const t of texts) for (const hit of workedStepHits(t)) fail(`${at}: typesetting ${hit.rule}: ${String(hit.math).slice(0, 90)}`);
@@ -72,5 +84,5 @@ for (const [skill, list] of Object.entries(EXTRA_FORMS)) {
   }
   for (const t of tags) if (!seen.has(t)) fail(`${skill}: form ${t} was never issued through generateQuestion`);
 }
-console.log(failures ? `INDIA EXTRA FORMS: FAIL — ${failures} problem(s)` : `INDIA EXTRA FORMS: PASS — ${forms} forms, ${draws} draws, every key matched its independent check; ${marked} issued questions run through the real marker (key accepted, wrong answers rejected)`);
+console.log(failures ? `INDIA EXTRA FORMS: FAIL — ${failures} problem(s)` : `INDIA EXTRA FORMS: PASS — ${forms} forms, ${draws} draws, every key matched its independent check; ${figured} figures drawn without printing a key; ${marked} issued questions run through the real marker (key accepted, wrong answers rejected)`);
 process.exit(failures ? 1 : 0);

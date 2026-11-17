@@ -39,7 +39,7 @@ const ts = (steps = []) => steps.map(x => (typeof x === 'string' ? typeset(x) : 
 
 /** A numeric-answer payload. `traps` are common wrong answers with the reason. */
 const r6x = v => Math.round(v * 1e6) / 1e6;
-export function numeric(form, prompt, rawValue, { hints, steps, traps: rawTraps = [] }) {
+export function numeric(form, prompt, rawValue, { hints, steps, traps: rawTraps = [], figure = null }) {
   // Keys are kept to six places so no floating-point artefact (4.800000000000001) is ever served.
   const tidy = v => (Number.isInteger(v) ? v : Math.round(v * 1e6) / 1e6);
   const value = tidy(rawValue);
@@ -60,7 +60,7 @@ export function numeric(form, prompt, rawValue, { hints, steps, traps: rawTraps 
   for (let i = kept.length - 1; i >= 0; i--) if (kept[i].value === value || kept.findIndex(u => u.value === kept[i].value) !== i) kept.splice(i, 1);
   if (!kept.length) kept.push({ value: value + 1, why: 'Close, but one out: recheck the last step.' });
   return {
-    form, prompt: typeset(prompt), answerType: 'numeric', answer: { value },
+    form, prompt: typeset(prompt), answerType: 'numeric', answer: { value }, ...(figure ? { figure } : {}),
     traps: kept.map(t => ({ ...t, why: typeset(t.why) })),
     hints: hints.map(typeset), steps: ts(steps)
   };

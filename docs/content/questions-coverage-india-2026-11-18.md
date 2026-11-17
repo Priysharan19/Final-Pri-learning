@@ -4,7 +4,7 @@
 
 Targets (owner, Nov 2026): at least 10,000 distinct instances and at least 5 structural forms per skill. Instances and forms are the question-capacity tool's synthetic measurement; diagram coverage is the share of 240 sampled questions per skill (60 seeds × 4 difficulties) that carry a figure, diagram, plot or graph. SYNTHETIC: generators run in-process; no student or examiner evidence.
 
-**279 Priyabhata skills measured. 279 meet both targets; 0 are below.** 6 skills carry a generated figure in at least one sampled question.
+**279 Priyabhata skills measured. 279 meet both targets; 0 are below.** 35 skills carry a generated figure in at least one sampled question.
 
 ## Below target
 
@@ -14,34 +14,19 @@ None.
 
 Skills whose questions benefit from a diagram (geometry, mensuration, coordinate geometry, graphs, vectors) and carry none in any sampled question are listed here as the diagram gap. The extra structural forms added in the capacity work (`generators/forms`) are text-only; a generated diagram needs the figure kit and its own accuracy tests and is tracked separately.
 
-- `c10-volume-combination-reasoning`
-- `c10-areas-circles`
-- `c10-surface-volume-combo`
 - `c12-monotonic-tangent-reasoning`
-- `c10-sector-reasoning`
 - `c11-radian-unit-circle-reasoning`
-- `c9-quadrilaterals`
-- `c10-circles`
 - `olymp-geometry`
-- `c11-conic-sections`
 - `c7-triangles-current`
 - `c9-triangles`
 - `c7-triangle-inequality-reasoning`
-- `c8-quadrilaterals-ncert-mastery`
-- `c8-mensuration-ncert-mastery`
-- `c7-solid-shapes`
 - `c7-triangle-angles`
-- `c10-quadratic-triangle-competency`
-- `c10-bpt-reasoning`
 - `c9-euclid-geometry`
 - `c7-parallel-intersecting-lines-current`
 - `c7-congruence-inference-reasoning`
-- `c9-circles-ncert-mastery`
-- `c9-perimeter-area-ncert-mastery`
 - `c7-angle-sum-reasoning`
+- `c7-solid-shapes`
 - `c7-symmetry`
-- `c9-circles`
-- `c10-tangent-length-reasoning`
 - `c7-connecting-dots-current`
 - `c7-common-ground-current`
 - `c7-angle-construction-reasoning`
@@ -51,7 +36,6 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 - `c8-quadrilateral-property-reasoning`
 - `c8-data-handling-ncert-mastery`
 - `c12-vector-direction-reasoning`
-- `c9-herons-formula`
 - `c7-perpendicular-bisector-reasoning`
 - `c11-radian-circle-reasoning`
 - `c8-graphs-ncert-mastery`
@@ -60,7 +44,6 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 - `c11-line-equation-reasoning`
 - `c7-congruent-matching-reasoning`
 - `c9-statistics-grouped`
-- `c8-area-decomposition-reasoning`
 - `c7-triangle-construction-reasoning`
 - `c8-linear-equations-decimals`
 - `c7-angle-pair-reasoning`
@@ -70,7 +53,6 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 - `c8-surface-area-reasoning`
 - `c11-circle-jee-reasoning`
 - `c10-linear-solution-conditions`
-- `c9-coordinate-geometry`
 - `c10-linear-ticket-competency`
 - `c11-3d-introduction`
 - `c8-linear-equations-foundations`
@@ -82,14 +64,10 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 - `c11-3d-point-jee-reasoning`
 - `c8-linear-equations-source-mastery`
 - `c12-vector-algebra`
-- `c9-coordinate-geometry-ncert-mastery`
 - `c12-vector-dot-product`
 - `c11-line-angle-reasoning`
-- `c10-section-reasoning`
-- `c10-distance-reasoning`
 - `c10-linear-condition-forms`
 - `c8-exterior-angle-reasoning`
-- `c10-coordinate-geometry`
 - `c12-linear-programming`
 - `c11-linear-inequality-jee-reasoning`
 - `c11-statistics`
@@ -133,7 +111,7 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | `c11-complex-quadratic-jee-reasoning` | 47.3k | 101 | 0% | — |
 | `c11-complex-quadratic-reasoning` | 24.7k | 56 | 0% | — |
 | `c11-compound-event-reasoning` | 90.1k | 698 | 0% | — |
-| `c11-conic-sections` | 15.4k | 18 | 0% | — |
+| `c11-conic-sections` | 15.4k | 18 | 25% | — |
 | `c11-counting-principle-jee-reasoning` | 64.1k | 27 | 0% | — |
 | `c11-counting-principle-reasoning` | 44.5k | 24 | 0% | — |
 | `c11-derivative-rules-reasoning` | 41.6k | 65 | 0% | — |
@@ -180,7 +158,7 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | Skill | Instances | Forms | Diagram share | Below target |
 | --- | --- | --- | --- | --- |
 | `c8-algebraic-identities-ncert-mastery` | 27.3k | 19 | 0% | — |
-| `c8-area-decomposition-reasoning` | 38.9k | 18 | 0% | — |
+| `c8-area-decomposition-reasoning` | 38.9k | 18 | 47% | — |
 | `c8-bar-graph-reasoning` | ≥ 42.7M | 40 | 0% | — |
 | `c8-common-factor-reasoning` | 219.5k | 45 | 0% | — |
 | `c8-comparing-quantities-ncert-mastery` | 10.7k | 56 | 0% | — |
@@ -208,7 +186,7 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | `c8-linear-equations-fractions` | 184.3k | 146 | 0% | — |
 | `c8-linear-equations-source-mastery` | 237.8k | 226 | 0% | — |
 | `c8-linear-equations-verification` | 3.5M | 106 | 0% | — |
-| `c8-mensuration-ncert-mastery` | 16.7k | 17 | 0% | — |
+| `c8-mensuration-ncert-mastery` | 16.7k | 17 | 57% | — |
 | `c8-monomial-product-reasoning` | 27.5k | 393 | 0% | — |
 | `c8-percentage-reasoning` | 93.2k | 105 | 0% | — |
 | `c8-pie-chart-reasoning` | 25.6M | 5810 | 0% | — |
@@ -217,7 +195,7 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | `c8-proportions-ncert-mastery` | 13.8k | 16 | 0% | — |
 | `c8-quadrilateral-property-reasoning` | 26.2k | 12 | 0% | — |
 | `c8-quadrilaterals` | 139.5k | 7 | 0% | — |
-| `c8-quadrilaterals-ncert-mastery` | 16.5k | 18 | 0% | — |
+| `c8-quadrilaterals-ncert-mastery` | 16.5k | 18 | 12% | — |
 | `c8-rational-numbers` | 23.9k | 6 | 0% | — |
 | `c8-rational-numbers-associativity` | 107.8k | 16 | 0% | — |
 | `c8-rational-numbers-between` | 24.9k | 7 | 0% | — |
@@ -240,7 +218,7 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | --- | --- | --- | --- | --- |
 | `c12-3d-geometry` | 8.6M | 6 | 0% | — |
 | `c12-applications-derivatives` | 17.3k | 434 | 0% | — |
-| `c12-applications-integrals` | 61.8k | 147 | 0% | — |
+| `c12-applications-integrals` | 61.8k | 147 | 50% | — |
 | `c12-bijection-reasoning` | 28.5k | 35 | 0% | — |
 | `c12-composite-inverse-reasoning` | 403.9k | 299 | 0% | — |
 | `c12-conditional-probability` | 65.4k | 40 | 0% | — |
@@ -281,12 +259,12 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | `c10-ap-sum-forms` | 65.7k | 39 | 0% | — |
 | `c10-ap-sum-reasoning` | 1.2M | 150 | 0% | — |
 | `c10-ap-term-forms` | 175.4k | 42 | 0% | — |
-| `c10-areas-circles` | 11.8k | 17 | 0% | — |
+| `c10-areas-circles` | 11.8k | 17 | 88% | — |
 | `c10-arithmetic-progressions` | 682.9k | 149 | 0% | — |
-| `c10-bpt-reasoning` | 17.4k | 59 | 0% | — |
-| `c10-circles` | 14.8k | 6 | 0% | — |
-| `c10-coordinate-geometry` | 789.4k | 6 | 0% | — |
-| `c10-distance-reasoning` | 648.9k | 7 | 0% | — |
+| `c10-bpt-reasoning` | 17.4k | 59 | 25% | — |
+| `c10-circles` | 14.8k | 6 | 50% | — |
+| `c10-coordinate-geometry` | 789.4k | 6 | 63% | — |
+| `c10-distance-reasoning` | 648.9k | 7 | 63% | — |
 | `c10-grouped-mean-reasoning` | 64.0M | 25 | 0% | — |
 | `c10-grouped-mode-reasoning` | 12.8M | 5 | 0% | — |
 | `c10-irrationality-proofs` | 20.4k | 6 | 0% | — |
@@ -300,26 +278,26 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | `c10-polynomial-zeroes-reasoning` | 39.0k | 19 | 0% | — |
 | `c10-probability-classical` | 11.3k | 34 | 0% | — |
 | `c10-probability-reasoning` | 12.4k | 33 | 0% | — |
-| `c10-quadratic-context` | 23.4k | 56 | 0% | — |
-| `c10-quadratic-discriminant` | 20.0k | 56 | 0% | — |
-| `c10-quadratic-factorisation-reasoning` | 23.4k | 63 | 0% | — |
-| `c10-quadratic-k-forms` | 19.6k | 75 | 0% | — |
-| `c10-quadratic-roots` | 20.0k | 62 | 0% | — |
-| `c10-quadratic-triangle-competency` | 17.3k | 58 | 0% | — |
+| `c10-quadratic-context` | 23.4k | 56 | 15% | — |
+| `c10-quadratic-discriminant` | 20.0k | 56 | 15% | — |
+| `c10-quadratic-factorisation-reasoning` | 23.4k | 63 | 15% | — |
+| `c10-quadratic-k-forms` | 19.6k | 75 | 15% | — |
+| `c10-quadratic-roots` | 20.0k | 62 | 15% | — |
+| `c10-quadratic-triangle-competency` | 17.3k | 58 | 15% | — |
 | `c10-real-numbers` | 23.5k | 8 | 0% | — |
-| `c10-section-reasoning` | 648.9k | 6 | 0% | — |
-| `c10-sector-reasoning` | 12.7k | 21 | 0% | — |
+| `c10-section-reasoning` | 648.9k | 6 | 63% | — |
+| `c10-sector-reasoning` | 12.7k | 21 | 88% | — |
 | `c10-statistics` | 66.9k | 19 | 0% | — |
-| `c10-surface-area-combo` | 18.6k | 18 | 12% | — |
-| `c10-surface-volume-combo` | 11.9k | 17 | 0% | — |
-| `c10-tangent-length-reasoning` | 19.5k | 9 | 0% | — |
-| `c10-triangles-current` | 15.4k | 18 | 8% | — |
-| `c10-trig-applications-current` | 18.1k | 151 | 12% | — |
-| `c10-trig-boundary-relations` | 17.7k | 151 | 0% | — |
+| `c10-surface-area-combo` | 18.6k | 18 | 100% | — |
+| `c10-surface-volume-combo` | 11.9k | 17 | 88% | — |
+| `c10-tangent-length-reasoning` | 19.5k | 9 | 50% | — |
+| `c10-triangles-current` | 15.4k | 18 | 33% | — |
+| `c10-trig-applications-current` | 18.1k | 151 | 53% | — |
+| `c10-trig-boundary-relations` | 17.7k | 151 | 42% | — |
 | `c10-trig-ratio-reasoning` | 108.6k | 59 | 0% | — |
 | `c10-trig-standard-reasoning` | 1.3M | 851 | 0% | — |
-| `c10-trigonometry-current` | 17.5k | 153 | 3% | — |
-| `c10-volume-combination-reasoning` | 11.4k | 19 | 0% | — |
+| `c10-trigonometry-current` | 17.5k | 153 | 45% | — |
+| `c10-volume-combination-reasoning` | 11.4k | 19 | 88% | — |
 | `c10-zero-coefficient-forms` | 11.5k | 39 | 0% | — |
 
 ### olymp
@@ -389,7 +367,7 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | `c7-property-rewrite-reasoning` | 126.8k | 21 | 0% | — |
 | `c7-range-display-reasoning` | ≥ 42.7M | 630 | 0% | — |
 | `c7-rounding-bounds-reasoning` | 18.3k | 315 | 0% | — |
-| `c7-solid-shapes` | 16.7k | 31 | 0% | — |
+| `c7-solid-shapes` | 18.7k | 28 | 0% | — |
 | `c7-sss-sas-reasoning` | 29.6k | 10 | 0% | — |
 | `c7-statistical-question-reasoning` | 2.9M | 310 | 0% | — |
 | `c7-symmetry` | 18.9k | 13 | 0% | — |
@@ -405,18 +383,18 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | Skill | Instances | Forms | Diagram share | Below target |
 | --- | --- | --- | --- | --- |
 | `c9-algebraic-identities-ncert-mastery` | 445.5k | 92 | 0% | — |
-| `c9-circles` | 19.1k | 8 | 0% | — |
-| `c9-circles-ncert-mastery` | 18.2k | 13 | 0% | — |
-| `c9-coordinate-geometry` | 75.6k | 18 | 0% | — |
-| `c9-coordinate-geometry-ncert-mastery` | 308.5k | 8 | 0% | — |
+| `c9-circles` | 19.1k | 8 | 7% | — |
+| `c9-circles-ncert-mastery` | 18.2k | 13 | 7% | — |
+| `c9-coordinate-geometry` | 75.6k | 18 | 72% | — |
+| `c9-coordinate-geometry-ncert-mastery` | 308.5k | 8 | 55% | — |
 | `c9-euclid-geometry` | 17.4k | 5 | 0% | — |
-| `c9-herons-formula` | 28.1k | 5 | 0% | — |
+| `c9-herons-formula` | 28.1k | 5 | 25% | — |
 | `c9-linear-polynomials-ncert-mastery` | ≥ 19.2M | 217 | 0% | — |
 | `c9-number-systems-ncert-mastery` | 10.4M | 5 | 0% | — |
-| `c9-perimeter-area-ncert-mastery` | 18.3k | 18 | 0% | — |
+| `c9-perimeter-area-ncert-mastery` | 18.3k | 18 | 57% | — |
 | `c9-polynomial-basics` | 16.9k | 289 | 0% | — |
 | `c9-probability-ncert-mastery` | 1.1M | 6 | 0% | — |
-| `c9-quadrilaterals` | 14.4k | 22 | 0% | — |
+| `c9-quadrilaterals` | 14.4k | 22 | 8% | — |
 | `c9-sequences-progressions-ncert-mastery` | 388.1k | 5 | 0% | — |
 | `c9-statistics-grouped` | 37.5k | 16 | 0% | — |
 | `c9-triangles` | 15.9k | 6 | 0% | — |

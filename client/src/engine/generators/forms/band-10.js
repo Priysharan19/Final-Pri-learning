@@ -1,6 +1,7 @@
 // Extra forms · Class 10. See forms/kit.js. Groups of skills share a factory so each
 // skill carries its own list of forms; π is 22/7 wherever a circle appears.
 import { ri, numeric, choice, span, person, place, r6, terminates } from './kit.js';
+import * as D from './diagrams.js';
 
 const R = d => span(d, 20, 15);
 const gcd = (x, y) => (y ? gcd(y, x % y) : x);
@@ -79,6 +80,7 @@ function mensForms() {
       const [x, y] = distinct(rng, 1, R(d), 2).sort((p, q) => p - q), r1 = 7 * x, r2 = 7 * y;
       return {
         payload: numeric('ring-area', `A circular path in a park in ${place(rng)} lies between two concentric circles of radii $${r1}$ m and $${r2}$ m. Taking $\\pi = \\dfrac{22}{7}$, find the area of the path in square metres.`, 22 * 7 * (y * y - x * x), {
+          figure: D.ringFigure({ r1: x * 7, r2: y * 7, shown: { inner: `${x * 7} m`, outer: `${y * 7} m` } }).svg,
           hints: ['The path is the larger circle minus the smaller one.', 'Area of a circle is $\\pi r^2$.', 'Factor out $\\pi$ before substituting.'],
           steps: [{ h: 'Difference of areas', d: '$\\pi(R^2 - r^2)$' }, { h: 'Substitute', d: `$\\dfrac{22}{7}(${r2}^2 - ${r1}^2)$` }],
           traps: [{ value: (22 / 7) * (r2 - r1) ** 2, why: 'Subtract the squares of the radii, not the radii first.' }]
@@ -90,6 +92,7 @@ function mensForms() {
       const k = ri(rng, 1, R(d)), r = 7 * k, th = [45, 90, 180, 120, 60][ri(rng, 0, 4)];
       return {
         payload: numeric('sector-area', `A sector of angle $${th}^\\circ$ is cut from a circular plate of radius $${r}$ cm. Using $\\pi = \\dfrac{22}{7}$, find the area of the sector in square centimetres.`, r6(((th * 22 * r * r) / (360 * 7))), {
+          figure: D.sectorFigure({ r, theta: th, shown: { r: `${r} cm`, theta: `${th}°` } }).svg,
           hints: ['The sector is the fraction $\\dfrac{\\theta}{360}$ of the whole circle.', 'Whole-circle area: $\\pi r^2$.', 'Multiply the fraction by the area.'],
           steps: [{ h: 'Fraction', d: `$\\dfrac{${th}}{360}$` }, { h: 'Area', d: `$\\dfrac{${th}}{360}\\times\\dfrac{22}{7}\\times ${r}^2$` }],
           traps: [{ value: r6((th * 22 * r) / (360 * 7)), why: 'Area uses $r^2$; $r$ alone would give a length.' }]
@@ -101,6 +104,7 @@ function mensForms() {
       const k = ri(rng, 1, R(d)), r = 7 * k, h = ri(rng, 2, 30 + 10 * d);
       return {
         payload: numeric('cylinder-volume', `A cylindrical water tank in a school has radius $${r}$ cm and height $${h}$ cm. Taking $\\pi = \\dfrac{22}{7}$, find its volume in cubic centimetres.`, 22 * 7 * k * k * h, {
+          figure: D.solidFigure({ kind: 'cylinder', r, h, shown: { r: `${r} cm`, h: `${h} cm` } }).svg,
           hints: ['Volume of a cylinder is $\\pi r^2 h$.', 'Since $r$ is a multiple of $7$, the $7$ in the denominator cancels.', 'Multiply the remaining factors.'],
           steps: [{ h: 'Formula', d: '$V = \\pi r^2 h$' }, { h: 'Substitute', d: `$\\dfrac{22}{7}\\times ${r}^2\\times ${h}$` }],
           traps: [{ value: 2 * 22 * 7 * k * h, why: 'The radius is squared, not doubled.' }]
@@ -112,6 +116,7 @@ function mensForms() {
       const k = ri(rng, 1, R(d)), r = 7 * k, h = 3 * ri(rng, 1, 10 + 4 * d);
       return {
         payload: numeric('cone-volume', `A conical heap of grain has base radius $${r}$ m and height $${h}$ m. Taking $\\pi = \\dfrac{22}{7}$, find its volume in cubic metres.`, (22 * 7 * k * k * h) / 3, {
+          figure: D.solidFigure({ kind: 'cone', r, h, shown: { r: `${r} m`, h: `${h} m` } }).svg,
           hints: ['Volume of a cone is $\\dfrac13\\pi r^2 h$.', 'The height is a multiple of $3$, so the factor $\\frac13$ cancels.', 'The radius is a multiple of $7$, so the $7$ cancels too.'],
           steps: [{ h: 'Formula', d: '$V = \\dfrac13\\pi r^2 h$' }, { h: 'Substitute', d: `$\\dfrac13\\times\\dfrac{22}{7}\\times ${r}^2\\times ${h}$` }],
           traps: [{ value: 22 * 7 * k * k * h, why: 'A cone is one third of the cylinder with the same base and height.' }]
@@ -123,6 +128,7 @@ function mensForms() {
       const k = ri(rng, 1, 6 + d), r = 21 * k;
       return {
         payload: numeric('hemisphere-volume', `A hemispherical bowl has inner radius $${r}$ cm. Taking $\\pi = \\dfrac{22}{7}$, find the volume of liquid it holds when full, in cubic centimetres.`, 19404 * k ** 3, {
+          figure: D.solidFigure({ kind: 'hemisphere', r, shown: { r: `${r} cm` } }).svg,
           hints: ['Volume of a hemisphere is $\\dfrac23\\pi r^3$.', 'The radius is a multiple of $21$, so the $3$ and $7$ both cancel.', 'Cube the radius carefully.'],
           steps: [{ h: 'Formula', d: '$V = \\dfrac23\\pi r^3$' }, { h: 'Substitute', d: `$\\dfrac23\\times\\dfrac{22}{7}\\times ${r}^3$` }],
           traps: [{ value: 38808 * k ** 3, why: 'A hemisphere is half a sphere: $\\frac23\\pi r^3$, not $\\frac43\\pi r^3$.' }]
@@ -141,6 +147,7 @@ function circleForms() {
       const r = (sw ? t[1] : t[0]) * k, len = (sw ? t[0] : t[1]) * k, dist = t[2] * k;
       return {
         payload: numeric('tangent-length', `From a point $P$, $${dist}$ cm from the centre of a circle of radius $${r}$ cm, a tangent $PT$ is drawn. Find $PT$ in cm.`, len, {
+          figure: D.tangentFigure({ r, dist, shown: { r, dist, tangent: '?' } }).svg,
           hints: ['A tangent is perpendicular to the radius at the point of contact.', 'So triangle $OTP$ has a right angle at $T$.', 'Use Pythagoras with $OP$ as the hypotenuse.'],
           steps: [{ h: 'Right angle', d: '$OT \\perp PT$' }, { h: 'Pythagoras', d: `$PT^2 = ${dist}^2 - ${r}^2$` }],
           traps: [{ value: dist - r, why: 'The tangent is a leg of a right triangle, not a difference of lengths.' }]
@@ -153,6 +160,7 @@ function circleForms() {
       const dist = (sw ? t[0] : t[1]) * k, half = (sw ? t[1] : t[0]) * k, r = t[2] * k;
       return {
         payload: numeric('chord-length', `A chord of a circle of radius $${r}$ cm is $${dist}$ cm from the centre. Find the length of the chord in cm.`, 2 * half, {
+          figure: D.chordFigure({ r, dist, shown: { r, dist, chord: '?' } }).svg,
           hints: ['The perpendicular from the centre to a chord bisects the chord.', 'Half the chord, the distance and the radius form a right triangle.', 'Find half the chord with Pythagoras, then double it.'],
           steps: [{ h: 'Half chord', d: `$\\sqrt{${r}^2 - ${dist}^2}$` }, { h: 'Double', d: 'the chord is twice that' }],
           traps: [{ value: half, why: 'That is half the chord; the perpendicular bisects it, so double it.' }]
@@ -164,6 +172,7 @@ function circleForms() {
       const c = ri(rng, 20, 160), rr = ri(rng, 3, 40 * d + 20);
       return {
         payload: numeric('angle-between-tangents', `Two tangents $PA$ and $PB$ are drawn from a point $P$ to a circle of radius $${rr}$ cm with centre $O$, and $\\angle AOB = ${c}^\\circ$. Find $\\angle APB$ in degrees.`, 180 - c, {
+          figure: D.twoTangents({ central: c, shown: { AOB: c, APB: '?' } }).svg,
           hints: ['Radii $OA$ and $OB$ are perpendicular to the tangents.', 'Quadrilateral $OAPB$ has two right angles.', 'Its four angles add to $360^\\circ$.'],
           steps: [{ h: 'Right angles', d: '$\\angle OAP = \\angle OBP = 90^\\circ$' }, { h: 'Angle sum', d: `$\\angle APB = 360^\\circ - 180^\\circ - ${c}^\\circ$` }],
           traps: [{ value: 90 - c / 2, why: 'That is an angle at the centre of triangle $OAP$, not the angle between the tangents.' }]
@@ -206,6 +215,7 @@ function coordForms() {
       const dx = t[0] * k * sx, dy = t[1] * k * sy;
       return {
         payload: numeric('distance', `Find the distance between the points $(${x1}, ${y1})$ and $(${x1 + dx}, ${y1 + dy})$.`, t[2] * k, {
+          figure: D.coordPlane({ points: [{ x: x1, y: y1, label: 'A' }, { x: x1 + dx, y: y1 + dy, label: 'B' }], segments: [[0, 1]] }).svg,
           hints: ['Use the distance formula.', 'Find the horizontal and vertical differences.', 'The sum of their squares is a perfect square.'],
           steps: [{ h: 'Differences', d: `$${Math.abs(dx)}$ and $${Math.abs(dy)}$` }, { h: 'Distance', d: `$\\sqrt{${dx * dx} + ${dy * dy}}$` }],
           traps: [{ value: Math.abs(dx) + Math.abs(dy), why: 'The distance is the hypotenuse, not the sum of the two differences.' }]
@@ -219,6 +229,7 @@ function coordForms() {
       const x1 = ri(rng, -R(d), R(d)), x2 = x1 + s * k;
       return {
         payload: numeric('section', `The point $P$ divides the segment from $A(${x1}, 3)$ to $B(${x2}, 9)$ internally in the ratio $${m} : ${n}$. Find the $x$-coordinate of $P$.`, (m * x2 + n * x1) / s, {
+          figure: D.coordPlane({ points: [{ x: x1, y: 3, label: 'A' }, { x: x2, y: 9, label: 'B' }], segments: [[0, 1]] }).svg,
           hints: ['Use the section formula.', 'The weight on $B$ is $m$ and on $A$ is $n$.', 'Divide by $m + n$.'],
           steps: [{ h: 'Section formula', d: '$x = \\dfrac{m x_2 + n x_1}{m + n}$' }, { h: 'Substitute', d: `$\\dfrac{${m}(${x2}) + ${n}(${x1})}{${s}}$` }],
           traps: [{ value: (n * x2 + m * x1) / s, why: 'The ratio $m:n$ puts the weight $m$ on the *second* point.' }]
@@ -230,6 +241,7 @@ function coordForms() {
       const xs = [ri(rng, -R(d), R(d)), ri(rng, -R(d), R(d))], k = ri(rng, -R(d), R(d)), x3 = 3 * k - xs[0] - xs[1];
       return {
         payload: numeric('centroid', `The vertices of a triangle are $(${xs[0]}, 2)$, $(${xs[1]}, 7)$ and $(${x3}, 5)$. Find the $x$-coordinate of its centroid.`, k, {
+          figure: D.coordPlane({ points: [{ x: xs[0], y: 2, label: 'A' }, { x: xs[1], y: 7, label: 'B' }, { x: x3, y: 5, label: 'C' }], segments: [[0, 1], [1, 2], [2, 0]] }).svg,
           hints: ['The centroid is the average of the three vertices.', 'Add the three $x$-coordinates.', 'Divide by $3$.'],
           steps: [{ h: 'Average', d: `$\\dfrac{${xs[0]} + ${xs[1]} + ${x3}}{3}$` }],
           traps: [{ value: (xs[0] + xs[1]) / 2, why: 'That is the midpoint of two vertices, not the centroid.' }].filter(t => t.value !== k)
@@ -495,6 +507,7 @@ function quadForms() {
       const t = TRIPLES[ri(rng, 0, 4)], k = ri(rng, 1, 2 + d), s = t[0] * k, l = t[1] * k, h = t[2] * k;
       return {
         payload: numeric('triangle-legs', `The two shorter sides of a right-angled field in ${place(rng)} differ by $${l - s}$ m and its longest side is $${h}$ m. Find the shorter of the two shorter sides, in metres.`, s, {
+          figure: D.rightTriangle({ base: s, height: l, shown: { base: 'x', height: `x + ${l - s}`, hyp: `${h} m` } }).svg,
           hints: ['Let the shorter leg be $x$; the other is $x + ' + (l - s) + '$.', 'Apply Pythagoras with the longest side as hypotenuse.', 'Solve the quadratic and keep the positive root.'],
           steps: [{ h: 'Pythagoras', d: `$x^2 + (x + ${l - s})^2 = ${h}^2$` }, { h: 'Solve', d: 'form the quadratic and factorise' }],
           traps: [{ value: l, why: 'That is the longer leg.' }]
@@ -641,6 +654,7 @@ function triForms() {
       if (u === v) throw RETRY;
       return {
         payload: numeric('bpt-length', `In triangle $ABC$, $DE \\parallel BC$ with $D$ on $AB$ and $E$ on $AC$. $AD = ${u * k}$ cm, $DB = ${v * k}$ cm and $AE = ${u * w}$ cm. Find $EC$ in cm.`, v * w, {
+          figure: D.bptTriangle({ ratioAD: u, ratioDB: v, shown: { AD: u * k, DB: v * k, AE: u * w, EC: '?' } }).svg,
           hints: ['Use the basic proportionality theorem.', '$\\dfrac{AD}{DB} = \\dfrac{AE}{EC}$.', 'Cross-multiply and solve for $EC$.'],
           steps: [{ h: 'Theorem', d: '$\\dfrac{AD}{DB} = \\dfrac{AE}{EC}$' }, { h: 'Solve', d: `$EC = \\dfrac{${v * k}\\times ${u * w}}{${u * k}}$` }],
           traps: [{ value: u * w * u / v, why: 'The ratio is $AD : DB = AE : EC$; $EC$ pairs with $DB$.' }].filter(t => Number.isInteger(t.value))
@@ -693,6 +707,7 @@ function trigForms() {
       void d;
       return {
         payload: numeric('ratio-from-3-4-5', `In a right triangle $ABC$ with the right angle at $B$, $\\sin A = \\dfrac{${3 * k}}{${5 * k}}$. Find the value of $${name}$.`, val, {
+          figure: D.rightTriangle({ base: 4 * k, height: 3 * k, shown: { base: '?', height: String(3 * k), hyp: String(5 * k) }, names: ['B', 'C', 'A'] }).svg,
           hints: ['Draw the triangle; $\\sin A$ is the opposite side over the hypotenuse.', 'Find the third side with Pythagoras.', 'Read the required ratio from the triangle.'],
           steps: [{ h: 'Sides', d: `opposite $${3 * k}$, hypotenuse $${5 * k}$, adjacent $${4 * k}$` }, { h: 'Ratio', d: 'divide the right pair of sides' }],
           traps: [{ value: 0.6, why: 'That is $\\sin A$ itself.' }]
@@ -726,6 +741,7 @@ function trigForms() {
       const h = ri(rng, 2, 12 + 4 * d), who = person(rng);
       return {
         payload: numeric('ladder', `${who} leans a ladder against a wall in ${place(rng)}. It reaches a height of $${h}$ m and makes an angle of $30^\\circ$ with the ground. Find the length of the ladder in metres.`, 2 * h, {
+          figure: D.ladderFigure({ ground: h / Math.tan(Math.PI / 6), height: h, shown: { angle: '30°', height: `${h} m`, ladder: '?' } }).svg,
           hints: ['The ladder is the hypotenuse; the height is the side opposite the $30^\\circ$ angle.', '$\\sin 30^\\circ = \\dfrac12$.', 'So the hypotenuse is twice the opposite side.'],
           steps: [{ h: 'Ratio', d: `$\\sin 30^\\circ = \\dfrac{${h}}{L}$` }, { h: 'Solve', d: `$L = ${h}\\div\\dfrac12$` }],
           traps: [{ value: h / 2, why: '$\\sin 30^\\circ = \\frac12$, so the ladder is longer than the height, not shorter.' }]
