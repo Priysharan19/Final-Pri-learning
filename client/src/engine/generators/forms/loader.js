@@ -2,11 +2,12 @@
 // forms. A bank's generator ids pick the chunks (by the id's class prefix); each
 // chunk is its own dynamic import. india-forms-extra.js imports every band
 // statically and exists for the tests and tools that want them all.
-const CHUNK_OF = { olymp: 'c12', c12: 'c12', c11: 'c11', c10: 'c10' };
+const CHUNK_OF = { olymp: 'c12', c12: 'c12', c11: 'c11', c10: 'c10', c9: 'c789', c8: 'c789', c7: 'c789' };
 const LOADERS = {
   c12: () => Promise.all([import('./band-12-a.js'), import('./band-12-b.js'), import('./band-12-c.js')]),
   c11: () => Promise.all([import('./band-11-a.js'), import('./band-11-b.js')]),
-  c10: () => Promise.all([import('./band-10.js')])
+  c10: () => Promise.all([import('./band-10.js')]),
+  c789: () => Promise.all([import('./band-789.js')])
 };
 
 /** The extra forms for the classes the given generator ids belong to. */
