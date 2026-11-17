@@ -3805,7 +3805,7 @@ export default {
   'msg.correctFinal': 'Correct final answer',
   'msg.structured': 'Structured question',
   'msg.methodCriterion': 'Method or final-answer criterion {n}',
-  'msg.notQuite': 'Not quite — check your working and try once more.',
+  'msg.notQuite': 'Look back over your working.',
   'msg.teacherSolution': 'Teacher solution',
   'msg.seeTeacher': 'See your teacher for the worked solution.',
   'msg.practicePaper': 'Practice paper',

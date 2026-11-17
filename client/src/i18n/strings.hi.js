@@ -3860,7 +3860,7 @@ export default {
   'msg.correctFinal': 'सही अंतिम उत्तर',
   'msg.structured': 'संरचित प्रश्न',
   'msg.methodCriterion': 'विधि या अंतिम उत्तर की कसौटी {n}',
-  'msg.notQuite': 'पूरी तरह सही नहीं — अपना काम जाँचिए और एक बार फिर कोशिश कीजिए।',
+  'msg.notQuite': 'अपने काम को एक बार फिर देखिए।',
   'msg.teacherSolution': 'शिक्षक का हल',
   'msg.seeTeacher': 'पूरे हल के लिए अपने शिक्षक से मिलिए।',
   'msg.practicePaper': 'अभ्यास प्रश्नपत्र',
