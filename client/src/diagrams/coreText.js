@@ -133,6 +133,7 @@ const en = {
   'solid.cylinder': 'cylinder',
   'solid.cone': 'cone',
   'solid.sphere': 'sphere',
+  'solid.hemisphere': 'hemisphere',
   'solid.pyramid': 'rectangular pyramid',
   'solid.title': 'A {name}',
   'solid.desc': 'A {name}: {dims}. Its volume is {volume} cubic units.',
@@ -141,6 +142,7 @@ const en = {
   'solid.dims.cylinder': 'radius {r}, height {h}',
   'solid.dims.cone': 'radius {r}, height {h}',
   'solid.dims.sphere': 'radius {r}',
+  'solid.dims.hemisphere': 'radius {r}',
 
   // Interactive.jsx
   'transform.titleLinear': 'Change the gradient and the intercept',
@@ -320,6 +322,7 @@ const hi = {
   'solid.cylinder': 'बेलन',
   'solid.cone': 'शंकु',
   'solid.sphere': 'गोला',
+  'solid.hemisphere': 'अर्धगोला',
   'solid.pyramid': 'आयताकार आधार वाला पिरामिड',
   'solid.title': '{name}',
   'solid.desc': '{name}: {dims}। इसका आयतन {volume} घन इकाई है।',
@@ -328,6 +331,7 @@ const hi = {
   'solid.dims.cylinder': 'त्रिज्या {r}, ऊँचाई {h}',
   'solid.dims.cone': 'त्रिज्या {r}, ऊँचाई {h}',
   'solid.dims.sphere': 'त्रिज्या {r}',
+  'solid.dims.hemisphere': 'त्रिज्या {r}',
 
   'transform.titleLinear': 'प्रवणता और अंतःखंड बदलिए',
   'transform.title': 'y = {name} का रूपांतरण कीजिए',

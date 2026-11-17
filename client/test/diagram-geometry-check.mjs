@@ -174,6 +174,9 @@ const throws = (fn, label) => { let t = false; try { fn(); } catch { t = true; }
   const vols = ['rectPrism', 'cylinder', 'cone', 'sphere', 'pyramid'].map(shape => g.solidModel({ shape, l: 4, w: 3, h: 5, r: 2 }).volume);
   // By hand: 4*3*5 = 60; 20*pi; 20*pi/3; 32*pi/3; 4*3*5/3 = 20.
   ok(near(vols[0], 60) && near(vols[1], 20 * Math.PI, 1e-5) && near(vols[2], (20 * Math.PI) / 3, 1e-5) && near(vols[3], (32 * Math.PI) / 3, 1e-5) && near(vols[4], 20), 'solids: the volumes of the five shapes match their formulas');
+  // Hemisphere r = 3: 2/3 * pi * 27 = 18 pi; its outline stays inside the figure.
+  const hemi = g.solidModel({ shape: 'hemisphere', r: 3 });
+  ok(near(hemi.volume, 18 * Math.PI, 1e-5) && [...hemi.solid, ...hemi.hidden].flat().every(([x, y]) => x >= 0 && x <= hemi.width && y >= 0 && y <= hemi.height), 'solids: a hemisphere of radius 3 has volume 18π and fits its frame');
 }
 // Pinned coordinates (one reference diagram per kind)
 {
