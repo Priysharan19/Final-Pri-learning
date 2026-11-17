@@ -24,13 +24,13 @@ One set of deterministic, parameter-driven SVG diagrams shared by Notes and ques
   question draws its static counterpart (or nothing, when it has none).
 - `diagrams.css` — Instrument tokens only (light and dark follow the theme); no colour scale of its own.
 
-## Kinds (25)
-Static (19): `function` (axes, ticks, asymptotes, intercepts, shading under a curve), `trig` (sin, cos, tan with
+## Kinds (28)
+Static (22): `function` (axes, ticks, asymptotes, intercepts, shading under a curve), `trig` (sin, cos, tan with
 amplitude/period/shift), `unitCircle`, `triangle` (SSS or SAS, labelled sides and angles, right-angle mark), `polygon`
 (regular), `circleTheorem` (`centre`, `segment`, `semicircle`, `cyclic`, `tangent`), `numberLine` (points, open/closed ends,
 intervals), `tree` (exact fractions; branches must add to 1), `venn` (2 or 3 sets), `table` (two-way), `histogram`,
 `boxPlot`, `normal` (shaded area by z or x), `vector` (tip to tail, resultant), `sequence` (`type`: arithmetic or
-geometric), `compound`, `timeline` (cash flows), `secantTangent`, `riemann` (left, right, mid).
+geometric), `compound`, `timeline` (cash flows), `secantTangent`, `riemann` (left, right, mid), `network` (nodes with positions, weighted or labelled edges, a highlighted `path` whose total the text states, `directed` for flow and activity networks), `scatter` (points, `line: 'fit'` for the least-squares line with its gradient, intercept and r, or `{m, c}`), `solid` (`rectPrism`, `cylinder`, `cone`, `sphere`, `pyramid` in oblique projection with hidden edges dashed and the exact volume in its description).
 Interactive (6): `transform`, `unitCircleDrag`, `secantToTangent`, `riemannSlider`, `normalZ`, `compoundExplorer`.
 
 ## Tests
