@@ -111,6 +111,13 @@ try {
   ok(Number(await a.inputValue()) === 1, 'Reset restores the starting values');
 
   const L = page.locator('[data-case="interactive-1"]');
+  {
+    const r = T.locator('input[type="range"]');
+    await r.nth(1).focus(); for (let i = 0; i < 4; i++) await page.keyboard.press('ArrowRight');
+    await r.nth(2).focus(); for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight');
+    const tex = (await T.locator('annotation').allTextContents()).join(' ');
+    ok(tex.includes('y=\\left(2(x-3)\\right)^2'), `a scaled and shifted parabola is bracketed so it reads as drawn (${tex.slice(0, 120)})`);
+  }
   const m = L.locator('input[type="range"]').first();
   ok((await L.locator('input[type="range"]').count()) === 2, 'the line explorer has just its two sliders (m and c)');
   await m.focus(); await page.keyboard.press('ArrowRight'); await page.keyboard.press('ArrowRight');
@@ -129,6 +136,9 @@ try {
   ok(await handle.getAttribute('aria-valuenow') === '60', 'Shift+Arrow moves 15°');
   await page.keyboard.press('PageDown');
   ok(await handle.getAttribute('aria-valuenow') === '45', 'PageDown moves back 15°');
+  await page.keyboard.press('ArrowRight');
+  ok(await handle.getAttribute('aria-valuenow') === '46', 'ArrowRight increases the angle, as a slider does');
+  await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('Home');
   ok(await handle.getAttribute('aria-valuenow') === '0', 'Home goes to 0°');
   await page.keyboard.press('End');
