@@ -4,7 +4,9 @@
 // the pen's event rate. It is a measurement aid, never evidence by itself —
 // numbers on a screenshot are the owner's own device run, labelled as such.
 const on = () => { try { return new URLSearchParams(globalThis.location?.search || '').get('inkdebug') === '1'; } catch { return false; } };
-export const inkDebugEnabled = on;
+let cached = null;
+const enabled = () => (cached === null ? (cached = on()) : cached);
+export const inkDebugEnabled = enabled;
 
 const state = { penUpMs: 0, penUpMax: 0, longTasks: 0, events: 0, firstEventAt: 0, rate: 0, strokes: 0 };
 let box = null; let observer = null;
@@ -28,7 +30,7 @@ function ensure() {
 
 /** One pen-up handler took `ms`. */
 export function recordPenUp(ms) {
-  if (!on()) return;
+  if (!enabled()) return;
   ensure();
   state.penUpMs = ms; state.penUpMax = Math.max(state.penUpMax, ms); state.strokes += 1;
   globalThis.__inkDebug = { ...state };
@@ -37,7 +39,7 @@ export function recordPenUp(ms) {
 
 /** A pen sample arrived (for the event rate). */
 export function recordPenEvent(now) {
-  if (!on()) return;
+  if (!enabled()) return;
   state.events += 1;
   if (!state.firstEventAt) state.firstEventAt = now;
   const span = now - state.firstEventAt;

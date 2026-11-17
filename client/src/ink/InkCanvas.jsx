@@ -22,7 +22,7 @@
 //   · stroke eraser, undo/redo, clear; serialisable strokes preserve
 //     {x,y,w,t,p,azimuth,altitude} when the browser exposes Pencil dynamics.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from 'react';
 import { strokeStarted, strokeMoved, strokeEnded, touchRejected } from './inputMetrics.js';
 import { makePenFilter } from './smooth.js';
 import { penWantsEraser } from './penButtons.js';
@@ -98,8 +98,13 @@ const InkCanvas = forwardRef(function InkCanvas({
     const hidden = () => { if (document.visibilityState === 'hidden') flushNotify(); };
     window.addEventListener('pagehide', flushNotify);
     document.addEventListener('visibilitychange', hidden);
-    return () => { window.removeEventListener('pagehide', flushNotify); document.removeEventListener('visibilitychange', hidden); flushNotify(); };
+    return () => { window.removeEventListener('pagehide', flushNotify); document.removeEventListener('visibilitychange', hidden); };
   }, [flushNotify]);
+  // On unmount the last stroke is delivered before the parent's own cleanup
+  // runs (layout cleanups run before passive ones), so the parent can still save it.
+  useLayoutEffect(() => flushNotify, [flushNotify]);
+  // Going read-only (a deadline, a submit) delivers anything still deferred.
+  useEffect(() => { if (disabled) flushNotify(); }, [disabled, flushNotify]);
 
   /** Reading a CSS custom property forces a style recalc, so it never happens
    *  in the frame loop — only when the theme actually changes. */

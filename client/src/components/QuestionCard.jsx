@@ -1101,10 +1101,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const pending = inkPendingSave.current;
     if (!pending) return;
     inkPendingSave.current = null;
-    writeInk(pending.strokes);
+    writeInk(pending.strokes, pending.questionId);
   };
   const saveInk = (strokes) => {
-    inkPendingSave.current = { strokes };
+    inkPendingSave.current = { strokes, questionId: question.id };
     if (!Array.isArray(strokes) || !strokes.length) { flushInkSave(); return; }
     if (!inkDebounce.current) inkDebounce.current = setTimeout(() => { inkDebounce.current = null; flushInkSave(); }, 300);
   };
@@ -1122,21 +1122,21 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       const pending = inkPendingSave.current;
       if (inkDebounce.current) clearTimeout(inkDebounce.current);
       inkPendingSave.current = null;
-      if (pending?.strokes?.length) { saveInkDraft(question.id, pending.strokes, { label: question.subtopicName, ...inkExtrasRef.current }); void flushInkDrafts(); }
+      if (pending?.strokes?.length) { saveInkDraft(pending.questionId, pending.strokes, { label: question.subtopicName, ...inkExtrasRef.current }); void flushInkDrafts(); }
     };
   }, [question.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  const writeInk = (strokes) => {
+  const writeInk = (strokes, questionId = question.id) => {
     if (inkSaveTimer.current) { clearTimeout(inkSaveTimer.current); inkSaveTimer.current = null; }
     const revision = ++inkSaveRevision.current;
     const extras = { ...inkExtrasRef.current };
     // saveInkDraft queues *sealed IndexedDB*, not drafts.js localStorage.
     // Its boolean acknowledges only acceptance into a write queue, not disk.
-    if (!saveInkDraft(question.id, strokes, { label: question.subtopicName, ...extras })) { setSaveState('failed'); return; }
+    if (!saveInkDraft(questionId, strokes, { label: question.subtopicName, ...extras })) { setSaveState('failed'); return; }
     if (!Array.isArray(strokes) || !strokes.length) { setSaveState(null); return; }
     setSaveState('saving');
     inkSaveTimer.current = setTimeout(() => {
       inkSaveTimer.current = null;
-      confirmInkDraftSaved(question.id, strokes, extras).then(
+      confirmInkDraftSaved(questionId, strokes, extras).then(
         outcome => {
           if (!mountedRef.current || attemptRef.current || inkSaveRevision.current !== revision) return;
           // Newer strokes are already queued: their own readback will answer.
