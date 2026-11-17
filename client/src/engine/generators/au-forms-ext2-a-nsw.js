@@ -22,7 +22,7 @@ function num(prompt, value, { suffix, prefix, tol, traps = [], hints, steps, inp
   if (!fin(value)) throw new Error('ext2-a: non-finite key');
   const seen = new Set([value]);
   const tr = [];
-  for (const t of traps) if (fin(t.value) && !seen.has(t.value)) { seen.add(t.value); tr.push(tol && !t.tol ? { ...t, tol } : t); }
+  for (const t of traps) if (fin(t.value) && !seen.has(t.value) && Math.abs(t.value - value) > 2 * (tol || t.tol || 0)) { seen.add(t.value); tr.push(tol && !t.tol ? { ...t, tol } : t); }
   const answer = { value, ...(tol ? { tol } : {}), ...(extra || {}) };
   const q = { prompt, answerType: 'numeric', answer, traps: tr, hints, steps };
   if (suffix) q.answerSuffix = suffix;
@@ -258,7 +258,7 @@ const demoivreForms = [
       const sign = ((b.t * n) / 12) % 2 === 0 ? 1 : -1;
       const val = sign * k ** n * modPow;
       if (Math.abs(val) > 4e6) continue;
-      const zt = k === 1 ? `(${b.tex})` : `${k}(${b.tex})`;
+      const zt = k === 1 ? `(${b.tex})` : `\\left(${k}(${b.tex})\\right)`;
       const modTex = b.root2 ? `${k === 1 ? '' : `${k}`}\\sqrt{2}` : String(2 * k);
       return num(`Use De Moivre's theorem to show that $${zt}^{${n}}$ is a real number, and find its value.`, val,
         { traps: [{ value: -val, why: `Check the sign: the argument of the power is $${n} \\times ${piFrac(b.t, 12).tex} = ${piFrac(b.t * n, 12).tex}$, which gives $\\cos = ${sign}$.` }, { value: sign * k ** n * Math.abs(b.root2 ? 2 * n : 2 * n), why: 'The modulus is RAISED to the power $n$, not multiplied by $n$.' }],
@@ -293,7 +293,7 @@ const demoivreForms = [
     const th = piFrac(arg[0], arg[1]);
     const r = ri(rng, 2, 3);
     void argF;
-    return num(`The complex number $w$ has modulus $${r ** n}$ and argument $${th.tex}$. The $${n}$ roots of $z^{${n}} = w$ have arguments $\\dfrac{\\theta + 2k\\pi}{${n}}$ for $k = 0, 1, \\ldots, ${n - 1}$. Find the argument of the root with $k = ${kk}$, exactly, in radians.`, key.val,
+    return num(`The complex number $w$ has modulus $${r ** n}$ and argument $${th.tex}$. The $${n}$ roots of $z^{${n}} = w$ have arguments $\\dfrac{\\theta + 2k\\pi}{${n}}$ for $k = 0, 1, \\ldots, ${n - 1}$. Find the argument of the root with $k = ${kk}$, exactly, in radians, giving the value of $\\dfrac{\\theta + 2k\\pi}{${n}}$ as it stands (do not reduce it to $(-\\pi, \\pi]$).`, key.val,
       { extra: { requireExact: true, canonicalInput: key.typed }, inputHint: 'e.g. 3pi/4',
         traps: [{ value: piFrac(arg[0], arg[1] * n).val, why: `That is the $k = 0$ root. Add $\\dfrac{2\\pi k}{${n}}$ for $k = ${kk}$.`, tol: 0.001 }, { value: piFrac(2 * kk + arg[0] / arg[1], 1).val === undefined ? 0 : (arg[0] / arg[1] + 2 * kk) * Math.PI, why: `Divide by $n = ${n}$ after adding $2k\\pi$ — the whole argument is shared among the roots.`, tol: 0.001 }],
         hints: [`Substitute $\\theta = ${th.tex}$ and $k = ${kk}$.`, `$\\dfrac{${th.tex} + ${2 * kk}\\pi}{${n}}$.`, `$= ${key.tex}$.`],
@@ -350,7 +350,7 @@ const integrationForms = [
       const f = new Frac(c, n * n);
       return frac(`Use integration by parts to evaluate $\\displaystyle\\int_0^{${up}} ${lead}x\\sin(${nx})\\,dx$ exactly.`, f,
         { traps: [{ frac: new Frac(c, n), why: `After parts the remaining integral $\\dfrac{1}{${n}}\\int\\cos(${nx})\\,dx$ brings a second factor of $\\dfrac{1}{${n}}$.` }, { frac: new Frac(-c, n * n), why: 'Check the sign of the first term: $\\left[-\\dfrac{x\\cos(nx)}{n}\\right]$ vanishes at both limits here, leaving a positive result.' }],
-          hints: [`Parts with $u = x$ and $dv = \\sin(${nx})\\,dx$.`, `Antiderivative: $${lead}\\left[-\\dfrac{x\\cos(${nx})}{${n}} + \\dfrac{\\sin(${nx})}{${n * n}}\\right]$.`, `At $x = ${up.replace('\\dfrac', '')}$ the cosine is $0$ and the sine is $1$.`],
+          hints: [`Parts with $u = x$ and $dv = \\sin(${nx})\\,dx$.`, `Antiderivative: $${lead}\\left[-\\dfrac{x\\cos(${nx})}{${n}} + \\dfrac{\\sin(${nx})}{${n * n}}\\right]$.`, `At $x = ${up}$ the cosine is $0$ and the sine is $1$.`],
           steps: [{ h: 'Integrate by parts', d: `$${lead}\\left[-\\dfrac{x\\cos(${nx})}{${n}} + \\dfrac{\\sin(${nx})}{${n * n}}\\right]_0^{${up}}$` }, { h: 'Evaluate at the limits', d: `The first term is $0$ at both limits; $\\sin$ gives $\\dfrac{1}{${n * n}}$ at the top and $0$ at the bottom.` }, { h: 'Result', d: `$${f.latex()}$` }] });
     }
     const val = c * (Math.PI / 2 - 1) / (n * n);
@@ -420,7 +420,7 @@ const integrationForms = [
       const den = `${fac(a)}${fac(b)}`;
       return frac(`Express $\\dfrac{${lin(p, q)}}{${den}}$ in the form $\\dfrac{A}{${fac(a)}} + \\dfrac{B}{${fac(b)}}$. Find ${wantA ? '$A$' : '$B$'}.`, target,
         { traps: [{ frac: wantA ? B : A, why: `${wantA ? '$A$' : '$B$'} belongs to the factor $${wantA ? fac(a) : fac(b)}$ — cover it up and substitute $x = ${wantA ? a : b}$.` }, { frac: new Frac(wantA ? p * a + q : p * b + q, 1), why: `Divide by the other factor evaluated at $x = ${wantA ? a : b}$: $${wantA ? a : b} - ${wantA ? b : a}$ is not $1$.` }],
-          hints: ['Multiply through by the denominator.', `Substitute $x = ${wantA ? a : b}$ to isolate ${wantA ? '$A$' : '$B$'}.`, `${wantA ? 'A' : 'B'}$ = ${target.latex()}$.`],
+          hints: ['Multiply through by the denominator.', `Substitute $x = ${wantA ? a : b}$ to isolate ${wantA ? '$A$' : '$B$'}.`, `$${wantA ? 'A' : 'B'} = ${target.latex()}$.`],
           steps: [{ h: 'Clear the fractions', d: `$${lin(p, q)} = A${fac(b)} + B${fac(a)}$` }, { h: `Let $x = ${wantA ? a : b}$`, d: `$${p * (wantA ? a : b) + q} = ${wantA ? 'A' : 'B'}(${wantA ? a - b : b - a})$` }, { h: 'Solve', d: `$${wantA ? 'A' : 'B'} = ${target.latex()}$` }] });
     }
     return integrationForms[0].make(rng, diff);
@@ -466,20 +466,20 @@ const integrationForms = [
   } },
   // Context: distance from a velocity involving a parts integral.
   { make: (rng, diff) => {
-    const k = rc(rng, [0.2, 0.25, 0.4, 0.5, 0.8, 1, 2]), T = ri(rng, 2, 6 + 2 * diff), c = ri(rng, 2, 4 + 4 * diff);
+    const k = rc(rng, [0.2, 0.25, 0.4, 0.5, 0.8, 2]), T = ri(rng, 2, 6 + 2 * diff), c = ri(rng, 2, 4 + 4 * diff);
     const dist = (c * (1 - Math.exp(-k * T) * (1 + k * T))) / (k * k);
     const who = rc(rng, ['cyclist on a Sydney bike path', 'netball ball rolling across the court after a pass', 'surf ski paddler leaving the beach', 'kangaroo accelerating across a paddock']);
     return num(`A ${who} has velocity $v = ${c}t\\,e^{-${k}t}$ metres per second, $t$ seconds after starting from rest at the origin. Use integration by parts to find the distance travelled in the first $${T}$ seconds, correct to 3 decimal places.`, r3(dist),
-      { tol: 0.002, suffix: 'm', traps: [{ value: r3((c * T * Math.exp(-k * T)) / k), why: 'Parts leaves a second integral; the first term alone is not the distance.' }, { value: r3(c * (1 - Math.exp(-k * T)) / (k * k)), why: `The $-te^{-kt}/k$ term must be kept: the antiderivative is $-\\dfrac{${c}}{${k}}te^{-${k}t} - \\dfrac{${c}}{${k * k}}e^{-${k}t}$.` }],
+      { tol: 0.002, suffix: 'm', traps: [{ value: r3((c * T * Math.exp(-k * T)) / k), why: 'Parts leaves a second integral; the first term alone is not the distance.' }, { value: r3(c * (1 - Math.exp(-k * T)) / (k * k)), why: `The $-te^{-kt}/k$ term must be kept: the antiderivative is $-\\dfrac{${c}}{${k}}te^{-${k}t} - \\dfrac{${c}}{${bigRound(k * k, 4)}}e^{-${k}t}$.` }],
         hints: ['Distance $= \\displaystyle\\int_0^{T} v\\,dt$.', `Parts with $u = t$ and $dv = e^{-${k}t}\\,dt$.`, 'Evaluate between $0$ and $T$.'],
-        steps: [{ h: 'Set up', d: `$s = \\displaystyle\\int_0^{${T}} ${c}t\\,e^{-${k}t}\\,dt$` }, { h: 'Integrate by parts', d: `$\\dfrac{${c}}{${k * k}}\\left[1 - e^{-${k}t}(1 + ${k}t)\\right]$ evaluated at $t = ${T}$` }, { h: 'Result', d: `$\\approx ${r3(dist)}$ m` }] });
+        steps: [{ h: 'Set up', d: `$s = \\displaystyle\\int_0^{${T}} ${c}t\\,e^{-${k}t}\\,dt$` }, { h: 'Integrate by parts', d: `$\\dfrac{${c}}{${bigRound(k * k, 4)}}\\left[1 - e^{-${k}t}(1 + ${k}t)\\right]$ evaluated at $t = ${T}$` }, { h: 'Result', d: `$\\approx ${r3(dist)}$ m` }] });
   } },
   // Double-angle then integrate.
   { make: (rng, diff) => {
     const n = ri(rng, 2, 5 + diff), c = ri(rng, 1, 6 * diff + 2), useSin = rng() < 0.5;
     const val = (c * Math.PI) / (4 * n);
     return num(`Using the identity $${useSin ? '\\sin^2' : '\\cos^2'}\\theta = \\dfrac{1 ${useSin ? '-' : '+'} \\cos 2\\theta}{2}$, evaluate $\\displaystyle\\int_0^{\\pi/${2 * n}} ${c === 1 ? '' : c}${useSin ? '\\sin^2' : '\\cos^2'}(${n}x)\\,dx$, correct to 3 decimal places.`, r3(val),
-      { tol: 0.002, traps: [{ value: r3(val * 2), why: `The half in the identity gives $\\tfrac{1}{2}$ of the width $\\dfrac{\\pi}{${2 * n}}$; the $\\cos(${2 * n}x)$ term then integrates to $\\sin$, which is $0$ at both limits.` }, { value: r3(c * Math.PI / (2 * n)), why: 'Include the factor of $\\tfrac{1}{2}$ from the identity.' }],
+      { tol: 0.002, traps: [{ value: r3(val * 2), why: 'Include the factor of $\\tfrac{1}{2}$ from the identity: only half of the width survives.' }],
         hints: [`$${useSin ? '\\sin^2' : '\\cos^2'}(${n}x) = \\dfrac{1 ${useSin ? '-' : '+'} \\cos(${2 * n}x)}{2}$.`, `The $\\cos(${2 * n}x)$ term integrates to $\\dfrac{\\sin(${2 * n}x)}{${2 * n}}$, which is $0$ at $x = 0$ and $x = \\dfrac{\\pi}{${2 * n}}$.`, 'Only $\\dfrac{1}{2}x$ survives.'],
         steps: [{ h: 'Rewrite', d: `$${c === 1 ? '' : c}\\left[\\dfrac{x}{2} ${useSin ? '-' : '+'} \\dfrac{\\sin(${2 * n}x)}{${4 * n}}\\right]_0^{\\pi/${2 * n}}$` }, { h: 'Evaluate', d: `$${c}\\cdot\\dfrac{\\pi}{${4 * n}} \\approx ${r3(val)}$` }] });
   } }
@@ -765,12 +765,24 @@ const mechanicsForms = [
 // A draw that hits an excluded parameter combination (an unlucky ratio, a zero
 // key) is redrawn from the same seeded stream, so a seed still reproduces.
 export const SAFE_STATS = { retries: 0 };
+/** Final typography pass on generated text: signs ("+ -3" -> "- 3"), unit coefficients ("1x" -> "x"), float tails. */
+export const tidyText = t => String(t)
+  .replace(/\+ -(\d)/g, '- $1').replace(/- -(\d)/g, '+ $1')
+  .replace(/(^|[^\d.\w\\^{_])1([a-zA-Z])(?![a-zA-Z])/g, '$1$2')
+  .replace(/(\d+\.\d{7,})/g, m => String(Math.round(parseFloat(m) * 1e6) / 1e6));
+const tidy = q => {
+  const o = { ...q, prompt: tidyText(q.prompt), hints: q.hints.map(tidyText), steps: q.steps.map(x => ({ h: tidyText(x.h), d: tidyText(x.d) })) };
+  if (q.traps) o.traps = q.traps.map(t => (t.why ? { ...t, why: tidyText(t.why) } : t));
+  if (q.mcqOptions) o.mcqOptions = q.mcqOptions.map(tidyText);
+  if (q.answer && q.answer.optionTraps) o.answer = { ...q.answer, optionTraps: Object.fromEntries(Object.entries(q.answer.optionTraps).map(([k, v]) => [k, tidyText(v)])) };
+  return o;
+};
 const safe = list => list.map(v => ({
   ...v,
   make: (rng, diff) => {
     let last;
     for (let i = 0; i < 60; i++) {
-      try { return v.make(rng, diff); } catch (e) { last = e; SAFE_STATS.retries++; }
+      try { return tidy(v.make(rng, diff)); } catch (e) { last = e; SAFE_STATS.retries++; }
     }
     throw last;
   }

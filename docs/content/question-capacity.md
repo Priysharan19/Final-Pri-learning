@@ -78,7 +78,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `mex-proof` | 4 | 12.5k | 30 | — |
 | `mex-mechanics` | 4 | 13.1k | 30 | — |
 | `y8-equations` | 3 | 14.7k | 26 | — |
-| `mex-integration` | 4 | 15.4k | 130 | — |
+| `mex-integration` | 4 | 15.3k | 130 | — |
 | `y10-simeq` | 4 | 17.0k | 6 | — |
 | `y10-probability` | 4 | 20.4k | 1 | forms |
 | `y8-algebra` | 4 | 21.6k | 25 | — |
