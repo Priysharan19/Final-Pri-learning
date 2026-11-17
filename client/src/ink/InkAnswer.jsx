@@ -474,10 +474,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const onOnline = () => {
       setOnline(true); clearIf(['offline']);
       // Back online: a page that waited for a connection is read now (autoRead).
-      if (autoReadRef.current && strokesRef.current.length && !disabledRef.current) {
+      if (autoReadRef.current && strokesRef.current.length && !disabledRef.current && signatureOfRef.current(strokesRef.current) !== readRef.current && autoCountRef.current < AUTO_READ_MAX) {
         autoTriedRef.current = null;
         clearTimeout(autoTimerRef.current);
-        autoTimerRef.current = setTimeout(() => { autoTriedRef.current = signatureOfRef.current(strokesRef.current); readRef2.current?.({ auto: true }); }, 600);
+        autoTimerRef.current = setTimeout(() => { autoTriedRef.current = signatureOfRef.current(strokesRef.current); autoCountRef.current += 1; readRef2.current?.({ auto: true }); }, 600);
       }
     };
     const onOffline = () => setOnline(false);

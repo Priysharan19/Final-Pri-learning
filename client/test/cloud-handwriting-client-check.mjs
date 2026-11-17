@@ -530,7 +530,7 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   // Owner decision, 18 November 2026: coming back online resumes a page that waited
   // for a connection, as an auto read (never a prompt, never marking). A session
   // announcement still only clears the reason.
-  ok(/onCloudSessionChange\(\(\) => clearIf\(/.test(src) && /const onOnline = \(\) => \{\s*setOnline\(true\); clearIf\(\['offline'\]\);/.test(src) && /autoReadRef\.current && strokesRef\.current\.length && !disabledRef\.current/.test(src),
+  ok(/onCloudSessionChange\(\(\) => clearIf\(/.test(src) && /const onOnline = \(\) => \{\s*setOnline\(true\); clearIf\(\['offline'\]\);/.test(src) && /autoReadRef\.current && strokesRef\.current\.length && !disabledRef\.current/.test(src) && /!== readRef\.current && autoCountRef\.current < AUTO_READ_MAX/.test(src),
     'a session announcement clears the reason and reads nothing; coming back online clears it and resumes a waiting page as an auto read only');
   ok(/ACCOUNT_BLOCKED_KEYS\.has\(shownStatus\.key\)/.test(src) && /to="\/settings"/.test(src),
     'an account blocker renders the way to Account settings beside the notice');

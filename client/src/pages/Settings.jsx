@@ -119,7 +119,6 @@ export default function Settings() {
       {classroom && <ClassroomPanel />}
       <WritingHand />
       <AutoRead />
-      <AutoRead />
       <AboutEdition />
       <StaffOperations />
     </>

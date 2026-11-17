@@ -114,9 +114,6 @@ const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transc
 // own picture: the two share this bucket, so the one-request Submit cannot be
 // used to read more pictures an hour than the receipt route allows.
 const RECOGNIZE_LIMIT = Object.freeze({ limit: 120, windowMs: 60 * 60 * 1000 });
-// The reader also runs on its own after a pause, so one question has its own
-// ceiling on top of the account's hourly bucket: reads of one question per day.
-const RECOGNIZE_QUESTION_LIMIT = Object.freeze({ limit: 60, windowMs: 24 * 60 * 60 * 1000 });
 const RECOGNITION_FIELDS = new Set(['image', 'mode', 'receipt', 'text']);
 const CORRECTION_FIELDS = new Set(['text']);
 const PUBLIC_Q = PUBLIC_QUESTION_FIELDS;
@@ -803,11 +800,6 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (held.get('practice-completion')) return reject(res, 409, 'QUESTION_ALREADY_GRADED', 'This question has been completed.');
     try { validateImage(body.image); }
     catch (error) { return reject(res, error.status || 400, error.code || 'RECOGNITION_IMAGE_INVALID', error.message || 'Invalid image.'); }
-    const perQuestion = await consumeRateLimit(db, `practice-recognize-q:${sha256(`${accountId}:${qid}`).slice(0, 24)}`, RECOGNIZE_QUESTION_LIMIT);
-    if (!perQuestion.allowed) {
-      res.set('Retry-After', String(Math.max(1, Math.ceil((perQuestion.resetAt - Date.now()) / 1000))));
-      return reject(res, 429, 'RATE_LIMITED', 'This question has been read too many times today. Check the reading you have, or try tomorrow.');
-    }
 
     // One paid read per picture (recognitionOps.js). A transcript this account
     // already paid for through /handwriting/transcribe — or a read of the same

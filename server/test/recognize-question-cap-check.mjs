@@ -11,20 +11,22 @@ const { consumeRateLimit, sha256 } = await import('../platform/security.js');
 
 let checks = 0;
 const assert = (c, m) => { checks++; if (!c) throw Error(m); };
-const src = readFileSync(new URL('../platform/practice.js', import.meta.url), 'utf8');
+const src = readFileSync(new URL('../platform/handwriting.js', import.meta.url), 'utf8');
+const practice = readFileSync(new URL('../platform/practice.js', import.meta.url), 'utf8');
 
-const limit = /RECOGNIZE_QUESTION_LIMIT = Object\.freeze\(\{ limit: (\d+), windowMs: ([\d* ]+) \}\)/.exec(src);
+const limit = /READ_QUESTION_LIMIT = Object\.freeze\(\{ limit: (\d+), windowMs: ([\d* ]+) \}\)/.exec(src);
 assert(limit && Number(limit[1]) === 60, 'one question is read at most 60 times a day');
-assert(/RECOGNIZE_LIMIT = Object\.freeze\(\{ limit: 120/.test(src), 'the account bucket (120 reads an hour) is unchanged');
-const route = src.slice(src.indexOf("router.post('/:id/recognize'"));
-const capAt = route.indexOf('practice-recognize-q:');
-assert(capAt > 0 && capAt < route.indexOf('recognitionOps') || capAt < route.indexOf('reused'), 'the per-question cap is taken before the reader is reached');
-assert(/validateImage\(body\.image\)[\s\S]{0,300}practice-recognize-q:/.test(route), 'a malformed picture is refused before it costs a unit');
+assert(/RECOGNIZE_LIMIT = Object\.freeze\(\{ limit: 120/.test(practice) && /handwriting-transcribe', \{ limit: 240/.test(src), 'the account buckets (120 an hour on recognize, 240 on transcribe) are unchanged');
+assert(!/practice-recognize-q:/.test(practice), 'the cap is on the paid read (transcribe), not on the receipt-binding route');
+const route = src.slice(src.indexOf("router.post('/transcribe'"));
+const capAt = route.indexOf('handwriting-read-q:');
+assert(capAt > 0 && capAt < route.indexOf('recognitionOpsFor(db).read'), 'the per-question cap is taken before the paid read');
+assert(/validateImage\(req\.body\.image\)[\s\S]{0,600}handwriting-read-q:/.test(route), 'a malformed picture is refused before it costs a unit');
 assert(/'RATE_LIMITED'/.test(route.slice(capAt, capAt + 600)) && /Retry-After/.test(route.slice(capAt, capAt + 600)), 'the cap answers a coded 429 with Retry-After');
 
 const h = await startApp({ engine: requestedEngine() });
 try {
-  const bucket = (account, question) => `practice-recognize-q:${sha256(`${account}:${question}`).slice(0, 24)}`;
+  const bucket = (account, question) => `handwriting-read-q:${sha256(`${account}:${question}`).slice(0, 24)}`;
   const rule = { limit: 60, windowMs: 24 * 60 * 60 * 1000 };
   const t0 = Date.now();
   let admitted = 0;

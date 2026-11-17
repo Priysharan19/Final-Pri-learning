@@ -34,7 +34,7 @@ A student can turn it off (Settings → Reading my handwriting). The preference 
 ## Cost and abuse guard
 
 - Per account: 120 reads an hour (`/practice/:id/recognize`), 240 an hour (`/handwriting/transcribe`), both existing.
-- **New:** per account per question, 60 reads a day (`RECOGNIZE_QUESTION_LIMIT`), refused before any provider work with a coded 429 and `Retry-After`.
+- **New:** per account per question, 60 paid reads a day on `/handwriting/transcribe` (`READ_QUESTION_LIMIT`, keyed by the question id the client sends), refused before any provider work with a coded 429 and `Retry-After`.
 - Deployment-wide: the daily paid-call ceiling (`spendCeiling.js`) still applies and is unchanged.
 - Client: one read in flight, an unchanged page is never read twice, 12 automatic reads of a page per visit.
 - Provider usage is logged as before.
