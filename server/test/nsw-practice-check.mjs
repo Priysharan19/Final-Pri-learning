@@ -189,7 +189,7 @@ try {
 
   // ── Final answer only, with the method-mark switch ON ─────────────────────
   {
-    const r = await issue({ generator: 'y7-equations', difficulty: 2, seed: 1, curriculum: 'nsw' });
+    const r = await issue({ generator: 'y7-equations', difficulty: 2, seed: 14071, curriculum: 'nsw' });
     c.deq([r.status, r.data.question.prompt], [201, 'Solve $2x + 1 = 11$.'], 'a two-mark equation is issued');
     c.ok(r.data.question.criteriaCount >= 2 && r.data.question.supportsSteps === true, 'it carries two marks and its working can be read');
     const sealed = await sealedOf(a.account.id, r.data.question.id);
@@ -209,7 +209,7 @@ try {
     const [event] = await eventsOf(r.data.question.id);
     c.deq([event.marksEarned, event.correct, event.curriculum?.outcomes?.[0]?.code], [0, false, 'MA4-EQU-C-01'], 'the recorded attempt: no marks, and its outcome');
     // Working alone, no final answer, earns nothing either.
-    const again = await issue({ generator: 'y7-equations', difficulty: 2, seed: 2, curriculum: 'nsw' });
+    const again = await issue({ generator: 'y7-equations', difficulty: 2, seed: 52507, curriculum: 'nsw' });
     await submit(again.data.question.id, 'nsw-working-only-1', '', ['3x - 5 = 16', '3x = 21']);
     const only = await submit(again.data.question.id, 'nsw-working-only-2', '', ['3x - 5 = 16', '3x = 21']);
     c.deq([only.data.resolved, only.data.marksEarned, only.data.partial], [true, 0, null], 'working with no final answer earns nothing');
@@ -361,7 +361,7 @@ try {
     const { generateQuestion, loadAllBanks } = await import('../../client/src/engine/generators/index.js');
     await loadAllBanks();
     const plant = async extra => {
-      const payload = JSON.stringify({ ...generateQuestion('y7-equations', 2, 1), _practiceMode: 'practice', _generator: 'y7-equations', ...extra });
+      const payload = JSON.stringify({ ...generateQuestion('y7-equations', 2, 14071), _practiceMode: 'practice', _generator: 'y7-equations', ...extra });
       const id = randomUUID();
       const now = Date.now();
       await india.db.transaction(() => india.db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",
