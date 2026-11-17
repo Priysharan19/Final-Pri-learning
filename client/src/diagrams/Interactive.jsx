@@ -15,8 +15,13 @@
 import React, { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import './diagrams.css';
-import { FunctionGraph, UnitCircle, SecantTangent, RiemannRectangles, NormalCurve, CompoundGrowth, Tex } from './Diagram.jsx';
+import { FunctionGraph, UnitCircle, SecantTangent, RiemannRectangles, NormalCurve, CompoundGrowth, Tex, riemannMode, currencySymbol, currencyTex } from './Diagram.jsx';
 import { unitCirclePoint, secantTangentModel, riemannModel, normalCurveModel, compoundModel, r3 } from './geometry.js';
+import { useKitText } from './kitText.js';
+import { CORE_TEXT } from './coreText.js';
+
+/** The kit's words in the language on screen (coreText.js). */
+const useTk = () => useKitText(CORE_TEXT);
 
 /** A labelled range input with its current value; arrow keys, Home/End and Page keys are the browser's own. */
 export function Slider({ label, min, max, step, value, onChange, format = v => String(v), name }) {
@@ -55,6 +60,7 @@ const BASES = {
 const place = (expr, u) => expr.replace(/\bx\b/g, u);
 
 export function TransformSliders({ base = 'quadratic', title = null, initial = {}, show = ['a', 'b', 'h', 'k'], names = {} }) {
+  const tk = useTk();
   const B = BASES[base];
   const [a, setA] = useState(initial.a ?? 1);
   const [b, setB] = useState(initial.b ?? 1);
@@ -74,22 +80,25 @@ export function TransformSliders({ base = 'quadratic', title = null, initial = {
   const reset = () => { setA(1); setB(1); setH(0); setK(0); };
   const fmt = v => r3(v, 2).toString();
   return (
-    <Shell title={title || (base === 'linear' ? 'Change the gradient and the intercept' : `Transform y = ${B.name.replace(/\\/g, '')}`)} readout={base === 'linear' ? `$${tex}$: gradient $${fmt(a)}$ (it rises ${fmt(Math.abs(a))} for each 1 across${a < 0 ? ', falling' : ''}), crossing the y-axis at $${fmt(k)}$.` : `$${tex}$: stretch ${fmt(Math.abs(a))}${a < 0 ? ' and reflect in the x-axis' : ''}; horizontal scale ${b === 0 ? 'none' : fmt(1 / Math.abs(b))}${b < 0 ? ' and reflect in the y-axis' : ''}; shift ${fmt(h)} right and ${fmt(k)} up.`}
+    <Shell title={title || (base === 'linear' ? tk('transform.titleLinear') : tk('transform.title', { name: B.name.replace(/\\/g, '') }))} readout={base === 'linear'
+      ? tk('transform.readoutLinear', { tex: `$${tex}$`, m: `$${fmt(a)}$`, rise: fmt(Math.abs(a)), falling: a < 0 ? tk('transform.falling') : '', k: `$${fmt(k)}$` })
+      : tk('transform.readout', { tex: `$${tex}$`, stretch: fmt(Math.abs(a)), reflectX: a < 0 ? tk('transform.reflectX') : '', scale: b === 0 ? tk('transform.noScale') : fmt(1 / Math.abs(b)), reflectY: b < 0 ? tk('transform.reflectY') : '', h: fmt(h), k: fmt(k) })}
       controls={<>
-        {show.includes('a') && <Slider label={names.a || 'a (vertical stretch)'} min={-3} max={3} step={0.25} value={a} onChange={setA} format={fmt} />}
-        {show.includes('b') && <Slider label={names.b || 'b (horizontal)'} min={-3} max={3} step={0.25} value={b} onChange={setB} format={fmt} />}
-        {show.includes('h') && <Slider label={names.h || 'h (shift right)'} min={-5} max={5} step={0.5} value={h} onChange={setH} format={fmt} />}
-        {show.includes('k') && <Slider label={names.k || 'k (shift up)'} min={-5} max={5} step={0.5} value={k} onChange={setK} format={fmt} />}
-        <div className="dgi-buttons"><button type="button" onClick={reset}>Reset</button></div>
+        {show.includes('a') && <Slider label={names.a || tk('transform.a')} min={-3} max={3} step={0.25} value={a} onChange={setA} format={fmt} />}
+        {show.includes('b') && <Slider label={names.b || tk('transform.b')} min={-3} max={3} step={0.25} value={b} onChange={setB} format={fmt} />}
+        {show.includes('h') && <Slider label={names.h || tk('transform.h')} min={-5} max={5} step={0.5} value={h} onChange={setH} format={fmt} />}
+        {show.includes('k') && <Slider label={names.k || tk('transform.k')} min={-5} max={5} step={0.5} value={k} onChange={setK} format={fmt} />}
+        <div className="dgi-buttons"><button type="button" onClick={reset}>{tk('common.reset')}</button></div>
       </>}>
-      <FunctionGraph xmin={B.xmin} xmax={B.xmax} ymin={B.ymin} ymax={B.ymax} hideIntercepts title={base === 'linear' ? 'The line y = mx + c' : `Graph of y = ${B.name.replace(/\\/g, '')} and its transformation`}
+      <FunctionGraph xmin={B.xmin} xmax={B.xmax} ymin={B.ymin} ymax={B.ymax} hideIntercepts title={base === 'linear' ? tk('transform.graphLinear') : tk('transform.graph', { name: B.name.replace(/\\/g, '') })}
         curves={[{ expr: B.expr, tone: 'secondary', id: 'base' }, { expr, label: tex, tone: 'primary', id: 'moved' }]} />
     </Shell>
   );
 }
 
 // ── Unit circle: drag a point ────────────────────────────────────────────────
-export function UnitCircleDrag({ initial = 30, title = 'Drag the point around the unit circle', showTan = true }) {
+export function UnitCircleDrag({ initial = 30, title, showTan = true }) {
+  const tk = useTk();
   const [deg, setDeg] = useState(initial);
   const svgRef = useRef(null);
   const p = unitCirclePoint(deg);
@@ -109,18 +118,22 @@ export function UnitCircleDrag({ initial = 30, title = 'Drag the point around th
     else if (e.key === 'Home') { e.preventDefault(); set(0); }
     else if (e.key === 'End') { e.preventDefault(); set(359); }
   };
-  const readout = `$\\theta=${p.deg}^{\\circ}$: $\\cos\\theta=${p.cos}$, $\\sin\\theta=${p.sin}$, ${p.tan === null ? '$\\tan\\theta$ is undefined' : `$\\tan\\theta=${p.tan}$`}. ${p.quadrant ? `Quadrant ${p.quadrant}; reference angle ${p.reference}°.` : 'On an axis.'}`;
+  const readout = tk('unitCircleDrag.readout', {
+    angle: `$\\theta=${p.deg}^{\\circ}$`, cos: `$\\cos\\theta=${p.cos}$`, sin: `$\\sin\\theta=${p.sin}$`,
+    tan: p.tan === null ? tk('unitCircleDrag.tanUndefined', { tan: '$\\tan\\theta$' }) : `$\\tan\\theta=${p.tan}$`,
+    where: p.quadrant ? tk('unitCircleDrag.quadrant', { quadrant: p.quadrant, reference: p.reference }) : tk('unitCircleDrag.onAxis')
+  });
   return (
-    <Shell title={title} readout={readout} className="dg-square"
+    <Shell title={title ?? tk('unitCircleDrag.title')} readout={readout} className="dg-square"
       controls={<>
-        <Slider label="Angle θ (degrees)" min={0} max={359} step={1} value={Math.round(p.deg) % 360} onChange={set} format={v => `${v}°`} />
-        <div className="dgi-buttons" role="group" aria-label="Common angles">{[0, 30, 45, 60, 90, 120, 150, 180, 270].map(a => <button key={a} type="button" aria-pressed={Math.round(p.deg) === a} onClick={() => set(a)}>{a}°</button>)}</div>
+        <Slider label={tk('unitCircleDrag.slider')} min={0} max={359} step={1} value={Math.round(p.deg) % 360} onChange={set} format={v => `${v}°`} />
+        <div className="dgi-buttons" role="group" aria-label={tk('unitCircleDrag.presets')}>{[0, 30, 45, 60, 90, 120, 150, 180, 270].map(a => <button key={a} type="button" aria-pressed={Math.round(p.deg) === a} onClick={() => set(a)}>{a}°</button>)}</div>
       </>}>
-      <UnitCircle deg={deg} showTan={showTan && p.tan !== null} title="The unit circle with a movable point"
+      <UnitCircle deg={deg} showTan={showTan && p.tan !== null} title={tk('unitCircleDrag.graph')}
         svgProps={{ role: 'group', ref: svgRef, onPointerDown: e => { e.currentTarget.setPointerCapture?.(e.pointerId); fromPointer(e); }, onPointerMove: e => { if (e.buttons) fromPointer(e); } }}
         overlay={m => (
-          <g className="dgi-handle" role="slider" tabIndex={0} aria-label="Point on the unit circle" aria-valuemin={0} aria-valuemax={359} aria-valuenow={Math.round(p.deg) % 360}
-            aria-valuetext={`${p.deg} degrees, cosine ${p.cos}, sine ${p.sin}`} onKeyDown={onKey}>
+          <g className="dgi-handle" role="slider" tabIndex={0} aria-label={tk('unitCircleDrag.handle')} aria-valuemin={0} aria-valuemax={359} aria-valuenow={Math.round(p.deg) % 360}
+            aria-valuetext={tk('unitCircleDrag.valueText', { deg: p.deg, cos: p.cos, sin: p.sin })} onKeyDown={onKey}>
             <circle className="dgi-ring" cx={m.px[0]} cy={m.px[1]} r="11" />
             <circle className="dg-dot is-key" cx={m.px[0]} cy={m.px[1]} r="4" />
           </g>
@@ -131,15 +144,16 @@ export function UnitCircleDrag({ initial = 30, title = 'Drag the point around th
 
 // ── Secant to tangent ────────────────────────────────────────────────────────
 const H_STEPS = [2, 1.5, 1, 0.75, 0.5, 0.25, 0.1, 0.05, 0.01, 0.001];
-export function SecantToTangent({ expr = 'x^2', x0 = 1, xmin = -1, xmax = 4, ymin = -1, ymax = 10, title = 'Move the secant towards the tangent' }) {
+export function SecantToTangent({ expr = 'x^2', x0 = 1, xmin = -1, xmax = 4, ymin = -1, ymax = 10, title }) {
+  const tk = useTk();
   const [i, setI] = useState(2);
   const h = H_STEPS[i];
   const m = secantTangentModel({ expr, x0, h, xmin, xmax, ymin, ymax });
   return (
-    <Shell title={title} readout={`Second point at $x=${r3(x0 + h, 4)}$ ($h=${h}$): secant gradient $${m.secantSlope}$; tangent gradient at $x=${x0}$ is $${m.tangentSlope}$. As $h\\to0$ the secant gradient approaches the tangent's.`}
+    <Shell title={title ?? tk('secantToTangent.title')} readout={tk('secantToTangent.readout', { x1: `$x=${r3(x0 + h, 4)}$`, h: `$h=${h}$`, secant: `$${m.secantSlope}$`, x0: `$x=${x0}$`, tangent: `$${m.tangentSlope}$`, limit: '$h\\to0$' })}
       controls={<>
-        <Slider label="h (distance to the second point)" min={0} max={H_STEPS.length - 1} step={1} value={i} onChange={setI} format={v => `h = ${H_STEPS[v]}`} />
-        <div className="dgi-buttons"><button type="button" onClick={() => setI(H_STEPS.length - 1)}>Move to the tangent</button><button type="button" onClick={() => setI(2)}>Reset</button></div>
+        <Slider label={tk('secantToTangent.slider')} min={0} max={H_STEPS.length - 1} step={1} value={i} onChange={setI} format={v => `h = ${H_STEPS[v]}`} />
+        <div className="dgi-buttons"><button type="button" onClick={() => setI(H_STEPS.length - 1)}>{tk('secantToTangent.toTangent')}</button><button type="button" onClick={() => setI(2)}>{tk('common.reset')}</button></div>
       </>}>
       <SecantTangent expr={expr} x0={x0} h={h} xmin={xmin} xmax={xmax} ymin={ymin} ymax={ymax} />
     </Shell>
@@ -147,15 +161,16 @@ export function SecantToTangent({ expr = 'x^2', x0 = 1, xmin = -1, xmax = 4, ymi
 }
 
 // ── Riemann rectangles ───────────────────────────────────────────────────────
-export function RiemannSlider({ expr = 'x^2', a = 0, b = 3, initialN = 4, title = 'Add rectangles under the curve' }) {
+export function RiemannSlider({ expr = 'x^2', a = 0, b = 3, initialN = 4, title }) {
+  const tk = useTk();
   const [n, setN] = useState(initialN);
   const [mode, setMode] = useState('left');
   const m = riemannModel({ expr, a, b, n, mode });
   return (
-    <Shell title={title} readout={`${n} ${mode}-point rectangles: total area $${m.sum}$; the area under the curve is $${m.area}$ (difference $${m.error}$). More rectangles fit the curve more closely.`}
+    <Shell title={title ?? tk('riemannSlider.title')} readout={tk('riemannSlider.readout', { n, mode: riemannMode(tk, mode), sum: `$${m.sum}$`, area: `$${m.area}$`, error: `$${m.error}$` })}
       controls={<>
-        <Slider label="n (number of rectangles)" min={1} max={60} step={1} value={n} onChange={setN} format={v => `n = ${v}`} />
-        <div className="dgi-buttons" role="group" aria-label="Where each rectangle meets the curve">{['left', 'mid', 'right'].map(k => <button key={k} type="button" aria-pressed={mode === k} onClick={() => setMode(k)}>{k === 'mid' ? 'Midpoint' : `${k[0].toUpperCase()}${k.slice(1)} endpoint`}</button>)}</div>
+        <Slider label={tk('riemannSlider.slider')} min={1} max={60} step={1} value={n} onChange={setN} format={v => `n = ${v}`} />
+        <div className="dgi-buttons" role="group" aria-label={tk('riemannSlider.group')}>{['left', 'mid', 'right'].map(k => <button key={k} type="button" aria-pressed={mode === k} onClick={() => setMode(k)}>{tk(`riemannSlider.${k}`)}</button>)}</div>
       </>}>
       <RiemannRectangles expr={expr} a={a} b={b} n={n} mode={mode} />
     </Shell>
@@ -163,17 +178,18 @@ export function RiemannSlider({ expr = 'x^2', a = 0, b = 3, initialN = 4, title 
 }
 
 // ── Normal curve: area by z ──────────────────────────────────────────────────
-export function NormalAreaByZ({ initial = [-1, 1], title = 'Shade the area between two z-scores' }) {
+export function NormalAreaByZ({ initial = [-1, 1], title }) {
+  const tk = useTk();
   const [lo, setLo] = useState(initial[0]);
   const [hi, setHi] = useState(initial[1]);
   const a = Math.min(lo, hi); const bz = Math.max(lo, hi);
   const m = normalCurveModel({ from: a, to: bz, mode: 'z' });
   return (
-    <Shell title={title} readout={`$P(${a}\\le Z\\le ${bz})=${m.area}$, which is ${r3(m.area * 100, 2)}% of the distribution. About 68%, 95% and 99.7% lie within 1, 2 and 3 standard deviations of the mean.`}
+    <Shell title={title ?? tk('normalZ.title')} readout={tk('normalZ.readout', { prob: `$P(${a}\\le Z\\le ${bz})=${m.area}$`, percent: r3(m.area * 100, 2) })}
       controls={<>
-        <Slider label="Lower z" min={-3.5} max={3.5} step={0.1} value={lo} onChange={setLo} format={v => `z = ${r3(v, 1)}`} />
-        <Slider label="Upper z" min={-3.5} max={3.5} step={0.1} value={hi} onChange={setHi} format={v => `z = ${r3(v, 1)}`} />
-        <div className="dgi-buttons" role="group" aria-label="Within k standard deviations">{[1, 2, 3].map(k => <button key={k} type="button" aria-pressed={a === -k && bz === k} onClick={() => { setLo(-k); setHi(k); }}>±{k} SD</button>)}</div>
+        <Slider label={tk('normalZ.lower')} min={-3.5} max={3.5} step={0.1} value={lo} onChange={setLo} format={v => `z = ${r3(v, 1)}`} />
+        <Slider label={tk('normalZ.upper')} min={-3.5} max={3.5} step={0.1} value={hi} onChange={setHi} format={v => `z = ${r3(v, 1)}`} />
+        <div className="dgi-buttons" role="group" aria-label={tk('normalZ.group')}>{[1, 2, 3].map(k => <button key={k} type="button" aria-pressed={a === -k && bz === k} onClick={() => { setLo(-k); setHi(k); }}>{tk('normalZ.sd', { k })}</button>)}</div>
       </>}>
       <NormalCurve from={a} to={bz} mode="z" />
     </Shell>
@@ -181,19 +197,22 @@ export function NormalAreaByZ({ initial = [-1, 1], title = 'Shade the area betwe
 }
 
 // ── Compound interest ────────────────────────────────────────────────────────
-export function CompoundInterestExplorer({ principal = 1000, initialRate = 5, initialYears = 10, title = 'Compound interest by rate and time' }) {
+export function CompoundInterestExplorer({ principal = 1000, initialRate = 5, initialYears = 10, title, currency }) {
+  const tk = useTk();
+  const cur = currencySymbol(currency); const money = v => `$${currencyTex(cur)}${v}$`;
+  const yearsText = v => tk(v === 1 ? 'compoundExplorer.year' : 'compoundExplorer.years', { n: v });
   const [rate, setRate] = useState(initialRate);
   const [years, setYears] = useState(initialYears);
   const [perYear, setPerYear] = useState(1);
   const m = compoundModel({ principal, rate: rate / 100, years, perYear });
   return (
-    <Shell title={title} readout={`$\\$${principal}$ at $${rate}\\%$ per year, compounded ${perYear === 1 ? 'yearly' : `${perYear} times a year`}, grows to $\\$${m.final}$ in ${years} ${years === 1 ? 'year' : 'years'}: interest $\\$${m.interest}$ (simple interest would give $\\$${m.simpleFinal}$).`}
+    <Shell title={title ?? tk('compoundExplorer.title')} readout={tk('compoundExplorer.readout', { principal: money(principal), rate: `$${rate}\\%$`, often: perYear === 1 ? tk('compoundExplorer.yearly') : tk('compoundExplorer.timesAYear', { n: perYear }), final: money(m.final), time: yearsText(years), interest: money(m.interest), simple: money(m.simpleFinal) })}
       controls={<>
-        <Slider label="Rate (% per year)" min={0} max={15} step={0.5} value={rate} onChange={setRate} format={v => `${v}%`} />
-        <Slider label="Time (years)" min={1} max={30} step={1} value={years} onChange={setYears} format={v => `${v} ${v === 1 ? 'year' : 'years'}`} />
-        <div className="dgi-buttons" role="group" aria-label="Compounding periods per year">{[[1, 'Yearly'], [2, 'Half-yearly'], [4, 'Quarterly'], [12, 'Monthly']].map(([v, l]) => <button key={v} type="button" aria-pressed={perYear === v} onClick={() => setPerYear(v)}>{l}</button>)}</div>
+        <Slider label={tk('compoundExplorer.rate')} min={0} max={15} step={0.5} value={rate} onChange={setRate} format={v => `${v}%`} />
+        <Slider label={tk('compoundExplorer.time')} min={1} max={30} step={1} value={years} onChange={setYears} format={yearsText} />
+        <div className="dgi-buttons" role="group" aria-label={tk('compoundExplorer.group')}>{[1, 2, 4, 12].map(v => <button key={v} type="button" aria-pressed={perYear === v} onClick={() => setPerYear(v)}>{tk(`compoundExplorer.p${v}`)}</button>)}</div>
       </>}>
-      <CompoundGrowth principal={principal} rate={rate / 100} years={years} perYear={perYear} />
+      <CompoundGrowth principal={principal} rate={rate / 100} years={years} perYear={perYear} currency={cur} />
     </Shell>
   );
 }
