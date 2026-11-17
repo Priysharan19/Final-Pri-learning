@@ -498,12 +498,25 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   eq(inkReaderUiState(null, { lines: [{ text: 'x=4' }], needsConfirmation: false }),
     { kind: INK_READER_STATE.READ_SUCCESS }, 'confident usable transcription is READ_SUCCESS');
   eq(inkReaderUiState(null, null), { kind: INK_READER_STATE.IDLE }, 'no current read state is IDLE');
-  // Read on request (owner decision): a read is sent because the student
-  // pressed "Read my answer" (or "Try again" after a refusal) and for no other
-  // reason. It still asks the server afresh, never a cached "not ready".
+  // OWNER DECISION, 18 November 2026 (supersedes the earlier read-on-request
+  // rule of #440/#942): "make it automatically read handwriting in the
+  // background, dont need to press read." A read is sent because the student
+  // pressed "Read my answer" (or "Try again", or Submit on changed writing), OR
+  // on its own after the pen rests (autoRead) — only after the student has said
+  // yes to the reader, never opening the permission prompt. It still asks the
+  // server afresh, never a cached "not ready".
   ok(/freshReadiness: true/.test(src) && /data-ink-read=/.test(src) && /onClick=\{readNow\}/.test(src),
     'the ink surface asks the server afresh (not the cache) when the student presses Read my answer');
-  ok(!/scheduleRead|scheduleRetry|SETTLE_MS|setTimeout\(go/.test(src), 'no timer, pause or stroke sends a read: there is no scheduler left in the surface');
+  ok(!/scheduleRead|scheduleRetry|SETTLE_MS|setTimeout\(go/.test(src), 'the old settle/retry scheduler is still gone');
+  {
+    // The new policy: the only things a timer may send are idle-pause reads, each
+    // marked auto (so they never ask for permission and never retry on failure).
+    const timed = [...src.matchAll(/readRef2\.current\?\.\(([^)]*)\)/g)].map(m => m[1].trim());
+    ok(timed.length >= 3 && timed.every(a => a === '{ auto: true }'), 'every timer-driven read is an auto read: the idle pause, the live step coach and coming back online');
+    ok(/export const AUTO_READ_IDLE_MS = 1300;/.test(src) && /export const AUTO_READ_MAX = 12;/.test(src), 'the idle pause and the per-visit cap are named constants');
+    ok(/readerPermission\(userRef\.current\) === READER_PERMISSION\.ACCEPTED/.test(src) && /if \(auto \|\| askingRef\.current\) return;/.test(src), 'an automatic read needs the student\'s earlier yes and never opens the prompt');
+    ok(/abortRef\.current\?\.abort\?\.\(\)/.test(src) && /flyingRef\.current !== pageSig/.test(src), 'a read still out for an older page is cancelled when the page changes');
+  }
   {
     const sends = [...src.matchAll(/readWithCloud\(/g)].length;
     const callers = [...src.matchAll(/(?<![A-Za-z])readNow\(\)|onClick=\{readNow\}/g)].length;
@@ -514,8 +527,11 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   }
   ok(/readinessIdentity\(user\)/.test(src) && /if \(changed\) setStatus\(/.test(src) && !/fresh: changed/.test(src),
     'a signed-in profile changing under the kept ink clears the sign-in notice and reads nothing');
-  ok(/onCloudSessionChange\(\(\) => clearIf\(/.test(src) && /const onOnline = \(\) => \{ setOnline\(true\); clearIf\(\['offline'\]\); \}/.test(src),
-    'a session announcement or coming back online clears the reason and reads nothing');
+  // Owner decision, 18 November 2026: coming back online resumes a page that waited
+  // for a connection, as an auto read (never a prompt, never marking). A session
+  // announcement still only clears the reason.
+  ok(/onCloudSessionChange\(\(\) => clearIf\(/.test(src) && /const onOnline = \(\) => \{\s*setOnline\(true\); clearIf\(\['offline'\]\);/.test(src) && /autoReadRef\.current && strokesRef\.current\.length && !disabledRef\.current/.test(src),
+    'a session announcement clears the reason and reads nothing; coming back online clears it and resumes a waiting page as an auto read only');
   ok(/ACCOUNT_BLOCKED_KEYS\.has\(shownStatus\.key\)/.test(src) && /to="\/settings"/.test(src),
     'an account blocker renders the way to Account settings beside the notice');
 
@@ -643,6 +659,9 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   for (const key of ['ink.waitingOffline', 'ink.waitingOfflinePlain', 'ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingServiceDown', 'ink.waitingServiceDownPlain']) {
     ok(!/will be read|it will be read|tried again shortly|read once you have/i.test(en[key]) && !/पढ़ा जाएगा|फिर कोशिश होगी/.test(hi[key]), `${key} promises no automatic read or retry`);
   }
+  // The one string that does promise it, by the owner's decision of 18 November 2026.
+  ok(en['ink.autoOffline'] === 'Offline: will read when you’re online' && /ऑफ़लाइन/.test(hi['ink.autoOffline']), 'offline, an auto-read page says it will read when back online (en, hi)');
+  ok(['ink.autoRead', 'ink.autoReadCheck', 'ink.autoCant'].every(k => en[k] && hi[k]), 'the honest read states exist in both languages');
   eq(inkReadingBlockedKey({ cloudLinked: true, cloudHandwriting: true }, { available: () => true, online: () => false }), 'ink.waitingOffline', 'and that is the key an offline page shows');
   const recovery = readFileSync(new URL('../src/components/practiceRecovery.js', import.meta.url), 'utf8');
   ok(/export \{ compactStrokes, saveInkDraft, readInkDraft, clearInkDraft \} from '\.\.\/local\/inkDrafts\.js';/.test(recovery), 'kept ink comes from the sealed IndexedDB store, not the localStorage draft store');
