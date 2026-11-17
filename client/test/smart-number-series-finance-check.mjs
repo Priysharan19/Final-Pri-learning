@@ -3,10 +3,12 @@
 // and correct working must never be flagged. Reports specificity and right-line
 // rate. Pure engine check: no network, no model, no mark touched.
 import assert from 'node:assert/strict';
-import { NUMBER_SLIPS } from '../src/engine/misconceptions/topics/number.js';
-import { SEQUENCE_SLIPS } from '../src/engine/misconceptions/topics/sequences.js';
-import { FINANCE_SLIPS } from '../src/engine/misconceptions/topics/finance.js';
+import { NUMBER_SLIPS } from '../src/engine/misconceptions/topics/number.slips.js';
+import { SEQUENCE_SLIPS } from '../src/engine/misconceptions/topics/sequences.slips.js';
+import { FINANCE_SLIPS } from '../src/engine/misconceptions/topics/finance.slips.js';
 import { detectSlip } from '../src/engine/misconceptions/topics/_run.js';
+import { stepCheck } from '../src/engine/checker.js';
+import { topicDiagnosisCodes, registeredTopics } from '../src/engine/misconceptions/topics/index.js';
 
 const ALL = [...NUMBER_SLIPS, ...SEQUENCE_SLIPS, ...FINANCE_SLIPS];
 let pass = 0; const bad = [];
@@ -67,6 +69,26 @@ for (const w of WORKINGS) {
   if (flagged === w.bad) rightLine += 1;
   ok(flagged === w.bad, `right line: ${w.lines.join(' ⏎ ')} flagged ${flagged} expected ${w.bad}`);
 }
+// Through the real checker: the registry may only change the words on a line
+// the check already marked a break. Statuses and the first break never move.
+ok(['number', 'sequences', 'finance'].every(t => registeredTopics().some(r => r.topic === t)), 'the three topics are registered');
+ok(ALL.every(sl => topicDiagnosisCodes().includes(sl.code)), 'every slip code is in the registry');
+let viaRegistry = 0, viaChecker = 0, generic = 0, moved = 0;
+for (const [code, prev, broken] of WRONG) {
+  const r = stepCheck({ kind: 'expression', source: prev, canonical: String(prev) }, broken);
+  const first = r.lines[0];
+  if (first?.status !== 'break') continue;
+  if (first.diagnosis?.code === code) viaRegistry += 1; else if (first.diagnosis) viaChecker += 1; else generic += 1;
+  if (r.firstBreak !== 0) moved += 1;
+  if (first.diagnosis?.code === code) {
+    ok(typeof first.note === 'string' && first.note.length > 20 && first.diagnosis.messages?.hi?.length > 10, `${code}: en and hi messages present`);
+  }
+}
+ok(moved === 0, 'the first break is on the line the check found, every time');
+let flagged = 0;
+for (const [prev, next] of RIGHT) { const r = stepCheck({ kind: 'expression', source: prev, canonical: next }, next); if (r.lines.some(l => l.status === 'break' || l.diagnosis)) flagged += 1; }
+ok(flagged === 0, `correct working is never flagged or named through the real checker (${flagged})`);
+console.log(`through the checker: ${viaRegistry}/${WRONG.length} broken lines are now named by the specific topic slip (measured on train-editions-23 before this change: 41/44 carried only the existing thin names — arithmetic-slip 24, term-dropped 6, sign-flipped 6 — and 3 carried none; only 3 fraction-across and 2 distribute-partial were specific, the latter wrong here); ${viaChecker} named otherwise, ${generic} still generic`);
 const bySlip = Object.fromEntries(ALL.map(s => [s.code, WRONG.filter(w => w[0] === s.code).length]));
 ok(Object.values(bySlip).every(n => n >= 2), 'every slip has at least two wrong-line fixtures');
 ok(ALL.every(s => typeof s.copy === 'function' && s.copy({ n: 3, r: 0.1, d: 2, m: 12, a: 2, tot: 5, p: 15, line: 'x', got: '1', left: 'a', right: 'b', op: '+', value: '1', dp: 1, cut: '1', rounded: '1', up: true, top: 9, bottom: 1, pct: 8 }, { edition: 'au' }).message.length > 20), 'every slip has a one-sentence message');
