@@ -118,9 +118,21 @@ async function runEdition(spec, browser) {
     await work.click();
     await work.fill(spec.working);
 
-    const graded = page.waitForResponse(r => POST_GRADE.test(new URL(r.url()).pathname) && r.request().method() === 'POST');
-    await page.locator('.ws-actions .btn-primary').click();
-    const reply = await (await graded).json();
+    // Working is checked when the question is finished, so the same wrong
+    // answer and working go in until the server resolves the question.
+    let reply = null;
+    for (let n = 0; n < 4 && reply?.resolved !== true; n++) {
+      if (n > 0) {
+        await page.locator('.ws-actions .btn-primary').waitFor({ state: 'visible', timeout: 15000 });
+        if (await page.locator('[data-final-answer]').inputValue() !== spec.answer) await page.locator('[data-final-answer]').fill(spec.answer);
+        if (!await work.isVisible() && await disclose.count()) await disclose.first().click();
+        if (await work.inputValue() !== spec.working) { await work.click(); await work.fill(spec.working); }
+      }
+      const graded = page.waitForResponse(r => POST_GRADE.test(new URL(r.url()).pathname) && r.request().method() === 'POST');
+      await page.locator('.ws-actions .btn-primary').click();
+      reply = await (await graded).json();
+      await page.locator('.verdict, .eval-card').first().waitFor({ timeout: 30000 });
+    }
     const report = reply.stepReport;
     check(`${spec.edition}: the real server marked it, wrong, with a step report`,
       reply.authoritative === true && reply.correct === false && Array.isArray(report?.lines),
