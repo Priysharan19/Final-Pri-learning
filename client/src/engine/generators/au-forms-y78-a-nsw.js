@@ -8,7 +8,10 @@ import { ri, rc, rs, nz, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, NAMES } 
 
 const SHOP = ['a surfboard leash', 'a cricket bat', 'netball shoes', 'a school backpack', 'a footy boot bag', 'a bike helmet', 'a beach umbrella', 'a camping stove'];
 const PLACES = ['Bondi', 'Parramatta', 'Newcastle', 'Wollongong', 'Penrith', 'Manly', 'Dubbo', 'Coffs Harbour'];
+const pl = (v, one, many) => (v === 1 ? one : many);   // singular when the number shown is exactly 1
 const art = w => (/^[AEIOU]/.test(w) ? 'An ' : 'A ') + w;
+// A whole number then a fraction ("8 1/2", "8\\frac{1}{2}"): a mixed number, not an improper fraction.
+const MIXED_FORM = '^[+-]?\\d+(\\s+\\d+\\s*/\\s*\\d+|\\s*\\\\d?frac\\s*\\{\\d+\\}\\s*\\{\\d+\\})$';
 const SPORTS = ['netball', 'cricket', 'AFL', 'soccer', 'basketball', 'touch football'];
 const pm = k => (k < 0 ? '-' : '+');            // sign glyph
 const lin = (a, b, v = 'x') => `${term(a, v)} ${pm(b)} ${Math.abs(b)}`;   // a x ± b
@@ -59,7 +62,7 @@ export const forms = {
         const added = base * p / 100, now = base + added;
         const sport = rc(rng, SPORTS);
         return {
-          prompt: `A ${sport} club had $${base}$ members last year and $${now}$ this year. By what percentage did its membership increase?`,
+          prompt: `${art(sport)} club had $${base}$ members last year and $${now}$ this year. By what percentage did its membership increase?`,
           answerType: 'numeric', answer: { value: p, percent: true }, answerSuffix: '%',
           traps: [{ value: r1(100 * added / now), why: 'Percentage change is measured against the **original** (last year’s) number, not the new one.' }],
           hints: ['Find the increase first.', `Increase $= ${now} - ${base} = ${added}$.`, `Divide the increase by the original, $${added} \\div ${base}$, then multiply by 100.`],
@@ -108,7 +111,7 @@ export const forms = {
         return {
           prompt: `The price of ${what} is ${moneyPlain(price)} before GST. In Australia GST is $10\\%$ of the price and is added on top. What is the total price including GST?`,
           answerType: 'numeric', answer: { value: total }, answerPrefix: '$',
-          traps: [{ value: price + 10, why: 'GST is $10\\%$ of the price (so it depends on the price), not a flat $10 added on.' }],
+          traps: [{ value: price + 10, why: 'GST is $10\\%$ of the price (so it depends on the price), not a flat \\$10 added on.' }],
           hints: ['GST is $10\\%$ of the price before GST.', `$10\\%$ of ${price} is $${price} \\div 10 = ${gst}$.`, 'Add the GST to the price.'],
           steps: [
             { h: 'Find the GST', d: `$10\\% \\times ${price} = ${gst}$` },
@@ -122,9 +125,9 @@ export const forms = {
         const A = ri(rng, 25, 129), W = ri(rng, 12, 48);          // tenths
         const rate = A / 10, kg = W / 10, cost = r2(A * W / 100);
         if (Math.abs(r2(rate + kg) - cost) < 0.005) return null;
-        const food = rc(rng, ['mangoes', 'prawns', 'lamb cutlets', 'cherries', 'cheddar cheese', 'mince']);
+        const [food, verb] = rc(rng, [['mangoes', 'cost'], ['prawns', 'cost'], ['lamb cutlets', 'cost'], ['cherries', 'cost'], ['cheddar cheese', 'costs'], ['mince', 'costs']]);
         return {
-          prompt: `${food[0].toUpperCase() + food.slice(1)} cost ${moneyPlain(rate)} per kilogram at the market. Find the cost of $${kg}$ kg, in dollars.`,
+          prompt: `${food[0].toUpperCase() + food.slice(1)} ${verb} ${moneyPlain(rate)} per kilogram at the market. Find the cost of $${kg}$ kg, in dollars.`,
           answerType: 'numeric', answer: { value: cost }, answerPrefix: '$',
           traps: [{ value: r2(rate + kg), why: 'The cost is the price per kilogram **times** the number of kilograms, not the sum.' }],
           hints: ['Cost = price per kilogram × number of kilograms.', `Compute $${rate} \\times ${kg}$.`, `Ignore the decimal points: $${A} \\times ${W} = ${A * W}$, then place the decimal point (two places in total).`],
@@ -234,7 +237,7 @@ export const forms = {
         const imp = w * d + r;
         return {
           prompt: `Write $${w}\\dfrac{${r}}{${d}}$ as an improper fraction.`,
-          answerType: 'numeric', answer: { value: imp / d, simplestFraction: { n: imp, d } }, inputHint: 'e.g. 17/5',
+          answerType: 'numeric', answer: { value: imp / d, simplestFraction: { n: imp, d }, forbid: MIXED_FORM, forbidWhy: 'That is still a mixed number. Write one fraction with the whole number absorbed, such as 17/5.' }, inputHint: 'e.g. 17/5',
           traps: [{ value: (w + r) / d, why: `The whole number ${w} is worth $${w} \\times ${d}$ parts of size $\\frac{1}{${d}}$, not ${w} parts.` }],
           hints: [`Each whole is ${d} parts of size $\\frac{1}{${d}}$.`, `$${w} \\times ${d} = ${w * d}$ parts, then add the ${r} extra.`, `$${w * d} + ${r} = ${imp}$ parts altogether.`],
           steps: [{ h: 'Convert the whole number', d: `$${w} \\times ${d} = ${w * d}$` }, { h: 'Add the fraction part', d: `$${w * d} + ${r} = ${imp}$, so $\\dfrac{${imp}}{${d}}$` }]
@@ -282,9 +285,9 @@ export const forms = {
         const d = rc(rng, [2, 3, 4, 5, 6, 8, 10]), n = ri(rng, 1, d - 1);
         if (gcd(n, d) !== 1) return null;
         const p = ri(rng, 3, 30), L = new Frac(p * n, d);
-        const kind = rc(rng, ['rope', 'ribbon', 'timber']);
+        const kind = rc(rng, ['rope', 'ribbon', 'plank']);
         return {
-          prompt: `A ${kind} is $${fracMixedOrLatex(L)}$ metres long. It is cut into pieces that are each $${new Frac(n, d).latex()}$ of a metre. How many pieces are there?`,
+          prompt: `A ${kind} is $${fracMixedOrLatex(L)}$ ${pl(L.value, 'metre', 'metres')} long. It is cut into pieces that are each $${new Frac(n, d).latex()}$ of a metre. How many pieces are there?`,
           answerType: 'numeric', answer: { value: p },
           traps: [{ value: L.mul(new Frac(n, d)).value, why: 'Cutting into equal pieces is **division** (how many pieces fit), not multiplication.' }],
           hints: ['How many times does one piece fit into the whole length?', `Calculate $${L.latex()} \\div ${new Frac(n, d).latex()}$.`, 'Dividing by a fraction is multiplying by its reciprocal.'],
@@ -429,6 +432,7 @@ export const forms = {
       make: rng => {
         const x = ri(rng, -6, 15), c = ri(rng, 1, 6), a = c + ri(rng, 1, 6), b = nz(rng, -12, 12);
         const d = a * x + b - c * x;
+        if (d === 0 || x === 0) return null;   // no '+ 0' term and no trivial zero solution
         const rhs = c === 1 ? `x ${sgn(d)}` : `${c}x ${sgn(d)}`;
         return {
           prompt: `Solve $${a}x ${sgn(b)} = ${rhs}$.`,

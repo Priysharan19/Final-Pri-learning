@@ -4,7 +4,7 @@
 // y8-percentages, y8-geo-figures, y8-linear and y8-rates. Every key is computed
 // from the same numbers the prompt shows; AI never sets a key.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, NAMES, ITEMS } from '../qhelpers.js';
+import { ri, rc, rs, nz, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, NAMES, ITEMS } from '../qhelpers.js';
 
 const PI = Math.PI;
 const fx = x => String(+Number(x).toFixed(6));
@@ -40,6 +40,13 @@ function mc(o) {
 }
 
 const T = s => `$${s}$`;
+const pl = (v, one, many) => (v === 1 ? one : many);   // singular when the number shown is exactly 1
+
+// Exact rounding for a positive quotient num/den (whole numbers), half-up, so a key never
+// depends on how a float product happens to fall. isTie() flags draws that sit exactly on
+// the half: those are redrawn, because "to the nearest cent" is ambiguous there.
+const rndHU = (num, den, p) => { const k = 10 ** p; return Math.floor((2 * num * k + den) / (2 * den)) / k; };
+const isTie = (num, den, p) => { const t = 2 * num * 10 ** p; return t % den === 0 && (t / den) % 2 === 1; };
 
 // ═════════════════════════════ y8-circles ════════════════════════════════════
 const circles = [
@@ -276,7 +283,7 @@ const probability = [
         { t: `${ri(rng, 101, 190)}%`, why: 'A probability is never more than 100%.' },
         { t: `-${fx(ri(rng, 1, 90) / 100)}`, why: 'A probability is never negative.' }
       ]);
-      const shuffled = [...valid].sort(() => rng() - 0.5).slice(0, 3);
+      const shuffled = rs(rng, valid).slice(0, 3);
       return mc({
         rng, prompt: 'Which of these **cannot** be a probability?',
         correct: bad.t, distractors: shuffled.map(t => ({ text: t, why: 'This is between 0 and 1 (or 0% and 100%), so it could be a probability.' })),
@@ -328,6 +335,7 @@ const indices = [
       let x = a ** p, y = b ** q, plus = rng() < 0.5;
       let A = a, P = p, B = b, Q = q;
       if (!plus && x < y) { [A, P, B, Q] = [b, q, a, p]; [x, y] = [y, x]; }
+      if (x === y) return null;   // no 'Evaluate 4^3 - 4^3 = 0'
       const val = plus ? x + y : x - y;
       const alt = plus ? x - y : x + y;
       return num({
@@ -368,7 +376,7 @@ const indices = [
         return {
           prompt: `Simplify $(${a2}x^{${p2}})^{${n}}$.`,
           answerType: 'expression', answer: { expr: `${c}*x^${e}`, positiveOnly: true }, inputHint: `e.g. ${c}x^${e + 1}`,
-          traps: [{ expr: `${a2}*x^${e}`, why: 'The power applies to the number too. Cube (or square) the coefficient as well.' }, { expr: `${a2 * n}*x^${e}`, why: 'Raising to a power repeats multiplication. It does not multiply the coefficient by the index.' }, { expr: `${c}*x^${p2 + n}`, why: 'Indices on a power of a power are multiplied, not added.' }],
+          traps: [{ expr: `${a2}*x^${e}`, why: 'The power applies to the number too. Cube (or square) the coefficient as well.' }, { expr: `${a2 * n}*x^${e}`, why: 'Raising to a power repeats multiplication. It does not multiply the coefficient by the index.' }, { expr: `${c}*x^${p2 + n}`, why: 'Indices on a power of a power are multiplied, not added.' }].filter(t => t.expr !== `${c}*x^${e}`),
           hints: ['Each factor inside the bracket gets the outer power.', `The number: $${a2}^{${n}} = ${c}$.`, `The pronumeral: $(x^{${p2}})^{${n}} = x^{${p2} \\times ${n}}$.`],
           steps: [{ h: 'Number', d: `$${a2}^{${n}} = ${c}$` }, { h: 'Pronumeral', d: `$(x^{${p2}})^{${n}} = x^{${e}}$` }, { h: 'Combine', d: `$${c}x^{${e}}$` }]
         };
@@ -377,7 +385,7 @@ const indices = [
       return {
         prompt: `Simplify $${a}x^{${p}} \\times ${b}x^{${q}}$.`,
         answerType: 'expression', answer: { expr: `${c}*x^${e}`, positiveOnly: true }, inputHint: `e.g. ${c}x^${e + 1}`,
-        traps: [{ expr: `${a + b}*x^${e}`, why: 'Multiply the coefficients. Do not add them.' }, { expr: `${c}*x^${p * q}`, why: 'When multiplying powers of the same base, add the indices.' }],
+        traps: [{ expr: `${a + b}*x^${e}`, why: 'Multiply the coefficients. Do not add them.' }, { expr: `${c}*x^${p * q}`, why: 'When multiplying powers of the same base, add the indices.' }].filter(t => t.expr !== `${c}*x^${e}`),
         hints: ['Multiply the numbers, then add the indices.', `$${a} \\times ${b} = ${c}$.`, `$x^{${p}} \\times x^{${q}} = x^{${p} + ${q}}$.`],
         steps: [{ h: 'Coefficients', d: `$${a} \\times ${b} = ${c}$` }, { h: 'Indices', d: `$x^{${p}} \\times x^{${q}} = x^{${e}}$` }, { h: 'Combine', d: `$${c}x^{${e}}$` }]
       };
@@ -388,8 +396,8 @@ const indices = [
       const kind = rc(rng, [
         { b: 2, s0: () => 1, text: (n) => `A sheet of paper is folded in half $${n}$ times. How many layers thick is the folded paper?` },
         { b: 2, s0: (r) => ri(r, 2, 9), text: (n, s) => `A culture starts with $${s}$ bacteria. The number doubles every hour. How many bacteria are there after $${n}$ hours?` },
-        { b: 3, s0: () => 1, text: (n) => `A rumour starts with one person. Every person who hears it tells 3 new people the next day. How many people hear it for the first time on day $${n}$?` },
-        { b: 4, s0: (r) => ri(r, 1, 5), text: (n, s) => `An online video has $${s}$ views at the start. Each hour the number of views quadruples. How many views are there after $${n}$ hours?` }
+        { b: 3, s0: () => 1, text: (n) => `On day $0$ one person starts a rumour. On each following day, everyone who first heard it the day before tells 3 people who have not heard it. How many people hear it for the first time on day $${n}$?` },
+        { b: 4, s0: (r) => ri(r, 1, 5), text: (n, s) => `An online video has $${s}$ ${pl(s, 'view', 'views')} at the start. Each hour the number of views quadruples. How many views are there after $${n}$ hours?` }
       ]);
       const maxN = { 2: by(d, [6, 8, 10, 14]), 3: by(d, [4, 5, 7, 9]), 4: by(d, [3, 4, 5, 6]) }[kind.b];
       const n = ri(rng, 3, Math.max(3, maxN));
@@ -407,14 +415,15 @@ const indices = [
     make: (rng, d) => {
       const lo = 2, hi = by(d, [6, 8, 9, 12]);
       const mode = ri(rng, 0, 3);
-      const x = (e) => T(`x^{${e}}`);
+      const xr = (e) => (e === 1 ? 'x' : `x^{${e}}`);
+      const x = (e) => T(xr(e));
       if (mode === 0) {
         const a = ri(rng, lo, hi), b = ri(rng, lo, hi);
         return mc({ rng, prompt: `Which expression is equal to $x^{${a}} \\times x^{${b}}$?`, correct: x(a + b), distractors: [{ text: x(a * b), why: 'Add the indices when multiplying powers of the same base.' }, { text: T(`2x^{${a + b}}`), why: 'There is no coefficient to produce. Only the indices combine.' }, { text: x(Math.abs(a - b) || a + b + 1), why: 'Subtracting indices is for division, not multiplication.' }, { text: x(a * b + 1), why: 'Add the indices. Nothing else is added.' }], hints: ['Same base, so use an index law.', 'Multiplying powers: add the indices.', `$${a} + ${b}$.`], steps: [{ h: 'Product law', d: `$x^{${a}} \\times x^{${b}} = x^{${a} + ${b}} = x^{${a + b}}$` }] });
       }
       if (mode === 1) {
         const b = ri(rng, lo, hi), a = b + ri(rng, 1, 6);
-        return mc({ rng, prompt: `Which expression is equal to $x^{${a}} \\div x^{${b}}$?`, correct: x(a - b), distractors: [{ text: x(a + b), why: 'Subtract the indices when dividing powers of the same base.' }, { text: x(a * b), why: 'Indices are not multiplied for a quotient.' }, { text: x(Math.round(a / b * 100) / 100), why: 'Do not divide the indices. Subtract them.' }, { text: x(a), why: 'The divisor must change the index. Subtract $' + b + '$ from $' + a + '$.' }, { text: x(b), why: 'Subtract the second index from the first.' }], hints: ['Same base, so use an index law.', 'Dividing powers: subtract the indices.', `$${a} - ${b}$.`], steps: [{ h: 'Quotient law', d: `$x^{${a}} \\div x^{${b}} = x^{${a} - ${b}} = x^{${a - b}}$` }] });
+        return mc({ rng, prompt: `Which expression is equal to $x^{${a}} \\div x^{${b}}$?`, correct: x(a - b), distractors: [{ text: x(a + b), why: 'Subtract the indices when dividing powers of the same base.' }, { text: x(a * b), why: 'Indices are not multiplied for a quotient.' }, { text: x(Math.round(a / b * 100) / 100), why: 'Do not divide the indices. Subtract them.' }, { text: x(a), why: 'The divisor must change the index. Subtract $' + b + '$ from $' + a + '$.' }, { text: x(b), why: 'Subtract the second index from the first.' }], hints: ['Same base, so use an index law.', 'Dividing powers: subtract the indices.', `$${a} - ${b}$.`], steps: [{ h: 'Quotient law', d: `$x^{${a}} \\div x^{${b}} = x^{${a} - ${b}} = ${xr(a - b)}$` }] });
       }
       if (mode === 2) {
         const a = ri(rng, 2, by(d, [5, 6, 7, 9])), b = ri(rng, 2, 5);
@@ -441,7 +450,7 @@ const indices = [
       const a = ri(rng, 2, by(d, [6, 9, 9, 12])), b = ri(rng, 2, by(d, [4, 5, 6, 8]));
       const c = ri(rng, 2, by(d, [6, 9, 9, 12])), e = ri(rng, 2, by(d, [4, 5, 6, 8]));
       const x = a ** b, y = c ** e;
-      if (x === y) return indices[0].make(rng, d);
+      if (x === y) return null;
       const big = x > y;
       return mc({
         rng, prompt: `Which is larger, $${a}^{${b}}$ or $${c}^{${e}}$?`,
@@ -548,15 +557,17 @@ const volume = [
   { // filling time
     make: (rng, d) => {
       const l = half(rng, ...by(d, [[1, 3], [2, 5], [2, 6], [3, 8]])), w = half(rng, 1, by(d, [2, 3, 4, 5])), h = half(rng, 1, by(d, [2, 2, 3, 3]));
-      const litres = l * w * h * 1000;
+      const litres = Math.round(l * w * h * 1000);
       const rate = rc(rng, [20, 25, 30, 40, 45, 50, 60, 75, 80, 90, 120]);
       const t = litres / rate;
+      if (isTie(litres, rate, 1)) return null;
+      const key = rndHU(litres, rate, 1);
       return num({
         prompt: `A rainwater tank is a rectangular prism $${fx(l)}$ m long, $${fx(w)}$ m wide and $${fx(h)}$ m high. A pump fills it from empty at $${rate}$ litres per minute. How many minutes does it take to fill, correct to 1 decimal place? (1 m³ = 1000 L)`,
-        value: r1(t), tol: 0.06, suffix: 'minutes',
+        value: key, tol: 0.06, suffix: 'minutes',
         traps: [{ value: r1(l * w * h / rate), why: 'The volume is in m³. Change it to litres (multiply by 1000) before dividing by a rate in litres per minute.' }, { value: r1(litres * rate), why: 'Time = amount $\\div$ rate. Do not multiply them.' }],
         hints: ['Find the volume in m³, then convert to litres.', `$${fx(l)} \\times ${fx(w)} \\times ${fx(h)} = ${fx(l * w * h)}$ m³ $= ${fx(litres)}$ L.`, `Time = $${fx(litres)} \\div ${rate}$.`],
-        steps: [{ h: 'Capacity', d: `$${fx(l * w * h)}$ m³ $= ${fx(litres)}$ L` }, { h: 'Divide by the rate', d: `$${fx(litres)} \\div ${rate} = ${r3(t)}\\ldots$` }, { h: 'Round', d: `$\\approx ${fx(r1(t))}$ minutes` }]
+        steps: [{ h: 'Capacity', d: `$${fx(l * w * h)}$ m³ $= ${fx(litres)}$ L` }, { h: 'Divide by the rate', d: `$${fx(litres)} \\div ${rate} = ${r3(t)}\\ldots$` }, { h: 'Round', d: `$\\approx ${fx(key)}$ minutes` }]
       });
     }
   },
@@ -648,7 +659,8 @@ const percentages = [
     make: (rng, d) => {
       const b = rc(rng, [20, 25, 30, 35, 40, 45, 60, 75, 80]);
       const a = ri(rng, Math.ceil(b / 5), b - 1);
-      const key = r1(a / b * 100);
+      if (isTie(a * 100, b, 1)) return null;
+      const key = rndHU(a * 100, b, 1);
       const who = rc(rng, NAMES);
       return num({
         prompt: `${who} scored $${a}$ out of $${b}$ in a maths test. What is the score as a percentage, correct to 1 decimal place?`,
@@ -663,9 +675,10 @@ const percentages = [
     make: (rng, d) => {
       const A = ri(rng, 20, by(d, [200, 800, 4000, 25000]));
       const B = Math.max(1, Math.round(A * (ri(rng, 50, 160) / 100)));
-      if (B === A) return percentages[4].make(rng, d);
+      if (B === A) return null;
       const up = B > A;
-      const key = r1(Math.abs(B - A) / A * 100);
+      if (isTie(Math.abs(B - A) * 100, A, 1)) return null;
+      const key = rndHU(Math.abs(B - A) * 100, A, 1);
       return num({
         prompt: `The crowd at a netball final ${up ? 'rose' : 'fell'} from $${A}$ to $${B}$. Find the percentage ${up ? 'increase' : 'decrease'}, correct to 1 decimal place.`,
         value: key, tol: 0.06, percent: true, suffix: '%',
@@ -693,13 +706,13 @@ const percentages = [
   { // MCQ: single multiplier
     make: (rng, d) => {
       const p = ri(rng, 2, by(d, [30, 45, 60, 80])), up = rng() < 0.5;
-      if (!up && p >= 100) return percentages[6].make(rng, d);
+      if (!up && p >= 100) return null;
       const m = up ? 1 + p / 100 : 1 - p / 100;
       return mc({
         rng, prompt: `Which single multiplier ${up ? 'increases' : 'decreases'} an amount by $${p}\\%$?`, correct: T(`\\times ${fx(r2(m))}`),
         distractors: [
           { text: T(`\\times ${fx(r2(up ? p / 100 : 1 + p / 100))}`), why: up ? `Multiplying by ${fx(p / 100)} finds ${p}% of the amount. It does not add it on.` : `Multiplying by ${fx(1 + p / 100)} would *increase* the amount.` },
-          { text: T(`\\times ${fx(up ? 1 + p : 1 - p / 10)}`), why: 'Convert the percentage to a decimal by dividing by 100.' },
+          { text: T(`\\times ${fx(up ? 1 + p : 100 - p)}`), why: 'Convert the percentage to a decimal by dividing by 100.' },
           { text: T(`\\times ${fx(r2(up ? 1 - p / 100 : p / 100))}`), why: up ? 'That decreases the amount.' : 'That keeps only the percentage, not what remains.' }
         ],
         hints: [`${up ? 'Increase' : 'Decrease'} means the result is $${up ? 100 + p : 100 - p}\\%$ of the original.`, `$${up ? 100 + p : 100 - p}\\% = ${fx(r2(m))}$.`, 'The multiplier is that decimal.'],
@@ -803,7 +816,7 @@ const geo = [
     make: (rng, d) => {
       const kind = rc(rng, ['alternate', 'corresponding', 'co-interior']);
       for (;;) {
-        const x = ri(rng, 5, by(d, [20, 25, 30, 35])), k = ri(rng, 2, 5), c = ri(rng, -10, 25);
+        const x = ri(rng, 5, by(d, [20, 25, 30, 35])), k = ri(rng, 2, 5), c = nz(rng, -10, 25);
         const e = k * x + c;
         const other = kind === 'co-interior' ? 180 - e : e;
         if (other < 15 || other > 165 || e < 15 || e > 165) continue;
@@ -913,7 +926,7 @@ const eq = (m, c) => `y = ${term(m)} ${sgn(c)}`;
 const linear = [
   { // table of values, extend
     make: (rng, d) => {
-      const m = nz(rng, -by(d, [4, 6, 8]), by(d, [4, 6, 8])), c = ri(rng, -9, 15);
+      const m = nz(rng, -by(d, [4, 6, 8]), by(d, [4, 6, 8])), c = nz(rng, -9, 15);
       const k = ri(rng, 6, by(d, [10, 12, 15]));
       const ys = [0, 1, 2, 3].map(x => m * x + c);
       return num({
@@ -981,13 +994,20 @@ const linear = [
       const m = nz(rng, -by(d, [4, 5, 7]), by(d, [4, 5, 7])), c = nz(rng, -9, 9), px = ri(rng, -5, 7);
       const py = m * px + c;
       const pt = (x, y) => T(`(${x}, ${y})`);
+      // A distractor must really be off the line (swapping the coordinates lands on it when m = -1 or px = py).
+      const off = (x, y, why) => (y !== m * x + c ? [{ text: pt(x, y), why }] : []);
+      const distractors = [
+        ...off(px, py + m, 'Substitute the $x$-value into the rule and compare $y$.'),
+        ...off(px, m * px - c, 'Check the sign of the constant term.'),
+        ...off(py, px, 'The coordinates are in the order $(x, y)$.'),
+        ...off(px + 1, py, 'Moving along by one in $x$ changes $y$ by the gradient.'),
+        ...off(px - 1, py, 'Moving along by one in $x$ changes $y$ by the gradient.'),
+        ...off(-px, py, 'Check the sign of the $x$-coordinate when you substitute.'),
+        ...off(px, -py, 'Check the sign of the $y$-value you worked out.')
+      ];
       return mc({
         rng, prompt: `Which point lies on the line $${eq(m, c)}$?`, correct: pt(px, py),
-        distractors: [
-          { text: pt(px, py + m), why: 'Substitute the $x$-value into the rule and compare $y$.' },
-          { text: pt(px, m * px - c), why: 'Check the sign of the constant term.' },
-          { text: pt(py, px), why: 'The coordinates are in the order $(x, y)$.' }
-        ],
+        distractors,
         hints: ['A point is on the line if its coordinates fit the rule.', 'Substitute each $x$-value and compare $y$.', `$x = ${px}$ gives $y = ${m} \\times ${px < 0 ? `(${px})` : px} ${sgn(c)}$.`],
         steps: [{ h: 'Test the point', d: `$x = ${px}$: $y = ${m * px} ${sgn(c)} = ${py}$` }]
       });
@@ -1068,7 +1088,7 @@ const rates = [
       }
       const ps = half(rng, 1, by(d, [4, 8, 12]));
       return num({
-        prompt: `A fire pump moves $${fx(ps)}$ litres per second. How many litres does it move in $${t}$ minutes?`,
+        prompt: `A fire pump moves $${fx(ps)}$ ${pl(ps, 'litre', 'litres')} per second. How many litres does it move in $${t}$ minutes?`,
         value: ps * 60 * t, suffix: 'L', traps: [{ value: ps * t, why: 'The rate is per second, so change the minutes to seconds first.' }, { value: r2(ps / 60 * t), why: 'There are 60 seconds in a minute, so multiply, not divide.' }],
         hints: [`$${t}$ minutes is $${t * 60}$ seconds.`, 'Amount = rate $\\times$ time, with matching units.', `$${fx(ps)} \\times ${t * 60}$.`],
         steps: [{ h: 'Seconds', d: `$${t} \\times 60 = ${t * 60}$ s` }, { h: 'Multiply', d: `$${fx(ps)} \\times ${t * 60} = ${fx(ps * 60 * t)}$ L` }]
@@ -1101,13 +1121,15 @@ const rates = [
           steps: [{ h: 'Lots of 100 km', d: `$${tank} \\div ${fx(cons)} = ${r3(tank / cons)}\\ldots$` }, { h: 'Distance', d: `$\\times 100 \\approx ${Math.round(dist)}$ km` }]
         });
       }
-      const price = ri(rng, 175, 235) / 100, L = ct * km / 1000;
+      const P = ri(rng, 175, 235), price = P / 100, L = ct * km / 1000;
+      if (isTie(ct * km * P, 100000, 2)) return null;   // an exact half-cent: ambiguous rounding
+      const costKey = rndHU(ct * km * P, 100000, 2);   // integer arithmetic, half-up
       return num({
         prompt: `Petrol costs ${moneyPlain(price)} per litre. A car uses $${fx(cons)}$ litres per 100 km. What does a $${km}$ km trip cost in petrol, to the nearest cent?`,
-        value: r2(L * price), tol: 0.005, prefix: '$',
+        value: costKey, tol: 0.005, prefix: '$',
         traps: [{ value: r2(km * price), why: 'First find the litres used, then multiply by the price per litre.' }],
         hints: [`Litres used: $${fx(cons)} \\times ${fx(km / 100)} = ${fx(r2(L))}$.`, `Cost $= ${fx(r2(L))} \\times ${fx(price)}$.`, 'Round to the nearest cent.'],
-        steps: [{ h: 'Litres', d: `$${fx(cons)} \\times ${fx(km / 100)} = ${fx(r3(L))}$ L` }, { h: 'Cost', d: `$${fx(r3(L))} \\times ${fx(price)} \\approx ${fx(r2(L * price))}$` }]
+        steps: [{ h: 'Litres', d: `$${fx(cons)} \\times ${fx(km / 100)} = ${fx(r3(L))}$ L` }, { h: 'Cost', d: `$${fx(r3(L))} \\times ${fx(price)} \\approx ${fx(costKey)}$` }]
       });
     }
   },
@@ -1121,17 +1143,18 @@ const rates = [
           prompt: `A cyclist rides at a steady $${v}$ km/h for $${m}$ minutes. How far does she ride, in kilometres?`,
           value: r1(dist), suffix: 'km',
           traps: [{ value: v * m, why: 'The speed is per hour, so change the minutes to hours first.' }, { value: r1(v / m), why: 'Distance = speed $\\times$ time.' }],
-          hints: [`$${m}$ minutes $= ${m} \\div 60 = ${fx(m / 60)}$ hours.`, 'Distance = speed $\\times$ time.', `$${v} \\times ${fx(m / 60)}$.`],
+          hints: [`$${m}$ minutes $= ${m} \\div 60 = ${fx(m / 60)}$ ${pl(m / 60, 'hour', 'hours')}.`, 'Distance = speed $\\times$ time.', `$${v} \\times ${fx(m / 60)}$.`],
           steps: [{ h: 'Hours', d: `$${m} \\div 60 = ${fx(m / 60)}$` }, { h: 'Distance', d: `$${v} \\times ${fx(m / 60)} = ${fx(r1(dist))}$ km` }]
         });
       }
       const dShown = r1(dist);
-      const key = r1(dShown * 60 / m);
+      if (isTie(Math.round(dShown * 10) * 6, m, 1)) return null;
+      const key = rndHU(Math.round(dShown * 10) * 6, m, 1);
       return num({
         prompt: `A runner covers $${fx(dShown)}$ km in $${m}$ minutes. What is her average speed in km/h, correct to 1 decimal place?`,
         value: key, tol: 0.06, suffix: 'km/h',
         traps: [{ value: r1(dShown / m), why: 'That is km per minute. Multiply by 60 to get km per hour.' }, { value: r1(m / dShown), why: 'Speed = distance $\\div$ time.' }],
-        hints: [`$${m}$ minutes $= ${fx(m / 60)}$ hours.`, 'Speed = distance $\\div$ time.', `$${fx(dShown)} \\div ${fx(m / 60)}$.`],
+        hints: [`$${m}$ minutes $= ${fx(m / 60)}$ ${pl(m / 60, 'hour', 'hours')}.`, 'Speed = distance $\\div$ time.', `$${fx(dShown)} \\div ${fx(m / 60)}$.`],
         steps: [{ h: 'Hours', d: `$${m} \\div 60 = ${fx(r3(m / 60))}$` }, { h: 'Speed', d: `$${fx(dShown)} \\div ${fx(r3(m / 60))} \\approx ${fx(key)}$ km/h` }]
       });
     }
@@ -1160,7 +1183,8 @@ const rates = [
     make: (rng, d) => {
       const u = ri(rng, 5, 16), a = ri(rng, 2, by(d, [5, 10, 20]));
       const b = a * u, c = ri(rng, 20, by(d, [150, 400, 900]));
-      const key = r1(a * c / b);
+      if (isTie(a * c, b, 1)) return null;
+      const key = rndHU(a * c, b, 1);
       const ctx = rc(rng, [{ s: 'paint', unit: 'litres', area: 'm² of wall' }, { s: 'fertiliser', unit: 'kilograms', area: 'm² of lawn' }, { s: 'sealer', unit: 'litres', area: 'm² of deck' }]);
       return num({
         prompt: `$${a}$ ${ctx.unit} of ${ctx.s} covers $${b}$ ${ctx.area}. How many ${ctx.unit} are needed for $${c}$ ${ctx.area}? Give your answer to 1 decimal place.`,
@@ -1173,14 +1197,23 @@ const rates = [
   }
 ];
 
+// A variant returns null when a draw is degenerate or ambiguous; redraw from the same stream.
+const redraw = arr => arr.map(v => ({
+  ...v,
+  make: (rng, diff) => {
+    for (let i = 0; i < 300; i++) { const q = v.make(rng, diff); if (q) return q; }
+    throw new Error('au-forms-y78-b: variant could not draw a valid question');
+  }
+}));
+
 export const forms = {
-  'y8-circles': circles,
-  'y8-probability': probability,
-  'y8-indices': indices,
+  'y8-circles': redraw(circles),
+  'y8-probability': redraw(probability),
+  'y8-indices': redraw(indices),
   // D4 of y8-volume is an excluded cell (nswBanks.js): keep the variants to the issued cells.
-  'y8-volume': volume.map(v => ({ ...v, diffs: v.diffs || [1, 2, 3] })),
-  'y8-percentages': percentages,
-  'y8-geo-figures': geo,
-  'y8-linear': linear,
-  'y8-rates': rates
+  'y8-volume': redraw(volume).map(v => ({ ...v, diffs: v.diffs || [1, 2, 3] })),
+  'y8-percentages': redraw(percentages),
+  'y8-geo-figures': redraw(geo),
+  'y8-linear': redraw(linear),
+  'y8-rates': redraw(rates)
 };
