@@ -16,7 +16,7 @@
 //     cannot honestly predict an exam mark.
 // Plain SVG and CSS grid: no canvas, no WebGL, no animation loop.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { tLater, useT } from '../i18n/index.js';
@@ -34,11 +34,11 @@ import { practiceHref } from '../lib/practiceLinks.js';
 // Explicit maps (not template keys) so the catalogue check sees every string.
 const STATE_WORD = {
   'not-started': 'board.state.notStarted', seen: 'board.state.seen', assisted: 'board.state.assisted',
-  thin: 'board.state.thin', independent: 'board.state.independent', retained: 'board.state.retained'
+  thin: 'board.state.thin', recheck: 'board.state.recheck', independent: 'board.state.independent', retained: 'board.state.retained'
 };
 const STATE_HELP = {
   'not-started': 'board.stateHelp.notStarted', seen: 'board.stateHelp.seen', assisted: 'board.stateHelp.assisted',
-  thin: 'board.stateHelp.thin', independent: 'board.stateHelp.independent', retained: 'board.stateHelp.retained'
+  thin: 'board.stateHelp.thin', recheck: 'board.stateHelp.recheck', independent: 'board.stateHelp.independent', retained: 'board.stateHelp.retained'
 };
 const ACTION_WORD = { learn: 'board.action.learn', consolidate: 'board.action.consolidate', retain: 'board.action.retain', extend: 'board.action.extend' };
 const TREND_WORD = { up: 'board.ready.trendUp', down: 'board.ready.trendDown', level: 'board.ready.trendLevel' };
@@ -64,15 +64,32 @@ export function StateGlyph({ state, size = 18 }) {
   if (state === 'seen') mark = <circle cx={s / 2} cy={s / 2} r={s / 9} className="sb-g-fill" />;
   if (state === 'thin') mark = <line x1={i + 2} y1={s - i - 2} x2={s - i - 2} y2={i + 2} className="sb-g-line" />;
   if (state === 'assisted') mark = <rect x={i} y={s / 2} width={w} height={w / 2} className="sb-g-fill" />;
-  if (state === 'independent' || state === 'retained') {
+  // Slipped: a solid square with its top-right corner cut away.
+  if (state === 'recheck') return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} aria-hidden="true" data-glyph={state}><path d={`M${i} ${i} H${s / 2} L${s - i} ${s / 2} V${s - i} H${i} Z`} className="sb-g-solid" /><rect {...box} className="sb-g-line" /></svg>;
+  if (state === 'independent') return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} aria-hidden="true" data-glyph={state}><rect {...box} className="sb-g-solid" /></svg>;
+  // Held after a gap: a solid square inside a second frame, with a tick.
+  if (state === 'retained') {
+    const o = 1, f = s - 2 * o, j = i + 1.5, v = s - 2 * j;
     return (
       <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} aria-hidden="true" data-glyph={state}>
-        <rect {...box} className="sb-g-solid" />
-        {state === 'retained' && <path d={`M${s * 0.3} ${s * 0.52} L${s * 0.45} ${s * 0.67} L${s * 0.72} ${s * 0.36}`} className="sb-g-tick" />}
+        <rect x={o} y={o} width={f} height={f} rx={2.5} className="sb-g-line" />
+        <rect x={j} y={j} width={v} height={v} rx={1.5} className="sb-g-solid" />
+        <path d={`M${s * 0.32} ${s * 0.52} L${s * 0.45} ${s * 0.65} L${s * 0.69} ${s * 0.38}`} className="sb-g-tick" />
       </svg>
     );
   }
   return <svg width={s} height={s} viewBox={`0 0 ${s} ${s}`} aria-hidden="true" data-glyph={state}><rect {...box} className="sb-g-line" />{mark}</svg>;
+}
+
+/** A topic's sentence: how many points are shown on their own, then only the states it holds. */
+function groupSummary(tally, t) {
+  const parts = [t('board.sum.own', { own: tally.independent + tally.retained, total: tally.total })];
+  if (tally.retained) parts.push(t('board.sum.held', { n: tally.retained }));
+  if (tally.assisted) parts.push(t('board.sum.help', { n: tally.assisted }));
+  if (tally.thin) parts.push(t('board.sum.thin', { n: tally.thin }));
+  if (tally.seen) parts.push(t('board.sum.seen', { n: tally.seen }));
+  if (tally['not-started']) parts.push(t('board.sum.none', { n: tally['not-started'] }));
+  return parts.join(' · ');
 }
 
 function nodeTitle(node, india) {
@@ -81,12 +98,16 @@ function nodeTitle(node, india) {
 
 function Detail({ node, group, india, track, onClose }) {
   const t = useT();
+  const panel = useRef(null);
+  // Focus moves into the panel when a point opens; Escape closes it (focus then returns to the tile).
+  useEffect(() => { panel.current?.focus(); }, [node.id]);
   const nav = useNavigate();
   const ev = node.evidence;
   const practised = useMemo(() => (india ? [] : Object.entries(NSW_DOTPOINT_OUTCOMES)
     .filter(([, codes]) => codes.includes(node.code)).map(([id]) => dotpointById(id)?.text).filter(Boolean)), [india, node.code]);
   return (
-    <div className="sb-detail" data-board-detail={node.id}>
+    <div className="sb-detail" id="sb-detail" role="region" aria-label={nodeTitle(node, india)} data-board-detail={node.id}
+      tabIndex={-1} ref={panel} onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); onClose(); } }}>
       <div className="spread" style={{ alignItems: 'flex-start', gap: 12 }}>
         <div>
           <div className="sb-detail-state"><StateGlyph state={node.state} /> <b>{t(STATE_WORD[node.state])}</b></div>
@@ -111,6 +132,7 @@ function Detail({ node, group, india, track, onClose }) {
         <div><dt>{t('board.ev.answered')}</dt><dd>{ev ? ev.answered : 0}</dd></div>
         <div><dt>{t('board.ev.own')}</dt><dd>{ev ? ev.independentRight : 0}</dd></div>
         <div><dt>{t('board.ev.helped')}</dt><dd>{ev ? ev.helpedRight : 0}</dd></div>
+        {node.breadth && node.breadth.total > 1 && <div><dt>{t('board.ev.kinds')}</dt><dd>{t('board.ev.kindsOf', { shown: node.breadth.shown, n: node.breadth.total })}</dd></div>}
         <div><dt>{t('board.ev.gap')}</dt><dd>{ev && ev.delayed ? t('board.ev.gapHeld', { kept: ev.delayedKept, n: ev.delayed }) : t('board.ev.gapNone')}</dd></div>
         <div><dt>{t('board.ev.last')}</dt><dd>{ev ? new Date(ev.lastAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : t('board.ev.never')}</dd></div>
       </dl>
@@ -125,6 +147,10 @@ function Detail({ node, group, india, track, onClose }) {
 export function BoardView({ board, india, track, courseLabel, initialOpen = null }) {
   const t = useT();
   const [open, setOpen] = useState(initialOpen);
+  const tiles = useRef(new Map());
+  const close = () => { const id = open; setOpen(null); requestAnimationFrame(() => tiles.current.get(id)?.focus()); };
+  const openGroup = open ? board.groups.find(x => x.nodes.some(n => n.id === open)) || null : null;
+  const openNode = openGroup ? openGroup.nodes.find(x => x.id === open) : null;
   const tally = board.tally;
   return (
     <section aria-labelledby="sb-title" className="sb" data-syllabus-board>
@@ -137,20 +163,17 @@ export function BoardView({ board, india, track, courseLabel, initialOpen = null
         {NODE_STATES.map(s => <li key={s} data-legend={s}><StateGlyph state={s} size={14} /> {t(STATE_WORD[s])} <span className="muted">({tally[s]})</span></li>)}
       </ul>
       <div className="sb-groups">
-        {board.groups.map(g => (
+        {board.groups.flatMap(g => ([
           <section key={g.id} className="sb-group" aria-labelledby={`sb-g-${g.id}`} data-board-group={g.id}>
             <h3 className="sb-group-name" id={`sb-g-${g.id}`} lang="en"><TermGloss text={g.name} /></h3>
-            <p className="muted sb-group-sum" data-group-summary>{t('board.groupSummary', {
-              own: g.tally.independent + g.tally.retained, total: g.tally.total, held: g.tally.retained,
-              help: g.tally.assisted, thin: g.tally.thin, seen: g.tally.seen, none: g.tally['not-started']
-            })}</p>
+            <p className="muted sb-group-sum" data-group-summary>{groupSummary(g.tally, t)}</p>
             <ul className="sb-tiles">
               {g.nodes.map(n => {
                 const word = t(STATE_WORD[n.state]);
                 return (
                   <li key={n.id}>
                     <button
-                      type="button" className="sb-tile" data-node={n.id} data-state={n.state}
+                      type="button" className="sb-tile" data-node={n.id} data-state={n.state} ref={el => { if (el) tiles.current.set(n.id, el); else tiles.current.delete(n.id); }}
                       aria-label={`${nodeTitle(n, india)}: ${word}`} aria-expanded={open === n.id} aria-controls="sb-detail"
                       title={`${india ? n.label : n.code} — ${word}`}
                       onClick={() => setOpen(open === n.id ? null : n.id)}
@@ -162,16 +185,12 @@ export function BoardView({ board, india, track, courseLabel, initialOpen = null
                 );
               })}
             </ul>
-          </section>
-        ))}
+          </section>,
+          // The open point's evidence sits on the row under its own topic, not at the foot of the board.
+          openGroup === g && openNode ? <Detail key={`${g.id}-detail`} node={openNode} group={g} india={india} track={track} onClose={close} /> : null
+        ]))}
       </div>
-      <div id="sb-detail" aria-live="polite">
-        {open && (() => {
-          const g = board.groups.find(x => x.nodes.some(n => n.id === open));
-          const n = g?.nodes.find(x => x.id === open);
-          return n ? <Detail node={n} group={g} india={india} track={track} onClose={() => setOpen(null)} /> : null;
-        })()}
-      </div>
+      <p className="sr-only" aria-live="polite">{openNode ? `${nodeTitle(openNode, india)}: ${t(STATE_WORD[openNode.state])}` : ''}</p>
     </section>
   );
 }
@@ -242,7 +261,7 @@ export function ReadinessView({ readiness }) {
                   <span lang="en">{p.title}</span>
                   <span className="muted sb-prio-meta">
                     {new Date(p.finishedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                    {' · '}{t(p.timed ? 'board.ready.timed' : 'board.ready.untimed')}
+                    {' · '}{t('board.ready.timed')}
                     {' · '}{t(p.full ? 'board.ready.full' : 'board.ready.part')}
                   </span>
                 </span>
@@ -296,7 +315,7 @@ export default function SyllabusBoard({ user, india, trackName = '' }) {
     const label = course?.firstHsc
       ? t('board.courseLabel', { name: course.name, version: course.version, year: course.firstHsc })
       : t('board.courseLabelPlain', { name: course?.name || '', version: course?.version || '' });
-    return { board, priorities: boardPriorities(board, nswAreas(board, blueprint)), readiness: paperReadiness(data.papers), label, paperName: blueprint ? t('board.prio.nswPaper', { name: course.name }) : '' };
+    return { board, priorities: boardPriorities(board, nswAreas(board, blueprint)), readiness: paperReadiness(data.papers, { course: courseKey }), label, paperName: blueprint ? t('board.prio.nswPaper', { name: course.name }) : '' };
   }, [data, india, courseKey, user.year, trackName, t]);
 
   if (error) return <div className="card" role="alert">{error}</div>;

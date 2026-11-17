@@ -11,7 +11,10 @@
 //                seen          answered, never right yet
 //                assisted      right only with help (hint, tutor, second try)
 //                thin          right on its own, but below the evidence floor
-//                              ("not enough evidence yet")
+//                              ("not enough evidence yet"), or on too few of
+//                              the kinds of question Pri sets for it (BREADTH)
+//                recheck       was right on its own, but has since slipped: most
+//                              answers now wrong, or it did not hold after a gap
 //                independent   right on its own at least the floor's times
 //                retained      and still right on its own after a gap of days
 //              A state is a word and a shape (progress/SyllabusBoard.jsx), never
@@ -37,9 +40,9 @@
 // never having been re-checked).
 // ─────────────────────────────────────────────────────────────────────────────
 import { evidenceProgress, EVIDENCE_FLOORS } from './progressEvidence.js';
-import { isLearningEvidence } from './progressTruth.js';
+import { isLearningEvidence, isSupported } from './progressTruth.js';
 
-export const NODE_STATES = Object.freeze(['not-started', 'seen', 'assisted', 'thin', 'independent', 'retained']);
+export const NODE_STATES = Object.freeze(['not-started', 'seen', 'assisted', 'thin', 'recheck', 'independent', 'retained']);
 export const ACTIONS = Object.freeze(['learn', 'consolidate', 'retain', 'extend']);
 export const READINESS_MIN_PAPERS = 2;
 /** How many recent papers readiness lists. */
@@ -103,14 +106,30 @@ export function nodeIdsOf(attempt, { located = null } = {}) {
 
 // ── States ───────────────────────────────────────────────────────────────────
 
-/** The state of one node from its evidence-model topic entry (or none). */
-export function stateOf(topic) {
+/**
+ * The state of one node from its evidence-model topic entry (or none).
+ * `breadth` ({ shown, total }) is how many of the node's source dot points have
+ * an unaided right answer, of how many it has: a node is "shown on your own"
+ * only when at least half of them (rounded up) do — three answers on one of an
+ * outcome's twelve kinds of question do not show the outcome.
+ */
+export function stateOf(topic, breadth = null) {
   if (!topic) return 'not-started';
   if (topic.right === 0) return 'seen';
   if (topic.independentRight === 0 || topic.independence === 'helped') return 'assisted';
   if (topic.independentRight < EVIDENCE_FLOORS.independence) return 'thin';
+  // Later evidence outranks earlier: mostly wrong now, or not held after a gap.
+  if (topic.accuracy === 'early' || topic.retention === 'slipping') return 'recheck';
+  if (breadth && breadth.total > 0 && breadth.shown < Math.ceil(breadth.total / 2)) return 'thin';
   if (topic.retention === 'holding') return 'retained';
   return 'independent';
+}
+
+/** Node id → the source dot point ids that can evidence it (NSW: the crosswalk inverted). */
+function sourcesOf(located) {
+  const out = new Map();
+  for (const [dp, codes] of Object.entries(located || {})) for (const code of codes) (out.get(code) || out.set(code, new Set()).get(code)).add(dp);
+  return out;
 }
 
 /**
@@ -120,24 +139,36 @@ export function stateOf(topic) {
 export function syllabusBoard(groups, attempts = [], { located = null, now = Date.now() } = {}) {
   const known = new Set(nodesOf(groups).map(n => n.id));
   const rows = [];
+  const sources = located ? sourcesOf(located) : null;
+  const shownBy = new Map();   // node id → source dot points with an unaided right answer
   for (const a of Array.isArray(attempts) ? attempts : []) {
     // Judged on the attempt as stored, before it is keyed by node: a game, a
     // repeat or a custom question is not evidence wherever it would land.
     if (!isLearningEvidence(a)) continue;
-    for (const id of nodeIdsOf(a, { located })) if (known.has(id)) rows.push({ ...a, subtopic: id });
+    const own = (a.correct === true || a.correct === 1) && !isSupported(a);
+    for (const id of nodeIdsOf(a, { located })) {
+      if (!known.has(id)) continue;
+      rows.push({ ...a, subtopic: id });
+      if (own && sources) {
+        const set = shownBy.get(id) || shownBy.set(id, new Set()).get(id);
+        for (const dp of a.dotpoints) if (sources.get(id)?.has(dp)) set.add(dp);
+      }
+    }
   }
   const evidence = evidenceProgress(rows, { now });
   const byId = new Map(evidence.topics.map(t => [t.id, t]));
   const outGroups = groups.map(g => {
     const nodes = g.nodes.map(n => {
       const t = byId.get(n.id) || null;
+      const breadth = sources ? { shown: shownBy.get(n.id)?.size || 0, total: sources.get(n.id)?.size || 0 } : null;
       return {
         ...n,
-        state: stateOf(t),
+        state: stateOf(t, breadth),
+        breadth,
         evidence: t ? {
           answered: t.answered, right: t.right, independentRight: t.independentRight,
           helpedRight: t.right - t.independentRight, lastAt: t.lastAt,
-          retention: t.retention, delayed: t.counts.delayed, delayedKept: t.counts.delayedKept
+          accuracy: t.accuracy, retention: t.retention, delayed: t.counts.delayed, delayedKept: t.counts.delayedKept
         } : null
       };
     });
@@ -168,7 +199,9 @@ export function nswAreas(board, blueprint = null, weights = null) {
   const paperMarks = weights ? [...marksByCode.values()].reduce((n, m) => n + m, 0) : blueprint ? blueprint.totalMarks : null;
   const areas = board.groups.map(g => ({
     id: g.id, name: g.name, nodeIds: g.nodes.map(n => n.id),
-    marks: paperMarks == null ? null : g.nodes.reduce((n, node) => n + (marksByCode.get(node.id) || 0), 0)
+    marks: paperMarks == null ? null : g.nodes.reduce((n, node) => n + (marksByCode.get(node.id) || 0), 0),
+    // Each outcome's own marks, so the stake counts the marks of exactly the outcomes not shown.
+    nodeMarks: paperMarks == null ? null : Object.fromEntries(g.nodes.map(node => [node.id, marksByCode.get(node.id) || 0]))
   }));
   return { areas, paperMarks };
 }
@@ -193,8 +226,8 @@ export function indiaAreas(board, blueprint = null) {
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const ACTION_RANK = { learn: 0, consolidate: 1, retain: 2, extend: 3 };
 const PRACTISE_FIRST = {
-  learn: ['not-started', 'seen', 'assisted', 'thin'],
-  consolidate: ['assisted', 'thin', 'seen', 'not-started'],
+  learn: ['not-started', 'seen', 'assisted', 'recheck', 'thin'],
+  consolidate: ['recheck', 'assisted', 'thin', 'seen', 'not-started'],
   retain: ['independent'],
   extend: ['retained', 'independent']
 };
@@ -209,7 +242,10 @@ export function boardPriorities(board, { areas, paperMarks = null }, { limit = 4
     const nodes = area.nodeIds.map(id => nodeById.get(id)).filter(Boolean);
     const t = tallyOf(nodes);
     const n = nodes.length;
-    const sure = t['not-started'] + t.seen + t.assisted;
+    // Not shown on your own: surely (no unaided evidence, or slipped since) and
+    // maybe (unaided, but too little or too narrow to say).
+    const SURE = ['not-started', 'seen', 'assisted', 'recheck'];
+    const sure = SURE.reduce((k, s) => k + t[s], 0);
     const maybe = sure + t.thin;
     let action;
     if (maybe === 0) action = t.independent > 0 ? 'retain' : 'extend';
@@ -218,8 +254,17 @@ export function boardPriorities(board, { areas, paperMarks = null }, { limit = 4
     const questions = action === 'learn' ? clamp(2 * maybe, 4, 10)
       : action === 'consolidate' ? clamp(2 * maybe, 4, 8)
         : action === 'retain' ? clamp(t.independent, 3, 6) : 4;
-    const stake = area.marks == null || !n ? null
-      : { low: Math.floor(area.marks * sure / n), high: Math.ceil(area.marks * maybe / n) };
+    let stake = null;
+    if (area.marks != null && n) {
+      if (area.nodeMarks) {
+        // Exact: the marks on the outcomes in each set.
+        const sum = states => nodes.filter(x => states.includes(x.state)).reduce((k, x) => k + (area.nodeMarks[x.id] || 0), 0);
+        stake = { low: sum(SURE), high: sum([...SURE, 'thin']) };
+      } else {
+        // Only the area's marks are published (CBSE units): a share, rounded outwards.
+        stake = { low: Math.floor(area.marks * sure / n), high: Math.ceil(area.marks * maybe / n) };
+      }
+    }
     const order = PRACTISE_FIRST[action];
     const target = [...nodes].filter(x => x.practise && order.includes(x.state))
       .sort((a, b) => order.indexOf(a.state) - order.indexOf(b.state))[0] || null;
@@ -246,19 +291,23 @@ export function boardPriorities(board, { areas, paperMarks = null }, { limit = 4
 
 /**
  * One finished paper as readiness reads it, or null when it is not evidence:
- * only a paper the SERVER marked (markedBy 'server'), finished, with every
+ * only a TIMED paper the SERVER marked (markedBy 'server'), finished, with every
  * mark decided (not provisional, nothing pending), counts.
  * `exam` is { id, title, finishedAt, score, total, deadlineAt, markedBy, provisional, pending, full }.
  */
-export function readinessPaper(exam) {
+export function readinessPaper(exam, { course = null } = {}) {
   if (!exam || exam.markedBy !== 'server' || !Number.isFinite(Number(exam.finishedAt))) return null;
+  // Timed papers only: an untimed paper is not exam conditions.
+  if (exam.deadlineAt == null || !Number.isFinite(Number(exam.deadlineAt))) return null;
+  // A paper set for another course (an Extension 1 paper on the Advanced board) is not this course's evidence.
+  if (course && exam.course && exam.course !== course) return null;
   if (exam.provisional || exam.pending) return null;
   if (exam.score == null || exam.total == null) return null;
   const score = Number(exam.score), total = Number(exam.total);
   if (!Number.isFinite(score) || !Number.isFinite(total) || total <= 0 || score < 0 || score > total) return null;
   return {
     id: String(exam.id ?? ''), title: String(exam.title || ''), finishedAt: Number(exam.finishedAt),
-    score, total, timed: Number.isFinite(Number(exam.deadlineAt)) && exam.deadlineAt != null, full: exam.full === true
+    score, total, timed: true, full: exam.full === true
   };
 }
 
@@ -267,8 +316,8 @@ export function readinessPaper(exam) {
  * a trend in words and the spread of THESE papers' raw results. Fewer than
  * READINESS_MIN_PAPERS: refused, with how many more are needed.
  */
-export function paperReadiness(exams = []) {
-  const papers = (Array.isArray(exams) ? exams : []).map(readinessPaper).filter(Boolean)
+export function paperReadiness(exams = [], { course = null } = {}) {
+  const papers = (Array.isArray(exams) ? exams : []).map(e => readinessPaper(e, { course })).filter(Boolean)
     .sort((a, b) => a.finishedAt - b.finishedAt || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   if (papers.length < READINESS_MIN_PAPERS) {
     return { status: 'too-few', count: papers.length, needed: READINESS_MIN_PAPERS - papers.length };
@@ -276,10 +325,11 @@ export function paperReadiness(exams = []) {
   const shown = papers.slice(-READINESS_SHOWN);
   const share = p => p.score / p.total;
   const first = shown[0], last = shown[shown.length - 1];
-  const diff = share(last) - share(first);
+  // Rounded to a thousandth so 64/100 → 69/100 is exactly the 5-point edge, not 4.999…
+  const diff = Math.round((share(last) - share(first)) * 1000) / 1000;
   const trend = Math.abs(diff) < LEVEL_BAND ? 'level' : diff > 0 ? 'up' : 'down';
   const byShare = [...shown].sort((a, b) => share(a) - share(b) || a.finishedAt - b.finishedAt);
-  const sameConditions = shown.every(p => p.timed === first.timed && p.full === first.full && p.total === first.total);
+  const sameConditions = shown.every(p => p.full === first.full && p.total === first.total);
   return {
     status: 'ready', count: papers.length, papers: shown, trend, sameConditions,
     spread: { low: byShare[0], high: byShare[byShare.length - 1] }

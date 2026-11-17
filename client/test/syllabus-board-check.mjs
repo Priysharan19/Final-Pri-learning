@@ -50,12 +50,15 @@ const groups = B.indiaBoardGroups(chapters);
     at('c1#4', true, 0), at('c1#4', true, 0), at('c1#4', true, 0), at('c1#4', false, 0), // independent, never re-checked
     at('c1#5', true, 0), at('c1#5', true, 0), at('c1#5', true, 0), at('c1#5', true, 3), at('c1#5', true, 6), // retained: 2 delayed trials, both kept
     ...Array.from({ length: 8 }, (_, i) => at('c1#6', true, 0, { support: 'supported', n: i })), at('c1#6', true, 0), at('c1#6', true, 0), // 2 of 10 own → mostly helped
-    at('c1#7', true, 0), at('c1#7', true, 0), at('c1#7', true, 0), at('c1#7', false, 3), at('c1#7', false, 6) // slipped after a gap → still independent, retention slipping
+    at('c1#7', true, 0), at('c1#7', true, 0), at('c1#7', true, 0), at('c1#7', false, 3), at('c1#7', false, 6) // slipped after a gap → recheck
   ];
   const board = B.syllabusBoard(groups, fixture, { now: NOW });
   const states = board.groups[0].nodes.map(n => n.state);
-  eq(states, ['not-started', 'seen', 'assisted', 'thin', 'independent', 'retained', 'assisted', 'independent'], 'each node state follows from its fixture');
-  eq(board.tally, { 'not-started': 1, seen: 1, assisted: 2, thin: 1, independent: 2, retained: 1, total: 8 }, 'the board tally');
+  eq(states, ['not-started', 'seen', 'assisted', 'thin', 'independent', 'retained', 'assisted', 'recheck'], 'each node state follows from its fixture');
+  eq(board.tally, { 'not-started': 1, seen: 1, assisted: 2, thin: 1, recheck: 1, independent: 1, retained: 1, total: 8 }, 'the board tally');
+  // Later wrong answers outrank earlier right ones (review finding 1).
+  const later = B.syllabusBoard(groups, [at('c1#0', true, 0), at('c1#0', true, 0), at('c1#0', true, 0), ...Array.from({ length: 10 }, () => at('c1#0', false, 8))], { now: NOW });
+  eq(later.groups[0].nodes[0].state, 'recheck', '3 right then 10 wrong is "slipped", never "shown on your own"');
   const n5 = board.groups[0].nodes[5].evidence;
   eq([n5.answered, n5.independentRight, n5.helpedRight, n5.delayed, n5.delayedKept], [5, 5, 0, 2, 2], 'a retained node carries its counts: 5 answered, 5 own, 2 of 2 kept after a gap');
   eq(board.groups[0].nodes[7].evidence.retention, 'slipping', 'a node that slipped after a gap says so in its evidence');
@@ -78,6 +81,21 @@ const groups = B.indiaBoardGroups(chapters);
     at('y7-integers.1', true, 0), at('y7-integers.1', true, 0), at('y7-integers.1', true, 0)
   ], { located, now: NOW });
   const touched = board.groups.flatMap(g => g.nodes).filter(n => n.state !== 'not-started').map(n => n.id);
+  // Breadth (review finding 2): an outcome with many kinds of question is not shown by one of them.
+  const sourcesOfCode = code => Object.entries(located).filter(([, cs]) => cs.includes(code)).map(([id]) => id);
+  const wide = adv.flatMap(g => g.nodes).map(n => [n.id, sourcesOfCode(n.id)]).sort((a, b) => b[1].length - a[1].length)[0];
+  ok(wide[1].length >= 4, `the widest Advanced outcome (${wide[0]}) has ${wide[1].length} kinds of question`);
+  const narrow = B.syllabusBoard(adv, [0, 0, 0].map(d => at(wide[1][0], true, d)), { located, now: NOW }).groups.flatMap(g => g.nodes).find(n => n.id === wide[0]);
+  eq([narrow.state, narrow.breadth], ['thin', { shown: 1, total: wide[1].length }], 'three answers on one kind of question leave a wide outcome "not enough evidence yet"');
+  const half = Math.ceil(wide[1].length / 2);
+  const broad = B.syllabusBoard(adv, wide[1].slice(0, half).flatMap(dp => [at(dp, true, 0)]).concat([at(wide[1][0], true, 0), at(wide[1][0], true, 0)]), { located, now: NOW }).groups.flatMap(g => g.nodes).find(n => n.id === wide[0]);
+  eq(broad.state, 'independent', 'right on its own across half its kinds of question: shown on your own');
+  // One answer that lands on two outcomes is one answer on each, never two on either.
+  const multi = Object.entries(located).find(([, cs]) => cs.length > 1 && cs.every(c => adv.some(g => g.nodes.some(n => n.id === c))));
+  if (multi) {
+    const mb = B.syllabusBoard(adv, [at(multi[0], true, 0)], { located, now: NOW }).groups.flatMap(g => g.nodes);
+    ok(multi[1].every(c => mb.find(n => n.id === c).evidence.answered === 1), `a dot point on ${multi[1].join(' and ')} counts once on each`);
+  } else ok(true, 'no Advanced dot point lands on two Advanced outcomes');
   eq(touched, [...located['y11-functions.1']].filter(c => c.startsWith('MAV')), 'only the Advanced outcome is lit; a Stage 4 answer lights nothing on the Advanced board');
 }
 
@@ -130,6 +148,15 @@ const groups = B.indiaBoardGroups(chapters);
   }
   ok(one.items.every(i => i.questions >= 3 && i.questions <= 10 && i.minutes === i.questions * B.MINUTES_PER_QUESTION), 'question counts are bounded and time is estimated per question');
   ok(!one.items.some(i => 'predicted' in i || 'score' in i), 'no item carries a predicted figure');
+  // Exact per-outcome marks (review finding 3): Working with functions is MAV-11-01 and MAV-11-02.
+  {
+    const wf = areas.areas.find(a => a.nodeIds.includes('MAV-11-01'));
+    const m1 = wf.nodeMarks['MAV-11-01'], m2 = wf.nodeMarks['MAV-11-02'];
+    const shown = B.syllabusBoard(adv, [], { now: NOW });
+    for (const g of shown.groups) for (const n of g.nodes) if (n.id === 'MAV-11-01') n.state = 'independent';
+    const item = B.boardPriorities(shown, B.nswAreas(shown, bp), { limit: 99 }).items.find(i => i.id === wf.id);
+    eq(item.stake, { low: m2, high: m2 }, `only MAV-11-01 (${m1} marks) shown: exactly MAV-11-02's ${m2} marks are at stake`);
+  }
   // Tie-break by id when everything else is equal.
   const tied = B.boardPriorities(board, { areas: [{ id: 'b', name: 'B', marks: 10, nodeIds: ['MAV-12-03'] }, { id: 'a', name: 'A', marks: 10, nodeIds: ['MAV-12-04'] }], paperMarks: 20 });
   eq(tied.items.map(i => i.id), ['a', 'b'], 'equal areas are ordered by id');
@@ -165,8 +192,11 @@ const groups = B.indiaBoardGroups(chapters);
   eq(r.papers.map(p => `${p.score}/${p.total}`), ['61/100', '68/100', '72/100'], 'the last three, oldest first');
   eq([r.trend, r.spread.low.score, r.spread.high.score, r.count], ['up', 61, 72, 4], 'trend up; the spread is of these papers');
   eq(B.paperReadiness([paper('a', 70, 100, 1), paper('b', 72, 100, 2)]).trend, 'level', 'a two-mark change reads as about level');
-  eq(B.paperReadiness([paper('a', 70, 100, 1), paper('b', 30, 50, 2, { full: false, deadlineAt: null })]).sameConditions, false, 'different totals or conditions are flagged');
-  eq(B.paperReadiness([paper('a', 70, 100, 1), paper('b', 30, 50, 2, { deadlineAt: null })]).papers[1].timed, false, 'an untimed paper says so');
+  eq(B.paperReadiness([paper('a', 70, 100, 1), paper('b', 30, 50, 2, { full: false })]).sameConditions, false, 'different totals or coverage are flagged');
+  eq(B.paperReadiness([paper('a', 70, 100, 1), paper('b', 30, 50, 2, { deadlineAt: null })]).status, 'too-few', 'an untimed paper is not counted');
+  eq(B.paperReadiness([paper('a', 70, 100, 1, { course: 'advanced' }), paper('b', 50, 70, 2, { course: 'extension-1' })], { course: 'advanced' }).status, 'too-few', 'another course\'s paper is not this board\'s evidence');
+  eq(B.paperReadiness([paper('a', 70, 100, 1, { course: 'advanced' }), paper('b', 72, 100, 2)], { course: 'advanced' }).status, 'ready', 'a paper with no course recorded still counts');
+  eq(B.paperReadiness([paper('a', 64, 100, 1), paper('b', 69, 100, 2)]).trend, 'up', '64 → 69 out of 100 is the 5-point edge: up, not level');
   ok(!('predicted' in r) && !('band' in r), 'readiness carries no predicted figure or band');
 }
 
@@ -202,7 +232,7 @@ try {
     await i18n.setLanguage(lang);
     const t = (k, v) => i18n.translate(k, v);
     const words = B.NODE_STATES.map(s => t(`board.state.${{ 'not-started': 'notStarted' }[s] || s}`));
-    eq(new Set(words).size, 6, `${lang}: six distinct state words`);
+    eq(new Set(words).size, B.NODE_STATES.length, `${lang}: a distinct word for every state`);
     const html = draw(view.BoardView, { board: inBoard, india: true, track: 'cbse', courseLabel: 'Class 12 CBSE / NCERT' });
     const tiles = [...html.matchAll(/<button[^>]*class="sb-tile"[^>]*>/g)].map(m => m[0]);
     eq(tiles.length, 8, `${lang}: one tile button per node`);

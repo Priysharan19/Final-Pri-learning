@@ -4735,7 +4735,9 @@ const routes = {
       id: e.id, title: e.title, finishedAt: e.finishedAt, score: e.score, total: e.total,
       deadlineAt: Number.isFinite(e.deadlineAt) ? e.deadlineAt : null, markedBy: markedByOf(e),
       pending: !!e.pendingFinish, provisional: e.provisional === true || pendingSummary(e.detail).any,
-      full: e.nsw ? e.nsw.partial !== true : e.indiaExam ? e.indiaExam.fullPaper === true : false
+      full: e.nsw ? e.nsw.partial !== true : e.indiaExam ? e.indiaExam.fullPaper === true : false,
+      // The NSW course a blueprint paper was set for (its key matches the board's), else null.
+      course: e.nsw?.course || null
     }));
     if (!india) return { course: 'nsw', attempts, papers };
     const trackId = cleanIndiaTrack(p.indiaTrack, p.year);
