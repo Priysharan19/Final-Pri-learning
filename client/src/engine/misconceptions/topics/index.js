@@ -6,3 +6,5 @@ import './indices.js';
 import './number.js';
 import './sequences.js';
 import './finance.js';
+import './trigonometry.js';
+import './functions.js';

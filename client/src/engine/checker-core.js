@@ -6,6 +6,7 @@
 // targeted misconception feedback for recognised wrong answers.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { diagnoseTopicLine } from './misconceptions/topics/index.js';
 import { slipFeedback } from './slips.js';
 import { checkMatrixMatch } from './matrixMatch.js';
 import { checkGraphSketch } from './graphFeatures.js';
@@ -1202,9 +1203,15 @@ function checkAnswerWithinBudget(question, rawInput) {
         }
         if (!ok) {
           const why = matchTraps(question, value, rawInput);
-          // No authored trap: name the kind of slip (sign, ×10, upside down, an earlier step), never a value.
-          const slip = why ? null : slipFeedback(value, target, question);
-          return { correct: false, feedback: why ?? slip?.feedback ?? undefined, ...(slip ? { slip: slip.kind } : {}) };
+          // No authored trap: a topic catalogue (misconceptions/topics) may name the slip from the
+          // question's own numbers. Words only: `correct` was decided above and is never touched.
+          let topic = null;
+          if (!why) {
+            try { topic = diagnoseTopicLine({ line: String(rawInput ?? ''), previous: null, index: 0, meta: { kind: 'answer', question, value } }); } catch { topic = null; }
+          }
+          // Else name the kind of slip (sign, ×10, upside down, an earlier step), never a value.
+          const slip = why || topic ? null : slipFeedback(value, target, question);
+          return { correct: false, feedback: why ?? topic?.message ?? slip?.feedback ?? undefined, ...(topic ? { slipCode: topic.code, feedbackMessages: topic.messages } : {}), ...(slip ? { slip: slip.kind } : {}) };
         }
         return { correct: true };
       }
