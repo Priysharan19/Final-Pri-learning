@@ -29,7 +29,8 @@ import {
   domainFunctionEquationSignature,
   domainSolutionDiagnosis,
   equationSolutionSet,
-  relateSolutionSets
+  relateSolutionSets,
+  absCaseSets
 } from './reason-v4.js';
 
 function unwrap(node) {
@@ -139,7 +140,7 @@ function undefinedAt(eq, variable, x) {
   } catch { return true; }
 }
 const listRoots = roots => roots.map(r => Number(r.toPrecision(8))).join(', ');
-function assessBySolutionSet({ ast, previousAst, previousTrusted, meta, variable }) {
+function assessBySolutionSet({ ast, previousAst, previousTrusted, meta, variable, anchorAst = null }) {
   if (!ast || ast.t !== 'equation' || !variable) return null;
   if (!usesCoveredClass(ast, variable) && !(previousAst && usesCoveredClass(previousAst, variable))) return null;
   const cur = equationSolutionSet(ast, variable);
@@ -158,6 +159,13 @@ function assessBySolutionSet({ ast, previousAst, previousTrusted, meta, variable
       }
       return { status: 'ok', trusted: true, implied: true, note: `True of every solution above, and it also allows ${variable} = ${listRoots(added)}, which the line above does not — check each value against the question.` };
     }
+    // One case of the absolute value (Q = P or -Q = P) is a branch: valid to
+    // write down whatever its sign condition then decides.
+    if (rel === 'subset' || rel === 'different') {
+      const cases = absCaseSets(previousAst, variable) || (anchorAst ? absCaseSets(anchorAst, variable) : null);
+      const branch = cases && cases.find(c => relateSolutionSets(c, cur) === 'same');
+      if (branch) return { status: 'ok', trusted: true, implied: true, note: `This is one case of the absolute value (${variable} = ${listRoots(cur.roots) || 'no value'}); check it against its own condition.` };
+    }
     if (rel === 'subset' || rel === 'different') {
       if (rel === 'subset' && answer && relateSolutionSets(answer, cur) === 'same') return { status: 'ok', trusted: true };
       const diagnosis = domainSolutionDiagnosis({ variable, a: prev, b: cur });
@@ -170,7 +178,7 @@ function assessBySolutionSet({ ast, previousAst, previousTrusted, meta, variable
   return null;
 }
 
-export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null } = {}) {
+export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null, anchorAst = null } = {}) {
   // A line with no unknown left in it is a check of the answer, whichever
   // reasoner would otherwise own it.
   const numericCheck = assessNumericCheckLine(ast, { previousAst, meta });
@@ -191,7 +199,7 @@ export function assessEquationLine({ ast, previousAst = null, previousTrusted = 
     if (assessed) return assessed;
   }
 
-  const bySet = assessBySolutionSet({ ast, previousAst, previousTrusted, meta, variable: variable || meta?.variable || null });
+  const bySet = assessBySolutionSet({ ast, previousAst, previousTrusted, meta, variable: variable || meta?.variable || null, anchorAst });
   if (bySet) return bySet;
 
   if (hasNestedDomainHazard(ast, variable)

@@ -27,6 +27,16 @@ r = run([4, -2], ['abs(x-1)=3', 'x-1=3', 'x=4']);
 ok(r.lines[2].incomplete === true, 'abs: one branch alone (x = 4) is true of it but unfinished: x = -2 is still to find');
 ok(!run([4, -2], ['abs(x-1)=3']).lines[0].incomplete, 'abs: the question itself is not flagged');
 
+// A case of the absolute value is a branch, valid to write down even when its condition then fails.
+r = run([1], ['abs(x+2)=3x', 'x+2=3x', 'x=1']);
+ok(r.firstBreak === -1 && r.lines.every(l => l.status === 'ok'), 'abs: the Q = P case is credited');
+r = run([1], ['abs(x+2)=3x', '-(x+2)=3x']);
+ok(r.firstBreak === -1 && r.lines[1].status === 'ok', 'abs: the -Q = P case (x = -1/2, which fails its own condition) is a branch, not a break');
+r = run([1], ['abs(x+2)=3x', '-(x+2)=2x']);
+ok(r.firstBreak === 1, 'abs: a wrong case equation is a break');
+r = run([1], ['abs(x-3)=2x', 'x-3=2x', '-(x-3)=2x']);
+ok(r.firstBreak === -1, 'abs: both cases are branches');
+
 // ── Square root ──
 r = run([2], ['sqrt(x+7)=x+1', 'x+7=x^2+2x+1', 'x^2+x-6=0', '(x+3)(x-2)=0']);
 ok(r.firstBreak === -1, 'surd: squaring is not a break');
