@@ -58,7 +58,10 @@ export function editionRecordModule(id) {
   const r = editionRecord(id);
   const list = values => `Object.freeze(${JSON.stringify(values)})`;
   const fields = Object.entries(r).map(([key, value]) => `${key}: ${Array.isArray(value) ? list(value) : JSON.stringify(value)}`);
-  return `export const EDITION_RECORD = Object.freeze({ ${fields.join(', ')} });\n`;
+  // EDITION_ID is a literal of its own: the bundler folds it into every `EDITION === '…'` test, so the
+  // other edition's pages (and their data) are dead code and are not emitted.
+  return `export const EDITION_RECORD = Object.freeze({ ${fields.join(', ')} });\nexport const EDITION_ID = ${JSON.stringify(r.id)};\n`;
 }
 
 export const EDITION_RECORD = editionRecord(DEFAULT_EDITION);
+export const EDITION_ID = EDITION_RECORD.id;
