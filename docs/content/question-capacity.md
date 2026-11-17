@@ -120,7 +120,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 
 ## Priyabhata
 
-279 skills measured; **203** meet both targets; **76** are below at least one.
+279 skills measured; **204** meet both targets; **75** are below at least one.
 
 | Skill (generator) | Cells | Distinct instances | Structural forms | Below target |
 | --- | --- | --- | --- | --- |
@@ -168,7 +168,6 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `c7-finding-unknown-current` | 4 | 8.3k | 18 | instances |
 | `c8-algebraic-identities-ncert-mastery` | 4 | 8.5k | 1 | instances + forms |
 | `c7-lcm-reasoning` | 4 | 8.6k | 3 | instances + forms |
-| `c10-circles` | 4 | 8.8k | 6 | instances |
 | `c7-triangle-angles` | 4 | 8.9k | 2 | instances + forms |
 | `c7-decimal-operations-current` | 4 | 9.3k | 1 | instances + forms |
 | `c9-triangles` | 4 | 10.1k | 2 | forms |
@@ -177,28 +176,25 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `c12-principal-value-reasoning` | 4 | 10.9k | 107 | — |
 | `c11-trig-functions` | 4 | 10.9k | 32 | — |
 | `c11-trig-identity-reasoning` | 4 | 11.0k | 50 | — |
+| `c10-probability-classical` | 4 | 11.3k | 34 | — |
 | `c12-definite-integrals` | 4 | 11.4k | 6 | — |
 | `c10-volume-combination-reasoning` | 4 | 11.4k | 19 | — |
 | `olymp-inequalities` | 4 | 11.5k | 144 | — |
 | `c10-zero-coefficient-forms` | 4 | 11.5k | 39 | — |
-| `c10-tangent-length-reasoning` | 4 | 11.6k | 9 | — |
-| `c10-probability-classical` | 4 | 11.8k | 34 | — |
 | `c10-areas-circles` | 4 | 11.8k | 17 | — |
 | `c11-arrangement-jee-reasoning` | 4 | 11.9k | 378 | — |
 | `c10-surface-volume-combo` | 4 | 11.9k | 17 | — |
 | `c10-ap-daily-life-reasoning` | 4 | 11.9k | 34 | — |
-| `c10-trig-boundary-relations` | 4 | 12.4k | 151 | — |
+| `c10-probability-reasoning` | 4 | 12.4k | 33 | — |
 | `c12-monotonic-tangent-reasoning` | 4 | 12.5k | 71 | — |
 | `c11-complex-polar-reasoning` | 4 | 12.5k | 243 | — |
 | `c10-sector-reasoning` | 4 | 12.7k | 21 | — |
-| `c10-probability-reasoning` | 4 | 12.9k | 33 | — |
 | `c7-integer-operations-current` | 4 | 12.9k | 1 | forms |
 | `c12-relations-equivalence` | 4 | 13.0k | 8 | — |
 | `c12-probability-bayes` | 4 | 13.2k | 27 | — |
 | `c11-limit-jee-reasoning` | 4 | 13.3k | 69 | — |
 | `c12-differentiability-reasoning` | 4 | 13.5k | 55 | — |
 | `c11-arrangement-reasoning` | 4 | 13.6k | 144 | — |
-| `c10-trigonometry-current` | 4 | 13.8k | 153 | — |
 | `c8-rational-numbers-distributivity` | 4 | 13.9k | 8 | — |
 | `c11-radian-unit-circle-reasoning` | 4 | 14.0k | 46 | — |
 | `c8-square-root-reasoning` | 4 | 14.0k | 64 | — |
@@ -206,8 +202,8 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `c7-fraction-context-reasoning` | 4 | 14.3k | 607 | — |
 | `c11-binomial-expansion-jee-reasoning` | 4 | 14.4k | 20 | — |
 | `c12-inverse-trigonometric` | 4 | 14.5k | 17 | — |
+| `c10-circles` | 4 | 14.8k | 6 | — |
 | `olymp-geometry` | 4 | 14.9k | 5 | — |
-| `c10-trig-applications-current` | 4 | 14.9k | 151 | — |
 | `c10-triangles-current` | 4 | 15.4k | 18 | — |
 | `c11-conic-sections` | 4 | 15.4k | 18 | — |
 | `c8-factorisation-ncert-mastery` | 4 | 16.2k | 1 | forms |
@@ -218,14 +214,18 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `c12-applications-derivatives` | 4 | 17.3k | 434 | — |
 | `c10-quadratic-triangle-competency` | 4 | 17.3k | 58 | — |
 | `c10-bpt-reasoning` | 4 | 17.4k | 59 | — |
+| `c10-trigonometry-current` | 4 | 17.5k | 153 | — |
 | `c11-mean-deviation-jee-reasoning` | 4 | 17.6k | 7 | — |
+| `c10-trig-boundary-relations` | 4 | 17.7k | 151 | — |
 | `c11-binomial-middle-term-jee-reasoning` | 4 | 17.9k | 45 | — |
 | `c12-inverse-trig-branch-reasoning` | 4 | 17.9k | 39 | — |
+| `c10-trig-applications-current` | 4 | 18.1k | 151 | — |
 | `c7-angle-sum-reasoning` | 4 | 18.3k | 60 | — |
 | `c7-number-play-current` | 4 | 18.3k | 1 | forms |
 | `c7-rounding-bounds-reasoning` | 4 | 18.3k | 315 | — |
 | `c10-surface-area-combo` | 4 | 18.6k | 18 | — |
 | `c7-perpendicular-bisector-reasoning` | 4 | 19.1k | 4 | forms |
+| `c10-tangent-length-reasoning` | 4 | 19.5k | 9 | — |
 | `c10-quadratic-k-forms` | 4 | 19.6k | 75 | — |
 | `c11-probability` | 4 | 19.7k | 12 | — |
 | `c10-quadratic-discriminant` | 4 | 20.0k | 56 | — |
@@ -268,12 +268,12 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `c12-related-rates-reasoning` | 4 | 34.9k | 8 | — |
 | `c11-ap-reasoning` | 4 | 35.0k | 91 | — |
 | `c11-line-equation-reasoning` | 4 | 35.1k | 5 | — |
+| `c10-polynomial-zeroes` | 4 | 35.4k | 20 | — |
 | `c7-integer-division-reasoning` | 4 | 36.2k | 26 | — |
-| `c10-polynomial-zeroes` | 4 | 36.3k | 20 | — |
 | `c7-congruent-matching-reasoning` | 4 | 37.2k | 1078 | — |
 | `c11-real-function-reasoning` | 4 | 38.4k | 310 | — |
+| `c10-polynomial-zeroes-reasoning` | 4 | 39.0k | 19 | — |
 | `c7-expression-translation-reasoning` | 4 | 39.0k | 917 | — |
-| `c10-polynomial-zeroes-reasoning` | 4 | 40.0k | 19 | — |
 | `c11-relations-functions` | 4 | 40.0k | 189 | — |
 | `c8-linear-equations-foundations` | 4 | 40.5k | 1 | forms |
 | `c7-triangle-construction-reasoning` | 4 | 41.3k | 91 | — |

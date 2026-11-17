@@ -125,7 +125,7 @@ function mensForms() {
         payload: numeric('hemisphere-volume', `A hemispherical bowl has inner radius $${r}$ cm. Taking $\\pi = \\dfrac{22}{7}$, find the volume of liquid it holds when full, in cubic centimetres.`, 19404 * k ** 3, {
           hints: ['Volume of a hemisphere is $\\dfrac23\\pi r^3$.', 'The radius is a multiple of $21$, so the $3$ and $7$ both cancel.', 'Cube the radius carefully.'],
           steps: [{ h: 'Formula', d: '$V = \\dfrac23\\pi r^3$' }, { h: 'Substitute', d: `$\\dfrac23\\times\\dfrac{22}{7}\\times ${r}^3$` }],
-          traps: [{ value: 38808 * k ** 3 * 2, why: 'A hemisphere is half a sphere: $\\frac23\\pi r^3$, not $\\frac43\\pi r^3$.' }]
+          traps: [{ value: 38808 * k ** 3, why: 'A hemisphere is half a sphere: $\\frac23\\pi r^3$, not $\\frac43\\pi r^3$.' }]
         }),
         check: () => r6(((2 * 22 * r * r * r) / (3 * 7)))
       };
@@ -320,6 +320,7 @@ function polyForms() {
     } },
     { form: 'find-p', make(rng, d) {
       const s0 = ri(rng, 1, R(d)), k = ri(rng, 2, 9), c = ri(rng, 1, R(d));
+      if (k * s0 * s0 < 4 * c) throw RETRY;
       return {
         payload: numeric('find-p', `The sum of the zeroes of the polynomial $${k}x^2 - px + ${c}$ is $${s0}$. Find $p$.`, k * s0, {
           hints: ['For $ax^2 + bx + c$ the sum of the zeroes is $-\\dfrac{b}{a}$.', 'Here the coefficient of $x$ is $-p$.', 'Set the sum equal to the given value and solve for $p$.'],
@@ -387,6 +388,7 @@ function probForms() {
       const N = [20, 25, 40, 50, 100, 200, 250, 400, 500, 1000][ri(rng, 0, 9)], a = ri(rng, 2, 14 + 2 * d);
       let b = a;
       while (b === a) b = ri(rng, 2, 14 + 2 * d);
+      if (a > N / 2 || b > N / 2 || a % b === 0 || b % a === 0) throw RETRY;
       let fav = 0; for (let i = 1; i <= N; i++) if (i % a === 0 || i % b === 0) fav += 1;
       if (!terminates(N / gcd(N, fav))) throw RETRY;
       return {
@@ -721,7 +723,7 @@ function trigForms() {
       };
     } },
     { form: 'ladder', make(rng, d) {
-      const h = ri(rng, 2, 40 + 30 * d), who = person(rng);
+      const h = ri(rng, 2, 12 + 4 * d), who = person(rng);
       return {
         payload: numeric('ladder', `${who} leans a ladder against a wall in ${place(rng)}. It reaches a height of $${h}$ m and makes an angle of $30^\\circ$ with the ground. Find the length of the ladder in metres.`, 2 * h, {
           hints: ['The ladder is the hypotenuse; the height is the side opposite the $30^\\circ$ angle.', '$\\sin 30^\\circ = \\dfrac12$.', 'So the hypotenuse is twice the opposite side.'],
