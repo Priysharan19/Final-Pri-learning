@@ -47,6 +47,7 @@ export const EDITION_SUITES = [
   'client/test/desk-clock-check.mjs',
   'client/test/desk-import-check.mjs',
   'client/test/export-file-check.mjs',
+  'client/test/edition-terms-check.mjs',
   'client/test/progress-export-check.mjs',
   'client/test/desk-ui-check.mjs',
   // The server: edition agreement, billing per edition, budgets per region,
@@ -59,6 +60,7 @@ export const EDITION_SUITES = [
   'server/test/nsw-exam-check.mjs',
   'server/test/desk-check.mjs',
   'server/test/desk-isolation-check.mjs',
+  'server/test/guardian-au-age-check.mjs',
   'server/test/security-hardening-check.mjs',
   'server/test/production-runtime-image-check.mjs'
 ];

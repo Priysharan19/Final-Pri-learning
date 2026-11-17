@@ -46,6 +46,7 @@ import { priNative } from '../platform/native/index.js';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
 import { readOnboardingAuthority } from './onboardingAuthority.js';
 import { parentFeaturesOffered } from '../platform/edition.js';
+import { EDITION_ID } from '../brand/edition.js';
 
 export { isNetworkFailure, signInErrorCopy };
 import './SignUpFlow.css';
@@ -63,7 +64,7 @@ const CODE_LIFETIME_MS = 10 * 60 * 1000;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 // Must equal CONSENT_NOTICE_VERSION in server/platform/guardianConsent.js; the
 // server refuses an approval that names any other notice.
-export const GUARDIAN_NOTICE_VERSION = '2026-10-22';
+export const GUARDIAN_NOTICE_VERSION = EDITION_ID === 'prithagoras' ? 'au-1' : '2026-10-22';
 
 /**
  * Read an SMS code where the platform offers it: the Android app through the
@@ -203,7 +204,7 @@ export default function SignUpFlow({
 
   const cleanDestination = () => (channel === 'email' ? destination.trim().toLowerCase() : destination.trim());
   const shownDestination = () => (channel === 'sms' ? `+91 ${destination.trim()}` : destination.trim());
-  const profile = () => ({ name: name.trim(), year: year == null ? undefined : String(year), isAdult: age === null ? undefined : age >= 18, role: 'student' });
+  const profile = () => ({ name: name.trim(), year: year == null ? undefined : String(year), isAdult: age === null ? undefined : age >= 18, age: age === null ? undefined : age, role: 'student' });
   const detailsReady = () => !!name.trim() && age !== null && (inline || year !== null);
 
   async function sendCode({ resend = false } = {}) {

@@ -26,6 +26,7 @@
 // and withdrawing stops sync at once.
 // ─────────────────────────────────────────────────────────────────────────────
 import { resolveSessionOnce, sha256 } from './security.js';
+import { serverEdition } from './edition.js';
 import { asyncHandler } from './asyncRouter.js';
 import { asStore, isDatabaseOverload } from './store.js';
 import { tagPolicy } from './routePolicy.js';
@@ -54,7 +55,29 @@ export const CONSENT_NOTICE_VERSION = '2026-10-22';
  * version here only when the change since it does not alter what a guardian
  * agreed to; leave it out to require renewal.
  */
-export const ACCEPTED_CONSENT_NOTICE_VERSIONS = Object.freeze(['2026-10-19', CONSENT_NOTICE_VERSION]);
+export const ACCEPTED_CONSENT_NOTICE_VERSIONS = Object.freeze(['2026-10-19', CONSENT_NOTICE_VERSION, 'au-1']);
+
+/**
+ * The Australian edition's guardian notice (Prithagoras): a short en-AU notice
+ * adapted from the existing one — what is collected, why, that consent can be
+ * withdrawn, and a contact — and linked to the Australian privacy policy. It is
+ * NOT reviewed by a lawyer, exactly like the legal pages (docs/legal): the owner
+ * reviews it with them. No new legal claim is made in it.
+ */
+export const AU_CONSENT_NOTICE_VERSION = 'au-1';
+
+/** The notice version a guardian is shown and confirms, for the edition this server is. */
+export const consentNoticeVersion = (edition = serverEdition()) => (edition === 'prithagoras' ? AU_CONSENT_NOTICE_VERSION : CONSENT_NOTICE_VERSION);
+
+/**
+ * Australia (Prithagoras): privacy guidance treats a student under 15 as
+ * generally unable to consent for themselves, so only a student who states they
+ * are under 15 needs a guardian's one-time email confirmation. 15 and over (or
+ * 18 and over) do not. The default is still the protective one: a declaration
+ * with no age, or an age below 15, is a child. India (Priyabhata) is unchanged:
+ * everyone who is not 18 or older.
+ */
+export const AU_GUARDIAN_AGE = 15;
 
 /** What was established. Deliberately not the words "verifiable consent". */
 export const CONSENT_METHOD = 'guardian-email-confirmation';
@@ -73,7 +96,12 @@ const CHILD_CLASS = /^(7|8|9|10|11|12)$/;
 const clean = (value, max) => clipText(String(value ?? '').trim(), max);
 
 /** Is this learner a child, on what they told us at signup? */
-export function learnerIsChild({ isAdult } = {}) {
+export function learnerIsChild({ isAdult, age } = {}, edition = serverEdition()) {
+  if (edition === 'prithagoras') {
+    if (isAdult === true) return false;
+    const years = typeof age === 'number' ? age : NaN;
+    return !(Number.isInteger(years) && years >= AU_GUARDIAN_AGE && years <= 120);
+  }
   // An explicit "I am 18 or older" is taken at its word; that is the only
   // declaration a service can make. Everything else — including saying nothing,
   // or naming no class — is treated as a child, because the safe default is the
@@ -87,8 +115,9 @@ export function learnerIsChild({ isAdult } = {}) {
  * boolean, or the learner must name a school class (which makes them a child).
  * A request that says nothing is refused rather than guessed about.
  */
-export function hasAgeDeclaration({ isAdult, year } = {}) {
+export function hasAgeDeclaration({ isAdult, year, age } = {}) {
   if (typeof isAdult === 'boolean') return true;
+  if (typeof age === 'number' && Number.isInteger(age) && age >= 5 && age <= 120) return true;
   return CHILD_CLASS.test(String(year ?? '').trim());
 }
 
@@ -99,12 +128,13 @@ export function hasAgeDeclaration({ isAdult, year } = {}) {
  * The student's own address (body.studentEmail, else body.email) is passed to
  * validateGuardian so a child cannot name their own mailbox as the guardian's.
  */
-export function ageDecision(body = {}, { guardianLater = false } = {}) {
-  const declaration = { isAdult: body.isAdult, year: body.year };
+export function ageDecision(body = {}, { guardianLater = false, edition = serverEdition() } = {}) {
+  const declaration = { isAdult: body.isAdult, year: body.year, age: body.age };
   if (!hasAgeDeclaration(declaration)) {
     return { ok: false, code: 'AGE_DECLARATION_REQUIRED', message: 'Say whether you are 18 or older, or which class you are in.' };
   }
-  if (!learnerIsChild(declaration)) return { ok: true, basis: 'adult', guardian: null };
+  // `basis: 'adult'` means "no guardian is required in this edition" (Prithagoras: 15 and over).
+  if (!learnerIsChild(declaration, edition)) return { ok: true, basis: 'adult', guardian: null };
   // guardianLater: the onboarding flow (otp.js) asks for the parent on the
   // next screen. The account is created as a child with a pending consent row
   // and no guardian yet, so the gate stays closed until a parent approves.
@@ -158,7 +188,7 @@ export async function recordConsentRequest(db, { accountId, name, email, tokenHa
       notice_version = excluded.notice_version,
       requested_at = excluded.requested_at,
       confirmed_at = NULL,
-      withdrawn_at = NULL`, [accountId, name, email, CONSENT_NOTICE_VERSION, now, CONSENT_METHOD]);
+      withdrawn_at = NULL`, [accountId, name, email, consentNoticeVersion(), now, CONSENT_METHOD]);
   return { accountId, tokenHash };
 }
 
@@ -229,8 +259,8 @@ export function consentBlockerCode(state) {
 }
 
 /** Did the guardian accept the notice this server shows now? */
-export const acceptsCurrentNotice = (body) =>
-  body?.approve === true && String(body?.noticeVersion || '') === CONSENT_NOTICE_VERSION;
+export const acceptsCurrentNotice = (body, edition = serverEdition()) =>
+  body?.approve === true && String(body?.noticeVersion || '') === consentNoticeVersion(edition);
 
 /**
  * Mark a guardian's confirmation of the notice they were shown. Returns false
@@ -238,9 +268,9 @@ export const acceptsCurrentNotice = (body) =>
  * one. One statement, so the version that is written is exactly the version
  * that was checked: no deploy, re-request or withdrawal can land in between.
  */
-export async function confirmConsent(db, accountId, noticeVersion, now = Date.now()) {
+export async function confirmConsent(db, accountId, noticeVersion, now = Date.now(), edition = serverEdition()) {
   db = asStore(db);
-  if (noticeVersion !== CONSENT_NOTICE_VERSION) return false;
+  if (noticeVersion !== consentNoticeVersion(edition)) return false;
   // Withdrawal is terminal for the current consent ceremony. Confirmation must
   // never clear a withdrawal or re-grant sync permission from the same bearer;
   // a future re-consent flow must create a new request/authority explicitly.

@@ -3738,4 +3738,6 @@ export default {
   'scn.tagRetest': 'दोबारा जाँच',
   'scn.tagNew': 'नया',
   'signup.orEmail': 'या ईमेल से',
+  'signup.noticeContact': "प्रश्नों या वापसी के लिए: संपर्क विवरण इसमें हैं",
+  'signup.noticeUnreviewed': "इस सूचना की किसी वकील ने अभी समीक्षा नहीं की है।",
 };

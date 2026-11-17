@@ -3683,4 +3683,6 @@ export default {
   'scn.tagRetest': 'retest',
   'scn.tagNew': 'new',
   'signup.orEmail': 'or use email',
+  'signup.noticeContact': "Questions, or to withdraw: the contact details are in the",
+  'signup.noticeUnreviewed': "This notice has not been reviewed by a lawyer yet.",
 };
