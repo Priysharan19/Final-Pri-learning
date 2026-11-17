@@ -41,7 +41,7 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
 // ── 2 · set, point and surd values are held to the numeric box ──────────────
 {
   const G = 'components';
-  const roots = generateQuestion('y10-quadratics', 1, 1);       // Solve (x − 2)(x + 8) = 0
+  const roots = generateQuestion('y10-quadratics', 1, 1104);    // Solve (x + 8)(x − 2) = 0
   for (const input of ['2, -8', 'x = 2, x = -8', '{-8, 2}']) check(G, verdict(roots, input).correct === true, `roots: "${input}" is credited`);
   for (const input of ['200%, -800%', '2 kg, -8 kg', '2 cm, -8 cm', '₹2, -8', '$2, -8']) {
     const r = verdict(roots, input);
