@@ -16,7 +16,7 @@ export const STRANDS = [
   'Calculus'
 ];
 
-const CODES = {"y7-integers": "MA4 · Number", "y7-fractions": "MA4 · Number", "y7-decimals-perc": "MA4 · Number", "y7-ratio": "MA4 · Number", "y7-algebra": "MA4 · Algebra", "y7-equations": "MA4 · Algebra", "y7-angles": "MA4 · Geometry", "y7-area": "MA4 · Measurement", "y7-data": "MA4 · Statistics", "y8-indices": "MA4 · Number", "y8-percentages": "MA4 · Financial", "y8-algebra": "MA4 · Algebra", "y8-equations": "MA4 · Algebra", "y8-linear": "MA4 · Linear", "y8-circles": "MA4 · Measurement", "y8-volume": "MA4 · Measurement", "y8-rates": "MA4 · Number", "y8-probability": "MA4 · Probability", "y9-pythagoras": "MA5 · Measurement", "y9-indices-sci": "MA5 · Number", "y9-algebra": "MA5 · Algebra", "y9-linear": "MA5 · Linear", "y9-trig": "MA5 · Trigonometry", "y9-surface-area": "MA5 · Measurement", "y9-simint": "MA5 · Financial", "y9-data": "MA5 · Statistics", "y9-probability": "MA5 · Probability", "y10-quadratics": "MA5 · Algebra", "y10-nonlinear": "MA5 · Non-linear", "y10-simeq": "MA5 · Algebra", "y10-trig": "MA5 · Trigonometry", "y10-surds": "MA5 · Number", "y10-compound": "MA5 · Financial", "y10-similarity": "MA5 · Geometry", "y10-stats": "MA5 · Statistics", "y10-probability": "MA5 · Probability", "y11-functions": "MA-F1", "y11-quadfunc": "MA-F1", "y11-polynomials": "MA-F1", "y11-lines": "MA-F1", "y11-trigfunc": "MA-T1/T2", "y11-sine-cosine-rule": "MA-T1", "y11-explog": "MA-E1", "y11-diff": "MA-C1", "y11-probability": "MA-S1", "y12-diff": "MA-C2", "y12-appdiff": "MA-C3", "y12-integration": "MA-C4", "y12-trigcalc": "MA-T3/C2", "y12-explogcalc": "MA-E1/C2", "y12-series": "MA-M1", "y12-financial": "MA-M1", "y12-stats": "MA-S3", "y12-motion": "MA-C3/C4", "y12-integral-calc": "MA-C4", "y12-random-var": "MA-S3", "y12-fin-exact": "MA-M1", "y12-trig-model": "MA-T3", "y12-func-model": "MA-E1/C3", "y8-geo-figures": "MA4 · Geometry", "y9-nonlinear-a": "MA5 · Algebra", "y9-variation": "MA5 · Algebra", "y9-rate-change": "MA5 · Algebra", "y9-surface-solids": "MA5 · Measurement", "y9-volume-solids": "MA5 · Measurement", "y9-data-inquiry": "MA5 · Statistics", "y10-indices-neg": "MA5 · Number", "y10-functions": "MA5 · Algebra", "y10-logarithms": "MA5 · Number", "y10-polynomials": "MA5 · Algebra", "y10-trig-nonright": "MA5 · Trigonometry", "y10-trig-any-angle": "MA5 · Trigonometry", "y10-geometry-proof": "MA5 · Geometry", "y10-circle-geometry": "MA5 · Geometry", "y10-networks": "MA5 · Statistics"};
+const CODES = {"y7-integers": "MA4 · Number", "y7-fractions": "MA4 · Number", "y7-decimals-perc": "MA4 · Number", "y7-ratio": "MA4 · Number", "y7-algebra": "MA4 · Algebra", "y7-equations": "MA4 · Algebra", "y7-angles": "MA4 · Geometry", "y7-area": "MA4 · Measurement", "y7-data": "MA4 · Statistics", "y8-indices": "MA4 · Number", "y8-percentages": "MA4 · Financial", "y8-algebra": "MA4 · Algebra", "y8-equations": "MA4 · Algebra", "y8-linear": "MA4 · Linear", "y8-circles": "MA4 · Measurement", "y8-volume": "MA4 · Measurement", "y8-rates": "MA4 · Number", "y8-probability": "MA4 · Probability", "y9-pythagoras": "MA5 · Measurement", "y9-indices-sci": "MA5 · Number", "y9-algebra": "MA5 · Algebra", "y9-linear": "MA5 · Linear", "y9-trig": "MA5 · Trigonometry", "y9-surface-area": "MA5 · Measurement", "y9-simint": "MA5 · Financial", "y9-data": "MA5 · Statistics", "y9-probability": "MA5 · Probability", "y10-quadratics": "MA5 · Algebra", "y10-nonlinear": "MA5 · Non-linear", "y10-simeq": "MA5 · Algebra", "y10-trig": "MA5 · Trigonometry", "y10-surds": "MA5 · Number", "y10-compound": "MA5 · Financial", "y10-similarity": "MA5 · Geometry", "y10-stats": "MA5 · Statistics", "y10-probability": "MA5 · Probability", "y11-functions": "MA-F1", "y11-quadfunc": "MA-F1", "y11-polynomials": "MA-F1", "y11-lines": "MA-F1", "y11-trigfunc": "MA-T1/T2", "y11-sine-cosine-rule": "MA-T1", "y11-explog": "MA-E1", "y11-diff": "MA-C1", "y11-probability": "MA-S1", "y12-diff": "MA-C2", "y12-appdiff": "MA-C3", "y12-integration": "MA-C4", "y12-trigcalc": "MA-T3/C2", "y12-explogcalc": "MA-E1/C2", "y12-series": "MA-M1", "y12-financial": "MA-M1", "y12-stats": "MA-S3", "y12-motion": "MA-C3/C4", "y12-integral-calc": "MA-C4", "y12-random-var": "MA-S3", "y12-fin-exact": "MA-M1", "y12-trig-model": "MA-T3", "y12-func-model": "MA-E1/C3", "y8-geo-figures": "MA4 · Geometry", "y9-nonlinear-a": "MA5 · Algebra", "y9-variation": "MA5 · Algebra", "y9-rate-change": "MA5 · Algebra", "y9-surface-solids": "MA5 · Measurement", "y9-volume-solids": "MA5 · Measurement", "y9-data-inquiry": "MA5 · Statistics", "y10-indices-neg": "MA5 · Number", "y10-functions": "MA5 · Algebra", "y10-logarithms": "MA5 · Number", "y10-polynomials": "MA5 · Algebra", "y10-trig-nonright": "MA5 · Trigonometry", "y10-trig-any-angle": "MA5 · Trigonometry", "y10-geometry-proof": "MA5 · Geometry", "y10-circle-geometry": "MA5 · Geometry", "y10-networks": "MA5 · Statistics", "y11-functions-more": "MA-F1", "y11-transform": "MA-F2", "y11-trig-ident": "MA-T2", "y11-explog-more": "MA-E1", "y11-data-sets": "MA-S2"};
 // A subtopic authored for the Prithagoras (NSW) bank carries the legacy exam-weight average (100/9: nine
 // subtopics a year sum to 100), so the Australian exam-weight pools keep their average, every legacy
 // share and the "high exam weight" cut-off at 12. Kept a few ulps under 100/9 so that a legacy weight
@@ -362,6 +362,31 @@ export const CURRICULUM = [
         'Multiplication and addition principles',
         'Arrangements and selections (nPr, nCr)',
         'Conditional probability with formulas'
+      ]),
+      S('y11-functions-more', 'Functions: Domain, Range and Inverses', 'Functions', AUTHORED_WEIGHT, [
+        'Find the domain of a function',
+        'Find the minimum value of a quadratic function',
+        'Use inverse and composite functions'
+      ]),
+      S('y11-transform', 'Graph Transformations', 'Functions', AUTHORED_WEIGHT, [
+        'Translate a graph',
+        'Reflect a graph in an axis',
+        'Dilate and combine transformations'
+      ]),
+      S('y11-trig-ident', 'Trigonometric Identities and Equations', 'Trigonometry', AUTHORED_WEIGHT, [
+        'Use the Pythagorean identity',
+        'Solve simple trigonometric equations',
+        'Count the solutions of a trigonometric equation'
+      ]),
+      S('y11-explog-more', 'Logarithms and Exponential Equations', 'Functions', AUTHORED_WEIGHT, [
+        'Use the logarithm laws',
+        'Solve an exponential equation',
+        'Use logarithms as inverse functions'
+      ]),
+      S('y11-data-sets', 'Data: Mean, Spread and Transformations', 'Statistics & Probability', AUTHORED_WEIGHT, [
+        'Find the mean of a data set',
+        'Find the median of a data set',
+        'Find and transform a standard deviation'
       ])
     ]
   },
@@ -488,6 +513,31 @@ export const STREAM_CURRICULUM = {
         'Probability from equally likely outcomes',
         'Relative frequency as an estimate of probability',
         'Expected numbers of outcomes'
+      ]),
+      T('ms11-linear', 'Linear Relationships in Practice', 'Algebra', 8, 'MS-A2', [
+        'Find the gradient of a line',
+        'Evaluate a linear equation',
+        'Use direct variation and linear cost models'
+      ]),
+      T('ms11-earning-exact', 'Earning Money: Pay and Commission', 'Financial Maths', 8, 'MS-F1', [
+        'Calculate pay from an hourly rate',
+        'Calculate annual and fortnightly pay',
+        'Calculate overtime and commission'
+      ]),
+      T('ms11-managing-exact', 'Managing Money: GST, Budgets and Discounts', 'Financial Maths', 8, 'MS-F1', [
+        'Calculate GST',
+        'Prepare a budget',
+        'Calculate discounts and unit prices'
+      ]),
+      T('ms11-time-location', 'Time and Location', 'Measurement & Geometry', 8, 'MS-M2', [
+        'Find time differences between places',
+        'Use longitude to find time differences',
+        'Calculate arrival times'
+      ]),
+      T('ms11-measure-more', 'Applications of Measurement: Areas and Volumes', 'Measurement & Geometry', 8, 'MS-M1', [
+        'Find the area of a composite shape',
+        'Find the area of a triangle',
+        'Find volumes and convert units'
       ])
     ]
   },
@@ -613,6 +663,11 @@ export const STREAM_CURRICULUM = {
         'Related rates of change',
         'Exponential growth and decay dN/dt = kN',
         'Motion described by derivatives'
+      ]),
+      T('me11-binomial', 'The Binomial Theorem: Coefficients', 'Algebra', 8, 'ME-A1', [
+        'Evaluate a binomial coefficient',
+        'Find the coefficient of a term in a binomial expansion',
+        'Find the sum of the coefficients'
       ])
     ]
   },
@@ -648,6 +703,11 @@ export const STREAM_CURRICULUM = {
         'Time of flight and range on level ground',
         'Greatest height of a projectile',
         'Resolve initial velocity into components'
+      ]),
+      T('me12-further-calc', 'Further Calculus: Inverse Trigonometric Functions', 'Calculus', 8, 'ME-C2', [
+        'Differentiate an inverse sine',
+        'Differentiate an inverse tangent',
+        'Integrate to inverse trigonometric functions'
       ])
     ]
   },
@@ -683,6 +743,11 @@ export const STREAM_CURRICULUM = {
         'Simple harmonic motion x = A cos(nt + φ)',
         'Velocity and acceleration in SHM',
         'Resisted motion and terminal velocity'
+      ]),
+      T('mex-vectors-lines', 'Vectors: Lines and Spheres in Three Dimensions', 'Algebra', 8, 'MEX-V1', [
+        'Find the parameter of a point on a line',
+        'Find a coordinate of a point on a line',
+        'Find intersections and radii'
       ])
     ]
   }
@@ -893,6 +958,19 @@ export const DOTPOINT_FORMS = Object.freeze({
   'ms11-energy': [[0], [1], [2], [0, 1]],
   'ms11-data': [[0], [1], [2], [0, 2]],
   'ms11-relfreq': [[0], [1], [2], [0]],
+  'y11-functions-more': [[0], [1], [2], [2]],
+  'y11-transform': [[0], [1], [2], [2]],
+  'y11-trig-ident': [[0], [1], [2], [1]],
+  'y11-explog-more': [[0], [1], [2], [2]],
+  'y11-data-sets': [[0], [1], [2], [2]],
+  'ms11-linear': [[0], [1], [2], [2]],
+  'ms11-earning-exact': [[0], [2], [1], [2]],
+  'ms11-managing-exact': [[0], [1], [2], [2]],
+  'ms11-time-location': [[0], [1], [2], [2]],
+  'ms11-measure-more': [[0], [1], [2], [2]],
+  'me11-binomial': [[0], [1], [1], [2]],
+  'me12-further-calc': [[0], [1], [2], [2]],
+  'mex-vectors-lines': [[0], [1], [2], [2]],
   // ── Standard · Year 12 ────────────────────────────────────────────────────
   'ms12-loans': [[0], [1], [1], [0, 2]],
   'ms12-annuity': [[0], [0, 2], [0, 2], [1]],

@@ -109,5 +109,18 @@ export const NSW_ISSUED_CELLS = Object.freeze({
   'mex-demoivre': [1, 2, 3, 4],
   'mex-integration': [1, 2, 3, 4],
   'mex-vectors': [1, 2, 3, 4],
-  'mex-mechanics': [1, 2, 3, 4]
+  'mex-mechanics': [1, 2, 3, 4],
+  'y11-functions-more': [1, 2, 3, 4],
+  'y11-transform': [1, 2, 3, 4],
+  'y11-trig-ident': [1, 2, 3, 4],
+  'y11-explog-more': [1, 2, 3, 4],
+  'y11-data-sets': [1, 2, 3, 4],
+  'ms11-linear': [1, 2, 3, 4],
+  'ms11-earning-exact': [1, 2, 3, 4],
+  'ms11-managing-exact': [1, 2, 3, 4],
+  'ms11-time-location': [1, 2, 3, 4],
+  'ms11-measure-more': [1, 2, 3, 4],
+  'me11-binomial': [1, 2, 3, 4],
+  'me12-further-calc': [1, 2, 3, 4],
+  'mex-vectors-lines': [1, 2, 3, 4]
 });
