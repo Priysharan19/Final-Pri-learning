@@ -743,7 +743,7 @@
       "pins": [
         {"has":"ACCESSIBILITY SUITE PASSED — 47/47 checks across 13 groups","note":"Plan E6: the accessibility walk on a Prithagoras build and server, an NSW Year 10 student; India-only steps (placement, the JEE room, generated papers refused by D15, the India chapter table) are listed as not applicable."},
         {"has":"ACCESSIBILITY SUITE PASSED — 50/50 checks across 14 groups"},
-        {"has":"not applicable on prithagoras (India-only): 7"},
+        {"has":"not applicable on prithagoras (India-only): 6"},
         {"has":"E2E SUITE PASSED — 35/35 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server."},
         {"has":"E2E SUITE PASSED — 72/72 checks across 1 flows","note":"The activation gate on a Prithagoras build."},
         {"has":"E2E SUITE PASSED — 5/5 checks across 1 flows","note":"The Exam Desk dark without its flag, Prithagoras."},
