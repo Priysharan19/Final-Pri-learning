@@ -168,8 +168,10 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
       const pos = new Map(areas.map(a => {
         const gx = padX + (cols > 1 ? a.col / (cols - 1) : 0.5) * (w - 2 * padX);
         const gy = (a.row - (rows - 1) / 2) * ((h - 2 * padY) / Math.max(1, rows - 1)) * 0.9;
-        // A raised point rises at most about 40% of a row, so it never climbs into the row above.
-        const target = raised.has(a.id) ? Math.min(phone ? 24 : 38, rowGap * 0.4) : 0;
+        // A raised point rises only into the space its row leaves clear: a row holds the point
+        // (2R) and its name below it (12 px + 14 px a line), so it never meets the name above.
+        const nameH = R + 12 + (rows > 8 ? 2 : 3) * 14;
+        const target = raised.has(a.id) ? Math.max(0, Math.min(phone ? 24 : 38, rowGap - nameH - R - 4)) : 0;
         let v = lift.current.get(a.id) || 0;
         if (reduce) v = target; else { v += (target - v) * 0.22; if (Math.abs(target - v) < 0.3) v = target; else moving = true; }
         lift.current.set(a.id, v);
@@ -249,7 +251,7 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
   };
   // Taller for a map with more rows, so its labels keep their room.
   const rowCount = areas.length ? Math.max(...areas.map(a => a.row)) + 1 : 1;
-  const height = phone ? Math.max(360, rowCount * 44 + 80) : Math.max(440, rowCount * 72 + 128);
+  const height = phone ? Math.max(360, rowCount * 44 + 80) : Math.max(440, rowCount * (rowCount > 8 ? 84 : 72) + 128);
   return <canvas ref={ref} className="sb-canvas" role="img" aria-label={label} onClick={pick} style={{ height, minHeight: height, maxHeight: 'none' }} data-board-map data-rows={rowCount} />;
 }
 

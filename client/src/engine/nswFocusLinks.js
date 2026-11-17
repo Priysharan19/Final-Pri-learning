@@ -23,6 +23,7 @@
  * does either is a mistake, not a layout).
  */
 export function autoLayout(ids, links) {
+  if (new Set(ids).size !== ids.length) throw new Error('duplicate focus area id');
   const known = new Set(ids);
   const into = new Map(ids.map(id => [id, []]));
   for (const [from, to] of links) {
@@ -53,7 +54,36 @@ export function autoLayout(ids, links) {
       .sort((a, b) => a[1] - b[1] || a[2] - b[2])
       .forEach(([id], k) => row.set(id, k));
   }
+  // A link along one row is drawn straight: it must not pass through an area between its
+  // ends. Move the far end down to the next free row of its column until none does.
+  for (let guard = 0; guard < ids.length * ids.length; guard++) {
+    const hit = blockedLink(links, id => [col.get(id), row.get(id)], ids);
+    if (!hit) break;
+    const [, to] = hit;
+    const c = col.get(to);
+    const taken = new Set(ids.filter(id => col.get(id) === c).map(id => row.get(id)));
+    let r = row.get(to) + 1;
+    while (taken.has(r)) r++;
+    row.set(to, r);
+  }
   return Object.freeze(Object.fromEntries(ids.map(id => [id, Object.freeze([col.get(id), row.get(id)])])));
+}
+
+/**
+ * The first link drawn straight (both ends on one row, or both in one column)
+ * that passes through another area between its ends, or null.
+ */
+export function blockedLink(links, at, ids) {
+  for (const [a, b] of links) {
+    const [ca, ra] = at(a), [cb, rb] = at(b);
+    for (const id of ids) {
+      if (id === a || id === b) continue;
+      const [c, r] = at(id);
+      if (ra === rb && r === ra && c > Math.min(ca, cb) && c < Math.max(ca, cb)) return [a, b, id];
+      if (ca === cb && c === ca && r > Math.min(ra, rb) && r < Math.max(ra, rb)) return [a, b, id];
+    }
+  }
+  return null;
 }
 
 const auto = (ids, links) => Object.freeze({ layout: autoLayout(ids, links), links: Object.freeze(links.map(l => Object.freeze(l))) });
@@ -72,9 +102,10 @@ const ADVANCED = Object.freeze({
     'differential-calculus-y12': [3, 2],
     'integral-calculus-y12': [4, 2],
     'applications-of-calculus-y12': [4, 3],
-    // [3, 4] on the approved board drew its Integral calculus link right to left; one column
-    // right keeps every link left to right or down a column (CTO follow-up, 18 Nov 2026).
-    'random-variables-y12': [4, 4],
+    // [3, 4] on the approved board drew its Integral calculus link right to left, and a place in
+    // Integral calculus's own column would draw that link through Applications of calculus. A
+    // column of its own keeps every link left to right (CTO follow-up, 18 Nov 2026).
+    'random-variables-y12': [5, 4],
     'financial-mathematics-y12': [2, 5]
   }),
   // [builds on, builds] — each link is drawn from the area it builds on.
@@ -109,7 +140,6 @@ const EXTENSION_1 = auto(EXT1_IDS, [
   ['further-trigonometry-y11', 'inverse-trigonometric-functions-y12'],
   ['further-trigonometry-y11', 'introduction-to-vectors-y12'],
   ['permutations-and-combinations-y11', 'the-binomial-theorem-y11'],
-  ['the-binomial-theorem-y11', 'proof-by-mathematical-induction-y12'],
   ['the-binomial-theorem-y11', 'the-binomial-distribution-and-sampling-distribution-of-the-mean-y12'],
   ['further-work-with-functions-y11', 'further-calculus-skills-y12'],
   ['inverse-trigonometric-functions-y12', 'further-calculus-skills-y12'],
@@ -199,7 +229,9 @@ const STAGE_5 = auto(STAGE5_IDS, [
   ['linear-relationships-a', 'variation-and-rates-of-change-a-path'],
   ['area-and-surface-area-a', 'volume-a'],
   ['properties-of-geometrical-figures-b-path', 'circle-geometry-path'],
-  ['indices-a', 'financial-mathematics-b']
+  ['indices-a', 'financial-mathematics-b'],
+  ['algebraic-techniques-b-path', 'equations-b-path'],          // factorising before solving quadratics
+  ['equations-b-path', 'non-linear-relationships-b']            // a parabola's intercepts
 ].map(([a, b]) => [S5(a), S5(b)]));
 
 /** Board catalogue course key → its focus-area map, where Pri has drawn one. */

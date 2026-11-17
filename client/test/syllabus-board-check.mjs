@@ -182,7 +182,7 @@ const groups = B.indiaBoardGroups(chapters);
 
 // ── 3b. The focus-area link tables (Pri's teaching maps) ─────────────────────
 {
-  const { NSW_FOCUS_LINKS, autoLayout } = await import('../src/engine/nswFocusLinks.js');
+  const { NSW_FOCUS_LINKS, autoLayout, blockedLink } = await import('../src/engine/nswFocusLinks.js');
   eq(Object.keys(NSW_FOCUS_LINKS).sort(), ['advanced', 'extension-1', 'k10-stage4', 'k10-stage5', 'standard-2'], 'link tables for Advanced, Extension 1, Standard 2 and Stages 4 and 5');
   for (const [key, table] of Object.entries(NSW_FOCUS_LINKS)) {
     const ids = NSW_BOARD_COURSES[key].groups.map(g => g.id);
@@ -196,8 +196,10 @@ const groups = B.indiaBoardGroups(chapters);
     eq(done.size, ids.length, `${key}: the links have no cycle`);
     // Generated layouts: strictly left to right. Advanced is the approved hand layout, whose
     // Integral → Applications of calculus link runs down its last column: never right to left.
-    ok(table.links.every(([a, b]) => (key === 'advanced' ? table.layout[a][0] <= table.layout[b][0] : table.layout[a][0] < table.layout[b][0])),
-      `${key}: every link runs ${key === 'advanced' ? 'left to right or down a column' : 'left to right'} (an area never sits left of what it builds on)`);
+    ok(table.links.every(([a, b]) => table.layout[a][0] < table.layout[b][0]
+        || (key === 'advanced' && table.layout[a][0] === table.layout[b][0] && table.layout[a][1] < table.layout[b][1])),
+      `${key}: every link runs ${key === 'advanced' ? 'left to right, or down its column' : 'left to right'} (an area never sits left of, or above in its own column, what it builds on)`);
+    eq(blockedLink(table.links, id => table.layout[id], ids), null, `${key}: no straight link passes through another area`);
     eq(new Set(Object.values(table.layout).map(c => c.join(','))).size, ids.length, `${key}: no two areas share a place`);
     ok(Object.values(table.layout).every(([c, r]) => Number.isInteger(c) && Number.isInteger(r) && c >= 0 && r >= 0), `${key}: whole, non-negative columns and rows`);
   }
@@ -209,6 +211,11 @@ const groups = B.indiaBoardGroups(chapters);
   ok(/cycle/.test(threw), 'a cyclic table is refused');
   threw = ''; try { autoLayout(['a'], [['a', 'zz']]); } catch (e) { threw = e.message; }
   ok(/unknown/.test(threw), 'a link to an unknown area is refused');
+  threw = ''; try { autoLayout(['a', 'a'], []); } catch (e) { threw = e.message; }
+  ok(/duplicate/.test(threw), 'a duplicate area id is refused');
+  // A straight link through another area is moved clear.
+  const z = autoLayout(['p', 'q', 'r', 's'], [['p', 'q'], ['q', 'r'], ['p', 'r'], ['s', 'q']]);
+  eq(blockedLink([['p', 'q'], ['q', 'r'], ['p', 'r'], ['s', 'q']], id => z[id], ['p', 'q', 'r', 's']), null, 'autoLayout moves a straight link clear of the area it would pass through');
 }
 
 // ── 4b. hsc-forecast's ranges (PR #1003 API), the area roll-up ──────────────
