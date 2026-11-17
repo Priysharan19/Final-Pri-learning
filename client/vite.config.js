@@ -587,6 +587,52 @@ export function editionRecordPlugin(edition, { mustLoad = false } = {}) {
   };
 }
 
+// The legal notices of the edition (plan: Prithagoras notices). The app's legal
+// page (src/pages/Legal.jsx) imports the Indian notices, written for the DPDP Act
+// and naming a Grievance Officer. A Prithagoras build must never carry them, so
+// for that edition this plugin points each of the page's imports at the
+// Australian notices in docs/legal/au/ (privacy, terms, refund policy, contact,
+// and their own review-status.json) and replaces the Hindi notices with an empty
+// set. A build then checks every file it is about to write for the Indian
+// notices' own words and stops if it finds one: the guarantee is checked on the
+// output, not assumed from the wiring. Priyabhata builds are untouched.
+export const LEGAL_PAGE_MODULE = fileURLToPath(new URL('./src/pages/Legal.jsx', import.meta.url));
+const LEGAL_DOCS = fileURLToPath(new URL('../docs/legal/', import.meta.url));
+const NO_HINDI_LEGAL = '\0pri-legal-hindi-none';
+export const INDIA_LEGAL_WORDS = /DPDP|Digital Personal Data Protection|Data Protection Board|Grievance Officer|grievance officer/;
+export const AU_LEGAL_FILES = Object.freeze(['privacy.md', 'terms.md', 'refund-policy.md', 'contact.md', 'review-status.json']);
+export function legalRedirect(edition, source, importer) {
+  if (edition !== 'prithagoras' || String(importer || '').split('?')[0] !== LEGAL_PAGE_MODULE) return null;
+  const doc = /docs\/legal\/(privacy|terms|refund-policy)\.md\?raw$/.exec(source);
+  if (doc) return `${LEGAL_DOCS}au/${doc[1]}.md?raw`;
+  if (/docs\/legal\/grievance\.md\?raw$/.test(source)) return `${LEGAL_DOCS}au/contact.md?raw`;
+  if (/docs\/legal\/review-status\.json$/.test(source)) return `${LEGAL_DOCS}au/review-status.json`;
+  if (/i18n\/legalHindi\.js$/.test(source)) return NO_HINDI_LEGAL;
+  return null;
+}
+export function editionLegalPlugin(edition) {
+  return {
+    name: 'pri-edition-legal',
+    enforce: 'pre',
+    buildStart() {
+      if (edition !== 'prithagoras') return;
+      for (const file of AU_LEGAL_FILES) {
+        try { readFileSync(`${LEGAL_DOCS}au/${file}`); } catch { this.error(`pri-edition-legal: docs/legal/au/${file} is missing, so the Prithagoras build has no notice to serve`); }
+      }
+    },
+    resolveId(source, importer) { return legalRedirect(edition, source, importer); },
+    load(id) { return id === NO_HINDI_LEGAL ? 'export default {};' : null; },
+    generateBundle(_options, bundle) {
+      if (edition !== 'prithagoras') return;
+      for (const [name, item] of Object.entries(bundle)) {
+        const text = item.type === 'chunk' ? item.code : typeof item.source === 'string' ? item.source : Buffer.from(item.source || '').toString('utf8');
+        const hit = INDIA_LEGAL_WORDS.exec(text);
+        if (hit) this.error(`pri-edition-legal: the Prithagoras build would ship "${hit[0]}" in ${name}: the Indian notices must not reach this edition`);
+      }
+    }
+  };
+}
+
 // Build-time feature flags (client/src/platform/features.js). A production
 // build is OFF unless its environment says PRI_FEATURE_<NAME>=1; development
 // (`vite` serve) is ON. Test harnesses that build set the variable themselves.
@@ -657,7 +703,9 @@ export function featureDefines(command, env = process.env) {
     __PRI_EDITION__: JSON.stringify(states.edition),
     // Plan E5: false in a build of an edition with no payment provider, so its
     // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).
-    __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0)
+    __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0),
+    // True where the edition lists the App Store or Google Play (Prithagoras sells on the web through Stripe only).
+    __PRI_STORE_BILLING__: JSON.stringify(editionOf(states.edition).billing.providers.some(p => p === 'apple' || p === 'google'))
   };
 }
 
@@ -687,7 +735,7 @@ export default defineConfig(({ command }) => {
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
       __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
     },
-    plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), editionBrand(featureStates(command).edition), editionLanguages(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
+    plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), editionLegalPlugin(featureStates(command).edition), editionBrand(featureStates(command).edition), editionLanguages(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',

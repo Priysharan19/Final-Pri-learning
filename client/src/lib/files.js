@@ -40,6 +40,35 @@ export function printPage() {
   return Promise.resolve({ completed: true });
 }
 
+/**
+ * Save or share a binary file from base64 (a PDF the server made). In a native
+ * shell that can carry bytes it goes to the share sheet; otherwise it downloads.
+ */
+export function saveBase64File(base64, filename, mimeType = 'application/pdf') {
+  let bytes;
+  try { bytes = Uint8Array.from(atob(String(base64)), ch => ch.charCodeAt(0)); } catch { return Promise.resolve({ completed: false }); }
+  if (priNative.share.available() && priNative.share.binary()) {
+    return priNative.share.file({ filename, mimeType, bytes }).catch(error => {
+      if (['UNSUPPORTED', 'UNAVAILABLE', 'TOO_LARGE'].includes(error?.code)) return downloadBytes(bytes, filename, mimeType);
+      throw error;
+    });
+  }
+  return Promise.resolve(downloadBytes(bytes, filename, mimeType));
+}
+
+function downloadBytes(bytes, filename, mimeType) {
+  if (typeof document === 'undefined') return { completed: false };
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([bytes], { type: mimeType }));
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 30_000);
+  return { completed: true };
+}
+
 function downloadText(text, filename, mimeType) {
   if (typeof document === 'undefined') return { completed: false };
   const blob = new Blob([text], { type: mimeType });

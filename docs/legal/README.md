@@ -27,6 +27,33 @@ and `counsel/README.md` says how the owner sends them:
   `npm run test:legal`) fails if a quote or a location drifts from the tree.
 - `counsel/COUNSEL-INFORMATION-PACK.md` — the background and all 35 questions.
 
+## Prithagoras (Australia): its own notices
+
+`docs/legal/au/` holds the notices a **Prithagoras** build serves instead of the ones above:
+`privacy.md` (the Privacy Act 1988 and the APPs), `terms.md` (Australian law, NSW courts),
+`refund-policy.md` (Australian Consumer Law) and `contact.md` (replaces Grievances), with their own
+`review-status.json`. English only. They sit in a subdirectory so `tools/legal-status.mjs`, which
+requires a Hindi twin for every Markdown file directly in this directory, does not treat them as
+Indian notices.
+
+- **Routing is per edition and done at build time.** `client/vite.config.js` `editionLegalPlugin`
+  points `client/src/pages/Legal.jsx` at `docs/legal/au/` for a Prithagoras build, and stops that build
+  if any file it would write contains the Indian notices' words (DPDP, Data Protection Board, Grievance
+  Officer). Priyabhata builds are unchanged. Routes: `/privacy`, `/terms`, `/refund-policy` (also
+  `/refunds`) and `/contact`; `/grievance` is not served by Prithagoras and redirects to `/contact`.
+- **Three placeholders** are left on purpose, because the code and repository cannot supply them: where
+  the Australian service is hosted and and its database held, and the contact address (Stripe takes payment and is named in the notices).
+  A notice with one unfilled shows the "template" banner. `docs/legal/counsel/AU-QUESTIONS-FOR-COUNSEL.md`
+  records what engineering was told for each and what the repository shows.
+- **The review switch is separate**: `docs/legal/au/review-status.json`, `reviewed: false`, never set by
+  an agent. A review of the Indian notices says nothing about the Australian ones.
+- **Held by** `client/test/legal-pages-au-check.mjs` (in `npm run test:legal`): the wall, nothing Indian
+  in the Australian notices, what an Australian notice must say, every stated number read from the code,
+  the review switch, and the counsel sheet's quotes. `tools/legal-promises.mjs` holds the Australian
+  privacy notice to the same two code promises as the Indian one (D17, D18).
+- **Not done**: the static marketing site under `site/` and the store listings are Indian and are not
+  changed here.
+
 ## Status, 9 November 2026 (D17, with #737)
 
 - The privacy notice (EN + HI), the store disclosures, the public site and
@@ -202,3 +229,7 @@ Engineering cannot complete any line below. The gate that consumes them is
 | 6 | Confirm the notice matches the code's data path at the release SHA | Reconciled by engineering 2 Nov 2026 against `a5778a319`; counsel's confirmation open | `docs/release/app-store-privacy-labels.md` §6, `play-data-safety.md` §6b |
 | 7 | Set the publication date of the filled version | 19 Oct 2026; revised 2 Nov 2026 | `**Last updated**` in all eight documents |
 | 8 | Name processors in the notice if counsel requires it | Named now: Resend, Railway, Supabase (planned), OpenAI, Apple and Google | `privacy.md` "Who else sees your data" |
+
+## Owner summary and sign-off (Prithagoras)
+
+`docs/legal/au/SUMMARY-FOR-OWNER.md` is a one-page plain-English summary of the Australian notices and the five points most worth a lawyer's look. `docs/legal/au/review-status.json` has an `ownerSignoff` block for the owner's own approval ("business owner, not a lawyer"). It is not a lawyer's review and never clears the "not yet reviewed by a lawyer" banner; only `reviewed` does.

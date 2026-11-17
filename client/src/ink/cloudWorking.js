@@ -23,6 +23,7 @@
 //   · Off until the student turns it on.
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
+import { translate } from '../i18n/core.js';
 
 /** How a merged verdict is labelled so History and evidence can tell them apart. */
 export const CLOUD_WORKING_ENGINE = 'cloud-working';
@@ -154,7 +155,7 @@ export function workingNote(check) {
   if (firstBreak < 0) {
     return {
       tone: 'note',
-      text: 'Each line follows from the one before it, so the slip is in how the question was set up rather than in the algebra.'
+      text: translate('msg.working.sound')
     };
   }
   const line = check.lines.find(l => l.index === firstBreak);
@@ -163,8 +164,8 @@ export function workingNote(check) {
   return {
     tone: check.needsConfirmation ? 'maybe' : 'break',
     text: check.needsConfirmation
-      ? `This might be line ${firstBreak + 1}${why}.${hint} Check it yourself — I am not certain of this one.`
-      : `Line ${firstBreak + 1} is where it goes wrong${why}.${hint}`
+      ? translate('msg.working.maybe', { line: firstBreak + 1, why, hint })
+      : translate('msg.working.break', { line: firstBreak + 1, why, hint })
   };
 }
 

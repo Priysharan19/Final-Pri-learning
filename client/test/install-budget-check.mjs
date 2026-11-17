@@ -88,9 +88,27 @@ let PYQ_ARCHIVE_MEASURED = null;
 // is estimated at roughly 20-30 kB more, so the new ceiling leaves about
 // 46 kB of headroom for it. The other three ceilings are unchanged.
 
+// Raised again 2026-11-18 (train editions-22, CTO under the same owner
+// decision, "i dont care if the app is 10gb just make it properly end to
+// end"): FIRST_VISIT_RAW only, 3,450,000 -> 3,500,000 bytes. The train-22 tree
+// (Stripe #941, Map and AU terms #944, bank growth #945, paper generator #948)
+// measured 3,372 kB in CI, over the 3,369 kB ceiling. The new ceiling gives
+// about 45 kB of headroom; the NSW notes typeface (CMU Serif) must load on
+// demand, not in the first visit, so it does not count against this. The other
+// three ceilings are unchanged.
+
+// Raised again 2026-11-18 (train editions-23, CTO under the same owner
+// decision): FIRST_VISIT_RAW only, 3,500,000 -> 3,600,000 bytes. Train 23 adds
+// nine features on top of train 22 (Submit re-read, intelligent feedback,
+// smooth Safari ink, sign-in redesign, AU legal notices, ops, Exam Desk realism,
+// the learning loop, Hindi parity) and measured 3,424 kB against the 3,418 kB
+// ceiling. The new ceiling leaves about 90 kB for the passkey and Apple
+// sign-in that follows. Notes fonts and the diagram kit stay on demand. The
+// other three ceilings are unchanged.
+
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 3_450_000;
+const FIRST_VISIT_RAW_CEILING = 3_600_000;
 const FIRST_VISIT_GZIP_CEILING = 1_290_000;
 
 // Things that must never be in the install again, and what each one costs.

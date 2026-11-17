@@ -30,15 +30,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
+import { answerToTex } from '../engine/answerTex.js';
 import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { clearDraft, queueDraft, readDraft } from '../components/drafts.js';
 import ExamAnalysis from '../components/ExamAnalysis.jsx';
+import LossBreakdown from '../components/LossBreakdown.jsx';
+import { analyseExam } from '../local/examAnalysis.js';
 import SectionTime from '../components/SectionTime.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { freezePage, pendingSummary, unreadInkKeys } from '../local/examPages.js';
 import { featureEnabled } from '../platform/features.js';
 import { omittedNames } from '../local/nswExamBackend.js';
+import { saveBase64File } from '../lib/files.js';
 import { MOCK_LABEL } from '../engine/boardMock.js';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
@@ -781,6 +785,7 @@ export default function ExamRoom() {
           {exam.targeted && <WhyKey why={exam.why} />}
           {exam.nsw && <p className="muted" data-exam-nsw-note>{t('examRoom.nswMarkingNote')}</p>}
           {exam.nsw?.omittedOutcomes?.length > 0 && <p className="muted" data-exam-nsw-omits>{t('exams.nsw.omits', { outcomes: omittedNames(exam.nsw.omittedOutcomes) })}</p>}
+          {exam.generated && <GuideButton examId={exam.id} />}
           {/* The number is ink, never a traffic light; the sentence carries the meaning. */}
           <div className="hero-num exam-result-num">
             {shownPct}%<span className="sr-only"> {t(shownPct >= 80 ? 'examRoom.pctSrStrong' : shownPct >= 50 ? 'examRoom.pctSrFair' : 'examRoom.pctSrLow')}</span>
@@ -806,6 +811,7 @@ export default function ExamRoom() {
         </div>
 
         <ExamAnalysis analysis={result.analysis} track={exam.indiaExam?.track} />
+        <LossBreakdown causes={(result.analysis || analyseExam({ detail: result.detail, indiaExam: exam.indiaExam }))?.causes} />
         <SectionTime report={result.timeReport} offered={result.timeReportOffered} />
 
         {result.detail.map((d, i) => d.multipart ? (
@@ -837,7 +843,7 @@ export default function ExamRoom() {
                 {pt.pending && pendingNote(pt)}
                 <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14, marginTop: 4 }}>
                   <span>{tx('examRoom.yours', { answer: <b>{pt.answerType === 'mcq' ? (pt.given !== '' && pt.given != null ? 'ABCD'[Number(pt.given)] ?? '—' : '—') : (pt.given || '—')}</b> })}</span>
-                  {!pt.pending && pt.answerText !== undefined && <span>{tx('examRoom.correctShort', { answer: <b><MathText text={pt.answerText} /></b> })}</span>}
+                  {!pt.pending && pt.answerText !== undefined && <span>{tx('examRoom.correctShort', { answer: <b><MathText text={answerToTex(pt.answerText)} /></b> })}</span>}
                 </div>
                 {!pt.correct && pt.steps && (
                   <details style={{ marginTop: 6 }}>
@@ -887,7 +893,7 @@ export default function ExamRoom() {
             <div className="row" style={{ flexWrap: 'wrap', gap: 16, fontSize: 14 }}>
               <span>{t('history.yourAnswerWas')} <b>{givenText(d)}</b></span>
               {/* A pending answer carries no solution: nothing is shown to decide a retry by. */}
-              {d.solution && <span>{t('history.correctAnswerWas')} <b><MathText text={d.solution.answerText} /></b></span>}
+              {d.solution && <span>{t('history.correctAnswerWas')} <b><MathText text={answerToTex(d.solution.answerText)} /></b></span>}
             </div>
             {d.partial && (
               <div className="verdict" style={{ marginTop: 8, background: 'var(--brand-soft)', border: '1px solid var(--brand-1)' }}>
@@ -1271,4 +1277,25 @@ function givenText(d) {
   if (d.answerType === 'mcq') return 'ABCD'[Number(d.given)] ?? '—';
   if (d.answerType === 'multi-mcq') return String(d.given).split(',').filter(Boolean).map(i => 'ABCD'[Number(i)] ?? '?').join(', ') || '—';
   return d.given;
+}
+
+// A generated paper's marking guide (worked solutions): the server opens it only
+// once the paper has been submitted, and this button exists only on the result.
+function GuideButton({ examId }) {
+  const t = useT();
+  const [state, setState] = useState('idle');
+  async function open() {
+    setState('working');
+    try {
+      const r = await api.get(`/exams/${examId}/guide`);
+      await saveBase64File(r.pdfBase64, r.filename || 'pri-practice-paper-guide.pdf', 'application/pdf');
+      setState('idle');
+    } catch { setState('failed'); }
+  }
+  return (
+    <p style={{ marginTop: 10 }} data-exam-guide>
+      <button type="button" className="btn btn-ghost btn-sm" onClick={open} disabled={state === 'working'}>{state === 'working' ? t('gen.guideWorking') : t('gen.guide')}</button>
+      {state === 'failed' && <span className="muted" role="status"> {t('gen.guideFailed')}</span>}
+    </p>
+  );
 }

@@ -1,0 +1,82 @@
+name: Production outage watch
+
+# Free safety net: every 10 minutes ask /v1/ready on both production editions.
+# A target that fails two probes in a row (60 s apart, each with curl retries)
+# opens - or comments on - one GitHub issue labelled "outage"; the first green
+# probe afterwards comments and closes it. GitHub emails the repository owner
+# about issue activity. No checkout, no secrets, GET only.
+#
+# BACKSTOP, not paging: GitHub delivers scheduled runs best-effort (see
+# staging-uptime.yml), so a gap of hours is possible. A real uptime monitor
+# remains the owner's call (docs/operations/alerts.md).
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: prod-outage-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    name: outage watch (${{ matrix.edition }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - edition: Priyabhata
+            base_url: https://app.prilearning.com
+          - edition: Prithagoras
+            base_url: https://au.prilearning.com
+    env:
+      EDITION: ${{ matrix.edition }}
+      BASE_URL: ${{ matrix.base_url }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Probe /v1/ready twice, then open, update or close the outage issue
+        run: |
+          set -u
+          probe() {
+            curl -sS -o /dev/null -w '%{http_code}' --max-time 15 \
+              --retry 2 --retry-delay 5 --retry-all-errors "${BASE_URL}/v1/ready" || true
+          }
+          first="$(probe)"; first="${first:-000}"
+          second="$first"
+          if [ "$first" != "200" ]; then
+            sleep 60
+            second="$(probe)"; second="${second:-000}"
+          fi
+          echo "${EDITION} /v1/ready: first=${first} second=${second}"
+
+          title="Outage: ${EDITION} (${BASE_URL#https://}) not ready"
+          gh label create outage --color B60205 --description "Production readiness check failing" >/dev/null 2>&1 || true
+          existing="$(gh issue list --label outage --state open --limit 100 --json number,title \
+            --jq "[.[] | select(.title == \"${title}\")][0].number // empty")"
+          now="$(date -u +%Y-%m-%dT%H:%MZ)"
+
+          if [ "$first" != "200" ] && [ "$second" != "200" ]; then
+            body="${BASE_URL}/v1/ready failed twice in a row at ${now} (HTTP ${first}, then ${second}). Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --body "Still failing. ${body}"
+            else
+              gh issue create --title "$title" --label outage --body "${body}
+
+          Restore steps: docs/operations/restore-runbook.md. The issue closes itself when /v1/ready answers 200 again."
+            fi
+            echo "::error::${EDITION} /v1/ready is failing"
+            exit 1
+          fi
+
+          if [ "$first" = "200" ] && [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Recovered: ${BASE_URL}/v1/ready answered 200 at ${now}."
+            gh issue close "$existing" --reason completed
+          fi
+          echo "${EDITION} ready"

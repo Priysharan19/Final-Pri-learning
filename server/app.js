@@ -14,7 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { ensureBillingSchema } from './platform/billingSchema.js';
 import { createAppleBilling } from './platform/appleBilling.js';
 import { createGoogleBilling } from './platform/googleBilling.js';
-import { createRazorpayBilling } from './platform/razorpay.js';
+import { createWebBilling } from './platform/webBilling.js';
 import { createPlatformRouter } from './platform/router.js';
 import { trustedProxyHops, clientIpHeader, clientIpProbeEnabled } from './platform/config.js';
 import { securityHeaders } from './platform/headers.js';
@@ -148,7 +148,7 @@ export async function createServerApp(db, {
   app.use('/v1', rejectUnsafeText({ exemptBody: [/^\/sync\/push\/?$/, /^\/billing\/webhook\/[^/]+\/?$/] }));
 
   ensureBillingSchema(db);
-  const webBilling = createRazorpayBilling(db);
+  const webBilling = createWebBilling(db);
   const appleBilling = createAppleBilling(db);
   const googleBilling = createGoogleBilling(db);
   app.use('/v1', createPlatformRouter(db, {

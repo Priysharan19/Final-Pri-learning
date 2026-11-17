@@ -1,4 +1,5 @@
 import { practiceHref } from '../lib/practiceLinks.js';
+import { translate } from '../i18n/core.js';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -66,7 +67,7 @@ function task(row, now) {
     : started ? 82 : classTask ? 75 : 68;
   return item(
     'task', priority, row.id,
-    { title: row.title || 'Practice task', status: overdue ? 'overdue' : dueAt != null ? 'due' : started ? 'started' : 'ready', remaining: Math.max(0, (Number(row.count) || 0) - (Number(row.done) || 0)) },
+    { title: row.title || translate('msg.practiceTask'), status: overdue ? 'overdue' : dueAt != null ? 'due' : started ? 'started' : 'ready', remaining: Math.max(0, (Number(row.count) || 0) - (Number(row.done) || 0)) },
     row.id ? '/practice?task=' + encodeURIComponent(row.id) : '/tasks',
     dueAt
   );
@@ -109,8 +110,8 @@ export function resolveHomeRecommendation({
   const live = unfinished.find(x => { const d = examDeadline(x); return d == null || d > now; });
   const expired = unfinished.find(x => { const d = examDeadline(x); return d != null && d <= now && now - d <= EXPIRED_EXAM_WINDOW; });
   const examHref = x => x.id ? '/exams/' + encodeURIComponent(x.id) : '/exams';
-  if (live) rows.push(item('exam', 100, live.id, { title: live.title || 'Practice exam' }, examHref(live), examDeadline(live)));
-  if (expired) rows.push(item('exam-expired', 81, expired.id, { title: expired.title || 'Practice exam' }, examHref(expired), examDeadline(expired)));
+  if (live) rows.push(item('exam', 100, live.id, { title: live.title || translate('msg.practiceExam') }, examHref(live), examDeadline(live)));
+  if (expired) rows.push(item('exam-expired', 81, expired.id, { title: expired.title || translate('msg.practiceExam') }, examHref(expired), examDeadline(expired)));
 
   if (online && cloudReady) for (const row of assignments) {
     const item = assignment(row, now);

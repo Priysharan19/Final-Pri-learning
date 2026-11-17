@@ -41,7 +41,13 @@ export const flow = {
     await check('and says nothing about the HSC', !HSC.test(hero), `hero reads ${JSON.stringify(hero.slice(0, 160))}`);
     // The welcome screen also carries the legal links in a muted line, so the
     // privacy copy is named rather than taken as the only muted paragraph.
-    const privacy = await page.locator('.auth-col p.muted').first().innerText();
+    // The full statement now sits behind "How your data is handled" (a folded
+    // disclosure, owner feedback on the sign-in screen); the visible line above
+    // it is the short note. Both must stay honest, so both are asserted.
+    const shortNote = await page.locator(".auth-col .login-note").first().innerText();
+    await check('the short note on the landing screen says checking needs an account and a connection, and no ads',
+      /needs an account and a connection/i.test(shortNote) && /no ads/i.test(shortNote) && !/account is optional|offline-first|works offline/i.test(shortNote), `note reads ${JSON.stringify(shortNote)}`);
+    const privacy = (await page.locator('.auth-col .login-more p').first().textContent()) || '';
     // Owner decision 2026-10-10: the welcome line may no longer promise an
     // optional account or offline checking. What it must still say honestly is
     // where a student's work lives and that there are no ads — and now, that

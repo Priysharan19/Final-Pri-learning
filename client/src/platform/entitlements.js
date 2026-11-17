@@ -35,10 +35,15 @@ export function normalizeCommercialDisplay(raw) {
     const n = Number(value);
     return Number.isSafeInteger(n) && n > 0 ? n : null;
   };
+  // A displayed price may carry cents (A$9.99); a whole-unit price is unchanged.
+  const amount = value => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 && n < 1e7 && Math.abs(n * 100 - Math.round(n * 100)) < 1e-6 ? n : null;
+  };
   return Object.freeze({
     currency,
-    monthly: positive(source.monthly),
-    annual: positive(source.annual),
+    monthly: amount(source.monthly),
+    annual: amount(source.annual),
     trialDays: positive(source.trialDays),
     advisoryOnly: source.advisoryOnly !== false
   });

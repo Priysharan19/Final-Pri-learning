@@ -21,6 +21,8 @@ import CloudAccountSecurity from './CloudAccountSecurity.jsx';
 import { tLater, useT, useTx } from '../i18n/index.js';
 import { priNative } from '../platform/native/index.js';
 import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
+import { acceptedCheckoutUrl } from '../platform/checkoutHosts.js';
+import { sellsPremium } from '../paywall/useSaleAvailable.js';
 
 function when(value, t) {
   if (!value) return t('cloud.never');
@@ -30,8 +32,10 @@ function when(value, t) {
 function price(value, currency) {
   if (!value || !currency) return null;
   try {
+    // Whole amounts print as before (₹199); a price with cents prints them (A$9.99).
+    const digits = Number.isInteger(value) ? 0 : 2;
     return new Intl.NumberFormat('en-IN', {
-      style: 'currency', currency, maximumFractionDigits: 0
+      style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits
     }).format(value);
   } catch {
     return `${currency} ${value}`;
@@ -70,6 +74,11 @@ export default function CloudAccountPanel() {
   const [session, setSession] = useState(null);
   const [pricing, setPricing] = useState(null);
   const [webCheckout, setWebCheckout] = useState(false);
+  // The provider the server says this deployment sells through (razorpay or stripe).
+  const [webProvider, setWebProvider] = useState(null);
+  // The server's own word on whether Premium is for sale (null until known): an edition
+  // through Stripe is on sale only once Stripe is configured there.
+  const [saleAvailable, setSaleAvailable] = useState(null);
   const [appleBootstrap, setAppleBootstrap] = useState(null);
   const [appleProducts, setAppleProducts] = useState([]);
   const [appleStoreError, setAppleStoreError] = useState('');
@@ -190,6 +199,8 @@ export default function CloudAccountPanel() {
         if (!live) return;
         setPricing(normalizeCommercialDisplay(result?.display));
         setWebCheckout(result?.webCheckout?.configured === true);
+        setWebProvider(typeof result?.webCheckout?.provider === 'string' ? result.webCheckout.provider : null);
+        setSaleAvailable(result?.available !== false);
       })
       .catch(() => {
         if (!live) return;
@@ -496,17 +507,12 @@ export default function CloudAccountPanel() {
     try {
       const result = await cloud.createWebBillingCheckout(cadence);
       const checkout = result?.checkout;
-      let destination;
-      try {
-        destination = new URL(String(checkout?.checkoutUrl || ''));
-        if (destination.protocol !== 'https:' || destination.hostname !== 'rzp.io') throw new Error('invalid hosted checkout');
-      } catch {
-        throw new Error('The payment provider returned an invalid checkout address.');
-      }
+      const destination = acceptedCheckoutUrl(webProvider, checkout);
+      if (!destination) throw new Error('The payment provider returned an invalid checkout address.');
       // The hosted provider page performs payment authorisation. Returning from
       // it does not itself unlock Premium; the verified server webhook/restore is
       // the only entitlement authority.
-      window.location.assign(destination.toString());
+      window.location.assign(destination);
     } catch (err) {
       setError(err.message || tLater('cloud.checkoutFailed'));
       setBusy('');
@@ -836,7 +842,7 @@ export default function CloudAccountPanel() {
             )}
           </div>}
 
-          {!PREMIUM_ON_SALE && !premium && <div className="muted" style={{ fontSize: 12, marginTop: 12 }} data-premium-not-on-sale>
+          {!sellsPremium(saleAvailable) && !premium && <div className="muted" style={{ fontSize: 12, marginTop: 12 }} data-premium-not-on-sale>
             {t('paywall.notOnSale')}
           </div>}
 
@@ -906,7 +912,7 @@ export default function CloudAccountPanel() {
       {(() => {
         const note = nativeStoreKit && appleProducts.length
           ? t('cloud.appleAuthorityNote')
-          : PREMIUM_ON_SALE ? pricingText(pricing, t) : '';
+          : sellsPremium(saleAvailable) ? pricingText(pricing, t) : '';
         return note ? <div className="muted" style={{ marginTop: 14, fontSize: 12.5 }}>{note}</div> : null;
       })()}
 

@@ -19,6 +19,7 @@
 // shown as server-certified. A paper an earlier version started and did not
 // finish cannot be marked at all.
 import { get, put, del, byIndex } from './idb.js';
+import { translate } from '../i18n/core.js';
 import { indiaScope, indiaChapter, cleanIndiaTrack } from '../engine/indiaProduct.js';
 import { indiaPyqCells, narrowCells } from '../engine/indiaExamCells.js';
 import { generateQuestion, loadBanksFor } from '../engine/generators/index.js';
@@ -77,7 +78,7 @@ function publicQuestion(row) {
   const chapter = indiaChapter(row.india?.chapterId);
   const marking = row.examMarking || { correct: 1, incorrect: 0, unanswered: 0 };
   const base = {
-    id: row.id, order: row.examOrder, section: row.indiaExamSection, sectionLabel: row.indiaExamSectionLabel || `Section ${row.indiaExamSection}`,
+    id: row.id, order: row.examOrder, section: row.indiaExamSection, sectionLabel: row.indiaExamSectionLabel || translate('msg.section', { id: row.indiaExamSection }),
     item: row.indiaExamItem, marks: Number(marking.correct), negativeMarks: Math.abs(Number(marking.incorrect || 0)),
     partialPerOption: marking.partialPerOption ?? null,
     subtopic: chapter?.id || q.subtopic, subtopicName: chapter?.name || q.subtopic, chapterId: chapter?.id || null,
@@ -140,6 +141,48 @@ async function pyqAboutArchive() {
   try { return await import('../engine/pyq/pyqCoverage.js'); } catch { return null; }
 }
 const pyqAbsenceFor = (about, track) => about.pyqAbsenceFor(track);
+
+/**
+ * A generated paper (the Paper Generator) for an India profile: the server
+ * assembles it from the India banks and keeps its seed; the device stores the
+ * public questions in this module's own shape so the room, the submit and the
+ * result read it like any India paper. Marking is the server's.
+ */
+async function createGeneratedIndiaExam(profile, body) {
+  const g = body.generated;
+  const track = cleanIndiaTrack(profile.indiaTrack || 'cbse', Number(profile.year));
+  const issued = await issueServerExam(profile.id, { kind: 'generated', generated: g },
+    `generated:${g.year}:${g.marks ?? `m${g.minutes}`}:${g.mix}:${g.weak ? 'w' : ''}:${(g.topics || []).join(',')}`);
+  const examId = String(issued.id);
+  const now = Date.now();
+  const questionIds = [];
+  try {
+    for (const sq of issued.questions) { const row = rowOf(profile.id, track, examId, sq, now); await put('questions', row); questionIds.push(row.id); }
+  } catch (err) {
+    await Promise.all(questionIds.map(id => del('questions', id).catch(() => {})));
+    throw err;
+  }
+  const sections = (issued.generated?.sections || []).map(s => ({
+    id: s.id, label: s.label, questions: s.questions, marks: s.marks, marksEach: null, negative: 0, partialPerOption: null, types: ['any']
+  }));
+  const exam = {
+    id: examId, pid: profile.id, year: profile.year, pathway: null, title: issued.title, generated: true,
+    durationMin: issued.durationMin, questionIds, createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null, summary: null,
+    indiaExam: {
+      blueprintId: 'generated', claimBlueprintId: 'generated', label: issued.generated?.label || issued.title, track, variant: 'standard', grade: Number(profile.year),
+      authenticity: 'generated', sourceSession: null, fullPaper: false, sectionTimerOfficial: false, fullPaperDurationMinutes: null, seed: null,
+      sections, units: [], pyq: { used: 0, questions: issued.questions.length, archive: null, absent: null },
+      composition: { pyq: 0, authored: issued.questions.length, nativeMcq: 0, numericToMcq: 0, assertionReason: 0, caseStudy: 0, multiCorrect: 0, matrixMatch: 0, internalChoice: 0 },
+      reducedPattern: false, composerNotes: [], sources: []
+    },
+    paperVersion: issued.paperVersion,
+    server: serverFieldOf(issued, await requireExamAccount(profile.id).catch(() => null))
+  };
+  startExamClock(exam, localStartOf(issued));
+  await put('exams', exam);
+  noteReconciled(exam.id);
+  return { exam: await examView(profile, exam.id) };
+}
 
 async function createIndiaExam(profile, body = {}) {
   const pyqAbout = await pyqAboutArchive();
@@ -277,7 +320,7 @@ async function createIndiaExam(profile, body = {}) {
       // server's; no seed on this device reproduces them.
       seed: composed.seed,
       sections: spec.sections.map(s => ({
-        id: s.id, label: s.label || `Section ${s.id}`, questions: s.questions, marks: s.marks,
+        id: s.id, label: s.label || translate('msg.section', { id: s.id }), questions: s.questions, marks: s.marks,
         marksEach: s.marksEach ?? s.correct, negative: Math.abs(Number(s.incorrect || 0)), partialPerOption: s.partialPerOption ?? null,
         types: s.types || [s.type]
       })),
@@ -378,6 +421,7 @@ async function examView(profile, id) {
     serverIssued: isServerPaper(exam),
     // A board mock (D22) is labelled on every surface and sat typed.
     ...(exam.mock ? { mock: true, mockLabel: MOCK_LABEL } : {}),
+    ...(exam.generated ? { generated: true } : {}),
     // A targeted paper (Premium) carries the server's "why these questions" key.
     ...(exam.targeted ? { targeted: true, targetedLabel: TARGETED_LABEL, why: exam.why || null } : {}),
     indiaExam: exam.indiaExam
@@ -413,10 +457,10 @@ async function listExams(profile) {
 function criteriaFor(q, marks, marking) {
   if (objectiveTypes.has(q.answerType) || (marking.incorrect || 0) < 0) {
     const negative = Math.abs(Number(marking.incorrect || 0));
-    return [{ mark: marks, text: `Correct response +${marks}${negative ? ` · incorrect response −${negative}` : ''} · unanswered ${marking.unanswered || 0}` }];
+    return [{ mark: marks, text: translate('msg.markScheme', { marks, negative: negative ? translate('msg.markNegative', { n: negative }) : '', unanswered: marking.unanswered || 0 }) }];
   }
   const key = (q.steps || []).filter(s => s?.h && !/^(check|note|bonus)/i.test(s.h)).slice(0, marks);
-  if (!key.length) return [{ mark: marks, text: 'Correct final answer' }];
+  if (!key.length) return [{ mark: marks, text: translate('msg.correctFinal') }];
   return key.map((s, i) => ({
     mark: i === key.length - 1 ? marks - (key.length - 1) : 1,
     text: i === key.length - 1 ? `${s.h} — leading to the correct answer` : s.h
@@ -618,7 +662,7 @@ async function paper(profile, id) {
             alt: pt.alt ? { key: pt.key, marks: pt.marks, ...printView(pt.alt), ...solved('or', dp?.choiceTaken === 'or' ? dp : null) } : null
           };
         }),
-        criteria: finished ? (q.parts || []).map(pt => ({ mark: pt.marks, text: `Part (${pt.key})` })) : undefined
+        criteria: finished ? (q.parts || []).map(pt => ({ mark: pt.marks, text: translate('msg.part', { key: pt.key }) })) : undefined
       });
       continue;
     }
@@ -654,6 +698,7 @@ export function indiaExamRoute(method, path) {
 export async function dispatchIndiaExam(profile, method, path, body = {}) {
   if (!profile?.id || profile.course !== 'in') throw error('India exam routing requires an India profile.', 400, 'INDIA_PROFILE_REQUIRED');
   if (path === '/exams' && method === 'GET') return listExams(profile);
+  if (path === '/exams' && method === 'POST' && body?.generated !== undefined) return createGeneratedIndiaExam(profile, body);
   if (path === '/exams' && method === 'POST') {
     // A paper is marked work, so it starts only for a signed-in account: the
     // same refusal a practice check gives (SIGN_IN_TO_CHECK). Whether the

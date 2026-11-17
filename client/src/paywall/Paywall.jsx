@@ -7,10 +7,12 @@ import { cloudAvailable } from '../platform/cloudTransport.js';
 import { cloudAccountLink, verifyCloudSession } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, hasEntitlement } from '../platform/entitlements.js';
 import { nativeBillingStore, PREMIUM_ON_SALE } from '../platform/nativeBilling.js';
+import { useSaleAvailable, sellsPremium } from './useSaleAvailable.js';
 import { useStoreKitPurchase } from './useStoreKitPurchase.js';
 import { useGooglePlayPurchase } from './useGooglePlayPurchase.js';
 import { planOffers, aboutPerMonth, yearlySavingPercent } from './pricing.js';
 import { ARRIVAL_KEYS, FREE_ROWS, PREMIUM_ROWS } from './plans.js';
+import { EDITION_ID } from '../brand/edition.js';
 
 // The Premium screen (D22: "the compliant paywall ships").
 //
@@ -60,6 +62,7 @@ export default function Paywall() {
   const store = nativeBillingStore();
   const apple = store === 'app-store';
   const google = store === 'google-play';
+  const saleAvailable = useSaleAvailable();
   const [link, setLink] = useState(null);
   const [session, setSession] = useState(null);
   const [busy, setBusy] = useState('');
@@ -127,7 +130,7 @@ export default function Paywall() {
           <div data-paywall-premium-rows>
             <h2 className="sc-label" style={{ margin: 0 }}>{t('paywall.premiumTitle')}</h2>
             <ul style={{ margin: 'var(--space-2) 0 0', paddingLeft: 'var(--space-5)', lineHeight: 1.5 }}>
-              {PREMIUM_ROWS.map(r => <li key={r.key}>{t(r.key, r.vars)}</li>)}
+              {PREMIUM_ROWS.filter(r => !(EDITION_ID === 'prithagoras' && r.key === 'paywall.premium.jeeAdvanced')).map(r => <li key={r.key}>{t(r.key, r.vars)}</li>)}
             </ul>
           </div>
         </div>
@@ -167,7 +170,7 @@ export default function Paywall() {
 
         {/* An edition with no payment provider (plan E5) has nothing to buy
             anywhere: it says so, and names no store, price or plan. */}
-        {!premium && !apple && !google && (PREMIUM_ON_SALE
+        {!premium && !apple && !google && (sellsPremium(saleAvailable)
           ? <p style={{ marginTop: 'var(--space-4)' }} data-paywall-in-app>{t('paywall.inAppOnly')}</p>
           : <p style={{ marginTop: 'var(--space-4)' }} data-paywall-not-on-sale>{t('paywall.notOnSale')}</p>
         )}

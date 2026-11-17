@@ -62,8 +62,11 @@
 .signup-next { width: 100%; margin-top: var(--space-4); }
 .signup-or { display: flex; align-items: center; gap: var(--space-3); color: var(--ink-3); font-size: 12.5px; margin: var(--space-5) 0 var(--space-3); }
 .signup-or::before, .signup-or::after { content: ''; flex: 1; height: 1px; background: var(--hairline); }
-.signup-social { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
-.signup-alt { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-3); margin-top: var(--space-5); font-size: 13.5px; }
+.signup-social { display: grid; grid-template-columns: 1fr; gap: var(--space-2); }
+/* Each provider is as wide and as tall as the primary button; the Google mark keeps its own colours. */
+.signup-provider { width: 100%; justify-content: center; gap: 10px; }
+.signup-google .signup-g { flex: none; }
+.signup-alt { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: var(--space-2) var(--space-5); margin-top: var(--space-5); font-size: 13.5px; text-align: center; }
 .signup-error { margin-top: var(--space-4); }
 
 .otp-boxes { display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--space-2); max-width: 360px; }
@@ -137,3 +140,8 @@
   .otp-boxes { gap: 6px; }
   .otp-box { font-size: 21px; min-height: 44px; }
 }
+
+/* Landing footer: one short note, the data statement folded, centred. */
+.login-more { margin: var(--space-3) auto 0; max-width: 34em; text-align: center; font-size: 13px; color: var(--ink-3); }
+.login-more summary { display: inline-block; cursor: pointer; min-height: 44px; line-height: 44px; text-decoration: underline; text-underline-offset: 3px; }
+.login-more p { margin: 0 0 var(--space-2); text-align: left; }

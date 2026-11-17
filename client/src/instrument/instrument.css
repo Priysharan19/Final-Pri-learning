@@ -1458,3 +1458,33 @@ html[data-pushed] .shell .main { transform: scale(var(--in-push-scale)); transfo
 .in-pal-form { margin-left: auto; font: 500 10.5px var(--in-mono); letter-spacing: 0.04em; color: var(--in-tx-3); white-space: nowrap; }
 .in-pal-form b { font: 500 12px var(--in-mono); color: var(--in-tx-2); }
 .in-pal-honest { margin: 0; padding: 0 18px 10px; font: 400 11px var(--in-mono); color: var(--in-tx-3); text-align: right; }
+
+/* Paper generator (/paper-generator): one calm screen — choices left, the live paper right; on a phone the summary leads. */
+.pg { display: grid; gap: 20px; max-width: 980px; margin: 0 auto; }
+.pg-head { display: grid; gap: 6px; }
+.pg-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 28px; align-items: start; }
+.pg-choices { display: grid; gap: 22px; }
+.pg-set { border: 0; margin: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+.pg-help, .pg-note { margin: 0; }
+.pg-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.pg-topics { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
+.pg-check, .pg-pick { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; padding: 10px 12px; border: 1px solid var(--in-edge); border-radius: 6px; cursor: pointer; color: var(--in-tx); }
+.pg-check input, .pg-pick input { margin-top: 3px; accent-color: var(--in-action); }
+.pg-check.is-on, .pg-pick.is-on { border-color: var(--in-action); background: var(--in-l1); }
+.pg-check:focus-within, .pg-pick:focus-within { outline: 2px solid var(--in-action); outline-offset: 2px; }
+.pg-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.pg-weak small { display: block; margin-top: 2px; }
+.pg-summary { position: sticky; top: 16px; display: grid; gap: 12px; padding: 18px; border: 1px solid var(--in-edge); border-radius: 8px; background: var(--in-l1); }
+.pg-live { margin: 0; font-family: var(--in-ui); font-size: 1.05rem; line-height: 1.45; color: var(--in-tx); }
+.pg-fit { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--in-tx-2); }
+.pg-fit-short { color: var(--in-tx); font-weight: 600; }
+.pg-actions { display: grid; gap: 8px; }
+@media (max-width: 760px) {
+  .pg-body { grid-template-columns: 1fr; gap: 18px; }
+  .pg-summary { position: static; order: -1; }
+  .pg-topics { grid-template-columns: 1fr; }
+}
+
+/* A line the engine marked wrong: the reading is one tap from a correction. */
+.ink-line-recheck { font-size: 12.5px; }
+html.ui-instrument .ink-correct-btn.is-emph { background: var(--in-l1); color: var(--in-tx); box-shadow: 0 0 0 1.5px var(--in-tx-2); font-weight: 600; }

@@ -418,6 +418,7 @@ jobs:
           node client/test/hint-ladder-check.mjs 2>&1 | tee -a practice-http.log
           node client/test/review-queue-check.mjs 2>&1 | tee -a practice-http.log
           node client/test/spaced-review-check.mjs 2>&1 | tee -a practice-http.log
+          node client/test/today-set-check.mjs 2>&1 | tee -a practice-http.log
           node tools/ci-check-counts.mjs verify platform/practice-http.log#3
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
           # After a relaunch or on another device the device's avoid list is empty: the server's picker reads the account's own seen records.
@@ -429,6 +430,9 @@ jobs:
           # Plan G4: NSW HSC-style papers over HTTP — release, reading time, final-answer marking, no band. SQLite here; Postgres below.
           node server/test/nsw-exam-check.mjs 2>&1 | tee -a practice-http.log
           node tools/ci-check-counts.mjs verify platform/practice-http.log#6
+          # The Paper Generator (both editions): deterministic assembly, exact marks, no key or seed in any payload, edition isolation, the insufficient-bank refusal, the printable PDF and the post-attempt guide. SQLite here; Postgres below.
+          node server/test/paper-generator-check.mjs 2>&1 | tee -a practice-http.log
+          node tools/ci-check-counts.mjs verify platform/practice-http.log#7
           node server/test/premium-practice-content-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/mistake-notebook-check.mjs 2>&1 | tee -a practice-http.log
           node server/test/forecast-check.mjs 2>&1 | tee -a practice-http.log
@@ -579,6 +583,11 @@ jobs:
           node tools/ci-check-counts.mjs verify platform/auth-email-ready.log
       - name: Razorpay billing lifecycle
         run: node server/test/razorpay-billing-check.mjs
+      - name: Stripe billing (Prithagoras, AUD) — signature, checkout, events, cancel, edition boundary
+        run: |
+          set -o pipefail
+          node server/test/stripe-billing-check.mjs 2>&1 | tee stripe-billing.log
+          node tools/ci-check-counts.mjs verify platform/stripe-billing.log
       - name: Apple billing lifecycle
         run: node server/test/apple-billing-check.mjs
       - name: Client compatibility floor (CP-11)
@@ -941,6 +950,8 @@ jobs:
             # Maths at 200% text (375 and 430 pt iPhones): superscripted formulas
             # wrap or scroll in their own box, nothing cut (WCAG 1.4.10).
             node client/test/tour-math-reflow.js --no-build 2>&1 | tee -a browser.log
+            # Ink smoothness on emulated Chromium and WebKit (synthesized pen events; not iPad evidence).
+            node client/test/ink-smooth-check.mjs 2>&1 | tee -a browser.log
               ;;
             webkit-layout)
             node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log
@@ -1095,6 +1106,13 @@ jobs:
           set -euo pipefail
           node client/test/brand-build-check.mjs --both | tee brand-build.log
           node tools/ci-check-counts.mjs verify build/brand-build.log
+      # Prithagoras's own legal notices: a Prithagoras build serves the Australian ones and
+      # carries no DPDP or Grievance Officer text; Priyabhata still serves its own. Builds both
+      # editions into temporary folders and scans them.
+      - name: Each edition serves its own legal notices
+        run: |
+          set -euo pipefail
+          node client/test/legal-pages-au-check.mjs --build 2>&1 | tee legal-au.log
       # The iOS web bundles are generated here, never read from git (decision
       # D28): sync copies client/dist into both packages, check proves each
       # copy is complete and byte-exact, then the shipped bytes are inspected.

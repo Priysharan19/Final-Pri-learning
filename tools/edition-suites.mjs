@@ -25,6 +25,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const EDITION_SUITES = [
   // Edition configuration, brand and client wiring.
   'client/test/edition-config-check.mjs',
+  'client/test/legal-pages-au-check.mjs',
   'client/test/brand-strings-check.mjs',
   'client/test/brand-usage-check.mjs',
   'client/test/brand-assets-check.mjs',

@@ -144,24 +144,28 @@ ok('every arrival reason has copy in both languages', Object.values(ARRIVAL_KEYS
   ok('whether Premium is on sale is a build fact, true wherever the build does not say otherwise',
     nativeBilling.includes("export const PREMIUM_ON_SALE = typeof __PRI_PREMIUM_ON_SALE__ !== 'boolean' || __PRI_PREMIUM_ON_SALE__;"));
   ok('a build with nothing to sell has no store: no StoreKit or Google Play flow can start',
-    nativeBilling.includes('return PREMIUM_ON_SALE && priNative.billing.available() ? priNative.billing.store() : null;'));
+    nativeBilling.includes('return PREMIUM_ON_SALE && STORE_BILLING && priNative.billing.available() ? priNative.billing.store() : null;') &&
+    nativeBilling.includes("export const STORE_BILLING = typeof __PRI_STORE_BILLING__ !== 'boolean' || __PRI_STORE_BILLING__;"));
+  // An edition through Stripe alone has no store either, even inside a native shell.
+  ok('an edition that sells on the web only (Stripe) has no App Store or Google Play flow in its bundle',
+    readFileSync(new URL('../vite.config.js', import.meta.url), 'utf8').includes("__PRI_STORE_BILLING__: JSON.stringify(editionOf(states.edition).billing.providers.some(p => p === 'apple' || p === 'google'))"));
   ok('the store is chosen in one place on both screens', (paywall.match(/nativeBillingStore\(\)/g) || []).length === 1 && (panel.match(/nativeBillingStore\(\)/g) || []).length === 1);
   ok('every plan, price, purchase, restore and disclosure on the Premium screen needs a store',
     /\{!premium && \(apple \|\| google\) && \(\s*<div[^>]*data-paywall-plans>/.test(paywall) && /\{\(apple \|\| google\) && \(\s*<p[^>]*data-paywall-disclosure/.test(paywall) &&
     (paywall.match(/<PlanCard /g) || []).length === 2 && paywall.indexOf('<PlanCard ') > paywall.indexOf('data-paywall-plans>'));
   ok('with no store and nothing on sale the screen says so, and does not send the student to an app to buy',
-    /\{!premium && !apple && !google && \(PREMIUM_ON_SALE\s*\? <p[^>]*data-paywall-in-app>\{t\('paywall\.inAppOnly'\)\}<\/p>\s*: <p[^>]*data-paywall-not-on-sale>\{t\('paywall\.notOnSale'\)\}<\/p>\s*\)\}/.test(paywall));
+    /\{!premium && !apple && !google && \(sellsPremium\(saleAvailable\)\s*\? <p[^>]*data-paywall-in-app>\{t\('paywall\.inAppOnly'\)\}<\/p>\s*: <p[^>]*data-paywall-not-on-sale>\{t\('paywall\.notOnSale'\)\}<\/p>\s*\)\}/.test(paywall));
   ok('the account panel offers web checkout only where Premium is on sale: nothing to sell, and the one place that turns it on is never reached',
     (panel.match(/setWebCheckout\(/g) || []).length === 3 && (panel.match(/setWebCheckout\(false\)/g) || []).length === 2 &&
     /if \(!enabled \|\| !PREMIUM_ON_SALE\) \{\s*setPricing\(null\);\s*setWebCheckout\(false\);\s*return \(\) => \{ live = false; \};\s*\}\s*cloud\.billingConfig\(\)/.test(panel) &&
     panel.includes('const canUseWebBilling = canSync && webCheckout && !nativeShell;'));
-  ok('and says Premium is not on sale where it is not', /\{!PREMIUM_ON_SALE && !premium && <div[^>]*data-premium-not-on-sale>\s*\{t\('paywall\.notOnSale'\)\}/.test(panel));
+  ok('and says Premium is not on sale where it is not (the edition sells nothing, or the server says it is not on sale)', /\{!sellsPremium\(saleAvailable\) && !premium && <div[^>]*data-premium-not-on-sale>\s*\{t\('paywall\.notOnSale'\)\}/.test(panel));
   ok('every web price and checkout button in the panel is behind that', (panel.match(/price\(pricing\.(monthly|annual), pricing\.currency\)/g) || []).length === 2 &&
     panel.indexOf('{canUseWebBilling && <div') < panel.indexOf('price(pricing.monthly') && (panel.match(/startWebCheckout\('/g) || []).length === 2 && /async function startWebCheckout\(cadence\) \{\s*if \(!canUseWebBilling\) return;/.test(panel));
   for (const [lang, cat] of [['en', en], ['hi', hi]]) {
     ok(`the not-on-sale sentence (${lang}) promises no date, price or store`, typeof cat['paywall.notOnSale'] === 'string' && !/\d|₹|\$|soon|App Store|Google Play|Razorpay/i.test(cat['paywall.notOnSale']), cat['paywall.notOnSale']);
   }
-  ok('the edition table is where it is decided: Prithagoras lists no provider', /billing: Object\.freeze\(\{ providers: Object\.freeze\(\[\]\), currency: 'AUD' \}\)/.test(config));
+  ok('the edition table is where it is decided: Prithagoras lists Stripe only', /billing: Object\.freeze\(\{ providers: Object\.freeze\(\['stripe'\]\), currency: 'AUD' \}\)/.test(config));
 }
 
 // 5 · every way into it

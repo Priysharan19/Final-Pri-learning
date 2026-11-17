@@ -58,6 +58,8 @@ export const MIN_TOPIC_ATTEMPTS = 3;
 export const TREND_WEEKS = 4;
 export const STRONG_AT = 0.8;
 export const WEAK_BELOW = 0.5;
+/** A fixed suggestion for one sitting on a topic, not a measured need. */
+export const REVISIT_MINUTES = 15;
 export const TREND_MARGIN = 0.05;
 // A gap longer than this between two marked answers ends a sitting.
 export const SITTING_GAP_MS = 15 * 60 * 1000;
@@ -204,7 +206,9 @@ export function buildWeeklyReport(attempts, { weekStart, weekEnd }) {
   if (!enough) {
     plan.push({ kind: 'start-practising', minimumAttempts: MIN_WEEK_ATTEMPTS });
   } else {
-    for (const t of weak.slice(0, 2)) plan.push({ kind: 'revisit-topic', topicId: t.id, name: t.name });
+    // At most three actions, so a parent gets a short list, not a backlog:
+    // two weak topics when nothing is waiting for a retest, one otherwise.
+    for (const t of weak.slice(0, stillOpen > 0 ? 1 : 2)) plan.push({ kind: 'revisit-topic', topicId: t.id, name: t.name, minutes: REVISIT_MINUTES });
     if (stillOpen > 0) plan.push({ kind: 'fix-mistakes', count: Math.min(stillOpen, 10) });
     plan.push({ kind: 'practise-days', days: Math.max(3, Math.min(5, activeDays + 1)) });
   }
@@ -346,12 +350,12 @@ export function parentReportLines(report) {
   }
   const plan = report.plan.map(step => {
     if (step.kind === 'start-practising') return `Answer at least ${step.minimumAttempts} questions so next week's report has something to show.`;
-    if (step.kind === 'revisit-topic') return `Revisit ${step.name}.`;
-    if (step.kind === 'fix-mistakes') return `Try again ${step.count} ${step.count === 1 ? 'question' : 'questions'} answered wrongly before (in Review).`;
+    if (step.kind === 'revisit-topic') return `${step.minutes} minutes on ${step.name}.`;
+    if (step.kind === 'fix-mistakes') return `${step.count} ${step.count === 1 ? 'retest' : 'retests'} due: questions answered wrongly before (in Review).`;
     if (step.kind === 'practise-days') return `Practise on ${step.days} days.`;
     return null;
   }).filter(Boolean);
-  lines.push(['Next week', plan.join(' ')]);
+  lines.push(['What to do this week', plan.join(' ')]);
   return lines;
 }
 

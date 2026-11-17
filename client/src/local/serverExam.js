@@ -39,6 +39,7 @@ import { profileCloudAccountId } from './entitlementGate.js';
 import { checkUnavailable, withExamLock } from './backend.js';
 import { examMarkingInputs, ensureExamClock } from './examSession.js';
 import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js';
+import { translate } from '../i18n/core.js';
 
 /**
  * D17: a frozen exam page is a picture of the student's writing, read by
@@ -377,16 +378,16 @@ export async function flushExamCheckpoints() {
 // ── Finishing ────────────────────────────────────────────────────────────────
 
 const QUEUED = {
-  offline: 'Your paper is submitted and will be marked when you are back online. It is not marked yet. If you reconnect after the paper’s time is up, the answers last saved to the server are the ones marked.',
-  'sign-in': 'Your paper is submitted and will be marked when you sign in again. It is not marked yet. If you sign in after the paper’s time is up, the answers last saved to the server are the ones marked.',
-  refused: 'Your paper is submitted, but this account cannot have it marked right now. It is not marked yet.'
+  offline: 'msg.exam.queuedOffline',
+  'sign-in': 'msg.exam.queuedSignIn',
+  refused: 'msg.exam.queuedRefused'
 };
 
 /** What the room is told about a paper waiting to be marked. Carries no score. */
 export function pendingView(exam) {
   const p = exam?.pendingFinish;
   if (!p) return null;
-  return { pending: true, code: 'EXAM_FINISH_QUEUED', reason: p.cause, causeCode: p.code || null, queuedAt: p.queuedAt, message: QUEUED[p.cause] || QUEUED.offline };
+  return { pending: true, code: 'EXAM_FINISH_QUEUED', reason: p.cause, causeCode: p.code || null, queuedAt: p.queuedAt, message: translate(QUEUED[p.cause] || QUEUED.offline) };
 }
 
 /**

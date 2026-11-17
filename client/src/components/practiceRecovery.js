@@ -21,6 +21,7 @@
 // Neither ever holds the expected answer, a solution or a mark.
 // ─────────────────────────────────────────────────────────────────────────────
 import { clearDraft, draftIdsIn, readDraft, saveDraft } from './drafts.js';
+import { translate } from '../i18n/core.js';
 
 const PENDING = 'submit';
 const SUBMISSION_ID = /^[A-Za-z0-9_-]{8,80}$/;
@@ -61,7 +62,7 @@ export function savePendingSubmission(questionId, rec, meta = {}) {
     lines: cleanLines(rec.lines),
     ...(rec.refused === true ? { refused: true } : {}),
     ...(rec.edited === true ? { edited: true } : {})
-  }, { label: meta.label || '', note: 'Answer being marked', path: '/practice' });
+  }, { label: meta.label || '', note: translate('msg.answerBeingMarked'), path: '/practice' });
 }
 
 /** The in-flight submission for this question, or null. */

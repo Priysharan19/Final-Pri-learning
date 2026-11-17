@@ -108,7 +108,7 @@ if (BOTH) {
     // Hashed chunks: compared by normalised content. Exactly these may differ,
     // each for a stated reason; any other difference fails.
     //   edition        the edition record, which holds this edition's name, cut and wordmark (E2, E4)
-    //   Paywall, CloudAccountPanel, useGooglePlayPurchase
+    //   Paywall, CloudAccountPanel, useGooglePlayPurchase, useSaleAvailable
     //                  commercial configuration: __PRI_PREMIUM_ON_SALE__ folds the
     //                  purchase paths of an edition that sells nothing (plan E5)
     //   i18n-hi, legalHindi, languages
@@ -121,11 +121,20 @@ if (BOTH) {
     //                  streams-standard, year8-10) carry the other hash in their import
     //                  line. Priyabhata's own bundle is byte-identical to before.
     const MAY_DIFFER = {
-      edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce',
-      'i18n-hi': 'language', legalHindi: 'language', languages: 'language',
+      edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce', useSaleAvailable: 'commerce', Legal: 'legal', i18n: 'language',
+      'i18n-hi': 'language', legalHindi: 'language', languages: 'language', core: 'language',
       backend: 'language', indiaProduct: 'language', 'streams-standard': 'language', year8: 'language', year9: 'language', year10: 'language'
     };
-    const base = rel => rel.replace(/^assets\//, '').replace(/-[A-Za-z0-9_-]{8}\.\w+$/, '');
+    //   core           i18n/core.js (split from i18n/index.js in train 23 so the server
+    //                  can translate without React) picks the edition's en-AU overrides
+    //   Legal          the legal page imports each edition's own notices (#954:
+    //                  docs/legal/au for Prithagoras, the Indian set for Priyabhata)
+    //   i18n           the language core carries each edition's en-AU overrides
+    //   _pri-legal-hindi-none
+    //                  Prithagoras's empty stand-in for legalHindi (vite.config.js
+    //                  editionLegalPlugin), so the pair is compared under one name
+    const ALIAS = { '_pri-legal-hindi-none': 'legalHindi' };
+    const base = rel => { const b = rel.replace(/^assets\//, '').replace(/-[A-Za-z0-9_-]{8}\.\w+$/, ''); return ALIAS[b] || b; };
     const hashed = m => [...m.entries()].filter(([rel]) => !plain(rel));
     const contentsOf = m => new Set(hashed(m).map(([, c]) => c));
     const inB = contentsOf(B), inA = contentsOf(A);

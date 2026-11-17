@@ -12,6 +12,7 @@ import {
 } from './store.js';
 import { cleanTimezone, dayKey, defaultTimezone, timezoneOf, localeOf } from '../lib/locale.js';
 import { cleanLanguage } from '../i18n/languages.js';
+import { translate } from '../i18n/core.js';
 import { DEFAULT_THEME_PREF, THEME_PREFS, cleanThemePref } from '../lib/theme.js';
 import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,
@@ -1147,11 +1148,11 @@ async function createIndiaQuestion(pid, chapter, target, mode, trackId, examId =
 // pickNextAmong and pickDotpoint over Indian ids.
 
 const INDIA_WHY = {
-  review: c => `Spaced review — your memory of ${c.name} is due to fade.`,
-  'weak-spot': c => `Targeting your weakest chapter — ${c.name} has the most room to grow.`,
-  misconception: (c, trap) => (trap ? `Same slip keeps coming back in ${c.name}: ${trap.label}` : `Practising ${c.name}, where the same mistake has come up before.`),
-  'new-ground': c => `New ground — ${c.name} has not been practised yet.`,
-  rotation: (c, _t, track) => `Keeping your practice balanced across ${track} — ${c.name} is up.`,
+  review: c => translate('msg.reason.review', { name: c.name }),
+  'weak-spot': c => translate('msg.reason.weakSpot', { name: c.name }),
+  misconception: (c, trap) => (trap ? translate('msg.reason.misconceptionNamed', { name: c.name, label: trap.label }) : translate('msg.reason.misconceptionPlain', { name: c.name })),
+  'new-ground': c => translate('msg.reason.newGround', { name: c.name }),
+  rotation: (c, _t, track) => translate('msg.reason.rotation', { track, name: c.name }),
   topic: (c, _t, track) => `${track} · focused practice on ${c.name}.`
 };
 
@@ -1365,10 +1366,10 @@ function indiaPick(p, trackId, ratings, reviews, now, { chapter = null, dotpoint
     let why = untargeted && choice.reason === 'misconception'
       ? INDIA_WHY.misconception(c, null, trackName)
       : INDIA_WHY[choice.reason](c, choice.trap, trackName);
-    if (t.pyq) why += ' This one is a real previous-year question.';
-    if (t.dotpointIndex != null) why += ` Dot point: ${c.dotpoints[t.dotpointIndex]}`;
-    if (t.windowed === false) why += ` (Served at D${t.difficulty} — this dot point has no authored form at ${trackName} depth yet.)`;
-    if (diagnosticStart) why += ' Your placement check suggested starting here — that was diagnostic evidence, not a mark.';
+    if (t.pyq) why += ' ' + translate('msg.why.pyq');
+    if (t.dotpointIndex != null) why += ' ' + translate('msg.why.dotPoint', { text: c.dotpoints[t.dotpointIndex] });
+    if (t.windowed === false) why += ' ' + translate('msg.why.served', { n: t.difficulty, track: trackName });
+    if (diagnosticStart) why += ' ' + translate('msg.why.placement');
     return why;
   };
   // Last line of defence: whatever chose the target, a named level is served
@@ -1583,7 +1584,7 @@ async function indiaStats(p, ratings, now) {
     const named = indiaNameOf(a.subtopic, { grade: p.year });
     return {
       subtopic: a.subtopic, difficulty: a.difficulty, correct: a.correct, created_at: a.createdAt, mode: a.mode,
-      name: named ? named.name : (a.subtopic === 'custom' ? 'Custom question' : a.subtopic), year: named ? named.year : null
+      name: named ? named.name : (a.subtopic === 'custom' ? translate('msg.custom') : a.subtopic), year: named ? named.year : null
     };
   });
   return {
@@ -1697,15 +1698,15 @@ function interventionFlags({ attempts, lastActiveAt, sinceMs, overdueTasks, weak
   const idle = anchor ? Math.floor((nowMs - anchor) / 86400000) : null;
   if (!attempts.length) {
     if (idle == null || idle >= INACTIVE_DAYS) {
-      flags.push({ code: 'inactive', label: 'Not started', reason: idle == null ? 'No practice recorded yet.' : `No practice recorded in the ${idle} days since joining.` });
+      flags.push({ code: 'inactive', label: translate('msg.flag.notStarted'), reason: idle == null ? translate('msg.flag.noneYet') : translate('msg.flag.noneSince', { n: idle }) });
     }
   } else if (idle != null && idle >= INACTIVE_DAYS) {
-    flags.push({ code: 'inactive', label: `Inactive ${idle}d`, reason: `Last answered a question ${idle} days ago.` });
+    flags.push({ code: 'inactive', label: translate('msg.flag.inactive', { n: idle }), reason: translate('msg.flag.lastAnswered', { n: idle }) });
   }
   if (overdueTasks.length) {
     flags.push({
       code: 'overdue', label: `${overdueTasks.length} overdue`,
-      reason: `Past due and unfinished: ${overdueTasks.map(t => `${t.title} (${t.done}/${t.count})`).join(', ')}.`
+      reason: translate('msg.flag.pastDue', { list: overdueTasks.map(t => `${t.title} (${t.done}/${t.count})`).join(', ') })
     });
   }
   // Accuracy over first sittings only: a run of repeats is neither a rise nor a drop.
@@ -1716,13 +1717,13 @@ function interventionFlags({ attempts, lastActiveAt, sinceMs, overdueTasks, weak
     const before = acc(recent.slice(0, half));
     const after = acc(recent.slice(half));
     if (before - after >= DROP_POINTS) {
-      flags.push({ code: 'accuracy-drop', label: `Accuracy −${before - after}`, reason: `Accuracy fell from ${before}% to ${after}% across the last ${DROP_WINDOW} questions.` });
+      flags.push({ code: 'accuracy-drop', label: translate('msg.flag.accuracyLabel', { n: before - after }), reason: translate('msg.flag.accuracyFell', { before, after, n: DROP_WINDOW }) });
     }
   }
   const repeated = (weaknesses || []).filter(w => w.count >= TRAP_ACTIVE_AT);
   if (repeated.length) {
     const w = repeated[0];
-    flags.push({ code: 'misconception', label: 'Repeated mistake', reason: `${w.label} — seen ${w.count} times in ${w.subtopicName}.` });
+    flags.push({ code: 'misconception', label: translate('msg.flag.repeated'), reason: translate('msg.flag.seen', { label: w.label, count: w.count, name: w.subtopicName }) });
   }
   return flags;
 }
@@ -1792,9 +1793,9 @@ function importedAnalyticsRow(imp, now) {
     // can justify are raised: inactivity from the last rating timestamp and a
     // repeated misconception from the trap ledger.
     flags: [
-      ...(attempts === 0 ? [{ code: 'inactive', label: 'Not started', reason: 'The imported progress file records no practice yet.' }]
+      ...(attempts === 0 ? [{ code: 'inactive', label: translate('msg.flag.notStarted'), reason: translate('msg.flag.importedNone') }]
         : lastActiveAt && now - lastActiveAt >= INACTIVE_DAYS * 86400000
-          ? [{ code: 'inactive', label: `Inactive ${Math.floor((now - lastActiveAt) / 86400000)}d`, reason: `Last answered a question ${Math.floor((now - lastActiveAt) / 86400000)} days ago (from the imported file).` }]
+          ? [{ code: 'inactive', label: translate('msg.flag.inactive', { n: Math.floor((now - lastActiveAt) / 86400000) }), reason: translate('msg.flag.importedLast', { n: Math.floor((now - lastActiveAt) / 86400000) }) }]
           : []),
       ...interventionFlags({ attempts: [], lastActiveAt: now, sinceMs: now, overdueTasks: [], weaknesses, nowMs: now }).filter(f => f.code === 'misconception')
     ],
@@ -1862,7 +1863,7 @@ function criteriaFor(q) {
   const steps = q.steps || [];
   const marks = Math.min(4, Math.max(1, q.difficulty));
   const keySteps = steps.filter(s => !/^(check|note|bonus)/i.test(s.h)).slice(0, marks);
-  if (!keySteps.length) return [{ mark: 1, text: 'Correct final answer' }];
+  if (!keySteps.length) return [{ mark: 1, text: translate('msg.correctFinal') }];
   return keySteps.map((s, i) => ({
     mark: 1,
     text: i === keySteps.length - 1 ? `${s.h} — leading to the correct answer` : s.h
@@ -1916,7 +1917,7 @@ function sanitize(q, row) {
   if (q.multipart) {
     return {
       id: row.id, multipart: true, title: q.title, stem: q.stem, figure: safeFigure(q.figure),
-      subtopicName: q.title, difficulty: q.difficulty, diffLabel: 'Structured question',
+      subtopicName: q.title, difficulty: q.difficulty, diffLabel: translate('msg.structured'),
       marks: q.totalMarks,
       parts: partsOf(q).map(pt => ({
         key: pt.key, prompt: pt.prompt, answerType: pt.answerType, mcqOptions: pt.mcqOptions,
@@ -1931,7 +1932,7 @@ function sanitize(q, row) {
   const inDp = inChapter && Number.isInteger(row.india?.dotpointIndex) ? row.india.dotpointIndex : null;
   return {
     id: row.id, subtopic: inChapter?.id || q.subtopic,
-    subtopicName: inChapter?.name || (q.custom ? q.customName || 'Custom question' : (s?.name || q.subtopic)),
+    subtopicName: inChapter?.name || (q.custom ? q.customName || translate('msg.custom') : (s?.name || q.subtopic)),
     year: inChapter ? indiaChapterGrade(inChapter) : s?.year, strand: inChapter?.strand || s?.strand,
     indiaTrack: row.india?.track || null,
     dotpoint: inChapter ? inDp : (dp ? dp.id : null),
@@ -1967,7 +1968,7 @@ function sanitize(q, row) {
     supportsSteps: publicShaped(row) ? q.supportsSteps === true : !!stepMetaFor(q),
     criteria: publicShaped(row)
       ? Array.from({ length: Math.min(4, Math.max(1, Number(q.criteriaCount) || 1)) },
-        (_, i) => ({ mark: 1, text: 'Method or final-answer criterion ' + (i + 1) }))
+        (_, i) => ({ mark: 1, text: translate('msg.methodCriterion', { n: i + 1 }) }))
       : criteriaFor(q),
     taskId: row.taskId || null
   };
@@ -2226,7 +2227,7 @@ async function replaySubmission(p, row, q, submissionId, requestDigest, answer, 
         serverAcknowledgedAt: tried.serverReceipt.serverAcknowledgedAt
       } : { authoritative: false }),
       correct: false, resolved: false, triesLeft: 1,
-      feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial,
+      feedback: feedback || translate('msg.notQuite'), stepReport, partial,
       diagnosis: diagnosis || null,
       misconception: await namedTrap(p.id, owner, tried.trapHit || null),
       submissionId, replayed: true
@@ -2532,7 +2533,7 @@ function buildCustomQuestion(src, ownerPid, strict = false) {
     return null;
   }
   const a = raw.answer && typeof raw.answer === 'object' ? raw.answer : {};
-  const name = safeLabel(raw.name, 60) || 'Custom question';
+  const name = safeLabel(raw.name, 60) || translate('msg.custom');
   const difficulty = safeInt(raw.difficulty, 1, 4, 2);
   const solutionText = sanitizeText(raw.solutionText, 2000);
   const hint = sanitizeText(raw.hint, 500);
@@ -2544,7 +2545,7 @@ function buildCustomQuestion(src, ownerPid, strict = false) {
         : { value: safeNum(a.value) },
     mcqOptions: answerType === 'mcq' ? safeOptions(raw.mcqOptions).slice(0, 4) : undefined,
     figure: safeFigure(raw.figure),
-    steps: [{ h: 'Teacher solution', d: solutionText || 'See your teacher for the worked solution.' }],
+    steps: [{ h: translate('msg.teacherSolution'), d: solutionText || translate('msg.seeTeacher') }],
     hints: hint ? [hint] : [],
     solutionText
   };
@@ -2891,7 +2892,7 @@ const IMPORT_ROWS = {
     return id && {
       ...(serverExamId ? { server: { examId: serverExamId, questionIds: pairs.map(([, remote]) => remote), kind: sanitizeText(r.server.kind, 20) || null, savedRev: 0, savedAt: null, restored: true } } : {}),
       id, pid, year: safeInt(r.year, 7, 12, 9), pathway: PATHWAYS[r.pathway] ? r.pathway : null,
-      title: safeLabel(r.title, 80) || 'Practice paper', durationMin: safeInt(r.durationMin, 5, 240, 30),
+      title: safeLabel(r.title, 80) || translate('msg.practicePaper'), durationMin: safeInt(r.durationMin, 5, 240, 30),
       questionIds: pairs.map(([local]) => local),
       createdAt: safeTime(r.createdAt) || Date.now(), finishedAt: safeTime(r.finishedAt),
       score: r.score == null ? null : safeInt(r.score, -999, 999, 0),
@@ -3512,7 +3513,7 @@ const routes = {
         const cq = await get('customQs', task.customIds[done % task.customIds.length]);
         if (cq) {
           const { row, payload } = await createQuestion(p.id, 'custom', cq.difficulty || 2, 'task', null, taskId, cq.q);
-          return { question: sanitize(payload, row), reason: 'task', why: `Task: ${task.title} — question ${done + 1} of ${task.count}.` };
+          return { question: sanitize(payload, row), reason: 'task', why: translate('msg.task.why', { title: task.title, n: done + 1, total: task.count }) };
         }
       }
       // An India-targeted task (NCERT chapter / dot point / track) is served
@@ -3541,7 +3542,7 @@ const routes = {
         const { row, payload, repeat } = await createIndiaQuestion(p.id, chapter, resolved, 'task', trackId, null, taskId, null, retarget);
         return {
           question: sanitize(payload, row), reason: 'task', repeat: !!repeat,
-          why: `Task: ${task.title} — question ${done + 1} of ${task.count}.`,
+          why: translate('msg.task.why', { title: task.title, n: done + 1, total: task.count }),
           dotpoint: resolved.dotpointIndex, target: state.mastery, misconception: null,
           ...difficultyServedAs(namedLevel, payload.difficulty ?? row.difficulty)
         };
@@ -3552,7 +3553,7 @@ const routes = {
       const aim = pickDifficulty(st?.rating ?? START_RATING, st?.attempts ?? 0, { state: st || {}, nowMs: Date.now() });
       const { dp, difficulty: d } = chooseDotpoint(sub, st, { want: aim });
       const { row, payload } = await createQuestion(p.id, sub, d, 'task', null, taskId, null, { dotpointId: dp?.id || null });
-      return { question: sanitize(payload, row), reason: 'task', why: `Task: ${task.title} — question ${done + 1} of ${task.count}.` };
+      return { question: sanitize(payload, row), reason: 'task', why: translate('msg.task.why', { title: task.title, n: done + 1, total: task.count }) };
     }
     const now = Date.now();
     if (p.course === 'in' && !taskId) {
@@ -3638,14 +3639,14 @@ const routes = {
       // requested dot point at all, the reply says the topic is the target.
       // Claiming otherwise would be worse than not having the feature.
       const whyPlain = asked && !real
-        ? `Focused practice on ${sub.name} — no question form covers this dot point on its own yet.`
-        : `Focused practice on ${sub.name}.`;
+        ? translate('msg.focus.noForm', { name: sub.name })
+        : translate('msg.focus.plain', { name: sub.name });
       choice = {
         subtopic, difficulty: d, reason: 'topic', dotpoint: real ? asked.id : (auto?.id || null),
         trap: seekableTraps(st?.traps, now)[0] || null,
         whyPlain,
-        why: real ? `Focused on this dot point: ${asked.text}`
-          : auto ? `Focused practice on ${sub.name}. Dot point: ${auto.text}`
+        why: real ? translate('msg.focus.real', { text: asked.text })
+          : auto ? translate('msg.focus.auto', { name: sub.name, text: auto.text })
             : whyPlain
       };
     } else {
@@ -4159,12 +4160,12 @@ const routes = {
       row.lastTry = submissionId ? {
         submissionId, digest: requestDigest, trapHit: trapHit || null,
         serverReceipt: authoritative,
-        replay: replayRecord({ feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null })
+        replay: replayRecord({ feedback: feedback || translate('msg.notQuite'), stepReport, partial, diagnosis: stepReport?.diagnosis || null })
       } : null;
       row.pendingGrade = null;
       await put('questions', row);
       return { ...certified,
-        correct: false, resolved: false, triesLeft: 1, feedback: feedback || 'Not quite — check your working and try once more.', stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
+        correct: false, resolved: false, triesLeft: 1, feedback: feedback || translate('msg.notQuite'), stepReport, partial, diagnosis: stepReport?.diagnosis || null, misconception: await namedTrap(p.id, evidenceKeyOf(row, q), trapHit), ...(submissionId ? { submissionId } : {}) };
     }
     if (result.invalid && !resolvedNow) {
       row.pendingGrade = null;
@@ -4338,6 +4339,14 @@ const routes = {
       if (!nswExamsFor(p)) throw Object.assign(new Error('These papers are not available here.'), { status: 404, code: 'EXAM_KIND_UNAVAILABLE' });
       const issued = await issueServerExam(p.id, nswExamSpec(body.nsw), `nsw:${body.nsw}`);
       return storeServerPaper(p, issued, { year: 12, pathway: null, title: issued.title, readingMin: issued.readingMin, nsw: issued.nsw });
+    }
+    // A generated paper (both editions): the request goes to the server, which
+    // assembles it from the edition's approved banks and keeps its seed.
+    if (body?.generated !== undefined) {
+      const g = body.generated;
+      const signature = `generated:${g.year}:${g.marks ?? `m${g.minutes}`}:${g.mix}:${g.weak ? 'w' : ''}:${(g.topics || []).join(',')}`;
+      const issued = await issueServerExam(p.id, { kind: 'generated', generated: g }, signature);
+      return storeServerPaper(p, issued, { year: g.year, pathway: g.pathway ?? null, title: issued.title, generated: true });
     }
     const length = [10, 15, 20].includes(Number(body?.length)) ? Number(body.length) : 10;
     const minutes = Math.round(Math.min(90, Math.max(10, Number(body?.minutes) || (length * 3))));
@@ -4681,7 +4690,7 @@ const routes = {
     const matchRuns = await byIndex('matchRuns', 'pid', pid);
     const exams = await byIndex('exams', 'pid', pid);
     const inkCount = attempts.filter(a => a.viaInk).length;
-    const recent = attempts.slice(-15).reverse().map(a => ({ subtopic: a.subtopic, difficulty: a.difficulty, correct: a.correct, created_at: a.createdAt, mode: a.mode, name: SUBTOPIC_BY_ID[a.subtopic]?.name || 'Custom question' }));
+    const recent = attempts.slice(-15).reverse().map(a => ({ subtopic: a.subtopic, difficulty: a.difficulty, correct: a.correct, created_at: a.createdAt, mode: a.mode, name: SUBTOPIC_BY_ID[a.subtopic]?.name || translate('msg.custom') }));
     return {
       predicted: pred, trajectory, priorities: prio, strands, misconceptions,
       activity: days.slice(-120), totals, byDiff, bestRush,
@@ -4768,7 +4777,7 @@ const routes = {
   },
   'POST /classes': async (body) => {
     const p = await requireProfile();
-    const c = { id: uuid(), name: String(body.name || 'My class').slice(0, 60), teacherPid: p.id, studentPids: [], createdAt: Date.now() };
+    const c = { id: uuid(), name: String(body.name || translate('msg.myClass')).slice(0, 60), teacherPid: p.id, studentPids: [], createdAt: Date.now() };
     await put('classes', c);
     return { class: c };
   },
@@ -4902,7 +4911,7 @@ const routes = {
     const targets = indiaTargetsFrom(body.targets, body.subtopics, body.track, body.difficulty);
     const t = {
       id: uuid(), classId: body.classId || null, ownerPid: p.id,
-      title: String(body.title || 'Practice task').slice(0, 80),
+      title: String(body.title || translate('msg.practiceTask')).slice(0, 80),
       mode: body.customIds?.length ? 'custom' : targets.length ? 'india' : 'subtopics',
       subtopics: (Array.isArray(body.subtopics) ? body.subtopics : []).filter(s => SUBTOPIC_BY_ID[s]),
       targets,
@@ -4952,7 +4961,7 @@ const routes = {
       const inChapter = r.india ? indiaChapter(r.india.chapterId) : null;
       return {
         id: r.id, subtopic: inChapter ? inChapter.id : r.subtopic,
-        subtopicName: q.multipart ? q.title : (inChapter?.name || (q.custom ? q.customName || 'Custom question' : (SUBTOPIC_BY_ID[r.subtopic]?.name || r.subtopic))),
+        subtopicName: q.multipart ? q.title : (inChapter?.name || (q.custom ? q.customName || translate('msg.custom') : (SUBTOPIC_BY_ID[r.subtopic]?.name || r.subtopic))),
         year: inChapter ? indiaChapterGrade(inChapter) : undefined,
         dotpointText: inChapter && Number.isInteger(r.india?.dotpointIndex) ? inChapter.dotpoints[r.india.dotpointIndex] : undefined,
         multipart: !!q.multipart,
@@ -5279,7 +5288,7 @@ const routes = {
     const targets = indiaTargetsFrom(src.targets, src.subtopics);
     const t = {
       id: uuid(), classId: null, ownerPid: p.id,
-      title: safeLabel(src.title, 80) || 'Imported task',
+      title: safeLabel(src.title, 80) || translate('msg.importedTask'),
       mode: customIds.length ? 'custom' : targets.length ? 'india' : 'subtopics',
       subtopics: (Array.isArray(src.subtopics) ? src.subtopics : []).slice(0, 100).filter(s => SUBTOPIC_BY_ID[s]),
       targets,
@@ -5444,7 +5453,7 @@ const routes = {
       } catch (cause) { throw refused(cause); }
       if (!settled(receipt) || receipt.submissionId !== submissionId || typeof receipt.correct !== 'boolean') throw checkUnavailable('unavailable');
       if (receipt.invalid) {
-        return { correct: false, resolved: false, invalid: true, triesLeft: 1, feedback: receipt.feedback || 'That answer could not be read — check it and submit again.' };
+        return { correct: false, resolved: false, invalid: true, triesLeft: 1, feedback: receipt.feedback || translate('msg.unreadable') };
       }
       correct = receipt.correct === true;
       feedback = receipt.feedback || '';
@@ -5781,7 +5790,7 @@ async function examFor(pid, examId) {
     if (!row) continue;
     questions.push(sanitize(row.payload, row));
   }
-  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e), ...(e.nsw ? { nsw: e.nsw } : {}) };
+  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e), ...(e.nsw ? { nsw: e.nsw } : {}), ...(e.generated ? { generated: true } : {}) };
 }
 
 /**
@@ -5789,7 +5798,7 @@ async function examFor(pid, examId) {
  * paper (plan G4) — as this profile's open paper: its public questions, the
  * server's clock, and for an NSW paper its reading time and what it is.
  */
-async function storeServerPaper(p, issued, { year, pathway, title, readingMin = null, nsw = null }) {
+async function storeServerPaper(p, issued, { year, pathway, title, readingMin = null, nsw = null, generated = false }) {
   const examId = String(issued.id);
   const now = Date.now();
   const qids = [];
@@ -5807,6 +5816,7 @@ async function storeServerPaper(p, issued, { year, pathway, title, readingMin = 
     id: examId, pid: p.id, year, pathway, title, durationMin: issued.durationMin, questionIds: qids,
     createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null,
     paperVersion: issued.paperVersion,
+    ...(generated ? { generated: true } : {}),
     ...(Number.isFinite(Number(readingMin)) && Number(readingMin) > 0 ? { readingMin: Number(readingMin) } : {}),
     ...(nsw && typeof nsw === 'object' ? { nsw: {
       label: String(nsw.label || ''), markingNote: String(nsw.markingNote || ''), blueprintId: String(nsw.blueprintId || ''), course: String(nsw.course || ''),
@@ -6037,8 +6047,8 @@ function resumedQuestionResponse(row) {
     // A pending submission's question can come back already answered (§09):
     // it is shown to give the student its verdict, not to be answered again.
     why: row.answered
-      ? 'Showing the result of the answer you submitted before the app closed.'
-      : 'Continuing your unfinished question.',
+      ? translate('msg.resume.answered')
+      : translate('msg.resume.open'),
     resumed: true
   };
 }
@@ -6122,12 +6132,12 @@ async function entitlementGate(method, pattern, body, params) {
  */
 function checkUnavailable(reason, cause = null) {
   const known = {
-    'sign-in': [401, 'SIGN_IN_TO_CHECK', 'Sign in to check this answer. Your working is kept.'],
-    offline: [503, 'RECONNECT_TO_CHECK', 'Pri could not reach the server. Your working is kept — reconnect and try again.'],
-    unavailable: [503, 'QUESTION_CHECK_UNAVAILABLE', 'This question cannot be checked right now. Your working is kept — try again, or move to the next question.'],
+    'sign-in': [401, 'SIGN_IN_TO_CHECK', translate('msg.check.signIn')],
+    offline: [503, 'RECONNECT_TO_CHECK', translate('msg.check.offline')],
+    unavailable: [503, 'QUESTION_CHECK_UNAVAILABLE', translate('msg.check.unavailable')],
     // Opened with no connection: it was never the server's question.
-    draft: [409, 'QUESTION_NOT_SERVER_ISSUED', 'This question was opened without a connection, so it cannot be marked. Your working is kept — open a new question to be marked.'],
-    expired: [409, 'QUESTION_PREPARED_EXPIRED', 'This question was opened too long ago to be marked. Your working is kept — open a new question to be marked.']
+    draft: [409, 'QUESTION_NOT_SERVER_ISSUED', translate('msg.check.draft')],
+    expired: [409, 'QUESTION_PREPARED_EXPIRED', translate('msg.check.expired')]
   };
   // An eligibility refusal (email not verified, guardian consent pending,
   // account restricted) keeps the server's own code so the card names it.

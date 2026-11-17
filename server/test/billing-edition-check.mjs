@@ -12,12 +12,15 @@ import { createHmac } from 'node:crypto';
 //   Priyabhata   every route behaves as it does on main: /billing/config is
 //                byte for byte main's reply, checkout reaches the provider, a
 //                signed webhook activates Premium.
-//   Prithagoras  nothing can be bought: /billing/config offers no price,
-//                product or checkout, every purchase route answers 404
-//                BILLING_NOT_AVAILABLE_IN_EDITION with or without a session,
-//                a correctly signed Razorpay webhook is refused and changes
-//                no row, no adapter runs and no provider call leaves the
-//                process. What an account already holds is still honoured.
+//   Prithagoras  sells through Stripe only (AUD, owner decision O2): the App
+//                Store and Google Play routes answer 404
+//                BILLING_NOT_AVAILABLE_IN_EDITION with or without a session;
+//                the web family is Stripe's, so a correctly signed RAZORPAY
+//                webhook is never applied (it changes no row and no Razorpay
+//                call leaves the process), nothing of Razorpay, Apple or
+//                Google is offered, and what an account already holds is
+//                still honoured. The Stripe adapter itself is proved in
+//                stripe-billing-check.mjs.
 //
 // Then start-up: a Prithagoras server refuses, in production, a variable of a
 // provider it does not sell through and a display currency that is not its own.
@@ -32,7 +35,7 @@ const ONLY = (process.argv.find(arg => arg.startsWith('--edition=')) || '').slic
 const ENV = {
   NODE_ENV: 'test',
   PRI_AUTH_DELIVERY_KEY: '55'.repeat(32),
-  PRI_DISPLAY_CURRENCY: 'INR', PRI_DISPLAY_MONTHLY_PRICE: '199', PRI_DISPLAY_ANNUAL_PRICE: '1499', PRI_DISPLAY_TRIAL_DAYS: '7',
+  PRI_DISPLAY_MONTHLY_PRICE: '199', PRI_DISPLAY_ANNUAL_PRICE: '1499', PRI_DISPLAY_TRIAL_DAYS: '7',
   PRI_RAZORPAY_KEY_ID: 'rzp_test_public_id', PRI_RAZORPAY_KEY_SECRET: 'rzp-test-secret', PRI_RAZORPAY_WEBHOOK_SECRET: 'whsec-test',
   PRI_RAZORPAY_MONTHLY_PLAN_ID: 'plan_Monthly123456', PRI_RAZORPAY_ANNUAL_PLAN_ID: 'plan_Annual1234567',
   PRI_RAZORPAY_MONTHLY_TOTAL_COUNT: '120', PRI_RAZORPAY_ANNUAL_TOTAL_COUNT: '10',
@@ -51,12 +54,24 @@ const MAIN_CONFIG = '{"display":{"currency":"INR","monthly":199,"annual":1499,"t
 const MAIN_CONFIG_BARE = '{"display":{"currency":"INR","monthly":null,"annual":null,"trialDays":null,"advisoryOnly":true},"products":{"appleMonthly":null,"appleAnnual":null,"googleMonthly":null,"googleAnnual":null,"webMonthly":null,"webAnnual":null},"webCheckout":{"provider":"razorpay","configured":false},"platformRule":"Native iOS/Android purchases must use the platform billing mechanism required for that storefront. The server consumes verified provider events and never trusts client premium flags."}';
 const PRITHAGORAS_CONFIG = '{"available":false,"display":{"currency":"AUD","monthly":null,"annual":null,"trialDays":null,"advisoryOnly":true},"products":{"appleMonthly":null,"appleAnnual":null,"googleMonthly":null,"googleAnnual":null,"webMonthly":null,"webAnnual":null},"webCheckout":{"provider":null,"configured":false},"platformRule":"Premium is not on sale in this edition yet. The server consumes verified provider events and never trusts client premium flags."}';
 const REFUSED = 'BILLING_NOT_AVAILABLE_IN_EDITION';
+// Test-only Stripe configuration (no real key, price or secret), applied only while a configured Prithagoras server is up.
+const STRIPE_TEST_ENV = {
+  PRI_STRIPE_SECRET_KEY: ['sk', 'test', 'EditionCheck12345'].join('_'), PRI_STRIPE_WEBHOOK_SECRET: ['whsec', 'EditionCheckSecret01'].join('_'),
+  PRI_STRIPE_MONTHLY_PRICE_ID: 'price_MonthlyEdition1', PRI_STRIPE_ANNUAL_PRICE_ID: 'price_AnnualEdition001', PRI_PUBLIC_ORIGIN: 'https://app.prithagoras.example',
+  PRI_DISPLAY_MONTHLY_PRICE: '9.99', PRI_DISPLAY_ANNUAL_PRICE: '99'
+};
+function withProcessEnv(values) {
+  const prior = Object.fromEntries(Object.keys(values).map(name => [name, process.env[name]]));
+  Object.assign(process.env, values);
+  return () => { for (const [name, value] of Object.entries(prior)) { if (value === undefined) delete process.env[name]; else process.env[name] = value; } };
+}
 
 const [
   { default: express },
   { default: cookieParser },
   { openTestStore },
   { createRazorpayBilling },
+  { createStripeBilling },
   { createPlatformRouter },
   { commercialConfig },
   { metrics }
@@ -65,6 +80,7 @@ const [
   import('cookie-parser'),
   import('./support/engine.mjs'),
   import('../platform/razorpay.js'),
+  import('../platform/stripe.js'),
   import('../platform/router.js'),
   import('../platform/billing.js'),
   import('../platform/metrics.js')
@@ -101,8 +117,13 @@ async function serve(edition) {
   async function fakeFetch(url, options = {}) {
     calls.provider++;
     const parsed = new URL(url);
-    assert.equal(parsed.origin, 'https://api.razorpay.com');
     const method = String(options.method || 'GET').toUpperCase();
+    if (edition === 'prithagoras') {
+      assert.equal(parsed.origin, 'https://api.stripe.com');
+      if (method === 'POST' && parsed.pathname === '/v1/checkout/sessions') return json({ id: 'cs_test_Edition000001', url: 'https://checkout.stripe.com/c/pay/cs_test_Edition000001' });
+      return json({ error: { message: 'unexpected test request' } }, 404);
+    }
+    assert.equal(parsed.origin, 'https://api.razorpay.com');
     if (method === 'POST' && parsed.pathname === '/v1/subscriptions') {
       checkoutAccount = JSON.parse(options.body || '{}').notes?.pri_account_id || null;
       return json({ ...providerSubscription(checkoutAccount), status: 'created', current_start: null, current_end: null });
@@ -111,7 +132,8 @@ async function serve(edition) {
     if (method === 'POST' && /\/cancel$/.test(parsed.pathname)) return json(providerSubscription(checkoutAccount));
     return json({ error: { description: 'unexpected test request' } }, 404);
   }
-  const web = createRazorpayBilling(db, { fetchImpl: fakeFetch });
+  // The web adapter is the edition's own, as app.js builds it (webBilling.js).
+  const web = edition === 'prithagoras' ? createStripeBilling(db, { fetchImpl: fakeFetch }) : createRazorpayBilling(db, { fetchImpl: fakeFetch });
   // Apple and Google adapters that would hand over Premium to whoever asks.
   // On an edition that does not sell through them they must never run.
   const grant = provider => async ({ accountId }) => {
@@ -145,7 +167,8 @@ async function serve(edition) {
   const origin = `http://127.0.0.1:${server.address().port}`;
 
   async function call(path, { method = 'GET', body, raw, jar = null, headers = {} } = {}) {
-    const requestHeaders = { Accept: 'application/json', ...headers };
+    // With a public origin configured the server enforces the browser Origin on mutations (webhooks are exempt).
+    const requestHeaders = { Accept: 'application/json', ...(process.env.PRI_PUBLIC_ORIGIN ? { Origin: process.env.PRI_PUBLIC_ORIGIN } : {}), ...headers };
     if (jar) {
       const cookies = Object.entries(jar).map(([name, value]) => `${name}=${value}`).join('; ');
       if (cookies) requestHeaders.Cookie = cookies;
@@ -283,7 +306,7 @@ try {
 
   // ── Prithagoras: nothing to buy, nothing applied ─────────────────────────
   if (ONLY !== 'priyabhata') {
-    const { BILLING_NOT_AVAILABLE, ROUTE_FAMILY_PROVIDER, editionBilling, editionBillingProblems, providerAllowed } = await import('../platform/billingProviders.js');
+    const { BILLING_NOT_AVAILABLE, ROUTE_FAMILY_PROVIDER, editionBilling, editionBillingProblems, providerAllowed, webProviderOf } = await import('../platform/billingProviders.js');
     const { EDITIONS, BILLING_PROVIDERS, editionProblems } = await import('../../client/edition.config.mjs');
     const { platformConfigStatus, assertPlatformConfig } = await import('../platform/config.js');
     check(BILLING_NOT_AVAILABLE === REFUSED, 'the refusal code is BILLING_NOT_AVAILABLE_IN_EDITION');
@@ -291,64 +314,84 @@ try {
     // The table.
     same([...editionBilling('priyabhata').providers], ['razorpay', 'apple', 'google'], 'Priyabhata sells through Razorpay, Apple and Google');
     same({ ...editionBilling('priyabhata'), providers: null }, { edition: 'priyabhata', providers: null, currency: 'INR', available: true }, 'Priyabhata: INR, available');
-    same({ ...editionBilling('prithagoras'), providers: [...editionBilling('prithagoras').providers] }, { edition: 'prithagoras', providers: [], currency: 'AUD', available: false }, 'Prithagoras: no provider, AUD, not available');
-    same(ROUTE_FAMILY_PROVIDER, { web: 'razorpay', apple: 'apple', google: 'google' }, 'the web route family is Razorpay\'s');
-    for (const name of ['web', 'razorpay', 'apple', 'google']) {
+    same({ ...editionBilling('prithagoras'), providers: [...editionBilling('prithagoras').providers] }, { edition: 'prithagoras', providers: ['stripe'], currency: 'AUD', available: true }, 'Prithagoras: Stripe only, AUD, available');
+    same(ROUTE_FAMILY_PROVIDER, { web: 'razorpay', apple: 'apple', google: 'google' }, 'the web route family defaults to Razorpay\'s');
+    check(webProviderOf('priyabhata') === 'razorpay' && webProviderOf('prithagoras') === 'stripe', 'the web family is Razorpay\'s for Priyabhata and Stripe\'s for Prithagoras');
+    for (const name of ['razorpay', 'apple', 'google']) {
       check(providerAllowed('priyabhata', name) === true && providerAllowed('prithagoras', name) === false, `${name}: sold by Priyabhata, not by Prithagoras`);
     }
-    check(providerAllowed('priyabhata', 'stripe') === false, 'a provider no edition lists is not allowed');
+    check(providerAllowed('prithagoras', 'stripe') === true && providerAllowed('priyabhata', 'stripe') === false, 'Stripe: sold by Prithagoras and never by Priyabhata');
+    check(providerAllowed('priyabhata', 'web') === true && providerAllowed('prithagoras', 'web') === true, 'the web family is sold by both editions, through their own provider');
+    check(providerAllowed('priyabhata', 'paypal') === false, 'a provider no edition lists is not allowed');
     assert.throws(() => editionBilling('typo'), /Unknown edition/); checks++;
     same(editionProblems(), [], 'the edition table has no problems');
     const broken = (id, billing) => editionProblems({ ...EDITIONS, [id]: { ...EDITIONS[id], billing } });
-    check(broken('prithagoras', { providers: ['stripe'], currency: 'AUD' }).some(p => /billing provider "stripe"/.test(p)), 'an unknown provider id is a problem');
+    check(broken('prithagoras', { providers: ['paypal'], currency: 'AUD' }).some(p => /billing provider "paypal"/.test(p)), 'an unknown provider id is a problem');
     check(broken('prithagoras', { providers: ['apple', 'apple'], currency: 'AUD' }).some(p => /twice/.test(p)), 'a provider listed twice is a problem');
     check(broken('prithagoras', { providers: [], currency: 'INR' }).some(p => /billing\.currency/.test(p)), 'a billing currency that is not the edition\'s is a problem');
     check(broken('priyabhata', undefined).some(p => /billing\.providers must be a list/.test(p)), 'an edition with no billing block is a problem');
-    same([...BILLING_PROVIDERS], ['razorpay', 'apple', 'google'], 'the platform has three provider adapters');
+    same([...BILLING_PROVIDERS], ['razorpay', 'stripe', 'apple', 'google'], 'the platform has four provider adapters');
 
+    for (const stripeConfigured of [false, true]) {
+    const restoreEnv = stripeConfigured ? withProcessEnv(STRIPE_TEST_ENV) : () => {};
     const au = await serve('prithagoras');
     open.push(au);
+    const T = stripeConfigured ? 'Prithagoras (Stripe configured)' : 'Prithagoras (Stripe not configured)';
     engine = au.engine;
     const { call, jar } = au;
 
     const config = await call('/billing/config');
-    check(config.status === 200 && config.text === PRITHAGORAS_CONFIG, `Prithagoras: /billing/config says nothing is on sale (${config.text})`);
-    check(config.data.available === false && config.data.display.currency === 'AUD', 'Prithagoras: available is false and the currency is AUD');
-    check(Object.values(config.data.products).every(v => v === null) && config.data.display.monthly === null && config.data.display.annual === null && config.data.display.trialDays === null,
-      'Prithagoras: no product id, price or trial, although the deployment variables hold all of them');
-    check(!/INR|₹|razorpay|plan_|com\.prilearning|pri_premium|199|1499/i.test(config.text), 'Prithagoras: no Indian currency, provider, plan or product appears in the reply');
-    const nativeConfig = await call('/billing/config', { headers: { 'x-pri-client': 'ios-native-v1' } });
-    check(nativeConfig.text === PRITHAGORAS_CONFIG, 'Prithagoras: a native shell is told the same');
-    check(JSON.stringify(commercialConfig('prithagoras')) === PRITHAGORAS_CONFIG, 'commercialConfig(prithagoras) is that reply');
+    check(config.status === 200 && config.data.display.currency === 'AUD', `${T}: /billing/config is in AUD (${config.text})`);
+    if (!stripeConfigured) {
+      check(config.text === PRITHAGORAS_CONFIG && config.data.available === false, `${T}: /billing/config says nothing is on sale, exactly as an edition with no provider does (${config.text})`);
+      check(Object.values(config.data.products).every(v => v === null) && config.data.display.monthly === null && config.data.display.annual === null, `${T}: no price, plan or product, although the deployment variables hold Razorpay's, Apple's and Google's`);
+    } else {
+      check(config.data.available === undefined && config.data.webCheckout.provider === 'stripe' && config.data.webCheckout.configured === true, `${T}: on sale through Stripe, configured`);
+      check(config.data.display.monthly === 9.99 && config.data.display.annual === 99, `${T}: the AUD prices are A$9.99 and A$99 (${JSON.stringify(config.data.display)})`);
+      check(config.data.products.webMonthly === 'price_MonthlyEdition1' && config.data.products.webAnnual === 'price_AnnualEdition001' && ['appleMonthly', 'appleAnnual', 'googleMonthly', 'googleAnnual'].every(k => config.data.products[k] === null), `${T}: only Stripe's two prices are offered; no Razorpay plan, App Store or Google Play product`);
+    }
+    check(!/INR|₹|razorpay|plan_|com\.prilearning|pri_premium/i.test(config.text), `${T}: no Indian currency, Razorpay, plan or store product appears in the reply`);
+    check(JSON.stringify(commercialConfig('prithagoras')) === config.text, `${T}: commercialConfig(prithagoras) is that reply`);
 
     const baseline = await au.rows();
-    const metricBefore = { web: webhookMetric('web', 'rejected'), apple: webhookMetric('apple', 'rejected'), google: webhookMetric('google', 'rejected') };
-    for (const [method, path, body] of PURCHASE_ROUTES) {
+    const metricBefore = { apple: webhookMetric('apple', 'rejected'), google: webhookMetric('google', 'rejected') };
+    // Apple and Google are never sold here; unconfigured, the web family is not sold either: refused before anything else runs.
+    for (const [method, path, body] of PURCHASE_ROUTES.filter(([, path]) => !stripeConfigured || !/web/.test(path))) {
       const anonymous = await call(path, { method, body });
-      check(anonymous.status === 404 && anonymous.code === REFUSED, `Prithagoras: ${method} ${path} without a session is 404 ${REFUSED} (${anonymous.status} ${anonymous.code})`);
+      check(anonymous.status === 404 && anonymous.code === REFUSED, `${T}: ${method} ${path} without a session is 404 ${REFUSED} (${anonymous.status} ${anonymous.code})`);
       const signedIn = await call(path, { method, jar, body });
-      check(signedIn.status === 404 && signedIn.code === REFUSED, `Prithagoras: ${method} ${path} signed in and verified is 404 ${REFUSED} (${signedIn.status} ${signedIn.code})`);
+      check(signedIn.status === 404 && signedIn.code === REFUSED, `${T}: ${method} ${path} signed in and verified is 404 ${REFUSED} (${signedIn.status} ${signedIn.code})`);
       const native = await call(path, { method, jar, body, headers: { 'x-pri-client': 'ios-native-v1' } });
-      check(native.status === 404 && native.code === REFUSED, `Prithagoras: ${method} ${path} from a native shell is 404 ${REFUSED} (${native.status} ${native.code})`);
+      check(native.status === 404 && native.code === REFUSED, `${T}: ${method} ${path} from a native shell is 404 ${REFUSED} (${native.status} ${native.code})`);
     }
-    // A correctly signed Razorpay event for this very account.
+    // The web family is Stripe's, and it is sold only where Stripe is configured.
+    if (stripeConfigured) {
+      for (const [method, path, body] of PURCHASE_ROUTES.filter(([, path]) => /web/.test(path))) {
+        const anonymous = await call(path, { method, body });
+        check(anonymous.status === 401, `${T}: ${method} ${path} without a session asks for one (${anonymous.status} ${anonymous.code})`);
+      }
+      const checkout = await call('/billing/checkout/web', { method: 'POST', jar, body: { cadence: 'monthly' } });
+      check(checkout.status === 201 && checkout.data.checkout.checkoutProvider === 'stripe' && /^https:\/\/checkout\.stripe\.com\//.test(checkout.data.checkout.checkoutUrl), `${T}: checkout is created at STRIPE (${checkout.status} ${checkout.text})`);
+    }
+    // A correctly signed Razorpay event for this very account is never applied.
     const hook = au.signedWebhook('evt-au-activated');
     const refused = await call('/billing/webhook/web', { method: 'POST', raw: hook.raw, headers: hook.headers });
-    check(refused.status === 404 && refused.code === REFUSED, `Prithagoras: a correctly signed Razorpay webhook is refused (${refused.status} ${refused.code})`);
+    check(refused.data?.ok !== true && (stripeConfigured ? (refused.status === 401 && refused.code === 'BILLING_WEBHOOK_SIGNATURE_INVALID') : (refused.status === 404 && refused.code === REFUSED)), `${T}: a correctly signed Razorpay webhook is not applied (${refused.status} ${refused.code})`);
     for (const provider of ['apple', 'google']) {
       const other = await call(`/billing/webhook/${provider}`, { method: 'POST', body: { signedPayload: 'x' }, headers: { authorization: 'Bearer aaa.bbb.ccc' } });
       check(other.status === 404 && other.code === REFUSED, `Prithagoras: a ${provider} payment event is refused (${other.status} ${other.code})`);
     }
-    same([webhookMetric('web', 'rejected') - metricBefore.web, webhookMetric('apple', 'rejected') - metricBefore.apple, webhookMetric('google', 'rejected') - metricBefore.google], [1, 1, 1],
-      'Prithagoras: each refused event is counted as rejected');
-    same(['web', 'apple', 'google'].map(provider => webhookMetric(provider, 'failed')), [0, 0, 0], 'Prithagoras: and never as failed, so it cannot page an operator');
-    check(metrics.snapshot().counters[`webhook_failures_total{code=${REFUSED},provider=web}`]?.total === 1, 'Prithagoras: the rejection carries the edition code');
-    same(await au.rows(), baseline, 'Prithagoras: none of it wrote a row: no entitlement, event, subscription, payment, audit or rate-limit row');
-    same(au.calls, { provider: 0, adapters: 0 }, 'Prithagoras: no adapter ran and no provider call left the process');
+    same([webhookMetric('apple', 'rejected') - metricBefore.apple, webhookMetric('google', 'rejected') - metricBefore.google], [1, 1], `${T}: each refused Apple and Google event is counted as rejected`);
+    same(['apple', 'google'].map(provider => webhookMetric(provider, 'failed')), [0, 0], 'Prithagoras: and never as failed, so it cannot page an operator');
+    // (A configured Stripe checkout counts its rate limit and reserves the trial it grants; nothing else may be written.)
+    const { rate_limits: _a, billing_trial_claims: _c, ...afterRows } = await au.rows();
+    const { rate_limits: _b, billing_trial_claims: _d, ...beforeRows } = baseline;
+    same(afterRows, beforeRows, `${T}: none of it wrote a row: no entitlement, event, subscription, payment or audit row`);
+    check(au.calls.provider === (stripeConfigured ? 1 : 0), `${T}: ${stripeConfigured ? 'the only provider call was the Stripe checkout' : 'no provider call left the process'}`);
     const status = await call('/billing/status', { jar });
     check(status.status === 200 && status.data.billing.plan === 'free', 'Prithagoras: the account is still on the free plan');
     const unknown = await call('/billing/restore/stripe', { method: 'POST', jar, body: {} });
-    check(unknown.status === 404 && unknown.code === 'BILLING_PROVIDER_UNSUPPORTED', 'Prithagoras: an unknown provider is unsupported, as everywhere');
+    check(unknown.status === 404 && unknown.code === 'BILLING_PROVIDER_UNSUPPORTED', 'Prithagoras: an unknown provider path is unsupported, as everywhere');
 
     // The guardian-consent gate is mounted in front of the billing router, so
     // a child account awaiting consent is refused there first. Refused either
@@ -359,27 +402,29 @@ try {
       check(child.status === 201, `a child account registers (${child.status} ${child.text})`);
       const billingRows = async () => { const all = await au.rows(); return TABLES.filter(t => t.startsWith('billing_')).map(t => all[t]); };
       const beforeChild = await billingRows();
+      const adaptersBeforeChild = au.calls.adapters;
+      const providerBeforeChild = au.calls.provider;
       for (const [method, path, body] of PURCHASE_ROUTES) {
         const answer = await call(path, { method, jar: childJar, body });
         check((answer.status === 403 && /^GUARDIAN_CONSENT/.test(answer.code || '')) || (answer.status === 404 && answer.code === REFUSED),
           `Prithagoras: ${method} ${path} for a child awaiting consent is refused, by the consent gate or the edition gate (${answer.status} ${answer.code})`);
       }
       same(await billingRows(), beforeChild, 'Prithagoras: and wrote no billing row');
-      same(au.calls, { provider: 0, adapters: 0 }, 'Prithagoras: and still no adapter ran');
+      same([au.calls.provider, au.calls.adapters], [providerBeforeChild, adaptersBeforeChild], `${T}: and no adapter ran for the child`);
     }
 
     // What an account already holds is not a purchase.
     const manage = await call('/billing/manage', { jar });
-    same(manage.data, { web: { provider: null, cancellable: false, cancelling: false, status: 'none', currentPeriodEnd: null, cancelRequestedAt: null } }, 'Prithagoras: /billing/manage answers, names no provider and offers nothing to cancel');
+    same(manage.data, { web: { provider: stripeConfigured ? 'stripe' : null, cancellable: false, cancelling: false, status: 'none', currentPeriodEnd: null, cancelRequestedAt: null } }, `${T}: /billing/manage answers, names ${stripeConfigured ? 'Stripe' : 'no provider'} and offers nothing to cancel`);
     await au.owner(`UPDATE entitlement_snapshots SET plan='premium', status='active', provider='support', current_period_end=${now + 86_400_000}, source_version=source_version+1 WHERE account_id='${au.accountId}'`);
     const granted = await call('/billing/status', { jar });
     check(granted.status === 200 && granted.data.billing.plan === 'premium' && granted.data.billing.provider === 'support', 'Prithagoras: an entitlement the account already holds is still reported');
     const entitlement = await call('/entitlements', { jar });
     check(entitlement.status === 200 && entitlement.data.entitlement.plan === 'premium', 'Prithagoras: and still honoured by the entitlement route');
-    const stillRefused = await call('/billing/checkout/web', { method: 'POST', jar, body: { cadence: 'monthly' } });
-    check(stillRefused.status === 404 && stillRefused.code === REFUSED, 'Prithagoras: and buying is still unavailable');
     await au.close();
     open.pop();
+    restoreEnv();
+    }
 
     // ── Start-up ───────────────────────────────────────────────────────────
     const NAMES = ['NODE_ENV', 'PRI_EDITION', ...Object.keys(ENV).filter(name => /^PRI_(DISPLAY|RAZORPAY|APPLE|GOOGLE)_/.test(name))];
@@ -409,6 +454,14 @@ try {
       checks++;
       check(platformConfigStatus().ok === false, 'the configuration is not ok, so the server does not start');
     });
+    // Stripe's variables: Prithagoras's own, and refused anywhere else.
+    const STRIPE = { PRI_STRIPE_SECRET_KEY: 'sk_test_abcdefghijkl', PRI_STRIPE_WEBHOOK_SECRET: 'whsec_abcdefghijkl', PRI_STRIPE_MONTHLY_PRICE_ID: 'price_Monthly1234', PRI_STRIPE_ANNUAL_PRICE_ID: 'price_Annual12345' };
+    same(editionMissing({ ...AU, ...STRIPE }), [], 'Stripe variables on a Prithagoras production server are accepted by the edition rule');
+    same(editionMissing({ ...IN, ...STRIPE }).map(line => line.split(' ')[0]).sort(), Object.keys(STRIPE).sort(), 'every Stripe variable is named on a Priyabhata server: it never accepts Stripe');
+    check(withEnv({ ...AU, PRI_STRIPE_MONTHLY_PRICE_ID: 'price_Monthly1234' }, () => platformConfigStatus().missing).includes('PRI_STRIPE_SECRET_KEY'), 'a Stripe price without its API key is a start-up problem in production');
+    withEnv({ NODE_ENV: 'test', PRI_EDITION: 'prithagoras', ...STRIPE, PRI_PUBLIC_ORIGIN: 'https://app.prithagoras.example' }, () => {
+      same(platformConfigStatus().webBillingProviderConfigured, true, 'with Stripe\'s variables set, Prithagoras reports its web provider configured');
+    });
     same(editionMissing({ ...AU, PRI_DISPLAY_CURRENCY: 'INR' }), ['PRI_DISPLAY_CURRENCY must be AUD or unset for the prithagoras edition'], 'PRI_DISPLAY_CURRENCY=INR on Prithagoras refuses');
     same(editionMissing({ ...AU, PRI_DISPLAY_CURRENCY: ' aud ' }), [], 'PRI_DISPLAY_CURRENCY=AUD on Prithagoras is fine');
     same(editionMissing({ ...IN, ...ENV, NODE_ENV: 'production' }), [], 'Priyabhata production with Razorpay, Apple, Google and INR has no edition problem');
@@ -417,9 +470,9 @@ try {
     same(editionBillingProblems('prithagoras', { PRI_APPLE_CLIENT_IDS: 'x', PRI_GOOGLE_CLIENT_IDS: 'y' }), [], 'sign-in identifiers are not payment variables');
     withEnv({ NODE_ENV: 'test', PRI_EDITION: 'prithagoras', ...ENV }, () => {
       const status = platformConfigStatus();
-      same([status.edition, [...status.billingProviders]], ['prithagoras', []], 'the configuration status reports the edition and its providers');
+      same([status.edition, [...status.billingProviders]], ['prithagoras', ['stripe']], 'the configuration status reports the edition and its providers');
       same([status.webBillingProviderConfigured, status.appleBillingProviderConfigured, status.googleBillingProviderConfigured, status.googleBillingNotificationsConfigured], [false, false, false, false],
-        'no provider is reported as configured on Prithagoras, whatever is set');
+        'no provider is reported as configured on Prithagoras until Stripe\'s own variables are set (Razorpay, Apple and Google never are)');
     });
     withEnv({ NODE_ENV: 'test', ...ENV }, () => {
       const status = platformConfigStatus();
@@ -430,7 +483,7 @@ try {
 
   console.log(`engine: ${engine}`);
   const scope = ONLY ? ` (${ONLY} half only)` : '';
-  console.log(`BILLING PER EDITION: PASS — ${checks}/${checks} checks${scope} — Priyabhata answers /billing/config byte for byte as main and still buys, restores and cancels through Razorpay, Apple and Google; Prithagoras offers no price, product or checkout, refuses every purchase route and every payment event with 404 ${REFUSED} without running an adapter or writing a row, and its production server refuses another edition's payment variables and currency.`);
+  console.log(`BILLING PER EDITION: PASS — ${checks}/${checks} checks${scope} — Priyabhata answers /billing/config byte for byte as main and still buys, restores and cancels through Razorpay, Apple and Google; Prithagoras sells through Stripe only (AUD): Apple and Google routes and events are refused 404 BILLING_NOT_AVAILABLE_IN_EDITION, a correctly signed Razorpay webhook is never applied, and an edition never accepts the other's provider variables.`);
 } finally {
   for (const server of open) await server.close().catch(() => {});
   for (const [name, value] of Object.entries(previous)) {

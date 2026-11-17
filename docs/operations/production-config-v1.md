@@ -182,3 +182,16 @@ into a record.
 | H13 line check and step coach absent | | | | |
 
 An agent never fills this table: every row is a person's observation of production.
+
+
+## Stripe (Prithagoras edition only)
+
+A Prithagoras deployment sells through Stripe in AUD (`server/platform/stripe.js`). Server variables, all secrets
+except the Price ids: `PRI_STRIPE_SECRET_KEY` (a restricted key with Checkout Sessions and Subscriptions write),
+`PRI_STRIPE_WEBHOOK_SECRET` (the endpoint's `whsec_` signing secret), `PRI_STRIPE_MONTHLY_PRICE_ID`,
+`PRI_STRIPE_ANNUAL_PRICE_ID` (AUD recurring Prices), and `PRI_PUBLIC_ORIGIN` (where hosted Checkout returns). The Stripe
+webhook endpoint is `https://<server>/v1/billing/webhook/web`, subscribed to `checkout.session.completed`,
+`customer.subscription.created|updated|deleted`, `invoice.paid`, `invoice.payment_failed` and `charge.refunded`.
+Deliveries older than five minutes are refused. A Priyabhata deployment must leave every `PRI_STRIPE_*` variable unset
+(and a Prithagoras one every `PRI_RAZORPAY_*`), or the server refuses to start in production. Setting these in
+production, and creating the Stripe account and Prices, is the owner's action; nothing here does either.

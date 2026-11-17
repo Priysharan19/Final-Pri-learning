@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api.js';
+import { answerToTex } from '../engine/answerTex.js';
 import { MathText } from '../lib/latex.jsx';
 import { dayKey, formatDate, formatNumber, timezoneOf } from '../lib/locale.js';
 import { useApp } from '../App.jsx';
@@ -216,7 +217,7 @@ function HistoryForProfile() {
               <div className="hist-detail">
                 {item.answerGiven !== '' && <p style={{ marginBottom: 8 }}>{t('history.yourAnswerWas')} <b>{item.answerGiven}</b></p>}
                 {open.detail.solution?.answerText !== undefined && (
-                  <p style={{ marginBottom: 8 }}>{t('history.correctAnswerWas')} <b><MathText text={open.detail.solution.answerText} /></b></p>
+                  <p style={{ marginBottom: 8 }}>{t('history.correctAnswerWas')} <b><MathText text={answerToTex(open.detail.solution.answerText)} /></b></p>
                 )}
                 {open.detail.question?.figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: open.detail.question.figure }} />}
                 {open.detail.solution?.steps && (

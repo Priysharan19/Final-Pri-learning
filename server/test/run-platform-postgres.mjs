@@ -89,6 +89,8 @@ export const ENGINE_SUITES = [
   // Plan G4: NSW HSC-style papers — sealed from issued NSW forms, reading time,
   // final-answer-only marking and no band, as pri_server under RLS.
   'nsw-exam-check.mjs',
+  // The Paper Generator: assembled from the edition's issued banks, sealed and sat as any paper, as pri_server under RLS.
+  'paper-generator-check.mjs',
   // D19: JEE Advanced's own questions are Premium, and a notebook twin is a
   // question of the free day — decided under the same lock and RLS scope.
   'premium-practice-content-check.mjs',
@@ -176,6 +178,8 @@ export const ENGINE_SUITES = [
   // Plan E5: billing provider per edition — the same requests to a Priyabhata
   // and a Prithagoras router, each on its own database as pri_server.
   'billing-edition-check.mjs',
+  // Stripe for the Australian edition (AUD): signature, checkout, events, cancel, boundary.
+  'stripe-billing-check.mjs',
   // Plan H7: the practice day per edition and the paid-call ceiling under each
   // edition; its HTTP part runs a Prithagoras server as pri_server.
   'edition-ai-budgets-check.mjs',

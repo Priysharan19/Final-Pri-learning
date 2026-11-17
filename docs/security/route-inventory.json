@@ -2733,6 +2733,75 @@
     },
     {
       "method": "POST",
+      "path": "/v1/exams/generator/options",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student asks for the Paper Generator's choices for a year (the body is year, pathway and track only) from this server's own edition (Priyabhata: that grade's chapters; Prithagoras: the year's or pathway's subtopics), the lengths (10/20/40 marks or 30/60/90 minutes), the mixes and the edition's section wording; topic ids and names only, the same for every account; no question, answer, seed or other account's data; Cache-Control no-store",
+      "rateLimits": [
+        {
+          "key": "exam-generator",
+          "limit": 300,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/exams/generator/check",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student asks whether the approved banks can fill a generated paper: the body is a request only (year, pathway/track, topics, marks or minutes, mix, weak; a seed is refused outside a test) and carries no question or mark; the server assembles from the edition's approved issued banks and answers counts and names, or 409 PAPER_BANK_INSUFFICIENT with the nearest valid paper; nothing is sealed, recorded or marked seen; weak is Premium (402 PREMIUM_REQUIRED); Cache-Control no-store",
+      "rateLimits": [
+        {
+          "key": "exam-generator",
+          "limit": 300,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/exams/generator/pdf",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "eligible student downloads a printable generated paper: the same request as /check; the reply is the paper's questions only, as a PDF (text-only questions; no answer, step, seed or mark scheme); nothing is sealed or recorded; the marking guide is a separate document that exists only for a paper this account has submitted; Cache-Control no-store",
+      "rateLimits": [
+        {
+          "key": "exam-generator-pdf",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
       "path": "/v1/exams/layout",
       "auth": "session",
       "roles": [
@@ -2764,7 +2833,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "eligible student starts a paper: the body is a paper SPEC only (blueprint track/class/variant with the layout seed the server set for this account by POST /v1/exams/layout — any other seed is 409 EXAM_LAYOUT_NOT_ISSUED, and the seed is spent in the transaction that seals the paper — or practice-paper year/minutes/pathway, and ordered slots; no title, seed, mark or question). A blueprint spec is held to the server's own layout for that seed (chapter allotted to each slot, internal-choice slots) and each slot's cells to that chapter inside the section's difficulty window; a practice paper to the year's subtopic scope, difficulty ladder and structured question. The plan is enforced from the server's entitlement record inside the create transaction: the free plan's exam simulations are counted from the account's own sealed papers (402 FREE_CAP_REACHED), a jee-advanced blueprint needs the jee-advanced-content capability (402 PREMIUM_REQUIRED), and an account holds at most 3 unfinalised papers (409 EXAM_OPEN_PAPER_LIMIT); before either is counted, any paper of the account left unfinished past deadline + 2 minutes is finalised by the server on its last saved snapshot. The server chooses every question, owns title, marking grid, start and deadline, and seals them under a new exam id keyed by (account_id, id) in idempotency_keys scope exam-paper; returns the public paper only (allow-listed fields; content ids and hashes are keyed digests, never the engine seed or answer-derived hash); a required Idempotency-Key replays the same paper without counting it again, a different body under the same key is 409",
+      "ownership": "eligible student starts a paper: the body is a paper SPEC only (blueprint track/class/variant with the layout seed the server set for this account by POST /v1/exams/layout — any other seed is 409 EXAM_LAYOUT_NOT_ISSUED, and the seed is spent in the transaction that seals the paper — or practice-paper year/minutes/pathway, and ordered slots; no title, seed, mark or question). A blueprint spec is held to the server's own layout for that seed (chapter allotted to each slot, internal-choice slots) and each slot's cells to that chapter inside the section's difficulty window; a practice paper to the year's subtopic scope, difficulty ladder and structured question. The plan is enforced from the server's entitlement record inside the create transaction: the free plan's exam simulations are counted from the account's own sealed papers (402 FREE_CAP_REACHED), a jee-advanced blueprint needs the jee-advanced-content capability (402 PREMIUM_REQUIRED), and an account holds at most 3 unfinalised papers (409 EXAM_OPEN_PAPER_LIMIT); before either is counted, any paper of the account left unfinished past deadline + 2 minutes is finalised by the server on its last saved snapshot. The server chooses every question, owns title, marking grid, start and deadline, and seals them under a new exam id keyed by (account_id, id) in idempotency_keys scope exam-paper; returns the public paper only (allow-listed fields; content ids and hashes are keyed digests, never the engine seed or answer-derived hash); a required Idempotency-Key replays the same paper without counting it again, a different body under the same key is 409 The Paper Generator's kind 'generated' takes year, pathway/track, topics, marks or minutes, mix and weak only (a seed is refused outside a test; weak is Premium): the server assembles the paper from the edition's approved issued banks, deterministically from its own seed, which never leaves it; a topic outside the edition's course, slots, layout seed, paper, mock or targeted is 400 EXAM_SPEC_INVALID; an unfillable request is 409 PAPER_BANK_INSUFFICIENT with the nearest valid paper and seals nothing.",
       "rateLimits": [
         {
           "key": "exam-create",
@@ -2880,6 +2949,29 @@
       "guardianConsent": true,
       "mfa": false,
       "ownership": "owner only (same 404 rule); the public paper, timing and saved snapshot while open; a paper of the account left unfinished past deadline + 2 minutes is first finalised by the server, exactly once, on its last saved snapshot (the same transaction and marking as a late finish); the stored result (marks, solutions) once finalised; never an answer, step, trap or seed of an unfinished paper",
+      "rateLimits": [
+        {
+          "key": "exam-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/exams/:id/guide",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "owner only (same 404 rule; another account cannot learn the paper exists); a generated paper's marking guide (worked solutions) as a PDF, 403 GUIDE_LOCKED until the paper has a result — submitted by the student or closed by the server at its deadline; never for an open paper; Cache-Control no-store",
       "rateLimits": [
         {
           "key": "exam-read",

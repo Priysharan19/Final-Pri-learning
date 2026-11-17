@@ -22,11 +22,13 @@
 //   · stroke eraser, undo/redo, clear; serialisable strokes preserve
 //     {x,y,w,t,p,azimuth,altitude} when the browser exposes Pencil dynamics.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useImperativeHandle, useRef, useState, forwardRef, useCallback } from 'react';
 import { strokeStarted, strokeMoved, strokeEnded, touchRejected } from './inputMetrics.js';
 import { makePenFilter } from './smooth.js';
 import { penWantsEraser } from './penButtons.js';
 import { useT } from '../i18n/index.js';
+import { renderWidth, velocityPrediction } from './inkRender.js';
+import { recordPenUp, recordPenEvent } from './inkDebug.js';
 
 const BASE_W = 3.05;          // resting ink width — strong, chalk-on-board
 const MIN_W = 1.5, MAX_W = 7.5;
@@ -72,6 +74,37 @@ const InkCanvas = forwardRef(function InkCanvas({
   const onStrokesChangeRef = useRef(onStrokesChange);
   onStrokesChangeRef.current = onStrokesChange;
   const notify = useCallback(() => { onStrokesChangeRef.current?.(strokesRef.current); }, []);
+  // A pen-up must do almost nothing synchronously: the parent's work on the
+  // page (a signature, a save, a re-render) runs after the next frame, never
+  // inside the pointerup handler where it would hold the next pen-down.
+  // Coalesced (one call reads the latest page), and flushed at once when the
+  // page is going away or something asks for the strokes.
+  const notifyTimerRef = useRef(0);
+  const notifyRafRef = useRef(0);
+  const flushNotify = useCallback(() => {
+    if (!notifyTimerRef.current && !notifyRafRef.current) return;
+    cancelAnimationFrame(notifyRafRef.current); clearTimeout(notifyTimerRef.current);
+    notifyRafRef.current = 0; notifyTimerRef.current = 0;
+    notify();
+  }, [notify]);
+  const notifyLater = useCallback(() => {
+    if (notifyRafRef.current || notifyTimerRef.current) return;
+    notifyRafRef.current = requestAnimationFrame(() => {
+      notifyRafRef.current = 0;
+      notifyTimerRef.current = setTimeout(() => { notifyTimerRef.current = 0; notify(); }, 0);
+    });
+  }, [notify]);
+  useEffect(() => {
+    const hidden = () => { if (document.visibilityState === 'hidden') flushNotify(); };
+    window.addEventListener('pagehide', flushNotify);
+    document.addEventListener('visibilitychange', hidden);
+    return () => { window.removeEventListener('pagehide', flushNotify); document.removeEventListener('visibilitychange', hidden); };
+  }, [flushNotify]);
+  // On unmount the last stroke is delivered before the parent's own cleanup
+  // runs (layout cleanups run before passive ones), so the parent can still save it.
+  useLayoutEffect(() => flushNotify, [flushNotify]);
+  // Going read-only (a deadline, a submit) delivers anything still deferred.
+  useEffect(() => { if (disabled) flushNotify(); }, [disabled, flushNotify]);
 
   /** Reading a CSS custom property forces a style recalc, so it never happens
    *  in the frame loop — only when the theme actually changes. */
@@ -126,7 +159,9 @@ const InkCanvas = forwardRef(function InkCanvas({
     for (let i = Math.max(1, from); i < to; i++) {
       const p0 = pts[i - 1], p1 = pts[i];
       ctx.beginPath();
-      ctx.lineWidth = Math.max(MIN_W, ((p0.w || BASE_W) + (p1.w || BASE_W)) / 2);
+      // Render-only: the stored widths are smoothed over their neighbours for
+      // drawing; the stored points are never touched.
+      ctx.lineWidth = Math.max(MIN_W, (renderWidth(pts, i - 1, BASE_W) + renderWidth(pts, i, BASE_W)) / 2);
       if (i === 1) ctx.moveTo(p0.x, p0.y);
       else ctx.moveTo((pts[i - 2].x + p0.x) / 2, (pts[i - 2].y + p0.y) / 2);
       ctx.quadraticCurveTo(p0.x, p0.y, (p0.x + p1.x) / 2, (p0.y + p1.y) / 2);
@@ -375,9 +410,15 @@ const InkCanvas = forwardRef(function InkCanvas({
      * display-only and never enter the model/corpus, so they intentionally carry
      * no synthetic timing or pressure metadata. */
     const takePrediction = (e, cur) => {
-      predictedRef.current = (e.getPredictedEvents ? e.getPredictedEvents() : [])
-        .slice(0, 4)
-        .map(ev => { const p = local(ev); return { x: p.x, y: p.y, w: cur._w || BASE_W }; });
+      if (e.getPredictedEvents) {
+        predictedRef.current = e.getPredictedEvents()
+          .slice(0, 4)
+          .map(ev => { const p = local(ev); return { x: p.x, y: p.y, w: cur._w || BASE_W }; });
+        return;
+      }
+      // Safari has no predicted events: a one-frame velocity guess, drawn on the
+      // live layer only (it is cleared at pen-up and never enters the stroke).
+      predictedRef.current = velocityPrediction(cur.points).map(p => ({ x: p.x, y: p.y, w: cur._w || BASE_W }));
     };
 
     const erasing = () => toolRef.current === 'eraser' || hwEraseRef.current;
@@ -427,6 +468,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       const coalesced = e.getCoalescedEvents ? e.getCoalescedEvents() : null;
       const events = coalesced && coalesced.length ? coalesced : [e];
       strokeMoved(e, events);
+      recordPenEvent(e.timeStamp || performance.now());
       for (const ev of events) {
         const raw = local(ev);
         const pt = cur.filter(raw.x, raw.y, ev.timeStamp || 0);
@@ -476,6 +518,7 @@ const InkCanvas = forwardRef(function InkCanvas({
      */
     const finish = (e) => {
       if (activePtrRef.current !== e.pointerId) return;
+      const t0 = performance.now();
       activePtrRef.current = null;
       predictedRef.current = [];
       const hwErased = hwEraseRef.current;
@@ -486,15 +529,25 @@ const InkCanvas = forwardRef(function InkCanvas({
         if (points.length) {
           strokesRef.current = [...strokesRef.current, { points }];
           paintStroke(ctxRef.current.base, points, inkRef.current);
-          notify();
+          notifyLater();
         }
         // Measured only after the stroke is safely committed.
         strokeEnded(e, { cancelled: e.type !== 'pointerup', kept: points.length });
         clearLive();
         force(x => x + 1);
+        recordPenUp(performance.now() - t0);
       }
     };
 
+    // Safari delivers the Pencil as touches too (touchType 'stylus'): while the
+    // pen is down the page must never scroll, zoom or start Scribble. Fingers
+    // are left alone — they scroll, and never draw once a Pencil has been seen.
+    const stylusTouch = (e) => {
+      const touches = [...(e.changedTouches || [])];
+      if (touches.some(t => t.touchType === 'stylus')) { penSeenRef.current = true; e.preventDefault(); }
+    };
+    canvas.addEventListener('touchstart', stylusTouch, { passive: false });
+    canvas.addEventListener('touchmove', stylusTouch, { passive: false });
     canvas.addEventListener('pointerdown', down, { passive: false });
     if (RAW_UPDATE) canvas.addEventListener('pointerrawupdate', onRaw, { passive: false });
     canvas.addEventListener('pointermove', onMove, { passive: false });
@@ -505,6 +558,8 @@ const InkCanvas = forwardRef(function InkCanvas({
     window.addEventListener('pointerup', finish);
     window.addEventListener('pointercancel', finish);
     return () => {
+      canvas.removeEventListener('touchstart', stylusTouch);
+      canvas.removeEventListener('touchmove', stylusTouch);
       canvas.removeEventListener('pointerdown', down);
       if (RAW_UPDATE) canvas.removeEventListener('pointerrawupdate', onRaw);
       canvas.removeEventListener('pointermove', onMove);
@@ -519,10 +574,11 @@ const InkCanvas = forwardRef(function InkCanvas({
     // Every dependency is identity-stable (callbacks over refs), so this runs
     // once per mount: the listeners are never torn down under a live stroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [notify, redrawBase, scheduleFrame, clearLive]);
+  }, [notify, notifyLater, redrawBase, scheduleFrame, clearLive]);
 
   useImperativeHandle(ref, () => ({
     undo() {
+      flushNotify();
       if (!strokesRef.current.length) return;
       redoRef.current.push(strokesRef.current[strokesRef.current.length - 1]);
       strokesRef.current = strokesRef.current.slice(0, -1);
@@ -540,20 +596,20 @@ const InkCanvas = forwardRef(function InkCanvas({
       strokesRef.current = [];
       notify(); redrawBase(); force(x => x + 1);
     },
-    getStrokes: () => strokesRef.current,
+    getStrokes: () => { flushNotify(); return strokesRef.current; },
     setStrokes(strokes) {
       strokesRef.current = strokes || [];
       redoRef.current = [];
       notify(); redrawBase(); force(x => x + 1);
     },
     isEmpty: () => strokesRef.current.length === 0
-  }), [notify, redrawBase]);
+  }), [notify, redrawBase, flushNotify]);
 
   return (
     <div
       ref={wrapRef}
       className={`ink-wrap ${guides ? 'ink-ruled' : ''}`}
-      style={{ height }}
+      style={{ height, touchAction: 'none', userSelect: 'none', WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
       role="img"
       aria-label={ariaLabel ?? t('ink.writingSpace')}
     >

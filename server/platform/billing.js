@@ -4,7 +4,9 @@ import { applyVerifiedEntitlement } from './entitlements.js';
 import { declaredNativeClient, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { recordWebhook } from './metrics.js';
 import { serverEdition } from './edition.js';
-import { BILLING_NOT_AVAILABLE, ROUTE_FAMILY_PROVIDER, billingNotAvailable, editionBilling, providerAllowed } from './billingProviders.js';
+import { BILLING_NOT_AVAILABLE, ROUTE_FAMILY_PROVIDER, billingNotAvailable, editionBilling, providerAllowed, saleLive } from './billingProviders.js';
+import { stripeConfigStatus } from './stripe.js';
+import { webProviderOf } from './billingProviders.js';
 
 const PROVIDERS = new Set(['apple', 'google', 'web']);
 // Lifecycle states in which a web (Razorpay) subscription still has a mandate
@@ -37,6 +39,14 @@ export async function webSubscriptionManageState(db, accountId, { adapterAvailab
   };
 }
 
+// A displayed price: a positive amount with at most two decimals (999 cents is 9.99).
+function positiveAmount(name, fallback) {
+  const raw = String(process.env[name] || '').trim();
+  if (!raw) return fallback;
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 && value < 1e7 && Math.abs(value * 100 - Math.round(value * 100)) < 1e-6 ? value : fallback;
+}
+
 function positiveInt(name, fallback) {
   const raw = String(process.env[name] || '').trim();
   if (!raw) return fallback;
@@ -53,7 +63,8 @@ function positiveInt(name, fallback) {
  */
 export function commercialConfig(edition = serverEdition()) {
   const billing = editionBilling(edition);
-  if (!billing.available) {
+  // An edition whose only provider is Stripe is on sale only once Stripe is configured: until then it says so, exactly as an edition with none does.
+  if (!billing.available || !saleLive(edition)) {
     return Object.freeze({
       available: false,
       display: Object.freeze({ currency: billing.currency, monthly: null, annual: null, trialDays: null, advisoryOnly: true }),
@@ -67,8 +78,8 @@ export function commercialConfig(edition = serverEdition()) {
   return Object.freeze({
     display: Object.freeze({
       currency: String(process.env.PRI_DISPLAY_CURRENCY || billing.currency).trim().toUpperCase().slice(0, 8) || billing.currency,
-      monthly: positiveInt('PRI_DISPLAY_MONTHLY_PRICE', null),
-      annual: positiveInt('PRI_DISPLAY_ANNUAL_PRICE', null),
+      monthly: positiveAmount('PRI_DISPLAY_MONTHLY_PRICE', null),
+      annual: positiveAmount('PRI_DISPLAY_ANNUAL_PRICE', null),
       trialDays: positiveInt('PRI_DISPLAY_TRIAL_DAYS', null),
       advisoryOnly: true
     }),
@@ -79,15 +90,15 @@ export function commercialConfig(edition = serverEdition()) {
       appleAnnual: product('apple', 'PRI_APPLE_ANNUAL_PRODUCT_ID'),
       googleMonthly: product('google', 'PRI_GOOGLE_MONTHLY_PRODUCT_ID'),
       googleAnnual: product('google', 'PRI_GOOGLE_ANNUAL_PRODUCT_ID'),
-      webMonthly: product('razorpay', 'PRI_RAZORPAY_MONTHLY_PLAN_ID', 'PRI_WEB_MONTHLY_PRICE_ID'),
-      webAnnual: product('razorpay', 'PRI_RAZORPAY_ANNUAL_PLAN_ID', 'PRI_WEB_ANNUAL_PRICE_ID')
+      webMonthly: product('razorpay', 'PRI_RAZORPAY_MONTHLY_PLAN_ID', 'PRI_WEB_MONTHLY_PRICE_ID') || product('stripe', 'PRI_STRIPE_MONTHLY_PRICE_ID'),
+      webAnnual: product('razorpay', 'PRI_RAZORPAY_ANNUAL_PLAN_ID', 'PRI_WEB_ANNUAL_PRICE_ID') || product('stripe', 'PRI_STRIPE_ANNUAL_PRICE_ID')
     }),
     webCheckout: Object.freeze({
-      provider: sells('razorpay') ? 'razorpay' : null,
-      configured: sells('razorpay') && !!(
+      provider: webProviderOf(edition),
+      configured: (sells('razorpay') && !!(
         process.env.PRI_RAZORPAY_KEY_ID && process.env.PRI_RAZORPAY_KEY_SECRET && process.env.PRI_RAZORPAY_WEBHOOK_SECRET &&
         (process.env.PRI_RAZORPAY_MONTHLY_PLAN_ID || process.env.PRI_WEB_MONTHLY_PRICE_ID || process.env.PRI_RAZORPAY_ANNUAL_PLAN_ID || process.env.PRI_WEB_ANNUAL_PRICE_ID)
-      )
+      )) || (sells('stripe') && stripeConfigStatus().configured)
     }),
     platformRule: 'Native iOS/Android purchases must use the platform billing mechanism required for that storefront. The server consumes verified provider events and never trusts client premium flags.'
   });
@@ -117,7 +128,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   // account awaiting its guardian is refused there with the consent code.)
   // Resolved once, when the router is built; on an edition that lists the
   // provider it is a pass-through and the route is what it always was.
-  const sold = Object.freeze(Object.fromEntries(Object.keys(ROUTE_FAMILY_PROVIDER).map(family => [family, providerAllowed(edition, family)])));
+  const sold = Object.freeze(Object.fromEntries(Object.keys(ROUTE_FAMILY_PROVIDER).map(family => [family, providerAllowed(edition, family) && (family !== 'web' || saleLive(edition))])));
   const soldHere = family => (req, res, next) => (sold[family] ? next() : billingNotAvailable(res));
   // /restore/:provider and /webhook/:provider name the family in the path. An
   // unknown name falls through to the route's own BILLING_PROVIDER_UNSUPPORTED.
@@ -141,7 +152,7 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
   router.get('/manage', requireSession(db), async (req, res) => {
     const web = await webSubscriptionManageState(db, req.platformSession.account_id, {
       adapterAvailable: sold.web && typeof lifecycle.web?.cancel === 'function',
-      provider: sold.web ? 'razorpay' : null
+      provider: sold.web ? webProviderOf(edition) : null
     });
     res.set('Cache-Control', 'no-store');
     res.json(sold.apple ? { web, apple: { manageUrl: APPLE_MANAGE_URL } } : { web });

@@ -10,6 +10,7 @@ import { sessionMaxAgeMs } from './security.js';
 import { serverEdition } from './edition.js';
 import { editionBilling, editionBillingProblems } from './billingProviders.js';
 import { storageConfigProblems } from './objectStorage.js';
+import { stripeConfigStatus } from './stripe.js';
 
 /** PRI_RESOURCE_PUBLISHING=on (plan F3). Off by default: the write routes do not exist. */
 export const resourcePublishingEnabled = (env = process.env) => String(env.PRI_RESOURCE_PUBLISHING || '').trim().toLowerCase() === 'on';
@@ -447,13 +448,23 @@ export function platformConfigStatus() {
     if (webAnnual && !nonEmpty('PRI_RAZORPAY_ANNUAL_TOTAL_COUNT')) missing.push('PRI_RAZORPAY_ANNUAL_TOTAL_COUNT');
   }
 
+  // Stripe (the Australian edition): prices alone are not a provider. In
+  // production a configured price needs the API key, the webhook secret and the
+  // public origin the hosted checkout returns to.
+  const stripeProducts = nonEmpty('PRI_STRIPE_MONTHLY_PRICE_ID') || nonEmpty('PRI_STRIPE_ANNUAL_PRICE_ID');
+  if (production && stripeProducts && sells('stripe')) {
+    for (const name of ['PRI_STRIPE_SECRET_KEY', 'PRI_STRIPE_WEBHOOK_SECRET', 'PRI_PUBLIC_ORIGIN']) {
+      if (!nonEmpty(name)) missing.push(name);
+    }
+  }
+
   const appleProducts = nonEmpty('PRI_APPLE_MONTHLY_PRODUCT_ID') || nonEmpty('PRI_APPLE_ANNUAL_PRODUCT_ID');
   if (production && appleProducts && sells('apple')) {
     if (!appleTrustConfigured()) missing.push('PRI_APPLE_ROOT_CA_PEM or PRI_APPLE_ROOT_CA_FILE');
     if (!nonEmpty('PRI_APPLE_APP_ID')) missing.push('PRI_APPLE_APP_ID');
   }
 
-  const webBillingProviderConfigured = sells('razorpay') && webProducts &&
+  const webBillingProviderConfigured = (sells('stripe') && stripeConfigStatus().configured) || sells('razorpay') && webProducts &&
     nonEmpty('PRI_RAZORPAY_KEY_ID') && nonEmpty('PRI_RAZORPAY_KEY_SECRET') && nonEmpty('PRI_RAZORPAY_WEBHOOK_SECRET') &&
     (!webMonthly || nonEmpty('PRI_RAZORPAY_MONTHLY_TOTAL_COUNT')) &&
     (!webAnnual || nonEmpty('PRI_RAZORPAY_ANNUAL_TOTAL_COUNT'));

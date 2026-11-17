@@ -21,7 +21,7 @@
 //   ms12-right-triangle MST-12-S1-04  Right-angled triangles (Standard 1)
 // ms12-algebraic, -rates and -bivariate-fit also serve Standard 1 (S1-01, S1-05, S1-06).
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc } from '../qhelpers.js';
+import { ri, rc, nz } from '../qhelpers.js';
 
 const trim = v => String(Number(v.toFixed(6)));
 const dollars = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
@@ -643,12 +643,225 @@ const raw = {
       hints: [`You are given the ${sx} side and the ${sy}, so use $\\${kind}$.`, `$\\${kind}\\,\\theta = \\dfrac{${x}}{${y}} = ${ratio}$.`, `Use the inverse ${kind} on your calculator.`],
       steps: [{ h: 'Choose the ratio', d: `${sx} and ${sy}: $\\${kind}\\,\\theta = \\dfrac{${x}}{${y}} = ${ratio}$` }, { h: 'Inverse ratio', d: `$\\theta = ${ans}^\\circ$` }]
     };
+  },
+
+  // ── Standard · Year 11 · Linear relationships ─────────────────────────────
+  'ms11-linear': (rng, diff) => {
+    if (diff === 1) {
+      const m = nz(rng, -6, 8), x1 = ri(rng, 0, 4), dx = ri(rng, 1, 5), y1 = ri(rng, -5, 10);
+      return {
+        prompt: `A straight line passes through $(${x1}, ${y1})$ and $(${x1 + dx}, ${y1 + m * dx})$. What is its gradient?`,
+        answerType: 'numeric', answer: { value: m },
+        traps: [{ value: -m, why: 'Gradient $=\\dfrac{\\text{rise}}{\\text{run}}$, taken in the same order for both coordinates.' }].filter(t => t.value !== m),
+        hints: ['Gradient $=\\dfrac{y_2 - y_1}{x_2 - x_1}$.', `Rise: $${m * dx}$, run: $${dx}$.`, 'Divide.'],
+        steps: [{ h: 'Rise over run', d: `$\\dfrac{${y1 + m * dx} - ${y1 < 0 ? `(${y1})` : y1}}{${x1 + dx} - ${x1}} = \\dfrac{${m * dx}}{${dx}} = ${m}$` }]
+      };
+    }
+    if (diff === 2) {
+      const m = ri(rng, 2, 7), c = nz(rng, -9, 9), x = ri(rng, 1, 8);
+      return {
+        prompt: `A line has the equation $y = ${m}x ${c >= 0 ? '+' : '-'} ${Math.abs(c)}$. Find $y$ when $x = ${x}$.`,
+        answerType: 'numeric', answer: { value: m * x + c },
+        traps: [{ value: (m + c) * x, why: 'Multiply $x$ by the gradient, then add the intercept.' }].filter(t => t.value !== m * x + c),
+        hints: ['Substitute the value of $x$.', `$${m}\\times ${x} = ${m * x}$.`, `Then ${c >= 0 ? 'add' : 'subtract'} $${Math.abs(c)}$.`],
+        steps: [{ h: 'Substitute', d: `$y = ${m}(${x}) ${c >= 0 ? '+' : '-'} ${Math.abs(c)} = ${m * x + c}$` }]
+      };
+    }
+    if (diff === 3) {
+      const k = ri(rng, 2, 9), x1 = ri(rng, 2, 6), x2 = x1 + ri(rng, 2, 6);
+      return {
+        prompt: `The cost of fuel varies directly with the litres bought. ${x1} litres cost \\$${k * x1}. How much do ${x2} litres cost, in dollars?`,
+        answerType: 'numeric', answer: { value: k * x2 },
+        traps: [{ value: k * x1 + (x2 - x1), why: 'Direct variation: find the cost of one litre, then multiply by the new amount.' }],
+        hints: [`Cost per litre $= ${k * x1}\\div ${x1} = ${k}$.`, `Multiply by $${x2}$.`, 'The cost is proportional to the litres.'],
+        steps: [{ h: 'Rate', d: `$${k * x1}\\div ${x1} = ${k}$ dollars per litre` }, { h: 'Cost', d: `$${k}\\times ${x2} = ${k * x2}$ dollars` }]
+      };
+    }
+    const f = ri(rng, 2, 9) * 10, r = ri(rng, 2, 9) * 5, h = ri(rng, 2, 8);
+    return {
+      prompt: `A plumber charges a call-out fee of \\$${f} plus \\$${r} per hour. Write the total cost as $C = ${f} + ${r}h$. Find the cost of a ${h}-hour job, in dollars.`,
+      answerType: 'numeric', answer: { value: f + r * h },
+      traps: [{ value: (f + r) * h, why: 'The call-out fee is charged once; only the hourly rate is multiplied by the hours.' }],
+      hints: ['Substitute $h$ into $C = f + rh$.', `$${r}\\times ${h} = ${r * h}$.`, 'Add the call-out fee.'],
+      steps: [{ h: 'Substitute', d: `$C = ${f} + ${r}(${h}) = ${f + r * h}$ dollars` }]
+    };
+  },
+
+  // ── Standard · Year 11 · Earning money ────────────────────────────────────
+  'ms11-earning-exact': (rng, diff) => {
+    if (diff === 1) {
+      const r = ri(rng, 20, 45), h = ri(rng, 12, 40);
+      return {
+        prompt: `Jordan earns \\$${r} per hour and works ${h} hours in a week. What is the week's pay, in dollars?`,
+        answerType: 'numeric', answer: { value: r * h },
+        traps: [{ value: r + h, why: 'Pay $=$ hourly rate $\\times$ hours worked.' }],
+        hints: ['Pay $=$ rate $\\times$ hours.', `$${r}\\times ${h}$.`, 'Give the answer in dollars.'],
+        steps: [{ h: 'Multiply', d: `$${r}\\times ${h} = ${r * h}$ dollars` }]
+      };
+    }
+    if (diff === 2) {
+      const r = 2 * ri(rng, 10, 25), n = ri(rng, 30, 38), o = ri(rng, 2, 6);
+      return {
+        prompt: `Sam earns \\$${r} per hour for ${n} ordinary hours and is paid time-and-a-half for ${o} overtime hours. What is the total pay, in dollars?`,
+        answerType: 'numeric', answer: { value: r * n + 1.5 * r * o },
+        traps: [{ value: r * (n + o), why: 'Overtime hours are paid at $1.5\\times$ the hourly rate.' }],
+        hints: ['Ordinary pay $=$ rate $\\times$ ordinary hours.', `Overtime rate $= 1.5\\times ${r} = ${1.5 * r}$.`, 'Add the two amounts.'],
+        steps: [{ h: 'Ordinary', d: `$${r}\\times ${n} = ${r * n}$` }, { h: 'Overtime', d: `$${1.5 * r}\\times ${o} = ${1.5 * r * o}$` }, { h: 'Total', d: `$${r * n + 1.5 * r * o}$ dollars` }]
+      };
+    }
+    if (diff === 3) {
+      const per = ri(rng, 1000, 2400) , f = per * 26;
+      return {
+        prompt: `An annual salary is \\$${f}. What is the pay for one fortnight, in dollars?`,
+        answerType: 'numeric', answer: { value: per },
+        traps: [{ value: f / 52, why: 'There are 26 fortnights in a year, not 52.' }].filter(t => Number.isInteger(t.value) && t.value !== per),
+        hints: ['There are $26$ fortnights in a year.', `$${f}\\div 26$.`, 'The answer is a whole number of dollars.'],
+        steps: [{ h: 'Divide', d: `$${f}\\div 26 = ${per}$ dollars` }]
+      };
+    }
+    const b = ri(rng, 4, 9) * 100, pct = rc(rng, [2, 4, 5, 10]), s = ri(rng, 2, 9) * 1000;
+    return {
+      prompt: `A salesperson is paid a base of \\$${b} a week plus ${pct}% commission on sales. In one week the sales are \\$${s}. What is the total pay, in dollars?`,
+      answerType: 'numeric', answer: { value: b + s * pct / 100 },
+      traps: [{ value: b + s, why: 'Commission is a percentage of the sales, not all of them.' }],
+      hints: [`Commission $= ${pct}\\%$ of $${s}$.`, `$${s}\\times ${pct / 100} = ${s * pct / 100}$.`, 'Add the base pay.'],
+      steps: [{ h: 'Commission', d: `$${s}\\times ${pct / 100} = ${s * pct / 100}$` }, { h: 'Total', d: `$${b} + ${s * pct / 100} = ${b + s * pct / 100}$ dollars` }]
+    };
+  },
+
+  // ── Standard · Year 11 · Managing money ───────────────────────────────────
+  'ms11-managing-exact': (rng, diff) => {
+    if (diff === 1) {
+      const p = ri(rng, 2, 40) * 10;
+      return {
+        prompt: `An item costs \\$${p} before GST. GST is 10%. What is the price including GST, in dollars?`,
+        answerType: 'numeric', answer: { value: p / 10 * 11 },
+        traps: [{ value: p + 10, why: 'GST is 10% of the price, not a flat \\$10.' }].filter(t => t.value !== p / 10 * 11),
+        hints: ['Price including GST $= 1.1\\times$ price.', `$${p}\\times 1.1$.`, 'Or add 10% of the price.'],
+        steps: [{ h: 'Add 10%', d: `$${p} + ${p / 10} = ${p / 10 * 11}$ dollars` }]
+      };
+    }
+    if (diff === 2) {
+      const e1 = ri(rng, 3, 8) * 100, e2 = ri(rng, 2, 6) * 100, e3 = ri(rng, 1, 5) * 100, inc = e1 + e2 + e3 + ri(rng, 2, 12) * 100;
+      return {
+        prompt: `A monthly budget has income \\$${inc} and expenses of \\$${e1} (rent), \\$${e2} (food) and \\$${e3} (transport). How much is left over, in dollars?`,
+        answerType: 'numeric', answer: { value: inc - e1 - e2 - e3 },
+        traps: [{ value: e1 + e2 + e3, why: 'The amount left over is income minus all the expenses.' }],
+        hints: ['Total expenses first.', `$${e1} + ${e2} + ${e3} = ${e1 + e2 + e3}$.`, 'Subtract from the income.'],
+        steps: [{ h: 'Expenses', d: `$${e1 + e2 + e3}$` }, { h: 'Left over', d: `$${inc} - ${e1 + e2 + e3} = ${inc - e1 - e2 - e3}$ dollars` }]
+      };
+    }
+    if (diff === 3) {
+      const p = ri(rng, 2, 12) * 100, d = rc(rng, [10, 20, 25, 40]);
+      return {
+        prompt: `A jacket marked \\$${p} is on sale at ${d}% off. What is the sale price, in dollars?`,
+        answerType: 'numeric', answer: { value: p * (100 - d) / 100 },
+        traps: [{ value: p - d, why: 'The discount is a percentage of the price, not that many dollars.' }].filter(t => t.value !== p * (100 - d) / 100),
+        hints: [`The sale price is ${100 - d}% of the marked price.`, `$${p}\\times ${(100 - d) / 100}$.`, 'Or subtract the discount.'],
+        steps: [{ h: 'Discount', d: `$${p}\\times ${d / 100} = ${p * d / 100}$` }, { h: 'Sale price', d: `$${p} - ${p * d / 100} = ${p * (100 - d) / 100}$ dollars` }]
+      };
+    }
+    const q1 = ri(rng, 2, 6), q2 = q1 + ri(rng, 2, 4), u1 = ri(rng, 3, 9);
+    const price1 = q1 * u1, price2 = q2 * u1;
+    return {
+      prompt: `A shop sells ${q1} kg of rice for \\$${price1}. At the same price per kilogram, how much do ${q2} kg cost, in dollars?`,
+      answerType: 'numeric', answer: { value: price2 },
+      traps: [{ value: price1 + (q2 - q1), why: 'Find the price of 1 kg first, then multiply.' }],
+      hints: [`Price per kilogram $= ${price1}\\div ${q1} = ${u1}$.`, `$${u1}\\times ${q2}$.`, 'Unit price first.'],
+      steps: [{ h: 'Unit price', d: `$${price1}\\div ${q1} = ${u1}$ dollars per kg` }, { h: 'Cost', d: `$${u1}\\times ${q2} = ${price2}$ dollars` }]
+    };
+  },
+
+  // ── Standard · Year 11 · Time and location ────────────────────────────────
+  'ms11-time-location': (rng, diff) => {
+    if (diff === 1) {
+      const a = nz(rng, -5, 3), b = a + ri(rng, 1, 9);
+      return {
+        prompt: `City A is $${a >= 0 ? '+' : '-'}${Math.abs(a)}$ hours from UTC and city B is $${b >= 0 ? '+' : '-'}${Math.abs(b)}$ hours from UTC. How many hours ahead of city A is city B?`,
+        answerType: 'numeric', answer: { value: b - a }, answerSuffix: 'hours',
+        traps: [{ value: a - b, why: 'City B has the larger UTC offset, so its clocks are ahead of city A’s.' }],
+        hints: ['Subtract the offsets.', `$${b} - (${a})$.`, 'A larger offset means ahead.'],
+        steps: [{ h: 'Difference', d: `$${b} - (${a}) = ${b - a}$ hours` }]
+      };
+    }
+    if (diff === 2) {
+      const lon = 15 * ri(rng, 2, 12);
+      return {
+        prompt: `Two places are on the same line of latitude. Their longitudes differ by $${lon}^\\circ$. By how many hours do their local (solar) times differ?`,
+        answerType: 'numeric', answer: { value: lon / 15 }, answerSuffix: 'hours',
+        traps: [{ value: lon * 15, why: 'The Earth turns $15^\\circ$ each hour, so divide the longitude difference by 15.' }],
+        hints: ['The Earth rotates $360^\\circ$ in $24$ hours.', 'That is $15^\\circ$ per hour.', `$${lon}\\div 15$.`],
+        steps: [{ h: 'Divide', d: `$${lon}\\div 15 = ${lon / 15}$ hours` }]
+      };
+    }
+    if (diff === 3) {
+      let d = ri(rng, 1, 12), dur = ri(rng, 2, 9);
+      while ((d + 6 + dur) % 24 === 0) { d = ri(rng, 1, 12); dur = ri(rng, 2, 9); }
+      return {
+        prompt: `A flight leaves at ${String(d + 6).padStart(2, '0')}00 and lasts ${dur} hours. What is the arrival time, in hours on the 24-hour clock (for example, 1500 is 15)? Use the departure city’s time.`,
+        answerType: 'numeric', answer: { value: (d + 6 + dur) % 24 },
+        traps: [{ value: d + 6, why: 'Add the flight time to the departure time.' }].filter(t => t.value !== (d + 6 + dur) % 24),
+        hints: ['Add the duration to the departure hour.', `$${d + 6} + ${dur}$.`, 'If it passes 24, subtract 24.'],
+        steps: [{ h: 'Add', d: `$${d + 6} + ${dur} = ${d + 6 + dur}$, so the hour is $${(d + 6 + dur) % 24}$` }]
+      };
+    }
+    let off = ri(rng, 1, 9), h = ri(rng, 8, 15), dur = ri(rng, 2, 6);
+    while ((h + dur + off) % 24 === 0) { off = ri(rng, 1, 9); h = ri(rng, 8, 15); dur = ri(rng, 2, 6); }
+    return {
+      prompt: `A flight leaves city A at ${String(h).padStart(2, '0')}00 local time and flies for ${dur} hours to city B, which is ${off} hours ahead of A. What is the local arrival hour in city B (24-hour clock; 1500 is 15)? Ignore any change of day.`,
+      answerType: 'numeric', answer: { value: (h + dur + off) % 24 },
+      traps: [{ value: h + dur, why: 'City B’s clocks are ahead, so add the time difference to the arrival time.' }].filter(t => t.value !== (h + dur + off) % 24),
+      hints: [`Arrival in A’s time: $${h} + ${dur} = ${h + dur}$.`, `Add the ${off} hour difference.`, 'Subtract 24 if it passes 24.'],
+      steps: [{ h: 'A’s time', d: `$${h} + ${dur} = ${h + dur}$` }, { h: 'B’s time', d: `$${h + dur} + ${off} = ${h + dur + off}$, so the hour is $${(h + dur + off) % 24}$` }]
+    };
+  },
+
+  // ── Standard · Year 11 · Applications of measurement ──────────────────────
+  'ms11-measure-more': (rng, diff) => {
+    if (diff === 1) {
+      const l = ri(rng, 5, 20), w = ri(rng, 3, 12), l2 = ri(rng, 2, l - 1), w2 = ri(rng, 1, w - 1);
+      return {
+        prompt: `An L-shaped room is a $${l}$ m by $${w}$ m rectangle with a $${l2}$ m by $${w2}$ m rectangular corner removed. What is its area, in square metres?`,
+        answerType: 'numeric', answer: { value: l * w - l2 * w2 }, answerSuffix: 'm²',
+        traps: [{ value: l * w + l2 * w2, why: 'The corner is removed, so subtract its area.' }],
+        hints: ['Area of the large rectangle first.', `$${l}\\times ${w} = ${l * w}$.`, `Subtract $${l2}\\times ${w2}$.`],
+        steps: [{ h: 'Large rectangle', d: `$${l * w}$` }, { h: 'Subtract the corner', d: `$${l * w} - ${l2 * w2} = ${l * w - l2 * w2}$ m²` }]
+      };
+    }
+    if (diff === 2) {
+      const b = 2 * ri(rng, 3, 15), h = ri(rng, 3, 14);
+      return {
+        prompt: `Find the area of a triangle with base $${b}$ cm and perpendicular height $${h}$ cm, in square centimetres.`,
+        answerType: 'numeric', answer: { value: b * h / 2 }, answerSuffix: 'cm²',
+        traps: [{ value: b * h, why: 'The area of a triangle is half of base times height.' }],
+        hints: ['$A = \\tfrac12 bh$.', `$\\tfrac12\\times ${b}\\times ${h}$.`, 'Use the perpendicular height.'],
+        steps: [{ h: 'Formula', d: `$A = \\tfrac12(${b})(${h}) = ${b * h / 2}$ cm²` }]
+      };
+    }
+    if (diff === 3) {
+      const l = ri(rng, 3, 12), w = ri(rng, 2, 9), h = ri(rng, 2, 10);
+      return {
+        prompt: `A rectangular prism is $${l}$ cm long, $${w}$ cm wide and $${h}$ cm high. Find its volume, in cubic centimetres.`,
+        answerType: 'numeric', answer: { value: l * w * h }, answerSuffix: 'cm³',
+        traps: [{ value: 2 * (l * w + w * h + l * h), why: 'Volume is length $\\times$ width $\\times$ height; the sum of face areas is the surface area.' }].filter(t => t.value !== l * w * h),
+        hints: ['$V = lwh$.', `$${l}\\times ${w} = ${l * w}$.`, `Then $\\times ${h}$.`],
+        steps: [{ h: 'Volume', d: `$${l}\\times ${w}\\times ${h} = ${l * w * h}$ cm³` }]
+      };
+    }
+    const m = ri(rng, 2, 9);
+    return {
+      prompt: `A tank holds $${m}$ cubic metres of water. How many litres is this? (1 cubic metre = 1000 litres.)`,
+      answerType: 'numeric', answer: { value: m * 1000 }, answerSuffix: 'L',
+      traps: [{ value: m * 100, why: 'One cubic metre is $1000$ litres.' }],
+      hints: ['$1\\text{ m}^3 = 1000$ L.', `$${m}\\times 1000$.`, 'Multiply.'],
+      steps: [{ h: 'Convert', d: `$${m}\\times 1000 = ${m * 1000}$ L` }]
+    };
   }
 };
 
 // A dollar answer is asked for in a box with a "$" prefix, as the older money cells do: the marker
 // reads a "$" typed with a money answer only when the question says it asks for money.
-const MONEY = { 'ms12-invest-loans': [1, 2, 3, 4], 'ms12-annuity-table': [1, 2, 3, 4], 'ms12-algebraic': [2, 4], 'ms12-rates': [3], 'ms12-simple-interest': [1, 2], 'ms12-depreciation': [1, 2, 3] };
+const MONEY = { 'ms12-invest-loans': [1, 2, 3, 4], 'ms12-annuity-table': [1, 2, 3, 4], 'ms12-algebraic': [2, 4], 'ms12-rates': [3], 'ms12-simple-interest': [1, 2], 'ms12-depreciation': [1, 2, 3], 'ms11-linear': [3, 4], 'ms11-earning-exact': [1, 2, 3, 4], 'ms11-managing-exact': [1, 2, 3, 4] };
 const withMoneyPrefix = (id, fn) => (rng, diff) => {
   const q = fn(rng, diff);
   return MONEY[id]?.includes(diff) ? { ...q, answerPrefix: '$' } : q;

@@ -507,7 +507,10 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   {
     const sends = [...src.matchAll(/readWithCloud\(/g)].length;
     const callers = [...src.matchAll(/(?<![A-Za-z])readNow\(\)|onClick=\{readNow\}/g)].length;
-    eq([sends, callers], [1, 2], 'one place sends a read, reached only from the Read my answer and Try again presses');
+    // Three explicit callers: Read my answer, Try again, and the Submit control
+    // (#942, owner-approved) that reads changed writing before anything is sent.
+    eq([sends, callers], [1, 3], 'one place sends a read, reached only from Read my answer, Try again and the Submit control');
+    ok((src.match(/read: \(\) => readNow\(\)/g) || []).length === 1, 'the Submit control is the only caller besides the two buttons');
   }
   ok(/readinessIdentity\(user\)/.test(src) && /if \(changed\) setStatus\(/.test(src) && !/fresh: changed/.test(src),
     'a signed-in profile changing under the kept ink clears the sign-in notice and reads nothing');

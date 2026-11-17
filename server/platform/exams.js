@@ -198,6 +198,13 @@ import { stampExamItem, contentHashOf } from '../../client/src/engine/contentIde
 import { seenKeysOf, seenKeyOf, repeatEvidenceOf, examItemsOf, seenAmong, markSeen } from './contentSeen.js';
 import { recognitionOpsFor } from './recognitionOps.js';
 import { transcribeHandwriting, validateImage } from './handwritingProvider.js';
+import {
+  GENERATED_LABEL, PAPER_MARKS, PAPER_MINUTES, MIXES, MAX_TOPICS, marksForMinutes, minutesForMarks,
+  generatorTopics, assemblePaper, publicSummary
+} from './paperGenerator.js';
+import { buildPdf, unprintable } from './pdfLite.js';
+import { indiaBank } from './indiaBanks.js';
+import { nswBank } from './nswBanks.js';
 
 /** How long after the deadline a finish may still carry its own answers. */
 export const FINISH_GRACE_MS = 2 * 60 * 1000;
@@ -223,7 +230,7 @@ const MAX_KEYS = 400;
 const MAX_MS = 24 * 60 * 60 * 1000;
 const OBJECTIVE = new Set(['mcq', 'multi-mcq']);
 
-const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots', 'mock', 'targeted']);
+const CREATE_FIELDS = new Set(['kind', 'blueprint', 'paper', 'layoutSeed', 'slots', 'mock', 'targeted', 'generated']);
 const LAYOUT_FIELDS = new Set(['blueprint']);
 const SNAPSHOT_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'cur', 'rev']);
 const FINISH_FIELDS = new Set(['answers', 'workings', 'times', 'modes', 'ink', 'ms', 'reason', 'submissionKey']);
@@ -329,6 +336,21 @@ function targetedFields(paper) {
   return { targeted: true, targetedLabel: TARGETED_LABEL, why: paper.targeted.key };
 }
 
+/** What a generated paper says about itself on every surface: label, request, nothing keyed. */
+function publicGenerated(paper) {
+  const sections = [];
+  for (const sq of paper.questions) {
+    let row = sections.find(x => x.id === sq.section);
+    if (!row) { row = { id: sq.section, label: sq.sectionLabel, questions: 0, marks: 0 }; sections.push(row); }
+    row.questions += 1; row.marks += sq.marks;
+  }
+  return {
+    label: GENERATED_LABEL, markingScope: 'final-answer-only', mix: paper.generated.mix, weak: paper.generated.weak === true,
+    marks: paper.total, minutes: paper.durationMin, repeats: paper.generated.repeats || 0, sections,
+    topics: [...new Map(paper.questions.map(sq => [sq.chapterId, sq.chapterName])).entries()].map(([id, name]) => ({ id, name }))
+  };
+}
+
 function publicPaper(paper, now) {
   return {
     id: paper.id, kind: paper.kind, ...(paper.mock ? { mock: true, label: MOCK_LABEL, typedOnly: true } : {}), title: paper.title, durationMin: paper.durationMin,
@@ -338,6 +360,7 @@ function publicPaper(paper, now) {
     // An NSW paper's reading time, on the server's clock (see the header).
     ...(paper.readingEndsAt ? { readingMin: paper.readingMin, readingEndsAt: paper.readingEndsAt, reading: now < paper.readingEndsAt } : {}),
     ...(paper.kind === 'nsw' ? { nsw: nswPublic(paper) } : {}),
+    ...(paper.kind === 'generated' ? { generated: publicGenerated(paper) } : {}),
     blueprint: paper.blueprint, paper: paper.paper, paperVersion: paper.paperVersion, total: paper.total,
     questions: paper.questions.map(publicQuestion)
   };
@@ -598,6 +621,144 @@ function readNswSpec(body, env = process.env) {
   };
 }
 
+// ── The Paper Generator (kind 'generated') ───────────────────────────────────
+//
+// The student's request — year (and pathway), topics, length, difficulty mix,
+// optionally "focus on my weak topics" — never carries a question or a mark
+// scheme. The SERVER assembles the paper from the edition's approved banks
+// (paperGenerator.js), deterministically from the seed it returns.
+const GENERATED_FIELDS = new Set(['year', 'pathway', 'track', 'topics', 'marks', 'minutes', 'mix', 'seed', 'weak']);
+const NSW_GENERATED_TYPES = new Set(['numeric', 'mcq', 'expression', 'point', 'set']);
+
+/** The edition's own topic model and section style for a generated paper. */
+function generatorModel(g) {
+  const curriculum = bankPolicy().curriculum;
+  const issues = curriculum === 'in' ? indiaBank : nswBank;
+  const style = curriculum === 'nsw' ? 'hsc' : (g.track === 'jee-main' ? 'jee' : 'cbse');
+  return { curriculum, style, topics: generatorTopics({ curriculum, year: g.year, pathway: g.pathway, issues }) };
+}
+
+/** The edition's gate for one drawn question: issued, sealed, printable, final-answer. */
+function generatedAdmit(style, { print = false } = {}) {
+  const banks = bankPolicy();
+  return (q, gen, slot) => {
+    // A figure is drawn on screen; a printed paper carries text only, so it omits those questions.
+    if (!q?.prompt || q.multipart || (print && q.figure) || q.matchList || Array.isArray(q.boardScheme)) return false;
+    // Nor one whose maths a printed page could not carry faithfully (a character it would replace).
+    if (print && (unprintable(q.prompt) || optionsOf(q).some(o => unprintable(optionText(o))))) return false;
+    if (style === 'hsc') {
+      if (!NSW_GENERATED_TYPES.has(q.answerType)) return false;
+      if (slot.objective !== (q.answerType === 'mcq')) return false;
+    } else if (style === 'jee' && slot.objective !== (q.answerType === 'mcq')) return false;
+    return sealForEdition(q, banks, gen);
+  };
+}
+
+function readGeneratedSpec(body) {
+  if (body.blueprint !== undefined || body.layoutSeed !== undefined || body.slots !== undefined || body.paper !== undefined) return INVALID();
+  const g = body.generated;
+  if (!plain(g) || unknown(g, GENERATED_FIELDS).length) return INVALID('Name the course, topics, length and difficulty of the paper.');
+  const curriculum = bankPolicy().curriculum;
+  if (curriculum !== 'in' && curriculum !== 'nsw') return refusal(422, 'EXAM_KIND_OUTSIDE_CURRICULUM', 'This kind of paper is not part of this edition.');
+  if (!Number.isInteger(g.year) || g.year < (curriculum === 'in' ? 6 : 7) || g.year > 12) return INVALID('Choose a year this course sets papers for.');
+  const pathway = g.pathway ?? null;
+  if (pathway !== null && (typeof pathway !== 'string' || !/^[a-z0-9-]{1,24}$/.test(pathway))) return INVALID();
+  if (curriculum === 'nsw' && (g.year >= 11 ? !(pathway && Object.hasOwn(PATHWAYS, pathway) && PATHWAYS[pathway].years.includes(g.year)) : pathway !== null)) return INVALID('That pathway is not one this year sits.');
+  if (curriculum === 'in' && pathway !== null) return INVALID();
+  const track = g.track ?? 'cbse';
+  if (curriculum === 'in' ? !['cbse', 'jee-main'].includes(track) : g.track !== undefined) return INVALID();
+  if ((g.marks === undefined) === (g.minutes === undefined)) return INVALID('Choose the length in marks or in minutes, not both.');
+  const marks = g.marks !== undefined ? g.marks : (PAPER_MINUTES.includes(g.minutes) ? marksForMinutes(g.minutes) : -1);
+  if (g.marks !== undefined ? !PAPER_MARKS.includes(g.marks) : marks < 0) return INVALID('A generated paper is 10, 20 or 40 marks (or 30, 60 or 90 minutes).');
+  if (!MIXES.includes(g.mix)) return INVALID('Choose Foundation, Standard, Challenge or like the real exam.');
+  if (!Array.isArray(g.topics) || g.topics.length < 1 || g.topics.length > MAX_TOPICS
+      || g.topics.some(t => typeof t !== 'string' || !CHAPTER_ID.test(t)) || new Set(g.topics).size !== g.topics.length) return INVALID(`Choose between 1 and ${MAX_TOPICS} topics.`);
+  // A seed the caller names would let the bundled engine regenerate every
+  // question and its answer: only a test may name one. The product's seed is
+  // the server's own, and never leaves it.
+  if (g.seed !== undefined && (process.env.NODE_ENV !== 'test' || !Number.isInteger(g.seed) || g.seed < 1 || g.seed > 0x7fffffff)) return INVALID();
+  if (g.weak !== undefined && typeof g.weak !== 'boolean') return INVALID();
+  const model = generatorModel({ year: g.year, pathway, track });
+  const known = new Set(model.topics.map(t => t.id));
+  if (!model.topics.length) return refusal(409, 'EXAM_BLUEPRINT_NOT_RELEASED', 'No generated paper is released for this year.');
+  if (g.topics.some(t => !known.has(t))) return INVALID('One of those topics is not part of this year’s course.');
+  return {
+    kind: 'generated', generated: { year: g.year, pathway, track, topics: g.topics, marks, mix: g.mix, seed: g.seed ?? null, weak: g.weak === true },
+    durationMin: minutesForMarks(marks), paper: { year: g.year, minutes: minutesForMarks(marks), pathway },
+    defaultTitle: `${GENERATED_LABEL} · ${marks} marks`
+  };
+}
+
+/** The weak-topic ids this account's own marked work names, as topic ids. */
+function weakTopicIds(model, targets) {
+  const weak = new Set(targets.map(t => t.subtopic));
+  return model.topics.filter(t => t.gens.some(g => weak.has(g.gen))).map(t => t.id);
+}
+
+/** Assemble (never seals): the preview and the sit share this one function. */
+async function assembleGenerated(spec, { weakIds = [], seenOf, print = false } = {}) {
+  await ensureBanks();
+  const g = spec.generated;
+  const model = generatorModel(g);
+  const seed = g.seed ?? (randomInt(0x7ffffffe) + 1);
+  const result = await assemblePaper({
+    topics: model.topics, topicIds: g.topics, marks: g.marks, mix: g.mix, seed, weakIds: g.weak ? weakIds : [],
+    style: model.style, admit: generatedAdmit(model.style, { print }), seenOf
+  });
+  return { result, seed, style: model.style };
+}
+
+/** Which of the drawn questions this account has recently seen (by index). */
+const seenOfFor = (db, accountId) => async questions => {
+  const keys = questions.map(q => seenKeysOf(q));
+  const seen = await seenAmong(db, accountId, keys.flat());
+  return new Set(keys.map((list, i) => (list.some(k => seen.has(k)) ? i : -1)).filter(i => i >= 0));
+};
+
+const optionText = o => (typeof o === 'string' ? o : (o && typeof o === 'object' ? (o.text ?? o.label ?? '') : String(o ?? '')));
+const optionsOf = q => (Array.isArray(q.mcqOptions) ? q.mcqOptions : Array.isArray(q.options) ? q.options : []);
+
+const EDITION_NOTE = {
+  hsc: 'HSC-style sections: Section I is multiple choice, Section II is extended response. This is Pri practice, not a NESA paper.',
+  cbse: 'CBSE-style sections by marks. This is Pri practice, not a CBSE paper.',
+  jee: 'JEE-style sections: single correct, then numerical value. This is Pri practice, not an NTA paper.'
+};
+
+/** The printable paper: questions only — no answer, step or mark scheme. */
+function paperDocument({ title, style, items, marks, minutes }) {
+  const lines = [
+    { text: title, size: 18, bold: true },
+    { text: `${marks} marks  -  ${minutes} minutes  -  Typed or written answers; final answers are marked.`, size: 10, gap: 6 },
+    { text: EDITION_NOTE[style] || '', size: 9, gap: 4 }
+  ];
+  let section = null;
+  items.forEach((it, i) => {
+    if (it.sectionLabel !== section) { section = it.sectionLabel; lines.push({ text: section, size: 13, bold: true, gap: 16 }); }
+    lines.push({ text: `${i + 1}.  [${it.marks} mark${it.marks === 1 ? '' : 's'}]  ${it.prompt}`, size: 11, gap: 10 });
+    optionsOf(it.q).forEach((o, k) => lines.push({ text: `(${'ABCDEFGH'[k] || k + 1})  ${optionText(o)}`, size: 11, gap: 2 }));
+  });
+  return lines;
+}
+
+/** The marking guide: worked solutions and keyed answers. Only ever built for a finished paper. */
+function guideDocument({ title, style, items, marks }) {
+  const lines = [
+    { text: `${title} - marking guide`, size: 18, bold: true },
+    { text: `Worked solutions for a paper you have sat. ${marks} marks in all; each question is marked on its final answer, all or nothing. Method marks are not awarded.`, size: 10, gap: 6 },
+    { text: EDITION_NOTE[style] || '', size: 9, gap: 4 }
+  ];
+  items.forEach((it, i) => {
+    lines.push({ text: `${i + 1}.  [${it.marks} mark${it.marks === 1 ? '' : 's'}]  ${it.prompt}`, size: 11, bold: true, gap: 12 });
+    lines.push({ text: `Answer: ${keyedAnswer(it.q)}`, size: 11, gap: 3 });
+    (it.q.steps || []).forEach((st, k) => lines.push({ text: `${k + 1}) ${typeof st === 'string' ? st : [st.h, st.t ?? st.text].filter(Boolean).join(': ')}`, size: 10, gap: 2 }));
+  });
+  return lines;
+}
+
+const pdfReply = (name, lines, title, extra = {}) => ({
+  filename: name, mimeType: 'application/pdf', pdfBase64: buildPdf({ title, lines }).toString('base64'), ...extra
+});
+
 function readSpec(body, env = process.env) {
   if (!plain(body) || unknown(body, CREATE_FIELDS).length) return INVALID();
   // D15: the practice paper is the NSW course's, built from banks outside the
@@ -617,7 +778,9 @@ function readSpec(body, env = process.env) {
   const nsw = body.kind === 'nsw' && bankPolicy().curriculum === 'nsw';
   if (nsw && !nswExamsOn(env)) return NSW_NOT_AVAILABLE;
   const read = body.kind === 'india' ? readIndiaSpec(body) : body.kind === 'practice-paper' ? readPracticeSpec(body)
+    : body.kind === 'generated' ? readGeneratedSpec(body)
     : nsw ? readNswSpec(body, env) : INVALID('Name the kind of paper.');
+  if (body.kind !== 'generated' && body.generated !== undefined) return INVALID();
   if (read.refused) return read;
   // A board mock ("Pri mock in board format", engine/boardMock.js, D22) is a
   // full blueprint paper on a board blueprint, sat typed, under its own title.
@@ -646,7 +809,7 @@ function practiceMarks(q) {
   return Math.max(1, Math.min(Math.min(4, Math.max(1, Number(q.difficulty) || 1)), keySteps.length || 1));
 }
 
-async function issueQuestions(read) {
+async function issueQuestions(read, ctx = {}) {
   await ensureBanks();
   const nonce = randomInt(0x7fffffff);
   const questions = [];
@@ -725,6 +888,24 @@ async function issueQuestions(read) {
   }
 
   if (read.kind === 'nsw') return issueNswQuestions(read, { seal, draw, fresh, onPaper, unitHashes, questions });
+
+  if (read.kind === 'generated') {
+    // Assembled by paperGenerator.js; sealed here exactly as any paper's items.
+    const { result, seed } = await assembleGenerated(read, ctx);
+    if (!result.ok) {
+      return { refused: [409, result.code, result.message], nearest: result.nearest };
+    }
+    for (const s of result.questions) {
+      if (!fresh(s.q)) return UNSUPPORTED(questions.length + 1);
+      for (const hash of unitHashes(s.q)) onPaper.add(hash);
+      seal({
+        section: s.section.id, sectionLabel: s.section.label, item: 'question', chapterId: s.topicId, chapterName: s.topicName,
+        marking: { correct: s.marks, incorrect: 0, unanswered: 0, partialPerOption: null }, marks: s.marks,
+        pyq: false, conversion: null, generator: s.gen, difficulty: s.q.difficulty || s.difficulty
+      }, { ...s.q, examItem: 'question' });
+    }
+    return { questions, generated: { seed, repeats: result.repeats } };
+  }
 
   for (const slot of read.slots) {
     if (slot.multipart) {
@@ -1237,6 +1418,10 @@ async function entitlementRefusal(db, accountId, spec, now) {
   if (spec.blueprint?.track === 'jee-advanced' && !capabilities.includes('jee-advanced-content')) {
     return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'jee-advanced-content',
       message: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.' };
+  }
+  if (spec.generated?.weak && !capabilities.includes('premium-exams')) {
+    return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams',
+      message: 'Focusing a paper on your weak topics is part of Pri Learning Premium. Every other generated paper stays on the free plan.' };
   }
   if (spec.targeted && !capabilities.includes('premium-exams')) {
     return { status: 402, code: 'PREMIUM_REQUIRED', capability: 'premium-exams',
@@ -1939,7 +2124,18 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
 
     // Questions are chosen before the transaction: no generator runs while a
     // database lock is held.
-    const issued = await issueQuestions(spec);
+    let issueCtx = {};
+    if (spec.kind === 'generated') {
+      const model = generatorModel(spec.generated);
+      issueCtx = {
+        weakIds: spec.generated.weak ? weakTopicIds(model, await accountTargets(db, accountId, Date.now())) : [],
+        seenOf: seenOfFor(db, accountId)
+      };
+    }
+    const issued = await issueQuestions(spec, issueCtx);
+    if (issued.refused && issued.nearest !== undefined) {
+      return res.status(issued.refused[0]).json({ error: { code: issued.refused[1], message: issued.refused[2], nearest: issued.nearest } });
+    }
     if (issued.refused) {
       // The server could not issue this layout's paper from the banks. The
       // layout is retired — by the server, never at the device's asking — so
@@ -1970,6 +2166,7 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
       // Reading time leads the paper; the deadline above already includes it.
       ...(spec.kind === 'nsw' ? { readingMin: spec.readingMin, readingEndsAt: startedAt + spec.readingMin * 60000 } : {}),
       ...(spec.mock ? { mock: true } : {}),
+      ...(spec.kind === 'generated' ? { generated: { ...spec.generated, ...issued.generated } } : {}),
       ...(targeted ? { targeted } : {}),
       total: issued.questions.reduce((n, sq) => n + Number(sq.marks), 0),
       questions: issued.questions
@@ -2078,6 +2275,75 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     if (outcome.status === 404) return notFound(res);
     if (outcome.status) return reject(res, outcome.status, outcome.code, outcome.message);
     return res.status(200).json({ result: await withTimeReport(db, accountId, outcome.result, Date.now()), attempted: outcome.attempted === true, ...(outcome.retryAt ? { retryAt: outcome.retryAt } : {}) });
+  });
+
+  // ── The Paper Generator ──
+  // What a student may choose, from this edition's own curriculum model.
+  router.post('/generator/options', rateLimit(db, 'exam-generator', { limit: 300, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const curriculum = bankPolicy().curriculum;
+    if (curriculum !== 'in' && curriculum !== 'nsw') return reject(res, 404, 'EXAM_KIND_UNAVAILABLE', 'Generated papers are not available here.');
+    const body = plain(req.body) ? req.body : {};
+    if (unknown(body, new Set(['year', 'pathway', 'track'])).length) return reject(res, 400, 'EXAM_SPEC_INVALID', 'Name the year.');
+    const year = Number(body.year);
+    const pathway = typeof body.pathway === 'string' && /^[a-z0-9-]{1,24}$/.test(body.pathway) ? body.pathway : null;
+    const track = typeof body.track === 'string' && /^[a-z0-9-]{1,24}$/.test(body.track) ? body.track : (curriculum === 'in' ? 'cbse' : undefined);
+    if (!Number.isInteger(year) || year < 6 || year > 12) return reject(res, 400, 'EXAM_SPEC_INVALID', 'Name the year.');
+    const model = generatorModel({ year, pathway, track });
+    return res.status(200).json({
+      label: GENERATED_LABEL, edition: curriculum === 'in' ? 'priyabhata' : 'prithagoras', style: model.style, note: EDITION_NOTE[model.style],
+      marks: PAPER_MARKS, minutes: PAPER_MINUTES, minutesPerMark: 1.5, mixes: MIXES, maxTopics: MAX_TOPICS,
+      topics: model.topics.map(t => ({ id: t.id, name: t.name })), markingScope: 'final-answer-only'
+    });
+  });
+
+  // Can the banks fill this request? Counts and names only; nothing is sealed or recorded.
+  const assembleFor = async (req, res, { print = false } = {}) => {
+    const spec = readGeneratedSpec({ kind: 'generated', generated: req.body?.generated });
+    if (!plain(req.body) || unknown(req.body, new Set(['generated'])).length) { reject(res, 400, 'EXAM_SPEC_INVALID', 'Send the generated paper’s request only.'); return null; }
+    if (spec.refused) { reject(res, ...spec.refused); return null; }
+    const accountId = req.platformSession.account_id;
+    const early = await entitlementRefusal(db, accountId, { generated: spec.generated }, Date.now());
+    if (early && early.code === 'PREMIUM_REQUIRED') { refuseEntitlement(res, early); return null; }
+    const model = generatorModel(spec.generated);
+    const weakIds = spec.generated.weak ? weakTopicIds(model, await accountTargets(db, accountId, Date.now())) : [];
+    const out = await assembleGenerated(spec, { weakIds, seenOf: seenOfFor(db, accountId), print });
+    return { spec, ...out, model };
+  };
+  router.post('/generator/check', rateLimit(db, 'exam-generator', { limit: 300, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const a = await assembleFor(req, res);
+    if (!a) return undefined;
+    const { result } = a;
+    return res.status(result.ok ? 200 : 409).json(result.ok ? publicSummary(result) : { error: { code: result.code, message: result.message, nearest: result.nearest } });
+  });
+  // A printable paper. Questions only; the marking guide is a separate document
+  // that exists only for a paper this account has sat and submitted.
+  router.post('/generator/pdf', rateLimit(db, 'exam-generator-pdf', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const a = await assembleFor(req, res, { print: true });
+    if (!a) return undefined;
+    const { result, spec, style } = a;
+    if (!result.ok) {
+      return res.status(409).json({ error: { code: result.code, message: `${result.message} A printed paper carries text-only questions, so topics that depend on a figure may need the on-screen paper.`, nearest: result.nearest } });
+    }
+    const items = result.questions.map(s => ({ q: s.q, prompt: s.q.prompt, marks: s.marks, sectionLabel: s.section.label }));
+    return res.status(200).json(pdfReply('pri-practice-paper.pdf', paperDocument({ title: spec.defaultTitle, style, items, marks: result.marks, minutes: result.minutes }), spec.defaultTitle,
+      { marks: result.marks, minutes: result.minutes, questions: items.length }));
+  });
+
+  // The marking guide of a generated paper: locked until the paper is submitted.
+  router.get('/:id/guide', rateLimit(db, 'exam-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const id = String(req.params.id || '');
+    if (!UUID.test(id)) return notFound(res);
+    const accountId = req.platformSession.account_id;
+    await finaliseExpiredExams(db, { accountId });
+    const now = Date.now();
+    const paper = await read(accountId, 'exam-paper', id, now);
+    if (!paper || paper.kind !== 'generated') return notFound(res);
+    if (!(await read(accountId, 'exam-result', id, now))) {
+      return reject(res, 403, 'GUIDE_LOCKED', 'The marking guide opens once you have submitted this paper.');
+    }
+    const style = paper.generated.style || (bankPolicy().curriculum === 'nsw' ? 'hsc' : (paper.generated.track === 'jee-main' ? 'jee' : 'cbse'));
+    const items = paper.questions.map(sq => ({ q: sq.payload, prompt: sq.payload.prompt, marks: sq.marks, sectionLabel: sq.sectionLabel }));
+    return res.status(200).json(pdfReply('pri-practice-paper-guide.pdf', guideDocument({ title: paper.title, style, items, marks: paper.total }), paper.title, { marks: paper.total }));
   });
 
   router.get('/:id', rateLimit(db, 'exam-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {

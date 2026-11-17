@@ -294,8 +294,9 @@ try {
     const all = r.data.syllabuses.flatMap(s => s.subtopics.flatMap(t => t.dotpoints));
     c.ok(all.every(dp => typeof dp.generated === 'boolean' && dp.generated === dp.practice.length > 0), 'each with an explicit, honest generated flag');
     const missing = all.filter(dp => !dp.generated);
-    c.ok(missing.length > 0 && r.data.outcomes.missing === missing.length && r.data.outcomes.total === all.length, `the gap is stated, not hidden: ${missing.length} of ${all.length} outcomes have no issued question`);
-    for (const code of ['MAV-11-03', 'MST-11-06', 'ME1-11-05']) c.eq(all.find(dp => dp.code === code)?.generated, false, `${code} has no generator and says so`);
+    c.ok(r.data.outcomes.missing === missing.length && r.data.outcomes.total === all.length, `any gap is stated, not hidden: ${missing.length} of ${all.length} outcomes have no issued question`);
+    // These once had no generator and said so; each outcome the bank now covers says so, and any that is not covered still says false (the flag check above).
+    for (const code of ['MAV-11-03', 'MST-11-06', 'ME1-11-05']) c.eq(all.find(dp => dp.code === code)?.generated, true, `${code} has a generator and says so`);
     // An outcome reached only through a partial bank is not advertised.
     c.ok(all.filter(dp => dp.generated).every(dp => dp.practice.every(t => nswCell(t.generator, t.difficulties[0]) && t.difficulties.every(d => nswCell(t.generator, d)))), 'every advertised target is an issued cell');
     // The shape curriculumAvailability.js reads.

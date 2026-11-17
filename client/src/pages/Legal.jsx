@@ -45,6 +45,7 @@ import terms from '../../../docs/legal/terms.md?raw';
 import refund from '../../../docs/legal/refund-policy.md?raw';
 import grievance from '../../../docs/legal/grievance.md?raw';
 import review from '../../../docs/legal/review-status.json';
+import { EDITION } from '../platform/edition.js';
 
 // The English of each notice, keyed by its own route. There is no `title` here
 // any more: a notice names itself in its first heading, in whichever language
@@ -61,8 +62,24 @@ export const LEGAL_PAGES = Object.freeze({
   terms: { kind: 'notice', source: terms },
   'refund-policy': { kind: 'notice', source: refund },
   grievance: { kind: 'notice', source: grievance },
+  // Prithagoras's contact page. It is the same import as `grievance`: the build
+  // resolves that import to this edition's own document (client/vite.config.js
+  // editionLegalPlugin), and the route table decides which of the two keys an
+  // edition serves.
+  contact: { kind: 'notice', source: grievance },
   'third-party-notices': { kind: 'licences', source: null, titleKey: 'legal.thirdPartyTitle' }
 });
+
+// The pages this edition serves: Priyabhata has the grievance page, Prithagoras
+// the contact page, and neither serves the other's.
+const PUBLISHED = Object.freeze(EDITION === 'prithagoras'
+  ? ['privacy', 'terms', 'refund-policy', 'contact', 'third-party-notices']
+  : ['privacy', 'terms', 'refund-policy', 'grievance', 'third-party-notices']);
+const keysOfEdition = () => Object.keys(LEGAL_PAGES).filter(key => PUBLISHED.includes(key));
+// The banner's wording follows the notices it sits above: an Indian notice is
+// reviewed by a lawyer qualified in Indian law, an Australian one by a lawyer
+// qualified in Australian law.
+const UNREVIEWED_BODY = EDITION === 'prithagoras' ? 'legal.unreviewedBodyAu' : 'legal.unreviewedBody';
 
 /** True only when a human has recorded a lawyer's review in review-status.json. */
 export const LEGAL_REVIEWED = review.reviewed === true;
@@ -224,7 +241,7 @@ export default function Legal() {
   // The routes are declared explicitly rather than as one parameterised path,
   // so the page is read from the location.
   const page = useLocation().pathname.replace(/^\/+|\/+$/g, '');
-  const entry = LEGAL_PAGES[page];
+  const entry = PUBLISHED.includes(page) ? LEGAL_PAGES[page] : undefined;
   const { language, t } = useLanguage();
   const tx = useTx();
 
@@ -288,7 +305,7 @@ export default function Legal() {
   };
 
   if (!entry) {
-    const published = Object.keys(LEGAL_PAGES).map((key, i, all) => (
+    const published = keysOfEdition().map((key, i, all) => (
       <React.Fragment key={key}>
         <PageLink to={`/${key}`}>{nameOf(key)}</PageLink>
         {i < all.length - 1 ? ' · ' : ''}
@@ -305,7 +322,7 @@ export default function Legal() {
     );
   }
 
-  const others = Object.keys(LEGAL_PAGES).filter(key => key !== page).map((key, i, all) => (
+  const others = keysOfEdition().filter(key => key !== page).map((key, i, all) => (
     <React.Fragment key={key}>
       <PageLink to={`/${key}`}>{nameOf(key)}</PageLink>
       {i < all.length - 1 ? ' · ' : ''}
@@ -348,7 +365,7 @@ export default function Legal() {
     <div className="qpage" style={{ maxWidth: 720 }}>
       <h1>{titleOf(source)}</h1>
 
-      <div className="seg-tabs" role="group" aria-label={t('legal.languageLabel')} style={{ marginTop: 0, marginBottom: 18 }}>
+      {LANGUAGES.length > 1 && <div className="seg-tabs" role="group" aria-label={t('legal.languageLabel')} style={{ marginTop: 0, marginBottom: 18 }}>
         {LANGUAGES.map(({ id, label }) => (
           <button
             key={id}
@@ -360,7 +377,7 @@ export default function Legal() {
             {label}
           </button>
         ))}
-      </div>
+      </div>}
 
       {wanted === 'hi' && !translated && hindiFailed && (
         <div className="notice" role="status" style={{ marginBottom: 18 }} data-legal-fallback="true">
@@ -373,7 +390,7 @@ export default function Legal() {
           of its own below. */}
       {!LEGAL_REVIEWED && (
         <div className="notice error" role="alert" style={{ marginBottom: 18 }} data-legal-unreviewed="true">
-          <b>{t('legal.unreviewedTitle')}</b> {t('legal.unreviewedBody')}
+          <b>{t('legal.unreviewedTitle')}</b> {t(UNREVIEWED_BODY)}
         </div>
       )}
 

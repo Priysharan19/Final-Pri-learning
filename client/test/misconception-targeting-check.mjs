@@ -13,6 +13,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import enStrings from '../src/i18n/strings.en.js';
 
 const SRC = new URL('../src/', import.meta.url);
 const A = await import(new URL('engine/adaptive.js', SRC));
@@ -125,7 +126,8 @@ ok('NSW serve swaps in the untargeted reason unless the server attested the trap
 // Train 10: the India reason also describes the cell that served (retargetOnRepeat.js),
 // so the untargeted wording is chosen for the picked cell and for a retargeted one alike.
 ok('India serve does the same', backend.includes('why: served === pick.target ? (trapKey ? pick.why : pick.whyUntargeted) : pick.whyFor(served, { untargeted: !trapKey })'));
-ok('the India untargeted reason does not say it keeps coming back', /misconception: \(c, trap\) => \(trap \? `Same slip keeps coming back in \$\{c\.name\}: \$\{trap\.label\}` : `Practising \$\{c\.name\}, where the same mistake has come up before\.`\)/.test(backend));
+ok('the India untargeted reason does not say it keeps coming back', /misconception: \(c, trap\) => \(trap \? translate\('msg\.reason\.misconceptionNamed', \{ name: c\.name, label: trap\.label \}\) : translate\('msg\.reason\.misconceptionPlain', \{ name: c\.name \}\)\)/.test(backend)
+  && /Same slip keeps coming back/.test(enStrings['msg.reason.misconceptionNamed']) && !/keeps coming back/.test(enStrings['msg.reason.misconceptionPlain']));
 
 if (fails.length) {
   console.error(fails.map(f => `  ✗ ${f}`).join('\n'));

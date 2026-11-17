@@ -35,7 +35,7 @@ import { retryClock } from './readerFailure.js';
 import { useInRouterContext } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
-import { feedbackGeometry } from './feedbackGeometry.js';
+import { feedbackGeometry, enclosingBox } from './feedbackGeometry.js';
 import { plausibleLineMatch, segmentInkLines } from './inkLines.js';
 import { neqWorthCheck, relationChoices, swapRelation } from './relationSwap.js';
 import { MathText } from '../lib/latex.jsx';
@@ -47,7 +47,7 @@ import MarginMarks, { stampDelay, sweepSpan } from '../instrument/MarginMarks.js
 import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
-import { strokeSignature } from './strokeSignature.js';
+import { strokeSignature, createStrokeSignature } from './strokeSignature.js';
 import { askReaderPermission, PROMPT_ANSWER, READER_PERMISSION, readerPermission } from './readerPermission.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
@@ -383,6 +383,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     publish(next, strokesRef.current, { stale });
   }, [rec, publish, stale]);
 
+  // The signature folded incrementally: a pen-up adds one stroke, so it costs
+  // that stroke, not the whole page (the value is exactly strokeSignature()).
+  const signatureOfRef = useRef(null);
+  if (!signatureOfRef.current) signatureOfRef.current = createStrokeSignature();
   const onStrokesChange = useCallback((strokes) => {
     if (strokes?.length) setCleared(null);
     strokesRef.current = strokes;
@@ -406,7 +410,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     // Kept the moment the pen lifts, whatever happens to reading: a page
     // written in the second before the app went away is still the student's.
     try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
-    const signature = strokes.length ? strokeSignature(strokes) : null;
+    const signature = strokes.length ? signatureOfRef.current(strokes) : null;
     // A page that could not be read at all is a different page once it changes.
     if (emptyRef.current && emptyRef.current !== signature) { emptyRef.current = null; setStatus(prev => (prev?.kind === 'empty' ? null : prev)); }
     if (!rec.lines.length) return;
@@ -538,7 +542,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // v1.1 instrument: the footer's Reset is the toolbar's Clear (with its undo).
   useEffect(() => {
     if (!controlRef) return undefined;
-    controlRef.current = { clear: () => act('clear')() };
+    controlRef.current = { clear: () => act('clear')(), read: () => readNow() };
     return () => { controlRef.current = null; };
   });
 
@@ -627,20 +631,23 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 if (showNote) noted = true;
                 const geometry = feedbackGeometry(line);
                 const b = geometry.anchor || line.box;
-                const boxes = geometry.boxes.length ? geometry.boxes : [b];
+                // One box that encloses the whole marked line (feedbackGeometry.js
+                // enclosingBox), not one overlapping box per glyph.
+                const enclosing = enclosingBox(line) || b;
+                const boxes = [enclosing];
                 const at = { '--d': `${stampDelay(span, line.box)}ms` };
                 return (
                   <React.Fragment key={li}>
                     {boxes.map((gb, gi) => (
                       <span key={`box-${gi}`} className={`ink-linebox ${good ? 'good' : 'bad'}`}
-                        style={{ left: gb.x - 5, top: gb.y - 5, width: gb.w + 10, height: gb.h + 10, ...at }} />
+                        style={{ left: gb.x, top: gb.y, width: gb.w, height: gb.h, ...at }} />
                     ))}
                     <span className={`ink-verdict ${good ? 'good' : 'bad'}`}
                       style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16, ...at }}
                       title={v.note || (good ? t('ink.lineOk') : t('ink.lineBreaks'))}>{good ? <Icon name="check" size={18} /> : <Icon name="correction" size={18} />}</span>
                     {bad && boxes.map((gb, gi) => (
                       <span key={`underline-${gi}`} className="ink-underline"
-                        style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6, ...at }} />
+                        style={{ left: gb.x + 3, top: gb.y + gb.h - 3, width: Math.max(0, gb.w - 6), ...at }} />
                     ))}
                     {showNote && (
                       <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
@@ -785,8 +792,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {/* Every line of the reading is the student's to correct before
                   Submit, not only the ones the reader doubted: a confident
                   misread is still a misread, and it is their page. */}
+              {!disabled && !stale && correcting?.index !== li && lineVerdicts?.[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && line.corrected !== true && (
+                <span className="ink-line-recheck muted">{t('ink.checkReadingEdit')}</span>
+              )}
               {!disabled && !stale && correcting?.index !== li && (
-                <button type="button" className="ink-correct-btn" aria-label={t('ink.iWroteAria', { n: li + 1 })}
+                <button type="button" className={`ink-correct-btn${lineVerdicts?.[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && line.corrected !== true ? ' is-emph' : ''}`} aria-label={t('ink.iWroteAria', { n: li + 1 })}
                   data-line-doubt={isLowConfidence(line, lineConfidenceFloor) ? 'low' : undefined}
                   onClick={() => setCorrecting({ index: li, text: line.text })}>{isLowConfidence(line, lineConfidenceFloor) ? t('ink.iWrote') : t('ink.editLine')}</button>
               )}

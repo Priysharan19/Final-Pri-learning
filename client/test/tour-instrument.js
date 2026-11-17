@@ -520,6 +520,16 @@ export const writeFlow = {
     await check('the sweep is one ink hairline, 900 ms, once: no gradient, no glow', sweep?.name === 'in-sweep' && sweep.dur === '0.9s' && sweep.image === 'none' && sweep.shadow === 'none', JSON.stringify(sweep));
     await check('the sweep never takes the pen: it ignores pointer input', sweep?.pointer === 'none');
     await check('each mark carries its own stamp delay from the line geometry', await page.locator('.editor-shell[data-marked="yes"] .ink-verdict').evaluateAll(els => els.length > 0 && els.every(e => e.style.getPropertyValue('--d').endsWith('ms'))));
+    // After a wrong answer the page says one thing: the marked line is where it went wrong. The
+    // reading of a line marked wrong carries a plain prompt, and its Edit button is the emphasised one.
+    const wrongPage = await page.evaluate(() => ({
+      recheck: !!document.querySelector('.ink-line-recheck'), emph: !!document.querySelector('.ink-correct-btn.is-emph'),
+      text: (document.querySelector('.qpage')?.innerText || '').replace(/\s+/g, ' ')
+    }));
+    await check('a line marked wrong asks to check the reading and makes Edit prominent; the page does not both say the working is checked later and to fix the marked step',
+      wrongPage.recheck && wrongPage.emph && /Check this reading — tap Edit if it isn.t what you wrote/.test(wrongPage.text) &&
+        !(/checked when this question is finished/.test(wrongPage.text) && /Fix it, then submit again/.test(wrongPage.text)) && !/unsettled/i.test(wrongPage.text),
+      JSON.stringify({ recheck: wrongPage.recheck, emph: wrongPage.emph }));
     // Reduced motion: no hairline, and the marks are there within 200 ms.
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const still = await page.evaluate(() => new Promise(r => setTimeout(() => {
@@ -689,7 +699,7 @@ export const writeFlow = {
       if (await check('the chapter just practised is on the map', await node.count() === 1)) {
         await node.focus();
         const shownMarks = await page.locator('[data-map-card="c7-integer-operations-current"] [data-map-marks]').getAttribute('data-map-marks');
-        await check('the map title states this month’s certified marks', (await page.locator('[data-map-subline]').textContent()).includes(`${reply.marksEarned} / ${reply.marksPossible} marks this month`), await page.locator('[data-map-subline]').textContent());
+        await check('the map title states this month’s certified marks', (await page.locator('[data-map-subline]').textContent()).includes(`${reply.marksEarned} of ${reply.marksPossible} marks this month`), await page.locator('[data-map-subline]').textContent());
         await check('its card shows the certified marks for that chapter', shownMarks === `${reply.marksEarned}/${reply.marksPossible}`, `${shownMarks} vs ${reply.marksEarned}/${reply.marksPossible}`);
       }
     }

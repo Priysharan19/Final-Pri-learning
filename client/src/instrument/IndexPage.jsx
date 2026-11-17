@@ -50,6 +50,7 @@ function Lazy(load) {
   };
 }
 const LazyReviewQueueCard = Lazy(() => import('../home/ReviewQueueCard.jsx'));
+const LazyTodayCard = Lazy(() => import('../today/TodayCard.jsx'));
 const LazyPlanCard = Lazy(() => import('../home/PlanCard.jsx'));
 
 function Ring({ value, colourVar }) {
@@ -399,6 +400,7 @@ export default function IndexPage() {
           </ul>
         )}
         <PlacementCard placement={placement} onGo={path => nav(path)} onSkip={skipPlacement} />
+        <LazyTodayCard user={user} />
         <LazyReviewQueueCard user={user} />
         <LazyPlanCard user={user} stats={stats} />
         <div className="in-week" data-instrument-week>

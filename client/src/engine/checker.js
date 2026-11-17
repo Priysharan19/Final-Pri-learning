@@ -11,6 +11,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, wit
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
 const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
+import { assessCalculusLine, calculusContext, refineDerivativeLine } from './calculusSteps.js';
 import { answerTooLong } from './checker-core.js';
 import { changedTerm } from './slips.js';
 import { checkGeometry } from './geometryFacts.js';
@@ -566,7 +567,8 @@ function unreadLines(rawLines) {
 }
 const unreadNote = entry => entry;
 
-function stepCheckSingle(meta, workingText, system = null, { loneBranches = false } = {}) {
+function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, calculus = null, named = false } = {}) {
+  const calculusStage = { claimed: false };   // calculusSteps.js: has a line made a claim yet?
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const unread = unreadLines(rawLines);
   const out = [];
@@ -584,6 +586,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     let status = 'note';
     let note;
     let lineDiagnosis = null;
+    let restates = false;
     try {
       const listed = readSolutionList(line, meta);
       if (listed) {
@@ -673,12 +676,17 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       if (meta?.kind === 'derivative') {
         const assessed = namesAValue(proseClean, meta)
           ? { status: 'note', note: 'This gives a value, not a derivative, so it is not checked as one.' }
-          : assessDerivativeLine({ text: proseClean, meta });
+          : (named
+            // Named slips only for a whole question's own working. A stage of a proof plan keeps
+            // reason-v2's diagnosis (its code is part of the plan's contract: pri-reason-v3-check).
+            ? refineDerivativeLine(proseClean, meta, assessDerivativeLine({ text: proseClean, meta }), calculusStage)
+            : assessDerivativeLine({ text: proseClean, meta }));
         status = assessed.status;
         note = assessed.note;
         lineDiagnosis = assessed.diagnosis || null;
+        if (status === 'ok' || status === 'break') calculusStage.claimed = true;
         if (status === 'break' && firstBreak === -1) firstBreak = i;
-        out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+        out.push({ text: line, status, note, ...(assessed.restates ? { restates: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
         return;
       }
 
@@ -816,10 +824,22 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           } else status = 'ok';
         }
       } else if (meta.kind === 'expression') {
-        const candidate = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
-        const same = exprEquivalent(candidate, meta.canonical, { positiveOnly: meta.positiveOnly });
-        status = same ? 'ok' : 'break';
-        if (!same) note = 'This line is no longer equivalent to the expression you started with — the slip is here.';
+        // An indefinite integral or a derivative is read as calculus
+        // (calculusSteps.js): the question restated is the START, an
+        // antiderivative is verified by differentiating it, and a slip is
+        // named. A line it cannot read falls through to the old rule below.
+        const assessed = assessCalculusLine(line, calculus, meta, calculusStage);
+        if (assessed) {
+          status = assessed.status;
+          note = assessed.note;
+          if (assessed.restates) restates = true;
+          if (assessed.diagnosis) lineDiagnosis = assessed.diagnosis;
+        } else {
+          const candidate = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
+          const same = exprEquivalent(candidate, meta.canonical, { positiveOnly: meta.positiveOnly });
+          status = same ? 'ok' : 'break';
+          if (!same) note = 'This line is no longer equivalent to the expression you started with — the slip is here.';
+        }
       }
     } catch {
       status = 'note';
@@ -827,7 +847,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     }
 
     if (status === 'break' && firstBreak === -1) firstBreak = i;
-    out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+    out.push({ text: line, status, note, ...(restates ? { restates: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
   });
 
   // Branches were allowed on the promise that the working keeps every root.
@@ -1603,7 +1623,10 @@ function nameChangedTerm(report) {
 }
 function stepCheckWithinBudget(meta, workingText, options = null) {
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
-  return stepCheckSingle(meta, workingText, pinnedSystem(meta, typeof options?.prompt === 'string' ? options.prompt : ''), { loneBranches: true });
+  const prompt = typeof options?.prompt === 'string' ? options.prompt : '';
+  let calculus = null;
+  try { calculus = calculusContext(meta, prompt); } catch { calculus = null; }
+  return stepCheckSingle(meta, workingText, pinnedSystem(meta, prompt), { loneBranches: true, calculus, named: true });
 }
 
 // ── Method marks (marking-11) ────────────────────────────────────────────────

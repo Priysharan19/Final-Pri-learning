@@ -116,9 +116,9 @@ try {
   check('a refused paper says how much it covers and names what it lacks, and has no start (none is refused once every course has approved forms)',
     !refusedId || (REFUSED_SAYS[refusedId].every(part => refusedText.includes(part)) && await page.locator(`[data-nsw-paper="${refusedId}"] [data-nsw-start]`).count() === 0), refusedText);
   const ext1 = await visibleText(page, '[data-nsw-paper="nsw-hsc-extension-1-2027"]');
-  check('a partial paper is titled by its coverage, never HSC or trial', /practice paper — 5 of 6 year 12 outcomes/i.test(ext1) && !/HSC paper|trial/i.test(ext1), ext1);
-  check('it names what it leaves out', (await visibleText(page, '[data-nsw-paper="nsw-hsc-extension-1-2027"] [data-nsw-omits]')).includes('Further calculus skills'), ext1);
-  check('its time and marks are scaled to what it examines', ext1.includes('10 min reading') && ext1.includes('100 min working') && ext1.includes('58 marks'), ext1);
+  check('a full paper is titled an answer-checked practice paper, never HSC or trial', /answer-checked practice paper/i.test(ext1) && !/HSC paper|trial/i.test(ext1), ext1);
+  check('it leaves nothing out once every slot has approved forms', (await page.locator('[data-nsw-paper="nsw-hsc-extension-1-2027"] [data-nsw-omits]').count()) === 0 || !(await visibleText(page, '[data-nsw-paper="nsw-hsc-extension-1-2027"] [data-nsw-omits]')).trim(), ext1);
+  check('its time and marks are the whole paper\'s', ext1.includes('10 min reading') && ext1.includes('120 min working') && ext1.includes('70 marks'), ext1);
   const intro = await visibleText(page, '[data-nsw-papers]');
   check('the list says these are answer-checked practice papers, final answer only, no band', intro.includes(en['exams.nsw.intro']), intro.slice(0, 200));
 
@@ -128,8 +128,8 @@ try {
   await page.waitForSelector('[data-exam-reading-time]', { timeout: 30000 });
   const startedAt = Date.now();
   const head = await visibleText(page, '.exam-head');
-  check('the paper opens under the server\'s title, with its coverage', head.includes('Practice paper — 5 of 6 Year 12 outcomes') && !/HSC paper|trial/i.test(head), head.slice(0, 160));
-  check('its start screen names what it leaves out', (await visibleText(page, '[data-exam-reading-time] [data-exam-nsw-omits]')).includes('Further calculus skills'));
+  check('the paper opens under the server\'s title', /Answer-checked practice paper/i.test(head) && !/HSC paper|trial/i.test(head), head.slice(0, 160));
+  check('its start screen has nothing left out to name', (await page.locator('[data-exam-reading-time] [data-exam-nsw-omits]').count()) === 0 || !(await visibleText(page, '[data-exam-reading-time] [data-exam-nsw-omits]')).trim());
   check('a reading-time notice is shown, as a status', (await page.locator('[data-exam-reading-time]').getAttribute('role')) === 'status'
     && (await visibleText(page, '[data-exam-reading-time]')).includes('Reading time'));
   check('the question is there to read', (await visibleText(page, '.exam-body')).length > 40);
@@ -164,8 +164,8 @@ try {
   await page.waitForSelector('[data-exam-nsw-note]', { timeout: 60000 });
   const result = await visibleText(page, 'main');
   check('the result is an answer-checked practice paper, checked on final answers only', result.includes(en['examRoom.nswMarkingNote']), result.slice(0, 300));
-  check('the result gives a score out of the paper\'s 7 kept marks', /of 7\b|\/\s*7\b|out of 7/.test(result), result.slice(0, 300));
-  check('the result names what the paper did not include', (await visibleText(page, '[data-exam-nsw-omits]')).includes('Further calculus skills'));
+  check('the result gives a score out of the paper\'s 9 marks', /of 9\b|\/\s*9\b|out of 9/.test(result), result.slice(0, 300));
+  check('the result has nothing left out to name', (await page.locator('[data-exam-nsw-omits]').count()) === 0 || !(await visibleText(page, '[data-exam-nsw-omits]')).trim());
   check('the result shows no band, ATAR, HSC mark or prediction', !BANDISH.test(result.replace(en['examRoom.nswMarkingNote'], '').replace(en['exams.nsw.intro'], '')), (result.match(BANDISH) || [])[0]);
   check('the paper was finished on the server', answerWrites.some(w => w.path.endsWith('/finish') && w.status === 200), JSON.stringify(answerWrites));
 } catch (error) {

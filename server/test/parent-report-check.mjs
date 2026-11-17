@@ -109,7 +109,7 @@ c.deq(report.topics.weak.map(t => [t.id, t.name, t.accuracy]), [[TOPIC_B, 'Circl
 c.ok(!JSON.stringify(report).includes('not-a-real-chapter'), 'an unknown chapter id is never shown');
 c.deq(report.mistakes, { fixed: 1, stillOpen: 12 }, 'a question wrong before and right this week is one mistake fixed; still-open counts each question whose latest answer was wrong');
 c.deq(report.plan, [
-  { kind: 'revisit-topic', topicId: TOPIC_B, name: 'Circles' },
+  { kind: 'revisit-topic', topicId: TOPIC_B, name: 'Circles', minutes: 15 },
   { kind: 'fix-mistakes', count: 10 },
   { kind: 'practise-days', days: 3 }
 ], 'the plan is built only from the week\'s facts');

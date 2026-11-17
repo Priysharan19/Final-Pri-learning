@@ -528,8 +528,8 @@ eq(staticImports, [], 'nothing statically imports the Hindi catalogue — it is 
 // that table and must not grow a template-string import() of its own.
 ok(/import\('\.\/strings\.hi\.js'\)/.test(read('src/i18n/languages.js')),
   'and the runtime does reach it, by a literal import() a bundler can see, in the registration table');
-ok(/LANGUAGES\.filter\(l => typeof l\.load === 'function'\)/.test(read('src/i18n/index.js'))
-  && !/import\(`/.test(read('src/i18n/index.js')),
+ok(/LANGUAGES\.filter\(l => typeof l\.load === 'function'\)/.test(read('src/i18n/core.js'))
+  && !/import\(`/.test(read('src/i18n/core.js')),
   'the runtime takes its loaders from that table and builds no import() path from a template');
 
 // The catalogue itself must import nothing, or the chunk stops being only strings.

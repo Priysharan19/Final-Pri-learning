@@ -267,18 +267,39 @@ export const LEGACY_CROSSWALK = Object.freeze([
     'Correction to G1: further integration is ME2-12-04 (G1 had -02).'),
   row('mex-vectors', EXT2, ['MEX-V1'], [['ME1-12-02'], ['ME1-12-02'], ['ME1-12-02', 'ME2-12-02']], 'mapped', 'elsewhere-in-part',
     'Magnitude, scalar product and angles in three dimensions are Extension 1 in 2024 (Introduction to vectors covers 2D and 3D). Correction to G1: Extension 2 vectors are ME2-12-02 (G1 had -03).'),
-  row('mex-mechanics', EXT2, ['MEX-M1'], same('ME2-12-05'), 'mapped', 'as-labelled')
+  row('mex-mechanics', EXT2, ['MEX-M1'], same('ME2-12-05'), 'mapped', 'as-labelled'),
+  row('y11-functions-more', ADV, ['MA-F1'], same('MAV-11-01'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms.'),
+  row('y11-transform', ADV, ['MA-F2'], same('MAV-11-03'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms.'),
+  row('y11-trig-ident', ADV, ['MA-T2'], same('MAV-11-05'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms.'),
+  row('y11-explog-more', ADV, ['MA-E1'], same('MAV-11-08'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms.'),
+  row('y11-data-sets', ADV, ['MA-S2'], same('MAV-11-10'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms.'),
+  row('ms11-linear', STD, ['MS-A2'], same('MST-11-02'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms. Year 11 content shared by Standard 1 and Standard 2.'),
+  row('ms11-earning-exact', STD, ['MS-F1'], same('MST-11-03'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms. Year 11 content shared by Standard 1 and Standard 2.'),
+  row('ms11-managing-exact', STD, ['MS-F1'], same('MST-11-04'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms. Year 11 content shared by Standard 1 and Standard 2.'),
+  row('ms11-time-location', STD, ['MS-M2'], same('MST-11-06'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms. Year 11 content shared by Standard 1 and Standard 2.'),
+  row('ms11-measure-more', STD, ['MS-M1'], same('MST-11-05'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms. Year 11 content shared by Standard 1 and Standard 2.'),
+  row('me11-binomial', EXT1, ['ME-A1'], same('ME1-11-05'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms.'),
+  row('me12-further-calc', EXT1, ['ME-C2'], same('ME1-12-04'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms.'),
+  row('mex-vectors-lines', EXT2, ['MEX-V1'], same('ME2-12-02'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms.')
 ]);
 
 /** Current outcomes that no legacy subtopic reaches: the content gap with no generator. */
 const gap = (syllabus, outcome, note = '') => Object.freeze({ subtopicId: null, syllabus, outcome, status: 'new-no-generator', note });
 
 export const NEW_OUTCOME_GAPS = Object.freeze([
-  gap(STD, 'MST-11-02', 'Linear relationships (Year 11).'),
-  gap(STD, 'MST-11-06', 'Time and location (Year 11).'),
-  gap(ADV, 'MAV-11-03', 'Graph transformations (Year 11).'),
-  gap(ADV, 'MAV-11-10', 'Probability and data: the Data content groups (Year 11).'),
-  gap(EXT1, 'ME1-11-05', 'The binomial theorem (Year 11).'),
 ]);
 
 export const NSW_CROSSWALK = Object.freeze([...LEGACY_CROSSWALK, ...NEW_OUTCOME_GAPS]);

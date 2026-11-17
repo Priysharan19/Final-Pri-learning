@@ -547,7 +547,10 @@ async function run() {
   const views = [];
   const skipped = [];
   const notApplicable = [];
-  const notApplicableRoutes = new Set();
+  // Served only by the Prithagoras build (App.jsx LEGAL_ROUTES_EXTRA: its contact
+  // page, and the /refunds alias). This walk builds Priyabhata, where they are not
+  // routes; legal-pages-au-check.mjs holds their wiring and their notices.
+  const notApplicableRoutes = new Set(['/contact', '/refunds']);
   let liveVerdict = null;
   let skipLink = null;
   let selfTest = null;
@@ -1090,6 +1093,16 @@ async function run() {
 
     await step('exams', '/exams', async () => { await goTo(page, BASE, '/exams'); });
 
+    // The Paper Generator (both editions): choose a topic, and the server answers
+    // whether its banks can fill the paper — the screen the student actually uses.
+    await step('paper generator', '/paper-generator', async () => {
+      await goTo(page, BASE, '/paper-generator');
+      await page.waitForSelector('[data-paper-generator]', { timeout: 30000 });
+      await page.locator('[data-topic]').first().check();
+      await page.waitForSelector('[data-gen-fit="ready"], [data-gen-fit="short"]', { timeout: 30000 });
+      await wait(page, SETTLE);
+    });
+
     if (!INDIA) {
       // D15 (server/platform/exams.js readSpec): the server composes no
       // generated practice paper outside the India course yet; the NSW papers
@@ -1284,6 +1297,18 @@ async function run() {
     await step('mistakes · compatibility redirect', '/mistakes', async () => {
       await goTo(page, BASE, '/mistakes');
       await page.waitForSelector('.hist-row, .muted', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    await step('today · mixed daily set', '/today', async () => {
+      await goTo(page, BASE, '/today');
+      await page.waitForSelector('[data-today-page]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    await step('error log · own mistakes', '/error-log', async () => {
+      await goTo(page, BASE, '/error-log');
+      await page.waitForSelector('[data-error-log-page]', { timeout: 20000 });
       await wait(page, 600);
     });
 
@@ -1639,9 +1664,9 @@ async function run() {
       refusals.replay?.held === 1 && /^Checking your earlier answer/.test(refusals.replay.checking || '') && refusals.replay.disabled === 0 &&
         refusals.replay.strokeDuringReplay === true && refusals.read?.button?.tag === 'button',
       JSON.stringify(refusals.replay));
-    ok('handwriting not yet read: a real, named "Read my answer" button, and Submit says why it is unavailable in a status the button is described by',
+    ok('handwriting not yet read: a real, named "Read my answer" button, and Submit says why it is unavailable (or, on stale ink, that it will read the page again) in a status the button is described by',
       refusals.read?.button?.tag === 'button' && /\p{L}/u.test(refusals.read.button.name) && refusals.read.unread?.role === 'status' &&
-        /\p{L}/u.test(refusals.read.unread.text) && refusals.read.unread.describes === true && refusals.read.unread.disabled === true,
+        /\p{L}/u.test(refusals.read.unread.text) && refusals.read.unread.describes === true && refusals.read.unread.disabled === (refusals.read.unread.key !== 'ink.submitReadAgain'),
       JSON.stringify({ button: refusals.read?.button, unread: refusals.read?.unread }));
     ok('activating "Read my answer" from the keyboard does not drop focus to <body>: while the page is read, focus rests on the announced reading status inside the writing surface',
       refusals.read?.during?.button === 0 && refusals.read.during.focus.body === false && refusals.read.during.focus.inInk === true &&

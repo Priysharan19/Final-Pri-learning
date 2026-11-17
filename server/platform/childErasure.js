@@ -52,7 +52,7 @@ import { ensureOtpSchema } from './otpCore.js';
 import { deleteAccountRows } from './accounts.js';
 import { logEvent, safeCode } from './observability.js';
 import { ensureBillingSchema } from './billingSchema.js';
-import { createRazorpayBilling } from './razorpay.js';
+import { createWebBilling } from './webBilling.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** How long an unconfirmed (or withdrawn) child account is kept. Counsel sets it. */
@@ -182,7 +182,7 @@ export function webSubscriptionCancel(db) {
   return async ({ accountId }) => {
     if (!cancel) {
       ensureBillingSchema(db);
-      cancel = createRazorpayBilling(db).lifecycle.web.cancel;
+      cancel = createWebBilling(db).lifecycle.web.cancel;
     }
     return cancel({ accountId, atCycleEnd: false, reason: 'account-erasure' });
   };

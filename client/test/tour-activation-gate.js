@@ -102,7 +102,10 @@ export const flow = {
       await page.locator('[data-testid="hero-offline"], [data-testid="hero-try-demo"], [data-testid="hero-existing-device"]').count() === 0 &&
         await page.locator('.shell').count() === 0);
     const legalLinks = [];
-    for (const href of ['/privacy', '/terms', '/refund-policy', '/grievance']) legalLinks.push(await page.locator(`.auth-col a[href="${href}"]`).count());
+    // The fourth link is the edition's contact route (#954): Prithagoras's contact
+    // page, Priyabhata's DPDP grievance page. The edition comes from the build.
+    const contactHref = process.env.PRI_EDITION === 'prithagoras' ? '/contact' : '/grievance';
+    for (const href of ['/privacy', '/terms', '/refund-policy', contactHref]) legalLinks.push(await page.locator(`.auth-col a[href="${href}"]`).count());
     await check('the welcome screen still links to the legal pages', legalLinks.every(n => n === 1), JSON.stringify(legalLinks));
     const adultEmail = freshEmail('adult');
     resetOtpLimits(platform);

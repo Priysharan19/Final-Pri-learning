@@ -10,7 +10,7 @@
 // and StoreKit itself re-delivers unfinished transactions on the next launch.
 import { priNative } from './native/index.js';
 
-/* global __PRI_PREMIUM_ON_SALE__ */
+/* global __PRI_PREMIUM_ON_SALE__, __PRI_STORE_BILLING__ */
 /**
  * False only in a build of an edition that has no payment provider (plan E5:
  * Prithagoras until owner decision O2; the `billing` block of the edition
@@ -23,6 +23,13 @@ import { priNative } from './native/index.js';
  */
 export const PREMIUM_ON_SALE = typeof __PRI_PREMIUM_ON_SALE__ !== 'boolean' || __PRI_PREMIUM_ON_SALE__;
 
+/**
+ * Whether the edition sells through the App Store or Google Play at all. Prithagoras
+ * sells on the web through Stripe only, so its bundle has no store to select even
+ * inside a native shell (the server refuses those routes for it as well).
+ */
+export const STORE_BILLING = typeof __PRI_STORE_BILLING__ !== 'boolean' || __PRI_STORE_BILLING__;
+
 export function nativeBillingAvailable() {
   return priNative.billing.available();
 }
@@ -30,7 +37,7 @@ export function nativeBillingAvailable() {
 /** Which store sheet the shell presents: 'app-store', 'google-play' or null.
  * It selects the purchase flow and copy only — never entitlement. */
 export function nativeBillingStore() {
-  return PREMIUM_ON_SALE && priNative.billing.available() ? priNative.billing.store() : null;
+  return PREMIUM_ON_SALE && STORE_BILLING && priNative.billing.available() ? priNative.billing.store() : null;
 }
 
 function request(action, body = {}, timeoutMs = 30_000) {

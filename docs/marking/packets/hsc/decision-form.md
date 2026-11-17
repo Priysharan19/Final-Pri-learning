@@ -7,7 +7,7 @@ Complete one form per examiner. Return the signed original as the README says; t
 ```text
 Jurisdiction:                    nsw-hsc
 Syllabus version(s):             nsw-mathematics-advanced-11-12-2024@2024, nsw-mathematics-extension1-11-12-2024@2024, nsw-mathematics-extension2-11-12-2024@2024, nsw-mathematics-k-10-2022@2022, nsw-mathematics-standard-11-12-2024@2024
-Dossier digest reviewed:         17fdb5d1e995148c46af5d5ab2deb8d8add857f7566c4f6c34756fe4f2c9c5f8
+Dossier digest reviewed:         47fadf9b8e4990c8227674b94d41c2e48ca19cec2d7c7609734f725eaa66694f
 Repository commit reviewed:      ________________________________________
 Examiner full name:              ________________________________________
 Qualification:                   ________________________________________
@@ -421,20 +421,72 @@ Verdict per item: **A** approved as the engine behaves · **C** approved with ch
 | 398 | `nsw-final:mex-mechanics/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
 | 399 | `nsw-final:mex-mechanics/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
 | 400 | `nsw-final:mex-mechanics/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-05 |  |  |
-| 401 | `nsw-method:y7-equations/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 402 | `nsw-method:y7-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 403 | `nsw-method:y7-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 404 | `nsw-method:y7-equations/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 405 | `nsw-method:y7-angles/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 406 | `nsw-method:y8-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 407 | `nsw-method:y8-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 408 | `nsw-method:y10-quadratics/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 409 | `nsw-method:y10-quadratics/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 410 | `nsw-method:y11-explog/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 411 | `nsw-method:y11-diff/D1` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
-| 412 | `nsw-method:y11-diff/D2` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
-| 413 | `nsw-method:y11-diff/D3` | Method rubric (plan) — may partial marks ever be paid? |  |  |
-| 414 | `nsw-method:y11-diff/D4` | Method rubric (plan) — may partial marks ever be paid? |  |  |
-| 415 | `nsw-method:ms11-formulas/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 401 | `nsw-final:y11-functions-more/D1` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-01 |  |  |
+| 402 | `nsw-final:y11-functions-more/D2` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-01 |  |  |
+| 403 | `nsw-final:y11-functions-more/D3` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-01 |  |  |
+| 404 | `nsw-final:y11-functions-more/D4` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-01 |  |  |
+| 405 | `nsw-final:y11-transform/D1` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-03 |  |  |
+| 406 | `nsw-final:y11-transform/D2` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-03 |  |  |
+| 407 | `nsw-final:y11-transform/D3` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-03 |  |  |
+| 408 | `nsw-final:y11-transform/D4` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-03 |  |  |
+| 409 | `nsw-final:y11-trig-ident/D1` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-05 |  |  |
+| 410 | `nsw-final:y11-trig-ident/D2` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-05 |  |  |
+| 411 | `nsw-final:y11-trig-ident/D3` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-05 |  |  |
+| 412 | `nsw-final:y11-trig-ident/D4` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-05 |  |  |
+| 413 | `nsw-final:y11-explog-more/D1` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-08 |  |  |
+| 414 | `nsw-final:y11-explog-more/D2` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-08 |  |  |
+| 415 | `nsw-final:y11-explog-more/D3` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-08 |  |  |
+| 416 | `nsw-final:y11-explog-more/D4` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-08 |  |  |
+| 417 | `nsw-final:y11-data-sets/D1` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-10 |  |  |
+| 418 | `nsw-final:y11-data-sets/D2` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-10 |  |  |
+| 419 | `nsw-final:y11-data-sets/D3` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-10 |  |  |
+| 420 | `nsw-final:y11-data-sets/D4` | Final answer only · nsw-mathematics-advanced-11-12-2024@2024 · MAV-11-10 |  |  |
+| 421 | `nsw-final:ms11-linear/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-02 |  |  |
+| 422 | `nsw-final:ms11-linear/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-02 |  |  |
+| 423 | `nsw-final:ms11-linear/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-02 |  |  |
+| 424 | `nsw-final:ms11-linear/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-02 |  |  |
+| 425 | `nsw-final:ms11-earning-exact/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-03 |  |  |
+| 426 | `nsw-final:ms11-earning-exact/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-03 |  |  |
+| 427 | `nsw-final:ms11-earning-exact/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-03 |  |  |
+| 428 | `nsw-final:ms11-earning-exact/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-03 |  |  |
+| 429 | `nsw-final:ms11-managing-exact/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-04 |  |  |
+| 430 | `nsw-final:ms11-managing-exact/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-04 |  |  |
+| 431 | `nsw-final:ms11-managing-exact/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-04 |  |  |
+| 432 | `nsw-final:ms11-managing-exact/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-04 |  |  |
+| 433 | `nsw-final:ms11-time-location/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-06 |  |  |
+| 434 | `nsw-final:ms11-time-location/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-06 |  |  |
+| 435 | `nsw-final:ms11-time-location/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-06 |  |  |
+| 436 | `nsw-final:ms11-time-location/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-06 |  |  |
+| 437 | `nsw-final:ms11-measure-more/D1` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-05 |  |  |
+| 438 | `nsw-final:ms11-measure-more/D2` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-05 |  |  |
+| 439 | `nsw-final:ms11-measure-more/D3` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-05 |  |  |
+| 440 | `nsw-final:ms11-measure-more/D4` | Final answer only · nsw-mathematics-standard-11-12-2024@2024 · MST-11-05 |  |  |
+| 441 | `nsw-final:me11-binomial/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-05 |  |  |
+| 442 | `nsw-final:me11-binomial/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-05 |  |  |
+| 443 | `nsw-final:me11-binomial/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-05 |  |  |
+| 444 | `nsw-final:me11-binomial/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-11-05 |  |  |
+| 445 | `nsw-final:me12-further-calc/D1` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-04 |  |  |
+| 446 | `nsw-final:me12-further-calc/D2` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-04 |  |  |
+| 447 | `nsw-final:me12-further-calc/D3` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-04 |  |  |
+| 448 | `nsw-final:me12-further-calc/D4` | Final answer only · nsw-mathematics-extension1-11-12-2024@2024 · ME1-12-04 |  |  |
+| 449 | `nsw-final:mex-vectors-lines/D1` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-02 |  |  |
+| 450 | `nsw-final:mex-vectors-lines/D2` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-02 |  |  |
+| 451 | `nsw-final:mex-vectors-lines/D3` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-02 |  |  |
+| 452 | `nsw-final:mex-vectors-lines/D4` | Final answer only · nsw-mathematics-extension2-11-12-2024@2024 · ME2-12-02 |  |  |
+| 453 | `nsw-method:y7-equations/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 454 | `nsw-method:y7-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 455 | `nsw-method:y7-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 456 | `nsw-method:y7-equations/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 457 | `nsw-method:y7-angles/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 458 | `nsw-method:y8-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 459 | `nsw-method:y8-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 460 | `nsw-method:y10-quadratics/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 461 | `nsw-method:y10-quadratics/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 462 | `nsw-method:y11-explog/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 463 | `nsw-method:y11-diff/D1` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
+| 464 | `nsw-method:y11-diff/D2` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
+| 465 | `nsw-method:y11-diff/D3` | Method rubric (plan) — may partial marks ever be paid? |  |  |
+| 466 | `nsw-method:y11-diff/D4` | Method rubric (plan) — may partial marks ever be paid? |  |  |
+| 467 | `nsw-method:ms11-formulas/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
 
-Items: 415.
+Items: 467.

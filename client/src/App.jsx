@@ -3,6 +3,7 @@ import Aurora from './instrument/Aurora.jsx';
 import Working from './instrument/Working.jsx';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { EDITION } from './platform/edition.js';
 import PageLink from './components/PageLink.jsx';
 import { api } from './api.js';
 import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, storedThemePref } from './lib/theme.js';
@@ -31,6 +32,7 @@ import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 // is only about what has to arrive before a student can do anything.
 const ProgressPage = React.lazy(() => import('./pages/Progress.jsx'));
 const Exams = React.lazy(() => import('./pages/Exams.jsx'));
+const PaperGenerator = React.lazy(() => import('./pages/PaperGenerator.jsx'));
 const ExamRoom = React.lazy(() => import('./pages/ExamRoom.jsx'));
 const Rush = React.lazy(() => import('./pages/Rush.jsx'));
 const Match = React.lazy(() => import('./pages/Match.jsx'));
@@ -46,6 +48,8 @@ const CLASSES_BUILT_OUT = typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' &
 const Classes = CLASSES_BUILT_OUT ? null : React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
+const Today = React.lazy(() => import('./pages/Today.jsx'));
+const ErrorLog = React.lazy(() => import('./pages/ErrorLog.jsx'));
 const Paywall = React.lazy(() => import('./paywall/Paywall.jsx'));
 // The placement check is opened once or twice per student, so it — and the
 // prerequisite graph and engine behind it — is an on-demand chunk (see
@@ -56,6 +60,17 @@ const Placement = React.lazy(() => import('./pages/Placement.jsx'));
 // /privacy is online, and the warm pass keeps it for offline, so it no longer
 // rides in the install every student downloads before the first screen.
 const Legal = React.lazy(() => import('./pages/Legal.jsx'));
+// The notices that differ by edition. Priyabhata publishes the DPDP Act's
+// grievance contact at /grievance. Prithagoras publishes its contact page at
+// /contact (it has no Grievance Officer), sends the old /grievance address there,
+// and answers /refunds with the refund policy.
+const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
+  <>
+    <Route path="/contact" element={<Legal />} />
+    <Route path="/grievance" element={<Navigate to="/contact" replace />} />
+    <Route path="/refunds" element={<Navigate to="/refund-policy" replace />} />
+  </>
+) : <Route path="/grievance" element={<Legal />} />;
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
 // The shared resource library (ADR-0002 plan F1): its own chunk, built only
@@ -193,7 +208,7 @@ function isDestinationActive(location, to) {
 
 const TITLE_KEYS = {
   '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/parent-report': 'nav.parentReport', '/tasks': 'nav.tasks', '/map': 'inst.tabMap',
-  '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
+  '/exams': 'nav.exams', '/paper-generator': 'gen.title', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
   '/notes': 'nav.notes', '/library': 'nav.library', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
 
@@ -536,7 +551,7 @@ export default function App() {
             <Route path="/privacy" element={<Legal />} />
             <Route path="/terms" element={<Legal />} />
             <Route path="/refund-policy" element={<Legal />} />
-            <Route path="/grievance" element={<Legal />} />
+            {LEGAL_ROUTES_EXTRA}
             <Route path="/third-party-notices" element={<Legal />} />
             <Route path="*" element={<Login />} />
           </Routes>
@@ -573,7 +588,7 @@ export default function App() {
             <Route path="/privacy" element={<Legal />} />
             <Route path="/terms" element={<Legal />} />
             <Route path="/refund-policy" element={<Legal />} />
-            <Route path="/grievance" element={<Legal />} />
+            {LEGAL_ROUTES_EXTRA}
             <Route path="/third-party-notices" element={<Legal />} />
             <Route path="*" element={<AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
           </Routes>
@@ -662,6 +677,8 @@ export default function App() {
                     <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
+                    <Route path="/today" element={studentOnly(<Today />)} />
+                    <Route path="/error-log" element={studentOnly(<ErrorLog />)} />
                     <Route path="/premium" element={studentOnly(<Paywall />)} />
                     <Route path="/insights" element={studentOnly(<Insights />)} />
                     {PARENT_REPORT_ON && <Route path="/parent-report" element={studentOnly(<ParentReport />)} />}
@@ -672,6 +689,7 @@ export default function App() {
                     <Route path="/tasks" element={studentOnly(<Tasks />, '/teach#teacher-assignments')} />
                     <Route path="/teach" element={teacherOnly(<Teach />)} />
                     <Route path="/exams" element={studentOnly(<Exams />)} />
+                    <Route path="/paper-generator" element={studentOnly(<PaperGenerator />)} />
                     <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
                     <Route path="/notes" element={studentOnly(<Notes />)} />
                     <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
@@ -689,7 +707,7 @@ export default function App() {
                     <Route path="/privacy" element={<Legal />} />
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/refund-policy" element={<Legal />} />
-                    <Route path="/grievance" element={<Legal />} />
+                    {LEGAL_ROUTES_EXTRA}
                     <Route path="/third-party-notices" element={<Legal />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Navigate to={roleLanding} replace />} />
