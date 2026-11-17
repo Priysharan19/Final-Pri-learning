@@ -72,7 +72,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms12-rates` | 4 | 11.0k | 34 | — |
 | `y12-appdiff` | 3 | 14.6k | 140 | — |
 | `y8-equations` | 3 | 14.7k | 26 | — |
-| `y12-integration` | 1 | 15.4k | 53 | — |
+| `y12-integration` | 1 | 15.4k | 64 | — |
 | `y12-stats` | 1 | 16.8k | 18 | — |
 | `y10-simeq` | 4 | 17.0k | 6 | — |
 | `y10-probability` | 4 | 20.4k | 1 | forms |
@@ -83,10 +83,10 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y9-indices-sci` | 4 | 23.6k | 2 | forms |
 | `ms12-invest-loans` | 4 | 24.5k | 16 | — |
 | `ms11-measure` | 3 | 26.3k | 32 | — |
-| `y12-explogcalc` | 4 | 30.3k | 73 | — |
+| `y12-explogcalc` | 4 | 30.3k | 75 | — |
 | `y7-integers` | 4 | 30.4k | 10 | — |
 | `ms12-depreciation` | 4 | 30.4k | 22 | — |
-| `y12-motion` | 4 | 30.4k | 126 | — |
+| `y12-motion` | 4 | 32.6k | 130 | — |
 | `me12-vectors` | 4 | 33.6k | 4 | forms |
 | `y9-linear` | 4 | 34.1k | 20 | — |
 | `y11-polynomials` | 4 | 34.7k | 95 | — |

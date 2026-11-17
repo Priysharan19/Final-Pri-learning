@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `9ab51b1918b8ce0c6e7f89ba9500cc2131b04ccd6c30afbdd27a25a6a261f290` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `46d3758c3e5e7a32509fcef7f2b9141523bcec43d07ad1a38ff700b5e0eb9031` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2708,7 +2708,7 @@ Final answer: 0
 
 ## `nsw-final:y12-integration/D1` — seed 1009
 
-> Use the substitution $u = 2x^2 - 1$ to evaluate $\\displaystyle\\int_0^{3} -12x(2x^2 - 1)^{2}\\,dx$.
+> Use the reverse chain rule to evaluate $\\displaystyle\\int_0^{3} -12x(2x^2 - 1)^{2}\\,dx$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|

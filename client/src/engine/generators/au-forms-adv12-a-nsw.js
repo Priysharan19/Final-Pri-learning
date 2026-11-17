@@ -38,7 +38,9 @@ const keepT = (arr, val) => { const seen = new Set(); return arr.filter(t => { c
 
 /** A three-line worked solution with an injected (or no) error; the key is the first erroneous line. */
 function firstError(rng, { intro, versions, because, rule }) {
-  const k = rc(rng, [0, 1, 2, 3]);
+  // An injected error must change its line (and leave earlier lines untouched): redraw otherwise.
+  const valid = [0, 1, 2, 3].filter(j => j === 0 || (versions[j][j - 1] !== versions[0][j - 1] && versions[j].slice(0, j - 1).every((l, i) => l === versions[0][i])));
+  const k = rc(rng, valid);
   const lines = versions[k];
   const labels = ['Line 1', 'Line 2', 'Line 3'];
   const correctText = k === 0 ? 'There is no error' : labels[k - 1];
@@ -1163,21 +1165,21 @@ intForms.push({ diffs: [1], make: (rng) => {
   };
 } });
 
-// Proof style: substitution (machine-keyed)
+// Proof style: reverse chain rule (machine-keyed)
 intForms.push({ diffs: [1], make: (rng) => {
   const a = ri(rng, 2, 7), b = nz(rng, -9, 9), n = ri(rng, 2, 6), mm = nz(rng, -6, 9), c = a * mm;
   const L = lin(a, b);
   return {
-    prompt: `Show that the substitution $u = ${L}$ turns $\\displaystyle\\int ${c}${pw(L, n)}\\,dx$ into $k\\displaystyle\\int u^{${n}}\\,du$. Find the constant $k$.`,
+    prompt: `Use the reverse chain rule to show that $\\displaystyle\\int ${c}${pw(L, n)}\\,dx = \\dfrac{k}{${n + 1}}${pw(L, n + 1)} + C$. Find the constant $k$.`,
     answerType: 'numeric', answer: { value: mm }, answerPrefix: 'k =',
     traps: keepT([
-      { value: c, why: `$du = ${a}\\,dx$, so $dx = \\dfrac{du}{${a}}$: the coefficient is divided by $${a}$.` },
-      { value: c * a, why: `$dx = \\dfrac{du}{${a}}$: *divide* by $${a}$, do not multiply.` }
+      { value: c, why: `The inner derivative is $${a}$, so $\\dfrac{d}{dx}${pw(L, n + 1)} = ${a * (n + 1)}${pw(L, n)}$: divide by $${a}$.` },
+      { value: c * a, why: `Divide by the inner derivative $${a}$, do not multiply by it.` }
     ], mm),
-    hints: [`Differentiate: $\\dfrac{du}{dx} = ${a}$, so $dx = \\dfrac{du}{${a}}$.`, `$\\int ${c}u^{${n}}\\,\\dfrac{du}{${a}}$.`, `$k = \\dfrac{${c}}{${a}}$.`],
+    hints: [`Differentiate the right-hand side: $\\dfrac{d}{dx}${pw(L, n + 1)} = ${n + 1}\\times ${a}${pw(L, n)}$.`, `So $\\dfrac{k}{${n + 1}}\\times ${a * (n + 1)}${pw(L, n)} = ${a}k${pw(L, n)}$.`, `Match $${a}k$ with $${c}$.`],
     steps: [
-      { h: 'Differentiate $u$', d: `$du = ${a}\\,dx \\Rightarrow dx = \\dfrac{du}{${a}}$` },
-      { h: 'Substitute', d: `$\\int ${c}u^{${n}}\\,\\dfrac{du}{${a}}$` },
+      { h: 'Differentiate the antiderivative', d: `$\\dfrac{d}{dx}\\left[\\dfrac{k}{${n + 1}}${pw(L, n + 1)}\\right] = ${a}k${pw(L, n)}$` },
+      { h: 'Match the integrand', d: `$${a}k = ${c}$` },
       { h: 'Constant', d: `$k = \\dfrac{${c}}{${a}} = ${mm}$` }
     ]
   };
@@ -1187,16 +1189,16 @@ intForms.push({ diffs: [1], make: (rng) => {
   const a = ri(rng, 1, 5), b = nz(rng, -7, 7), n = ri(rng, 2, 5), mm = nz(rng, -6, 8), c = 2 * a * mm;
   const L = poly([a, 0, b]);
   return {
-    prompt: `Using the substitution $u = ${L}$, the integral $\\displaystyle\\int ${c === 1 ? '' : c}x${pw(L, n)}\\,dx$ can be written as $k\\displaystyle\\int u^{${n}}\\,du$. Find the constant $k$.`,
+    prompt: `Use the reverse chain rule to show that $\\displaystyle\\int ${c === 1 ? '' : c}x${pw(L, n)}\\,dx = \\dfrac{k}{${n + 1}}${pw(L, n + 1)} + C$. Find the constant $k$.`,
     answerType: 'numeric', answer: { value: mm }, answerPrefix: 'k =',
     traps: keepT([
-      { value: c, why: `$du = ${2 * a}x\\,dx$, so $x\\,dx = \\dfrac{du}{${2 * a}}$.` },
+      { value: c, why: `The inner derivative is $${2 * a}x$, so $\\dfrac{d}{dx}${pw(L, n + 1)} = ${2 * a * (n + 1)}x${pw(L, n)}$: divide by $${2 * a}$.` },
       { value: c / a, why: `The derivative of $${term(a, 'x', 2)}$ is $${2 * a}x$, not $${a}x$: divide by $${2 * a}$.` }
     ], mm),
-    hints: [`$\\dfrac{du}{dx} = ${2 * a}x$, so $x\\,dx = \\dfrac{du}{${2 * a}}$.`, `$\\int ${c}u^{${n}}\\,\\dfrac{du}{${2 * a}}$.`, `$k = \\dfrac{${c}}{${2 * a}}$.`],
+    hints: [`Differentiate the right-hand side: $\\dfrac{d}{dx}${pw(L, n + 1)} = ${n + 1}\\times ${2 * a}x${pw(L, n)}$.`, `So the derivative of the right-hand side is $${2 * a}kx${pw(L, n)}$.`, `Match $${2 * a}k$ with $${c}$.`],
     steps: [
-      { h: 'Differentiate $u$', d: `$du = ${2 * a}x\\,dx \\Rightarrow x\\,dx = \\dfrac{du}{${2 * a}}$` },
-      { h: 'Substitute', d: `$\\int ${c}u^{${n}}\\,\\dfrac{du}{${2 * a}}$` },
+      { h: 'Differentiate the antiderivative', d: `$\\dfrac{d}{dx}\\left[\\dfrac{k}{${n + 1}}${pw(L, n + 1)}\\right] = ${2 * a}kx${pw(L, n)}$` },
+      { h: 'Match the integrand', d: `$${2 * a}k = ${c}$` },
       { h: 'Constant', d: `$k = \\dfrac{${c}}{${2 * a}} = ${mm}$` }
     ]
   };
@@ -1209,19 +1211,20 @@ intForms.push({ diffs: [1], make: (rng) => {
     c = 2 * a * (n + 1) * t; u1 = b; u2 = a * p * p + b; key = t * (u2 ** (n + 1) - u1 ** (n + 1));
   } while (key === 0);
   const L = poly([a, 0, b]);
-  agree(key, simpson(x => c * x * (a * x * x + b) ** n, 0, p), 'u-sub definite');
+  const tc = t === 1 ? '' : t === -1 ? '-' : t;
+  agree(key, simpson(x => c * x * (a * x * x + b) ** n, 0, p), 'reverse chain definite');
   return {
-    prompt: `Use the substitution $u = ${L}$ to evaluate $\\displaystyle\\int_0^{${p}} ${c}x${pw(L, n)}\\,dx$.`,
+    prompt: `Use the reverse chain rule to evaluate $\\displaystyle\\int_0^{${p}} ${c}x${pw(L, n)}\\,dx$.`,
     answerType: 'numeric', answer: { value: key },
     traps: keepT([
-      { value: t * u2 ** (n + 1), why: `Change the limits too: when $x = 0$, $u = ${u1}$, so subtract the value at the lower limit.` },
-      { value: 2 * a * (n + 1) * t * (u2 ** (n + 1) - u1 ** (n + 1)), why: `$du = ${2 * a}x\\,dx$, so the coefficient reduces to $\\dfrac{${c}}{${2 * a}} = ${c / (2 * a)}$, then divide by $${n + 1}$.` }
+      { value: t * u2 ** (n + 1), why: `Subtract the value at the lower limit: $F(0) = ${t * u1 ** (n + 1)}$.` },
+      { value: 2 * a * (n + 1) * t * (u2 ** (n + 1) - u1 ** (n + 1)), why: `$\\dfrac{d}{dx}${pw(L, n + 1)} = ${2 * a * (n + 1)}x${pw(L, n)}$, so the antiderivative is $${tc}${pw(L, n + 1)}$ without the extra factor.` }
     ], key),
-    hints: [`$du = ${2 * a}x\\,dx$, so the integral is $${c / (2 * a)}\\int u^{${n}}\\,du$.`, `New limits: $x = 0 \\to u = ${u1}$; $x = ${p} \\to u = ${u2}$.`, `Integrate $u^{${n}}$ to get $\\dfrac{u^{${n + 1}}}{${n + 1}}$.`],
+    hints: [`$\\dfrac{d}{dx}${pw(L, n + 1)} = ${2 * a * (n + 1)}x${pw(L, n)}$.`, `So the antiderivative is $F(x) = ${tc}${pw(L, n + 1)}$.`, `Evaluate $F(${p}) - F(0)$.`],
     steps: [
-      { h: 'Substitute', d: `$\\displaystyle ${c / (2 * a)}\\int_{${u1}}^{${u2}} u^{${n}}\\,du$` },
-      { h: 'Integrate', d: `$${c / (2 * a)}\\left[\\dfrac{u^{${n + 1}}}{${n + 1}}\\right]_{${u1}}^{${u2}}$` },
-      { h: 'Evaluate', d: `$${t}\\left(${u2 ** (n + 1)} - ${u1 ** (n + 1)}\\right) = ${key}$` }
+      { h: 'Antiderivative', d: `$F(x) = ${tc}${pw(L, n + 1)}$` },
+      { h: 'Limits', d: `$F(${p}) = ${t * u2 ** (n + 1)},\\; F(0) = ${t * u1 ** (n + 1)}$` },
+      { h: 'Subtract', d: `$${t * u2 ** (n + 1)} - (${t * u1 ** (n + 1)}) = ${key}$` }
     ]
   };
 } });
@@ -1229,18 +1232,18 @@ intForms.push({ diffs: [1], make: (rng) => {
 intForms.push({ diffs: [1], make: (rng) => {
   let a, b, n;
   do { a = ri(rng, 2, 6); b = nz(rng, -8, 8); n = ri(rng, 3, 6); } while (a === 1);
-  const L = lin(a, b);
-  const g = [`u = ${L} \\;\\Rightarrow\\; du = ${a}\\,dx`, `\\int ${pw(L, n)}\\,dx = \\dfrac{1}{${a}}\\int u^{${n}}\\,du`, `= \\dfrac{u^{${n + 1}}}{${a * (n + 1)}} + C = \\dfrac{(${L})^{${n + 1}}}{${a * (n + 1)}} + C`];
+  const L = lin(a, b), P1 = pw(L, n + 1), P0 = pw(L, n), q = a * (n + 1);
+  const g = [`\\dfrac{d}{dx}${P1} = ${n + 1}\\times ${a}${P0} = ${q}${P0}`, `\\text{divide by } ${q}: \\dfrac{d}{dx}\\left[\\dfrac{${P1}}{${q}}\\right] = ${P0}`, `\\int ${P0}\\,dx = \\dfrac{${P1}}{${q}} + C`];
   const versions = [
     g,
-    [`u = ${L} \\;\\Rightarrow\\; du = dx`, `\\int ${pw(L, n)}\\,dx = \\int u^{${n}}\\,du`, `= \\dfrac{u^{${n + 1}}}{${n + 1}} + C = \\dfrac{(${L})^{${n + 1}}}{${n + 1}} + C`],
-    [g[0], `\\int ${pw(L, n)}\\,dx = ${a}\\int u^{${n}}\\,du`, `= \\dfrac{${a}u^{${n + 1}}}{${n + 1}} + C = \\dfrac{${a}(${L})^{${n + 1}}}{${n + 1}} + C`],
-    [g[0], g[1], `= \\dfrac{u^{${n + 1}}}{${n}} + C = \\dfrac{(${L})^{${n + 1}}}{${n}} + C`]
+    [`\\dfrac{d}{dx}${P1} = ${n + 1}${P0}`, `\\text{divide by } ${n + 1}: \\dfrac{d}{dx}\\left[\\dfrac{${P1}}{${n + 1}}\\right] = ${P0}`, `\\int ${P0}\\,dx = \\dfrac{${P1}}{${n + 1}} + C`],
+    [g[0], `\\text{multiply by } ${q}: \\dfrac{d}{dx}\\left[${q}${P1}\\right] = ${P0}`, `\\int ${P0}\\,dx = ${q}${P1} + C`],
+    [g[0], g[1], `\\int ${P0}\\,dx = \\dfrac{${P1}}{${n}} + C`]
   ];
   return firstError(rng, {
-    intro: `A student evaluates $\\displaystyle\\int ${pw(L, n)}\\,dx$ by substitution.`,
-    versions, because: [null, `$\\dfrac{du}{dx} = ${a}$, so $du = ${a}\\,dx$, not $dx$`, `$dx = \\dfrac{du}{${a}}$: the factor is $\\dfrac{1}{${a}}$, not $${a}$`, `integrating $u^{${n}}$ gives $\\dfrac{u^{${n + 1}}}{${n + 1}}$: divide by the *new* power`],
-    rule: 'Substitution: $du = u\'(x)\\,dx$, replace $dx$, integrate, then substitute back.'
+    intro: `A student finds $\\displaystyle\\int ${P0}\\,dx$ by differentiating a trial antiderivative (the reverse chain rule).`,
+    versions, because: [null, `the chain rule multiplies by the inner derivative $${a}$ as well`, `to cancel the factor $${q}$ you must *divide* by it, not multiply`, `the divisor is the factor $${q}$ found in Line 1, not the old power $${n}$`],
+    rule: 'Reverse chain rule: differentiate a trial antiderivative, then divide by the constant that appears.'
   });
 } });
 
@@ -1398,7 +1401,9 @@ statsForms.push({ diffs: [2], make: (rng) => {
   const m2 = mcq(rng, `$${key}$`, [
     { text: `$${r2(s - m)}$`, why: 'Subtract the *square* of the mean: $[E(X)]^2$.' },
     { text: `$${r2(s + m * m)}$`, why: 'The variance *subtracts* $[E(X)]^2$.' },
-    { text: `$${r2((s - m) * (s - m))}$`, why: 'Var$(X) = E(X^2) - [E(X)]^2$ — there is no extra squaring.' }
+    { text: `$${r2((s - m) * (s - m))}$`, why: 'Var$(X) = E(X^2) - [E(X)]^2$ — there is no extra squaring.' },
+    { text: `$${r2(s - 2 * m)}$`, why: 'Subtract $[E(X)]^2$, not $2E(X)$.' },
+    { text: `$${r2(m * m)}$`, why: 'That is $[E(X)]^2$: subtract it from $E(X^2)$.' }
   ]);
   return {
     prompt: `For a random variable $X$, $E(X) = ${m}$ and $E(X^2) = ${s}$. What is $\\text{Var}(X)$?`,
@@ -1478,9 +1483,28 @@ statsForms.push({ diffs: [2], make: (rng) => {
   };
 } });
 
-export const forms = {
-  'y12-diff': diffForms,
-  'y12-appdiff': appForms,
-  'y12-integration': intForms,
-  'y12-stats': statsForms
+// Final formatting pass over every variant: no unit coefficients/exponents, no double signs.
+const tidyStr = t => String(t)
+  .replace(/\^\{1\}(?!\d)/g, '')
+  .replace(/\+ -(?=[\d\\a-zA-Z(])/g, '- ')
+  .replace(/- -(?=[\d\\a-zA-Z(])/g, '+ ')
+  .replace(/(?<![\d.\w]|\^\{)-1(?=[a-zA-Z(])/g, '-')
+  .replace(/(?<![\d.\w]|\^\{)1(?=[a-zA-Z(])/g, '');
+const tidy = q => {
+  q.prompt = tidyStr(q.prompt);
+  if (q.hints) q.hints = q.hints.map(tidyStr);
+  if (q.steps) q.steps = q.steps.map(x => ({ ...x, h: tidyStr(x.h), d: tidyStr(x.d) }));
+  if (q.mcqOptions) q.mcqOptions = q.mcqOptions.map(tidyStr);
+  if (q.traps) q.traps = q.traps.map(x => (x.why ? { ...x, why: tidyStr(x.why) } : x));
+  if (q.answer && q.answer.optionTraps) q.answer.optionTraps = Object.fromEntries(Object.entries(q.answer.optionTraps).map(([k, v]) => [k, tidyStr(v)]));
+  return q;
 };
+const wrap = list => list.map(v => ({ ...v, make: (rng, diff) => tidy(v.make(rng, diff)) }));
+
+export const forms = {
+  'y12-diff': wrap(diffForms),
+  'y12-appdiff': wrap(appForms),
+  'y12-integration': wrap(intForms),
+  'y12-stats': wrap(statsForms)
+};
+

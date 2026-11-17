@@ -11,6 +11,7 @@
 import { ri, rc, nz, mcq, Frac, gcd, poly } from '../qhelpers.js';
 
 /** An exponent m x written without a stray 1: 1 -> x, -1 -> -x. */
+const et = m => (m === 1 ? 't' : m === -1 ? '-t' : `${m}t`);
 const ex = m => (m === 1 ? 'x' : m === -1 ? '-x' : `${m}x`);
 const fin = v => typeof v === 'number' && Number.isFinite(v);
 const D = v => `\\$${String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
@@ -23,11 +24,32 @@ const linS = (a, b) => `${a}*x${b > 0 ? `+${b}` : b < 0 ? `-${-b}` : ''}`;
 /** A signed term for appending: ' + 3' / ' - 3'. */
 const sg = v => (v < 0 ? ` - ${-v}` : ` + ${v}`);
 
+/** Typographic clean-up: no 1x / 1k / 1t / 1e^, no ^{1}, no '+ -' or '- -', no dangling \cdot. */
+function tidyStr(t) {
+  if (typeof t !== 'string') return t;
+  return t
+    .replace(/(^|[^\d.\w\\])1(?=[xkt](?![a-zA-Z{]))/g, '$1')
+    .replace(/(^|[^\d.\w\\])1(?=e\^)/g, '$1')
+    .replace(/\^\{1\}(?!\d)/g, '')
+    .replace(/\+ -(?=\d|\\|[a-z])/g, '- ')
+    .replace(/- -(?=\d|\\|[a-z])/g, '+ ')
+    .replace(/\\cdot\s*(?=[$}),.])/g, '');
+}
+function tidy(q) {
+  if (!q) return;
+  q.prompt = tidyStr(q.prompt);
+  if (Array.isArray(q.hints)) q.hints = q.hints.map(tidyStr);
+  if (Array.isArray(q.steps)) q.steps = q.steps.map(st => ({ ...st, h: tidyStr(st.h), d: tidyStr(st.d) }));
+  if (Array.isArray(q.mcqOptions)) q.mcqOptions = q.mcqOptions.map(tidyStr);
+  if (q.answer?.optionTraps) for (const k of Object.keys(q.answer.optionTraps)) q.answer.optionTraps[k] = tidyStr(q.answer.optionTraps[k]);
+  if (Array.isArray(q.traps)) for (const t of q.traps) if (t.why) t.why = tidyStr(t.why);
+}
+
 /** Wrap a generator: make = payload only; gen carries the independent truth. */
 const V = (name, diffs, raw) => {
   // a draw that lands on a degenerate case is redrawn from the same rng (never thrown to the caller)
   const gen = (rng, diff) => { let last; for (let i = 0; i < 80; i++) { try { return raw(rng, diff); } catch (e) { last = e; } } throw last; };
-  return { name, diffs, gen, make: (rng, diff) => gen(rng, diff)[0] };
+  return { name, diffs, gen: (rng, diff) => { const out = gen(rng, diff); tidy(out[0]); return out; }, make: (rng, diff) => { const out = gen(rng, diff); tidy(out[0]); return out[0]; } };
 };
 
 /** Numeric payload; a trap that equals the key (or repeats) is not a misconception. */
@@ -480,7 +502,7 @@ expForms.push(V('exp-product-rule', [2, 3, 4], (rng) => {
     prefix: 'dy/dx =', inputHint: `e.g. x^${n - 1}e^(${a}x)(${n}${a < 0 ? ' - ' : ' + '}${Math.abs(a)}x)`,
     traps: [
       { expr: `${n}*x^${n - 1}*${a}*e^(${a}*x)`, why: 'The product rule is $u\'v + uv\'$ — a sum of two terms, not the product of the derivatives.' },
-      { expr: `x^${n - 1}*e^(${a}*x)*(${n}+x)`, why: `$\\dfrac{d}{dx}e^{${ex(a)}} = ${cf(a)}e^{${ex(a)}}$, so the second term carries the factor $${a}$.` }
+      { expr: `x^${n - 1}*e^(${a}*x)*(${n}${a === 1 ? '-' : '+'}x)`, why: `$\\dfrac{d}{dx}e^{${ex(a)}} = ${cf(a)}e^{${ex(a)}}$, so the second term carries the factor $${a}$.` }
     ],
     hints: [`Product rule: $y' = u'v + uv'$ with $u = x^{${n}}$ and $v = e^{${ex(a)}}$.`, `$u' = ${n}${xn}$ and $v' = ${cf(a)}e^{${ex(a)}}$.`, `Take the common factor $${xn}e^{${ex(a)}}$ out.`],
     steps: [{ h: 'Derivatives of each factor', d: `$u' = ${n}${xn}$, $v' = ${cf(a)}e^{${ex(a)}}$` }, { h: 'Product rule', d: `$y' = ${n}${xn}e^{${ex(a)}} ${a < 0 ? '-' : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}x^{${n}}e^{${ex(a)}}$` }, { h: 'Factorise', d: `$y' = ${xn}e^{${ex(a)}}(${n} ${a < 0 ? '-' : '+'} ${Math.abs(a) === 1 ? '' : Math.abs(a)}x)$` }]
@@ -765,22 +787,22 @@ expForms.push(V('exp-mcq-integral-error', [2, 3, 4], (rng) => {
     return [q, { kind: 'mcq' }];
   }
   // locate the first wrong line in a working for d/dx[ x e^{ax} ] = (1 + a x) e^{ax}
-  const wrong = ri(rng, 0, 3);
+  const wrong = ri(rng, 1, 4);   // the first faulty line; every faulty line differs from its correct version
   const L = [
-    [`$u = x,\\ v = e^{${a}x}$`, `$u = x,\\ v = e^{${a}x}$`],
+    [`$u = x,\\ v = e^{${a}x}$`, `$u = x,\\ v = e^{x}$`],
     [`$u' = 1,\\ v' = ${a}e^{${a}x}$`, `$u' = 1,\\ v' = e^{${a}x}$`],
     [`$y' = u'v + uv' = e^{${a}x} + ${a}xe^{${a}x}$`, `$y' = u'v \\times uv' = ${a}xe^{${2 * a}x}$`],
     [`$y' = (1 + ${a}x)e^{${a}x}$`, `$y' = (1 + x)${a}e^{${a}x}$`]
   ];
-  // wrong = index of the first erroneous line (0 means "no error" option)
-  const show = L.map((pair, i) => (wrong === 0 ? pair[0] : (i + 1 === wrong ? pair[1] : (i + 1 > wrong ? pair[0] : pair[0]))));
-  const lines = show.map((s, i) => `Line ${i + 1}: ${s}`).join('\n');
+  for (const pr of L) if (pr[0] === pr[1]) throw new Error('faulty line equals correct line');
+  const show = L.map((pair, i) => (i + 1 === wrong ? pair[1] : pair[0]));
+  const lines = show.map((t, i) => `Line ${i + 1}: ${t}`).join('\n');
   const optionsText = ['Line 1', 'Line 2', 'Line 3', 'Line 4'];
-  const correctText = wrong === 0 ? 'There is no error' : optionsText[wrong - 1];
+  const correctText = optionsText[wrong - 1];
   const q = mcQ(rng, `A student differentiates $y = xe^{${a}x}$ using the product rule:\n\n${lines}\n\nWhich line contains the **first** error?`, correctText,
-    [...optionsText, 'There is no error'].filter(t => t !== correctText).map(t => ({ text: t })).slice(0, 3),
-    ['Check each line against the product rule $y\' = u\'v + uv\'$.', `$\\dfrac{d}{dx}e^{${a}x} = ${a}e^{${a}x}$.`, 'Work down the lines in order.'],
-    [{ h: 'Correct working', d: `$u = x$, $v = e^{${a}x}$, $u' = 1$, $v' = ${a}e^{${a}x}$` }, { h: 'Product rule', d: `$y' = e^{${a}x} + ${a}xe^{${a}x} = (1 + ${a}x)e^{${a}x}$` }, { h: 'Compare', d: correctText }]);
+    optionsText.filter(t => t !== correctText).map(t => ({ text: t })),
+    ["Check each line against the product rule $y' = u'v + uv'$.", `$\\dfrac{d}{dx}e^{${a}x} = ${a}e^{${a}x}$.`, 'Work down the lines in order.'],
+    [{ h: 'Correct working', d: `$u = x$, $v = e^{${a}x}$, $u' = 1$, $v' = ${a}e^{${a}x}$` }, { h: 'Product rule', d: `$y' = e^{${a}x} + ${a}xe^{${a}x} = (1 + ${a}x)e^{${a}x}$` }, { h: 'Compare', d: `The faulty line is Line ${wrong}: it differs from the correct working shown here.` }]);
   return [q, { kind: 'mcq' }];
 }));
 
@@ -869,14 +891,18 @@ function bisect(f, lo, hi) { for (let i = 0; i < 200; i++) { const mid = (lo + h
 
 // Vertical projectile context: AFL kick, cricket throw
 motionForms.push(V('motion-projectile', [2, 3, 4], (rng) => {
-  const m = ri(rng, 1, 4), s = ri(rng, m + 1, m + 6);
-  const a0 = 5 * (s * s - m * m);
-  const hs = `${a0 > 0 ? `${a0} + ` : ''}${cf(10 * m)}t - 5t^2`.replace('+ -', '- ');
-  const ctx = rc(rng, [
-    { who: 'A kicker at the Sydney Cricket Ground punts a football', obj: 'The ball' },
-    { who: 'A fielder at the Gabba throws a cricket ball vertically upwards', obj: 'The ball' },
-    { who: 'A netball is thrown straight up in a Perth gym', obj: 'The ball' }
+  // believable launch speeds and heights: kicks and skyers leave the ground; a throw from a platform starts 15-40 m up
+  const ctx0 = rc(rng, [
+    { who: 'A kicker at the Sydney Cricket Ground punts a football straight up', ground: true, mMax: 2 },
+    { who: 'A batter at the Gabba skies a cricket ball almost vertically', ground: true, mMax: 3 },
+    { who: 'A netball is thrown straight up in a Perth gym', ground: true, mMax: 1 },
+    { who: 'A ball is thrown straight up from a viewing platform at Bondi', ground: false, mMax: 2 }
   ]);
+  let m, s, a0;
+  if (ctx0.ground) { m = ri(rng, 1, ctx0.mMax); s = m; a0 = 0; }
+  else { const pr = rc(rng, [[1, 2], [1, 3], [2, 3]]); m = pr[0]; s = pr[1]; a0 = 5 * (s * s - m * m); }
+  const hs = `${a0 > 0 ? `${a0} + ` : ''}${cf(10 * m)}t - 5t^2`;
+  const ctx = { who: ctx0.ground ? ctx0.who : `${ctx0.who}, ${a0} m above the ground`, obj: 'The ball' };
   const lead = `${ctx.who}. Its height above the ground is $h(t) = ${hs}$ metres, $t$ seconds after release.`;
   const ask = ri(rng, 1, 4);
   const maxH = a0 + 5 * m * m, tg = m + s, vImp = 10 * s;
@@ -888,21 +914,21 @@ motionForms.push(V('motion-projectile', [2, 3, 4], (rng) => {
     4: `Find the **speed** of the ball when it hits the ground.`
   };
   const traps = {
-    1: [{ value: m, why: `$t = ${m}$ is the **time** of the greatest height — substitute it into $h(t)$ to get the height.` }, { value: a0, why: `$h(0) = ${a0}$ is the height at release, not the maximum.` }],
+    1: [{ value: m, why: `$t = ${m}$ is the **time** of the greatest height — substitute it into $h(t)$ to get the height.` }, { value: a0 === 0 ? 5 * m : a0, why: a0 === 0 ? `$${5 * m}$ is not the greatest height; evaluate $h$ at the time its velocity is zero.` : `$h(0) = ${a0}$ is the height at release, not the maximum.` }],
     2: [{ value: maxH, why: `$${maxH}$ is the maximum **height**; the question asks when it happens.` }, { value: 2 * m, why: `The velocity is $v = ${10 * m} - 10t$, which is zero at $t = ${m}$ — not at twice that.` }],
-    3: [{ value: m, why: `$t = ${m}$ is when the ball is at its highest. It still has to fall back to the ground.` }, { value: s, why: `Solve $h(t) = 0$ carefully: $t = ${m} + ${s}$.` }].filter(t => t.value !== tg),
+    3: [{ value: m, why: `$t = ${m}$ is when the ball is at its highest. It still has to fall back to the ground.` }, { value: s + 1, why: `Solve $h(t) = 0$ carefully: the positive root is $t = ${tg}$.` }].filter(t => t.value !== tg),
     4: [{ value: -vImp, why: 'Speed is the **magnitude** of the velocity, so it is positive.' }, { value: 10 * tg, why: `Velocity is $v(t) = ${10 * m} - 10t$, not $10t$ — the ball was thrown up first.` }, { value: 10 * m, why: `That is the initial speed. At $t = ${tg}$ the speed is larger because the ball has been falling.` }]
   };
   const hints = {
     1: ['At the greatest height the velocity is zero.', `$v(t) = h'(t) = ${10 * m} - 10t = 0$ gives $t = ${m}$.`, `Substitute $t = ${m}$ into $h(t)$.`],
     2: ['The ball is momentarily at rest at its highest point.', `$h'(t) = ${10 * m} - 10t$.`, 'Solve $h\'(t) = 0$.'],
-    3: ['The ball is on the ground when $h(t) = 0$.', `Divide by $-5$: $t^2 - ${2 * m}t - ${s * s - m * m} = 0$.`, `Factorise: $(t - ${tg})(t + ${s - m}) = 0$; reject the negative root.`],
+    3: ['The ball is on the ground when $h(t) = 0$.', `Divide by $-5$: $t^2 - ${2 * m}t${s > m ? ` - ${s * s - m * m}` : ''} = 0$.`, s > m ? `Factorise: $(t - ${tg})(t + ${s - m}) = 0$; reject the negative root.` : `Factorise: $t(t - ${tg}) = 0$; $t = 0$ is the release, so the landing time is the other root.`],
     4: [`First find when the ball lands: solve $h(t) = 0$ for $t > 0$.`, `$v(t) = ${10 * m} - 10t$.`, `Evaluate $v(${tg})$ and take the magnitude.`]
   };
   const steps = {
     1: [{ h: 'Velocity', d: `$v(t) = ${10 * m} - 10t$` }, { h: 'Time of greatest height', d: `$t = ${m}$` }, { h: 'Height', d: `$h(${m}) = ${maxH}$ m` }],
     2: [{ h: 'Velocity', d: `$v(t) = ${10 * m} - 10t$` }, { h: 'Set to zero', d: `$${10 * m} - 10t = 0$` }, { h: 'Solve', d: `$t = ${m}$ s` }],
-    3: [{ h: 'Set height to zero', d: `$${hs} = 0$` }, { h: 'Factorise', d: `$(t - ${tg})(t + ${s - m}) = 0$` }, { h: 'Positive root', d: `$t = ${tg}$ s` }],
+    3: [{ h: 'Set height to zero', d: `$${hs} = 0$` }, { h: 'Factorise', d: s > m ? `$(t - ${tg})(t + ${s - m}) = 0$` : `$t(t - ${tg}) = 0$` }, { h: 'Landing time', d: `$t = ${tg}$ s` }],
     4: [{ h: 'Landing time', d: `$h(t) = 0$ at $t = ${tg}$ s` }, { h: 'Velocity then', d: `$v(${tg}) = ${10 * m} - ${10 * tg} = ${10 * m - 10 * tg}$ m/s` }, { h: 'Speed', d: `$${vImp}$ m/s` }]
   };
   const q = numQ(`${lead} ${prompts[ask]}`, common[ask][0], { suffix: common[ask][1], traps: traps[ask], hints: hints[ask], steps: steps[ask] });
@@ -1070,11 +1096,11 @@ motionForms.push(V('motion-show-shm', [2, 3, 4], (rng) => {
     return [q, { kind: 'num', value: -acc / x(t0), tolOverride: 1e-3 }];
   }
   const A = ri(rng, 2, 9), c = nz(rng, -5, 5);
-  const q = numQ(`The distance of a drone from its base is $x(t) = ${A}e^{${ex(c)}}$ metres after $t$ seconds. Show that $\\dfrac{dx}{dt} = c\\,x$ for a constant $c$, and find $c$.`, c, {
+  const q = numQ(`The distance of a drone from its base is $x(t) = ${A}e^{${et(c)}}$ metres after $t$ seconds. Show that $\\dfrac{dx}{dt} = c\\,x$ for a constant $c$, and find $c$.`, c, {
     prefix: 'c =',
-    traps: [{ value: A * c, why: `$\\dfrac{dx}{dt} = ${A * c}e^{${ex(c)}} = ${c}\\times ${A}e^{${ex(c)}}$ — the constant $c$ is the multiplier of $x$, not of $e^{${ex(c)}}$.` }, { value: -c, why: 'Check the sign of the exponent when differentiating.' }],
-    hints: [`$\\dfrac{d}{dt}e^{${ex(c)}} = ${c}e^{${ex(c)}}$.`, `So $\\dfrac{dx}{dt} = ${A * c}e^{${ex(c)}}$.`, `Write this as $c \\times ${A}e^{${ex(c)}}$.`],
-    steps: [{ h: 'Differentiate', d: `$\\dfrac{dx}{dt} = ${A * c}e^{${ex(c)}}$` }, { h: 'Rewrite', d: `$= ${c} \\times ${A}e^{${ex(c)}} = ${c}x$` }, { h: 'Constant', d: `$c = ${c}$` }]
+    traps: [{ value: A * c, why: `$\\dfrac{dx}{dt} = ${A * c}e^{${et(c)}} = ${c}\\times ${A}e^{${et(c)}}$ — the constant $c$ is the multiplier of $x$, not of $e^{${et(c)}}$.` }, { value: -c, why: 'Check the sign of the exponent when differentiating.' }],
+    hints: [`$\\dfrac{d}{dt}e^{${et(c)}} = ${c}e^{${et(c)}}$.`, `So $\\dfrac{dx}{dt} = ${A * c}e^{${et(c)}}$.`, `Write this as $c \\times ${A}e^{${et(c)}}$.`],
+    steps: [{ h: 'Differentiate', d: `$\\dfrac{dx}{dt} = ${A * c}e^{${et(c)}}$` }, { h: 'Rewrite', d: `$= ${c} \\times ${A}e^{${et(c)}} = ${c}x$` }, { h: 'Constant', d: `$c = ${c}$` }]
   });
   const x = t => A * Math.exp(c * t), t0 = 0.4;
   return [q, { kind: 'num', value: numD(x, t0) / x(t0), tolOverride: 1e-6 }];
@@ -1296,7 +1322,7 @@ seriesForms.push(V('series-sigma', [2, 3, 4], (rng) => {
   }
   const A = ri(rng, 1, 9), r = rc(rng, [2, 3]), n = ri(rng, 3, 8);
   const val = A * r * (r ** n - 1) / (r - 1);
-  const q = numQ(`Evaluate $\\displaystyle\\sum_{k=1}^{${n}} ${A === 1 ? '' : A}\\cdot ${r}^{k}$.`, val, {
+  const q = numQ(`Evaluate $\\displaystyle\\sum_{k=1}^{${n}} ${A === 1 ? '' : `${A}\\cdot `}${r}^{k}$.`, val, {
     traps: [{ value: A * (r ** n - 1) / (r - 1), why: `The first term is $${A}\\cdot ${r}^1 = ${A * r}$ (not $${A}$) — the series starts at $k = 1$.` }, { value: A * r * (r ** (n + 1) - 1) / (r - 1), why: `There are exactly $${n}$ terms, from $k = 1$ to $k = ${n}$.` }].filter(t => t.value !== val),
     hints: [`Write out the first terms: $${A * r} + ${A * r * r} + \\cdots$.`, `This is geometric with $a = ${A * r}$, $r = ${r}$ and $${n}$ terms.`, '$S_n = \\dfrac{a(r^n - 1)}{r - 1}$.'],
     steps: [{ h: 'First term and ratio', d: `$a = ${A * r}$, $r = ${r}$, $n = ${n}$` }, { h: 'Formula', d: `$S_{${n}} = \\dfrac{${A * r}(${r}^{${n}} - 1)}{${r} - 1}$` }, { h: 'Evaluate', d: `$${val}$` }]
