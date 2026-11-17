@@ -46,6 +46,11 @@ ok(r.firstBreak === -1, 'x^2=9 then x=3 then x=-3 is correct');
 r = stepCheck({ kind: 'equation', variable: 'x', solutions: [0, 3, -3] }, ['x(x^2-9)=0', 'x=0', 'x^2=9', 'x=5'].join('\n'));
 ok(r.firstBreak === 3, 'x^2=9 then x=5 is a break at the value line');
 
+r = run(['(x-3)(x-5)=0', 'x-3=0', 'x-5=0', 'x=3', 'x=5']);
+ok(r.firstBreak === -1, 'both branches written first, then their values in order, is correct');
+r = run(['(x-3)(x-5)=0', 'x-3=0', 'x-5=0', 'x=3', 'x=6']);
+ok(r.firstBreak === 4, 'a value no branch above gives is still a break');
+
 // 4. `e` as the variable.
 r = stepCheck({ kind: 'derivative', variable: 'e', source: 'e^2' }, '2e');
 ok(r.lines[0].status !== 'ok' && r.lines[0].status !== 'break', 'differentiating in e is not read with e as Euler\'s number: it abstains');

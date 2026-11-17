@@ -1075,12 +1075,17 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               // A VALUE line (x = 5) written straight under a branch (x - 3 = 0)
               // must be one of the roots that branch gives: a true root of the question that
               // the line above does not produce is a slip, however true it is.
-              const above = branchLines[branchLines.length - 1];
-              if (valued && above && above.index === i - 1 && !above.valued && !held.every(h => above.covered.some(c => numsClose(h, c)))) {
+              // (Any branch in the unbroken run of branch lines just above may give it:
+              // x - 3 = 0, x - 5 = 0, then x = 3, x = 5.)
+              const run = [];
+              for (let k = branchLines.length - 1, at = i - 1; k >= 0 && branchLines[k].index === at && !branchLines[k].valued; k--, at--) run.push(branchLines[k]);
+              const above = run[0];
+              const given = run.flatMap(b => b.covered);
+              if (valued && above && !held.every(h => given.some(c => numsClose(h, c)))) {
                 status = 'break';
                 lineDiagnosis = {
                   code: 'branch-value-mismatch', title: 'This value does not follow from the line above',
-                  message: `The line above gives ${meta.variable} = ${above.covered.map(v => Number(v.toPrecision(8))).join(' or ')}, not ${meta.variable} = ${held.map(v => Number(v.toPrecision(8))).join(' or ')}.`,
+                  message: `The line above gives ${meta.variable} = ${given.map(v => Number(v.toPrecision(8))).join(' or ')}, not ${meta.variable} = ${held.map(v => Number(v.toPrecision(8))).join(' or ')}.`,
                   fix: 'Solve the line above for the unknown, then write that value.', confidence: 'high'
                 };
                 lineDiagnosis = withConfidence(lineDiagnosis);
