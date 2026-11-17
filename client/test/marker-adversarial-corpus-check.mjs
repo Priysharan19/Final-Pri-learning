@@ -204,7 +204,7 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   else failures.push(`${G} · c10-arithmetic-progressions D2 seed 1009: normal [${normal}] vs slow clock [${slow}]`);
 }
 
-// ── SymPy differential oracle, 2026-11-18 · 60 cases ────────────────────────
+// ── SymPy differential oracle, 2026-11-18 · 66 cases ────────────────────────
 // tools/math-oracle found the checker crediting each wrong answer below
 // (docs/evidence/sympy-oracle-2026-11-18.md, PR #993): a calculator display of an exact
 // value on a question that demands the exact value, and final-answer
@@ -257,7 +257,12 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
     [square, `x^2 + ${vanishing}*(x+abs(x)) + (1.1-1.1)*10^20*(x+abs(x))`], [square, `x^2 + ${vanishing}*(x+abs(x)) + (1.1-1.1)*10^15*(x+abs(x))`],
     [square, 'x^2 + 0.0000001*(x+abs(x)) + (1.1-1.1)*10^20*(x+abs(x))'], [y9, 'x^2 - 169 + 0.0000001*(x+abs(x)) + (1.1-1.1)*10^20*(x+abs(x))'],
     [generateQuestion('mex-proof', 3, 21001), '32n + 0.00001*(n-4.5+abs(n-4.5)) + (1.1-1.1)*10^20*(n-4.5+abs(n-4.5))'],
-    [square, 'x^2 + 0.0000001x + (sin(x)^2 + cos(x)^2 - 1)*10^20*(x+abs(x))'], [square, 'x^2 + 1e-15x'], [square, 'x^2 + 0.0000000001x'],
+    [square, 'x^2 + 0.0000001x + (sin(x)^2 + cos(x)^2 - 1)*10^20*(x+abs(x))'], [square, 'x^2 + 0.0000000001x'],
+    // round 6: a function call or a power past the exact bounds used to leave the
+    // wide probes behind
+    [square, 'x^2 + 1000(x-4+abs(x-4))*cos(0)'], [square, 'x^2 + 1000(x-4+sqrt((x-4)^2))'], [square, 'x^2 + 1000(x-4+abs(x-4)) + 0*sin(x)'],
+    [square, 'x^2 + 1000(x-4+abs(x-4)) + 0*(x^2+1)^70'], [y9, 'x^2 - 169 + 1000(x-4+abs(x-4))*cos(0)'],
+    [generateQuestion('mex-proof', 3, 21001), '32n + (n-8.5+abs(n-8.5))*cos(0)'], [square, 'x^2 + 0.0000001x*cos(0)'],
     [{ answerType: 'expression', answer: { expr: 'abs(2x + 7)^7' } }, '128x^7 + 3136x^6 + 32928x^5 + 192080x^4 + 672280x^3 + 1411788x^2 + 1647086x + 823543']
   ]) expect(G, `padded-${w.slice(0, 48)}`, q, w, false);
   const thirdExact = { answerType: 'numeric', prompt: 'Find the exact value.', answer: { value: 1 / 3, requireExact: true } };
@@ -265,7 +270,7 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   for (const w of ['0.3333333333', '0.33333333']) expect(G, `third-wrong-${w}`, thirdExact, w, false);
 }
 
-// ── The probe keeps right answers right · 1087 cases ─────────────────────────
+// ── The probe keeps right answers right · 1091 cases ─────────────────────────
 // Independent review of the probe above (PR #992): an expanded high-degree
 // polynomial is a difference of large terms and carries their rounding, so a
 // band on the result alone refused (2x + 7)⁷ written out. Every expansion of
@@ -292,7 +297,10 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   }
   for (const [key, answer, extra] of [
     ['abs(2x + 7)^7', expand(2, 7, 7), { positiveOnly: true }], ['abs(2x - 5)^8', expand(2, -5, 8)], ['sqrt((2x - 5)^16)', expand(2, -5, 8)],
-    ['(2x + 7)^(-7)', `1/(${expand(2, 7, 7)})`], ['1/(x - 3)^4', '1/(x^4 - 12x^3 + 54x^2 - 108x + 81)', { positiveOnly: true }]
+    ['(2x + 7)^(-7)', `1/(${expand(2, 7, 7)})`], ['1/(x - 3)^4', '1/(x^4 - 12x^3 + 54x^2 - 108x + 81)', { positiveOnly: true }],
+    ['sqrt(abs((3x - 9)^4(2x - 8)^3))', 'sqrt(abs(648x^7 - 15552x^6 + 159408x^5 - 904608x^4 + 3069576x^3 - 6228576x^2 + 6998400x - 3359232))'],
+    // a written decimal gets the numeric noise floor (marking-tolerance.md), both ways
+    ['x/3', '0.333333333333333x'], ['x/7', '0.142857142857143x'], ['0.333333333333333x', 'x/3']
   ]) expect(G, `noise-in-${key}`, { answerType: 'expression', answer: { expr: key, ...(extra || {}) } }, answer, true);
   expect(G, 'expanded-(x-3)^10-positive', { answerType: 'expression', answer: { expr: '(x - 3)^10', positiveOnly: true } }, expand(1, -3, 10), true);
 }
@@ -312,8 +320,23 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   ]) expect(G, `refused-${id}-${input.slice(0, 30)}`, generateQuestion(id, d, seed), input, false);
 }
 
+// ── Policy and residual · 3 cases ────────────────────────────────────────────
+// A written decimal within the numeric noise floor (1e-12 of the value) is the
+// value, as 0.333333333333 is 1/3 (marking-tolerance.md): x² + 1e-15x is x².
+// XFAIL, pinned so it cannot spread: behind a function call the float probe
+// cannot resolve a term between 1e-12 and 1e-9 of the value (x² − 169 +
+// 0.0000000001x·cos 0). Follow-up: an exact path that treats a function of a
+// constant as an exact symbol. When it lands, flip `true` to `false`.
+{
+  const G = 'noise-floor-and-XFAIL';
+  const sq = { answerType: 'expression', answer: { expr: 'x^2' } };
+  expect(G, 'noise-floor-1e-15', sq, 'x^2 + 1e-15x', true);
+  expect(G, 'beyond-noise-floor-1e-12x-refused', sq, 'x^2 + 1e-12x', false);
+  expect(G, 'XFAIL-float-path-1e-10-behind-a-function', generateQuestion('y9-algebra', 3, 21001), 'x^2-169 + 0.0000000001x*cos(0)', true);
+}
+
 // ── Counts are part of the contract ─────────────────────────────────────────
-const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 60, 'sympy-oracle-2026-11-18-controls': 1087, 'formerly-XFAIL-exact-probe': 5 };
+const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 66, 'sympy-oracle-2026-11-18-controls': 1091, 'formerly-XFAIL-exact-probe': 5, 'noise-floor-and-XFAIL': 3 };
 for (const [g, n] of Object.entries(EXPECTED)) if (groups[g]?.total !== n) failures.push(`${g}: built ${groups[g]?.total} cases, the corpus has ${n}`);
 
 const pass = Object.values(groups).reduce((s, g) => s + g.pass, 0);

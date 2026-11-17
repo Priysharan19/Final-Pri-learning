@@ -709,8 +709,10 @@ function withError(ast, env, memo = new Map()) {
       if (ast.op === '^') {
         const [l, el] = withError(ast.l, env, memo);
         const [r, er] = withError(ast.r, env, memo);
-        const v = evaluate(ast, env, DOMAIN_EVAL);
-        const shift = (dl, dr) => abs(evaluate({ t: 'bin', op: '^', l: { t: 'num', v: l + dl }, r: { t: 'num', v: r + dr } }, env, DOMAIN_EVAL) - v);
+        // the power of the children's values (exact where they are), not a fresh float evaluation
+        const powAt = (lv, rv) => evaluate({ t: 'bin', op: '^', l: { t: 'num', v: lv }, r: { t: 'num', v: rv } }, env, DOMAIN_EVAL);
+        const v = powAt(l, r);
+        const shift = (dl, dr) => abs(powAt(l + dl, r + dr) - v);
         const dl = el ? Math.max(shift(el, 0), shift(-el, 0)) : 0, dr = er ? Math.max(shift(0, er), shift(0, -er)) : 0;
         return [v, dl + dr + abs(v) * 2 * EPS];
       }
@@ -729,10 +731,11 @@ function withError(ast, env, memo = new Map()) {
       }
     }
     case 'call': {
-      const v = evaluate(ast, env, DOMAIN_EVAL);
-      if (Array.isArray(ast.args) || !Object.hasOwn(FUNCTIONS, ast.fn)) return [v, abs(v) * 1e-13];   // sums, counting: Lanczos-level
+      if (Array.isArray(ast.args) || !Object.hasOwn(FUNCTIONS, ast.fn)) { const v = evaluate(ast, env, DOMAIN_EVAL); return [v, abs(v) * 1e-13]; }   // sums, counting: Lanczos-level
       const [a, ea] = withError(ast.arg, env, memo);
       const f = FUNCTIONS[ast.fn];
+      // the function of the argument's value (exact where it is), not a fresh float evaluation
+      const v = f(a);
       return [v, (ea ? Math.max(abs(f(a + ea) - v), abs(f(a - ea) - v)) : 0) + abs(v) * 2 * EPS];
     }
     // a probe variable is exact by construction; π and e are rounded once
@@ -831,10 +834,56 @@ function probeSeed(a, b) {
  * to within evaluation noise? A point where either side is undefined says
  * nothing and is skipped; the domain probe judges definedness.
  */
+/** Does a tree write a decimal literal (0.5, 1e-7)? */
+function writesDecimal(ast) {
+  if (!ast || typeof ast !== 'object') return false;
+  if (ast.t === 'num') return typeof ast.s === 'string' ? /[.eE]/.test(ast.s) : !Number.isInteger(ast.v);
+  return ['v', 'l', 'r', 'arg'].some(k => writesDecimal(ast[k])) || (Array.isArray(ast.args) && ast.args.some(writesDecimal));
+}
+
+/**
+ * Compare the two sides at one point: 'ok', 'differ', 'skip' (the reference is
+ * undefined or unreadable here), 'undefined' (the answer is undefined where the
+ * reference is not) or 'noisy' (only the answer's rounding hides the value).
+ */
+function comparePoint(astA, astB, env, decimals) {
+  const qa = exactOrUndefined(astA, env), qb = exactOrUndefined(astB, env);
+  if (qa !== undefined && qb !== undefined) {
+    if (qb === null) return 'skip';
+    if (qa === null) return 'undefined';
+    if (qa.n === qb.n && qa.d === qb.d) return 'ok';
+    // A written decimal gets the numeric noise floor (marking-tolerance.md):
+    // 0.333333333333333x is x/3 as 0.333333333333 is 1/3. Nothing coarser.
+    if (decimals) {
+      // the same band as an exact-value demand: max(1e-12, 8 ulps of the value)
+      const diff = abs(xqNumber(xq(qa.n * qb.d - qb.n * qa.d, qa.d * qb.d))), v = abs(xqNumber(qb));
+      if (diff <= Math.max(1e-12, v * 8 * EPS)) return 'ok';
+    }
+    return 'differ';
+  }
+  // One side exact, the other not (a function): the exact side is its true
+  // value, rounded once, so an expanded polynomial carries no rounding of its own.
+  const [va, ea] = qa === null ? [NaN, NaN] : qa ? [xqNumber(qa), abs(xqNumber(qa)) * EPS] : withError(astA, env);
+  const [vb, eb] = qb === null ? [NaN, NaN] : qb ? [xqNumber(qb), abs(xqNumber(qb)) * EPS] : withError(astB, env);
+  if (!fin(vb)) return 'skip';
+  if (!fin(va)) return 'undefined';
+  const size = Math.max(1, abs(va), abs(vb));
+  // Only the REFERENCE's rounding widens the band (the second argument: the key,
+  // in every marking call); the answer's own rounding never does (#992 review,
+  // round 4). A point the reference cannot read says nothing; a point only the
+  // ANSWER makes unreadable refuses it, so an answer cannot choose where it is
+  // compared (round 5).
+  const band = Math.max(1e-9 * size, 64 * eb);
+  if (!(64 * eb <= 1e-6 * size)) return 'skip';
+  if (!(64 * ea <= band)) return 'noisy';
+  return abs(va - vb) > band ? 'differ' : 'ok';
+}
+
 function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed, wide = false) {
   let x = seed >>> 0;
   // mulberry32: xorshift32's first draws from nearby seeds bunch together
   const next = () => { x = (x + 0x6D2B79F5) >>> 0; let t = x; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const decimals = writesDecimal(astA) || writesDecimal(astB);
   let readable = 0, undefinedHere = 0;
   // Up to 24 draws for 6 readable points (8 with a whole-number variable, whose
   // values 1‥8 are each visited in turn, so a term that is zero for n ≤ 4 and
@@ -852,45 +901,20 @@ function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed,
       // exact probe's denominators stay small
       env[n] = Math.round(env[n] * 1024) / 1024;
     }
-    // Exact first: both sides in rationals, no rounding to hide behind.
-    const qa = exactOrUndefined(astA, env), qb = exactOrUndefined(astB, env);
-    if (qa !== undefined && qb !== undefined) {
-      if (qb === null) continue;                              // the reference is undefined here
-      if (qa === null) { undefinedHere++; continue; }          // the answer is undefined where the reference is not
-      readable++;
-      if (qa.n !== qb.n || qa.d !== qb.d) return false;
-      continue;
-    }
-    // One side exact, the other not (a function): the exact side is its true
-    // value, rounded once, so an expanded polynomial carries no rounding of its own.
-    const [va, ea] = qa === null ? [NaN, NaN] : qa ? [xqNumber(qa), abs(xqNumber(qa)) * EPS] : withError(astA, env);
-    const [vb, eb] = qb === null ? [NaN, NaN] : qb ? [xqNumber(qb), abs(xqNumber(qb)) * EPS] : withError(astB, env);
-    if (!fin(vb)) continue;                                   // the reference is undefined here: nothing to compare
-    if (!fin(va)) { undefinedHere++; continue; }               // the answer is undefined where the reference is not
-    const size = Math.max(1, abs(va), abs(vb));
-    // Only the REFERENCE's rounding widens the band (the second argument: the
-    // key, in every marking call); the answer's own rounding never does (#992
-    // review, round 4). A point the reference cannot read says nothing. A point
-    // only the ANSWER makes unreadable refuses it: otherwise an answer could
-    // choose where it is compared (round 5: a padded zero that is noisy only
-    // where the answer is wrong).
-    const band = Math.max(1e-9 * size, 64 * eb);
-    if (!(64 * eb <= 1e-6 * size)) continue;
-    if (!(64 * ea <= band)) return false;
-    readable++;
-    if (abs(va - vb) > band) return false;
+    const r = comparePoint(astA, astB, env, decimals);
+    if (r === 'differ' || r === 'noisy') return false;
+    if (r === 'ok') readable++;
+    else if (r === 'undefined') undefinedHere++;
   }
   // An answer undefined almost everywhere it could be compared (+ 0·sqrt(tiny −
-  // …²), defined only near the published samples) is not shown equal. Where the
-  // reference itself is mostly undefined or unreadable, the sampling above decides.
-  // (An interval difference is the domain policy's to judge, not this probe's:
-  // ln x + ln y for ln(xy) is undefined on half the reference's domain and is
-  // accepted by default. Only an answer undefined almost everywhere the
-  // reference is defined is refused here.)
+  // …²), defined only near the published samples) is not shown equal. (An
+  // interval difference is the domain policy's to judge, not this probe's: ln x
+  // + ln y for ln(xy) is accepted by default.) Where the reference itself is
+  // mostly undefined or unreadable, the sampling above decides.
   if ((readable < 3 && undefinedHere >= 3) || undefinedHere > 3 * readable) return false;
-  // With no authored domain, an exactly computable pair is also compared far
-  // out (|x| from 1 to 10⁶): a term that vanishes on the sampled interval and
-  // not beyond it (0.00001·(n − 4.5 + |n − 4.5|)) is seen there (round 5).
+  // With no authored domain, the pair is also compared far out (|x| from 1 to
+  // 10⁶), exactly or in floats: a term that vanishes on the sampled interval and
+  // not beyond it (1000·(x − 4 + |x − 4|)) is seen there (rounds 5 and 6).
   if (wide) {
     for (let k = 0; k < 6; k++) {
       const env = {};
@@ -899,10 +923,13 @@ function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed,
         const mag = 10 ** (next() * 6), sign = positiveOnly || next() < 0.5 ? 1 : -1;
         env[n] = sign * Math.round(mag * 1024) / 1024;
       }
-      const qa = exactOrUndefined(astA, env), qb = exactOrUndefined(astB, env);
-      if (qa === undefined || qb === undefined) break;          // not exactly computable: the interval probe stands
-      if (qb === null) continue;
-      if (qa === null || qa.n !== qb.n || qa.d !== qb.d) return false;
+      // Far out, floats overflow and lose their argument (e^x, sec x at 10⁵): the
+      // float comparison is used only to |x| ≤ 10³, and there only a clear
+      // disagreement refuses; the exact comparison runs at every magnitude.
+      const exactPair = exactOrUndefined(astA, env) !== undefined && exactOrUndefined(astB, env) !== undefined;
+      if (!exactPair && names.some(n => abs(env[n]) > 1000)) continue;
+      const r = comparePoint(astA, astB, env, decimals);
+      if (r === 'differ' || (exactPair && r === 'noisy')) return false;
     }
   }
   return true;
