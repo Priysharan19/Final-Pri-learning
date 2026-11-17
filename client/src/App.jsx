@@ -637,6 +637,18 @@ export default function App() {
   const teacherOnly = (element) =>
     user.role === 'teacher' ? element : <Navigate to="/" replace />;
 
+  const destinationLink = (item, className, onClick) => {
+    const active = isDestinationActive(loc, item.to);
+    return (
+      <PageLink key={item.to} to={item.to} className={`${className}${active ? ' active' : ''}`}
+        aria-current={active ? 'page' : undefined} onClick={onClick}>
+        <span className="nav-ico" aria-hidden="true">{item.ico}</span>
+        <span className="nav-label">{t(item.key)}</span>
+        {item.to === '/' && dueCount > 0 && <span className="nav-badge">{t('nav.due', { count: dueCount, n: dueCount })}</span>}
+      </PageLink>
+    );
+  };
+
   const switchProfile = async () => {
     // The reminders runtime is loaded here, on the way out, rather than named
     // at the top of this file: a static import carried the study planner it

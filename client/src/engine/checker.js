@@ -782,6 +782,12 @@ function flagUnfinishedFinalLine(out, meta) {
   }
 }
 
+/** `x = 4` written on its own: a value line, as opposed to a respelling of one (`x/2 = 3`). */
+function statesPlainValue(text, variable) {
+  if (typeof text !== 'string' || !variable) return false;
+  return new RegExp(`^\\s*${variable}\\s*=\\s*[-+]?\\d+(\\.\\d+)?(/\\d+)?\\s*$`).test(text);
+}
+
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, calculus = null, named = false, prompt = '' } = {}) {
   const calculusStage = { claimed: false };   // calculusSteps.js: has a line made a claim yet?
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -1240,7 +1246,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               for (let k = branchLines.length - 1, at = i - 1; k >= 0 && branchLines[k].index === at && !branchLines[k].valued && !branchLines[k].expLog; k--, at--) run.push(branchLines[k]);
               const above = run[0];
               const given = run.flatMap(b => b.covered);
-              if (valued && above && !held.every(h => given.some(c => numsClose(h, c)))) {
+              if (valued && above && run.length === 1 && run[0].covered.length === 1 && !held.every(h => given.some(c => numsClose(h, c)))) {
                 status = 'break';
                 lineDiagnosis = {
                   code: 'branch-value-mismatch', title: 'This value does not follow from the line above',
@@ -1388,7 +1394,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       for (const b of branchLines) {
         out[b.index].note = `True for ${meta.variable} = ${b.covered.join(' or ')} — the equation has ${wanted.length} solutions, and the other is still to find.`;
       }
-    } else if (!listedInFull && !complete && (firstBreak === -1 || (branchLines[0].valued && branchLines[0].index < firstBreak))) {
+    } else if (!listedInFull && !complete && (firstBreak === -1 || (branchLines[0].index < firstBreak && out[firstBreak]?.diagnosis?.code !== 'branch-value-mismatch' && (branchLines[0].valued || !statesPlainValue(out[firstBreak]?.text, meta.variable))))) {
       const { index } = branchLines[0];
       const diagnosis = lostRootDiagnosis(meta.variable, covered.join(' or ') || 'this branch', wanted.length);
       out[index] = { text: out[index].text, status: 'break', note: diagnosis.message, diagnosis };
