@@ -13,7 +13,7 @@ export default {
     prereqs: ['ma4-frc-c-01'],
     concepts: [
       { title: 'Kinds of data', body: 'Categorical data names a group, such as favourite sport or eye colour. Numerical data is a count or a measurement. A count (shoe size, goals scored) is discrete; a measurement (height, time) is continuous and can take any value in a range.' },
-      { title: 'Frequency tables and class intervals', body: 'A frequency table lists each value, or each class interval, with the number of times it occurs. Equal class intervals keep a graph fair. The class width is $\\dfrac{\\text{range}}{\\text{number of classes}}$, rounded up to a convenient number.' },
+      { title: 'Frequency tables and class intervals', body: 'A frequency table lists each value, or each class interval, with the number of times it occurs. Equal class intervals keep a graph fair. For whole-number data, divide the number of possible values, $\\text{range}+1$, by the number of classes and round up so that every value is covered.' },
       { title: 'Choosing and reading a graph', body: 'A column graph compares categories, a dot plot or stem-and-leaf plot shows every value in a small data set, a histogram shows the shape of a large numerical set, and a sector graph shows parts of a whole. The scale, the axis labels and the title must let a reader recover the data.' }
     ],
     definitions: [
