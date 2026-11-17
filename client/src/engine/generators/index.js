@@ -364,6 +364,8 @@ const INDIA_BANK_OF = {
 
 /** Holds the generators of every bank loaded so far, keyed by subtopic id. */
 export const GENERATORS = {};
+/** Further structural forms per skill id: [{ form, make(rng, diff) => { payload, check } }]. */
+export const EXTRA_FORMS = {};
 
 const loaded = new Set();
 const inflight = new Map();
@@ -405,13 +407,20 @@ function bankLoader(name) {
   };
 }
 
+/** Extra structural forms ride with the Indian banks only, one chunk per class (forms/loader.js). */
+function extraFormsFor(name, ids) {
+  return String(name).startsWith('india-') ? import('./forms/loader.js').then(m => m.loadExtraForms(ids)) : Promise.resolve({});
+}
+
 function loadBank(name) {
   const loader = bankLoader(name);
   if (!loader || loaded.has(name)) return Promise.resolve();
   let job = inflight.get(name);
   if (!job) {
-    job = loader().then(bank => {
+    job = loader().then(async bank => {
+      const extra = await extraFormsFor(name, Object.keys(bank));
       Object.assign(GENERATORS, bank);
+      Object.assign(EXTRA_FORMS, extra);
       loaded.add(name);
       inflight.delete(name);
     }, err => {
@@ -596,7 +605,13 @@ export function generateQuestion(subtopicId, difficulty, seed, dotpointId, pick 
   const rng = makeRng(s);
   const d = Math.min(4, Math.max(1, want | 0));
   if (pick && dotpointId != null) throw new Error('A picked item has no requested dot point');
-  const payload = pick ? pick(rng) : gen(rng, d);
+  // The established generator is the skill's direct form. Skills with extra
+  // forms draw one from the seed through a separate rng, so the direct form's
+  // own stream (and every seed it already served) is unchanged. (A picked item
+  // is its own form: no extra form is drawn for it.)
+  const extra = !pick && Object.hasOwn(EXTRA_FORMS, subtopicId) ? EXTRA_FORMS[subtopicId] : null;
+  const formPick = extra ? Math.floor(makeRng((s ^ 0x2f6b9c1d) >>> 0)() * (extra.length + 1)) : 0;
+  const payload = pick ? pick(rng) : formPick === 0 ? gen(rng, d) : extra[formPick - 1].make(rng, d).payload;
   const q = { seed: s, subtopic: subtopicId, difficulty: pick ? payload.difficulty : d, ...payload };
   const { list, source, perQuestion } = dotpointsOf(gen, subtopicId, q.difficulty, payload);
   q.dotpoints = list.map(dp => dp.id);
