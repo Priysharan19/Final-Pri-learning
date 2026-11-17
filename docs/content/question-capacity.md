@@ -73,7 +73,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms12-right-triangle` | 4 | 10.0k | 24 | — |
 | `y11-trigfunc` | 2 | 10.2k | 192 | — |
 | `ms12-rates` | 4 | 11.0k | 34 | — |
-| `y11-probability` | 4 | 11.1k | 81 | — |
+| `y11-probability` | 4 | 11.3k | 81 | — |
 | `y8-equations` | 3 | 14.7k | 26 | — |
 | `y10-simeq` | 4 | 17.0k | 6 | — |
 | `y11-quadfunc` | 3 | 18.5k | 75 | — |

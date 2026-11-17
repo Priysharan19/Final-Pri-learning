@@ -31,7 +31,17 @@ const fracQ = (prompt, f, o) => ({
   traps: dedupe((o.traps || []).map(t => ({ ...t, value: typeof t.f === 'object' ? t.f.value : t.value })), f.value),
   hints: o.hints, steps: o.steps
 });
-const mcQ = (rng, prompt, correct, ds, hints, steps) => {
+const mcQ = (rng, prompt, correct, ds, hints, steps, cv) => {
+  // Reject any distractor whose VALUE equals the key's (or another distractor's).
+  const seen = new Set();
+  ds = ds.filter(d => {
+    if (d.v === undefined) return true;
+    if (cv !== undefined && Math.abs(d.v - cv) < 1e-9) return false;
+    const k = Math.round(d.v * 1e6);
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
   const m = mcq(rng, correct, ds);
   return { prompt, answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options, hints, steps };
 };
@@ -89,7 +99,7 @@ const linesForms = [
       opt(new Frac(q, p), 'The reciprocal is right but perpendicular gradients have opposite signs.')].filter(o => Math.abs(o.v - perp.value) > 1e-9);
     return mcQ(rng, `Which could be the gradient of a line **perpendicular** to $y = ${mx(M)} ${sgn(c0)}$?`, `$m = ${perp.latex()}$`, ds,
       ['Perpendicular gradients multiply to $-1$.', 'Take the negative reciprocal of the given gradient.', 'Check: the two gradients should multiply to $-1$.'],
-      [{ h: 'Read the gradient', d: `$m_1 = ${M.latex()}$` }, { h: 'Negative reciprocal', d: `$m_2 = -\\dfrac{1}{${M.latex()}} = ${perp.latex()}$` }]);
+      [{ h: 'Read the gradient', d: `$m_1 = ${M.latex()}$` }, { h: 'Negative reciprocal', d: `$m_2 = -\\dfrac{1}{${M.latex()}} = ${perp.latex()}$` }], perp.value);
   } },
   // D1 — representation change: general form
   { diffs: [1], make: rng => {
@@ -545,7 +555,7 @@ const diffForms = [
     let a, b, c, x0, m, y0;
     do { a = nz(rng, -3, 3); b = nz(rng, -6, 6); c = nz(rng, -8, 8); x0 = nz(rng, -3, 3); m = 2 * a * x0 + b; y0 = a * x0 * x0 + b * x0 + c; } while (m === 0);
     const cand = [[y0, 'That is the $y$-value at $x = ' + x0 + '$ (the height of the curve), not its gradient.'], [a * x0 + b, 'The derivative of $' + term(a, 'x', 2) + '$ is $' + 2 * a + 'x$, so the factor $2$ was missed.'], [2 * a * x0 - b, 'The derivative of $' + b + 'x$ is $+' + b + '$ — its sign does not change.'], [m + 1, 'Check the arithmetic when substituting.']].filter(([v]) => v !== m);
-    return mcQ(rng, `What is the gradient of the tangent to $y = ${poly([a, b, c])}$ at the point where $x = ${x0}$?`, `$${m}$`, cand.map(([v, why]) => ({ text: `$${v}$`, why })),
+    return mcQ(rng, `What is the gradient of the tangent to $y = ${poly([a, b, c])}$ at the point where $x = ${x0}$?`, `$${m}$`, cand.map(([v, why]) => ({ text: `$${v}$`, why, v })),
       ['The gradient of the tangent is the derivative evaluated at the point.', `$\\dfrac{dy}{dx} = ${poly([2 * a, b])}$.`, `Substitute $x = ${x0}$.`],
       [{ h: 'Differentiate', d: `$\\dfrac{dy}{dx} = ${poly([2 * a, b])}$` }, { h: 'Substitute', d: `$${m}$` }]);
   } },
@@ -670,16 +680,16 @@ const probForms = [
   // D1 — MCQ: which expression counts the situation
   { diffs: [1], make: rng => {
     const ordered = rng() < 0.5, n = ri(rng, 7, 15), r = ri(rng, 3, 5);
-    const sit = ordered
-      ? rc(rng, [`awards first, second and third prizes to ${r} different people chosen from $${n}$ entrants`.replace(/\$?\d+\$? different/, `${r} different`), `assigns $${r}$ different jobs to $${r}$ people chosen from $${n}$ volunteers`])
-      : rc(rng, [`chooses a committee of $${r}$ people from $${n}$ nominees`, `selects $${r}$ players from a squad of $${n}$ to form a team`]);
+    const stem = ordered
+      ? rc(rng, [`Which expression gives the number of ways to award $${r}$ ranked prizes (1st, 2nd and so on), one to each of $${r}$ different people chosen from $${n}$ entrants?`, `Which expression gives the number of ways to assign $${r}$ different jobs, one each to $${r}$ people chosen from $${n}$ volunteers?`])
+      : rc(rng, [`Which expression gives the number of ways to choose a committee of $${r}$ people from $${n}$ nominees?`, `Which expression gives the number of ways to select $${r}$ players from a squad of $${n}$ to form a team?`]);
     const P = `{}^{${n}}P_{${r}}`, C = `{}^{${n}}C_{${r}}`;
     const ds = ordered
-      ? [{ text: `$${C}$`, why: 'That counts unordered groups. Here the positions are different, so order matters.' }, { text: `$${n}^{${r}}$`, why: 'That allows the same person to be chosen more than once.' }, { text: `$\\dfrac{${n}!}{${r}!}$`, why: 'The count of ordered selections divides by $(n - r)!$, not $r!$.' }]
-      : [{ text: `$${P}$`, why: 'That counts ordered arrangements. Here only who is chosen matters, not the order.' }, { text: `$${n}^{${r}}$`, why: 'That allows the same person to be chosen more than once.' }, { text: `$\\dfrac{${n}!}{${r}!}$`, why: 'The count of unordered selections divides by $r!\\,(n - r)!$.' }];
-    return mcQ(rng, `Which expression gives the number of ways a club ${sit}?`.replace('a club', ordered ? 'a school' : 'a club'), `$${ordered ? P : C}$`, ds,
+      ? [{ text: `$${C}$`, v: nCr(n, r), why: 'That counts unordered groups. Here the positions are different, so order matters.' }, { text: `$${n}^{${r}}$`, v: Math.pow(n, r), why: 'That allows the same person to be chosen more than once.' }, { text: `$\\dfrac{${n}!}{${r}!}$`, v: fact(n) / fact(r), why: 'The count of ordered selections divides by $(n - r)!$, not $r!$.' }]
+      : [{ text: `$${P}$`, v: nPr(n, r), why: 'That counts ordered arrangements. Here only who is chosen matters, not the order.' }, { text: `$${n}^{${r}}$`, v: Math.pow(n, r), why: 'That allows the same person to be chosen more than once.' }, { text: `$\\dfrac{${n}!}{${r}!}$`, v: fact(n) / fact(r), why: 'The count of unordered selections divides by $r!\\,(n - r)!$.' }];
+    return mcQ(rng, stem, `$${ordered ? P : C}$`, ds,
       ['Ask: does the order, or role, matter?', 'If order matters use $ {}^{n}P_{r}$; if not, use $ {}^{n}C_{r}$.', 'Rule out any option that allows repeats.'],
-      [{ h: 'Decide', d: ordered ? 'Order (roles) matters: permutations.' : 'Only the group matters: combinations.' }, { h: 'Expression', d: `$${ordered ? P : C}$` }]);
+      [{ h: 'Decide', d: ordered ? 'Order (roles) matters: permutations.' : 'Only the group matters: combinations.' }, { h: 'Expression', d: `$${ordered ? P : C}$` }], ordered ? nPr(n, r) : nCr(n, r));
   } },
   // D1 — symmetry of combinations (show that): find the other value
   { diffs: [1], make: rng => {
@@ -750,10 +760,18 @@ const probForms = [
     const w = rc(rng, WORDS), cs = wordCounts(w), n = w.length, rs = cs.filter(c => c > 1);
     const fix = c => `${c}!`;
     const correct = `$\\dfrac{${n}!}{${rs.map(fix).join('\\,')}}$`;
-    const ds = [{ text: `$${n}!$`, why: 'That treats every letter as different, so identical letters swapped are counted as different arrangements.' }, { text: `$\\dfrac{${n}!}{${rs.reduce((a, b) => a + b, 0)}!}$`, why: 'Divide by the factorial of each repeat count **separately** and multiply the denominators; do not add the counts first.' }, { text: `$\\dfrac{${n}!}{${rs.reduce((a, b) => a * b, 1)}}$`, why: 'Divide by $k!$ for each letter repeated $k$ times, not by $k$.' }].filter(o => o.text !== correct);
+    const prodR = rs.reduce((a, b) => a * b, 1), sumR = rs.reduce((a, b) => a + b, 0), distinct = cs.length;
+    const key = fact(n) / rs.reduce((a, c) => a * fact(c), 1);
+    const ds = [
+      { text: `$${n}!$`, v: fact(n), why: 'That treats every letter as different, so identical letters swapped are counted as different arrangements.' },
+      { text: `$\\dfrac{${n}!}{${sumR}!}$`, v: fact(n) / fact(sumR), why: 'Divide by the factorial of each repeat count **separately** and multiply the denominators; do not add the counts first.' },
+      { text: `$\\dfrac{${n}!}{${prodR}}$`, v: fact(n) / prodR, why: 'Divide by $k!$ for each letter repeated $k$ times, not by $k$.' },
+      { text: `$\\dfrac{${n}!}{${distinct}!}$`, v: fact(n) / fact(distinct), why: 'The divisor depends on how often letters repeat, not on how many different letters there are.' },
+      { text: `$${n - 1}!$`, v: fact(n - 1), why: 'Fixing one letter ignores the repeats among the others.' }
+    ].filter(o => o.text !== correct);
     return mcQ(rng, `Which expression gives the number of different arrangements of all the letters of **${w}**?`, correct, ds,
       ['Count how many times each letter occurs.', 'Divide $n!$ by the factorial of each repeat count.', 'Identical letters cannot be told apart.'],
-      [{ h: 'Letter counts', d: `${rs.join(', ')} repeated` }, { h: 'Expression', d: correct }]);
+      [{ h: 'Letter counts', d: `${rs.join(', ')} repeated` }, { h: 'Expression', d: correct }], key);
   } },
   // D2 — reverse: how many letters
   { diffs: [2], make: rng => {
@@ -814,10 +832,10 @@ const probForms = [
   { diffs: [3], make: rng => {
     let N, nA, nB, nAB;
     do { N = rc(rng, [30, 36, 40, 48, 50]); nA = ri(rng, 10, 24); nB = ri(rng, 8, 22); nAB = ri(rng, 2, Math.min(nA, nB) - 2); } while (nA === nB || nA + nB - nAB > N - 3 || nAB === nA - 0);
-    const ds = [{ text: `$${rat(nAB, nA)}$`, why: 'That divides by $n(A)$, so it is $P(B \\mid A)$, the other conditional probability.' }, { text: `$${rat(nAB, N)}$`, why: 'That is $P(A \\cap B)$, the probability of both events, with no conditioning.' }, { text: `$${rat(nA, nB)}$`, why: 'This compares the sizes of $A$ and $B$ but ignores the overlap.' }];
+    const ds = [{ text: `$${rat(nAB, nA)}$`, v: nAB / nA, why: 'That divides by $n(A)$, so it is $P(B \\mid A)$, the other conditional probability.' }, { text: `$${rat(nAB, N)}$`, v: nAB / N, why: 'That is $P(A \\cap B)$, the probability of both events, with no conditioning.' }, { text: `$${rat(nA, nB)}$`, v: nA / nB, why: 'This compares the sizes of $A$ and $B$ but ignores the overlap.' }];
     return mcQ(rng, `Among $${N}$ students, $${nA}$ study Music ($A$), $${nB}$ study Drama ($B$) and $${nAB}$ study both. One student is chosen at random. Which expression gives $P(A \\mid B)$, the probability of studying Music **given** that the student studies Drama?`, `$${rat(nAB, nB)}$`, ds,
       ['The condition is the **given** event: it becomes the new sample space.', '$P(A \\mid B) = \\dfrac{n(A \\cap B)}{n(B)}$.', 'The denominator is the size of $B$.'],
-      [{ h: 'Restrict to B', d: `$n(B) = ${nB}$` }, { h: 'Overlap', d: `$n(A \\cap B) = ${nAB}$` }, { h: 'Probability', d: `$P(A \\mid B) = ${rat(nAB, nB)}$` }]);
+      [{ h: 'Restrict to B', d: `$n(B) = ${nB}$` }, { h: 'Overlap', d: `$n(A \\cap B) = ${nAB}$` }, { h: 'Probability', d: `$P(A \\mid B) = ${rat(nAB, nB)}$` }], nAB / nB);
   } },
   // D3 — two suppliers: P(supplier | defective) (tree-diagram reversal)
   { diffs: [3], make: rng => {
@@ -889,10 +907,10 @@ const probForms = [
   // D4 — MCQ: expression for red then green without replacement
   { diffs: [4], make: rng => {
     const r = ri(rng, 3, 9), g = ri(rng, 3, 9), N = r + g;
-    const ds = [{ text: `$${rat(r, N)} \\times ${rat(g, N)}$`, why: 'That assumes the first counter is replaced. Without replacement the second draw is from $' + (N - 1) + '$ counters.' }, { text: `$${rat(r, N)} + ${rat(g, N - 1)}$`, why: '"Then" means both happen in sequence, so **multiply** the probabilities; adding is for "or".' }, { text: `$${rat(r, N)} \\times ${rat(g - 1, N - 1)}$`, why: 'The first counter is red, so only red counters have been removed. The number of green is still $' + g + '$.' }];
+    const ds = [{ text: `$${rat(r, N)} \\times ${rat(g, N)}$`, v: r * g / (N * N), why: 'That assumes the first counter is replaced. Without replacement the second draw is from $' + (N - 1) + '$ counters.' }, { text: `$${rat(r, N)} + ${rat(g, N - 1)}$`, v: r / N + g / (N - 1), why: '"Then" means both happen in sequence, so **multiply** the probabilities; adding is for "or".' }, { text: `$${rat(r, N)} \\times ${rat(g - 1, N - 1)}$`, v: r * (g - 1) / (N * (N - 1)), why: 'The first counter is red, so only red counters have been removed. The number of green is still $' + g + '$.' }];
     return mcQ(rng, `A bag holds $${r}$ red and $${g}$ green counters. Two are drawn without replacement. Which expression gives the probability that the first is red and the second is green?`, `$${rat(r, N)} \\times ${rat(g, N - 1)}$`, ds,
       ['"And then" means multiply.', 'After one red counter is removed the bag holds one fewer counter.', 'The number of green counters has not changed.'],
-      [{ h: 'First draw', d: `$P(\\text{red}) = ${rat(r, N)}$` }, { h: 'Second draw', d: `$P(\\text{green} \\mid \\text{red first}) = ${rat(g, N - 1)}$` }, { h: 'Multiply', d: `$${rat(r, N)} \\times ${rat(g, N - 1)}$` }]);
+      [{ h: 'First draw', d: `$P(\\text{red}) = ${rat(r, N)}$` }, { h: 'Second draw', d: `$P(\\text{green} \\mid \\text{red first}) = ${rat(g, N - 1)}$` }, { h: 'Multiply', d: `$${rat(r, N)} \\times ${rat(g, N - 1)}$` }], r * g / (N * (N - 1)));
   } },
   // D1/D2 — selection from two groups (product of combinations)
   { diffs: [1, 2], make: rng => {
@@ -1028,6 +1046,8 @@ export const tidy = t => {
       .replace(/\^\{1\}(?![0-9])/g, '')
       .replace(/ [+\u2212-] 0(?![\d.a-zA-Z])/g, '')
       .replace(/ [+-] 0[xyh](\^\{?\d+\}?)?(?![\w.])/g, '')
+      .replace(/\\dfrac\{(-*)(\d+)\}\{(-*)(\d+)\}/g, (_, a, n, b, d) => { const neg = (a.length + b.length) % 2 === 1; return (neg ? '-' : '') + (d === '1' ? n : `\\dfrac{${n}}{${d}}`); })
+      .replace(/\+-/g, '-').replace(/(?<=[\s$(=])--(?=\d|\\)/g, '')
       .replace(/\+ -/g, '- ').replace(/- -/g, '+ ').replace(/\+ \+/g, '+ ')
       .replace(/-\s?\(-(\d+)\)/g, '+ $1');
   }

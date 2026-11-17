@@ -1536,9 +1536,16 @@ const SCR = [
   }
 ];
 
+// Display-only clean-up: a long float tail in shown text (1.3157894736842106) is rounded to 4 d.p.
+// The answer object is never touched, so keys and tolerances are unchanged.
+const roundTails = v => typeof v === 'string' ? v.replace(/(\d+\.\d{7,})/g, m => String(Math.round(Number(m) * 1e4) / 1e4))
+  : Array.isArray(v) ? v.map(roundTails)
+  : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === 'answer' ? x : roundTails(x)])) : v;
+const clean = list => list.map(f => ({ ...f, make: (rng, diff) => roundTails(f.make(rng, diff)) }));
+
 export const forms = {
-  'y11-trigfunc': TRIG,
-  'y11-quadfunc': QUAD,
-  'y11-explog': EXPLOG,
-  'y11-sine-cosine-rule': SCR
+  'y11-trigfunc': clean(TRIG),
+  'y11-quadfunc': clean(QUAD),
+  'y11-explog': clean(EXPLOG),
+  'y11-sine-cosine-rule': clean(SCR)
 };
