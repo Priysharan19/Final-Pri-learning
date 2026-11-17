@@ -18,9 +18,9 @@
 // what a server says it is with this build; a difference is a blocking state
 // (components/EditionMismatch.jsx), never something to adapt to.
 // ─────────────────────────────────────────────────────────────────────────────
-import { EDITION_RECORD, EDITION_LITERAL } from './edition-record.js';
+import { EDITION_RECORD } from './edition-record.js';
 
-export const EDITION = EDITION_LITERAL;
+export const EDITION = EDITION_RECORD.id;
 
 /** The request header this build declares its edition in (the server only ever refuses on it). */
 export const EDITION_HEADER = 'X-Pri-Edition';
@@ -28,8 +28,6 @@ export const EDITION_HEADER = 'X-Pri-Edition';
 export const edition = () => EDITION_RECORD;
 export const defaultCourse = () => EDITION_RECORD.defaultCourse;
 export const offersCourse = course => EDITION_RECORD.courses.includes(course);
-/** Whether this edition has parent-facing features (the parent report, its email links, the parent sign-in path). Priyabhata only. */
-export const parentFeaturesOffered = () => EDITION_RECORD.family.parentFeatures === true;
 
 const EDITION_ID = /^[a-z]{3,24}$/;
 
