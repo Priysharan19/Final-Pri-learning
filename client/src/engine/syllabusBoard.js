@@ -34,7 +34,8 @@
 //
 // Product choices, not research thresholds: the floors are progressEvidence's;
 // the question counts, the 3 minutes a question and the 5-point "level" trend
-// band are wording/estimation choices (docs/research/DELAYED_TRANSFER_
+// band, and the BREADTH rule (at least half of an outcome's located dot points,
+// rounded up — so an outcome with one or two needs one) are wording/estimation choices (docs/research/DELAYED_TRANSFER_
 // MEASUREMENT_PROTOCOL.md §15–16: separate evidence, no fake precision; a
 // missing delayed outcome is not a zero, so "independent" is not demoted for
 // never having been re-checked).

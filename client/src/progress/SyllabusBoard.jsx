@@ -82,10 +82,11 @@ export function StateGlyph({ state, size = 18 }) {
 }
 
 /** A topic's sentence: how many points are shown on their own, then only the states it holds. */
-function groupSummary(tally, t) {
+export function groupSummary(tally, t) {
   const parts = [t('board.sum.own', { own: tally.independent + tally.retained, total: tally.total })];
   if (tally.retained) parts.push(t('board.sum.held', { n: tally.retained }));
   if (tally.assisted) parts.push(t('board.sum.help', { n: tally.assisted }));
+  if (tally.recheck) parts.push(t('board.sum.recheck', { n: tally.recheck }));
   if (tally.thin) parts.push(t('board.sum.thin', { n: tally.thin }));
   if (tally.seen) parts.push(t('board.sum.seen', { n: tally.seen }));
   if (tally['not-started']) parts.push(t('board.sum.none', { n: tally['not-started'] }));

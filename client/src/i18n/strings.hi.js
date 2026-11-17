@@ -285,6 +285,7 @@ export default {
   'board.sum.own': '{total} में से {own} अपने दम पर दिखाए',
   'board.sum.held': '{n} अंतराल के बाद भी टिके',
   'board.sum.help': '{n} केवल मदद से',
+  'board.sum.recheck': '{n} फिसले, फिर से देखें',
   'board.sum.thin': '{n} में अभी पर्याप्त प्रमाण नहीं',
   'board.sum.seen': '{n} हल किए, अभी सही नहीं',
   'board.sum.none': '{n} शुरू नहीं हुए',

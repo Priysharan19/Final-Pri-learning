@@ -231,6 +231,10 @@ try {
   for (const lang of ['en', 'hi']) {
     await i18n.setLanguage(lang);
     const t = (k, v) => i18n.translate(k, v);
+    // Every state present in a topic is named in its sentence, so the parts add up to the total.
+    const sentence = view.groupSummary({ 'not-started': 1, seen: 1, assisted: 1, thin: 1, recheck: 1, independent: 1, retained: 1, total: 7 }, t);
+    eq(sentence.split(' · ').length, 7, `${lang}: a topic sentence names every state it holds, slipped included`);
+    ok(sentence.includes(t('board.sum.recheck', { n: 1 })), `${lang}: slipped points are spoken in the topic sentence`);
     const words = B.NODE_STATES.map(s => t(`board.state.${{ 'not-started': 'notStarted' }[s] || s}`));
     eq(new Set(words).size, B.NODE_STATES.length, `${lang}: a distinct word for every state`);
     const html = draw(view.BoardView, { board: inBoard, india: true, track: 'cbse', courseLabel: 'Class 12 CBSE / NCERT' });

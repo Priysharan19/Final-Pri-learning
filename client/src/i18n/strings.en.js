@@ -225,6 +225,7 @@ export default {
   'board.sum.own': '{own} of {total} shown on your own',
   'board.sum.held': '{n} held after a gap',
   'board.sum.help': '{n} with help only',
+  'board.sum.recheck': '{n} slipped, needs another look',
   'board.sum.thin': '{n} not enough evidence yet',
   'board.sum.seen': '{n} answered, not yet right',
   'board.sum.none': '{n} not started',
