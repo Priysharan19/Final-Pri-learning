@@ -62,6 +62,7 @@ function engineMark(item, opts = {}) {
   const verdicts = item.lines.map((_, i) => {
     if (i === 0 && item.kind !== 'derivative') return 'given';
     const s = st[i];
+    if (rep.lines[i]?.secondBreak) return 'invalid';   // a later line disproved against the line above it
     if (s === 'ok' && incomplete[i] && !opts.ignoreIncompleteNote) return 'invalid';
     return s === 'ok' ? 'valid' : s === 'break' ? 'invalid' : 'abstain';
   });

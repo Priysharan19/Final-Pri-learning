@@ -602,6 +602,16 @@ function lineVersusPrevious(prevText, text, meta) {
     const side = s => (s.includes('=') ? s.split('=').pop() : s);
     const ea = side(na), eb = side(nb);
     if (!ea.trim() || !eb.trim()) return 'unknown';
+    // Both sides must READ as expressions in the question's own unknown
+    // before a difference means anything: prose, units and other letters are
+    // not a disproof (exprEquivalent is also false on a parse failure).
+    const known = new Set([meta.variable].filter(Boolean));
+    for (const src of [meta.canonical, meta.source]) {
+      if (typeof src === 'string') { try { for (const v of variablesOf(parse(normalize(src)))) known.add(v); } catch { /* ignore */ } }
+    }
+    const pa = parse(ea), pb = parse(eb);
+    if (pa.t === 'equation' || pb.t === 'equation') return 'unknown';
+    for (const node of [pa, pb]) for (const v of variablesOf(node)) if (!known.has(v)) return 'unknown';
     return exprEquivalent(ea, eb) ? 'same' : 'different';
   }
   return 'unknown';
@@ -615,16 +625,15 @@ function checkLinesAfterBreakAgainstPrevious(out, firstBreak, meta) {
     if (!prev || prev.unread || (i - 1 !== firstBreak && prev.status === 'note' && prev.note !== 'Follows from the earlier slip.')) continue;
     let verdict = 'unknown';
     try { verdict = lineVersusPrevious(prev.text, row.text, meta); } catch { verdict = 'unknown'; }
-    if (verdict === 'different' && (row.status === 'ok' || /earlier slip/.test(String(row.note || '')))) {
+    if (verdict === 'different' && (row.status === 'ok' || row.status === 'note')) {
       let diagnosis = null;
       try { diagnosis = diagnoseStep({ prevText: prev.text, brokenText: row.text, meta }); } catch { diagnosis = null; }
-      row.status = 'break';
+      // A flag, not a status: every mark, count and "verified" test reads the
+      // status, and the marks policy is unchanged (one slip costs one mark).
+      row.secondBreak = true;
       row.independent = true;
       row.note = (diagnosis && diagnosis.message) || 'This line does not follow from the line above it — a second slip.';
       if (diagnosis) row.diagnosis = withConfidence(diagnosis); else delete row.diagnosis;
-    } else if (verdict === 'same' && row.status === 'break') {
-      row.status = 'note';
-      row.note = 'Follows from the earlier slip.';
     }
   }
 }
