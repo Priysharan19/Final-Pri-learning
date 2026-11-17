@@ -2016,11 +2016,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const photoAwaitingValidReading = !photoEligibleForGrading({ mode, photo,
     ocrPhase: photoOCR.phase, unreadPages: pdfUnread, pdfPageCount,
     reattachRequired: photoReattachRequired });
-  // Stale ink + Submit: the same read as "Read again" (same server reader, consent and online gates,
-  // answer-blind), shown to the student. Nothing is sent: the reading must be seen first, and a
-  // second Submit sends it only if the ink is unchanged since that read (inkStale is false then).
-  const rereadable = INSTRUMENT && writeMode && !isMcq && !resolved && inkHasStrokes && inkStale;
-  const rereadFromSubmit = () => { setRereadAsked(true); inkControlRef.current?.read?.(); };
   const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? inkReadable : !!working.trim()) : writeMode ? (inkReadable && !!inkResult?.answerLine && !!String(inkAnswer).trim()) : !!answer.trim()) &&
     !photoAwaitingValidReading && !(mode === 'photo' && photoReadExpired);
   // Reader refused by authentication is not a handwriting error or a
@@ -2195,6 +2190,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     ? inkResult.lines.filter(l => !String(l?.text ?? '').trim() || isLowConfidence(l, confidenceFloorOf(inkResult))).length : 0;
 
   // ── The one dominant next move ─────────────────────────────────────────────
+  // Stale ink + Submit: the same read as "Read again" (same server reader, consent and online gates,
+  // answer-blind), shown to the student. Nothing is sent: the reading must be seen first, and a
+  // second Submit sends it only if the ink is unchanged since that read (inkStale is false then).
+  // A reader that is already known to be blocked (signed out, a limit, the service down) has its own
+  // reason and action beside the work, so Submit waits there instead of being a press that cannot read.
+  const rereadable = INSTRUMENT && writeMode && !isMcq && !resolved && inkHasStrokes && inkStale && !inkAccountBlocked && !inkBlockKey;
+  const rereadFromSubmit = () => { setRereadAsked(true); inkControlRef.current?.read?.(); };
   const primary = resolved || state.res?.conflict
     ? { label: t('practice.nextQuestion'), run: () => onNext?.(), disabled: false }
     : unmarkable
