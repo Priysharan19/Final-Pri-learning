@@ -156,7 +156,7 @@ const raw = {
     const x2 = a * T ** 3 / 3, x1 = b * T ** 2 / 2;
     const val = x2 + x1;
     return {
-      prompt: `A particle moves along a line with velocity $v(t) = ${a === 1 ? '' : a}t^2 + ${b}t$ metres per second. It starts at the origin. Find its displacement, in metres, from the origin after $${T}$ seconds.`,
+      prompt: `A particle moves along a line with velocity $v(t) = ${a === 1 ? '' : a}t^2 + ${b === 1 ? '' : b}t$ metres per second. It starts at the origin. Find its displacement, in metres, from the origin after $${T}$ seconds.`,
       answerType: 'numeric', answer: { value: val }, answerSuffix: 'm',
       traps: [{ value: a * T * T + b * T, why: 'Displacement is the integral of velocity over the time interval, not the velocity at the end.' }],
       hints: ['Displacement $= \\displaystyle\\int_0^T v(t)\\,dt$.', `$\\displaystyle\\int (${a === 1 ? '' : a}t^2 + ${b}t)\\,dt = \\dfrac{${a}t^3}{3} + \\dfrac{${b}t^2}{2}$.`, `Substitute $t = ${T}$.`],
@@ -232,7 +232,7 @@ const raw = {
     if (form === 'variance-from-moments') {
       const mu = ri(rng, 2, 15), v = ri(rng, 1, 40);
       return {
-        formTag: 'reverse', prompt: `For a random variable $X$, $E(X) = ${mu}$ and $E(X^2) = ${mu * mu + v}$. Find $\\mathrm{Var}(X)$.`,
+        formTag: 'direct', prompt: `For a random variable $X$, $E(X) = ${mu}$ and $E(X^2) = ${mu * mu + v}$. Find $\\mathrm{Var}(X)$.`,
         answerType: 'numeric', answer: { value: v },
         traps: [{ value: mu * mu + v - mu, why: '$\\mathrm{Var}(X) = E(X^2) - [E(X)]^2$: square the mean, then subtract.' }].filter(t => t.value !== v),
         hints: ['$\\mathrm{Var}(X) = E(X^2) - [E(X)]^2$.', `$[E(X)]^2 = ${mu * mu}$.`, 'Subtract.'],
@@ -250,7 +250,7 @@ const raw = {
       };
     }
     if (form === 'z-forward' || form === 'z-reverse') {
-      const mu = ri(rng, 20, 120), sd = ri(rng, 2, 12), z = rc(rng, [1, 2, 3, -1, -2, -3]), x = mu + z * sd;
+      const sd = ri(rng, 2, 12), mu = ri(rng, 4 * sd + 20, 4 * sd + 120), z = rc(rng, [1, 2, 3, -1, -2, -3]), x = mu + z * sd;
       const things = ['masses of loaves', 'marks in a test', 'times for a 100 m sprint, in tenths of a second', 'lengths of bolts, in millimetres'];
       const thing = rc(rng, things);
       if (form === 'z-forward') {
@@ -383,7 +383,7 @@ const raw = {
     }
     if (form === 'two-stage') {
       const { r, a, b, n, P } = pick(1, 2, 1);
-      const x = P * a ** n / b ** n, dep = b * ri(rng, 100, 3000) / 10 * 10;
+      const x = P * a ** n / b ** n, dep = b * 10 * ri(rng, 1, Math.max(1, Math.floor(x / (b * 40))));
       const total = (x + dep) * a / b;
       return {
         formTag: 'multi-step', prompt: `${D(P)} is invested at ${r}% per annum, compounded annually. After ${n} year${n > 1 ? 's' : ''}, ${D(dep)} is added to the account, and it earns interest for one more year at the same rate. What is the balance at the end, in dollars?`,
@@ -395,8 +395,9 @@ const raw = {
     }
     if (form === 'loan-balance') {
       const { r, a, b, P: B } = pick(1, 1);
-      const M = 100 * ri(rng, 2, 30), after = B * a / b - M;
-      if (after <= 0) return raw['y12-fin-exact'](rng, diff);
+      const interest = B * (a - b) / b, lo = Math.ceil((interest + 100) / 100), hi = Math.floor((B * a / b - 100) / 100);
+      if (hi < lo) return raw['y12-fin-exact'](rng, diff);
+      const M = 100 * ri(rng, lo, Math.min(hi, lo + 30)), after = B * a / b - M;   // the repayment exceeds the interest, so the debt falls
       return {
         formTag: 'context', prompt: `A loan of ${D(B)} is charged ${r}% interest per year, added at the end of the year. A repayment of ${D(M)} is made straight after the interest is added. What is the balance owing after that repayment, in dollars?`,
         answerType: 'numeric', answer: { value: after },
@@ -419,21 +420,28 @@ const raw = {
 
   // ── Transformations of trigonometric functions ─────────────────────────────
   'y12-trig-model': (rng, diff) => {
+    // Each context carries values and a period that exist: a Ferris wheel turns in half a minute or so, a day's
+    // temperature repeats in 24 hours, daylight repeats yearly, a tide about twice a day.
     const CTX = [
-      { thing: 'the depth of water at a jetty, in metres', unit: 'metres', t: 'hours after midnight', fn: 'sin' },
-      { thing: 'the height of a passenger on a Ferris wheel above the ground, in metres', unit: 'metres', t: 'seconds after the ride starts', fn: 'cos' },
-      { thing: 'the temperature in a cold room, in degrees Celsius', unit: '°C', t: 'hours after 6 am', fn: 'sin' },
-      { thing: 'the number of hours of daylight in a town', unit: 'hours', t: 'months after the equinox', fn: 'sin' }
+      { thing: 'the depth of water at a jetty, in metres', t: 'hours after midnight', fn: 'sin', ms: [6, 12], aMax: 8, cGap: 8 },
+      { thing: 'the height of a passenger on a Ferris wheel above the ground, in metres', t: 'seconds after the ride starts', fn: 'cos', ms: [12, 18, 24, 30], aMax: 15, cGap: 3 },
+      { thing: 'the temperature in a cold room, in degrees Celsius', t: 'hours after 6 am', fn: 'sin', ms: [12], aMax: 5, cGap: 6 },
+      { thing: 'the number of hours of daylight in a town', t: 'months after the equinox', fn: 'sin', ms: [6], aMax: 2, cGap: 3, cBase: 10 },
+      { thing: 'the water level in a tidal creek, in metres', t: 'hours after the first high tide', fn: 'cos', ms: [6, 12], aMax: 6, cGap: 6 },
+      { thing: 'the monthly demand for electricity in a town, in megawatts', t: 'months after January', fn: 'sin', ms: [6], aMax: 8, cGap: 12, cBase: 20 },
+      { thing: 'the height of a buoy above the seabed, in metres', t: 'seconds after a reading starts', fn: 'sin', ms: [6, 12, 18], aMax: 4, cGap: 10, cBase: 20 }
     ];
     const cx = rc(rng, CTX);
-    const a = ri(rng, 1, 10) * 2, c = a + ri(rng, 1, 12);
+    let a = ri(rng, 1, 2 * cx.aMax), c = cx.cBase ? cx.cBase + ri(rng, 0, cx.cGap) : a + ri(rng, 1, cx.cGap);
     const fn = cx.fn;
     const model = m => `${c} + ${a}\\${fn}\\left(\\dfrac{\\pi t}{${m}}\\right)`;
     const form = diff === 1 ? rc(rng, ['max', 'min', 'amplitude-reverse'])
       : diff === 2 ? rc(rng, ['period', 'midline-reverse', 'range'])
         : diff === 3 ? rc(rng, ['value-at-angle', 'time-of-extreme'])
           : rc(rng, ['first-time-half', 'missing-a']);
-    const m = rc(rng, [3, 4, 6, 12, 18, 24]);
+    // The forms that need half the amplitude to be whole (a value at a sixth of a turn) use an even amplitude.
+    if ((form === 'value-at-angle' || form === 'first-time-half' || form === 'missing-a') && a % 2) { a += 1; if (!cx.cBase) c += 1; }
+    const m = rc(rng, cx.ms);
     if (form === 'max' || form === 'min') {
       const mx = form === 'max';
       return {
@@ -473,7 +481,7 @@ const raw = {
         steps: [{ h: 'Period formula', d: `$T = 2\\pi\\div\\dfrac{\\pi}{${m}} = ${2 * m}$` }]
       };
     }
-    const mm = rc(rng, [6, 12, 18, 24]);
+    const mm = rc(rng, cx.ms.filter(v => v % 6 === 0));
     if (form === 'value-at-angle') {
       const frac = rc(rng, [1, 5]), t = mm * frac / 6;
       const cosStart = fn === 'cos';
@@ -512,21 +520,21 @@ const raw = {
     if (form === 'first-time-half') {
       const isCos = fn === 'cos', ans = isCos ? mm / 3 : mm / 6;
       return {
-        formTag: 'multi-step', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${c} + ${a}\\${fn}\\left(\\dfrac{\\pi t}{${mm}}\\right)$. What is the first time $t > 0$ at which $h(t) = ${c + a / 2}$? (Use ${isCos ? '$\\cos\\dfrac{\\pi}{3} = \\dfrac12$' : '$\\sin\\dfrac{\\pi}{6} = \\dfrac12$'}.)`,
+        formTag: 'multi-step', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${c} + ${a}\\${fn}\\left(\\dfrac{\\pi t}{${mm}}\\right)$. What is the first time $t > 0$ at which $h(t) = ${c + a / 2}$?`,
         answerType: 'numeric', answer: { value: ans },
         traps: [{ value: mm / 2, why: `Solve ${isCos ? '$\\cos' : '$\\sin'}\\dfrac{\\pi t}{${mm}} = \\dfrac12$ for the smallest positive angle, not $\\dfrac{\\pi}{2}$.` }],
         hints: [`Subtract ${c} and divide by ${a}.`, `${isCos ? '$\\cos' : '$\\sin'}\\dfrac{\\pi t}{${mm}} = \\dfrac12$.`, 'Take the smallest positive angle.'],
         steps: [{ h: 'Isolate', d: `${isCos ? '$\\cos' : '$\\sin'}\\dfrac{\\pi t}{${mm}} = \\dfrac12$` }, { h: 'Smallest angle', d: `$\\dfrac{\\pi t}{${mm}} = ${isCos ? '\\dfrac{\\pi}{3}' : '\\dfrac{\\pi}{6}'}$, so $t = ${ans}$` }]
       };
     }
-    // missing-a: find the amplitude from two readings
-    const t1 = mm / 2, rd = c + a * 1;
+    // missing-a: the amplitude from a reading at a standard angle (the value is the midline plus half the amplitude)
+    const isCosA = fn === 'cos', tA = isCosA ? mm / 3 : mm / 6, rd = c + a / 2;
     return {
-      formTag: 'missing-parameter', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${c} + A\\sin\\left(\\dfrac{\\pi t}{${mm}}\\right)$ with $A > 0$. At $t = ${t1}$ it is at its maximum, ${rd}. Find $A$.`,
+      formTag: 'missing-parameter', prompt: `${cx.thing.charAt(0).toUpperCase() + cx.thing.slice(1)}, $t$ ${cx.t}, is modelled by $h(t) = ${c} + A\\${fn}\\left(\\dfrac{\\pi t}{${mm}}\\right)$ with $A > 0$. At $t = ${tA}$ the value is $${rd}$. Find $A$.`,
       answerType: 'numeric', answer: { value: a },
-      traps: [{ value: rd, why: 'The maximum is $c + A$: subtract the midline to find the amplitude.' }].filter(t => t.value !== a),
-      hints: [`At $t = ${t1}$ the angle is $\\dfrac{\\pi}{2}$, so $\\sin = 1$.`, `$${c} + A = ${rd}$.`, 'Solve for $A$.'],
-      steps: [{ h: 'At the maximum', d: `$\\sin\\dfrac{\\pi}{2} = 1$, so $${c} + A = ${rd}$` }, { h: 'Amplitude', d: `$A = ${a}$` }]
+      traps: [{ value: rd - c, why: `At $t = ${tA}$ the angle is a standard angle whose ${fn} is $\\dfrac12$, so $${rd - c} = \\dfrac{A}{2}$, not $A$.` }].filter(t => t.value !== a),
+      hints: [`The angle at $t = ${tA}$ is $${isCosA ? '\\dfrac{\\pi}{3}' : '\\dfrac{\\pi}{6}'}$.`, `$\\${fn}$ of that angle is $\\dfrac12$.`, `$${c} + \\dfrac{A}{2} = ${rd}$.`],
+      steps: [{ h: 'The angle', d: `$\\dfrac{\\pi\\times ${tA}}{${mm}} = ${isCosA ? '\\dfrac{\\pi}{3}' : '\\dfrac{\\pi}{6}'}$, and $\\${fn}$ of it is $\\dfrac12$` }, { h: 'Solve', d: `$${c} + \\dfrac{A}{2} = ${rd}$, so $A = ${a}$` }]
     };
   },
 
@@ -554,7 +562,7 @@ const raw = {
     if (form === 'decay-direct') {
       const M0 = 2 ** k * 5 * ri(rng, 2, 100);
       return {
-        formTag: 'context', prompt: `A radioactive sample has a half-life of ${T} days. Its mass is modelled by $M(t) = ${M0}\\times\\left(\\tfrac12\\right)^{t/${T}}$ grams, where $t$ is in days. Find the mass after ${k * T} days.`,
+        formTag: 'direct', prompt: `A radioactive sample has a half-life of ${T} days. Its mass is modelled by $M(t) = ${M0}\\times\\left(\\tfrac12\\right)^{t/${T}}$ grams, where $t$ is in days. Find the mass after ${k * T} days.`,
         answerType: 'numeric', answer: { value: M0 / 2 ** k }, answerSuffix: 'g',
         traps: [{ value: M0 / 2, why: `${k * T} days is ${k} half-lives, so the mass has halved ${k} times.` }].filter(t => t.value !== M0 / 2 ** k),
         hints: [`The number of half-lives is $${k}$.`, `$\\left(\\tfrac12\\right)^{${k}} = \\dfrac{1}{${2 ** k}}$.`, `$${M0}\\div ${2 ** k}$.`],
@@ -622,7 +630,7 @@ const raw = {
     if (form === 'break-even') {
       const vary = ri(rng, 2, 12) * 5, gap = ri(rng, 1, 8) * 5, units = ri(rng, 10, 120), price = vary + gap, fixed = gap * units;
       return {
-        formTag: 'context', prompt: `A school fundraiser has fixed costs of \\$${fixed}. Each item costs \\$${vary} to make and sells for \\$${price}. How many items must be sold to break even?`,
+        formTag: 'context', prompt: `A school fundraiser has fixed costs of \\$${dollars(fixed)}. Each item costs \\$${vary} to make and sells for \\$${price}. How many items must be sold to break even?`,
         answerType: 'numeric', answer: { value: units },
         traps: [{ value: Math.round(fixed / price), why: 'Break even when revenue equals total cost, which includes the cost of making each item.' }].filter(t => t.value !== units),
         hints: ['Cost $=$ revenue.', `$${fixed} + ${vary}n = ${price}n$.`, `$${fixed} = ${gap}n$.`],
@@ -648,7 +656,7 @@ const raw = {
         steps: [{ h: 'Zeros', d: `$n = 0$ and $n = ${2 * mm}$` }, { h: 'Midpoint', d: `$n = ${mm}$` }]
       };
     }
-    const fixed = ri(rng, 1, 5) * 10, perUnit = ri(rng, 1, p * mm);   // C(n) = fixed + perUnit n
+    const fixed = ri(rng, 1, 5) * 10, perUnit = ri(rng, 1, Math.max(1, Math.floor((p * mm * mm - fixed - 1) / mm)));   // C(n) = fixed + perUnit n, profit > 0
     return {
       formTag: 'multi-step', prompt: `A club sells $n$ tickets with revenue $R(n) = ${p}n(${2 * mm} - n)$ dollars and costs $C(n) = ${fixed} + ${perUnit}n$ dollars. Find the profit, in dollars, when $n = ${mm}$.`,
       answerType: 'numeric', answer: { value: p * mm * mm - fixed - perUnit * mm }, answerPrefix: '$',

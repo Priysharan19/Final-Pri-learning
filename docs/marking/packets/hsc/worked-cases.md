@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `2f713aee5efad95fb12ca66dd2700b5260e83214c3c1cc1dc00f0f96ef515778` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `3c9f5e183281b665d8308acf745f69d74f3c79d06d0061cdb29ac02a2fd76248` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -3027,40 +3027,40 @@ Final answer: 0
 
 ## `nsw-final:y12-trig-model/D1` — seed 1009
 
-> The temperature in a cold room, in degrees Celsius, $t$ hours after 6 am, is modelled by $h(t) = 19 + 14\\sin\\left(\\dfrac{\\pi t}{18}\\right)$. What is the minimum value of $h$?
+> The water level in a tidal creek, in metres, $t$ hours after the first high tide, is modelled by $h(t) = 11 + 8\\cos\\left(\\dfrac{\\pi t}{12}\\right)$. What is the minimum value of $h$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `3.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `4` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trig-model/D2` — seed 1009
 
-> The temperature in a cold room, in degrees Celsius varies sinusoidally with a maximum of $33$ and a minimum of $5$. What is the value of the midline (the constant added to the trigonometric term)?
+> The water level in a tidal creek, in metres varies sinusoidally with a maximum of $19$ and a minimum of $3$. What is the value of the midline (the constant added to the trigonometric term)?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `19` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `19.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `20` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `20` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `11` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `11.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `12` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `12` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trig-model/D3` — seed 1009
 
-> The temperature in a cold room, in degrees Celsius, $t$ hours after 6 am, is modelled by $h(t) = 19 + 14\\sin\\left(\\dfrac{\\pi t}{12}\\right)$. Find $h(10)$. (Use $\\sin\\dfrac{\\pi}{6} = \\sin\\dfrac{5\\pi}{6} = \\dfrac12$.)
+> The water level in a tidal creek, in metres, $t$ hours after the first high tide, is modelled by $h(t) = 11 + 8\\cos\\left(\\dfrac{\\pi t}{6}\\right)$. Find $h(10)$. (Use $\\cos\\dfrac{\\pi}{3} = \\dfrac12$ and $\\cos\\dfrac{5\\pi}{3} = \\dfrac12$.)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `26` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `26.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `27` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `27` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `15` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `15.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `16` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `16` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trig-model/D4` — seed 1009
 
-> The temperature in a cold room, in degrees Celsius, $t$ hours after 6 am, is modelled by $h(t) = 19 + 14\\sin\\left(\\dfrac{\\pi t}{12}\\right)$. What is the first time $t > 0$ at which $h(t) = 26$? (Use $\\sin\\dfrac{\\pi}{6} = \\dfrac12$.)
+> The water level in a tidal creek, in metres, $t$ hours after the first high tide, is modelled by $h(t) = 11 + 8\\cos\\left(\\dfrac{\\pi t}{6}\\right)$. What is the first time $t > 0$ at which $h(t) = 15$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -3093,7 +3093,7 @@ Final answer: 0
 
 ## `nsw-final:y12-func-model/D3` — seed 1009
 
-> A school fundraiser has fixed costs of \\$1500. Each item costs \\$25 to make and sells for \\$55. How many items must be sold to break even?
+> A school fundraiser has fixed costs of \\$1,500. Each item costs \\$25 to make and sells for \\$55. How many items must be sold to break even?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|

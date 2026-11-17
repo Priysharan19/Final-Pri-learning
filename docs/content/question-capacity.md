@@ -6,7 +6,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 
 ## Prithagoras
 
-107 skills measured; **22** meet both targets; **85** are below at least one.
+107 skills measured; **21** meet both targets; **86** are below at least one.
 
 | Skill (generator) | Cells | Distinct instances | Structural forms (proxy) | Tagged forms | Below target |
 | --- | --- | --- | --- | --- | --- |
@@ -79,13 +79,13 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y11-diff` | 4 | 6.8k | 63 | — | instances |
 | `y11-probability` | 4 | 7.3k | 44 | — | instances |
 | `me11-poly` | 3 | 7.4k | 64 | — | instances |
+| `y12-trig-model` | 4 | 7.9k | 21 | 4: direct, missing-parameter, multi-step, reverse | instances + forms |
 | `ms12-normal` | 2 | 8.8k | 1 | — | instances + forms |
 | `y12-integral-calc` | 4 | 8.8k | 6 | — | instances |
 | `y12-series` | 3 | 9.7k | 3 | — | instances + forms |
 | `y11-lines` | 4 | 10.3k | 32 | — | — |
 | `ms12-normal-exact` | 4 | 10.3k | 1 | — | forms |
 | `y8-rates` | 3 | 10.8k | 26 | — | — |
-| `y12-trig-model` | 4 | 12.5k | 12 | 4: direct, missing-parameter, multi-step, reverse | — |
 | `y11-functions` | 4 | 12.8k | 51 | — | — |
 | `y8-equations` | 3 | 15.4k | 26 | — | — |
 | `y10-simeq` | 4 | 16.4k | 6 | — | — |
@@ -97,10 +97,10 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y7-integers` | 4 | 30.2k | 10 | — | — |
 | `y9-linear` | 4 | 32.5k | 20 | — | — |
 | `me12-vectors` | 4 | 40.5k | 4 | — | forms |
-| `y12-func-model` | 4 | 40.9k | 9 | 5: context, direct, missing-parameter, multi-step, reverse | — |
+| `y12-func-model` | 4 | 40.6k | 9 | 5: context, direct, missing-parameter, multi-step, reverse | — |
+| `y12-fin-exact` | 4 | 43.6k | 8 | 5: context, direct, missing-parameter, multi-step, reverse | — |
+| `y12-random-var` | 4 | 44.1k | 9 | 5: context, direct, missing-parameter, multi-step, reverse | — |
 | `me11-functions` | 3 | 44.2k | 95 | — | — |
-| `y12-fin-exact` | 4 | 45.0k | 8 | 5: context, direct, missing-parameter, multi-step, reverse | — |
-| `y12-random-var` | 4 | 47.1k | 9 | 5: context, direct, missing-parameter, multi-step, reverse | — |
 | `y10-stats` | 4 | 53.9k | 15 | — | — |
 | `ms11-formulas` | 4 | 63.9k | 1 | — | forms |
 | `ms12-nonright` | 4 | 64.7k | 1 | — | forms |

@@ -114,7 +114,8 @@ for (const id of Object.keys(GENERATORS).sort()) {
 }
 
 const unmeasured = Object.keys(GENERATORS).filter(id => !editionOf(id)).sort();
-const below = (r) => r.instances < TARGET_INSTANCES || r.forms < TARGET_FORMS;
+const formsShort = r => (r.tags.length ? r.tags.length < TARGET_FORMS : r.forms < TARGET_FORMS);   // declared forms are the real measure where a generator declares them
+const below = r => r.instances < TARGET_INSTANCES || formsShort(r);
 const fmt = n => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(1)}k` : String(n));
 let md = `# Question capacity — distinct instances and structural forms per skill
 
@@ -129,7 +130,7 @@ for (const edition of ['Prithagoras', 'Priyabhata']) {
   md += `## ${edition}\n\n${list.length} skills measured; **${list.length - short.length}** meet both targets; **${short.length}** are below at least one.\n\n`;
   md += `| Skill (generator) | Cells | Distinct instances | Structural forms (proxy) | Tagged forms | Below target |\n| --- | --- | --- | --- | --- | --- |\n`;
   for (const r of [...list].sort((a, b) => a.instances - b.instances || a.forms - b.forms)) {
-    const miss = [r.instances < TARGET_INSTANCES ? 'instances' : '', r.forms < TARGET_FORMS ? 'forms' : ''].filter(Boolean).join(' + ');
+    const miss = [r.instances < TARGET_INSTANCES ? 'instances' : '', formsShort(r) ? 'forms' : ''].filter(Boolean).join(' + ');
     md += `| \`${r.id}\` | ${r.cells} | ${r.lower ? '≥ ' : ''}${fmt(r.instances)} | ${r.forms} | ${r.tags.length ? `${r.tags.length}: ${r.tags.join(', ')}` : '—'} | ${miss || '—'} |\n`;
   }
   md += '\n';
