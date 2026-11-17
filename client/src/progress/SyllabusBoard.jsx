@@ -164,10 +164,14 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
       const cols = Math.max(...areas.map(a => a.col)) + 1, rows = Math.max(...areas.map(a => a.row)) + 1;
       const padX = phone ? 34 : 80, padY = phone ? 40 : 64, tilt = 0.62, R = phone ? 7 : 9;
       let moving = false;
+      const rowGap = ((h - 2 * padY) / Math.max(1, rows - 1)) * 0.9;
       const pos = new Map(areas.map(a => {
         const gx = padX + (cols > 1 ? a.col / (cols - 1) : 0.5) * (w - 2 * padX);
         const gy = (a.row - (rows - 1) / 2) * ((h - 2 * padY) / Math.max(1, rows - 1)) * 0.9;
-        const target = raised.has(a.id) ? (phone ? 24 : 38) : 0;
+        // A raised point rises only into the space its row leaves clear: a row holds the point
+        // (2R) and its name below it (12 px + 14 px a line), so it never meets the name above.
+        const nameH = R + 12 + (rows > 8 ? 2 : 3) * 14;
+        const target = raised.has(a.id) ? Math.max(0, Math.min(phone ? 24 : 38, rowGap - nameH - R - 4)) : 0;
         let v = lift.current.get(a.id) || 0;
         if (reduce) v = target; else { v += (target - v) * 0.22; if (Math.abs(target - v) < 0.3) v = target; else moving = true; }
         lift.current.set(a.id, v);
@@ -207,13 +211,23 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
           for (const word of a.name.split(' ')) { const next = cur ? `${cur} ${word}` : word; if (ctx.measureText(next).width > colW && cur) { lines.push(cur); cur = word; } else cur = next; }
           if (cur) lines.push(cur);
           ctx.fillStyle = sel ? ink : ink2;
-          lines.slice(0, 3).forEach((ln, k) => ctx.fillText(ln, Math.max(colW / 2, Math.min(w - colW / 2, p.x)), p.y + R + 12 + k * 14));
+          lines.slice(0, rows > 8 ? 2 : 3).forEach((ln, k) => ctx.fillText(ln, Math.max(colW / 2, Math.min(w - colW / 2, p.x)), p.y + R + 12 + k * 14));
         }
         const stake = raised.get(a.id);
         if (p.lift > 1 && stake) {
           ctx.font = `500 11px ${mono}`; ctx.fillStyle = ink;
-          const half = ctx.measureText(stake).width / 2 + 4;   // kept inside the canvas
-          ctx.fillText(stake, Math.max(half, Math.min(w - half, p.x)), p.y - R - 12);
+          // Beside the raised point, not above it, so it never runs into the row above;
+          // on the left when the right edge is too close.
+          const tw = ctx.measureText(stake).width, gap = R + (sel ? 14 : 0) + 10;   // clear of the selection ring
+          // The side with room: no other point in the way on this row, and inside the canvas.
+          const clear = dir => p.x + dir * (gap + tw) > 4 && p.x + dir * (gap + tw) < w - 4
+            // A raised neighbour may put its own label towards this one: leave room for both.
+            && ![...pos.values()].some(q => q !== p && Math.abs(q.y - p.y) < 22 && (q.x - p.x) * dir > 0
+              && Math.abs(q.x - p.x) < (q.lift > 1 ? 2 : 1) * (gap + tw) + R + 12);
+          const side = clear(1) ? 1 : clear(-1) ? -1 : 0;
+          if (side) { ctx.textAlign = side > 0 ? 'left' : 'right'; ctx.fillText(stake, p.x + side * gap, p.y); }
+          else { ctx.fillText(stake, Math.max(tw / 2 + 4, Math.min(w - tw / 2 - 4, p.x)), p.y - gap - 4); }
+          ctx.textAlign = 'center';
         }
         hits.current.push([p.x, p.y, a.id]);
       }
@@ -235,7 +249,10 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
     for (const [hx, hy, id] of hits.current) { const d = (hx - x) ** 2 + (hy - y) ** 2; if (d < bd) { bd = d; best = id; } }
     if (best) onSelect(best);
   };
-  return <canvas ref={ref} className="sb-canvas" role="img" aria-label={label} onClick={pick} data-board-map />;
+  // Taller for a map with more rows, so its labels keep their room.
+  const rowCount = areas.length ? Math.max(...areas.map(a => a.row)) + 1 : 1;
+  const height = phone ? Math.max(360, rowCount * 44 + 80) : Math.max(440, rowCount * (rowCount > 8 ? 84 : 72) + 128);
+  return <canvas ref={ref} className="sb-canvas" role="img" aria-label={label} onClick={pick} style={{ height, minHeight: height, maxHeight: 'none' }} data-board-map data-rows={rowCount} />;
 }
 
 // ── The list: the same areas, a listbox moved with the arrow keys ────────────
