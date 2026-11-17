@@ -13,7 +13,7 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
-import { hscPriorities } from '../engine/hsc/hscPriorities.js';
+import { hscPriorities, topicWeightRanges } from '../engine/hsc/hscPriorities.js';
 import { hscPractiseNext, curriculumRows } from '../engine/hsc/hscPractice.js';
 import { HSC_UNTAGGED } from '../engine/hsc/hscSources.js';
 
@@ -67,6 +67,8 @@ export default function HscPriorities({ user, courses, curriculum }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const result = useMemo(() => hscPriorities(course), [course]);
+  // Marks at stake are shown only as a range (topicWeightRanges), never as a point share.
+  const ranges = useMemo(() => topicWeightRanges(course), [course]);
   const rows = useMemo(() => curriculumRows(curriculum), [curriculum]);
   const joined = useMemo(() => hscPractiseNext(result.priorities, rows), [result, rows]);
   const byCode = useMemo(() => Object.fromEntries(joined.map(r => [r.code, r])), [joined]);
@@ -140,7 +142,7 @@ export default function HscPriorities({ user, courses, curriculum }) {
                     {p.focusArea} <span className="muted">· {p.code} · {t('common.yearNumber', { n: p.year })}</span>
                     {p.novelty > 0 && <span className="tag" style={{ marginLeft: 8 }}>{t('hsc.newContent')}</span>}
                   </div>
-                  <div style={{ fontSize: 13 }}>{t('hsc.marksBand', { lo: p.marks[0], hi: p.marks[1], total: result.paperMarks })}</div>
+                  <div style={{ fontSize: 13 }}>{t('hsc.marksBand', { lo: Math.floor(ranges[p.code].low * result.paperMarks), hi: Math.ceil(ranges[p.code].high * result.paperMarks), total: result.paperMarks })}</div>
                   {p.styles.length > 0 && <div className="muted" style={{ fontSize: 12.5 }}>{t('hsc.likelyStyles', { styles: styleText(t, p) })}</div>}
                   <div className="muted" style={{ fontSize: 12.5 }}>{t('hsc.yourPractice')} <Evidence row={row} /></div>
                   <details style={{ marginTop: 4 }}>

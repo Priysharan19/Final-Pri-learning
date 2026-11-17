@@ -118,6 +118,13 @@ ok(P.selectHistoryMethod(btA).method === 'decayed' && P.selectHistoryMethod(btE)
 ok(P.selectHistoryMethod({ mean: { decayed: { tvd: 0.3 }, last: { tvd: 0.2 }, uniform: { tvd: 0.25 } } }).method === 'last', 'a losing model falls back to the better baseline');
 ok(P.HSC_PREREGISTERED.decay === 0.7 && P.HSC_PREREGISTERED.primaryMetric === 'tvd', 'the pre-registered settings are unchanged');
 ok(P.topicWeights('advanced')['MAV-12-06'] === adv.priorities[0].expected && /Not a prediction/.test(P.forecastMeta('extension1').disclaimer), 'topicWeights and forecastMeta expose the ranking with its disclaimer');
+for (const course of ['advanced', 'extension1']) {
+  const ranges = P.topicWeightRanges(course), weights = P.topicWeights(course), meta = P.forecastMeta(course);
+  ok(Object.keys(ranges).join() === Object.keys(weights).join(), `${course} ranges cover exactly the weighted outcomes`);
+  ok(Object.entries(ranges).every(([c, r]) => r.mid === weights[c] && r.low === meta.bands[c][0] && r.high === meta.bands[c][1]), `${course} ranges agree with topicWeights (mid) and forecastMeta.bands (low, high)`);
+  ok(Object.values(ranges).every(r => r.low >= 0 && r.low <= r.mid && r.mid <= r.high && r.high <= 1 && r.high > r.low), `${course} every range is a real range around its mid`);
+  ok(Object.isFrozen(ranges) && Object.values(ranges).every(Object.isFrozen), `${course} ranges are frozen`);
+}
 try { execFileSync(process.execPath, [join(repo, 'tools', 'hsc-backtest.mjs'), '--check'], { stdio: 'pipe' }); ok(true, 'evidence doc'); }
 catch (e) { ok(false, `docs/evidence/hsc-forecast-backtest-2026-11-18.md matches the engine: ${String(e.stderr)}`); }
 
@@ -174,6 +181,8 @@ try {
   const a = html({ course: 'nsw', year: 12, pathway: 'advanced' }, ['advanced']);
   ok(a.includes('data-hsc-priorities="advanced"') && a.includes('HSC 2027 priorities') && a.includes('Not a prediction of the actual questions'), 'Advanced renders with the disclaimer');
   ok((a.match(/data-hsc-outcome=/g) || []).length === 18 && a.includes('data-hsc-paper'), 'every Advanced outcome is listed, and Year 12 is offered the weighted paper');
+  const r6 = P.topicWeightRanges('advanced')['MAV-12-06'];
+  ok(a.includes(`About ${Math.floor(r6.low * 100)}–${Math.ceil(r6.high * 100)} of 100 marks`) && !/\d+(\.\d+)?% of (the )?(paper|marks)/.test(a.replace(/about \d+% of the marks went on this content/g, '')), 'the tab shows marks at stake as ranges from topicWeightRanges, never as a point share');
   ok(!/\{[a-z]+\}/.test(a) && !/hsc\.[a-z]/.test(a), 'no raw placeholder or key reaches the page');
   const e = html({ course: 'nsw', year: 11, pathway: 'ext1' }, ['advanced', 'extension1']);
   ok(e.includes('Mathematics Extension 1') && !e.includes('data-hsc-paper'), 'Extension 1 offers both papers; Year 11 is not offered the Year 12 paper');

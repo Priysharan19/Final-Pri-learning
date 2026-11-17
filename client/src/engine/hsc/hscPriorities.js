@@ -370,3 +370,15 @@ export function forecastMeta(course) {
     evidenceDoc: 'docs/evidence/hsc-forecast-backtest-2026-11-18.md'
   });
 }
+
+/**
+ * Marks at stake as RANGES, never points: 2024 outcome code → { low, mid, high }
+ * as shares of the course's paper marks. `mid` is topicWeights' expected share;
+ * `low`/`high` are forecastMeta's band — the backtest's empirical error for the
+ * 2017 topics behind the outcome (mean |forecast − actual| over the test years,
+ * carried through the map), plus ν·|sample − syllabus| for new content, widened
+ * to take in every component's own figure.
+ */
+export function topicWeightRanges(course) {
+  return Object.freeze(Object.fromEntries(hscPriorities(course).priorities.map(p => [p.code, Object.freeze({ low: p.band[0], mid: p.expected, high: p.band[1] })])));
+}
