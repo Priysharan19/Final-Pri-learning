@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `2c13172754f840c993f7388d5304061b60e79133cb69f34c5b63418cb9467d88` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `2715e35dbcc121e77239377d751c6702aad31daf1ad82aab62142ddc11834658` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -94,7 +94,7 @@ Final answer: 12
 |---|---|---|---|---|---|
 | correct | `2079/4` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
 | alternative | `2079/4` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `2083/4` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
+| common wrong | `2080/4` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
 
 <details><summary>Pages</summary>
 
@@ -112,7 +112,7 @@ r = 21, θ = 135
 A = θ/360 × π × r^2
 A = (135)/360 × (22/7) × (21)^2
 = 2079/4
-Final answer: 2083/4
+Final answer: 2080/4
 ```
 </details>
 
@@ -501,17 +501,17 @@ Final answer: 31
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `3, 2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `4, 2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4, 2` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: 4, 2
 ```
 </details>
 
@@ -603,7 +603,7 @@ Final answer: 19
 |---|---|---|---|---|---|
 | correct | `6776/15` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
 | alternative | `6776/15` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `6791/15` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
+| common wrong | `6777/15` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
 | partial | `20636/45` | no | 0/1 | 0/1 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
@@ -626,7 +626,7 @@ r = 28, m = 11
 A = θ/360 × π × r^2
 A = (66)/360 × (22/7) × (28)^2
 = 6776/15
-Final answer: 6791/15
+Final answer: 6777/15
 ```
 partial:
 ```text
@@ -648,7 +648,7 @@ Final answer: 20636/45
 |---|---|---|---|---|---|
 | correct | `6776/15` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
 | alternative | `6776/15` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `6791/15` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
+| common wrong | `6777/15` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
 | partial | `20636/45` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
@@ -671,7 +671,7 @@ r = 28, m = 11
 A = θ/360 × π × r^2
 A = (66)/360 × (22/7) × (28)^2
 = 6776/15
-Final answer: 6791/15
+Final answer: 6777/15
 ```
 partial:
 ```text
@@ -693,7 +693,7 @@ Final answer: 20636/45
 |---|---|---|---|---|---|
 | correct | `6776/15` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
 | alternative | `6776/15` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `6791/15` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
+| common wrong | `6777/15` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
 | partial | `20636/45` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
@@ -716,7 +716,7 @@ r = 28, m = 11
 A = θ/360 × π × r^2
 A = (66)/360 × (22/7) × (28)^2
 = 6776/15
-Final answer: 6791/15
+Final answer: 6777/15
 ```
 partial:
 ```text
@@ -738,7 +738,7 @@ Final answer: 20636/45
 |---|---|---|---|---|---|
 | correct | `6776/15` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
 | alternative | `6776/15` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `6791/15` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
+| common wrong | `6777/15` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
 | partial | `20636/45` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
@@ -761,7 +761,7 @@ r = 28, m = 11
 A = θ/360 × π × r^2
 A = (66)/360 × (22/7) × (28)^2
 = 6776/15
-Final answer: 6791/15
+Final answer: 6777/15
 ```
 partial:
 ```text
@@ -889,9 +889,9 @@ Final answer: 44353
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 2 is “$x > 5$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “$x > 6$”. |
 | partial | `0` | no | 0/1 | 0/1 | The step check is an inequality check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
@@ -909,9 +909,9 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 2 is “$x < -1$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “$x > 6$”. |
 | partial | `0` | no | 0/2 | 0/2 | The step check is an inequality check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
@@ -990,16 +990,16 @@ Final answer: 127
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `56/3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `56/3` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `59/3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `59/3` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `57/3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `57/3` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 59/3
+Final answer: 57/3
 ```
 </details>
 
@@ -1069,17 +1069,17 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `3, 2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `4, 2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4, 2` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: 4, 2
 ```
 </details>
 
@@ -1089,17 +1089,17 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `3, 2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `4, 2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4, 2` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: 4, 2
 ```
 </details>
 
@@ -1109,17 +1109,17 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/4 | 0/4 | The keyed answer as the server prints it. |
+| correct | `37/100, -137/100` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/4 | 0/4 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `137/100, -137/100` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `137/100, -137/100` | no | 0/4 | 0/4 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: 137/100, -137/100
 ```
 </details>
 
@@ -1129,17 +1129,17 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `28x^6` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(28x^6)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `(28x^6) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(28x^6) + 1` | no | 0/1 | 0/1 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: (28x^6) + 1
 ```
 </details>
 
@@ -1149,17 +1149,17 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `9x^2 + 2x + -1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(9x^2 + 2x + -1)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(9x^2 + 2x + -1) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(9x^2 + 2x + -1) + 1` | no | 0/2 | 0/2 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: (9x^2 + 2x + -1) + 1
 ```
 </details>
 
@@ -1189,17 +1189,17 @@ Final answer: -3
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `(-2, 0)` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `(-1, 0)` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(-1, 0)` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: (-1, 0)
 ```
 </details>
 

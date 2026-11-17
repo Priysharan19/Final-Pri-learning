@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `17fdb5d1e995148c46af5d5ab2deb8d8add857f7566c4f6c34756fe4f2c9c5f8` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `41fe8522f2ff84a49fbe6d36938253b92a30fef7851ee2b939e1c5fadbfcd155` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -57,9 +57,9 @@ For each item, one issued question (seed shown) and the pages a student might ha
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `6/5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `6/5` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `11/5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `11/5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `7/5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7/5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-fractions/D2` — seed 1009
 
@@ -68,9 +68,9 @@ For each item, one issued question (seed shown) and the pages a student might ha
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `1/40` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `1/40` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `41/40` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `41/40` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `2/40` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2/40` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-fractions/D3` — seed 1009
 
@@ -79,9 +79,9 @@ For each item, one issued question (seed shown) and the pages a student might ha
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `8/15` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `8/15` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `23/15` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `23/15` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `9/15` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9/15` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-fractions/D4` — seed 1009
 
@@ -100,9 +100,9 @@ For each item, one issued question (seed shown) and the pages a student might ha
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 1 is “$0.7$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “$7$”. |
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-decimals-perc/D2` — seed 1009
@@ -144,10 +144,10 @@ For each item, one issued question (seed shown) and the pages a student might ha
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `7:5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `8:5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8:5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-ratio/D2` — seed 1009
 
@@ -177,9 +177,9 @@ For each item, one issued question (seed shown) and the pages a student might ha
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. Option 2 is “The 500 g jar — it costs $91.6$c per 100 g”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. Option 0 is “The 500 g jar, because it has the lower price tag”. |
 | partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-algebra/D1` — seed 1009
@@ -199,10 +199,10 @@ For each item, one issued question (seed shown) and the pages a student might ha
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2y + 15` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `(2y + 15)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `(2y + 15) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(2y + 15) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-algebra/D4` — seed 1009
 
@@ -210,10 +210,10 @@ For each item, one issued question (seed shown) and the pages a student might ha
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/4 | 0/4 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `7x + 5` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
+| alternative | `(7x + 5)` | yes | 4/4 | 4/4 | The same expression written with brackets. |
+| common wrong | `(7x + 5) + 1` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(7x + 5) + 1` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-equations/D1` — seed 1009
 
@@ -323,10 +323,10 @@ Final answer: 24
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `0` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 0 is “$106°$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | yes | 2/2 | 2/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | yes | 2/2 | 2/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 1 is “$16°$”. |
+| partial | `1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-angles/D4` — seed 1009
 
@@ -420,9 +420,9 @@ Final answer: 34
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. Option 2 is “The mean”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. Option 0 is “All three change by the same amount”. |
 | partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-data/D4` — seed 1009
@@ -453,10 +453,10 @@ Final answer: 34
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `x^3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(x^3)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(x^3) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(x^3) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-indices/D3` — seed 1009
 
@@ -464,10 +464,10 @@ Final answer: 34
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `x^19` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(x^19)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(x^19) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(x^19) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-indices/D4` — seed 1009
 
@@ -530,10 +530,10 @@ Final answer: 34
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `25x + -6` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(25x + -6)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `(25x + -6) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(25x + -6) + 1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-algebra/D2` — seed 1009
 
@@ -541,10 +541,10 @@ Final answer: 34
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `5(4x + -1)` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(5(4x + -1))` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(5(4x + -1)) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(5(4x + -1)) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-algebra/D3` — seed 1009
 
@@ -552,10 +552,10 @@ Final answer: 34
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-12x + 8` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `(-12x + 8)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `(-12x + 8) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(-12x + 8) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-algebra/D4` — seed 1009
 
@@ -563,10 +563,10 @@ Final answer: 34
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `16*x^4*y^6` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `(16*x^4*y^6)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `(16*x^4*y^6) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(16*x^4*y^6) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-equations/D2` — seed 1009
 
@@ -647,9 +647,9 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 1 is “gradient $2$, y-intercept $2$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “gradient $2$, y-intercept $-2$”. |
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-circles/D1` — seed 1009
@@ -735,9 +735,9 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 1 is “The $400$ g pack, at $158$c per 100 g”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “The $400$ g pack, because it has the smaller price tag”. |
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-rates/D2` — seed 1009
@@ -769,9 +769,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `5/13` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `5/13` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `18/13` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `18/13` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `6/13` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6/13` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-probability/D2` — seed 1009
 
@@ -780,9 +780,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `5/6` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5/6` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `11/6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `11/6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `6/6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6/6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-probability/D3` — seed 1009
 
@@ -846,9 +846,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `1/64` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `1/64` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `65/64` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `65/64` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `2/64` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2/64` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-indices-sci/D2` — seed 1009
 
@@ -856,9 +856,9 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 1 is “$6.5 \\times 10^{-6}$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “$6.5 \\times 10^{-7}$”. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-indices-sci/D3` — seed 1009
@@ -878,10 +878,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1/x^3` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `(1/x^3)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `(1/x^3) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(1/x^3) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-algebra/D1` — seed 1009
 
@@ -889,10 +889,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `x^2 + 5x + 6` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(x^2 + 5x + 6)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `(x^2 + 5x + 6) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(x^2 + 5x + 6) + 1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-algebra/D2` — seed 1009
 
@@ -900,10 +900,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `8x^2 + 0x + -2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(8x^2 + 0x + -2)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(8x^2 + 0x + -2) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(8x^2 + 0x + -2) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-algebra/D3` — seed 1009
 
@@ -911,10 +911,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `x^2 - 100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `(x^2 - 100)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `(x^2 - 100) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(x^2 - 100) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-algebra/D4` — seed 1009
 
@@ -922,10 +922,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `x - 12` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(x - 12)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(x - 12) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(x - 12) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-linear/D1` — seed 1009
 
@@ -944,9 +944,9 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 2 is “$(-1, -2)$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “$(-2, 1)$”. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-linear/D3` — seed 1009
@@ -955,10 +955,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2x + -3` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `(2x + -3)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `(2x + -3) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(2x + -3) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-linear/D4` — seed 1009
 
@@ -966,10 +966,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-1x + 2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `(-1x + 2)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `(-1x + 2) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(-1x + 2) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-trig/D1` — seed 1009
 
@@ -1132,9 +1132,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `11/16` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `11/16` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `27/16` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `27/16` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `12/16` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `12/16` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-probability/D2` — seed 1009
 
@@ -1143,9 +1143,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `7/12` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `7/12` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `19/12` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `19/12` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `8/12` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8/12` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-probability/D3` — seed 1009
 
@@ -1154,9 +1154,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `1/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `1/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `6/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `2/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-probability/D4` — seed 1009
 
@@ -1165,9 +1165,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `13/30` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `13/30` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `43/30` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `43/30` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `14/30` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `14/30` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-quadratics/D1` — seed 1009
 
@@ -1175,17 +1175,17 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `3, 2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `4, 2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4, 2` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: 4, 2
 ```
 </details>
 
@@ -1195,10 +1195,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `(x + 3)(x + 2)` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `((x + 3)(x + 2))` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `((x + 3)(x + 2)) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `((x + 3)(x + 2)) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-quadratics/D3` — seed 1009
 
@@ -1206,17 +1206,17 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `3, 2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `4, 2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4, 2` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: 4, 2
 ```
 </details>
 
@@ -1226,10 +1226,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `(2, -1)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `(3, -1)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(3, -1)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-nonlinear/D2` — seed 1009
 
@@ -1237,9 +1237,9 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 1 is “y-intercept $2$; opens upward”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “y-intercept $-2$; opens downward”. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-nonlinear/D3` — seed 1009
@@ -1248,10 +1248,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `3, 2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `4, 2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4, 2` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-nonlinear/D4` — seed 1009
 
@@ -1266,14 +1266,14 @@ Final answer: 0
 
 ## `nsw-final:y10-simeq/D1` — seed 1009
 
-> Solve the simultaneous equations $y = -x + 5$ and $3x + 3y = 15$ by substitution. Give your answer as a point $(x, y)$.
+> Solve the simultaneous equations $y = -x + 5$ and $4x + 3y = 18$ by substitution. Give your answer as a point $(x, y)$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `(3, 2)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `(4, 2)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(4, 2)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-simeq/D2` — seed 1009
 
@@ -1281,10 +1281,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `(3, 2)` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `(4, 2)` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(4, 2)` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-simeq/D3` — seed 1009
 
@@ -1292,10 +1292,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `(3, 2)` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `(4, 2)` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(4, 2)` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-simeq/D4` — seed 1009
 
@@ -1358,10 +1358,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `19.364917` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | `19.364917` | no | 0/1 | 0/1 | The same value written in another equivalent form. |
-| common wrong | `20.364917` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `20.364917` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `5sqrt(15)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `6sqrt(15)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6sqrt(15)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-surds/D2` — seed 1009
 
@@ -1369,10 +1369,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `16.248077` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `16.248077` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
-| common wrong | `17.248077` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `17.248077` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2sqrt(66)` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `3sqrt(66)` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3sqrt(66)` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-surds/D3` — seed 1009
 
@@ -1446,10 +1446,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `0` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 0 is “Set A — same mean, larger spread (standard deviation)”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | yes | 2/2 | 2/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | yes | 2/2 | 2/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 1 is “They have equal standard deviation because the means are equal”. |
+| partial | `1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-stats/D3` — seed 1009
 
@@ -1480,9 +1480,9 @@ Final answer: 0
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `7/23` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `7/23` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `30/23` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `30/23` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `8/23` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8/23` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-probability/D2` — seed 1009
 
@@ -1491,9 +1491,9 @@ Final answer: 0
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `17/28` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `17/28` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `45/28` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `45/28` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `18/28` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18/28` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-probability/D3` — seed 1009
 
@@ -1502,9 +1502,9 @@ Final answer: 0
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `1/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `1/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `6/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `2/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-probability/D4` — seed 1009
 
@@ -1512,9 +1512,9 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 1 is “Yes — because $P(A \\cap B) = P(A)P(B)$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “Cannot be determined from the information given”. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-geo-figures/D1` — seed 1009
@@ -1831,10 +1831,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `x^(5)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(x^(5))` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `(x^(5)) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(x^(5)) + 1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-indices-neg/D2` — seed 1009
 
@@ -1842,10 +1842,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `x^(3)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(x^(3))` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `(x^(3)) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(x^(3)) + 1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-indices-neg/D3` — seed 1009
 
@@ -1853,10 +1853,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `20*x^(5)` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(20*x^(5))` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(20*x^(5)) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(20*x^(5)) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-indices-neg/D4` — seed 1009
 
@@ -1864,10 +1864,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3*x^(6)` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(3*x^(6))` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(3*x^(6)) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(3*x^(6)) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-functions/D1` — seed 1009
 
@@ -2249,9 +2249,9 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. Option 1 is “$y \\ge -1$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. Option 0 is “All real y”. |
 | partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-functions/D4` — seed 1009
@@ -2326,9 +2326,9 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 1 is “$(x - 2)$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “$(x - 1)$”. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-polynomials/D4` — seed 1009
@@ -2337,10 +2337,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/4 | 0/4 | The keyed answer as the server prints it. |
+| correct | `4, -4, 3, -3` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `5, -4, 3, -3` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5, -4, 3, -3` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-lines/D1` — seed 1009
 
@@ -2349,9 +2349,9 @@ Final answer: 0
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `-7/4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `-7/4` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `-3/4` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-3/4` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `-6/4` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-6/4` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-lines/D2` — seed 1009
 
@@ -2359,10 +2359,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2x + 1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(2x + 1)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(2x + 1) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(2x + 1) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-lines/D3` — seed 1009
 
@@ -2370,21 +2370,21 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `(-4/3)x + 10` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `((-4/3)x + 10)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `((-4/3)x + 10) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `((-4/3)x + 10) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-lines/D4` — seed 1009
 
-> Find the point of intersection of $y = -x + 4$ and $y =  + 2$.
+> Find the point of intersection of $y = -x + 4$ and $y = x + 0$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `(2, 2)` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `(3, 2)` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(3, 2)` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-trigfunc/D1` — seed 1009
 
@@ -2392,8 +2392,8 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `7.071068` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | `7.071068` | no | 0/1 | 0/1 | The same value written in another equivalent form. |
+| correct | `5sqrt(2)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `8.071068` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
 | partial | `8.071068` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
@@ -2404,7 +2404,7 @@ Final answer: 0
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `2` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
@@ -2511,17 +2511,17 @@ Final answer: 3
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `28x^6` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(28x^6)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `(28x^6) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(28x^6) + 1` | no | 0/1 | 0/1 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: (28x^6) + 1
 ```
 </details>
 
@@ -2531,17 +2531,17 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `9x^2 + 2x + -1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(9x^2 + 2x + -1)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(9x^2 + 2x + -1) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(9x^2 + 2x + -1) + 1` | no | 0/2 | 0/2 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: (9x^2 + 2x + -1) + 1
 ```
 </details>
 
@@ -2571,17 +2571,17 @@ Final answer: -3
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `(-2, 0)` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `(-1, 0)` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(-1, 0)` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: (-1, 0)
 ```
 </details>
 
@@ -2614,9 +2614,9 @@ Final answer: 0
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `1/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `1/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `6/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `2/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-probability/D4` — seed 1009
 
@@ -2625,9 +2625,9 @@ Final answer: 0
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `8/17` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `8/17` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `25/17` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `25/17` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `9/17` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9/17` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-diff/D1` — seed 1009
 
@@ -2635,10 +2635,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `16(4x + 2)^3` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(16(4x + 2)^3)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `(16(4x + 2)^3) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(16(4x + 2)^3) + 1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-diff/D2` — seed 1009
 
@@ -2646,10 +2646,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `9x^2 + 2x^1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(9x^2 + 2x^1)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(9x^2 + 2x^1) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(9x^2 + 2x^1) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-diff/D3` — seed 1009
 
@@ -2679,10 +2679,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `2, 3` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `3, 3` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3, 3` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-appdiff/D2` — seed 1009
 
@@ -2690,9 +2690,9 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 1 is “A maximum turning point”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “Not a stationary point at all”. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-appdiff/D4` — seed 1009
@@ -2712,10 +2712,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4*x^6 + -1*x` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(4*x^6 + -1*x)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `2*(4*x^6 + -1*x)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2*(4*x^6 + -1*x)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trigcalc/D1` — seed 1009
 
@@ -2723,10 +2723,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `0` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 0 is “$-4\\sin(4x)$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | yes | 1/1 | 1/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | yes | 1/1 | 1/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 1 is “$4\\sin(4x)$”. |
+| partial | `1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trigcalc/D2` — seed 1009
 
@@ -2734,10 +2734,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `0` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 0 is “$-\\dfrac{1}{4}\\cos(4x) + C$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | yes | 2/2 | 2/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | yes | 2/2 | 2/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 1 is “$\\dfrac{1}{4}\\cos(4x) + C$”. |
+| partial | `1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trigcalc/D3` — seed 1009
 
@@ -2745,8 +2745,8 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-2.598076` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | `-2.598076` | no | 0/3 | 0/3 | The same value written in another equivalent form. |
+| correct | `-3sqrt(3)/2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `-1.598076` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
 | partial | `-1.598076` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
@@ -2767,9 +2767,9 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 1 is “$5e^{5x}$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “$\\dfrac{e^{5x}}{5}$”. |
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-explogcalc/D2` — seed 1009
@@ -2778,10 +2778,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3*ln(5*x + 4)` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(3*ln(5*x + 4))` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `2*(3*ln(5*x + 4))` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2*(3*ln(5*x + 4))` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-explogcalc/D3` — seed 1009
 
@@ -2834,9 +2834,9 @@ Final answer: 0
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `68/3` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `68/3` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `71/3` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `71/3` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `69/3` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `69/3` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-stats/D2` — seed 1009
 
@@ -2877,10 +2877,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `8, 9` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `9, 9` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9, 9` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-motion/D4` — seed 1009
 
@@ -2899,10 +2899,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-2*cos(5*x)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(-2*cos(5*x))` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `2*(-2*cos(5*x))` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2*(-2*cos(5*x))` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-integral-calc/D2` — seed 1009
 
@@ -2921,10 +2921,10 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2*e^(5*x + (-1))` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(2*e^(5*x + (-1)))` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `2*(2*e^(5*x + (-1)))` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2*(2*e^(5*x + (-1)))` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-integral-calc/D4` — seed 1009
 
@@ -3239,9 +3239,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `11/19` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `11/19` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `30/19` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `30/19` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `12/19` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `12/19` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-relfreq/D3` — seed 1009
 
@@ -3261,9 +3261,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `27/68` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `27/68` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `95/68` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `95/68` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `28/68` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `28/68` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-networks/D1` — seed 1009
 
@@ -3315,9 +3315,9 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 2 is “The first result — its z-score of $1.4$ is higher”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “Impossible to compare without the raw totals”. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-normal/D4` — seed 1009
@@ -3337,9 +3337,9 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 2 is “Negative — as one variable increases, the other decreases”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “Cannot tell from a scatterplot”. |
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-nonright/D1` — seed 1009
@@ -3909,10 +3909,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `(x - 2)/4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `((x - 2)/4)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `((x - 2)/4) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `((x - 2)/4) + 1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-functions/D3` — seed 1009
 
@@ -3931,9 +3931,9 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/4 | 0/4 | The keyed answer as the server prints it. |
+| correct | `1` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. Option 1 is “$g^{-1}\\!\\left(f^{-1}(x)\\right)$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. Option 0 is “$\\dfrac{1}{f(g(x))}$”. |
 | partial | `0` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-trigid/D1` — seed 1009
@@ -3942,8 +3942,8 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0.707107` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | `0.707107` | no | 0/1 | 0/1 | The same value written in another equivalent form. |
+| correct | `sqrt(2)/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `1.707107` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
 | partial | `1.707107` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
@@ -3954,9 +3954,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `-312/1537` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-312/1537` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `1225/1537` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1225/1537` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `-311/1537` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-311/1537` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-trigid/D3` — seed 1009
 
@@ -3964,10 +3964,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0.934964` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | `0.934964` | no | 0/3 | 0/3 | The same value written in another equivalent form. |
-| common wrong | `1.934964` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1.934964` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3479/3721` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `3480/3721` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3480/3721` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-trigid/D4` — seed 1009
 
@@ -3975,10 +3975,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0.934964` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | `0.934964` | no | 0/3 | 0/3 | The same value written in another equivalent form. |
-| common wrong | `1.934964` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1.934964` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3479/3721` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `3480/3721` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3480/3721` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-inversetrig/D1` — seed 1009
 
@@ -3987,7 +3987,7 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `1.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
 | partial | `2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
@@ -3997,8 +3997,8 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `3.141593` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `3.141593` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
+| correct | `pi` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `4.141593` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `4.141593` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
@@ -4009,9 +4009,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `11/60` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `11/60` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `71/60` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `71/60` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `12/60` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `12/60` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-inversetrig/D4` — seed 1009
 
@@ -4019,8 +4019,8 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0.785398` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `0.785398` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
+| correct | `pi/4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `1.785398` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `1.785398` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
@@ -4085,10 +4085,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `(k+1)(k+2)(k+3)/3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `((k+1)(k+2)(k+3)/3)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `((k+1)(k+2)(k+3)/3) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `((k+1)(k+2)(k+3)/3) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-induction/D3` — seed 1009
 
@@ -4096,10 +4096,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `10p + 6^k` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `(10p + 6^k)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `(10p + 6^k) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(10p + 6^k) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-vectors/D1` — seed 1009
 
@@ -4239,10 +4239,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `5*n + 10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(5*n + 10)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(5*n + 10) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(5*n + 10) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-proof/D3` — seed 1009
 
@@ -4250,10 +4250,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `(n + 6)^3` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `((n + 6)^3)` | yes | 3/3 | 3/3 | The same expression written with brackets. |
+| common wrong | `((n + 6)^3) + 1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `((n + 6)^3) + 1` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-proof/D4` — seed 1009
 
@@ -4272,10 +4272,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `(1, 0)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `(2, 0)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(2, 0)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-complex/D2` — seed 1009
 
@@ -4283,10 +4283,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `(-1, -3)` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `(0, -3)` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(0, -3)` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-complex/D3` — seed 1009
 
@@ -4294,8 +4294,8 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2.356194` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `2.356194` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
+| correct | `3pi/4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `3.356194` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `3.356194` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
@@ -4306,9 +4306,9 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `-3/2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `-3/2` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `-1/2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-1/2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `-2/2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-2/2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-demoivre/D1` — seed 1009
 
@@ -4327,8 +4327,8 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `15.707963` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `15.707963` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
+| correct | `5pi` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `16.707963` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `16.707963` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
@@ -4338,8 +4338,8 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4.18879` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `4.18879` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
+| correct | `4pi/3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `5.18879` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `5.18879` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
@@ -4360,10 +4360,10 @@ Final answer: 6
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2*e^(3*x)*((x + 1)/3 - 1/9)` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(2*e^(3*x)*((x + 1)/3 - 1/9))` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `2*(2*e^(3*x)*((x + 1)/3 - 1/9))` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2*(2*e^(3*x)*((x + 1)/3 - 1/9))` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-integration/D2` — seed 1009
 
@@ -4394,7 +4394,7 @@ Final answer: 6
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `2072/3` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
-| alternative | `2072/3` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `2075/3` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
 | partial | `2075/3` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 

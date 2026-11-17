@@ -348,7 +348,8 @@ export const year10 = {
     const x = ri(rng, -5, 6), y = ri(rng, -5, 6);
     if (diff === 1) {
       const m = nz(rng, -3, 3), c = y - m * x;
-      const a2 = ri(rng, 2, 4), b2 = ri(rng, 1, 3);
+      let a2 = ri(rng, 2, 4); const b2 = ri(rng, 1, 3);
+      if (a2 + b2 * m === 0) a2 += 1;   // a2 + b2 m = 0 would make the second equation a multiple of the first (infinitely many solutions)
       const r2v = a2 * x + b2 * y;
       return {
         prompt: `Solve the simultaneous equations $y = ${term(m)} ${sgn(c)}$ and $${a2}x + ${b2}y = ${r2v}$ by substitution. Give your answer as a point $(x, y)$.`,
