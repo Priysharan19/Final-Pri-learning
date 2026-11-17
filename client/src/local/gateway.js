@@ -255,6 +255,8 @@ const BODY_RULES = [
     optionalString(body, 'variant', 20); optionalNumber(body, 'seed'); optionalString(body, 'source', 20);
     // Plan G4: an NSW paper is named by its blueprint id alone.
     optionalString(body, 'nsw', 64);
+    // Prithagoras: a practice paper weighted by the HSC 2027 priorities, named by course.
+    if (body.hscPriorities !== undefined && body.hscPriorities !== 'advanced' && body.hscPriorities !== 'extension1') throw apiError('hscPriorities must be advanced or extension1.', 400, 'INVALID_FIELD');
   }],
   [/^POST \/exams\/[A-Za-z0-9._-]+\/submit$/, body => {
     requireObject(body, 'exam submit'); boundedMap(body, 'answers', 120); boundedMap(body, 'workings', 120); optionalNumber(body, 'ms');

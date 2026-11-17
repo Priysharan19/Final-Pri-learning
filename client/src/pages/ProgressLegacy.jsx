@@ -5,6 +5,11 @@ import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { LineChart, HBars, Calendar, StatTile, Sparkline, MASTERY_FILLS } from '../components/Charts.jsx';
 import { useT, useTx } from '../i18n/index.js';
+import { hscCoursesFor } from '../engine/hscCourses.js';
+
+// The HSC 2027 priorities (Prithagoras, Years 11–12): its own on-demand chunk
+// with the NESA metadata behind it (vite.config.js 'hsc-priorities').
+const HscPriorities = React.lazy(() => import('../hsc/HscPriorities.jsx'));
 
 // Mastery band names, as catalogue keys resolved with t() at render time.
 const BAND_KEY = { unseen: 'progressAu.bandUnseen', emerging: 'progressAu.bandEmerging', developing: 'progressAu.bandDeveloping', strong: 'progressAu.bandStrong', mastered: 'progressAu.bandMastered' };
@@ -41,7 +46,9 @@ export default function Progress() {
 
   const setTab = k => setParams(k === 'overview' ? {} : { tab: k });
 
-  const tabName = t((TABS.find(([k]) => k === tab) || TABS[0])[1]);
+  const hscCourses = hscCoursesFor(user);
+  const tabs = hscCourses.length ? [...TABS, ['hsc', 'progressAu.tabHsc']] : TABS;
+  const tabName = t((tabs.find(([k]) => k === tab) || tabs[0])[1]);
 
   return (
     <div>
@@ -49,7 +56,7 @@ export default function Progress() {
           so the heading a screen reader needs is spoken rather than drawn. */}
       <h1 className="sr-only">{t('progressAu.srHeading', { tab: tabName })}</h1>
       <div className="page-tabs no-print">
-        {TABS.map(([k, labelKey]) => (
+        {tabs.map(([k, labelKey]) => (
           <button key={k} className={`page-tab ${tab === k ? 'on' : ''}`} aria-pressed={tab === k} onClick={() => setTab(k)}>{t(labelKey)}</button>
         ))}
       </div>
@@ -57,6 +64,11 @@ export default function Progress() {
       {tab === 'overview' && <Overview stats={stats} curriculum={curriculum} section={section} sections={sections} sectionKey={section?.key} setSectionKey={setSectionKey} badges={badges} range={range} setRange={setRange} user={user} nav={nav} />}
       {tab === 'priorities' && <Priorities stats={stats} nav={nav} curriculum={curriculum} user={user} />}
       {tab === 'map' && <KnowledgeMap curriculum={curriculum} user={user} nav={nav} />}
+      {tab === 'hsc' && hscCourses.length > 0 && (
+        <React.Suspense fallback={<div className="skeleton" style={{ height: 400 }} />}>
+          <HscPriorities user={user} courses={hscCourses} curriculum={curriculum} />
+        </React.Suspense>
+      )}
     </div>
   );
 }
