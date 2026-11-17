@@ -42,6 +42,7 @@ export default function ProgressAustralia() {
       scope={scope?.title || t('common.yearNumber', { n: user.year })}
       practiseTo={row => `/practice?subtopic=${row.id}`}
       teacher={user.role === 'teacher'}
+      ownHeading
     />
   );
 }

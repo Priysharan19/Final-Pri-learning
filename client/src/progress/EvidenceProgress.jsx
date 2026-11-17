@@ -32,21 +32,23 @@ function Word({ band, map, t }) {
 
 /**
  * @param {{ evidence: object, rows: {id:string,name:string,strand?:string}[], scope: string,
- *           practiseTo: (row) => string, teacher?: boolean }} props
+ *           practiseTo: (row) => string, teacher?: boolean, ownHeading?: boolean }} props
  */
-export default function EvidenceProgress({ evidence, rows, scope, practiseTo, teacher = false }) {
+export default function EvidenceProgress({ evidence, rows, scope, practiseTo, teacher = false, ownHeading = false }) {
   const t = useT();
   const nav = useNavigate();
   const byId = new Map(evidence.topics.map(x => [x.id, x]));
   const nameOf = id => rows.find(r => r.id === id)?.name || id;
   const started = rows.filter(r => byId.has(r.id)).length;
   const { overall } = evidence;
-  const Title = INSTRUMENT_UI ? 'h2' : 'h1';
+  // The page's own h1 is spoken, not drawn, where no Report above carries one (ownHeading).
+  const Title = INSTRUMENT_UI || ownHeading ? 'h2' : 'h1';
 
   return (
     <div className="pg" data-progress-evidence>
+      {ownHeading && <h1 className="sr-only">{t('progressEv.title')}</h1>}
       <header className="pg-head">
-        <Title className={INSTRUMENT_UI ? 'pg-title' : undefined}>{t('progressEv.title')}</Title>
+        <Title className={INSTRUMENT_UI || ownHeading ? 'pg-title' : undefined}>{t('progressEv.title')}</Title>
         <p className="sub">{t('progressEv.sub')}</p>
       </header>
 
