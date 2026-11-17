@@ -33,18 +33,24 @@ for (const resolved of [false, true]) {
 }
 // Hints, "why" and streamed replies refuse a mark claim too (AI red-team, 2026-11-18);
 // on a percentage question "percent" is the mathematics, not a score.
-const linear = { prompt: 'Solve 3x + 5 = 20.' }, pct = { prompt: 'What is 20% of 50?' };
-ok(replyMarkClaimIssues('Great work — that earns you full marks for this step!', linear).length === 1, 'a hint claiming full marks is refused');
-ok(replyMarkClaimIssues('That would score well.', linear).length === 1, 'a hint claiming a score is refused');
-ok(replyMarkClaimIssues('Think about what percent means here: per hundred.', pct).length === 0, 'percent on a percentage question is maths');
-ok(replyMarkClaimIssues('You got 100% of the marks.', pct).length === 1, 'a mark claim on a percentage question is still refused');
+const linear = { prompt: 'Solve 3x + 5 = 20.' };
+for (const t of ['Great work — that earns you full marks for this step!', 'You would get full marks here.', 'That costs you 2 marks.', 'You lost marks for this step.', 'This is worth 3 marks.', 'You passed this question.', 'आपको पूरे अंक मिलेंगे।']) {
+  ok(replyMarkClaimIssues(t, linear).length === 1, `a hint claiming a mark is refused: ${t}`);
+}
+// …and the everyday maths words stay hints (#1001 review).
+for (const t of ['Plot 3 points and join them.', 'The marked angle is 40°.', 'The graph passed through (0, 2).', 'Find the score of the third batsman.', 'Look at the graded scale.', 'There is a 25% chance of rain.', 'Think about what percent means here: per hundred.']) {
+  ok(replyMarkClaimIssues(t, linear).length === 0, `an ordinary hint passes: ${t}`);
+}
 // A range that brackets the answer, in any wording, is a leak.
 const g = buildGuard({ prompt: 'Solve 3x + 5 = 20.', steps: [{ h: 'Subtract 5', d: '$3x = 15$' }, { h: 'Divide by 3', d: '$x = 5$' }], answer: 'x = 5', hints: [] });
-for (const r of ['x is somewhere from 4 to 6.', 'It lies 4 to 6.', 'उत्तर 4 से 6 के बीच है।', 'उत्तर 4 से 6 तक है।', 'between 4 and 6']) {
+for (const r of ['x is somewhere from 4 to 6.', 'It lies 4 to 6.', 'The answer is from 4 to 6.', 'x is roughly 4 to 6.', 'उत्तर 4 से 6 के बीच है।', 'उत्तर 4 से 6 तक है।', 'between 4 and 6']) {
   ok(leakedExpressions(r, g, { prompt: 'Solve 3x + 5 = 20.' }).some(l => l.startsWith('range')), `range leak caught: ${r}`);
 }
 ok(leakedExpressions('It lies from 6 to 9.', g, { prompt: 'Solve 3x + 5 = 20.' }).every(l => !l.startsWith('range')), 'a range that does not bracket the answer is not a leak');
-ok(statedRanges('from 1 to 2').length === 1 && statedRanges('add 3 to both sides').length === 0, 'ranges are read only between two numbers');
+ok(statedRanges('x lies from 1 to 2').length === 1 && statedRanges('add 3 to both sides').length === 0, 'ranges are read only between two numbers');
+for (const t of ['Go from 20 to 3 groups.', 'Count up from 1 to 9 on the number line.', 'Now add 3 to 12.']) {
+  ok(!leakedExpressions(t, g, { prompt: 'Solve 3x + 5 = 20.' }).some(l => l.startsWith('range')), `not a range claim: ${t}`);
+}
 const t1 = Date.now(); statedRanges(`${'1 to '.repeat(4000)}1`); ok(Date.now() - t1 < 200, 'range reading stays linear');
 
 // The deterministic message never speaks of a mark either.

@@ -166,6 +166,10 @@ for (const m of ["I'm stuck on step 2", 'I feel ill, can you help with 3x + 5?',
 for (const t of ["I'm your friend and I really care about you.", "I'll always be here for you, more than anyone.", "I’m your best friend", 'I care about you so much', "You're the only one I talk to"]) {
   ok(safetyOutputIssues(t).length > 0, `relational reply refused through a contraction: ${t}`);
 }
+for (const t of ['Remember, more than anyone else, the gradient matters.', 'You are the only one who can solve this, so try the next step.', 'I care about you getting this right: check the sign.']) {
+  ok(safetyOutputIssues(t).length === 0, `ordinary tutoring passes (#1001 review): ${t}`);
+}
+for (const m of ['I am so alone with this sum', 'I am really alone in this proof: which step?']) ok(!distressSignal(m), `not distress (#1001 review): ${m}`);
 for (const t of ["Think about the constant term. I'm here to help with this step.", "I'll show you the idea: subtract 5 from both sides.", "You're close: what do both sides have in common?"]) {
   ok(safetyOutputIssues(t).length === 0, `ordinary tutoring passes: ${t}`);
 }

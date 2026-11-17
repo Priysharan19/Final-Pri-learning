@@ -829,7 +829,7 @@ export function createTutorRouter(db, {
       model = reply.model || model;
       const leaked = leakedExpressions(reply.message, guard, { prompt: request.question.prompt });
       // A hint never speaks of a mark either: only the engine marks (AI red-team, 2026-11-18).
-      if (reply.message && !reply.revealsAnswer && !leaked.length && !safetyOutputIssues(reply.message).length && !replyMarkClaimIssues(reply.message, request.question).length) {
+      if (reply.message && !reply.revealsAnswer && !leaked.length && !safetyOutputIssues(reply.message).length && !replyMarkClaimIssues(reply.message).length) {
         return {
           tutor: {
             level: request.level, message: reply.message, referencesStepIndex: reply.referencesStepIndex,
@@ -936,7 +936,7 @@ export function createTutorRouter(db, {
       return fallback(error instanceof TutorProviderError ? error.code : 'TUTOR_FAILED');
     }
     const issues = reply?.message
-      ? [...diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines }), ...safetyOutputIssues(reply.message), ...replyMarkClaimIssues(reply.message, request.question)]
+      ? [...diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines }), ...safetyOutputIssues(reply.message), ...replyMarkClaimIssues(reply.message)]
       : ['empty'];
     if (issues.length) {
       // The student got the step itself, not an explanation: the try is given back.
@@ -1276,7 +1276,7 @@ export function createTutorRouter(db, {
       req.on('close', onClose);
 
       const guard = buildGuard(request.question, { studentLines: request.studentWork.lines, verifiedLines: request.studentWork.verifiedLines });
-      const gate = createReleaseGate(guard, { prompt: request.question.prompt, maxChars: MAX_STREAM_CHARS, extraIssues: text => [...safetyOutputIssues(text), ...replyMarkClaimIssues(text, request.question)] });
+      const gate = createReleaseGate(guard, { prompt: request.question.prompt, maxChars: MAX_STREAM_CHARS, extraIssues: text => [...safetyOutputIssues(text), ...replyMarkClaimIssues(text)] });
       const model = providerConfig(env).model;
       send('meta', { level: request.level, source: 'model', model, cached: false });
 

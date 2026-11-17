@@ -352,9 +352,10 @@ const RANGES = [
   // "from 4 to 6", "4 to 6", "4 से 6 तक": the same bracket in other words. (A dash
   // range, 4–6, reaches here as subtraction and is not read; a known gap.)
   // (AI red-team, docs/evidence/ai-redteam-2026-11-18.md: "x is somewhere from
-  // 4 to 6" reached the student). Errs towards refusal: "add 3 to 12" in a reply
-  // about a different number costs one regenerated message.
-  new RegExp(String.raw`${NUM}\s+(?:to|till|until|through|thru)\s+${NUM}`, 'gi'),
+  // 4 to 6" reached the student). Read only where the reply places the unknown
+  // ("is", "lies", "the answer/value", "somewhere"), so "go from 20 to 3 groups"
+  // and "add 3 to 12" stay hints (#1001 review).
+  new RegExp(String.raw`\b(?:is|lies|be|somewhere|answer|value|range)\s+(?:from\s+|in\s+|between\s+|about\s+|roughly\s+)?${NUM}\s+(?:to|till|until|through|thru)\s+${NUM}`, 'gi'),
   new RegExp(String.raw`${NUM}\s+से\s+${NUM}\s+(?:के\s+बीच|तक)`, 'g'),
   new RegExp(String.raw`${NUM}\s+(?:और|तथा)\s+${NUM}\s+के\s+बीच`, 'g'),
   new RegExp(String.raw`(?:more|greater|bigger|larger)\s+than\s+${NUM}\s+(?:and|but)\s+(?:less|smaller|fewer)\s+than\s+${NUM}`, 'gi'),
@@ -681,7 +682,13 @@ export function markClaimIssues(text, { percentIsMaths = false } = {}) {
   return MARK_WORDS.test(t) || /\bout of\b\s*[0-9०-९]/i.test(t) ? ['mark-claim'] : [];
 }
 
-/** A help, "why" or streamed reply: the same mark-claim rule, with percent read as maths where the question is about it. */
-export function replyMarkClaimIssues(text, question) {
-  return markClaimIssues(text, { percentIsMaths: /%|percent/i.test(String(question?.prompt ?? '')) });
+// A hint is mathematics, and "points", "score", "marked", "passed", "grade" and
+// "%" are everyday words in it ("plot 3 points", "the marked angle", "the line
+// passed through (0, 2)"). So a help, "why" or streamed reply is refused only for
+// a claim about the student's marks (#1001 review), not for the words themselves.
+const HINT_MARK_CLAIM = /\b(?:full|partial|half|bonus|method|answer) (?:marks?|credit)\b|\byou (?:would |will |ll |have |ve |just )?(?:get|got|earn|earned|lose|lost|score|scored|gain|gained|deserve) (?:full |all |the |\d+ |[a-z]+ )?(?:marks?|points?|credit)\b|\b(?:earns?|loses?|costs?|worth) (?:you )?(?:full |all |the |\d+ |[a-z]+ )?(?:marks?|credit)\b|\bmarks? (?:for|on|in) (?:this|that|your)\b|\b\d+\s*(?:\/|out of)\s*\d+\s*marks?\b|\byou (?:have )?(?:passed|failed) (?:this|the) (?:question|step|test)\b|(?:पूरे|आधे) अंक|अंक (?:मिलेंगे|मिलेगा|कटेंगे|कटेगा|मिले)/iu;
+export function replyMarkClaimIssues(text) {
+  const s = String(text ?? '');
+  if (s.length > 20_000) return ['mark-claim'];
+  return HINT_MARK_CLAIM.test(s) ? ['mark-claim'] : [];
 }
