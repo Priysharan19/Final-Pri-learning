@@ -659,3 +659,15 @@ export function diagnosisGroundingIssues(text, { question, studentLines = [] } =
   if (PROSE_SYMBOLS.test(prose)) issues.push('prose:symbol');
   return issues;
 }
+
+// A model explanation never states or implies a mark. The engine decides marks
+// (AGENTS.md: AI proposes, the deterministic engine decides), so the words for
+// one are refused in any model-written diagnosis: marks, score, grade, points,
+// percentages, "out of N", "full credit", and their Hindi and Devanagari-digit
+// forms. Linear in the text; a hit sends the student the deterministic message.
+const MARK_WORDS = /\b(?:mark(?:s|ed|ing)|scor(?:e|es|ed|ing)|grad(?:e|es|ed|ing)|percent|full credit|partial credit|passed|failed)\b|[0-9०-९]\s*points?\b|(?<![ऀ-ॿ])अंक(?![ऀ-ॿ])|ग्रेड|उत्तीर्ण|अनुत्तीर्ण|[0-9०-९]\s*%/iu;
+export function markClaimIssues(text) {
+  const s = String(text ?? '');
+  if (s.length > 20_000) return ['mark-claim'];
+  return MARK_WORDS.test(s) || /\bout of\b\s*[0-9०-९]/i.test(s) ? ['mark-claim'] : [];
+}

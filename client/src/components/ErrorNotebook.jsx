@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { formatDate } from '../lib/locale.js';
 import { useApp } from '../App.jsx';
-import { useT } from '../i18n/index.js';
+import { useT, useLanguage } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 import { isEntitlementGate } from '../local/entitlementGate.js';
 import { PAYWALL_ROUTE } from '../paywall/route.js';
@@ -55,12 +55,17 @@ export default function ErrorNotebook() {
   const [book, setBook] = useState(null);
   const [openKey, setOpenKey] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [slip, setSlip] = useState(null);
+  const { language } = useLanguage();
 
   useEffect(() => {
     let live = true;
     api.get('/notebook')
       .then(r => { if (live) setBook(normalizeNotebook(r)); })
       .catch(() => { if (live) setBook(normalizeNotebook({ available: false, reason: 'offline' })); });
+    // The repeated slip across the last marked answers (engine/slipPattern.js,
+    // computed by the server for this account); nothing shows when there is none.
+    api.get('/slip-pattern').then(r => { if (live && r?.pattern) setSlip(r.pattern); }).catch(() => {});
     return () => { live = false; };
   }, [user?.id]);
 
@@ -85,6 +90,15 @@ export default function ErrorNotebook() {
       <h2 id="notebook-title" className="notebook-title">{t('notebook.title')}</h2>
       <p className="muted notebook-how">{t('notebook.how')}</p>
       {book.available === false && <p className="muted notebook-empty">{t(book.reason === 'sign-in' ? 'notebook.signIn' : 'notebook.offline')}</p>}
+      {book.available !== false && slip && (
+        <div className="notebook-slip" data-slip-pattern={slip.misconceptionId} role="note">
+          <p style={{ margin: '0 0 6px' }}><b>{t('smart.slip.note', { move: slip.nameKey ? t(slip.nameKey) : (slip.name?.[language] || slip.name?.en || t('smart.slip.generic')), n: slip.count, of: slip.of, topic: sections.find(x => x.subtopic === slip.subtopic)?.chapterName || slip.subtopic })}</b></p>
+          <div className="muted" style={{ marginBottom: 6 }}>{t('smart.slip.drill')}</div>
+          {slip.drill.filter(d => d.canTwin).map((d, i) => (
+            <button key={d.id} type="button" className="btn btn-ghost btn-sm" data-slip-drill={d.id} disabled={busy} onClick={() => twin(d.id)} style={{ marginRight: 8 }}>{t('smart.slip.try', { n: i + 1 })}</button>
+          ))}
+        </div>
+      )}
       {book.available !== false && book.dueCount > 0 && (
         <p className="notebook-due" data-notebook-due-count={book.dueCount}><b>{t('notebook.dueCount', { n: book.dueCount, count: book.dueCount })}</b></p>
       )}

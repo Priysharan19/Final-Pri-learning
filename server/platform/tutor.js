@@ -82,7 +82,7 @@ import { asStore, sqliteHandle } from './store.js';
 import { consumeRateLimit, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import { issuedQuestionForTutor } from './practice.js';
-import { buildGuard, captionWordingOk, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
+import { buildGuard, captionWordingOk, markClaimIssues, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
 import {
   MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_DIAGNOSE_LEVEL, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
   TUTOR_TURN_LEVEL, TUTOR_WHY_LEVEL, TutorProviderError, askTutorModel, providerConfig, streamTutorModel
@@ -576,6 +576,8 @@ export function deterministicDiagnosis(request) {
 export function diagnosisIssues(reply, request) {
   const parts = [reply.didRight, reply.wentWrong, reply.nextStep];
   const issues = parts.flatMap(part => diagnosisGroundingIssues(part, { question: request.question, studentLines: request.studentWork.lines }));
+  // A model explanation never states or implies a mark, open attempt or resolved.
+  for (const part of parts) issues.push(...markClaimIssues(part));
   if (!request.resolved) {
     if (reply.revealsAnswer) issues.push('declared');
     const guard = buildGuard(request.question, { studentLines: request.studentWork.lines, verifiedLines: request.studentWork.verifiedLines });
@@ -858,7 +860,7 @@ export function createTutorRouter(db, {
     }
     const issues = diagnosisIssues(reply, request);
     if (issues.length) {
-      const leak = issues.some(i => !i.startsWith('span:') && !i.startsWith('prose:') && i !== 'unbalanced-span');
+      const leak = issues.some(i => !i.startsWith('span:') && !i.startsWith('prose:') && i !== 'unbalanced-span' && i !== 'mark-claim');
       return fallback(leak ? 'TUTOR_ANSWER_GUARD' : 'TUTOR_GROUNDING_GUARD', reply.model || null);
     }
     // Which lines are credited and which is at fault are the ENGINE's, never the
