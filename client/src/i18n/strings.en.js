@@ -3650,7 +3650,7 @@ export default {
   'login.plotAltY': 'A plot of y equals x squared minus 2x minus 3',
   "notes.nsw.eyebrow": "NSW revision notebook",
   "notes.nsw.lede": "Notes for NSW Mathematics, Years 7 to 12: the ideas in plain words, the formulas, what markers look for, the usual traps and worked examples whose answers the maths engine has checked.",
-  "notes.nsw.unofficial": "Pri Learning notes, written for revision. They are not an official NESA publication.",
+  "notes.nsw.unofficial": "These notes are written for revision. They are not an official NESA publication.",
   "notes.nsw.yearTab": "Year {n}",
   "notes.nsw.yearLabel": "Choose a year",
   "notes.nsw.courseLabel": "Choose a course",

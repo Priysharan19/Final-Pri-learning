@@ -3705,7 +3705,7 @@ export default {
   'login.plotAltY': 'y = x² − 2x − 3 का आलेख',
   "notes.nsw.eyebrow": "NSW संशोधन नोटबुक",
   "notes.nsw.lede": "NSW गणित, Year 7 से 12 के नोट्स: सरल शब्दों में विचार, सूत्र, परीक्षक किस पर ध्यान देते हैं, आम गलतियाँ और हल किए उदाहरण जिनके उत्तर गणित-इंजन ने जाँचे हैं।",
-  "notes.nsw.unofficial": "Pri Learning के नोट्स, संशोधन के लिए लिखे गए। ये NESA का आधिकारिक प्रकाशन नहीं हैं।",
+  "notes.nsw.unofficial": "ये नोट्स संशोधन के लिए लिखे गए हैं। ये NESA का आधिकारिक प्रकाशन नहीं हैं।",
   "notes.nsw.yearTab": "ईयर {n}",
   "notes.nsw.yearLabel": "वर्ष चुनें",
   "notes.nsw.courseLabel": "पाठ्यक्रम चुनें",
