@@ -91,11 +91,13 @@ async function tour(edition) {
     check(`${label}: nothing is chosen, so it says to choose a topic`, (await visibleText(page, '[data-gen-summary]')).includes(en['gen.chooseTopics']));
 
     // Keyboard: Tab onto the first topic, Space chooses it.
-    const first = page.locator('[data-topic]').first();
+    // (A printed paper carries text-only questions, so the NSW topics chosen here are ones without figures.)
+    const pick = edition === 'prithagoras' ? ['y9-indices-sci', 'y9-algebra'] : null;
+    const first = pick ? page.locator(`[data-topic="${pick[0]}"]`) : page.locator('[data-topic]').first();
     await first.focus();
     await page.keyboard.press('Space');
     check(`${label}: Space on a focused topic chooses it`, await first.isChecked());
-    await page.locator('[data-topic]').nth(1).check();
+    await (pick ? page.locator(`[data-topic="${pick[1]}"]`) : page.locator('[data-topic]').nth(1)).check();
     // Length by time, and the mix.
     await page.getByRole('radio', { name: en['gen.byMinutes'] }).click();
     await page.getByLabel(en['gen.lenMinutes'].replace('{n}', '60')).check();
