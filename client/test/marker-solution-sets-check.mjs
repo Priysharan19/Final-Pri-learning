@@ -30,12 +30,20 @@ ok(!run([4, -2], ['abs(x-1)=3']).lines[0].incomplete, 'abs: the question itself 
 // A case of the absolute value is a branch, valid to write down even when its condition then fails.
 r = run([1], ['abs(x+2)=3x', 'x+2=3x', 'x=1']);
 ok(r.firstBreak === -1 && r.lines.every(l => l.status === 'ok'), 'abs: the Q = P case is credited');
-r = run([1], ['abs(x+2)=3x', '-(x+2)=3x']);
-ok(r.firstBreak === -1 && r.lines[1].status === 'ok', 'abs: the -Q = P case (x = -1/2, which fails its own condition) is a branch, not a break');
+r = run([1], ['abs(x+2)=3x', '-(x+2)=3x', 'x+2=3x', 'x=1']);
+ok(r.firstBreak === -1 && r.lines[1].status === 'ok' && !r.lines[3].incomplete, 'abs: the -Q = P case (x = -1/2, which fails its own condition) is a branch, not a break');
 r = run([1], ['abs(x+2)=3x', '-(x+2)=2x']);
 ok(r.firstBreak === 1, 'abs: a wrong case equation is a break');
 r = run([1], ['abs(x-3)=2x', 'x-3=2x', '-(x-3)=2x']);
 ok(r.firstBreak === -1, 'abs: both cases are branches');
+
+// A branch must BE the case equation, and is never the credited last line.
+r = run([1], ['abs(x+2)=3x', '4x=-2']);
+ok(r.lines[1].status === 'note' && r.lines[1].incomplete === true, 'abs: a rearranged case that is the last line and not the answer is not credited');
+r = run([1], ['abs(x+2)=3x', '5x=-2']);
+ok(r.firstBreak === 1, 'abs: a line that is no case of the equation is a break even where roots look near');
+r = run([1], ['abs(x-3)=2x', 'x=-3']);
+ok(r.lines[1].status !== 'ok', 'abs: x = -3 alone (an extraneous root) is never credited');
 
 // ── Square root ──
 r = run([2], ['sqrt(x+7)=x+1', 'x+7=x^2+2x+1', 'x^2+x-6=0', '(x+3)(x-2)=0']);

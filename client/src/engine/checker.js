@@ -715,6 +715,9 @@ function flagUnfinishedFinalLine(out, meta) {
   }
   if (incomplete) {
     row.incomplete = true;
+    // A step that only follows from the line above (an implied step or one case) is not
+    // credited as the finished answer: it is set aside as unverified.
+    if (row.implied === true && row.status === 'ok') row.status = 'note';
     if (!row.note) row.note = 'This line is not the answer: it still allows a value that does not solve the question, or leaves out one that does.';
   }
 }
