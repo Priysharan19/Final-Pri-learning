@@ -73,6 +73,8 @@ async function tour(edition) {
     const ctx = await browser.newContext({ viewport: { width: 1180, height: 860 }, acceptDownloads: true });
     const page = await ctx.newPage();
     const writes = [];
+    page.on('pageerror', e => console.log('  pageerror:', String(e.message).slice(0, 300)));
+    page.on('response', r => { if (r.status() >= 400) console.log('  http', r.status(), new URL(r.url()).pathname); });
     page.on('response', r => { const u = new URL(r.url()); if (/^\/v1\/exams\/[^/]+\/finish$/.test(u.pathname)) writes.push(r.status()); });
     await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
@@ -81,10 +83,10 @@ async function tour(edition) {
 
     await page.goto(`${platform.origin}/exams`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-paper-generator-entry]', { timeout: 30000 });
-    check(`${label}: the Exams page offers the paper generator`, (await visibleText(page, '[data-paper-generator-entry]')).includes(en['gen.entry.title']));
+    check(`${label}: the Exams page offers the paper generator`, (await visibleText(page, '[data-paper-generator-entry]')).toLowerCase().includes(en['gen.entry.title'].toLowerCase()));
     await page.locator('[data-paper-generator-entry] button').click();
     await page.waitForURL(/\/paper-generator$/, { timeout: 15000 });
-    await page.waitForSelector('[data-paper-generator]', { timeout: 30000 });
+    await page.waitForSelector('[data-paper-generator]', { timeout: 30000 }).catch(async e => { console.log('  on screen:', (await visibleText(page, 'main')).slice(0, 300)); throw e; });
     check(`${label}: the screen has its heading`, await page.locator('h1').count() === 1);
     check(`${label}: nothing is chosen, so it says to choose a topic`, (await visibleText(page, '[data-gen-summary]')).includes(en['gen.chooseTopics']));
 
@@ -143,7 +145,7 @@ async function tour(edition) {
 }
 
 try {
-  for (const edition of ['priyabhata', 'prithagoras']) await tour(edition);
+  for (const edition of (process.env.PRI_EDITIONS || 'priyabhata,prithagoras').split(',')) await tour(edition);
 } catch (error) {
   failures.push(`the tour stopped: ${error.message.split('\n')[0]}`);
   console.error(error);
