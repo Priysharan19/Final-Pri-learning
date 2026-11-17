@@ -403,7 +403,7 @@ try {
   ok(/examDesk: typeof __PRI_FEATURE_EXAM_DESK__ === 'boolean'/.test(read('src/platform/features.js')), 'features.js reads the build constant');
   const group = CHUNK_GROUPS.find(g => g.name === 'exam-desk');
   ok(group && ['/x/src/desk/DeskPage.jsx', '/x/src/examShell/ClockFace.jsx', '/x/src/examShell/useAutosave.js', '/x/src/engine/deskClock.js', '/x/src/engine/deskImport.js'].every(f => group.test.test(f)) && !group.test.test('/x/src/pages/ExamRoom.jsx') && !group.test.test('/x/src/examShell/ConfirmSheet.jsx') && ['ConfirmSheet.jsx', 'ShortcutsSheet.jsx', 'useAnnounce.js', 'useExamShortcuts.js', 'shortcuts.css'].every(f => !group.test.test('/x/src/examShell/' + f)) && !group.test.test('/x/src/engine/examTime.js'),
-    'the desk, the shell's desk-only pieces and the pure modules are one named chunk; the four shell pieces the marked room imports are not in it (F4c: the room works offline)');
+    'the desk, the shell desk-only pieces and the pure modules are one named chunk; the four shell pieces the marked room imports are not in it (F4c: the room works offline)');
   for (const file of ['assets/exam-desk-Bl2D7GYK.js', 'assets/exam-desk-BECvxl1c.css', 'assets/DeskPage-CSttVgzJ.js', 'assets/DeskImport-Bn-QSsVr.js', 'assets/DeskEntry-BCuXJmcw.js', 'assets/deskCache-C0ffee12.js']) {
     ok(ON_DEMAND.some(([re]) => re.test(file)), `${file} is fetched on demand, never installed`);
   }
