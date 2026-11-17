@@ -402,7 +402,7 @@ const TRIG = [
 // ═════════════════════════════════════════════════════════════════════════════
 // y11-quadfunc  (issued cells: 2, 3, 4)
 // ═════════════════════════════════════════════════════════════════════════════
-const sx = b => (b === 1 ? '+ x' : b === -1 ? '- x' : `${sgn(b)}x`);
+const sx = b => (b === 0 ? '' : b === 1 ? '+ x' : b === -1 ? '- x' : `${sgn(b)}x`);
 const sq = v => `(${v})^2`;
 const QUAD = [
   // D2 — the constant q in (x + p)² + q.
@@ -540,11 +540,12 @@ const QUAD = [
     diffs: [3],
     make: rng => until(() => {
       const p = nz(rng, -12, 12), q = nz(rng, -12, 12);
+      if (p === q) return null;
       const which = rc(rng, ['b', 'c']);
       const val = which === 'b' ? -(p + q) : p * q;
       return num(`The roots of $x^2 + bx + c = 0$ are $${p}$ and $${q}$. Find the value of $${which}$.`, val, {
         prefix: `${which} =`,
-        traps: which === 'b' ? [{ value: p + q, why: `The sum of the roots is $-b$, so $b = -(${p} + ${q})$.` }, { value: p * q, why: '$p q$ is $c$, the constant term.' }] : [{ value: -(p * q), why: 'The product of the roots is $+c$ (when $a = 1$).' }, { value: p + q, why: '$-(p + q)$ is $b$, not $c$.' }],
+        traps: which === 'b' ? [{ value: p + q, why: `The sum of the roots is $-b$, so $b = -((${p}) + (${q}))$.` }, { value: p * q, why: '$p q$ is $c$, the constant term.' }] : [{ value: -(p * q), why: 'The product of the roots is $+c$ (when $a = 1$).' }, { value: p + q, why: '$-(p + q)$ is $b$, not $c$.' }],
         hints: ['For $x^2 + bx + c = 0$: sum of roots $= -b$ and product of roots $= c$.', `Sum $= ${p + q}$, product $= ${p * q}$.`, which === 'b' ? `$b = -(${p + q})$.` : `$c = ${p * q}$.`],
         steps: [{ h: 'Sum and product', d: `$\\alpha + \\beta = ${p + q},\\quad \\alpha\\beta = ${p * q}$` }, { h: `Read off ${which}`, d: `$${which} = ${val}$` }]
       });
@@ -557,7 +558,7 @@ const QUAD = [
       const p = nz(rng, -14, 14), q = nz(rng, -14, 14);
       if (p === q) return null;
       const b = -(p + q), c = p * q;
-      return num(`One root of $x^2 ${sx(b)} ${sgn(c)} = 0$ is $${p}$. Use the sum of the roots, without factorising, to find the other root.`, q, {
+      return num(`One root of $${poly([1, b, c])} = 0$ is $${p}$. Use the sum of the roots, without factorising, to find the other root.`, q, {
         traps: [{ value: -q, why: `The roots add to $-b = ${-b}$, so the other root is $${-b} - (${p})$.` }, { value: b - p, why: `Sum of roots is $-b = ${-b}$, not $b$.` }],
         hints: ['Sum of roots $= -\\dfrac{b}{a}$.', `The roots add to $${-b}$.`, `Other root $= ${-b} - (${p})$.`],
         steps: [{ h: 'Sum of roots', d: `$\\alpha + \\beta = ${-b}$` }, { h: 'Other root', d: `$\\beta = ${-b} - (${p}) = ${q}$` }]
@@ -569,6 +570,7 @@ const QUAD = [
     diffs: [3],
     make: rng => until(() => {
       const p = nz(rng, -9, 9), q = nz(rng, -9, 9);
+      if (p === q) return null;
       const b = -(p + q), c = p * q;
       const kind = rc(rng, ['sumsq', 'recip', 'sumcube']);
       if (kind === 'recip') {
@@ -576,7 +578,7 @@ const QUAD = [
         let t = dd; while (t % 2 === 0) t /= 2; while (t % 5 === 0) t /= 5;
         if (t !== 1) return null;
         const val = (p + q) / c;
-        return num(`The roots of $x^2 ${sx(b)} ${sgn(c)} = 0$ are $\\alpha$ and $\\beta$. Find $\\dfrac{1}{\\alpha} + \\dfrac{1}{\\beta}$ as a decimal.`, val, {
+        return num(`The roots of $${poly([1, b, c])} = 0$ are $\\alpha$ and $\\beta$. Find $\\dfrac{1}{\\alpha} + \\dfrac{1}{\\beta}$ as a decimal.`, val, {
           traps: [{ value: 1 / (p + q || 1), why: '$\\dfrac{1}{\\alpha} + \\dfrac{1}{\\beta} = \\dfrac{\\alpha + \\beta}{\\alpha\\beta}$, not the reciprocal of the sum.' }, { value: c / (p + q || 1), why: 'Put the sum on top and the product underneath.' }],
           hints: ['Combine over a common denominator: $\\dfrac{\\alpha + \\beta}{\\alpha\\beta}$.', `$\\alpha + \\beta = ${p + q}$ and $\\alpha\\beta = ${c}$.`, `$\\dfrac{${p + q}}{${c}}$.`],
           steps: [{ h: 'Common denominator', d: '$\\dfrac{1}{\\alpha} + \\dfrac{1}{\\beta} = \\dfrac{\\alpha + \\beta}{\\alpha\\beta}$' }, { h: 'Substitute', d: `$\\dfrac{${p + q}}{${c}}$` }, { h: 'Evaluate', d: `$${val}$` }]
@@ -584,7 +586,7 @@ const QUAD = [
       }
       if (kind === 'sumsq') {
         const val = (p + q) ** 2 - 2 * c;
-        return num(`The roots of $x^2 ${sx(b)} ${sgn(c)} = 0$ are $\\alpha$ and $\\beta$. Find $\\alpha^2 + \\beta^2$ without solving the equation.`, val, {
+        return num(`The roots of $${poly([1, b, c])} = 0$ are $\\alpha$ and $\\beta$. Find $\\alpha^2 + \\beta^2$ without solving the equation.`, val, {
           traps: [{ value: (p + q) ** 2, why: '$\\alpha^2 + \\beta^2 = (\\alpha + \\beta)^2 - 2\\alpha\\beta$: do not forget to subtract $2\\alpha\\beta$.' }, { value: (p + q) ** 2 + 2 * c, why: 'Expanding $(\\alpha + \\beta)^2$ gives $+2\\alpha\\beta$, so subtract it to isolate $\\alpha^2 + \\beta^2$.' }],
           hints: ['Use $(\\alpha + \\beta)^2 = \\alpha^2 + 2\\alpha\\beta + \\beta^2$.', `$\\alpha + \\beta = ${p + q}$ and $\\alpha\\beta = ${c}$.`, `$\\alpha^2 + \\beta^2 = (${p + q})^2 - 2(${c})$.`],
           steps: [{ h: 'Rearrange the square of the sum', d: '$\\alpha^2 + \\beta^2 = (\\alpha + \\beta)^2 - 2\\alpha\\beta$' }, { h: 'Substitute', d: `$(${p + q})^2 - 2(${c})$` }, { h: 'Evaluate', d: `$${val}$` }]
@@ -592,7 +594,7 @@ const QUAD = [
       }
       const val = (p + q) ** 3 - 3 * c * (p + q);
       if (val === 0) return null;
-      return num(`The roots of $x^2 ${sx(b)} ${sgn(c)} = 0$ are $\\alpha$ and $\\beta$. Show that $\\alpha^3 + \\beta^3 = (\\alpha + \\beta)^3 - 3\\alpha\\beta(\\alpha + \\beta)$, and hence find $\\alpha^3 + \\beta^3$.`, val, {
+      return num(`The roots of $${poly([1, b, c])} = 0$ are $\\alpha$ and $\\beta$. Show that $\\alpha^3 + \\beta^3 = (\\alpha + \\beta)^3 - 3\\alpha\\beta(\\alpha + \\beta)$, and hence find $\\alpha^3 + \\beta^3$.`, val, {
         traps: [{ value: (p + q) ** 3, why: 'Do not forget the correction term $-3\\alpha\\beta(\\alpha + \\beta)$.' }, { value: (p + q) ** 3 + 3 * c * (p + q), why: 'The correction term is subtracted.' }],
         hints: ['Expand $(\\alpha + \\beta)^3 = \\alpha^3 + 3\\alpha^2\\beta + 3\\alpha\\beta^2 + \\beta^3$.', `$\\alpha + \\beta = ${p + q}$, $\\alpha\\beta = ${c}$.`, `$(${p + q})^3 - 3(${c})(${p + q})$.`],
         steps: [{ h: 'Identity', d: '$\\alpha^3 + \\beta^3 = (\\alpha + \\beta)^3 - 3\\alpha\\beta(\\alpha + \\beta)$' }, { h: 'Substitute', d: `$(${p + q})^3 - 3(${c})(${p + q})$` }, { h: 'Evaluate', d: `$${val}$` }]
@@ -604,9 +606,10 @@ const QUAD = [
     diffs: [3],
     make: rng => until(() => {
       const p = nz(rng, -10, 10), q = nz(rng, -10, 10), k = nz(rng, -6, 6);
+      if (p === q) return null;
       const b = -(p + q), c = p * q;
       const val = c + k * (p + q) + k * k;
-      return num(`The roots of $x^2 ${sx(b)} ${sgn(c)} = 0$ are $\\alpha$ and $\\beta$. Find $(\\alpha ${sgn(k)})(\\beta ${sgn(k)})$ without solving the equation.`, val, {
+      return num(`The roots of $${poly([1, b, c])} = 0$ are $\\alpha$ and $\\beta$. Find $(\\alpha ${sgn(k)})(\\beta ${sgn(k)})$ without solving the equation.`, val, {
         traps: [{ value: c + k, why: `Expand fully: $(\\alpha + k)(\\beta + k) = \\alpha\\beta + k(\\alpha + \\beta) + k^2$.` }, { value: c - k * (p + q) + k * k, why: 'The middle term is $k(\\alpha + \\beta)$ with $\\alpha + \\beta = -b$: check its sign.' }],
         hints: [`Expand: $(\\alpha ${sgn(k)})(\\beta ${sgn(k)}) = \\alpha\\beta ${sgn(k)}(\\alpha + \\beta) + ${k * k}$.`, `$\\alpha + \\beta = ${p + q}$ and $\\alpha\\beta = ${c}$.`, `$${c} ${sgn(k * (p + q))} + ${k * k}$.`],
         steps: [{ h: 'Expand', d: `$\\alpha\\beta ${sgn(k)}(\\alpha + \\beta) + ${k * k}$` }, { h: 'Substitute', d: `$${c} + (${k})(${p + q}) + ${k * k}$` }, { h: 'Evaluate', d: `$${val}$` }]
@@ -618,7 +621,7 @@ const QUAD = [
     diffs: [3],
     make: rng => until(() => {
       const S = nz(rng, -12, 12), P = nz(rng, -20, 20);
-      const f = (bb, cc) => `$x^2 ${sx(bb)} ${sgn(cc)} = 0$`;
+      const f = (bb, cc) => `$${poly([1, bb, cc])} = 0$`;
       const key = f(-S, P);
       const ds = [{ text: f(S, P), why: 'The sum of the roots is $-b$, so $b = -S$.' }, { text: f(-S, -P), why: 'The product of the roots is $+c$ when $a = 1$.' }, { text: f(S, -P), why: 'Both signs are wrong: $b = -(\\text{sum})$ and $c = +(\\text{product})$.' }].filter(d => d.text !== key);
       return mc(rng, `Which quadratic equation has roots with sum $${S}$ and product $${P}$?`, key, ds,
@@ -650,7 +653,7 @@ const QUAD = [
       if (p === q) return null;
       const b = -(p + q), c = p * q;
       const val = Math.abs(p - q);
-      return num(`The roots of $x^2 ${sx(b)} ${sgn(c)} = 0$ are $\\alpha$ and $\\beta$. Use $(\\alpha - \\beta)^2 = (\\alpha + \\beta)^2 - 4\\alpha\\beta$ to find the positive difference $|\\alpha - \\beta|$.`, val, {
+      return num(`The roots of $${poly([1, b, c])} = 0$ are $\\alpha$ and $\\beta$. Use $(\\alpha - \\beta)^2 = (\\alpha + \\beta)^2 - 4\\alpha\\beta$ to find the positive difference $|\\alpha - \\beta|$.`, val, {
         traps: [{ value: (p - q) ** 2, why: 'That is $(\\alpha - \\beta)^2$. Take the square root for $|\\alpha - \\beta|$.' }, { value: Math.abs(p + q), why: 'That is $|\\alpha + \\beta|$, the sum; the question asks for the difference.' }],
         hints: [`$\\alpha + \\beta = ${p + q}$ and $\\alpha\\beta = ${c}$.`, `$(\\alpha - \\beta)^2 = (${p + q})^2 - 4(${c}) = ${(p - q) ** 2}$.`, 'Take the positive square root.'],
         steps: [{ h: 'Square of the difference', d: `$(\\alpha - \\beta)^2 = (${p + q})^2 - 4(${c}) = ${(p - q) ** 2}$` }, { h: 'Square root', d: `$|\\alpha - \\beta| = ${val}$` }]
@@ -736,8 +739,8 @@ const QUAD = [
       return num(`The line $y = ${term2(m)}x + c$ touches the parabola $y = ${parab}$ at exactly one point. Find the value of $c$.`, c, {
         prefix: 'c =',
         traps: [{ value: d, why: `$d = ${d}$ is the constant of the parabola. Substitute the line and set $\\Delta = 0$ to find $c$.` }, { value: d + ((b - m) * (b - m)) / 4, why: 'Rearranging $d - c = \\dfrac{(b - m)^2}{4}$ gives $c = d - \\dfrac{(b - m)^2}{4}$.' }],
-        hints: ['Equate the line and the parabola; a tangent gives a repeated root, so $\\Delta = 0$.', `$x^2 ${sx(b - m)} ${sgn(d)} - c = 0$.`, `$\\Delta = (${b - m})^2 - 4(${d} - c) = 0$.`],
-        steps: [{ h: 'Equate', d: `$x^2 ${sx(b - m)} + (${d} - c) = 0$` }, { h: 'Set Δ = 0', d: `$(${b - m})^2 - 4(${d} - c) = 0$` }, { h: 'Solve', d: `$c = ${c}$` }]
+        hints: ['Equate the line and the parabola; a tangent gives a repeated root, so $\\Delta = 0$.', `$${poly([1, b - m, d])} - c = 0$.`, `$\\Delta = (${b - m})^2 - 4(${d} - c) = 0$.`],
+        steps: [{ h: 'Equate', d: `$${poly([1, b - m, 0])} + (${d} - c) = 0$` }, { h: 'Set Δ = 0', d: `$(${b - m})^2 - 4(${d} - c) = 0$` }, { h: 'Solve', d: `$c = ${c}$` }]
       });
     })
   },
@@ -749,6 +752,7 @@ const QUAD = [
       const b = rc(rng, [-1, 1]) * 2 * a * m;
       const A = 4 * a, B = b * b, k = a * m * m;
       const err = ri(rng, 1, 4);
+      if (A === B) return null;
       const lead = a === 1 ? '' : a;
       const eq = `${lead}x^2 ${sx(b)} + k = 0`;
       const L = [];
@@ -791,12 +795,15 @@ for (const B of [2, 3, 5, 6, 10]) {
     if (T > 1e5) continue;
     for (let x = 2; x <= 40; x++) for (let y = 2; y <= 40; y++) for (let n = 1; n <= 4; n++) for (let m = 1; m <= 4; m++) {
       if (n + m < 3) continue;
+      const isPow = v => { let t = v; while (t % B === 0) t /= B; return t === 1; };
+      if (isPow(x) || isPow(y)) continue;
       if (x ** n * y ** m === T) TUP.plus[B].push([n, x, m, y, r]);
       if (x ** n === T * y ** m) TUP.minus[B].push([n, x, m, y, r]);
     }
   }
 }
 const argTex = (num, den) => (den === 1 ? String(num) : `\\dfrac{${num}}{${den}}`);
+const lgk = (c, n) => `${c === 1 ? '' : c === -1 ? '-' : c}\\log_k ${n}`;
 const fracSimple = (R, K) => { if (K < 0) { R = -R; K = -K; } return fracTex(R, K); };
 
 const EXPLOG = [
@@ -856,8 +863,8 @@ const EXPLOG = [
       return num(`Evaluate $\\log_{${b ** q}} ${b ** p}$ as a fraction in simplest form.`, p / q, {
         frac: { n: p, d: q }, hint: 'e.g. 2/3',
         traps: [{ value: q / p, why: `Write both numbers as powers of ${b}: $\\log_{${b ** q}} ${b ** p} = \\dfrac{${p}}{${q}}$ (index of the argument over index of the base).` }],
-        hints: [`Write $${b ** q} = ${b}^{${q}}$ and $${b ** p} = ${b}^{${p}}$.`, `Let $x = \\log_{${b ** q}} ${b ** p}$, so $(${b}^{${q}})^x = ${b}^{${p}}$.`, `$${q}x = ${p}$.`],
-        steps: [{ h: 'Index form', d: `$(${b ** q})^x = ${b ** p}$` }, { h: 'Common base', d: `$${b}^{${q}x} = ${b}^{${p}}$` }, { h: 'Solve', d: `$x = \\dfrac{${p}}{${q}}$` }]
+        hints: [`Write $${b ** q} = ${b}^{${q}}$ and $${b ** p} = ${powTex(b, p)}$.`, `Let $x = \\log_{${b ** q}} ${b ** p}$, so $(${b}^{${q}})^x = ${powTex(b, p)}$.`, `$${q}x = ${p}$.`],
+        steps: [{ h: 'Index form', d: `$(${b ** q})^x = ${b ** p}$` }, { h: 'Common base', d: `$${b}^{${q}x} = ${powTex(b, p)}$` }, { h: 'Solve', d: `$x = \\dfrac{${p}}{${q}}$` }]
       });
     })
   },
@@ -877,8 +884,8 @@ const EXPLOG = [
   {
     diffs: [2],
     make: rng => {
-      const B = rc(rng, [2, 3, 5, 6, 10]);
       const op = rc(rng, ['+', '-']);
+      const B = rc(rng, [2, 3, 5, 6, 10].filter(v => (op === '+' ? TUP.plus[v] : TUP.minus[v]).length));
       const [n, x, m, y, r] = rc(rng, op === '+' ? TUP.plus[B] : TUP.minus[B]);
       return num(`Evaluate $${cf(n === 1 ? 1 : n, '')}\\log_{${B}} ${x} ${op} ${m === 1 ? '' : m}\\log_{${B}} ${y}$.`.replace('$1\\log', '$\\log'), r, {
         traps: [{ value: op === '+' ? Math.log10(x * n + y * m) : n * x - m * y, why: 'Move each coefficient inside as a power first: $n\\log x = \\log x^n$, then combine with the product/quotient law.', tol: 0.01 }],
@@ -891,8 +898,8 @@ const EXPLOG = [
   {
     diffs: [2],
     make: rng => {
-      const B = rc(rng, [2, 3, 5, 6, 10]);
       const op = rc(rng, ['+', '-']);
+      const B = rc(rng, [2, 3, 5, 6, 10].filter(v => (op === '+' ? TUP.plus[v] : TUP.minus[v]).length));
       const [n, x, m, y, r] = rc(rng, op === '+' ? TUP.plus[B] : TUP.minus[B]);
       return num(`Show that $${n === 1 ? '' : n}\\log_{${B}} ${x} ${op} ${m === 1 ? '' : m}\\log_{${B}} ${y}$ can be written as a single logarithm $\\log_{${B}} k$. Find the value of $k$.`, B ** r, {
         prefix: 'k =',
@@ -912,8 +919,8 @@ const EXPLOG = [
       const val = (a * P + b * Q) / 100;
       return num(`Given that $\\log_k 2 = ${P / 100}$ and $\\log_k 3 = ${Q / 100}$, find $\\log_k ${argTex(numr, den)}$.`, val, {
         traps: [{ value: (Math.abs(a) * P + Math.abs(b) * Q) / 100, why: 'Reciprocals give negative multiples: $\\log_k \\dfrac{1}{x} = -\\log_k x$.' }],
-        hints: [`Factorise: $${numr}$ ${den > 1 ? `over $${den}$ ` : ''}in terms of $2$ and $3$.`, `$= ${a}\\log_k 2 + ${b}\\log_k 3$ (using the product, quotient and power laws).`, `$${a}(${P / 100}) + ${b}(${Q / 100})$.`],
-        steps: [{ h: 'Split with the log laws', d: `$\\log_k ${argTex(numr, den)} = ${a}\\log_k 2 + (${b})\\log_k 3$` }, { h: 'Substitute', d: `$${a}(${P / 100}) + (${b})(${Q / 100})$` }, { h: 'Evaluate', d: `$${val}$` }]
+        hints: [`Factorise: $${numr}$ ${den > 1 ? `over $${den}$ ` : ''}in terms of $2$ and $3$.`, `$= ${lgk(a, 2)} ${b < 0 ? '-' : '+'} ${lgk(Math.abs(b), 3)}$ (using the product, quotient and power laws).`, `$${a}(${P / 100}) ${b < 0 ? '-' : '+'} ${Math.abs(b)}(${Q / 100})$.`],
+        steps: [{ h: 'Split with the log laws', d: `$\\log_k ${argTex(numr, den)} = ${lgk(a, 2)} ${b < 0 ? '-' : '+'} ${lgk(Math.abs(b), 3)}$` }, { h: 'Substitute', d: `$${a}(${P / 100}) ${b < 0 ? '-' : '+'} ${Math.abs(b)}(${Q / 100})$` }, { h: 'Evaluate', d: `$${val}$` }]
       });
     })
   },
@@ -968,6 +975,7 @@ const EXPLOG = [
     diffs: [3],
     make: rng => until(() => {
       const B = ri(rng, 2, 9), a = ri(rng, 2, 5), x = nz(rng, -8, 8), b = nz(rng, -9, 9), c = a * x + b;
+      if (c <= 1) return null;
       return num(`Solve $${B}^{${poly([a, b])}} = ${B}^{${c}}$.`, x, {
         prefix: 'x =', stepcheck: { kind: 'equation', variable: 'x', solutions: [x] },
         traps: [{ value: c - b, why: `After equating exponents, divide by the coefficient of $x$: $${a}x = ${c - b}$.` }, { value: (c + b) / a, why: `Move $${b}$ across with the opposite sign.` }],
@@ -981,7 +989,7 @@ const EXPLOG = [
     diffs: [3],
     make: rng => until(() => {
       const B = rc(rng, [2, 3, 5]), top = B === 5 ? 3 : 4;
-      const i = ri(rng, 1, top), j = ri(rng, 1, top), p = ri(rng, 1, 4), r = ri(rng, 1, 4), q = nz(rng, -6, 6), s = nz(rng, -6, 6);
+      const i = ri(rng, 2, top), j = ri(rng, 2, top), p = ri(rng, 1, 4), r = ri(rng, 1, 4), q = nz(rng, -6, 6), s = nz(rng, -6, 6);
       if (i === j) return null;
       const den = i * p - j * r, numr = j * s - i * q;
       if (den === 0 || numr % den !== 0) return null;
@@ -991,7 +999,7 @@ const EXPLOG = [
         prefix: 'x =', stepcheck: { kind: 'equation', variable: 'x', solutions: [x] },
         traps: [{ value: (s - q) / (p - r || 1), why: `Write both sides as powers of ${B} first: $${B ** i} = ${B}^{${i}}$ and $${B ** j} = ${B}^{${j}}$; equating the bases' exponents without that is invalid.` }],
         hints: [`Write both bases as powers of $${B}$: $${B ** i} = ${B}^{${i}}$, $${B ** j} = ${B}^{${j}}$.`, `$${B}^{${i}(${poly([p, q])})} = ${B}^{${j}(${poly([r, s])})}$.`, `Equate exponents: $${i}(${poly([p, q])}) = ${j}(${poly([r, s])})$.`],
-        steps: [{ h: 'Common base', d: `$(${B}^{${i}})^{${poly([p, q])}} = (${B}^{${j}})^{${poly([r, s])}}$` }, { h: 'Equate exponents', d: `$${poly([i * p, i * q])} = ${poly([j * r, j * s])}$` }, { h: 'Solve', d: `$${i * p - j * r}x = ${numr}$, so $x = ${x}$` }]
+        steps: [{ h: 'Common base', d: `$(${B}^{${i}})^{${poly([p, q])}} = (${B}^{${j}})^{${poly([r, s])}}$` }, { h: 'Equate exponents', d: `$${poly([i * p, i * q])} = ${poly([j * r, j * s])}$` }, { h: 'Solve', d: `$${poly([i * p - j * r, 0])} = ${numr}$, so $x = ${x}$` }]
       });
     })
   },
@@ -1027,7 +1035,7 @@ const EXPLOG = [
     diffs: [3],
     make: rng => until(() => {
       const B = rc(rng, [2, 3, 5]), top = B === 5 ? 3 : 4;
-      const i = ri(rng, 1, top), j = ri(rng, 1, top), p = ri(rng, 1, 4), r = ri(rng, 1, 4), q = nz(rng, -6, 6), s = nz(rng, -6, 6);
+      const i = ri(rng, 2, top), j = ri(rng, 2, top), p = ri(rng, 1, 4), r = ri(rng, 1, 4), q = nz(rng, -6, 6), s = nz(rng, -6, 6);
       if (i === j) return null;
       const err = ri(rng, 1, 4);
       const I = err === 1 ? i + 1 : i;
@@ -1035,7 +1043,7 @@ const EXPLOG = [
       let K = P1 - R1, R = err === 3 ? S1 + Q1 : S1 - Q1;
       if (K === 0 || (i * p - j * r) === 0) return null;
       const L = [`${B}^{${I}(${poly([p, q])})} = ${B}^{${j}(${poly([r, s])})}`, `${poly([P1, Q1])} = ${poly([R1, S1])}`, `${poly([K, 0])} = ${R}`, err === 4 ? `x = ${fracSimple(K, R || 1)}` : `x = ${fracSimple(R, K)}`];
-      if (err === 4 && R === 0) return null;
+      if (err === 4 && (R === 0 || Math.abs(K) === Math.abs(R))) return null;
       const reason = [`Line 1 is wrong: $${B ** i} = ${B}^{${i}}$, not $${B}^{${i + 1}}$.`, 'Line 2 is wrong: the factor outside the bracket multiplies *both* terms, including the constant.', 'Line 3 is wrong: subtract $' + `${Q1}` + '$ from the right-hand side, do not add it.', 'Line 4 is wrong: divide the right-hand side by the coefficient of $x$.'];
       const labels = [1, 2, 3, 4].map(n => `Line ${n}`);
       const m2 = mcq(rng, labels[err - 1], labels.filter((_, n) => n !== err - 1).map(t => ({ text: t, why: 'This line follows correctly from the line before it.' })));
@@ -1382,13 +1390,14 @@ const SCR = [
     diffs: [3],
     make: rng => {
       const kind = ri(rng, 1, 4);
-      const [x, y, z] = [ri(rng, 8, 40), ri(rng, 8, 40), ri(rng, 8, 40)];
+      const [x, y] = [ri(rng, 8, 40), ri(rng, 8, 40)];
+      const cSide = ri(rng, Math.abs(x - y) + 1, x + y - 1);
       const A = ri(rng, 30, 80), B = ri(rng, 30, 80), C = ri(rng, 30, 100);
       const S = 'The sine rule', Cs = 'The cosine rule';
       const cases = [
         [`$a = ${x}$ cm, $\\angle A = ${A}°$ and $\\angle B = ${B}°$; find $b$`, S],
         [`$b = ${x}$ cm, $c = ${y}$ cm and the included angle $\\angle A = ${C}°$; find $a$`, Cs],
-        [`$a = ${x}$ cm, $b = ${y}$ cm and $c = ${z + x + y}$ cm; find $\\angle C$`, Cs],
+        [`$a = ${x}$ cm, $b = ${y}$ cm and $c = ${cSide}$ cm; find $\\angle C$`, Cs],
         [`$a = ${x}$ cm, $b = ${y}$ cm and $\\angle A = ${A}°$ (not between them); find $\\angle B$`, S]
       ];
       const [giv, ans] = cases[kind - 1];
@@ -1415,6 +1424,8 @@ const SCR = [
       ];
       const v3 = err === 1 ? b * b + c * c + t * cs : err === 3 ? (b * b + c * c - t) * cs : x;
       if (v3 <= 0) return null;
+      if (err === 3 && Math.abs(v3 - good) < 0.5) return null;
+      if (err === 4 && Math.abs(v3 / 2 - Math.sqrt(v3)) < 0.1) return null;
       L.push(`a^2 = ${r2(v3)}`);
       L.push(err === 4 ? `a = ${r2(v3)} \\div 2 = ${r2(v3 / 2)}` : `a = \\sqrt{${r2(v3)}} = ${r2(Math.sqrt(v3))}`);
       const reason = ['Line 1 is wrong: the cosine rule subtracts $2bc\\cos A$.', 'Line 2 is wrong: the term is $2bc\\cos A$ with $2bc = 2 \\times b \\times c$, not $2(b + c)$.', 'Line 3 is wrong: multiply $2bc$ by $\\cos A$ only, then subtract from $b^2 + c^2$.', 'Line 4 is wrong: $a$ is the *square root* of $a^2$, not half of it.'];

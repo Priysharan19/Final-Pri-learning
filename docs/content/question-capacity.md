@@ -76,7 +76,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y11-probability` | 4 | 11.1k | 81 | — |
 | `y8-equations` | 3 | 14.7k | 26 | — |
 | `y10-simeq` | 4 | 17.0k | 6 | — |
-| `y11-quadfunc` | 3 | 18.6k | 74 | — |
+| `y11-quadfunc` | 3 | 18.5k | 75 | — |
 | `y10-probability` | 4 | 20.4k | 1 | forms |
 | `y8-algebra` | 4 | 21.6k | 25 | — |
 | `mex-complex` | 4 | 21.8k | 28 | — |
@@ -94,9 +94,9 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms11-relfreq` | 3 | 44.6k | 53 | — |
 | `y10-stats` | 4 | 46.1k | 15 | — |
 | `ms12-networks` | 4 | 47.9k | 999 | — |
-| `y11-explog` | 4 | 50.3k | 100 | — |
+| `y11-explog` | 4 | 49.8k | 87 | — |
 | `ms12-simple-interest` | 4 | 55.0k | 16 | — |
-| `y11-diff` | 4 | 65.7k | 239 | — |
+| `y11-diff` | 4 | 65.4k | 239 | — |
 | `ms12-normal-exact` | 4 | 77.1k | 155 | — |
 | `ms12-network-flow` | 4 | 95.8k | 33 | — |
 | `ms12-annuity-table` | 4 | 97.2k | 19 | — |

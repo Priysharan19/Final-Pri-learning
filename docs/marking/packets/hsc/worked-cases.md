@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `4b8497122f2002f377ccd32b6fc23e655a22ce7e7cd1da8f99e0db96bbe486b5` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `8ad01108b102240d6071cc25e24c0e96dde081fe7b65afc2790337fb2d369967` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2432,7 +2432,7 @@ Final answer: 0
 
 ## `nsw-final:y11-sine-cosine-rule/D3` — seed 1009
 
-> In triangle $ABC$ you are given $a = 21$ cm, $b = 22$ cm and $c = 74$ cm; find $\\angle C$. Which is the best first step?
+> In triangle $ABC$ you are given $a = 21$ cm, $b = 22$ cm and $c = 31$ cm; find $\\angle C$. Which is the best first step?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|

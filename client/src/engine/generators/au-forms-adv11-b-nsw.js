@@ -43,7 +43,11 @@ const coprime = (a, b) => gcd(a, b) === 1;
 const mx = M => M.d === 1 ? term(M.n, 'x') : `${M.latex()}x`;     // gradient times x
 const gform = (a, b, c) => `${term(a, 'x')} ${b < 0 ? '-' : '+'} ${term(Math.abs(b), 'y')} = ${c}`;
 const pg = (y1, g, x1) => `y ${y1 < 0 ? '+' : '-'} ${Math.abs(y1)} = ${g}\\left(x ${x1 < 0 ? '+' : '-'} ${Math.abs(x1)}\\right)`;
-const tex = v => String(v);
+const rat = (n, d) => { if (d < 0) { n = -n; d = -d; } if (d === 1) return String(n); return n < 0 ? `-\\dfrac{${-n}}{${d}}` : `\\dfrac{${n}}{${d}}`; };
+const krat = b => b === 1 ? '-k' : b === -1 ? 'k' : b < 0 ? `\\dfrac{k}{${-b}}` : `-\\dfrac{k}{${b}}`;
+const hterm = a => a < 0 ? `- ${term(-a, 'h')}` : `+ ${term(a, 'h')}`;
+const h2term = a => a < 0 ? `- ${term(-a, 'h', 2)}` : `+ ${term(a, 'h', 2)}`;
+
 
 // ═════════════════════════════════════════════════════════════════════════════
 // y11-lines
@@ -58,7 +62,7 @@ const linesForms = [
         { value: new Frac(dx, dy).value, why: 'The reciprocal is right but the sign is not: $m_1 m_2 = -1$ means the signs must differ.' },
         { value: -m.value, why: 'You negated but did not flip. Perpendicular gradients are negative **reciprocals**.' }],
       hints: ['First find the gradient of $AB$ using rise over run.', `$m_{AB} = \\dfrac{${y1 + dy} - ${y1 < 0 ? `(${y1})` : y1}}{${x1 + dx} - ${x1 < 0 ? `(${x1})` : x1}}$.`, 'Then take the negative reciprocal.'],
-      steps: [{ h: 'Gradient of AB', d: `$m_{AB} = \\dfrac{${dy}}{${dx}} = ${m.latex()}$` }, { h: 'Perpendicular gradient', d: `$m_{\\perp} = -\\dfrac{1}{m_{AB}} = ${perp.latex()}$` }]
+      steps: [{ h: 'Gradient of AB', d: `$m_{AB} = ${rat(dy, dx)} = ${m.latex()}$` }, { h: 'Perpendicular gradient', d: `$m_{\\perp} = -\\dfrac{1}{m_{AB}} = ${perp.latex()}$` }]
     });
   } },
   // D1 — missing parameter: perpendicular lines, general form
@@ -68,10 +72,10 @@ const linesForms = [
     const M = new Frac(p, q), t = nz(rng, -3, 3), b = p * t, k = q * t, c0 = nz(rng, -6, 6), c = nz(rng, -9, 9);
     return numQ(`The lines $y = ${mx(M)} ${sgn(c0)}$ and $kx ${b < 0 ? '-' : '+'} ${term(Math.abs(b), 'y')} = ${c}$ are perpendicular. Find the value of $k$.`, k, {
       hint: 'e.g. -4',
-      traps: [{ value: -k, why: 'Check the sign: the second line has gradient $-\\dfrac{k}{' + b + '}$, not $\\dfrac{k}{' + b + '}$.' },
+      traps: [{ value: -k, why: `Check the sign: the second line has gradient $${krat(b)}$, not $${krat(-b)}$.` },
         { value: b, why: 'The coefficient of $y$ is not $k$. Use the gradient condition $m_1 m_2 = -1$ to find $k$.' }],
-      hints: ['Write the second line as $y = \\ldots$ to read off its gradient.', `$${term(Math.abs(b), 'y')} = ${-1}\\,kx + \\ldots$ gives gradient $-\\dfrac{k}{${b}}$.`, 'Use $m_1 m_2 = -1$ and solve for $k$.'],
-      steps: [{ h: 'Gradients', d: `$m_1 = ${M.latex()}$ and $m_2 = -\\dfrac{k}{${b}}$` }, { h: 'Perpendicular', d: `$${M.latex()} \\times \\left(-\\dfrac{k}{${b}}\\right) = -1$` }, { h: 'Solve', d: `$k = ${k}$` }]
+      hints: ['Write the second line as $y = \\ldots$ to read off its gradient.', `$${term(Math.abs(b), 'y')} = -kx + \\ldots$ gives gradient $${krat(b)}$.`, 'Use $m_1 m_2 = -1$ and solve for $k$.'],
+      steps: [{ h: 'Gradients', d: `$m_1 = ${M.latex()}$ and $m_2 = ${krat(b)}$` }, { h: 'Perpendicular', d: `$${M.latex()} \\times \\left(${krat(b)}\\right) = -1$` }, { h: 'Solve', d: `$k = ${k}$` }]
     });
   } },
   // D1 — MCQ: perpendicular gradient with misconception distractors
@@ -96,7 +100,7 @@ const linesForms = [
         { value: new Frac(-b, a).value, why: 'Check the sign: the given line has gradient $-\\dfrac{a}{b}$, so its perpendicular is $+\\dfrac{b}{a}$.' },
         { value: new Frac(a, b).value, why: 'You must rearrange to $y = mx + c$: the gradient is $-\\dfrac{a}{b}$, not $\\dfrac{a}{b}$.' }],
       hints: ['Rearrange into $y = mx + c$ to find the gradient.', `$${term(Math.abs(b), 'y')} = ${b < 0 ? '' : '-'}\\ldots$ so $m = -\\dfrac{a}{b}$ with $a = ${a}$, $b = ${b}$.`, 'Then take the negative reciprocal.'],
-      steps: [{ h: 'Gradient of the given line', d: `$m = -\\dfrac{${a}}{${b}} = ${m.latex()}$` }, { h: 'Negative reciprocal', d: `$m_{\\perp} = ${perp.latex()}$` }]
+      steps: [{ h: 'Gradient of the given line', d: `$m = ${rat(-(a), b)} = ${m.latex()}$` }, { h: 'Negative reciprocal', d: `$m_{\\perp} = ${perp.latex()}$` }]
     });
   } },
   // D1 — missing parameter: parallel lines (show they are parallel)
@@ -106,9 +110,9 @@ const linesForms = [
     return numQ(`The lines $${gform(a, b, c1)}$ and $kx ${b * t < 0 ? '-' : '+'} ${term(Math.abs(b * t), 'y')} = ${c2}$ are parallel and distinct. Find the value of $k$.`, k, {
       hint: 'e.g. 6',
       traps: [{ value: a, why: 'Both $x$ and $y$ coefficients must scale by the same factor for the gradients to match.' },
-        { value: -k, why: 'Parallel lines have equal gradients, so $-\\dfrac{a}{b}$ and $-\\dfrac{k}{' + b * t + '}$ must match without a sign change.' }],
-      hints: ['Parallel lines have equal gradients.', `The first gradient is $-\\dfrac{${a}}{${b}}$; the second is $-\\dfrac{k}{${b * t}}$.`, 'Set them equal and solve for $k$.'],
-      steps: [{ h: 'Equal gradients', d: `$-\\dfrac{${a}}{${b}} = -\\dfrac{k}{${b * t}}$` }, { h: 'Solve', d: `$k = ${a} \\times ${t} = ${k}$` }]
+        { value: -k, why: 'Parallel lines have equal gradients, so the two gradients must match without a sign change.' }],
+      hints: ['Parallel lines have equal gradients.', `The first gradient is $${rat(-(a), b)}$; the second is $${krat(b * t)}$.`, 'Set them equal and solve for $k$.'],
+      steps: [{ h: 'Equal gradients', d: `$${rat(-(a), b)} = ${krat(b * t)}$` }, { h: 'Solve', d: `$k = ${a} \\times ${t} = ${k}$` }]
     });
   } },
   // D2 — y-intercept of a perpendicular line through a point
@@ -179,7 +183,7 @@ const linesForms = [
     return numQ(`Points $A(${ax}, ${ay})$, $B(${bx}, ${by})$ and $C(${cx}, k)$ are such that $AB \\perp BC$. Find $k$.`, k, {
       hint: 'e.g. 2',
       traps: [{ value: by + dx * t, why: 'Sign slip: $BC$ must have the negative reciprocal gradient, so $k - ' + by + '$ moves the other way.' }, { value: by + new Frac(dy, dx).value * (cx - bx), why: 'That makes $BC$ parallel to $AB$. For a right angle the gradients must multiply to $-1$.' }],
-      hints: [`$m_{AB} = \\dfrac{${dy}}{${dx}}$.`, `So $m_{BC} = ${new Frac(-dx, dy).latex()}$.`, `$\\dfrac{k - ${by < 0 ? `(${by})` : by}}{${dy * t}} = ${new Frac(-dx, dy).latex()}$.`],
+      hints: [`$m_{AB} = ${rat(dy, dx)}$.`, `So $m_{BC} = ${new Frac(-dx, dy).latex()}$.`, `$\\dfrac{k - ${by < 0 ? `(${by})` : by}}{${dy * t}} = ${new Frac(-dx, dy).latex()}$.`],
       steps: [{ h: 'Gradient of AB', d: `$m_{AB} = ${new Frac(dy, dx).latex()}$` }, { h: 'Gradient of BC', d: `$m_{BC} = ${new Frac(-dx, dy).latex()}$` }, { h: 'Use C', d: `$\\dfrac{k ${sgn(-by)}}{${cx - bx}} = ${new Frac(-dx, dy).latex()} \\Rightarrow k = ${k}$` }]
     });
   } },
@@ -339,8 +343,8 @@ const linesForms = [
     return numQ(`The simultaneous equations $${gform(a, b, c1)}$ and $kx ${b * t < 0 ? '-' : '+'} ${term(Math.abs(b * t), 'y')} = ${c2}$ have **no solution**. Find $k$.`, k, {
       hint: 'e.g. -8',
       traps: [{ value: a, why: 'The coefficients of $y$ differ by a factor of ' + t + ', so the coefficient of $x$ must scale by the same factor.' }, { value: -k, why: 'No solution means parallel lines: equal gradients, so no sign change.' }],
-      hints: ['No intersection means the lines are parallel (and distinct).', `Their gradients are $-\\dfrac{${a}}{${b}}$ and $-\\dfrac{k}{${b * t}}$.`, 'Set them equal and solve.'],
-      steps: [{ h: 'Parallel lines', d: `$-\\dfrac{${a}}{${b}} = -\\dfrac{k}{${b * t}}$` }, { h: 'Solve', d: `$k = ${a} \\times ${t} = ${k}$` }, { h: 'Check distinct', d: `$${c2} \\ne ${t} \\times ${c1}$, so the lines do not coincide.` }]
+      hints: ['No intersection means the lines are parallel (and distinct).', `Their gradients are $${rat(-(a), b)}$ and $${krat(b * t)}$.`, 'Set them equal and solve.'],
+      steps: [{ h: 'Parallel lines', d: `$${rat(-(a), b)} = ${krat(b * t)}$` }, { h: 'Solve', d: `$k = ${a} \\times ${t} = ${k}$` }, { h: 'Check distinct', d: `$${c2} \\ne ${t} \\times ${c1}$, so the lines do not coincide.` }]
     });
   } }
 ];
@@ -374,7 +378,7 @@ const diffForms = [
   { diffs: [1], make: rng => {
     const a = nz(rng, -8, 8), n = ri(rng, 1, 3), k = nz(rng, -3, 3), f = new Frac(-a * n, Math.pow(k, n + 1));
     const den = n === 1 ? 'x' : `x^{${n}}`;
-    return fracQ(`Find $\\dfrac{dy}{dx}$ when $x = ${k}$ for $y = \\dfrac{${a}}{${den}}$.`, f, {
+    return fracQ(`Find $\\dfrac{dy}{dx}$ when $x = ${k}$ for $y = ${rat(a, den)}$.`, f, {
       hint: f.d === 1 ? 'e.g. -3' : 'e.g. -3/4',
       traps: [{ value: new Frac(a * n, Math.pow(k, n + 1)).value, why: 'Check the sign. Bringing down $-' + n + '$ makes the coefficient $-' + a * n + '$.' }, { value: new Frac(-a * n, Math.pow(k, n - 1)).value, why: 'The power goes **down** by 1 from $-' + n + '$ to $-' + (n + 1) + '$, so the denominator power is $' + (n + 1) + '$.' }],
       hints: [`Rewrite as $y = ${a}x^{-${n}}$.`, `$\\dfrac{dy}{dx} = ${-a * n}x^{-${n + 1}}$.`, `Substitute $x = ${k}$: $\\dfrac{${-a * n}}{(${k})^{${n + 1}}}$.`],
@@ -388,7 +392,7 @@ const diffForms = [
       hint: f.d === 1 ? 'e.g. 2' : 'e.g. 3/8',
       traps: [{ value: new Frac(a, 2 * k * k).value, why: 'Evaluate $\\sqrt{x}$ at ' + k * k + ' as $' + k + '$, not as $' + k * k + '$.' }, { value: new Frac(a, k).value, why: 'The power $\\tfrac{1}{2}$ comes down in front, so the derivative has a factor $\\tfrac{1}{2}$.' }],
       hints: [`Rewrite $\\sqrt{x}$ as $x^{\\frac{1}{2}}$.`, `$f'(x) = ${a} \\times \\dfrac{1}{2}x^{-\\frac{1}{2}} = \\dfrac{${a}}{2\\sqrt{x}}$.`, `Substitute $x = ${k * k}$, so $\\sqrt{x} = ${k}$.`],
-      steps: [{ h: 'Index form', d: `$f(x) = ${a}x^{\\frac{1}{2}}$` }, { h: 'Differentiate', d: `$f'(x) = \\dfrac{${a}}{2\\sqrt{x}}$` }, { h: 'Substitute', d: `$f'(${k * k}) = \\dfrac{${a}}{${2 * k}} = ${f.latex()}$` }]
+      steps: [{ h: 'Index form', d: `$f(x) = ${a}x^{\\frac{1}{2}}$` }, { h: 'Differentiate', d: `$f'(x) = \\dfrac{${a}}{2\\sqrt{x}}$` }, { h: 'Substitute', d: `$f'(${k * k}) = ${rat(a, 2 * k)} = ${f.latex()}$` }]
     });
   } },
   // D1 — MCQ: power rule misconceptions
@@ -436,11 +440,11 @@ const diffForms = [
   // D2 — context: rate of rising depth
   { diffs: [2], make: rng => {
     const a = ri(rng, 1, 3), b = ri(rng, 1, 5), c = ri(rng, 1, 8), t = ri(rng, 1, 4), v = 3 * a * t * t + 2 * b * t + c;
-    return numQ(`After heavy rain, the depth $d$ metres of water in a Hunter Valley dam is modelled by $d = ${poly([a, b, c, 0])}$, where $t$ is the time in hours since the rain began. Find how fast the depth is rising when $t = ${t}$, in m/h.`, v, {
+    return numQ(`After heavy rain, the depth $d$ metres of water in a Hunter Valley dam is modelled by $d = ${poly([a, b, c, 0], 't')}$, where $t$ is the time in hours since the rain began. Find how fast the depth is rising when $t = ${t}$, in m/h.`, v, {
       hint: 'e.g. 14',
-      traps: [{ value: a * t ** 3 + b * t * t + c * t, why: 'That is the **depth** at $t = ' + t + '$, not the rate at which it is changing.' }, { value: 3 * a * t * t + 2 * b * t, why: 'The term $' + c + 't$ differentiates to $' + c + '$, which must be included.' }],
-      hints: ['The rate of change of depth is $\\dfrac{dd}{dt}$.', `$\\dfrac{dd}{dt} = ${poly([3 * a, 2 * b, c])}$.`, `Substitute $t = ${t}$.`],
-      steps: [{ h: 'Differentiate', d: `$\\dfrac{dd}{dt} = ${poly([3 * a, 2 * b, c])}$` }, { h: 'Substitute', d: `$${v}$ m/h` }]
+      traps: [{ value: a * t ** 3 + b * t * t + c * t, why: 'That is the **depth** at $t = ' + t + '$, not the rate at which it is changing.' }, { value: 3 * a * t * t + 2 * b * t, why: 'The term $' + term(c, 't') + '$ differentiates to $' + c + '$, which must be included.' }],
+      hints: ['The rate of change of depth is $\\dfrac{dd}{dt}$.', `$\\dfrac{dd}{dt} = ${poly([3 * a, 2 * b, c], 't')}$.`, `Substitute $t = ${t}$.`],
+      steps: [{ h: 'Differentiate', d: `$\\dfrac{dd}{dt} = ${poly([3 * a, 2 * b, c], 't')}$` }, { h: 'Substitute', d: `$${v}$ m/h` }]
     });
   } },
   // D2 — expand then differentiate a product of brackets
@@ -485,7 +489,7 @@ const diffForms = [
   // D3 — y-intercept of the tangent to a cubic
   { diffs: [3], make: rng => {
     let a, b, c, d, x0, m, y0, ct;
-    do { a = rc(rng, [1, 2, -1]); b = nz(rng, -4, 4); c = nz(rng, -6, 6); d = nz(rng, -8, 8); x0 = nz(rng, -2, 2); m = 3 * a * x0 * x0 + 2 * b * x0 + c; y0 = a * x0 ** 3 + b * x0 * x0 + c * x0 + d; ct = y0 - m * x0; } while (ct === 0);
+    do { a = rc(rng, [1, 2, -1]); b = nz(rng, -4, 4); c = nz(rng, -6, 6); d = nz(rng, -8, 8); x0 = nz(rng, -2, 2); m = 3 * a * x0 * x0 + 2 * b * x0 + c; y0 = a * x0 ** 3 + b * x0 * x0 + c * x0 + d; ct = y0 - m * x0; } while (ct === 0 || m === 0);
     return numQ(`Find the $y$-intercept of the tangent to $y = ${poly([a, b, c, d])}$ at the point where $x = ${x0}$.`, ct, {
       hint: 'e.g. -4',
       traps: [{ value: y0, why: 'That is the $y$-coordinate of the point of tangency. The tangent crosses the $y$-axis at a different point.' }, { value: m, why: 'That is the gradient of the tangent, not its intercept.' }, { value: y0 + m * x0, why: 'Sign slip: $c = y_0 - m x_0$.' }],
@@ -505,12 +509,13 @@ const diffForms = [
   } },
   // D3 — first principles (show that): find the constant in the difference quotient
   { diffs: [3], make: rng => {
-    const a = nz(rng, -4, 4), b = nz(rng, -6, 6), x0 = nz(rng, -4, 4), P = 2 * a * x0 + b;
-    return numQ(`Let $f(x) = ${poly([a, b, 0])}$. Show that $\\dfrac{f(${x0} + h) - f(${x0})}{h} = P + ${term(a, 'h')}$ for $h \\ne 0$, where $P$ is a constant, and find $P$.`, P, {
+    let a, b, x0, P;
+    do { a = nz(rng, -4, 4); b = nz(rng, -6, 6); x0 = nz(rng, -4, 4); P = 2 * a * x0 + b; } while (P === 0);
+    return numQ(`Let $f(x) = ${poly([a, b, 0])}$. Show that $\\dfrac{f(${x0} + h) - f(${x0})}{h} = P ${hterm(a)}$ for $h \\ne 0$, where $P$ is a constant, and find $P$.`, P, {
       hint: 'e.g. 6',
       traps: [{ value: a * x0 * x0 + b * x0, why: 'That is $f(' + x0 + ')$. $P$ is what remains after dividing $f(' + x0 + ' + h) - f(' + x0 + ')$ by $h$.' }, { value: P - b, why: 'The linear term $' + b + 'x$ contributes $' + b + '$ to $P$.' }],
       hints: [`Expand $f(${x0} + h)$ and subtract $f(${x0})$.`, 'Every remaining term has a factor of $h$; divide by $h$.', 'The constant left over is $P$ (and is also $f\'(' + x0 + ')$ as $h \\to 0$).'],
-      steps: [{ h: 'Difference', d: `$f(${x0} + h) - f(${x0}) = ${P}h ${sgn(a)}h^2$` }, { h: 'Divide by h', d: `$${P} ${sgn(a)}h$` }, { h: 'Constant', d: `$P = ${P}$` }]
+      steps: [{ h: 'Difference', d: `$f(${x0} + h) - f(${x0}) = ${term(P, 'h')} ${h2term(a)}$` }, { h: 'Divide by h', d: `$${P} ${hterm(a)}$` }, { h: 'Constant', d: `$P = ${P}$` }]
     });
   } },
   // D3 — gradient of a chord, as a decimal, then compare with the tangent
@@ -608,11 +613,11 @@ const diffForms = [
   // D4 — context: greatest height of a cricket ball
   { diffs: [4], make: rng => {
     const a = ri(rng, 2, 5), ts = ri(rng, 1, 3), c = ri(rng, 1, 3), b = 2 * a * ts, H = c + a * ts * ts;
-    return numQ(`The height $h$ metres of a cricket ball $t$ seconds after it is hit is modelled by $h = ${poly([-a, b, c])}$. Use calculus to find the greatest height the ball reaches, in metres.`, H, {
+    return numQ(`The height $h$ metres of a cricket ball $t$ seconds after it is hit is modelled by $h = ${poly([-a, b, c], 't')}$. Use calculus to find the greatest height the ball reaches, in metres.`, H, {
       hint: 'e.g. 21',
       traps: [{ value: ts, why: 'That is the **time** at which the greatest height occurs. The question asks for the height.' }, { value: c, why: 'That is the height at $t = 0$ (when the ball is hit).' }],
-      hints: ['The ball is at its highest where $\\dfrac{dh}{dt} = 0$.', `$\\dfrac{dh}{dt} = ${poly([-2 * a, b])}$.`, 'Find $t$, then substitute into $h$.'],
-      steps: [{ h: 'Differentiate', d: `$\\dfrac{dh}{dt} = ${poly([-2 * a, b])}$` }, { h: 'Set to 0', d: `$t = ${ts}$` }, { h: 'Greatest height', d: `$h(${ts}) = ${H}$ metres` }]
+      hints: ['The ball is at its highest where $\\dfrac{dh}{dt} = 0$.', `$\\dfrac{dh}{dt} = ${poly([-2 * a, b], 't')}$.`, 'Find $t$, then substitute into $h$.'],
+      steps: [{ h: 'Differentiate', d: `$\\dfrac{dh}{dt} = ${poly([-2 * a, b], 't')}$` }, { h: 'Set to 0', d: `$t = ${ts}$` }, { h: 'Greatest height', d: `$h(${ts}) = ${H}$ metres` }]
     });
   } }
 ];
@@ -787,8 +792,8 @@ const probForms = [
     return fracQ(`A bag holds $${r}$ red counters and $${g}$ green counters. Two counters are drawn at random **without replacement**. Given that the second counter drawn is red, find the probability that the first was also red. Give a fraction in simplest form.`, f, {
       hint: 'e.g. 3/8',
       traps: [{ value: second.value, why: 'That is $P(\\text{second red})$. The question conditions on the second being red and asks about the first.' }, { value: r / N, why: 'The first draw has probability $\\dfrac{' + r + '}{' + N + '}$ before any information; knowing the second is red changes it.' }, { value: both.value, why: 'That is $P(\\text{both red})$. Divide by $P(\\text{second red})$ to condition on it.' }],
-      hints: ['Use $P(A \\mid B) = \\dfrac{P(A \\cap B)}{P(B)}$.', `$P(\\text{both red}) = \\dfrac{${r}}{${N}} \\times \\dfrac{${r - 1}}{${N - 1}}$.`, `$P(\\text{second red}) = \\dfrac{${r}}{${N}}$ in total.`],
-      steps: [{ h: 'Both red', d: `$\\dfrac{${r}}{${N}} \\times \\dfrac{${r - 1}}{${N - 1}} = ${both.latex()}$` }, { h: 'Second red (either first)', d: `$${second.latex()}$` }, { h: 'Condition', d: `$\\dfrac{${both.latex()}}{${second.latex()}} = ${f.latex()}$` }]
+      hints: ['Use $P(A \\mid B) = \\dfrac{P(A \\cap B)}{P(B)}$.', `$P(\\text{both red}) = ${rat(r, N)} \\times ${rat(r - 1, N - 1)}$.`, `$P(\\text{second red}) = ${rat(r, N)}$ in total.`],
+      steps: [{ h: 'Both red', d: `$${rat(r, N)} \\times ${rat(r - 1, N - 1)} = ${both.latex()}$` }, { h: 'Second red (either first)', d: `$${second.latex()}$` }, { h: 'Condition', d: `$${rat(both.latex(), second.latex())} = ${f.latex()}$` }]
     });
   } },
   // D3 — context: percentages and conditional probability
@@ -802,17 +807,17 @@ const probForms = [
       hint: 'e.g. 2/5',
       traps: [{ value: y / 100, why: 'That is the probability for the whole group. The person is already known to be in the first group, so divide by that group.' }, { value: x / 100, why: 'That is $P(A)$ itself, not the conditional probability.' }],
       hints: ['Write $P(A \\mid B)$ with the given group as the condition.', `$P(\\text{both}) = ${y / 100}$ and $P(\\text{first group}) = ${x / 100}$.`, '$\\dfrac{P(\\text{both})}{P(\\text{first group})}$.'],
-      steps: [{ h: 'Formula', d: '$P(B \\mid A) = \\dfrac{P(A \\cap B)}{P(A)}$' }, { h: 'Substitute', d: `$\\dfrac{${y}}{${x}} = ${f.latex()}$` }]
+      steps: [{ h: 'Formula', d: '$P(B \\mid A) = \\dfrac{P(A \\cap B)}{P(A)}$' }, { h: 'Substitute', d: `$${rat(y, x)} = ${f.latex()}$` }]
     });
   } },
   // D3 — MCQ: which expression is P(A | B)
   { diffs: [3], make: rng => {
     let N, nA, nB, nAB;
     do { N = rc(rng, [30, 36, 40, 48, 50]); nA = ri(rng, 10, 24); nB = ri(rng, 8, 22); nAB = ri(rng, 2, Math.min(nA, nB) - 2); } while (nA === nB || nA + nB - nAB > N - 3 || nAB === nA - 0);
-    const ds = [{ text: `$\\dfrac{${nAB}}{${nA}}$`, why: 'That divides by $n(A)$, so it is $P(B \\mid A)$, the other conditional probability.' }, { text: `$\\dfrac{${nAB}}{${N}}$`, why: 'That is $P(A \\cap B)$, the probability of both events, with no conditioning.' }, { text: `$\\dfrac{${nA}}{${nB}}$`, why: 'This compares the sizes of $A$ and $B$ but ignores the overlap.' }];
-    return mcQ(rng, `Among $${N}$ students, $${nA}$ study Music ($A$), $${nB}$ study Drama ($B$) and $${nAB}$ study both. One student is chosen at random. Which expression gives $P(A \\mid B)$, the probability of studying Music **given** that the student studies Drama?`, `$\\dfrac{${nAB}}{${nB}}$`, ds,
+    const ds = [{ text: `$${rat(nAB, nA)}$`, why: 'That divides by $n(A)$, so it is $P(B \\mid A)$, the other conditional probability.' }, { text: `$${rat(nAB, N)}$`, why: 'That is $P(A \\cap B)$, the probability of both events, with no conditioning.' }, { text: `$${rat(nA, nB)}$`, why: 'This compares the sizes of $A$ and $B$ but ignores the overlap.' }];
+    return mcQ(rng, `Among $${N}$ students, $${nA}$ study Music ($A$), $${nB}$ study Drama ($B$) and $${nAB}$ study both. One student is chosen at random. Which expression gives $P(A \\mid B)$, the probability of studying Music **given** that the student studies Drama?`, `$${rat(nAB, nB)}$`, ds,
       ['The condition is the **given** event: it becomes the new sample space.', '$P(A \\mid B) = \\dfrac{n(A \\cap B)}{n(B)}$.', 'The denominator is the size of $B$.'],
-      [{ h: 'Restrict to B', d: `$n(B) = ${nB}$` }, { h: 'Overlap', d: `$n(A \\cap B) = ${nAB}$` }, { h: 'Probability', d: `$P(A \\mid B) = \\dfrac{${nAB}}{${nB}}$` }]);
+      [{ h: 'Restrict to B', d: `$n(B) = ${nB}$` }, { h: 'Overlap', d: `$n(A \\cap B) = ${nAB}$` }, { h: 'Probability', d: `$P(A \\mid B) = ${rat(nAB, nB)}$` }]);
   } },
   // D3 — two suppliers: P(supplier | defective) (tree-diagram reversal)
   { diffs: [3], make: rng => {
@@ -832,8 +837,8 @@ const probForms = [
     return fracQ(`A bag holds $${r}$ red marbles and $${g}$ blue marbles. Two marbles are drawn at random **without replacement**. Find the probability that **at least one** is red, as a fraction in simplest form.`, f, {
       hint: 'e.g. 11/15',
       traps: [{ value: none.value, why: 'That is the probability that **neither** is red. Subtract it from $1$.' }, { value: 1 - (g / N) * (g / N), why: 'Without replacement, the second draw has only $' + (N - 1) + '$ marbles to choose from.' }, { value: 2 * r / N, why: 'Adding $\\dfrac{' + r + '}{' + N + '}$ twice double-counts the case when both are red.' }],
-      hints: ['Use the complement: $P(\\text{at least one red}) = 1 - P(\\text{no red})$.', `$P(\\text{both blue}) = \\dfrac{${g}}{${N}} \\times \\dfrac{${g - 1}}{${N - 1}}$.`, 'Subtract from $1$.'],
-      steps: [{ h: 'Both blue', d: `$\\dfrac{${g}}{${N}} \\times \\dfrac{${g - 1}}{${N - 1}} = ${none.latex()}$` }, { h: 'Complement', d: `$1 - ${none.latex()} = ${f.latex()}$` }]
+      hints: ['Use the complement: $P(\\text{at least one red}) = 1 - P(\\text{no red})$.', `$P(\\text{both blue}) = ${rat(g, N)} \\times ${rat(g - 1, N - 1)}$.`, 'Subtract from $1$.'],
+      steps: [{ h: 'Both blue', d: `$${rat(g, N)} \\times ${rat(g - 1, N - 1)} = ${none.latex()}$` }, { h: 'Complement', d: `$1 - ${none.latex()} = ${f.latex()}$` }]
     });
   } },
   // D4 — two different colours, without replacement
@@ -842,8 +847,8 @@ const probForms = [
     return fracQ(`A drawer holds $${r}$ red socks and $${g}$ grey socks. Two socks are taken at random without replacement. Find the probability that they are **different colours**, as a fraction in simplest form.`, f, {
       hint: 'e.g. 8/15',
       traps: [{ value: r * g / (N * (N - 1)), why: 'Different colours can happen in two orders: red then grey, **or** grey then red. Add both.' }, { value: 2 * r * g / (N * N), why: 'Without replacement the second sock is chosen from $' + (N - 1) + '$, not $' + N + '$.' }],
-      hints: ['There are two ways: red then grey, or grey then red.', `$\\dfrac{${r}}{${N}} \\times \\dfrac{${g}}{${N - 1}}$ and $\\dfrac{${g}}{${N}} \\times \\dfrac{${r}}{${N - 1}}$.`, 'Add the two probabilities.'],
-      steps: [{ h: 'Red then grey', d: `$\\dfrac{${r}}{${N}} \\times \\dfrac{${g}}{${N - 1}}$` }, { h: 'Grey then red', d: `$\\dfrac{${g}}{${N}} \\times \\dfrac{${r}}{${N - 1}}$` }, { h: 'Add', d: `$${f.latex()}$` }]
+      hints: ['There are two ways: red then grey, or grey then red.', `$${rat(r, N)} \\times ${rat(g, N - 1)}$ and $${rat(g, N)} \\times ${rat(r, N - 1)}$.`, 'Add the two probabilities.'],
+      steps: [{ h: 'Red then grey', d: `$${rat(r, N)} \\times ${rat(g, N - 1)}$` }, { h: 'Grey then red', d: `$${rat(g, N)} \\times ${rat(r, N - 1)}$` }, { h: 'Add', d: `$${f.latex()}$` }]
     });
   } },
   // D4 — two dice (sum at least s, or exactly s)
@@ -868,7 +873,7 @@ const probForms = [
       hint: 'e.g. 7/10',
       traps: [{ value: (a + b) / N, why: 'The $' + c + '$ students who play both are counted twice. Subtract the overlap: $P(A \\cup B) = P(A) + P(B) - P(A \\cap B)$.' }, { value: neither ? (a + b - c) / N : (N - (a + b - c)) / N, why: neither ? 'That is the probability of playing at least one sport. "Neither" is its complement.' : 'That is the probability of playing neither sport, the complement.' }],
       hints: ['Use the addition rule: $P(A \\cup B) = P(A) + P(B) - P(A \\cap B)$.', `$n(A \\cup B) = ${a} + ${b} - ${c} = ${a + b - c}$.`, neither ? 'Neither is the complement of the union.' : 'Divide by the group size.'],
-      steps: [{ h: 'Union', d: `$n(A \\cup B) = ${a} + ${b} - ${c} = ${a + b - c}$` }, ...(neither ? [{ h: 'Neither', d: `$${N} - ${a + b - c} = ${k}$` }] : []), { h: 'Probability', d: `$\\dfrac{${k}}{${N}} = ${f.latex()}$` }]
+      steps: [{ h: 'Union', d: `$n(A \\cup B) = ${a} + ${b} - ${c} = ${a + b - c}$` }, ...(neither ? [{ h: 'Neither', d: `$${N} - ${a + b - c} = ${k}$` }] : []), { h: 'Probability', d: `$${rat(k, N)} = ${f.latex()}$` }]
     });
   } },
   // D4 — three independent shots: exactly two scored
@@ -884,10 +889,10 @@ const probForms = [
   // D4 — MCQ: expression for red then green without replacement
   { diffs: [4], make: rng => {
     const r = ri(rng, 3, 9), g = ri(rng, 3, 9), N = r + g;
-    const ds = [{ text: `$\\dfrac{${r}}{${N}} \\times \\dfrac{${g}}{${N}}$`, why: 'That assumes the first counter is replaced. Without replacement the second draw is from $' + (N - 1) + '$ counters.' }, { text: `$\\dfrac{${r}}{${N}} + \\dfrac{${g}}{${N - 1}}$`, why: '"Then" means both happen in sequence, so **multiply** the probabilities; adding is for "or".' }, { text: `$\\dfrac{${r}}{${N}} \\times \\dfrac{${g - 1}}{${N - 1}}$`, why: 'The first counter is red, so only red counters have been removed. The number of green is still $' + g + '$.' }];
-    return mcQ(rng, `A bag holds $${r}$ red and $${g}$ green counters. Two are drawn without replacement. Which expression gives the probability that the first is red and the second is green?`, `$\\dfrac{${r}}{${N}} \\times \\dfrac{${g}}{${N - 1}}$`, ds,
+    const ds = [{ text: `$${rat(r, N)} \\times ${rat(g, N)}$`, why: 'That assumes the first counter is replaced. Without replacement the second draw is from $' + (N - 1) + '$ counters.' }, { text: `$${rat(r, N)} + ${rat(g, N - 1)}$`, why: '"Then" means both happen in sequence, so **multiply** the probabilities; adding is for "or".' }, { text: `$${rat(r, N)} \\times ${rat(g - 1, N - 1)}$`, why: 'The first counter is red, so only red counters have been removed. The number of green is still $' + g + '$.' }];
+    return mcQ(rng, `A bag holds $${r}$ red and $${g}$ green counters. Two are drawn without replacement. Which expression gives the probability that the first is red and the second is green?`, `$${rat(r, N)} \\times ${rat(g, N - 1)}$`, ds,
       ['"And then" means multiply.', 'After one red counter is removed the bag holds one fewer counter.', 'The number of green counters has not changed.'],
-      [{ h: 'First draw', d: `$P(\\text{red}) = \\dfrac{${r}}{${N}}$` }, { h: 'Second draw', d: `$P(\\text{green} \\mid \\text{red first}) = \\dfrac{${g}}{${N - 1}}$` }, { h: 'Multiply', d: `$\\dfrac{${r}}{${N}} \\times \\dfrac{${g}}{${N - 1}}$` }]);
+      [{ h: 'First draw', d: `$P(\\text{red}) = ${rat(r, N)}$` }, { h: 'Second draw', d: `$P(\\text{green} \\mid \\text{red first}) = ${rat(g, N - 1)}$` }, { h: 'Multiply', d: `$${rat(r, N)} \\times ${rat(g, N - 1)}$` }]);
   } },
   // D1/D2 — selection from two groups (product of combinations)
   { diffs: [1, 2], make: rng => {
@@ -918,7 +923,7 @@ const probForms = [
       hint: 'e.g. 3/8',
       traps: [{ value: nAB / nA, why: 'That is $P(B \\mid A)$, with the condition reversed.' }, { value: nAB / N, why: 'That is $P(A \\cap B)$, which does not condition on piano.' }],
       hints: ['Given piano, the sample space is the piano players.', `$n(B) = ${nB}$ and $n(A \\cap B) = ${nAB}$.`, '$P(A \\mid B) = \\dfrac{n(A \\cap B)}{n(B)}$.'],
-      steps: [{ h: 'Restrict to B', d: `$${nB}$` }, { h: 'Divide', d: `$\\dfrac{${nAB}}{${nB}} = ${f.latex()}$` }]
+      steps: [{ h: 'Restrict to B', d: `$${nB}$` }, { h: 'Divide', d: `$${rat(nAB, nB)} = ${f.latex()}$` }]
     });
   } },
   // D3 — independent events (show that): number who do both
@@ -934,7 +939,7 @@ const probForms = [
     return numQ(`Among $${N}$ customers, $${a}$ buy coffee ($A$) and $${b}$ buy a pastry ($B$). The events $A$ and $B$ are independent. How many customers buy both?`, k, {
       hint: 'e.g. 12',
       traps: [{ value: a * b, why: 'Divide by the total $' + N + '$: $P(A \\cap B) = P(A)\\,P(B)$ gives a probability, which then multiplies back by $' + N + '$.' }, { value: Math.min(a, b), why: 'Independent does not mean one event contains the other.' }],
-      hints: ['Independent: $P(A \\cap B) = P(A)\\,P(B)$.', `$P(A) = \\dfrac{${a}}{${N}}$ and $P(B) = \\dfrac{${b}}{${N}}$.`, `Multiply the product by $${N}$.`],
+      hints: ['Independent: $P(A \\cap B) = P(A)\\,P(B)$.', `$P(A) = ${rat(a, N)}$ and $P(B) = ${rat(b, N)}$.`, `Multiply the product by $${N}$.`],
       steps: [{ h: 'Independence', d: `$n(A \\cap B) = \\dfrac{${a} \\times ${b}}{${N}}$` }, { h: 'Evaluate', d: `$${k}$` }]
     });
   } },
@@ -945,7 +950,7 @@ const probForms = [
       hint: 'e.g. 12/55',
       traps: [{ value: r * g * b / (N * (N - 1) * (N - 2)), why: 'The three colours can be drawn in $3! = 6$ different orders; multiply by $6$.' }, { value: 6 * r * g * b / (N * N * N), why: 'Without replacement the denominator shrinks: $' + N + ' \\times ' + (N - 1) + ' \\times ' + (N - 2) + '$.' }],
       hints: ['One counter of each colour, in any order.', `One order has probability $\\dfrac{${r} \\times ${g} \\times ${b}}{${N} \\times ${N - 1} \\times ${N - 2}}$.`, 'There are $6$ orders.'],
-      steps: [{ h: 'One order', d: `$\\dfrac{${r * g * b}}{${N * (N - 1) * (N - 2)}}$` }, { h: 'Times 6', d: `$${f.latex()}$` }]
+      steps: [{ h: 'One order', d: `$${rat(r * g * b, N * (N - 1) * (N - 2))}$` }, { h: 'Times 6', d: `$${f.latex()}$` }]
     });
   } },
   // D4 — with replacement: at least one
@@ -954,8 +959,8 @@ const probForms = [
     return fracQ(`A jar holds $${r}$ red and $${g}$ yellow jellybeans. $${n}$ jellybeans are taken one at a time **with replacement**. Find the probability that **at least one** is red, as a fraction in simplest form.`, f, {
       hint: 'e.g. 19/27',
       traps: [{ value: Math.pow(g / N, n), why: 'That is the probability that **none** is red. Subtract it from $1$.' }, { value: n * r / N, why: 'Adding the probabilities double-counts outcomes with more than one red.' }],
-      hints: ['Use the complement.', `$P(\\text{no red}) = \\left(\\dfrac{${g}}{${N}}\\right)^{${n}}$.`, 'Subtract from $1$.'],
-      steps: [{ h: 'No red', d: `$\\left(\\dfrac{${g}}{${N}}\\right)^{${n}}$` }, { h: 'Complement', d: `$${f.latex()}$` }]
+      hints: ['Use the complement.', `$P(\\text{no red}) = \\left(${rat(g, N)}\\right)^{${n}}$.`, 'Subtract from $1$.'],
+      steps: [{ h: 'No red', d: `$\\left(${rat(g, N)}\\right)^{${n}}$` }, { h: 'Complement', d: `$${f.latex()}$` }]
     });
   } },
   // D2 — at least one woman on a committee (complement)
@@ -987,7 +992,7 @@ const probForms = [
       hint: 'e.g. 3/8',
       traps: [{ value: i / a, why: 'That divides by $P(A)$, giving $P(B \\mid A)$.' }, { value: i / 100, why: 'That is $P(A \\cap B)$; divide by $P(B)$ to condition.' }],
       hints: ['Use the addition rule to find $P(A \\cap B)$.', `$P(A \\cap B) = ${a / 100} + ${b / 100} - ${u / 100} = ${i / 100}$.`, '$P(A \\mid B) = \\dfrac{P(A \\cap B)}{P(B)}$.'],
-      steps: [{ h: 'Intersection', d: `$P(A \\cap B) = ${i / 100}$` }, { h: 'Condition', d: `$\\dfrac{${i / 100}}{${b / 100}} = ${f.latex()}$` }]
+      steps: [{ h: 'Intersection', d: `$P(A \\cap B) = ${i / 100}$` }, { h: 'Condition', d: `$${rat(i / 100, b / 100)} = ${f.latex()}$` }]
     });
   } },
   // D4 — two independent shooters: at least one scores
@@ -1006,14 +1011,39 @@ const probForms = [
     return fracQ(`A bag holds $${r}$ red and $${g}$ green counters. Three counters are drawn at random **without replacement**. Find the probability that all three are red, as a fraction in simplest form.`, f, {
       hint: 'e.g. 1/10',
       traps: [{ value: Math.pow(r / N, 3), why: 'Without replacement each draw leaves fewer counters, so the numerator and denominator both drop by $1$.' }, { value: 3 * r / N, why: '"And" means multiply, not add.' }],
-      hints: ['Multiply the probabilities for each successive draw.', `$\\dfrac{${r}}{${N}} \\times \\dfrac{${r - 1}}{${N - 1}} \\times \\dfrac{${r - 2}}{${N - 2}}$.`, 'Simplify.'],
-      steps: [{ h: 'Three draws', d: `$\\dfrac{${r}}{${N}} \\times \\dfrac{${r - 1}}{${N - 1}} \\times \\dfrac{${r - 2}}{${N - 2}}$` }, { h: 'Simplify', d: `$${f.latex()}$` }]
+      hints: ['Multiply the probabilities for each successive draw.', `$${rat(r, N)} \\times ${rat(r - 1, N - 1)} \\times ${rat(r - 2, N - 2)}$.`, 'Simplify.'],
+      steps: [{ h: 'Three draws', d: `$${rat(r, N)} \\times ${rat(r - 1, N - 1)} \\times ${rat(r - 2, N - 2)}$` }, { h: 'Simplify', d: `$${f.latex()}$` }]
     });
   } }
 ];
 
+// Final typographic clean-up applied to every string a variant emits: no 1x / 1h,
+// no ^{1}, no doubled signs, no fractions over 1, no "+ 0" terms.
+export const tidy = t => {
+  if (typeof t !== 'string') return t;
+  let u = t;
+  for (let i = 0; i < 3; i++) {
+    u = u.replace(/\\dfrac\{([^{}]*)\}\{1\}/g, '$1')
+      .replace(/(?<![\d.\w\\])1([xyhkn])(?![a-zA-Z0-9])/g, '$1')
+      .replace(/\^\{1\}(?![0-9])/g, '')
+      .replace(/ [+\u2212-] 0(?![\d.a-zA-Z])/g, '')
+      .replace(/ [+-] 0[xyh](\^\{?\d+\}?)?(?![\w.])/g, '')
+      .replace(/\+ -/g, '- ').replace(/- -/g, '+ ').replace(/\+ \+/g, '+ ')
+      .replace(/-\s?\(-(\d+)\)/g, '+ $1');
+  }
+  return u;
+};
+const tidyQ = q => {
+  const o = { ...q, prompt: tidy(q.prompt), hints: q.hints?.map(tidy), steps: q.steps?.map(st => ({ ...st, h: tidy(st.h), d: tidy(st.d) })) };
+  if (q.mcqOptions) o.mcqOptions = q.mcqOptions.map(tidy);
+  if (q.answer?.optionTraps) o.answer = { ...q.answer, optionTraps: Object.fromEntries(Object.entries(q.answer.optionTraps).map(([k, v]) => [k, tidy(v)])) };
+  if (q.traps) o.traps = q.traps.map(t => t.why ? { ...t, why: tidy(t.why) } : t);
+  return o;
+};
+const wrap = list => list.map(v => ({ ...v, make: (rng, diff) => tidyQ(v.make(rng, diff)) }));
+
 export const forms = {
-  'y11-lines': linesForms,
-  'y11-diff': diffForms,
-  'y11-probability': probForms
+  'y11-lines': wrap(linesForms),
+  'y11-diff': wrap(diffForms),
+  'y11-probability': wrap(probForms)
 };
