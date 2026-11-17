@@ -367,9 +367,6 @@ export const GENERATORS = {};
 /** Further structural forms per skill id: [{ form, make(rng, diff) => { payload, check } }]. */
 export const EXTRA_FORMS = {};
 
-// Banks whose Australian skills carry extra structural forms (au-forms.js).
-const AU_OVERLAID = new Set(['streams-standard', 'year7', 'year8', 'year9', 'year10']);
-
 const loaded = new Set();
 const inflight = new Map();
 const JEE_BANK_PREFIX = 'jee-pyq:';
@@ -421,10 +418,8 @@ function loadBank(name) {
   let job = inflight.get(name);
   if (!job) {
     job = loader().then(async bank => {
-      if (AU_OVERLAID.has(name)) {
-        const [{ applyAuForms }, { AU_FORMS }] = await Promise.all([import('./au-forms-apply.js'), import('./au-forms.js')]);
-        bank = applyAuForms(bank, AU_FORMS);
-      }
+      const overlay = await import('./au-forms.js').then(m => m.loadAuForms(name));
+      if (overlay) bank = (await import('./au-forms-apply.js')).applyAuForms(bank, overlay);
       const extra = await extraFormsFor(name, Object.keys(bank));
       Object.assign(GENERATORS, bank);
       Object.assign(EXTRA_FORMS, extra);
