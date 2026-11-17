@@ -60,7 +60,8 @@ export function lineMarks(report, lines, { count = null, indexOf = i => i } = {}
   matched.lines.forEach((line, i) => {
     const at = indexOf(i);
     if (!Number.isInteger(at) || at < 0 || at >= n) return;
-    if (line.status === 'break') marks[at] = { kind: i === first ? 'break' : 'also', note: clean(line.note) || null };
+    if (line.secondBreak === true && line.status !== 'break') marks[at] = { kind: 'also', note: clean(line.note) || null };
+    else if (line.status === 'break') marks[at] = { kind: i === first ? 'break' : 'also', note: clean(line.note) || null };
     else if (line.status === 'ok') marks[at] = { kind: line.ecf === true ? 'ecf' : 'ok', note: line.ecf === true ? clean(line.note) || null : null };
   });
   return marks;

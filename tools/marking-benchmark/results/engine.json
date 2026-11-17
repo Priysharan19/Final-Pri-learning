@@ -584,7 +584,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid",
    "valid"
   ],
@@ -595,7 +595,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
@@ -623,7 +623,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
@@ -687,7 +687,7 @@
    "given",
    "valid",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
@@ -758,7 +758,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 1
@@ -836,7 +836,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
@@ -1100,7 +1100,7 @@
    "given",
    "abstain",
    "invalid",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 2
@@ -1149,7 +1149,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
@@ -1235,7 +1235,7 @@
    "given",
    "valid",
    "invalid",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 2
@@ -1357,7 +1357,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 1
@@ -1385,7 +1385,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
@@ -1432,7 +1432,7 @@
    "given",
    "valid",
    "invalid",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 2
@@ -1485,7 +1485,7 @@
    "given",
    "valid",
    "invalid",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 2
@@ -1551,7 +1551,7 @@
    "given",
    "invalid",
    "abstain",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 1
@@ -1651,7 +1651,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
@@ -1670,7 +1670,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "abstain"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 1
@@ -1725,7 +1725,7 @@
    "given",
    "valid",
    "invalid",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 2
@@ -1815,7 +1815,7 @@
    "given",
    "valid",
    "invalid",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 2
@@ -1931,7 +1931,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
@@ -1977,7 +1977,7 @@
    "valid",
    "invalid",
    "abstain",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 3
@@ -2027,7 +2027,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
@@ -2060,7 +2060,7 @@
    "valid",
    "valid",
    "invalid",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 3
@@ -2116,7 +2116,7 @@
    "invalid",
    "abstain",
    "abstain",
-   "valid"
+   "invalid"
   ],
   "solution": "incorrect",
   "firstBreak": 1
@@ -2145,7 +2145,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
@@ -2184,7 +2184,7 @@
   "verdicts": [
    "given",
    "invalid",
-   "valid",
+   "invalid",
    "valid"
   ],
   "solution": "incorrect",
