@@ -44,7 +44,7 @@ export default function PaperGenerator() {
     let live = true;
     api.get(`/exams/generator/options?${optionsQuery(user)}`)
       .then(r => { if (live) setOptions(r); })
-      .catch(() => { if (live) setUnavailable(true); });
+      .catch(err => { console.log('GEN-OPTIONS', err?.status, err?.code, err?.message); if (live) setUnavailable(true); });
     return () => { live = false; };
   }, [user.year, user.pathway, user.indiaTrack]);
 
