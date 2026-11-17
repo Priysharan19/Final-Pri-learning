@@ -114,6 +114,8 @@ export function bptTriangle({ ratioAD, ratioDB, shown = {} }) {
   const mid = (p, q, ox, oy) => [(p[0] + q[0]) / 2 + ox, (p[1] + q[1]) / 2 + oy];
   const segs = [['AD', A, D, -14, 0], ['DB', D, B, -14, 0], ['AE', A, E, 14, 0], ['EC', E, C, 14, 0]];
   for (const [k, p, q, ox, oy] of segs) if (shown[k] != null) { const m = mid(p, q, ox / 2, oy); cv.label(m[0], m[1] + 4, lab(shown[k]), { dx: Math.sign(ox), accent: unk(shown[k]), anchor: ox < 0 ? 'end' : 'start' }); }
+  if (shown.DE != null) cv.label((D[0] + E[0]) / 2, D[1] - 8, lab(shown.DE), { dy: -1, size: 12, accent: unk(shown.DE) });
+  if (shown.BC != null) cv.label((B[0] + C[0]) / 2, B[1] + 18, lab(shown.BC), { dy: 1, accent: unk(shown.BC) });
   return cv.out('Triangle ABC with DE parallel to BC', { pts: { A, B, C, D, E }, ratio: t });
 }
 
@@ -177,7 +179,7 @@ function niceStep(span, target = 6) {
  * `segments` are [i, j] index pairs. Ticks are labelled at multiples of a nice step, and the
  * zero tick is labelled O once.
  */
-export function coordPlane({ points = [], segments = [], polygon = false, curves = [], circles = [] }) {
+export function coordPlane({ points = [], segments = [], polygon = false, curves = [], circles = [], equal = curves.length === 0 }) {
   const cv = new Canvas();
   const SAMPLES = 80;
   const sampled = curves.map(c => Array.from({ length: SAMPLES + 1 }, (_, i) => { const x = c.x0 + ((c.x1 - c.x0) * i) / SAMPLES; return [x, c.fn(x)]; }));
@@ -187,18 +189,20 @@ export function coordPlane({ points = [], segments = [], polygon = false, curves
   const xMin = Math.min(...xs), xMax = Math.max(...xs), yMin = Math.min(...ys), yMax = Math.max(...ys);
   const padX = (xMax - xMin) * 0.12 || 1, padY = (yMax - yMin) * 0.12 || 1;
   const x0 = xMin - padX, x1 = xMax + padX, y0 = yMin - padY, y1 = yMax + padY;
-  const sc = Math.min((W - 2 * PAD) / (x1 - x0), (H - 2 * PAD) / (y1 - y0));
-  const ox = PAD + (W - 2 * PAD - (x1 - x0) * sc) / 2 - x0 * sc, oy = PAD + (H - 2 * PAD - (y1 - y0) * sc) / 2 + y1 * sc;
-  const px = x => ox + x * sc, py = y => oy - y * sc;
-  const step = niceStep(Math.max(x1 - x0, y1 - y0));
+  // Geometry keeps ONE scale for x and y (a right angle stays a right angle); a function graph may use a
+  // separate vertical scale, with both axes labelled, so a steep curve is not squeezed into a line.
+  const sc = equal ? Math.min((W - 2 * PAD) / (x1 - x0), (H - 2 * PAD) / (y1 - y0)) : (W - 2 * PAD) / (x1 - x0), scY = equal ? sc : (H - 2 * PAD) / (y1 - y0);
+  const ox = PAD + (W - 2 * PAD - (x1 - x0) * sc) / 2 - x0 * sc, oy = PAD + (H - 2 * PAD - (y1 - y0) * scY) / 2 + y1 * scY;
+  const px = x => ox + x * sc, py = y => oy - y * scY;
+  const step = equal ? niceStep(Math.max(x1 - x0, y1 - y0)) : niceStep(x1 - x0), stepY = equal ? step : niceStep(y1 - y0);
   cv.line(px(x0), py(0), px(x1), py(0)); cv.line(px(0), py(y0), px(0), py(y1));
   const ticks = { x: [], y: [] };
   for (let v = Math.ceil(x0 / step) * step; v <= x1 + 1e-9; v += step) {
     const r = Math.round(v / step) * step; if (Math.abs(r) < 1e-9) continue;
     cv.line(px(r), py(0) - 3, px(r), py(0) + 3); cv.label(px(r), py(0) + 16, String(N(r)), { dy: 1, size: 11 }); ticks.x.push(N(r));
   }
-  for (let v = Math.ceil(y0 / step) * step; v <= y1 + 1e-9; v += step) {
-    const r = Math.round(v / step) * step; if (Math.abs(r) < 1e-9) continue;
+  for (let v = Math.ceil(y0 / stepY) * stepY; v <= y1 + 1e-9; v += stepY) {
+    const r = Math.round(v / stepY) * stepY; if (Math.abs(r) < 1e-9) continue;
     cv.line(px(0) - 3, py(r), px(0) + 3, py(r)); cv.label(px(0) - 8, py(r) + 4, String(N(r)), { dx: -1, size: 11, anchor: 'end' }); ticks.y.push(N(r));
   }
   cv.label(px(0) - 8, py(0) + 14, 'O', { dx: -1, dy: 1, size: 11, anchor: 'end' });
@@ -220,18 +224,18 @@ export function coordPlane({ points = [], segments = [], polygon = false, curves
     const vx = p.x - cx, vy = p.y - cy, l = Math.hypot(vx, vy) || 1;
     cv.label(px(p.x) + (vx / l) * 16, py(p.y) - (vy / l) * 14 + 4, p.label, { dx: vx / l, dy: -vy / l, accent: p.accent });
   }
-  return cv.out('Coordinate plane', { px: { origin: [px(0), py(0)] }, origin: [px(0), py(0)], scale: sc, points: points.map(p => ({ ...p, X: px(p.x), Y: py(p.y) })), curves: curvePx, circles: circles.map(c => ({ ...c, X: px(c.cx), Y: py(c.cy), R: c.r * sc })), ticks, step, win: { x0, x1, y0, y1 } });
+  return cv.out('Coordinate plane', { px: { origin: [px(0), py(0)] }, origin: [px(0), py(0)], scale: sc, points: points.map(p => ({ ...p, X: px(p.x), Y: py(p.y) })), curves: curvePx, circles: circles.map(c => ({ ...c, X: px(c.cx), Y: py(c.cy), R: c.r * sc })), scaleY: scY, equal, ticks, step, stepY, win: { x0, x1, y0, y1 } });
 }
 
 // ── mensuration ──────────────────────────────────────────────────────────────
 function dimLine(cv, x1, y1, x2, y2, text, side, accent) {
   cv.line(x1, y1, x2, y2);
   const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, vx = x2 - x1, vy = y2 - y1, l = Math.hypot(vx, vy) || 1;
-  const nx = (vy / l) * side, ny = (-vx / l) * side;
-  cv.label(mx + nx * 14, my + ny * 14 + 4, text, { dx: nx, dy: ny, accent });
+  const nx = (vy / l) * side, ny = (-vx / l) * side, anchor = nx > 0.5 ? 'start' : nx < -0.5 ? 'end' : 'middle';
+  cv.label(mx + nx * 8, my + ny * (Math.abs(ny) > 0.5 ? 14 : 0) + 4, text, { dx: nx, dy: ny, accent, anchor });
 }
 /** Rectangle l × w to scale with both dimensions labelled; an optional corner cut-out (a × b). */
-export function rectangleFigure({ l, w, shown = {}, cut = null }) {
+export function rectangleFigure({ l, w, shown = {}, cut = null, diagonal = null }) {
   const cv = new Canvas();
   const sc = Math.min((W - 2 * PAD) / l, (H - 2 * PAD) / w), L = l * sc, Wd = w * sc, x = (W - L) / 2, y = (H - Wd) / 2;
   if (cut) {
@@ -239,6 +243,7 @@ export function rectangleFigure({ l, w, shown = {}, cut = null }) {
     cv.poly([[x, y], [x + L - a, y], [x + L - a, y + b], [x + L, y + b], [x + L, y + Wd], [x, y + Wd]]);
     cv.line(x + L - a, y, x + L, y, { dash: true }); cv.line(x + L, y, x + L, y + b, { dash: true });
   } else cv.poly([[x, y], [x + L, y], [x + L, y + Wd], [x, y + Wd]]);
+  if (diagonal != null) { cv.line(x, y + Wd, x + L, y, { stroke: ACCENT }); cv.label(x + L / 2 + 8, y + Wd / 2 - 8, lab(diagonal), { dx: 1, dy: -1, size: 12, accent: unk(diagonal), anchor: 'start' }); }
   if (shown.l != null) dimLine(cv, x, y + Wd, x + L, y + Wd, lab(shown.l), -1, unk(shown.l));
   if (shown.w != null) dimLine(cv, x, y, x, y + Wd, lab(shown.w), 1, unk(shown.w));
   return cv.out('Rectangle', { rect: { x, y, L, Wd }, scale: sc, l, w, cut });
@@ -357,4 +362,176 @@ export function pieChart({ slices }) {
     arcs.push({ from: a, to: a1, degrees: (da * 180) / Math.PI }); a = a1;
   }
   return cv.out('Pie chart', { O, R, arcs });
+}
+
+// ── angles, polygons, parallel lines, circles with points, segments, prisms ──
+/** Triangle drawn from its three TRUE angles (degrees); `shown` are the labels ('?' for the unknown). */
+export function angleTriangle({ A, B, C, shown = {}, exterior = null }) {
+  const cv = new Canvas();
+  const rad = d => (d * Math.PI) / 180, a = Math.sin(rad(A)), b = Math.sin(rad(B)), c = Math.sin(rad(C));
+  const raw = { A: [0, 0], B: [c, 0], C: [b * Math.cos(rad(A)), -b * Math.sin(rad(A))] };
+  const ext = exterior ? 0.45 * c : 0;
+  const Eraw = exterior ? [raw.C[0] + (raw.C[0] - raw.B[0]) * 0.45, raw.C[1] + (raw.C[1] - raw.B[1]) * 0.45] : null;
+  const margin = exterior ? 0.16 * c : 0;                         // room for the exterior angle's label
+  const xs = [...Object.values(raw).map(p => p[0]), ...(Eraw ? [Eraw[0]] : [])], ys = [...Object.values(raw).map(p => p[1]), ...(Eraw ? [Eraw[1] - margin] : [])];
+  const sc = Math.min((W - 2 * PAD) / (Math.max(...xs) - Math.min(...xs)), (H - 2 * PAD) / (Math.max(...ys) - Math.min(...ys)));
+  const ox = PAD + ((W - 2 * PAD) - (Math.max(...xs) - Math.min(...xs)) * sc) / 2 - Math.min(...xs) * sc, oy = PAD + ((H - 2 * PAD) - (Math.max(...ys) - Math.min(...ys)) * sc) / 2 - Math.min(...ys) * sc;
+  const P = Object.fromEntries(Object.entries(raw).map(([k, p]) => [k, [ox + p[0] * sc, oy + p[1] * sc]]));
+  cv.poly([P.A, P.B, P.C]);
+  const cx = (P.A[0] + P.B[0] + P.C[0]) / 3, cy = (P.A[1] + P.B[1] + P.C[1]) / 3;
+  const unit = (p, q) => { const l = Math.hypot(q[0] - p[0], q[1] - p[1]); return [(q[0] - p[0]) / l, (q[1] - p[1]) / l]; };
+  for (const k of ['A', 'B', 'C']) {
+    const vx = P[k][0] - cx, vy = P[k][1] - cy, l = Math.hypot(vx, vy);
+    cv.label(P[k][0] + (vx / l) * 14, P[k][1] + (vy / l) * 14 + 4, k, { dx: vx / l, dy: vy / l });
+    if (shown[k] != null) cv.label(P[k][0] - (vx / l) * 30, P[k][1] - (vy / l) * 30 + 4, lab(shown[k]), { dx: -vx / l, dy: -vy / l, size: 12, accent: unk(shown[k]) });
+  }
+  let E = null;
+  if (exterior) {
+    const u = unit(P.B, P.C), len = 0.45 * Math.hypot(P.C[0] - P.B[0], P.C[1] - P.B[1]); E = [P.C[0] + u[0] * len, P.C[1] + u[1] * len];
+    cv.line(P.C[0], P.C[1], E[0], E[1]);
+    cv.label(P.C[0] + u[0] * (len * 0.55) - u[1] * 0, P.C[1] + u[1] * (len * 0.55) - 14, lab(exterior), { dy: -1, size: 12, accent: unk(exterior) });
+  }
+  void a; void ext;
+  return cv.out('Triangle with its angles', { pts: P, ext: E, angles: { A, B, C } });
+}
+
+/** Regular n-gon to scale; optionally its n lines of symmetry (dashed) or one exterior angle marked. */
+export function regularPolygon({ n, lines = false, exteriorLabel = null, centreAngleLabel = null }) {
+  const cv = new Canvas();
+  const R = Math.min(W, H) / 2 - PAD - 6, O = [W / 2, H / 2 + 4];
+  const V = Array.from({ length: n }, (_, i) => { const a = -Math.PI / 2 + (2 * Math.PI * i) / n; return [O[0] + R * Math.cos(a), O[1] + R * Math.sin(a)]; });
+  cv.poly(V);
+  if (lines) {
+    for (let i = 0; i < n; i++) {
+      const a = -Math.PI / 2 + (Math.PI * i) / n;           // n axes: through a vertex (and the opposite vertex or edge midpoint)
+      cv.line(O[0] - (R + 8) * Math.cos(a), O[1] - (R + 8) * Math.sin(a), O[0] + (R + 8) * Math.cos(a), O[1] + (R + 8) * Math.sin(a), { dash: true });
+    }
+  }
+  if (exteriorLabel != null) {
+    const a = V[1], b = V[0], d = [a[0] - b[0], a[1] - b[1]], l = Math.hypot(d[0], d[1]), e = [a[0] + (d[0] / l) * 34, a[1] + (d[1] / l) * 34];
+    cv.line(a[0], a[1], e[0], e[1], { stroke: ACCENT });
+    cv.label(e[0] + 8, e[1] - 4, lab(exteriorLabel), { dx: 1, dy: -1, size: 12, accent: unk(exteriorLabel) });
+  }
+  if (centreAngleLabel != null) { cv.dot(O[0], O[1]); cv.line(O[0], O[1], V[0][0], V[0][1]); cv.line(O[0], O[1], V[1][0], V[1][1]); cv.label(O[0] + 4, O[1] - 18, lab(centreAngleLabel), { dy: -1, size: 12, accent: unk(centreAngleLabel) }); }
+  return cv.out(`Regular polygon with ${n} sides`, { O, V, R, n, lines });
+}
+
+/**
+ * Two parallel lines cut by a transversal. `angle` is the interior angle on the LEFT of the transversal at the
+ * upper line (between the lines); at the lower line the interior angle on the left is 180° − angle.
+ */
+export function parallelLines({ angle, shown = {} }) {
+  const cv = new Canvas();
+  const y1 = H / 2 - 42, y2 = H / 2 + 42, a = (angle * Math.PI) / 180, u = [-Math.cos(a), Math.sin(a)], dx = ((y2 - y1) * u[0]) / u[1], cx = W / 2;
+  const T1 = [cx - dx / 2, y1], T2 = [cx + dx / 2, y2], ext = 46;
+  cv.line(PAD, y1, W - PAD, y1); cv.line(PAD, y2, W - PAD, y2);
+  cv.line(T1[0] - u[0] * ext, T1[1] - u[1] * ext, T2[0] + u[0] * ext, T2[1] + u[1] * ext, { stroke: ACCENT });
+  const r = 24;
+  cv.add(`<path d="M ${N(T1[0] - r)} ${N(y1)} A ${r} ${r} 0 0 0 ${N(T1[0] + r * u[0])} ${N(y1 + r * u[1])}"/>`);
+  cv.add(`<path d="M ${N(T2[0] - r)} ${N(y2)} A ${r} ${r} 0 0 1 ${N(T2[0] - r * u[0])} ${N(y2 - r * u[1])}"/>`);
+  if (shown.top != null) cv.label(T1[0] - 50, y1 + 20, lab(shown.top), { dx: -1, dy: 1, size: 12, accent: unk(shown.top), anchor: 'end' });
+  if (shown.bottom != null) cv.label(T2[0] - 50, y2 - 12, lab(shown.bottom), { dx: -1, dy: -1, size: 12, accent: unk(shown.bottom), anchor: 'end' });
+  return cv.out('Two parallel lines cut by a transversal', { y1, y2, T1, T2, u, angle });
+}
+
+/** Parallelogram with sides a (horizontal) and b at `angle` degrees, to scale. */
+export function parallelogram({ a, b, angle, shown = {} }) {
+  const cv = new Canvas();
+  const rad = (angle * Math.PI) / 180, bc = b * Math.cos(rad), minx = Math.min(0, bc), maxx = Math.max(a, a + bc), w = maxx - minx, h = b * Math.sin(rad), sc = Math.min((W - 2 * PAD - 40) / w, (H - 2 * PAD - 24) / h);
+  const x0 = (W - w * sc) / 2 - minx * sc, y0 = H - PAD - 10 - (H - 2 * PAD - 24 - h * sc) / 2;
+  const P = [[x0, y0], [x0 + a * sc, y0], [x0 + (a + b * Math.cos(rad)) * sc, y0 - h * sc], [x0 + b * Math.cos(rad) * sc, y0 - h * sc]];
+  cv.poly(P);
+  if (shown.a != null) cv.label((P[0][0] + P[1][0]) / 2, y0 + 18, lab(shown.a), { dy: 1, accent: unk(shown.a) });
+  if (shown.b != null) cv.label((P[0][0] + P[3][0]) / 2 - 10, (P[0][1] + P[3][1]) / 2 + 4, lab(shown.b), { dx: -1, accent: unk(shown.b), anchor: 'end' });
+  if (shown.angle != null) cv.label(P[0][0] + 30, y0 - 6, lab(shown.angle), { dx: 1, size: 12, accent: unk(shown.angle) });
+  if (shown.adj != null) cv.label(P[1][0] - 30, y0 - 6, lab(shown.adj), { dx: -1, size: 12, accent: unk(shown.adj), anchor: 'end' });
+  return cv.out('Parallelogram', { P, scale: sc, a, b, angle });
+}
+
+/** Points on a circle at given positions (degrees, anticlockwise from the +x axis), chords between them, optional centre. */
+export function circlePoints({ points, chords = [], centre = false, radii = [], shown = {}, angleLabels = [], centreLabel = null }) {
+  const cv = new Canvas();
+  const R = Math.min(W, H) / 2 - PAD - 6, O = [W / 2, H / 2];
+  const pos = points.map(p => [O[0] + R * Math.cos((p.deg * Math.PI) / 180), O[1] - R * Math.sin((p.deg * Math.PI) / 180)]);
+  cv.circle(O[0], O[1], R);
+  for (const [i, j] of chords) cv.line(pos[i][0], pos[i][1], pos[j][0], pos[j][1], { stroke: ACCENT });
+  for (const i of radii) cv.line(O[0], O[1], pos[i][0], pos[i][1]);
+  if (centre) { cv.dot(O[0], O[1]); cv.label(O[0] + 4, O[1] + 16, 'O', { dy: 1 }); }
+  points.forEach((p, i) => { const ux = Math.cos((p.deg * Math.PI) / 180), uy = -Math.sin((p.deg * Math.PI) / 180); cv.label(pos[i][0] + ux * 14, pos[i][1] + uy * 14 + 4, p.name, { dx: ux, dy: uy }); });
+  for (const al of angleLabels) { const q = pos[al.at], vx = O[0] - q[0], vy = O[1] - q[1], l = Math.hypot(vx, vy); cv.label(q[0] + (vx / l) * 30 + (al.dx || 0), q[1] + (vy / l) * 30 + 4 + (al.dy || 0), lab(al.text), { dx: vx / l, dy: vy / l, size: 12, accent: unk(al.text) }); }
+  if (centreLabel) { const m = [(pos[centreLabel.between[0]][0] + pos[centreLabel.between[1]][0]) / 2, (pos[centreLabel.between[0]][1] + pos[centreLabel.between[1]][1]) / 2]; cv.label(O[0] + (m[0] - O[0]) * 0.35, O[1] + (m[1] - O[1]) * 0.35 + 4, lab(centreLabel.text), { size: 12, accent: unk(centreLabel.text) }); }
+  for (const [k, text] of Object.entries(shown)) { const [x, y] = k.split(',').map(Number); cv.label(x, y, lab(text), { size: 12, accent: unk(text) }); }
+  return cv.out('Circle with points on it', { O, R, pos, points });
+}
+
+/** A line with named points at true positions and the segment lengths between them labelled. */
+export function segmentLine({ points, labels = [] }) {
+  const cv = new Canvas();
+  const lo = Math.min(...points.map(p => p.at)), hi = Math.max(...points.map(p => p.at)), sc = (W - 2 * PAD) / (hi - lo), y = H / 2;
+  const X = p => PAD + (p.at - lo) * sc;
+  cv.line(PAD, y, W - PAD, y);
+  for (const p of points) { cv.dot(X(p), y); cv.label(X(p), y + 20, p.name, { dy: 1 }); }
+  const placed = [];
+  for (const l of labels) { const a = points.find(p => p.name === l.from), b = points.find(p => p.name === l.to); const x0 = Math.min(X(a), X(b)), x1 = Math.max(X(a), X(b)), level = placed.filter(q => q.x0 < x1 && x0 < q.x1).length, yy = y - 14 - 22 * level; placed.push({ x0, x1 }); cv.line(x0, yy, x1, yy, { stroke: ACCENT }); cv.label((x0 + x1) / 2, yy - 8, lab(l.text), { dy: -1, accent: unk(l.text) }); }
+  return cv.out('Points on a line', { y, X: Object.fromEntries(points.map(p => [p.name, X(p)])), scale: sc });
+}
+
+/** Prism with an n-gon base in oblique view: bottom base, top base, vertical edges (back edges dashed). */
+export function prismFigure({ n, shown = {} }) {
+  const cv = new Canvas();
+  const rx = Math.min(W / 2 - PAD, 90), ry = rx * 0.38, h = H - 2 * PAD - ry * 2 - 10, cx = W / 2, cy = H - PAD - ry;
+  const ang = i => Math.PI / 2 + (2 * Math.PI * i) / n;
+  const bot = Array.from({ length: n }, (_, i) => [cx + rx * Math.cos(ang(i)), cy + ry * Math.sin(ang(i))]);
+  const top = bot.map(p => [p[0], p[1] - h]);
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n, back = bot[i][1] < cy - 1e-6 && bot[j][1] < cy - 1e-6;
+    cv.line(bot[i][0], bot[i][1], bot[j][0], bot[j][1], { dash: back });
+    cv.line(top[i][0], top[i][1], top[j][0], top[j][1]);
+    cv.line(bot[i][0], bot[i][1], top[i][0], top[i][1], { dash: bot[i][1] < cy - 1e-6 });
+  }
+  if (shown.n != null) cv.label(cx, cy + ry + 20, lab(shown.n), { dy: 1, size: 12 });
+  return cv.out(`Prism with a base of ${n} sides`, { bot, top, n });
+}
+
+/** Two similar right triangles to ONE scale (legs 3k:4k stay right-angled), the second scaled by q/p. */
+export function similarTriangles({ small, big, shown = {}, names = ['A', 'P'] }) {
+  const cv = new Canvas();
+  const legs = [3, 4], total = big * legs[0] + small * legs[0], sc = Math.min((W - 2 * PAD - 20) / (legs[0] * (small + big)), (H - 2 * PAD) / (legs[1] * Math.max(small, big)));
+  const t = (x, y, k) => [[x, y], [x + legs[0] * k * sc, y], [x, y - legs[1] * k * sc]];
+  const base = H - PAD - 8, x1 = PAD, x2 = PAD + legs[0] * small * sc + 20;
+  const T1 = t(x1, base, small), T2 = t(x2, base, big);
+  cv.poly(T1); cv.poly(T2); cv.rightMark(T1[0][0], T1[0][1], 1, 0, 0, -1, 8); cv.rightMark(T2[0][0], T2[0][1], 1, 0, 0, -1, 8);
+  cv.label(T1[0][0] + (legs[0] * small * sc) / 2, base + 16, lab(shown.small), { dy: 1, accent: unk(shown.small) });
+  cv.label(T2[0][0] + (legs[0] * big * sc) / 2, base + 16, lab(shown.big), { dy: 1, accent: unk(shown.big) });
+  cv.label(T1[0][0] - 6, base - (legs[1] * small * sc) / 2, names[0], { dx: -1, size: 12, anchor: 'end' });
+  cv.label(T2[0][0] - 6, base - (legs[1] * big * sc) / 2, names[1], { dx: -1, size: 12, anchor: 'end' });
+  void total;
+  return cv.out('Two similar triangles', { T1, T2, small, big, scale: sc });
+}
+
+/** An angle of `total` degrees at O with its bisector dashed; labels for the whole angle and the half. */
+export function angleBisector({ total, shown = {} }) {
+  const cv = new Canvas();
+  const a = (total * Math.PI) / 180, r = 110, O = [PAD + 14 + r * Math.max(0, -Math.cos(a)), H - PAD - 20];
+  const P1 = [O[0] + r, O[1]], P2 = [O[0] + r * Math.cos(a), O[1] - r * Math.sin(a)], M = [O[0] + r * Math.cos(a / 2), O[1] - r * Math.sin(a / 2)];
+  cv.line(O[0], O[1], P1[0], P1[1]); cv.line(O[0], O[1], P2[0], P2[1]); cv.line(O[0], O[1], M[0], M[1], { dash: true, stroke: ACCENT });
+  const ar = 42;
+  cv.add(`<path d="M ${N(O[0] + ar)} ${N(O[1])} A ${ar} ${ar} 0 0 0 ${N(O[0] + ar * Math.cos(a))} ${N(O[1] - ar * Math.sin(a))}"/>`);
+  cv.label(O[0] - 10, O[1] + 14, 'O', { dx: -1, dy: 1 });
+  if (shown.total != null) cv.label(O[0] + ar + 18, O[1] - 14 * Math.sin(a / 2) - 4, lab(shown.total), { dx: 1, size: 12, accent: unk(shown.total) });
+  if (shown.half != null) cv.label(M[0] + 8, M[1] - 8, lab(shown.half), { dx: 1, dy: -1, size: 12, accent: unk(shown.half), anchor: 'start' });
+  return cv.out('An angle with its bisector', { O, P1, P2, M, total });
+}
+
+/** A segment AB with P on its perpendicular bisector, to scale (PA = pa, AB = ab); the midpoint M marked. */
+export function perpBisectorFigure({ ab, pa, shown = {} }) {
+  const cv = new Canvas();
+  const h = Math.sqrt(pa * pa - (ab / 2) * (ab / 2)), sc = Math.min((W - 2 * PAD) / ab, (H - 2 * PAD) / h), A = [W / 2 - (ab * sc) / 2, H - PAD - 6], B = [W / 2 + (ab * sc) / 2, H - PAD - 6], M = [W / 2, H - PAD - 6], P = [W / 2, H - PAD - 6 - h * sc];
+  cv.line(A[0], A[1], B[0], B[1]); cv.line(P[0], P[1], M[0], M[1], { dash: true }); cv.line(P[0], P[1], A[0], A[1], { stroke: ACCENT }); cv.line(P[0], P[1], B[0], B[1], { stroke: ACCENT });
+  cv.rightMark(M[0], M[1], 1, 0, 0, -1, 8);
+  cv.label(A[0] - 10, A[1] + 16, 'A', { dx: -1, dy: 1 }); cv.label(B[0] + 10, B[1] + 16, 'B', { dx: 1, dy: 1 }); cv.label(M[0] + 2, M[1] + 16, 'M', { dy: 1 }); cv.label(P[0], P[1] - 10, 'P', { dy: -1 });
+  if (shown.ab != null) cv.label(M[0] + (ab * sc) / 4, A[1] + 16, lab(shown.ab), { dy: 1, accent: unk(shown.ab) });
+  if (shown.pa != null) cv.label((P[0] + A[0]) / 2 - 8, (P[1] + A[1]) / 2, lab(shown.pa), { dx: -1, anchor: 'end', accent: unk(shown.pa) });
+  if (shown.pb != null) cv.label((P[0] + B[0]) / 2 + 8, (P[1] + B[1]) / 2, lab(shown.pb), { dx: 1, anchor: 'start', accent: unk(shown.pb) });
+  return cv.out('Point on the perpendicular bisector of a segment', { A, B, M, P, scale: sc, ab, pa });
 }

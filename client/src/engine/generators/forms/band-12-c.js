@@ -1,5 +1,6 @@
 // Extra forms · Class 12 and Olympiad, part C. See forms/kit.js.
 import { ri, numeric, choice, span, person, place, simpson, numDeriv, r6, C, terminates } from './kit.js';
+import * as D from './diagrams.js';
 
 const R = d => span(d, 30, 20);
 const lin = (a, b) => `${a === 1 ? '' : a}x ${b < 0 ? `- ${-b}` : `+ ${b}`}`;
@@ -33,6 +34,7 @@ const rates = [
     const k = ri(rng, 1, 12 + 3 * d), v = ri(rng, 1, R(d));
     return {
       payload: numeric('ladder', `A ladder of length $${5 * k}$ m leans against a wall. Its foot, $${3 * k}$ m from the wall, is pulled away at $${v}$ m/s. At what rate is the top sliding down the wall, in m/s? (Give the downward speed as a positive number.)`, 0.75 * v, {
+        figure: D.ladderFigure({ ground: 3 * k, height: 4 * k, shown: { ground: `${3 * k} m`, ladder: `${5 * k} m`, height: 'y' } }).svg,
         hints: ['Let $x$ be the foot\'s distance from the wall and $y$ the height of the top: $x^2 + y^2 = L^2$.', 'Differentiate with respect to time; the ladder length does not change.', 'Find $y$ from Pythagoras at that instant.'],
         steps: [{ h: 'Relate', d: '$x^2 + y^2 = L^2$' }, { h: 'Differentiate', d: '$2x\\dfrac{dx}{dt} + 2y\\dfrac{dy}{dt} = 0$' }, { h: 'Height', d: `$y = \\sqrt{${(5 * k) ** 2} - ${(3 * k) ** 2}}$` }],
         traps: [{ value: v, why: 'The top and the foot do not move at the same speed; the ratio of $x$ to $y$ sets the difference.' }, { value: r6(v * 4 / 3), why: 'The ratio is $x/y$ with $x$ the foot distance; this inverts it.' }]

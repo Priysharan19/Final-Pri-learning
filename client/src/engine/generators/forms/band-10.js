@@ -666,6 +666,7 @@ function triForms() {
       const [p, q] = distinct(rng, 2, 9 + d, 2), m = ri(rng, 1, 9), A = m * p * p;
       return {
         payload: numeric('area-ratio', `Triangles $ABC$ and $PQR$ are similar with $AB = ${p}$ cm and $PQ = ${q}$ cm. The area of $ABC$ is $${A}$ square cm. Find the area of $PQR$.`, m * q * q, {
+          figure: D.similarTriangles({ small: p, big: q, shown: { small: `AB = ${p} cm`, big: `PQ = ${q} cm` } }).svg,
           hints: ['The areas of similar triangles are in the ratio of the squares of corresponding sides.', `The ratio of sides is $${q} : ${p}$.`, 'Scale the area by the square of that ratio.'],
           steps: [{ h: 'Theorem', d: '$\\dfrac{\\text{area } PQR}{\\text{area } ABC} = \\dfrac{PQ^2}{AB^2}$' }, { h: 'Solve', d: `$${A}\\times\\dfrac{${q * q}}{${p * p}}$` }],
           traps: [{ value: (A * q) / p, why: 'Areas scale with the square of the side ratio.' }].filter(t => Number.isInteger(t.value) && t.value !== m * q * q)
@@ -677,6 +678,7 @@ function triForms() {
       const [p, q] = distinct(rng, 2, 9 + d, 2), m = ri(rng, 2, 12);
       return {
         payload: numeric('perimeter-ratio', `Triangles $ABC$ and $DEF$ are similar. Their corresponding sides $BC$ and $EF$ are $${p}$ cm and $${q}$ cm. The perimeter of $ABC$ is $${m * p}$ cm. Find the perimeter of $DEF$ in cm.`, m * q, {
+          figure: D.similarTriangles({ small: p, big: q, names: ['B', 'E'], shown: { small: `BC = ${p} cm`, big: `EF = ${q} cm` } }).svg,
           hints: ['The perimeters of similar triangles are in the same ratio as corresponding sides.', `The ratio is $${p} : ${q}$.`, 'Scale the given perimeter by it.'],
           steps: [{ h: 'Ratio', d: `$\\dfrac{${q}}{${p}}$` }, { h: 'Scale', d: `$${m * p}\\times\\dfrac{${q}}{${p}}$` }],
           traps: [{ value: m * q * q / p, why: 'Perimeters are lengths; they scale by the side ratio, not its square.' }].filter(t => Number.isInteger(t.value) && t.value !== m * q)
@@ -707,7 +709,7 @@ function trigForms() {
       void d;
       return {
         payload: numeric('ratio-from-3-4-5', `In a right triangle $ABC$ with the right angle at $B$, $\\sin A = \\dfrac{${3 * k}}{${5 * k}}$. Find the value of $${name}$.`, val, {
-          figure: D.rightTriangle({ base: 4 * k, height: 3 * k, shown: { base: '?', height: String(3 * k), hyp: String(5 * k) }, names: ['B', 'C', 'A'] }).svg,
+          figure: D.rightTriangle({ base: 4 * k, height: 3 * k, shown: { base: '?', height: String(3 * k), hyp: String(5 * k) }, names: ['B', 'A', 'C'] }).svg,
           hints: ['Draw the triangle; $\\sin A$ is the opposite side over the hypotenuse.', 'Find the third side with Pythagoras.', 'Read the required ratio from the triangle.'],
           steps: [{ h: 'Sides', d: `opposite $${3 * k}$, hypotenuse $${5 * k}$, adjacent $${4 * k}$` }, { h: 'Ratio', d: 'divide the right pair of sides' }],
           traps: [{ value: 0.6, why: 'That is $\\sin A$ itself.' }]
