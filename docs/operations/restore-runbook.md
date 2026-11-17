@@ -11,7 +11,7 @@ gh secret set PRI_BACKUP_DB_URL_IN   # paste the Neon Singapore connection strin
 gh secret set PRI_BACKUP_DB_URL_AU   # paste the Neon Sydney connection string, then Enter
 ```
 
-Use a read-only role if you can (`pg_dump` needs only SELECT). Without a secret, that edition's backup is skipped with a notice.
+Use the DIRECT connection string (not the pooled `-pooler` host: `pg_dump` fails through a transaction pooler) and a read-only role if you can (`pg_dump` needs only SELECT). The grants are dumped with the data. Without a secret, that edition's backup is skipped with a notice.
 
 ## Restore
 
@@ -25,7 +25,7 @@ Needs `age` and PostgreSQL client 17 (`brew install age postgresql@17`).
    ```bash
    umask 077; security find-generic-password -s pri-backup-age -a owner -w > /tmp/pri-age-key.txt
    ```
-3. Create an EMPTY target database. Never restore over production directly: restore into a new Neon branch or a new database, check it, then repoint `DATABASE_URL` in Railway (owner action).
+3. Create an EMPTY target database and the roles the grants name (`create role pri_server;`, then set its password as in `docs/operations/runbook.md`). Never restore over production directly: restore into a new Neon branch or a new database, check it, then repoint `DATABASE_URL` in Railway (owner action).
 4. Restore:
    ```bash
    scripts/ops-restore.sh ./restore/pri-in-<timestamp>.dump.age /tmp/pri-age-key.txt "postgresql://USER:PASS@HOST/DBNAME?sslmode=require"
