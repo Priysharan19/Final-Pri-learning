@@ -537,7 +537,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // v1.1 instrument: the footer's Reset is the toolbar's Clear (with its undo).
   useEffect(() => {
     if (!controlRef) return undefined;
-    controlRef.current = { clear: () => act('clear')() };
+    controlRef.current = { clear: () => act('clear')(), read: () => readNow() };
     return () => { controlRef.current = null; };
   });
 

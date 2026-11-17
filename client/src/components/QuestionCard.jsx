@@ -332,6 +332,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // each { rung, text }, and the level the server has committed so far.
   const [hints, setHints] = useState([]);
   const inkControlRef = useRef(null);
+  // Submit pressed on stale ink reads the page again instead of sending (see rereadFromSubmit).
+  const [rereadAsked, setRereadAsked] = useState(false);
   const [hintLevel, setHintLevel] = useState(question.hintLevel || 0);
   // The last rung is the whole solution: like Show solution it takes two presses.
   const [solutionRungArmed, setSolutionRungArmed] = useState(false);
@@ -1320,6 +1322,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
   async function submit(vouchedNow) {
+    setRereadAsked(false);
     if (inFlightRef.current || busy || resolved) return;
     // A question that can never be marked is not sent to be marked.
     if (unmarkable) return;
@@ -2013,6 +2016,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const photoAwaitingValidReading = !photoEligibleForGrading({ mode, photo,
     ocrPhase: photoOCR.phase, unreadPages: pdfUnread, pdfPageCount,
     reattachRequired: photoReattachRequired });
+  // Stale ink + Submit: the same read as "Read again" (same server reader, consent and online gates,
+  // answer-blind), shown to the student. Nothing is sent: the reading must be seen first, and a
+  // second Submit sends it only if the ink is unchanged since that read (inkStale is false then).
+  const rereadable = INSTRUMENT && writeMode && !isMcq && !resolved && inkHasStrokes && inkStale;
+  const rereadFromSubmit = () => { setRereadAsked(true); inkControlRef.current?.read?.(); };
   const canSubmit = (isMcq ? mcqSel !== null : isWorking ? (writeMode ? inkReadable : !!working.trim()) : writeMode ? (inkReadable && !!inkResult?.answerLine && !!String(inkAnswer).trim()) : !!answer.trim()) &&
     !photoAwaitingValidReading && !(mode === 'photo' && photoReadExpired);
   // Reader refused by authentication is not a handwriting error or a
@@ -2141,6 +2149,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     || (mode === 'photo' && !!photo && photoOCR.phase === 'idle'));
   // Why Submit is not available, said beside it — never a dead button.
   const submitReasonKey = resolved || isMcq || busy ? null
+    : writeMode && inkHasStrokes && rereadAsked && inkReadable ? 'ink.submitReadAgainDone'
     : writeMode && inkHasStrokes && inkStale && inkReadExpired ? 'ink.submitReadExpired'
     : mode === 'photo' && photoInUse && photoReadExpired ? 'photo.readExpired'
     : writeMode && inkHasStrokes && inkStale ? 'ink.submitReadAgain'
@@ -2195,7 +2204,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         ? { label: t('verdict.checkReadingFirst'), run: () => submit(), disabled: busy || !canSubmit }
         : {
           label: t(busy ? 'verdict.marking' : 'verdict.submit') + (unsettledLines === 1 ? ' ' + t('inst.unsettledOne') : unsettledLines > 1 ? ' ' + t('inst.unsettledMany', { n: unsettledLines }) : ''),
-          run: () => submit(), disabled: busy || !canSubmit
+          run: () => (rereadable ? rereadFromSubmit() : submit()), disabled: busy || (!canSubmit && !rereadable)
         };
 
   // v1.1 instrument: ⌘↵ / Ctrl+↵ presses the primary action while it is a

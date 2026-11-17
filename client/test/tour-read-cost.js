@@ -306,8 +306,8 @@ export const flow = {
         await submitAndSettle();
         const grade = (await gradesOf(right.serverQuestionId)).at(-1);
         costs.wroteWhileReading = reader.requests.length - start;
-        await check(`8 · ink written while an earlier page was being read: that reading arrives labelled as from earlier writing, Submit is unavailable with the reason, nothing is marked; "Read again" reads the page as it stands — 2 provider calls [${EVIDENCE}]`,
-          late.stale === 1 && late.submitDisabled === true && late.reason === 'ink.submitReadAgain' && late.grades === 0 &&
+        await check(`8 · ink written while an earlier page was being read: that reading arrives labelled as from earlier writing, Submit only re-reads (never sends), with the reason, nothing is marked; "Read again" reads the page as it stands — 2 provider calls [${EVIDENCE}]`,
+          late.stale === 1 && late.submitDisabled === false && late.reason === 'ink.submitReadAgain' && late.grades === 0 &&
             costs.wroteWhileReading === 2 && grade?.json?.correct === true,
           `when the late reading landed ${JSON.stringify(late)}; total ${costs.wroteWhileReading}; correct ${grade?.json?.correct}`);
       }
