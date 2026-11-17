@@ -83,11 +83,11 @@ const bearingEast = {
   slips({ d, b }) {
     return [
       { id: 'trig-bearing-from-east', value: d * COS(b), say: s(
-        `Bearings are measured from north, so the east displacement is ${n4(d)} × sin ${b}° = ${n4(d * SIN(b))}; ${n4(d)} × cos ${b}° = ${n4(d * COS(b))} is the north–south part.`,
-        `दिशा-कोण उत्तर से नापे जाते हैं, इसलिए पूर्व की ओर दूरी ${n4(d)} × sin ${b}° = ${n4(d * SIN(b))} है; ${n4(d)} × cos ${b}° = ${n4(d * COS(b))} उत्तर–दक्षिण वाला भाग है।`) },
+        `Bearings are measured from north, so the east displacement uses sin ${b}°, not cos ${b}°: ${n4(d)} × cos ${b}° (= ${n4(d * COS(b))}, your value) is the north–south part.`,
+        `दिशा-कोण उत्तर से नापे जाते हैं, इसलिए पूर्व की ओर दूरी में sin ${b}° आता है, cos ${b}° नहीं: ${n4(d)} × cos ${b}° (= ${n4(d * COS(b))}, आपका मान) उत्तर–दक्षिण वाला भाग है।`) },
       { id: 'trig-calculator-radians', value: d * Math.sin(b), say: s(
-        `sin ${b} was worked out in radians: the bearing is ${b} degrees, so use degree mode (sin ${b}° = ${n4(SIN(b))}).`,
-        `sin ${b} रेडियन में निकाला गया: दिशा-कोण ${b} डिग्री है, इसलिए डिग्री मोड रखें (sin ${b}° = ${n4(SIN(b))})।`) },
+        `sin ${b} was worked out in radians: the bearing is ${b} degrees, so put the calculator in degree mode.`,
+        `sin ${b} रेडियन में निकाला गया: दिशा-कोण ${b} डिग्री है, इसलिए कैलकुलेटर को डिग्री मोड में रखें।`) },
       { id: 'trig-wrong-ratio', value: d * TAN(b), say: s(
         `The east displacement is ${n4(d)} × sin ${b}°, not ${n4(d)} × tan ${b}°: the hypotenuse ${n4(d)} km is the distance sailed.`,
         `पूर्व की दूरी ${n4(d)} × sin ${b}° है, ${n4(d)} × tan ${b}° नहीं: कर्ण ${n4(d)} km चली हुई दूरी है।`) }
@@ -102,11 +102,10 @@ const bearingHiker = {
     return m ? { N: num(m[1]), E: num(m[2]) } : null;
   },
   slips({ N, E }) {
-    const right = deg(Math.atan2(E, N));
     return [
       { id: 'trig-bearing-from-east-axis', value: deg(Math.atan2(N, E)), say: s(
-        `A bearing is the angle from north: tan⁻¹(${n4(E)} ÷ ${n4(N)}) = ${n4(right)}°. Your ${n4(deg(Math.atan2(N, E)))}° is the angle from the east line.`,
-        `दिशा-कोण उत्तर से नापा जाता है: tan⁻¹(${n4(E)} ÷ ${n4(N)}) = ${n4(right)}°। आपका ${n4(deg(Math.atan2(N, E)))}° पूर्व रेखा से बना कोण है।`) },
+        `A bearing is the angle from north, so tan θ = east ÷ north = ${n4(E)} ÷ ${n4(N)}. Your ${n4(deg(Math.atan2(N, E)))}° is the angle from the east line.`,
+        `दिशा-कोण उत्तर से नापा जाता है, इसलिए tan θ = पूर्व ÷ उत्तर = ${n4(E)} ÷ ${n4(N)}। आपका ${n4(deg(Math.atan2(N, E)))}° पूर्व रेखा से बना कोण है।`) },
       { id: 'trig-ratio-flipped-angle', value: deg(Math.atan(N / E)), say: s(
         `tan θ = opposite ÷ adjacent = ${n4(E)} ÷ ${n4(N)} (east over north), not ${n4(N)} ÷ ${n4(E)}.`,
         `tan θ = सम्मुख ÷ संलग्न = ${n4(E)} ÷ ${n4(N)} (पूर्व ÷ उत्तर) है, ${n4(N)} ÷ ${n4(E)} नहीं।`) }
@@ -145,8 +144,8 @@ const pythagoras = {
         `The other side is √(${n4(h)}² − ${n4(a)}²), not ${n4(h)} − ${n4(a)}: square both, subtract, then take the square root.`,
         `दूसरी भुजा √(${n4(h)}² − ${n4(a)}²) है, ${n4(h)} − ${n4(a)} नहीं: दोनों का वर्ग करके घटाएँ, फिर वर्गमूल लें।`) },
       { id: 'pythag-leg-as-hyp', value: Math.sqrt(h * h + a * a), say: s(
-        `${n4(h)} is the hypotenuse (the longest side), so the missing side is √(${n4(h)}² − ${n4(a)}²) = ${n4(Math.sqrt(Math.max(0, h * h - a * a)))}; you added the squares.`,
-        `${n4(h)} कर्ण (सबसे लंबी भुजा) है, इसलिए छूटी भुजा √(${n4(h)}² − ${n4(a)}²) = ${n4(Math.sqrt(Math.max(0, h * h - a * a)))} है; आपने वर्ग जोड़ दिए।`) },
+        `${n4(h)} is the hypotenuse (the longest side), so the missing side is √(${n4(h)}² − ${n4(a)}²); you added the squares.`,
+        `${n4(h)} कर्ण (सबसे लंबी भुजा) है, इसलिए छूटी भुजा √(${n4(h)}² − ${n4(a)}²) है; आपने वर्ग जोड़ दिए।`) },
       { id: 'pythag-no-root', value: h * h - a * a, say: s(
         `${n4(h)}² − ${n4(a)}² = ${n4(h * h - a * a)} is the square of the missing side; take the square root.`,
         `${n4(h)}² − ${n4(a)}² = ${n4(h * h - a * a)} छूटी भुजा का वर्ग है; वर्गमूल लें।`) }
@@ -169,8 +168,8 @@ const cosineRuleSide = {
     const c2 = a * a + b * b - 2 * a * b * COS(C);
     return [
       { id: 'cosine-rule-plus', value: Math.sqrt(a * a + b * b + 2 * a * b * COS(C)), say: s(
-        `The cosine rule is c² = a² + b² − 2ab cos C: the 2ab cos C term is subtracted. With a plus you get ${n4(Math.sqrt(a * a + b * b + 2 * a * b * COS(C)))}; subtracting gives ${n4(Math.sqrt(c2))}.`,
-        `कोज्या नियम c² = a² + b² − 2ab cos C है: 2ab cos C घटाया जाता है। जोड़ने पर ${n4(Math.sqrt(a * a + b * b + 2 * a * b * COS(C)))} मिलता है; घटाने पर ${n4(Math.sqrt(c2))}।`) },
+        `The cosine rule is c² = a² + b² − 2ab cos C: the 2ab cos C term is subtracted, but here it was added (which gives ${n4(Math.sqrt(a * a + b * b + 2 * a * b * COS(C)))}).`,
+        `कोज्या नियम c² = a² + b² − 2ab cos C है: 2ab cos C घटाया जाता है, पर यहाँ जोड़ दिया गया (जिससे ${n4(Math.sqrt(a * a + b * b + 2 * a * b * COS(C)))} मिलता है)।`) },
       { id: 'cosine-rule-no-root', value: c2, say: s(
         `${n4(c2)} is c², the square of the side; take the square root to get the length.`,
         `${n4(c2)} भुजा का वर्ग c² है; लंबाई के लिए वर्गमूल लें।`) },
@@ -201,17 +200,16 @@ const areaRule = {
     return m ? { a: num(m[1]), b: num(m[2]), C: num(m[3]) } : null;
   },
   slips({ a, b, C }) {
-    const area = 0.5 * a * b * SIN(C);
     return [
       { id: 'area-half-forgotten', value: a * b * SIN(C), say: s(
-        `The area is ½ × ${n4(a)} × ${n4(b)} × sin ${C}° = ${n4(area)}; ${n4(a * b * SIN(C))} is double that: the ½ was left out.`,
-        `क्षेत्रफल ½ × ${n4(a)} × ${n4(b)} × sin ${C}° = ${n4(area)} है; ${n4(a * b * SIN(C))} उसका दुगुना है: ½ छूट गया।`) },
+        `The area is ½ × ${n4(a)} × ${n4(b)} × sin ${C}°; your ${n4(a * b * SIN(C))} is double that: the ½ was left out.`,
+        `क्षेत्रफल ½ × ${n4(a)} × ${n4(b)} × sin ${C}° है; आपका ${n4(a * b * SIN(C))} उसका दुगुना है: ½ छूट गया।`) },
       { id: 'area-right-angle-formula', value: 0.5 * a * b, say: s(
         `½ab is the area only for a right angle (sin 90° = 1); here the angle is ${C}°, so multiply by sin ${C}° = ${n4(SIN(C))}.`,
         `½ab केवल समकोण (sin 90° = 1) के लिए क्षेत्रफल है; यहाँ कोण ${C}° है, इसलिए sin ${C}° = ${n4(SIN(C))} से गुणा करें।`) },
       { id: 'area-cos-for-sin', value: 0.5 * a * b * COS(C), say: s(
-        `The area formula uses sin C, not cos C: ½ × ${n4(a)} × ${n4(b)} × sin ${C}° = ${n4(area)}.`,
-        `क्षेत्रफल के सूत्र में sin C आता है, cos C नहीं: ½ × ${n4(a)} × ${n4(b)} × sin ${C}° = ${n4(area)}।`) },
+        `The area formula uses sin C, not cos C: ½ × ${n4(a)} × ${n4(b)} × sin ${C}°.`,
+        `क्षेत्रफल के सूत्र में sin C आता है, cos C नहीं: ½ × ${n4(a)} × ${n4(b)} × sin ${C}°।`) },
       { id: 'trig-calculator-radians', value: 0.5 * a * b * Math.sin(C), say: s(
         `sin ${C} was worked out in radians: the angle is ${C} degrees, so use degree mode.`,
         `sin ${C} रेडियन में निकाला गया: कोण ${C} डिग्री है, इसलिए डिग्री मोड रखें।`) }
@@ -229,8 +227,8 @@ const sineRuleSide = {
   slips({ A, B, a }) {
     return [
       { id: 'sine-rule-inverted', value: a * SIN(A) / SIN(B), say: s(
-        `Each side goes over the sine of its OWN opposite angle: b = ${n4(a)} × sin ${B}° ÷ sin ${A}° = ${n4(a * SIN(B) / SIN(A))}. You had sin ${A}° on top.`,
-        `हर भुजा अपने सम्मुख कोण की ज्या के साथ आती है: b = ${n4(a)} × sin ${B}° ÷ sin ${A}° = ${n4(a * SIN(B) / SIN(A))}। आपने sin ${A}° ऊपर रखा।`) },
+        `Each side goes over the sine of its OWN opposite angle: b ÷ sin ${B}° = ${n4(a)} ÷ sin ${A}°. You had sin ${A}° on top.`,
+        `हर भुजा अपने सम्मुख कोण की ज्या के साथ आती है: b ÷ sin ${B}° = ${n4(a)} ÷ sin ${A}°। आपने sin ${A}° ऊपर रखा।`) },
       { id: 'sine-rule-cosine', value: a * COS(B) / COS(A), say: s(
         `The sine rule uses sines: a ÷ sin A = b ÷ sin B, not cosines.`,
         `ज्या नियम में ज्या (sin) आती है: a ÷ sin A = b ÷ sin B, कोज्या नहीं।`) },
@@ -252,14 +250,14 @@ const sineRuleAngle = {
     const right = sB <= 1 ? deg(Math.asin(sB)) : NaN;
     return [
       { id: 'sine-rule-inverted', value: deg(Math.asin(Math.min(1, (a * SIN(A)) / b))), say: s(
-        `sin B = b × sin A ÷ a = ${n4(b)} × sin ${A}° ÷ ${n4(a)} = ${n4(sB)}, so B = ${n4(right)}°. You had the two sides the wrong way round.`,
-        `sin B = b × sin A ÷ a = ${n4(b)} × sin ${A}° ÷ ${n4(a)} = ${n4(sB)}, इसलिए B = ${n4(right)}°। आपने दोनों भुजाएँ उलटी रखीं।`) },
+        `sin B = b × sin A ÷ a = ${n4(b)} × sin ${A}° ÷ ${n4(a)}. You had the two sides the wrong way round.`,
+        `sin B = b × sin A ÷ a = ${n4(b)} × sin ${A}° ÷ ${n4(a)}। आपने दोनों भुजाएँ उलटी रखीं।`) },
       { id: 'sine-rule-no-inverse', value: sB, say: s(
         `${n4(sB)} is sin B; take sin⁻¹ of it to get the angle.`,
         `${n4(sB)} sin B है; कोण के लिए इसका sin⁻¹ लें।`) },
       { id: 'sine-rule-obtuse-angle', value: 180 - right, say: s(
-        `The question asks for the ACUTE angle B = ${n4(right)}°; ${n4(180 - right)}° is the obtuse partner.`,
-        `प्रश्न न्यून कोण B = ${n4(right)}° माँगता है; ${n4(180 - right)}° उसका अधिक कोण साथी है।`) }
+        `The question asks for the ACUTE angle B; ${n4(180 - right)}° is its obtuse partner (180° minus the acute angle).`,
+        `प्रश्न न्यून कोण B माँगता है; ${n4(180 - right)}° उसका अधिक कोण साथी है (180° में से न्यून कोण घटाने पर)।`) }
     ];
   }
 };
@@ -278,8 +276,8 @@ const exactSum = {
     const sw = (f, t) => EXACT[f === 'sin' ? 'cos' : 'sin'][t];
     return [
       { id: 'trig-exact-value-ratio-as-one', value: k + m, say: s(
-        `${f1} ${t1}° = ${n4(v1)} and ${f2} ${t2}° = ${n4(v2)}, not 1: the sum is ${n4(k)} × ${n4(v1)} + ${n4(m)} × ${n4(v2)} = ${n4(k * v1 + m * v2)}.`,
-        `${f1} ${t1}° = ${n4(v1)} और ${f2} ${t2}° = ${n4(v2)}, 1 नहीं: योग ${n4(k)} × ${n4(v1)} + ${n4(m)} × ${n4(v2)} = ${n4(k * v1 + m * v2)} है।`) },
+        `${f1} ${t1}° = ${n4(v1)} and ${f2} ${t2}° = ${n4(v2)}, not 1: use ${n4(k)} × ${n4(v1)} + ${n4(m)} × ${n4(v2)}.`,
+        `${f1} ${t1}° = ${n4(v1)} और ${f2} ${t2}° = ${n4(v2)}, 1 नहीं: ${n4(k)} × ${n4(v1)} + ${n4(m)} × ${n4(v2)} लें।`) },
       { id: 'trig-exact-value-swapped', value: k * sw(f1, t1) + m * sw(f2, t2), say: s(
         `sin and cos swap at 30° and 60°: sin 30° = cos 60° = ½ and sin 60° = cos 30° = √3⁄2. Check which function each term is.`,
         `30° और 60° पर sin और cos आपस में बदल जाते हैं: sin 30° = cos 60° = ½ और sin 60° = cos 30° = √3⁄2। देखें हर पद में कौन सा फलन है।`) }
@@ -313,19 +311,19 @@ const trigEquation = {
     const other = which === 'smaller' ? right[1] : right[0];
     const out = [
       { id: 'trig-other-solution', value: other, say: s(
-        `There are two solutions in 0°–360°: ${right[0]}° and ${right[1]}°. The question asks for the ${which} one, ${wanted}°.`,
-        `0°–360° में दो हल हैं: ${right[0]}° और ${right[1]}°। प्रश्न ${which === 'smaller' ? 'छोटा' : 'बड़ा'} हल ${wanted}° माँगता है।`) },
+        `There are two solutions in 0°–360°, one in each of two quadrants. Your ${n4(other)}° is the ${which === 'smaller' ? 'larger' : 'smaller'} one; the question asks for the ${which} one.`,
+        `0°–360° में दो हल होते हैं, दो चतुर्थांशों में एक-एक। ${n4(other)}° ${which === 'smaller' ? 'बड़ा' : 'छोटा'} हल है; प्रश्न ${which === 'smaller' ? 'छोटा' : 'बड़ा'} हल माँगता है।`) },
       { id: 'trig-reference-angle-only', value: r, say: s(
-        `${r}° is only the reference angle (the first-quadrant angle). The sign tells you which quadrants: ${fn} ${neg ? 'is negative' : 'is positive'} in ${right[0]}° and ${right[1]}°.`,
-        `${r}° केवल संदर्भ कोण (प्रथम चतुर्थांश का कोण) है। चिह्न बताता है कौन से चतुर्थांश: ${fn} ${neg ? 'ऋणात्मक' : 'धनात्मक'} है ${right[0]}° और ${right[1]}° पर।`) }
+        `${r}° is only the reference angle (the first-quadrant angle). The sign tells you which quadrants: ${fn} is ${neg ? 'negative' : 'positive'} in quadrants ${quadsRight.map(k => k[1]).join(' and ')}.`,
+        `${r}° केवल संदर्भ कोण (प्रथम चतुर्थांश का कोण) है। चिह्न बताता है कौन से चतुर्थांश: ${fn} ${neg ? 'ऋणात्मक' : 'धनात्मक'} है चतुर्थांश ${quadsRight.map(k => k[1]).join(' और ')} में।`) }
     ];
     for (const k of ['q1', 'q2', 'q3', 'q4']) {
       const v = c[k];
       if (k === 'q1' && !quadsRight.includes('q1')) continue; // handled by reference-angle
       if (right.includes(v) || v === r) continue;
       out.push({ id: 'trig-wrong-quadrant', value: v, say: s(
-        `${v}° is in the wrong quadrant: ${fn} ${neg ? 'negative' : 'positive'} puts the solutions at ${right[0]}° and ${right[1]}° (use ASTC: All, Sin, Tan, Cos).`,
-        `${v}° गलत चतुर्थांश में है: ${fn} ${neg ? 'ऋणात्मक' : 'धनात्मक'} के हल ${right[0]}° और ${right[1]}° पर हैं (ASTC नियम देखें)।`) });
+        `${v}° is in the wrong quadrant: ${fn} ${neg ? 'negative' : 'positive'} puts the solutions in quadrants ${quadsRight.map(k => k[1]).join(' and ')} (use ASTC: All, Sin, Tan, Cos).`,
+        `${v}° गलत चतुर्थांश में है: ${fn} ${neg ? 'ऋणात्मक' : 'धनात्मक'} के हल चतुर्थांश ${quadsRight.map(k => k[1]).join(' और ')} में हैं (ASTC नियम देखें)।`) });
     }
     return out;
   }
@@ -341,8 +339,8 @@ const pythagoreanIdentity = {
   slips({ k, j, c }) {
     return [
       { id: 'identity-forgot-one', value: c, say: s(
-        `sin²θ + cos²θ = 1, so ${n4(k)}sin²θ + ${n4(k)}cos²θ = ${n4(k)}, and the total is ${n4(k)} + ${n4(c)} = ${n4(k + c)}. The ${n4(k)} was dropped.`,
-        `sin²θ + cos²θ = 1, इसलिए ${n4(k)}sin²θ + ${n4(k)}cos²θ = ${n4(k)}, और कुल ${n4(k)} + ${n4(c)} = ${n4(k + c)} है। ${n4(k)} छूट गया।`) },
+        `sin²θ + cos²θ = 1, so ${n4(k)}sin²θ + ${n4(k)}cos²θ collapses to ${n4(k)}, and then the ${n4(c)} is added. The ${n4(k)} was dropped.`,
+        `sin²θ + cos²θ = 1, इसलिए ${n4(k)}sin²θ + ${n4(k)}cos²θ का मान ${n4(k)} रह जाता है, फिर ${n4(c)} जोड़ें। ${n4(k)} छूट गया।`) },
       { id: 'identity-sum-of-coefficients', value: k + j + c, say: s(
         `Factor first: ${n4(k)}(sin²θ + cos²θ) = ${n4(k)} × 1. Adding the coefficients as if sin² and cos² were each 1 gives ${n4(k + j + c)}.`,
         `पहले गुणनखंड लें: ${n4(k)}(sin²θ + cos²θ) = ${n4(k)} × 1। sin² और cos² को अलग-अलग 1 मानकर गुणांक जोड़ने से ${n4(k + j + c)} मिलता है।`) }
@@ -373,8 +371,8 @@ const exactAngle = {
     const other = { sin: 'cos', cos: 'sin', tan: 'tan' }[fn];
     const out = [
       { id: 'trig-sign-by-quadrant', value: -val, say: s(
-        `The reference angle gives ${n4(Math.abs(val))}, but the sign comes from the quadrant ${t}° lies in (ASTC): ${fn} ${t}° is ${val < 0 ? 'negative' : 'positive'} there.`,
-        `संदर्भ कोण से ${n4(Math.abs(val))} मिलता है, पर चिह्न उस चतुर्थांश से तय होता है जिसमें ${t}° है (ASTC): वहाँ ${fn} ${t}° ${val < 0 ? 'ऋणात्मक' : 'धनात्मक'} है।`) }
+        `Use the reference angle for the size, but the sign comes from the quadrant ${t}° lies in (ASTC): check whether ${fn} is positive or negative there.`,
+        `आकार संदर्भ कोण से मिलता है, पर चिह्न उस चतुर्थांश से तय होता है जिसमें ${t}° है (ASTC): देखें वहाँ ${fn} धनात्मक है या ऋणात्मक।`) }
     ];
     if (other !== fn) out.push({ id: 'trig-exact-value-swapped', value: FN[other](t), say: s(
       `That is ${other} ${t}°; the question asks for ${fn} ${t}°. (sin and cos swap at 30° and 60°.)`,
@@ -411,11 +409,11 @@ const exactTriangleLength = {
     const r = FN[fn](t);
     return [
       { id: 'trig-ratio-ignored', value: L, say: s(
-        `The side is ${n4(L)} × ${fn} ${t}° = ${n4(L)} × ${n4(r)} = ${n4(L * r)}: the hypotenuse is multiplied by the ratio, not left as it is.`,
-        `भुजा ${n4(L)} × ${fn} ${t}° = ${n4(L)} × ${n4(r)} = ${n4(L * r)} है: कर्ण को अनुपात से गुणा करना है, वैसा ही नहीं छोड़ना।`) },
+        `The side is ${n4(L)} × ${fn} ${t}° = ${n4(L)} × ${n4(r)}: the hypotenuse is multiplied by the ratio, not left as it is.`,
+        `भुजा ${n4(L)} × ${fn} ${t}° = ${n4(L)} × ${n4(r)} है: कर्ण को अनुपात से गुणा करना है, वैसा ही नहीं छोड़ना।`) },
       { id: 'trig-ratio-inverted', value: L / r, say: s(
-        `The side is hypotenuse × ${fn} ${t}° = ${n4(L * r)}; dividing by ${n4(r)} gives ${n4(L / r)}, which is longer than the hypotenuse.`,
-        `भुजा कर्ण × ${fn} ${t}° = ${n4(L * r)} है; ${n4(r)} से भाग देने पर ${n4(L / r)} आता है, जो कर्ण से लंबा है।`) }
+        `The side is hypotenuse × ${fn} ${t}°, so multiply, not divide: dividing by ${n4(r)} gives ${n4(L / r)}, which is longer than the hypotenuse.`,
+        `भुजा कर्ण × ${fn} ${t}° है, इसलिए गुणा करें, भाग नहीं: ${n4(r)} से भाग देने पर ${n4(L / r)} आता है, जो कर्ण से लंबा है।`) }
     ];
   }
 };
@@ -435,21 +433,21 @@ const solutionCount = {
     const out = [];
     if (count !== 1) out.push({ id: 'trig-count-one-solution', value: 1, say: s(
       count === 2
-        ? `${fn} θ = ${n4(c)} has two solutions in 0°–360°, one in each of the two quadrants where ${fn} has that sign. Only one was counted.`
-        : `${fn} θ = ${n4(c)} has no solution: ${fn} θ is never above 1 or below −1.`,
+        ? `${fn} θ = ${n4(c)}: check the quadrants where ${fn} has that sign; the first-quadrant angle is not the only one in 0°–360°.`
+        : `${fn} θ = ${n4(c)}: check how large ${fn} θ can get; its values stay between −1 and 1.`,
       count === 2
-        ? `${fn} θ = ${n4(c)} के 0°–360° में दो हल हैं, उन दो चतुर्थांशों में एक-एक जहाँ ${fn} का यही चिह्न है। केवल एक गिना गया।`
-        : `${fn} θ = ${n4(c)} का कोई हल नहीं है: ${fn} θ कभी 1 से ऊपर या −1 से नीचे नहीं जाता।`) });
+        ? `${fn} θ = ${n4(c)}: देखें किन चतुर्थांशों में ${fn} का यही चिह्न है; 0°–360° में प्रथम चतुर्थांश का कोण अकेला नहीं होता।`
+        : `${fn} θ = ${n4(c)}: देखें ${fn} θ कितना बड़ा हो सकता है; इसके मान −1 और 1 के बीच रहते हैं।`) });
     if (count !== 2) out.push({ id: 'trig-count-two-solutions', value: 2, say: s(
       count === 0
-        ? `${fn} θ can never equal ${n4(c)}, since its values stay between −1 and 1, so there are no solutions.`
-        : `${fn} θ = ${n4(c)} touches the graph at one point only (${fn} θ reaches ${n4(c)} once), so there is one solution, not two.`,
+        ? `Check whether ${fn} θ can ever equal ${n4(c)}: its values stay between −1 and 1.`
+        : `Check where ${fn} θ reaches ${n4(c)}: does the graph cross that height twice, or touch it once?`,
       count === 0
-        ? `${fn} θ कभी ${n4(c)} के बराबर नहीं हो सकता, क्योंकि इसके मान −1 और 1 के बीच रहते हैं, इसलिए कोई हल नहीं।`
-        : `${fn} θ = ${n4(c)} ग्राफ़ को एक ही बिंदु पर छूता है, इसलिए एक हल है, दो नहीं।`) });
+        ? `देखें क्या ${fn} θ कभी ${n4(c)} के बराबर हो सकता है: इसके मान −1 और 1 के बीच रहते हैं।`
+        : `देखें ${fn} θ कहाँ ${n4(c)} तक पहुँचता है: क्या ग्राफ़ उस ऊँचाई को दो बार काटता है या एक बार छूता है?`) });
     if (count !== 0) out.push({ id: 'trig-count-zero', value: 0, say: s(
-      `${n4(c)} is between −1 and 1, so ${fn} θ = ${n4(c)} does have solutions in 0°–360°.`,
-      `${n4(c)} −1 और 1 के बीच है, इसलिए ${fn} θ = ${n4(c)} के 0°–360° में हल हैं।`) });
+      `${n4(c)} is between −1 and 1, so ${fn} θ = ${n4(c)} does have solutions in 0°–360°: find them.`,
+      `${n4(c)} −1 और 1 के बीच है, इसलिए ${fn} θ = ${n4(c)} के 0°–360° में हल हैं: उन्हें खोजें।`) });
     return out;
   }
 };
@@ -469,8 +467,8 @@ const ladderRamp = {
     const other = fn === 'sin' ? 'cos' : 'sin';
     return [
       { id: 'trig-ratio-inverted', value: L / r, say: s(
-        `The ${fn === 'sin' ? 'height' : 'reach'} is L × ${fn} ${t}° = ${n4(L)} × ${n4(r)} = ${n4(L * r)}; it cannot be longer than the ${n4(L)} m itself, so do not divide.`,
-        `${fn === 'sin' ? 'ऊँचाई' : 'दीवार पर पहुँच'} L × ${fn} ${t}° = ${n4(L)} × ${n4(r)} = ${n4(L * r)} है; यह ${n4(L)} m से लंबी नहीं हो सकती, इसलिए भाग न दें।`) },
+        `The ${fn === 'sin' ? 'height' : 'reach'} is L × ${fn} ${t}° = ${n4(L)} × ${n4(r)}; it cannot be longer than the ${n4(L)} m itself, so do not divide.`,
+        `${fn === 'sin' ? 'ऊँचाई' : 'दीवार पर पहुँच'} L × ${fn} ${t}° = ${n4(L)} × ${n4(r)} है; यह ${n4(L)} m से लंबी नहीं हो सकती, इसलिए भाग न दें।`) },
       { id: 'trig-wrong-ratio', value: L * FN[other](t), say: s(
         `Check which side is opposite the ${t}° angle: here the answer uses ${fn} ${t}° = ${n4(r)}, not ${other} ${t}° = ${n4(FN[other](t))}.`,
         `देखें ${t}° कोण के सम्मुख कौन सी भुजा है: यहाँ ${fn} ${t}° = ${n4(r)} लगेगा, ${other} ${t}° = ${n4(FN[other](t))} नहीं।`) }
@@ -517,39 +515,37 @@ const waveModel = {
   slips(p) {
     if (p.kind === 'maximum' || p.kind === 'minimum') {
       const { A, k, kind } = p;
-      const right = kind === 'maximum' ? k + A : k - A;
       return [
         { id: 'wave-forgot-shift', value: kind === 'maximum' ? A : -A, say: s(
-          `The ${kind} of A sin(…) alone is ${kind === 'maximum' ? '' : '−'}${n4(A)}; the vertical shift of ${n4(k)} moves the whole graph, so the ${kind} is ${n4(k)} ${kind === 'maximum' ? '+' : '−'} ${n4(A)} = ${n4(right)}.`,
-          `केवल A sin(…) का ${kind === 'maximum' ? 'अधिकतम' : 'न्यूनतम'} ${kind === 'maximum' ? '' : '−'}${n4(A)} है; ${n4(k)} का ऊर्ध्वाधर विस्थापन पूरे ग्राफ़ को खिसकाता है, इसलिए ${kind === 'maximum' ? 'अधिकतम' : 'न्यूनतम'} ${n4(k)} ${kind === 'maximum' ? '+' : '−'} ${n4(A)} = ${n4(right)} है।`) },
+          `The ${kind} of A sin(…) alone is ${kind === 'maximum' ? '' : '−'}${n4(A)}; the vertical shift of ${n4(k)} moves the whole graph, so add it on.`,
+          `केवल A sin(…) का ${kind === 'maximum' ? 'अधिकतम' : 'न्यूनतम'} ${kind === 'maximum' ? '' : '−'}${n4(A)} है; ${n4(k)} का ऊर्ध्वाधर विस्थापन पूरे ग्राफ़ को खिसकाता है, इसलिए उसे जोड़ें।`) },
         { id: 'wave-wrong-extreme', value: kind === 'maximum' ? k - A : k + A, say: s(
-          `That is the ${kind === 'maximum' ? 'minimum' : 'maximum'}: the ${kind} is ${n4(k)} ${kind === 'maximum' ? '+' : '−'} ${n4(A)} = ${n4(right)}.`,
-          `यह ${kind === 'maximum' ? 'न्यूनतम' : 'अधिकतम'} है: ${kind === 'maximum' ? 'अधिकतम' : 'न्यूनतम'} ${n4(k)} ${kind === 'maximum' ? '+' : '−'} ${n4(A)} = ${n4(right)} है।`) },
+          `That is the ${kind === 'maximum' ? 'minimum' : 'maximum'}: the ${kind} is the midline ${n4(k)} ${kind === 'maximum' ? 'plus' : 'minus'} the amplitude ${n4(A)}.`,
+          `यह ${kind === 'maximum' ? 'न्यूनतम' : 'अधिकतम'} है: ${kind === 'maximum' ? 'अधिकतम' : 'न्यूनतम'} मध्य रेखा ${n4(k)} ${kind === 'maximum' ? 'में' : 'से'} आयाम ${n4(A)} ${kind === 'maximum' ? 'जोड़ने' : 'घटाने'} पर मिलता है।`) },
         { id: 'wave-shift-only', value: k, say: s(
-          `${n4(k)} is the midline; the ${kind} is the midline ${kind === 'maximum' ? 'plus' : 'minus'} the amplitude ${n4(A)}: ${n4(right)}.`,
-          `${n4(k)} मध्य रेखा है; ${kind === 'maximum' ? 'अधिकतम' : 'न्यूनतम'} मध्य रेखा ${kind === 'maximum' ? 'में' : 'से'} आयाम ${n4(A)} ${kind === 'maximum' ? 'जोड़ने' : 'घटाने'} पर ${n4(right)} है।`) }
+          `${n4(k)} is the midline; the ${kind} is the midline ${kind === 'maximum' ? 'plus' : 'minus'} the amplitude ${n4(A)}.`,
+          `${n4(k)} मध्य रेखा है; ${kind === 'maximum' ? 'अधिकतम' : 'न्यूनतम'} मध्य रेखा ${kind === 'maximum' ? 'में' : 'से'} आयाम ${n4(A)} ${kind === 'maximum' ? 'जोड़ने' : 'घटाने'} पर मिलता है।`) }
       ];
     }
     if (p.kind === 'period') {
       const { D } = p;
-      const right = 2 * D;
       return [
         { id: 'wave-period-denominator', value: D, say: s(
-          `The period is 2π ÷ b where b = π/${n4(D)}: 2π ÷ (π/${n4(D)}) = ${n4(right)}. ${n4(D)} is only the denominator.`,
-          `आवर्त 2π ÷ b है जहाँ b = π/${n4(D)}: 2π ÷ (π/${n4(D)}) = ${n4(right)}। ${n4(D)} केवल हर है।`) },
+          `The period is 2π ÷ b where b = π/${n4(D)}, so work out 2π ÷ (π/${n4(D)}). ${n4(D)} is only the denominator.`,
+          `आवर्त 2π ÷ b है जहाँ b = π/${n4(D)}, इसलिए 2π ÷ (π/${n4(D)}) निकालें। ${n4(D)} केवल हर है।`) },
         { id: 'wave-half-period', value: D * 1, say: s(
-          `2π ÷ b, not π ÷ b: the full period is ${n4(right)}.`,
-          `2π ÷ b, π ÷ b नहीं: पूरा आवर्त ${n4(right)} है।`) },
+          `The full period is 2π ÷ b, not π ÷ b (that is only half a cycle).`,
+          `पूरा आवर्त 2π ÷ b है, π ÷ b नहीं (वह केवल आधा चक्र है)।`) },
         { id: 'wave-period-from-b', value: (2 * Math.PI) / (Math.PI / D) * 2, say: s(
-          `The period is 2π ÷ b = ${n4(right)}, not twice that.`,
-          `आवर्त 2π ÷ b = ${n4(right)} है, उसका दुगुना नहीं।`) }
+          `The period is 2π ÷ b, and no more: it is not doubled again.`,
+          `आवर्त 2π ÷ b है, उससे दुगुना नहीं।`) }
       ];
     }
     const { k, A, D, t } = p;
     return [
       { id: 'wave-sine-as-one', value: k + A, say: s(
-        `At t = ${n4(t)} the angle is π × ${n4(t)} ÷ ${n4(D)} = ${n4((180 * t) / D)}°, so sin = ${n4(SIN((180 * t) / D))}: h = ${n4(k)} + ${n4(A)} × ${n4(SIN((180 * t) / D))} = ${n4(k + A * SIN((180 * t) / D))}. Using sin = 1 gives ${n4(k + A)}.`,
-        `t = ${n4(t)} पर कोण π × ${n4(t)} ÷ ${n4(D)} = ${n4((180 * t) / D)}° है, इसलिए sin = ${n4(SIN((180 * t) / D))}: h = ${n4(k)} + ${n4(A)} × ${n4(SIN((180 * t) / D))} = ${n4(k + A * SIN((180 * t) / D))}। sin = 1 लेने पर ${n4(k + A)} आता है।`) },
+        `At t = ${n4(t)} the angle is π × ${n4(t)} ÷ ${n4(D)} = ${n4((180 * t) / D)}°: work out sin of that angle, not sin = 1 (using sin = 1 gives ${n4(k + A)}).`,
+        `t = ${n4(t)} पर कोण π × ${n4(t)} ÷ ${n4(D)} = ${n4((180 * t) / D)}° है: उस कोण का sin निकालें, sin = 1 नहीं (sin = 1 लेने पर ${n4(k + A)} आता है)।`) },
       { id: 'trig-calculator-degrees', value: k + A * SIN(t / D * 1), say: s(
         `The angle πt/${n4(D)} is in radians: at t = ${n4(t)} it is π/${n4(D)} (${n4(180 / D * t)}°), not ${n4(t / D)}°.`,
         `कोण πt/${n4(D)} रेडियन में है: t = ${n4(t)} पर यह π/${n4(D)} (${n4(180 / D * t)}°) है, ${n4(t / D)}° नहीं।`) }
@@ -578,8 +574,8 @@ const compoundFraction = {
         `The ${fn} formula's middle sign is ${fn === 'sin' ? (op === '+' ? '+' : '−') : (op === '+' ? '−' : '+')} for ${fn}(A ${op} B): ${fn === 'sin' ? 'sin A cos B ' + op + ' cos A sin B' : 'cos A cos B ' + (op === '+' ? '−' : '+') + ' sin A sin B'}. Here the other sign was used (${n4(wrongSign)}).`,
         `${fn}(A ${op} B) के सूत्र का बीच का चिह्न ${fn === 'sin' ? (op === '+' ? '+' : '−') : (op === '+' ? '−' : '+')} है। यहाँ दूसरा चिह्न लिया गया (${n4(wrongSign)})।`) },
       { id: 'compound-formula-mixed', value: mixed, say: s(
-        `${fn}(A ${op} B) uses ${fn === 'sin' ? 'sin A cos B and cos A sin B (products of one sin and one cos)' : 'cos A cos B and sin A sin B (two cos, two sin)'}; the other formula was used.`,
-        `${fn}(A ${op} B) में ${fn === 'sin' ? 'sin A cos B और cos A sin B (एक sin, एक cos वाले गुणनफल)' : 'cos A cos B और sin A sin B (दो cos, दो sin)'} आते हैं; दूसरा सूत्र लिया गया।`) }
+        `${fn}(A ${op} B) uses ${fn === 'sin' ? 'sin A cos B and cos A sin B (one sin and one cos in each product)' : 'cos A cos B and sin A sin B (two cos, then two sin)'}; the other formula was used (your ${n4(mixed)}), with sin A = ${n4(A.s)}, cos A = ${n4(A.c)}, sin B = ${n4(B.s)}, cos B = ${n4(B.c)}.`,
+        `${fn}(A ${op} B) में ${fn === 'sin' ? 'sin A cos B और cos A sin B (हर गुणनफल में एक sin, एक cos)' : 'cos A cos B और sin A sin B (दो cos, फिर दो sin)'} आते हैं; दूसरा सूत्र लिया गया (आपका ${n4(mixed)}), जहाँ sin A = ${n4(A.s)}, cos A = ${n4(A.c)}, sin B = ${n4(B.s)}, cos B = ${n4(B.c)}।`) }
     ];
   }
 };
@@ -633,18 +629,18 @@ const doubleAngle = {
         `sin 2θ = 2 sin θ cos θ, not 2 sin θ: the cos θ factor was left out (2 × ${n4(sn)} = ${n4(2 * sn)}).`,
         `sin 2θ = 2 sin θ cos θ है, 2 sin θ नहीं: cos θ का गुणक छूट गया (2 × ${n4(sn)} = ${n4(2 * sn)})।`) });
       out.push({ id: 'double-angle-sign-by-quadrant', value: -right, say: s(
-        `The size of 2 sin θ cos θ is ${n4(Math.abs(right))}, but its sign follows the quadrant: sin θ = ${n4(sn)} and cos θ = ${n4(c)} are ${sn * c < 0 ? 'opposite' : 'the same'} in sign, so sin 2θ is ${right < 0 ? 'negative' : 'positive'}.`,
-        `2 sin θ cos θ का परिमाण ${n4(Math.abs(right))} है, पर चिह्न चतुर्थांश से तय होता है: sin θ = ${n4(sn)} और cos θ = ${n4(c)} ${sn * c < 0 ? 'विपरीत' : 'समान'} चिह्न के हैं, इसलिए sin 2θ ${right < 0 ? 'ऋणात्मक' : 'धनात्मक'} है।`) });
+        `The sign of 2 sin θ cos θ follows the quadrant: sin θ = ${n4(sn)} and cos θ = ${n4(c)}, so check whether their product is positive or negative.`,
+        `2 sin θ cos θ का चिह्न चतुर्थांश से तय होता है: sin θ = ${n4(sn)} और cos θ = ${n4(c)}, इसलिए देखें उनका गुणनफल धनात्मक है या ऋणात्मक।`) });
     } else {
       out.push({ id: 'double-angle-doubled-ratio', value: 2 * c, say: s(
         `cos 2θ = cos²θ − sin²θ, not 2 cos θ: doubling the angle does not double the ratio (2 × ${n4(c)} = ${n4(2 * c)}).`,
         `cos 2θ = cos²θ − sin²θ है, 2 cos θ नहीं: कोण दुगुना करने से अनुपात दुगुना नहीं होता (2 × ${n4(c)} = ${n4(2 * c)})।`) });
       out.push({ id: 'double-angle-sign-by-quadrant', value: -right, say: s(
-        `cos²θ − sin²θ = ${n4(c * c)} − ${n4(sn * sn)} = ${n4(right)}: the sign comes from the squares, not from the quadrant.`,
-        `cos²θ − sin²θ = ${n4(c * c)} − ${n4(sn * sn)} = ${n4(right)}: चिह्न वर्गों से आता है, चतुर्थांश से नहीं।`) });
+        `cos²θ − sin²θ = ${n4(c * c)} − ${n4(sn * sn)}: the sign comes from the two squares, not from the quadrant.`,
+        `cos²θ − sin²θ = ${n4(c * c)} − ${n4(sn * sn)}: चिह्न दोनों वर्गों से आता है, चतुर्थांश से नहीं।`) });
       out.push({ id: 'double-angle-sum-of-squares', value: c * c + sn * sn, say: s(
-        `cos 2θ = cos²θ MINUS sin²θ (= ${n4(right)}); cos²θ + sin²θ is always 1.`,
-        `cos 2θ = cos²θ घटा sin²θ (= ${n4(right)}) है; cos²θ + sin²θ हमेशा 1 होता है।`) });
+        `cos 2θ = cos²θ MINUS sin²θ; cos²θ + sin²θ is always 1.`,
+        `cos 2θ = cos²θ घटा sin²θ है; cos²θ + sin²θ हमेशा 1 होता है।`) });
     }
     return out;
   }
@@ -661,8 +657,8 @@ const compoundSpecial = {
     const f = fn === 'sin' ? SIN : COS;
     return [
       { id: 'compound-sign-flipped', value: -right, say: s(
-        `${fn}(${A}° + ${B}°) = ${fn === 'sin' ? `sin ${A}° cos ${B}° + cos ${A}° sin ${B}°` : `cos ${A}° cos ${B}° − sin ${A}° sin ${B}°`} = ${n4(right)}: keep the formula's own signs.`,
-        `${fn}(${A}° + ${B}°) = ${fn === 'sin' ? `sin ${A}° cos ${B}° + cos ${A}° sin ${B}°` : `cos ${A}° cos ${B}° − sin ${A}° sin ${B}°`} = ${n4(right)}: सूत्र के अपने चिह्न रखें।`) },
+        `${fn}(${A}° + ${B}°) = ${fn === 'sin' ? `sin ${A}° cos ${B}° + cos ${A}° sin ${B}°` : `cos ${A}° cos ${B}° − sin ${A}° sin ${B}°`}: keep the formula's own signs.`,
+        `${fn}(${A}° + ${B}°) = ${fn === 'sin' ? `sin ${A}° cos ${B}° + cos ${A}° sin ${B}°` : `cos ${A}° cos ${B}° − sin ${A}° sin ${B}°`}: सूत्र के अपने चिह्न रखें।`) },
       { id: 'compound-distributed', value: f(A) + f(B), say: s(
         `${fn}(${A}° + ${B}°) is not ${fn} ${A}° + ${fn} ${B}°: expand with the compound-angle formula instead.`,
         `${fn}(${A}° + ${B}°) और ${fn} ${A}° + ${fn} ${B}° एक नहीं: संयुक्त-कोण सूत्र से फैलाएँ।`) }
@@ -702,25 +698,25 @@ const inverseTrig = {
       const wrong = terms.reduce((acc, t2, j) => acc + t2.sign * (j === i ? wrongBranch : principal(t2)), 0);
       out.push({ id: tm.fn === 'cos' ? 'inverse-trig-cos-range' : 'inverse-trig-odd-sign', value: conv(wrong), say: s(
         tm.fn === 'cos'
-          ? `cos⁻¹ only gives angles from 0 to π (0° to 180°), so cos⁻¹(${n4(tm.x)}) = ${n4(conv(principal(tm)))}, not ${n4(conv(wrongBranch))}.`
-          : `${tm.fn}⁻¹(${n4(tm.x)}) = −${tm.fn}⁻¹(${n4(Math.abs(tm.x))}) = ${n4(conv(principal(tm)))}: a negative input gives a negative principal value.`,
+          ? `cos⁻¹ only gives angles from 0 to π (0° to 180°), so cos⁻¹(${n4(tm.x)}) cannot be negative (not ${n4(conv(wrongBranch))}).`
+          : `${tm.fn}⁻¹(${n4(tm.x)}) = −${tm.fn}⁻¹(${n4(Math.abs(tm.x))}): a negative input gives a negative principal value, so the sign is not lost.`,
         tm.fn === 'cos'
-          ? `cos⁻¹ केवल 0 से π (0° से 180°) तक के कोण देता है, इसलिए cos⁻¹(${n4(tm.x)}) = ${n4(conv(principal(tm)))}, ${n4(conv(wrongBranch))} नहीं।`
-          : `${tm.fn}⁻¹(${n4(tm.x)}) = −${tm.fn}⁻¹(${n4(Math.abs(tm.x))}) = ${n4(conv(principal(tm)))}: ऋणात्मक इनपुट का मुख्य मान ऋणात्मक आता है।`) });
+          ? `cos⁻¹ केवल 0 से π (0° से 180°) तक के कोण देता है, इसलिए cos⁻¹(${n4(tm.x)}) ऋणात्मक नहीं हो सकता (${n4(conv(wrongBranch))} नहीं)।`
+          : `${tm.fn}⁻¹(${n4(tm.x)}) = −${tm.fn}⁻¹(${n4(Math.abs(tm.x))}): ऋणात्मक इनपुट का मुख्य मान ऋणात्मक आता है, चिह्न छूटना नहीं चाहिए।`) });
     });
     if (terms.length > 1) {
       const swapped = terms.reduce((acc, tm, i) => acc + (i === 0 ? tm.sign : (tm.sign === 1 ? -1 : 1)) * principal(tm), 0);
       out.push({ id: 'inverse-trig-operation-sign', value: conv(swapped), say: s(
-        `Evaluate each inverse to its principal value first, then combine them with the sign between them: ${n4(right)}.`,
-        `पहले हर प्रतिलोम का मुख्य मान निकालें, फिर बीच के चिह्न से जोड़ें: ${n4(right)}।`) });
+        `Evaluate each inverse to its principal value first, then combine them using the sign written between them: your ${n4(conv(swapped))} combined them the wrong way.`,
+        `पहले हर प्रतिलोम का मुख्य मान निकालें, फिर बीच में लिखे चिह्न से जोड़ें: आपका ${n4(conv(swapped))} उन्हें गलत तरह से जोड़ता है।`) });
     }
     out.push({ id: 'trig-units-swapped', value: unit === 'deg' ? total(terms) : deg(total(terms)), say: s(
       unit === 'deg'
-        ? `The answer is asked in DEGREES: ${n4(right)}°, not the radian value.`
-        : `The answer is asked in RADIANS: convert ${n4(deg(total(terms)))}° to ${n4(right)}, not the degree value.`,
+        ? `The answer is asked in DEGREES: your ${n4(total(terms))} is a radian value, so convert it.`
+        : `The answer is asked in RADIANS: your ${n4(deg(total(terms)))} is a degree value, so convert it.`,
       unit === 'deg'
-        ? `उत्तर डिग्री में माँगा गया है: ${n4(right)}°, रेडियन मान नहीं।`
-        : `उत्तर रेडियन में माँगा गया है: ${n4(deg(total(terms)))}° को ${n4(right)} में बदलें, डिग्री मान नहीं।`) });
+        ? `उत्तर डिग्री में माँगा गया है: आपका ${n4(total(terms))} रेडियन मान है, इसे बदलें।`
+        : `उत्तर रेडियन में माँगा गया है: आपका ${n4(deg(total(terms)))} डिग्री मान है, इसे बदलें।`) });
     return out;
   }
 };
@@ -739,8 +735,8 @@ const inverseNested = {
   },
   slips({ ang }) {
     return [{ id: 'inverse-trig-undo-without-range', value: ang, say: s(
-      `cos⁻¹(cos x) = x only when x is between 0 and π. ${n4(ang)} is outside that range, so first find the angle in [0, π] with the same cosine.`,
-      `cos⁻¹(cos x) = x केवल तब जब x, 0 और π के बीच हो। ${n4(ang)} इस सीमा के बाहर है, इसलिए पहले [0, π] में वही कोज्या वाला कोण खोजें।`) }];
+      `cos⁻¹(cos x) = x only when x is between 0 and π. Your ${n4(ang)} is outside that range, so first find the angle in [0, π] with the same cosine.`,
+      `cos⁻¹(cos x) = x केवल तब जब x, 0 और π के बीच हो। आपका ${n4(ang)} इस सीमा के बाहर है, इसलिए पहले [0, π] में वही कोज्या वाला कोण खोजें।`) }];
   }
 };
 
@@ -780,14 +776,14 @@ const trigGradient = {
     const yv = fn === 'sin' ? Math.sin(b * x0) : Math.cos(b * x0);
     return [
       { id: 'trig-calculus-no-chain', value: fn === 'sin' ? Math.cos(b * x0) : -Math.sin(b * x0), say: s(
-        `The chain rule brings out the inner derivative ${n4(b)}: y′ = ${fn === 'sin' ? '' : '−'}${n4(b)}${fn === 'sin' ? 'cos' : 'sin'}(${n4(b)}x), so the gradient is ${n4(d)}.`,
-        `शृंखला नियम से भीतरी अवकलज ${n4(b)} बाहर आता है: y′ = ${fn === 'sin' ? '' : '−'}${n4(b)}${fn === 'sin' ? 'cos' : 'sin'}(${n4(b)}x), इसलिए ढाल ${n4(d)} है।`) },
+        `The chain rule brings out the inner derivative ${n4(b)}: y′ = ${fn === 'sin' ? '' : '−'}${n4(b)}${fn === 'sin' ? 'cos' : 'sin'}(${n4(b)}x), then substitute x.`,
+        `शृंखला नियम से भीतरी अवकलज ${n4(b)} बाहर आता है: y′ = ${fn === 'sin' ? '' : '−'}${n4(b)}${fn === 'sin' ? 'cos' : 'sin'}(${n4(b)}x), फिर x रखें।`) },
       { id: 'trig-calculus-sign', value: -d, say: s(
-        `The derivative of ${fn} is ${fn === 'sin' ? 'cos (positive)' : '−sin (note the minus)'}, so the gradient is ${n4(d)}.`,
-        `${fn} का अवकलज ${fn === 'sin' ? 'cos (धनात्मक)' : '−sin (ऋण चिह्न पर ध्यान दें)'} है, इसलिए ढाल ${n4(d)} है।`) },
+        `The derivative of ${fn} is ${fn === 'sin' ? 'cos (positive)' : '−sin (note the minus)'}: check the sign of the derivative.`,
+        `${fn} का अवकलज ${fn === 'sin' ? 'cos (धनात्मक)' : '−sin (ऋण चिह्न पर ध्यान दें)'} है: अवकलज का चिह्न जाँचें।`) },
       { id: 'trig-calculus-value-not-gradient', value: yv, say: s(
-        `${n4(yv)} is the height y of the curve at that x. The gradient comes from the derivative y′ evaluated there: ${n4(d)}.`,
-        `${n4(yv)} उस x पर वक्र की ऊँचाई y है। ढाल वहाँ मूल्यांकित अवकलज y′ से आता है: ${n4(d)}।`) }
+        `${n4(yv)} is the height y of the curve at that x. The gradient comes from the derivative y′ evaluated there.`,
+        `${n4(yv)} उस x पर वक्र की ऊँचाई y है। ढाल वहाँ मूल्यांकित अवकलज y′ से आता है।`) }
     ];
   }
 };
@@ -804,22 +800,22 @@ const trigStationary = {
   slips({ kind, b }) {
     if (kind === 'first') return [
       { id: 'trig-calculus-no-chain', value: Math.PI / 2, say: s(
-        `The stationary points are where the derivative ${n4(b)}·cos(${n4(b)}x) = 0, so ${n4(b)}x = π/2, not x = π/2: x = π/${n4(2 * b)}.`,
-        `स्थिर बिंदु वहाँ हैं जहाँ अवकलज ${n4(b)}·cos(${n4(b)}x) = 0, इसलिए ${n4(b)}x = π/2, x = π/2 नहीं: x = π/${n4(2 * b)}।`) },
+        `The stationary points are where the derivative ${n4(b)}·cos(${n4(b)}x) = 0, so ${n4(b)}x = π/2, not x = π/2.`,
+        `स्थिर बिंदु वहाँ हैं जहाँ अवकलज ${n4(b)}·cos(${n4(b)}x) = 0, इसलिए ${n4(b)}x = π/2, x = π/2 नहीं।`) },
       { id: 'trig-calculus-zero-not-stationary', value: Math.PI / b, say: s(
         `${n4(Math.PI / b)} is where y = 0, not where the gradient is 0: set ${n4(b)}cos(${n4(b)}x) = 0, giving ${n4(b)}x = π/2.`,
         `${n4(Math.PI / b)} वह है जहाँ y = 0, जहाँ ढाल 0 हो वह नहीं: ${n4(b)}cos(${n4(b)}x) = 0 रखें, ${n4(b)}x = π/2 मिलता है।`) }
     ];
     return [
       { id: 'trig-calculus-count-endpoints', value: 2 * b + 1, say: s(
-        `cos(${n4(b)}x) = 0 has no solution at x = 0 or x = 2π (cos 0 = 1), so the endpoints are not stationary: ${n4(2 * b)} stationary points.`,
-        `cos(${n4(b)}x) = 0 का x = 0 या x = 2π पर कोई हल नहीं (cos 0 = 1), इसलिए सिरे स्थिर बिंदु नहीं हैं: ${n4(2 * b)} स्थिर बिंदु।`) },
+        `cos(${n4(b)}x) = 0 has no solution at x = 0 or x = 2π (cos 0 = 1), so the endpoints are not stationary points.`,
+        `cos(${n4(b)}x) = 0 का x = 0 या x = 2π पर कोई हल नहीं (cos 0 = 1), इसलिए सिरे स्थिर बिंदु नहीं हैं।`) },
       { id: 'trig-calculus-no-chain', value: 2, say: s(
-        `The inner ${n4(b)}x matters: over 0 to 2π the angle ${n4(b)}x sweeps ${n4(b)} full turns, with 2 stationary points per turn: ${n4(2 * b)}.`,
-        `भीतरी ${n4(b)}x मायने रखता है: 0 से 2π में कोण ${n4(b)}x ${n4(b)} पूरे चक्र घूमता है, हर चक्र में 2 स्थिर बिंदु: ${n4(2 * b)}।`) },
+        `The inner ${n4(b)}x matters: over 0 to 2π the angle ${n4(b)}x sweeps ${n4(b)} full turns, with 2 stationary points in each turn.`,
+        `भीतरी ${n4(b)}x मायने रखता है: 0 से 2π में कोण ${n4(b)}x ${n4(b)} पूरे चक्र घूमता है, हर चक्र में 2 स्थिर बिंदु।`) },
       { id: 'trig-calculus-one-per-turn', value: b, say: s(
-        `Each full turn of ${n4(b)}x has a maximum AND a minimum, so 2 stationary points per turn: ${n4(2 * b)}.`,
-        `${n4(b)}x के हर पूरे चक्र में एक अधिकतम और एक न्यूनतम होता है, यानी हर चक्र में 2 स्थिर बिंदु: ${n4(2 * b)}।`) }
+        `Each full turn of ${n4(b)}x has a maximum AND a minimum, so 2 stationary points per turn.`,
+        `${n4(b)}x के हर पूरे चक्र में एक अधिकतम और एक न्यूनतम होता है, यानी हर चक्र में 2 स्थिर बिंदु।`) }
     ];
   }
 };
@@ -831,3 +827,94 @@ export const entries = Object.freeze([
   compoundFraction, compoundExpression, doubleAngle, compoundSpecial, inverseTrig, inverseNested, inverseOfRatio, trigGradient, trigStationary
 ]);
 export default entries;
+
+// ── Registration (topics/registry.js): one slip per code, each asking the one catalogue ──
+import { registerTopic } from './registry.js';
+import { diagnoseWith, sayIn } from '../slipKit.js';
+
+/** Every slip id this catalogue can name; the registry code is the id, prefixed `trig-` unless it already is. */
+export const SLIP_IDS = Object.freeze([
+  'area-cos-for-sin',
+  'area-half-forgotten',
+  'area-right-angle-formula',
+  'compound-angle-sign',
+  'compound-distributed',
+  'compound-formula-mixed',
+  'compound-sign-flipped',
+  'cosine-rule-factor-two',
+  'cosine-rule-no-root',
+  'cosine-rule-order',
+  'cosine-rule-plus',
+  'cosine-rule-pythagoras',
+  'double-angle-doubled-ratio',
+  'double-angle-sign-by-quadrant',
+  'double-angle-sum-of-squares',
+  'identity-forgot-one',
+  'identity-sum-of-coefficients',
+  'inverse-trig-cos-range',
+  'inverse-trig-odd-sign',
+  'inverse-trig-operation-sign',
+  'inverse-trig-ratio-as-given',
+  'inverse-trig-undo-without-range',
+  'pythag-added-sides',
+  'pythag-leg-as-hyp',
+  'pythag-no-root',
+  'pythag-subtracted-sides',
+  'sine-rule-cosine',
+  'sine-rule-inverted',
+  'sine-rule-no-inverse',
+  'sine-rule-obtuse-angle',
+  'trig-bearing-from-east',
+  'trig-bearing-from-east-axis',
+  'trig-calculator-degrees',
+  'trig-calculator-radians',
+  'trig-calculus-count-endpoints',
+  'trig-calculus-no-chain',
+  'trig-calculus-one-per-turn',
+  'trig-calculus-sign',
+  'trig-calculus-value-not-gradient',
+  'trig-calculus-zero-not-stationary',
+  'trig-complement-angle',
+  'trig-count-one-solution',
+  'trig-count-two-solutions',
+  'trig-count-zero',
+  'trig-exact-value-ratio-as-one',
+  'trig-exact-value-swapped',
+  'trig-other-solution',
+  'trig-ratio-flipped-angle',
+  'trig-ratio-ignored',
+  'trig-ratio-inverted',
+  'trig-reference-angle-only',
+  'trig-sign-by-quadrant',
+  'trig-units-swapped',
+  'trig-wrong-quadrant',
+  'trig-wrong-ratio',
+  'wave-forgot-shift',
+  'wave-half-period',
+  'wave-period-denominator',
+  'wave-period-from-b',
+  'wave-shift-only',
+  'wave-sine-as-one',
+  'wave-wrong-extreme'
+]);
+export const registryCode = id => (/^trig-/.test(id) ? id : `trig-${id}`);
+const asked = new WeakMap();
+const hitFor = ctx => {
+  if (asked.has(ctx)) return asked.get(ctx);
+  const q = ctx?.meta?.question;
+  const hit = q && ctx.meta.kind === 'answer' ? diagnoseWith(entries, q, ctx.meta.value) : null;
+  asked.set(ctx, hit);
+  return hit;
+};
+registerTopic({
+  topic: 'trigonometry',
+  appliesTo: meta => meta?.kind === 'answer' && !!meta.question && typeof meta.question.prompt === 'string',
+  slips: SLIP_IDS.map(id => ({
+    code: registryCode(id),
+    detect: ctx => {
+      const hit = hitFor(ctx);
+      if (!hit || hit.id !== id) return null;
+      return { message: sayIn(hit.say, 'en'), messages: { hi: sayIn(hit.say, 'hi'), 'en-AU': sayIn(hit.say, 'en-AU') }, notesSectionId: null };
+    }
+  }))
+});

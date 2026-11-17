@@ -35,6 +35,7 @@ const shapeOf = p => String(p).replace(/\$[^$]*\$/g, '$').replace(/[-\d.]+/g, '#
 const rows = [];
 let totalTraps = 0, totalNamed = 0;
 const missed = new Map();
+const leaks = new Map();
 
 for (const [group, topics, entries] of [['trigonometry', TRIG, trig], ['functions', FUNC, functions]]) {
   for (const topic of topics) {
@@ -59,6 +60,15 @@ for (const [group, topics, entries] of [['trigonometry', TRIG, trig], ['function
               ok(!/undefined|NaN|\[object/.test(sentence), `${topic}/${hit.id}/${lang}: bad interpolation: ${sentence}`);
             }
             ok(/[ऀ-ॿ]/.test(sayIn(hit.say, 'hi')), `${topic}/${hit.id}: the hi sentence has no Devanagari`);
+            // D · never reveals the final answer: the right value does not appear as a number in the sentence.
+            if (Number.isFinite(right) && !/^-?[01]$/.test(String(Number(right.toPrecision(4)))) && !(String(q.prompt).match(/\d+(?:\.\d+)?/g) || []).includes(String(Math.abs(Number(right.toPrecision(4)))))) {
+              const token = String(Number(right.toPrecision(4)));
+              for (const lang of ['en', 'hi']) {
+                const text = sayIn(hit.say, lang).replace(/[−–]/g, '-');
+                const esc = token.replace(/[.\-+]/g, m => '\\' + m);
+                if (new RegExp(`(^|[^\\d.${token.startsWith('-') ? '' : '-'}])${esc}($|[^\\d.])`).test(text) && Math.abs(Number(hit.value) - right) > 1e-9) { leaks.set(`${topic}/${hit.id}`, (leaks.get(`${topic}/${hit.id}`) || 0) + 1); if (process.argv.includes('--leaks')) console.log(`LEAK right=${right}: ${text}`); }
+              }
+            }
           } else {
             const k = `${topic} | ${shapeOf(q.prompt)} | ${String(t.why || '').slice(0, 60)}`;
             missed.set(k, (missed.get(k) || 0) + 1);
@@ -75,6 +85,7 @@ for (const r of rows) console.log(`${r.group.padEnd(13)} ${r.topic.padEnd(22)} $
 const pct = totalTraps ? (100 * totalNamed) / totalTraps : 100;
 console.log(`TOTAL ${totalNamed}/${totalTraps} designed wrong answers named with a specific sentence (${pct.toFixed(1)}%)`);
 if (process.argv.includes('--missed')) for (const [k, n] of [...missed].sort((a, b) => b[1] - a[1]).slice(0, 60)) console.log(`  missed ×${n}: ${k}`);
+for (const [k, n] of leaks) fail(`the sentence for ${k} states the right answer (${n} time(s))`);
 ok(pct >= 80, `only ${pct.toFixed(1)}% of designed wrong answers are named (need ≥ 80%)`);
 if (failures.length) { console.error(`SMART TRIG + FUNCTIONS: FAIL — ${failures.length} problem(s)\n  ${failures.join('\n  ')}`); process.exit(1); }
 console.log(`SMART TRIG + FUNCTIONS: PASS — ${checks} checks — ${pct.toFixed(1)}% of designed wrong answers named, none on a right answer. [SYNTHETIC]`);
