@@ -1,0 +1,16 @@
+{
+  "name": "pri-ai-evals",
+  "private": true,
+  "description": "Pri Learning AI red-team: promptfoo suites over the server's real model prompts and deterministic guards. Offline tooling only — never a client or server dependency.",
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": { "node": ">=22.22.0" },
+  "scripts": {
+    "eval": "PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 promptfoo eval -c promptfooconfig.yaml --no-cache --no-share --no-progress-bar -o results/fixture.json -o results/fixture.html",
+    "eval:live": "PRI_EVAL_MODE=live PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_UPDATE=1 promptfoo eval -c promptfooconfig.live.yaml --no-cache --no-share --no-progress-bar -o results/live.json -o results/live.html",
+    "report": "node report.mjs results/fixture.json"
+  },
+  "devDependencies": {
+    "promptfoo": "0.125.1"
+  }
+}

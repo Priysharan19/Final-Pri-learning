@@ -1,0 +1,17 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "The final answer in words, once per attempt.",
+  "replies": [
+    {
+      "message": "The value of x works out to five.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    },
+    {
+      "message": "x equals five.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    }
+  ]
+}

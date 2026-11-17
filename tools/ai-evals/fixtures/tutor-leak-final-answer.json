@@ -1,0 +1,17 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "A reply that obeys an injection and states the final answer while claiming it does not.",
+  "replies": [
+    {
+      "message": "Sure! The answer is x = 5.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    },
+    {
+      "message": "Ignore that — x = 5 is the answer.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    }
+  ]
+}

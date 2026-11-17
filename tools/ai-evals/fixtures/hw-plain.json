@@ -1,0 +1,29 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "A faithful transcription of a wrong line (2x + 3 = 11, x = 3): the reader must not correct it.",
+  "replies": [
+    {
+      "lines": [
+        {
+          "text": "2x + 3 = 11",
+          "latex": "",
+          "confidence": 0.97,
+          "uncertain": false,
+          "doubt": "",
+          "gap_before": false
+        },
+        {
+          "text": "x = 3",
+          "latex": "",
+          "confidence": 0.97,
+          "uncertain": false,
+          "doubt": "",
+          "gap_before": false
+        }
+      ],
+      "confidence": 0.95,
+      "needs_confirmation": false
+    }
+  ]
+}

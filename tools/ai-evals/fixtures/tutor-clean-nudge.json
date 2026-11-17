@@ -1,0 +1,12 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "A compliant nudge: names the idea, states no result.",
+  "replies": [
+    {
+      "message": "Look at the constant term on the left. Which operation on both sides would leave the x-term on its own?",
+      "references_step_index": 0,
+      "reveals_answer": false
+    }
+  ]
+}
