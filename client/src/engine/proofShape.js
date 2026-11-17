@@ -22,7 +22,7 @@
 //     side meet at the same written expression.
 //
 // Used by checker.js for items with `stepMeta.sides` only (identityProofs.js).
-import { parse } from './expr.js';
+import { parse, evaluate } from './expr.js';
 
 export const SIDE_LABEL = /^\s*(l|r)\.?\s*h\.?\s*s\.?\s*$/i;
 
@@ -88,6 +88,51 @@ export function canonicalKey(n) {
   }
 }
 
+// ── Algebra alone ────────────────────────────────────────────────────────────
+// Two expressions agree "by algebra alone" when they agree with every function
+// call (sin θ, sec θ, ln x) treated as an unrelated unknown. A line that agrees
+// with a side by algebra alone — 1·tan³θ, tan³θ + 0, 2·LHS/2, tan²θ·tan θ —
+// used no identity at all, so it is not working towards the other side.
+function atomize(n, table) {
+  if (!n || typeof n !== 'object') return n;
+  if (n.t === 'call' && !Array.isArray(n.args)) {
+    const key = `${n.fn === 'csc' ? 'cosec' : n.fn}(${canonicalKey(n.arg)})`;
+    if (!table.has(key)) table.set(key, `_u${table.size}`);
+    return { t: 'var', v: table.get(key) };
+  }
+  if (n.t === 'bin') return bin(n.op, atomize(n.l, table), atomize(n.r, table));
+  if (n.t === 'neg' || n.t === 'fact' || n.t === 'group') return { t: n.t, v: atomize(n.v, table) };
+  return n;
+}
+function namesOf(n, acc = new Set()) {
+  if (!n || typeof n !== 'object') return acc;
+  if ((n.t === 'var' || n.t === 'const') && n.v !== 'pi' && n.v !== 'e') acc.add(n.v);
+  for (const k of ['l', 'r', 'arg']) if (n[k]) namesOf(n[k], acc);
+  if (n.v && typeof n.v === 'object') namesOf(n.v, acc);
+  return acc;
+}
+const SAMPLES = [0.613, 1.377, 0.851, 1.729, 0.437, 1.163, 0.967, 1.541];
+/** Do two expression texts agree with every function call an independent unknown? */
+export function sameByAlgebra(aText, bText) {
+  let a, b;
+  try { a = strip(parse(String(aText))); b = strip(parse(String(bText))); } catch { return false; }
+  if (!a || !b || a.t === 'equation' || b.t === 'equation') return false;
+  const table = new Map();
+  const A = atomize(a, table), B = atomize(b, table);
+  const names = [...new Set([...namesOf(A), ...namesOf(B)])];
+  let compared = 0;
+  for (let i = 0; i < 6; i += 1) {
+    const env = {};
+    names.forEach((n, j) => { env[n] = SAMPLES[(i * 3 + j * 5) % SAMPLES.length] + 0.0137 * j; });
+    let va, vb;
+    try { va = evaluate(A, env); vb = evaluate(B, env); } catch { return false; }
+    if (!Number.isFinite(va) || !Number.isFinite(vb)) continue;
+    compared += 1;
+    if (Math.abs(va - vb) > 1e-9 * Math.max(1, Math.abs(va), Math.abs(vb))) return false;
+  }
+  return compared >= 4;
+}
+
 /** The written-form key of an expression's text, or null when it is not one expression. */
 export function writtenKey(text) {
   const src = String(text ?? '').replace(/[−–—]/g, '-').trim();
@@ -111,7 +156,7 @@ function partsOf(text) {
     const m = SIDE_LABEL.exec(p);
     if (m) return { label: m[1].toLowerCase() === 'l' ? 'lhs' : 'rhs' };
     const key = writtenKey(p);
-    return key ? { key } : null;
+    return key ? { key, text: p } : null;
   });
   return parts.some(p => !p) ? null : { continues, parts };
 }
@@ -147,6 +192,7 @@ export function proofVerdict(lines, sides) {
   if (!lhs || !rhs) return { ok: false, reason: 'unread' };
   const resolve = p => (p.label ? (p.label === 'lhs' ? lhs : rhs) : p.key);
   const chains = [];
+  const written = [];
   let chain = null;
   for (const text of lines) {
     const read = partsOf(text);
@@ -166,10 +212,14 @@ export function proofVerdict(lines, sides) {
         continue;
       }
       chain.keys.push(resolve(p));
+      if (p.text) written.push(p);
     }
   }
   const sideOf = k => (k === lhs ? 'lhs' : k === rhs ? 'rhs' : null);
-  const between = new Set(chains.flatMap(c => c.keys).filter(k => k !== lhs && k !== rhs));
+  // Working: an expression between the sides that is not one of them rewritten
+  // by algebra alone (1·tan³θ, tan³θ + 0, 2·LHS/2 are not working).
+  const between = new Set(written.filter(p => p.key !== lhs && p.key !== rhs
+    && !sameByAlgebra(p.text, sides.lhs) && !sameByAlgebra(p.text, sides.rhs)).map(p => p.key));
   if (!chains.length || !chains.every(c => sideOf(c.start))) return { ok: false, reason: 'start' };
   if (between.size === 0) return { ok: false, reason: 'no-steps' };
   const end = c => c.keys[c.keys.length - 1];

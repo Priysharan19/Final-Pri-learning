@@ -302,6 +302,14 @@ ok('the screenshot identity is a CBSE proof', identityProofCatalogue('cbse').som
   deny('the LHS then the RHS (a jump)', [L, 'tan(θ)^3']);
   deny('the LHS written twice, then the RHS', [L, L, 'tan(θ)^3']);
   deny('"LHS = RHS" alone', ['LHS = RHS']);
+  // 2b · a jump dressed with one line that only rewrites a side by algebra (re-review finding 1)
+  deny('1·RHS between', [L, '1*tan(θ)^3', 'tan(θ)^3']);
+  deny('RHS + 0 between', [L, 'tan(θ)^3 + 0', 'tan(θ)^3']);
+  deny('2·LHS/2 between', [L, `2*(${L})/2`, 'tan(θ)^3']);
+  deny('1·LHS between', [L, `1*(${L})`, 'tan(θ)^3']);
+  deny('RHS + sin θ − sin θ between', [L, 'tan(θ)^3 + sin(θ) - sin(θ)', 'tan(θ)^3']);
+  deny('"= 1·RHS = RHS" on one line', [L, '= 1*tan(θ)^3 = tan(θ)^3']);
+  deny('tan²θ·tan θ between', [L, 'tan(θ)^2*tan(θ)', 'tan(θ)^3']);
   // 3 · circular: the identity asserted, then "worked" towards
   deny('the identity asserted at the top, then the RHS', [`${L} = tan(θ)^3`, 'tan(θ)^3']);
   deny('"LHS = RHS" at the top, then RHS', ['LHS = RHS', 'tan(θ)^3', '= RHS']);
