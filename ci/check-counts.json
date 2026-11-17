@@ -347,7 +347,7 @@
       "job": "platform-contracts",
       "log": "classroom.log",
       "pins": [
-        {"has":"classroom-check (sqlite): 108 checks passed"}
+        {"has":"classroom-check (sqlite): 120 checks passed"}
       ]
     },
     "platform/edition-agreement.log": {
@@ -361,7 +361,7 @@
       "job": "platform-contracts",
       "log": "region-isolation.log",
       "pins": [
-        {"has":"REGION ISOLATION (H2): PASS — 489 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables."}
+        {"has":"REGION ISOLATION (H2): PASS — 489 checks (sqlite)","note":"423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables. 467 → 489 (teacher workspace, re-derived by running): the check walks the route inventory, which now lists the eight /v1/classroom routes."}
       ]
     },
     "platform/practice-http.log": {

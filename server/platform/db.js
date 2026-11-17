@@ -701,6 +701,7 @@ export function createPlatformDb(path = DEFAULT_PATH) {
     marks INTEGER NOT NULL CHECK((decision = 'decline' AND marks = 0) OR (decision = 'award' AND marks >= 1)),
     comment TEXT CHECK(comment IS NULL OR length(comment) <= 1000),
     engine_awarded INTEGER NOT NULL CHECK(engine_awarded >= 0),
+    ink_digest TEXT CHECK(ink_digest IS NULL OR length(ink_digest) = 64),
     supersedes TEXT UNIQUE REFERENCES teacher_marks(id) ON DELETE CASCADE,
     created_at INTEGER NOT NULL
   );`);

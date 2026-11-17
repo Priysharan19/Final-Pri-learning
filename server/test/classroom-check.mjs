@@ -146,6 +146,17 @@ const p1 = await sit(S1);
 c.ok(p1.judged >= 1, `S1 has at least one wrong written answer worth 2+ marks (${p1.judged})`);
 const p3 = await sit(S3);
 
+// One answer was handwritten: its page was read and resolved, and the server
+// froze the page's SHA-256 with the paper (exams.js handwriting.pages).
+const INK = 'ab'.repeat(32);
+const inkKey = p1.result.detail.find(d => !d.parts && !d.correct && d.working)?.id;
+{
+  const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-result' AND key=?", [S1.id, p1.id]);
+  const r = JSON.parse(row.response_json);
+  r.handwriting = { pages: { [inkKey]: { key: inkKey, questionId: inkKey, digest: INK, state: 'resolved' } } };
+  await db.run("UPDATE idempotency_keys SET response_json=? WHERE account_id=? AND scope='exam-result' AND key=?", [JSON.stringify(r), S1.id, p1.id]);
+}
+
 // Snapshot everything the engine wrote, to prove it never changes.
 const engineState = async who => ({
   result: (await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-result'", [who.id]))?.response_json,
@@ -166,7 +177,30 @@ const hi = await handin(S1, C1, A1, p1.id);
 c.eq(hi.status, 201, 'S1 hands in the paper');
 c.ok(hi.data.handin.reviewItems >= 1, `review items are created for the teacher (${hi.data.handin.reviewItems})`);
 c.eq((await handin(S1, C1, A1, p1.id)).status, 409, 'a paper is handed in once');
+// The same paper cannot be handed in to a second assignment (409, not a 500).
+const asg2 = await req(T1, `/v1/classes/${C1}/assignments`, { method: 'POST', body: { title: 'Same paper again', specification: { kind: 'paper', paper: PAPER } } });
+const again = await handin(S1, C1, asg2.data.assignment.id, p1.id);
+c.deq([again.status, again.data?.error?.code], [409, 'HANDIN_EXAM_USED'], 'one paper is handed in to one assignment');
+// A paper assignment is submitted only by hand-in, and its template is frozen once handed in.
+c.deq((await req(S1, `/v1/classes/${C1}/assignments/${A1}/submission`, { method: 'PATCH', body: { state: 'submitted', summary: { questionsAnswered: 10, correct: 10 } } })).data?.error?.code, 'ASSIGNMENT_IS_A_PAPER', 'a device summary cannot submit a paper');
+c.deq((await req(T1, `/v1/classes/${C1}/assignments/${A1}`, { method: 'PATCH', body: { specification: { kind: 'paper', paper: { kind: 'practice-paper', year: 8, minutes: 30 } } } })).data?.error?.code, 'ASSIGNMENT_HANDED_IN', 'a handed-in paper cannot be retargeted');
 c.eq((await db.get('SELECT state FROM assignment_submissions WHERE assignment_id=? AND student_account_id=?', [A1, S1.id])).state, 'submitted', 'the submission is submitted');
+
+// Handwriting that can still be read blocks hand-in; a page past its window does not.
+{
+  const asgC2 = await req(T2, `/v1/classes/${C2}/assignments`, { method: 'POST', body: { title: 'Paper', specification: { kind: 'paper', paper: PAPER } } });
+  const S4 = await person('s4.class@example.test', 'Dev', 'student');
+  await req(S4, '/v1/classes/join', { method: 'POST', body: { code: c2.data.joinCode } });
+  const p4 = await sit(S4);
+  const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-result' AND key=?", [S4.id, p4.id]);
+  const r = JSON.parse(row.response_json);
+  const setPages = async (handwriting) => db.run("UPDATE idempotency_keys SET response_json=? WHERE account_id=? AND scope='exam-result' AND key=?", [JSON.stringify({ ...r, handwriting }), S4.id, p4.id]);
+  const page = { key: 'k', digest: 'cd'.repeat(32), state: 'needs-review', reason: 'uncertain', attempts: 1, autoUsed: true, nextAttemptAt: 0 };
+  await setPages({ windowEndsAt: Date.now() + 86400000, pages: { k: page } });
+  c.deq((await handin(S4, C2, asgC2.data.assignment.id, p4.id)).data?.error?.code, 'HANDIN_HANDWRITING_PENDING', 'a page that can still be read (tries left, in its window) is refused');
+  await setPages({ windowEndsAt: Date.now() - 1000, pages: { k: { ...page, state: 'awaiting-reading' } } });
+  c.eq((await handin(S4, C2, asgC2.data.assignment.id, p4.id)).status, 201, 'a page whose reading window has closed is final: the paper may be handed in');
+}
 
 // ── Private data a teacher must never see ────────────────────────────────────
 await db.run('INSERT INTO sync_entities(account_id,kind,entity_id,version,server_cursor,body_json,tombstone,updated_at) VALUES (?,?,?,?,?,?,?,?)',
@@ -182,7 +216,10 @@ const t = async (who, path, opts) => { const r = await req(who, path, opts); tea
 const queue = await t(T1, `/v1/classroom/classes/${C1}/review`);
 c.eq(queue.status, 200, 'T1 reads the review queue');
 c.ok(queue.data.items.length >= 1 && queue.data.items.every(i => i.student.id === S1.id), 'every item is S1\'s');
-const item = queue.data.items[0];
+const inked = queue.data.items.filter(i => i.question.key === inkKey);
+c.ok(inked.length >= 1 && inked.every(i => i.evidence.inputMode === 'ink' && i.evidence.ink?.digest === INK), 'a handwritten answer carries the digest of the original page the teacher judges');
+c.ok(queue.data.items.filter(i => i.question.key !== inkKey).every(i => i.evidence.inputMode === 'typed' && i.evidence.ink === null), 'typed answers carry no ink');
+const item = inked[0] || queue.data.items[0];
 c.ok(item.evidence.reading.length >= 2 && item.evidence.lineStatuses.length === item.evidence.reading.length, 'the teacher sees the working as read and a verdict per line');
 c.ok(item.evidence.lineStatuses.every(s => REVIEW_LINE_STATUSES.includes(s)), 'line verdicts are the closed set');
 c.ok(item.engineAwarded + item.available < item.marksPossible, 'the cap never reaches full marks for a wrong answer');
@@ -196,7 +233,7 @@ c.eq((await req(S1, `/v1/classroom/classes/${C1}/review/${item.id}`, { method: '
 c.eq((await req(T2, `/v1/classroom/classes/${C1}/assignments/${A1}/results`)).status, 404, 'another teacher cannot read results');
 c.eq((await req(T2, `/v1/classroom/classes/${C1}/assignments/${A1}/results.csv`)).status, 404, 'nor export them');
 const t2queue = await req(T2, `/v1/classroom/classes/${C2}/review`);
-c.deq(t2queue.data.items, [], 'T2\'s own queue holds nothing of T1\'s class');
+c.ok(t2queue.data.items.every(i => i.student.id !== S1.id && i.student.id !== S2.id) && t2queue.data.items.every(i => !queue.data.items.some(x => x.id === i.id)), 'T2\'s own queue holds nothing of T1\'s class');
 
 // ── Teacher marks: the audit trail ───────────────────────────────────────────
 const post = body => t(T1, `/v1/classroom/classes/${C1}/review/${item.id}`, { method: 'POST', body });
@@ -215,6 +252,7 @@ const rows = await db.all('SELECT * FROM teacher_marks WHERE review_item_id=? OR
 c.deq(rows.map(r => [r.teacher_account_id, r.criterion, r.decision, Number(r.engine_awarded)]), [[T1.id, item.criterion, 'award', item.engineAwarded], [T1.id, item.criterion, 'decline', item.engineAwarded]],
   'each row records who, which criterion and the engine mark at the time');
 c.ok(rows.every(r => Number(r.created_at) > 0), 'and when');
+c.ok(rows.every(r => r.ink_digest === INK) && first.data.mark.inkDigest === INK, 'and which ink version the teacher reviewed');
 const audits = await db.all("SELECT action,metadata_json FROM audit_log WHERE target_id=? AND action LIKE 'teacher-mark.%' ORDER BY id", [item.id]);
 c.deq(audits.map(a => [a.action, JSON.parse(a.metadata_json).criterion]), [['teacher-mark.award', item.criterion], ['teacher-mark.decline', item.criterion]], 'every decision is in the audit log');
 let refused = false;
@@ -224,7 +262,8 @@ const third = await post({ decision: 'award', marks: 1 });
 c.eq(third.status, 201, 'and awarded again');
 // The other criterion on the same question shares the cap.
 const sibling = queue.data.items.find(i => i.question.key === item.question.key && i.id !== item.id);
-if (sibling) {
+c.ok(!!sibling, 'the sound line before the break and the line after it give both criteria on one question');
+{
   const rest = item.available - 1;
   const over = await t(T1, `/v1/classroom/classes/${C1}/review/${sibling.id}`, { method: 'POST', body: { decision: 'award', marks: rest + 1 } });
   c.eq(over.status, rest + 1 > sibling.available ? 400 : 409, 'the two criteria of one question share one cap');
