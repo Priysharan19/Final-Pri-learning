@@ -7,7 +7,7 @@ Complete one form per examiner. Return the signed original as the README says; t
 ```text
 Jurisdiction:                    nsw-hsc
 Syllabus version(s):             nsw-mathematics-advanced-11-12-2024@2024, nsw-mathematics-extension1-11-12-2024@2024, nsw-mathematics-extension2-11-12-2024@2024, nsw-mathematics-k-10-2022@2022, nsw-mathematics-standard-11-12-2024@2024
-Dossier digest reviewed:         17fdb5d1e995148c46af5d5ab2deb8d8add857f7566c4f6c34756fe4f2c9c5f8
+Dossier digest reviewed:         f590bfe4e83ada2f76a0bcafbd8234a524a39273dfe30fe1915d96cfb8b659a4
 Repository commit reviewed:      ________________________________________
 Examiner full name:              ________________________________________
 Qualification:                   ________________________________________
@@ -425,16 +425,19 @@ Verdict per item: **A** approved as the engine behaves · **C** approved with ch
 | 402 | `nsw-method:y7-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
 | 403 | `nsw-method:y7-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
 | 404 | `nsw-method:y7-equations/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 405 | `nsw-method:y7-angles/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 406 | `nsw-method:y8-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 407 | `nsw-method:y8-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 408 | `nsw-method:y10-quadratics/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 409 | `nsw-method:y10-quadratics/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 410 | `nsw-method:y11-explog/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
-| 411 | `nsw-method:y11-diff/D1` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
-| 412 | `nsw-method:y11-diff/D2` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
-| 413 | `nsw-method:y11-diff/D3` | Method rubric (plan) — may partial marks ever be paid? |  |  |
-| 414 | `nsw-method:y11-diff/D4` | Method rubric (plan) — may partial marks ever be paid? |  |  |
-| 415 | `nsw-method:ms11-formulas/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 405 | `nsw-method:y7-angles/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 406 | `nsw-method:y7-angles/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 407 | `nsw-method:y7-angles/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 408 | `nsw-method:y7-angles/D4` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 409 | `nsw-method:y8-equations/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 410 | `nsw-method:y8-equations/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 411 | `nsw-method:y10-quadratics/D1` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 412 | `nsw-method:y10-quadratics/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 413 | `nsw-method:y11-explog/D3` | Method rubric (equation) — may partial marks ever be paid? |  |  |
+| 414 | `nsw-method:y11-diff/D1` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
+| 415 | `nsw-method:y11-diff/D2` | Method rubric (derivative) — may partial marks ever be paid? |  |  |
+| 416 | `nsw-method:y11-diff/D3` | Method rubric (plan) — may partial marks ever be paid? |  |  |
+| 417 | `nsw-method:y11-diff/D4` | Method rubric (plan) — may partial marks ever be paid? |  |  |
+| 418 | `nsw-method:ms11-formulas/D2` | Method rubric (equation) — may partial marks ever be paid? |  |  |
 
-Items: 415.
+Items: 418.
