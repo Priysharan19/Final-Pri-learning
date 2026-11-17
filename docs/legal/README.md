@@ -229,3 +229,7 @@ Engineering cannot complete any line below. The gate that consumes them is
 | 6 | Confirm the notice matches the code's data path at the release SHA | Reconciled by engineering 2 Nov 2026 against `a5778a319`; counsel's confirmation open | `docs/release/app-store-privacy-labels.md` §6, `play-data-safety.md` §6b |
 | 7 | Set the publication date of the filled version | 19 Oct 2026; revised 2 Nov 2026 | `**Last updated**` in all eight documents |
 | 8 | Name processors in the notice if counsel requires it | Named now: Resend, Railway, Supabase (planned), OpenAI, Apple and Google | `privacy.md` "Who else sees your data" |
+
+## Owner summary and sign-off (Prithagoras)
+
+`docs/legal/au/SUMMARY-FOR-OWNER.md` is a one-page plain-English summary of the Australian notices and the five points most worth a lawyer's look. `docs/legal/au/review-status.json` has an `ownerSignoff` block for the owner's own approval ("business owner, not a lawyer"). It is not a lawyer's review and never clears the "not yet reviewed by a lawyer" banner; only `reviewed` does.

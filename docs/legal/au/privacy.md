@@ -71,8 +71,8 @@ device can open a profile that has no password.
 ## What we collect if you create a cloud account
 
 - **Your email address**, to sign you in and to send verification and password
-  reset links and one-time sign-in codes. We do not offer sign-in by SMS; if we
-  ever do, this notice will describe it first.
+  reset links and one-time sign-in codes. The app does not use SMS for sign-in; if
+  that changes, this notice will describe it first.
 - **Your name**, as you typed it.
 - **Your answers, for marking**: the question our server issued, the answer and
   working you submit, and the mark the server decided; your exam papers and
@@ -190,12 +190,11 @@ this notice, particularly the section on what a cloud account collects. Answers
 cannot be checked without an account; without one, nothing about your learning
 leaves the device.
 
-**The OAIC's Children's Online Privacy Code.** The Privacy and Other Legislation
-Amendment Act 2024 requires the Office of the Australian Information
-Commissioner (OAIC) to develop a Children's Online Privacy Code. At the date of
-this notice we have not treated that Code as being in force, and we do not claim
-to comply with it. We will review this notice and the sign-up flow when it takes
-effect.
+**The OAIC's Children's Online Privacy Code.** We understand the Office of the Australian
+Information Commissioner (OAIC) may issue a Children's Online Privacy Code. At
+the date of this notice we have not treated any such Code as being in force, and
+we do not claim to comply with one. We will review this notice and the sign-up
+flow if a Code applies to us.
 
 We do not use children's information for advertising, we do not track children
 across other services, and we do not build behavioural profiles for anything
@@ -221,7 +220,7 @@ We do not sell your information. We do not share it for advertising.
 
 ## Sending information overseas
 
-Under APP 8, this is the list of the overseas recipients we know of.
+This is the list of the overseas recipients we know of.
 
 - **OpenAI** is a company based in the United States. It receives the images,
   photos and (if you turn it on) working described above, so that they can be
@@ -260,9 +259,7 @@ the handwriting setting off and type your answers.
   synced work and answer records, your exam papers, your class memberships and
   submissions, your telemetry and any guardian's details. Your email address can
   then be used to create a new, empty account.
-- Three things are kept after deletion, with nothing in them that identifies you:
-  the record of any payment you made (amount, currency, date and the payment
-  processor's own reference), which tax and accounting law requires us to keep;
+- Two things are kept after deletion, with nothing in them that identifies you:
   any problem report you sent about a question, with everything you typed into it
   removed; and a log entry saying that an account was deleted, with no name or
   email.
@@ -272,7 +269,7 @@ the handwriting setting off and type your answers.
 
 ## Your rights: access and correction
 
-Under APP 12 and APP 13 you can ask us to:
+You can ask us to (these requests follow the access and correction principles, APP 12 and APP 13, which we aim to follow):
 
 - **Show you** what we hold about you. The app exports it directly.
 - **Correct** anything that is wrong.
@@ -285,7 +282,7 @@ Under APP 12 and APP 13 you can ask us to:
   under "How long we keep it".
 - **Withdraw consent**, after which we stop processing and delete.
 
-Write to {{CONTACT_EMAIL}}. We acknowledge your message within 48 hours and
+Write to {{CONTACT_EMAIL}}. We aim to acknowledge your message within 48 hours and
 answer within 30 days. If we cannot give you access to something, or cannot
 correct it, we will tell you why.
 
@@ -303,8 +300,9 @@ hashes. Verification and reset links are single-use, short-lived, and delivered
 encrypted. One-time codes are never stored, only a keyed one-way hash of each
 is, and they expire after ten minutes and five attempts. Connections use HTTPS.
 
-No system is perfectly secure. If we discover an eligible data breach affecting
-your information, we will tell you and the OAIC as the Privacy Act requires.
+No system is perfectly secure. If we discover a data breach affecting
+your information that is likely to cause serious harm, we will tell you, and the
+OAIC where the Privacy Act requires it.
 
 ## Changes
 

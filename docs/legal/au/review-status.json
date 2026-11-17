@@ -6,5 +6,12 @@
   "reviewedOn": null,
   "languages": [],
   "evidence": null,
-  "unreviewedSince": "2026-11-18"
+  "unreviewedSince": "2026-11-18",
+  "ownerSignoff": {
+    "$comment": "The owner's approval of the wording, recorded by the owner. This is NOT a lawyer's review and never clears the 'not yet reviewed by a lawyer' banner (only `reviewed` does). Expected values when filled: reviewer 'owner', qualification 'business owner, not a lawyer'. No agent fills this in.",
+    "reviewer": null,
+    "qualification": null,
+    "signedOn": null,
+    "evidence": null
+  }
 }

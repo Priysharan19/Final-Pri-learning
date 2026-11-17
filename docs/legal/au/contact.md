@@ -23,8 +23,8 @@ You do not need to quote the law or use any particular form.
 
 ## What we do
 
-1. We acknowledge your message within **48 hours**.
-2. We investigate and reply with an answer or a plan within **30 days** of
+1. We aim to acknowledge your message within **48 hours**.
+2. We aim to investigate and reply with an answer or a plan within **30 days** of
    receiving it. If we need longer, we say why and when we will answer.
 
 For a request to see, correct or delete your information, see "Your rights:

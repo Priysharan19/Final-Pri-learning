@@ -112,27 +112,27 @@ rule for an unconfirmed account; the guardian's erasure route.
 
 **Current text** · `docs/legal/au/privacy.md`
 
-> At the date of
-> this notice we have not treated that Code as being in force, and we do not claim
-> to comply with it.
+> At
+> the date of this notice we have not treated any such Code as being in force, and
+> we do not claim to comply with one.
 
-**For counsel:** the Code's status at the date you review (the notice says it is being developed, and
-nothing more), when it will apply, and what it will require of an app used mainly by minors. The notice
+**For counsel:** the Code's status at the date you review (the notice says only that the OAIC may issue one), when it will apply, and what it will require of an app used mainly by minors. The notice
 must not claim compliance until counsel says so.
 
 ## 5. Access, correction, complaints and breach [rights]
 
 **Current text** · `docs/legal/au/privacy.md`
 
-> We acknowledge your message within 48 hours and
+> We aim to acknowledge your message within 48 hours and
 > answer within 30 days.
 
 **Current text** · `docs/legal/au/privacy.md`
 
-> If we discover an eligible data breach affecting
-> your information, we will tell you and the OAIC as the Privacy Act requires.
+> If we discover a data breach affecting
+> your information that is likely to cause serious harm, we will tell you, and the
+> OAIC where the Privacy Act requires it.
 
-**Lives in** · `docs/legal/au/contact.md` · `We acknowledge your message within **48 hours**`
+**Lives in** · `docs/legal/au/contact.md` · `We aim to acknowledge your message within **48 hours**`
 
 **For counsel:** are 48 hours and 30 days acceptable commitments (they were carried over from the Indian
 notice, not chosen for Australia)? Is the OAIC the right escalation, and is the Notifiable Data Breaches

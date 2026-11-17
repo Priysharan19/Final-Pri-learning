@@ -38,7 +38,7 @@ a subscription ends.
 ## How to ask for a refund
 
 Write to {{CONTACT_EMAIL}} from the email address on the account, with the date
-of the charge. We acknowledge within 48 hours and reply within 3 business days.
+of the charge. We aim to acknowledge within 48 hours and reply within 3 business days.
 Whatever we decide, you keep the rights described above.
 
 ## Disputes

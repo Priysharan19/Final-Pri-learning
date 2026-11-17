@@ -155,8 +155,8 @@ for (const [label, re] of [
   ['overseas disclosure under APP 8, with the recipients', /Sending information overseas[\s\S]*OpenAI[\s\S]*Resend/], ['APP 12 and 13: access and correction', /APP 12 and APP 13/],
   ['a complaint to us then the OAIC', /write to us first[\s\S]{0,300}Office of the Australian\s+Information Commissioner \(OAIC\)/],
   ['children: under 18 treated as a child; a parent or guardian confirms', /unless you say you are, the account is\s+treated as a child's/],
-  ['the Children\'s Online Privacy Code, pending and not claimed', /Children.s Online Privacy Code[\s\S]{0,500}not treated that Code as being in force[\s\S]{0,60}do not claim\s+to comply/],
-  ['how long it is kept', /How long we keep it/], ['security and the data-breach promise', /eligible data breach/], ['a way to delete', /\/account\/delete-request/]
+  ['the Children\'s Online Privacy Code, pending and not claimed', /Children.s Online Privacy Code[\s\S]{0,500}not treated any such Code as being in force[\s\S]{0,80}do not claim\s+to comply/],
+  ['how long it is kept', /How long we keep it/], ['security and the data-breach promise', /data breach[\s\S]{0,120}tell you/], ['a way to delete', /\/account\/delete-request/]
 ]) ok(re.test(privacy), `the privacy notice has ${label}`);
 ok(!/we (?:comply|are compliant) with the (?:Children|Privacy)/i.test(privacy), 'the privacy notice does not claim compliance with the Children\'s Online Privacy Code or the Act');
 ok(/aim to handle your information in line with the APPs/.test(privacy), 'it says we AIM to follow the APPs (whether the Act applies to us is open), not that we are bound or compliant');
@@ -179,7 +179,7 @@ ok(!/grievance/i.test(all), 'no notice uses the word grievance: Prithagoras has 
 const edition = await import(pathToFileURL(join(ROOT, 'client/edition.config.mjs')).href);
 const prithagoras = edition.EDITIONS.prithagoras;
 ok(prithagoras.billing.providers.length === 0 && prithagoras.billing.currency === 'AUD', 'Prithagoras sells through no provider and in AUD, so "Premium is not on sale" and "Australian dollars" are true (edition.config.mjs)');
-ok(/Premium is not on sale/.test(privacy) || /not on sale/.test(privacy), 'the privacy notice says Premium is not on sale');
+ok(/not on sale/.test(privacy), 'the privacy notice says Premium is not on sale');
 ok(/available:\s*false|answers `available: false`/.test(read('server/platform/billing.js')), 'the server answers that Premium is not available on an edition with no provider (billing.js)');
 const marking = read('server/platform/editionMarking.js');
 ok(/UNCERTIFIED_EDITIONS = Object\.freeze\(\[[^\]]*'prithagoras'/.test(marking), 'Prithagoras marks the final answer only: its method marks cannot be switched on (editionMarking.js)');
@@ -204,13 +204,12 @@ ok(/48 hours/.test(contact) && /48 hours/.test(privacy), 'the 48-hour acknowledg
 const DECLARED = new Set(['AU_HOSTING_PROVIDER_AND_REGION', 'AU_DATABASE_PROVIDER_AND_REGION', 'AU_PAYMENT_PROCESSOR', 'CONTACT_EMAIL']);
 const found = new Set((all.match(/\{\{[A-Z_]+\}\}/g) || []).map(p => p.slice(2, -2)));
 for (const name of found) ok(DECLARED.has(name), `placeholder {{${name}}} is one of the declared four`);
-for (const name of DECLARED) ok(found.has(name) || name === 'AU_PAYMENT_PROCESSOR' && found.has(name), `declared placeholder {{${name}}} is used`);
+for (const name of DECLARED) ok(found.has(name), `declared placeholder {{${name}}} is used`);
 const statusPath = join(ROOT, 'docs/legal/au/review-status.json');
 ok(existsSync(statusPath), 'docs/legal/au/review-status.json exists');
 const status = JSON.parse(readFileSync(statusPath, 'utf8'));
 const indiaStatus = JSON.parse(read('docs/legal/review-status.json'));
 ok(typeof status.reviewed === 'boolean', 'the Australian switch is a boolean');
-ok(status.reviewed === false || Object.keys(status).includes('reviewed'), 'the switch exists');
 if (status.reviewed !== true) {
   for (const key of ['reviewer', 'qualification', 'reviewedOn', 'evidence']) ok(status[key] == null, `while unreviewed the Australian record leaves ${key} empty rather than half-filled`);
   ok(Array.isArray(status.languages) && status.languages.length === 0, 'and no language is recorded as reviewed');
@@ -224,8 +223,19 @@ if (status.reviewed !== true) {
 }
 function placeholdersLeft(text) { return (text.match(/\{\{[A-Z_]+\}\}/g) || []).length; }
 ok(/qualified in Australian law/.test(en.match(/'legal\.unreviewedBodyAu': '[^']*'/)?.[0] || ''), 'the banner while unreviewed says no lawyer qualified in Australian law has reviewed it');
-ok(status.reviewed === false || indiaStatus.reviewed !== undefined, 'the two records are separate');
-ok(JSON.stringify(Object.keys(status).sort()) === JSON.stringify(Object.keys(indiaStatus).sort()), 'the Australian record has exactly the fields of the Indian one');
+ok(statusPath !== join(ROOT, 'docs/legal/review-status.json'), 'the two records are separate files');
+ok(JSON.stringify(Object.keys(status).filter(k => k !== 'ownerSignoff').sort()) === JSON.stringify(Object.keys(indiaStatus).sort()), 'the Australian record has the fields of the Indian one, plus the owner sign-off only');
+{
+  const o = status.ownerSignoff;
+  ok(o && typeof o === 'object', 'the record has an owner sign-off block');
+  const filled = o && [o.reviewer, o.qualification, o.signedOn, o.evidence].some(v => v != null);
+  if (filled) {
+    ok(typeof o.reviewer === 'string' && o.reviewer.trim() && typeof o.signedOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.signedOn), 'a filled owner sign-off names who and when');
+    ok(o.qualification === 'business owner, not a lawyer', 'and says plainly that the owner is not a lawyer');
+  }
+  ok(/\breview\.reviewed\b/.test(read('client/src/pages/Legal.jsx')) && !/ownerSignoff/.test(read('client/src/pages/Legal.jsx')), 'the banner reads only `reviewed`: an owner sign-off can never clear it');
+  ok(existsSync(join(ROOT, 'docs/legal/au/SUMMARY-FOR-OWNER.md')), 'the plain-English owner summary exists');
+}
 ok(/Nothing in the code or in any agent's work may set this to true/.test(status.$comment) && status.unreviewedSince === '2026-11-18', 'and says no agent may set it');
 ok(Array.from(AU.map(d => d.text)).every(t => /been\s+reviewed by a\s+lawyer; the app says so above/.test(t) || /has not yet been reviewed by one\.\s+The app says so above/.test(t)), 'every Australian notice says, in its own words, that no lawyer has reviewed it');
 
