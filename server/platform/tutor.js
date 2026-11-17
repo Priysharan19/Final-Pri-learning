@@ -82,6 +82,7 @@ import { asStore, sqliteHandle } from './store.js';
 import { consumeRateLimit, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import { issuedQuestionForTutor } from './practice.js';
+import { markTutorHelp } from './attemptSupport.js';
 import { buildGuard, captionWordingOk, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
 import {
   MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_DIAGNOSE_LEVEL, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
@@ -981,6 +982,10 @@ export function createTutorRouter(db, {
       if (!grounded.ok) return res.status(grounded.status).json({ error: { code: grounded.code, message: grounded.message } });
       const request = grounded.request;
       const diagnosing = request.level === TUTOR_DIAGNOSE_LEVEL;
+      // Help served on a server-issued question is recorded against it, so the
+      // attempt's `support` is the server's own (attemptSupport.js). Called
+      // only where a reply is actually served; a refusal records nothing.
+      const served = () => (request.serverQuestionId ? markTutorHelp(db, req.platformSession.account_id, request.serverQuestionId, request.level, at) : null);
       // An OPEN attempt is diagnosed by the engine alone, with no model call and
       // one fixed response shape (F1/F2). A model reply on open work could be
       // refused by the answer guard exactly when a guess is right, and that
@@ -988,16 +993,17 @@ export function createTutorRouter(db, {
       // Here nothing in the reply depends on whether the student's guess is
       // correct: only on the engine's verdict (withheld until resolution for a
       // server-issued question) and the verified plan.
-      if (diagnosing && !request.resolved) return res.json({ tutor: openDiagnosis(request) });
+      if (diagnosing && !request.resolved) { await served(); return res.json({ tutor: openDiagnosis(request) }); }
       if (request.level === TUTOR_WHY_LEVEL) return whyThisStep(req, res, request, at);
 
       const key = tutorCacheKey(request, cacheScope(req.platformSession.account_id));
       const hit = await cached(key, at);
-      if (hit) return res.json({ tutor: { ...hit, cached: true } });
+      if (hit) { await served(); return res.json({ tutor: { ...hit, cached: true } }); }
 
       // A diagnosis still helps with no model: the engine's own diagnosis is
       // served (never cached) when the tutor is unconfigured or the allowance is spent.
-      const deterministicOnly = reason => {
+      const deterministicOnly = async reason => {
+        await served();
         const diagnosis = deterministicDiagnosis(request);
         return res.json({ tutor: {
           level: TUTOR_DIAGNOSE_LEVEL, diagnosis, message: diagnosisMessage(diagnosis), referencesStepIndex: diagnosis.referencesStepIndex,
@@ -1033,6 +1039,7 @@ export function createTutorRouter(db, {
 
       if (diagnosing) {
         const outcome = await diagnose(request);
+        await served();
         if (outcome.cache) await remember(key, outcome.tutor, at);
         return res.json({ tutor: { ...outcome.tutor, cached: false } });
       }
@@ -1040,6 +1047,7 @@ export function createTutorRouter(db, {
       try {
         const outcome = request.level === 'walkthrough' ? await walkthrough(request) : await help(request);
         if (outcome.refusal) return refusePaidCall(res, outcome.refusal);
+        await served();
         await remember(key, outcome.tutor, at);
         res.json({ tutor: { ...outcome.tutor, cached: false } });
       } catch (error) {
@@ -1228,6 +1236,9 @@ export function createTutorRouter(db, {
       const admitted = await admitStream(req, res);
       if (!admitted) return;
       const { request, key, at, hit } = admitted;
+      // Recorded against a server-issued question before any help is sent
+      // (attemptSupport.js); admitStream has already refused everything else.
+      if (request.serverQuestionId) await markTutorHelp(db, req.platformSession.account_id, request.serverQuestionId, request.level, at);
       const send = openStream(res);
 
       if (hit) {
