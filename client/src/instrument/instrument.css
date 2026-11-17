@@ -1379,11 +1379,11 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
 .in-read.is-check .in-read-cf i.on { background: var(--in-unc); }
 .in-read-tg { font: 500 10.5px var(--in-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--in-tx-3); }
 .in-read.is-check .in-read-tg { color: var(--in-unc); }
-.in-state { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; font: 500 10.5px var(--in-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--in-tx-3); }
-.in-state i, .in-strip-i i { flex: none; width: 9px; height: 9px; border-radius: 2px; background: var(--in-tx-2); }
+.in-rstate { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; font: 500 10.5px var(--in-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--in-tx-3); }
+.in-rstate i, .in-strip-i i { flex: none; width: 9px; height: 9px; border-radius: 2px; background: var(--in-tx-2); }
 [data-read-state="check"] > i { background: var(--in-unc); }
 [data-read-state="cant"] > i { background: none; border: 1px dashed var(--in-tx-3); box-sizing: border-box; }
-.in-state[data-read-state="check"] { color: var(--in-unc); }
+.in-rstate[data-read-state="check"] { color: var(--in-unc); }
 .in-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; min-height: 40px; padding: 8px 12px; margin-top: 10px; border-radius: 6px; background: var(--in-l1); box-shadow: 0 -1px 0 var(--in-edge-2); font: 400 11.5px var(--in-mono); color: var(--in-tx-2); }
 .in-strip-i { display: inline-flex; align-items: center; gap: 6px; }
 @media (prefers-reduced-motion: reduce) { .in-read.is-check { transition: none; } }
