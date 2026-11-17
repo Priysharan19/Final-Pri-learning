@@ -649,7 +649,9 @@ function absFit(rel) {
   const c1 = realRootsOf(sub(q.co, p.co)), c2 = realRootsOf(sub(q.co.map(x => -x), p.co)), c3 = realRootsOf(q.co);
   const scale = Math.max(1, q.scale, p.scale);
   const zeros = [...c1, ...c2].filter(x => Number.isFinite(x) && Math.abs(f(x)) <= 1e-9 * scale * (1 + Math.abs(x)));
-  return { co: null, v: q.v, op, f, scale, zeros, cuts: [...c1, ...c2, ...c3], tol: 1e-10 };
+  // The unknown is the one of Q or P that has one (polyFit defaults a constant's to 'x').
+  const unknown = degreeOf(q.co) > 0 ? q.v : degreeOf(p.co) > 0 ? p.v : q.v;
+  return { co: null, v: unknown, op, f, scale, zeros, cuts: [...c1, ...c2, ...c3], tol: 1e-10 };
 }
 const regionFit = rel => polyFit(rel) || absFit(rel);
 

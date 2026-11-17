@@ -61,6 +61,8 @@ r = stepCheck({ kind: 'inequality', variable: 'x', source: 'abs(x)<3' }, 'abs(x)
 ok(r.lines.every(l => l.status !== 'ok' || l.text === 'abs(x)<3'), 'abs(x)<3 then abs(y)<3 is not the same region');
 r = stepCheck({ kind: 'inequality', variable: 'x', source: 'abs(x)<3' }, 'abs(x)<3\ny^2<9');
 ok(r.lines.every(l => l.status !== 'ok' || l.text === 'abs(x)<3'), 'abs(x)<3 then y^2<9 is not the same region');
+r = stepCheck({ kind: 'inequality', variable: 'x', source: 'x<3' }, 'x<3\nabs(3)>y');
+ok(r.lines[1].status !== 'ok', 'abs of a constant against y is not x<3 (the unknown comes from the non-constant side)');
 
 // Not piecewise polynomial in one variable: abstain, never guess.
 r = run('abs(x)+abs(x-1)<3', ['abs(x)+abs(x-1)<3', 'x<2']);
