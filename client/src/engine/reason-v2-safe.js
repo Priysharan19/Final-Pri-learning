@@ -163,7 +163,8 @@ function assessBySolutionSet({ ast, previousAst, previousTrusted, meta, variable
     // write down whatever its sign condition then decides.
     if (rel === 'subset' || rel === 'different') {
       const cases = absCaseSets(previousAst, variable) || (anchorAst ? absCaseSets(anchorAst, variable) : null);
-      const branch = cases && cases.find(c => relateSolutionSets(c, cur) === 'same');
+      // The line must BE a case equation (rearranged, scaled), not merely share its roots.
+      const branch = cases && cases.find(c => relateSolutionSets(c, cur) === 'same' && sameEquationClaim(ast, c.equation, variable));
       if (branch) return { status: 'ok', trusted: true, implied: true, note: `This is one case of the absolute value (${variable} = ${listRoots(cur.roots) || 'no value'}); check it against its own condition.` };
     }
     if (rel === 'subset' || rel === 'different') {

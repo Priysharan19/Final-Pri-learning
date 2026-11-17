@@ -651,10 +651,15 @@ export function absCaseSets(eq, variable = null) {
   const Q = quadraticFit(left.arg, v), P = quadraticFit(right, v);
   if (!Q || !P) return null;
   const out = [];
+  const equations = [
+    { t: 'equation', l: left.arg, r: right },
+    { t: 'equation', l: { t: 'neg', v: left.arg }, r: right }
+  ];
+  let k = 0;
   for (const co of [polySub(Q, P), Q.map((x, i) => -x - P[i])]) {
     const r = realRootsUpTo4(co);
     if (r === null) return null;
-    out.push({ kind: 'finite', variable: v, roots: uniqueNumbers(r), excluded: [] });
+    out.push({ kind: 'finite', variable: v, roots: uniqueNumbers(r), excluded: [], equation: equations[k++] });
   }
   return out;
 }
