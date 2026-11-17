@@ -3244,7 +3244,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <button type="button" className="in-hintsheet-scrim" aria-label={t('inst.hintSheetClose')} tabIndex={-1} onClick={closeHintSheet} />
             <div className="in-hintsheet" ref={hintSheetRef} role="dialog" aria-modal="true" aria-label={t('verdict.hints')}
               onTouchStart={(e) => { sheetTouchY.current = e.touches[0].clientY; }}
-              onTouchEnd={(e) => { const y0 = sheetTouchY.current; sheetTouchY.current = null; if (y0 != null && e.changedTouches[0].clientY - y0 > 60) closeHintSheet(); }}>
+              onTouchEnd={(e) => { if (e.changedTouches[0].clientY - sheetTouchY.current > 60 && e.currentTarget.scrollTop < 1) closeHintSheet(); }}>
               {renderLadder(true)}
               <button type="button" className="btn btn-quiet in-hintsheet-close" data-hint-sheet-close onClick={closeHintSheet}>{t('inst.hintSheetClose')}</button>
             </div>
