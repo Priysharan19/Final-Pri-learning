@@ -461,7 +461,8 @@ eq(shape(T.buildTranscript({ lines: OWNER_NOTES.map(text => ({ text })) }, { pro
 const mine = T.setLineExcluded(T.includeAll(owner), 8, true);
 eq([mine.lines[8].why, T.includeAll(mine).lines[8].excluded, T.defaultExclusions(mine)], ['student', true, 0], 'a line the student left out is theirs: "include them" does not bring it back');
 const revived = T.reviveTranscript(JSON.parse(JSON.stringify(fixed)));
-eq(revived, { lines: fixed.lines, undecided: false, anchor: 5 }, 'a transcript survives a round trip through storage');
+// A revived line also records whether the student confirmed it (the Check-what-Pri-read gate): false until they do.
+eq(revived, { lines: fixed.lines.map(l => ({ ...l, confirmed: l.confirmed === true })), undecided: false, anchor: 5 }, 'a transcript survives a round trip through storage');
 eq([T.reviveTranscript(null), T.reviveTranscript({ lines: [] }), T.reviveTranscript('x')], [null, null, null], 'and junk from storage is refused');
 
 // A page that could not be read is a reading problem, not working to mark.

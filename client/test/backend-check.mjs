@@ -2400,6 +2400,21 @@ async function run() {
       [...reviews.due, ...reviews.upcoming].some(r => r.subtopic === topicId),
       `neither list holds ${topicId} after three attempts`);
 
+    // Progress is read as evidence, never as a mastery figure or a predicted mark.
+    const evidence = await GET('/progress/evidence');
+    ok('progress evidence is bands and counts, with a topic list and a review list', !!evidence.overall && Array.isArray(evidence.topics) && Array.isArray(evidence.review), show(Object.keys(evidence)));
+    ok('the practised subtopic has an evidence entry carrying its answer count', evidence.topics.some(t => t.id === topicId && t.answered >= 1), `no entry for ${topicId}`);
+    ok('progress evidence carries no mastery figure, percentage or predicted mark',
+      !/"(mastery|percent|percentage|predicted|predictedMark|predictedBand)"/.test(JSON.stringify(evidence)), 'a score-like field leaked into the evidence reading');
+
+    const board = await GET('/progress/board');
+    eq('the board is for the NSW course on this profile', board.course, 'nsw');
+    ok('the board lists the attempts with the dot points each question named',
+      board.attempts.length > 0 && board.attempts.every(a => Array.isArray(a.dotpoints)), show(board.attempts.length));
+    ok('the board lists finished papers as an array', Array.isArray(board.papers), show(Object.keys(board)));
+    ok('the board never carries an answer, a solution or an expected value',
+      !/"(answer|answers|expected|expectedAnswer|solution|solutions)"/.test(JSON.stringify(board)), 'an answer-bearing field leaked into the board');
+
     const storage = await GET('/data/storage');
     ok('storage reports a usage figure', typeof storage.usage === 'number' && typeof storage.quota === 'number', show(storage));
   } catch (err) { crashed(err); }

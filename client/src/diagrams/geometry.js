@@ -24,7 +24,6 @@ export function r3(n, digits = 3) {
   const v = Number(Number(n).toFixed(digits));
   return Object.is(v, -0) || v === 0 ? 0 : v;
 }
-const pt = (x, y) => [r3(x), r3(y)];
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 

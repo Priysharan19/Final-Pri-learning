@@ -308,8 +308,11 @@ check('handwriting drafts live in one recovery store and are restored, never mar
 });
 
 check('a reading in doubt is confirmed in place, not by rewriting', () => {
-  assert.match(card, /needsCheck && checking\s*\? \{ label: t\('verdict\.confirmReading'\), run: acceptReading/);
-  assert.match(card, /className="ws-check"/);
+  // The in-place confirmation now lives in the Check-what-Pri-read panel: the
+  // primary becomes Confirm and mark and stays disabled until every doubted
+  // line is resolved (confirm-reading-check.mjs pins the same rule).
+  assert.match(card, /needsCheck\s*\n?\s*\? \{ label: t\('verdict\.confirmAndSubmit'\), run: acceptReading, disabled: busy \|\| !canSubmit \|\| toConfirm > 0 \}/);
+  assert.match(card, /className="ws-check ws-confirm"/);
 });
 
 check('mistakes, uncertainty and failures are three different states', () => {
