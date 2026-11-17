@@ -4502,4 +4502,6 @@ export default {
   'math.formula': 'Formula',
   'math.readFormula': 'Read formula',
   'math.hideReading': 'Hide reading',
+  'signup.noticeContact': "Questions, or to withdraw: the contact details are in the",
+  'signup.noticeUnreviewed': "This notice has not been reviewed by a lawyer yet.",
 };

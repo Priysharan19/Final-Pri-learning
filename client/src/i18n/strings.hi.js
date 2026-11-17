@@ -4550,4 +4550,6 @@ export default {
   'math.formula': 'सूत्र',
   'math.readFormula': 'सूत्र पढ़ें',
   'math.hideReading': 'पाठ छिपाएँ',
+  'signup.noticeContact': "प्रश्नों या वापसी के लिए: संपर्क विवरण इसमें हैं",
+  'signup.noticeUnreviewed': "इस सूचना की किसी वकील ने अभी समीक्षा नहीं की है।",
 };
