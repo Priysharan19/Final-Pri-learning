@@ -766,6 +766,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     let status = 'note';
     let note;
     let lineDiagnosis = null;
+    let impliedStep = false;
     try {
       const listed = readSolutionList(line, meta);
       if (listed) {
@@ -1084,6 +1085,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               status = assessed.status;
               note = assessed.note;
               lineDiagnosis = assessed.diagnosis || null;
+              impliedStep = assessed.implied === true;
               // A mistake is a line that is false for the question. A line
               // that every answer satisfies and that would also let in
               // another value — `a^2 = 4` where the question says a > 0,
@@ -1145,7 +1147,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     }
 
     if (status === 'break' && firstBreak === -1) firstBreak = i;
-    out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+    out.push({ text: line, status, note, ...(impliedStep ? { implied: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
   });
 
   // Branches were allowed on the promise that the working keeps every root.

@@ -227,10 +227,34 @@ export function rationalEquationSignature(eq, variable = null) {
   if (numerator.every(nearZero)) {
     return { kind: 'cofinite', variable: v, excluded: excluded.roots };
   }
-  const roots = realRoots(numerator);
+  // A numerator above degree 2 is solved after its excluded roots are divided
+  // out (they are never solutions, so removing them loses nothing).
+  let work = numerator;
+  if (work.length - 1 > 2) {
+    for (const e of excluded.roots) {
+      for (let guard = 0; guard < 6 && work.length - 1 > 0; guard++) {
+        const quotient = divideByRoot(work, e);
+        if (!quotient) break;
+        work = quotient;
+      }
+    }
+  }
+  const roots = realRoots(work);
   if (roots === null) return null;
   const kept = uniqueNumbers(roots).filter(x => !excluded.roots.some(e => numsClose(x, e, 1e-7)));
   return { kind: 'finite', variable: v, roots: kept, excluded: excluded.roots };
+}
+
+/** Synthetic division of a polynomial (low -> high) by (x - e) when e is a root; else null. */
+function divideByRoot(poly, e) {
+  const n = poly.length - 1;
+  if (n < 1) return null;
+  const q = new Array(n);
+  let carry = 0;
+  for (let i = n; i >= 1; i--) { carry = poly[i] + carry * e; q[i - 1] = carry; }
+  const remainder = poly[0] + carry * e;
+  const scale = Math.max(1, ...poly.map(Math.abs));
+  return Math.abs(remainder) <= 1e-9 * scale * Math.max(1, Math.abs(e) ** n) ? q : null;
 }
 
 function signatureEqual(a, b) {

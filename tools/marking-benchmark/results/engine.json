@@ -863,8 +863,8 @@
  "eq-037": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain"
+   "valid",
+   "valid"
   ],
   "solution": "incorrect",
   "firstBreak": null
@@ -872,9 +872,9 @@
  "eq-038": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
-   "abstain"
+   "valid",
+   "valid",
+   "valid"
   ],
   "solution": "incorrect",
   "firstBreak": null
