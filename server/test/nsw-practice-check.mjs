@@ -114,6 +114,11 @@ try {
     const banded = await issue({ generator: 'pyq-jee-main-c11-straight-lines', difficulty: 3, curriculum: 'nsw', mode: 'practice', band: 'short' });
     c.deq([banded.status, banded.data?.error?.code], [422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM'], 'a JEE band issue is refused on a Prithagoras server');
   }
+  // F12 parity: the root-gap reading walks India's prerequisite graph, so a Prithagoras server refuses it.
+  {
+    const gap = await h.request('/v1/root-gap', { jar: a.jar });
+    c.deq([gap.status, gap.data?.error?.code], [422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM'], 'the India root-gap reading is refused on a Prithagoras server');
+  }
   const submit = (qid, submissionId, answer, steps, jar = a.jar) => h.request(`/v1/practice/${qid}/submit`, {
     method: 'POST', jar, headers: { 'Idempotency-Key': submissionId }, body: { submissionId, answer, mode: 'typed', ...(steps ? { steps } : {}) } });
   const escrowCount = async accountId => Number((await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='practice-question'", [accountId]))?.n || 0);

@@ -942,6 +942,9 @@
         },
         {
           "has": "NSW PRACTICE (G3): PASS — 163/163 checks"
+        },
+        {
+          "has": "NSW PRACTICE (G3): PASS — 164/164 checks"
         }
       ]
     },
@@ -1027,6 +1030,9 @@
         },
         {
           "has": "PRACTICE SEEN-AWARE PICK: PASS — 26/26 checks"
+        },
+        {
+          "has": "ROOT GAP: PASS — 24/24 checks"
         }
       ]
     },
