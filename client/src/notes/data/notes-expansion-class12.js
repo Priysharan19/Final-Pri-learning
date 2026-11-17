@@ -4,7 +4,7 @@ export default {
     "concepts": [
       {
         "title": "Composition order can change the result",
-        "body": "Composition f∘g means apply g first and then f. In general f∘g differs from g∘f, so the order is part of the mathematical statement. Check the output lies in the next function's domain."
+        "body": "The composition $f \\circ g$ means apply $g$ first and then $f$. In general $f \\circ g$ differs from $g \\circ f$, so the order is part of the mathematical statement. Check that each output lies in the next function's domain."
       }
     ],
     "points": [
@@ -16,15 +16,15 @@ export default {
     "mistakes": [
       {
         "wrong": "Composition is commutative just like addition.",
-        "right": "Order matters; f(g(x)) and g(f(x)) can differ."
+        "right": "Order matters; $f(g(x))$ and $g(f(x))$ can differ."
       }
     ],
     "examples": [
       {
-        "question": "Let f(x)=2x+1 and g(x)=x². Find f(g(3)) and g(f(3)).",
+        "question": "Let $f(x) = 2x + 1$ and $g(x) = x^2$. Find $f(g(3))$ and $g(f(3))$.",
         "steps": [
-          "g(3)=9, hence f(g(3))=19.",
-          "f(3)=7, hence g(f(3))=49.",
+          "$g(3) = 9$, hence $f(g(3)) = 19$.",
+          "$f(3) = 7$, hence $g(f(3)) = 49$.",
           "The two results differ; composition is not commutative."
         ],
         "answer": "19 and 49",
@@ -48,30 +48,30 @@ export default {
     "concepts": [
       {
         "title": "Principal branches make inverse trigonometry functions",
-        "body": "Sine repeats many inputs; arcsin is a function only after its output is restricted to the principal interval [-pi/2,pi/2]. Therefore arcsin(sin x) need not equal x outside that interval."
+        "body": "Sine takes each value at many inputs; $\\sin^{-1}$ is a function only after its output is restricted to the principal interval $\\left[-\\tfrac{\\pi}{2}, \\tfrac{\\pi}{2}\\right]$. Therefore $\\sin^{-1}(\\sin x)$ need not equal $x$ outside that interval."
       }
     ],
     "points": [
       {
-        "front": "What is the output interval of the principal arcsin function?",
-        "back": "From -pi/2 to pi/2, inclusive."
+        "front": "What is the output interval of the principal $\\sin^{-1}$ function?",
+        "back": "From $-\\tfrac{\\pi}{2}$ to $\\tfrac{\\pi}{2}$, inclusive."
       }
     ],
     "mistakes": [
       {
-        "wrong": "arcsin(sin(5pi/6)) must equal 5pi/6.",
-        "right": "The principal value is pi/6, because it lies in the arcsin output interval."
+        "wrong": "$\\sin^{-1}\\left(\\sin \\tfrac{5\\pi}{6}\\right)$ must equal $\\tfrac{5\\pi}{6}$.",
+        "right": "The principal value is $\\tfrac{\\pi}{6}$, because it lies in the output interval of $\\sin^{-1}$."
       }
     ],
     "examples": [
       {
-        "question": "Find the principal value of arcsin(sin(5pi/6)).",
+        "question": "Find the principal value of $\\sin^{-1}\\left(\\sin \\tfrac{5\\pi}{6}\\right)$.",
         "steps": [
-          "sin(5pi/6)=1/2.",
-          "The angle pi/6 is in the principal arcsin range and has sine 1/2.",
-          "Therefore the principal value is pi/6."
+          "$\\sin \\tfrac{5\\pi}{6} = \\tfrac{1}{2}$.",
+          "The angle $\\tfrac{\\pi}{6}$ is in the principal range of $\\sin^{-1}$ and has sine $\\tfrac{1}{2}$.",
+          "Therefore the principal value is $\\tfrac{\\pi}{6}$."
         ],
-        "answer": "pi/6",
+        "answer": "$\\tfrac{\\pi}{6}$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -92,13 +92,13 @@ export default {
     "concepts": [
       {
         "title": "Matrix products encode row–column interactions",
-        "body": "The (i,j) entry of AB is the dot product of row i of A with column j of B. The inner dimensions must match; even when both AB and BA exist, they are generally different."
+        "body": "The $(i, j)$ entry of $AB$ is the dot product of row $i$ of $A$ with column $j$ of $B$. The inner dimensions must match; even when both $AB$ and $BA$ exist, they are generally different."
       }
     ],
     "points": [
       {
-        "front": "Why can AB exist when BA does not?",
-        "back": "AB only requires columns of A to equal rows of B, a condition that need not hold in reverse."
+        "front": "Why can $AB$ exist when $BA$ does not?",
+        "back": "$AB$ only requires the number of columns of $A$ to equal the number of rows of $B$, a condition that need not hold the other way round."
       }
     ],
     "mistakes": [
@@ -109,13 +109,13 @@ export default {
     ],
     "examples": [
       {
-        "question": "Multiply A=[[1,2],[3,4]] by B=[[2,0],[1,3]].",
+        "question": "Multiply $A = \\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}$ by $B = \\begin{pmatrix} 2 & 0 \\\\ 1 & 3 \\end{pmatrix}$.",
         "steps": [
-          "Top row: (1×2+2×1, 1×0+2×3)=(4,6).",
-          "Bottom row: (3×2+4×1, 3×0+4×3)=(10,12).",
-          "AB=[[4,6],[10,12]]."
+          "Top row: $(1 \\times 2 + 2 \\times 1,\\ 1 \\times 0 + 2 \\times 3) = (4, 6)$.",
+          "Bottom row: $(3 \\times 2 + 4 \\times 1,\\ 3 \\times 0 + 4 \\times 3) = (10, 12)$.",
+          "$AB = \\begin{pmatrix} 4 & 6 \\\\ 10 & 12 \\end{pmatrix}$."
         ],
-        "answer": "[[4,6],[10,12]]",
+        "answer": "$\\begin{pmatrix} 4 & 6 \\\\ 10 & 12 \\end{pmatrix}$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -144,7 +144,7 @@ export default {
     "concepts": [
       {
         "title": "Expansion signs alternate because orientation matters",
-        "body": "For a 3-by-3 determinant, cofactor expansion across the first row has +,-,+ signs. A determinant vanishes when rows are linearly dependent and is multiplied by k when one row is scaled by k."
+        "body": "For a $3 \\times 3$ determinant, cofactor expansion along the first row has the signs $+, -, +$. A determinant is zero when its rows are linearly dependent, and is multiplied by $k$ when one row is multiplied by $k$."
       }
     ],
     "points": [
@@ -161,10 +161,10 @@ export default {
     ],
     "examples": [
       {
-        "question": "Evaluate determinant of [[1,2,3],[0,1,4],[5,6,0]].",
+        "question": "Evaluate $\\begin{vmatrix} 1 & 2 & 3 \\\\ 0 & 1 & 4 \\\\ 5 & 6 & 0 \\end{vmatrix}$.",
         "steps": [
-          "Expand the first row: 1(0-24)-2(0-20)+3(0-5).",
-          "Compute -24+40-15.",
+          "Expand along the first row: $1(0 - 24) - 2(0 - 20) + 3(0 - 5)$.",
+          "Compute $-24 + 40 - 15$.",
           "The determinant is 1."
         ],
         "answer": "1",
@@ -180,7 +180,7 @@ export default {
     "concepts": [
       {
         "title": "Continuity is a matching condition at the junction",
-        "body": "A function is continuous at a when its two-sided limit equals its defined value f(a). If a removable discontinuity is present, assigning the limiting value repairs continuity; differentiability is a stronger condition."
+        "body": "A function is continuous at $a$ when its two-sided limit equals its defined value $f(a)$. If a removable discontinuity is present, assigning the limiting value repairs continuity; differentiability is a stronger condition."
       }
     ],
     "points": [
@@ -191,19 +191,19 @@ export default {
     ],
     "mistakes": [
       {
-        "wrong": "A finite limit guarantees continuity even if f(a) differs.",
-        "right": "Continuity requires the actual f(a) to equal that limit."
+        "wrong": "A finite limit guarantees continuity even if $f(a)$ differs from it.",
+        "right": "Continuity requires the actual value $f(a)$ to equal that limit."
       }
     ],
     "examples": [
       {
-        "question": "Let f(x)=(x²-4)/(x-2) for x≠2 and f(2)=k. Find k for continuity.",
+        "question": "Let $f(x) = \\dfrac{x^2 - 4}{x - 2}$ for $x \\ne 2$ and $f(2) = k$. Find $k$ for continuity.",
         "steps": [
-          "For x≠2, cancel the factor to get f(x)=x+2.",
-          "The limit as x tends to 2 is 4.",
-          "Assign f(2)=k=4 to make the function continuous."
+          "For $x \\ne 2$, cancel the factor to get $f(x) = x + 2$.",
+          "The limit as $x$ tends to 2 is 4.",
+          "Set $f(2) = k = 4$ to make the function continuous."
         ],
-        "answer": "k=4",
+        "answer": "$k = 4$",
         "verify": {
           "kind": "value",
           "expr": "2+2",
@@ -216,30 +216,30 @@ export default {
     "concepts": [
       {
         "title": "Stationary does not mean minimum",
-        "body": "If f'(a)=0 the point is stationary, but could be a maximum, a minimum or neither. Examine a sign change of f' or use f'' when its hypotheses apply, then check domain endpoints."
+        "body": "If $f'(a) = 0$ the point is stationary, but it could be a maximum, a minimum or neither. Examine the sign change of $f'$, or use $f''$ when its hypotheses apply, then check the endpoints of the domain."
       }
     ],
     "points": [
       {
-        "front": "Why can an interior maximum occur where f'=0?",
+        "front": "Why can an interior maximum occur where $f' = 0$?",
         "back": "The derivative may change from positive to negative there."
       }
     ],
     "mistakes": [
       {
-        "wrong": "Every root of f' is a local minimum.",
+        "wrong": "Every root of $f'$ is a local minimum.",
         "right": "A sign change from positive to negative instead gives a local maximum."
       }
     ],
     "examples": [
       {
-        "question": "Find the minimum of f(x)=x²-6x+5 on the real line.",
+        "question": "Find the minimum of $f(x) = x^2 - 6x + 5$ on the real line.",
         "steps": [
-          "Differentiate: f'(x)=2x-6, so stationary point x=3.",
-          "Second derivative f''(x)=2>0.",
-          "At x=3 the minimum value is 9-18+5=-4."
+          "Differentiate: $f'(x) = 2x - 6$, so the stationary point is $x = 3$.",
+          "Second derivative: $f''(x) = 2 > 0$.",
+          "At $x = 3$ the minimum value is $9 - 18 + 5 = -4$."
         ],
-        "answer": "-4 at x=3",
+        "answer": "$-4$ at $x = 3$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -260,27 +260,27 @@ export default {
     "concepts": [
       {
         "title": "Antiderivatives should be checked by differentiation",
-        "body": "An indefinite integral is a family F(x)+C whose derivatives equal the integrand. A definite integral is a number F(b)-F(a), and does not contain an arbitrary C."
+        "body": "An indefinite integral is a family $F(x) + C$ whose derivatives equal the integrand. A definite integral is a number, $F(b) - F(a)$, and contains no arbitrary $C$."
       }
     ],
     "points": [
       {
-        "front": "Why do definite integrals not retain a +C constant?",
-        "back": "Any antiderivative constants cancel in F(b)-F(a)."
+        "front": "Why does a definite integral not keep a constant $+C$?",
+        "back": "Any constant cancels in $F(b) - F(a)$."
       }
     ],
     "mistakes": [
       {
-        "wrong": "The integral of x² is 2x.",
-        "right": "Differentiating x³/3 gives x²; the power increases before division."
+        "wrong": "The integral of $x^2$ is $2x$.",
+        "right": "Differentiating $\\tfrac{x^3}{3}$ gives $x^2$; raise the power first, then divide by the new power."
       }
     ],
     "examples": [
       {
-        "question": "Evaluate the integral from 0 to 2 of 3x²-4x+1.",
+        "question": "Evaluate $\\displaystyle\\int_0^2 (3x^2 - 4x + 1)\\,dx$.",
         "steps": [
-          "An antiderivative is x³-2x²+x.",
-          "Evaluate at 2: 8-8+2=2.",
+          "An antiderivative is $x^3 - 2x^2 + x$.",
+          "At 2: $8 - 8 + 2 = 2$.",
           "At 0 the value is zero, so the integral is 2."
         ],
         "answer": "2",
@@ -296,7 +296,7 @@ export default {
     "concepts": [
       {
         "title": "Area uses upper minus lower, not blindly the integrand",
-        "body": "For two curves meeting at endpoints, compare which graph lies above on each interval. Their enclosed area is the integral of upper-minus-lower; intersections inside the interval can require splitting."
+        "body": "For two curves meeting at the endpoints, compare which graph lies above on each interval. The enclosed area is the integral of upper minus lower; intersections inside the interval may require splitting it."
       }
     ],
     "points": [
@@ -313,13 +313,13 @@ export default {
     ],
     "examples": [
       {
-        "question": "Find the area between y=x and y=x² from x=0 to x=1.",
+        "question": "Find the area between $y = x$ and $y = x^2$ from $x = 0$ to $x = 1$.",
         "steps": [
-          "On 0≤x≤1, x≥x².",
-          "Integrate x-x², giving [x²/2-x³/3] from 0 to 1.",
-          "Area =1/2-1/3=1/6."
+          "On $0 \\le x \\le 1$, $x \\ge x^2$.",
+          "Integrate $x - x^2$, giving $\\left[\\tfrac{x^2}{2} - \\tfrac{x^3}{3}\\right]_0^1$.",
+          "Area $= \\tfrac{1}{2} - \\tfrac{1}{3} = \\tfrac{1}{6}$."
         ],
-        "answer": "1/6",
+        "answer": "$\\tfrac{1}{6}$",
         "verify": {
           "kind": "value",
           "expr": "1/2-1/3",
@@ -332,28 +332,28 @@ export default {
     "concepts": [
       {
         "title": "An initial condition chooses one solution from a family",
-        "body": "Integrating dy/dx=g(x) produces y=G(x)+C. A specified point (x0,y0) determines C, assuming the proposed solution satisfies the differential equation there."
+        "body": "Integrating $\\dfrac{dy}{dx} = g(x)$ produces $y = G(x) + C$. A given point $(x_0, y_0)$ on the solution curve then fixes $C$."
       }
     ],
     "points": [
       {
-        "front": "Why is +C needed before applying an initial condition?",
+        "front": "Why is $+C$ needed before applying an initial condition?",
         "back": "Differentiation removes constants, so a differential equation usually admits a family of curves."
       }
     ],
     "mistakes": [
       {
         "wrong": "A differential equation with an initial value still needs an arbitrary constant in its final answer.",
-        "right": "Use the given condition to solve the integration constant."
+        "right": "Use the given condition to find the constant of integration."
       }
     ],
     "examples": [
       {
-        "question": "Solve dy/dx=3x² with y(0)=4; find y(2).",
+        "question": "Solve $\\dfrac{dy}{dx} = 3x^2$ with $y(0) = 4$, and find $y(2)$.",
         "steps": [
-          "Integrate to y=x³+C.",
-          "Set x=0 and y=4, giving C=4.",
-          "Thus y(2)=8+4=12."
+          "Integrate: $y = x^3 + C$.",
+          "Set $x = 0$ and $y = 4$, giving $C = 4$.",
+          "Thus $y(2) = 8 + 4 = 12$."
         ],
         "answer": "12",
         "verify": {
@@ -368,13 +368,13 @@ export default {
     "concepts": [
       {
         "title": "Dot products measure alignment, not length alone",
-        "body": "a·b=|a||b|cos(theta). In coordinates it is the sum of products of corresponding components. A zero dot product means perpendicularity for two non-zero vectors."
+        "body": "$\\vec a \\cdot \\vec b = |\\vec a|\\,|\\vec b|\\cos\\theta$. In coordinates it is the sum of the products of corresponding components. For two non-zero vectors, a zero dot product means they are perpendicular."
       }
     ],
     "points": [
       {
         "front": "Can two non-zero vectors have zero dot product?",
-        "back": "Yes, when the angle between them is 90 degrees."
+        "back": "Yes, when the angle between them is $90^\\circ$."
       }
     ],
     "mistakes": [
@@ -385,10 +385,10 @@ export default {
     ],
     "examples": [
       {
-        "question": "Find the dot product of (1,2,3) and (4,-1,2).",
+        "question": "Find the dot product of $(1, 2, 3)$ and $(4, -1, 2)$.",
         "steps": [
-          "Multiply corresponding coordinates: 1×4,2×(-1),3×2.",
-          "Sum 4-2+6.",
+          "Multiply corresponding components: $1 \\times 4$, $2 \\times (-1)$, $3 \\times 2$.",
+          "Add: $4 - 2 + 6$.",
           "The dot product is 8."
         ],
         "answer": "8",
@@ -404,7 +404,7 @@ export default {
     "concepts": [
       {
         "title": "Point–plane distance normalizes a signed expression",
-        "body": "A plane ax+by+cz=d has normal vector (a,b,c). Substitute the point into ax+by+cz-d and divide its absolute value by sqrt(a²+b²+c²). The denominator prevents arbitrary coefficient scaling from changing distance."
+        "body": "The plane $ax + by + cz = d$ has normal vector $(a, b, c)$. Substitute the point into $ax + by + cz - d$ and divide its absolute value by $\\sqrt{a^2 + b^2 + c^2}$. The denominator stops a rescaling of the coefficients from changing the distance."
       }
     ],
     "points": [
@@ -421,13 +421,13 @@ export default {
     ],
     "examples": [
       {
-        "question": "Find the distance from (1,2,3) to the plane 2x-y+2z=4.",
+        "question": "Find the distance from $(1, 2, 3)$ to the plane $2x - y + 2z = 4$.",
         "steps": [
-          "The signed numerator is 2(1)-2+2(3)-4=2.",
-          "Normal magnitude is sqrt(2²+(-1)²+2²)=3.",
-          "Distance =|2|/3=2/3."
+          "The signed numerator is $2(1) - 2 + 2(3) - 4 = 2$.",
+          "The length of the normal is $\\sqrt{2^2 + 1^2 + 2^2} = 3$.",
+          "Distance $= \\tfrac{|2|}{3} = \\tfrac{2}{3}$."
         ],
-        "answer": "2/3",
+        "answer": "$\\tfrac{2}{3}$",
         "verify": {
           "kind": "value",
           "expr": "abs(2*1-2+2*3-4)/sqrt(2^2+(-1)^2+2^2)",
@@ -451,19 +451,19 @@ export default {
     ],
     "mistakes": [
       {
-        "wrong": "The optimum always occurs at the largest x-coordinate.",
+        "wrong": "The optimum always occurs at the largest $x$-coordinate.",
         "right": "The objective weights and all constraints jointly determine the optimum."
       }
     ],
     "examples": [
       {
-        "question": "Maximise 3x+2y subject to x+y≤4, x≤2, x≥0, y≥0.",
+        "question": "Maximise $3x + 2y$ subject to $x + y \\le 4$, $x \\le 2$, $x \\ge 0$, $y \\ge 0$.",
         "steps": [
-          "Vertices are (0,0),(2,0),(2,2),(0,4).",
-          "Evaluate 3x+2y: 0,6,10,8 respectively.",
-          "Maximum 10 occurs at (2,2)."
+          "The vertices are $(0, 0)$, $(2, 0)$, $(2, 2)$ and $(0, 4)$.",
+          "Evaluate $3x + 2y$: 0, 6, 10 and 8 respectively.",
+          "The maximum, 10, occurs at $(2, 2)$."
         ],
-        "answer": "10 at (2,2)",
+        "answer": "10 at $(2, 2)$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -488,7 +488,7 @@ export default {
     "concepts": [
       {
         "title": "Bayes' rule must account for false positives",
-        "body": "A test with high sensitivity can still have a low positive predictive value when the base rate is small. Use a probability tree or weighted population table rather than confusing P(positive|condition) with P(condition|positive)."
+        "body": "A test with high sensitivity can still have a low positive predictive value when the base rate is small. Use a probability tree or a weighted population table rather than confusing $P(\\text{positive} \\mid \\text{condition})$ with $P(\\text{condition} \\mid \\text{positive})$."
       }
     ],
     "points": [
@@ -499,19 +499,19 @@ export default {
     ],
     "mistakes": [
       {
-        "wrong": "P(condition|positive) equals sensitivity.",
-        "right": "Sensitivity is P(positive|condition), a different conditional probability."
+        "wrong": "$P(\\text{condition} \\mid \\text{positive})$ equals the sensitivity.",
+        "right": "Sensitivity is $P(\\text{positive} \\mid \\text{condition})$, a different conditional probability."
       }
     ],
     "examples": [
       {
-        "question": "Prevalence is 1%, sensitivity 90% and false-positive rate 5%. Find P(condition|positive).",
+        "question": "Prevalence is 1%, sensitivity 90% and the false-positive rate 5%. Find $P(\\text{condition} \\mid \\text{positive})$.",
         "steps": [
-          "True-positive probability is .01×.90=.009.",
-          "False-positive probability is .99×.05=.0495.",
-          "Posterior =.009/(.009+.0495)=2/13."
+          "True-positive probability: $0.01 \\times 0.90 = 0.009$.",
+          "False-positive probability: $0.99 \\times 0.05 = 0.0495$.",
+          "Posterior $= \\dfrac{0.009}{0.009 + 0.0495} = \\tfrac{2}{13}$."
         ],
-        "answer": "2/13",
+        "answer": "$\\tfrac{2}{13}$",
         "verify": {
           "kind": "value",
           "expr": "(0.01*0.9)/(0.01*0.9+0.99*0.05)",

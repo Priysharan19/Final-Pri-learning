@@ -279,9 +279,6 @@ try {
     ok(/role="status" aria-live="polite"/.test(html), `${n}: a polite live region`);
     ok(/<button/.test(html) && !/<button(?![^>]*type="button")/.test(html), `${n}: real type="button" buttons`);
     figureChecks(html, `${n} (interactive)`);
-    // KNOWN GAP (core kit, not this pack): the counterpart `solid` has no hemisphere (geometry.js solidModel throws),
-    // so a hemisphere solidExplorer cannot be drawn in a question until solidModel gains one. Reported to the coordinator.
-    if (spec.shape === 'hemisphere') continue;
     const asked = draw(spec, false);
     ok(!/data-diagram-interactive|type="range"/.test(asked), `${n}: a question gets no control`);
   }
@@ -298,6 +295,9 @@ try {
   ok(/roots of z to the power 5/.test(draw(GOOD_X.argandRootsX)), 'argandExplorer (roots) in a question draws the roots');
   ok(/det M = 5/.test(draw(GOOD_X.matrixT)), 'matrixTransform in a question draws matrix2d');
   ok(/role="img"/.test(draw(GOOD_X.solidCone)), 'solidExplorer (cone) in a question draws the core solid');
+  ok(/role="img"/.test(draw(GOOD_X.solidHemi)), 'solidExplorer (hemisphere) in a question draws the core solid (solidModel has a hemisphere)');
+  const vq = draw({ kind: 'vectorExplorer', a: [3, 1], b: [1, 2], mode: 'sum' });
+  ok(/role="img"/.test(vq) && /<path|<line/.test(vq) && !/type="range"/.test(vq) && /4/.test(vq), 'vectorExplorer in a question draws a and b tip to tail with their resultant, not empty axes');
 } finally {
   await server.close();
 }

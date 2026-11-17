@@ -32,7 +32,7 @@ export default {
       { front: 'Checking a square from coordinates', back: 'All four sides equal and both diagonals equal.' }
     ],
     mistakes: [
-      { wrong: 'Plotting $(3, -2)$ by going 3 down and 2 right.', right: 'Move along $x$ first: 3 right, then 2 down.', misconception: 'variable-swapped' },
+      { wrong: 'Plotting $(3, -2)$ by going $3$ down and $2$ right.', right: 'Move along $x$ first: $3$ right, then $2$ down.', misconception: 'variable-swapped' },
       { wrong: 'Distance from $(1, 2)$ to $(4, 6)$ is $3 + 4 = 7$.', right: 'Add the squares, then take the root: $\\sqrt{9 + 16} = 5$.' },
       { wrong: 'Distance from $(-3, 5)$ to $(4, 5)$ is $4 - 3 = 1$.', right: 'Subtract the coordinates with their signs: $4 - (-3) = 7$.', misconception: 'sign-flipped' },
       { wrong: 'Saying $(0, 5)$ is in Quadrant I.', right: 'It lies on the $y$-axis, so it is in no quadrant.' }
@@ -54,11 +54,11 @@ export default {
       { title: 'Parallel lines', body: 'Lines with the same slope but different intercepts never meet: they are parallel.' }
     ],
     definitions: [
-      { term: 'Polynomial in $x$', meaning: 'An expression whose terms are numbers times $x^n$ with $n$ a whole number (0, 1, 2, ...).' },
+      { term: 'Polynomial in $x$', meaning: 'An expression whose terms are numbers times $x^n$ with $n$ a whole number ($0$, $1$, $2$, ...).' },
       { term: 'Degree', meaning: 'The highest power of the variable with a non-zero coefficient.' },
-      { term: 'Linear polynomial', meaning: 'A polynomial of degree 1, written $ax + b$ with $a \\ne 0$.' },
+      { term: 'Linear polynomial', meaning: 'A polynomial of degree $1$, written $ax + b$ with $a \\ne 0$.' },
       { term: 'Zero of a polynomial', meaning: 'A number $c$ with $p(c) = 0$.' },
-      { term: 'Slope', meaning: 'The change in $y$ for each increase of 1 in $x$.' }
+      { term: 'Slope', meaning: 'The change in $y$ for each increase of $1$ in $x$.' }
     ],
     formulas: [
       { label: 'General linear polynomial', tex: 'p(x) = ax + b,\\quad a \\ne 0' },
@@ -76,13 +76,13 @@ export default {
     ],
     mistakes: [
       { wrong: 'Zero of $3x - 12$ is $-4$.', right: '$3x - 12 = 0$ gives $3x = 12$, so $x = 4$.', misconception: 'sign-on-transfer' },
-      { wrong: 'Degree of $4x^2 + 9x^5 - 1$ is 2 because $x^2$ comes first.', right: 'Degree is the highest power anywhere: 5.' },
+      { wrong: 'Degree of $4x^2 + 9x^5 - 1$ is $2$ because $x^2$ comes first.', right: 'Degree is the highest power anywhere: $5$.' },
       { wrong: 'Evaluating $-x^2$ at $x = -3$ as $9$.', right: 'Square first, then apply the minus: $-(-3)^2 = -9$.', misconception: 'negative-squared' },
       { wrong: 'Reading $b$ in $y = ax + b$ as the slope.', right: '$a$ is the slope; $b$ is the $y$-intercept.' }
     ],
     examples: [
       { question: 'Find the zero of $p(x) = 3x - 12$.', steps: ['Set $3x - 12 = 0$.', '$3x = 12$, so $x = 4$.'], answer: '$x = 4$', verify: { kind: 'roots', f: '3x-12', answers: ['4'] } },
-      { question: 'A candle is 20 cm tall and burns 2 cm per hour. How tall is it after 6 hours?', steps: ['Height after $x$ hours: $h = 20 - 2x$.', 'At $x = 6$: $20 - 12 = 8$.'], answer: '$8$ cm', verify: { kind: 'value', expr: '20-2*6', answer: '8' } }
+      { question: 'A candle is $20$ cm tall and burns $2$ cm per hour. How tall is it after $6$ hours?', steps: ['Height after $x$ hours: $h = 20 - 2x$.', 'At $x = 6$: $20 - 12 = 8$.'], answer: '$8$ cm', verify: { kind: 'value', expr: '20-2*6', answer: '8' } }
     ]
   },
 
@@ -94,7 +94,7 @@ export default {
       { title: 'Rational and irrational', body: 'A rational number can be written $p/q$ with integers $p, q$ and $q \\ne 0$. Numbers such as $\\sqrt{2}$, $\\sqrt{3}$ and $\\pi$ cannot be written this way; they are irrational.' },
       { title: 'Density', body: 'Between any two different rationals there is another one, for example their average. So there are infinitely many rationals between any two.' },
       { title: 'Decimal test', body: 'A rational number has a decimal that either stops (terminates) or repeats forever. An irrational number has a decimal that never stops and never settles into a repeating block.' },
-      { title: 'Placing roots on the line', body: 'Build a right triangle with legs 1 and 1 on the number line; its hypotenuse is $\\sqrt{2}$. Swing an arc from 0 to mark it. Repeating with legs $\\sqrt{2}$ and 1 gives $\\sqrt{3}$, and so on.' }
+      { title: 'Placing roots on the line', body: 'Build a right triangle with legs $1$ and $1$ on the number line; its hypotenuse is $\\sqrt{2}$. Swing an arc from $0$ to mark it. Repeating with legs $\\sqrt{2}$ and $1$ gives $\\sqrt{3}$, and so on.' }
     ],
     definitions: [
       { term: 'Rational number', meaning: 'A number expressible as $p/q$ with $p, q$ integers and $q \\ne 0$.' },
@@ -103,7 +103,7 @@ export default {
       { term: 'Recurring decimal', meaning: 'A decimal in which a block of digits repeats forever, written with a bar, such as $0.\\overline{36}$.' }
     ],
     formulas: [
-      { label: 'Pure recurring decimal', tex: '0.\\overline{ab} = \\dfrac{ab}{99}', note: 'One 9 for each repeating digit.' },
+      { label: 'Pure recurring decimal', tex: '0.\\overline{ab} = \\dfrac{ab}{99}', note: 'One $9$ for each repeating digit.' },
       { label: 'Terminating test', tex: '\\dfrac{p}{q}\\text{ terminates} \\iff q = 2^m 5^n', note: 'With the fraction in lowest terms.' },
       { label: 'Root rules', tex: '\\sqrt{ab} = \\sqrt{a}\\,\\sqrt{b},\\quad \\sqrt{\\dfrac{a}{b}} = \\dfrac{\\sqrt{a}}{\\sqrt{b}}', note: 'For $a, b > 0$.' },
       { label: 'Rationalising', tex: '\\dfrac{1}{\\sqrt{a} - \\sqrt{b}} = \\dfrac{\\sqrt{a} + \\sqrt{b}}{a - b}', note: 'For $a, b \\ge 0$ with $a \\ne b$.' }
@@ -112,7 +112,7 @@ export default {
       { front: 'Is every integer rational?', back: 'Yes: $n = n/1$.' },
       { front: 'Is $\\sqrt{9}$ irrational?', back: 'No, $\\sqrt{9} = 3$. The square root of a natural number is irrational only when that number is not a perfect square.' },
       { front: 'Rational + irrational is...', back: 'Always irrational.' },
-      { front: 'Irrational × irrational is...', back: 'Can be either: $\\sqrt{2} \\times \\sqrt{2} = 2$ is rational.' },
+      { front: 'An irrational number times an irrational number is...', back: 'Can be either: $\\sqrt{2} \\times \\sqrt{2} = 2$ is rational.' },
       { front: 'Does $7/40$ terminate?', back: 'Yes: $40 = 2^3 \\times 5$, so $7/40 = 0.175$.' },
       { front: 'A rational between $a$ and $b$', back: 'Their average $(a + b)/2$.' }
     ],
@@ -158,7 +158,7 @@ export default {
       { front: 'Is $(a + b)^2 = a^2 + b^2$?', back: 'No. The middle term $2ab$ is always there.' },
       { front: 'Quick way to compute $99^2$', back: '$(100 - 1)^2 = 10000 - 200 + 1 = 9801$.' },
       { front: 'First step in any factorisation', back: 'Take out the highest common factor.' },
-      { front: 'Splitting $x^2 + 5x + 6$', back: 'Need two numbers with sum 5 and product 6: 2 and 3, giving $(x + 2)(x + 3)$.' },
+      { front: 'Splitting $x^2 + 5x + 6$', back: 'Need two numbers with sum $5$ and product $6$: $2$ and $3$, giving $(x + 2)(x + 3)$.' },
       { front: 'If $a + b + c = 0$, then $a^3 + b^3 + c^3 = $?', back: '$3abc$.' },
       { front: 'Checking a factorisation', back: 'Expand your answer; it must give back the original expression.' }
     ],
@@ -169,7 +169,7 @@ export default {
       { wrong: '$a^3 + b^3 = (a + b)^3$.', right: '$a^3 + b^3 = (a + b)(a^2 - ab + b^2)$.', misconception: 'power-of-sum' }
     ],
     examples: [
-      { question: 'Factorise $x^2 + 5x + 6$.', steps: ['Find two numbers with sum 5 and product 6: 2 and 3.', '$x^2 + 2x + 3x + 6 = x(x + 2) + 3(x + 2)$.'], answer: '$(x + 2)(x + 3)$', verify: { kind: 'equivalent', a: 'x^2+5x+6', b: '(x+2)(x+3)' } },
+      { question: 'Factorise $x^2 + 5x + 6$.', steps: ['Find two numbers with sum $5$ and product $6$: $2$ and $3$.', '$x^2 + 2x + 3x + 6 = x(x + 2) + 3(x + 2)$.'], answer: '$(x + 2)(x + 3)$', verify: { kind: 'equivalent', a: 'x^2+5x+6', b: '(x+2)(x+3)' } },
       { question: 'Use an identity to find $103 \\times 97$.', steps: ['$103 \\times 97 = (100 + 3)(100 - 3)$.', '$= 100^2 - 3^2 = 10000 - 9$.'], answer: '$9991$', verify: { kind: 'value', expr: '103*97', answer: '9991' } }
     ]
   },
@@ -198,7 +198,7 @@ export default {
       { label: 'Cyclic quadrilateral', tex: '\\angle A + \\angle C = \\angle B + \\angle D = 180^\\circ' }
     ],
     points: [
-      { front: 'How many circles pass through 3 collinear points?', back: 'None.' },
+      { front: 'How many circles pass through $3$ collinear points?', back: 'None.' },
       { front: 'Perpendicular from centre to a chord', back: 'It bisects the chord.' },
       { front: 'Equal chords are...', back: 'Equidistant from the centre and subtend equal central angles.' },
       { front: 'Angle subtended by a diameter at the circle', back: '$90^\\circ$.' },
@@ -211,7 +211,7 @@ export default {
       { wrong: 'Using the full chord length with the radius in Pythagoras.', right: 'Use half the chord: $r^2 = d^2 + (\\ell/2)^2$.' }
     ],
     examples: [
-      { question: 'A chord lies 5 cm from the centre of a circle of radius 13 cm. Find its length.', steps: ['Half-chord $= \\sqrt{13^2 - 5^2} = \\sqrt{144} = 12$.', 'Full chord $= 2 \\times 12$.'], answer: '$24$ cm', verify: { kind: 'value', expr: '2*sqrt(13^2-5^2)', answer: '24' } },
+      { question: 'A chord lies $5$ cm from the centre of a circle of radius $13$ cm. Find its length.', steps: ['Half-chord $= \\sqrt{13^2 - 5^2} = \\sqrt{144} = 12$.', 'Full chord $= 2 \\times 12$.'], answer: '$24$ cm', verify: { kind: 'value', expr: '2*sqrt(13^2-5^2)', answer: '24' } },
       { question: 'In a cyclic quadrilateral $ABCD$, $\\angle A = 75^\\circ$. Find $\\angle C$.', steps: ['Opposite angles of a cyclic quadrilateral sum to $180^\\circ$.', '$\\angle C = 180^\\circ - 75^\\circ$.'], answer: '$105^\\circ$', verify: { kind: 'value', expr: '180-75', answer: '105' } }
     ]
   },
@@ -221,7 +221,7 @@ export default {
     prereqs: ['c8-mensuration'],
     concepts: [
       { title: 'Working with $\\pi$', body: 'Keep answers in terms of $\\pi$ unless told otherwise. If an approximation such as $22/7$ or $3.14$ is stated, use exactly that one and say the answer is approximate.' },
-      { title: 'Areas from base and height', body: 'A parallelogram has area base × height, and a triangle is half of that. The height must be perpendicular to the chosen base. Parallelograms on the same base and between the same parallels have equal heights, so equal areas; the same holds for two triangles.' },
+      { title: 'Areas from base and height', body: 'A parallelogram has area $\\text{base}\\times\\text{height}$, and a triangle is half of that. The height must be perpendicular to the chosen base. Parallelograms on the same base and between the same parallels have equal heights, so equal areas; the same holds for two triangles.' },
       { title: 'Heron’s formula', body: 'When only the three sides are known, find the semi-perimeter $s$, then multiply $s$ by its three differences from the sides and take the square root.' },
       { title: 'Arcs, sectors and segments', body: 'A sector with angle $\\theta$ is the fraction $\\theta/360$ of the whole circle, for both arc length and area. A segment is a sector minus the triangle cut off by the chord.' },
       { title: 'Composite shapes', body: 'Split a figure into known pieces, or take a big shape and subtract the missing parts. A circular track is the difference of two circles.' }
@@ -247,7 +247,7 @@ export default {
       { front: 'Equilateral triangle of side $a$', back: 'Area $= \\frac{\\sqrt{3}}{4}a^2$.' },
       { front: 'Segment area', back: 'Sector area minus the triangle area.' },
       { front: 'Triangle and parallelogram on the same base, same parallels', back: 'Triangle area is half the parallelogram’s.' },
-      { front: 'Units of area', back: 'Always square units, e.g. cm².' },
+      { front: 'Units of area', back: 'Always square units, e.g. $\\text{cm}^2$.' },
       { front: 'Before using Heron', back: 'Check that each side is less than the sum of the other two.' }
     ],
     mistakes: [
@@ -257,16 +257,16 @@ export default {
       { wrong: 'Mixing diameter and radius in $\\pi r^2$.', right: 'Halve the diameter first.' }
     ],
     examples: [
-      { question: 'Find the area of a triangle with sides 13 cm, 14 cm and 15 cm.', steps: ['$s = (13 + 14 + 15)/2 = 21$.', '$A = \\sqrt{21 \\times 8 \\times 7 \\times 6} = \\sqrt{7056}$.'], answer: '$84$ cm²', verify: { kind: 'value', expr: 'sqrt(21*(21-13)*(21-14)*(21-15))', answer: '84' } },
-      { question: 'Find the area of a sector of radius 7 cm and angle $90^\\circ$, in terms of $\\pi$.', steps: ['Fraction of the circle: $90/360 = 1/4$.', 'Area $= \\frac{1}{4} \\times \\pi \\times 49$.'], answer: '$\\dfrac{49\\pi}{4}$ cm²', verify: { kind: 'value', expr: '(90/360)*pi*7^2', answer: '49*pi/4' } }
+      { question: 'Find the area of a triangle with sides $13$ cm, $14$ cm and $15$ cm.', steps: ['$s = (13 + 14 + 15)/2 = 21$.', '$A = \\sqrt{21 \\times 8 \\times 7 \\times 6} = \\sqrt{7056}$.'], answer: '$84\\text{ cm}^2$', verify: { kind: 'value', expr: 'sqrt(21*(21-13)*(21-14)*(21-15))', answer: '84' } },
+      { question: 'Find the area of a sector of radius $7$ cm and angle $90^\\circ$, in terms of $\\pi$.', steps: ['Fraction of the circle: $90/360 = 1/4$.', 'Area $= \\frac{1}{4} \\times \\pi \\times 49$.'], answer: '$\\dfrac{49\\pi}{4}\\text{ cm}^2$', verify: { kind: 'value', expr: '(90/360)*pi*7^2', answer: '49*pi/4' } }
     ]
   },
 
   'c9-probability': {
-    summary: 'Probability puts a number from 0 to 1 on how likely an event is. It can be estimated from experiments and data, or worked out exactly by counting equally likely outcomes.',
+    summary: 'Probability puts a number from $0$ to $1$ on how likely an event is. It can be estimated from experiments and data, or worked out exactly by counting equally likely outcomes.',
     prereqs: ['c8-data-handling'],
     concepts: [
-      { title: 'The probability scale', body: 'An impossible event has probability 0, a certain event has probability 1, and everything else lies in between. An even chance is $1/2$.' },
+      { title: 'The probability scale', body: 'An impossible event has probability $0$, a certain event has probability $1$, and everything else lies in between. An even chance is $1/2$.' },
       { title: 'Experimental probability', body: 'Repeat an experiment and divide the number of times the event happened by the number of trials. With more trials, this fraction tends to settle near the theoretical value.' },
       { title: 'Theoretical probability', body: 'When all outcomes are equally likely, the probability of an event is the number of favourable outcomes divided by the total number of outcomes.' },
       { title: 'Sample spaces and trees', body: 'List every possible outcome. For several stages, a tree diagram shows each stage as branches; the outcomes are the paths, and counting them gives the total.' },
@@ -286,20 +286,20 @@ export default {
       { label: 'Complement', tex: 'P(\\text{not } E) = 1 - P(E)' }
     ],
     points: [
-      { front: 'Can a probability be $1.2$ or $-0.1$?', back: 'Never. It always lies between 0 and 1.' },
+      { front: 'Can a probability be $1.2$ or $-0.1$?', back: 'Never. It always lies between $0$ and $1$.' },
       { front: 'Sample space for tossing two coins', back: 'HH, HT, TH, TT: four outcomes, not three.' },
       { front: 'Why do more trials help?', back: 'Experimental probability settles closer to the true value in the long run.' },
-      { front: 'Prime numbers on a die', back: '2, 3 and 5: three of six faces.' },
+      { front: 'Prime numbers on a die', back: '$2$, $3$ and $5$: three of six faces.' },
       { front: '“At least one” problems', back: 'Often easiest as $1 - P(\\text{none})$.' },
-      { front: 'Sum of probabilities of all outcomes', back: 'Exactly 1.' }
+      { front: 'Sum of probabilities of all outcomes', back: 'Exactly $1$.' }
     ],
     mistakes: [
-      { wrong: 'Two coins: outcomes are 2 heads, 1 head, 0 heads, so $P(\\text{1 head}) = 1/3$.', right: 'HT and TH are separate outcomes: $P = 2/4 = 1/2$.', misconception: 'probability-wrong-total' },
+      { wrong: 'Two coins: outcomes are $2$ heads, $1$ head, $0$ heads, so $P(\\text{1 head}) = 1/3$.', right: 'HT and TH are separate outcomes: $P = 2/4 = 1/2$.', misconception: 'probability-wrong-total' },
       { wrong: 'After five heads, a tail is “due”.', right: 'Each fair toss is independent; $P(\\text{tail})$ is still $1/2$.' },
-      { wrong: 'Counting 1 as a prime when finding $P(\\text{prime})$ on a die.', right: '1 is not prime; the primes are 2, 3, 5.' }
+      { wrong: 'Counting $1$ as a prime when finding $P(\\text{prime})$ on a die.', right: '$1$ is not prime; the primes are $2$, $3$, $5$.' }
     ],
     examples: [
-      { question: 'A fair die is rolled. Find the probability of getting a prime number.', steps: ['Sample space: 1, 2, 3, 4, 5, 6 (6 outcomes).', 'Primes: 2, 3, 5 (3 outcomes). $P = 3/6$.'], answer: '$\\dfrac{1}{2}$', verify: { kind: 'value', expr: '3/6', answer: '1/2' } },
+      { question: 'A fair die is rolled. Find the probability of getting a prime number.', steps: ['Sample space: $1$, $2$, $3$, $4$, $5$, $6$ ($6$ outcomes).', 'Primes: $2$, $3$, $5$ ($3$ outcomes). $P = 3/6$.'], answer: '$\\dfrac{1}{2}$', verify: { kind: 'value', expr: '3/6', answer: '1/2' } },
       { question: 'Two fair coins are tossed. Find the probability of at least one head.', steps: ['Outcomes: HH, HT, TH, TT.', 'Only TT has no head, so $P = 1 - 1/4$.'], answer: '$\\dfrac{3}{4}$', verify: { kind: 'value', expr: '1-1/4', answer: '3/4' } }
     ]
   },
@@ -308,7 +308,7 @@ export default {
     summary: 'A sequence is an ordered list of numbers made by a rule. Adding the same amount each time gives an arithmetic progression; multiplying by the same amount gives a geometric progression. Knowing the rule lets you predict any term without listing them all.',
     prereqs: ['c9-linear-polynomials', 'c8-exponents'],
     concepts: [
-      { title: 'Explicit and recursive rules', body: 'An explicit rule gives $a_n$ directly from $n$, like $a_n = 2n + 1$. A recursive rule builds each term from earlier ones, like $a_n = a_{n-1} + a_{n-2}$ for the Virahānka–Fibonacci numbers 1, 1, 2, 3, 5, 8, ...' },
+      { title: 'Explicit and recursive rules', body: 'An explicit rule gives $a_n$ directly from $n$, like $a_n = 2n + 1$. A recursive rule builds each term from earlier ones, like $a_n = a_{n-1} + a_{n-2}$ for the Virahānka–Fibonacci numbers $1$, $1$, $2$, $3$, $5$, $8$, ...' },
       { title: 'Arithmetic progression', body: 'Each term is the previous one plus a fixed common difference $d$. The terms follow a linear pattern, so their graph is a set of points on a straight line.' },
       { title: 'Sum of an AP', body: 'Pair the first and last terms, the second and second-last, and so on: every pair has the same total. That gives $S_n = \\frac{n}{2}(\\text{first} + \\text{last})$.' },
       { title: 'Geometric progression', body: 'Each term is the previous one times a fixed common ratio $r$. With a positive first term, $r > 1$ makes the terms grow quickly and $0 < r < 1$ makes them shrink, as in fractal patterns where each stage is a fixed fraction of the last.' }
@@ -321,7 +321,7 @@ export default {
     ],
     formulas: [
       { label: 'nth term of an AP', tex: 'a_n = a + (n - 1)d' },
-      { label: 'Sum of first n terms of an AP', tex: 'S_n = \\dfrac{n}{2}\\big[2a + (n - 1)d\\big] = \\dfrac{n}{2}(a + \\ell)' },
+      { label: 'Sum of first $n$ terms of an AP', tex: 'S_n = \\dfrac{n}{2}\\big[2a + (n - 1)d\\big] = \\dfrac{n}{2}(a + \\ell)' },
       { label: 'nth term of a GP', tex: 'a_n = a\\,r^{\\,n - 1}' },
       { label: 'Virahānka–Fibonacci rule', tex: 'F_n = F_{n-1} + F_{n-2},\\quad F_1 = F_2 = 1' }
     ],
@@ -334,14 +334,14 @@ export default {
       { front: 'A recursive rule needs...', back: 'Starting value(s) as well as the rule.' }
     ],
     mistakes: [
-      { wrong: '$a_{20} = 3 + 20 \\times 4$ for the AP 3, 7, 11, ...', right: 'Use $n - 1$: $a_{20} = 3 + 19 \\times 4 = 79$.', misconception: 'arithmetic-slip' },
-      { wrong: 'Common difference of 10, 7, 4, ... is 3.', right: 'Subtract in order: $7 - 10 = -3$.', misconception: 'sign-flipped' },
+      { wrong: '$a_{20} = 3 + 20 \\times 4$ for the AP $3$, $7$, $11$, ...', right: 'Use $n - 1$: $a_{20} = 3 + 19 \\times 4 = 79$.', misconception: 'arithmetic-slip' },
+      { wrong: 'Common difference of $10$, $7$, $4$, ... is $3$.', right: 'Subtract in order: $7 - 10 = -3$.', misconception: 'sign-flipped' },
       { wrong: 'nth term of a GP is $a r^n$.', right: 'It is $a r^{n-1}$.' },
-      { wrong: 'Treating 2, 4, 8, 16 as an AP.', right: 'Differences change but ratios are all 2: it is a GP.' }
+      { wrong: 'Treating $2$, $4$, $8$, $16$ as an AP.', right: 'Differences change but ratios are all $2$: it is a GP.' }
     ],
     examples: [
-      { question: 'For the AP 3, 7, 11, ..., find the 20th term and the sum of the first 20 terms.', steps: ['$a = 3$, $d = 4$. $a_{20} = 3 + 19 \\times 4 = 79$.', '$S_{20} = \\frac{20}{2}(3 + 79) = 10 \\times 82$.'], answer: '$a_{20} = 79$, $S_{20} = 820$', verify: { kind: 'values', pairs: [['3+(20-1)*4', '79'], ['20/2*(2*3+(20-1)*4)', '820']] } },
-      { question: 'Find the 6th term of the GP 2, 6, 18, ...', steps: ['$a = 2$, $r = 6/2 = 3$.', '$a_6 = 2 \\times 3^5 = 2 \\times 243$.'], answer: '$486$', verify: { kind: 'value', expr: '2*3^(6-1)', answer: '486' } }
+      { question: 'For the AP $3$, $7$, $11$, ..., find the 20th term and the sum of the first $20$ terms.', steps: ['$a = 3$, $d = 4$. $a_{20} = 3 + 19 \\times 4 = 79$.', '$S_{20} = \\frac{20}{2}(3 + 79) = 10 \\times 82$.'], answer: '$a_{20} = 79$, $S_{20} = 820$', verify: { kind: 'values', pairs: [['3+(20-1)*4', '79'], ['20/2*(2*3+(20-1)*4)', '820']] } },
+      { question: 'Find the 6th term of the GP $2$, $6$, $18$, ...', steps: ['$a = 2$, $r = 6/2 = 3$.', '$a_6 = 2 \\times 3^5 = 2 \\times 243$.'], answer: '$486$', verify: { kind: 'value', expr: '2*3^(6-1)', answer: '486' } }
     ]
   }
 };
