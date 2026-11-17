@@ -239,43 +239,43 @@ Answer type: mcq. Printed answer: `A` (options: 0: B; 1: A; 2: C; 3: All equal).
 
 ## Squares and Square Roots (Class 8) · `c8-squares-roots-ncert-mastery` D1 seed 1
 
-> Without multiplying fully, find the units digit of $67^2$.
+> Find the square root of $4489$.
 
-Answer type: numeric. Printed answer: `9`.
+Answer type: numeric. Printed answer: `67`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `9` | ✓ credited | |
-| as a sum still to do | `8 + 1` | refused (D13) | |
-| a neighbouring value | `10` | ✗ wrong | |
-| a contradicting unit | `9 kg` | unread | |
+| key | `67` | ✓ credited | |
+| as a sum still to do | `66 + 1` | refused (D13) | |
+| a neighbouring value | `68` | ✗ wrong | |
+| a contradicting unit | `67 kg` | unread | |
 
 ## Cubes and Cube Roots (Class 8) · `c8-cubes-roots-ncert-mastery` D1 seed 1
 
-> Find the units digit of $70^3$ without calculating the whole cube.
+> Find the square root of $4489$.
 
-Answer type: numeric. Printed answer: `0`.
+Answer type: numeric. Printed answer: `67`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `0` | ✓ credited | |
-| as a sum still to do | `-1 + 1` | refused (D13) | |
-| a neighbouring value | `1` | ✗ wrong | |
-| a contradicting unit | `0 kg` | unread | |
+| key | `67` | ✓ credited | |
+| as a sum still to do | `66 + 1` | refused (D13) | |
+| a neighbouring value | `68` | ✗ wrong | |
+| a contradicting unit | `67 kg` | unread | |
 
 ## Comparing Quantities (Class 8) · `c8-comparing-quantities-ncert-mastery` D1 seed 1
 
-> An article is marked at ₹1000 and discounted by $10\%$. Find the sale price.
+> A pair of shoes in Mysuru is marked at ₹1200. The shopkeeper offers a discount of $5\%$. What is the selling price in rupees?
 
-Answer type: numeric (prefix "₹"). Printed answer: `₹ 900`.
+Answer type: numeric. Printed answer: `1140`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `900` | ✓ credited | |
-| with ₹ | `₹900` | ✓ credited | |
-| as a sum still to do | `899 + 1` | refused (D13) | |
-| a neighbouring value | `901` | ✗ wrong | |
-| a contradicting unit | `900 kg` | unread | |
+| key | `1140` | ✓ credited | |
+| with ₹ | `₹1140` | ✓ credited | |
+| as a sum still to do | `1139 + 1` | refused (D13) | |
+| a neighbouring value | `1141` | ✗ wrong | |
+| a contradicting unit | `1140 kg` | unread | |
 
 ## Algebraic Expressions and Identities (Class 8) · `c8-algebraic-identities-ncert-mastery` D1 seed 1
 
@@ -1062,4 +1062,4 @@ Answer type: numeric. Printed answer: `378`.
 | a neighbouring value | `379` | ✗ wrong | |
 | a contradicting unit | `378 kg` | unread | |
 
-**Sample digest (sha256 of everything above this line):** `75b4d09cffd221ce265d6337ff516942b324cdb38dd46619880cc30f1602e3e9`
+**Sample digest (sha256 of everything above this line):** `5122bf26d9b00468ee754ca46e202aea458288b9cb31ddfd98e0db3ba0f34a12`

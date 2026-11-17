@@ -78,7 +78,7 @@ const SOURCES = [...new Set([...importTree(['server/platform/markerOps.js', ...s
 const sourceRows = SOURCES.map(f => ({ file: f, sha256: sha(readFileSync(path.join(ROOT, f))) }));
 
 // Every rubric bank: a (generator, difficulty) that issues a chain plan on the fixed seeds.
-const SEEDS = Array.from({ length: 12 }, (_, i) => 1009 + i * 7919);
+const SEEDS = Array.from({ length: 24 }, (_, i) => 1009 + i * 7919);   // 12 until train 25: the extra Priyabhata forms left c10-ap-inverse-competency/D1 with no step check on the first 12
 // A wider sweep finds banks; the digest samples SEEDS within each one.
 const DISCOVERY = Array.from({ length: 200 }, (_, i) => 1 + i * 37);
 const banks = [];
@@ -115,7 +115,10 @@ function judge(q, lines, ans) {
 }
 const probes = [];
 for (const diff of [1, 2, 4]) {
-  const q = generateQuestion('c10-arithmetic-progressions', diff, 1009);
+  // Seed 1009 unless the extra forms drew another shape of question for it: the probe needs the
+  // direct form (the one that issues a step check with its givens).
+  const probeSeed = SEEDS.find(sd => { try { return !!generateQuestion('c10-arithmetic-progressions', diff, sd)?.stepcheck?.givens; } catch { return false; } }) ?? 1009;
+  const q = generateQuestion('c10-arithmetic-progressions', diff, probeSeed);
   const { a, d, n } = q.stepcheck.givens;
   const [wa, wd, wn] = [a + 3, d + 1, n + 2];
   const sum = diff !== 1;

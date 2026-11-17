@@ -27,7 +27,7 @@ const DEN = [2, 4, 5, 8, 10, 20, 25];
 const INTS = () => [
   mk('mixed', (rng, d) => {
     const [a, b] = distinct(rng, -R(d), R(d), 2), c = nzs(rng, 12), e = nzs(rng, R(d));
-    if (Math.abs(c) === 1 || (a - b) * c + e === 0) throw RETRY;
+    if (Math.abs(c) === 1 || (a - b) * c + e === 0 || b === 0) throw RETRY;   // no "- 0" term in the bracket
     const inner = `${a} ${b < 0 ? '+' : '-'} ${Math.abs(b)}`, tail = e < 0 ? `- ${-e}` : `+ ${e}`;
     return { p: `Find the value of $(${inner}) \\times ${pr(c)} ${tail}$.`, v: (a - b) * c + e,
       h: ['Work out the bracket first.', 'Then multiply, keeping track of signs.', 'Add or subtract the last number.'], s: [{ h: 'Bracket', d: `$${inner} = ${a - b}$` }, { h: 'Multiply', d: `$${a - b}\\times ${pr(c)}$` }],

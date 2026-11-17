@@ -503,7 +503,7 @@ const methods = [
     };
   } },
   { form: 'average-value', make(rng, d) {
-    const j = ri(rng, 1, R(d)), p = ri(rng, 0, R(d)), q = p + ri(rng, 1, R(d));
+    const j = ri(rng, 1, R(d)), p = ri(rng, 1, R(d)), q = p + ri(rng, 1, R(d));
     return {
       payload: numeric('average-value', `A farmer's plot near ${place(rng)} has width $w(x) = ${3 * j}x^2$ metres at distance $x$ metres from the road, for $x$ from $${p}$ to $${q}$. Find the mean width over this stretch, in metres.`, j * (q * q + p * q + p * p), {
         hints: ['The mean value of $w$ on $[p, q]$ is $\\dfrac{1}{q - p}\\int_p^q w\\,dx$.', 'Integrate $' + 3 * j + 'x^2$ to $' + j + 'x^3$.', 'Divide by the length of the stretch.'],
