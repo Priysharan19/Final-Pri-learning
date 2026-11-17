@@ -8,14 +8,14 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 ## Summary
 
-**43 of 196 chapters at standard.**
+**57 of 196 chapters at standard.**
 
 | Band | Chapters | With notes | At standard | Missing sections (count of chapters) | ≥2 diagrams | Interactive | KaTeX issues |
 |---|---|---|---|---|---|---|---|
 | CBSE Class 7 | 15 | 15 | 15 | — | 15 | 14 | 0 |
 | CBSE Class 8 | 13 | 13 | 13 | — | 13 | 13 | 0 |
 | CBSE Class 9 | 8 | 8 | 8 | — | 8 | 8 | 0 |
-| CBSE Class 10 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 0 |
+| CBSE Class 10 | 14 | 14 | 14 | — | 14 | 13 | 0 |
 | CBSE Class 11 | 14 | 14 | 0 | objective 14, intuition 14, checkpoint 14 | 0 | 0 | 0 |
 | CBSE Class 12 | 13 | 13 | 0 | objective 13, intuition 13, checkpoint 13 | 0 | 0 | 0 |
 | Olympiad | 7 | 7 | 7 | — | 7 | 5 | 0 |
@@ -34,6 +34,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 ## Chapters with no interactive diagram, and why
 
 - `c7-parallel-intersecting-lines-current` Parallel and Intersecting Lines — Turning the transversal would help, but the diagram kit draws parallel lines as a fixed figure; three figures at different transversal angles show the same equalities instead.
+- `c10-real-numbers` Real Numbers — Every idea in this chapter is about whole numbers and exact divisibility, so there is no continuous quantity to slide; the rectangle of squares and the prime-power chart show each argument whole.
 - `olymp-number-theory` Number Theory — Congruence arguments are about remainders of whole numbers; the cycle of residues is read completely from one static chart, and no slider over a continuous quantity would show the reason a cycle exists.
 - `olymp-functional-equations` Functional Equations — A functional equation is decided by substitutions on paper; sliding a parameter on a graph shows a candidate but never why it is the only one, so a moving picture here would mislead.
 
@@ -94,20 +95,20 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `c10-real-numbers` Real Numbers | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 5 | ok | **no** |
-| `c10-polynomials` Polynomials | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | ok | **no** |
-| `c10-pair-linear-equations` Pair of Linear Equations in Two Variables | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 47 | ok | **no** |
-| `c10-quadratic-equations` Quadratic Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 20 | ok | **no** |
-| `c10-arithmetic-progressions` Arithmetic Progressions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
-| `c10-triangles` Triangles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 36 | ok | **no** |
-| `c10-coordinate-geometry` Coordinate Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 71 | ok | **no** |
-| `c10-trigonometry` Introduction to Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 1 | ok | **no** |
-| `c10-trig-applications` Some Applications of Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 2 | ok | **no** |
-| `c10-circles` Circles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 3 | ok | **no** |
-| `c10-areas-circles` Areas Related to Circles | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 11 | ok | **no** |
-| `c10-surface-volume` Surface Areas and Volumes | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | ok | **no** |
-| `c10-statistics` Statistics | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 42 | ok | **no** |
-| `c10-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 22 | ok | **no** |
+| `c10-real-numbers` Real Numbers | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | reason | 5 | ok | yes |
+| `c10-polynomials` Polynomials | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 12 | ok | yes |
+| `c10-pair-linear-equations` Pair of Linear Equations in Two Variables | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 47 | ok | yes |
+| `c10-quadratic-equations` Quadratic Equations | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 20 | ok | yes |
+| `c10-arithmetic-progressions` Arithmetic Progressions | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 3 | ok | yes |
+| `c10-triangles` Triangles | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 36 | ok | yes |
+| `c10-coordinate-geometry` Coordinate Geometry | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 71 | ok | yes |
+| `c10-trigonometry` Introduction to Trigonometry | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 1 | ok | yes |
+| `c10-trig-applications` Some Applications of Trigonometry | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 2 | ok | yes |
+| `c10-circles` Circles | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 3 | ok | yes |
+| `c10-areas-circles` Areas Related to Circles | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 11 | ok | yes |
+| `c10-surface-volume` Surface Areas and Volumes | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 8 | ok | yes |
+| `c10-statistics` Statistics | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 42 | ok | yes |
+| `c10-probability` Probability | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 22 | ok | yes |
 
 ### CBSE Class 11
 
