@@ -1280,7 +1280,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     revision: currentRevision, write: writeMode, lines: inkResult?.lines || null, inkStale,
     inkAnswer: isWorking ? '' : inkAnswer, answer, working, choice: isMcq ? mcqSel : null
   };
-  const checkFocus = needsCheck && checking ? (doubt.weakest?.id || null) : null;
+  const checkFocus = needsCheck && checking ? (doubt?.weakest?.id || null) : null;
 
   useEffect(() => { if (!needsCheck && checking) setChecking(false); }, [needsCheck, checking]);
 
@@ -1375,6 +1375,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     submit(reading);
   }
   const confirmedRef = useRef(null);
+  // A confirmation belongs to the exact page and reading it was given for: if
+  // the transcript or the ink changes (a re-read, an edit), it is asked again.
+  useEffect(() => { setVouched(null); confirmedRef.current = null; }, [inkResult?.text, inkSignature]);
 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
@@ -1383,7 +1386,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (inFlightRef.current || busy || resolved) return;
     // A question that can never be marked is not sent to be marked.
     if (unmarkable) return;
-    if (needsCheck && vouchedNow !== reading) { setChecking(true); return; }
+    // A reading in doubt asks its question; any other waits for the one combined
+    // Confirm and submit tap (never opens the doubt panel, which has nothing to say).
+    if (needsCheck && vouchedNow !== reading) { if (doubt) setChecking(true); return; }
     // A stale answer left over from another attachment is not evidence that
     // the NEW photo was recognised. Never let Submit race its cloud reading or
     // quietly grade only the readable subset of a multi-page PDF.
@@ -2273,7 +2278,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         };
 
   // v1.1 instrument: ⌘↵ / Ctrl+↵ presses the primary action while it is a
-  // check (never Next, never a confirmation the student has to read). No other
+  // check (never Next; on a doubted reading it does not confirm; on an unremarkable one the reading is on screen beside the button). No other
   // shortcut in the app uses a modifier with Enter; Enter alone keeps its
   // field behaviour.
   const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable && !(needsCheck && checking);

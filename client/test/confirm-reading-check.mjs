@@ -29,6 +29,8 @@ ok(/if \(needsCheck && vouchedNow !== reading\) \{ setChecking\(true\); return; 
 ok(/confirmOnly\s*\n?\s*\? \{ label: t\('verdict.confirmAndSubmit'\), run: acceptReading/.test(card), 'the primary is the combined Confirm and submit');
 ok(/confirmed: viaInk \? confirmedRef\.current : null/.test(card), 'the confirmed revision is kept with the submission record');
 ok(/ink = \{ strokes: compactInkStrokes\(inkResult\.strokes\), recognized: inkResult\.text/.test(card), 'the original strokes still travel with the confirmed reading');
+ok(/doubt\?\.weakest\?\.id/.test(card) && /if \(doubt\) setChecking\(true\); return;/.test(card), 'a no-argument submit on an undoubted reading neither throws nor opens the doubt panel');
+ok(/setVouched\(null\); confirmedRef\.current = null;/.test(card), 'a confirmation is dropped when the transcript or the ink changes');
 const exam = readFileSync(new URL('../src/pages/ExamRoom.jsx', import.meta.url), 'utf8');
 ok(!/confirmGate\.js/.test(exam), 'the exam room keeps its own rules (it is not gated here)');
 console.log(`CONFIRM READING: PASS — ${n}/${n} checks — a read answer is confirmed before it is sent; an edited reading is confirmed again; a stale reading is re-read; the exam room is untouched`);
