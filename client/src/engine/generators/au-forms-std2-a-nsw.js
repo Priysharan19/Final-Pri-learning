@@ -443,6 +443,21 @@ export const forms = {
       const n = ri(rng, 5, 6), edges = makeNet(rng, n, ri(rng, 3, 5), 2, 15), y = ri(rng, 1, n - 2), x = ri(rng, y + 1, n - 1);
       const d0 = distances(n, edges, 0), dy = distances(n, edges, y);
       const v = d0[y] + dy[x];
+      // Shortest walk must be a simple path (no vertex repeated) so the key is unambiguous.
+      let best = Infinity;
+      const seen = new Array(n).fill(false);
+      const dfs = (u, w, hit) => {
+        if (w >= best) return;
+        if (u === x) { if (hit) best = w; return; }
+        seen[u] = true;
+        for (const [p, q, c] of edges) {
+          const o = p === u ? q : q === u ? p : -1;
+          if (o >= 0 && !seen[o]) dfs(o, w + c, hit || o === y);
+        }
+        seen[u] = false;
+      };
+      dfs(0, 0, y === 0);
+      if (best !== v) return null;
       return num(`The network gives travel times in minutes between $${n}$ stops: ${listEdges(edges)}. A bus must go from $A$ to $${LET[x]}$ and must call at $${LET[y]}$ on the way. What is the shortest possible travel time, in minutes?`, v, {
         suffix: 'min', figure: figNetwork({ nodes: LET.slice(0, n), edges }),
         traps: [{ value: d0[x], why: `The route must pass through ${LET[y]}, so the shortest A to ${LET[x]} path may not be allowed.` }].filter(t => t.value !== v),

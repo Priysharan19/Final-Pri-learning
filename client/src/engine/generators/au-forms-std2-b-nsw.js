@@ -295,7 +295,9 @@ const BD = [
   { x: 'weekly hours of screen time', y: 'exam mark', a: [70, 95], b: [1, 3], xr: [3, 15] },
   { x: 'hours since a phone battery was fully charged', y: 'charge remaining (%)', a: [90, 100], b: [3, 8], xr: [1, 10] }
 ];
-const lineTxt = (a, b) => `y = ${a} + ${b}x`;
+const bx = b => (b === 1 ? 'x' : `${b}x`);
+const an = w => (/^[aeiou]/i.test(w) ? 'an' : 'a');
+const lineTxt = (a, b) => `y = ${a} + ${bx(b)}`;
 
 const bivariate = [
   // What does the gradient mean?
@@ -378,7 +380,7 @@ const bivariate = [
   {
     make: rng => {
       const c = rc(rng, BD), a = ri(rng, c.a[0], c.a[1]), b = ri(rng, c.b[0], c.b[1]), x = ri(rng, c.xr[0], c.xr[1]);
-      const line = `y = ${a} - ${b}x`, kind = ri(rng, 0, 2), y = a - b * x;
+      const line = `y = ${a} - ${bx(b)}`, kind = ri(rng, 0, 2), y = a - b * x;
       if (kind === 0) {
         return num(`A line of best fit for ${c.y} ($y$) against ${c.x} ($x$) is $${line}$. Use it to predict $y$ when $x = ${x}$.`, y, {
           traps: [{ value: a + b * x, why: 'The gradient is negative, so subtract $bx$.' }, { value: (a - b) * x, why: 'Multiply $x$ by the gradient only, then subtract from $' + a + '$.' }],
@@ -389,8 +391,8 @@ const bivariate = [
       if (kind === 1) {
         return num(`A line of best fit for ${c.y} ($y$) against ${c.x} ($x$) is $${line}$. For what value of $x$ does the line predict $y = ${y}$?`, x, {
           traps: [{ value: (a + y) / b, why: 'Subtract $y$ from $' + a + '$: $' + a + ' - ' + b + 'x = ' + y + '$.' }, { value: y / b, why: 'Deal with the constant $' + a + '$ before dividing.' }],
-          hints: ['Set $y$ equal to the value and solve for $x$.', `$${a} - ${b}x = ${y}$.`, `$${b}x = ${a - y}$.`],
-          steps: [{ h: 'Solve', d: `$${a} - ${b}x = ${y} \\Rightarrow ${b}x = ${a - y} \\Rightarrow x = ${x}$` }]
+          hints: ['Set $y$ equal to the value and solve for $x$.', `$${a} - ${bx(b)} = ${y}$.`, `$${bx(b)} = ${a - y}$.`],
+          steps: [{ h: 'Solve', d: `$${a} - ${bx(b)} = ${y} \\Rightarrow ${bx(b)} = ${a - y} \\Rightarrow x = ${x}$` }]
         });
       }
       const dx = ri(rng, 2, 4);
@@ -407,9 +409,9 @@ const bivariate = [
     make: rng => {
       const c = rc(rng, BX), a = ri(rng, 5, 40), b = ri(rng, 2, 9);
       return choice(rng,
-        `A line of best fit predicts a ${c.y} of $${a}$ when ${c.x} is zero, and the prediction rises by $${b}$ for each ${c.one}. Which equation is the line of best fit, with ${c.x} as $x$ and ${c.y} as $y$?`,
+        `A line of best fit predicts ${an(c.y)} ${c.y} of $${a}$ when ${c.x} is zero, and the prediction rises by $${b}$ for each ${c.one}. Which equation is the line of best fit, with ${c.x} as $x$ and ${c.y} as $y$?`,
         `$${lineTxt(a, b)}$`,
-        [{ text: `$y = ${b} + ${a}x$`, why: 'The value at $x = 0$ is the constant term and the rise per unit is the coefficient of $x$.' },
+        [{ text: `$y = ${b} + ${bx(a)}$`, why: 'The value at $x = 0$ is the constant term and the rise per unit is the coefficient of $x$.' },
           { text: `$y = ${a + b}x$`, why: 'A line through the origin has no constant term; this line starts at ' + a + '.' },
           { text: `$y = ${a}${b}x$`, why: 'Write the equation as constant plus gradient times $x$.' }],
         ['The equation has the form $y = c + mx$.', `$c$ is the value at $x = 0$: $${a}$.`, `$m$ is the rise for each extra unit: $${b}$.`],
@@ -813,7 +815,7 @@ const measure = [
       const ks = new Set();
       while (ks.size < 4) ks.add(ri(rng, 30, 99));
       const vals = [...ks];
-      const forms = [m => `${m / 10} m`, m => `${m * 10} cm`, m => `${m * 100} mm`];
+      const forms = [m => `${m / 10}\\text{ m}`, m => `${m * 10}\\text{ cm}`, m => `${m * 100}\\text{ mm}`];
       const order = [0, 1, 2, rc(rng, [0, 1, 2])];
       const items = vals.map((v, i) => ({ v, text: forms[order[i]](v) }));
       const longest = rng() < 0.5;
@@ -896,7 +898,9 @@ const measure = [
   {
     diffs: [3],
     make: rng => {
-      const r = ri(rng, 5, 15) / 10, h = ri(rng, 8, 25) / 10, key = Math.round(Math.PI * r * r * h * 1000);
+      let r, h, exact;
+      do { r = ri(rng, 5, 15) / 10; h = ri(rng, 8, 25) / 10; exact = Math.PI * r * r * h * 1000; } while (Math.abs(exact - Math.floor(exact) - 0.5) < 0.05);
+      const key = Math.round(exact);
       return num(`A cylindrical rainwater tank has a radius of $${r}$ m and a height of $${h}$ m. How many litres does it hold when full, to the nearest whole number? (1 m³ = 1000 L; use the $\\pi$ button.)`, key, {
         tol: 0.51, suffix: 'L', traps: [{ value: r1(Math.PI * r * r * h), why: 'That is the volume in m³; multiply by 1000 for litres.', tol: 0.06 }, { value: Math.round(Math.PI * r * h * 1000), why: 'The volume of a cylinder is $\\pi r^2 h$: square the radius.', tol: 0.51 }],
         hints: ['$V = \\pi r^2 h$.', `$\\pi(${r})^2(${h}) \\approx ${r3(Math.PI * r * r * h)}$ m³.`, 'Multiply by 1000.'],

@@ -105,7 +105,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms12-normal` | 2 | 103.0k | 20 | — |
 | `ms11-formulas` | 4 | 129.1k | 18 | — |
 | `me11-functions` | 3 | 159.7k | 92 | — |
-| `ms12-bivariate-fit` | 4 | 164.5k | 30 | — |
+| `ms12-bivariate-fit` | 4 | 164.5k | 33 | — |
 | `mex-vectors` | 4 | 206.6k | 1 | forms |
 | `ms11-data` | 3 | 283.9k | 50 | — |
 | `ms12-bivariate` | 1 | 338.3k | 11 | — |
