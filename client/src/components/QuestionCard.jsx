@@ -133,6 +133,11 @@ const MistakeDiagnosis = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tu
 const WhyStep = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/WhyStep.jsx'));
 // The live step coach (F1): its requests and per-line verdicts, on demand.
 const StepCoachLive = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor/StepCoachLive.jsx'));
+// "See why it's wrong": the first break drawn as two graphs. Engine-only (no
+// model, no network), feedback only, and its own chunk so the plotting code is
+// fetched only when a step report actually has a break. A chunk that cannot
+// load (offline, a stale deploy) shows nothing rather than breaking the card.
+const MistakeGraph = React.lazy(() => import('./MistakeGraph.jsx').catch(() => ({ default: () => null })));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -3417,6 +3422,12 @@ function StepReport({ report, instrument = false, correctAnswer = null }) {
   // also wrong, and a line that is right on the student's own earlier value
   // (error carried forward) keeps its tick and says so.
   const first = report.lines.findIndex(l => l.status === 'break');
+  // The line before the first break is the last line Step Check accepted —
+  // the same line the engine diagnosed the break against.
+  let beforeFirst = null;
+  for (let j = first - 1; j >= 0; j--) {
+    if (report.lines[j].status === 'ok') { beforeFirst = report.lines[j].text; break; }
+  }
   const line = (l, i) => (
     <React.Fragment key={i}>
       <div className={`stepcheck-line sc-${l.status}${l.status === 'ok' && l.ecf === true ? ' sc-ecf' : ''}`}
@@ -3430,6 +3441,11 @@ function StepReport({ report, instrument = false, correctAnswer = null }) {
         {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
       </div>
       {l.diagnosis && <Diagnosis d={l.diagnosis} line={i + 1} />}
+      {i === first && typeof beforeFirst === 'string' && typeof l.text === 'string' && (
+        <React.Suspense fallback={null}>
+          <MistakeGraph prevText={beforeFirst} brokenText={l.text} />
+        </React.Suspense>
+      )}
       {/* Your line beside the correct one — only at the first break, only
           when that break is the final line (the answer), and only from the
           resolved reply's own answer, which this card already shows. The
