@@ -206,7 +206,7 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
 
 // ── SymPy differential oracle, 2026-11-18 · 34 cases ────────────────────────
 // tools/math-oracle found the checker crediting each wrong answer below
-// (docs/evidence/sympy-oracle-2026-11-18.md): a calculator display of an exact
+// (docs/evidence/sympy-oracle-2026-11-18.md, PR #993): a calculator display of an exact
 // value on a question that demands the exact value, and final-answer
 // expressions that agree with the key only at the published sample points or
 // only within the 1e-6 sampling band. Each sits beside a right answer the
@@ -240,8 +240,31 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   for (const w of ['0.3333333333', '0.33333333']) expect(G, `third-wrong-${w}`, thirdExact, w, false);
 }
 
+// ── The probe keeps right answers right · 542 cases ─────────────────────────
+// Independent review of the probe above (PR #992): an expanded high-degree
+// polynomial is a difference of large terms and carries their rounding, so a
+// band on the result alone refused (2x + 7)⁷ written out. Every expansion of
+// (ax + b)ⁿ for n 2–7, a 1–5, b ±1–9 must stay right.
+{
+  const G = 'sympy-oracle-2026-11-18-controls';
+  const binom = (n, k) => { let r = 1n; for (let i = 1n; i <= BigInt(k); i++) r = r * (BigInt(n) - i + 1n) / i; return r; };
+  const expand = (a, b, n) => {
+    const terms = [];
+    for (let k = n; k >= 0; k--) {
+      const c = binom(n, k) * BigInt(a) ** BigInt(k) * BigInt(b) ** BigInt(n - k);
+      terms.push(`${c}${k ? `x${k > 1 ? `^${k}` : ''}` : ''}`);
+    }
+    return terms.join(' + ').replace(/\+ -/g, '- ');
+  };
+  for (let n = 2; n <= 7; n++) for (let a = 1; a <= 5; a++) for (const b of [-9, -8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    expect(G, `expanded-(${a}x+${b})^${n}`, { answerType: 'expression', answer: { expr: `(${a}x + ${b})^${n}` } }, expand(a, b, n), true);
+  }
+  expect(G, 'expanded-(2x+7)^7-review', { answerType: 'expression', answer: { expr: '(2x + 7)^7' } }, '128x^7 + 3136x^6 + 32928x^5 + 192080x^4 + 672280x^3 + 1411788x^2 + 1647086x + 823543', true);
+  expect(G, 'expanded-(x-3)^10-positive', { answerType: 'expression', answer: { expr: '(x - 3)^10', positiveOnly: true } }, expand(1, -3, 10), true);
+}
+
 // ── Counts are part of the contract ─────────────────────────────────────────
-const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 34 };
+const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 34, 'sympy-oracle-2026-11-18-controls': 542 };
 for (const [g, n] of Object.entries(EXPECTED)) if (groups[g]?.total !== n) failures.push(`${g}: built ${groups[g]?.total} cases, the corpus has ${n}`);
 
 const pass = Object.values(groups).reduce((s, g) => s + g.pass, 0);

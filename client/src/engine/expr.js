@@ -680,8 +680,35 @@ const domainEval = (ast, env) => evaluate(ast, env, DOMAIN_EVAL);
 const domainEnv = ({ e, pi, ...env }) => env;
 /** Do two sampled values differ beyond rounding? */
 const apart = (u, v) => abs(u - v) > 1e-6 * Math.max(1, abs(u), abs(v));
-/** …or beyond binary64 evaluation noise alone (the final-answer probe). */
-const apartTight = (u, v) => abs(u - v) > 1e-9 * Math.max(1, abs(u), abs(v));
+/**
+ * …or beyond binary64 evaluation noise alone (the final-answer probe). The noise
+ * of a sum is set by the size of its terms, not of its result: an expanded
+ * (2x + 7)⁷ near its root is a difference of terms near 10⁸ and carries ~10⁻⁸ of
+ * rounding, so the band also covers 1e-11 of the larger side's term magnitude.
+ */
+const apartTight = (u, v, scale) => abs(u - v) > Math.max(1e-9 * Math.max(1, abs(u), abs(v)), 1e-11 * scale);
+
+/**
+ * An upper bound on the size of the terms an evaluation adds up: every + and −
+ * adds magnitudes, × and ÷ and whole powers carry them, and anything else
+ * contributes the size of its value.
+ */
+function magnitude(ast, env) {
+  switch (ast.t) {
+    case 'group': case 'neg': return magnitude(ast.v, env);
+    case 'bin': {
+      if (ast.op === '+' || ast.op === '-') return magnitude(ast.l, env) + magnitude(ast.r, env);
+      if (ast.op === '*') return magnitude(ast.l, env) * magnitude(ast.r, env);
+      if (ast.op === '/') return magnitude(ast.l, env) / abs(evaluate(ast.r, env));
+      if (ast.op === '^') {
+        const r = evaluate(ast.r, env);
+        return Number.isInteger(r) && r >= 0 ? magnitude(ast.l, env) ** r : abs(evaluate(ast, env));
+      }
+      return abs(evaluate(ast, env));
+    }
+    default: return abs(evaluate(ast, env));
+  }
+}
 
 /** FNV-1a over both sides as written: the probe points follow from the answer, not from a published table. */
 function probeSeed(a, b) {
@@ -709,7 +736,9 @@ function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed)
     }
     const va = evaluate(astA, env), vb = evaluate(astB, env);
     if (!fin(va) || !fin(vb)) continue;
-    if (apartTight(va, vb)) return false;
+    const scale = Math.max(magnitude(astA, env), magnitude(astB, env));
+    if (!fin(scale)) continue;                  // no bound on the noise: this point says nothing
+    if (apartTight(va, vb, scale)) return false;
   }
   return true;
 }

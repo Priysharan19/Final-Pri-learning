@@ -58,7 +58,7 @@
         {"has":"shape; 81 official CBSE records → 314 Pri variants on their chapter (10 bands with no serving generator).","note":"28/110 → 80/310 records/variants (Train 15: #840, #845, #842 records, re-derived by running all 4 shards). 80/310 → 81/314 (#846: 65/2/1 Q24, re-derived by running all 4 shards on Train 15 + #846)."},
         {"has":"258/258 dot points have a generator behind them; 0 do not"},
         {"has":"NCERT ANSWER FORMS: PASS — 481/481 checks","note":"L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three)."},
-        {"has":"ADVERSARIAL CORPUS: PASS — 253/253 checks","note":"#723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count. 219 → 253: the 34 SymPy differential oracle cases (2026-11-18), re-derived by running the suite on the changed tree."},
+        {"has":"ADVERSARIAL CORPUS: PASS — 795/795 checks","note":"#723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count. 219 → 795: the 34 SymPy differential oracle cases (2026-11-18) and 542 right-answer controls for the final-answer probe (PR #992 review), re-derived by running the suite on the changed tree."},
         {"has":"EXACT BOUNDS: PASS — 107/107 checks"},
         {"has":"STEP14 REVIEW FIXES: PASS — 43915/43915 checks","note":"39533 → 39547 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
         {"has":"REVIEW FOLLOW-UPS: PASS — 415/415 checks"},
