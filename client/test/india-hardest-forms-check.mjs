@@ -914,8 +914,8 @@ for (const id of ids.filter(id => !ONLY || id.startsWith(ONLY))) {
     // form: it varies with difficulty by design and carries its own independent
     // key check plus a run through the real marker in india-extra-forms-check.mjs.
     // This suite keeps proving the authored form's solver on every other draw.
-    if (q.form && (EXTRA_FORMS[id] || []).some(f => f.form === q.form)) continue;
     prompts.add(q.prompt);
+    if (q.form && (EXTRA_FORMS[id] || []).some(f => f.form === q.form)) continue;
     const problems = inspect(q);
     if (ok(`${id} seed ${seed} passes the engine self-check`, problems.length === 0, problems.slice(0, 2).join('; '))) inspected++;
     ok(`${id} seed ${seed} is reproducible`, JSON.stringify(generateQuestion(id, rungOf[id], seed)) === JSON.stringify(q));
