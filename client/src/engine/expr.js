@@ -684,7 +684,7 @@ const apart = (u, v) => abs(u - v) > 1e-6 * Math.max(1, abs(u), abs(v));
  * …or beyond binary64 evaluation noise alone (the final-answer probe). The noise
  * of a sum is set by the size of its terms, not of its result: an expanded
  * (2x + 7)⁷ near its root is a difference of terms near 10⁸ and carries ~10⁻⁸ of
- * rounding, so the band also covers 1e-11 of the larger side's term magnitude.
+ * rounding, so the band also covers 1e-11 of the reference side's term magnitude.
  */
 const apartTight = (u, v, scale) => abs(u - v) > Math.max(1e-9 * Math.max(1, abs(u), abs(v)), 1e-11 * scale);
 
@@ -736,7 +736,13 @@ function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed)
     }
     const va = evaluate(astA, env), vb = evaluate(astB, env);
     if (!fin(va) || !fin(vb)) continue;
-    const scale = Math.max(magnitude(astA, env), magnitude(astB, env));
+    // The noise scale is the REFERENCE's (the key's: every marking call passes
+    // the answer first and the key second), never the answer's. An answer that
+    // set its own scale could pad itself with zero of any size — x² + 0.0000001x
+    // + (10²⁰ − 10²⁰) — and widen the band until anything passed (PR #992 review).
+    // A factored key bounds the terms of its own expansion, so (2x + 7)⁷ written
+    // out is still judged within its real rounding.
+    const scale = magnitude(astB, env);
     if (!fin(scale)) continue;                  // no bound on the noise: this point says nothing
     if (apartTight(va, vb, scale)) return false;
   }
