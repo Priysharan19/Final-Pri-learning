@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { normalize, parse, evaluate, numsClose, variablesOf } from './expr.js';
+import { sameFormalForm } from './reason-forms.js';
 import {
   assessEquationLine as assessEquationLineV1,
   assessNumericCheckLine as assessNumericCheckLineV1,
@@ -665,7 +666,14 @@ export function differentiateAst(ast, variable = 'x') {
     }
     if (ast.op === '^') {
       const exponent = constantNumber(ast.r);
-      if (exponent === null || !dl) return null;
+      // b^v, b a positive constant (e^x, 2^(3x)): b^v · ln b · v'.
+      if (exponent === null) {
+        const base = constantNumber(ast.l);
+        if (base === null || base <= 0 || !dr) return null;
+        const lnb = Math.abs(base - Math.E) < 1e-12 ? N(1) : N(Math.log(base));
+        return simplify(B('*', B('*', B('^', ast.l, ast.r), lnb), dr));
+      }
+      if (!dl) return null;
       return simplify(B('*', B('*', N(exponent), B('^', ast.l, N(exponent - 1))), dl));
     }
     return null;
@@ -737,5 +745,8 @@ export function assessDerivativeLine({ text, meta = null } = {}) {
     };
     return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
   }
+  // No counterexample, so the line agrees with the derivative everywhere it
+  // was tried. It is credited only when the two are the same formal form.
+  if (sameFormalForm(expected, candidate) === true) return { status: 'ok', trusted: true };
   return { status: 'note', trusted: false, note: 'Pri could not prove this derivative form symbolically, so it is not marked correct.' };
 }
