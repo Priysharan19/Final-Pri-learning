@@ -57,9 +57,9 @@ export default function SignInPlot() {
       let yLo = Infinity;
       let yHi = -Infinity;
       for (let x = X_MIN; x <= X_MAX; x += 0.25) { const y = fn.f(x); yLo = Math.min(yLo, y); yHi = Math.max(yHi, y); }
-      const u = Math.min(Math.min(w, h) / 12, h / (yHi - yLo + 2), w / (X_MAX - X_MIN + 2));
+      const u = Math.min(Math.min(w, h) / 12, h / (yHi - yLo + 5), w / (X_MAX - X_MIN + 2));
       const px = x => w / 2 + (x - (X_MIN + X_MAX) / 2) * u;
-      const py = y => h / 2 - (y - (yLo + yHi) / 2) * u;
+      const py = y => h * 0.46 - (y - (yLo + yHi) / 2) * u;
       // Grid: 1 px, one line per unit, aligned to the axes.
       ctx.strokeStyle = tok('--in-edge', 'rgba(128,128,128,.1)');
       ctx.lineWidth = 1;
