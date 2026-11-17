@@ -884,6 +884,9 @@ jobs:
             # The sign-in card helper the gate and login tours sign in with:
             # a card that leaves the page is read in one look, never waited on.
             node client/test/signin-card-step-check.mjs 2>&1 | tee -a browser.log
+            # Both editions build, sign in and walk the main routes: any page error
+            # or the crash screen fails here, before a train.
+            node client/test/app-boot-smoke-check.mjs 2>&1 | tee -a browser.log
             node client/test/notes-illustrated-browser-check.mjs --no-build 2>&1 | tee -a browser.log
             node client/test/notes-wave8-browser-check.mjs --no-build 2>&1 | tee -a browser.log
             # A request cancelled by leaving the page is not "no connection":
