@@ -199,6 +199,19 @@ an intent and a revision; the server stamps every time, so a device clock cannot
 sitting. An imported prithagoras-web file is validated by the server against its own edition's
 library and never carries its timer across (`desk-check`).
 
+**Resource publishing (schema 17, plan F3).** `resource_revisions` and `resource_assets` are global tables under the
+fail-closed `pri_scope_required` policy only; authorisation is the server's (`resourcePublishing.js`): a staff session,
+role and MFA on every route, an admin plus a five-minute step-up for publish, withdraw and rollback, and the author of a
+revision can never approve it (also a table CHECK). The write routes exist only while `PRI_RESOURCE_PUBLISHING=on`.
+*Upload abuse:* no route carries more than the 1 MiB transport limit; a file arrives in 512 KiB parts and is assembled on
+the server, which requires `%PDF-` at byte 0 (so an HTML/PDF polyglot is refused), `%%EOF` in the last KiB, no script,
+launch action or embedded file, at most 25 MiB, and equal declared and computed length and sha256. No caller-supplied
+name reaches storage: keys are server-made and pattern-checked. *Stored-file XSS:* files are never served from the app's
+origin; students get a 5-minute signed URL that forces `attachment` and `application/pdf`, and the storage key never
+leaves the server. *Rights:* a revision cannot leave draft without a rights basis; a hosted file whose source names NESA
+needs a recorded permission reference; the software records permission and cannot obtain it. *Residency:* storage refuses
+to start in a region outside the edition's own.
+
 ## 7a. Edition and region boundary (plan H2)
 
 Each edition is its own deployment with its own database, storage, secrets and budgets (ADR-0002 §9). The boundary between them is separate infrastructure, not code inside one server: a cookie, token or idempotency key from one deployment is unknown to the other because the other has a different database and delivery key. Two controls hold it in software. `bindDatabaseEdition` (`server/platform/edition.js`) records the edition in `platform_meta` and stops a server pointed at the other edition's database before it listens. The edition is deployment identity (`PRI_EDITION`); a client-supplied edition is read only by the E2 middleware and only ever refuses. `server/test/region-isolation-check.mjs` proves both with two instances over separate databases, and a static scan of `server/`. Not covered by one server: secrets reused across the two deployments, and storage, backup and admin separation. Those are checked by hand in `docs/operations/region-isolation-verification.md`, which stays unverified until the Australian region exists.

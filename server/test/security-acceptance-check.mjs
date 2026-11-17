@@ -91,7 +91,7 @@ const inventory = loadInventory();
 const c = checks();
 // The parent report is off by default (D22), but every inventoried route —
 // its included — is held to the same fail-closed floor, so it is on here.
-const h = await startApp({ engine: requestedEngine(), log: () => {}, parentReport: { enabled: true } });
+const h = await startApp({ engine: requestedEngine(), log: () => {}, parentReport: { enabled: true }, resources: { publishing: true, storage: null } });
 const db = h.db;
 const responses = [];
 
