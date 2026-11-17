@@ -254,6 +254,26 @@ breaksAt('(2^x−4)(2^x+1) loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^
   ok(`log x (log x − 2) = 0 by branches: no break, branches verified, got ${JSON.stringify(s)}`, !s.includes('break') && s.slice(1).every(v => v === 'ok'));
 }
 
+// Review of head e335858e8: a line worked from an exponential or logarithmic
+// branch must keep that branch's root (x = 1 straight after 3^x = 9 is wrong
+// even though 1 is the other root).
+breaksAt('x = 1 straight after 3^x = 9', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', 'x=1', '3^x=3', 'x=1'], 2);
+breaksAt('answers swapped across branches', eqMeta([0, 2]), ['(2^x-1)(2^x-4)=0', '2^x=1', 'x=2', '2^x=4', 'x=0'], 2);
+breaksAt('a root repeated across branches', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-1)(2^x-4)=0', '2^x=1', 'x=2', '2^x=4', 'x=2'], 3);
+breaksAt('lone branches with the wrong value', eqMeta([0, 2]), ['2^x=4', 'x=0', '2^x=1', 'x=0'], 1);
+{
+  const rep = report(eqMeta([1, 100]), ['log(x)(log(x)-2)=0', 'log(x)=0', 'x=100', 'log(x)=2', 'x=100']);
+  ok(`a log branch with the wrong value breaks on that line, got ${JSON.stringify(rep.lines.map(l => l.status))}`, rep.firstBreak === 2 && !rep.lines.slice(0, 2).some(l => l.status === 'break'));
+}
+{
+  const s = statuses(eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', 'x=1', '3^x=3', 'x=1'], { prompt: 'Solve $(3^x - 9)(3^x - 3) = 0$.' });
+  ok(`x = 1 after 3^x = 9 breaks with a prompt too, got ${JSON.stringify(s)}`, s.indexOf('break') === 2);
+  const s2 = statuses(eqMeta([1, 2]), ['(2^x-2)(2^x-4)=0', '2^x=2', 'x=1', '2^x=2', 'x=2']);
+  ok(`a branch written twice never leaves the working without a break, got ${JSON.stringify(s2)}`, s2.includes('break'));
+  const s3 = statuses(eqMeta([0, 2]), ['(2^x-1)(2^x-4)=0', '2^x=1', '2^x=4', 'x=0', 'x=2']);
+  ok(`both branches written before their values: no false credit, got ${JSON.stringify(s3)}`, s3.includes('break') || s3.every(v => v === 'ok'));
+}
+
 // Abstain: lines outside the proved families are notes, never credit, never a break.
 {
   const s = statuses(eqMeta([2]), ['x*2^x=8', '2^x=8/x']);
@@ -286,4 +306,4 @@ if (fail) {
   console.log(`\nSTEP CHECK EXP/LOG: FAIL — ${pass}/${total} checks`);
   process.exit(1);
 }
-console.log(`STEP CHECK EXP/LOG: PASS — ${total}/${total} checks — exponential and logarithmic lines are verified when their complete real solution set on its domain is the question's, each slip breaks on its own line, an unrejected extraneous root is never credited, and anything else abstains.`);
+console.log(`STEP CHECK EXP/LOG: PASS — ${total}/${total} checks — exponential and logarithmic lines are verified when their complete real solution set on its domain is the question's, each slip tested here breaks on its own line or is not credited, an unrejected extraneous root is never credited, and anything else abstains.`);

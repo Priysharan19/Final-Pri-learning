@@ -655,7 +655,14 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     return questionFormsRead;
   };
 
+  // The roots an exponential or logarithmic branch on the line just above
+  // names (`2^x = 1` names 0): the next line, if it is not a branch of its own
+  // (`2^x = 4`), is worked from it and must keep one of those roots.
+  let lastExpLogBranch = null;
+
   rawLines.forEach((line, i) => {
+    const branchAbove = lastExpLogBranch;
+    lastExpLogBranch = null;
     const skipped = unreadNote(unread[i]);
     if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true }); return; }
     let status = 'note';
@@ -957,11 +964,34 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               out.push({ text: line, status, note });
               return;
             }
+            if (partial && branchAbove && !expLogLine && !held.some(h => branchAbove.some(r => sameRoot(r, h)))) {
+              // `x = 1` straight after `3^x = 9`: a root of the question, but not
+              // the one the line above gives. Worked from that line, it is wrong.
+              status = 'break';
+              const r = branchAbove[0];
+              let reads = '';
+              try {
+                const env = { [meta.variable]: r };
+                reads = ` and it reads ${shownRoot(evaluate(ast.l, env))} = ${shownRoot(evaluate(ast.r, env))}`;
+              } catch { reads = ''; }
+              lineDiagnosis = {
+                code: 'counterexample',
+                title: 'This line is no longer true',
+                message: `${meta.variable} = ${shownRoot(r)} makes the line above true; put it into this line${reads}.`,
+                fix: 'Compare it term by term with the line above — the change between them is where to look.',
+                confidence: 'high'
+              };
+              note = lineDiagnosis.message;
+              if (firstBreak === -1) firstBreak = i;
+              out.push({ text: line, status, note, diagnosis: lineDiagnosis });
+              return;
+            }
             if (partial) {
               // One branch of a factorisation already shown. It is true of the
               // roots it names; whether the working keeps the rest is settled
               // once every line has been read.
               status = 'ok';
+              if (expLogLine && expLog) lastExpLogBranch = expLog.roots.slice();
               branchLines.push({ index: i, covered: held, lone });
               out.push({ text: line, status, branch: true });
               return;
