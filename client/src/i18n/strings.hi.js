@@ -4453,6 +4453,7 @@ export default {
   'tw.sees.evidenceStates': 'हर पाठ्यक्रम परिणाम पर, Pri के सर्वर द्वारा जाँचे गए काम से प्रमाण-स्थिति',
   'tw.sees.commonMistakes': 'कक्षा में कितनों ने एक जैसी गलती की (बिना नाम के)',
   'tw.sees.handedInPapers': 'आपके जमा किए प्रश्नपत्र: अंक, हर प्रश्न के अंक, Pri ने आपका हल जैसा पढ़ा वह, पंक्ति-जाँच और पहली चूक',
+  'tw.sees.handedInHandwriting': 'आपके जमा किए उत्तरों पर आपकी लिखावट',
   'tw.sees.teacherMarks': 'उनके अपने दिए अंक और टिप्पणियाँ',
   'tw.never.email': 'आपका ईमेल पता',
   'tw.never.guardian': 'आपके माता-पिता या अभिभावक का विवरण',
@@ -4460,7 +4461,7 @@ export default {
   'tw.never.notes': 'आपके नोट्स',
   'tw.never.tutorChats': 'ट्यूटर या AI से आपकी बातचीत',
   'tw.never.practiceWorking': 'आपके अभ्यास का हल',
-  'tw.never.photos': 'आपकी लिखावट की फ़ोटो और चित्र',
+  'tw.never.photos': 'फ़ोटो, और अभ्यास में आपकी लिखावट',
   'tw.never.papersNotHandedIn': 'वे प्रश्नपत्र जो आपने जमा नहीं किए',
   'tw.never.otherClasses': 'आपकी दूसरी कक्षाएँ',
   // ── teacher workspace · review queue (client/src/classroom) ──

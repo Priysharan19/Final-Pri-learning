@@ -35,12 +35,12 @@ export const HANDIN_ERROR = {
 /** What a teacher can see, item by item (classroom.js TEACHER_VISIBILITY). */
 export const SEES_WORD = {
   name: 'tw.sees.name', membership: 'tw.sees.membership', 'evidence-states': 'tw.sees.evidenceStates',
-  'common-mistakes': 'tw.sees.commonMistakes', 'handed-in-papers': 'tw.sees.handedInPapers', 'teacher-marks': 'tw.sees.teacherMarks'
+  'common-mistakes': 'tw.sees.commonMistakes', 'handed-in-papers': 'tw.sees.handedInPapers', 'handed-in-handwriting': 'tw.sees.handedInHandwriting', 'teacher-marks': 'tw.sees.teacherMarks'
 };
 export const NEVER_WORD = {
   email: 'tw.never.email', guardian: 'tw.never.guardian', plan: 'tw.never.plan', notes: 'tw.never.notes',
   'tutor-and-ai-chats': 'tw.never.tutorChats', 'practice-working': 'tw.never.practiceWorking',
-  'photos-and-handwriting-images': 'tw.never.photos', 'papers-not-handed-in': 'tw.never.papersNotHandedIn', 'other-classes': 'tw.never.otherClasses'
+  'photos-and-practice-handwriting': 'tw.never.photos', 'papers-not-handed-in': 'tw.never.papersNotHandedIn', 'other-classes': 'tw.never.otherClasses'
 };
 
 /** The India paper choices a teacher can set (server paperAssignments.js india template). */

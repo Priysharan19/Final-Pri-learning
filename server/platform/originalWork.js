@@ -231,7 +231,7 @@ async function membershipOf(db, teacherId, classId, studentId) {
  * /v1/originals — read the original work behind a mark.
  *   GET /v1/originals/:id                              the student's own
  *   GET /v1/originals?attemptId=… | ?questionId=…&submissionId=…
- *   GET /v1/originals/class/:classId/student/:studentId/:id   their teacher
+ *   GET /v1/originals/class/:classId/student/:studentId/:id   their teacher, for work handed in only
  * Nothing here writes: an original is written only with its mark.
  */
 export function createOriginalsRouter(db, { edition = serverEdition(process.env) } = {}) {
@@ -265,7 +265,20 @@ export function createOriginalsRouter(db, { edition = serverEdition(process.env)
     // Only work the student did while in this teacher's class: nothing from
     // before they joined is opened to the teacher by joining.
     const row = await db.get('SELECT * FROM attempt_originals WHERE id=? AND account_id=? AND edition=? AND created_at >= ?', [id, String(studentId), edition, Number(member.joined_at)]);
-    return row ? send(res, row) : fail(res, 404, 'ORIGINAL_NOT_FOUND', 'No such work.');
+    if (!row) return fail(res, 404, 'ORIGINAL_NOT_FOUND', 'No such work.');
+    // And only work the student HANDED IN: the original must be the one a review item of this
+    // teacher's class names (classroom.js records it on the item at hand-in). A practice original,
+    // or a paper never handed in, is the student's own and is not opened by an id alone
+    // (TEACHER_VISIBILITY: 'handed-in-handwriting', never 'papers-not-handed-in').
+    const items = await db.all('SELECT evidence_json FROM teacher_review_items WHERE class_id=? AND teacher_account_id=? AND student_account_id=? ORDER BY created_at DESC LIMIT 2000',
+      [String(classId), session.account_id, String(studentId)]);
+    const handedIn = items.some(item => {
+      try {
+        const named = JSON.parse(item.evidence_json)?.original;
+        return named && named.id === row.id && String(named.sha256 || '').toLowerCase() === String(row.sha256).toLowerCase();
+      } catch { return false; }
+    });
+    return handedIn ? send(res, row) : fail(res, 404, 'ORIGINAL_NOT_FOUND', 'No such work.');
   });
 
   router.get('/:id', requireRole('student'), read, async (req, res) => {

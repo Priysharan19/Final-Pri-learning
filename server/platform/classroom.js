@@ -58,15 +58,16 @@ export const TEACHER_VISIBILITY = Object.freeze({
     'evidence-states',   // per syllabus outcome: the evidence state from server-marked work
     'common-mistakes',   // class counts of the same verified first break (no names attached)
     'handed-in-papers',  // papers the student hands in: score, each question's marks, the working as read, line checks, first break
+    'handed-in-handwriting', // the handwriting of a handed-in answer (originalWork.js): only an original that belongs to a review item of the teacher's class
     'teacher-marks'      // the teacher's own marks and comments
   ]),
   never: Object.freeze([
-    // 'photos-and-handwriting-images' is true while no teacher route serves a
-    // stored original. When the original-work route (#1018) shows a handed-in
-    // answer's ink to its teacher, this entry moves to `sees` as
-    // 'handed-in-handwriting' IN THE SAME RELEASE: students are shown this list.
+    // The original-work route (#1018) shows a handed-in answer's handwriting to
+    // the class's teacher, so 'handed-in-handwriting' is in `sees` (students are
+    // shown this list). What stays out of reach is every other original: practice
+    // handwriting, photos, and anything not handed in.
     'email', 'guardian', 'plan', 'notes', 'tutor-and-ai-chats', 'practice-working',
-    'photos-and-handwriting-images', 'papers-not-handed-in', 'other-classes'
+    'photos-and-practice-handwriting', 'papers-not-handed-in', 'other-classes'
   ])
 });
 

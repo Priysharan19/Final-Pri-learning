@@ -208,9 +208,27 @@ try {
   await db.run('INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES (?,?,?)', ['orig-class', alice.id, now]);
   c.eq((await h.request(teacherPath('orig-class'), { jar: carol.jar })).status, 404, 'work done before the student joined the class is not opened to the teacher');
   await db.run('UPDATE class_members SET joined_at=? WHERE class_id=? AND student_account_id=?', [now - 3600_000, 'orig-class', alice.id]);
+  // Handed in or not: the teacher route serves only an original that a review item of the teacher's class names.
+  const practiceOriginal = (await originalsOf(alice.id)).find(o => o.id !== id);
+  c.ok(practiceOriginal, 'the student has a second original (practice work that was never handed in)');
+  c.eq((await h.request(teacherPath('orig-class'), { jar: carol.jar })).status, 404, 'an original that was never handed in is not opened to the teacher, even with its id');
+  const origRow = await db.get('SELECT id,sha256 FROM attempt_originals WHERE id=?', [id]);
+  await db.run("INSERT INTO assignments(id,class_id,teacher_account_id,title,specification_json,created_at) VALUES ('orig-asg','orig-class',?,'Paper','{}',?)", [carol.id, now]);
+  await db.run("INSERT INTO assignment_handins(assignment_id,student_account_id,class_id,teacher_account_id,exam_id,paper_kind,score,total,questions_json,handed_in_at) VALUES ('orig-asg',?,'orig-class',?,'orig-exam','test',1,2,'[]',?)", [alice.id, carol.id, now]);
+  const reviewItem = (itemId, original) => db.run(`INSERT INTO teacher_review_items(id,assignment_id,class_id,student_account_id,teacher_account_id,exam_id,question_key,question_order,marks_possible,engine_awarded,criterion,available,evidence_json,created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [itemId, 'orig-asg', 'orig-class', alice.id, carol.id, 'orig-exam', `q-${itemId}`, 1, 3, 1, 'method', 1, JSON.stringify({ original }), now]);
+  // A review item that names this id with another digest does not open it.
+  await reviewItem('rvw-wrong-digest', { id, sha256: 'f'.repeat(64), kind: 'strokes' });
+  c.eq((await h.request(teacherPath('orig-class'), { jar: carol.jar })).status, 404, 'an item naming this id with another digest does not open it');
+  await reviewItem('rvw-orig', { id: origRow.id, sha256: origRow.sha256, kind: 'strokes' });
   const served = await h.request(teacherPath('orig-class'), { jar: carol.jar });
+  c.eq((await h.request(`/v1/originals/class/orig-class/student/${alice.id}/${practiceOriginal.id}`, { jar: carol.jar })).status, 404, 'once one original is handed in, the student\'s other original is still not opened by its id');
   c.deq([served.status, served.data?.original?.sha256], [200, sha(bytes)], 'their teacher sees the student\'s own ink, by the same digest');
   c.eq((await h.request(teacherPath('dave-class'), { jar: dave.jar })).status, 404, 'another teacher, through their own class, is refused');
+  // Even a member of dave's class: the hand-in was to carol's class, so dave's class has no review item naming it.
+  await db.run('INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES (?,?,?)', ['dave-class', alice.id, now - 3600_000]);
+  c.eq((await h.request(teacherPath('dave-class'), { jar: dave.jar })).status, 404, 'a second class the student is in does not open work handed in to the first');
+  await db.run('DELETE FROM class_members WHERE class_id=? AND student_account_id=?', ['dave-class', alice.id]);
   c.eq((await h.request(teacherPath('orig-class'), { jar: dave.jar })).status, 404, 'and through a class they do not teach');
   c.eq((await h.request(teacherPath('orig-class', bob.id), { jar: carol.jar })).status, 404, 'a teacher cannot reach it under another student');
   c.eq((await h.request(teacherPath('orig-class'), { jar: bob.jar })).status, 403, 'a student cannot use the teacher route');

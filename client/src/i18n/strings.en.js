@@ -4405,6 +4405,7 @@ export default {
   'tw.sees.evidenceStates': 'For each syllabus outcome, the evidence state from work Pri’s server marked',
   'tw.sees.commonMistakes': 'How many in the class made the same mistake (no names attached)',
   'tw.sees.handedInPapers': 'Papers you hand in: the score, each question’s marks, your working as Pri read it, the line checks and the first break',
+  'tw.sees.handedInHandwriting': 'Your handwriting on the answers you hand in',
   'tw.sees.teacherMarks': 'Their own teacher marks and comments',
   'tw.never.email': 'Your email address',
   'tw.never.guardian': 'Your parent or guardian’s details',
@@ -4412,7 +4413,7 @@ export default {
   'tw.never.notes': 'Your notes',
   'tw.never.tutorChats': 'Your conversations with the tutor or AI',
   'tw.never.practiceWorking': 'Your practice working',
-  'tw.never.photos': 'Photos and pictures of your handwriting',
+  'tw.never.photos': 'Photos, and your handwriting in practice',
   'tw.never.papersNotHandedIn': 'Papers you have not handed in',
   'tw.never.otherClasses': 'Your other classes',
   // ── teacher workspace · review queue (client/src/classroom) ──
