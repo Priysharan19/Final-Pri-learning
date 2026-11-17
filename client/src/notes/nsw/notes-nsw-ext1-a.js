@@ -20,10 +20,10 @@ export default {
     ],
     formulas: [
       { label: 'Inverse and composition', tex: 'f\\big(f^{-1}(x)\\big)=x,\\qquad f^{-1}\\big(f(x)\\big)=x' },
-      { label: 'Finding an inverse', tex: 'y=f(x)\;\\Longrightarrow\;x=f(y)\\text{ solved for }y' }
+      { label: 'Finding an inverse', tex: 'y=f(x)\\;\\Longrightarrow\\;x=f(y)\\text{ solved for }y' }
     ],
     points: [
-      { front: 'Where do $f$ and $f^{-1}$ meet if they meet at all on the line $y=x$?', back: 'On the line $y=x$ itself. Any point where the graph of $f$ crosses $y=x$ is also on $f^{-1}$.' },
+      { front: 'Where does the graph of $f$ meet the graph of $f^{-1}$?', back: 'Any point where $f$ crosses $y=x$ is on both graphs. For an increasing $f$ every meeting point is on $y=x$; a decreasing $f$ such as $-x^3$ can also meet its inverse off the line.' },
       { front: 'What becomes the domain of $f^{-1}$?', back: 'The range of $f$.' },
       { front: 'The inverse of $y=2x-6$', back: 'Swap: $x=2y-6$, so $y=\\tfrac{x+6}{2}$.' },
       { front: 'How do you eliminate the parameter from $x=2t+1$, $y=t^2-3$?', back: 'Solve $t=\\tfrac{x-1}{2}$ and substitute: $y=\\left(\\tfrac{x-1}{2}\\right)^2-3$.' },
@@ -132,7 +132,7 @@ export default {
     ],
     mistakes: [
       { wrong: '$\\sin(A+B)=\\sin A+\\sin B$.', right: 'Sine does not distribute over addition. Use $\\sin A\\cos B+\\cos A\\sin B$: for $A=B=90^\\circ$ the first gives $2$, impossible for a sine.' },
-      { wrong: 'Dividing $\\cos2x=\\sin x$ through by $\\sin x$ to solve it.', right: 'Dividing by $\\sin x$ loses the roots where $\\sin x=0$. Rewrite as a quadratic in $\\sin x$ and factorise instead.' },
+      { wrong: 'Dividing $\\sin2x=\\sin x$ through by $\\sin x$ to solve it.', right: 'Dividing by $\\sin x$ loses the roots where $\\sin x=0$ (here $x=0$ and $x=\\pi$ are solutions). Move everything to one side and factorise instead.' },
       { wrong: 'Giving only $x=\\tfrac{\\pi}{6}$ for $\\sin x=\\tfrac12$ on $[0,2\\pi]$.', right: 'Sine is positive in two quadrants: $x=\\tfrac{\\pi}{6}$ and $x=\\tfrac{5\\pi}{6}$.' }
     ],
     examples: [

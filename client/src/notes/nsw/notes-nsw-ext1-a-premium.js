@@ -14,7 +14,7 @@ export default {
       'A rational inequality is solved by combining into one fraction and testing intervals, not by multiplying by a denominator of unknown sign. Excluded values (here $x=2$ and $x=5$) are marked open.'
     ],
     diagrams: [
-      { title: 'A function and its inverse', spec: { kind: 'function', xmin: 0, xmax: 6, ymin: 0, ymax: 6, curves: [{ expr: 'x^2+1', label: 'y=x^2+1' }, { expr: 'sqrt(x-1)', label: 'y=\\sqrt{x-1}' }, { expr: 'x', label: 'y=x' }] }, note: 'The two curves are mirror images in $y=x$. The point $(3,10)$ on $f$ corresponds to $(10,3)$ on $f^{-1}$.' },
+      { title: 'A function and its inverse', spec: { kind: 'function', xmin: 0, xmax: 6, ymin: 0, ymax: 6, curves: [{ expr: 'x^2+1', label: 'y=x^2+1' }, { expr: 'sqrt(x-1)', label: 'y=\\sqrt{x-1}' }, { expr: 'x', label: 'y=x' }] }, note: 'The two curves are mirror images in $y=x$. The point $(2,5)$ on $f$ corresponds to $(5,2)$ on $f^{-1}$.' },
       { title: 'Where the curve is above $y=2$', spec: { kind: 'function', xmin: -3, xmax: 9, ymin: -6, ymax: 10, curves: [{ expr: '(x+1)/(x-2)', label: 'y=\\dfrac{x+1}{x-2}' }, { expr: '2', label: 'y=2' }], asymptotes: [{ x: 2 }] }, note: 'The branch lies above the line $y=2$ only between the asymptote $x=2$ and the crossing at $x=5$, so $\\tfrac{x+1}{x-2}>2$ for $2<x<5$.' }
     ],
     working: [

@@ -29,7 +29,7 @@ export default {
       { front: 'What does the inductive step prove?', back: 'An implication: $P(k)\\Rightarrow P(k+1)$. It does not prove $P(k)$ itself.' },
       { front: 'How is a divisibility step usually arranged?', back: 'Split the $k+1$ expression into a multiple of the assumed expression plus a term that is clearly divisible, for example $7^{k+1}-1=7(7^k-1)+6$.' },
       { front: 'What must a final conclusion say?', back: 'That $P(n)$ is true for all integers $n\\ge n_0$ by the principle of mathematical induction, since the basis case holds and the step has been proved.' },
-      { front: 'Where does an inequality proof often start?', back: 'Not at $1$. Test small values: $2^n>n^2$ fails at $n=2,3,4$ and first holds at $n=5$, so the basis case is $n=5$.' }
+      { front: 'Where does an inequality proof often start?', back: 'Not at $1$. Test small values: $2^n>n^2$ fails at $n=2,3,4$ and holds for every $n\\ge5$, so the basis case is $n=5$.' }
     ],
     mistakes: [
       { wrong: 'Writing “assume $P(k)$ is true for all $k$” and then proving $P(k+1)$.', right: 'Assume it for one arbitrary $k$ only. Assuming it for all $k$ is the very statement being proved.' },
