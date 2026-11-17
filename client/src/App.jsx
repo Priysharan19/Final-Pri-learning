@@ -80,9 +80,9 @@ const Landing = React.lazy(() => import('./landing/Landing.jsx'));
 const PublicInfo = React.lazy(() => import('./landing/PublicInfo.jsx'));
 // The Prithagoras edition has its own NSW notes page, built from the NSW curriculum
 // model; it never loads or shows the India notes (client/test/nsw-notes-no-india-check.mjs).
-// EDITION is a literal in a build, so the other edition's page, and its
-// whole notes data, is dead code and is not emitted (nor warmed offline).
-const NSW_NOTES_BUILD = EDITION === 'prithagoras';
+// __PRI_NOTES_PAGE__ is a literal in a build (vite.config.js, from the edition the build resolved), so the
+// other edition's page, and its whole notes data, is dead code and is not emitted (nor warmed offline).
+const NSW_NOTES_BUILD = typeof __PRI_NOTES_PAGE__ === 'string' && __PRI_NOTES_PAGE__ === 'nsw';
 const Notes = NSW_NOTES_BUILD
   ? React.lazy(() => import('./pages/NswNotes.jsx'))
   : React.lazy(() => import('./pages/Notes.jsx'));

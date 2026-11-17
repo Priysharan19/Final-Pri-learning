@@ -748,6 +748,9 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_TUTOR_POLICY__: JSON.stringify(states.tutorPolicy),
     __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
     __PRI_EDITION__: JSON.stringify(states.edition),
+    // Which notes page this build carries: a literal, so the other edition's page and its whole notes data are
+    // dead code and are not emitted (App.jsx; client/test/nsw-notes-no-india-check.mjs).
+    __PRI_NOTES_PAGE__: JSON.stringify(states.edition === 'prithagoras' ? 'nsw' : 'india'),
     // Plan E5: false in a build of an edition with no payment provider, so its
     // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).
     __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0),
