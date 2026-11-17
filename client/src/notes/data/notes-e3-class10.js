@@ -30,7 +30,7 @@ export default {
       },
       {
         title: 'HCF and LCM from prime powers',
-        spec: { kind: 'barChart', categories: ['2', '3', '5', '7'], values: [3, 2, 1, 0], yLabel: 'power in 360', dual: { values: [2, 1, 0, 1], label: 'power in 84' } },
+        spec: { kind: 'barChart', categories: ['2', '3', '5', '7'], values: [3, 2, 1, 0], label: '360', yLabel: 'power of the prime', dual: { values: [2, 1, 0, 1], label: '84' } },
         note: 'Here $360=2^3\\times3^2\\times5$ and $84=2^2\\times3\\times7$. The HCF takes the lower bar for each prime, $2^2\\times3=12$; the LCM takes the higher bar, $2^3\\times3^2\\times5\\times7=2520$. As a check, $12\\times2520=30240=360\\times84$.'
       }
     ],
@@ -276,9 +276,9 @@ export default {
         note: 'The angles of depression from $T$ equal the angles of elevation at the ships, $45^\\circ$ at $P$ and $30^\\circ$ at $Q$. So $BP=75$ m and $BQ=75\\sqrt3\\approx129.9$ m, and the ships are $75(\\sqrt3-1)\\approx54.9$ m apart.'
       },
       {
-        title: 'Height from distance and angle',
-        spec: { kind: 'triangleExplorer', mode: 'trigRatios', initial: { angle: 30, adj: 30 } },
-        note: 'Keep the ground distance at $30$ and raise the angle of elevation. The height is $30\\tan\\theta$: about $17.3$ at $30^\\circ$, exactly $30$ at $45^\\circ$, and about $52.0$ at $60^\\circ$. The height grows faster than the angle.'
+        title: 'Height over ground distance',
+        spec: { kind: 'triangleExplorer', mode: 'trigRatios', initial: { angle: 30, hyp: 10 } },
+        note: 'Read the triangle as a sight line: the hypotenuse is the line of sight, the opposite side is the height and the adjacent side is the ground distance. Raise the angle of elevation from $30^\\circ$ to $60^\\circ$ and $\\tan\\theta$, height over ground distance, goes from about $0.58$ through exactly $1$ at $45^\\circ$ to about $1.73$, however long the line of sight is.'
       }
     ]
   },
