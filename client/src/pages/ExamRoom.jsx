@@ -48,7 +48,6 @@ import ConfirmSheet from '../examShell/ConfirmSheet.jsx';
 import ShortcutsSheet from '../examShell/ShortcutsSheet.jsx';
 import { useAnnounce } from '../examShell/useAnnounce.js';
 import { useExamShortcuts } from '../examShell/useExamShortcuts.js';
-import '../examShell/examShell.css';
 import '../workspace.css';
 
 const SAVE_DEBOUNCE_MS = 600;
