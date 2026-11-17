@@ -40,6 +40,17 @@ const leaks = (value, path = '') => {
   return Object.entries(value).flatMap(([k, v]) => [...(PRIVATE.has(k) ? [path + k] : []), ...leaks(v, path + k + '.')]);
 };
 
+// The seed must not leave the server in any form: no field named like a seed,
+// and no value equal to it (as a number, or as a string that is the seed or
+// names it). A substring test on the whole reply was not precise: a Postgres
+// id or timestamp can contain the same digits by chance.
+const carriesSeed = (value, seed) => {
+  if (typeof value === 'number') return value === seed;
+  if (typeof value === 'string') return value === String(seed) || new RegExp(`seed\\W*${seed}(?!\\d)`, 'i').test(value);
+  if (!value || typeof value !== 'object') return false;
+  return Object.entries(value).some(([k, v]) => /seed/i.test(k) || carriesSeed(v, seed));
+};
+
 // ── The plan: marks add up exactly, whatever the length and mix ────────────
 for (const style of ['hsc', 'cbse']) {
   for (const marks of PAPER_MARKS) for (const mix of MIXES) {
@@ -101,7 +112,7 @@ try {
   c.ok(pa.questions.every(q => q.payload._curriculum && q.payload._marking === 'final-answer-only'), 'every question is sealed with the edition\'s identity and final-answer marking');
   c.ok(pa.questions.every(q => topics.includes(q.chapterId)), 'only the chosen topics');
   c.deq(leaks(first.data), [], 'no key, answer, step or seed leaves in the create reply');
-  c.ok(!JSON.stringify(first.data).includes('424242') && first.data.exam.generated.label === 'Pri practice paper', 'the seed stays on the server and the paper is a "Pri practice paper"');
+  c.ok(!carriesSeed(first.data, 424242) && first.data.exam.generated.label === 'Pri practice paper', 'the seed stays on the server and the paper is a "Pri practice paper"');
   const noSeed = await create(d.jar, { ...request, seed: undefined });
   c.eq(noSeed.status, 201, 'without a seed the server draws its own');
   const pc = await sealed(noSeed.data.exam.id);
@@ -195,7 +206,7 @@ try {
   c.ok(pia.questions.every(q => /^[ABCD]$/.test(q.section) && q.marks === 'ABCD'.indexOf(q.section) + 1 || (q.section === 'D' && q.marks >= 4)), 'CBSE-style sections by marks');
   c.ok(pia.questions.every(q => itopics.includes(q.chapterId)), 'only the chosen chapters');
   c.deq(leaks(ia.data), [], 'India: no key in the create reply');
-  c.ok(!JSON.stringify(ia.data).includes('777'), 'India: the seed stays on the server');
+  c.ok(!carriesSeed(ia.data, 777), 'India: the seed stays on the server');
   const ipdf = await h.request('/v1/exams/generator/pdf', { method: 'POST', jar: a.jar, body: { generated: irequest } });
   c.ok(Buffer.from(ipdf.data.pdfBase64, 'base64').toString('latin1').includes('not a CBSE paper'), 'India: the printable paper is labelled Pri practice, not CBSE');
   c.eq((await h.request('/v1/exams/generator/check', { method: 'POST', jar: a.jar, body: { generated: { ...irequest, year: 5 } } })).status, 400, 'India: Class 5 is out of range');
