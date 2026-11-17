@@ -19,7 +19,7 @@ const areas = [
     };
   } },
   { form: 'line-area', make(rng, d) {
-    const u = ri(rng, 1, R(d)), a = 2 * u, c = ri(rng, 0, R(d)), p = ri(rng, 0, R(d)), q = p + ri(rng, 1, R(d));
+    const u = ri(rng, 1, R(d)), a = 2 * u, c = ri(rng, 1, R(d)), p = ri(rng, 0, 3), q = p + ri(rng, 8, R(d));
     return {
       payload: numeric('line-area', `Find the area under the line $y = ${a}x + ${c}$ from $x = ${p}$ to $x = ${q}$, in square units.`, u * (q * q - p * p) + c * (q - p), {
         figure: D.coordPlane({ curves: [{ fn: x => a * x + c, x0: p, x1: q, shade: true, label: `y = ${a}x + ${c}` }] }).svg,
@@ -414,6 +414,7 @@ const props = [
     const c = 3 * ri(rng, 1, R(d)), e = ri(rng, 0, R(d)), a = ri(rng, 1, R(d));
     return {
       payload: numeric('even-function', `Evaluate $\\displaystyle\\int_{-${a}}^{${a}} (${c}x^2 + ${e})\\,dx$.`, 2 * (c / 3 * a ** 3 + e * a), {
+        figure: D.coordPlane({ curves: [{ fn: x => c * x * x + e, x0: -a, x1: a, shade: true, label: 'f' }] }).svg,
         hints: ['The integrand is even: $f(-x) = f(x)$.', 'For an even function, the integral over $[-a, a]$ is twice the integral over $[0, a]$.', 'Integrate over $[0, a]$ and double.'],
         steps: [{ h: 'Even', d: '$f(-x) = f(x)$' }, { h: 'Double', d: `$2\\displaystyle\\int_0^{${a}} (${c}x^2 + ${e})\\,dx$` }, { h: 'Evaluate', d: `$2\\left[${c / 3}x^3 + ${e}x\\right]_0^{${a}}$` }],
         traps: [{ value: 0, why: 'Symmetric limits make an *odd* integrand vanish; this integrand is even, so both halves add.' }]
@@ -540,9 +541,12 @@ const cont = [
     };
   } },
   { form: 'mvt-point', make(rng, d) {
-    const a = ri(rng, 1, R(d)), b = ri(rng, -R(d), R(d)), p = ri(rng, -R(d), R(d)), q = p + 2 * ri(rng, 1, R(d));
+    const a = ri(rng, 1, R(d)), b = ri(rng, -R(d), R(d));
+    let p = 0, q = 0;
+    do { p = ri(rng, -R(d), R(d)); q = p + 2 * ri(rng, 1, R(d)); } while ((q - p) < 0.4 * Math.max(Math.abs(p), Math.abs(q)));
     return {
       payload: numeric('mvt-point', `Find the value of $c$ guaranteed by the Mean Value Theorem for $f(x) = ${a === 1 ? '' : a}x^2 + ${b}x$ on $[${p}, ${q}]$.`.replace(/\+ -/g, '- '), (p + q) / 2, {
+        figure: D.coordPlane({ points: [{ x: p, y: a * p * p + b * p, label: 'A' }, { x: q, y: a * q * q + b * q, label: 'B' }], segments: [[0, 1]], curves: [{ fn: x => a * x * x + b * x, x0: p, x1: q, label: 'f' }] }).svg,
         hints: ['The theorem says some $c$ in the interval has $f\'(c)$ equal to the average slope.', 'Compute the average slope $\\dfrac{f(q) - f(p)}{q - p}$.', 'Solve $f\'(c) = $ that slope.'],
         steps: [{ h: 'Average slope', d: `$\\dfrac{f(${q}) - f(${p})}{${q - p}} = ${a}(${p + q}) + ${b}$` }, { h: 'Derivative', d: `$f'(c) = ${2 * a}c + ${b}$` }, { h: 'Solve', d: 'equate and solve for $c$' }],
         traps: [{ value: q - p, why: 'That is the length of the interval, not the point $c$.' }]
@@ -554,6 +558,7 @@ const cont = [
     const s = ri(rng, 2, R(d) * 2);
     return {
       payload: numeric('rolle', `$f(x) = x^2 - ${s}x$ satisfies the conditions of Rolle's theorem on $[0, ${s}]$ because $f(0) = f(${s})$. Find the point $c$ in $(0, ${s})$ where $f'(c) = 0$.`, s / 2, {
+        figure: D.coordPlane({ points: [{ x: 0, y: 0, label: 'A' }, { x: s, y: 0, label: 'B' }], curves: [{ fn: x => x * x - s * x, x0: 0, x1: s, label: 'f' }] }).svg,
         hints: ["Differentiate $f$.", 'Set the derivative equal to zero.', 'Check that the solution lies inside the open interval.'],
         steps: [{ h: 'Differentiate', d: `$f'(x) = 2x - ${s}$` }, { h: 'Solve', d: '$f\'(c) = 0$' }, { h: 'Check', d: `$0 < c < ${s}$` }],
         traps: [{ value: s, why: 'That is the other end of the interval, where $f$ returns to $0$, not where the slope is $0$.' }]

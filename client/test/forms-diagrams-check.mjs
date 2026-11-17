@@ -6,6 +6,7 @@
 import * as D from '../src/engine/generators/forms/diagrams.js';
 import { makeRng, ri } from '../src/engine/qhelpers.js';
 
+const D_H = 260;
 let fails = 0, checks = 0;
 const ok = (cond, msg) => { checks += 1; if (!cond) { fails += 1; if (fails <= 40) console.error('FAIL', msg); } };
 const near = (a, b, tol = 1e-6) => Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
@@ -91,7 +92,8 @@ for (let i = 1; i <= 300; i++) {
   // curves and circles on the plane
   {
     const k = ri(rng, 1, 6), b = ri(rng, 2, 9), g = D.coordPlane({ points: [{ x: b, y: k * b * b, label: 'P' }], curves: [{ fn: x => k * x * x, x0: 0, x1: b, shade: true, label: 'y' }] }).geom;
-    for (const [i, [x, y]] of g.curves[0].samples.entries()) ok(near(g.curves[0].px[i][0], g.origin[0] + x * g.scale) && near(g.curves[0].px[i][1], g.origin[1] - y * g.scale), 'curve: every sample is at its true pixel (one scale)');
+    for (const [i, [x, y]] of g.curves[0].samples.entries()) ok(near(g.curves[0].px[i][0], g.origin[0] + x * g.scale) && near(g.curves[0].px[i][1], g.origin[1] - y * g.scaleY), 'curve: every sample is at its true pixel (x and y each on their own labelled scale)');
+    ok(!g.equal && near(g.win.y1 - g.win.y0, (D_H - 2 * 34) / g.scaleY, 1e-6), 'curve: the vertical window fills the frame on its own scale');
     const cx = ri(rng, -10, 10), cy = ri(rng, -10, 10), cr = ri(rng, 2, 12), cf = D.coordPlane({ points: [{ x: cx, y: cy, label: 'C' }], circles: [{ cx, cy, r: cr, centre: true }] });
     ok(near(cf.geom.circles[0].R, cr * cf.geom.scale) && near(cf.geom.circles[0].X, cf.geom.origin[0] + cx * cf.geom.scale), 'circle on the plane: centre and radius are to scale');
     ok(cf.geom.win.x0 <= cx - cr && cf.geom.win.x1 >= cx + cr && cf.geom.win.y0 <= cy - cr && cf.geom.win.y1 >= cy + cr, 'circle on the plane: the whole circle is inside the window');
@@ -139,6 +141,60 @@ for (let i = 1; i <= 300; i++) {
     pf.geom.arcs.forEach((arc, k) => ok(near(arc.degrees, (slices[k].value / tot) * 360, 1e-6), 'pie chart: each slice is value / total of 360°'));
     ok(near(pf.geom.arcs.reduce((s, x) => s + x.degrees, 0), 360, 1e-9), 'pie chart: the slices fill the circle');
     framed('pieChart', pf);
+  }
+}
+// ── angles, polygons, parallel lines, circle points, segments, prisms, similar triangles ──
+for (let i = 1; i <= 300; i++) {
+  const rng = makeRng(i * 6151);
+  const A = ri(rng, 25, 100), B = ri(rng, 25, 150 - A), C = 180 - A - B;
+  if (C >= 20) {
+    const f = D.angleTriangle({ A, B, C, shown: { A: `${A}°`, B: `${B}°`, C: '?' } }), P = f.geom.pts;
+    const ang = (o, p, q) => (Math.acos(dot(o, p, q) / (dist(o, p) * dist(o, q))) * 180) / Math.PI;
+    ok(near(ang(P.A, P.B, P.C), A, 1e-6) && near(ang(P.B, P.A, P.C), B, 1e-6) && near(ang(P.C, P.A, P.B), C, 1e-6), `angle triangle: vertex angles are ${A}, ${B}, ${C}`);
+    framed('angleTriangle', f);
+    const fe = D.angleTriangle({ A, B, C, shown: { A: `${A}°`, B: `${B}°` }, exterior: '?' });
+    ok(fe.geom.ext && Math.abs((fe.geom.ext[1] - fe.geom.pts.C[1]) * (fe.geom.pts.C[0] - fe.geom.pts.B[0]) - (fe.geom.ext[0] - fe.geom.pts.C[0]) * (fe.geom.pts.C[1] - fe.geom.pts.B[1])) < 1e-6 * 1e3, 'angle triangle: the produced side continues BC in a straight line');
+    framed('angleTriangle exterior', fe);
+  }
+  const n = ri(rng, 3, 12), pg = D.regularPolygon({ n, lines: true }), { O, V, R } = pg.geom;
+  ok(V.every(v => near(dist(O, v), R)) && V.every((v, k) => near(dist(v, V[(k + 1) % n]), dist(V[0], V[1]))), `regular ${n}-gon: equal sides on a circle`);
+  ok(near((Math.acos(dot(V[1], V[0], V[2]) / (dist(V[1], V[0]) * dist(V[1], V[2]))) * 180) / Math.PI, ((n - 2) * 180) / n, 1e-6), `regular ${n}-gon: interior angle (n-2)180/n`);
+  ok((pg.svg.match(/stroke-dasharray/g) || []).length === n, `regular ${n}-gon: exactly n lines of symmetry drawn`);
+  framed('regularPolygon', D.regularPolygon({ n, exteriorLabel: '?' }));
+  const pa = ri(rng, 30, 150), pl = D.parallelLines({ angle: pa, shown: { top: `${pa}°`, bottom: '?' } });
+  { const v = [pl.geom.T2[0] - pl.geom.T1[0], pl.geom.T2[1] - pl.geom.T1[1]], l = Math.hypot(v[0], v[1]); ok(near((Math.acos(-v[0] / l) * 180) / Math.PI, pa, 1e-6) && near(pl.geom.T1[1], pl.geom.y1) && near(pl.geom.T2[1], pl.geom.y2), `parallel lines: the interior angle on the left is ${pa}°, the lines are horizontal`); }
+  framed('parallelLines', pl);
+  const a = ri(rng, 4, 30), b = ri(rng, 4, 30), th = ri(rng, 35, 145), pm = D.parallelogram({ a, b, angle: th, shown: { a: `${a}`, b: `${b}`, angle: `${th}°` } }), PP = pm.geom.P;
+  ok(near(dist(PP[0], PP[1]) / dist(PP[0], PP[3]), a / b) && near((Math.acos(dot(PP[0], PP[1], PP[3]) / (dist(PP[0], PP[1]) * dist(PP[0], PP[3]))) * 180) / Math.PI, th, 1e-6), 'parallelogram: sides in ratio and the angle is to scale');
+  ok(near(PP[2][0] - PP[1][0], PP[3][0] - PP[0][0]) && near(PP[2][1] - PP[1][1], PP[3][1] - PP[0][1]), 'parallelogram: opposite sides are parallel and equal');
+  framed('parallelogram', pm);
+  const degs = [ri(rng, 0, 80), ri(rng, 100, 170), ri(rng, 190, 260), ri(rng, 280, 350)], cp = D.circlePoints({ points: degs.map((d, k) => ({ deg: d, name: 'ABCD'[k] })), chords: [[0, 1], [1, 2], [2, 3], [3, 0]], centre: true });
+  cp.geom.pos.forEach((q, k) => ok(near(dist(cp.geom.O, q), cp.geom.R) && near(Math.atan2(cp.geom.O[1] - q[1], q[0] - cp.geom.O[0]), (degs[k] * Math.PI) / 180 > Math.PI ? (degs[k] * Math.PI) / 180 - 2 * Math.PI : (degs[k] * Math.PI) / 180, 1e-6), 'circle points: each point is on the circle at its angle'));
+  framed('circlePoints', cp);
+  const p1 = ri(rng, 2, 20), p2 = ri(rng, 2, 20), sl = D.segmentLine({ points: [{ name: 'A', at: 0 }, { name: 'B', at: p1 }, { name: 'C', at: p1 + p2 }], labels: [{ from: 'A', to: 'B', text: `${p1} cm` }, { from: 'B', to: 'C', text: '?' }] });
+  ok(near((sl.geom.X.B - sl.geom.X.A) / (sl.geom.X.C - sl.geom.X.B), p1 / p2), 'segment line: lengths are to scale');
+  framed('segmentLine', sl);
+  const pn = ri(rng, 3, 9), pr = D.prismFigure({ n: pn, shown: { n: `${pn} sides` } });
+  ok(pr.geom.bot.length === pn && pr.geom.top.every((t, k) => near(t[0], pr.geom.bot[k][0]) && near(pr.geom.bot[k][1] - t[1], pr.geom.bot[0][1] - pr.geom.top[0][1])), 'prism: the top base is the bottom base lifted straight up');
+  framed('prism', pr);
+  const sm = ri(rng, 1, 6), bg = sm + ri(rng, 1, 6), st = D.similarTriangles({ small: sm, big: bg, shown: { small: `${3 * sm} cm`, big: '?' } });
+  const [S1, S2] = [st.geom.T1, st.geom.T2];
+  ok(Math.abs(dot(S1[0], S1[1], S1[2])) < 1e-6 && Math.abs(dot(S2[0], S2[1], S2[2])) < 1e-6, 'similar triangles: right angles at the base corners');
+  ok(near(dist(S2[0], S2[1]) / dist(S1[0], S1[1]), bg / sm) && near(dist(S2[0], S2[2]) / dist(S1[0], S1[2]), bg / sm), 'similar triangles: the second is the first scaled by big / small, on one scale');
+  framed('similarTriangles', st);
+}
+// ── the labels on a figure sit on the sides the question names (regression: ratio-from-3-4-5) ──
+{
+  const { EXTRA_FORMS } = await import('../src/engine/generators/india-forms-extra.js');
+  const form = EXTRA_FORMS['c10-trigonometry-current'].find(f => f.form === 'ratio-from-3-4-5');
+  for (let i = 1; i <= 100; i++) {
+    const { payload } = form.make(makeRng(i * 31), 2), svg = payload.figure;
+    const texts = [...svg.matchAll(/<text x="([\d.-]+)" y="([\d.-]+)"[^>]*>([^<]*)<\/text>/g)].map(m => ({ x: +m[1], y: +m[2], t: m[3] }));
+    const at = n => texts.find(q => q.t === n), mid = (p, q) => [(p.x + q.x) / 2, (p.y + q.y) / 2];
+    const A = at('A'), B = at('B'), C = at('C'), unknown = texts.find(q => q.t === '?');
+    const d2 = (p, q) => Math.hypot(p[0] - q.x, p[1] - q.y);
+    // the prompt: right angle at B, sin A = 3k/5k, so AB is the unknown side: '?' lies nearest the midpoint of A and B
+    ok(unknown && d2(mid(A, B), unknown) < d2(mid(B, C), unknown) && d2(mid(A, B), unknown) < d2(mid(A, C), unknown), 'ratio-from-3-4-5: the "?" is on side AB, which the question asks about');
   }
 }
 console.log(fails ? `FORMS DIAGRAMS: FAIL — ${fails} of ${checks} checks failed` : `FORMS DIAGRAMS: PASS — ${checks} checks: shapes to scale, right angles square, origin at the true pixel of 0, bars from zero, no label collisions`);

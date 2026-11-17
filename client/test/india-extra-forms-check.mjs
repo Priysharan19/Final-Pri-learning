@@ -34,6 +34,18 @@ for (const [skill, list] of Object.entries(EXTRA_FORMS)) {
             const printed = texts.map(t => t.replace(/[^0-9.\-]/g, '')).filter(Boolean);
             if (printed.includes(key) && !given.includes(key)) fail(`${at}: the figure prints the key ${key}`);
           }
+          if (!plane) {
+            // Every number a figure prints is a number the question states (the unknown is '?').
+            const given2 = new Set((payload.prompt.replace(/\$/g, '').match(/-?\d+(?:\.\d+)?/g) || []).map(x => String(Number(x))));
+            for (const t of texts) for (const m of t.match(/-?\d+(?:\.\d+)?/g) || []) if (!given2.has(String(Number(m))) && !/^[A-Za-z?]$/.test(t)) fail(`${at}: the figure prints ${m}, which the question does not state`);
+          }
+          // A curve or shaded region must be legible: its drawn extent is at least 30 px each way.
+          for (const m of payload.figure.matchAll(/<polyline points="([^"]+)"/g)) {
+            const pts = m[1].trim().split(/\s+/).map(q => q.split(',').map(Number));
+            if (pts.length < 10) continue;
+            const xs2 = pts.map(q => q[0]), ys2 = pts.map(q => q[1]);
+            if (Math.max(...xs2) - Math.min(...xs2) < 30 || (Math.max(...ys2) - Math.min(...ys2) < 8 && Math.max(...ys2) !== Math.min(...ys2))) fail(`${at}: the curve is illegible (a sliver)`);
+          }
           figured += 1;
         }
         const got = check();

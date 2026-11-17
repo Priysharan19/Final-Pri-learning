@@ -155,11 +155,13 @@ const QUAD_MORE = () => [
   mk('midpoint-theorem', (rng, d) => {
     const bc = 2 * ri(rng, 3, 20 * d + 10);
     return { p: `In triangle $ABC$, $D$ and $E$ are the midpoints of $AB$ and $AC$. If $BC = ${bc}$ cm, find $DE$ in cm.`, v: bc / 2, h: ['The segment joining the midpoints of two sides is parallel to the third side.', 'It is half as long.', 'Halve $BC$.'], s: [{ h: 'Midpoint theorem', d: `$DE = \\dfrac{${bc}}{2}$` }],
+      f: D.bptTriangle({ ratioAD: 1, ratioDB: 1, shown: { BC: `${bc} cm`, DE: '?' } }),
       t: [{ value: bc * 2, why: 'The segment joining the midpoints is half the third side, not double it.' }], c: () => bc / 2 };
   }),
   mk('parallelogram-perimeter', (rng, d) => {
     const [a, b] = distinct(rng, 3, 20 * d + 10, 2);
     return { p: `The adjacent sides of a parallelogram are $${a}$ cm and $${b}$ cm. Find its perimeter in cm.`, v: 2 * (a + b), h: ['Opposite sides of a parallelogram are equal.', 'Add two adjacent sides.', 'Double the sum.'], s: [{ h: 'Perimeter', d: `$2(${a} + ${b})$` }],
+      f: D.parallelogram({ a, b, angle: 65, shown: { a: `${a} cm`, b: `${b} cm` } }),
       t: [{ value: a + b, why: 'A parallelogram has four sides; opposite sides are equal.' }], c: () => a + b + a + b };
   }),
   mk('rectangle-diagonals', (rng, d) => {

@@ -296,7 +296,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `c7-integer-product-sign-reasoning` | 4 | 57.4k | 26 | — |
 | `c11-coefficient-variation-reasoning` | 4 | 58.8k | 515 | — |
 | `c7-place-value-systems-reasoning` | 4 | 59.6k | 197 | — |
-| `c12-applications-integrals` | 4 | 61.8k | 147 | — |
+| `c12-applications-integrals` | 4 | 61.8k | 146 | — |
 | `c11-linear-inequalities` | 4 | 62.3k | 9 | — |
 | `c11-complex-modulus-reasoning` | 4 | 63.6k | 128 | — |
 | `c8-exponent-laws-reasoning` | 4 | 64.1k | 5 | — |

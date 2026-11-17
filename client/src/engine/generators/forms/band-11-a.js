@@ -311,7 +311,7 @@ const conics = [
     const c = h * h + k * k - r * r;
     return {
       payload: numeric('circle-radius', `Find the radius of the circle $x^2 + y^2 ${sgnStr(-2 * h)}x ${sgnStr(-2 * k)}y ${sgnStr(c)} = 0$.`, r, {
-        figure: D.coordPlane({ points: [{ x: h, y: k, label: `(${h}, ${k})` }], circles: [{ cx: h, cy: k, r, centre: true }] }).svg,
+        figure: D.coordPlane({ points: [{ x: h, y: k, label: 'C' }], circles: [{ cx: h, cy: k, r, centre: true }] }).svg,
         hints: ['Complete the square in $x$ and in $y$.', 'Or use $r^2 = g^2 + f^2 - c$ for $x^2 + y^2 + 2gx + 2fy + c = 0$.', 'Take the positive square root.'],
         steps: [{ h: 'Identify', d: `$g = ${-h}$, $f = ${-k}$, $c = ${c}$` }, { h: 'Radius', d: '$r = \\sqrt{g^2 + f^2 - c}$' }],
         traps: [{ value: r * r, why: 'That is $r^2$; take the square root.' }].filter(t => r > 1)
