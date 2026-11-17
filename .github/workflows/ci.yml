@@ -418,6 +418,7 @@ jobs:
           node client/test/hint-ladder-check.mjs 2>&1 | tee -a practice-http.log
           node client/test/review-queue-check.mjs 2>&1 | tee -a practice-http.log
           node client/test/spaced-review-check.mjs 2>&1 | tee -a practice-http.log
+          node client/test/today-set-check.mjs 2>&1 | tee -a practice-http.log
           node tools/ci-check-counts.mjs verify platform/practice-http.log#3
           node server/test/practice-daily-cap-check.mjs 2>&1 | tee -a practice-http.log
           # After a relaunch or on another device the device's avoid list is empty: the server's picker reads the account's own seen records.

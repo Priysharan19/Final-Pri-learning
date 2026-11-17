@@ -1300,6 +1300,18 @@ async function run() {
       await wait(page, 600);
     });
 
+    await step('today · mixed daily set', '/today', async () => {
+      await goTo(page, BASE, '/today');
+      await page.waitForSelector('[data-today-page]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
+    await step('error log · own mistakes', '/error-log', async () => {
+      await goTo(page, BASE, '/error-log');
+      await page.waitForSelector('[data-error-log-page]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+
     await step('favorites · compatibility redirect', '/favorites', async () => { await goTo(page, BASE, '/favorites'); });
 
     await step('favorites · saved questions', '/favorites', async () => {

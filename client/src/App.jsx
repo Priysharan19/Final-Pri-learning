@@ -48,6 +48,8 @@ const CLASSES_BUILT_OUT = typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' &
 const Classes = CLASSES_BUILT_OUT ? null : React.lazy(() => import('./pages/Classes.jsx'));
 const Settings = React.lazy(() => import('./pages/Settings.jsx'));
 const PlanPage = React.lazy(() => import('./plan/PlanPage.jsx'));
+const Today = React.lazy(() => import('./pages/Today.jsx'));
+const ErrorLog = React.lazy(() => import('./pages/ErrorLog.jsx'));
 const Paywall = React.lazy(() => import('./paywall/Paywall.jsx'));
 // The placement check is opened once or twice per student, so it — and the
 // prerequisite graph and engine behind it — is an on-demand chunk (see
@@ -675,6 +677,8 @@ export default function App() {
                     <Route path="/practise-photo" element={studentOnly(<PractisePhoto />)} />
                     <Route path="/progress" element={studentOnly(<Progress />, '/teach#teacher-analytics')} />
                     <Route path="/plan" element={studentOnly(<PlanPage />)} />
+                    <Route path="/today" element={studentOnly(<Today />)} />
+                    <Route path="/error-log" element={studentOnly(<ErrorLog />)} />
                     <Route path="/premium" element={studentOnly(<Paywall />)} />
                     <Route path="/insights" element={studentOnly(<Insights />)} />
                     {PARENT_REPORT_ON && <Route path="/parent-report" element={studentOnly(<ParentReport />)} />}
