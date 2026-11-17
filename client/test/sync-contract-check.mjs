@@ -8,6 +8,10 @@ const event = {
 const entity = { kind: 'profile', entityId: 'self', operation: 'upsert', baseVersion: 2, body: { name: 'Pri' } };
 const push = createPushEnvelope({ deviceId: 'device-a', baseCursor: 8, events: [event], entities: [entity] });
 assert.equal(push.schemaVersion, 1);
+assert.equal(push.accountId, undefined, 'legacy envelopes remain backward compatible');
+const bound = createPushEnvelope({ deviceId: 'device-a', accountId: 'acct-A', events: [event] });
+assert.equal(bound.accountId, 'acct-A', 'a sync request is bound to the previously verified account');
+assert.throws(() => createPushEnvelope({ deviceId: 'device-a', accountId: 'invalid/account' }), /accountId is invalid/);
 assert.equal(push.events.length, 1);
 assert.equal(push.entities.length, 1);
 assert.equal(syncPolicyFor('practice-progress'), SYNC_POLICY.APPEND_ONLY);

@@ -60,19 +60,14 @@ try {
   const page = await ctx.newPage();
   const online = platform.session(ctx, page);
   const issueBodies = [];
+  const issueRequests = [];
   page.on('request', request => {
     if (request.method() === 'POST' && new URL(request.url()).pathname === '/v1/practice/issue') {
+      issueRequests.push(request);
       try { issueBodies.push(JSON.parse(request.postData() || '{}')); } catch { issueBodies.push(null); }
     }
   });
 
-  const issueReplies = [];
-  page.on('response', async response => {
-    if (response.request().method() === 'POST' && new URL(response.url()).pathname === '/v1/practice/issue') {
-      let body = null; try { body = await response.json(); } catch {}
-      issueReplies.push({ status: response.status(), code: body?.error?.code || body?.code || null, generator: (() => { try { return JSON.parse(response.request().postData()).generator; } catch { return null; } })() });
-    }
-  });
   await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
   await createVerifiedProfile(page, platform, { name: 'NSW Practice Student', year: 10, fromPicker: await page.getByTestId('picker-create-account').count() > 0 });
@@ -104,7 +99,20 @@ try {
   }
 
   await online.settled();
-  const nswReplies = issueReplies;
+  // Prithagoras begins with an NSW profile. Capture *all* its issue
+  // requests, including the one pre-fetched during onboarding, and await
+  // completed replies rather than racing an async page.on('response') handler.
+  const nswReplies = await Promise.all(issueRequests.map(async request => {
+    const response = await request.response();
+    if (!response) return { status: null, code: 'NO_RESPONSE' };
+    const failure = await response.finished();
+    let body = null;
+    try { body = await response.json(); } catch { /* status remains authoritative */ }
+    return { status: failure ? null : response.status(),
+      code: failure ? String(failure) : (body?.error?.code || body?.code || null),
+      generator: (() => { try { return JSON.parse(request.postData()).generator; } catch { return null; } })()
+    };
+  }));
   check(`the server issued what the NSW profile asked for (${CHAPTER})`, nswReplies.length > 0 && nswReplies.every(r => r.status === 201), JSON.stringify(nswReplies));
   const shown = await online.shownRow();
   check('practice shows a question the server issued, not a draft', shown?.checkState === 'issued', JSON.stringify(shown));

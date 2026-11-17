@@ -88,7 +88,7 @@ jobs:
     if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     name: Swift build, capture gate and bridge smoke test (iOS 26)
     runs-on: macos-26
-    timeout-minutes: 60
+    timeout-minutes: 70
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -200,19 +200,20 @@ jobs:
       - name: Server dependencies for the local Pri server
         run: npm ci --prefix server
 
-      # Step limits keep a hung journey from running into the job's 60-minute
-      # limit: a cancelled job keeps no log (Train editions-9, run 43608786790,
-      # lost the iPad journey's log that way), a step that times out fails
-      # with its log and the evidence steps below still run. Healthy runs:
-      # everything before the journeys ~21 min, the iPhone journey 7.5 min
-      # (Train editions-9), the iPad journey 8-10 min (runs 43178769936,
-      # 43166964444); 21 + 15 + 15 stays inside 60.
+      # Preserve bounded steps so a hung journey fails with its log rather than
+      # letting the entire macOS job be cancelled without evidence.
+      # Run 43929547385: iPhone 45/45 and iPad 35/35 PASS, both pinned; on
+      # iPad, offlineRelaunch spent ~8 min in simulator log retrieval and the
+      # completed 35/35 journey crossed the former 15-minute step budget.
+      # This is a hosted simulator latency allowance, not a skipped assertion.
+      # Pre-journey ~21 min + iPhone up to 15 + iPad up to 25 fits inside
+      # the 70-minute job cap, with buffer for evidence upload.
       - name: iPhone certification journey (simulator)
         timeout-minutes: 15
         run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone.json
 
       - name: iPad journey (simulator)
-        timeout-minutes: 15
+        timeout-minutes: 25
         run: node scripts/iphone-journey.mjs --family ipad --app "$PRI_SIM_APP" --dynamic-type --lifecycle --a11y --evidence journey-ipad.json
 
       - name: The evidence names the pinned runtime

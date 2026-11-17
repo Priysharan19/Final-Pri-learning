@@ -97,6 +97,32 @@ try {
   c.eq(reusedId.data.error.code, 'SYNC_EVENT_ID_CONFLICT', 'and not an internal error');
   c.eq((await db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [accountId])).n, 1, 'exactly one event is stored');
 
+  // ── 3 · A request bound to A can never read/write B after a cookie swap ───
+  // accountId is a constraint on the authenticated cookie, never a selector.
+  const wrongAccount = await push({
+    accountId: 'acct-other',
+    events: [event('forbidden-cross-account', 12, { confidentialTo: 'A' })]
+  }, 'device-bound-wrong');
+  c.eq(wrongAccount.status, 409, 'wrong-account push is refused before any database write');
+  c.eq(wrongAccount.data.error.code, 'SYNC_ACCOUNT_MISMATCH', 'push refusal names account mismatch');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [accountId])).n,
+    1, 'a refused cross-account push cannot commit its event');
+
+  const boundPull = await app.request(`/v1/sync/pull/${accountId}/0`, { jar });
+  c.eq(boundPull.status, 200, 'a pull bound to the live account succeeds');
+  const unboundPull = await app.request('/v1/sync/pull/0', { jar });
+  c.eq(unboundPull.status, 200, 'legacy installed clients may still pull their own account');
+  const wrongPull = await app.request('/v1/sync/pull/acct-other/0', { jar });
+  c.eq(wrongPull.status, 409, 'a pull bound to a different account is refused');
+  c.eq(wrongPull.data.error.code, 'SYNC_ACCOUNT_MISMATCH', 'pull refusal names account mismatch');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [accountId])).n,
+    1, 'mismatched pull changed no learning facts');
+
+  const boundPush = await push({ accountId, events: [event('evt-bound-to-A', 13, { correct: true })] }, 'device-bound-good');
+  c.eq(boundPush.status, 200, 'a push explicitly bound to the live session account succeeds');
+  c.eq((await db.get('SELECT COUNT(*) AS n FROM learning_events WHERE account_id=?', [accountId])).n,
+    2, 'bound push writes exactly one additional account-scoped event');
+
   // ── 3 · An unclaimed failure is INTERNAL, whatever the driver called it ───
   // Deliberate 5xx codes a client acts on (HANDWRITING_UNREACHABLE, BILLING_
   // PROVIDER_NOT_CONFIGURED) still carry their code — see

@@ -222,8 +222,21 @@ function cookie(name) {
 }
 
 function requestId() {
-  try { return globalThis.crypto?.randomUUID?.() || `req-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
-  catch { return `req-${Date.now()}`; }
+  // A request correlation ID travels across the native/Web API boundary.
+  // Never downgrade its unpredictability to Math.random or a timestamp if
+  // randomUUID is unavailable in a supported WebView.
+  const crypto = globalThis.crypto;
+  try {
+    if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+    if (typeof crypto?.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return 'req-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch { /* fail closed below when secure randomness is unavailable */ }
+  const error = new Error('Secure cloud request identifiers are unavailable.');
+  error.code = 'SECURE_RANDOM_UNAVAILABLE';
+  throw error;
 }
 
 function byteLength(text) {
@@ -719,7 +732,7 @@ export const cloud = Object.freeze({
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
   linkIdentity: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/link`, { method: 'POST', body }),
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),
-  syncPull: cursor => cloudRequest(`/v1/sync/pull/${Math.max(0, Number(cursor) || 0)}`),
+  syncPull: (cursor, accountId = null) => cloudRequest(`/v1/sync/pull/${accountId == null ? '' : `${pathId(accountId, 'account id')}/`}${Math.max(0, Number(cursor) || 0)}`),
   entitlements: () => cloudRequest('/v1/entitlements'),
   billingConfig: () => cloudRequest('/v1/billing/config'),
   billingStatus: () => cloudRequest('/v1/billing/status'),

@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { installApp, keepOnlySimulator } from './simulator-fleet.mjs';
+import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PACKAGE = join(HERE, '../ios/PriLearning.swiftpm');
@@ -54,24 +54,19 @@ function launchApp(device, bundleId, args = [], opts = {}) {
 }
 
 
+// Use the same pinned-runtime simulator selection as the journey and native
+// ink tests. The iOS 27 lane must never silently run this gate on iOS 27.2,
+// then boot a separate iOS 27.0 phone for the certification journey.
+// Resolve the pin only on execution, not module import by Node test suites.
 function pickDevice() {
+  const pinnedRuntime = requiredRuntime();
   const named = argOf('device');
-  const family = (argOf('family') || 'ipad').toLowerCase();
-  const pattern = named ? null : (family === 'iphone' ? /iPhone/ : /iPad/);
-  // Devices are listed under runtime headers ("-- iOS 26.0 --"). Prefer the
-  // newest runtime: an older one can need a long first boot on a CI runner.
-  let runtime = [0];
-  const rows = [];
-  for (const l of run('xcrun', ['simctl', 'list', 'devices', 'available']).split('\n')) {
-    const header = l.match(/^-- iOS ([\d.]+) --/);
-    if (header) { runtime = header[1].split('.').map(Number); continue; }
-    const m = l.match(/^\s+(.+?) \(([0-9A-F-]{36})\) \((\w+)\)/i);
-    if (m && /^-- /.test(l) === false) rows.push({ name: m[1], udid: m[2], state: m[3], runtime });
+  const family = (argOf('family') || 'ipad').toLowerCase() === 'iphone' ? 'iPhone' : 'iPad';
+  const listing = run('xcrun', ['simctl', 'list', 'devices', 'available']);
+  const pick = pickSimulator(listing, { family, named, runtime: pinnedRuntime });
+  if (!pick) {
+    throw new Error(`no ${named || family} simulator on pinned iOS ${pinnedRuntime || 'latest'} (available: ${describeRuntimes(listing) || 'none'})`);
   }
-  const newer = (a, b) => { for (let i = 0; i < Math.max(a.length, b.length); i++) { const d = (b[i] || 0) - (a[i] || 0); if (d) return d; } return 0; };
-  const matching = rows.filter(d => (named ? d.name === named : pattern.test(d.name))).sort((a, b) => newer(a.runtime, b.runtime));
-  const pick = matching.find(d => d.state === 'Booted') || matching[0];
-  if (!pick) throw new Error(`no ${named || family} simulator is available`);
   return pick;
 }
 

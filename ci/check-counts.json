@@ -896,6 +896,10 @@
         {
           "has": "REGION ISOLATION (H2): PASS — 486 checks (sqlite)",
           "note": "423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables."
+        },
+        {
+          "has": "REGION ISOLATION (H2): PASS — 470 checks (sqlite)",
+          "note": "423 → 429 (plan F6a): the check walks the route inventory, which now lists the two public catalogue routes. 429 → 467 (plan F3, re-derived by running): the 17 publishing routes and the two new tables; +3 Step15 authenticated sync ownership route assertions."
         }
       ]
     },
