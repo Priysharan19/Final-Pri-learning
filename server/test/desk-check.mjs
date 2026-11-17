@@ -348,7 +348,7 @@ try {
   // ── 7 · Postgres: RLS, migration ──────────────────────────────────────────
   c.ok(/^begin;$/m.test(ROLLBACK) && /^commit;$/m.test(ROLLBACK) && /update pri\.platform_meta set value = '15' where key = 'schema_version';/.test(ROLLBACK)
     && (ROLLBACK.match(/^drop table /gm) || []).length === 1, 'the documented rollback is one transaction: one table dropped, schema_version back to 15');
-  c.ok(/update pri\.platform_meta set value = '16' where key = 'schema_version';/.test(MIGRATION) && SCHEMA_VERSION === 16, 'the migration and the build agree on schema 16');
+  c.ok(/update pri\.platform_meta set value = '16' where key = 'schema_version';/.test(MIGRATION) && SCHEMA_VERSION >= 16, 'the migration sets schema 16, and the build is at 16 or later (17: resource publishing)');
   if (au.engine === 'postgres') {
     const C = await student(au, 'desk-c@example.test');
     const cs = (await start(C, { resourceId: SEED.id })).data.attempt.id;
@@ -391,7 +391,7 @@ try {
     } finally { await scratch.drop(); }
   } else {
     const db = createPlatformDb(':memory:');
-    c.eq(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value, '16', 'SQLite: the build is at schema 16');
+    c.eq(db.prepare("SELECT value FROM platform_meta WHERE key='schema_version'").get().value, String(SCHEMA_VERSION), 'SQLite: the build is at its schema version (16 since the Exam Desk)');
     db.prepare("INSERT INTO accounts(id,email,name,role,created_at,updated_at) VALUES ('mig-a','mig-a@example.test','A','student',1,1)").run();
     const ins = (id, mode, state, finished) => () => db.prepare(`INSERT INTO desk_attempts(id,account_id,edition,mode,origin,resource_id,paper_json,clock_json,questions_json,state,created_at,updated_at,finished_at)
       VALUES (?,'mig-a','prithagoras',?,'desk',?,'{}','{}','{}',?,1,1,?)`).run(id, mode, SEED.id, state, finished);

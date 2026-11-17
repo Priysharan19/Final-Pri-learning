@@ -14,6 +14,13 @@ export const RESOURCE_COURSES = Object.freeze(['in', 'nsw']);
 export const CERTIFICATION_STATES = Object.freeze(['uploaded', 'structured', 'verified', 'issued', 'certified']);
 export const AVAILABILITIES = Object.freeze(['external', 'hosted']);
 export const REVIEW_STATES = Object.freeze(['draft', 'published', 'withdrawn']);
+// Publishing (plan F3): what a revision may be, and on what footing a resource is offered.
+export const REVISION_STATES = Object.freeze(['draft', 'in_review', 'approved', 'published', 'withdrawn', 'superseded']);
+export const RIGHTS_BASES = Object.freeze(['own-work', 'licensed', 'public-domain', 'external-link-only']);
+// NESA's copyright terms exclude tutoring companies without written permission
+// (docs/architecture/g1-nsw-syllabus-authority): a hosted file whose source names
+// NESA needs the permission's reference on record.
+const NESA = /\bNESA\b|NSW Education Standards/i;
 // A section of a paper (plan F4's Exam Desk reads them): the question numbers
 // it spans and its format. Only the formats a recorded paper actually uses.
 export const SECTION_KINDS = Object.freeze(['multiple-choice', 'extended-response']);
@@ -82,7 +89,7 @@ export function httpsUrl(value) {
  * Every way a resource record breaks the F1 contract, as strings; empty when it
  * is acceptable. The seed is held to it here, and F3's publishing will be.
  */
-export function resourceProblems(r) {
+export function resourceProblems(r, { asset = null } = {}) {
   const p = [];
   if (!r || typeof r !== 'object') return ['resource must be an object'];
   if (typeof r.id !== 'string' || !ID.test(r.id)) p.push('id must be 3–120 lowercase letters, digits or hyphens');
@@ -105,8 +112,20 @@ export function resourceProblems(r) {
   if (!RESOURCE_COURSES.includes(r.course)) p.push(`course must be one of ${RESOURCE_COURSES.join(', ')}`);
   if (!optionalText(r.syllabusVersion, 160)) p.push('syllabusVersion must be text');
   if (!CERTIFICATION_STATES.includes(r.certificationState)) p.push(`certificationState must be one of ${CERTIFICATION_STATES.join(', ')}`);
-  if (r.availability === 'hosted') p.push('availability hosted is reserved for plan F3 (publishing) and is refused');
-  else if (r.availability !== 'external') p.push('availability must be external');
+  if (r.availability === 'hosted') {
+    // A hosted file is accepted only through publishing, and only while the
+    // file's record (hash and size verified when it was uploaded) is the one the
+    // revision names. Everything else keeps refusing it, as on main.
+    if (!asset) p.push('availability hosted is reserved for plan F3 (publishing) and is refused');
+    else if (r.assetSha256 !== asset.sha256) p.push('hosted resource needs an uploaded file whose sha256 matches assetSha256');
+    if (r.url !== null && r.url !== undefined) p.push('a hosted resource has no external url');
+    if (asset) {
+      if (!['own-work', 'licensed', 'public-domain'].includes(r.rightsBasis)) p.push('a hosted file needs a rights basis of own-work, licensed or public-domain');
+      if ([r.source, r.attribution, r.rightsNote].some(v => typeof v === 'string' && NESA.test(v)) && !text(r.permissionReference, 300)) {
+        p.push('a hosted file whose source names NESA needs permissionReference (written permission) on record');
+      }
+    }
+  } else if (r.availability !== 'external') p.push('availability must be external');
   else if (!httpsUrl(r.url)) p.push('an external resource needs an https url');
   if (!text(r.source, 200)) p.push('source is required');
   if (!text(r.attribution, 600)) p.push('attribution is required');
