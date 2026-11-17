@@ -582,7 +582,8 @@ function polyFit(rel) {
       if (!Number.isFinite(want) || Math.abs(want - evalPoly(t)) > 1e-8 * Math.max(1, Math.abs(want), scale * Math.pow(Math.abs(t) + 1, 4))) return null;
     }
     const clean = co.map(c => (Math.abs(c) <= 1e-10 * scale ? 0 : c));
-    return { co: clean, v, op: rel.op, f: evalPoly, scale };
+    const roots = realRootsOf(clean);
+    return { co: clean, v, op: rel.op, f: evalPoly, scale, zeros: roots, cuts: roots, tol: degreeOf(clean) > 2 ? 1e-7 : 1e-10 };
   } catch { return null; }
 }
 function realRootsOf(co) {
@@ -624,22 +625,52 @@ function realRootsOf(co) {
 // of its value, which is meaningless far from the origin); any other sample is
 // judged by the exact sign of the value.
 const degreeOf = co => { let d = co.length - 1; while (d > 0 && co[d] === 0) d--; return d; };
+
+// `abs(Q) op P` (or `P op abs(Q)`), Q and P polynomials of degree <= 2: the
+// function |Q| - P changes sign only at roots of Q - P and -Q - P, and has a
+// kink at roots of Q, so those are the cut points; the zeros are the cut points
+// where |Q| really equals P.
+function absFit(rel) {
+  if (!rel || rel.t !== 'relation') return null;
+  const strip = n => { let o = n; while (o?.t === 'group') o = o.v; return o; };
+  let l = strip(rel.l), r = strip(rel.r), op = rel.op;
+  const isAbs = n => n?.t === 'call' && n.fn === 'abs';
+  if (!isAbs(l) && isAbs(r)) { [l, r] = [r, l]; op = flipRelation(op); }
+  if (!isAbs(l) || isAbs(r)) return null;
+  const rest = n => { const o = strip(n); return o && !(function has(x) { x = strip(x); return !!x && typeof x === 'object' && ((x.t === 'call' && x.fn === 'abs') || ['l', 'r', 'v', 'arg'].some(k => has(x[k]))); })(o); };
+  if (!rest(r) || !rest(l.arg)) return null;
+  const zero = { t: 'num', v: 0 };
+  const q = polyFit({ t: 'relation', op: '=', l: l.arg, r: zero });
+  const p = polyFit({ t: 'relation', op: '=', l: r, r: zero });
+  if (!q || !p || degreeOf(q.co) > 2 || degreeOf(p.co) > 2) return null;
+  if (q.v !== p.v && q.co.length > 1 && p.co.length > 1) return null;
+  const sub = (a, b) => a.map((x, i) => x - b[i]);
+  const f = t => Math.abs(q.f(t)) - p.f(t);
+  const c1 = realRootsOf(sub(q.co, p.co)), c2 = realRootsOf(sub(q.co.map(x => -x), p.co)), c3 = realRootsOf(q.co);
+  const scale = Math.max(1, q.scale, p.scale);
+  const zeros = [...c1, ...c2].filter(x => Number.isFinite(x) && Math.abs(f(x)) <= 1e-9 * scale * (1 + Math.abs(x)));
+  return { co: null, v: q.v, op, f, scale, zeros, cuts: [...c1, ...c2, ...c3], tol: 1e-10 };
+}
+const regionFit = rel => polyFit(rel) || absFit(rel);
+
+// Membership at a point. A ROOT sample is "zero" only if it is within a tight
+// relative tolerance of one of this function's own zeros (never by the size of
+// its value, which is meaningless far from the origin); any other sample is
+// judged by the exact sign of the value.
 function holds(fit, t, atRoot) {
   const val = fit.f(t);
-  const roots = atRoot ? realRootsOf(fit.co) : [];
-  const tol = degreeOf(fit.co) > 2 ? 1e-7 : 1e-10;
-  const zero = atRoot && roots.some(r => Math.abs(r - t) <= tol * Math.max(1, Math.abs(r)));
+  const zero = atRoot && fit.zeros.some(r => Math.abs(r - t) <= fit.tol * Math.max(1, Math.abs(r)));
   if (fit.op === '<') return !zero && val < 0;
   if (fit.op === '>') return !zero && val > 0;
   if (fit.op === '<=') return zero || val <= 0;
   return zero || val >= 0;
 }
 function sameRegion(a, b) {
-  const fa = polyFit(a), fb = polyFit(b);
+  const fa = regionFit(a), fb = regionFit(b);
   if (!fa || !fb) return null;
-  if (fa.co.length > 1 && fb.co.length > 1 && fa.v !== fb.v) return null;
-  const tol = Math.max(degreeOf(fa.co), degreeOf(fb.co)) > 2 ? 1e-7 : 1e-10;
-  const cuts = [...realRootsOf(fa.co), ...realRootsOf(fb.co)].filter(Number.isFinite).sort((x, y) => x - y);
+  if (fa.co?.length > 1 && fb.co?.length > 1 && fa.v !== fb.v) return null;
+  const tol = Math.max(fa.tol, fb.tol);
+  const cuts = [...fa.cuts, ...fb.cuts].filter(Number.isFinite).sort((x, y) => x - y);
   const uniq = [];
   for (const r of cuts) if (!uniq.length || Math.abs(r - uniq[uniq.length - 1]) > tol * Math.max(1, Math.abs(r))) uniq.push(r);
   const samples = []; // [t, isRoot]

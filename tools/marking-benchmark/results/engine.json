@@ -68,9 +68,9 @@
  },
  "ca-010": {
   "verdicts": [
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-011": {
@@ -930,21 +930,21 @@
  "eq-044": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
-   "abstain"
+   "valid",
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "eq-045": {
   "verdicts": [
    "given",
-   "abstain",
+   "invalid",
    "abstain"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 1
  },
  "eq-046": {
   "verdicts": [
