@@ -684,6 +684,20 @@
         {
           "has": "FALSE-POSITIVE SWEEP: PASS — 0 of 459294 wrong answers marked correct across 20784 questions",
           "note": "133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit. 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree). 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree). 419741/18696 → 422759/19248 (Train 15: #838 widening + CBSE X/XII Section A (#840, #845) + JEE Main 2026 S2 (#842), re-derived by running all 4 shards on the merged tree). 422759/19248 → 422837/19248 (#846: CBSE XII 65/2/1 Q24, the first Section B record, restacked on Train 15)."
+        },
+        {
+          "has": "3192000/3192000 self-checks passed across 399 subtopics"
+        },
+        {
+          "has": "PROMPT VARIABLE CONSISTENCY: PASS — 191524 prompts, 526 claim prompts, 2762 stated solutions, 0 inconsistent"
+        },
+        {
+          "has": "NSW BANK QUALITY: PASS — 111 generators, 411 cells issued",
+          "note": "Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render."
+        },
+        {
+          "has": "FALSE-POSITIVE SWEEP: PASS — 0 of 462897 wrong answers marked correct across 20976 questions",
+          "note": "133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit. 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree). 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree). 419741/18696 → 422759/19248 (Train 15: #838 widening + CBSE X/XII Section A (#840, #845) + JEE Main 2026 S2 (#842), re-derived by running all 4 shards on the merged tree). 422759/19248 → 422837/19248 (#846: CBSE XII 65/2/1 Q24, the first Section B record, restacked on Train 15)."
         }
       ]
     },

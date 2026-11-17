@@ -155,7 +155,7 @@ for (const b of NSW_EXAM_BLUEPRINTS) {
     check(r.included.length === 0 && r.omittedOutcomes.length > 0, `pinned: ${b.id} sets nothing and lists its gaps (${r.omittedOutcomes.length})`);
   }
 }
-check(NSW_EXAM_POOL.length === 447, `the pool the pins were taken on: 447 approved forms (got ${NSW_EXAM_POOL.length})`);
+check(NSW_EXAM_POOL.length === 411, `the pool the pins were taken on: 411 approved forms (got ${NSW_EXAM_POOL.length})`);
 
 // On G3's pool, released exactly above the floor (no hand-entered list).
 for (const b of NSW_EXAM_BLUEPRINTS) {
