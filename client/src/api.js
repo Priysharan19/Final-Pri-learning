@@ -175,7 +175,9 @@ async function localDispatch(method, path, body) {
   if (generatedRoute(method, path, body) && !(method === 'POST' && path === '/exams')) {
     return dispatchGeneratedPaper(activeUser, method, path, body);
   }
-  if (method === 'POST' && path === '/exams' && body?.generated !== undefined) return dispatch(method, path, body);
+  if (method === 'POST' && path === '/exams' && body?.generated !== undefined) {
+    return activeUser?.course === 'in' ? dispatchIndiaExam(activeUser, method, path, body) : dispatch(method, path, body);
+  }
   // Never let an India profile fall through to local/backend.js's legacy paper
   // builder: that path appends an HSC-style multipart Section II. The India exam
   // module owns the full /exams namespace for Indian profiles and fails closed
