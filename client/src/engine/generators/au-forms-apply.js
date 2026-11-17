@@ -18,6 +18,7 @@ export function applyAuForms(bank, forms) {
       return pick ? pick.make(rng, diff) : base(rng, diff);
     };
     Object.assign(wrapped, base);   // keep per-difficulty dot-point declarations
+    wrapped.direct = base;          // the skill's established form on its own (tests pin seeds against it)
     out[id] = wrapped;
   }
   return out;

@@ -45,10 +45,12 @@ export function renderMath(tex, displayMode = false, locale = 'en') {
 }
 
 /** Split on $...$ (math), then apply light markdown to the text parts. */
-export function MathText({ text, block = false, className }) {
+/** `display`: the whole text is one formula, set in display style (a boxed or aligned equation of its own). */
+export function MathText({ text, block = false, display = false, className }) {
   const locale = useMathLocale();
   const html = useMemo(() => {
     if (text == null) return '';
+    if (display) return renderMath(String(text), true, locale);
     // Split on unescaped $…$ so literal amounts written as \$4,000 stay text
     const parts = String(text).split(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g);
     let out = '';
@@ -78,7 +80,7 @@ export function MathText({ text, block = false, className }) {
     });
     flush('');
     return out;
-  }, [text, locale]);
+  }, [text, locale, display]);
   const Tag = block ? 'div' : 'span';
   return <Tag className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }

@@ -33,7 +33,19 @@
 // students. Marks are not touched here: marks.test suites assert that.
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
-const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
+const { generateQuestion: generateAnyForm, loadAllBanks, EXTRA_FORMS, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
+// The slip catalogues and the designed wrong answers below are written against each skill's direct form.
+// The extra structural forms (generators/forms/) and the Prithagoras capacity overlays (au-forms-apply.js)
+// draw other shapes of question from the same seeds, which would dilute these cells; every one of them is
+// read by the marker sweeps over all issued questions. So the sweep asks for the direct form.
+function generateQuestion(id, d, seed, ...rest) {
+  const extra = EXTRA_FORMS[id], wrapped = GENERATORS[id];
+  const direct = typeof wrapped?.direct === 'function' ? wrapped.direct : null;
+  if (!extra && !direct) return generateAnyForm(id, d, seed, ...rest);
+  if (extra) delete EXTRA_FORMS[id];
+  if (direct) GENERATORS[id] = direct;
+  try { return generateAnyForm(id, d, seed, ...rest); } finally { if (extra) EXTRA_FORMS[id] = extra; GENERATORS[id] = wrapped; }
+}
 const { stepCheck, checkAnswer } = await import(`${SRC}engine/checker.js`);
 const { NSW_ISSUED_CELLS } = await import(`${SRC}engine/nswIssuedCells.js`);
 const { polyOf, calculusContext, fmtNum, innerCoefficient } = await import(`${SRC}engine/calculusSteps.js`);

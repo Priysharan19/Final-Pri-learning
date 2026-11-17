@@ -18,7 +18,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
 const { checkAnswer, stepCheck } = await import(`${SRC}engine/checker.js`);
-const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
+const { generateQuestion: generateAnyForm, loadAllBanks, EXTRA_FORMS, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
+// These cases name a question by (skill, difficulty, seed) and pin its answer: they are written against each
+// skill's direct form. The extra structural forms (generators/forms/) draw from the same seed, so a pinned
+// seed would otherwise land on another form; every extra form is marked by the sweeps over all issued
+// questions (false-positive, correct-answer, decimal) instead. A capacity overlay (au-forms-apply.js) wraps the
+// generator and keeps the established one as `direct`.
+function generateQuestion(id, d, seed, ...rest) {
+  const extra = EXTRA_FORMS[id], wrapped = GENERATORS[id];
+  const direct = typeof wrapped?.direct === 'function' ? wrapped.direct : null;   // a Prithagoras capacity overlay
+  if (!extra && !direct) return generateAnyForm(id, d, seed, ...rest);
+  if (extra) delete EXTRA_FORMS[id];
+  if (direct) GENERATORS[id] = direct;
+  try { return generateAnyForm(id, d, seed, ...rest); } finally { if (extra) EXTRA_FORMS[id] = extra; GENERATORS[id] = wrapped; }
+}
 await loadAllBanks();
 
 const groups = {};

@@ -28,14 +28,14 @@ const INDIA = /NCERT|CBSE|\bJEE\b|\bClass\s*\d|\bIndian?\b|rupee|₹|lakh|crore|
 
 // ── 1 · wiring ───────────────────────────────────────────────────────────────
 const app = read('src/App.jsx');
-ok(/const NSW_NOTES_BUILD = typeof __PRI_EDITION__ === 'string' && __PRI_EDITION__ === 'prithagoras';\s*const Notes = NSW_NOTES_BUILD\s*\?\s*React\.lazy\(\(\) => import\('\.\/pages\/NswNotes\.jsx'\)\)\s*:\s*React\.lazy\(\(\) => import\('\.\/pages\/Notes\.jsx'\)\);/.test(app), 'App picks the NSW notes page for the Prithagoras edition and the India page otherwise');
+ok(/const NSW_NOTES_BUILD = EDITION === 'prithagoras';\s*const Notes = NSW_NOTES_BUILD\s*\?\s*React\.lazy\(\(\) => import\('\.\/pages\/NswNotes\.jsx'\)\)\s*:\s*React\.lazy\(\(\) => import\('\.\/pages\/Notes\.jsx'\)\);/.test(app), 'App picks the NSW notes page for the Prithagoras edition and the India page otherwise');
 ok(/<Route path="\/notes" element=\{studentOnly\(<Notes \/>\)\} \/>/.test(app) && /<Route path="\/notes\/:chapterId" element=\{studentOnly\(<Notes \/>\)\} \/>/.test(app), 'both /notes routes render the edition-chosen page');
 ok(!/import\(['"]\.\/pages\/Notes\.jsx['"]\)/.test(app.replace(/const Notes = NSW_NOTES_BUILD[\s\S]*?Notes\.jsx'\)\);/, '')), 'no other route imports the India notes page');
 
 // The welcome screen's kicker named CBSE / NCERT / JEE on every edition; it now
 // names them only where the edition offers the India course.
 const login = read('src/pages/Login.jsx');
-ok(/\{!offersCourse\('in'\) \? t\('login\.kickerNsw'\) : featureEnabled\('extendedTracks'\)/.test(login), 'the welcome kicker shows CBSE / NCERT / JEE only where the edition offers the India course');
+ok(/\{!offersCourse\('in'\) \? t\('login\.brandKicker'\) : featureEnabled\('extendedTracks'\)/.test(login), 'the welcome kicker shows CBSE / NCERT / JEE only where the edition offers the India course');
 
 // ── 2 · the import graph ─────────────────────────────────────────────────────
 const FORBIDDEN = [/engine\/curriculum-in\.js$/, /notes\/notesIndex\.js$/, /notes\/data\//, /pages\/Notes\.jsx$/, /engine\/curriculum\.js$/, /lib\/studyJourney\.js$/, /lib\/practiceLinks\.js$/];

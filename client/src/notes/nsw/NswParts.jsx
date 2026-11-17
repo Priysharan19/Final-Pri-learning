@@ -9,8 +9,7 @@
 // All mathematics goes through KaTeX (lib/latex.jsx for running text, DisplayMath
 // below for display and aligned working). Nothing here builds maths from HTML or
 // Unicode super/subscripts. Icons are the app's stroke icons, never emoji or glyph ticks.
-import React, { useMemo, useState } from 'react';
-import katex from 'katex';
+import React, { useState } from 'react';
 import { MathText } from '../../lib/latex.jsx';
 import Icon from '../../components/Icon.jsx';
 import DiagramFromSpec from '../../diagrams/DiagramFromSpec.jsx';
@@ -20,15 +19,10 @@ import '../notesFonts.css';
 import '../notesSheet.css';
 import './nswNotes.css';
 
-const escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
-/** One display equation (or an aligned block). A render error shows the source in a marked element the build tests fail on. */
+/** One display equation (or an aligned block). A render error is drawn as KaTeX's own .katex-error span, which the notes checks fail on. */
 export function DisplayMath({ tex, className = '' }) {
-  const html = useMemo(() => {
-    try { return katex.renderToString(tex, { displayMode: true, throwOnError: true, strict: 'error' }); }
-    catch { return `<span class="katex-error" data-katex-error>${escapeHtml(tex)}</span>`; }
-  }, [tex]);
-  return <div className={`nn-display ${className}`.trim()} dangerouslySetInnerHTML={{ __html: html }} />;
+  // The one escaped sink (lib/latex.jsx), in display style: it also names the formula for a screen reader.
+  return <MathText block display className={`nn-display ${className}`.trim()} text={tex} />;
 }
 
 export function SectionBlock({ id, title, children }) {
