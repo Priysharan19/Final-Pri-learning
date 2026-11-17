@@ -197,6 +197,75 @@ for (let i = 1; i <= 200; i++) {
   ok(near(dist(q.P, q.A), dist(q.P, q.B)) && near(dist(q.P, q.A) / dist(q.A, q.B), pa / ab) && Math.abs(dot(q.M, q.P, q.B)) < 1e-6 * 1e3, 'perpendicular bisector: P is equidistant from A and B, to scale, and PM is perpendicular to AB');
   framed('perpBisector', pf);
 }
+// ── prompt-driven figures for authored skills: re-extract the numbers a second way and compare ──
+{
+  const { FIGURE_FOR } = await import('../src/engine/generators/forms/prompt-figures.js');
+  const dec = FIGURE_FOR;
+  const prompts = {};
+  const { generateQuestion, loadAllBanks } = await import('../src/engine/generators/index.js');
+  await loadAllBanks();
+  let drawn = 0;
+  const tx = s => String(s).replace(/\$/g, '').replace(/\\circ/g, '°').replace(/\^°/g, '°');
+  for (const id of Object.keys(dec)) {
+    prompts[id] = 0;
+    for (let i = 1; i <= 400; i++) {
+      const q = generateQuestion(id, 1 + (i % 4), i * 113);
+      const fig = dec[id](q);
+      if (!fig) continue;
+      prompts[id] += 1; drawn += 1;
+      const g = fig.geom, text = tx(q.prompt), at = `${id}: "${text.slice(0, 50)}"`;
+      framed(id, fig);
+      // The same figure comes out of the real question path (the generateQuestion hook), and never prints the key.
+      ok(q.figure === fig.svg, `${at}: generateQuestion carries the decorator's figure`);
+      if (!/Coordinate plane|Bar chart|Grouped bar/.test(fig.svg) && q.answer && q.answer.value != null) {
+        const keyText = String(q.answer.value), nums = new Set((text.match(/-?\d+(?:\.\d+)?/g) || []));
+        for (const m of fig.svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)) ok(!(m[1].trim() === keyText && !nums.has(keyText)), `${at}: the figure prints the key ${keyText}`);
+      }
+      if (id === 'c12-linear-programming') ok(fig.geom.points.length >= 3, `${at}: a feasible region has at least three corners`);
+      if (id === 'c8-pie-chart-reasoning') for (const m of fig.svg.matchAll(/<text[^>]*>([A-Za-z ]+) (\d+)°<\/text>/g)) ok(new RegExp(`${m[1]} ${m[2]}°`).test(text), `${at}: slice label "${m[1]} ${m[2]}°" is in the question`);
+      if (id === 'c8-bar-graph-reasoning') { const labels = [...fig.svg.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map(m => m[1].trim()); const yearLike = /\b(19|20)\d\d: /.test(text); ok(g.series.length === 2 && (!yearLike || labels.some(l => /^(19|20)\d\d$/.test(l))), `${at}: group labels are the stated classes or years`); }
+      if (id === 'c10-statistics') {
+        const freqs = text.split(',').map(s => s.match(/\d+[–-]\d+: (\d+)/)).filter(Boolean).map(m => +m[1]);
+        ok(freqs.length === g.rects.length && freqs.every((f, k) => f === g.rects[k].value), `${at}: histogram bars are the stated frequencies`);
+        g.rects.forEach(r => ok(near(r.y + r.h, g.baseline), `${at}: bars rise from the zero baseline`));
+      } else if (id === 'c12-linear-programming') {
+        const seg = text.slice(text.indexOf('corner points') + 13), pts = [...seg.matchAll(/\((-?\d+), ?(-?\d+)\)/g)].map(m => [+m[1], +m[2]]);
+        const drawnPts = g.points.map(p => [p.x, p.y]);
+        { const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); const ch = g.points.map(p => [p.x, p.y]); let sign = 0, convex = true; for (let a = 0; a < ch.length; a++) { const c = cr(ch[a], ch[(a + 1) % ch.length], ch[(a + 2) % ch.length]); if (c === 0) convex = false; else if (sign && Math.sign(c) !== sign) convex = false; else sign = Math.sign(c); } ok(convex, `${at}: the drawn feasible region is strictly convex`); }
+        ok(pts.length === drawnPts.length && pts.every(p => drawnPts.some(d2 => d2[0] === p[0] && d2[1] === p[1])), `${at}: the corners are the stated corner points`);
+        g.points.forEach(p => ok(near(p.X, g.origin[0] + p.x * g.scale) && near(p.Y, g.origin[1] - p.y * g.scale), `${at}: corners at their true pixels`));
+      } else if (id === 'c12-monotonic-tangent-reasoning') {
+        const m = text.match(/y = (.+?) at the point where x = (-?\d+)/), src = m[1].replace(/(\d)x/g, '$1*x').replace(/\^/g, '**').replace(/\s+/g, ''), f = new Function('x', `return ${src};`);
+        g.curves[0].samples.forEach(([x, y], k) => ok(near(y, f(x), 1e-9) && near(g.curves[0].px[k][1], g.origin[1] - y * g.scaleY, 1e-9), `${at}: the plotted curve is the stated curve`));
+        ok(g.points.length === 1 && g.points[0].x === +m[2] && near(g.points[0].y, f(+m[2]), 1e-9), `${at}: the marked point is on the curve at the stated x`);
+      } else if (id === 'c8-pie-chart-reasoning') {
+        const angles = [...text.slice(text.indexOf('central angles')).matchAll(/(\d+)°/g)].map(m => +m[1]);
+        const arcs = g.arcs.map(a => a.degrees);
+        ok(angles.every((a, k) => near(arcs[k], a, 1e-6)) && near(arcs.reduce((s, x) => s + x, 0), 360, 1e-9), `${at}: pie slices are the stated central angles and fill the circle`);
+      } else if (id === 'c8-bar-graph-reasoning') {
+        const data = text.slice(text.search(/[A-Za-z0-9 ]+: [a-z]+ \d+/)), nums = [...data.matchAll(/: [a-z]+ (\d+), [a-z]+ (\d+)/g)].flatMap(m => [+m[1], +m[2]]);
+        ok(nums.length === g.rects.length && nums.every((n, k) => n === g.rects[k].value), `${at}: the bars are the stated values`);
+        g.rects.forEach(r => ok(near(r.y + r.h, g.baseline), `${at}: bars rise from the zero baseline`));
+      } else if (id === 'c8-quadrilaterals') {
+        const SIDES2 = { triangle: 3, quadrilateral: 4, pentagon: 5, hexagon: 6, heptagon: 7, octagon: 8, nonagon: 9, decagon: 10, dodecagon: 12 };
+        const pm = text.match(/parallelogram is (\d+)°/), gm = text.match(/interior angles of an? (\w+)/);
+        if (pm) ok(g.P && near((Math.acos(dot(g.P[0], g.P[1], g.P[3]) / (dist(g.P[0], g.P[1]) * dist(g.P[0], g.P[3]))) * 180) / Math.PI, +pm[1], 1e-6), `${at}: the parallelogram has the stated angle`);
+        else ok(gm && g.n === SIDES2[gm[1]], `${at}: the polygon has the stated number of sides`);
+      } else if (id === 'c11-line-distance-reasoning' || id === 'c11-straight-lines') {
+        const eqs = [...text.replace(/−/g, '-').matchAll(/(-?\d*)x ([+-]) (\d*)y ([+-]) (\d+) = 0/g)];
+        ok(eqs.length === g.lines.length, `${at}: every stated line is drawn`);
+        g.lines.forEach(L => { const m = [(L.a[0] + L.b[0]) / 2, (L.a[1] + L.b[1]) / 2], X = (m[0] - g.origin[0]) / g.scale, Y = (g.origin[1] - m[1]) / g.scaleY; ok(Math.abs(L.l.a * X + L.l.b * Y + L.l.c) < 1e-6 * (Math.abs(L.l.a) + Math.abs(L.l.b) + Math.abs(L.l.c)), `${at}: the drawn line satisfies its equation`); });
+      } else {
+        const named = [...text.matchAll(/\b([A-Z])\((-?\d+(?:\.\d+)?),\s*(-?\d+(?:\.\d+)?)\)/g)];
+        const first = new Map(); named.forEach(m => { if (!first.has(m[1])) first.set(m[1], [+m[2], +m[3]]); });
+        ok(first.size === g.points.length && g.points.every(p => first.has(p.label) && first.get(p.label)[0] === p.x && first.get(p.label)[1] === p.y), `${at}: the points are the stated points`);
+        g.points.forEach(p => ok(near(p.X, g.origin[0] + p.x * g.scale) && near(p.Y, g.origin[1] - p.y * g.scale), `${at}: points at their true pixels`));
+      }
+    }
+  }
+  ok(drawn > 1500, `the decorators drew ${drawn} figures across the authored skills`);
+  for (const [id, n] of Object.entries(prompts)) ok(n > 0, `${id}: at least one prompt of this skill yields a figure`);
+}
 // ── the labels on a figure sit on the sides the question names (regression: ratio-from-3-4-5) ──
 {
   const { EXTRA_FORMS } = await import('../src/engine/generators/india-forms-extra.js');

@@ -366,6 +366,8 @@ const INDIA_BANK_OF = {
 export const GENERATORS = {};
 /** Further structural forms per skill id: [{ form, make(rng, diff) => { payload, check } }]. */
 export const EXTRA_FORMS = {};
+/** Prompt-driven figure decorators for authored skills: id -> (payload) => { svg } | null (forms/prompt-figures.js). */
+export const FIGURE_FOR = {};
 
 const loaded = new Set();
 const inflight = new Map();
@@ -409,7 +411,7 @@ function bankLoader(name) {
 
 /** Extra structural forms ride with the Indian banks only, one chunk per class (forms/loader.js). */
 function extraFormsFor(name, ids) {
-  return String(name).startsWith('india-') ? import('./forms/loader.js').then(m => m.loadExtraForms(ids)) : Promise.resolve({});
+  return String(name).startsWith('india-') ? import('./forms/loader.js').then(async m => ({ forms: await m.loadExtraForms(ids), figures: await m.loadFigureDecorators(ids) })) : Promise.resolve({ forms: {}, figures: {} });
 }
 
 function loadBank(name) {
@@ -420,7 +422,8 @@ function loadBank(name) {
     job = loader().then(async bank => {
       const extra = await extraFormsFor(name, Object.keys(bank));
       Object.assign(GENERATORS, bank);
-      Object.assign(EXTRA_FORMS, extra);
+      Object.assign(EXTRA_FORMS, extra.forms);
+      Object.assign(FIGURE_FOR, extra.figures);
       loaded.add(name);
       inflight.delete(name);
     }, err => {
@@ -606,7 +609,12 @@ export function generateQuestion(subtopicId, difficulty, seed, dotpointId) {
   // own stream (and every seed it already served) is unchanged.
   const extra = Object.hasOwn(EXTRA_FORMS, subtopicId) ? EXTRA_FORMS[subtopicId] : null;
   const pick = extra ? Math.floor(makeRng((s ^ 0x2f6b9c1d) >>> 0)() * (extra.length + 1)) : 0;
-  const payload = pick === 0 ? gen(rng, d) : extra[pick - 1].make(rng, d).payload;
+  let payload = pick === 0 ? gen(rng, d) : extra[pick - 1].make(rng, d).payload;
+  if (!payload.figure && Object.hasOwn(FIGURE_FOR, subtopicId)) {
+    let drawn = null;
+    try { drawn = FIGURE_FOR[subtopicId](payload); } catch { drawn = null; }   // an odd prompt leaves the question without a figure, never without a question
+    if (drawn) payload = { ...payload, figure: drawn.svg };
+  }
   const q = { seed: s, subtopic: subtopicId, difficulty: d, ...payload };
   const { list, source, perQuestion } = dotpointsOf(gen, subtopicId, d, payload);
   q.dotpoints = list.map(dp => dp.id);

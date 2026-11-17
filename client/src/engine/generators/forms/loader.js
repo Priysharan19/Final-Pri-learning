@@ -35,3 +35,10 @@ export async function loadExtraForms(ids) {
   }
   return out;
 }
+
+/** Figure decorators (forms/prompt-figures.js) for the authored skills among the given ids; its own chunk. */
+export async function loadFigureDecorators(ids) {
+  const want = new Set(ids.map(String));
+  const { FIGURE_FOR } = await import('./prompt-figures.js');
+  return Object.fromEntries(Object.entries(FIGURE_FOR).filter(([id]) => want.has(id)));
+}
