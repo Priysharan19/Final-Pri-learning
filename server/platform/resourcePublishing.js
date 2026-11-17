@@ -344,7 +344,7 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     if (needStorage(res)) return;
     const resourceId = rid(req); const n = rev(req);
     if (!resourceId || n === null) return bad(res, 404, 'REVISION_NOT_FOUND', 'No such revision.');
-    const [row, e] = await draftOf(req, resourceId, n);
+    const [, e] = await draftOf(req, resourceId, n);
     if (e) return res.status(e[0]).json(e[1]);
     for (let i = 0; i < MAX_PARTS; i++) await storage.delete(partKey(resourceId, n, i));
     res.json({ partBytes: PART_BYTES, maxParts: MAX_PARTS, maxBytes: MAX_ASSET_BYTES });
@@ -355,7 +355,7 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     const resourceId = rid(req); const n = rev(req);
     const i = /^[0-9]{1,2}$/.test(String(req.params.i)) ? Number(req.params.i) : -1;
     if (!resourceId || n === null || i < 0 || i >= MAX_PARTS) return bad(res, 400, 'UPLOAD_PART_INVALID', 'That part number is not valid.');
-    const [row, e] = await draftOf(req, resourceId, n);
+    const [, e] = await draftOf(req, resourceId, n);
     if (e) return res.status(e[0]).json(e[1]);
     const data = req.body?.data;
     if (typeof data !== 'string' || !/^[A-Za-z0-9+/]*={0,2}$/.test(data) || data.length > Math.ceil(PART_BYTES / 3) * 4) return bad(res, 400, 'UPLOAD_PART_INVALID', 'The part is not valid base64 or is too large.');
@@ -369,7 +369,7 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     if (needStorage(res)) return;
     const resourceId = rid(req); const n = rev(req);
     if (!resourceId || n === null) return bad(res, 404, 'REVISION_NOT_FOUND', 'No such revision.');
-    const [row, e] = await draftOf(req, resourceId, n);
+    const [, e] = await draftOf(req, resourceId, n);
     if (e) return res.status(e[0]).json(e[1]);
     const count = req.body?.parts;
     if (!Number.isInteger(count) || count < 1 || count > MAX_PARTS) return bad(res, 400, 'UPLOAD_INVALID', 'Say how many parts were sent.');
@@ -411,7 +411,7 @@ export function createResourcePublishingRouter(db, { edition = serverEdition(pro
     if (needStorage(res)) return;
     const resourceId = rid(req); const n = rev(req);
     if (!resourceId || n === null) return bad(res, 404, 'REVISION_NOT_FOUND', 'No such revision.');
-    const [row, e] = await draftOf(req, resourceId, n);
+    const [, e] = await draftOf(req, resourceId, n);
     if (e) return res.status(e[0]).json(e[1]);
     const asset = await assetOf(resourceId, n);
     if (!asset) return bad(res, 404, 'ASSET_NOT_FOUND', 'This revision has no file.');
