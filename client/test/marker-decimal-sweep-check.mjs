@@ -35,7 +35,10 @@ import { checkAnswer as serverCheckAnswer } from '../../server/engine/checker.js
 import { generateQuestion, loadAllBanks, GENERATORS } from '../src/engine/generators/index.js';
 await loadAllBanks();
 
-const DEFAULT_DRAWS = 150;
+// 150 until train 25: the extra Priyabhata forms (generators/forms/) take a share of every skill's draws,
+// so the direct form's own fractions are fewer per cell; 200 draws restore the sample the floors below were
+// measured on (the floors themselves are unchanged and still met).
+const DEFAULT_DRAWS = 200;
 const DRAWS = Math.max(1, Number(process.argv[2]) || DEFAULT_DRAWS);   // seeds per (generator, difficulty)
 // The population floors below were measured at DEFAULT_DRAWS; a smaller run
 // scales them down so a quick local pass is still a real pass.
