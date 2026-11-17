@@ -1,6 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · Year 8 generators
 // ─────────────────────────────────────────────────────────────────────────────
+import { year8Nsw } from './year8-nsw.js';
 import { ri, rc, rs, nz, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, NAMES, ITEMS } from '../qhelpers.js';
 import { figCircle } from '../figures.js';
 
@@ -20,6 +21,7 @@ function idxParts(coef, vars) {
 }
 
 export const year8 = {
+  ...year8Nsw,
 
   // ── Index notation & laws ────────────────────────────────────────────────
   'y8-indices': (rng, diff) => {

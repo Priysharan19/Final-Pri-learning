@@ -329,6 +329,8 @@ export async function cloudRequest(path, {
       if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       if (Array.isArray(data?.error?.proofs)) err.proofs = proofList(data.error.proofs);
+      // The plain-text reasons a publishing step was refused (plan F3), bounded.
+      if (Array.isArray(data?.error?.problems)) err.problems = data.error.problems.filter(p => typeof p === 'string').slice(0, 12).map(p => p.slice(0, 300));
       editionRefusal(err, data);
       err.requestId = result?.requestId || rid;
       throw err;
@@ -398,6 +400,8 @@ export async function cloudRequest(path, {
       if (typeof data?.error?.timeZone === 'string' && TIME_ZONE.test(data.error.timeZone)) err.timeZone = data.error.timeZone;
       if (typeof data?.error?.openExamId === 'string' && SAFE_ID.test(data.error.openExamId)) err.openExamId = data.error.openExamId;
       if (Array.isArray(data?.error?.proofs)) err.proofs = proofList(data.error.proofs);
+      // The plain-text reasons a publishing step was refused (plan F3), bounded.
+      if (Array.isArray(data?.error?.problems)) err.problems = data.error.problems.filter(p => typeof p === 'string').slice(0, 12).map(p => p.slice(0, 300));
       editionRefusal(err, data);
       err.requestId = response.headers.get('x-pri-request-id') || rid;
       throw err;
@@ -685,9 +689,6 @@ export const cloud = Object.freeze({
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
   linkIdentity: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/link`, { method: 'POST', body }),
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),
-  // A bound pull cannot silently switch accounts between /me and a later
-  // pagination request. The last path segment stays the numeric cursor for
-  // legacy callers and test fixtures; the server checks the preceding id.
   syncPull: (cursor, accountId = null) => cloudRequest(`/v1/sync/pull/${accountId == null ? '' : `${pathId(accountId, 'account id')}/`}${Math.max(0, Number(cursor) || 0)}`),
   entitlements: () => cloudRequest('/v1/entitlements'),
   billingConfig: () => cloudRequest('/v1/billing/config'),
@@ -727,6 +728,24 @@ export const cloud = Object.freeze({
   submitContentReview: revisionId => cloudRequest(`/v1/content/${pathId(revisionId, 'revision id')}/submit-review`, { method: 'POST', body: {} }),
   approveContent: revisionId => cloudRequest(`/v1/content/${pathId(revisionId, 'revision id')}/approve`, { method: 'POST', body: {} }),
   publishContent: revisionId => cloudRequest(`/v1/content/${pathId(revisionId, 'revision id')}/publish`, { method: 'POST', body: {} }),
+  // Library publishing (plan F3). Staff only, and only where the server has
+  // PRI_RESOURCE_PUBLISHING=on (otherwise every one of these answers 404). Every
+  // body is JSON inside the 1 MiB transport limit: a file goes up in 512 KiB
+  // parts (client/src/library/assetUpload.js), never as one binary request.
+  resourceAdminList: () => cloudRequest('/v1/resources/admin'),
+  resourceAdminHistory: rid => cloudRequest(`/v1/resources/admin/${pathId(rid, 'resource id')}/revisions`),
+  resourceAdminRead: (rid, n) => cloudRequest(`/v1/resources/admin/${pathId(rid, 'resource id')}/revisions/${pathId(n, 'revision')}`),
+  resourceAdminDraft: (rid, body) => cloudRequest(`/v1/resources/admin/${pathId(rid, 'resource id')}/drafts`, { method: 'POST', body: { body } }),
+  resourceAdminEdit: (rid, n, body) => cloudRequest(`/v1/resources/admin/${pathId(rid, 'resource id')}/revisions/${pathId(n, 'revision')}`, { method: 'PATCH', body: { body } }),
+  resourceAdminStep: (rid, n, step, body = {}) => {
+    if (!['submit', 'approve', 'reject', 'publish', 'rollback', 'revise'].includes(step)) throw new Error('step is invalid');
+    return cloudRequest(`/v1/resources/admin/${pathId(rid, 'resource id')}/revisions/${pathId(n, 'revision')}/${step}`, { method: 'POST', body });
+  },
+  resourceAdminWithdraw: (rid, reason) => cloudRequest(`/v1/resources/admin/${pathId(rid, 'resource id')}/withdraw`, { method: 'POST', body: { reason } }),
+  resourceAdminAssetStart: (rid, n) => cloudRequest(`/v1/resources/admin/${pathId(rid, 'resource id')}/revisions/${pathId(n, 'revision')}/asset/start`, { method: 'POST', body: {} }),
+  resourceAdminAssetPart: (rid, n, i, data) => cloudRequest(`/v1/resources/admin/${pathId(rid, 'resource id')}/revisions/${pathId(n, 'revision')}/asset/parts/${pathId(i, 'part')}`, { method: 'POST', body: { data } }),
+  resourceAdminAssetComplete: (rid, n, body) => cloudRequest(`/v1/resources/admin/${pathId(rid, 'resource id')}/revisions/${pathId(n, 'revision')}/asset/complete`, { method: 'POST', body }),
+  resourceAdminAssetDelete: (rid, n) => cloudRequest(`/v1/resources/admin/${pathId(rid, 'resource id')}/revisions/${pathId(n, 'revision')}/asset`, { method: 'DELETE' }),
   adminHealth: () => cloudRequest('/v1/admin/health'),
   adminUsers: () => cloudRequest('/v1/admin/users'),
   updateUserRole: (accountId, role) => cloudRequest(`/v1/admin/users/${pathId(accountId, 'account id')}/role`, { method: 'PATCH', body: { role } }),

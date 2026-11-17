@@ -56,7 +56,7 @@ globalThis.fetch = async (url, options = {}) => {
   return json({ error: { code: 'NOT_FOUND', message: path } }, 404);
 };
 
-const { add, put } = await import('../src/local/idb.js');
+const { add, put, uuid } = await import('../src/local/idb.js');
 const { loginCloudAccount } = await import('../src/platform/cloudAccount.js');
 const {
   acknowledgeProfileMutations, pendingProfileMutations, recordProfileMutation
@@ -72,6 +72,26 @@ const ok = (name, condition, detail = '') => {
   failures.push(`${name}${detail ? ` — ${detail}` : ''}`);
 };
 const same = (name, actual, expected) => ok(name, JSON.stringify(actual) === JSON.stringify(expected), `expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+
+// This production UUID source also mints the opaque cloud device ID.
+// Simulate a WebView without randomUUID; random bytes remain compulsory.
+const originalCryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'crypto');
+try {
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    value: { getRandomValues(bytes) { for (let i = 0; i < bytes.length; i++) bytes[i] = i; return bytes; } }
+  });
+  same('secure UUID falls back to CSPRNG bytes with RFC 4122 v4/variant bits',
+    uuid(), '00010203-0405-4607-8809-0a0b0c0d0e0f');
+  Object.defineProperty(globalThis, 'crypto', { configurable: true, value: {} });
+  let unavailable = null;
+  try { uuid(); } catch (error) { unavailable = error; }
+  same('UUID creation fails closed when both secure generators are missing',
+    unavailable?.code, 'SECURE_RANDOM_UNAVAILABLE');
+} finally {
+  if (originalCryptoDescriptor) Object.defineProperty(globalThis, 'crypto', originalCryptoDescriptor);
+  else delete globalThis.crypto;
+}
 
 await put('profiles', { id: 'p1', name: 'Local A', avatar: 'A', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
 await add('attempts', { pid: 'p1', questionId: 'q-old-1', subtopic: 'linear', difficulty: 2, correct: 0, ms: 1400, hintsUsed: 1, mode: 'practice', viaInk: true, ratingBefore: 1000, ratingAfter: 990, createdAt: 1000 });

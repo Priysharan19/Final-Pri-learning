@@ -615,6 +615,41 @@ export function createPlatformDb(path = DEFAULT_PATH) {
   db.exec(`CREATE INDEX IF NOT EXISTS idx_desk_attempts_account_resource ON desk_attempts(account_id, resource_id, created_at);`);
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_desk_attempts_one_open ON desk_attempts(account_id, resource_id) WHERE state <> 'finished';`);
 
+  // Schema v17 — resource publishing (resourcePublishing.js, plan F3): the
+  // revision history behind the library and the hosted PDF records. Global.
+  db.exec(`CREATE TABLE IF NOT EXISTS resource_revisions (
+    id TEXT PRIMARY KEY,
+    resource_id TEXT NOT NULL,
+    revision INTEGER NOT NULL CHECK(revision >= 1),
+    state TEXT NOT NULL CHECK(state IN ('draft','in_review','approved','published','withdrawn','superseded')),
+    body_json TEXT NOT NULL,
+    author_account_id TEXT NOT NULL,
+    reviewer_account_id TEXT CHECK(reviewer_account_id IS NULL OR reviewer_account_id <> author_account_id),
+    reason TEXT,
+    created_at INTEGER NOT NULL,
+    submitted_at INTEGER,
+    reviewed_at INTEGER,
+    published_at INTEGER,
+    withdrawn_at INTEGER,
+    UNIQUE(resource_id, revision)
+  );`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_resource_revisions_one_open ON resource_revisions(resource_id) WHERE state IN ('draft','in_review','approved');`);
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_resource_revisions_one_published ON resource_revisions(resource_id) WHERE state = 'published';`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_resource_revisions_state ON resource_revisions(state, created_at);`);
+  db.exec(`CREATE TABLE IF NOT EXISTS resource_assets (
+    id TEXT PRIMARY KEY,
+    resource_id TEXT NOT NULL,
+    revision INTEGER NOT NULL,
+    sha256 TEXT NOT NULL CHECK(length(sha256) = 64),
+    byte_length INTEGER NOT NULL CHECK(byte_length >= 1 AND byte_length <= 26214400),
+    storage_key TEXT NOT NULL,
+    region TEXT NOT NULL,
+    uploaded_by TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE(resource_id, revision),
+    FOREIGN KEY(resource_id, revision) REFERENCES resource_revisions(resource_id, revision) ON DELETE CASCADE
+  );`);
+
   db.prepare("INSERT OR REPLACE INTO platform_meta(key,value) VALUES ('schema_version',?)").run(String(SCHEMA_VERSION));
   return db;
 }

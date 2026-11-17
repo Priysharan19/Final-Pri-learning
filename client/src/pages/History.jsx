@@ -20,6 +20,7 @@ import MarkStrip from '../instrument/MarkStrip.jsx';
 import { colourFor, scopeFor } from '../instrument/chapters.js';
 import Glyph from '../instrument/Glyph.jsx';
 import BarSlot from '../instrument/BarSlot.jsx';
+import Working from '../instrument/Working.jsx';
 
 // v1.1 instrument: each row carries its certified mark as a strip.
 const INSTRUMENT_STRIP = INSTRUMENT_UI;
@@ -396,7 +397,7 @@ function HistoryForProfile() {
       </div>}
 
       <div id={INSTRUMENT_STRIP ? 'in-hist-ledger' : undefined} className={`card${INSTRUMENT_STRIP ? ' in-led' : ''}`} style={INSTRUMENT_STRIP ? undefined : { padding: 10 }}>
-        {!data && !loadFailed && <div className="skeleton" style={{ height: 300 }} role="status" aria-label={t('common.loading')} />}
+        {!data && !loadFailed && <div className="skeleton" style={{ height: 300 }} role="status" aria-label={t('common.loading')}><Working pending={!data && !loadFailed} size={24} /></div>}
         {loadFailed && (
           <div className="error-box" role="alert" data-history-load-error>
             <p>{t('errorScreen.title')}</p>

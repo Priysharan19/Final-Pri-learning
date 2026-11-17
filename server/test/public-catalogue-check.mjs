@@ -77,7 +77,7 @@ try {
   const list = await au.request('/v1/public/resources');
   const ids = r => (r.data?.resources || []).map(x => x.id);
   c.eq(list.status, 200, 'on: an anonymous caller is answered');
-  c.deq(ids(list), [SEED.id, 'shared-solutions'], 'the list holds the published rows of this edition only, newest year first')
+  c.deq(ids(list), [SEED.id, 'shared-solutions'], 'the list holds the published rows of this edition only, newest year first');
   c.ok(!hidden.some(id => list.text.includes(id)) && !/Draft calculus|Withdrawn paper|Quadratics|Hosted paper|Plain http/.test(list.text), 'no draft, withdrawn, hosted, non-https or other-edition row appears anywhere in the list');
   for (const id of hidden) {
     const r = await au.request(`/v1/public/resources/${id}`);

@@ -9,6 +9,10 @@ import { mfaKeyConfigured, mfaKeyMalformed } from './mfa.js';
 import { sessionMaxAgeMs } from './security.js';
 import { serverEdition } from './edition.js';
 import { editionBilling, editionBillingProblems } from './billingProviders.js';
+import { storageConfigProblems } from './objectStorage.js';
+
+/** PRI_RESOURCE_PUBLISHING=on (plan F3). Off by default: the write routes do not exist. */
+export const resourcePublishingEnabled = (env = process.env) => String(env.PRI_RESOURCE_PUBLISHING || '').trim().toLowerCase() === 'on';
 
 function nonEmpty(name) {
   return !!String(process.env[name] || '').trim();
@@ -413,6 +417,8 @@ export function platformConfigStatus() {
   // Session lifetime and sync quota are whole numbers or absent; nothing else.
   if (sessionMaxAgeProblem(env)) missing.push(sessionMaxAgeProblem(env));
   missing.push(...syncQuotaProblems(env));
+  // Hosted library files (plan F3): when publishing is on and a store is named, its region must be the edition's.
+  if (resourcePublishingEnabled(env)) missing.push(...storageConfigProblems(env, serverEdition(env)));
   if (production && !postgresSelected() && !configuredDbPath()) missing.push('PRI_PLATFORM_DB');
   // A configured provider key is a licence to spend real money on every request
   // that reaches it. Per-account limits bound one student; only these bound the

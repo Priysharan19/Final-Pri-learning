@@ -22,6 +22,7 @@ import { queueTelemetry } from '../platform/telemetry.js';
 import { consumeSessionReceipt } from './practiceSessionReceipt.js';
 import { shouldReloadPracticeOnCloudSignIn } from './practiceCloudRecovery.js';
 import { BRAND } from '../brand/edition.js';
+import Working from '../instrument/Working.jsx';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
@@ -669,7 +670,7 @@ function ProfilePractice() {
             <div className="skeleton" style={{ height: 22, marginBottom: 10 }} />
             <div className="skeleton" style={{ height: 22, width: '70%' }} />
           </div>
-          <p className="muted" role="status" style={{ textAlign: 'center' }}>{t('practice.loading')}</p>
+          <p className="muted" role="status" style={{ textAlign: 'center' }}><Working pending={!serve && !error} size={24} /><span>{t('practice.loading')}</span></p>
         </div>
       )}
 
