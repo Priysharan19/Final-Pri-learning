@@ -84,11 +84,25 @@ export function timeline(page) {
 /** The samples of a stroke written by time `t` (a replay frame). */
 export const pointsUntil = (stroke, t) => stroke.points.filter(p => p.t <= t);
 
+/**
+ * Whether a fetched original may be shown as THIS mark's work: only when the
+ * mark names a digest and the record carries exactly that digest (the bytes
+ * are then re-hashed by openOriginal). No digest named is not shown — a
+ * record is never trusted to be the marked page on its own say-so.
+ */
+export function fetchedPhase(original, markSha256) {
+  if (typeof markSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(markSha256)) return 'none';
+  if (!original || typeof original !== 'object') return 'none';
+  return original.sha256 === markSha256 ? 'ready' : 'mismatch';
+}
+
 /** The reading layer, for the small "what Pri read" line. */
 export function readingLayer(reading) {
   if (!reading || typeof reading !== 'object') return null;
   const confirmed = typeof reading.confirmed === 'string' ? reading.confirmed : '';
   const read = typeof reading.read === 'string' ? reading.read : null;
-  return { read, confirmed, corrected: reading.corrected === true || (read !== null && read !== confirmed),
+  // What Pri read is shown only when the server still had it; a correction
+  // without it is not shown as a reading.
+  return { read, confirmed, corrected: read !== null && (reading.corrected === true || read !== confirmed),
     edits: Array.isArray(reading.edits) ? reading.edits.length : 0 };
 }

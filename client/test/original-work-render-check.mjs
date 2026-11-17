@@ -66,6 +66,15 @@ eq(model.markBoxes(opened.page, view.lines, [{ line: 1, status: 'made-up' }])[0]
 eq(model.readingLayer(view.reading), { read: 'x = 9', confirmed: '9', corrected: true, edits: 1 }, 'what Pri read and what the student confirmed are kept apart');
 eq(model.readingLayer({ read: '9', confirmed: '9' }).corrected, false, 'agreement is not a correction');
 
+// ── A fetched record is shown only as the page the mark names ─────────────────
+eq(model.fetchedPhase(view, view.sha256), 'ready', 'the record carrying the mark\'s digest is shown');
+eq(model.fetchedPhase(view, 'e'.repeat(64)), 'mismatch', 'a record with another digest is refused as this mark\'s work');
+eq(model.fetchedPhase(view, null), 'none', 'no digest named: not shown (a record is never trusted on its own say-so)');
+eq(model.fetchedPhase(null, view.sha256), 'none', 'no record: nothing shown');
+eq(model.readingLayer({ read: null, confirmed: '9', corrected: true }).corrected, false, 'a correction whose reading the server no longer holds is not shown as a reading');
+const marked = readFileSync(new URL('../src/components/OriginalWork.jsx', import.meta.url), 'utf8');
+ok(/export function MarkedOriginal\(\{ originalId, sha256, /.test(marked) && /fetchedPhase\(original, sha256\)/.test(marked), 'MarkedOriginal decides with fetchedPhase and has no default digest');
+
 // ── Replay ────────────────────────────────────────────────────────────────────
 const tl = model.timeline(opened.page);
 ok(tl.spans[0].start < tl.spans[1].start && tl.spans[1].start < tl.spans[2].start, 'strokes replay in the order written');

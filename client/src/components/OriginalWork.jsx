@@ -15,16 +15,17 @@
 //   showReading  show the small "What Pri read" line (default true)
 //   label      accessible name of the page (default: "Your handwriting")
 //
-// The bytes are re-hashed before anything is drawn: a page that does not match
-// the digest the mark names is not shown as the student's work. Strokes are
-// drawn through their own samples with straight segments — nothing smoothed or
+// The bytes are re-hashed before anything is drawn (OriginalWork), and
+// MarkedOriginal shows a record only when it carries the digest the mark
+// names: a page that does not match is not shown as the student's work.
+// Strokes are drawn through their own samples with straight segments — nothing smoothed or
 // redrawn. Replay plays the strokes in the order and at the pace written;
 // reduced motion shows the finished page and offers no replay.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useT } from '../i18n/index.js';
 import { cloud } from '../platform/cloudTransport.js';
-import { markBoxes, openOriginal, pointsUntil, readingLayer, strokePath, timeline } from './originalWorkModel.js';
+import { fetchedPhase, markBoxes, openOriginal, pointsUntil, readingLayer, strokePath, timeline } from './originalWorkModel.js';
 import './OriginalWork.css';
 
 const reducedMotion = () => typeof window !== 'undefined' && Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches);
@@ -122,7 +123,7 @@ export default function OriginalWork({ original, marks = [], showReading = true,
         {reading && reading.confirmed && (
           <p className="ow-reading">
             <span className="ow-reading-label">{t('ow.whatPriRead')}</span>{' '}
-            <span className="ow-reading-text">{reading.corrected && reading.read !== null ? reading.read : reading.confirmed}</span>
+            <span className="ow-reading-text">{reading.corrected ? reading.read : reading.confirmed}</span>
             {reading.corrected && (
               <>
                 {' · '}<span className="ow-reading-label">{t('ow.youConfirmed')}</span>{' '}
@@ -141,24 +142,25 @@ export default function OriginalWork({ original, marks = [], showReading = true,
  * MarkedOriginal — fetch the original a mark names and show it.
  *   originalId          the id in the grade reply (`original.id`) or the
  *                       graded-attempt event (`original.id`)
- *   sha256              the digest the mark names; a fetched page with any
- *                       other digest is not shown as this mark's work
+ *   sha256              REQUIRED: the digest the mark names; a fetched page
+ *                       with any other digest — or none named — is not shown
+ *                       as this mark's work
  *   classId, studentId  the teacher's view (both, or neither)
  *   marks, showReading, label   as OriginalWork
  */
-export function MarkedOriginal({ originalId, sha256 = null, classId = null, studentId = null, ...rest }) {
+export function MarkedOriginal({ originalId, sha256, classId = null, studentId = null, ...rest }) {
   const t = useT();
   const [state, setState] = useState({ phase: 'loading', original: null });
   useEffect(() => {
     let live = true;
-    if (!originalId) { setState({ phase: 'none', original: null }); return undefined; }
+    if (!originalId || fetchedPhase({ sha256 }, sha256) !== 'ready') { setState({ phase: 'none', original: null }); return undefined; }
     setState({ phase: 'loading', original: null });
     const ask = classId && studentId ? cloud.teacherOriginal(classId, studentId, originalId) : cloud.original(originalId);
     ask.then(reply => {
       if (!live) return;
       const original = reply?.original || null;
-      if (!original || (sha256 && original.sha256 !== sha256)) setState({ phase: sha256 && original ? 'mismatch' : 'none', original: null });
-      else setState({ phase: 'ready', original });
+      const phase = fetchedPhase(original, sha256);
+      setState({ phase, original: phase === 'ready' ? original : null });
     }).catch(() => { if (live) setState({ phase: 'none', original: null }); });
     return () => { live = false; };
   }, [originalId, sha256, classId, studentId]);
