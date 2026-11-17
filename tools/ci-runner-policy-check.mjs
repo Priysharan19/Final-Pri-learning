@@ -574,6 +574,7 @@ export const LANE_GATED = Object.freeze({
   'ink-structural-v4-live-lan.yml': 'developer LAN structural inference',
   'ink-writer-generalization.yml': 'V17 writer-generalization smoke (Python)',
   'build-ink-v3-test-model.yml': 'V3 test-model training and Core ML export (macOS)',
+  'nightly-backup.yml': 'encrypted nightly pg_dump and the throwaway-Postgres restore test (runs nightly too)',
   'jee-question-department.yml': 'JEE question pipeline (the India suites and marking sweeps run in the required suites job)'
 });
 export const LANE_EVERYWHERE = Object.freeze({

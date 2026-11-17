@@ -10,6 +10,12 @@ name: Nightly logical backup
 on:
   schedule:
     - cron: '17 18 * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/nightly-backup.yml'
+      - 'scripts/ops-*.sh'
+      - 'scripts/ops-age-recipient.txt'
   pull_request:
     paths:
       - '.github/workflows/nightly-backup.yml'
@@ -27,6 +33,7 @@ concurrency:
 jobs:
   restore-test:
     name: restore test (throwaway Postgres)
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     services:
@@ -58,7 +65,7 @@ jobs:
   backup:
     name: backup (${{ matrix.edition }})
     needs: restore-test
-    if: github.event_name != 'pull_request'
+    if: (github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')) && (github.event_name != 'pull_request' && github.event_name != 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
