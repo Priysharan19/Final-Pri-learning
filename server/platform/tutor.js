@@ -84,7 +84,7 @@ import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import { issuedQuestionForTutor } from './practice.js';
 import { distressReply, safetyOutputIssues } from './tutorSafety.js';
 import { serverEdition } from './edition.js';
-import { buildGuard, captionWordingOk, markClaimIssues, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
+import { buildGuard, captionWordingOk, markClaimIssues, replyMarkClaimIssues, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
 import {
   MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_DIAGNOSE_LEVEL, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
   TUTOR_TURN_LEVEL, TUTOR_WHY_LEVEL, TutorProviderError, askTutorModel, providerConfig, streamTutorModel
@@ -828,7 +828,8 @@ export function createTutorRouter(db, {
       const reply = await ask(request, { env });
       model = reply.model || model;
       const leaked = leakedExpressions(reply.message, guard, { prompt: request.question.prompt });
-      if (reply.message && !reply.revealsAnswer && !leaked.length && !safetyOutputIssues(reply.message).length) {
+      // A hint never speaks of a mark either: only the engine marks (AI red-team, 2026-11-18).
+      if (reply.message && !reply.revealsAnswer && !leaked.length && !safetyOutputIssues(reply.message).length && !replyMarkClaimIssues(reply.message).length) {
         return {
           tutor: {
             level: request.level, message: reply.message, referencesStepIndex: reply.referencesStepIndex,
@@ -935,7 +936,7 @@ export function createTutorRouter(db, {
       return fallback(error instanceof TutorProviderError ? error.code : 'TUTOR_FAILED');
     }
     const issues = reply?.message
-      ? [...diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines }), ...safetyOutputIssues(reply.message)]
+      ? [...diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines }), ...safetyOutputIssues(reply.message), ...replyMarkClaimIssues(reply.message)]
       : ['empty'];
     if (issues.length) {
       // The student got the step itself, not an explanation: the try is given back.
@@ -1275,7 +1276,7 @@ export function createTutorRouter(db, {
       req.on('close', onClose);
 
       const guard = buildGuard(request.question, { studentLines: request.studentWork.lines, verifiedLines: request.studentWork.verifiedLines });
-      const gate = createReleaseGate(guard, { prompt: request.question.prompt, maxChars: MAX_STREAM_CHARS, extraIssues: safetyOutputIssues });
+      const gate = createReleaseGate(guard, { prompt: request.question.prompt, maxChars: MAX_STREAM_CHARS, extraIssues: text => [...safetyOutputIssues(text), ...replyMarkClaimIssues(text)] });
       const model = providerConfig(env).model;
       send('meta', { level: request.level, source: 'model', model, cached: false });
 
