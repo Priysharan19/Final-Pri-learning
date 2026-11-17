@@ -62,7 +62,10 @@ final class NativeHostBridge: NSObject {
                 // Sign in with Apple is only useful against a configured Pri
                 // cloud: the token is verified there, nowhere else.
                 "identity": ["versions": [1], "transport": "bridge", "apple": cloudConfigured],
-                "notifications": ["versions": [1], "transport": "bridge"]
+                "notifications": ["versions": [1], "transport": "bridge"],
+                // Touch feedback (haptics v1): the page asks for one of two kinds;
+                // the system's own haptics setting decides whether it is felt.
+                "haptics": ["versions": [1], "transport": "bridge", "kinds": ["confirm", "selection"]]
             ]
         ]
         if let release = NativeReleaseIdentity.object { descriptor["release"] = release }
@@ -169,6 +172,13 @@ final class NativeHostBridge: NSObject {
             appleSignIn.signIn(id, payload,
                                reply: { [weak self] result in self?.reply(id, result) },
                                fail: { [weak self] code, message in self?.fail(id, code, message) })
+        case "haptics.fire":
+            switch payload["kind"] as? String {
+            case "confirm": UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            case "selection": UISelectionFeedbackGenerator().selectionChanged()
+            default: return fail(id, "BAD_REQUEST", "haptics.fire needs kind confirm or selection.")
+            }
+            reply(id, [:])
         case "notifications.requestPermission", "notifications.schedule", "notifications.cancelAll":
             NotificationBridge.shared.handle(op: op, payload: payload,
                                              reply: { [weak self] result in self?.reply(id, result) },

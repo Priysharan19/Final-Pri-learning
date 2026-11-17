@@ -51,6 +51,7 @@ import { askReaderPermission, PROMPT_ANSWER, READER_PERMISSION, readerPermission
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
 import ReadingPlot from '../instrument/ReadingPlot.jsx';
+import { haptic } from '../platform/native/haptics.js';
 // v1.1 instrument: the student's own equations, drawn under the reading.
 const INSTRUMENT_PLOT = featureEnabled('instrument');
 
@@ -115,7 +116,7 @@ function readStateOf(line, floor) {
   return isLowConfidence(line, floor) ? 'check' : 'read';
 }
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -788,7 +789,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               {INSTRUMENT_PLOT && !disabled && !stale && correcting?.index !== li && isLowConfidence(line, lineConfidenceFloor) && String(line.text ?? '').trim() && (
                 <button type="button" className="ink-accept-btn" data-line-accept
                   aria-label={t('inst.readThatsItAria', { n: li + 1 })}
-                  onClick={() => correctLine(li, line.text)}>{t('inst.readThatsIt')}</button>
+                  onClick={() => { if (feedback) haptic('selection'); correctLine(li, line.text); }}>{t('inst.readThatsIt')}</button>
               )}
               {!disabled && !stale && correcting?.index === li && (
                 <form className="ink-correct" onSubmit={e => { e.preventDefault(); correctLine(li, correcting.text); }}>
