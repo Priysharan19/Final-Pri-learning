@@ -3626,4 +3626,8 @@ export default {
   'export.chapterRow': '{name}: {attempts} answered, {correct} correct',
   'export.examRow': '{title}: {score} of {total}',
   'export.noExams': 'No finished papers.',
+  'login.plotZeroes': 'zeroes at −2 and 4',
+  'login.plotTurning': 'turning point at (1, −4)',
+  'login.plotAltP': 'A plot of p of x equals x squared minus 2x minus 8',
+  'login.plotAltY': 'A plot of y equals x squared minus 2x minus 3',
 };
