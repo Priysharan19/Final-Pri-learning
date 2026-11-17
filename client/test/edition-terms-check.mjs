@@ -40,6 +40,7 @@ const ALLOW = [
   [/^home\.next\.firstIndia$/, 'first-step copy for Indian courses'],
   [/^login\.olympiadTrack$/, 'Indian track chooser at sign-up'],
   [/^signup\.trackJeeHint$/, 'Indian track chooser at sign-up'],
+  [/^board\.ready\.whyIn$/, 'the Priyabhata honesty box under exam readiness (progress/SyllabusBoard.jsx draws whyNsw for Prithagoras, whyIn only for edition "in")'],
   [/^board\.prio\.sourceIndia$/, 'the CBSE unit-weightage note under syllabus-board priorities (progress/SyllabusBoard.jsx draws it only when india is true, i.e. an Indian course)']
 ];
 
