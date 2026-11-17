@@ -3656,4 +3656,5 @@ export default {
   'inst.mapLayerFirst': 'Step 1 of {total} · foundations in this year',
   'inst.mapLayerN': 'Step {n} of {total} · builds on the steps before',
   'login.heroNote': 'Answers are checked by Pri’s server, so checking needs an account and a connection. No ads.',
+  'login.privacyDetail': 'How your data is handled',
 };

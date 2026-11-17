@@ -140,3 +140,8 @@
   .otp-boxes { gap: 6px; }
   .otp-box { font-size: 21px; min-height: 44px; }
 }
+
+/* Landing footer: one short note, the data statement folded, centred. */
+.login-more { margin: var(--space-3) auto 0; max-width: 34em; text-align: center; font-size: 13px; color: var(--ink-3); }
+.login-more summary { display: inline-block; cursor: pointer; min-height: 44px; line-height: 44px; text-decoration: underline; text-underline-offset: 3px; }
+.login-more p { margin: 0 0 var(--space-2); text-align: left; }

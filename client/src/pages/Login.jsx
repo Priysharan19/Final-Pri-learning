@@ -596,6 +596,11 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
               )}
               {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
               <p className="muted login-note" style={{ marginTop: 22, textAlign: 'center', fontSize: 13 }}>{t('login.heroNote')}</p>
+              {/* The full data statement is one tap away, not a paragraph on the screen. */}
+              <details className="login-more">
+                <summary>{t('login.privacyDetail')}</summary>
+                <p className="muted">{t('login.heroPrivacy')}</p>
+              </details>
               {appleEntry}
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for

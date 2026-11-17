@@ -3711,4 +3711,5 @@ export default {
   'inst.mapLayerFirst': 'चरण 1 / {total} · इस वर्ष की नींव',
   'inst.mapLayerN': 'चरण {n} / {total} · पिछले चरणों पर आधारित',
   'login.heroNote': 'उत्तर Pri का सर्वर जाँचता है, इसलिए जाँच के लिए खाता और कनेक्शन चाहिए। कोई विज्ञापन नहीं।',
+  'login.privacyDetail': 'आपके डेटा का क्या होता है',
 };
