@@ -3218,7 +3218,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className="in-hintrow-head">
               <span className="in-meter" aria-hidden="true">{HINT_RUNGS.map((r, i) => <i key={r} className={i < hintLevel ? 'is-used' : undefined} />)}</span>
               <span className="in-hintrow-label">{t('inst.ladderHead', { used: rungLevelUsed, total: HINT_RUNGS.length })}</span>
-              <button type="button" className="in-hintrow-all" 
+              <button type="button" className="btn btn-quiet in-hintrow-all" 
                 onClick={(e) => { sheetOpener.current = e.currentTarget; setHintSheet(true); }}>{t('inst.allHints')}</button>
             </div>
             {!resolved && nextRung && (() => {

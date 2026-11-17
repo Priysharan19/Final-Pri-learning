@@ -1351,10 +1351,7 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
   .in-meter i { width: 14px; height: 4px; border-radius: 1px; background: var(--in-l4); }
   .in-meter i.is-used { background: var(--in-tx); }
   .in-hintrow-label { flex: 1; font: 400 13px var(--in-ui); color: var(--in-tx-2); }
-  .in-hintrow-all {
-    min-height: 44px; padding: 0 4px; border: 0; background: none; cursor: pointer;
-    font: 500 13px var(--in-ui); color: var(--in-tx); text-decoration: underline;
-  }
+  .in-hintrow-all { min-height: 44px; }
   .in-hintrow-next { width: 100%; min-height: 44px; justify-content: space-between; }
   .in-hintrow-next small { font: 500 11px var(--in-mono); color: var(--in-tx-3); }
   .in-hintsheet-scrim {
