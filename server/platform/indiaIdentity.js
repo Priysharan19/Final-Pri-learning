@@ -30,6 +30,8 @@ export const INDIA_SYLLABUS_VERSION = 'CBSE-2026-27';
  * rather than claiming one.
  */
 export const INDIA_VERSIONED_CLASSES = Object.freeze([7, 9, 10]);
+/** What an India outcome code is: the product curriculum's own dot point, not a CBSE/NCERT outcome code. */
+export const OUTCOME_BASIS = 'curriculum-dotpoint';
 const TRACKS = Object.freeze(['jee-advanced', 'jee-main', 'olympiad', 'cbse']);
 
 const CHAPTER_BY_ID = new Map(IN_CHAPTERS.map(c => [c.id, c]));
@@ -65,18 +67,24 @@ export function indiaQuestionIdentity(q, generator = q?._generator ?? q?.subtopi
   if (placed?.length) {
     const difficulty = Number(q.difficulty);
     const hit = placed.find(p => p.cover.diff?.includes(difficulty)) || placed[0];
-    const topics = (hit.cover.dp || []).map(i => text(hit.chapter.dotpoints?.[i])).filter(Boolean);
-    return chapterRecord(hit.chapter, { generator, topics, kind: 'practice' });
+    const indexes = (hit.cover.dp || []).filter(i => Number.isInteger(i) && text(hit.chapter.dotpoints?.[i]));
+    const topics = indexes.map(i => text(hit.chapter.dotpoints[i]));
+    // The learning outcomes the curriculum itself states for the chapter (its dot points), coded
+    // `<chapter id>#<1-based dot point>`. Not a board code: no board outcome code is held for
+    // India, so none is claimed (basis says so). The code is stable while the chapter's dot-point
+    // order is; edition-parity / in-outcome-identity-check pin that every coded outcome resolves.
+    const outcomes = indexes.map(i => ({ code: `${hit.chapter.id}#${i + 1}`, text: text(hit.chapter.dotpoints[i]), basis: OUTCOME_BASIS }));
+    return chapterRecord(hit.chapter, { generator, topics, outcomes, kind: 'practice' });
   }
   if (hasPyqGenerator(generator) || hasJeePyqGenerator(generator)) {
     const tail = generator.replace(/^pyq-/, '');
     const track = TRACKS.find(t => tail === t || tail.startsWith(`${t}-`)) || null;
     const chapter = track ? CHAPTER_BY_ID.get(tail.slice(track.length + 1)) : null;
-    if (chapter) return chapterRecord(chapter, { generator, topics: [], kind: 'previous-year', track });
-    return { jurisdiction: 'IN', authority: 'previous-year bank', board: null, class: null, syllabus: null, syllabusVersion: null, source: null, chapterId: null, chapterName: null, strand: null, generator, topics: [], kind: 'previous-year', track };
+    if (chapter) return chapterRecord(chapter, { generator, topics: [], outcomes: [], kind: 'previous-year', track });
+    return { jurisdiction: 'IN', authority: 'previous-year bank', board: null, class: null, syllabus: null, syllabusVersion: null, source: null, chapterId: null, chapterName: null, strand: null, generator, topics: [], outcomes: [], kind: 'previous-year', track };
   }
   // A suite that borrows an NSW-era bank as a vehicle (allowBanksOutsideIndiaForTests, refused in
   // production) gets a labelled identity, so the borrowed question is still issued in that suite.
-  if (practicePapersAllowed()) return { jurisdiction: 'IN', authority: 'test-vehicle', board: null, class: null, syllabus: null, syllabusVersion: null, source: null, chapterId: null, chapterName: null, strand: null, generator, topics: [], kind: 'test-vehicle' };
+  if (practicePapersAllowed()) return { jurisdiction: 'IN', authority: 'test-vehicle', board: null, class: null, syllabus: null, syllabusVersion: null, source: null, chapterId: null, chapterName: null, strand: null, generator, topics: [], outcomes: [], kind: 'test-vehicle' };
   return null;
 }
