@@ -130,7 +130,9 @@ const NULLS = [
   // Final review, head 46fcb00: true only on a half-line that covers the window is not an identity.
   ['|x − 10| = 10 − x is an equation, not a chain of equals', 'abs(x-10)=10-x', 'x-10=-(10-x)'],
   ['sqrt((x−10)^2) = 10 − x is an equation, not a chain of equals', 'sqrt((x-10)^2)=10-x', 'x-10=x-10'],
-  ['|x − 25| = 25 − x is an equation, not a chain of equals', 'abs(x-25)=25-x', 'x-25=x-24']
+  ['|x − 25| = 25 − x is an equation, not a chain of equals', 'abs(x-25)=25-x', 'x-25=x-24'],
+  ['a floor/ceil line is never certified a chain of equals by sampling', 'x+floor(x)+floor(-x)=x-1', 'x-1=x+1'],
+  ['an abs line differing only between samples is never certified', 'x+abs(x-20)-abs(x-21)-abs(x-23)+abs(x-24)=x', 'x=x+1']
 ];
 for (const [label, before, yours] of NULLS) {
   ok(mistakeView({ prevText: before, brokenText: yours }) === null, `null: ${label}`);

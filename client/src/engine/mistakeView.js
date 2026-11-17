@@ -60,6 +60,15 @@ function readLine(text) {
   } catch { return null; }
 }
 
+const PIECEWISE = new Set(['abs', 'floor', 'ceil', 'sqrt']);
+
+/** Does the tree call any function in `names`? */
+function hasCall(ast, names) {
+  if (!ast || typeof ast !== 'object') return false;
+  if (ast.t === 'call' && names.has(ast.fn)) return true;
+  return Object.values(ast).some(v => (Array.isArray(v) ? v.some(w => hasCall(w, names)) : v && typeof v === 'object' && hasCall(v, names)));
+}
+
 /** True when the tree uses something the picture cannot show honestly. */
 function unshowable(ast, angles) {
   let bad = false;
@@ -147,6 +156,12 @@ function isConstant(fn, value = null) {
  * two sides defined at the same points and equal there, far beyond the window?
  */
 function identity(eq, name) {
+  // A piecewise line (abs, floor, ceil — and sqrt, since sqrt(t²) is |t|) can agree at every sample and still
+  // differ on an interval between them, so sampling cannot certify it: it is
+  // never read as a chain of equals. Beyond the largest sample (|x| ≈ 1e6) a
+  // threshold cannot be seen either; there the reading matches the engine's,
+  // since exprEquivalent samples nearer the origin than this does.
+  if (hasCall(eq, PIECEWISE)) return false;
   if (!exprEquivalent(eq.l, eq.r)) return false;
   const L = asFunction(eq.l, name);
   const R = asFunction(eq.r, name);
