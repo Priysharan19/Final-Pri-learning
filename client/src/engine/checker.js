@@ -1134,7 +1134,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     // A break the check found but could not name: a topic catalogue may name
     // it (misconceptions/topics). The status, the mark and the first break
     // are already decided; only the note becomes specific.
-    if (status === 'break' && !lineDiagnosis) {
+    if (status === 'break' && (!lineDiagnosis || lineDiagnosis.code === 'counterexample')) {
       const named = diagnoseTopicLine({ line, previous: i > 0 ? rawLines[i - 1] : (meta.source ?? null), index: i, meta });
       if (named) { note = named.message; lineDiagnosis = named; }
     }
@@ -1204,6 +1204,14 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       }
       if (specific) diagnosis = specific;
     } catch { /* remain conservative */ }
+  }
+  // The same topic catalogues name a first break that only reached a bare counterexample (an answer line the
+  // per-line pass above never offered them). Status, mark and first break are already decided.
+  if (diagnosis && diagnosis.code === 'counterexample') {
+    try {
+      const named = diagnoseTopicLine({ line: out[firstBreak].text, previous: prevText, index: firstBreak, meta });
+      if (named) diagnosis = named;
+    } catch { /* keep the counterexample */ }
   }
   if (diagnosis) {
     diagnosis = withConfidence(diagnosis);

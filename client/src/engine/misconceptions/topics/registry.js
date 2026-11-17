@@ -60,7 +60,7 @@ export function diagnoseTopicLine(ctx) {
       let hit = null;
       try { hit = s.detect(ctx); } catch { hit = null; }
       if (hit && typeof hit.message === 'string' && hit.message) {
-        return { code: s.code, title: typeof hit.title === 'string' ? hit.title : null, fix: typeof hit.fix === 'string' ? hit.fix : null, confidence: hit.confidence || 'medium', message: hit.message, messages: hit.messages || {}, notesSectionId: hit.notesSectionId || null, misconceptionId: s.misconceptionId || null, topic: t.topic };
+        return { code: s.code, title: (typeof hit.title === 'string' && hit.title) ? hit.title : 'a slip in this line', fix: typeof hit.fix === 'string' ? hit.fix : null, confidence: hit.confidence || 'medium', message: hit.message, messages: hit.messages || {}, notesSectionId: hit.notesSectionId || null, misconceptionId: s.misconceptionId || null, topic: t.topic };
       }
     }
   }

@@ -8,3 +8,4 @@ import './sequences.js';
 import './finance.js';
 import './trigonometry.js';
 import './functions.js';
+import './polynomial-lines.js';
