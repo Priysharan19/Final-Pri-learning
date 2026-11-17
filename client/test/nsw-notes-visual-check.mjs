@@ -26,20 +26,18 @@ import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
-import { NSW_NOTES_TOPICS } from '../src/notes/nsw/nswNotesIndex.js';
-import base from '../src/notes/nsw/notes-nsw-stage4.js';
-import adv from '../src/notes/nsw/notes-nsw-stage6-advanced.js';
-import std from '../src/notes/nsw/notes-nsw-stage6-standard.js';
+import { NSW_NOTES_TOPICS, loadNswNotesForStage } from '../src/notes/nsw/nswNotesIndex.js';
 
 const CLIENT = fileURLToPath(new URL('..', import.meta.url));
 const SHOTS_DIR = fileURLToPath(new URL('../../docs/design/nsw-notes-screens/', import.meta.url));
 const WRITE_SHOTS = process.argv.includes('--shots');
-const SHOT_TOPICS = ['ma4-frc-c-01', 'ma4-pyt-c-01', 'mav-12-05', 'mst-12-s2-07']; // a Year 7 and a Year 8 chapter, then an Advanced and a Standard 2 chapter
+const SHOT_TOPICS = (process.env.SHOT_TOPICS || 'ma4-frc-c-01,ma4-pyt-c-01,mav-12-05,mst-12-s2-07').split(','); // a Year 7 and a Year 8 chapter, then an Advanced and a Standard 2 chapter
 let pass = 0;
 const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 
-const written = { ...base, ...adv, ...std };
+const written = {};
+for (const [stage, course] of [[4, null], [5, null], [6, 'advanced'], [6, 'standard'], [6, 'ext1'], [6, 'ext2']]) Object.assign(written, (await loadNswNotesForStage(stage, course)) || {});
 const topics = NSW_NOTES_TOPICS.filter(t => Object.hasOwn(written, t.id));
 const ORDER = ['ideas', 'definitions', 'formulas', 'diagram', 'examiners', 'mistakes', 'examples', 'check'];
 
@@ -116,7 +114,7 @@ try {
       ok(r.plainLabels === 0, `${where}: a diagram label is not KaTeX`);
       const expected = ORDER.filter(s => s !== 'diagram' || r.sections.includes('diagram'));
       ok(JSON.stringify(r.sections) === JSON.stringify(expected), `${where}: sections out of order (${r.sections.join(', ')})`);
-      ok(r.sections.includes('diagram') || t.id === 'ma4-vol-c-01', `${where}: has no diagram`);
+      ok(r.sections.includes('diagram') === (written[t.id].diagrams?.length > 0), `${where}: the diagram section does not match the chapter's diagrams`);
       ok(/^"?CMU Serif/.test(r.readFont), `${where}: reading text is not CMU Serif (${r.readFont})`);
       ok(/Instrument Sans/.test(r.labelFont), `${where}: section labels are not Instrument Sans (${r.labelFont})`);
       ok(r.cmuLoaded, `${where}: CMU Serif did not load`);
