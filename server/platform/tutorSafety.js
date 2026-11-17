@@ -19,6 +19,10 @@
 //      dependency, no personal questions, no claim to be a person or to have
 //      feelings. A hit replaces the reply with the deterministic one.
 //
+// The distress lexicon is a floor, not a clinical instrument: every review round finds
+// more phrasings. Before launch it needs a child-safety specialist's list (and a
+// native Hindi speaker's), and a review of real, anonymised misses.
+//
 // Support lines, read on the official pages on 18 Nov 2026:
 //   Australia — Kids Helpline 1800 55 1800 (https://www.kidshelpline.com.au/)
 //   India     — Tele-MANAS 14416 (https://telemanas.mohfw.gov.in/home)
@@ -66,13 +70,17 @@ const DISTRESS = [
   /\bi (hate|cant stand) myself\b/, /\bnobody (cares|loves me) (about me)?\b/,
   /\bi (am|m|feel|feeling) (so |really )?(hopeless|worthless|depressed)\b/,
   /\b(someone|somebody|he|she|they|my [a-z]+) (is |are |keeps )?(hitting|beating|hurting|touching|abusing|threatening) me\b/,
+  /\bwish i (wasnt|was not|werent|were not) (here|born|alive|around)\b/, /\b(dont|do not) want to go on\b/, /\bi hate my (own )?life\b/, /\bkill me\b/, /\bno point (anymore|any more|in anything)\b/, /\bdont see the point( anymore| any more)?\b/,
+  /\b(want|wanna|going) to (sleep|go to sleep) forever\b/, /\bsleep forever\b/, /\btook too many (pills|tablets)\b/, /\b(overdose|overdosing)\b/, /\bending (everything|my pain)\b/, /\bend everything\b/,
+  /\b(my (dad|mum|mom|father|mother|uncle|aunt|brother|sister|teacher|stepdad|stepmom|boyfriend|girlfriend|friend)|someone|somebody|he|she|they|people)( at (school|home))? (is |are |keeps |always |often |sometimes )?(hits|hit|beats|slaps|punches|kicks|hurts|touches|abuses|threatens|bullies|hurting|hitting|beating|touching|abusing|threatening|bullying) me\b/,
+  /\bhurt (myself|my ?self)\b/, /\bhurting myself\b/, /\bcut my (wrists?|arms?)\b/, /\bi (want|need|have) to (hurt|punish) myself\b/,
   // Hindi (Devanagari)
-  /आत्महत्या|आत्म हत्या|आत्मघात|सुसाइड|सूसाइड|ख़ुदकुशी|खुदकुशी|खुद कुशी/, /मर\s*(जाना|जाऊँगा|जाऊंगा|जाऊँगी|जाऊंगी|जाऊँ|जाऊं|जाएँ)\s*(है|हूँ|चाहता|चाहती)?/, /मरने का (मन|मन है|दिल)/, /(मुझे|मैं).{0,20}(मरना|मर जाना|मर जाऊँ|मर जाऊं)/, /(मर|मरना|मर जाना|जान दे)\s*(जाना\s*)?(चाहता|चाहती|दूँ|दूं|देना चाहता|देना चाहती)/,
+  /आत्महत्या|आत्म हत्या|आत्मघात|सुसाइड|सूसाइड|ख़ुदकुशी|खुदकुशी|खुद कुशी/, /मर\s*(जाना|जाऊँगा|जाऊंगा|जाऊँगी|जाऊंगी|जाऊँ|जाऊं|जाएँ)\s*(है|हूँ|चाहता|चाहती)?/, /मरने का (मन|मन है|दिल)/, /(अब )?(और )?नहीं जी (सकता|सकती)/, /जीना (मुश्किल|बेकार|नहीं)/, /(मेरे )?(पापा|मम्मी|माँ|पिता|चाचा|भाई|टीचर|शिक्षक|कोई)\s*(मुझे\s*)?(मारते|मारता|मारती|पीटते|पीटता|मारपीट|छूते|छूता)/, /खुद को (हर्ट|चोट|नुकसान)/, /(मुझे|मैं).{0,20}(मरना|मर जाना|मर जाऊँ|मर जाऊं)/, /(मर|मरना|मर जाना|जान दे)\s*(जाना\s*)?(चाहता|चाहती|दूँ|दूं|देना चाहता|देना चाहती)/,
   /(जीना|जीने का मन|ज़िंदा रहना|जिंदा रहना)\s*(नहीं|नही)/, /(खुद को|ख़ुद को|अपने आप को)\s*(खत्म|ख़त्म|नुकसान|चोट|मार|काट)/,
   /(जीवन|ज़िंदगी|जिंदगी)\s*(खत्म|ख़त्म)\s*(कर|करना)/, /(मुझे|मुझको)\s*(कोई\s*)?(मारता|मारते|पीटता|पीटते|छूता|छूते)\s*(है|हैं)/,
   // Hinglish
   /\b(marna|mar jana|mar jaana|mar jaun|mar jaon) (chahta|chahti|hai)\b/, /\bmar jaun\b/, /\bjeena nahi\b|\bjeene ka mann? nahi\b/,
-  /\bzindagi khatam\b|\bkhud ko khatam\b|\bkhud ?kushi\b|\bjaan de (du|dunga|dungi)\b|\bjaan dena\b|\bnahi jeena\b|\bnahin jeena\b|\bmar jaunga\b|\bmar jaungi\b|\bmar jana hai\b|\bmar jaana hai\b|\bsab khatam kar\b|\bkhatam kar (dunga|dungi|du)\b|\bjeene ka (mann?|dil) nahi\b/
+  /\bzindagi khatam\b|\bkhud ko khatam\b|\bkhud ?kushi\b|\bjaan de (du|dunga|dungi)\b|\bjaan dena\b|\bnahi jeena\b|\bnahin jeena\b|\bmar jaunga\b|\bmar jaungi\b|\bmar jana hai\b|\bmar jaana hai\b|\bsab khatam kar\b|\bkhatam kar (dunga|dungi|du)\b|\bjeene ka (mann?|dil) nahi\b|\bjaan le (lunga|lungi|lu)\b|\bapni jaan le\b|\b(papa|mummy|mama|chacha|bhai|teacher|koi) mujhe (maarte|maarta|marte|marta|maarti|peette|peeta)\b|\bkhud ko (hurt|nuksan|chot)\b|\bmaarte hain\b|\bmujhe maarte\b/
 ];
 
 export function distressSignal(text) {
