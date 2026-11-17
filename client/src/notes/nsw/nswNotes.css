@@ -48,7 +48,7 @@
 /* Diagrams */
 .nn-diagrams { display: grid; gap: var(--nn-s5); }
 .nn-diagram-t { font-family: var(--nn-ui); font-size: 15px; font-weight: 600; margin: 0 0 var(--nn-s1); }
-.nn-diagram-note { font-family: var(--nn-read); font-size: 17px; line-height: 1.5; color: var(--nt-ink-2); text-align: center; max-width: 560px; margin: var(--nn-s1) auto 0; }
+.nn-diagram-note { font-family: var(--nn-read); font-size: 17px; line-height: 1.5; color: var(--nt-ink-2); text-align: left; max-width: 64ch; margin: var(--nn-s2) 0 0; }
 
 /* What examiners look for */
 .nn-examiners { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--nn-s3); }

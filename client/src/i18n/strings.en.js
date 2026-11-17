@@ -3682,4 +3682,5 @@ export default {
   'notes.nsw.sectionCheck': 'Self-check',
   'notes.nsw.showAnswer': 'Show the answer',
   'notes.nsw.hideAnswer': 'Hide the answer',
+  'notes.nsw.working': 'Working',
 };

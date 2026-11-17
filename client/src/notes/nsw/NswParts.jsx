@@ -132,8 +132,8 @@ export function WorkedExample({ ex, n }) {
         </div>
       ) : (
         <div className="nn-answer">
+          {ex.working && <><p className="nn-label">{t('notes.nsw.working')}</p><DisplayMath tex={ex.working} className="nn-working" /></>}
           <p className="nn-label">{t('notes.answer')} <span className="nn-checked">{t('notes.engineChecked')}</span></p>
-          {ex.working && <DisplayMath tex={ex.working} className="nn-working" />}
           <MathText block className="nn-read nn-final" text={ex.answer} />
         </div>
       )}

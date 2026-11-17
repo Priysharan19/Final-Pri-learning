@@ -23,7 +23,7 @@ document.documentElement.setAttribute('data-theme', params.get('theme') === 'dar
 document.documentElement.style.colorScheme = params.get('theme') === 'dark' ? 'dark' : 'light';
 
 createRoot(document.getElementById('root')).render(
-  <article className="nt nt-article" data-nsw-notes data-topic={id}>
+  <article className="nt nt-article" style={{ padding: "8px 16px 72px" }} data-nsw-notes data-topic={id}>
     <header className="nt-ch-head">
       <p className="nt-eyebrow">Year {topic.years[0]} · Stage {topic.stage}</p>
       <h1 className="nt-title">{topic.name}</h1>

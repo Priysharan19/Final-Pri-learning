@@ -34,7 +34,7 @@ const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 
 ok(DIAGRAM_KINDS.length >= 25, `the kit registry was read (${DIAGRAM_KINDS.length} kinds)`);
 const texRenders = (tex, display) => {
-  try { katex.renderToString(tex, { throwOnError: true, displayMode: display, strict: 'ignore' }); return null; } catch (e) { return e.message; }
+  try { katex.renderToString(tex, { throwOnError: true, displayMode: display, strict: display ? 'error' : 'ignore' }); return null; } catch (e) { return e.message; }
 };
 function spansOf(text) {
   const out = [];

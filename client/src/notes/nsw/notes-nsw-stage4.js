@@ -59,7 +59,7 @@ export default {
       { title: 'Percentage of an amount', body: 'Write the percentage as a decimal and multiply: $15\\%$ of $80$ is $0.15\\times80=12$.' }
     ],
     definitions: [
-      { term: 'Percentage', meaning: 'A number out of $100$. The symbol $\\%$ means "per hundred".' },
+      { term: 'Percentage', meaning: 'A number out of $100$. The symbol $\\%$ means “per hundred”.' },
       { term: 'Equivalent fractions', meaning: 'Fractions that name the same amount, such as $\\tfrac{2}{3}$ and $\\tfrac{8}{12}$.' }
     ],
     formulas: [

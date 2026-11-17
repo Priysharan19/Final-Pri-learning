@@ -3737,4 +3737,5 @@ export default {
   'notes.nsw.sectionCheck': 'खुद जाँचें',
   'notes.nsw.showAnswer': 'उत्तर दिखाएँ',
   'notes.nsw.hideAnswer': 'उत्तर छिपाएँ',
+  'notes.nsw.working': 'हल',
 };

@@ -34,7 +34,7 @@ export default {
       'Money is given to two decimal places with the dollar sign, for example $\\$59.50$.'
     ],
     diagrams: [
-      { title: 'One value, three names', spec: { kind: 'numberLine', min: 0, max: 1, points: [{ value: 0.25, label: '\\tfrac{1}{4}' }, { value: 0.5, label: '\\tfrac{1}{2}' }, { value: 0.75, label: '\\tfrac{3}{4}' }] }, note: 'Each mark is a fraction, a decimal and a percentage at once: $\\tfrac{3}{4}=0.75=75\\%$.' }
+      { title: 'One value, three names', spec: { kind: 'numberLine', min: 0, max: 1, points: [{ value: 0.25, label: '\\dfrac{1}{4}' }, { value: 0.5, label: '\\dfrac{1}{2}' }, { value: 0.75, label: '\\dfrac{3}{4}' }] }, note: 'Each mark is a fraction, a decimal and a percentage at once: $\\tfrac{3}{4}=0.75=75\\%$.' }
     ],
     working: [
       '\\begin{aligned}\\text{Sale price}&=85\\times(1-0.30)\\\\&=85\\times0.70\\\\&=59.50\\end{aligned}',
