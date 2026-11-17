@@ -25,7 +25,7 @@ const EN = {
   squared: 'squared', cubed: 'cubed', power: 'to the power', endPower: 'end power', sub: 'sub', over: 'over', fraction: 'fraction', endFraction: 'end fraction',
   sqrt: 'square root of', cbrt: 'cube root of', nthRoot: 'th root of', endRoot: 'end root', choose: 'choose', factorial: 'factorial', prime: 'prime',
   open: 'open bracket', close: 'close bracket', openSq: 'open square bracket', closeSq: 'close square bracket', openBrace: 'open brace', closeBrace: 'close brace', openAngle: 'open angle bracket', closeAngle: 'close angle bracket',
-  abs: 'absolute value of', endAbs: 'end absolute value', evaluated: 'evaluated', given: 'given', ifWord: 'if', floor: 'floor of', endFloor: 'end floor', ceiling: 'ceiling of', endCeiling: 'end ceiling', inverse: 'inverse', fromAbove: 'from above', fromBelow: 'from below', and: 'and', not: 'not', or: 'or', divides: 'divides', congruent: 'is congruent to', because: 'because', partial: 'partial', del: 'del', realPart: 'real part of', imagPart: 'imaginary part of', norm: 'magnitude of', endNorm: 'end magnitude',
+  abs: 'absolute value of', endAbs: 'end absolute value', evaluated: 'evaluated', given: 'given', ifWord: 'if', floor: 'floor of', endFloor: 'end floor', ceiling: 'ceiling of', endCeiling: 'end ceiling', inverse: 'inverse', fromAbove: 'from above', fromBelow: 'from below', and: 'and', not: 'not', or: 'or', divides: 'divides', suchThat: 'such that', emptySet: 'empty set', leftArrow: 'left arrow', positive: 'the positive', negative: 'the negative', congruent: 'is congruent to', because: 'because', partial: 'partial', del: 'del', realPart: 'real part of', imagPart: 'imaginary part of', norm: 'magnitude of', endNorm: 'end magnitude',
   sum: 'sum', prod: 'product', integral: 'integral', from: 'from', to: 'to', of: 'of', limit: 'limit', as: 'as', base: 'base', dots: 'dot dot dot', comma: 'comma', semicolon: 'semicolon', colon: 'colon', point: 'point',
   vector: 'vector', bar: 'bar', hat: 'hat', dot: 'dot', tilde: 'tilde', bold: 'bold', boxed: 'boxed',
   matrix: 'matrix', rows: 'rows', row: 'row', columns: 'columns', column: 'column', endMatrix: 'end matrix', aligned: 'working', lines: 'lines', line: 'line', endAligned: 'end working', cases: 'cases', endCases: 'end cases',
@@ -45,7 +45,7 @@ const LEXICON = {
     abs: 'निरपेक्ष मान', endAbs: 'निरपेक्ष मान समाप्त', evaluated: 'मान निकालें', sum: 'योग', integral: 'समाकल', from: 'से', to: 'तक', of: 'का', limit: 'सीमा', as: 'जब', base: 'आधार', comma: 'अल्पविराम', point: 'दशमलव',
     vector: 'सदिश', bar: 'बार', hat: 'हैट', matrix: 'आव्यूह', rows: 'पंक्तियाँ', row: 'पंक्ति', columns: 'स्तंभ', column: 'स्तंभ', endMatrix: 'आव्यूह समाप्त', aligned: 'हल', lines: 'पंक्तियाँ', line: 'पंक्ति', endAligned: 'हल समाप्त',
     less: 'छोटा है', greater: 'बड़ा है', lessEq: 'छोटा या बराबर है', greaterEq: 'बड़ा या बराबर है', given: 'दिया गया', ifWord: 'यदि', floor: 'फ़र्श', endFloor: 'फ़र्श समाप्त', ceiling: 'छत', endCeiling: 'छत समाप्त',
-    inverse: 'प्रतिलोम', fromAbove: 'ऊपर से', fromBelow: 'नीचे से', and: 'और', not: 'नहीं', or: 'या', divides: 'विभाजित करता है', congruent: 'सर्वांगसम है', because: 'क्योंकि', partial: 'आंशिक', del: 'डेल', realPart: 'वास्तविक भाग', imagPart: 'काल्पनिक भाग',
+    inverse: 'प्रतिलोम', fromAbove: 'ऊपर से', fromBelow: 'नीचे से', and: 'और', not: 'नहीं', or: 'या', divides: 'विभाजित करता है', suchThat: 'ऐसा कि', emptySet: 'रिक्त समुच्चय', leftArrow: 'बायाँ तीर', positive: 'धनात्मक', negative: 'ऋणात्मक', congruent: 'सर्वांगसम है', because: 'क्योंकि', partial: 'आंशिक', del: 'डेल', realPart: 'वास्तविक भाग', imagPart: 'काल्पनिक भाग',
     openSq: 'वर्ग कोष्ठक खुला', closeSq: 'वर्ग कोष्ठक बंद', openBrace: 'ब्रेस खुला', closeBrace: 'ब्रेस बंद', openAngle: 'कोण कोष्ठक खुला', closeAngle: 'कोण कोष्ठक बंद', angle: 'कोण', triangle: 'त्रिभुज',
     union: 'संघ', intersection: 'सर्वनिष्ठ', isIn: 'में है', notIn: 'में नहीं है', subset: 'का उपसमुच्चय है', prod: 'गुणनफल', real: 'वास्तविक संख्याएँ', natural: 'प्राकृत संख्याएँ', integers: 'पूर्णांक', rationals: 'परिमेय संख्याएँ', complex: 'सम्मिश्र संख्याएँ',
     perp: 'लंबवत है', parallel: 'समांतर है', forall: 'सभी के लिए', exists: 'अस्तित्व है', therefore: 'इसलिए', equiv: 'समतुल्य है', similar: 'समरूप है', proportional: 'समानुपाती है', iff: 'यदि और केवल यदि', semicolon: 'अर्धविराम', colon: 'द्विबिंदु',
@@ -260,7 +260,9 @@ export function speakMath(tex, locale = 'en') {
     if (name === 'neg' || name === 'lnot') return { say: L.not };
     if (name === 'land' || name === 'wedge') return { say: L.and };
     if (name === 'lor' || name === 'vee') return { say: L.or };
-    if (name === 'mid') return { say: L.divides };
+    if (name === 'mid') return { say: L.suchThat };
+    if (name === 'emptyset' || name === 'varnothing') return { say: L.emptySet };
+    if (name === 'leftarrow' || name === 'Leftarrow') return { say: L.leftArrow };
     if (name === 'cong') return { say: L.congruent, op: true };
     if (name === 'because') return { say: L.because };
     if (name === 'partial') return { say: L.partial };
@@ -314,6 +316,12 @@ export function speakMath(tex, locale = 'en') {
     if (name === 'overset' || name === 'underset' || name === 'stackrel') { parseArg(); const b = parseArg(); return { say: b.say }; }
     if (name === 'mathbb') {
       const a = parseArg(); const m = { R: L.real, N: L.natural, Z: L.integers, Q: L.rationals, C: L.complex }[a.say];
+      if (m && startsScript() && toks[pos].v === '^' && toks[pos + 1] && toks[pos + 1].t === 'sym' && (toks[pos + 1].v === '+' || toks[pos + 1].v === '-')) {
+        const sign = toks[pos + 1].v; pos += 2;
+        const sets = { [L.real]: hi ? 'वास्तविक संख्याएँ' : 'real numbers', [L.integers]: hi ? 'पूर्णांक' : 'integers', [L.rationals]: hi ? 'परिमेय संख्याएँ' : 'rational numbers', [L.natural]: hi ? 'प्राकृत संख्याएँ' : 'natural numbers' };
+        const noun = sets[m] || m;
+        return { say: hi ? join([sign === '+' ? L.positive : L.negative, noun]) : `${sign === '+' ? L.positive : L.negative} ${noun}` };
+      }
       return { say: m || a.say };
     }
     if (name === '%') return { say: L.percent };
