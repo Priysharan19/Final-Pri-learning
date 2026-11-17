@@ -7,6 +7,7 @@ import { cloudAvailable } from '../platform/cloudTransport.js';
 import { cloudAccountLink, verifyCloudSession } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, hasEntitlement } from '../platform/entitlements.js';
 import { nativeBillingStore, PREMIUM_ON_SALE } from '../platform/nativeBilling.js';
+import { useSaleAvailable, sellsPremium } from './useSaleAvailable.js';
 import { useStoreKitPurchase } from './useStoreKitPurchase.js';
 import { useGooglePlayPurchase } from './useGooglePlayPurchase.js';
 import { planOffers, aboutPerMonth, yearlySavingPercent } from './pricing.js';
@@ -60,6 +61,7 @@ export default function Paywall() {
   const store = nativeBillingStore();
   const apple = store === 'app-store';
   const google = store === 'google-play';
+  const saleAvailable = useSaleAvailable();
   const [link, setLink] = useState(null);
   const [session, setSession] = useState(null);
   const [busy, setBusy] = useState('');
@@ -167,7 +169,7 @@ export default function Paywall() {
 
         {/* An edition with no payment provider (plan E5) has nothing to buy
             anywhere: it says so, and names no store, price or plan. */}
-        {!premium && !apple && !google && (PREMIUM_ON_SALE
+        {!premium && !apple && !google && (sellsPremium(saleAvailable)
           ? <p style={{ marginTop: 'var(--space-4)' }} data-paywall-in-app>{t('paywall.inAppOnly')}</p>
           : <p style={{ marginTop: 'var(--space-4)' }} data-paywall-not-on-sale>{t('paywall.notOnSale')}</p>
         )}

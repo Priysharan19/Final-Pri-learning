@@ -242,7 +242,7 @@
       "job": "platform-contracts",
       "log": "billing-edition.log",
       "pins": [
-        {"has":"BILLING PER EDITION: PASS — 121/121 checks —"}
+        {"has":"BILLING PER EDITION: PASS — 178/178 checks —"}
       ]
     },
     "platform/tutor-diagnose.log": {

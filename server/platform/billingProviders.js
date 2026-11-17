@@ -17,6 +17,7 @@
 // What an account already holds (an administrator's grant, a trial) is not a
 // purchase and is untouched: /billing/status and /billing/manage still answer.
 import { BILLING_PROVIDERS, editionOf } from '../../client/edition.config.mjs';
+import { stripeConfigStatus } from './stripe.js';
 
 export const BILLING_NOT_AVAILABLE = 'BILLING_NOT_AVAILABLE_IN_EDITION';
 
@@ -27,6 +28,19 @@ export const BILLING_NOT_AVAILABLE = 'BILLING_NOT_AVAILABLE_IN_EDITION';
 // (Prithagoras). webProviderOf() answers it; an edition lists at most one.
 export const ROUTE_FAMILY_PROVIDER = Object.freeze({ web: 'razorpay', apple: 'apple', google: 'google' });
 export const WEB_PROVIDERS = Object.freeze(['razorpay', 'stripe']);
+/**
+ * Whether an edition is really on sale: it lists a provider, and where its only
+ * provider is Stripe, Stripe is configured (key, webhook secret, price ids,
+ * public origin). An edition through Razorpay, Apple or Google answers exactly as
+ * before whatever is set. With Stripe unconfigured the edition says "not on sale"
+ * everywhere (config, routes, screen) instead of offering a purchase that cannot work.
+ */
+export function saleLive(edition) {
+  const providers = editionBilling(edition).providers;
+  if (!providers.length) return false;
+  return providers.some(p => p !== 'stripe') || stripeConfigStatus().configured;
+}
+
 export function webProviderOf(edition) {
   const listed = editionBilling(edition).providers;
   return WEB_PROVIDERS.find(p => listed.includes(p)) || null;
