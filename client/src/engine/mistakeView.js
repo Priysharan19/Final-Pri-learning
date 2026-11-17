@@ -110,6 +110,28 @@ export function isContinuousAt(fn, x) {
   return true;
 }
 
+/** The one variable of a tree, or null. */
+function singleVariable(ast) {
+  const names = [...variablesOf(ast)];
+  return names.length === 1 ? names[0] : null;
+}
+
+/**
+ * Does `fn` take one value everywhere it is defined (to `value`, when given)?
+ * A line that is the same number for every x — an identity, or a line with
+ * the variable cancelled out — has no graph worth comparing.
+ */
+function isConstant(fn, value = null) {
+  const seen = [];
+  for (let i = 0; i <= 40; i++) {
+    const v = fn(-9.73 + i * 0.4871);
+    if (finite(v)) seen.push(v);
+  }
+  if (seen.length < 3) return true;
+  const ref = value === null ? seen[0] : value;
+  return seen.every(v => Math.abs(v - ref) <= 1e-9 * Math.max(1, Math.abs(ref), Math.abs(v)));
+}
+
 /** Clearly different, not floating-point noise. */
 function differ(a, b) {
   return Math.abs(a - b) > 1e-6 * Math.max(1, Math.abs(a), Math.abs(b));
@@ -120,9 +142,14 @@ export function formatValue(v) {
   if (!finite(v)) return null;
   if (Math.abs(v - Math.round(v)) < 1e-9) v = Math.round(v);
   let s;
-  if (Number.isInteger(v)) s = String(Math.abs(v));
+  if (Number.isInteger(v)) {
+    if (Math.abs(v) >= 1e15) return null;
+    s = String(Math.abs(v));
+  }
   else {
     const abs = Math.abs(v);
+    // A value too small or too large to write plainly is not shown at all.
+    if (abs < 1e-4 || abs >= 1e15) return null;
     s = abs >= 1000 ? String(Math.round(abs)) : String(Number(abs.toPrecision(3)));
   }
   return (v < 0 ? '−' : '') + s;
@@ -233,21 +260,39 @@ function windowFor(fns, x0) {
  */
 export function mistakeView({ prevText = null, brokenText = null, meta = null } = {}) {
   try {
-    const A = readLine(prevText);
-    const B = readLine(brokenText);
+    let A = readLine(prevText);
+    let B = readLine(brokenText);
     if (!A || !B) return null;
-    const isEq = A.t === 'equation';
-    if (isEq !== (B.t === 'equation')) return null;
     const angles = meta && meta.angles === 'radians' ? 'radians' : null;
     if (unshowable(A, angles) || unshowable(B, angles)) return null;
+
+    // A chain of equals in a simplification — `(x+1)^2 = x^2 + 2x + 1` — is
+    // not an equation to solve: the line before is true for every x. Step
+    // Check reads such a line by its right-hand side, so the picture does too.
+    let rhs = false;
+    if (A.t === 'equation') {
+      const name = singleVariable(minus(A));
+      if (name && isConstant(asFunction(minus(A), name), 0)) {
+        A = A.r;
+        if (B.t === 'equation') B = B.r;
+        rhs = true;
+      }
+    }
+    const isEq = A.t === 'equation';
+    if (isEq !== (B.t === 'equation')) return null;
 
     const dA = isEq ? minus(A) : A;
     const dB = isEq ? minus(B) : B;
     const names = [...new Set([...variablesOf(dA), ...variablesOf(dB)])];
     if (names.length !== 1) return null;
     const variable = names[0];
+    // Both lines must be about the variable. A line with the number put in
+    // (`2(3) + 1 = 7`) or a bare identity (`7 = 7`) is a different move —
+    // substitution, or arithmetic — and two graphs would not explain it.
+    if (!variablesOf(dA).has(variable) || !variablesOf(dB).has(variable)) return null;
     const before = asFunction(dA, variable);
     const yours = asFunction(dB, variable);
+    if (isConstant(before) || isConstant(yours)) return null;
 
     let x0 = null;
     let reason = null;
@@ -259,12 +304,17 @@ export function mistakeView({ prevText = null, brokenText = null, meta = null } 
     } else {
       // A solution the line before has and the student's line lacks, or one
       // the student's line gained. Either way the step changed the answer.
+      // The solution is used only where the value the student will read is
+      // itself a solution: x = 1.41 is not a solution of x² = 2, so it is never
+      // called one.
       const zero = v => Math.abs(v) < 1e-7;
-      const lost = solutions(before).find(r => isContinuousAt(yours, r) && !zero(yours(r)));
-      if (lost !== undefined) { x0 = lost; reason = 'lost'; }
+      const shown = r => Number(String(formatValue(r)).replace('−', '-'));
+      const exact = (g, r) => Number.isFinite(shown(r)) && finite(g(shown(r))) && Math.abs(g(shown(r))) < 1e-9;
+      const lost = solutions(before).find(r => exact(before, r) && isContinuousAt(yours, shown(r)) && !zero(yours(shown(r))));
+      if (lost !== undefined) { x0 = shown(lost); reason = 'lost'; }
       else {
-        const gained = solutions(yours).find(r => isContinuousAt(before, r) && !zero(before(r)));
-        if (gained !== undefined) { x0 = gained; reason = 'gained'; }
+        const gained = solutions(yours).find(r => exact(yours, r) && isContinuousAt(before, shown(r)) && !zero(before(shown(r))));
+        if (gained !== undefined) { x0 = shown(gained); reason = 'gained'; }
       }
     }
     if (x0 === null) return null;
@@ -279,8 +329,10 @@ export function mistakeView({ prevText = null, brokenText = null, meta = null } 
       before: formatValue(point.before),
       yours: formatValue(point.yours)
     };
+    if (Object.values(vars).some(v => v === null)) return null;
     return {
       kind: isEq ? 'equation' : 'expression',
+      rhs,
       variable,
       symbol,
       before: { text: String(prevText), at: before },

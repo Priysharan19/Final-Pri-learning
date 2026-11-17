@@ -3422,12 +3422,13 @@ function StepReport({ report, instrument = false, correctAnswer = null }) {
   // also wrong, and a line that is right on the student's own earlier value
   // (error carried forward) keeps its tick and says so.
   const first = report.lines.findIndex(l => l.status === 'break');
-  // The line before the first break is the last line Step Check accepted —
-  // the same line the engine diagnosed the break against.
-  let beforeFirst = null;
-  for (let j = first - 1; j >= 0; j--) {
-    if (report.lines[j].status === 'ok') { beforeFirst = report.lines[j].text; break; }
-  }
+  // The graph compares the first break with the line directly above it, and
+  // only when Step Check accepted that line as a step of the working: not a
+  // substitution check (`check`), not one branch of a factorisation (`branch`),
+  // and with nothing skipped or unread in between — so "this step" is one step.
+  const above = first > 0 ? report.lines[first - 1] : null;
+  const beforeFirst = above && above.status === 'ok' && above.check !== true && above.branch !== true
+    && typeof above.text === 'string' ? above.text : null;
   const line = (l, i) => (
     <React.Fragment key={i}>
       <div className={`stepcheck-line sc-${l.status}${l.status === 'ok' && l.ecf === true ? ' sc-ecf' : ''}`}

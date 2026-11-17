@@ -12,7 +12,8 @@
 //     there, closed — nothing is drawn until the student asks;
 //   · opened, it draws two curves, says the counterexample in words and puts
 //     the marker on it, with values that equal the student's own two lines;
-//   · the arrow keys move the marker and the aria-live readout follows;
+//   · the arrow keys and dragging move the marker and the aria-live readout
+//     follows; a button puts it back on the counterexample;
 //   · the verdict, marks and receipt on the card are the server's and do not
 //     change when the graph is opened or moved.
 //
@@ -166,8 +167,8 @@ async function runEdition(spec, browser) {
     const moved = await live.innerText();
     check(`${spec.edition}: the arrow keys move the marker and the live readout follows`, moved !== start && /At x = /.test(moved), `${start} → ${moved}`);
     await page.screenshot({ path: join(OUT, `${spec.edition}-moved.png`), clip: await clipAround(page, card) });
-    await page.keyboard.press('Home');
-    check(`${spec.edition}: Home puts the marker back on the counterexample`, await live.innerText() === start);
+    await graph.locator('[data-mistake-reset]').click();
+    check(`${spec.edition}: "Back to" puts the marker back on the counterexample`, await live.innerText() === start);
     const box = await slider.boundingBox();
     await page.mouse.move(box.x + box.width * 0.8, box.y + box.height / 2);
     await page.mouse.down();

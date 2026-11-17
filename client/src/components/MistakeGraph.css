@@ -3,7 +3,7 @@
    carry the difference too, so nothing depends on colour alone. No transitions
    and no animation: the marker moves only when the student moves it. */
 .mistake-graph { margin: 4px 0 10px; }
-.mistake-graph .mg-toggle { font-size: 13px; padding: 6px 10px; }
+.mistake-graph .mg-toggle, .mistake-graph .mg-reset { font-size: 13px; padding: 6px 10px; }
 .mg-body {
   margin-top: 8px; padding: 12px 14px; border: 1px solid var(--hairline);
   border-radius: var(--radius-sm); background: var(--surface-raised);

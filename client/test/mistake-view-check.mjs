@@ -20,6 +20,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { mistakeView, liveValues, isContinuousAt, formatValue } from '../src/engine/mistakeView.js';
 import { evalNumeric, normalize } from '../src/engine/expr.js';
+import { stepCheck } from '../src/engine/checker.js';
 
 let pass = 0;
 const failures = [];
@@ -111,12 +112,63 @@ const NULLS = [
   ['unparseable', '3(x−2', '3x−2'],
   ['missing line before', null, '3x−2'],
   ['missing broken line', '3x−2', null],
-  ['empty', '', '']
+  ['empty', '', ''],
+  // Independent review, head 6e8aba3: each of these was drawn, and each said something false.
+  ['the line before has the number put in (2(3)+1 = 7): no x to compare', '2(3)+1=7', 'x=4'],
+  ['the line before is a bare identity (7 = 7)', '7=7', 'x=4'],
+  ['the line before is an identity in x (1/x = 1/x)', '1/x=1/x', 'x=1'],
+  ['the student\'s line is a number (x^2+1 → 2^2+2): a substitution, not a rewrite', 'x^2+1', '2^2+2'],
+  ['the student\'s line is an identity (2x = 6 → x + 1 = x + 1)', '2x=6', 'x+1=x+1'],
+  ['a rounded root is never called a solution (x^2 = 2 → x = 1.414)', 'x^2=2', 'x=1.414'],
+  ['a counterexample too small to write plainly', 'x', 'x+0.00001'],
+  ['a square root only at its domain edge', 'sqrt(x-3)=0', 'x=3'],
+  ['a pole is not a solution', 'x/(x-1)=1/(x-1)', 'x=1']
 ];
 for (const [label, before, yours] of NULLS) {
   ok(mistakeView({ prevText: before, brokenText: yours }) === null, `null: ${label}`);
 }
 ok(mistakeView() === null, 'null: no arguments');
+
+// A chain of equals in a simplification is read by its right-hand side, as
+// Step Check reads it (checker.js takes the text after the last =), and is
+// never presented as an equation with "solutions".
+{
+  const v = mistakeView({ prevText: '(x+1)^2 = x^2+x+x+1', brokenText: '(x+1)^2 = x^2+1' });
+  ok(v && v.kind === 'expression' && v.rhs === true && v.message.key === 'mistake.graph.expression', 'a chain of equals is compared as expressions, by the right-hand side');
+  ok(v && v.point.x === 1 && v.point.before === 4 && v.point.yours === 2, 'and at a clean integer, with the right-hand sides\' values');
+  const solve = mistakeView({ prevText: '2x + 4 = 10', brokenText: '2x = 14' });
+  ok(solve && solve.rhs === false && solve.kind === 'equation', 'an equation that is not an identity is still an equation');
+}
+// The whole path, with the real Step Check: its report, the client's rule for
+// the line above the break (QuestionCard StepReport), then the picture.
+function throughStepCheck(meta, working) {
+  const lines = stepCheck(meta, working).lines;
+  const first = lines.findIndex(l => l.status === 'break');
+  const above = first > 0 ? lines[first - 1] : null;
+  const prevText = above && above.status === 'ok' && above.check !== true && above.branch !== true ? above.text : null;
+  return { first, view: prevText ? mistakeView({ prevText, brokenText: lines[first].text }) : null };
+}
+{
+  const sub = throughStepCheck({ kind: 'equation', variable: 'x', solutions: [3], source: '2x+1=7' }, '2x+1=7\n2(3)+1=7\nx=4');
+  ok(sub.first === 2 && sub.view === null, 'real Step Check: a substitution check above the break is never "the line before"');
+  const quad = { kind: 'equation', variable: 'x', solutions: [3, 5], source: 'x^2-8x+15=0' };
+  const branch = throughStepCheck(quad, 'x^2-8x+15=0\n(x-3)(x-5)=0\nx-3=0\nx=3\nx-5=0\nx=6');
+  ok(branch.first === 5 && branch.view === null, 'real Step Check: one branch of a factorisation is never compared as if it were the whole equation');
+  const dropped = throughStepCheck(quad, 'x^2-8x+15=0\n(x-3)(x-5)=0\nx=3\nx=6');
+  ok(dropped.first === 2 && dropped.view?.message.key === 'mistake.graph.equationLost' && dropped.view.point.x === 5,
+    'real Step Check: writing only x = 3 under (x−3)(x−5) = 0 shows the solution it lost, x = 5');
+  const chain = throughStepCheck({ kind: 'expression', canonical: 'x^2+2x+1' }, '(x+1)^2 = x^2+x+x+1\n(x+1)^2 = x^2+1');
+  ok(chain.first === 1 && chain.view?.kind === 'expression' && chain.view.rhs === true, 'real Step Check: a chain of equals is drawn by its right-hand sides, not as an equation');
+  const slip = throughStepCheck({ kind: 'equation', variable: 'x', solutions: [-7], source: '5(x+2)-2=2x-13' }, '5(x+2)-2=2x-13\n5x+2-2=2x-13\n3x=-13');
+  ok(slip.first === 1 && slip.view?.message.key === 'mistake.graph.equationLost' && slip.view.point.x === -7, 'real Step Check: a distribution slip shows the lost solution x = −7');
+}
+// Equation solutions are named only where the shown value is itself a solution.
+for (const [a, b] of [['x^2 = 4', 'x = 2'], ['x = 2', 'x^2 = 4'], ['x^3 = x', 'x^2 = 1'], ['sqrt(x) = 2', 'x = -4'], ['(x-0.5)^2 = 0', 'x = 1']]) {
+  const v = mistakeView({ prevText: a, brokenText: b });
+  const g = v?.message.key === 'mistake.graph.equationLost' ? v.before.at : v?.yours.at;
+  ok(v && Number(v.message.vars.x.replace('−', '-')) === v.point.x && Math.abs(g(v.point.x)) < 1e-9,
+    `${a} → ${b}: the x named as a solution is exactly the x shown, and solves its line`);
+}
 ok(mistakeView({ prevText: 'tan(x)', brokenText: 'sin(x)', meta: { angles: 'radians' } }) !== null,
   'trigonometry is drawn only when the caller says angles are radians');
 
@@ -128,8 +180,8 @@ ok(!isContinuousAt(x => (x < 1 ? 0 : 1), 1), 'a step function at its step is not
 ok(isContinuousAt(x => x ** 6, 2) && isContinuousAt(x => 3 * x - 2, 0), 'smooth functions are continuous');
 // A step whose first differing candidate is a jump moves on to a smooth point.
 {
-  const v = mistakeView({ prevText: 'abs(x)/x', brokenText: '1' });
-  ok(v && v.point.x !== 0 && isContinuousAt(v.before.at, v.point.x), 'a jump at x = 0 is skipped for a point where both lines are continuous');
+  const v = mistakeView({ prevText: 'abs(x)/x', brokenText: 'abs(x)/x + x' });
+  ok(v && v.point.x === 1 && isContinuousAt(v.before.at, v.point.x), 'a jump at x = 0 is skipped for a point where both lines are continuous');
 }
 
 // Number formatting.
@@ -140,7 +192,7 @@ ok(liveValues(mistakeView({ prevText: '1/x + x', brokenText: '1/x' }), 0).vars.b
 // ── 4 · Strings ──────────────────────────────────────────────────────────────
 const en = (await import('../src/i18n/strings.en.js')).default;
 const hi = (await import('../src/i18n/strings.hi.js')).default;
-const KEYS = ['open', 'close', 'expression', 'equationLost', 'equationGained', 'equationNote', 'yours', 'before', 'at', 'live', 'liveEquation', 'marker', 'howTo', 'figure', 'feedbackOnly'].map(k => `mistake.graph.${k}`);
+const KEYS = ['open', 'close', 'expression', 'equationLost', 'equationGained', 'equationNote', 'rhsNote', 'reset', 'yours', 'before', 'at', 'live', 'liveEquation', 'marker', 'howTo', 'figure', 'feedbackOnly'].map(k => `mistake.graph.${k}`);
 const holes = s => [...String(s).matchAll(/\{(\w+)\}/g)].map(m => m[1]).sort().join();
 for (const k of KEYS) {
   ok(typeof en[k] === 'string' && en[k].length > 0, `en (Priyabhata and Prithagoras) has ${k}`);
@@ -177,7 +229,8 @@ try {
   const view = engine.mistakeView({ prevText: '3(x−2)', brokenText: '3x−2' });
   const open = renderToStaticMarkup(h(mod.MistakeGraphView, { view }));
   ok(open.includes('At x = 0 your line gives −2, but the line before gives −6.'), 'open, it says the counterexample in words');
-  ok(/role="slider"/.test(open) && /tabindex="0"/.test(open) && /aria-valuetext="At x = 0: your line gives −2, the line before gives −6\."/.test(open), 'the marker is a focusable slider whose value is spoken');
+  ok(/role="slider"/.test(open) && /tabindex="0"/.test(open) && /aria-valuetext="At x = 0"/.test(open), 'the marker is a focusable slider whose value is spoken briefly');
+  ok(/aria-live="polite"[^>]*>At x = 0: your line gives −2, the line before gives −6\./.test(open), 'the live region says both values, once');
   ok(/aria-live="polite"/.test(open), 'an aria-live region carries the live values');
   ok((open.match(/data-curve="before"/g) || []).length >= 1 && (open.match(/data-curve="yours"/g) || []).length >= 1, 'both curves are drawn');
   ok(/data-curve="yours"[^>]*stroke-dasharray="9 6"|stroke-dasharray="9 6"[^>]*data-curve="yours"/.test(open), 'your line is dashed');
@@ -206,13 +259,20 @@ const eng = read('src/engine/mistakeView.js');
 ok(/const MistakeGraph = React\.lazy\(\(\) => import\('\.\/MistakeGraph\.jsx'\)\.catch\(/.test(card), 'QuestionCard loads the graph as its own lazy chunk, and a failed load shows nothing');
 ok(!/^import .*MistakeGraph/m.test(card), 'QuestionCard never imports the graph statically');
 ok(/<MistakeGraph prevText=\{beforeFirst\} brokenText=\{l\.text\} \/>/.test(card) && /i === first && typeof beforeFirst === 'string'/.test(card), 'it is drawn only at the first break, against the last accepted line');
-ok(!/api|fetch\(|grade|verdict|receipt|credit|setState\(.*res/i.test(comp.replace(/^\/\/.*$/gm, '')), 'the component touches no network, grade, verdict, receipt or credit');
+const code = comp.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '');
+ok(!/api|fetch\(|grade|verdict|receipt|credit|setState\(.*res/i.test(code), 'the component touches no network, grade, verdict, receipt or credit');
 ok(!/from '\.\.\/(api|platform|tutor)/.test(comp), 'the component imports nothing from the network or tutor layers');
 ok([...eng.matchAll(/^import .* from '([^']+)'/gm)].map(m => m[1]).sort().join() === './expr.js,./plot.js', 'the engine reads only expr.js and plot.js');
 ok(!/edition-accent|au-light|brand-prime/.test(css + comp.replace(/^\/\/.*$/gm, '')), 'no edition accent on the plot (editions decision: never charts or plots)');
 ok(!/(^|[^-])(transition|animation)\s*:/m.test(css.replace(/\/\*[\s\S]*?\*\//g, '').replace(/@media \(prefers-reduced-motion: reduce\)\s*\{[^}]*\{[^}]*\}\s*\}/, '')), 'no transition or animation outside the reduced-motion guard');
 ok(/prefers-reduced-motion: reduce/.test(css), 'and the reduced-motion guard is there');
 ok(/:focus-visible \{ outline: 2px solid var\(--ink\)/.test(css), 'the focus ring is ink (Lit Instrument D2)');
+ok(/class GraphBoundary extends React\.Component/.test(comp) && /getDerivedStateFromError\(\) \{ return \{ failed: true \}; \}/.test(comp)
+  && /return <GraphBoundary><Disclosure \{\.\.\.props\} \/><\/GraphBoundary>;/.test(comp), 'a failure inside the graph renders nothing and leaves the card standing');
+ok(/const above = first > 0 \? report\.lines\[first - 1\] : null;/.test(card)
+  && /above\.status === 'ok' && above\.check !== true && above\.branch !== true/.test(card),
+  'the graph compares only with the line directly above the break, an accepted step that is not a check or a branch');
+ok(/else if \(e\.key === 'Home'\) next = win\.xMin;/.test(comp) && /data-mistake-reset/.test(comp), 'Home and End are the slider\'s ends; going back to the counterexample is its own button');
 
 if (failures.length) {
   console.error(`MISTAKE VIEW: FAIL — ${failures.length} failed, ${pass} passed`);

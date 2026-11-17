@@ -58,6 +58,9 @@ export function MistakeGraphView({ view }) {
   const step = useMemo(() => tickStep(win.xMax - win.xMin, 40), [win]);
 
   const [x, setX] = useState(point.x);
+  // What the live region says. It follows a key press or the end of a drag,
+  // not every pointer move, so a screen reader hears a value, not a stream.
+  const [spokenX, setSpokenX] = useState(point.x);
   const plotRef = useRef(null);
   const dragging = useRef(false);
 
@@ -75,13 +78,20 @@ export function MistakeGraphView({ view }) {
 
   const onKeyDown = e => {
     const moves = { ArrowRight: step, ArrowUp: step, ArrowLeft: -step, ArrowDown: -step, PageUp: step * 10, PageDown: -step * 10 };
-    if (e.key in moves) { e.preventDefault(); setX(v => snap(v + moves[e.key])); }
-    else if (e.key === 'Home') { e.preventDefault(); setX(point.x); }
-    else if (e.key === 'End') { e.preventDefault(); setX(win.xMax); }
+    let next = null;
+    if (e.key in moves) next = snap(x + moves[e.key]);
+    else if (e.key === 'Home') next = win.xMin;
+    else if (e.key === 'End') next = win.xMax;
+    if (next === null) return;
+    e.preventDefault();
+    setX(next);
+    setSpokenX(next);
   };
+  const endDrag = () => { if (dragging.current) { dragging.current = false; setSpokenX(x); } };
+  const reset = () => { setX(point.x); setSpokenX(point.x); };
 
   const vars = { variable: view.symbol, x: formatValue(point.x) };
-  const live = liveValues(view, x);
+  const live = liveValues(view, spokenX);
   const liveText = t(live.key, live.vars);
   const b = view.before.at(x);
   const y = view.yours.at(x);
@@ -102,16 +112,17 @@ export function MistakeGraphView({ view }) {
     <div className="mg-body" role="group" aria-label={t('mistake.graph.figure')}>
       <p className="mg-say" data-mistake-say>{t(view.message.key, view.message.vars)}</p>
       {view.kind === 'equation' && <p className="mg-note">{t('mistake.graph.equationNote')}</p>}
+      {view.rhs && <p className="mg-note">{t('mistake.graph.rhsNote')}</p>}
       <div className="mg-plot" ref={plotRef} role="slider" tabIndex={0}
         aria-label={t('mistake.graph.marker', { variable: view.symbol })}
         aria-valuemin={win.xMin} aria-valuemax={win.xMax} aria-valuenow={Number(x.toFixed(6))}
-        aria-valuetext={liveText} aria-describedby={`${clip}-how`}
+        aria-valuetext={t('mistake.graph.at', { variable: view.symbol, x: formatValue(x) ?? '' })} aria-describedby={`${clip}-how`}
         data-mistake-marker={formatValue(x)}
         onKeyDown={onKeyDown}
         onPointerDown={e => { dragging.current = true; e.currentTarget.setPointerCapture?.(e.pointerId); fromPointer(e); }}
         onPointerMove={e => { if (dragging.current) fromPointer(e); }}
-        onPointerUp={() => { dragging.current = false; }}
-        onPointerCancel={() => { dragging.current = false; }}>
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}>
         <svg viewBox={`0 0 ${W} ${H}`} aria-hidden="true" focusable="false">
           <defs>
             <clipPath id={`${clip}-c`}><rect x={left} y={top} width={right - left} height={bottom - top} /></clipPath>
@@ -156,16 +167,32 @@ export function MistakeGraphView({ view }) {
       </div>
       <p className="mg-live" aria-live="polite" data-mistake-live>{liveText}</p>
       <p className="mg-how" id={`${clip}-how`}>{t('mistake.graph.howTo', vars)}</p>
+      {x !== point.x && <button type="button" className="btn btn-quiet mg-reset" onClick={reset} data-mistake-reset>{t('mistake.graph.reset', vars)}</button>}
       <p className="mg-how">{t('mistake.graph.feedbackOnly')}</p>
     </div>
   );
 }
 
 /**
+ * Whatever goes wrong inside the graph stays inside it: the verdict, the step
+ * report and the diagnosis around it are the server's and must still render.
+ */
+class GraphBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { /* feedback only: nothing to report, nothing to retry */ }
+  render() { return this.state.failed ? null : this.props.children; }
+}
+
+/**
  * The disclosure in the diagnosis area. Renders nothing unless the engine can
  * show this step honestly.
  */
-export default function MistakeGraph({ prevText, brokenText }) {
+export default function MistakeGraph(props) {
+  return <GraphBoundary><Disclosure {...props} /></GraphBoundary>;
+}
+
+function Disclosure({ prevText, brokenText }) {
   const t = useT();
   const view = useMemo(() => mistakeView({ prevText, brokenText }), [prevText, brokenText]);
   const [open, setOpen] = useState(false);
