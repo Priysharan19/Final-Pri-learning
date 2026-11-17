@@ -1,0 +1,17 @@
+{
+  "$comment": "The one switch behind the 'not yet reviewed by a lawyer' banner on the Prithagoras (Australian edition) /privacy, /terms, /refund-policy and /contact pages (client/src/pages/Legal.jsx, resolved per edition by client/vite.config.js editionLegalPlugin). It is false until a lawyer qualified in Australian law has reviewed the English notices in docs/legal/au/. Filling placeholders never clears it; only a human does, by editing this file, and client/test/legal-pages-au-check.mjs refuses `reviewed: true` unless every field below is filled and `reviewedOn` is on or after the 'Last updated' date of every Australian notice. This switch is separate from docs/legal/review-status.json, which belongs to the Indian notices: a review of one says nothing about the other. Nothing in the code or in any agent's work may set this to true.",
+  "reviewed": false,
+  "reviewer": null,
+  "qualification": null,
+  "reviewedOn": null,
+  "languages": [],
+  "evidence": null,
+  "unreviewedSince": "2026-11-18",
+  "ownerSignoff": {
+    "$comment": "The owner's approval of the wording, recorded by the owner. This is NOT a lawyer's review and never clears the 'not yet reviewed by a lawyer' banner (only `reviewed` does). Expected values when filled: reviewer 'owner', qualification 'business owner, not a lawyer'. No agent fills this in.",
+    "reviewer": null,
+    "qualification": null,
+    "signedOn": null,
+    "evidence": null
+  }
+}

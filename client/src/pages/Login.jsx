@@ -11,6 +11,7 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
+import LegalContactLink from '../components/LegalContactLink.jsx';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 import { EditionByline } from '../components/BrandMark.jsx';
@@ -606,9 +607,8 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
               {/* A store reviewer, a payment provider and a parent all look for
                   these, and each is required of us before the app can be sold. */}
               <p className="muted login-legal" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
-                <PageLink to="/privacy">{t('login.privacy')}</PageLink> · <PageLink to="/terms">{t('login.terms')}</PageLink>
-                {/* Refunds and the grievance officer are India's requirements; the Australian set is Privacy and Terms. */}
-                {EDITION_ID !== 'prithagoras' && <> · <PageLink to="/refund-policy">{t('login.refunds')}</PageLink> · <PageLink to="/grievance">{t('login.grievances')}</PageLink></>}
+                <PageLink to="/privacy">{t('login.privacy')}</PageLink> · <PageLink to="/terms">{t('login.terms')}</PageLink> ·{' '}
+                <PageLink to="/refund-policy">{t('login.refunds')}</PageLink> · <LegalContactLink />
               </p>
             </>
           )}

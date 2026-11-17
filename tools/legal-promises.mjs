@@ -30,7 +30,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-export const PROMISES = Object.freeze([
+const INDIA_PROMISES = [
   {
     id: 'D18 erasure of an unconfirmed or withdrawn child account',
     notice: 'docs/legal/privacy.md',
@@ -79,6 +79,16 @@ export const PROMISES = Object.freeze([
       }
     ]
   }
+];
+
+// The Australian edition's privacy notice (docs/legal/au/privacy.md) makes the same
+// two promises about the same code, so it is held to them too. Optional: a commit
+// that does not carry the Australian notice is not a gap (the Indian one is judged
+// as before); one that carries it and breaks a promise is.
+const AU_PRIVACY = 'docs/legal/au/privacy.md';
+export const PROMISES = Object.freeze([
+  ...INDIA_PROMISES,
+  ...INDIA_PROMISES.map(promise => ({ ...promise, id: `${promise.id} (Prithagoras)`, notice: AU_PRIVACY, optional: true }))
 ]);
 
 /**
@@ -110,6 +120,7 @@ export async function legalPromiseGaps(readAt, promises = PROMISES) {
       try { notices.set(promise.notice, { text: await readAt(promise.notice) }); }
       catch (error) {
         notices.set(promise.notice, { error });
+        if (promise.optional) continue;
         gaps.push(`${promise.notice} could not be read at this commit (${error?.message || error})`);
       }
     }

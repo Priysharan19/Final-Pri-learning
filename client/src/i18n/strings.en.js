@@ -716,6 +716,7 @@ export default {
   'login.terms': 'Terms',
   'login.refunds': 'Refunds',
   'login.grievances': 'Grievances',
+  'login.contact': 'Contact',
   'login.chooseLanguage': 'Choose your language',
 
   'login.backToWelcome': 'Back to the {brand} welcome screen',
@@ -916,6 +917,7 @@ export default {
   'legal.translationUnavailable': 'The Hindi translation has not arrived — it is fetched the first time it is asked for, so this is what an offline first read looks like. Below is the English, which is the version that governs in any case.',
   'legal.unreviewedTitle': 'Not yet reviewed by a lawyer.',
   'legal.unreviewedBody': 'This notice is published so you can read what the app does with your data. No lawyer qualified in Indian law has reviewed it yet. When that review has happened, this banner will go.',
+  'legal.unreviewedBodyAu': 'This notice is published so you can read what the app does with your information. No lawyer qualified in Australian law has reviewed it yet. When that review has happened, this banner will go.',
   'legal.thirdPartyTitle': 'Third-party notices',
   'legal.thirdPartyLead': '{company} is built with open-source software. The licences below are reproduced in English exactly as their authors published them, which is why this page is not translated.',
   'legal.thirdPartyLoading': 'Loading the licence texts…',

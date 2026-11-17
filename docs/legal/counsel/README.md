@@ -1,6 +1,8 @@
 # Counsel pack — what to send, and what comes back
 
-This directory is for the owner to send to a lawyer qualified in Indian law. Nothing in it is legal
+This directory is for the owner to send to a lawyer qualified in Indian law. For a lawyer qualified in Australian law (the Prithagoras edition) send
+`AU-QUESTIONS-FOR-COUNSEL.md` and the notices in `../au/` instead; its review switch is
+`../au/review-status.json`. Nothing in it is legal
 advice, and nothing in it says a review has happened: `docs/legal/review-status.json` is
 `reviewed: false`, and the app shows "Not yet reviewed by a lawyer" above every notice until a
 person changes that.
