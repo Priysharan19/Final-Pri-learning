@@ -158,7 +158,7 @@ const inkKey = p1.result.detail.find(d => !d.parts && !d.correct && d.working)?.
 }
 
 // The original-ink lane stores the original and names it on the graded-attempt event.
-const ORIGINAL = { id: 'orig_abc123', sha256: 'ef'.repeat(32), kind: 'ink' };
+const ORIGINAL = { id: 'orig_abc123', sha256: 'ef'.repeat(32), kind: 'strokes', origin: 'ink' };
 const origLine = p1.result.detail.filter(d => !d.parts && !d.correct && d.working)[0];
 {
   const ev = await db.get('SELECT payload_json FROM learning_events WHERE account_id=? AND id=?', [S1.id, origLine.attemptId]);
@@ -230,6 +230,7 @@ const inked = queue.data.items.filter(i => i.question.key === inkKey);
 c.ok(inked.length >= 1 && inked.every(i => i.evidence.inputMode === 'ink' && i.evidence.ink?.digest === INK), 'a handwritten answer carries the digest of the original page the teacher judges');
 c.ok(queue.data.items.filter(i => i.question.key !== inkKey).every(i => i.evidence.inputMode === 'typed' && i.evidence.ink === null), 'typed answers carry no ink');
 const item = inked[0] || queue.data.items[0];
+c.ok(queue.data.items.some(i => i.question.key === origLine.id), 'the answer with a stored original has a review item');
 c.ok(queue.data.items.filter(i => i.question.key === origLine.id).every(i => JSON.stringify(i.evidence.original) === JSON.stringify(ORIGINAL))
   && queue.data.items.filter(i => i.question.key !== origLine.id).every(i => i.evidence.original === null), 'the stored original the teacher judges is named on its item, and only there');
 // The input mode is the server's record of the marked answer, never an autosave's.
