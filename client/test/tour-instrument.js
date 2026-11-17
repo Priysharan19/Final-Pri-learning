@@ -529,7 +529,7 @@ export const writeFlow = {
     await check('a line marked wrong asks to check the reading and makes Edit prominent; the page does not both say the working is checked later and to fix the marked step',
       wrongPage.recheck && wrongPage.emph && /Check this reading — tap Edit if it isn.t what you wrote/.test(wrongPage.text) &&
         !(/checked when this question is finished/.test(wrongPage.text) && /Fix it, then submit again/.test(wrongPage.text)) && !/unsettled/i.test(wrongPage.text),
-      JSON.stringify({ recheck: wrongPage.recheck, emph: wrongPage.emph, a: /Check this reading/.test(wrongPage.text), b: /checked when this question is finished/.test(wrongPage.text), c: /Fix it, then submit again/.test(wrongPage.text), d: /unsettled/i.test(wrongPage.text), ctx: (wrongPage.text.match(/.{60}checked when this question is finished.{30}/) || [''])[0] }));
+      JSON.stringify({ recheck: wrongPage.recheck, emph: wrongPage.emph }));
     // Reduced motion: no hairline, and the marks are there within 200 ms.
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const still = await page.evaluate(() => new Promise(r => setTimeout(() => {
