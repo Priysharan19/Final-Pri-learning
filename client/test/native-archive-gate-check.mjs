@@ -32,11 +32,12 @@ bad('https://app.prilearning.com/v1', 'the right host with a path');
 
 const dir = mkdtempSync(join(tmpdir(), 'pri-archive-gate-'));
 try {
-  const app = (origin, bundle = 'com.prilearning.app', sha = 'a'.repeat(40)) => {
+  const app = (origin, bundle = 'com.prilearning.app', sha = 'a'.repeat(40), built = bundle === 'com.prilearning.prithagoras' ? 'prithagoras' : 'priyabhata') => {
     const root = join(dir, `${Math.random().toString(36).slice(2)}.xcarchive`, 'Products', 'Applications', 'PriLearning.app');
     mkdirSync(join(root, 'Web'), { recursive: true });
     writeFileSync(join(root, 'Info.plist'), `<?xml version="1.0"?><plist><dict><key>CFBundleIdentifier</key><string>${bundle}</string><key>CFBundleShortVersionString</key><string>4.0</string><key>CFBundleVersion</key><string>3</string><key>PRICloudOrigin</key>${origin === '' ? '<string></string>' : `<string>${origin}</string>`}</dict></plist>`);
     writeFileSync(join(root, 'Web', 'release.json'), JSON.stringify({ releaseSha: sha }));
+    writeFileSync(join(root, 'Web', 'features.json'), JSON.stringify({ edition: built }));
     return join(root, '..', '..', '..');
   };
   assert.deepEqual(checkArchive(app('https://app.prilearning.com'), { sha: 'a'.repeat(40) }).problems, [], 'a correct archive passes'); n++;
@@ -44,6 +45,13 @@ try {
   assert.ok(checkArchive(app('https://app.prilearning.com')).problems.some(p => /--sha/.test(p)), 'an archive checked without the release commit fails'); n++;
   assert.equal(checkArchive(app('https://app.prilearning.com', 'com.prilearning.qa'), { sha: 'a'.repeat(40) }).problems.length, 1, 'a QA bundle id is not the shipping app'); n++;
   assert.equal(checkArchive(app('https://app.prilearning.com'), { sha: 'b'.repeat(40) }).problems.length, 1, 'a build from another commit fails'); n++;
+  // One app per edition: each names its own server and bundles its own client.
+  const P = 'com.prilearning.prithagoras';
+  assert.deepEqual(checkArchive(app('https://au.prilearning.com', P), { sha: 'a'.repeat(40) }).problems, [], 'a correct Prithagoras archive passes'); n++;
+  assert.ok(checkArchive(app('https://app.prilearning.com', P), { sha: 'a'.repeat(40) }).problems.some(p => /exactly https:\/\/au\.prilearning\.com/.test(p)), 'Prithagoras pointed at the India server fails'); n++;
+  assert.ok(checkArchive(app('https://au.prilearning.com'), { sha: 'a'.repeat(40) }).problems.some(p => /exactly https:\/\/app\.prilearning\.com/.test(p)), 'Priyabhata pointed at the Australian server fails'); n++;
+  assert.ok(checkArchive(app('https://au.prilearning.com', P, 'a'.repeat(40), 'priyabhata'), { sha: 'a'.repeat(40) }).problems.some(p => /bundled client is the priyabhata edition/.test(p)), 'the Prithagoras app with the Priyabhata client fails'); n++;
+  assert.ok(checkArchive(app('https://app.prilearning.com', 'com.prilearning.app', 'a'.repeat(40), 'prithagoras'), { sha: 'a'.repeat(40) }).problems.some(p => /bundled client is the prithagoras edition/.test(p)), 'the Priyabhata app with the Prithagoras client fails'); n++;
 } finally { rmSync(dir, { recursive: true, force: true }); }
 const answer = body => async () => ({ ok: true, json: async () => body });
 assert.equal(await probeOrigin('https://api.prilearning.example', 'a'.repeat(40), answer({ service: 'pri-learning-platform', releaseIdentity: { releaseSha: 'a'.repeat(40) } })), null, 'an origin serving this release passes the probe'); n++;

@@ -8,7 +8,7 @@
 // Run on its own:  node client/test/apple-shipping-target-check.mjs
 // ─────────────────────────────────────────────────────────────────────────────
 import { readFileSync } from 'node:fs';
-import { BUNDLE_ID, bundleIdOf, familiesOf, orientationsOf, shippingProblems } from '../../scripts/apple-shipping-target.mjs';
+import { BUNDLE_ID, EDITION_BUNDLE_IDS, bundleIdOf, bundleIdsOf, familiesOf, orientationsOf, shippingProblems } from '../../scripts/apple-shipping-target.mjs';
 
 let pass = 0;
 const failures = [];
@@ -44,6 +44,9 @@ ok(shippingProblems(canon.replace(/,\s*\.landscapeLeft\(\.when\(deviceFamilies: 
 ok(shippingProblems(canon.replace('.portrait,', '.portrait(.when(deviceFamilies: [.pad])),')).length > 0,
   'an iPhone with no portrait orientation is refused');
 ok(shippingProblems(canon.replace(`"${BUNDLE_ID}"`, '"com.prilearning.phone"')).length > 0, 'a different bundle id is refused');
+ok(JSON.stringify(bundleIdsOf(canon)) === JSON.stringify(EDITION_BUNDLE_IDS), 'the package has exactly the two edition products (Priyabhata keeps com.prilearning.app, Prithagoras is com.prilearning.prithagoras)');
+ok(shippingProblems(canon.replace('"com.prilearning.prithagoras"', '"com.prilearning.other"')).length > 0, 'a second product with another bundle id is refused');
+ok(shippingProblems(canon.slice(0, canon.indexOf('        .iOSApplication(', canon.indexOf('.iOSApplication(') + 20)) + '    ],\n    targets' + canon.split('    ],\n    targets')[1]).length > 0, 'a package without the Prithagoras product is refused');
 ok(shippingProblems(canon.replace('.landscapeLeft(.when(deviceFamilies: [.pad]))', '.landscapeLeft,\n                .landscapeLeft(.when(deviceFamilies: [.pad]))')).length > 0,
   'an unconditional orientation hidden before its iPad-only duplicate is refused (repeated keys)');
 ok(shippingProblems(canon.replace('.portrait,', '.portrait,\n                .portrait,')).length > 0,
