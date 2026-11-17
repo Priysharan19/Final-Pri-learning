@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `954ba0790603e1ae622ebe02ebaedf6bd1413457a9a402c5acc0098e3ab9cb54` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `3c67eac6db05ae9f3f985b476252942e344cd2ee8ccede9b16935a0d98ac5c36` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -4215,47 +4215,47 @@ Final answer: 0
 
 ## `nsw-final:mex-proof/D1` — seed 1009
 
-> A student claims "$n^2 - n + 17$ is prime for every positive integer $n$". Test the claim at $n = 12$: what value does $n^2 - n + 17$ take there?
+> In a proof that there are infinitely many primes, suppose the only primes were $5, 7, 11, 19$, and form $N = 5 \\times 7 \\times 11 \\times 19 - 1 = 7314$. Find the smallest prime factor of $N$ — it cannot be on the list.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `149` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `149.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `150` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `150` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `2.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `3` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-proof/D2` — seed 1009
 
-> A direct proof starts by writing the sum of $5$ consecutive integers, the smallest being $n$. Write that sum as a simplified expression in $n$.
+> In a proof that there are infinitely many primes, suppose the only primes were $5, 7, 11, 19$, and form $N = 5 \\times 7 \\times 11 \\times 19 - 1 = 7314$. Find the smallest prime factor of $N$ — it cannot be on the list.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-proof/D3` — seed 1009
 
-> Factor $n^3 + 18n^2 + 108n + 216$ completely — the identity behind a proof about perfect cubes.
+> In a proof that there are infinitely many primes, suppose the only primes were $5, 7, 11, 19$, and form $N = 5 \\times 7 \\times 11 \\times 19 - 1 = 7314$. Find the smallest prime factor of $N$ — it cannot be on the list.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `2.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `3` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-proof/D4` — seed 1009
 
-> The AM–GM inequality says $\\frac{a+b}{2} \\ge \\sqrt{ab}$. Verify it for $a = 9$, $b = 8$: compute $\\frac{a+b}{2} - \\sqrt{ab}$, correct to 3 decimal places.
+> In a proof that there are infinitely many primes, suppose the only primes were $5, 7, 11, 19$, and form $N = 5 \\times 7 \\times 11 \\times 19 - 1 = 7314$. Find the smallest prime factor of $N$ — it cannot be on the list.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `3/200` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `3/200` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `203/200` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `203/200` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `2.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `3` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-complex/D1` — seed 1009
 
@@ -4303,128 +4303,128 @@ Final answer: 0
 
 ## `nsw-final:mex-demoivre/D1` — seed 1009
 
-> Using De Moivre's theorem, $\\left(\\cos 30° + i\\sin 30°\\right)^{6}$ has argument equal to how many **degrees**?
+> The $9$ roots of $z^{9} = -5$ are equally spaced around a circle in the Argand plane. How many of them have a **positive** imaginary part?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `180` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `180.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `181` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `181` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-demoivre/D2` — seed 1009
 
-> Write $z = -\\sqrt{3} + i$ in polar form and hence find the argument of $z^{6}$, in radians (this may lie outside $(-\\pi, \\pi]$).
+> The $11$ roots of $z^{11} = -5$ are equally spaced around a circle in the Argand plane. How many of them have a **positive** imaginary part?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `15.707963` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `15.707963` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
-| common wrong | `16.707963` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `16.707963` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-demoivre/D3` — seed 1009
 
-> The $9$ roots of $z^{9} = 1$ are evenly spaced around the unit circle, starting at $z = 1$. Turning $6$ steps anticlockwise from $z = 1$ reaches another root — how far have you turned, exactly, in radians?
+> The $14$ roots of $z^{14} = -5$ are equally spaced around a circle in the Argand plane. How many of them have a **positive** imaginary part?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4.18879` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `4.18879` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
-| common wrong | `5.18879` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5.18879` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-demoivre/D4` — seed 1009
 
-> Solve $z^{5} = 100000$ over the complex numbers. All $5$ solutions share the same **modulus** — what is it?
+> The $16$ roots of $z^{16} = -5$ are equally spaced around a circle in the Argand plane. How many of them have a **positive** imaginary part?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `10.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `11` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `11` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `8` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `8.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `9` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-integration/D1` — seed 1009
 
-> Use integration by parts to find $\\displaystyle\\int 2(x + 1) e^{3x}\\,dx$. (Omit +C.)
+> Let $J_n = \\displaystyle\\int_0^1 x^n e^{x}\\,dx$. Using the reduction formula $J_n = e - nJ_{n-1}$ with $J_0 = e - 1$, evaluate $4J_{4}$, correct to 3 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `929/500` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `929/500` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `1429/500` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1429/500` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-integration/D2` — seed 1009
 
-> Evaluate $\\displaystyle\\int_0^{2} 5x e^{2x}\\,dx$, correct to 3 decimal places.
+> Let $J_n = \\displaystyle\\int_0^1 x^n e^{x}\\,dx$. Using the reduction formula $J_n = e - nJ_{n-1}$ with $J_0 = e - 1$, evaluate $6J_{4}$, correct to 3 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `205993/1000` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `205993/1000` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `206993/1000` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `206993/1000` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2787/1000` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2787/1000` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `3787/1000` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3787/1000` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-integration/D3` — seed 1009
 
-> Using partial fractions, evaluate $\\displaystyle\\int_0^{2} \\dfrac{1}{(x + 4)(x + 8)}\\,dx$, correct to 4 decimal places.
+> Let $J_n = \\displaystyle\\int_0^1 x^n e^{x}\\,dx$. Using the reduction formula $J_n = e - nJ_{n-1}$ with $J_0 = e - 1$, evaluate $8J_{5}$, correct to 3 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `57/1250` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `57/1250` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `1307/1250` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1307/1250` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `633/200` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `633/200` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `833/200` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `833/200` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-integration/D4` — seed 1009
 
-> Using the substitution $u = x^2 + 25$, evaluate $\\displaystyle\\int_0^{12} x\\sqrt{x^2 + 25}\\,dx$ exactly.
+> Let $J_n = \\displaystyle\\int_0^1 x^n e^{x}\\,dx$. Using the reduction formula $J_n = e - nJ_{n-1}$ with $J_0 = e - 1$, evaluate $10J_{6}$, correct to 3 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2072/3` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
-| alternative | `2072/3` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
-| common wrong | `2075/3` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2075/3` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3447/1000` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `3447/1000` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `4447/1000` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4447/1000` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-vectors/D1` — seed 1009
 
-> Find the magnitude of $\\underset{\\sim}{v} = \\begin{pmatrix} 2 \\\\ 1 \\\\ -1 \\end{pmatrix}$, correct to 2 decimal places.
+> The vectors $\\underset{\\sim}{u} = \\begin{pmatrix} 1 \\\\ -1 \\\\ -1 \\end{pmatrix}$ and $\\begin{pmatrix} k \\\\ -3 \\\\ -3 \\end{pmatrix}$ are **parallel**. Find $k$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `49/20` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `49/20` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `69/20` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `69/20` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `3.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `4` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-vectors/D2` — seed 1009
 
-> Find $\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b}$ for $\\underset{\\sim}{a} = \\begin{pmatrix} 2 \\\\ 1 \\\\ -1 \\end{pmatrix}$, $\\underset{\\sim}{b} = \\begin{pmatrix} -1 \\\\ 2 \\\\ -2 \\end{pmatrix}$.
+> The vectors $\\underset{\\sim}{u} = \\begin{pmatrix} 1 \\\\ -1 \\\\ -1 \\end{pmatrix}$ and $\\begin{pmatrix} k \\\\ -3 \\\\ -3 \\end{pmatrix}$ are **parallel**. Find $k$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `2.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `3` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-vectors/D3` — seed 1009
 
-> Find the angle between $\\begin{pmatrix} 3 \\\\ 3 \\\\ -1 \\end{pmatrix}$ and $\\begin{pmatrix} 2 \\\\ 2 \\\\ 2 \\end{pmatrix}$, to the nearest degree.
+> The vectors $\\underset{\\sim}{u} = \\begin{pmatrix} 1 \\\\ -1 \\\\ -1 \\end{pmatrix}$ and $\\begin{pmatrix} k \\\\ -3 \\\\ -3 \\end{pmatrix}$ are **parallel**. Find $k$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `49` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `49.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `50` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `50` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-vectors/D4` — seed 1009
 
-> Find $k$ so that $\\begin{pmatrix} 2 \\\\ 1 \\\\ 2 \\end{pmatrix}$ and $\\begin{pmatrix} -4 \\\\ 2 \\\\ k \\end{pmatrix}$ are **perpendicular**.
+> The vectors $\\underset{\\sim}{u} = \\begin{pmatrix} 1 \\\\ -1 \\\\ -1 \\end{pmatrix}$ and $\\begin{pmatrix} k \\\\ -3 \\\\ -3 \\end{pmatrix}$ are **parallel**. Find $k$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -4435,44 +4435,44 @@ Final answer: 0
 
 ## `nsw-final:mex-mechanics/D1` — seed 1009
 
-> A particle moves in simple harmonic motion $x = 9\\cos(5t)$. State the **amplitude** and hence the greatest distance it reaches from the centre of motion.
+> A boat moving at $13$ m/s in still water has its engine switched off. The resistance gives $\\dot{v} = -0.5v$. How long does it take for the speed to fall to half its initial value? Give the answer correct to 2 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `9` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `9.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `10` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `10` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `139/100` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `139/100` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `239/100` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `239/100` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-mechanics/D2` — seed 1009
 
-> For the SHM $x = 9\\cos(5t)$, find the velocity $\\dot{x}$ at $t = 0.5$, correct to 2 decimal places.
+> Which equation describes simple harmonic motion with $n = 6$? Its centre of motion is $x = 2$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-2693/100` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `-2693/100` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `-2593/100` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-2593/100` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-mechanics/D3` — seed 1009
 
-> For SHM $x = 9\\cos(5t)$, find the **maximum speed** of the particle.
+> Which equation describes simple harmonic motion with $n = 6$? Its centre of motion is $x = 2$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `45` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `45.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `46` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `46` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-mechanics/D4` — seed 1009
 
-> A $69$ kg skydiver falls with resistance $R = 8v$ (newtons), so $m\\ddot{x} = mg - 8v$ with $g = 10$. Find the **terminal velocity** (where acceleration is zero), correct to 1 decimal place.
+> A boat moving at $19$ m/s in still water has its engine switched off. The resistance gives $\\dot{v} = -0.5v$. How long does it take for the speed to fall to half its initial value? Give the answer correct to 2 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `863/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `863/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `873/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `873/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `139/100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `139/100` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `239/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `239/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
