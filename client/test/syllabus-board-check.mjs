@@ -16,7 +16,8 @@
 //      India chapter, and each course only its own syllabus's codes;
 //   9. dark by default: a production build has the board off.
 // ─────────────────────────────────────────────────────────────────────────────
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 let pass = 0;
@@ -179,6 +180,29 @@ const groups = B.indiaBoardGroups(chapters);
   eq(B.nswAreas(B.syllabusBoard(B.nswBoardGroups(NSW_BOARD_COURSES['k10-stage5']), [], { now: NOW }), null).paperMarks, null, 'Years 7–10: no exam, no marks');
 }
 
+// ── 4b. hsc-forecast's ranges (PR #1003 API), the area roll-up ──────────────
+{
+  const adv = B.syllabusBoard(B.nswBoardGroups(NSW_BOARD_COURSES.advanced), [], { now: NOW });
+  const codes = B.nodesOf(adv.groups).map(n => n.id);
+  const ranges = Object.fromEntries(codes.map((c, i) => [c, { low: 0.03, mid: 0.05, high: 0.08 + (i === 0 ? 0.01 : 0) }]));
+  const meta = { paperMarks: 100, disclaimer: 'Not a prediction of the actual questions, a mark or a band.' };
+  const fc = { topicWeightRanges: c => (c === 'advanced' ? ranges : {}), forecastMeta: c => ({ ...meta, course: c }) };
+  const fa = B.forecastAreas(adv, fc, 'advanced');
+  eq([fa.source, fa.paperMarks, fa.disclaimer], ['forecast', 100, meta.disclaimer], 'forecast areas carry the source, paper marks and disclaimer');
+  const wf = B.boardPriorities(adv, fa, { limit: 99 }).items.find(i => i.id === 'working-with-functions-y11');
+  eq(wf.stake, { low: 6, high: 17 }, 'nothing shown: the stake is the outcomes\' low–high marks summed and rounded outwards (3+3 to 9+8)');
+  eq(B.forecastAreas(adv, { topicWeights: () => ({}), forecastMeta: () => meta }, 'advanced'), null, 'without topicWeightRanges there is no forecast stake (never a point figure)');
+  eq(B.forecastAreas(adv, fc, 'standard-2'), null, 'no forecast for a course hsc-forecast does not cover');
+  eq(B.forecastAreas(adv, null, 'advanced'), null, 'no module (#1003 not in this build): the blueprint fallback applies');
+  eq(B.forecastAreas(adv, { topicWeightRanges: () => ({ 'MAV-11-01': { low: 0.5, high: 0.2 } }), forecastMeta: () => meta }, 'advanced'), null, 'a malformed range is not used');
+  eq(B.FORECAST_COURSE, { advanced: 'advanced', 'extension-1': 'extension1' }, 'board course keys map to hsc-forecast course names');
+  // Area roll-up: shown on your own only when every outcome is.
+  eq(B.groupState([{ state: 'retained' }, { state: 'independent' }]), 'independent', 'an area is as strong as its weakest outcome');
+  eq(B.groupState([{ state: 'retained' }, { state: 'not-started' }]), 'not-started', 'an untouched outcome keeps the area from reading as shown');
+  eq(B.groupState([{ state: 'not-started' }, { state: 'not-started' }]), 'not-started', 'an untouched area is not started');
+  eq(B.groupState([{ state: 'independent' }, { state: 'recheck' }]), 'recheck', 'a slipped outcome shows on its area');
+}
+
 // ── 5. Readiness: refuses below two server-marked papers ────────────────────
 {
   const paper = (id, score, total, day, extra = {}) => ({ id, title: `Paper ${id}`, finishedAt: T0 + day * DAY, score, total, deadlineAt: T0 + day * DAY, markedBy: 'server', provisional: false, pending: false, full: true, ...extra });
@@ -198,6 +222,9 @@ const groups = B.indiaBoardGroups(chapters);
   eq(B.paperReadiness([paper('a', 70, 100, 1, { course: 'advanced' }), paper('b', 72, 100, 2)], { course: 'advanced' }).status, 'ready', 'a paper with no course recorded still counts');
   eq(B.paperReadiness([paper('a', 64, 100, 1), paper('b', 69, 100, 2)]).trend, 'up', '64 → 69 out of 100 is the 5-point edge: up, not level');
   ok(!('predicted' in r) && !('band' in r), 'readiness carries no predicted figure or band');
+  const withSec = B.paperReadiness([paper('a', 61, 100, 1, { sections: [{ id: 'I', label: 'Section I', marks: 10, awarded: 7 }, { id: 'II', label: 'Section II', marks: 90, awarded: 54 }] }), paper('b', 68, 100, 2, { sections: [{ id: 'I', marks: 10, awarded: 9 }, { id: 'II', marks: 90, awarded: 60 }] })]);
+  eq(withSec.papers[0].sections.map(x => `${x.awarded}/${x.marks}`), ['7/10', '54/90'], 'sections that add up to the paper are shown');
+  eq(withSec.papers[1].sections, null, 'sections that do not add up to the paper\'s own result are dropped, never shown');
 }
 
 // ── 6–8. Rendering (both languages), the guard, isolation ───────────────────
@@ -228,38 +255,77 @@ try {
   const glyphs = B.NODE_STATES.map(s => renderToStaticMarkup(React.createElement(view.StateGlyph, { state: s })).replace(/data-glyph="[^"]+"/, ''));
   eq(new Set(glyphs).size, B.NODE_STATES.length, 'every state has its own glyph shape');
 
+  const { NSW_FOCUS_LINKS } = await server.ssrLoadModule('/src/engine/nswFocusLinks.js');
+  const advLinks = NSW_FOCUS_LINKS.advanced;
+  const nswPrio = B.boardPriorities(nswBoard, B.nswAreas(nswBoard, nswExamBlueprint('nsw-hsc-advanced-2027')));
+  const inPrio = B.boardPriorities(inBoard, B.indiaAreas(inBoard, null));
   for (const lang of ['en', 'hi']) {
     await i18n.setLanguage(lang);
     const t = (k, v) => i18n.translate(k, v);
-    // Every state present in a topic is named in its sentence, so the parts add up to the total.
+    // Every state present in an area is named in its sentence, so the parts add up to the total.
     const sentence = view.groupSummary({ 'not-started': 1, seen: 1, assisted: 1, thin: 1, recheck: 1, independent: 1, retained: 1, total: 7 }, t);
-    eq(sentence.split(' · ').length, 7, `${lang}: a topic sentence names every state it holds, slipped included`);
-    ok(sentence.includes(t('board.sum.recheck', { n: 1 })), `${lang}: slipped points are spoken in the topic sentence`);
+    eq(sentence.split(' · ').length, 7, `${lang}: an area sentence names every state it holds, slipped included`);
+    ok(sentence.includes(t('board.sum.recheck', { n: 1 })), `${lang}: slipped points are spoken in the area sentence`);
     const words = B.NODE_STATES.map(s => t(`board.state.${{ 'not-started': 'notStarted' }[s] || s}`));
     eq(new Set(words).size, B.NODE_STATES.length, `${lang}: a distinct word for every state`);
-    const html = draw(view.BoardView, { board: inBoard, india: true, track: 'cbse', courseLabel: 'Class 12 CBSE / NCERT' });
-    const tiles = [...html.matchAll(/<button[^>]*class="sb-tile"[^>]*>/g)].map(m => m[0]);
-    eq(tiles.length, 8, `${lang}: one tile button per node`);
-    ok(tiles.every(tag => /aria-label="[^"]+: [^"]+"/.test(tag) && /data-state="([a-z-]+)"/.test(tag)), `${lang}: every tile has an accessible name`);
-    ok(tiles.every(tag => { const st = /data-state="([a-z-]+)"/.exec(tag)[1]; return tag.includes(esc(words[B.NODE_STATES.indexOf(st)])); }), `${lang}: every tile's name carries its state's word, so nothing rests on colour`);
+
+    // India: no link table, so the list is the view — a listbox moved by the arrow keys.
+    const html = draw(view.BoardView, { board: inBoard, priorities: inPrio, india: true, track: 'cbse', courseLabel: 'Class 12 CBSE / NCERT', source: 'none' });
+    ok(/role="listbox"[^>]*tabindex="0"/i.test(html) && /aria-activedescendant="sb-opt-c1"/.test(html), `${lang}: the list is a focusable listbox with an active option`);
+    const opts = [...html.matchAll(/<div[^>]*role="option"[^>]*>[\s\S]*?<\/div>/g)].map(m => m[0]);
+    eq(opts.length, 1, `${lang}: one option per chapter`);
+    ok(opts.every(o => /data-state="([a-z-]+)"/.test(o) && o.includes(esc(words[B.NODE_STATES.indexOf(/data-state="([a-z-]+)"/.exec(o)[1])]))), `${lang}: every option carries its state as a word`);
+    ok(!html.includes('data-board-map'), `${lang}: no map is drawn without Pri's link table`);
     ok(B.NODE_STATES.every(s => html.includes(`data-legend="${s}"`)) && words.every(w => html.includes(esc(w))), `${lang}: the legend names every state in words`);
-    ok(/<section[^>]*data-board-group="c1"/.test(html) && /<h3[^>]*>/.test(html) && html.includes('data-group-summary') && /<ul class="sb-tiles">/.test(html), `${lang}: a list grouped by topic, each with a heading and a summary sentence`);
-    const open = draw(view.BoardView, { board: inBoard, india: true, track: 'cbse', courseLabel: 'x', initialOpen: 'c1#5' });
-    ok(open.includes('data-board-detail="c1#5"') && open.includes(esc(t('board.practiseThis'))) && open.includes(esc(t('board.ev.gapHeld', { kept: 2, n: 2 }))), `${lang}: a node opens its evidence and Practise this`);
-    const nsw = draw(view.BoardView, { board: nswBoard, india: false, courseLabel: t('board.courseLabel', { name: 'Mathematics Advanced', version: '2024', year: 2027 }) });
+    const nodesShown = [...html.matchAll(/<li data-node="(c1#\d)" data-state="([a-z-]+)"/g)].map(m => [m[1], m[2]]);
+    eq(nodesShown.length, 8, `${lang}: the chapter's detail lists every learning outcome`);
+    ok(nodesShown.every(([id, st]) => inBoard.groups[0].nodes.find(n => n.id === id).state === st), `${lang}: each outcome shows its own state`);
+    ok(html.includes('data-group-summary') && html.includes(esc(t('board.practiseThis'))), `${lang}: the area has its summary sentence and Practise this`);
+
+    // NSW Advanced: the map, with Pri's links, and the same areas as a list.
+    const nsw = draw(view.BoardView, { board: nswBoard, priorities: nswPrio, links: advLinks, india: false, courseLabel: t('board.courseLabel', { name: 'Mathematics Advanced', version: '2024', year: 2027 }), source: 'blueprint-nsw', paperName: 'x' });
+    ok(nsw.includes('data-board-map') && /<canvas[^>]*role="img"[^>]*aria-label="[^"]+"/.test(nsw), `${lang}: the Advanced map is a canvas with a spoken label`);
+    ok(/aria-pressed="true"[^>]*>[^<]*<\/button><button[^>]*aria-pressed="false"/.test(nsw), `${lang}: the Map/List toggle says which is on`);
     ok(nsw.includes(esc(t('board.courseLabel', { name: 'Mathematics Advanced', version: '2024', year: 2027 }))), `${lang}: the NSW board names its course and syllabus version`);
     ok(lang !== 'en' || nsw.includes('Mathematics Advanced (2024 syllabus · first HSC 2027)'), 'en: "Mathematics Advanced (2024 syllabus · first HSC 2027)"');
-    ok(!/c\d+-[a-z]/.test(nsw.replace(/data-[a-z-]+="[^"]*"/g, '')) && !/MA[VEX]|MST|ME[12]-/.test(html), `${lang}: neither edition's board carries the other's units`);
-    const nswOpen = draw(view.BoardView, { board: nswBoard, india: false, courseLabel: 'x', initialOpen: 'MAV-11-02' });
-    ok(nswOpen.includes(esc(t('board.nswWording'))) && nswOpen.includes(esc(t('board.priDotpoints'))), `${lang}: an NSW outcome shows Pri's own dot points and says NESA wording is not reproduced`);
-    const prio = draw(view.PrioritiesView, { priorities: B.boardPriorities(nswBoard, B.nswAreas(nswBoard, nswExamBlueprint('nsw-hsc-advanced-2027'))), india: false, paperName: t('board.prio.nswPaper', { name: 'Mathematics Advanced' }) });
-    ok(/<ol class="sb-prio-list">/.test(prio) && prio.includes('data-board-stake='), `${lang}: priorities are an ordered list with the marks at stake`);
-    ok(prio.includes(esc(t('board.prio.sourceNsw'))), `${lang}: the NSW marks say they are Pri's paper design, not NESA's`);
-    const few = draw(view.ReadinessView, { readiness: B.paperReadiness([]) });
-    ok(few.includes(esc(t('board.ready.sit'))) && !few.includes('data-ready-line'), `${lang}: below two papers it says "Sit a timed paper to see this." and shows none`);
-    const ready = draw(view.ReadinessView, { readiness: B.paperReadiness([1, 2, 3].map(d => ({ id: `p${d}`, title: 'P', finishedAt: T0 + d * DAY, score: 60 + d, total: 100, deadlineAt: 1, markedBy: 'server', full: true }))) });
-    ok(ready.includes(esc(t('board.ready.last', { count: 3, n: 3, list: '61/100, 62/100, 63/100' }))) && ready.includes(esc(t('board.ready.why'))), `${lang}: the raw results and why practice can't forecast a mark`);
+    ok(nsw.includes(esc(t('board.linksNote'))), `${lang}: the links are labelled as Pri's own teaching map`);
+    const nswList = draw(view.BoardView, { board: nswBoard, priorities: nswPrio, links: null, india: false, courseLabel: 'x', source: 'blueprint-nsw' });
+    const groupsShown = [...nswList.matchAll(/role="group" aria-label="([^"]+)"/g)].map(m => m[1]);
+    eq(groupsShown, [t('common.yearNumber', { n: 11 }), t('common.yearNumber', { n: 12 })], `${lang}: the NSW list is grouped by Year 11 and Year 12`);
+    eq([...nswList.matchAll(/role="option"/g)].length, 14, `${lang}: 14 focus areas in the Advanced list`);
+    ok(!/c\d+-[a-z]/.test(nsw.replace(/data-[a-z-]+="[^"]*"/g, '').replace(/id="[^"]*"/g, '')) && !/MA[VEX]-|MST-|ME[12]-/.test(html), `${lang}: neither edition's board carries the other's units`);
+    // An NSW area: each outcome's code and Pri's own description, never NESA's wording.
+    const open = draw(view.BoardView, { board: nswBoard, priorities: nswPrio, links: null, india: false, courseLabel: 'x', initialSelected: 'working-with-functions-y11', source: 'blueprint-nsw' });
+    ok(open.includes('MAV-11-01') && open.includes('MAV-11-02') && open.includes(esc(t('board.priPractises'))), `${lang}: an NSW area lists its outcome codes with what Pri practises there`);
+    ok(open.includes(esc(t('board.nswWording'))), `${lang}: it says NESA's wording is not reproduced`);
+
+    // What to work on: cards, the reason in words, marks at stake as a range, the source said.
+    const prio = draw(view.PrioritiesView, { priorities: nswPrio, source: 'blueprint-nsw', paperName: t('board.prio.nswPaper', { name: 'Mathematics Advanced' }) });
+    ok(/<ol class="sb-cards">/.test(prio) && prio.includes('data-board-stake=') && /class="sb-card-why"/.test(prio), `${lang}: priorities are cards with the reason and the marks at stake`);
+    ok(prio.includes(esc(t('board.prio.sourceNsw'))), `${lang}: blueprint marks say they are Pri's paper design, not NESA's`);
+    const fc = draw(view.PrioritiesView, { priorities: nswPrio, source: 'forecast', disclaimer: 'FORECAST-DISCLAIMER' });
+    ok(fc.includes('FORECAST-DISCLAIMER') && !fc.includes(esc(t('board.prio.sourceNsw'))), `${lang}: forecast marks carry hsc-forecast's own disclaimer`);
+
+    // Exam readiness.
+    const few = draw(view.ReadinessView, { readiness: B.paperReadiness([]), edition: 'nsw' });
+    ok(few.includes(esc(t('board.ready.sit'))) && !few.includes('data-ready-line') && few.includes('data-board-honesty'), `${lang}: below two papers it says "Sit a timed paper to see this.", shows none, and keeps the honesty box`);
+    const papers = [[61, 7, 54], [68, 8, 60], [72, 8, 64]].map(([s, s1, s2], d) => ({ id: `p${d}`, title: 'P', finishedAt: T0 + d * DAY, score: s, total: 100, deadlineAt: 1, durationMin: 180, readingMin: 10, markedBy: 'server', full: true,
+      sections: [{ id: 'I', label: 'Section I', marks: 10, awarded: s1 }, { id: 'II', label: 'Section II', marks: 90, awarded: s2 }] }));
+    const ready = draw(view.ReadinessView, { readiness: B.paperReadiness(papers), edition: 'nsw', courseName: 'Mathematics Advanced' });
+    ok(ready.includes(esc(t('board.ready.last', { count: 3, n: 3, list: '61/100, 68/100, 72/100' }))), `${lang}: the raw results, in words`);
+    ok(/<svg class="sb-chart"[^>]*role="img"/.test(ready) && (ready.match(/class="sb-pt( on)?"/g) || []).length === 3, `${lang}: three papers on the chart`);
+    ok(ready.includes('data-section="I"') && ready.includes('8 / 10') && ready.includes('64 / 90'), `${lang}: the last paper's Section I and II marks`);
+    ok(ready.includes(esc(t('board.ready.delta', { d: '+4', paper: t('board.ready.paperN', { n: 2 }) }))), `${lang}: the change on the previous paper`);
+    ok(ready.includes(esc(t('board.ready.whyNsw'))) && ready.includes(esc(t('board.ready.whyTitleNsw'))), `${lang}: the honesty box`);
+    const inReady = draw(view.ReadinessView, { readiness: B.paperReadiness(papers), edition: 'in' });
+    ok(inReady.includes(esc(t('board.ready.whyIn'))) && !inReady.includes('NESA') && !inReady.includes('UAC'), `${lang}: Priyabhata's box speaks of its own board, not NESA or UAC`);
+    const mixed = draw(view.ReadinessView, { readiness: B.paperReadiness([{ ...papers[0], total: 80, score: 50, sections: null }, papers[1]]), edition: 'nsw' });
+    ok(!mixed.includes('class="sb-chart"'), `${lang}: papers out of different totals are not drawn on one scale`);
   }
+  // The corrected copy (CTO review): NESA aligns HSC marks to bands; UAC scales the ATAR separately.
+  await i18n.setLanguage('en');
+  const box = i18n.translate('board.ready.whyNsw');
+  ok(/NESA aligns HSC marks to performance bands/.test(box) && /ATAR is scaled separately by UAC/.test(box), 'en: NESA aligns marks to bands and UAC scales the ATAR — not the other way round');
   await i18n.setLanguage('en');
 } finally {
   await server.close();
@@ -268,11 +334,47 @@ try {
 // ── 7. The guard: nothing offers a predicted or scaled mark ─────────────────
 const BANNED = /predicted (scaled )?mark|scaled mark|predicted score|predicted band|band prediction|\bATAR\b/i;
 for (const file of ['src/i18n/strings.en.js', 'src/i18n/strings.hi.js', 'src/i18n/strings.au.js']) {
-  const hits = read(file).split('\n').filter(line => /^\s*'[^']+':/.test(line) && BANNED.test(line));
+  // The honesty box names the ATAR only to say why none is predicted (reviewed copy).
+  const hits = read(file).split('\n').filter(line => /^\s*'[^']+':/.test(line) && !/^\s*'board\.ready\.whyNsw':/.test(line) && BANNED.test(line));
   eq(hits, [], `${file}: no catalogue string offers a predicted or scaled mark, ATAR or band`);
 }
 const boardSrc = read('src/progress/SyllabusBoard.jsx');
-ok(!/predict|scaled|atar/i.test(boardSrc.replace(/^\s*\/\/.*$/gm, '').replace(/'board\.[a-zA-Z.]+'/g, '')), 'the board component computes and draws no prediction');
+ok(!/predict|scaled|atar/i.test(boardSrc.replace(/^\s*\/\/.*$/gm, '').replace(/^\s*\/?\*.*$/gm, '').replace(/'board\.[a-zA-Z.]+'/g, '')), 'the board component computes and draws no prediction');
+
+// ── 7b. No NESA wording anywhere in the client or the build (CTO review) ─────
+// NESA syllabus text is Crown copyright and not licensed to Pri (research §5.7).
+// The board shows outcome CODES with Pri's own descriptions. These are the
+// forms of NESA's outcome and content statements Pri deliberately avoids: the
+// "A student:" stem and the verb phrases NESA outcomes open with. Pri holds no
+// copy of the licensed text, so this is a phrasing guard, not a comparison
+// against it; a hit means someone pasted outcome wording in.
+const NESA_FORMS = [
+  // ("A student uses …" alone is not banned: question prompts say it.)
+  /\bA student:/,
+  /\buses algebraic and graphical techniques to solve\b/i, /\bapplies calculus techniques to model and solve problems\b/i,
+  /\bselects and uses appropriate (?:technology|strategies)\b/i, /\bcommunicates using mathematical language, notation\b/i,
+  /\bsolves problems involving (?:the )?(?:use of )?(?:simple|basic)? ?(?:functions|calculus|probability)\b/i,
+  /\bconstructs arguments to prove and justify results\b/i
+];
+function walkSrc(dir, out = []) {
+  for (const name of readdirSync(dir)) {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) walkSrc(p, out); else if (/\.(m?js|jsx|css|html|json)$/.test(name)) out.push(p);
+  }
+  return out;
+}
+const SRC = fileURLToPath(new URL('../src', import.meta.url));
+const nesaHits = walkSrc(SRC).flatMap(f => NESA_FORMS.filter(rx => rx.test(readFileSync(f, 'utf8'))).map(rx => `${f.slice(SRC.length + 1)} ~ ${rx}`));
+eq(nesaHits, [], 'no NESA outcome or content wording in client/src');
+const DIST = fileURLToPath(new URL('../dist', import.meta.url));
+if (existsSync(DIST)) {
+  const distHits = walkSrc(DIST).flatMap(f => NESA_FORMS.filter(rx => rx.test(readFileSync(f, 'utf8'))).map(rx => `${f.slice(DIST.length + 1)} ~ ${rx}`));
+  eq(distHits, [], 'no NESA outcome or content wording in the built client');
+} else ok(true, 'no build to scan (the build check runs where one exists)');
+// The descriptions the board shows are Pri's own dot points, never a NESA statement.
+for (const code of ['MAV-11-01', 'MAV-12-05', 'ME1-12-02']) {
+  ok(!/^A student/.test(B.nodesOf(B.nswBoardGroups(NSW_BOARD_COURSES.advanced)).find(n => n.id === code)?.label || ''), `${code}: its label is the focus-area name, not an outcome statement`);
+}
 
 // ── 8. Isolation in the wiring ──────────────────────────────────────────────
 {

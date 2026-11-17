@@ -178,6 +178,17 @@ export function syllabusBoard(groups, attempts = [], { located = null, now = Dat
   return { groups: outGroups, tally: tallyOf(outGroups.flatMap(g => g.nodes)) };
 }
 
+/**
+ * A focus area's (or chapter's) state on the map: its weakest outcome's.
+ * An area reads "shown on your own" only when every outcome in it is; an
+ * area none of whose outcomes has evidence is "not started".
+ */
+export const STATE_RANK = Object.freeze(['not-started', 'seen', 'assisted', 'recheck', 'thin', 'independent', 'retained']);
+export function groupState(nodes) {
+  if (!nodes.length || nodes.every(n => n.state === 'not-started')) return 'not-started';
+  return nodes.reduce((worst, n) => (STATE_RANK.indexOf(n.state) < STATE_RANK.indexOf(worst) ? n.state : worst), 'retained');
+}
+
 /** Node count per state, plus the total. */
 export function tallyOf(nodes) {
   const t = Object.fromEntries(NODE_STATES.map(s => [s, 0]));
@@ -224,6 +235,37 @@ export function indiaAreas(board, blueprint = null) {
   return { areas, paperMarks: areas.length ? units.reduce((n, u) => n + u.marks, 0) : null };
 }
 
+/** Board course key → hsc-forecast's course name (PR #1003); others have no forecast. */
+export const FORECAST_COURSE = Object.freeze({ advanced: 'advanced', 'extension-1': 'extension1' });
+
+/**
+ * NSW areas from hsc-forecast's ranges (client/src/engine/hsc/hscPriorities.js):
+ * topicWeightRanges(course) → { code: { low, mid, high } } shares of the paper,
+ * forecastMeta(course) → { paperMarks, disclaimer, … }. Each outcome carries its
+ * own low–high marks (share × paper marks). Null when the module, the course or
+ * the ranges are not there — a single expected share is never turned into a
+ * point figure — and the caller then falls back to the labelled blueprint.
+ */
+export function forecastAreas(board, forecast, courseKey) {
+  const course = FORECAST_COURSE[courseKey];
+  if (!course || typeof forecast?.topicWeightRanges !== 'function' || typeof forecast?.forecastMeta !== 'function') return null;
+  let ranges, meta;
+  try { ranges = forecast.topicWeightRanges(course); meta = forecast.forecastMeta(course); } catch { return null; }
+  const P = Number(meta?.paperMarks);
+  if (!ranges || !Number.isFinite(P) || P <= 0) return null;
+  const range = code => {
+    const r = Object.hasOwn(ranges, code) ? ranges[code] : null;
+    const lo = Number(r?.low), hi = Number(r?.high);
+    return Number.isFinite(lo) && Number.isFinite(hi) && lo >= 0 && hi >= lo && hi <= 1 ? { low: lo * P, high: hi * P } : null;
+  };
+  const areas = board.groups.map(g => ({
+    id: g.id, name: g.name, nodeIds: g.nodes.map(n => n.id), marks: null,
+    nodeRanges: Object.fromEntries(g.nodes.map(n => [n.id, range(n.id)]).filter(([, r]) => r))
+  }));
+  if (!areas.some(a => Object.keys(a.nodeRanges).length)) return null;
+  return { areas, paperMarks: P, source: 'forecast', disclaimer: String(meta.disclaimer || '') };
+}
+
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const ACTION_RANK = { learn: 0, consolidate: 1, retain: 2, extend: 3 };
 const PRACTISE_FIRST = {
@@ -256,7 +298,11 @@ export function boardPriorities(board, { areas, paperMarks = null }, { limit = 4
       : action === 'consolidate' ? clamp(2 * maybe, 4, 8)
         : action === 'retain' ? clamp(t.independent, 3, 6) : 4;
     let stake = null;
-    if (area.marks != null && n) {
+    if (area.nodeRanges) {
+      // hsc-forecast: each outcome's own low–high marks, rounded outwards.
+      const sum = (states, k) => nodes.filter(x => states.includes(x.state)).reduce((acc, x) => acc + (area.nodeRanges[x.id]?.[k] || 0), 0);
+      stake = { low: Math.floor(sum(SURE, 'low') + 1e-9), high: Math.ceil(sum([...SURE, 'thin'], 'high') - 1e-9) };
+    } else if (area.marks != null && n) {
       if (area.nodeMarks) {
         // Exact: the marks on the outcomes in each set.
         const sum = states => nodes.filter(x => states.includes(x.state)).reduce((k, x) => k + (area.nodeMarks[x.id] || 0), 0);
@@ -269,8 +315,14 @@ export function boardPriorities(board, { areas, paperMarks = null }, { limit = 4
     const order = PRACTISE_FIRST[action];
     const target = [...nodes].filter(x => x.practise && order.includes(x.state))
       .sort((a, b) => order.indexOf(a.state) - order.indexOf(b.state))[0] || null;
+    // Why, in plain words (progress/SyllabusBoard.jsx turns this into a sentence).
+    const started = n - t['not-started'];
+    const why = t.recheck > 0 ? { key: 'slipped', n: t.recheck }
+      : action === 'learn' ? (started ? { key: 'learnSome', started, n } : { key: 'learnNone' })
+        : action === 'consolidate' ? { key: 'consolidate', gap: maybe, n }
+          : action === 'retain' ? { key: 'retain' } : { key: 'extend' };
     return {
-      id: area.id, name: area.name, action, questions, minutes: questions * minutesPerQuestion,
+      id: area.id, name: area.name, action, why, questions, minutes: questions * minutesPerQuestion,
       marks: area.marks, stake, gap: maybe, nodes: n, tally: t,
       practise: target ? { ...target.practise, node: target.id } : null
     };
@@ -308,8 +360,18 @@ export function readinessPaper(exam, { course = null } = {}) {
   if (!Number.isFinite(score) || !Number.isFinite(total) || total <= 0 || score < 0 || score > total) return null;
   return {
     id: String(exam.id ?? ''), title: String(exam.title || ''), finishedAt: Number(exam.finishedAt),
-    score, total, timed: true, full: exam.full === true
+    score, total, timed: true, full: exam.full === true,
+    minutes: Number.isFinite(Number(exam.durationMin)) && exam.durationMin != null ? Number(exam.durationMin) : null,
+    readingMin: Number.isFinite(Number(exam.readingMin)) && exam.readingMin != null ? Number(exam.readingMin) : null,
+    // By section, only when the sections add up to the paper's own result.
+    sections: sectionsAddUp(exam.sections, score, total) ? exam.sections.map(x => ({ id: String(x.id), label: String(x.label || ''), awarded: Number(x.awarded), marks: Number(x.marks) })) : null
   };
+}
+
+function sectionsAddUp(sections, score, total) {
+  if (!Array.isArray(sections) || !sections.length) return false;
+  const ok = sections.every(x => Number.isFinite(Number(x?.marks)) && Number.isFinite(Number(x?.awarded)) && Number(x.marks) > 0 && Number(x.awarded) >= 0 && Number(x.awarded) <= Number(x.marks));
+  return ok && sections.reduce((n, x) => n + Number(x.marks), 0) === total && sections.reduce((n, x) => n + Number(x.awarded), 0) === score;
 }
 
 /**

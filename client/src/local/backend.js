@@ -4731,8 +4731,25 @@ const routes = {
       ...(a.repeat === true ? { repeat: true } : {}),
       dotpoints: dotpointsOf(questions.get(a.questionId))
     }));
+    // Marks by section, from the server's per-question result and the section each
+    // question was sealed in; null unless every question has both.
+    const sectionsOf = e => {
+      const out = [];
+      for (const d of Array.isArray(e.detail) ? e.detail : []) {
+        const row = questions.get(String(d.id));
+        const id = row?.examSection ?? row?.indiaExamSection;
+        const marks = Number(d.marks), got = Number(d.awarded);
+        if (id == null || !Number.isFinite(marks) || !Number.isFinite(got)) return null;
+        let sec = out.find(x => x.id === String(id));
+        if (!sec) { sec = { id: String(id), label: String(row.examSectionLabel ?? row.indiaExamSectionLabel ?? ''), marks: 0, awarded: 0 }; out.push(sec); }
+        sec.marks += marks; sec.awarded += got;
+      }
+      return out.length ? out : null;
+    };
     const papers = (await byIndex('exams', 'pid', p.id)).filter(e => e.finishedAt).map(e => ({
       id: e.id, title: e.title, finishedAt: e.finishedAt, score: e.score, total: e.total,
+      durationMin: Number.isFinite(e.durationMin) ? e.durationMin : null, readingMin: Number.isFinite(e.readingMin) ? e.readingMin : null,
+      sections: sectionsOf(e),
       deadlineAt: Number.isFinite(e.deadlineAt) ? e.deadlineAt : null, markedBy: markedByOf(e),
       pending: !!e.pendingFinish, provisional: e.provisional === true || pendingSummary(e.detail).any,
       full: e.nsw ? e.nsw.partial !== true : e.indiaExam ? e.indiaExam.fullPaper === true : false,
@@ -5885,7 +5902,9 @@ function paperRowOf(pid, examId, sq, now, id = String(sq.id)) {
     id, pid, subtopic: q.multipart ? sq.generator : (q.subtopic || sq.generator), difficulty: q.multipart ? 3 : (q.difficulty || sq.difficulty || 2),
     // No answer, step or trap is on this device.
     payload: q, mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: now,
-    examMarking: sq.marking, examServer: true
+    examMarking: sq.marking, examServer: true,
+    // The paper's section, as the server sealed it, so a result can be read by section.
+    ...(sq.section != null ? { examSection: String(sq.section), examSectionLabel: String(sq.sectionLabel || '') } : {})
   };
 }
 

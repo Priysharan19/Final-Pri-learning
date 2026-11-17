@@ -113,3 +113,9 @@ html.ui-instrument.skin-aurora.a11y-reduce-transparency[data-aurora-pools] body 
 
 /* UI7a: the current question on an exam rail is a current place (D1): an ink bar with an edition-light halo and a 2 px rule. */
 html.ui-instrument.skin-aurora .xs-nav--rail .xs-q.is-current::after { box-shadow: 0 0 0 3px var(--au-light-soft), 0 3px 0 -1px var(--au-light); }
+
+/* ── The syllabus map's current place (verified-page spec §2) ──────────────
+   The selected focus area in the list, and the canvas's own colour — what the
+   map draws its selection ring, lit links and raised priorities in. */
+html.ui-instrument.skin-aurora .sb-opt[aria-selected="true"] { border-color: var(--au-light); background: var(--au-light-soft); }
+html.ui-instrument.skin-aurora .sb-canvas { color: var(--au-light); }
