@@ -110,13 +110,17 @@ async function tour(edition) {
     check(`${label}: the guide is not offered before a paper is submitted`, (await visibleText(page, '.pg')).includes(en['gen.guideNote']));
     const unnamed = await unnamedControls(page);
     check(`${label}: every control is named`, unnamed.length === 0, JSON.stringify(unnamed));
-    await page.screenshot({ path: join(SHOTS, `${edition}-desktop.png`), fullPage: true });
+    await page.setViewportSize({ width: 1180, height: 1300 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: join(SHOTS, `${edition}-desktop.png`) });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.waitForTimeout(300);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     check(`${label}: the phone layout does not scroll sideways`, overflow <= 1, String(overflow));
     check(`${label}: on a phone the summary comes before the choices`, await page.evaluate(() => { const s = document.querySelector('.pg-summary').getBoundingClientRect().top; const c = document.querySelector('.pg-choices').getBoundingClientRect().top; return s < c; }));
-    await page.screenshot({ path: join(SHOTS, `${edition}-phone.png`), fullPage: true });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.screenshot({ path: join(SHOTS, `${edition}-phone.png`) });
     await page.setViewportSize({ width: 1180, height: 860 });
 
     // The printable paper.
