@@ -32,7 +32,7 @@ import { handwrite, pressRead } from './fakeServerReader.js';
 
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const TOPIC = 'c7-finding-unknown-current';
-const SUBMIT = { name: 'Submit Answer' };
+const SUBMIT = { name: /^(Submit answer|Confirm and mark)/i };
 
 export const flow = {
   id: 'read-cost',
