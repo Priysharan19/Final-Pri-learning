@@ -218,7 +218,7 @@ export default {
       { title: 'Rates of change', body: 'If $y$ depends on $x$ and both depend on time, $\\frac{dy}{dt}=\\frac{dy}{dx}\\cdot\\frac{dx}{dt}$. Write the relation between the quantities first, then differentiate with respect to $t$.' },
       { title: 'Increasing and decreasing', body: 'On an interval, $f\'>0$ means strictly increasing and $f\'<0$ means strictly decreasing. Find where $f\'=0$ or is undefined, split the line there, and test the sign on each piece.' },
       { title: 'Tangents and normals', body: 'The slope of the tangent at $(x_1,y_1)$ is $f\'(x_1)$; the normal is perpendicular, so its slope is $-1/f\'(x_1)$ when $f\'(x_1)\\ne0$.' },
-      { title: 'Local extrema', body: 'At a critical point, the first derivative test checks the sign change of $f\'$ (+ to − is a maximum, − to + a minimum). The second derivative test: $f\'\'(c)<0$ gives a local maximum, $f\'\'(c)>0$ a local minimum, $f\'\'(c)=0$ is inconclusive.' },
+      { title: 'Local extrema', body: 'At a critical point, the first derivative test checks the sign change of $f\'$ (positive to negative is a maximum, negative to positive a minimum). The second derivative test: $f\'\'(c)<0$ gives a local maximum, $f\'\'(c)>0$ a local minimum, $f\'\'(c)=0$ is inconclusive.' },
       { title: 'Absolute extrema on a closed interval', body: 'A continuous function on $[a,b]$ attains its greatest and least values. Evaluate $f$ at all critical points inside and at both endpoints, then compare.' }
     ],
     definitions: [
@@ -304,8 +304,8 @@ export default {
     summary: 'A definite integral adds up thin strips, so it gives area. We find the area between a curve and an axis, between two curves, and regions bounded by a line and a circle, parabola or ellipse, always sketching first and taking areas as positive.',
     prereqs: ['c12-integrals', 'c11-conic-sections'],
     concepts: [
-      { title: 'Area with the x-axis', body: 'For $y=f(x)\\ge0$ between $x=a$ and $x=b$, area $=\\int_a^b y\\,dx$. If the curve dips below the axis, split at the crossings and add absolute values.' },
-      { title: 'Area with the y-axis', body: 'Using horizontal strips, area $=\\int_c^d x\\,dy$ between $y=c$ and $y=d$.' },
+      { title: 'Area with the $x$-axis', body: 'For $y=f(x)\\ge0$ between $x=a$ and $x=b$, area $=\\int_a^b y\\,dx$. If the curve dips below the axis, split at the crossings and add absolute values.' },
+      { title: 'Area with the $y$-axis', body: 'Using horizontal strips, area $=\\int_c^d x\\,dy$ between $y=c$ and $y=d$.' },
       { title: 'Between two curves', body: 'If $f(x)\\ge g(x)$ on $[a,b]$, area $=\\int_a^b\\big(f(x)-g(x)\\big)dx$: top minus bottom. Find intersection points to get the limits.' },
       { title: 'Use symmetry', body: 'Circles and ellipses are symmetric about both axes; compute one quarter and multiply by 4.' }
     ],
@@ -328,7 +328,7 @@ export default {
       { front: 'JEE tip', back: 'Area between $y=x^2$ and $y=x$ is $\\frac16$; between $y^2=x$ and $y=x$ also $\\frac16$.' }
     ],
     mistakes: [
-      { wrong: 'Integrating across an x-intercept and getting cancellation.', right: 'Split at the intercept and add absolute values.' },
+      { wrong: 'Integrating across an $x$-intercept and getting cancellation.', right: 'Split at the intercept and add absolute values.' },
       { wrong: 'Subtracting the upper curve from the lower.', right: 'Use top minus bottom (or right minus left for $dy$).' },
       { wrong: 'Using limits from the axis instead of intersection points.', right: 'Solve the equations simultaneously for the limits.' }
     ],

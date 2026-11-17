@@ -649,4 +649,10 @@ export const INTERACTIVE = Object.freeze({
   solidExplorer: { validate: validateSolidExplorer, model: p => solidExplorerModel(p) }
 });
 // interactive kind -> static kind a question (or a print) shows instead
-export const COUNTERPART = Object.freeze({ argandExplorer: 'argand', vectorExplorer: 'vector', matrixTransform: 'matrix2d', solidExplorer: 'solid' });
+export const COUNTERPART = Object.freeze({ argandExplorer: 'argand', // The core vector diagram takes a list of displacements: draw a and b tip to tail (their sum), or a and
+  // -b for a difference, so a question shows the same vectors the explorer starts with.
+  vectorExplorer: ({ a = [3, 1], b = [1, 2], mode = 'sum', k = 2 }) => ({
+    kind: 'vector', resultant: mode === 'sum' || mode === 'difference',
+    vectors: mode === 'scalar' ? [{ dx: k * a[0], dy: k * a[1], label: `${k}\\mathbf{a}` }]
+      : [{ dx: a[0], dy: a[1], label: '\\mathbf{a}' }, mode === 'difference' ? { dx: -b[0], dy: -b[1], label: '-\\mathbf{b}' } : { dx: b[0], dy: b[1], label: '\\mathbf{b}' }]
+  }), matrixTransform: 'matrix2d', solidExplorer: 'solid' });

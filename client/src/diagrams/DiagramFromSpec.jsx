@@ -38,8 +38,11 @@ export default function DiagramFromSpec({ spec, interactive = false }) {
   const { kind, ...params } = spec;
   if (Object.hasOwn(INTERACTIVE_KINDS, kind)) {
     if (interactive) { const C = INTERACTIVE_KINDS[kind]; return <C {...params} />; }
+    // A counterpart is a static kind with the same params, or (for a pack kind whose static
+    // picture takes other params) a function from the interactive params to a static spec.
     const counterpart = STATIC_COUNTERPART[kind];
     if (!counterpart) return null;
+    if (typeof counterpart === 'function') return <DiagramFromSpec spec={counterpart(params)} />;
     const S = STATIC_KINDS[counterpart];
     return <S {...params} />;
   }

@@ -4,13 +4,13 @@ export default {
   "c12-relations-functions": {
     "examples": [
       {
-        "question": "Find the inverse of f(x)=(3x+1)/(x-2), specifying the excluded inputs.",
+        "question": "Find the inverse of $f(x) = \\dfrac{3x+1}{x-2}$, stating the excluded inputs.",
         "steps": [
-          "Write y=(3x+1)/(x-2), where x≠2.",
-          "Rearrange yx-2y=3x+1 to x(y-3)=2y+1.",
-          "Thus f inverse(y)=(2y+1)/(y-3), with y≠3. The original function never outputs 3."
+          "Write $y = \\dfrac{3x+1}{x-2}$, where $x \\ne 2$.",
+          "Rearrange $yx - 2y = 3x + 1$ to $x(y - 3) = 2y + 1$.",
+          "Thus $f^{-1}(y) = \\dfrac{2y+1}{y-3}$, with $y \\ne 3$. The original function never outputs 3."
         ],
-        "answer": "f inverse(y)=(2y+1)/(y-3)",
+        "answer": "$f^{-1}(y) = \\dfrac{2y+1}{y-3}$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -30,13 +30,13 @@ export default {
   "c12-inverse-trigonometric": {
     "examples": [
       {
-        "question": "Evaluate arctan(1/2)+arctan(1/3) exactly.",
+        "question": "Evaluate $\\tan^{-1}\\tfrac{1}{2} + \\tan^{-1}\\tfrac{1}{3}$ exactly.",
         "steps": [
-          "Both principal arctangents are positive acute angles, and their sum remains below π/2.",
-          "By the tangent addition identity, tan(sum)=(1/2+1/3)/(1-1/6)=1.",
-          "The only such sum with tangent 1 is π/4."
+          "Both principal values are positive acute angles, and their sum stays below $\\tfrac{\\pi}{2}$.",
+          "By the tangent addition identity, the tangent of the sum is $\\dfrac{\\tfrac{1}{2} + \\tfrac{1}{3}}{1 - \\tfrac{1}{6}} = 1$.",
+          "The only such sum with tangent 1 is $\\tfrac{\\pi}{4}$."
         ],
-        "answer": "π/4",
+        "answer": "$\\tfrac{\\pi}{4}$",
         "verify": {
           "kind": "value",
           "expr": "atan(1)",
@@ -48,13 +48,13 @@ export default {
   "c12-matrices": {
     "examples": [
       {
-        "question": "For A=[[1,2],[3,4]], find the matrix X satisfying 2A+X=I.",
+        "question": "For $A = \\begin{pmatrix} 1 & 2 \\\\ 3 & 4 \\end{pmatrix}$, find the matrix $X$ satisfying $2A + X = I$.",
         "steps": [
-          "Rearrange X=I-2A; the identity has diagonal ones and off-diagonal zeros.",
-          "Subtract entries: 1-2=-1, 0-4=-4, 0-6=-6, 1-8=-7.",
-          "X=[[-1,-4],[-6,-7]]."
+          "Rearrange: $X = I - 2A$; the identity has ones on the diagonal and zeros elsewhere.",
+          "Subtract entries: $1 - 2 = -1$, $0 - 4 = -4$, $0 - 6 = -6$, $1 - 8 = -7$.",
+          "$X = \\begin{pmatrix} -1 & -4 \\\\ -6 & -7 \\end{pmatrix}$."
         ],
-        "answer": "[[-1,-4],[-6,-7]]",
+        "answer": "$\\begin{pmatrix} -1 & -4 \\\\ -6 & -7 \\end{pmatrix}$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -82,13 +82,13 @@ export default {
   "c12-determinants": {
     "examples": [
       {
-        "question": "For what values of real t is the determinant of [[t,1],[4,t]] zero?",
+        "question": "For which real values of $t$ is $\\begin{vmatrix} t & 1 \\\\ 4 & t \\end{vmatrix}$ zero?",
         "steps": [
-          "The determinant is t·t-1·4=t²-4.",
-          "Set t²-4=(t-2)(t+2)=0.",
-          "Therefore t=2 or t=-2; at each value the rows are dependent."
+          "The determinant is $t \\cdot t - 1 \\cdot 4 = t^2 - 4$.",
+          "Set $t^2 - 4 = (t-2)(t+2) = 0$.",
+          "Therefore $t = 2$ or $t = -2$; at each value the rows are dependent."
         ],
-        "answer": "t=±2",
+        "answer": "$t = \\pm 2$",
         "verify": {
           "kind": "roots",
           "f": "x^2-4",
@@ -104,13 +104,13 @@ export default {
   "c12-continuity-differentiability": {
     "examples": [
       {
-        "question": "Let f(x)=x² for x≤1 and f(x)=ax+b for x>1. Determine a and b for differentiability at x=1.",
+        "question": "Let $f(x) = x^2$ for $x \\le 1$ and $f(x) = ax + b$ for $x > 1$. Find $a$ and $b$ so that $f$ is differentiable at $x = 1$.",
         "steps": [
-          "Continuity gives a+b=1, since the left value is 1.",
-          "The left derivative at x=1 is 2; the right derivative is a, so a=2.",
-          "Then b=1-a=-1. Both value and derivative match."
+          "Continuity gives $a + b = 1$, since the left value is 1.",
+          "The left derivative at $x = 1$ is 2; the right derivative is $a$, so $a = 2$.",
+          "Then $b = 1 - a = -1$. Both the value and the derivative match."
         ],
-        "answer": "a=2, b=-1",
+        "answer": "$a = 2$, $b = -1$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -132,11 +132,11 @@ export default {
       {
         "question": "A 40 m fence encloses three sides of a rectangular plot bordering a straight river. Find the greatest possible enclosed area.",
         "steps": [
-          "Let x be each side perpendicular to the river, y the fenced parallel side: 2x+y=40.",
-          "Area A=xy=x(40-2x)=40x-2x², with 0<x<20.",
-          "A'=40-4x vanishes at x=10, yielding y=20 and maximum area 200 m²."
+          "Let $x$ be each side perpendicular to the river and $y$ the fenced side parallel to it: $2x + y = 40$.",
+          "Area $A = xy = x(40 - 2x) = 40x - 2x^2$, with $0 < x < 20$.",
+          "$A' = 40 - 4x$ vanishes at $x = 10$, giving $y = 20$ and maximum area $200\\text{ m}^2$."
         ],
-        "answer": "200 m², dimensions 10 m by 20 m",
+        "answer": "$200\\text{ m}^2$, with dimensions 10 m by 20 m",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -156,13 +156,13 @@ export default {
   "c12-integrals": {
     "examples": [
       {
-        "question": "Evaluate ∫ from 0 to 1 of 2x/(1+x²) dx.",
+        "question": "Evaluate $\\displaystyle\\int_0^1 \\frac{2x}{1+x^2}\\,dx$.",
         "steps": [
-          "Use substitution u=1+x², so du=2x dx.",
-          "When x=0, u=1; when x=1, u=2.",
-          "The result ∫ from 1 to 2 of du/u equals ln 2."
+          "Substitute $u = 1 + x^2$, so $du = 2x\\,dx$.",
+          "When $x = 0$, $u = 1$; when $x = 1$, $u = 2$.",
+          "The integral becomes $\\displaystyle\\int_1^2 \\frac{du}{u} = \\ln 2$."
         ],
-        "answer": "ln(2)",
+        "answer": "$\\ln 2$",
         "verify": {
           "kind": "integral",
           "f": "2*x/(1+x^2)",
@@ -176,11 +176,11 @@ export default {
   "c12-applications-integrals": {
     "examples": [
       {
-        "question": "Find the geometric area between y=x² and y=1 over -2≤x≤2.",
+        "question": "Find the geometric area between $y = x^2$ and $y = 1$ over $-2 \\le x \\le 2$.",
         "steps": [
-          "Intersections are x=±1; the curve order changes there.",
-          "By symmetry, area equals 2(∫0^1(1-x²) dx + ∫1^2(x²-1) dx).",
-          "The bracket equals 2/3+4/3=2, giving total area 4."
+          "The curves meet at $x = \\pm 1$; which curve is on top changes there.",
+          "By symmetry, the area is $2\\left(\\displaystyle\\int_0^1 (1 - x^2)\\,dx + \\int_1^2 (x^2 - 1)\\,dx\\right)$.",
+          "The bracket equals $\\tfrac{2}{3} + \\tfrac{4}{3} = 2$, giving a total area of 4."
         ],
         "answer": "4 square units",
         "verify": {
@@ -194,13 +194,13 @@ export default {
   "c12-differential-equations": {
     "examples": [
       {
-        "question": "Solve dy/dx=2xy with y(0)=3, and find y(1).",
+        "question": "Solve $\\dfrac{dy}{dx} = 2xy$ with $y(0) = 3$, and find $y(1)$.",
         "steps": [
-          "Separate variables on the positive solution: dy/y=2x dx.",
-          "Integrate ln y=x²+C; y(0)=3 gives exp(C)=3.",
-          "Thus y=3 exp(x²), so y(1)=3e."
+          "Separate the variables on the positive solution: $\\dfrac{dy}{y} = 2x\\,dx$.",
+          "Integrate: $\\ln y = x^2 + C$; $y(0) = 3$ gives $e^C = 3$.",
+          "Thus $y = 3e^{x^2}$, so $y(1) = 3e$."
         ],
-        "answer": "y=3exp(x²); y(1)=3e",
+        "answer": "$y = 3e^{x^2}$; $y(1) = 3e$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -220,13 +220,13 @@ export default {
   "c12-vector-algebra": {
     "examples": [
       {
-        "question": "Find the scalar projection of a=(3,4,0) along b=(1,2,2).",
+        "question": "Find the scalar projection of $\\vec a = (3, 4, 0)$ along $\\vec b = (1, 2, 2)$.",
         "steps": [
-          "Calculate a dot b =3×1+4×2+0×2=11.",
-          "The length |b|=sqrt(1+4+4)=3.",
-          "Scalar projection of a on b is 11/3."
+          "$\\vec a \\cdot \\vec b = 3 \\times 1 + 4 \\times 2 + 0 \\times 2 = 11$.",
+          "The length $|\\vec b| = \\sqrt{1 + 4 + 4} = 3$.",
+          "The scalar projection of $\\vec a$ on $\\vec b$ is $\\tfrac{11}{3}$."
         ],
-        "answer": "11/3",
+        "answer": "$\\tfrac{11}{3}$",
         "verify": {
           "kind": "value",
           "expr": "(3*1+4*2+0*2)/sqrt(1^2+2^2+2^2)",
@@ -238,13 +238,13 @@ export default {
   "c12-3d-geometry": {
     "examples": [
       {
-        "question": "Find the distance from P=(3,0,0) to the line through the origin in direction (1,2,2).",
+        "question": "Find the distance from $P(3, 0, 0)$ to the line through the origin with direction $(1, 2, 2)$.",
         "steps": [
-          "Let b=(1,2,2) and P=(3,0,0). The squared distance is |P|²-(P dot b)²/|b|².",
-          "Compute |P|²=9, P dot b=3 and |b|²=9.",
-          "Distance²=9-9/9=8, so distance=2sqrt(2)."
+          "Let $\\vec b = (1, 2, 2)$ and $\\vec p = (3, 0, 0)$. The squared distance is $|\\vec p|^2 - \\dfrac{(\\vec p \\cdot \\vec b)^2}{|\\vec b|^2}$.",
+          "Compute $|\\vec p|^2 = 9$, $\\vec p \\cdot \\vec b = 3$ and $|\\vec b|^2 = 9$.",
+          "The squared distance is $9 - \\tfrac{9}{9} = 8$, so the distance is $2\\sqrt{2}$."
         ],
-        "answer": "2sqrt(2)",
+        "answer": "$2\\sqrt{2}$",
         "verify": {
           "kind": "value",
           "expr": "sqrt(3^2-3^2/(1^2+2^2+2^2))",
@@ -256,13 +256,13 @@ export default {
   "c12-linear-programming": {
     "examples": [
       {
-        "question": "Maximise P=5x+3y subject to x+y≤8, 2x+y≤10, x≥0 and y≥0.",
+        "question": "Maximise $P = 5x + 3y$ subject to $x + y \\le 8$, $2x + y \\le 10$, $x \\ge 0$ and $y \\ge 0$.",
         "steps": [
-          "Feasible vertices are (0,0),(5,0),(2,6) and (0,8).",
-          "Evaluate 5x+3y at the vertices to obtain 0,25,28 and 24.",
-          "Maximum is 28 at intersection (2,6)."
+          "The feasible vertices are $(0, 0)$, $(5, 0)$, $(2, 6)$ and $(0, 8)$.",
+          "Evaluate $5x + 3y$ at the vertices to obtain 0, 25, 28 and 24.",
+          "The maximum is 28, at the intersection $(2, 6)$."
         ],
-        "answer": "28 at (2,6)",
+        "answer": "28 at $(2, 6)$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -286,13 +286,13 @@ export default {
   "c12-probability": {
     "examples": [
       {
-        "question": "One of two boxes is chosen fairly. Box A has 2 red and 1 blue ball; Box B has 1 red and 2 blue balls. Given a red draw, find probability Box A was chosen.",
+        "question": "One of two boxes is chosen at random. Box A has 2 red balls and 1 blue ball; Box B has 1 red and 2 blue. Given that a red ball is drawn, find the probability that Box A was chosen.",
         "steps": [
-          "Both boxes have prior probability 1/2.",
-          "Joint P(A and red)=(1/2)(2/3)=1/3; joint P(B and red)=(1/2)(1/3)=1/6.",
-          "By Bayes' theorem P(A|red)=(1/3)/(1/3+1/6)=2/3."
+          "Both boxes have prior probability $\\tfrac{1}{2}$.",
+          "$P(A \\cap \\text{red}) = \\tfrac{1}{2} \\cdot \\tfrac{2}{3} = \\tfrac{1}{3}$; $P(B \\cap \\text{red}) = \\tfrac{1}{2} \\cdot \\tfrac{1}{3} = \\tfrac{1}{6}$.",
+          "By Bayes' theorem, $P(A \\mid \\text{red}) = \\dfrac{1/3}{1/3 + 1/6} = \\tfrac{2}{3}$."
         ],
-        "answer": "2/3",
+        "answer": "$\\tfrac{2}{3}$",
         "verify": {
           "kind": "value",
           "expr": "(0.5*(2/3))/(0.5*(2/3)+0.5*(1/3))",

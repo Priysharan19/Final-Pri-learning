@@ -205,7 +205,9 @@ rejects({ kind: 'circleExplorer', theorem: 'centre', initial: { a: 20, b: 260 } 
 rejects({ kind: 'circleExplorer', theorem: 'chords', initial: { a: 0, b: 90, c: 200, d: 300 } }, /chords AB and CD cross/, 'circleExplorer: chords that do not cross');
 rejects({ kind: 'circleExplorer', theorem: 'cyclic', initial: { a: 20, b: 10, c: 200, d: 290 } }, /in order/, 'circleExplorer: points out of order');
 rejects({ kind: 'circleExplorer', theorem: 'tangents' }, /theorem must be one of/, 'circleExplorer: an unknown theorem');
-ok(PACK_COUNTERPARTS.triangleExplorer === 'triangle' && PACK_COUNTERPARTS.circleExplorer === 'circleTheorem' && PACK_COUNTERPARTS.parallelLinesExplorer === 'parallelLines', 'every interactive kind names its static counterpart');
+// A counterpart is a static kind name or a function from the explorer's params to the static spec of its starting picture.
+const cp = PACK_COUNTERPARTS;
+ok(cp.parallelLinesExplorer === 'parallelLines' && cp.triangleExplorer({ mode: 'angleSum', initial: { A: 65, B: 48 } }).kind === 'triangle' && cp.circleExplorer({ theorem: 'segment' }).kind === 'circleTheorem' && cp.circleExplorer({ theorem: 'chords' }) === null, 'every interactive kind maps to its static counterpart (chords have none)');
 ok(P.counterpartParams('triangleExplorer', { mode: 'pythagoras', initial: { a: 3, b: 4 } }).C === 90 && P.counterpartParams('circleExplorer', { theorem: 'segment' }).params.r2 === 300, 'counterpartParams maps an explorer to its static figure');
 
 // ── 4. Words ─────────────────────────────────────────────────────────────────

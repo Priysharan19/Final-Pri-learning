@@ -220,7 +220,7 @@ export default {
       { term: 'Pythagorean triplet', meaning: 'Three natural numbers $a, b, c$ with $a^2+b^2=c^2$.' }
     ],
     formulas: [
-      { label: 'Sum of first n odd numbers', tex: '1+3+5+\\dots+(2n-1)=n^2' },
+      { label: 'Sum of first $n$ odd numbers', tex: '1+3+5+\\dots+(2n-1)=n^2' },
       { label: 'Pythagorean triplet', tex: '(2m)^2+(m^2-1)^2=(m^2+1)^2' },
       { label: 'Consecutive squares', tex: '(n+1)^2-n^2=2n+1' },
       { label: 'Root of a fraction', tex: '\\sqrt{\\frac{a}{b}}=\\frac{\\sqrt{a}}{\\sqrt{b}}' }
@@ -228,7 +228,7 @@ export default {
     points: [
       { front: 'Squares of odd and even numbers', back: 'An odd number has an odd square; an even number has an even square.' },
       { front: 'Number of digits in a square root', back: 'If a perfect square has $n$ digits, its root has $\\frac{n}{2}$ digits ($n$ even) or $\\frac{n+1}{2}$ digits ($n$ odd).' },
-      { front: 'Squares ending in 6', back: 'The number must end in $4$ or $6$.' },
+      { front: 'Squares ending in $6$', back: 'The number must end in $4$ or $6$.' },
       { front: 'Square root of a decimal', back: 'Pair digits away from the decimal point on both sides: $\\sqrt{2.25}=1.5$.' },
       { front: 'Smallest multiplier for a square', back: 'Multiply by the product of the primes that have no partner.' },
       { front: 'Quick check with odd numbers', back: 'Keep subtracting $1, 3, 5, \\dots$; if you reach $0$ after $n$ steps, the number is $n^2$.' }
