@@ -44,7 +44,8 @@ function prose(text, where, { min = 1 } = {}) {
   const plain = outsideMath(text);
   ok(!UNICODE_MATH.test(plain), `${where}: maths outside KaTeX in "${plain.trim().slice(0, 80)}"`);
   ok(!MACHINE_TELL.test(plain), `${where}: machine-written maths in "${plain.trim().slice(0, 80)}"`);
-  ok(!FILLER.test(text), `${where}: filler or hype ("${(text.match(FILLER) || [''])[0]}")`);
+  const words = text.replace(/\$\$[\s\S]*?\$\$|\$[^$]*\$/g, ' '); // a factorial inside maths is not an exclamation
+  ok(!FILLER.test(words), `${where}: filler or hype ("${(words.match(FILLER) || [''])[0]}")`);
 }
 
 const close = (a, b, tol = 1e-6) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
@@ -145,6 +146,29 @@ if (!only || only === 'olympiad') {
     });
     layerEntry(id, { objective: n.objective, intuition: n.intuition, check: n.check, diagrams: n.diagrams, interactiveNone: n.interactiveNone, mistakes: n.mistakes }, w, { nsw: false });
   }
+}
+
+// Every teaching diagram in every chapter (written before this layer too): the expression only calls
+// functions the engine really has (log2(x) parses as log10(2)*x and once drew a straight line labelled
+// y = log_2 x), and a point drawn on a function graph lies on one of its curves unless it says `free`.
+if (!only) {
+  const FN_OK = new Set(['sin', 'cos', 'tan', 'sqrt', 'exp', 'ln', 'log', 'abs', 'asin', 'acos', 'atan', 'sec', 'csc', 'cot', 'floor', 'ceil', 'cbrt']);
+  const { loadNotesForGrade, loadOlympiadNotes } = await import('../src/notes/notesIndex.js');
+  const { loadNswNotesForStage } = await import('../src/notes/nsw/nswNotesIndex.js');
+  const books = [];
+  for (const g of IN_CURRICULUM) books.push(await loadNotesForGrade(g.grade));
+  books.push(await loadOlympiadNotes());
+  for (const [st, c] of [[4, null], [5, null], [6, 'standard'], [6, 'advanced'], [6, 'ext1'], [6, 'ext2']]) books.push((await loadNswNotesForStage(st, c)) || {});
+  for (const book of books) for (const [id, ch] of Object.entries(book)) (ch.diagrams || []).forEach((d, i) => {
+    const sp = d.spec || {}; const w = `${id} diagram ${i + 1}`;
+    const exprs = [...(sp.curves || []).map(c => c.expr), sp.expr].filter(e => typeof e === 'string');
+    for (const e of exprs) for (const [, f] of e.matchAll(/([A-Za-z_]\w*)\s*\(/g)) ok(FN_OK.has(f), `${w}: ${f}() is not an engine function (in ${e})`);
+    if (sp.kind === 'function') for (const p of sp.points || []) {
+      if (p.free) continue;
+      const on = (sp.curves || []).some(c => { try { const y = evalNumeric(c.expr, { x: p.x }); return Math.abs(y - p.y) <= 1e-3 * Math.max(1, Math.abs(p.y)); } catch { return false; } });
+      ok(on, `${w}: the point (${p.x}, ${p.y}) is on none of its curves (mark it free: true if that is intended)`);
+    }
+  });
 }
 
 console.log(`notes-e3-check: ${pass} passed, ${failures.length} failed`);

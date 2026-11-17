@@ -700,6 +700,15 @@ export function solidModel({ shape = 'rectPrism', l = 4, w = 3, h = 3, r = 2, wi
     out.marks.push({ kind: 'dash', from: [r3(cx), r3(cy)], to: [r3(cx + r * s), r3(cy)] });
     out.labels.push({ tex: String(r), at: [r3(cx + (r * s) / 2), r3(cy - 13)] });
     out.volume = r3((4 / 3) * Math.PI * r ** 3, 6);
+  } else if (shape === 'hemisphere') {
+    // The curved half above a flat circular base (its near half solid, far half hidden).
+    const ry = r * 0.3; const s = fit(2 * r, r + ry); const cx = width / 2; const by = height - 34 - ry * s;
+    const arc = []; for (let i = 0; i <= 40; i++) { const a = Math.PI + (Math.PI * i) / 40; arc.push([r3(cx + Math.cos(a) * r * s), r3(by + Math.sin(a) * r * s)]); }
+    const base = (from, to) => { const pts = []; for (let i = 0; i <= 30; i++) { const a = from + ((to - from) * i) / 30; pts.push([r3(cx + Math.cos(a) * r * s), r3(by + Math.sin(a) * ry * s)]); } return pts; };
+    out.solid.push(arc, base(0, Math.PI)); out.hidden.push(base(Math.PI, 2 * Math.PI));
+    out.marks.push({ kind: 'dash', from: [r3(cx), r3(by)], to: [r3(cx + r * s), r3(by)] });
+    out.labels.push({ tex: String(r), at: [r3(cx + (r * s) / 2), r3(by + 14)] });
+    out.volume = r3((2 / 3) * Math.PI * r ** 3, 6);
   } else throw new RangeError(`unknown solid ${shape}`);
   return out;
 }

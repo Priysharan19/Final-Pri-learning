@@ -473,7 +473,7 @@ export default {
       {
         question: 'A diver goes down $4$ m every minute. Where is she after $7$ minutes, measured from the surface?',
         steps: ['Each minute is a change of $-4$ m.', '$7 \\times (-4) = -28$.'],
-        answer: '$-28$ m (28 m below the surface)',
+        answer: '$-28$ m ($28$ m below the surface)',
         verify: { kind: 'value', expr: '7*(-4)', answer: '-28' }
       }
     ]
