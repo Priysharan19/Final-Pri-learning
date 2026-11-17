@@ -100,9 +100,9 @@ export default {
           kind: 'plane', xmin: -1, xmax: 5, ymin: -1, ymax: 5, axes: false, grid: true,
           polygons: [
             { points: [[0, 0], [1, 0], [1, 1], [0, 1]], shade: true },
-            { points: [[1, 0], [2, 0], [2, 2], [0, 2], [0, 1], [1, 1]] },
+            { points: [[1, 0], [2, 0], [2, 2], [0, 2], [0, 1], [1, 1]], shade: false },
             { points: [[2, 0], [3, 0], [3, 3], [0, 3], [0, 2], [2, 2]], shade: true },
-            { points: [[3, 0], [4, 0], [4, 4], [0, 4], [0, 3], [3, 3]] }
+            { points: [[3, 0], [4, 0], [4, 4], [0, 4], [0, 3], [3, 3]], shade: false }
           ],
           points: [
             { x: 0.5, y: 0.5, label: '1' },
@@ -159,8 +159,8 @@ export default {
     diagrams: [
       {
         title: 'Every cup ends at room temperature',
-        spec: { kind: 'slopeFieldExplorer', dydx: '-(ln(2)/5)*(y-20)', xmin: 0, xmax: 30, ymin: 0, ymax: 100, through: [[0, 90]] },
-        note: 'Each dash has gradient $-k(T-20)$ with $k=\\tfrac{\\ln2}{5}$: steep far above $20$, flat at $20$. Start the tea at $90^\\circ\\text{C}$ and the curve passes $55^\\circ\\text{C}$ at $t=5$ and $37.5^\\circ\\text{C}$ at $t=10$. Move the starting point, even below room temperature, and every curve still approaches $T=20$.'
+        spec: { kind: 'slopeFieldExplorer', dydx: '(20-y)*ln(2)/5', xmin: 0, xmax: 30, ymin: 0, ymax: 100, through: [[0, 90]] },
+        note: 'Each dash has gradient $k(20-T)$ with $k=\\tfrac{\\ln2}{5}$: steep far above $20$, flat at $20$. Start the tea at $90^\\circ\\text{C}$ and the curve passes $55^\\circ\\text{C}$ at $t=5$ and $37.5^\\circ\\text{C}$ at $t=10$. Move the starting point, even below room temperature, and every curve still approaches $T=20$.'
       }
     ]
   },
