@@ -267,7 +267,11 @@ export async function handIn(db, { classId, assignmentId, studentId, examId, now
       if (mode === 'ink' || mode === 'typed') modeByAttempt.set(row.id, mode);
       const o = payload?.original;
       if (plain(o) && typeof o.id === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(o.id) && typeof o.sha256 === 'string' && /^[0-9a-f]{64}$/i.test(o.sha256)) {
-        originalByAttempt.set(row.id, { id: o.id, sha256: o.sha256.toLowerCase(), kind: ['ink', 'photo'].includes(o.kind) ? o.kind : null });
+        // #1018's contract: kind 'strokes' | 'image', origin 'ink' | 'photo' | 'pdf-page';
+        // sha256 over the canonical bytes. Anything else is not a reference.
+        if (['strokes', 'image'].includes(o.kind) && (o.origin === undefined || ['ink', 'photo', 'pdf-page'].includes(o.origin))) {
+          originalByAttempt.set(row.id, { id: o.id, sha256: o.sha256.toLowerCase(), kind: o.kind, origin: o.origin ?? null });
+        }
       }
     }
   }

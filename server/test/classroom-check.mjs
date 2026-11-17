@@ -158,7 +158,7 @@ const inkKey = p1.result.detail.find(d => !d.parts && !d.correct && d.working)?.
 }
 
 // The original-ink lane stores the original and names it on the graded-attempt event.
-const ORIGINAL = { id: 'orig_abc123', sha256: 'ef'.repeat(32), kind: 'ink' };
+const ORIGINAL = { id: 'orig_abc123', sha256: 'ef'.repeat(32), kind: 'strokes', origin: 'ink' };
 const origLine = p1.result.detail.filter(d => !d.parts && !d.correct && d.working)[0];
 {
   const ev = await db.get('SELECT payload_json FROM learning_events WHERE account_id=? AND id=?', [S1.id, origLine.attemptId]);
