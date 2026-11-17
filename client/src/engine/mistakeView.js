@@ -116,18 +116,28 @@ function singleVariable(ast) {
   return names.length === 1 ? names[0] : null;
 }
 
-/**
- * Does `fn` take one value everywhere it is defined (to `value`, when given)?
- * A line that is the same number for every x — an identity, or a line with
- * the variable cancelled out — has no graph worth comparing.
- */
-function isConstant(fn, value = null) {
+/** Values of `fn` across the window the picture can use, where it is defined. */
+function samplesOf(fn) {
   const seen = [];
   for (let i = 0; i <= 40; i++) {
     const v = fn(-9.73 + i * 0.4871);
     if (finite(v)) seen.push(v);
   }
-  if (seen.length < 3) return true;
+  return seen;
+}
+
+/** Too little of the line is defined near the origin to draw or to judge. */
+function sparse(fn) { return samplesOf(fn).length < 8; }
+
+/**
+ * Does `fn` take one value everywhere it is defined (to `value`, when given)?
+ * A line that is the same number for every x — an identity, or a line with
+ * the variable cancelled out — has no graph worth comparing. A line defined
+ * at too few points is NOT called constant: sparse() refuses it first.
+ */
+function isConstant(fn, value = null) {
+  const seen = samplesOf(fn);
+  if (seen.length < 3) return false;
   const ref = value === null ? seen[0] : value;
   return seen.every(v => Math.abs(v - ref) <= 1e-9 * Math.max(1, Math.abs(ref), Math.abs(v)));
 }
@@ -272,7 +282,9 @@ export function mistakeView({ prevText = null, brokenText = null, meta = null } 
     let rhs = false;
     if (A.t === 'equation') {
       const name = singleVariable(minus(A));
-      if (name && isConstant(asFunction(minus(A), name), 0)) {
+      const gap = name ? asFunction(minus(A), name) : null;
+      if (gap && sparse(gap)) return null;
+      if (gap && isConstant(gap, 0)) {
         A = A.r;
         if (B.t === 'equation') B = B.r;
         rhs = true;
@@ -292,7 +304,7 @@ export function mistakeView({ prevText = null, brokenText = null, meta = null } 
     if (!variablesOf(dA).has(variable) || !variablesOf(dB).has(variable)) return null;
     const before = asFunction(dA, variable);
     const yours = asFunction(dB, variable);
-    if (isConstant(before) || isConstant(yours)) return null;
+    if (sparse(before) || sparse(yours) || isConstant(before) || isConstant(yours)) return null;
 
     let x0 = null;
     let reason = null;
@@ -349,6 +361,17 @@ export function mistakeView({ prevText = null, brokenText = null, meta = null } 
   }
 }
 
+/**
+ * A value as the readout shows it: the rounded number, ≈ 0 for one too small
+ * to write plainly, — where the line is undefined. Never the text "null".
+ */
+export function displayValue(v) {
+  if (!finite(v)) return '—';
+  const s = formatValue(v);
+  if (s !== null) return s;
+  return Math.abs(v) < 1e-4 ? '≈ 0' : '—';
+}
+
 /** The live sentence for the marker at x: both values, or that a line is undefined there. */
 export function liveValues(view, x) {
   if (!view) return null;
@@ -358,9 +381,9 @@ export function liveValues(view, x) {
     key: view.kind === 'equation' ? 'mistake.graph.liveEquation' : 'mistake.graph.live',
     vars: {
       variable: view.symbol,
-      x: formatValue(x),
-      before: finite(b) ? formatValue(b) : '—',
-      yours: finite(y) ? formatValue(y) : '—'
+      x: displayValue(x),
+      before: displayValue(b),
+      yours: displayValue(y)
     }
   };
 }

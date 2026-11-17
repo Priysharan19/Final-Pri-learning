@@ -122,7 +122,11 @@ const NULLS = [
   ['a rounded root is never called a solution (x^2 = 2 → x = 1.414)', 'x^2=2', 'x=1.414'],
   ['a counterexample too small to write plainly', 'x', 'x+0.00001'],
   ['a square root only at its domain edge', 'sqrt(x-3)=0', 'x=3'],
-  ['a pole is not a solution', 'x/(x-1)=1/(x-1)', 'x=1']
+  ['a pole is not a solution', 'x/(x-1)=1/(x-1)', 'x=1'],
+  // Second review, head 6bd0dc3: a line undefined near the origin was taken for an identity.
+  ['the line before is undefined near the origin (sqrt)', 'sqrt(x-10)=x-12', 'x-10 = x^2+144'],
+  ['the line before is undefined near the origin (log)', 'log(x-15)=x-20', 'x-15=x^2'],
+  ['the line before is undefined near the origin (sqrt of −x)', 'sqrt(-x-12)=x+20', '-x-12=x^2+40x+400']
 ];
 for (const [label, before, yours] of NULLS) {
   ok(mistakeView({ prevText: before, brokenText: yours }) === null, `null: ${label}`);
@@ -188,6 +192,11 @@ ok(isContinuousAt(x => x ** 6, 2) && isContinuousAt(x => 3 * x - 2, 0), 'smooth 
 ok(formatValue(-6) === '−6' && formatValue(0) === '0' && formatValue(5 / 6) === '0.833' && formatValue(0.4) === '0.4', 'values are rounded and signed the way a student writes them');
 ok(formatValue(2.9999999999) === '3' && formatValue(NaN) === null, 'float noise is not shown, an undefined value is not a number');
 ok(liveValues(mistakeView({ prevText: '1/x + x', brokenText: '1/x' }), 0).vars.before === '—', 'the readout says — where a line is undefined');
+{
+  const v = mistakeView({ prevText: 'x^4+x', brokenText: 'x^4' });
+  const at = liveValues(v, 0.05).vars;
+  ok(at.yours === '≈ 0' && !Object.values(at).includes(null) && !Object.values(at).includes('null'), 'a value too small to write plainly reads ≈ 0, never "null"');
+}
 
 // ── 4 · Strings ──────────────────────────────────────────────────────────────
 const en = (await import('../src/i18n/strings.en.js')).default;

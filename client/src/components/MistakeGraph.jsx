@@ -21,7 +21,7 @@
 // charts and plots (docs/brand/editions-decision.md).
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useCallback, useId, useMemo, useRef, useState } from 'react';
-import { mistakeView, liveValues, formatValue } from '../engine/mistakeView.js';
+import { mistakeView, liveValues, formatValue, displayValue } from '../engine/mistakeView.js';
 import { curvePaths, projector, ticksFor, tickStep } from '../engine/plot.js';
 import { useT } from '../i18n/index.js';
 import './MistakeGraph.css';
@@ -116,7 +116,7 @@ export function MistakeGraphView({ view }) {
       <div className="mg-plot" ref={plotRef} role="slider" tabIndex={0}
         aria-label={t('mistake.graph.marker', { variable: view.symbol })}
         aria-valuemin={win.xMin} aria-valuemax={win.xMax} aria-valuenow={Number(x.toFixed(6))}
-        aria-valuetext={t('mistake.graph.at', { variable: view.symbol, x: formatValue(x) ?? '' })} aria-describedby={`${clip}-how`}
+        aria-valuetext={t('mistake.graph.at', { variable: view.symbol, x: displayValue(x) })} aria-describedby={`${clip}-how`}
         data-mistake-marker={formatValue(x)}
         onKeyDown={onKeyDown}
         onPointerDown={e => { dragging.current = true; e.currentTarget.setPointerCapture?.(e.pointerId); fromPointer(e); }}
@@ -153,16 +153,16 @@ export function MistakeGraphView({ view }) {
         </svg>
       </div>
       <div className="mg-read" data-mistake-readout>
-        <div className="mg-read-at">{t('mistake.graph.at', { variable: view.symbol, x: formatValue(x) })}</div>
+        <div className="mg-read-at">{t('mistake.graph.at', { variable: view.symbol, x: displayValue(x) })}</div>
         <div className="mg-read-row" data-row="yours">
           <Swatch which="yours" /><span className="mg-read-name">{t('mistake.graph.yours')}</span>
           <span className="mg-read-line">{view.yours.text}</span>
-          <b className="mg-read-v">{Number.isFinite(y) ? formatValue(y) : '—'}</b>
+          <b className="mg-read-v">{displayValue(y)}</b>
         </div>
         <div className="mg-read-row" data-row="before">
           <Swatch which="before" /><span className="mg-read-name">{t('mistake.graph.before')}</span>
           <span className="mg-read-line">{view.before.text}</span>
-          <b className="mg-read-v">{Number.isFinite(b) ? formatValue(b) : '—'}</b>
+          <b className="mg-read-v">{displayValue(b)}</b>
         </div>
       </div>
       <p className="mg-live" aria-live="polite" data-mistake-live>{liveText}</p>
