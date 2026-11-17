@@ -274,6 +274,32 @@ breaksAt('lone branches with the wrong value', eqMeta([0, 2]), ['2^x=4', 'x=0', 
   ok(`both branches written before their values: no false credit, got ${JSON.stringify(s3)}`, s3.includes('break') || s3.every(v => v === 'ok'));
 }
 
+// Review of head 30bd32a95: the branch a line is worked from stays in force
+// through any line in between, and branches written first are matched to the
+// values that follow them.
+function firstBreakAt(label, meta, lines, at) {
+  const rep = report(meta, lines);
+  ok(`${label}: first break at line ${at + 1}, got ${JSON.stringify(rep.lines.map(l => l.status))}`, rep.firstBreak === at && !rep.lines.slice(0, at).some(l => l.status === 'break'));
+}
+for (const sep of ['x*ln(3)=ln(9)', 'x=log(9)/log(3)', 'x=2', '9 = 3^2', 'so', 'therefore']) {
+  firstBreakAt(`x = 1 after 3^x = 9 with "${sep}" between`, eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', sep, 'x=1', '3^x=3', 'x=1'], 3);
+}
+firstBreakAt('a log branch, x = 10^0, then the wrong value', eqMeta([1, 100]), ['log(x)(log(x)-2)=0', 'log(x)=0', 'x=10^0', 'x=100', 'log(x)=2', 'x=100'], 3);
+breaksAt('a lone branch, the log ratio, then the wrong value', eqMeta([0, 2]), ['2^x=4', 'x=log(4)/log(2)', 'x=0', '2^x=1', 'x=0'], 2);
+breaksAt('both branches first, one value twice', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x=1', 'x=1'], 4);
+breaksAt('both branches first, worked towards one, the other value given', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x*ln(3)=ln(9)', 'x=1'], 4);
+allOk('both branches first, values in either order', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x=1', 'x=2']);
+allOk('both branches first, worked in turn', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x*ln(3)=ln(3)', 'x=1', 'x*ln(3)=ln(9)', 'x=2']);
+allOk('each branch worked through a separator', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', 'x*ln(3)=ln(9)', 'x=2', '3^x=3', 'x*ln(3)=ln(3)', 'x=1']);
+{
+  const s = statuses(eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', 'so', 'x=1', '3^x=3', 'x=1'], { prompt: 'Solve $(3^x - 9)(3^x - 3) = 0$.' });
+  ok(`the same with a prompt, got ${JSON.stringify(s)}`, s.indexOf('break') === 3);
+  const rep = report(eqMeta([0, 2]), ['(2^x-1)(2^x-4)=0', '2^x=1', 'x=0', '2^x=4']);
+  ok(`a branch never solved, values stated: no break, ${JSON.stringify(rep.lines.map(l => l.status))}`, rep.firstBreak === -1);
+  const rep2 = report(eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x=1']);
+  ok(`one branch's value never stated: the last value says the other is still to find`, /still to find/.test(rep2.lines[3].note || ''));
+}
+
 // Abstain: lines outside the proved families are notes, never credit, never a break.
 {
   const s = statuses(eqMeta([2]), ['x*2^x=8', '2^x=8/x']);
