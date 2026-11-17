@@ -258,6 +258,8 @@ function fmtWait(ms, t) {
  */
 function LanguagePicker() {
   const { chosen, t } = useLanguage();
+  // Prithagoras offers English only: no language switch is drawn there.
+  if (EDITION_ID === 'prithagoras') return null;
   const pick = (id) => { rememberSignInLanguage(id); setLanguage(id); };
   // V1 decision D11: the switch stays, and the app says plainly that
   // questions and worked solutions remain in English — here, on the first
@@ -593,15 +595,15 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                 </div>
               )}
               {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
-              <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
-              <p className="muted" style={{ marginTop: 10, textAlign: 'center', fontSize: 13 }}>{t('login.heroSub')}</p>
+              <p className="muted login-note" style={{ marginTop: 22, textAlign: 'center', fontSize: 13 }}>{t('login.heroNote')}</p>
               {appleEntry}
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for
                   these, and each is required of us before the app can be sold. */}
               <p className="muted login-legal" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
-                <PageLink to="/privacy">{t('login.privacy')}</PageLink> · <PageLink to="/terms">{t('login.terms')}</PageLink> ·{' '}
-                <PageLink to="/refund-policy">{t('login.refunds')}</PageLink> · <PageLink to="/grievance">{t('login.grievances')}</PageLink>
+                <PageLink to="/privacy">{t('login.privacy')}</PageLink> · <PageLink to="/terms">{t('login.terms')}</PageLink>
+                {/* Refunds and the grievance officer are India's requirements; the Australian set is Privacy and Terms. */}
+                {EDITION_ID !== 'prithagoras' && <> · <PageLink to="/refund-policy">{t('login.refunds')}</PageLink> · <PageLink to="/grievance">{t('login.grievances')}</PageLink></>}
               </p>
             </>
           )}

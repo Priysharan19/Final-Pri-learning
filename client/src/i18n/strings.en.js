@@ -2958,7 +2958,7 @@ export default {
 
   // ── The one sign-in card and the activation gate (account first) ──
   'login.welcomeTitle': "Welcome to {brand}",
-  'login.welcomeSub': "Your mathematics journey starts here.",
+  'login.welcomeSub': "Practise CBSE and JEE maths. Your working is checked line by line.",
   'login.instrumentHeadline': 'Write it by hand. Watch it get marked.',
   'login.existingDeviceProfile': "Continue with a profile saved on this device",
   'login.createAnotherAccount': "Create another Pri account",
@@ -3655,4 +3655,5 @@ export default {
   'inst.mapBuildsOn': 'Builds on: {names}',
   'inst.mapLayerFirst': 'Step 1 of {total} · foundations in this year',
   'inst.mapLayerN': 'Step {n} of {total} · builds on the steps before',
+  'login.heroNote': 'Answers are checked by Pri’s server, so checking needs an account and a connection. No ads.',
 };

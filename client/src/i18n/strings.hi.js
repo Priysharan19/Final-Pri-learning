@@ -3018,7 +3018,7 @@ export default {
 
   // ── एक साइन-इन कार्ड और सक्रियण द्वार (खाता पहले) ──
   'login.welcomeTitle': "{brand} में आपका स्वागत है",
-  'login.welcomeSub': "आपकी गणित की यात्रा यहीं से शुरू होती है।",
+  'login.welcomeSub': "CBSE और JEE गणित का अभ्यास कीजिए। आपके हर चरण की जाँच पंक्ति-दर-पंक्ति होती है।",
   'login.instrumentHeadline': 'हाथ से लिखिए। उसे जँचते हुए देखिए।',
   'login.existingDeviceProfile': "इस डिवाइस पर सहेजी गई प्रोफ़ाइल से जारी रखें",
   'login.createAnotherAccount': "एक और Pri खाता बनाएँ",
@@ -3710,4 +3710,5 @@ export default {
   'inst.mapBuildsOn': 'इन पर आधारित: {names}',
   'inst.mapLayerFirst': 'चरण 1 / {total} · इस वर्ष की नींव',
   'inst.mapLayerN': 'चरण {n} / {total} · पिछले चरणों पर आधारित',
+  'login.heroNote': 'उत्तर Pri का सर्वर जाँचता है, इसलिए जाँच के लिए खाता और कनेक्शन चाहिए। कोई विज्ञापन नहीं।',
 };
