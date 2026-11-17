@@ -95,7 +95,7 @@ ok((app.match(/\{LEGAL_ROUTES_EXTRA\}/g) || []).length === 3, 'all three route t
 ok(/UNREVIEWED_BODY = EDITION === 'prithagoras' \? 'legal\.unreviewedBodyAu' : 'legal\.unreviewedBody'/.test(legalPage), 'the banner names Australian law for Prithagoras');
 const en = read('client/src/i18n/strings.en.js'), hi = read('client/src/i18n/strings.hi.js');
 ok(/'legal\.unreviewedBodyAu': '[^']*Australian law/.test(en) && /'legal\.unreviewedBodyAu'/.test(hi) && /'login\.contact'/.test(en) && /'login\.contact'/.test(hi), 'the Australian banner and the Contact link are translated');
-ok(/EDITION === 'prithagoras' \? <PageLink to="\/contact">/.test(read('client/src/pages/Login.jsx')), 'the sign-in footer links Contact for Prithagoras and Grievances for Priyabhata');
+ok(/<LegalContactLink \/>/.test(read('client/src/pages/Login.jsx')) && /EDITION === 'prithagoras'\s*\?\s*<PageLink to="\/contact">[\s\S]*<PageLink to="\/grievance">/.test(read('client/src/components/LegalContactLink.jsx')), 'the sign-in footer links Contact for Prithagoras and Grievances for Priyabhata');
 
 // Real builds: handed over (--dist-au / --dist-in), or built here (--build: both editions
 // into temporary folders, the way brand-build-check --both builds the other one).

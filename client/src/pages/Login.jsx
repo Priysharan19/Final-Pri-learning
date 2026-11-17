@@ -11,12 +11,13 @@
 import React, { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
+import LegalContactLink from '../components/LegalContactLink.jsx';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 import { EditionByline } from '../components/BrandMark.jsx';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
 import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
-import { defaultCourse, offersCourse, EDITION } from '../platform/edition.js';
+import { defaultCourse, offersCourse } from '../platform/edition.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
@@ -600,7 +601,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                   these, and each is required of us before the app can be sold. */}
               <p className="muted login-legal" style={{ marginTop: 22, textAlign: 'center', fontSize: 12.5 }}>
                 <PageLink to="/privacy">{t('login.privacy')}</PageLink> · <PageLink to="/terms">{t('login.terms')}</PageLink> ·{' '}
-                <PageLink to="/refund-policy">{t('login.refunds')}</PageLink> · {EDITION === 'prithagoras' ? <PageLink to="/contact">{t('login.contact')}</PageLink> : <PageLink to="/grievance">{t('login.grievances')}</PageLink>}
+                <PageLink to="/refund-policy">{t('login.refunds')}</PageLink> · <LegalContactLink />
               </p>
             </>
           )}
