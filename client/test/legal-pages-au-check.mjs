@@ -35,7 +35,7 @@
 // SYNTHETIC / STATIC: reads files and runs the plugin's own functions. It is not
 // legal advice and not a lawyer's review.
 // ─────────────────────────────────────────────────────────────────────────────
-import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -115,7 +115,7 @@ if (process.argv.includes('--build')) {
 const arg = flag => { const i = process.argv.indexOf(flag); return i > 0 ? process.argv[i + 1] : null; };
 function textOf(dir) {
   let out = '';
-  const walk = d => { for (const n of readdirSync(d)) { const p = join(d, n); if (statSync(p).isDirectory()) walk(p); else if (/\.(js|css|html|json|md|webmanifest|txt)$/.test(n)) out += `\n${readFileSync(p, 'utf8')}`; } };
+  const walk = d => { for (const e of readdirSync(d, { withFileTypes: true })) { const p = join(d, e.name); if (e.isDirectory()) walk(p); else if (e.isFile() && /\.(js|css|html|json|md|webmanifest|txt)$/.test(e.name)) out += `\n${readFileSync(p, 'utf8')}`; } };
   walk(dir);
   return out;
 }
@@ -183,7 +183,7 @@ const stripeCode = read('server/platform/stripe.js');
 ok(/cancel_at_period_end: true/.test(stripeCode) && /at the cycle end by the student's choice/.test(stripeCode), 'cancelling asks Stripe to stop at the period end, so Premium stays until then (stripe.js)');
 ok(/immediately for account erasure/.test(stripeCode), 'deleting the account cancels a subscription at once (stripe.js)');
 ok(/FULL refund of the CURRENT period/.test(stripeCode), 'a full refund of the current period ends Premium at once (stripe.js)');
-ok(/checkout\.stripe\.com/.test(stripeCode) && /customer_email: account\.email/.test(stripeCode), 'payment is taken on Stripe\'s hosted page and the account email is the only identifier sent (stripe.js)');
+ok(/^const CHECKOUT_HOST = 'checkout\.stripe\.com';$/m.test(stripeCode) && /customer_email: account\.email/.test(stripeCode), 'payment is taken on Stripe\'s hosted page and the account email is the only identifier sent (stripe.js)');
 ok(!/card_number|cardNumber|pan\b/i.test(stripeCode), 'no card number is handled in the Stripe code');
 ok(/stays on\s+until the end of the period/.test(terms) && /A\$9\.99 a month or A\$99 a year/.test(terms) && /Stripe, our payment processor/.test(terms), 'the terms state the price, the processor and the cancellation rule');
 ok(/never receive or store a card number/.test(privacy) && /\*\*Stripe\*\* is our payment processor/.test(privacy) && /Three things are kept after deletion/.test(privacy), 'the privacy notice names Stripe, says no card number is held, and lists the payment record kept after deletion');

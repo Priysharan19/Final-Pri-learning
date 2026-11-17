@@ -44,6 +44,9 @@ const leaks = (value, path = '') => {
 // and no value equal to it (as a number, or as a string that is the seed or
 // names it). A substring test on the whole reply was not precise: a Postgres
 // id or timestamp can contain the same digits by chance.
+// Markup removed until none is left (a single pass can leave a tag behind,
+// e.g. "<<b>i>"), then any stray angle bracket.
+const stripTags = s => { let prev; do { prev = s; s = s.replace(/<[^<>]*>/g, ''); } while (s !== prev); return s.replace(/[<>]/g, ''); };
 const carriesSeed = (value, seed) => {
   if (typeof value === 'number') return value === seed;
   if (typeof value === 'string') return value === String(seed) || new RegExp(`seed\\W*${seed}(?!\\d)`, 'i').test(value);
@@ -169,7 +172,7 @@ try {
   // was submitted, draws other questions.
   const again = await h.request('/v1/exams/generator/pdf', { method: 'POST', jar: a.jar, body: { generated: request } });
   const againText = Buffer.from(again.data.pdfBase64, 'base64').toString('latin1');
-  const seenPrompts = pa.questions.map(q => String(q.payload.prompt).replace(/<[^>]*>/g, '').slice(0, 40));
+  const seenPrompts = pa.questions.map(q => stripTags(String(q.payload.prompt)).slice(0, 40));
   c.ok(again.status === 200 && seenPrompts.filter(p => p.length > 12 && againText.includes(p.replace(/[()\\]/g, '\\$&'))).length === 0, 'questions the account has just sat are not drawn again');
   const fresh = await check(a.jar, request);
   c.deq([fresh.status, fresh.data.repeats], [200, 0], 'and none of the fresh paper is a repeat');
