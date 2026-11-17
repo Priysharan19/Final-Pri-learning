@@ -68,7 +68,7 @@ export default {
       },
       {
         title: 'The angles of a triangle always add to $180^\\circ$',
-        spec: { kind: 'triangleExplorer', mode: 'angleSum', initial: { a: 7, b: 6, C: 60 } },
+        spec: { kind: 'triangleExplorer', mode: 'angleSum', initial: { A: 60, B: 70 } },
         note: 'Reshape the triangle and read the three angles: they change, but their total stays $180^\\circ$. Two such triangles make a quadrilateral, which is why its angles total $360^\\circ$.'
       },
       {
@@ -259,7 +259,7 @@ export default {
       },
       {
         title: 'Inverse proportion $y=\\tfrac{k}{x}$',
-        spec: { kind: 'paramGraph', expr: 'k/x', params: [{ name: 'k', min: 12, max: 96, step: 12, initial: 48 }], xmin: 0, xmax: 16, ymin: 0, ymax: 30 },
+        spec: { kind: 'paramGraph', expr: 'k/x', params: [{ name: 'k', min: 12, max: 96, step: 12, initial: 48 }], xmin: -2, xmax: 16, ymin: -2, ymax: 30 },
         note: 'With $k=48$ the curve passes through $(6,8)$ and $(12,4)$: twice the workers, half the days. The product $xy$ stays $48$ all along the curve, and the curve never reaches either axis.'
       }
     ]

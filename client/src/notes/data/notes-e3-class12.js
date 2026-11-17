@@ -75,9 +75,9 @@ export default {
     ],
     diagrams: [
       {
-        title: 'Where $A=\\begin{pmatrix}2&1\\\\5&3\\end{pmatrix}$ sends the unit square',
-        spec: { kind: 'matrixTransform', m: [[2, 1], [5, 3]] },
-        note: '$A$ sends $(1,0)$ to $(2,5)$ and $(0,1)$ to $(1,3)$, its two columns. The unit square becomes a parallelogram of area $|2\\cdot3-1\\cdot5|=1$, so nothing is flattened and $A$ can be undone by $A^{-1}=\\begin{pmatrix}3&-1\\\\-5&2\\end{pmatrix}$. Change an entry and watch the image square change with it.'
+        title: 'Where $A=\\begin{pmatrix}2&1\\\\3&2\\end{pmatrix}$ sends the unit square',
+        spec: { kind: 'matrixTransform', m: [[2, 1], [3, 2]] },
+        note: '$A$ sends $(1,0)$ to $(2,3)$ and $(0,1)$ to $(1,2)$, its two columns. The unit square becomes a parallelogram of area $|2\\cdot2-1\\cdot3|=1$, so nothing is flattened and $A$ can be undone by $A^{-1}=\\begin{pmatrix}2&-1\\\\-3&2\\end{pmatrix}$. Change an entry and watch the image square change with it.'
       },
       {
         title: 'Reflect in the $x$-axis, then rotate: $PQ$',
@@ -104,7 +104,7 @@ export default {
       {
         title: 'The determinant as an area',
         spec: { kind: 'matrixTransform', m: [[3, 1], [1, 2]] },
-        note: 'The columns $(3,1)$ and $(1,2)$ are the sides of the image of the unit square, with area $3\\cdot2-1\\cdot1=5$. Change the entries to $\\begin{pmatrix}2&4\\\\1&2\\end{pmatrix}$: the columns $(2,1)$ and $(4,2)$ point the same way, the parallelogram flattens to a segment, the determinant is $0$ and no inverse exists.'
+        note: 'The columns $(3,1)$ and $(1,2)$ are the sides of the image of the unit square, with area $3\\cdot2-1\\cdot1=5$. Change the entries to $\\begin{pmatrix}2&2\\\\1&1\\end{pmatrix}$: the columns $(2,1)$ and $(2,1)$ point the same way, the parallelogram flattens to a segment, the determinant is $0$ and no inverse exists.'
       },
       {
         title: 'A triangle from its vertices',
