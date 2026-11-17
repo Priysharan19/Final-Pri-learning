@@ -310,7 +310,7 @@ async function rupeeProbe(h, s, page) {
   const opened = await openPractice(h, page, RUPEE_TOPIC);
   let found = null;
   const seenPrompts = [];
-  for (let i = 0; opened && i < 5 && !found; i++) {
+  for (let i = 0; opened && i < 5; i++) {
     const box = await typedBox(page);
     const prompt = await seen(page, '.q-prompt');
     seenPrompts.push(prompt.slice(0, 60));

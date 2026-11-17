@@ -37,7 +37,6 @@ const env = {
   PRI_AI_DAILY_FREE: '5', PRI_AI_DAILY_PREMIUM: '12'
 };
 const EXPECTED_CHECKS = 52; // every check is unconditional
-const PNG = pngDataUrl('a'.repeat(600));
 
 // ── configuration (owner default D20: 5 free / 25 Premium a day, per kind) ──
 const D20 = { free: 5, premium: 25 };

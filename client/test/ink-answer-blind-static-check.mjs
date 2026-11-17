@@ -81,7 +81,12 @@ export const INK_ANSWER_PROPS = Object.freeze([
   // after a line is finished — the same picture-only, answer-blind request,
   // never before the student accepted the reader. It carries nothing about the
   // question or its answer and never reaches the reader request.
-  'liveRead'
+  'liveRead',
+  // Reviewed 2026-11-17 (UI9b, native haptics): a boolean literal, `feedback`
+  // on the practice card and absent in the exam room. It only lets the "That's
+  // it" accept button ask the shell for a selection tick; it carries nothing
+  // about the question or its answer and never reaches the reader request.
+  'feedback'
 ]);
 /** Identifiers that must never appear inside a recognition-context expression. */
 export const FORBIDDEN_IDENTIFIERS = Object.freeze([

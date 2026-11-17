@@ -60,6 +60,7 @@ import { asksForInequality } from '../ink/relationSwap.js';
 import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../tutor/diagnoseGate.js';
 import { INSTRUMENT_UI } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
+import { haptic } from '../platform/native/haptics.js';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
@@ -1279,6 +1280,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   };
 
   const flipMode = (m) => {
+    if (m !== mode) haptic('selection');
     setMode(m);
     // Explicitly changing to typing abandons the Photo provenance. A later
     // typed submission receives a fresh idempotency key, never the pending
@@ -1491,7 +1493,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           setJudged(submitted); setJudgedStale(false);
           setState({ phase: 'resolved', res: earlierAnswer === null ? r : { ...r, earlierAnswer } });
           if (!diagnostic) {
-            if (!r.replayed) celebrate(r);
+            if (!r.replayed) { celebrate(r); haptic('confirm'); }
             refreshUser(); refreshDue(); refreshRecent?.();
           }
           setSaveState(null);
@@ -2737,7 +2739,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
-                <InkAnswer liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                <InkAnswer feedback liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
                   focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}

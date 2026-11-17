@@ -229,6 +229,18 @@ const share = Object.freeze({
   },
 });
 
+// Touch feedback (haptics v1). Two kinds, nothing else; the system's own
+// haptics setting governs whether it is felt. Best effort: a refusal or an
+// absent capability is silent, and the web build has none (no vibration API).
+const HAPTIC_KINDS = new Set(['confirm', 'selection']);
+const haptics = Object.freeze({
+  available: () => { const c = capOf('haptics'); return !!c && c.transport === 'bridge'; },
+  fire(kind) {
+    if (!HAPTIC_KINDS.has(kind) || !haptics.available()) return Promise.resolve(false);
+    return viaBridge('haptics', 'fire', { kind }, { timeoutMs: 2_000, cancellable: false }).then(() => true, () => false);
+  },
+});
+
 /** Files are imported with the platform picker behind <input type=file> on
  * every host (WKWebView natively, Android via onShowFileChooser). This is the
  * one validated way to ask for a file. */
@@ -387,7 +399,7 @@ export const priNative = Object.freeze({
   has: cap => !!capOf(cap),
   version: cap => capOf(cap)?.version || 0,
   releaseIdentity: () => hostReleaseIdentity(scopeOf()),
-  ink, photo, billing, cloud, share, files, lifecycle, storage, device, identity, notifications, otp,
+  ink, photo, billing, cloud, share, files, lifecycle, storage, device, identity, notifications, otp, haptics,
   /** Bridge counters for diagnostics (no user data). */
   stats: () => (runtime ? runtime.bridge.stats() : null),
   /** Cancel everything in flight (tests, explicit teardown). */
