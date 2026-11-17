@@ -34,15 +34,16 @@ const statuses = r => r.lines.map(l => l.status);
 // ── 1 · The statuses are the engine's ────────────────────────────────────────
 ok(runDemo() === null && runDemo({ glyph: null }) === null, 'nothing is checked before the reading is confirmed');
 const base = runDemo({ glyph: UNSURE.read });
-ok(JSON.stringify(statuses(base)) === JSON.stringify([STATUS.UNVERIFIED, STATUS.CHECKED, STATUS.CHECKED, STATUS.ERROR, STATUS.FOLLOWS]),
-  `the script as written: line 1 not verified (tan x is outside the derivative vocabulary), 2–3 checked, 4 first error, 5 follows — got ${statuses(base)}`);
+ok(JSON.stringify(statuses(base)) === JSON.stringify([STATUS.GIVEN, STATUS.CHECKED, STATUS.CHECKED, STATUS.ERROR, STATUS.FOLLOWS]),
+  `the script as written: line 1 is the given substitution (context, no verdict), 2–3 checked, 4 first error, 5 follows — got ${statuses(base)}`);
+ok(base.lines[0].engine.length === 0 && DEMO_LINES[0].given === true && !DEMO_LINES[0].claims, 'the given line makes no claim and is never put to the engine');
+ok(base.lines.slice(1, 4).every(l => l.engine.length > 0), 'every marked line rests on Step Check rows');
 ok(base.firstError === 4, 'the first error is line 4');
-ok(base.lines.filter(l => l.n !== 5).every(l => l.engine.length > 0), 'every line with a claim rests on at least one Step Check row');
 ok(base.lines[4].engine.length === 0 && DEMO_LINES[4].claims('u').length === 0, 'line 5 (a definite integral) gives the engine nothing it can check, so it can never be Checked');
 ok(DEMO_LINES.every(l => !('status' in l) && !('verdict' in l)), 'the script carries no status of its own');
 
 // The rows behind each verdict are exactly what Step Check returns now.
-for (const line of DEMO_LINES.filter(l => l.claims)) {
+for (const line of DEMO_LINES.filter(l => l.claims && l.claims.length)) {
   const fresh = line.claims(UNSURE.read).flatMap(c => stepCheck(c.meta, c.working).lines);
   const shown = base.lines.find(l => l.n === line.n).engine;
   ok(JSON.stringify(fresh.map(r => r.status)) === JSON.stringify(shown.map(r => r.status)), `line ${line.n}: the shown rows are Step Check's rows`);
@@ -114,13 +115,12 @@ try {
 
   const page = at(h(L.default, { demoInitial: L.FINAL }));
   ok(page.includes('Every line checked.') && page.includes('Not guessed.'), 'the headline');
-  for (const [n, word] of [[1, 'Not verified'], [2, 'Checked'], [3, 'Checked'], [4, 'First error'], [5, 'Follows from line 4']]) {
+  for (const [n, word] of [[1, 'Given'], [2, 'Checked'], [3, 'Checked'], [4, 'First error'], [5, 'Follows from line 4']]) {
     const cell = page.match(new RegExp(`data-demo-status="${n}">([\\s\\S]*?)</span><span class="lp-chip"`));
     ok(cell && /<svg/.test(cell[1]) && cell[1].includes(word), `line ${n}: an icon and the word "${word}"`);
   }
   ok(/data-demo-line="4" data-status="error"/.test(page) && /data-demo-line="2" data-status="checked"/.test(page), 'the final state carries the engine\'s statuses');
   ok(page.includes('Line 4 is the first error.'), 'the summary names the engine\'s first error');
-  ok(page.includes('Not verified means the engine couldn’t prove that line'), 'a Not verified line is explained, never ticked');
   ok(page.includes('Correct form:') && page.includes('data-demo-correct'), 'the correct form is shown with See why');
   ok(page.includes('A scripted student.'), 'the page says the student is scripted');
   ok(page.includes('Every line is checked by a maths engine, and anything it can’t verify is labelled. AI never decides your mark.'), 'proof point 1, exactly');

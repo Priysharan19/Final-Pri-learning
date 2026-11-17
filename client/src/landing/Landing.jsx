@@ -47,6 +47,9 @@ export const syllabusKey = (edition = EDITION) => (edition === 'prithagoras' ? '
 /* ── shapes: each state is a shape AND a word ─────────────────────────────── */
 export function StatusGlyph({ status }) {
   const common = { width: 16, height: 16, viewBox: '0 0 18 18', 'aria-hidden': true, focusable: 'false' };
+  if (status === STATUS.GIVEN) {
+    return <svg {...common}><path d="M6.5 3H4v12h2.5M11.5 3H14v12h-2.5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+  }
   if (status === STATUS.CHECKED) {
     return <svg {...common}><circle cx="9" cy="9" r="7.5" fill="none" stroke="currentColor" strokeWidth="1.6" /><path d="M5.5 9.3l2.3 2.3 4.6-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>;
   }
@@ -60,6 +63,7 @@ export function StatusGlyph({ status }) {
 }
 
 export function statusWord(t, status, firstError) {
+  if (status === STATUS.GIVEN) return t('landing.st.given');
   if (status === STATUS.CHECKED) return t('landing.st.checked');
   if (status === STATUS.ERROR) return t('landing.st.error');
   if (status === STATUS.FOLLOWS) return t('landing.st.follows', { n: firstError });
@@ -107,7 +111,6 @@ export function LiveDemo({ initial = null }) {
   const replay = () => { setState(reducedMotion() ? WAITING : START); toSay(); };
 
   const firstError = result?.firstError ?? null;
-  const anyUnverified = !!result?.lines.some(l => l.status === STATUS.UNVERIFIED);
   const say = state.read < n ? t('landing.demo.reading')
     : waiting ? t('landing.demo.ask', { n: UNSURE.line, a: UNSURE.read, b: UNSURE.alternative })
       : !done ? t('landing.demo.checking')
@@ -165,8 +168,6 @@ export function LiveDemo({ initial = null }) {
         )}
         {done && <button type="button" className="lp-btn lp-btn-sec" data-demo-replay onClick={replay}>{t('landing.demo.replay')}</button>}
       </div>
-
-      {done && anyUnverified && <p className="lp-note" data-demo-unverified-note>{t('landing.demo.unverifiedNote')}</p>}
 
       {showSeeWhy && (
         <div className="lp-seewhy" data-demo-seewhy>

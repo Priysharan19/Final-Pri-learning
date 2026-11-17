@@ -53,10 +53,10 @@ export const DEMO_LINES = Object.freeze([
     ink: 'u = tan x,  du = sec²x dx',
     tex: 'u = \\tan x,\\quad du = \\sec^2 x\\,dx',
     rule: 'substitution',
-    claims: () => [
-      // du/dx = sec²x: a derivative of tan x.
-      { meta: { kind: 'derivative', source: 'tan(x)', variable: 'x' }, working: 'du/dx = sec(x)^2' }
-    ]
+    // The substitution the question tells the student to make: context the
+    // working starts from, not a claim to mark. It is given no verdict and the
+    // engine is not asked about it (the checked lines start at line 2).
+    given: true
   },
   {
     n: 2,
@@ -116,7 +116,7 @@ export const CORRECT_LINE4 = Object.freeze({
 });
 
 /** Line statuses the page can show. Each has a shape and a word (Landing.jsx). */
-export const STATUS = Object.freeze({ CHECKED: 'checked', ERROR: 'error', FOLLOWS: 'follows', UNVERIFIED: 'unverified' });
+export const STATUS = Object.freeze({ GIVEN: 'given', CHECKED: 'checked', ERROR: 'error', FOLLOWS: 'follows', UNVERIFIED: 'unverified' });
 
 const stripLead = s => String(s).replace(/^\s*=\s*/, '');
 
@@ -138,6 +138,8 @@ export function runDemo({ glyph = null, lines = DEMO_LINES, chain = CHAIN, corre
   const chainBreak = chainRows.findIndex(r => r.status === 'break');
 
   const out = lines.map(line => {
+    // A given line is context, not a claim: no verdict, and no engine row.
+    if (line.given === true) return { n: line.n, status: STATUS.GIVEN, engine: [] };
     if (Number.isInteger(line.chain)) {
       const row = chainRows[line.chain] || null;
       let status = STATUS.UNVERIFIED;
