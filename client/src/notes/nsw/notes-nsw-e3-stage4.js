@@ -265,7 +265,7 @@ export default {
     diagrams: [
       {
         title: 'An outlier moves the mean, not the median',
-        spec: { kind: 'dataExplorer', data: [12, 15, 9, 20, 14], editable: [3], show: ['mean', 'median', 'range'] },
+        spec: { kind: 'dataExplorer', data: [12, 15, 9, 20, 14], editable: [3], min: 0, max: 50, show: ['mean', 'median', 'range'] },
         note: 'For $9, 12, 14, 15, 20$ the mean and the median are both $14$. Drag $20$ up to $45$: the mean jumps to $19$ and the range to $36$, but the median stays at $14$ because $14$ is still the middle value.'
       }
     ]
@@ -283,7 +283,7 @@ export default {
       {
         title: 'Test marks as a dot plot',
         spec: { kind: 'dataExplorer', data: [12, 18, 23, 25, 29, 31, 34, 36, 41, 47], editable: [9], show: ['range'] },
-        note: 'The marks run from $12$ to $47$, a range of $35$, so $5$ classes of width $8$ starting at $10$ cover them, the last class being $42$ to $49$. Drag the top mark to $52$: the range becomes $40$, that mark falls outside every class, and the class width has to grow.'
+        note: 'The marks run from $12$ to $47$, a range of $35$, so $5$ classes of width $8$ starting at $10$ cover them, the last class running from $42$ up to $50$. Drag the top mark to $52$: the range becomes $40$, that mark falls outside every class, and the class width has to grow.'
       }
     ]
   }
