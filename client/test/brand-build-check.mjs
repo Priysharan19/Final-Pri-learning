@@ -76,7 +76,13 @@ function checkBuild(dist) {
   return edition;
 }
 
-const norm = s => s.replace(/-[A-Za-z0-9_-]{8}\.(js|css|woff2?|ttf|png|svg|json)\b/g, '-#.$1').replace(/pri-[0-9a-f]{12}/g, 'pri-#');
+// The notes are edition content (ADR-0002: curriculum differs): India's class notes and the Olympiad notes in one build,
+// the NSW notes and their Experience 3 chunks in the other. The chunks that LOAD them name them (a route table imports
+// `Notes` here and `NswNotes` there; studyJourney is the India notes' study-link helper, which the NSW notes do not use), so a name that is a notes chunk is read as one name when two builds are compared.
+// What the notes chunks themselves hold is compared below under its own reason; nothing else may differ.
+export const NOTES_CHUNK = /^(?:notes-.+|Notes|NswNotes|notesIndex|e3|studyJourney)$/;
+const NOTES_REF = /\b(?:notes-[A-Za-z0-9_-]+?|NswNotes|Notes|notesIndex|e3|studyJourney)-#\.(js|css)\b/g;
+const norm = s => s.replace(/-[A-Za-z0-9_-]{8}\.(js|css|woff2?|ttf|png|svg|json)\b/g, '-#.$1').replace(/pri-[0-9a-f]{12}/g, 'pri-#').replace(NOTES_REF, 'NOTES-#.$1');
 function contents(dist) {
   const byName = new Map();
   for (const rel of walk(dist)) {
@@ -95,7 +101,11 @@ if (BOTH) {
     execFileSync('npx', ['vite', 'build', '--outDir', out, '--emptyOutDir'], { cwd: CLIENT, env: { ...process.env, PRI_EDITION: other }, stdio: ['ignore', 'ignore', 'inherit'] });
     checkBuild(out);
     const A = contents(DIST), B = contents(out);
-    ok(A.size === B.size, `the two builds have the same number of files (${A.size}, ${B.size})`);
+    // The builds hold the same files, except the notes chunks of the curriculum each edition teaches.
+    const rootOf = rel => rel.replace(/^assets\//, '').replace(/-[A-Za-z0-9_-]{8}\.\w+$/, '').replace(/^_pri-legal-hindi-none$/, 'legalHindi');
+    const roots = m => new Set([...m.keys()].filter(rel => /-[A-Za-z0-9_-]{8}\.\w+$/.test(rel)).map(rootOf));
+    const aOnly = [...roots(A)].filter(r => !roots(B).has(r)), bOnly = [...roots(B)].filter(r => !roots(A).has(r));
+    ok(A.size === B.size || [...aOnly, ...bOnly].every(r => NOTES_CHUNK.test(r)), `the two builds have the same files, but for each edition's notes (${A.size}, ${B.size}; only in ${first}: ${aOnly.join(', ') || 'none'}; only in ${other}: ${bOnly.join(', ') || 'none'})`);
     // Files that keep their name (no content hash) are compared by name; hashed
     // chunks are compared as a set of normalised contents.
     const plain = rel => !/-[A-Za-z0-9_-]{8}\.\w+$/.test(rel);
@@ -123,7 +133,13 @@ if (BOTH) {
     const MAY_DIFFER = {
       edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce', useSaleAvailable: 'commerce', Legal: 'legal', i18n: 'language',
       'i18n-hi': 'language', legalHindi: 'language', languages: 'language', core: 'language',
-      backend: 'language', indiaProduct: 'language', 'streams-standard': 'language', year8: 'language', year9: 'language', year10: 'language'
+      backend: 'language', indiaProduct: 'language', 'streams-standard': 'language', year8: 'language', year9: 'language', year10: 'language',
+      // The chunks that import `backend` (and the route table that names each edition's notes) by minified export name:
+      // the minifier numbers a chunk's exports by what the chunk holds, so when `backend` differs (above), every importer's
+      // `import{It as v,…}` carries other letters, and the shell's preload lists hold one notes chunk more or fewer.
+      // They differ in those letters and lists only; the brand and commerce checks below still apply to every chunk.
+      App: 'cascade', IndexPage: 'cascade', InstrumentBar: 'cascade', MapPage: 'cascade', PageLink: 'cascade', QuestionCard: 'cascade',
+      SyllabusBoard: 'cascade', api: 'cascade', classroomWords: 'cascade', copy: 'cascade', latex: 'cascade'
     };
     //   core           i18n/core.js (split from i18n/index.js in train 23 so the server
     //                  can translate without React) picks the edition's en-AU overrides
@@ -140,7 +156,10 @@ if (BOTH) {
     const inB = contentsOf(B), inA = contentsOf(A);
     const onlyA = hashed(A).filter(([, c]) => !inB.has(c)), onlyB = hashed(B).filter(([, c]) => !inA.has(c));
     const names = list => [...new Set(list.map(([rel]) => base(rel)))].sort();
-    ok(JSON.stringify(names(onlyA)) === JSON.stringify(names(onlyB)) && names(onlyA).every(n => Object.hasOwn(MAY_DIFFER, n)),
+    // The notes chunks are each edition's own (named differently, so compared as a set per side); every other chunk that
+    // differs must differ in BOTH builds, and each must be one of the allowed names above.
+    const outsideNotes = list => names(list).filter(n => !NOTES_CHUNK.test(n));
+    ok(JSON.stringify(outsideNotes(onlyA)) === JSON.stringify(outsideNotes(onlyB)) && [...names(onlyA), ...names(onlyB)].every(n => (Object.hasOwn(MAY_DIFFER, n) || NOTES_CHUNK.test(n))),
       `hashed chunks differ only where an edition should (${names(onlyA).join(', ')} | ${names(onlyB).join(', ')})`);
     const brandChunks = (list, id) => list.filter(([, c]) => c.includes(wordmarkTail(id)));
     ok(brandChunks(onlyA, first).length === 1 && base(brandChunks(onlyA, first)[0][0]) === 'edition' && brandChunks(onlyB, other).length === 1 && base(brandChunks(onlyB, other)[0][0]) === 'edition',
@@ -159,4 +178,4 @@ if (failures.length) {
   for (const f of failures) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
-console.log(`BRAND BUILD: PASS — ${pass}/${pass} checks${BOTH ? ' — both editions built; they differ only in brand files, the edition record, the E5 commercial chunks and the languages an edition does not offer' : ''}`);
+console.log(`BRAND BUILD: PASS — ${pass}/${pass} checks${BOTH ? ' — both editions built; they differ only in brand files, the edition record, the E5 commercial chunks, the languages an edition does not offer, each edition's own notes, and the importers of those by minified name' : ''}`);
