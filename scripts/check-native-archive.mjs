@@ -25,7 +25,14 @@ import { resolveCname as dnsResolveCname } from 'node:dns/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const SHIPPING_BUNDLE = 'com.prilearning.app';
+/**
+ * One app per edition (ADR-0002): each bundle id names its edition's server and
+ * the edition its bundled client must have been built for.
+ */
+export const EDITION_APPS = Object.freeze({
+  'com.prilearning.app': Object.freeze({ edition: 'priyabhata', origin: 'https://app.prilearning.com', displayName: 'Priyabhata', icon: 'AppIcon' }),
+  'com.prilearning.prithagoras': Object.freeze({ edition: 'prithagoras', origin: 'https://au.prilearning.com', displayName: 'Prithagoras', icon: 'AppIconPrithagoras' })
+});
 
 /** The one origin a native archive may name (D5; RELEASE.md §4 "Cloud origin"). */
 export const CANDIDATE_ORIGIN = 'https://app.prilearning.com';
@@ -40,7 +47,7 @@ export const BACKEND_HOSTS = Object.freeze({
   production: 'final-pri-learning-production.up.railway.app'
 });
 
-export function originProblem(value) {
+export function originProblem(value, expected = CANDIDATE_ORIGIN) {
   const raw = typeof value === 'string' ? value.trim() : '';
   if (!raw) return 'PRICloudOrigin is empty: this build could never mark an answer';
   if (/\$\(|\$\{/.test(raw)) return `PRICloudOrigin is an unsubstituted build setting (${raw})`;
@@ -57,8 +64,8 @@ export function originProblem(value) {
   if (host === 'railway.app' || host.endsWith('.railway.app')) {
     return `PRICloudOrigin is a raw Railway host (${raw}); a native archive names ${CANDIDATE_ORIGIN}, which fronts the right service`;
   }
-  if (url.origin !== CANDIDATE_ORIGIN) {
-    return `PRICloudOrigin must be exactly ${CANDIDATE_ORIGIN} (D5: every native archive talks to the public origin; until GO it fronts staging at the candidate SHA), not ${raw}`;
+  if (url.origin !== expected) {
+    return `PRICloudOrigin must be exactly ${expected} (D5: every native archive talks to the public origin; until GO it fronts staging at the candidate SHA), not ${raw}`;
   }
   return null;
 }
@@ -92,14 +99,14 @@ function findApp(path) {
   return { plist: join(apps, name, 'Info.plist'), app: join(apps, name) };
 }
 
-function findReleaseJson(app) {
+function findReleaseJson(app, file = 'release.json') {
   if (!app) return null;
   const stack = [app];
   while (stack.length) {
     const dir = stack.pop();
     for (const name of readdirSync(dir)) {
       const full = join(dir, name);
-      if (name === 'release.json') return full;
+      if (name === file) return full;
       if (statSync(full).isDirectory() && !name.endsWith('.framework')) stack.push(full);
     }
   }
@@ -108,15 +115,25 @@ function findReleaseJson(app) {
 
 export function checkArchive(path, { sha = null } = {}) {
   const { plist, app } = findApp(path);
-  const info = readPlist(plist, ['PRICloudOrigin', 'CFBundleIdentifier', 'CFBundleShortVersionString', 'CFBundleVersion']);
+  const info = readPlist(plist, ['PRICloudOrigin', 'CFBundleIdentifier', 'CFBundleShortVersionString', 'CFBundleVersion', 'CFBundleDisplayName']);
   const problems = [];
-  const origin = originProblem(info.PRICloudOrigin);
+  const edition = EDITION_APPS[info.CFBundleIdentifier] || null;
+  const origin = originProblem(info.PRICloudOrigin, edition?.origin ?? CANDIDATE_ORIGIN);
   if (origin) problems.push(origin);
   // A built product always has a bundle id; only a bare source Info.plist
   // handed in directly may lack one, and that is never a release artefact.
-  if (info.CFBundleIdentifier !== SHIPPING_BUNDLE) {
-    problems.push(`bundle id is ${info.CFBundleIdentifier ?? 'missing'}, not the shipping ${SHIPPING_BUNDLE}`);
+  if (!edition) {
+    problems.push(`bundle id is ${info.CFBundleIdentifier ?? 'missing'}, not a shipping one (${Object.keys(EDITION_APPS).join(', ')})`);
   }
+  // The bundled client must be this edition's build: its features.json names it.
+  if (app && edition) {
+    const features = findReleaseJson(app, 'features.json');
+    let built = null;
+    if (features) { try { built = JSON.parse(readFileSync(features, 'utf8')).edition || null; } catch { built = null; } }
+    if (built !== edition.edition) problems.push(`the bundled client is the ${built || 'unknown'} edition, not ${edition.edition} (${info.CFBundleIdentifier})`);
+  }
+  // The icon and name are the edition's: an archive carrying the other edition's would ship its brand.
+  if (edition && app && info.CFBundleDisplayName !== edition.displayName) problems.push(`display name is ${info.CFBundleDisplayName ?? 'missing'}, not ${edition.displayName}`);
   if (app && !sha) problems.push('no --sha given: a release archive is checked against the exact release commit');
   let releaseSha = null;
   const release = findReleaseJson(app);
