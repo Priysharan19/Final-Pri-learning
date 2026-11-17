@@ -34,11 +34,11 @@ for (const resolved of [false, true]) {
 // Hints, "why" and streamed replies refuse a mark claim too (AI red-team, 2026-11-18);
 // on a percentage question "percent" is the mathematics, not a score.
 const linear = { prompt: 'Solve 3x + 5 = 20.' };
-for (const t of ['Great work — that earns you full marks for this step!', 'You would get full marks here.', "You'd get 2 marks here.", "You've earned 2 marks.", 'You scored 3', 'you passed', 'Perfect score!', "That's 10/10!", 'That would score well.', 'That costs you 2 marks.', 'You lost marks for this step.', 'This is worth 3 marks.', 'You passed this question.', 'आपको पूरे अंक मिलेंगे।']) {
+for (const t of ['Great work — that earns you full marks for this step!', 'You would get full marks here.', "You'd get 2 marks here.", "You've earned 2 marks.", 'You scored 3', 'you passed', 'Perfect score!', "That's 10/10!", 'That would score well.', "You'll be marked correct.", 'This would be marked right.', 'Top marks!', 'Ten out of ten!', 'Youve earned 2 marks', 'That costs you 2 marks.', 'You lost marks for this step.', 'This is worth 3 marks.', 'You passed this question.', 'आपको पूरे अंक मिलेंगे।']) {
   ok(replyMarkClaimIssues(t, linear).length === 1, `a hint claiming a mark is refused: ${t}`);
 }
 // …and the everyday maths words stay hints (#1001 review).
-for (const t of ['The line has passed through (0, 2) already.', "It's a line through 2 points.", 'Plot 3 points and join them.', 'The marked angle is 40°.', 'The graph passed through (0, 2).', 'Find the score of the third batsman.', 'Look at the graded scale.', 'There is a 25% chance of rain.', 'Think about what percent means here: per hundred.']) {
+for (const t of ['Multiply 4 by 3 and you get 12; now compare.', 'You get 2 equations; solve them together.', 'When you expand (x+1)^2 you get 3 terms.', "You've got 3 terms on the left.", "That's 3/4 of the whole bar.", 'This is 3/4, so shade three parts.', 'That is 2 out of 6 outcomes.', 'Look at a score of 12 out of 20 in the table.', 'It looks like you failed to change the sign.', 'You failed to carry the 1.', 'You passed 3 on the number line; go back.', 'The line has passed through (0, 2) already.', "It's a line through 2 points.", 'Plot 3 points and join them.', 'The marked angle is 40°.', 'The graph passed through (0, 2).', 'Find the score of the third batsman.', 'Look at the graded scale.', 'There is a 25% chance of rain.', 'Think about what percent means here: per hundred.']) {
   ok(replyMarkClaimIssues(t, linear).length === 0, `an ordinary hint passes: ${t}`);
 }
 // A range that brackets the answer, in any wording, is a leak.
@@ -48,7 +48,7 @@ for (const r of ['x is somewhere from 4 to 6.', 'It lies 4 to 6.', 'The answer i
 }
 ok(leakedExpressions('It lies from 6 to 9.', g, { prompt: 'Solve 3x + 5 = 20.' }).every(l => !l.startsWith('range')), 'a range that does not bracket the answer is not a leak');
 ok(statedRanges('x lies from 1 to 2').length === 1 && statedRanges('add 3 to both sides').length === 0, 'ranges are read only between two numbers');
-for (const t of ['Go from 20 to 3 groups.', 'Count up from 1 to 9 on the number line.', 'Now add 3 to 12.']) {
+for (const t of ['Go from 20 to 3 groups.', 'Count up from 1 to 9 on the number line.', 'Now add 3 to 12.', 'The odds are 1 to 9.', 'Step 1: 3 to 12 is a jump of 9.']) {
   ok(!leakedExpressions(t, g, { prompt: 'Solve 3x + 5 = 20.' }).some(l => l.startsWith('range')), `not a range claim: ${t}`);
 }
 const t1 = Date.now(); statedRanges(`${'1 to '.repeat(4000)}1`); ok(Date.now() - t1 < 200, 'range reading stays linear');

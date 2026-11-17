@@ -355,7 +355,7 @@ const RANGES = [
   // 4 to 6" reached the student). Read only where the reply places the unknown
   // ("is", "lies", "the answer/value", "somewhere"), so "go from 20 to 3 groups"
   // and "add 3 to 12" stay hints (#1001 review).
-  new RegExp(String.raw`(?:\b(?:is|are|was|be|lies|lie|somewhere|answer|value|range|numbers?|values)|[=:])\s*(?:(?:likely|probably|about|roughly|around|approximately|somewhere|anywhere)\s+)?(?:from\s+|in\s+|between\s+)?${NUM}\s+(?:to|till|until|through|thru)\s+${NUM}`, 'gi'),
+  new RegExp(String.raw`(?:\b(?:is|was|be|lies|lie|somewhere|answer|value|range|numbers?|values)|\b[a-z]\s*[=:])\s*(?:(?:likely|probably|about|roughly|around|approximately|somewhere|anywhere)\s+)?(?:from\s+|in\s+|between\s+)?${NUM}\s+(?:to|till|until|through|thru)\s+${NUM}`, 'gi'),
   new RegExp(String.raw`${NUM}\s+से\s+${NUM}\s+(?:के\s+बीच|तक)`, 'g'),
   new RegExp(String.raw`${NUM}\s+(?:और|तथा)\s+${NUM}\s+के\s+बीच`, 'g'),
   new RegExp(String.raw`(?:more|greater|bigger|larger)\s+than\s+${NUM}\s+(?:and|but)\s+(?:less|smaller|fewer)\s+than\s+${NUM}`, 'gi'),
@@ -374,7 +374,8 @@ export function expandContractions(text) {
     .replace(/\b(i)'m\b/gi, '$1 am').replace(/\b(you|we|they)'re\b/gi, '$1 are')
     .replace(/\b(i|you|we|they|he|she|it)'ll\b/gi, '$1 will').replace(/\b(i|you|we|they)'ve\b/gi, '$1 have')
     .replace(/\b(i|you|we|they|he|she|it)'d\b/gi, '$1 would')
-    .replace(/\b(\w+)n't\b/gi, '$1 not').replace(/\b(\w+)'s\b/gi, '$1 is');
+    .replace(/\b(\w+)n't\b/gi, '$1 not').replace(/\b(\w+)'s\b/gi, '$1 is')
+    .replace(/\byouve\b/gi, 'you have').replace(/\byoull\b/gi, 'you will').replace(/\byoud\b/gi, 'you would');
 }
 
 export function statedRanges(text) {
@@ -700,7 +701,7 @@ export function markClaimIssues(text, { percentIsMaths = false } = {}) {
 // passed through (0, 2)"). So a help, "why" or streamed reply is refused only for
 // a claim about the student's marks (#1001 review), not for the words themselves.
 const HINT_MARK_CLAIM = /\b(?:full|partial|half|bonus|method|answer) (?:marks?|credit)\b|\byou (?:would |will |ll |have |ve |just )?(?:get|got|earn|earned|lose|lost|score|scored|gain|gained|deserve) (?:full |all |the |\d+ |[a-z]+ )?(?:marks?|points?|credit)\b|\b(?:earns?|loses?|costs?|worth) (?:you )?(?:full |all |the |\d+ |[a-z]+ )?(?:marks?|credit)\b|\bmarks? (?:for|on|in) (?:this|that|your)\b|\b\d+\s*(?:\/|out of)\s*\d+\s*marks?\b|\byou (?:have )?(?:passed|failed) (?:this|the) (?:question|step|test)\b|(?:पूरे|आधे) अंक|अंक (?:मिलेंगे|मिलेगा|कटेंगे|कटेगा|मिले)/iu;
-const HINT_SCORE_CLAIM = /\bperfect score\b|\byou (?:would |will |have |just )?(?:scored?|got|get) (?:a |an )?(?:score of )?\d+\b|\b(?:that is|this is|you got|you get|score of) \d+\s*(?:\/|out of)\s*\d+\b|\byou (?:have |would have )?(?:passed|failed)\b(?! (?:through|the point|over|under|by|along|across|above|below))|\b(?:would|will) score (?:well|highly|full|top|high)\b/i;
+const HINT_SCORE_CLAIM = /\bperfect score\b|\btop marks\b|\bten out of ten\b|\byou (?:have |would have |just )?scored? (?:a )?\d+\b|\b(?:that is|this is|you got|you get) (\d+)\s*(?:\/|out of)\s*\1\b|\byou (?:have |would have )?(?:passed|failed)\b(?! (?:to|through|the point|over|under|by|along|across|above|below|\d))|\b(?:would|will) score (?:well|highly|full|top|high)\b|\b(?:be|been|is|was|are) marked (?:as )?(?:correct|right|wrong|incorrect)\b|\byou (?:have )?earned \d+ (?:marks?|points?)\b/i;
 export function replyMarkClaimIssues(text) {
   const s = expandContractions(text);
   if (s.length > 20_000) return ['mark-claim'];
