@@ -21,7 +21,7 @@ import {
 } from './reason-v2-safe.js';
 import { assessEvaluationLine, assessPointLine } from './reason-v3.js';
 import { assessFormulaLine, bareNumbers, chainDiagnosis, cleanLine, evaluateChain, givensLine, isNumberText, labelKey, listsValues, matchesShape, readChain, sameValue, substitutionShapes, valueUnder } from './reason-chain.js';
-import { assessRelationChainLine, assessModulusInequalityLine, compareDomainAwareEquationClaims } from './reason-v4.js';
+import { assessRelationChainLine, assessModulusInequalityLine, compareDomainAwareEquationClaims, equationSolutionSet, relateSolutionSets } from './reason-v4.js';
 import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 import { lostMarks, ruleKeyFor } from './lost-marks.js';
@@ -686,6 +686,42 @@ function checkLinesAfterBreakAgainstPrevious(out, firstBreak, meta) {
   }
 }
 
+/**
+ * The last line of an equation's working must BE the answer. When its complete
+ * real solution set can be found and is not exactly the question's — it still
+ * allows a root the question rules out, or names a value that is no solution —
+ * the row is flagged `incomplete` and says so. A flag, not a status: the line
+ * may be a perfectly valid step, and every mark still reads the status. A last
+ * line whose own note says it still allows another value is flagged the same way.
+ */
+function flagUnfinishedFinalLine(out, meta) {
+  if (meta?.kind !== 'equation' || !out.length) return;
+  const row = out[out.length - 1];
+  if (!row || row.unread || row.check || row.status === 'break') return;
+  let incomplete = /would also allow another value|not finished|still to find/.test(String(row.note || ''));
+  if (!incomplete) {
+    try {
+      const wanted = uniqueNumeric(meta.solutions);
+      const cleaned = normalize(String(row.text).trim().replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, ''));
+      if (cleaned.includes('=') && Array.isArray(meta.solutions)) {
+        const ast = parse(cleaned);
+        if (ast.t === 'equation' && !foreignLetters(ast, meta).length) {
+          const cur = equationSolutionSet(ast, meta.variable);
+          if (cur && relateSolutionSets({ kind: 'finite', roots: wanted }, cur) === 'different') incomplete = true;
+          else if (cur && relateSolutionSets({ kind: 'finite', roots: wanted }, cur) === 'superset') incomplete = true;
+        }
+      }
+    } catch { /* an unreadable last line is not flagged */ }
+  }
+  if (incomplete) {
+    row.incomplete = true;
+    // A step that only follows from the line above (an implied step or one case) is not
+    // credited as the finished answer: it is set aside as unverified.
+    if (row.implied === true && row.status === 'ok') row.status = 'note';
+    if (!row.note) row.note = 'This line is not the answer: it still allows a value that does not solve the question, or leaves out one that does.';
+  }
+}
+
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, prompt = '' } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const unread = unreadLines(rawLines);
@@ -693,6 +729,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
   let firstBreak = -1;
   let previousEquation = null;
   let previousEquationTrusted = false;
+  let absAnchor = null; // the latest verified absolute-value equation: its cases are valid branches
   let previousRelation = null;
   let previousRelationTrusted = false;
   let branchesOpen = false;
@@ -733,6 +770,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     let status = 'note';
     let note;
     let lineDiagnosis = null;
+    let impliedStep = false;
     try {
       const listed = readSolutionList(line, meta);
       if (listed) {
@@ -1047,10 +1085,12 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               previousEquationTrusted = true;
               if (productEqualsZero(ast)) branchesOpen = true;
             } else {
-              const assessed = assessEquationLine({ ast, previousAst: previousEquation, previousTrusted: previousEquationTrusted, meta });
+              const assessed = assessEquationLine({ ast, previousAst: previousEquation, previousTrusted: previousEquationTrusted, meta, anchorAst: absAnchor });
+              if (assessed.status === 'ok' && assessed.trusted && /abs\s*\(/.test(String(line))) absAnchor = ast;
               status = assessed.status;
               note = assessed.note;
               lineDiagnosis = assessed.diagnosis || null;
+              impliedStep = assessed.implied === true;
               // A mistake is a line that is false for the question. A line
               // that every answer satisfies and that would also let in
               // another value — `a^2 = 4` where the question says a > 0,
@@ -1112,7 +1152,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     }
 
     if (status === 'break' && firstBreak === -1) firstBreak = i;
-    out.push({ text: line, status, note, ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+    out.push({ text: line, status, note, ...(impliedStep ? { implied: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
   });
 
   // Branches were allowed on the promise that the working keeps every root.
@@ -1150,6 +1190,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     };
   }
 
+  flagUnfinishedFinalLine(out, meta);
   if (firstBreak === -1) return { lines: out, firstBreak, diagnosis: null };
   for (let i = firstBreak + 1; i < out.length; i++) {
     if (out[i].status === 'break' || out[i].branch) {

@@ -227,10 +227,34 @@ export function rationalEquationSignature(eq, variable = null) {
   if (numerator.every(nearZero)) {
     return { kind: 'cofinite', variable: v, excluded: excluded.roots };
   }
-  const roots = realRoots(numerator);
+  // A numerator above degree 2 is solved after its excluded roots are divided
+  // out (they are never solutions, so removing them loses nothing).
+  let work = numerator;
+  if (work.length - 1 > 2) {
+    for (const e of excluded.roots) {
+      for (let guard = 0; guard < 6 && work.length - 1 > 0; guard++) {
+        const quotient = divideByRoot(work, e);
+        if (!quotient) break;
+        work = quotient;
+      }
+    }
+  }
+  const roots = realRoots(work);
   if (roots === null) return null;
   const kept = uniqueNumbers(roots).filter(x => !excluded.roots.some(e => numsClose(x, e, 1e-7)));
   return { kind: 'finite', variable: v, roots: kept, excluded: excluded.roots };
+}
+
+/** Synthetic division of a polynomial (low -> high) by (x - e) when e is a root; else null. */
+function divideByRoot(poly, e) {
+  const n = poly.length - 1;
+  if (n < 1) return null;
+  const q = new Array(n);
+  let carry = 0;
+  for (let i = n; i >= 1; i--) { carry = poly[i] + carry * e; q[i - 1] = carry; }
+  const remainder = poly[0] + carry * e;
+  const scale = Math.max(1, ...poly.map(Math.abs));
+  return Math.abs(remainder) <= 1e-9 * scale * Math.max(1, Math.abs(e) ** n) ? q : null;
 }
 
 function signatureEqual(a, b) {
@@ -503,4 +527,139 @@ export function assessModulusInequalityLine({ text, meta = null } = {}) {
   }
   const expected = `${-radius} ${op} ${meta.expression} ${op} ${radius}`;
   return assessRelationChainLine({ text, meta: { source: expected } });
+}
+
+// ── Absolute-value and square-root equations ─────────────────────────────────
+// `abs(Q) = P`, `abs(Q) = abs(R)` and `sqrt(Q) = P` / `sqrt(Q) = sqrt(R)` with
+// polynomial Q, R, P of degree <= 2 after the case split. The complete real
+// solution set is exact: each case is a polynomial equation of degree <= 2
+// whose roots are kept only where the case's own condition holds (Q >= 0 or
+// Q < 0 for abs; P >= 0 for sqrt, which also gives Q >= 0). Anything else
+// returns null (abstain).
+
+/** The coefficients of a polynomial of degree <= 2 in `v`, by exact fit, or null. */
+function quadraticFit(node, v) {
+  const f = t => evaluate(node, { [v]: t });
+  try {
+    const f0 = f(0), f1 = f(1), fm = f(-1);
+    if (![f0, f1, fm].every(Number.isFinite)) return null;
+    const c = (f1 + fm) / 2 - f0, b = (f1 - fm) / 2;
+    const co = [f0, b, c];
+    const scale = Math.max(1, ...co.map(Math.abs));
+    for (const t of [2, -2, 3, 0.5, -3.5, 7, 11]) {
+      const want = f(t);
+      if (!Number.isFinite(want) || Math.abs(want - (f0 + b * t + c * t * t)) > 1e-9 * Math.max(1, Math.abs(want), scale * t * t)) return null;
+    }
+    return co.map(x => (Math.abs(x) <= 1e-10 * scale ? 0 : x));
+  } catch { return null; }
+}
+const polyAt = (co, t) => co[0] + co[1] * t + co[2] * t * t;
+const polySub = (a, b) => a.map((x, i) => x - b[i]);
+const polyMul = (a, b) => {
+  // degree <= 2 each; the product is kept only when it stays <= 4 (squaring).
+  const out = [0, 0, 0, 0, 0];
+  a.forEach((x, i) => b.forEach((y, j) => { out[i + j] += x * y; }));
+  return out;
+};
+
+function realRootsUpTo4(co) {
+  const c = co.slice();
+  while (c.length > 1 && nearZero(c[c.length - 1])) c.pop();
+  if (c.length - 1 > 2) return null; // quartics are not solved here
+  return realRoots(c) ?? (c.length === 1 && !nearZero(c[0]) ? [] : null);
+}
+
+function absSurdSignature(eq, variable = null) {
+  if (!eq || eq.t !== 'equation') return null;
+  const v = inferSingleVariable(eq, null, variable);
+  if (!v) return null;
+  let left = unwrap(eq.l), right = unwrap(eq.r);
+  const isFn = (n, fn) => n?.t === 'call' && n.fn === fn;
+  const kind = isFn(left, 'abs') || isFn(right, 'abs') ? 'abs' : isFn(left, 'sqrt') || isFn(right, 'sqrt') ? 'sqrt' : null;
+  if (!kind) return null;
+  if (!isFn(left, kind)) [left, right] = [right, left];
+  const Q = quadraticFit(left.arg, v);
+  if (!Q) return null;
+  const roots = [];
+  if (isFn(right, kind)) {
+    // f(Q) = f(R): abs -> Q = R or Q = -R; sqrt -> Q = R with Q >= 0.
+    const R = quadraticFit(right.arg, v);
+    if (!R) return null;
+    const cases = kind === 'abs' ? [polySub(Q, R), Q.map((x, i) => x + R[i])] : [polySub(Q, R)];
+    for (const co of cases) {
+      const r = realRootsUpTo4(co);
+      if (r === null) return null;
+      roots.push(...r.filter(x => (kind === 'sqrt' ? polyAt(Q, x) >= -1e-9 : true)));
+    }
+    return { kind: 'finite', variable: v, roots: uniqueNumbers(roots), excluded: [] };
+  }
+  const P = quadraticFit(right, v);
+  if (!P) return null;
+  if (kind === 'abs') {
+    for (const [co, keep] of [[polySub(Q, P), x => polyAt(Q, x) >= -1e-9], [Q.map((x, i) => -x - P[i]), x => polyAt(Q, x) <= 1e-9]]) {
+      const r = realRootsUpTo4(co);
+      if (r === null) return null;
+      roots.push(...r.filter(keep));
+    }
+  } else {
+    const diff = polySub(polyMul(P, [1, 0, 0]).slice(0, 3).map((_, i) => P[i]), P); // keep type checker honest
+    void diff;
+    const sq = polyMul(P, P);
+    const co = sq.map((x, i) => x - (Q[i] || 0));
+    const r = (() => {
+      const c = co.slice();
+      while (c.length > 1 && nearZero(c[c.length - 1])) c.pop();
+      if (c.length - 1 > 2) return null;
+      return realRoots(c) ?? (c.length === 1 && !nearZero(c[0]) ? [] : null);
+    })();
+    if (r === null) return null;
+    roots.push(...r.filter(x => polyAt(P, x) >= -1e-9));
+  }
+  return { kind: 'finite', variable: v, roots: uniqueNumbers(roots), excluded: [] };
+}
+
+/** Complete solution set for the supported rational / absolute-value / square-root equations, or null. */
+export function equationSolutionSet(eq, variable = null) {
+  return rationalEquationSignature(eq, variable) || absSurdSignature(eq, variable);
+}
+
+/** How the second finite solution set relates to the first: same | superset | subset | different. */
+export function relateSolutionSets(a, b) {
+  if (!a || !b || a.kind !== 'finite' || b.kind !== 'finite') return null;
+  const inB = x => b.roots.some(y => numsClose(x, y, 1e-7));
+  const inA = x => a.roots.some(y => numsClose(x, y, 1e-7));
+  const aInB = a.roots.every(inB), bInA = b.roots.every(inA);
+  if (aInB && bInA) return 'same';
+  if (aInB) return 'superset';
+  if (bInA) return 'subset';
+  return 'different';
+}
+
+/**
+ * The unconditional case equations of `abs(Q) = P` — Q = P and -Q = P — each
+ * with its complete real root set, so a line that is exactly one case can be
+ * recognised as a BRANCH (valid to write down, whatever its condition decides).
+ */
+export function absCaseSets(eq, variable = null) {
+  if (!eq || eq.t !== 'equation') return null;
+  const v = inferSingleVariable(eq, null, variable);
+  if (!v) return null;
+  let left = unwrap(eq.l), right = unwrap(eq.r);
+  const isAbs = n => n?.t === 'call' && n.fn === 'abs';
+  if (!isAbs(left) && isAbs(right)) [left, right] = [right, left];
+  if (!isAbs(left) || isAbs(right)) return null;
+  const Q = quadraticFit(left.arg, v), P = quadraticFit(right, v);
+  if (!Q || !P) return null;
+  const out = [];
+  const equations = [
+    { t: 'equation', l: left.arg, r: right },
+    { t: 'equation', l: { t: 'neg', v: left.arg }, r: right }
+  ];
+  let k = 0;
+  for (const co of [polySub(Q, P), Q.map((x, i) => -x - P[i])]) {
+    const r = realRootsUpTo4(co);
+    if (r === null) return null;
+    out.push({ kind: 'finite', variable: v, roots: uniqueNumbers(r), excluded: [], equation: equations[k++] });
+  }
+  return out;
 }
