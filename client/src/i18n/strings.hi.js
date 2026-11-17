@@ -568,6 +568,21 @@ export default {
   // Apple Pencil is the product's name and stays Latin; "Pencil" alone in the
   // English means that stylus, so it is written पेंसिल as verdict.modeWriteTitle does.
   'ink.writingSpace': 'लिखने की जगह',
+  'ow.label': 'आपकी लिखावट',
+  'ow.opening': 'आपकी लिखावट खुल रही है…',
+  'ow.unavailable': 'इस उत्तर की आपकी लिखावट सर्वर पर नहीं रखी गई है। हो सकता है वह उसी डिवाइस पर हो जिस पर आपने लिखा था।',
+  'ow.digestMismatch': 'यह पन्ना उस लिखावट से मेल नहीं खाता जिस पर अंक दिए गए थे, इसलिए इसे नहीं दिखाया गया।',
+  'ow.replay': 'लिखावट दोबारा चलाएँ',
+  'ow.showCrossedOut': 'काटा हुआ काम दिखाएँ',
+  'ow.hideCrossedOut': 'काटा हुआ काम छिपाएँ',
+  'ow.whatPriRead': 'Pri ने क्या पढ़ा:',
+  'ow.youConfirmed': 'आपने पुष्टि की:',
+  'ow.keptWithMark': 'अंक के साथ रखा गया · {digest}',
+  'ow.status.checked': 'जाँचा गया',
+  'ow.status.firstError': 'पहली गलती',
+  'ow.status.follows': 'गलती के बाद का',
+  'ow.status.notVerified': 'जाँचा नहीं जा सका',
+  'ow.status.unread': 'पढ़ा नहीं गया',
 
   'verdict.removeAttachment': 'अटैचमेंट हटाएँ',
   'verdict.decodedOnDevice': 'इसी डिवाइस पर पढ़ा गया',
