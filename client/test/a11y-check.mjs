@@ -1270,7 +1270,7 @@ async function run() {
 
     await step('notes · a chapter read through', '/notes/:chapterId', async () => {
       await goTo(page, BASE, INDIA ? '/notes/c10-quadratic-equations' : '/notes/ma4-equ-c-01?year=7');
-      await page.waitForSelector('.nt-formula', { timeout: 20000 });
+      await page.waitForSelector(INDIA ? '.nt-formula' : '.nn-formula', { timeout: 20000 });
       await page.evaluate(() => document.querySelectorAll('.nt-reveal').forEach(el => el.classList.add('is-in')));
       await wait(page, 1600);
     });
