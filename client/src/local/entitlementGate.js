@@ -22,6 +22,7 @@ import { get, put } from './idb.js';
 import { cloudLinkRowId } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, FREE_EXAM_ALLOWANCE, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
 import { FREE_PRACTICE_ALLOWANCE } from '../engine/practiceAllowance.js';
+import { translate } from '../i18n/index.js';
 
 const DAY = 86_400_000;
 const USAGE_PREFIX = 'pri-free-usage-v1:';
@@ -131,7 +132,7 @@ function gateError(code, message, details = {}) {
 
 function offlineNote(decision) {
   return decision?.reason === 'offline-entitlement-expired'
-    ? ' Your Premium needs to reconnect — this device has been offline for longer than the 7-day window.'
+    ? translate('msg.ent.offline')
     : '';
 }
 
@@ -203,12 +204,12 @@ export async function recordExamSimulation(profile, now = clock()) {
 }
 
 const CAPABILITY_COPY = Object.freeze({
-  [ENTITLEMENTS.JEE_ADVANCED]: 'The JEE Advanced track is part of Pri Learning Premium. JEE Main and the CBSE / NCERT chapters stay on the free plan.',
-  [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'Adaptive Pri Explain teaching is part of Pri Learning Premium.',
-  [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'The estimate from your practice and your mistake patterns are part of Pri Learning Premium.',
-  [ENTITLEMENTS.PREMIUM_EXAMS]: 'Further exam simulations are part of Pri Learning Premium.',
-  [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'Unlimited daily practice is part of Pri Learning Premium.',
-  [ENTITLEMENTS.EXTRA_AI]: 'Additional AI usage is reserved for Pri Learning Premium.'
+  [ENTITLEMENTS.JEE_ADVANCED]: 'msg.ent.jeeAdvanced',
+  [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'msg.ent.explain',
+  [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'msg.ent.analytics',
+  [ENTITLEMENTS.PREMIUM_EXAMS]: 'msg.ent.exams',
+  [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'msg.ent.practice',
+  [ENTITLEMENTS.EXTRA_AI]: 'msg.ent.extraAi'
 });
 
 /** Throw a 402 unless the linked account currently holds `capability`. */
@@ -216,7 +217,7 @@ export async function requireCapability(profile, capability, now = clock()) {
   const decision = await capabilityDecision(profile.id, capability, now);
   if (decision.allowed) return decision;
   throw gateError('PREMIUM_REQUIRED',
-    `${CAPABILITY_COPY[capability] || 'This feature is part of Pri Learning Premium.'}${offlineNote(decision)}`,
+    `${translate(CAPABILITY_COPY[capability] || 'msg.ent.generic')}${offlineNote(decision)}`,
     { capability, reason: decision.reason, refreshRequired: !!decision.refreshRequired });
 }
 
@@ -239,7 +240,7 @@ export function serverGateRefusal(cause) {
   if (!isEntitlementGate(cause)) return null;
   const n = v => (Number.isFinite(Number(v)) ? Number(v) : undefined);
   const timeZone = typeof cause.timeZone === 'string' && TIME_ZONE_NAME.test(cause.timeZone) && validTimeZone(cause.timeZone) ? cause.timeZone : undefined;
-  return gateError(cause.code, cause.message || `${CAPABILITY_COPY[cause.capability] || 'This is part of Pri Learning Premium.'}`, {
+  return gateError(cause.code, cause.message || translate(CAPABILITY_COPY[cause.capability] || 'msg.ent.genericShort'), {
     capability: typeof cause.capability === 'string' ? cause.capability : null,
     used: n(cause.used), limit: n(cause.limit),
     resetsAt: n(cause.resetsAt) ?? n(cause.resetAt), nextAt: n(cause.nextAt), windowDays: n(cause.windowDays),

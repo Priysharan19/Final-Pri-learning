@@ -172,8 +172,8 @@ function Overview({ stats, curriculum, section, sections, sectionKey, setSection
               <div key={b.id} className={`badge-card ${b.earnedAt ? '' : 'locked'}`}>
                 <span className="badge-ico">{b.icon}</span>
                 <div>
-                  <div className="badge-name">{b.name}</div>
-                  <div className="badge-desc">{b.desc}</div>
+                  <div className="badge-name">{t(b.nameKey)}</div>
+                  <div className="badge-desc">{t(b.descKey)}</div>
                 </div>
               </div>
             ))}

@@ -14,6 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloudRequest } from '../platform/cloudTransport.js';
 import { editionDisplayName } from '../platform/edition.js';
+import { translate } from '../i18n/index.js';
 
 /**
  * The public practice-desk website an attempt can be brought in from
@@ -30,7 +31,7 @@ export const isAttemptId = id => UUID.test(String(id || ''));
 export const INTENTS = Object.freeze(['begin-reading', 'begin-working', 'pause', 'resume', 'finish']);
 
 const refuse = (code, message) => Promise.reject(Object.assign(new Error(message), { code, status: 404 }));
-const notFound = () => refuse('DESK_ATTEMPT_NOT_FOUND', 'This practice attempt does not belong to this account.');
+const notFound = () => refuse('DESK_ATTEMPT_NOT_FOUND', translate('msg.desk.notYours'));
 
 /** A reply the desk may draw: it, and any attempt in it, is unmarked practice. */
 export function unmarked(data) {
@@ -53,7 +54,7 @@ export const deskApi = Object.freeze({
   account: () => cloudRequest('/v1/account/me').then(data => String(data?.account?.id || '')),
   start: (resourceId, idempotencyKey) => (RESOURCE_ID.test(String(resourceId || ''))
     ? cloudRequest('/v1/desk/attempts', { method: 'POST', body: { resourceId }, idempotencyKey }).then(unmarked)
-    : refuse('DESK_PAPER_NOT_FOUND', 'This paper is not in your library.')),
+    : refuse('DESK_PAPER_NOT_FOUND', translate('msg.desk.noPaper'))),
   list: () => cloudRequest('/v1/desk/attempts').then(unmarked),
   read: id => (isAttemptId(id) ? cloudRequest(`/v1/desk/attempts/${id}`).then(unmarked) : notFound()),
   clock: (id, intent, rev, early = false) => (isAttemptId(id) && INTENTS.includes(intent)
