@@ -116,8 +116,12 @@ export const flow = {
     await page.locator('main .pg-head h1, main .pg-head .pg-title, main [role="alert"]').first()
       .waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const progressTitle = await progressHead.count() === 1 ? await progressHead.innerText() : '';
-    await check('Progress is the India presentation for Class 10', /Class 10/.test(progressTitle) && !HSC.test(progressTitle),
-      `URL ${page.url()}, heading ${JSON.stringify(progressTitle)}, screen ${JSON.stringify((await page.locator('main').innerText().catch(() => '')).slice(0, 400))}`);
+    // Progress was rebuilt around evidence: the page heading is "Your progress"
+    // for both editions and the track is named by the topics heading
+    // ("... · Class 10 CBSE / NCERT"), so the India presentation is read there.
+    const topicsHead = await page.locator('main h2#pg-topics').count() ? await page.locator('main h2#pg-topics').innerText() : '';
+    await check('Progress is the India presentation for Class 10', /Class 10/i.test(topicsHead) && !HSC.test(progressTitle) && !HSC.test(topicsHead),
+      `URL ${page.url()}, heading ${JSON.stringify(progressTitle)}, topics heading ${JSON.stringify(topicsHead)}, screen ${JSON.stringify((await page.locator('main').innerText().catch(() => '')).slice(0, 400))}`);
     await check('a fresh student is not shown someone else’s past: no demo history', !/\bPri demo\b/i.test(await page.locator('main').innerText()));
     await page.goto(`${base}/history`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('main', { timeout: 30000 });

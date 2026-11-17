@@ -25,7 +25,7 @@ import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js'
 import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
-import { buildTranscript, confirmLine, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
+import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
 import PhotoLines from './PhotoLines.jsx';
@@ -1285,7 +1285,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const ackKey = `${readingId}|${inkResult?.text ?? ''}|${inkSignature ?? ''}`;
   const doubtOnly = writeMode && !!doubt && unsureLines.length === 0 && ackedDoubt !== ackKey;
   const toConfirm = unsureLines.length + (doubtOnly ? 1 : 0);
-  const confirmOnly = needsCheck;
   // The page as it stands now. Submit records it; a graded result is shown as
   // a result of what is on screen only while this has not changed since.
   const photoIdentity = useMemo(() => photoFingerprint(photo), [photo]);

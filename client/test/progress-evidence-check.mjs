@@ -105,7 +105,7 @@ const topic = (r, id) => r.topics.find(t => t.id === id);
   const keys = new Set();
   const walk = (v, p = '') => { if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) { keys.add(k); walk(x, `${p}.${k}`); } };
   walk(r);
-  ok(![...keys].some(k => /mastery|percent|predict|mark|score|rating|band$/i.test(k)), 'the reading has no mastery, percentage, prediction, mark, score or rating field');
+  ok(![...keys].some(k => /mastery|percent|predict|mark|score|rating/i.test(k) || /band$/i.test(k)), 'the reading has no mastery, percentage, prediction, mark, score or rating field');
   const bands = [...BANDS.accuracy, ...BANDS.independence, ...BANDS.retention, ...BANDS.transfer, 'thin'];
   ok(r.topics.every(t => [t.accuracy, t.independence, t.retention, t.transfer].every(b => bands.includes(b))), 'every dimension is one of the named bands');
 }

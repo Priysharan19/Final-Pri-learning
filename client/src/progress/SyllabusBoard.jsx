@@ -162,7 +162,7 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
       // the selection ring and the selected area's links only. Text and stems stay ink.
       const lit = getComputedStyle(cv).color || accent;
       const cols = Math.max(...areas.map(a => a.col)) + 1, rows = Math.max(...areas.map(a => a.row)) + 1;
-      const padX = phone ? 34 : 80, padY = phone ? 40 : 64, tilt = 0.62, R = phone ? 7 : 9;
+      const padX = phone ? 34 : 80, padY = phone ? 40 : 64, R = phone ? 7 : 9;
       let moving = false;
       const rowGap = ((h - 2 * padY) / Math.max(1, rows - 1)) * 0.9;
       const pos = new Map(areas.map(a => {
@@ -263,7 +263,7 @@ export function AreaList({ sections, selected, onSelect, label }) {
   const at = flat.findIndex(a => a.id === selected);
   const key = e => {
     const k = e.key;
-    let i = at;
+    let i;
     if (k === 'ArrowDown' || k === 'ArrowRight') i = Math.min(flat.length - 1, at + 1);
     else if (k === 'ArrowUp' || k === 'ArrowLeft') i = Math.max(0, at - 1);
     else if (k === 'Home') i = 0;

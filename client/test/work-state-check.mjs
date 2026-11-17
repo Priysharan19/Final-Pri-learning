@@ -2,7 +2,7 @@
 // underlying state, and nothing is ever shown as saved (or uploaded, or marked) before it is true.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { WORK_STATES, ALL_STATE_KEYS, stateKey, practiceWorkState, autosaveWorkState, syncWorkState, contentWorkState } from '../src/platform/workState.js';
+import { WORK_STATES, ALL_STATE_KEYS, practiceWorkState, autosaveWorkState, syncWorkState, contentWorkState } from '../src/platform/workState.js';
 import en from '../src/i18n/strings.en.js';
 import hi from '../src/i18n/strings.hi.js';
 
@@ -35,7 +35,7 @@ ok('no state claims more than is true: no label says saved, uploaded or marked u
     const s = stateOfKey(k); const t = en[k].toLowerCase();
     if (/(^|[^t] )saved to your account/.test(t) && !/not saved/.test(t)) assert.equal(s, 'uploaded', k);
     if (/not saved to your account/.test(t)) assert.equal(s, 'waiting-to-upload', k);
-    if (/^marked|marked by/.test(t)) assert.equal(s, 'marked', k);
+    if ((/^marked/.test(t) || /marked by/.test(t))) assert.equal(s, 'marked', k);
     if (/(^|\b)saved on this device|photo and reading saved/.test(t) && !/not saved|waiting/.test(t)) assert.ok(['saved-on-device', 'waiting-to-upload'].includes(s), k);
   }
 });

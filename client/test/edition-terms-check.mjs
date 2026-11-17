@@ -113,7 +113,6 @@ check('the Prithagoras sign-in screen: its own eyebrow and value line, no langua
   assert.ok(en['login.heroNote'].length < 120, 'the note stays one short line');
 });
 check('the sign-in scenes: Prithagoras lists only scenes that are live there (no board papers, no India notes; the desk only when it is switched on)', async () => {
-  const { scenesFor } = await import('../src/instrument/SignInScenes.jsx').catch(() => ({ scenesFor: null }));
   const src = readFileSync(fileURLToPath(new URL('../src/instrument/SignInScenes.jsx', here)), 'utf8');
   assert.match(src, /prithagoras'\) return \['hand', \.\.\.\(flags\.desk \? \['desk'\] : \[\]\), 'daily'\]/);
   assert.match(src, /return \['hand', 'papers', 'notes', 'daily'\]/);
