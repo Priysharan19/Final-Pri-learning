@@ -7,7 +7,7 @@
 // engine at run time (landing/demoScript.js); this file only paces what the
 // engine returned and draws it.
 //
-// Honesty rules this page keeps (client/test/landing-demo-check.mjs):
+// Honesty rules this page keeps (client/test/landing-home-check.mjs):
 //   · no invented statistics, no competitor names;
 //   · the social-proof slots render only with the flag on AND consented
 //     content (landing.config.js) — neither is true today;
@@ -76,10 +76,13 @@ export function statusWord(t, status, firstError) {
  */
 export const FINAL = Object.freeze({ read: DEMO_LINES.length, glyph: UNSURE.read, lock: DEMO_LINES.length, open: true });
 const START = Object.freeze({ read: 0, glyph: null, lock: 0, open: false });
+/** Reduced motion: every line read at once, still waiting for the visitor to confirm — the reading is never confirmed for them. */
+export const WAITING = Object.freeze({ read: DEMO_LINES.length, glyph: null, lock: 0, open: false });
 
 export function LiveDemo({ initial = null }) {
   const t = useT();
-  const [state, setState] = useState(() => initial || (reducedMotion() ? FINAL : START));
+  const [state, setState] = useState(() => initial || (reducedMotion() ? WAITING : START));
+  const sayRef = useRef(null);
   const timer = useRef(null);
   const result = useMemo(() => runDemo({ glyph: state.glyph }), [state.glyph]);
   const n = DEMO_LINES.length;
@@ -98,8 +101,10 @@ export function LiveDemo({ initial = null }) {
     return () => clearTimeout(timer.current);
   }, [state, waiting, done, n]);
 
-  const confirm = glyph => setState(s => ({ ...s, glyph, lock: reducedMotion() ? n : 0, open: reducedMotion() }));
-  const replay = () => setState(reducedMotion() ? FINAL : START);
+  // The button pressed disappears, so focus moves to the status line it changed.
+  const toSay = () => setTimeout(() => sayRef.current?.focus({ preventScroll: true }), 0);
+  const confirm = glyph => { setState(s => ({ ...s, glyph, lock: reducedMotion() ? n : 0, open: reducedMotion() })); toSay(); };
+  const replay = () => { setState(reducedMotion() ? WAITING : START); toSay(); };
 
   const firstError = result?.firstError ?? null;
   const anyUnverified = !!result?.lines.some(l => l.status === STATUS.UNVERIFIED);
@@ -151,7 +156,7 @@ export function LiveDemo({ initial = null }) {
       </ol>
 
       <div className="lp-demo-bar">
-        <p className="lp-say" aria-live="polite" data-demo-say>{say}</p>
+        <p className="lp-say" aria-live="polite" data-demo-say tabIndex={-1} ref={sayRef}>{say}</p>
         {waiting && (
           <div className="lp-demo-acts">
             <button type="button" className="lp-btn lp-btn-sec" data-demo-confirm onClick={() => confirm(UNSURE.read)}>{t('landing.demo.confirm', { a: UNSURE.read })}</button>

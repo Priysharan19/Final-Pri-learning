@@ -13,7 +13,8 @@
 //       engine/checker.js), and See why opens at line 4;
 //     · the edition's syllabus proof point; no social-proof slot;
 //     · phone: no horizontal scroll, every control at least 44 px tall;
-//     · reduced motion: the final state on first paint.
+//     · reduced motion: every line read at once, the visitor still confirms,
+//       then the final state at once; focus follows to the status line.
 //   Home (/ signed in, a verified account made through the shipped card):
 //     · one primary action; the aside shows nothing it has no evidence for
 //       (a new account has no papers and no marked work).
@@ -108,7 +109,11 @@ async function reduced(spec, browser, platform) {
     await page.goto(`${platform.origin}/welcome`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-landing-demo]', { timeout: 30000 });
     const state = await page.getAttribute('[data-landing-demo]', 'data-demo-state');
-    check(`${spec.edition}: reduced motion shows the final state on first paint`, state === 'done', state);
+    check(`${spec.edition}: reduced motion reads every line at once and still waits for the visitor`, state === 'waiting', state);
+    await page.click('[data-demo-confirm]');
+    await page.waitForSelector('[data-landing-demo][data-demo-state="done"]', { timeout: 2000 });
+    check(`${spec.edition}: after confirming, reduced motion shows the final state at once`, true);
+    check(`${spec.edition}: focus moves to the status line the confirmation changed`, await page.evaluate(() => document.activeElement?.hasAttribute('data-demo-say')));
     check(`${spec.edition}: and its statuses are the engine's too`, JSON.stringify(await statusesIn(page)) === JSON.stringify(ENGINE));
   } finally {
     await ctx.close();

@@ -160,16 +160,19 @@ try {
   await i18n.setLanguage('en');
 
   // ── 5 · Home ───────────────────────────────────────────────────────────────
+  const S = 'server';
   const exams = [
-    { id: 'a', finished_at: 3, score: 72, total: 100 },
-    { id: 'b', finished_at: 1, score: 61, total: 100 },
-    { id: 'c', finished_at: 2, score: 68, total: 100 },
-    { id: 'd', finished_at: 4, score: 10, total: 100, provisional: true },
-    { id: 'e', finished_at: null, score: 0, total: 100 },
-    { id: 'f', finished_at: 5, score: 50, total: 100, pending_marks: 4 }
+    { id: 'a', finished_at: 3, score: 72, total: 100, marked_by: S },
+    { id: 'b', finished_at: 1, score: 61, total: 100, marked_by: S },
+    { id: 'c', finished_at: 2, score: 68, total: 100, marked_by: S },
+    { id: 'd', finished_at: 4, score: 10, total: 100, marked_by: S, provisional: true },
+    { id: 'e', finished_at: null, score: 0, total: 100, marked_by: S },
+    { id: 'f', finished_at: 5, score: 50, total: 100, marked_by: S, pending_marks: 4 },
+    { id: 'g', finished_at: 6, score: 40, total: 100, marked_by: 'earlier-version' },
+    { id: 'h', finished_at: 7, score: 45, total: 100, marked_by: 'backup' }
   ];
   const trend = papersTrend(exams);
-  ok(JSON.stringify(trend.map(p => p.pct)) === '[61,68,72]', 'the trend is the fully marked papers, oldest first (provisional, pending and unfinished left out)');
+  ok(JSON.stringify(trend.map(p => p.pct)) === '[61,68,72]', 'the trend is the papers the server marked in full, oldest first (provisional, pending, unfinished, restored-backup and earlier-version marks left out)');
   ok(papersTrend(exams.slice(0, 1)) === null && papersTrend([]) === null && papersTrend(null) === null, 'fewer than two papers: no trend');
   ok(sparkPath(trend).d.startsWith('M') && sparkPath(null) === null, 'the sparkline is drawn only from a trend');
   const trendHtml = at(h(H.PapersTrend, { exams }), '/');
@@ -192,6 +195,7 @@ try {
   ok(nextMeta({ kind: 'adaptive', data: { topic: 'x' } }).questions === null && nextMeta({ kind: 'smart-practice', data: {} }).minutes === null, 'practice carries no count or time, and none is invented');
   ok(nextMeta({ kind: 'exam', dueAt: 1000 + 25 * 60000, data: {} }, 1000).minutesLeft === 25, 'an exam in progress carries its real minutes left');
   ok(nextMeta({ kind: 'reviews', data: { count: 3, unit: 'topic' } }).questions === 3 && nextMeta({ kind: 'reviews', data: { count: 3, unit: 'dotpoint' } }).questions === null, 'due topic reviews carry their count; dot points are not questions');
+  ok(at(h(H.default, { exams, recent: { id: 'q', subtopicName: 'Integration', marksEarned: 2, marksPossible: 4 }, action: null, showMarked: false }), '/').indexOf('data-home-latest-marked') === -1, 'the latest marked work is not repeated while the Resume card shows it');
   const aside = at(h(H.default, { exams: [], recent: null, action: null }), '/');
   ok(aside === '', 'with nothing true to show, the aside renders nothing');
 } finally {
@@ -210,7 +214,7 @@ const script = read('src/landing/demoScript.js');
 ok(!/edition-accent/.test(landing + read('src/landing/landing.css') + read('src/home/verifiedHome.css')), 'the edition accent stays off verdicts and charts (editions decision)');
 ok(/import \{ stepCheck \} from '\.\.\/engine\/checker\.js'/.test(script) && /import \{ mistakeView \} from '\.\.\/engine\/mistakeView\.js'/.test(script), 'the demo imports the real engine');
 ok(!/from '\.\.\/(api|platform\/cloud|tutor)/.test(landing + script), 'the demo calls no server, cloud or tutor');
-ok(/prefers-reduced-motion: reduce/.test(read('src/landing/landing.css')) && /reducedMotion\(\) \? FINAL : START/.test(landing), 'reduced motion: the final state at once');
+ok(/prefers-reduced-motion: reduce/.test(read('src/landing/landing.css')) && /reducedMotion\(\) \? WAITING : START/.test(landing), 'reduced motion: every line read at once, but the visitor still confirms the reading');
 const app = read('src/App.jsx');
 ok(/<Route path="\/welcome" element=\{<Landing \/>\} \/>/.test(app) && /React\.lazy\(\(\) => import\('\.\/landing\/Landing\.jsx'\)\)/.test(app), 'the landing is a lazy, signed-out route');
 

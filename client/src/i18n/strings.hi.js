@@ -3772,7 +3772,7 @@ export default {
   'landing.syllabus.au': '{brand} NSW Mathematics Advanced 2024 पाठ्यक्रम पर बना है, जिसकी पहली HSC परीक्षा 2027 में होगी।',
   'landing.syllabus.in': '{brand} कक्षा 7 से 12 के लिए CBSE पाठ्यक्रम और NCERT पाठ्यपुस्तकों का पालन करता है, साथ में JEE Main और JEE Advanced ट्रैक।',
   'landing.teachers.title': 'शिक्षकों के लिए',
-  'landing.teachers.p1': '{brand} का हर अंक गणित इंजन से आता है, पंक्ति दर पंक्ति, और जिस पंक्ति पर वह रुका वह दिखाई जाती है।',
+  'landing.teachers.p1': '{brand} का हर अंक गणित इंजन से आता है, और हल के लिए वह पंक्ति दिखाई जाती है जहाँ इंजन रुका।',
   'landing.teachers.p2': 'शिक्षक खाते अभी खुले नहीं हैं। जब खुलेंगे, यह पेज बताएगा कि खाता कैसे बनाएँ।',
   'login.seeHowMarking': 'देखें कि एक पंक्ति कैसे जाँची जाती है',
   // ── Home, "the verified page" §5 ─────────────────────────────────────────

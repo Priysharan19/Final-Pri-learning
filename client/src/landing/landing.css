@@ -74,6 +74,8 @@
 .lp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 
 .lp-demo-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 48px; }
+.lp-say:focus { outline: none; }
+.lp-say:focus-visible { outline: 2px solid var(--in-tx, var(--ink)); outline-offset: 2px; }
 .lp-say { flex: 1; min-width: 200px; margin: 0; font-size: 14px; line-height: 1.45; color: var(--in-tx-2, var(--ink-2)); }
 .lp-demo-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .lp-demo-bar .lp-btn { min-height: 44px; font-size: 14px; padding: 0 16px; }

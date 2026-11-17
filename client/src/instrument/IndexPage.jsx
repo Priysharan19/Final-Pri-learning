@@ -254,7 +254,11 @@ export default function IndexPage() {
             </div>
           )}
         </div>
-        <HomeAside exams={local?.exams} recent={recent} action={homeDecision.primary} />
+        {/* The action is passed only when it is the one shown (NextAction), and
+            the latest marked work only when the Resume card is not showing it. */}
+        <HomeAside exams={local?.exams} recent={recent}
+          action={homeDecision.primary && (homeDecision.primary.priority >= URGENT || recent === null) ? homeDecision.primary : null}
+          showMarked={!(recent && !(homeDecision.primary && homeDecision.primary.priority >= URGENT))} />
       </div>
       <div className="in-spine">
         {phone && current && (

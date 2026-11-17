@@ -39,14 +39,15 @@ export function nextMeta(action, now = Date.now()) {
 
 /**
  * The timed-paper trend from GET /exams: finished papers the server marked in
- * full (not pending, not provisional, a positive total), as whole percentages,
+ * full (marked_by 'server' — not a restored backup or an earlier version's
+ * device marking — not pending, not provisional, a positive total), as whole percentages,
  * oldest first, the last `max`. Null with fewer than two.
  */
 export function papersTrend(exams, max = 6) {
   if (!Array.isArray(exams)) return null;
   const done = exams.filter(e => e
     && Number.isFinite(Number(e.finished_at)) && Number(e.finished_at) > 0
-    && !e.pending && !e.provisional && !(Number(e.pending_marks) > 0)
+    && e.marked_by === 'server' && !e.pending && !e.provisional && !(Number(e.pending_marks) > 0)
     && Number.isFinite(Number(e.score)) && Number(e.total) > 0)
     .sort((a, b) => Number(a.finished_at) - Number(b.finished_at))
     .slice(-max)

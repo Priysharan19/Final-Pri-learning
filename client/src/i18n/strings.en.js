@@ -3717,7 +3717,7 @@ export default {
   'landing.syllabus.au': '{brand} is built on the NSW Mathematics Advanced 2024 syllabus, which is first examined in the HSC in 2027.',
   'landing.syllabus.in': '{brand} follows the CBSE syllabus and the NCERT textbooks for Classes 7 to 12, with JEE Main and JEE Advanced tracks.',
   'landing.teachers.title': 'For teachers',
-  'landing.teachers.p1': 'Every mark {brand} gives comes from the maths engine, line by line, with the line it stopped at shown.',
+  'landing.teachers.p1': 'Every mark {brand} gives comes from the maths engine, and for working it shows the line where the engine stopped.',
   'landing.teachers.p2': 'Teacher accounts aren’t open yet. This page will show how to set one up when they are.',
   'login.seeHowMarking': 'See how a line is checked',
   // ── Home, "the verified page" §5 ─────────────────────────────────────────

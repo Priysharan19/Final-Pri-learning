@@ -6,7 +6,7 @@
 // placeholder and never invents any of the three, so the slots render only
 // when this flag is on AND a slot has real, consented content. Both are false
 // today. Turning the flag on without content still renders nothing
-// (client/test/landing-demo-check.mjs).
+// (client/test/landing-home-check.mjs).
 //
 // TEACHERS. "For teachers" opens a simple page until the teacher workspace's
 // onboarding route ships; then it points there instead.

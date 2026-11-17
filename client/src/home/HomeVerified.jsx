@@ -45,7 +45,7 @@ export function PapersTrend({ exams }) {
           <path d={spark.d} className="vp-spark" />
           <circle cx={spark.last[0]} cy={spark.last[1]} r="3" className="vp-spark-dot" />
         </svg>
-        <span className="vp-spark-n">{series}</span>
+        <span className="vp-spark-n" aria-hidden="true">{series}</span>
       </span>
       <span className="vp-sr">{t('home.vp.papersSay', { count: points.length, n: points.length, series })}</span>
     </PageLink>
@@ -78,17 +78,18 @@ export function MarksAtStake({ action, forecast = homeForecast() }) {
 }
 
 /** The column beside the Next card. Renders nothing when it has nothing true to show. */
-export default function HomeAside({ exams, recent, action }) {
+export default function HomeAside({ exams, recent, action, showMarked = true }) {
   const t = useT();
   const trend = papersTrend(exams);
-  const marked = latestMarked(recent);
+  // The Resume card already shows the latest question's marks: not twice.
+  const marked = showMarked ? latestMarked(recent) : null;
   const stake = marksAtStake(action, homeForecast());
   if (!trend && !marked && !stake) return null;
   return (
     <aside className="vp-aside" aria-label={t('home.vp.aside')} data-home-aside>
       <MarksAtStake action={action} />
       <PapersTrend exams={exams} />
-      <LatestMarked recent={recent} />
+      {showMarked && <LatestMarked recent={recent} />}
     </aside>
   );
 }

@@ -10,7 +10,7 @@
 // (engine/checker.js) returns for that line's claims when the page runs, and
 // See why is the real mistakeView (engine/mistakeView.js) on the same two
 // lines Step Check compared. Nothing here says "checked" or "first error" by
-// itself; client/test/landing-demo-check.mjs proves it by breaking a line and
+// itself; client/test/landing-home-check.mjs proves it by breaking a line and
 // watching the status follow.
 //
 // What a line claims. A line of working is several mathematical claims (line 3
