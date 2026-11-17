@@ -1237,7 +1237,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               // (Any branch in the unbroken run of branch lines just above may give it:
               // x - 3 = 0, x - 5 = 0, then x = 3, x = 5.)
               const run = [];
-              for (let k = branchLines.length - 1, at = i - 1; k >= 0 && branchLines[k].index === at && !branchLines[k].valued; k--, at--) run.push(branchLines[k]);
+              for (let k = branchLines.length - 1, at = i - 1; k >= 0 && branchLines[k].index === at && !branchLines[k].valued && !branchLines[k].expLog; k--, at--) run.push(branchLines[k]);
               const above = run[0];
               const given = run.flatMap(b => b.covered);
               if (valued && above && !held.every(h => given.some(c => numsClose(h, c)))) {
@@ -1388,7 +1388,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       for (const b of branchLines) {
         out[b.index].note = `True for ${meta.variable} = ${b.covered.join(' or ')} — the equation has ${wanted.length} solutions, and the other is still to find.`;
       }
-    } else if (!listedInFull && !complete && firstBreak === -1) {
+    } else if (!listedInFull && !complete && (firstBreak === -1 || (branchLines[0].valued && branchLines[0].index < firstBreak))) {
       const { index } = branchLines[0];
       const diagnosis = lostRootDiagnosis(meta.variable, covered.join(' or ') || 'this branch', wanted.length);
       out[index] = { text: out[index].text, status: 'break', note: diagnosis.message, diagnosis };
