@@ -116,8 +116,11 @@ const whyLines = adaptiveSrc.split('\n').filter(l => /'weak-spot':|misconception
 ok('no adaptive why-string makes an efficacy claim', whyLines.every(l => !EFFICACY.test(l)), whyLines.join('\n'));
 const indiaWhy = backend.slice(backend.indexOf('const INDIA_WHY = {'), backend.indexOf('};', backend.indexOf('const INDIA_WHY = {')));
 ok('no India why-string makes one', !EFFICACY.test(indiaWhy));
-ok('the English success-rate line claims no speed of learning', /'progressAu\.engineNear70': 'The engine aims to keep your success rate near 70%\.'/.test(en));
-ok('nor the Hindi one', !/सबसे तेज़ होता/.test(hi) && /'progressAu\.engineNear70': 'इंजन आपकी सफलता दर/.test(hi));
+// The evidence-first Progress rebuild (train 24) retired the 70% success-rate line
+// altogether (no mastery figure, percentage or predicted mark), so the line is
+// either absent or the one reviewed wording; it can never come back as a speed-of-learning claim.
+ok('the English success-rate line is absent or claims no speed of learning', !/'progressAu\.engineNear70'/.test(en) || /'progressAu\.engineNear70': 'The engine aims to keep your success rate near 70%\.'/.test(en));
+ok('nor the Hindi one', !/सबसे तेज़ होता/.test(hi) && (!/'progressAu\.engineNear70'/.test(hi) || /'progressAu\.engineNear70': 'इंजन आपकी सफलता दर/.test(hi)));
 ok('the untargeted reason does not say the slip keeps coming back', !/keeps coming back/i.test(A.MISCONCEPTION_UNTARGETED_WHY));
 const choice = pick(liveTraps);
 ok('the pick names the slip for when the question carries it', /Same slip keeps coming back/.test(choice.why));

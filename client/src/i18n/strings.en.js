@@ -241,7 +241,7 @@ export default {
   'board.prio.sourceIndia': 'Marks are the unit weightage CBSE publishes for this paper. They show where marks sit, not what you will score.',
   'board.prio.sourceForecast': 'Marks come from Pri’s HSC topic forecast for this course: a range from the 2024 syllabus, NESA’s sample materials and past papers. They show where marks sit, not what you will score.',
   'board.prio.sourceNsw': 'Marks come from the design of Pri’s HSC-style practice paper for this course, not from NESA or any HSC paper. They show where marks sit, not what you will score.',
-  'board.prio.stakeNone': 'Every topic on {paper} has some independent evidence. Keep it fresh.',
+  'board.prio.stakeNone': 'No topic on {paper} is missing independent evidence right now. Keep it fresh.',
   'board.prio.stakeOneShort': 'about {n}',
   'board.prio.stakeTotal': '{range} of the {total} marks on {paper} sit in areas you haven’t shown on your own yet.',
   'board.prio.title': 'What to work on',
