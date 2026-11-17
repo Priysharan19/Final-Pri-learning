@@ -36,7 +36,7 @@ const EDGES = {
   'y10-trig-nonright': ['y10-trig'], 'y10-trig-any-angle': ['y10-trig-nonright'], 'y10-geometry-proof': ['y10-similarity'],
   'y10-circle-geometry': ['y10-geometry-proof'], 'y10-networks': ['y9-data'],
   // Year 11
-  'y11-functions': ['y10-functions'], 'y11-quadfunc': ['y10-quadratics', 'y11-functions'], 'y11-polynomials': ['y10-polynomials'],
+  'y11-functions': ['y10-functions'], 'y11-functions-more': ['y11-functions'], 'y11-quadfunc': ['y10-quadratics', 'y11-functions'], 'y11-polynomials': ['y10-polynomials'],
   'y11-lines': ['y9-linear'], 'y11-trigfunc': ['y10-trig-any-angle'], 'y11-sine-cosine-rule': ['y10-trig-nonright'],
   'y11-explog': ['y10-logarithms', 'y11-functions'], 'y11-diff': ['y11-lines', 'y11-functions'], 'y11-probability': ['y10-probability'],
   // Year 12
