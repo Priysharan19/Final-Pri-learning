@@ -66,23 +66,26 @@ function figCliff({ u, h, unknown } = {}) {
   for (let i = 0; i <= 40; i++) { const t = i / 40; pts.push(`${n2(cx + 190 * t)},${n2(top + (gy - top) * t * t)}`); }
   parts.push(`<polyline points="${pts.join(' ')}" stroke-dasharray="5 4"/>`, dot(cx, top), dot(cx + 190, gy));
   parts.push(arrow(cx, top, cx + 56, top), label(cx + 30, top - 8, `${u} m/s`));
-  parts.push(`<line x1="${cx - 18}" y1="${top}" x2="${cx - 18}" y2="${gy}"/>`, label(cx - 24, (top + gy) / 2 + 4, `${h} m`, { anchor: 'end' }));
+  parts.push(`<line x1="${cx - 18}" y1="${top}" x2="${cx - 18}" y2="${gy}"/><line x1="${cx - 24}" y1="${top}" x2="${cx - 12}" y2="${top}"/><line x1="${cx - 24}" y1="${gy}" x2="${cx - 12}" y2="${gy}"/>`, label(cx - 24, (top + gy) / 2 + 4, `${h} m`, { anchor: 'end' }));
   if (unknown === 'd') parts.push(`<line x1="${cx}" y1="${gy + 18}" x2="${cx + 190}" y2="${gy + 18}"/>`, label(cx + 95, gy + 34, 'd', { italic: true }));
-  if (unknown === 'T') parts.push(label(cx + 150, top + 30, 'time to land T', { anchor: 'middle' }));
+  if (unknown === 'T') parts.push(label(cx + 150, top + 30, 'T', { italic: true }));
   parts.push(notToScale(W, Ht));
   return wrapSvg(parts.join(''), W, Ht, 'A ball thrown horizontally from the top of a cliff');
 }
 
 /** A parallelogram OABC with A and C given and B unknown (optionally with its diagonals meeting at M). */
 function figParallelogram({ a, c, askMid }) {
-  const W = 340, H = 200, O = [50, 160], A = [220, 160], C = [120, 50], B = [290, 50];
+  const W = 340, H = 200, bx = a[0] + c[0], by = a[1] + c[1];
+  const xs = [0, a[0], c[0], bx], ys = [0, a[1], c[1], by];
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const sc = Math.min(210 / Math.max(1, x1 - x0), 100 / Math.max(1, y1 - y0));
+  const P = ([x, y]) => [n2(60 + (x - x0) * sc), n2(150 - (y - y0) * sc)];
+  const O = P([0, 0]), A = P(a), C = P(c), B = P([bx, by]);
   const parts = [`<polygon points="${O.join(',')} ${A.join(',')} ${B.join(',')} ${C.join(',')}"/>`, dot(...O), dot(...A), dot(...B), dot(...C)];
-  parts.push(label(O[0] - 6, O[1] + 16, 'O', { anchor: 'end', italic: true }), label(A[0] + 8, A[1] + 16, `A(${a[0]}, ${a[1]})`, { anchor: 'start' }));
-  parts.push(label(C[0] - 8, C[1] - 6, `C(${c[0]}, ${c[1]})`, { anchor: 'end' }), label(B[0] + 4, B[1] - 8, 'B', { anchor: 'start', italic: true }));
-  if (askMid) {
-    const M = [(O[0] + B[0]) / 2, (O[1] + B[1]) / 2];
-    parts.push(`<line x1="${O[0]}" y1="${O[1]}" x2="${B[0]}" y2="${B[1]}" stroke-dasharray="4 4"/><line x1="${A[0]}" y1="${A[1]}" x2="${C[0]}" y2="${C[1]}" stroke-dasharray="4 4"/>`, dot(...M), label(M[0] + 8, M[1] + 16, 'M', { anchor: 'start', italic: true }));
-  }
+  const cen = [(O[0] + B[0]) / 2, (O[1] + B[1]) / 2];
+  const put = (pt, txt, italic) => label(pt[0] + (pt[0] >= cen[0] ? 8 : -8), pt[1] + (pt[1] >= cen[1] ? 16 : -8), txt, { anchor: pt[0] >= cen[0] ? 'start' : 'end', italic });
+  parts.push(put(O, 'O', true), put(A, `A(${a[0]}, ${a[1]})`), put(C, `C(${c[0]}, ${c[1]})`), put(B, 'B', true));
+  if (askMid) parts.push(`<line x1="${O[0]}" y1="${O[1]}" x2="${B[0]}" y2="${B[1]}" stroke-dasharray="4 4"/><line x1="${A[0]}" y1="${A[1]}" x2="${C[0]}" y2="${C[1]}" stroke-dasharray="4 4"/>`, dot(...cen), label(cen[0] + 8, cen[1] - 8, 'M', { anchor: 'start', italic: true }));
   parts.push(notToScale(W, H));
   return wrapSvg(parts.join(''), W, H, askMid ? 'A parallelogram OABC whose diagonals meet at M' : 'A parallelogram OABC');
 }
@@ -117,11 +120,11 @@ function sumFamily(rng) {
       closedTex: n => `\\dfrac{${n}(${n + 1})(${2 * n + 1 + 3 * c})}{6}`
     };
   }
-  const a = ri(rng, 1, 9), r = ri(rng, 2, 6), A = a === 1 ? '' : a;
+  const a = ri(rng, 1, 9), r = ri(rng, 3, 6), pre = a === 1 ? '' : `${a}\\times `;
   return {
-    kind, term: i => a * r ** (i - 1), termTex: `${A}\\times ${r}^{i-1}`, nextTex: `${A}\\times ${r}^{k}`,
-    claim: `\\sum_{i=1}^{n}${A}\\times ${r}^{i-1} = \\dfrac{${A}(${r}^{n}-1)}{${r - 1}}`,
-    closedTex: n => `\\dfrac{${A}(${r}^{${n}}-1)}{${r - 1}}`
+    kind, term: i => a * r ** (i - 1), termTex: `${pre}${r}^{i-1}`, nextTex: `${pre}${r}^{k}`,
+    claim: `\\sum_{i=1}^{n}${pre}${r}^{i-1} = \\dfrac{${a === 1 ? '' : a}(${r}^{n}-1)}{${r - 1}}`,
+    closedTex: n => `\\dfrac{${a === 1 ? '' : a}(${r}^{${n}}-1)}{${r - 1}}`
   };
 }
 const sumTo = (F, n) => { let s = 0; for (let i = 1; i <= n; i++) s += F.term(i); return s; };
@@ -134,7 +137,7 @@ const induction = {
       () => {
         const F = sumFamily(rng), m = ri(rng, 1, F.kind === 'geom' ? 7 : 9), v = sumTo(F, m);
         return {
-          formTag: 'direct', prompt: `A proof by induction of $${F.claim}$ for all integers $n \\ge 1$ begins with the base case $n = ${m}$. What value do **both sides** take?`,
+          formTag: 'direct', prompt: `A proof by induction of $${F.claim}$ for all integers $n \\ge 1$ is checked at $n = ${m}$. What value do **both sides** take?`,
           answerType: 'numeric', answer: { value: v },
           traps: [{ value: sumTo(F, m + 1), why: `Substitute $n = ${m}$, not $n = ${m + 1}$.` }],
           hints: [`Add the terms $i = 1$ to $i = ${m}$.`, 'Substitute into the right side to check that the two sides agree.', 'The shared value is the answer.'],
@@ -223,7 +226,7 @@ const induction = {
     ];
     const L4 = [
       () => {
-        const F = sumFamily(rng), m = ri(rng, F.kind === 'geom' ? 6 : 8, F.kind === 'geom' ? 11 : 40), v = sumTo(F, m);
+        const F = sumFamily(rng), m = ri(rng, F.kind === 'geom' ? 6 : 8, F.kind === 'geom' ? 9 : 40), v = sumTo(F, m);
         return {
           formTag: 'multi-step', prompt: `It has been proved by induction that $${F.claim}$ for all integers $n \\ge 1$. Use the result to evaluate $\\sum_{i=1}^{${m}} ${F.termTex}$.`,
           answerType: 'numeric', answer: { value: v },
@@ -233,7 +236,7 @@ const induction = {
         };
       },
       () => {
-        const F = sumFamily(rng), m = ri(rng, 5, F.kind === 'geom' ? 9 : 30), j = ri(rng, 2, m - 2), v = sumTo(F, m) - sumTo(F, j);
+        const F = sumFamily(rng), m = ri(rng, 5, F.kind === 'geom' ? 8 : 30), j = ri(rng, 2, m - 2), v = sumTo(F, m) - sumTo(F, j);
         return {
           formTag: 'multi-step', prompt: `Given the proved result $${F.claim}$, find $\\sum_{i=${j + 1}}^{${m}} ${F.termTex}$, the sum of the terms from $i = ${j + 1}$ to $i = ${m}$.`,
           answerType: 'numeric', answer: { value: v },
@@ -263,16 +266,16 @@ const induction = {
 // me12-binomial-forms · ME1-12-06
 // ─────────────────────────────────────────────────────────────────────────────
 const CONTEXTS = [
-  { unit: 'attempts', who: 'A basketball player', ok: 'scores' },
-  { unit: 'seeds', who: 'A gardener', ok: 'germinates' },
-  { unit: 'components', who: 'A factory', ok: 'passes inspection' },
-  { unit: 'calls', who: 'A survey team', ok: 'is answered' },
-  { unit: 'penalty kicks', who: 'A footballer', ok: 'is converted' },
-  { unit: 'flights', who: 'An airline', ok: 'departs on time' },
-  { unit: 'customers', who: 'A café', ok: 'buys a coffee' },
-  { unit: 'patients', who: 'A clinic', ok: 'is protected by the vaccine' },
-  { unit: 'buses', who: 'A bus company', ok: 'arrives on time' },
-  { unit: 'emails', who: 'A newsletter', ok: 'is opened' }
+  { one: 'attempt', unit: 'attempts', who: 'A basketball player', ok: 'scores' },
+  { one: 'seed', unit: 'seeds', who: 'A gardener', ok: 'germinates' },
+  { one: 'component', unit: 'components', who: 'A factory', ok: 'passes inspection' },
+  { one: 'call', unit: 'calls', who: 'A survey team', ok: 'is answered' },
+  { one: 'penalty kick', unit: 'penalty kicks', who: 'A footballer', ok: 'is converted' },
+  { one: 'flight', unit: 'flights', who: 'An airline', ok: 'departs on time' },
+  { one: 'customer', unit: 'customers', who: 'A café', ok: 'buys a coffee' },
+  { one: 'patient', unit: 'patients', who: 'A clinic', ok: 'is protected by the vaccine' },
+  { one: 'bus', unit: 'buses', who: 'A bus company', ok: 'arrives on time' },
+  { one: 'email', unit: 'emails', who: 'A newsletter', ok: 'is opened' }
 ];
 const PS = [[1, 10], [1, 5], [1, 4], [3, 10], [2, 5], [1, 2], [3, 5], [7, 10], [3, 4], [4, 5], [9, 10], [1, 20], [3, 20], [7, 20], [9, 20], [11, 20], [13, 20], [17, 20], [19, 20]];
 const pTex = ([a, b]) => String(a / b);
@@ -283,7 +286,7 @@ const choose = (n, k) => { let r = 1; for (let i = 1; i <= k; i++) r = (r * (n -
 const binomial = {
   'me12-binomial-forms': (rng, diff) => {
     const cx = pick(rng, CONTEXTS), pr = pick(rng, PS), [pa, pd] = pr, qa = pd - pa, qTex = pTex([qa, pd]);
-    const intro = `${cx.who} finds that each of its ${cx.unit} independently succeeds (the item ${cx.ok}) with probability $${pTex(pr)}$.`;
+    const intro = `${cx.who} models each ${cx.one} as independent: it ${cx.ok} with probability $${pTex(pr)}$. Call that a success.`;
     const L1 = [
       () => {
         const n = ri(rng, 4, 400), v = dec(n * pa, pd);
@@ -410,7 +413,7 @@ const OBJECTS = ['A ball', 'A stone', 'A cricket ball', 'A tennis ball', 'A rugb
 const TRIPLES = (() => {   // (horizontal, vertical, speed) with the vertical component a multiple of 10 (vertical speed 10t)
   const base = [[3, 4, 5], [4, 3, 5], [5, 12, 13], [12, 5, 13], [8, 15, 17], [15, 8, 17], [7, 24, 25], [24, 7, 25], [20, 21, 29], [21, 20, 29]];
   const out = [];
-  for (const [a, b, c] of base) for (let s = 1; s <= 40; s++) if ((b * s) % 10 === 0 && b * s <= 50 && c * s <= 100) out.push([a * s, b * s, c * s]);
+  for (const [a, b, c] of base) for (let s = 1; s <= 40; s++) if ((b * s) % 10 === 0 && b * s <= 50 && c * s <= 55) out.push([a * s, b * s, c * s]);
   return out;
 })();
 const TRIPLES5 = TRIPLES.filter(t => t[1] % 5 === 0);   // vertical component a multiple of 5 (flight time vy/5 is whole)
@@ -419,7 +422,7 @@ const G = ' Take $g = 10$ m/s² and ignore air resistance.';
 const projectile = {
   'me12-projectile-forms': (rng, diff) => {
     const lead = `${pick(rng, OBJECTS)} is`;
-    const k = ri(rng, 2, 16), vy = 5 * k, vx = ri(rng, 4, 60), T = k, R = vx * T, H = (vy * vy) / 20;
+    const k = ri(rng, 2, 11), vy = 5 * k, vx = ri(rng, 4, 55), T = k, R = vx * T, H = (vy * vy) / 20;
     const f = {
       flight: () => ({
         formTag: 'direct', figure: figTrajectory({ vx, vy, unknown: 'T' }),
@@ -461,8 +464,27 @@ const projectile = {
         hints: ['It lands when $v_y t - 5t^2 = 0$.', 'So $T = \\dfrac{v_y}{5}$.', `$v_y = 5\\times ${T}$.`],
         steps: [{ h: 'Landing time', d: '$T = \\dfrac{v_y}{5}$' }, { h: 'Solve', d: `$v_y = 5\\times ${T} = ${vy}$ m/s` }]
       }),
+      'distance-at-time': () => {
+        const t = ri(rng, 1, T - 1) || 1, d = vx * t;
+        return {
+          formTag: 'representation', figure: figTrajectory({ vx, vy }),
+          prompt: `${lead} launched from level ground with horizontal velocity $${vx}$ m/s and vertical velocity $${vy}$ m/s. How far has it travelled horizontally, in metres, $${t}$ s after launch?${G}`,
+          answerType: 'numeric', answer: { value: d }, answerSuffix: 'm',
+          traps: [{ value: vy * t, why: 'Horizontal distance uses the horizontal velocity: $x = v_x t$.' }].filter(x => x.value !== d),
+          hints: ['Horizontally there is no acceleration.', '$x = v_x t$.', `$${vx}\\times ${t}$.`],
+          steps: [{ h: 'Horizontal motion', d: '$x = v_x t$' }, { h: 'Distance', d: `$x = ${vx}\\times ${t} = ${d}$ m` }]
+        };
+      },
+      'time-to-top': () => ({
+        formTag: 'direct', figure: figTrajectory({ vx, vy }),
+        prompt: `${lead} launched from level ground with horizontal velocity $${vx}$ m/s and vertical velocity $${vy}$ m/s. Find the time, in seconds, to reach its greatest height.${G}`,
+        answerType: 'numeric', answer: { value: vy / 10 }, answerSuffix: 's',
+        traps: [{ value: T, why: 'That is the whole flight; the top is reached at half of it.' }],
+        hints: ['At the top the vertical velocity is zero.', `$0 = ${vy} - 10t$.`, 'Solve for $t$.'],
+        steps: [{ h: 'Vertical velocity', d: `$v_y = ${vy} - 10t = 0$` }, { h: 'Time', d: `$t = ${vy / 10}$ s` }]
+      }),
       'cliff-time': () => {
-        const t = ri(rng, 1, 5), h = 5 * t * t, u = ri(rng, 4, 60);
+        const t = ri(rng, 1, 5), h = 5 * t * t, u = ri(rng, 4, 45);
         return {
           formTag: 'context', figure: figCliff({ u, h, unknown: 'T' }),
           prompt: `${lead} thrown horizontally at $${u}$ m/s from the top of a cliff $${h}$ m above level ground, as shown. Find the time $T$, in seconds, until it lands.${G}`,
@@ -473,7 +495,7 @@ const projectile = {
         };
       },
       'cliff-distance': () => {
-        const t = ri(rng, 2, 5), h = 5 * t * t, u = ri(rng, 4, 60);
+        const t = ri(rng, 2, 5), h = 5 * t * t, u = ri(rng, 4, 45);
         return {
           formTag: 'multi-step', figure: figCliff({ u, h, unknown: 'd' }),
           prompt: `${lead} thrown horizontally at $${u}$ m/s from the top of a cliff $${h}$ m above level ground. How far $d$ from the base of the cliff does it land, in metres?${G}`,
@@ -507,7 +529,7 @@ const projectile = {
         };
       },
       'time-at-height': () => {
-        const t1 = ri(rng, 1, 11), t2 = ri(rng, t1 + 1, 14), vy2 = 5 * (t1 + t2), h = 5 * t1 * t2, vx2 = ri(rng, 4, 60), first = rng() < 0.5;
+        const t1 = ri(rng, 1, 9), t2 = ri(rng, t1 + 1, 11), vy2 = 5 * (t1 + t2), h = 5 * t1 * t2, vx2 = ri(rng, 4, 55), first = rng() < 0.5;
         return {
           formTag: 'reverse', figure: figTrajectory({ vx: vx2, vy: vy2 }),
           prompt: `${lead} launched from level ground with horizontal velocity $${vx2}$ m/s and vertical velocity $${vy2}$ m/s. Find the ${first ? 'first' : 'second'} time, in seconds, at which it is $${h}$ m above the ground.${G}`,
@@ -521,7 +543,7 @@ const projectile = {
         const [cx0, cy0, sp] = pick(rng, TRIPLES5), T2 = cy0 / 5, R2 = cx0 * T2;
         return {
           formTag: 'context', figure: figTrajectory({ unknown: 'R' }),
-          prompt: `${lead} launched from level ground at $${sp}$ m/s at an angle $\\theta$ above the horizontal, where $\\cos\\theta = \\dfrac{${cx0}}{${sp}}$. Find its horizontal range $R$, in metres.${G}`,
+          prompt: `${lead} launched from level ground at $${sp}$ m/s at an angle $\\theta$ above the horizontal, where $\\cos\\theta = \\dfrac{${cx0 / gcdI(cx0, sp)}}{${sp / gcdI(cx0, sp)}}$. Find its horizontal range $R$, in metres.${G}`,
           answerType: 'numeric', answer: { value: R2 }, answerSuffix: 'm',
           traps: [{ value: sp * T2, why: 'Use the horizontal component $v\\cos\\theta$, not the whole speed.' }].filter(t => t.value !== R2),
           hints: [`$v_x = ${sp}\\cos\\theta = ${cx0}$ m/s.`, `$v_y = \\sqrt{${sp}^2 - ${cx0}^2} = ${cy0}$ m/s.`, `$T = \\dfrac{2\\times ${cy0}}{10}$, then $R = v_x T$.`],
@@ -529,7 +551,7 @@ const projectile = {
         };
       }
     };
-    const levels = [['flight', 'cliff-time', 'find-vy'], ['range', 'height', 'cliff-time', 'height-at-time'], ['find-vx', 'cliff-distance', 'height-at-time', 'time-at-height'], ['cliff-speed', 'time-at-height', 'angle-range', 'find-vx']];
+    const levels = [['flight', 'cliff-time', 'find-vy', 'time-to-top'], ['range', 'height', 'cliff-time', 'height-at-time', 'distance-at-time'], ['find-vx', 'cliff-distance', 'height-at-time', 'time-at-height'], ['cliff-speed', 'time-at-height', 'angle-range', 'find-vx']];
     return f[pick(rng, levels[(diff || 1) - 1])]();
   }
 };
@@ -544,12 +566,12 @@ const vectors = {
   'me12-vectors-forms': (rng, diff) => {
     const f = {
       dot: () => {
-        const a = [ri(rng, -12, 12), ri(rng, -12, 12)], b = [ri(rng, -12, 12), ri(rng, -12, 12)], v = a[0] * b[0] + a[1] * b[1];
+        const a = [nz(rng, -12, 12), nz(rng, -12, 12)], b = [nz(rng, -12, 12), nz(rng, -12, 12)], v = a[0] * b[0] + a[1] * b[1];
         return {
           formTag: 'direct', prompt: `Given $\\underline{a} = ${vec(a[0], a[1])}$ and $\\underline{b} = ${vec(b[0], b[1])}$, find $\\underline{a}\\cdot\\underline{b}$.`,
           answerType: 'numeric', answer: { value: v },
           traps: [{ value: a[0] * b[1] + a[1] * b[0], why: 'Multiply matching components: $a_1b_1 + a_2b_2$.' }].filter(t => t.value !== v),
-          hints: ['Multiply the top components, then the bottom components.', `$${paren(a[0])}${paren(b[0])} + ${paren(a[1])}${paren(b[1])}$.`.replace(/\)\(/g, ')\\times('), 'Add.'],
+          hints: ['Multiply the top components, then the bottom components.', `$${paren(a[0])}\\times ${paren(b[0])} + ${paren(a[1])}\\times ${paren(b[1])}$.`, 'Add.'],
           steps: [{ h: 'Dot product', d: `$${paren(a[0])}\\times ${paren(b[0])} + ${paren(a[1])}\\times ${paren(b[1])} = ${v}$` }]
         };
       },
@@ -569,7 +591,7 @@ const vectors = {
           formTag: 'missing-parameter', prompt: `The vectors $\\underline{a} = ${vec(p, q)}$ and $\\underline{b} = ${vec('k', r)}$ are perpendicular. Find $k$.`,
           answerType: 'numeric', answer: { value: kk },
           traps: [{ value: -kk, why: 'Perpendicular vectors have dot product zero: $pk + qr = 0$, so $k = -\\dfrac{qr}{p}$; keep the sign.' }].filter(x => x.value !== kk),
-          hints: ['Perpendicular means $\\underline{a}\\cdot\\underline{b} = 0$.', `$${p}k + ${paren(q)}${paren(r)} = 0$.`.replace(/\)\(/g, ')\\times('), 'Solve for $k$.'],
+          hints: ['Perpendicular means $\\underline{a}\\cdot\\underline{b} = 0$.', `$${p}k + ${paren(q)}\\times ${paren(r)} = 0$.`, 'Solve for $k$.'],
           steps: [{ h: 'Dot product is zero', d: `$${p}k + ${q * r < 0 ? `(${q * r})` : q * r} = 0$` }, { h: 'Solve', d: `$k = ${kk}$` }]
         };
       },
@@ -595,7 +617,9 @@ const vectors = {
         };
       },
       parallelogram: () => {
-        const a = [ri(rng, 1, 12), ri(rng, -6, 6)], c = [ri(rng, -6, 6), ri(rng, 2, 12)], B = [a[0] + c[0], a[1] + c[1]], askX = rng() < 0.5;
+        let a, c;
+        do { a = [ri(rng, 1, 12), ri(rng, -6, 6)]; c = [ri(rng, -6, 6), ri(rng, 2, 12)]; } while (a[0] * c[1] - a[1] * c[0] === 0);
+        const B = [a[0] + c[0], a[1] + c[1]], askX = rng() < 0.5;
         return {
           formTag: 'representation', figure: figParallelogram({ a, c }),
           prompt: `$OABC$ is a parallelogram with $O$ at the origin, as shown. $A$ is the point $(${a[0]}, ${a[1]})$ and $C$ is the point $(${c[0]}, ${c[1]})$. Find the ${askX ? '$x$' : '$y$'}-coordinate of $B$.`,
@@ -606,7 +630,9 @@ const vectors = {
         };
       },
       centre: () => {
-        const a = [2 * ri(rng, 1, 8), 2 * ri(rng, -4, 4)], c = [2 * ri(rng, -4, 4), 2 * ri(rng, 1, 8)], M = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2], askX = rng() < 0.5;
+        let a, c;
+        do { a = [2 * ri(rng, 1, 8), 2 * ri(rng, -4, 4)]; c = [2 * ri(rng, -4, 4), 2 * ri(rng, 1, 8)]; } while (a[0] * c[1] - a[1] * c[0] === 0);
+        const M = [(a[0] + c[0]) / 2, (a[1] + c[1]) / 2], askX = rng() < 0.5;
         return {
           formTag: 'multi-step', figure: figParallelogram({ a, c, askMid: true }),
           prompt: `$OABC$ is a parallelogram with $O$ at the origin, $A(${a[0]}, ${a[1]})$ and $C(${c[0]}, ${c[1]})$, as shown. Its diagonals meet at $M$. Find the ${askX ? '$x$' : '$y$'}-coordinate of $M$.`,
@@ -617,7 +643,9 @@ const vectors = {
         };
       },
       division: () => {
-        const m = ri(rng, 1, 4), n = ri(rng, 1, 4), s = [nz(rng, -5, 5), nz(rng, -5, 5)], A = [ri(rng, -9, 9), ri(rng, -9, 9)];
+        let m, n;
+        do { m = ri(rng, 1, 4); n = ri(rng, 1, 4); } while (gcdI(m, n) !== 1);
+        const s = [nz(rng, -5, 5), nz(rng, -5, 5)], A = [ri(rng, -9, 9), ri(rng, -9, 9)];
         const B = [A[0] + (m + n) * s[0], A[1] + (m + n) * s[1]], P = [A[0] + m * s[0], A[1] + m * s[1]], askX = rng() < 0.5, ans = askX ? P[0] : P[1];
         const swapped = askX ? A[0] + n * s[0] : A[1] + n * s[1];   // the ratio read the wrong way round
         return {

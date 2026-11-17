@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `40c405457ff1b6cd1ec5c3b431e4731ebc72cdd28053a4934caf79eddbc92f37` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `f7dfc4f255d37112f6570df366ac0b1364185ae4f4d8aa4b03f7606cd2aa622e` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -4312,7 +4312,7 @@ Final answer: 6
 
 ## `nsw-final:me12-projectile-forms/D1` — seed 1009
 
-> A javelin is thrown horizontally at $21$ m/s from the top of a cliff $80$ m above level ground, as shown. Find the time $T$, in seconds, until it lands. Take $g = 10$ m/s² and ignore air resistance.
+> A javelin is thrown horizontally at $16$ m/s from the top of a cliff $80$ m above level ground, as shown. Find the time $T$, in seconds, until it lands. Take $g = 10$ m/s² and ignore air resistance.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -4323,40 +4323,40 @@ Final answer: 6
 
 ## `nsw-final:me12-projectile-forms/D2` — seed 1009
 
-> A javelin is launched from level ground with horizontal velocity $27$ m/s and vertical velocity $55$ m/s. Find the greatest height $H$ reached, in metres. Take $g = 10$ m/s² and ignore air resistance.
+> A javelin is thrown horizontally at $16$ m/s from the top of a cliff $80$ m above level ground, as shown. Find the time $T$, in seconds, until it lands. Take $g = 10$ m/s² and ignore air resistance.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `605/4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `605/4` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `609/4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `609/4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-projectile-forms/D3` — seed 1009
 
-> A javelin is thrown horizontally at $21$ m/s from the top of a cliff $80$ m above level ground. How far $d$ from the base of the cliff does it land, in metres? Take $g = 10$ m/s² and ignore air resistance.
+> A javelin is thrown horizontally at $16$ m/s from the top of a cliff $80$ m above level ground. How far $d$ from the base of the cliff does it land, in metres? Take $g = 10$ m/s² and ignore air resistance.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `84` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `84.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `85` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `85` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `64` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `64.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `65` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `65` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-projectile-forms/D4` — seed 1009
 
-> A javelin is launched from level ground with horizontal velocity $39$ m/s and vertical velocity $90$ m/s. Find the first time, in seconds, at which it is $400$ m above the ground. Take $g = 10$ m/s² and ignore air resistance.
+> A javelin is launched from level ground with horizontal velocity $36$ m/s and vertical velocity $80$ m/s. Find the first time, in seconds, at which it is $315$ m above the ground. Take $g = 10$ m/s² and ignore air resistance.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `8` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `8.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `9` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `9` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `7` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-binomial-forms/D1` — seed 1009
 
-> A café finds that each of its customers independently succeeds (the item buys a coffee) with probability $0.05$. Let $X$ be the number of successes among $172$ customers. Find $E(X)$.
+> A café models each customer as independent: it buys a coffee with probability $0.05$. Call that a success. Let $X$ be the number of successes among $172$ customers. Find $E(X)$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -4389,7 +4389,7 @@ Final answer: 6
 
 ## `nsw-final:me12-binomial-forms/D4` — seed 1009
 
-> A café finds that each of its customers independently succeeds (the item buys a coffee) with probability $0.05$. Find the probability that **at least one** of $2$ customers succeeds. Give the exact decimal.
+> A café models each customer as independent: it buys a coffee with probability $0.05$. Call that a success. Find the probability that **at least one** of $2$ customers succeeds. Give the exact decimal.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|

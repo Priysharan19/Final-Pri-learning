@@ -86,9 +86,9 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y11-lines` | 4 | 10.3k | 32 | — | — |
 | `ms12-normal-exact` | 4 | 10.3k | 1 | — | forms |
 | `y8-rates` | 3 | 10.8k | 26 | — | — |
-| `me12-projectile-forms` | 4 | 12.6k | 48 | 5: context, direct, multi-step, representation, reverse | — |
+| `me12-projectile-forms` | 4 | 10.9k | 48 | 5: context, direct, multi-step, representation, reverse | — |
 | `y11-functions` | 4 | 12.8k | 51 | — | — |
-| `me12-induction-forms` | 4 | 14.3k | 9 | 5: context, direct, missing-parameter, multi-step, reverse | — |
+| `me12-induction-forms` | 4 | 12.8k | 9 | 5: context, direct, missing-parameter, multi-step, reverse | — |
 | `y8-equations` | 3 | 15.4k | 26 | — | — |
 | `y10-simeq` | 4 | 16.4k | 6 | — | — |
 | `y10-probability` | 4 | 20.7k | 1 | — | forms |
@@ -110,7 +110,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y11-sine-cosine-rule` | 4 | 72.5k | 1 | — | forms |
 | `ms11-relfreq` | 3 | 123.6k | 3 | — | forms |
 | `y7-ratio` | 4 | 142.1k | 1009 | — | — |
-| `me12-vectors-forms` | 4 | 209.8k | 6 | 5: context, direct, missing-parameter, multi-step, representation | — |
+| `me12-vectors-forms` | 4 | 250.8k | 6 | 5: context, direct, missing-parameter, multi-step, representation | — |
 | `mex-vectors` | 4 | 268.7k | 1 | — | forms |
 | `ms11-data` | 3 | 288.6k | 50 | — | — |
 | `y7-angles` | 4 | 402.4k | 3 | — | forms |
