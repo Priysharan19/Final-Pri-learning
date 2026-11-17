@@ -273,7 +273,7 @@
     "test:platform:resources": "node server/test/resources-check.mjs && node server/test/resource-bookmark-sync-check.mjs && node server/test/resource-publishing-check.mjs",
     "test:platform:public-catalogue": "node server/test/public-catalogue-check.mjs",
     "test:platform:desk": "node server/test/desk-check.mjs && node server/test/desk-isolation-check.mjs",
-    "test:platform:classroom": "node server/test/classroom-check.mjs",
+    "test:platform:classroom": "node server/test/classroom-check.mjs && node server/test/class-board-check.mjs",
     "test:platform:edition": "node server/test/edition-agreement-check.mjs",
     "test:platform:guardian": "node server/test/guardian-consent-check.mjs && node server/test/parent-report-check.mjs && node server/test/guardian-notice-version-check.mjs && node server/test/child-erasure-check.mjs && node client/test/task03-guardian-notice-check.mjs",
     "test:consent:signup": "node client/test/signup-consent-check.mjs",

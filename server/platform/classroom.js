@@ -43,6 +43,7 @@ import { id, rateLimit, requireRole, requireSession, requireVerifiedEmail } from
 import { consentBlockerCode, consentState } from './guardianConsent.js';
 import { markerPool } from './markerPool.js';
 import { resultMatchesTemplate } from './paperAssignments.js';
+import { boardCourses, classBoard } from './classBoard.js';
 import { writeStudentSubmission } from './classes.js';
 import { clipText } from './text.js';
 import { resolveMisconceptionId } from '../../client/src/engine/misconceptions.js';
@@ -552,6 +553,18 @@ export function createClassroomRouter(db) {
       res.set('Content-Disposition', 'attachment; filename="results.csv"');
       res.send(resultsCsv(results));
     });
+
+  // The class board (classBoard.js): per outcome, students per evidence state.
+  router.get('/board/courses', requireRole('teacher'), (req, res) => res.json({ courses: boardCourses() }));
+
+  router.get('/classes/:classId/board', requireRole('teacher'), rateLimit(db, 'classroom-board', { limit: 300, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const classId = String(req.params.classId || '');
+    if (!(await ownedClass(db, req.platformSession.account_id, classId))) return notFound(res);
+    const out = await classBoard(db, { classId, course: req.query?.course, node: typeof req.query?.node === 'string' ? req.query.node : null });
+    if (out.status) return res.status(out.status).json({ error: { code: out.code, message: out.message } });
+    res.set('Cache-Control', 'no-store');
+    res.json(out);
+  });
 
   router.get('/classes/:classId/review', requireRole('teacher'), async (req, res) => {
     const classId = String(req.params.classId || '');

@@ -3671,6 +3671,45 @@
       "csrf": "double-submit-when-session-cookie",
       "origin": "enforced",
       "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/board/courses",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher: the fixed list of NSW board courses of this edition; reads no record",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/classes/:classId/board",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class (not archived); counts and drill-down over active, consented members only, from server-grader records; otherwise 404",
+      "rateLimits": [
+        {
+          "key": "classroom-board",
+          "limit": 300,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
     }
   ]
 }
