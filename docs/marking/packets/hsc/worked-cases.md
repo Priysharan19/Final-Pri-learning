@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `17fdb5d1e995148c46af5d5ab2deb8d8add857f7566c4f6c34756fe4f2c9c5f8` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `1434068fceeafb411ac63cc7b75813c46e1a9227abd46cae74dcab4dc1e7f982` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -3115,89 +3115,80 @@ Final answer: 0
 
 ## `nsw-final:ms11-formulas/D1` — seed 1009
 
-> A plumber charges using the formula $C = 65n + 91$, where $n$ is the number of hours. Find the charge $C$ for a $5$-hour job.
+> For the formula $C = 52n + 85$, a student works out $C$ for $n = 5$ and gets $142$. What mistake did the student make?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `416` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `416.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `417` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `417` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-formulas/D2` — seed 1009
 
-> Using $C = 49n + 107$, find the number of hours $n$ for which the charge is \\$352.00.
+> For the formula $C = 52n + 85$, a student works out $C$ for $n = 5$ and gets $142$. What mistake did the student make?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
-
-<details><summary>Pages</summary>
-
-partial:
-```text
-(working with the right method, ending in a wrong value)
-Final answer: 6
-```
-</details>
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-formulas/D3` — seed 1009
 
-> The formula $BAC = \\dfrac{10N - 7.5H}{6.8M}$ estimates blood alcohol content for males, where $N$ = standard drinks, $H$ = hours drinking, $M$ = mass (kg). Estimate $BAC$ for $N = 4$, $H = 3$, $M = 70$, correct to 3 decimal places.
+> For the formula $C = 52n + 85$, a student works out $C$ for $n = 5$ and gets $142$. What mistake did the student make?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `37/1000` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `37/1000` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `1037/1000` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1037/1000` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-formulas/D4` — seed 1009
 
-> Young's formula for a child's medicine dose is $D = \\dfrac{yA}{y + 12}$, where $y$ is the child's age and $A$ the adult dose. Find the dose for a $11$-year-old when the adult dose is $60$ mL, correct to 1 decimal place.
+> For the formula $C = 52n + 85$, a student works out $C$ for $n = 5$ and gets $142$. What mistake did the student make?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `287/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `287/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `297/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `297/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-measure/D1` — seed 1009
 
-> A hallway is $7$ m $61$ cm long. Write this length in metres.
+> A pool chemical bottle holds $4210$ mL. How many litres is that?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `761/100` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `761/100` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `861/100` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `861/100` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `421/100` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `421/100` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `521/100` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `521/100` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-measure/D2` — seed 1009
 
-> A backyard is a trapezium with parallel sides $12$ m and $14$ m, and perpendicular height $6$ m. Find its area using $A = \\frac{h}{2}(a + b)$.
+> A fish tank is $91$ cm long, $35$ cm wide and $40$ cm high. How many litres of water does it hold when full? (1 L = 1000 cm³.) Give your answer to 1 decimal place.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `78` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `78.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `79` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `79` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `637/5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `637/5` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `642/5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `642/5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-measure/D3` — seed 1009
 
-> A quantity is measured as $31.2$ s, to the nearest tenth of a second. Find the **percentage error**, correct to 2 decimal places. (Absolute error = half the precision.)
+> A measurement is recorded as $21.3$ g, to the nearest tenth of a gram. What is the greatest (upper limit) value it could actually have been?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4/25` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `4/25` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `29/25` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `29/25` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `427/20` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `427/20` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `447/20` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `447/20` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-data/D1` — seed 1009
 
@@ -3234,102 +3225,102 @@ Final answer: 6
 
 ## `nsw-final:ms11-relfreq/D1` — seed 1009
 
-> A box has $11$ working batteries and $8$ flat ones. One is chosen at random. Find $P(\\text{working})$ as a fraction in simplest form.
+> A fair six-sided die has landed on 6 on each of the last 5 rolls. What is the probability that the next roll is a 6?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `11/19` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `11/19` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `30/19` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `30/19` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-relfreq/D3` — seed 1009
 
-> The probability a customer pays cash is $\\frac{3}{8}$. Out of $128$ customers, how many would you **expect** to pay cash?
+> The chance of rain on a March day in Sydney is $60\\%$. How many rainy days would you expect over $180$ such days?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `48` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `48.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `49` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `49` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `108` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `108.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `109` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `109` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-relfreq/D4` — seed 1009
 
-> A two-way table: Adults — $25$ exercise, $16$ don't; Teens — $16$ exercise, $11$ don't. One of the $68$ people is chosen at random, each equally likely. Find the probability that the person chosen does not exercise, as a fraction in simplest form.
+> A survey of $81$ beachgoers found: surfers who wear a rash vest, $19$; surfers who do not wear a rash vest, $19$; swimmers who wear a rash vest, $27$; swimmers who do not wear a rash vest, $16$. One person is chosen at random, each equally likely. Find the probability that the person is someone who does not wear a rash vest, as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `27/68` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `27/68` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `95/68` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `95/68` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `35/81` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `35/81` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `116/81` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `116/81` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-networks/D1` — seed 1009
 
-> The network below has $6$ vertices and $7$ edges. State the **degree** of vertex $F$ (the number of edges meeting it).
+> A network of $14$ depots is to be joined by the fewest possible links so that every one is reachable from every other. Each link costs \\$2,200. What is the total cost, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `1.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `28600` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `28600.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `28601` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `28601` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-networks/D2` — seed 1009
 
-> The network below shows travel times in minutes between $4$ stops. Find the length of the **shortest path** from $A$ to $D$.
+> A network of $14$ depots is to be joined by the fewest possible links so that every one is reachable from every other. Each link costs \\$2,200. What is the total cost, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `9` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `9.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `28600` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `28600.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `28601` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `28601` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-networks/D3` — seed 1009
 
-> The network below shows cable lengths in metres between $6$ junctions. Find the **shortest path** from $A$ to $D$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `7.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `8` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-networks/D4` — seed 1009
-
-> The network below shows the cost (in \\$100s) of each possible fibre link between $6$ towns. Find the total cost of the **minimum spanning tree** — the cheapest way to connect every town.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `21` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `21.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `22` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `22` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-normal/D3` — seed 1009
-
-> Two test results: $94$ (on a test with mean $80$, sd $10$) and $84$ (same test). Which is the **better** result relative to the cohort?
+> A connected network has vertices with degrees $3, 4, 2, 2, 3$. Which statement is correct?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `0` | yes | 2/2 | 2/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | yes | 2/2 | 2/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-## `nsw-final:ms12-normal/D4` — seed 1009
+## `nsw-final:ms12-networks/D4` — seed 1009
 
-> Results are normal with mean $80$ and sd $10$. What raw score has a $z$-score of $-0.75$?
+> The network gives travel times in minutes between $6$ stops: AB = $11$, AC = $10$, BD = $2$, BE = $15$, BF = $12$, DE = $4$, EF = $11$, CE = $14$, AF = $8$. A bus must go from $A$ to $F$ and must call at $E$ on the way. What is the shortest possible travel time, in minutes?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `145/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `145/2` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `147/2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `147/2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `28` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `28.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `29` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `29` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-normal/D3` — seed 1009
+
+> About 95% of the results on an aptitude test, which are normally distributed, lie between $81$ and $101$. What is the standard deviation?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-normal/D4` — seed 1009
+
+> About 95% of the results on an aptitude test, which are normally distributed, lie between $81$ and $101$. What is the standard deviation?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-bivariate/D1` — seed 1009
 
@@ -3344,7 +3335,249 @@ Final answer: 6
 
 ## `nsw-final:ms12-nonright/D1` — seed 1009
 
-> In triangle $ABC$, $\\angle A = 63°$, $\\angle B = 63°$ and side $a = 17$ m. Use the sine rule to find side $b$, correct to 1 decimal place.
+> A triangle has sides $10$, $10$ and $14$ and no known angles. You want the largest angle. What is the best first step?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-nonright/D2` — seed 1009
+
+> A triangle has sides $10$, $10$ and $14$ and no known angles. You want the largest angle. What is the best first step?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-nonright/D3` — seed 1009
+
+> A triangle has sides $10$, $10$ and $14$ and no known angles. You want the largest angle. What is the best first step?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-nonright/D4` — seed 1009
+
+> A triangle has sides $10$, $10$ and $14$ and no known angles. You want the largest angle. What is the best first step?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-algebraic/D1` — seed 1009
+
+> The perimeter $P$ of a rectangle is given by $P = 2(l + w)$. Find $P$, in metres, when $l = 26$ m and $w = 11$ m.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `74` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `74.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `75` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `75` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-algebraic/D2` — seed 1009
+
+> A taxi charges a fixed fee plus an amount per kilometre. A 3 km trip costs \\$55 and a 9 km trip costs \\$115. What is the fixed fee, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `25` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `25.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `26` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `26` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-algebraic/D3` — seed 1009
+
+> The wage $W$ of a casual worker varies directly with the hours $h$. When the quantity is $6$ the value is $60$. What is the value when the quantity is $24$?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `240` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `240.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `241` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `241` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-algebraic/D4` — seed 1009
+
+> Plan A costs \\$55 plus \\$7 per hour. Plan B costs \\$97 plus \\$4 per hour. For how many hours do the two plans cost the same?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `14` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `14.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `15` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `15` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-invest-loans/D1` — seed 1009
+
+> An investment of \\$32,000 grows to \\$33,600 after one year. What annual interest rate does this show, as a percentage?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `5.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `6` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-invest-loans/D2` — seed 1009
+
+> A credit card balance of \\$32,200 is charged 1% interest for the month. A payment of \\$1,850 is then made. What is the balance owing after the payment, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `30672` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `30672.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `30673` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `30673` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-invest-loans/D3` — seed 1009
+
+> A car loan of \\$14,000 is charged flat-rate interest of 5% per annum on the amount borrowed, for 4 years. The total owed is repaid in equal monthly instalments. How much is each instalment, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `350` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `350.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `351` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `351` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-invest-loans/D4` — seed 1009
+
+> A car loan of \\$14,000 is charged flat-rate interest of 5% per annum on the amount borrowed, for 4 years. The total owed is repaid in equal monthly instalments. How much is each instalment, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `350` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `350.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `351` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `351` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-annuity-table/D1` — seed 1009
+
+> A future value table at 6% per annum shows: 5 years: 5.64; 12 years: 16.87; 16 years: 25.67. Use it to find the future value of \\$1,300 deposited each year for 12 years, in dollars.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `21931` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `21931.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `21932` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `21932` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-annuity-table/D2` — seed 1009
+
+> A future value table at 6% per annum shows: 5 years: 5.64; 12 years: 16.87; 16 years: 25.67. Use it to find the future value of \\$1,300 deposited each year for 12 years, in dollars.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `21931` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `21931.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `21932` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `21932` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-annuity-table/D3` — seed 1009
+
+> A future value table at 6% per annum shows: 5 years: 5.64; 12 years: 16.87; 16 years: 25.67. Use it to find the future value of \\$1,300 deposited each year for 12 years, in dollars.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `21931` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `21931.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `21932` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `21932` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-annuity-table/D4` — seed 1009
+
+> A prize can be taken as a lump sum of \\$12,468 today, or as \\$1,300 at the end of each year for 10 years. Money earns 6% per annum and the present value table factor is 7.36. Which is worth more today, and by how much?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-rates/D1` — seed 1009
+
+> A bank exchanges A\\$1 for 0.85 Singapore dollars. How many Singapore dollars does \\$1,800 buy?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1530` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `1530.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `1531` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1531` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-rates/D2` — seed 1009
+
+> A map has a scale of $1:50000$. Two towns are $26$ cm apart on the map. What is the real distance between them, in kilometres?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `13` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `13.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `14` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `14` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-rates/D3` — seed 1009
+
+> The exchange rate is A\\$1 $= 0.5$ British pounds. A traveller receives $1300$ British pounds. How many Australian dollars did they exchange?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2600` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `2600.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `2601` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2601` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-rates/D4` — seed 1009
+
+> The exchange rate is A\\$1 $= 0.5$ British pounds. A traveller receives $1300$ British pounds. How many Australian dollars did they exchange?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2600` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `2600.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `2601` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2601` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-network-flow/D1` — seed 1009
+
+> A network has source $S$, sink $T$ and directed arcs with capacities S→A 10, S→B 7, A→T 8, B→T 11, A→B 6. A cut puts the listed vertices on the source side and the rest on the sink side. Which cut has the smallest capacity?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-network-flow/D2` — seed 1009
+
+> The only routes from $S$ to $T$ in a network are $S\\to A\\to T$ and $S\\to B\\to T$. The capacities are $S\\to A$ 10, $A\\to T$ 8, $S\\to B$ 8 and $B\\to T$ 11. What is the maximum flow from $S$ to $T$?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `16` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `16.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `17` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-network-flow/D3` — seed 1009
+
+> Goods move from the depot (S) to the shopping centre (T) through distribution centre A, distribution centre B. The capacities, in pallets per day, are S→A 10, S→B 7, A→T 8, B→T 11, A→B 6. What is the greatest possible total flow from S to T, in pallets per day?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -3353,258 +3586,16 @@ Final answer: 6
 | common wrong | `18` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
 | partial | `18` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-## `nsw-final:ms12-nonright/D2` — seed 1009
-
-> Two sides of a paddock are $12$ m and $12$ m, with an included angle of $73°$. Use the cosine rule to find the third side, correct to 1 decimal place.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `143/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `143/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `153/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `153/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-nonright/D3` — seed 1009
-
-> A triangular sail has sides $12$ m and $11$ m with an included angle of $75°$. Find its area, correct to 1 decimal place.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `319/5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `319/5` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `324/5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `324/5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-nonright/D4` — seed 1009
-
-> A triangle has sides $a = 12$, $b = 12$ and $c = 10$. Find the angle $A$ opposite side $a$, to the nearest degree.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `65` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `65.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `66` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `66` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-algebraic/D1` — seed 1009
-
-> The number of members of an online club is modelled by $N = 35\\times 3^{t}$, where $t$ is the number of months since it began. How many members does the model give when $t = 3$?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `945` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `945.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `946` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `946` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-algebraic/D2` — seed 1009
-
-> A taxi fare is a straight-line function of the distance travelled. A trip of $0$ km costs \\$35 and a trip of $10$ km costs \\$105. How many dollars does each kilometre cost?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `7.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `8` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-algebraic/D3` — seed 1009
-
-> A stall pays a fixed cost of \\$465. Each item costs \\$35 to make and sells for \\$50. How many items must be sold for the stall to break even?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `31` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `31.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `32` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `32` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-algebraic/D4` — seed 1009
-
-> Plan A charges a \\$25 fee plus \\$6 per gigabyte. Plan B charges a \\$43 fee plus \\$3 per gigabyte. The two plans cost the same for a certain amount of data. What is that common cost, in dollars?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `61` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `61.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `62` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `62` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-invest-loans/D1` — seed 1009
-
-> \\$16,000 is invested at 5% per annum, compounded annually, for 2 years. What is the investment worth at the end of the 2 years, in dollars?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `17640` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `17640.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `17641` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `17641` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-invest-loans/D2` — seed 1009
-
-> \\$16,000 is invested at 5% per annum, compounded annually, for 2 years. How much interest is earned, in dollars?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `1640` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `1640.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `1641` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1641` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-invest-loans/D3` — seed 1009
-
-> A loan of \\$28,000 is charged 5% interest per year, added at the end of the year. A repayment of \\$800 is made at the end of the year, straight after the interest is added. What is the balance owing after the repayment, in dollars?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `28600` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `28600.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `28601` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `28601` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-invest-loans/D4` — seed 1009
-
-> A machine bought for \\$10,000 loses 20% of its value each year (declining-balance depreciation). What is it worth after 2 years, in dollars?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `6400` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `6400.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6401` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6401` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-annuity-table/D1` — seed 1009
-
-> The table factor for the future value of an annuity of \\$1 per year for 2 years at 4% per annum is 2.04. What is the future value of an annuity of \\$700 per year for 2 years, in dollars?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `1428` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `1428.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `1429` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1429` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-annuity-table/D2` — seed 1009
-
-> The table factor for the present value of an annuity of \\$1 per year for 3 years at 5% per annum is 2.72. What is the present value of an annuity of \\$700 per year for 3 years, in dollars? Use the factor as given.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `1904` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `1904.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `1905` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1905` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-annuity-table/D3` — seed 1009
-
-> Using a future value table factor of 2.04 (2 years at 4% per annum), find the interest earned in total on an annuity of \\$700 deposited each year for 2 years, in dollars.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `28` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `28.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `29` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `29` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-annuity-table/D4` — seed 1009
-
-> A savings plan needs to reach \\$1,428 after 2 years of equal yearly deposits at 4% per annum. The future value table factor is 2.04. What yearly deposit is needed, in dollars?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `700` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `700.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `701` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `701` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-rates/D1` — seed 1009
-
-> A delivery van travels at $90$ kilometres per hour. What is this speed in metres per second?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `25` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `25.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `26` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `26` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-rates/D2` — seed 1009
-
-> A car uses $10$ litres of fuel per 100 km. How many litres does it use on a trip of $350$ km?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `35` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `35.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `36` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `36` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-rates/D3` — seed 1009
-
-> \\$490 is shared between two people in the ratio $4:3$. How many dollars does the person with the larger share receive?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `280` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `280.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `281` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `281` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-rates/D4` — seed 1009
-
-> Water flows into a tank at a constant $40$ litres per minute. How many hours does it take to put $12000$ litres into the tank?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-network-flow/D1` — seed 1009
-
-> A network has source $S$, sink $T$ and the directed arcs (with capacities) S→A 11, S→B 10, A→T 7, B→T 8, A→B 11. What is the capacity of the cut that separates $\\{S\\}$ from $\\{A, B, T\\}$?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `21` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `21.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `22` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `22` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-network-flow/D2` — seed 1009
-
-> A network has source $S$, sink $T$ and the directed arcs (with capacities) S→A 11, S→B 10, A→T 7, B→T 8, A→B 11. What is the capacity of the cut that separates $\\{S, A\\}$ from $\\{B, T\\}$?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `28` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `28.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `29` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `29` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:ms12-network-flow/D3` — seed 1009
-
-> A network has source $S$, sink $T$ and the directed arcs (with capacities) S→A 11, S→B 10, A→T 7, B→T 8, A→B 11. What is the maximum flow from $S$ to $T$?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `15` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `15.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `16` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `16` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
 ## `nsw-final:ms12-network-flow/D4` — seed 1009
 
-> A network has source $S$, sink $T$ and the directed arcs (with capacities) S→A 11, S→B 10, A→C 7, B→C 8, A→T 11, C→T 6, B→T 10. What is the capacity of a minimum cut?
+> Goods move from the dam (S) to the treatment plant (T) through pumping station A, pumping station B, pumping station C. The capacities, in megalitres per hour, are S→A 10, S→B 7, A→C 8, B→C 11, A→T 6, C→T 10, B→T 7. What is the greatest possible total flow from S to T, in megalitres per hour?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `21` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `21.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `22` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `22` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `17` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-critical-path/D1` — seed 1009
 
@@ -3652,117 +3643,128 @@ Final answer: 6
 
 ## `nsw-final:ms12-bivariate-fit/D1` — seed 1009
 
-> A line of best fit for weekly sales (thousands of dollars) ($y$) against advertising spend (thousands of dollars) ($x$) is $y = 29 + 7x$. Use it to predict $y$ when $x = 7$.
+> A line of best fit for exam mark ($y$) against weekly hours of screen time ($x$) is $y = 80 - 2x$. Use it to predict $y$ when $x = 12$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `78` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `78.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `79` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `79` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `56` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `56.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `57` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `57` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-bivariate-fit/D2` — seed 1009
 
-> A line of best fit for weekly sales (thousands of dollars) ($y$) against advertising spend (thousands of dollars) ($x$) is $y = 29 + 7x$. According to the line, by how much does $y$ change when $x$ increases by $4$?
+> A line of best fit for bottles of water sold at a kiosk ($y$) against daily maximum temperature (°C) ($x$) is $y = 22 + 5x$. For $x = 10$ the actual value of $y$ was $68$. Find the residual (actual value minus predicted value).
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `28` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `28.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `29` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `29` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `-3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-3` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-bivariate-fit/D3` — seed 1009
 
-> A line of best fit passes through $(2, 43)$ and $(6, 71)$. Use the line to predict $y$ when $x = 9$.
+> A line of best fit $y = 19 + 5x$ was fitted to data for daily maximum temperature (°C) ($x$) collected from $18$ to $31$. Which prediction is likely to be the most reliable?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `92` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `92.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `93` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `93` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-bivariate-fit/D4` — seed 1009
 
-> A line of best fit for weekly sales (thousands of dollars) ($y$) against advertising spend (thousands of dollars) ($x$) is $y = 29 + 7x$. For what value of $x$ does the line predict $y = 78$?
+> A line of best fit $y = 19 + 5x$ was fitted to data for daily maximum temperature (°C) ($x$) collected from $18$ to $31$. Which prediction is likely to be the most reliable?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `7` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `7.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `8` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `8` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-normal-exact/D1` — seed 1009
 
-> Scores on a test are normally distributed with mean $75$ and standard deviation $6$. What is the $z$-score of a score of $93$?
+> A normally distributed variable has mean $72$ and standard deviation $4$. How many standard deviations below the mean is a value of $68$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `3` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `3.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `4` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `4` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `1.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-normal-exact/D2` — seed 1009
 
-> Scores are normally distributed with mean $75$ and standard deviation $6$. What score has a $z$-score of $3$?
+> A normally distributed variable has mean $72$ and standard deviation $4$. How many standard deviations below the mean is a value of $68$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `93` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `93.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `94` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `94` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-normal-exact/D3` — seed 1009
 
-> A normally distributed variable has mean $75$ and standard deviation $6$. In a sample of $4000$ values, using the 68–95–99.7 rule, about how many are expected to lie between $63$ and $87$?
+> A normally distributed variable has mean $72$ and standard deviation $4$. In a sample of $6000$ values, using the 68–95–99.7 rule, about how many are expected to be between $72$ and $84$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `3800` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `3800.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `3801` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3801` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2991` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2991.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `2992` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2992` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-normal-exact/D4` — seed 1009
 
-> A normally distributed variable has mean $75$ and standard deviation $6$. In a sample of $4000$ values, using the 68–95–99.7 rule, about how many are expected to be greater than $87$?
+> About 95% of the values of a normally distributed variable lie between $64$ and $80$. What is the standard deviation?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `100` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `100.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `101` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `101` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-simple-interest/D1` — seed 1009
 
-> \\$7,000 is invested at 5% per annum simple interest for 4 years. How much interest is earned, in dollars?
+> Jo borrows \\$25,400 from a credit union at 5% per annum simple interest and repays everything in one payment after 4 years. How much does Jo repay, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1400` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `1400.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `1401` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1401` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `30480` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `30480.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `30481` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `30481` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-simple-interest/D2` — seed 1009
 
-> \\$7,000 is invested at 5% per annum simple interest for 4 years. What is the total value of the investment at the end, in dollars?
+> A bank pays 5% per annum simple interest. \\$25,400 is left in the account for 4 years. What is the balance at the end, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `8400` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `8400.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `8401` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `8401` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `30480` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `30480.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `30481` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `30481` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-simple-interest/D3` — seed 1009
 
-> An investment of \\$7,000 earns \\$1,400 simple interest in 4 years. What is the annual interest rate, as a percentage?
+> \\$19,100 is invested at 5% per annum simple interest. How many more dollars of interest are earned in 6 years than in 2 years?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `3820` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3820.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `3821` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3821` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-simple-interest/D4` — seed 1009
+
+> \\$32,000 is invested for 4 years at simple interest. It grows to \\$38,400. What is the annual interest rate, as a percentage?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -3771,104 +3773,93 @@ Final answer: 6
 | common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-## `nsw-final:ms12-simple-interest/D4` — seed 1009
-
-> \\$7,000 is invested at 5% per annum simple interest. For how many years must it be invested to earn \\$1,400 in interest?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
 ## `nsw-final:ms12-depreciation/D1` — seed 1009
 
-> A van is bought for \\$29,000 and loses \\$2,000 of its value each year (straight-line depreciation). What is it worth after 4 years, in dollars?
+> A forklift bought for \\$31,000 loses \\$3,500 in value each year (straight-line). How much value has it lost in total after 4 years, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `21000` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `21000.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `21001` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `21001` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `14000` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `14000.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `14001` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `14001` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-depreciation/D2` — seed 1009
 
-> A machine bought for \\$29,000 is worth \\$21,000 after 4 years. Assuming straight-line depreciation, how many dollars does it lose each year?
+> The table shows the value of a boat bought for \\$41,000. Year 1: \\$39,000. Year 2: \\$37,000. Year 3: \\$35,000. The loss is the same each year. What will it be worth in year 6, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2000` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `2000.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `2001` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2001` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `29000` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `29000.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `29001` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `29001` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-depreciation/D3` — seed 1009
 
-> A loan of \\$15,000 is repaid in equal instalments of \\$1,325 per month for 12 months. How much interest is paid in total, in dollars?
+> A \\$24,000 loan is charged flat-rate interest of 6% per annum for 4 years. The total is repaid in equal monthly instalments. How much is each instalment, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `900` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `900.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `901` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `901` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `620` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `620.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `621` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `621` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-depreciation/D4` — seed 1009
 
-> A tractor bought for \\$37,000 loses \\$2,000 of its value each year (straight-line depreciation). After how many years is it worth \\$29,000?
+> Machine A cost \\$42,000 and loses \\$2,000 of its value each year. Machine B cost \\$31,000 and loses \\$3,000 each year (both straight-line). After 3 years, which is worth more and by how much?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-right-triangle/D1` — seed 1009
 
-> A right-angled triangle has perpendicular sides of $35$ cm and $84$ cm. What is the length of the hypotenuse, in centimetres?
+> The right-angled triangle in the figure has the lengths marked. Find the length marked $?$, in centimetres.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `91` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `91.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `92` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `92` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `16` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `16.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `17` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-right-triangle/D2` — seed 1009
 
-> A support wire $15$ m long runs from the top of a vertical pole to the ground. Its top is $12$ m above the ground. How far is its lower end from the base, in metres?
+> In a right-angled triangle with an angle of $30^\\circ$, the side opposite the $30^\\circ$ angle is $39$ cm. Use $\\sin 30^\\circ = \\tfrac12$ to find the hypotenuse, in centimetres.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `9` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `9.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `78` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `78.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `79` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `79` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-right-triangle/D3` — seed 1009
 
-> A ladder $8$ m long leans against a vertical wall and makes an angle of $60^\\circ$ with the wall. How far up the wall does it reach, in metres? (Use $\\cos 60^\\circ = \\tfrac12$.)
+> In a right-angled triangle with an angle of $30^\\circ$, the side opposite the $30^\\circ$ angle is $39$ cm. Use $\\sin 30^\\circ = \\tfrac12$ to find the hypotenuse, in centimetres.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `78` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `78.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `79` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `79` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-right-triangle/D4` — seed 1009
 
-> In a right-angled triangle, the side opposite to the acute angle $\\theta$ is $9$ cm and the hypotenuse is $18$ cm. Find $\\theta$ in degrees.
+> In a right-angled triangle with an angle of $30^\\circ$, the side opposite the $30^\\circ$ angle is $39$ cm. Use $\\sin 30^\\circ = \\tfrac12$ to find the hypotenuse, in centimetres.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `30` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `30.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `31` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `31` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `78` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `78.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `79` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `79` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-poly/D1` — seed 1009
 
