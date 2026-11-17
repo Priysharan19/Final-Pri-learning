@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `e45a5d123611b21ae409f8046cdf661e3335a824e03d28772648ea78c04eb659` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `c96c6955f29c07f2b3346348268e49412fb3c53126956c3c191e3a814993b97d` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -438,47 +438,47 @@ Final answer: 34
 
 ## `nsw-final:y8-indices/D1` — seed 1009
 
-> Evaluate $7^{3}$.
+> Find the value of $n$ if $7 \\times 5^{n} = 4375$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `343` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `343.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `344` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `344` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-indices/D2` — seed 1009
 
-> Simplify $x^{10} \\div x^{7}$, giving your answer in index form.
+> Find the value of $n$ if $7 \\times 5^{n} = 4375$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-indices/D3` — seed 1009
 
-> Simplify $(x^{4})^{4} \\times x^{3}$, giving your answer in index form.
+> Find the value of $n$ if $7 \\times 5^{n} = 4375$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-indices/D4` — seed 1009
 
-> Simplify $\\dfrac{4x^{5} \\times 3x^{2}}{x^{7}}$.
+> The mass of a sample halves every day. It starts at $576$ g. What is its mass, in grams, after $5$ days?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `12` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `12.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `13` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `13` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `18` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `18.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `19` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `19` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-percentages/D1` — seed 1009
 
@@ -973,47 +973,47 @@ Final answer: 6
 
 ## `nsw-final:y9-trig/D1` — seed 1009
 
-> In the right-angled triangle shown, the hypotenuse is $22$ cm and the marked angle is $53°$. Find the side **opposite** to the $53°$ angle, correct to 1 decimal place.
+> A ladder $8.7$ m long leans against a vertical wall and makes an angle of $43°$ with the level ground. How high up the wall does the ladder reach? Give your answer correct to 1 decimal place.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `88/5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `88/5` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `93/5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `93/5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `59/10` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `59/10` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `69/10` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `69/10` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-trig/D2` — seed 1009
 
-> In the right-angled triangle shown, the side opposite the $53°$ angle is $13$ m. Find the **hypotenuse**, correct to 1 decimal place.
+> In triangle $XYZ$, the angle at $Y$ is $90°$, $\\angle X = 42°$ and $XY = 8.5$ cm. Find the length of $XZ$, correct to 1 decimal place.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `163/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `163/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `173/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `173/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `57/5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `57/5` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `62/5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `62/5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-trig/D3` — seed 1009
 
-> In the right-angled triangle shown, find the marked angle $\\theta$, correct to the nearest degree.
+> From the top of a vertical cliff $7.4$ m high, the angle of depression to a boat on the sea is $42°$. How far is the boat from the base of the cliff? Give your answer correct to 1 decimal place.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `54` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `54.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `55` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `55` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `41/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `41/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `46/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `46/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-trig/D4` — seed 1009
 
-> From a point on level ground, the angle of elevation to the top of a $42$ m tower is $37°$, as shown. How far is the point from the **base** of the tower, correct to 1 decimal place?
+> A vertical pole is $8.3$ m tall and casts a shadow $7.4$ m long on level ground. What is the angle of elevation of the sun? Give your answer to the nearest degree.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `557/10` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `557/10` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `567/10` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `567/10` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `48` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `48.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `49` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `49` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y9-surface-area/D1` — seed 1009
 
@@ -1222,18 +1222,18 @@ Final answer: 0
 
 ## `nsw-final:y10-nonlinear/D1` — seed 1009
 
-> State the vertex of the parabola $y = (x - 2)^2 - 1$.
+> What is the minimum value of $y$ on the parabola $y = (x + 2)^{2} - 1$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| correct | `-1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `-1.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
 | common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-nonlinear/D2` — seed 1009
 
-> For the parabola $y = x^2 - 1x + 2$, identify the y-intercept and whether it opens upward or downward.
+> State the coordinates of the vertex of the parabola $y = x^{2} + 2x - 1$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -1244,25 +1244,25 @@ Final answer: 0
 
 ## `nsw-final:y10-nonlinear/D3` — seed 1009
 
-> Find the x-intercepts of the parabola $y = (x - 3)(x - 2)$.
+> A ball is thrown upward from a platform. Its height $H$ metres above the ground, $t$ seconds after it is thrown, is given by $H = -4t^{2} + 24t + 13$. After how many seconds does the ball reach its maximum height?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-nonlinear/D4` — seed 1009
 
-> The exponential curve shown passes through the marked point $(1, 4)$. State the equation of its **horizontal asymptote** — the value $y$ approaches as $x \\to -\\infty$.
+> A culture starts with $9$ cells and triples every hour. After how many whole hours will there first be more than $588$ cells?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-2.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `-1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-simeq/D1` — seed 1009
 
@@ -3819,47 +3819,47 @@ Final answer: 0
 
 ## `nsw-final:ms12-right-triangle/D1` — seed 1009
 
-> The right-angled triangle in the figure has the lengths marked. Find the length marked $?$, in centimetres.
+> A triangular garden bed has a right angle between sides of $30$ m and $16$ m. Edging is put along all three sides and costs \\$28 per metre. What is the total cost, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `16` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `16.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `17` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `17` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2240` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `2240.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `2241` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2241` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-right-triangle/D2` — seed 1009
 
-> In a right-angled triangle with an angle of $30^\\circ$, the side opposite the $30^\\circ$ angle is $39$ cm. Use $\\sin 30^\\circ = \\tfrac12$ to find the hypotenuse, in centimetres.
+> A triangular garden bed has a right angle between sides of $30$ m and $16$ m. Edging is put along all three sides and costs \\$28 per metre. What is the total cost, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `78` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `78.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `79` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `79` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2240` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2240.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `2241` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2241` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-right-triangle/D3` — seed 1009
 
-> In a right-angled triangle with an angle of $30^\\circ$, the side opposite the $30^\\circ$ angle is $39$ cm. Use $\\sin 30^\\circ = \\tfrac12$ to find the hypotenuse, in centimetres.
+> A triangular garden bed has a right angle between sides of $42$ m and $40$ m. Edging is put along all three sides and costs \\$28 per metre. What is the total cost, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `78` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `78.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `79` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `79` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3920` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `3920.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `3921` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3921` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-right-triangle/D4` — seed 1009
 
-> In a right-angled triangle with an angle of $30^\\circ$, the side opposite the $30^\\circ$ angle is $39$ cm. Use $\\sin 30^\\circ = \\tfrac12$ to find the hypotenuse, in centimetres.
+> A right-angled triangular plot has a hypotenuse of $58$ m and one other side of $42$ m. Turf costs \\$19 per square metre. What is the cost of turfing the whole plot, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `78` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `78.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `79` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `79` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `15960` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `15960.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `15961` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `15961` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-poly/D1` — seed 1009
 
@@ -4303,47 +4303,47 @@ Final answer: 0
 
 ## `nsw-final:mex-demoivre/D1` — seed 1009
 
-> Using De Moivre's theorem, $\\left(\\cos 30° + i\\sin 30°\\right)^{6}$ has argument equal to how many **degrees**?
+> Let $z_1 = 35\\left(\\cos(-75°) + i\\sin(-75°)\\right)$ and $z_2 = 7\\left(\\cos(-55°) + i\\sin(-55°)\\right)$. Find $\\left\|\\dfrac{z_1}{z_2}\\right\|$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `180` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `180.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `181` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `181` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `5.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `6` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-demoivre/D2` — seed 1009
 
-> Write $z = -\\sqrt{3} + i$ in polar form and hence find the argument of $z^{6}$, in radians (this may lie outside $(-\\pi, \\pi]$).
+> Let $z = 5\\left(\\cos(-75°) + i\\sin(-75°)\\right)$. Use De Moivre's theorem to find $\\arg(z^{6})$ as a principal argument, in degrees (that is, in the interval $(-180°, 180°]$).
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `15.707963` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `15.707963` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
-| common wrong | `16.707963` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `16.707963` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-90` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-90.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `-89` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-89` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-demoivre/D3` — seed 1009
 
-> The $9$ roots of $z^{9} = 1$ are evenly spaced around the unit circle, starting at $z = 1$. Turning $6$ steps anticlockwise from $z = 1$ reaches another root — how far have you turned, exactly, in radians?
+> Expand $(\\cos\\theta + i\\sin\\theta)^{10}$ with the binomial theorem. The real part contains the term $c\\cos^{6}\\theta\\sin^{4}\\theta$. Find $c$. (The imaginary part is the coefficient of $i$.)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4.18879` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `4.18879` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
-| common wrong | `5.18879` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5.18879` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `210` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `210.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `211` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `211` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-demoivre/D4` — seed 1009
 
-> Solve $z^{5} = 100000$ over the complex numbers. All $5$ solutions share the same **modulus** — what is it?
+> Expand $(\\cos\\theta + i\\sin\\theta)^{10}$ with the binomial theorem. The real part contains the term $c\\cos^{6}\\theta\\sin^{4}\\theta$. Find $c$. (The imaginary part is the coefficient of $i$.)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `10.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `11` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `11` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `210` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `210.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `211` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `211` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-integration/D1` — seed 1009
 
