@@ -165,6 +165,20 @@ try {
   const dhFalse = await fresh(IN, 9703);
   eq((await grade(a.jar, dhFalse.id, dhFalse.q.answer.value, { deviceHelp: false })).status, 400, 'deviceHelp: false is refused — the device can never claim independence');
 
+  // ── concurrent help on one question drops no kind ─────────────────────────
+  {
+    const raced = await fresh(IN, 9430);
+    const kinds = ['line-check', 'step-coach', 'hint:nudge', 'tutor:A1', 'tutor:A2', 'hint:method'];
+    await Promise.all(kinds.map(kind => S.markHelp(h.db, a.account.id, raced.id, kind)));
+    const stored = JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-tutor-help' AND key=?", [a.account.id, raced.id])).response_json).kinds;
+    eq([...stored].sort(), [...kinds].sort(), 'six help calls at once on one question leave all six kinds on the record');
+    const grown = await Promise.all([1, 2, 3, 4].map(n => S.markHelp(h.db, a.account.id, raced.id, `tutor:B${n}`)));
+    const again = JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-tutor-help' AND key=?", [a.account.id, raced.id])).response_json).kinds;
+    ok(grown.length === 4 && ['tutor:B1', 'tutor:B2', 'tutor:B3', 'tutor:B4', ...kinds].every(k => again.includes(k)), 'later concurrent calls add to the kinds already there, never replace them');
+    await grade(a.jar, raced.id, raced.q.answer.value);
+    eq(view(await eventOf(raced.id))[0], 'supported', 'a question helped by concurrent calls is graded supported, never independent');
+  }
+
   // ── old records are left as they are, and read as supported ──────────────
   const old = { correct: true, hintsUsed: 1, support: 'supported', subtopic: IN };
   await h.db.run(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)

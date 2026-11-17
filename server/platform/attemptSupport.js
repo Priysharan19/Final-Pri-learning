@@ -66,13 +66,29 @@ export const stepCoachBucket = (accountId, questionId) => `step-coach:${sha256(`
 export async function markHelp(db, accountId, questionId, kind, at = Date.now()) {
   if (typeof questionId !== 'string' || !questionId) return;
   const k = String(kind || 'help').slice(0, 32);
-  const row = await db.get('SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope=? AND key=?', [accountId, MARKER_SCOPE, questionId]);
-  let kinds = [];
-  try { const was = row ? JSON.parse(row.response_json) : {}; kinds = was.kinds || (was.levels || []).map(l => `tutor:${l}`); } catch { kinds = []; }
-  const next = [...new Set([...kinds, k])].slice(0, 16);
-  await db.run(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)
-    ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json`,
-    [accountId, MARKER_SCOPE, questionId, JSON.stringify({ kinds: next, at }), sha256(`${questionId}:${next.join(',')}`), at, at + MARKER_TTL_MS]);
+  // Atomic merge of one kind into the question's kinds. Two help calls on one question can run at once
+  // (a hint rung and a line check, two tabs): a plain read-then-write let the later write drop the
+  // earlier kind, and a kind with no second witness could then leave a helped attempt "independent".
+  // Each write here is conditional on the exact row it read (compare-and-set), so a lost race re-reads
+  // and merges again; the kinds only ever grow. Running out of attempts throws rather than losing help.
+  const kindsOf = text => {
+    try { const was = JSON.parse(text); return was.kinds || (was.levels || []).map(l => `tutor:${l}`); } catch { return []; }
+  };
+  let merged = false;
+  for (let attempt = 0; attempt < 12 && !merged; attempt++) {
+    const row = await db.get('SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope=? AND key=?', [accountId, MARKER_SCOPE, questionId]);
+    const next = [...new Set([...(row ? kindsOf(row.response_json) : []), k])].slice(0, 16);
+    const json = JSON.stringify({ kinds: next, at });
+    const digest = sha256(`${questionId}:${next.join(',')}`);
+    const info = row
+      ? (row.response_json === json ? { changes: 1 } : await db.run(
+        'UPDATE idempotency_keys SET response_json=?, request_digest=? WHERE account_id=? AND scope=? AND key=? AND response_json=?',
+        [json, digest, accountId, MARKER_SCOPE, questionId, row.response_json]))
+      : await db.run(`INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)
+        ON CONFLICT(account_id,scope,key) DO NOTHING`, [accountId, MARKER_SCOPE, questionId, json, digest, at, at + MARKER_TTL_MS]);
+    merged = info.changes === 1;
+  }
+  if (!merged) throw Object.assign(new Error('Help record could not be written.'), { code: 'HELP_RECORD_CONTENDED' });
   const escrow = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=?", [accountId, questionId]);
   let q = null;
   try { q = escrow ? JSON.parse(escrow.response_json) : null; } catch { q = null; }
