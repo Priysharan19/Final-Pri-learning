@@ -46,7 +46,7 @@ import { INTERFACE_SKIN as SETTING_SKIN } from '../../interface.config.mjs';
 
 
 /* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__, __PRI_FEATURE_LIBRARY__, __PRI_FEATURE_EXAM_DESK__, __PRI_FEATURE_EXPORTS__ */
-/* global __PRI_FEATURE_NSW_EXAMS__, __PRI_FEATURE_SYLLABUS_BOARD__ */
+/* global __PRI_FEATURE_NSW_EXAMS__, __PRI_FEATURE_SYLLABUS_BOARD__, __PRI_FEATURE_TUTOR_POLICY__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
   extendedTracks: typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' ? __PRI_FEATURE_EXTENDED_TRACKS__ : null,
@@ -81,7 +81,13 @@ const BUILT = {
   // PRI_FEATURE_SYLLABUS_BOARD=1 — the syllabus board, priorities and paper
   // readiness on Progress (both editions). OFF in a production build until the
   // owner's GO (NESA permission for outcome codes is unverified).
-  syllabusBoard: typeof __PRI_FEATURE_SYLLABUS_BOARD__ === 'boolean' ? __PRI_FEATURE_SYLLABUS_BOARD__ : null
+  syllabusBoard: typeof __PRI_FEATURE_SYLLABUS_BOARD__ === 'boolean' ? __PRI_FEATURE_SYLLABUS_BOARD__ : null,
+  // PRI_FEATURE_TUTOR_POLICY=1 — the tutor policy's "smallest next step" above
+  // the hint ladder (src/engine/tutorPolicy.js). Opt-in everywhere, the dev
+  // server included, and OFF in the Node suites unless a test turns it on
+  // (false, not null, so no default-on): turning it on is an owner decision.
+  // The server answers 404 too unless PRI_FEATURE_TUTOR_POLICY=1.
+  tutorPolicy: typeof __PRI_FEATURE_TUTOR_POLICY__ === 'boolean' ? __PRI_FEATURE_TUTOR_POLICY__ : false
 };
 
 // The student interface as a build constant (client/interface.config.mjs).

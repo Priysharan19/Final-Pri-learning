@@ -1,0 +1,82 @@
+{
+  "id": "tutor-first-help-v1",
+  "version": 1,
+  "status": "off",
+  "title": "Policy-chosen first help versus the fixed hint-ladder start",
+  "preregisteredAt": "2026-11-18",
+  "activation": "Owner decision only. Requires PRI_FEATURE_TUTOR_POLICY=1 on the server, a client build made with PRI_FEATURE_TUTOR_POLICY=1, and this id in PRI_EXPERIMENTS. Status stays 'off' in this file; the environment is the switch, so turning it on or off is a deployment change, not a code change.",
+  "requires": [
+    "PRI_FEATURE_TUTOR_POLICY"
+  ],
+  "prerequisites": [
+    "An A/A run of the assignment and logging path (RESEARCH_TO_BUILD_V7 V7-24) with no unexplained sample-ratio mismatch, recorded before any readout of this experiment is interpreted.",
+    "The protected different-family outcome items for the skills in scope exist (DELAYED_TRANSFER_MEASUREMENT_PROTOCOL §12); until then the outcome is read on ordinary practice items of a different generator."
+  ],
+  "hypothesis": "For a student who asks for help on a practice question, offering the smallest next intervention chosen by the transparent tutor policy (client/src/engine/tutorPolicy.js, tutor-policy-v1) instead of the hint ladder's fixed first rung changes the rate of delayed independent success on a different item family of the same skill. Direction is not assumed: the policy may also lower it.",
+  "unit": "account",
+  "salt": "tutor-first-help-v1:2026-11-18",
+  "arms": [
+    {
+      "id": "control",
+      "weight": 0.5,
+      "description": "Today's practice card: the hint ladder starts at its first rung (nudge); no policy panel."
+    },
+    {
+      "id": "policy",
+      "weight": 0.5,
+      "description": "The policy panel above the same ladder offers one smallest next step with its reason. Rungs, their order, their cost and the server's charge are unchanged."
+    }
+  ],
+  "eligibility": "A signed-in student account with a server-graded practice attempt (practice, review or task mode) after activation. Exam, mock, placement and every one-try mode are excluded: the policy is off there and no attempt in those modes counts.",
+  "trigger": "Assignment is computed for every eligible account from a stable hash of (salt, account id) and stamped on each graded-attempt event while the experiment is active (intention to treat). Exposure to the panel is not required for inclusion.",
+  "primaryOutcome": {
+    "id": "delayed-independent-transfer",
+    "definition": "Per account, the first index attempt after assignment on skill S (dot point, else generator) whose skill has a later qualifying outcome: the first graded attempt on S from a DIFFERENT item family (generator) made at least delayHours after the index attempt, with no hint-ladder rung opened, no help requested through the help plan, not a reveal and not a repeat. Success = that outcome attempt is correct. One binary outcome per account.",
+    "delayHours": 24,
+    "independence": "hintLevel 0, revealed false, repeat false, and no help requested on the item through the help plan, in either arm (policyAssistance: a request is recorded in the control arm too, so the exclusion does not depend on the arm). Tutor-panel use is device-observed and not on the event; it is a recorded limitation, not an assumption of independence.",
+    "missing": "An account with no qualifying outcome is missing, never a failure. Outcome observation rates are reported per arm and checked for imbalance."
+  },
+  "guardrails": [
+    {
+      "id": "time-on-task",
+      "metric": "Median device-reported milliseconds per resolved graded attempt (the submit body's ms), per arm.",
+      "harm": "Policy arm median more than 1.5 times control.",
+      "kind": "ratio",
+      "threshold": 1.5
+    },
+    {
+      "id": "give-up-rate",
+      "metric": "Share of resolved graded attempts that are reveals (Show solution or the solution rung), per arm.",
+      "harm": "Policy arm share more than 5 percentage points above control.",
+      "kind": "difference",
+      "threshold": 0.05
+    },
+    {
+      "id": "complaint-reports",
+      "metric": "Learner or guardian reports about help or hints, per arm.",
+      "harm": "Any report that the policy withheld help a student needed, reviewed by a person.",
+      "kind": "manual",
+      "instrumented": false
+    }
+  ],
+  "minimumSample": {
+    "perArm": 200,
+    "basis": "Two-sided alpha 0.05, power 0.80, to detect a 15 percentage-point difference around a 45% base rate needs about 170 accounts with an observed outcome per arm (normal approximation); 200 allows for attrition between assignment and outcome. This is a planning figure, not a measured variance; no smaller sample is read for efficacy."
+  },
+  "analysis": {
+    "estimand": "Difference in the per-account success proportion, policy minus control, among accounts with an observed outcome.",
+    "interval": "Newcombe hybrid score interval (Wilson score per arm), 95%.",
+    "srm": "Chi-square goodness of fit of assigned accounts against the arm weights; p < 0.001 stops interpretation until the cause is found. Outcome-observation balance is reported the same way.",
+    "stoppingRule": "One fixed-horizon efficacy readout once every arm has at least minimumSample.perArm observed outcomes. Interim readouts show counts and guardrails only. Guardrails may stop the experiment for harm at any time; they never declare a winner.",
+    "decision": "Promotion of the policy to all students requires the interval's lower bound to exceed zero at the fixed horizon, no guardrail breached, an A/A pass recorded, and an owner decision. A null or negative result keeps the fixed ladder."
+  },
+  "limitations": [
+    "Twelve real accounts today: this experiment cannot be read for months, and the readout refuses below the minimum sample.",
+    "The different-family outcome uses ordinary practice items until a protected outcome bank exists, so outcome items may have been seen in tutoring.",
+    "Time on task is device-reported, not server-measured.",
+    "Complaint reports have no product channel yet; the guardrail is manual until one exists.",
+    "Results transport only to Pri students who ask for help in untimed practice; nothing here is evidence about exams, other products or other populations.",
+    "The panel differs between arms: in control it hides after the first press, so control students may ask for help less often. Items with a help request are excluded in both arms by the same rule, but the request rate itself can differ by arm; the readout reports it per arm and a large gap is read as a threat to the outcome comparison, not as an effect."
+  ],
+  "claims": "None. Nothing about this experiment may appear in product copy, marketing or reports as evidence that the tutor policy works, until a fixed-horizon readout meets the decision rule above."
+}

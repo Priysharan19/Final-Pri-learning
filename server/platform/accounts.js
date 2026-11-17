@@ -291,7 +291,8 @@ export async function deleteAccountRows(db, accountId, { beforeDelete = null, re
 // request digest (a hash) never is.
 //   · EXPORT_BODY_SCOPES — what the student wrote or was already shown: their
 //     answer snapshots, results, gradings, reading transcripts, completions,
-//     reveals, hint rungs, tries, issue replies and the daily counter.
+//     reveals, hint rungs, tries, issue replies, the daily counter and the
+//     tutor policy's offers.
 //   · SEALED_SCOPES — the escrowed question/paper holds the answers, worked
 //     steps and marking criteria. Its body is exported only once the question
 //     is resolved (its completion/result row exists for the same key); an
@@ -302,7 +303,9 @@ export async function deleteAccountRows(db, accountId, { beforeDelete = null, re
 //     withheld. A new scope is withheld until someone decides otherwise here.
 const EXPORT_BODY_SCOPES = new Set([
   'exam-answers', 'exam-result', 'practice-grade', 'practice-recognition', 'recognition-read', 'practice-completion',
-  'practice-reveal', 'practice-hints', 'practice-tries', 'practice-issue', 'practice-prepared', 'practice-daily', 'practice-content'
+  'practice-reveal', 'practice-hints', 'practice-tries', 'practice-issue', 'practice-prepared', 'practice-daily', 'practice-content',
+  // The tutor policy's offers on an item (helpPlan.js): what the student was shown.
+  'practice-help-plan'
 ]);
 const SEALED_SCOPES = { 'exam-paper': 'exam-result', 'practice-question': 'practice-completion' };
 

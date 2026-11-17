@@ -1,0 +1,65 @@
+{
+  "id": "aa-assignment-v1",
+  "version": 1,
+  "status": "off",
+  "title": "A/A: two identical arms, to validate assignment, logging and the readout",
+  "preregisteredAt": "2026-11-18",
+  "activation": "Owner decision only: this id in PRI_EXPERIMENTS. It changes nothing a student sees; both arms are today's product. It must run, and pass, before tutor-first-help-v1 is read (RESEARCH_TO_BUILD_V7 V7-24).",
+  "requires": [],
+  "prerequisites": [],
+  "hypothesis": "With two arms that receive the same product, assignment balance, outcome observation and the primary outcome show no systematic difference. Any difference beyond chance is an instrumentation bug, not an effect.",
+  "unit": "account",
+  "salt": "aa-assignment-v1:2026-11-18",
+  "arms": [
+    {
+      "id": "a1",
+      "weight": 0.5,
+      "description": "Today's product."
+    },
+    {
+      "id": "a2",
+      "weight": 0.5,
+      "description": "Today's product."
+    }
+  ],
+  "eligibility": "As tutor-first-help-v1: signed-in student accounts with a server-graded practice attempt; exam and one-try modes excluded.",
+  "trigger": "As tutor-first-help-v1: stable hash of (salt, account id), stamped on each graded-attempt event while active.",
+  "primaryOutcome": {
+    "id": "delayed-independent-transfer",
+    "definition": "Identical to tutor-first-help-v1.",
+    "delayHours": 24,
+    "independence": "hintLevel 0, revealed false, repeat false, no help requested through the help plan.",
+    "missing": "Missing, never a failure."
+  },
+  "guardrails": [
+    {
+      "id": "time-on-task",
+      "metric": "Median device-reported ms per resolved attempt, per arm.",
+      "harm": "Ratio beyond 1.5 either way indicates a logging fault.",
+      "kind": "ratio",
+      "threshold": 1.5
+    },
+    {
+      "id": "give-up-rate",
+      "metric": "Share of resolved attempts that are reveals, per arm.",
+      "harm": "Difference beyond 5 points indicates a logging fault.",
+      "kind": "difference",
+      "threshold": 0.05
+    }
+  ],
+  "minimumSample": {
+    "perArm": 200,
+    "basis": "The same horizon as the experiment it validates, so the A/A exercises the readout at the size it will be used."
+  },
+  "analysis": {
+    "estimand": "Difference in per-account success proportion, a2 minus a1.",
+    "interval": "Newcombe hybrid score interval, 95%.",
+    "srm": "Chi-square against the arm weights; p < 0.001 is a failure of the A/A.",
+    "stoppingRule": "One readout at the minimum sample.",
+    "decision": "Pass when there is no sample-ratio mismatch, outcome observation is balanced, and the interval includes zero."
+  },
+  "limitations": [
+    "A single A/A pass at 5% has a 1-in-20 chance of a false alarm on the outcome; a failure is investigated, not averaged away."
+  ],
+  "claims": "None."
+}

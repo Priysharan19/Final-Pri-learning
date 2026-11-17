@@ -3924,6 +3924,39 @@ const routes = {
   // "Why this step?" — a grounded dialogue about one step of a RESOLVED
   // question's verified solution. Writes nothing to the row (no charge: the
   // mark is decided; Premium and the free taster are the server's to enforce).
+  // The tutor policy's smallest next step (engine/tutorPolicy.js), decided by
+  // the server for its own issued question (server/platform/helpPlan.js).
+  // It serves and charges nothing: a rung it points at is opened through the
+  // hint route above. Lines ride only while this question still has a line
+  // check left, and a check the server spent is counted here like the line
+  // check's, so the two never give a question more than two between them.
+  'POST /practice/:id/help-plan': async (body, params) => {
+    if (!featureEnabled('tutorPolicy')) throw Object.assign(new Error('Not enabled in this build.'), { status: 404, code: 'NOT_FOUND' });
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409, code: 'ALREADY_RESOLVED' });
+    if (!row.serverQuestionId) throw Object.assign(new Error('Only a question the server issued has a help plan.'), { status: 409, code: 'HELP_PLAN_UNAVAILABLE' });
+    const usedChecks = Math.max(0, Number(row.lineChecks) || 0);
+    const lines = usedChecks < 2 ? (Array.isArray(body?.lines) ? body.lines : []).map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40) : [];
+    // Action names only; the server checks them against the policy's menu.
+    const offered = (Array.isArray(body?.offered) ? body.offered : []).filter(a => typeof a === 'string' && /^[a-z-]{1,24}$/.test(a)).slice(0, 8);
+    const recognition = ['confirmed', 'unconfirmed', 'low-confidence'].includes(body?.recognition) ? body.recognition : undefined;
+    const r = await viaServer(() => cloud.helpPlanPractice(row.serverQuestionId, {
+      ...(lines.length ? { lines } : {}), ...(recognition ? { recognition } : {}), offered,
+      // Line numbers are the server's count of the lines it receives: if
+      // cleaning dropped any line here, the device's drawable numbers no
+      // longer match, so the view is not offered at all.
+      ...(Array.isArray(body?.drawable) && lines.length === (Array.isArray(body?.lines) ? body.lines.length : -1)
+        ? { mistakeGraph: body?.mistakeGraph === true, drawable: body.drawable.filter(n => Number.isInteger(n) && n >= 2 && n <= lines.length).slice(0, 40) }
+        : { mistakeGraph: false }),
+      helpRequested: body?.helpRequested !== false
+    }));
+    if (r?.lineCheckSpent === true) { row.lineChecks = usedChecks + 1; await put('questions', row); }
+    return { plan: r?.plan && typeof r.plan === 'object' ? r.plan : null, experiment: r?.experiment || null };
+  },
   'POST /practice/:id/tutor/why': async (body, params) => {
     if (!tutorFeatureEnabled()) throw tutorDisabledError();
     const p = await requireProfile();
@@ -6676,6 +6709,7 @@ async function runGated(method, pattern, handler, body, params) {
     key === 'POST /practice/:id/submit'
     || key === 'POST /practice/:id/reveal'
     || key === 'POST /practice/:id/hint'
+    || key === 'POST /practice/:id/help-plan'
     || key === 'POST /practice/:id/tutor'
     || key === 'POST /practice/:id/tutor/diagnose'
     || key === 'POST /practice/:id/tutor/line-check'
