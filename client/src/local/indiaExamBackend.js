@@ -420,6 +420,7 @@ async function examView(profile, id) {
     serverIssued: isServerPaper(exam),
     // A board mock (D22) is labelled on every surface and sat typed.
     ...(exam.mock ? { mock: true, mockLabel: MOCK_LABEL } : {}),
+    ...(exam.generated ? { generated: true } : {}),
     // A targeted paper (Premium) carries the server's "why these questions" key.
     ...(exam.targeted ? { targeted: true, targetedLabel: TARGETED_LABEL, why: exam.why || null } : {}),
     indiaExam: exam.indiaExam
