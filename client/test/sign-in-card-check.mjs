@@ -124,9 +124,12 @@ ok(!/localStorage|sessionStorage|document\.cookie/.test(card), 'it stores nothin
 ok(!/console\.(log|info|debug|warn|error)/.test(card) && !/console\./.test(otp), 'and logs nothing — a code can never reach the console');
 ok(!/encrypt|secure(ly)?\b|safe(ly)? stored|backed up/i.test(Object.entries(en).filter(([k]) => /^signup\.(inline|code|about|password|continue|with|use|agree|verify|signing)/.test(k)).map(([, v]) => JSON.stringify(v)).join(' ')),
   'the card makes no claim about encryption, security or backup');
-const GUARDIAN_NOTICE_VERSION = /export const GUARDIAN_NOTICE_VERSION = '([^']+)'/.exec(card)?.[1];
-const serverNotice = /CONSENT_NOTICE_VERSION = '([^']+)'/.exec(readFileSync(fileURLToPath(new URL('../../server/platform/guardianConsent.js', import.meta.url)), 'utf8'))?.[1];
-eq(GUARDIAN_NOTICE_VERSION, serverNotice, 'the notice version the parent page sends is the server\'s current one');
+const guardianSource = readFileSync(fileURLToPath(new URL('../../server/platform/guardianConsent.js', import.meta.url)), 'utf8');
+const [, AU_NOTICE, IN_NOTICE] = /export const GUARDIAN_NOTICE_VERSION = EDITION_ID === 'prithagoras' \? '([^']+)' : '([^']+)';/.exec(card) || [];
+const serverNotice = /CONSENT_NOTICE_VERSION = '([^']+)'/.exec(guardianSource)?.[1];
+const serverAuNotice = /AU_CONSENT_NOTICE_VERSION = '([^']+)'/.exec(guardianSource)?.[1];
+eq(IN_NOTICE, serverNotice, 'the notice version the parent page sends is the server\'s current one (Priyabhata)');
+eq(AU_NOTICE, serverAuNotice, 'and in Prithagoras it is the Australian notice, au-1');
 
 // ── 4 · where the one card is mounted ────────────────────────────────────────
 const login = read('pages/Login.jsx');
