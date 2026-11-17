@@ -35,7 +35,8 @@ import ConfirmSheet from '../examShell/ConfirmSheet.jsx';
 import ShortcutsSheet from '../examShell/ShortcutsSheet.jsx';
 import PaperHeader from '../examShell/PaperHeader.jsx';
 import { readHand } from '../lib/writingHand.js';
-import { saveStateKey, useAutosave } from '../examShell/useAutosave.js';
+import { autosaveWorkState } from '../platform/workState.js';
+import { useAutosave } from '../examShell/useAutosave.js';
 import { useExamShortcuts } from '../examShell/useExamShortcuts.js';
 import { useAnnounce } from '../examShell/useAnnounce.js';
 import { IMPORT_SITE, deskApi, isAttemptId, newKey, unreachable } from './deskApi.js';
@@ -471,8 +472,8 @@ function Desk({ attemptId }) {
   const allotted = (clock.phase === 'reading' ? paper.readingMinutes : paper.workingMinutes) * MINUTE;
   const elapsed = clock.phase === 'reading' ? clock.elapsedReadingMs : clock.phase === 'working' || finished ? clock.elapsedWorkingMs : 0;
   const clockNote = estimate ? t('desk.estimate') : paused ? t('desk.paused') : over ? t('desk.overNote') : clock.phase === 'ready' ? t('desk.readyNote') : clock.phase === 'idle' ? t('desk.idleNote') : null;
-  const saveKey = view.problem === 'signed-out' ? 'desk.signedOutKept' : view.problem === 'offline' || view.problem === 'failed' ? 'shell.unsaved'
-    : view.checking ? 'desk.checking' : saveStateKey(saveState);
+  const saveKey = view.checking && !view.problem ? 'desk.checking'
+    : autosaveWorkState({ saveState, problem: view.problem || null, target: 'account', synced: view.synced !== false }).key;
   const link = attempt.resource.listed ? safeExternalUrl(attempt.resource.url) : null;
   const shortcuts = [
     { keys: ['←', '→'], label: t('desk.keyMove') }, { keys: ['D'], label: t('desk.keyDone') }, { keys: ['F'], label: t('desk.keyFlag') },

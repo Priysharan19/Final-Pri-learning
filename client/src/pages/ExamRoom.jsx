@@ -27,6 +27,7 @@
 // paper is marked. Multiple-choice and numerical-entry questions keep their
 // native controls; written answers can be handwritten or typed.
 // ─────────────────────────────────────────────────────────────────────────────
+import { autosaveWorkState } from '../platform/workState.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api } from '../api.js';
@@ -1097,7 +1098,7 @@ export default function ExamRoom() {
   }
 
   const answeredQ = qq => keysOf(qq).some(k => !blank(answers[k]));
-  const saveLabel = saveState === 'saving' ? t('examRoom.saving') : saveState === 'saved' ? t('examRoom.saved') : saveState === 'error' ? t('examRoom.saveError') : '';
+  const saveLabel = (k => (k ? t(k) : ''))(autosaveWorkState({ saveState, target: 'device' }).key);
 
   const flaggedCount = Object.values(flagged).filter(Boolean).length;
   const unanswered = exam.questions.length - answeredCount;
