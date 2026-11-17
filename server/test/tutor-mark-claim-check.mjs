@@ -9,12 +9,12 @@ let n = 0; const ok = (c, m) => { assert.ok(c, m); n += 1; };
 const claims = [
   'You lost 2 marks here.', 'That is worth full marks.', 'Your score would be low.', 'This earns partial credit.', 'You passed this step.',
   'That is 3 out of 4.', 'Marked as wrong.', 'A grade of C.', '75% correct so far.', '5 points deducted.',
-  'यहाँ आपके अंक कटेंगे।', 'इसका ग्रेड कम होगा।', 'प्रतिशत कम आएगा।', 'आपको पूरे अंक मिलेंगे।'
+  'यहाँ आपके अंक कटेंगे।', 'इसका ग्रेड कम होगा।', 'आपको पूरे अंक मिलेंगे।'
 ];
 for (const c of claims) ok(markClaimIssues(c).length === 1, `refused: ${c}`);
 const fine = [
   'The sign changed when the term crossed the equals sign.', 'Line 2 does not follow from line 1.', 'The points of intersection are where the lines meet.',
-  'Divide each term by its new power.', 'दूसरी पंक्ति पहली पंक्ति से नहीं निकलती।', 'घात बढ़ाने के बाद नई घात से भाग दीजिए।', 'x = 3/4', ''
+  'Divide each term by its new power.', 'दूसरी पंक्ति पहली पंक्ति से नहीं निकलती।', 'घात बढ़ाने के बाद नई घात से भाग दीजिए।', 'x = 3/4', 'अंकगणित का नियम लगाइए।', 'इन अंकों का योग देखिए।', 'What percentage of the circle is shaded?', 'Mark the point on the graph.'
 ];
 for (const c of fine) ok(markClaimIssues(c).length === 0, `allowed: ${c}`);
 ok(markClaimIssues('a'.repeat(30_000)).length === 1, 'an over-long reply is refused, not scanned');

@@ -860,7 +860,7 @@ export function createTutorRouter(db, {
     }
     const issues = diagnosisIssues(reply, request);
     if (issues.length) {
-      const leak = issues.some(i => !i.startsWith('span:') && !i.startsWith('prose:') && i !== 'unbalanced-span');
+      const leak = issues.some(i => !i.startsWith('span:') && !i.startsWith('prose:') && i !== 'unbalanced-span' && i !== 'mark-claim');
       return fallback(leak ? 'TUTOR_ANSWER_GUARD' : 'TUTOR_GROUNDING_GUARD', reply.model || null);
     }
     // Which lines are credited and which is at fault are the ENGINE's, never the
