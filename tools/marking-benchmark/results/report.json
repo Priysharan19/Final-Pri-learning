@@ -1,0 +1,48 @@
+{
+ "date": "2026-11-17",
+ "commit": "ffa18272b",
+ "corpus": {
+  "total": 245,
+  "judged": 245,
+  "excluded": []
+ },
+ "contenders": [
+  {
+   "name": "Pri deterministic engine",
+   "items": 245,
+   "wrongSolutions": 156,
+   "correctSolutions": 89,
+   "falseCreditSolutions": 1,
+   "falseRejectSolutions": 0,
+   "abstainOnCorrect": 21,
+   "abstainOnWrong": 29,
+   "firstBreakExact": 126,
+   "firstBreakTotal": 148,
+   "invalidLines": 148,
+   "falseCreditLines": 0,
+   "validLines": 267,
+   "falseRejectLines": 0,
+   "abstainLines": 94,
+   "examples": [
+    {
+     "kind": "FALSE-CREDIT",
+     "id": "eq-073"
+    }
+   ],
+   "rates": {
+    "falseCreditSolutions": "0.6%",
+    "falseRejectSolutions": "0.0%",
+    "firstBreakExact": "85.1%",
+    "falseCreditLines": "0.0%",
+    "falseRejectLines": "0.0%",
+    "abstainOnCorrect": "23.6%",
+    "abstainOnWrong": "18.6%"
+   },
+   "consistency": "100% (deterministic: same input, same output)",
+   "cost": {
+    "usd": 0,
+    "note": "runs on our own server"
+   }
+  }
+ ]
+}

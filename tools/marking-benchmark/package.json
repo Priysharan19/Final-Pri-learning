@@ -1,0 +1,13 @@
+{
+  "name": "pri-marking-benchmark",
+  "private": true,
+  "type": "module",
+  "description": "Offline lab tooling: head-to-head marking benchmark (deterministic engine vs frontier LLM graders). Never part of the client or server runtime.",
+  "scripts": {
+    "bench": "node run.mjs"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.9.0",
+    "zod": "4.6.7"
+  }
+}
