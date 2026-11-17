@@ -233,12 +233,12 @@ export default {
           ],
           angles: [{ at: [0, 0], from: [3, 0], to: [0, 4], right: true }]
         },
-        note: 'The squares on the legs $3$ and $4$ have areas $9$ and $16$. The square on the hypotenuse $5$ has area $25$, which is exactly $9+16$.'
+        note: 'The squares on the shorter sides $3$ and $4$ have areas $9$ and $16$. The square on the hypotenuse $5$ has area $25$, which is exactly $9+16$.'
       },
       {
-        title: 'Change the legs, keep the right angle',
+        title: 'Change the shorter sides, keep the right angle',
         spec: { kind: 'triangleExplorer', mode: 'pythagoras', initial: { a: 6, b: 8 } },
-        note: 'With legs $6$ and $8$ the readout shows $36+64=100$, so the hypotenuse is $10$. Change a leg: the three squares change, but while the angle stays $90^\\circ$ the two smaller areas always add to the largest.'
+        note: 'With legs $6$ and $8$ the readout shows $36+64=100$, so the hypotenuse is $10$. Change a shorter side: the three squares change, but while the angle stays $90^\\circ$ the two smaller areas always add to the largest.'
       }
     ]
   },

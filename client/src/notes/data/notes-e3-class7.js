@@ -535,7 +535,7 @@ export default {
       },
       {
         title: 'Building $3x+4$ forwards when $x=5$',
-        spec: { kind: 'numberLineStepper', op: 'multiply', a: 3, b: 5, min: 0, max: 20, step: 1 },
+        spec: { kind: 'numberLineStepper', op: 'multiply', a: 5, b: 3, min: 0, max: 20, step: 1 },
         note: 'Three jumps of $5$ reach $15$, which is $3x$. Adding $4$ more reaches $19$. Solving runs the same path backwards: from $19$ go back $4$ to $15$, then split $15$ into three equal jumps of $5$.'
       }
     ],

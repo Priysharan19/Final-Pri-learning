@@ -144,9 +144,9 @@ export function UnitCircleDrag({ initial = 30, title, showTan = true }) {
 
 // ── Secant to tangent ────────────────────────────────────────────────────────
 const H_STEPS = [2, 1.5, 1, 0.75, 0.5, 0.25, 0.1, 0.05, 0.01, 0.001];
-export function SecantToTangent({ expr = 'x^2', x0 = 1, xmin = -1, xmax = 4, ymin = -1, ymax = 10, title }) {
+export function SecantToTangent({ expr = 'x^2', x0 = 1, h: h0 = 1, xmin = -1, xmax = 4, ymin = -1, ymax = 10, title }) {
   const tk = useTk();
-  const [i, setI] = useState(2);
+  const [i, setI] = useState(() => { const k = H_STEPS.indexOf(h0); return k < 0 ? 2 : k; }); // opens at the spec's h when the slider has that step
   const h = H_STEPS[i];
   const m = secantTangentModel({ expr, x0, h, xmin, xmax, ymin, ymax });
   return (
