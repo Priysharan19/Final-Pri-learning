@@ -73,8 +73,9 @@ const AURORA_PLACES = [
   // The syllabus map's selected focus area (verified-page spec §2, CTO-approved
   // 18 Nov 2026): the list's selected row, and the canvas, whose CSS colour is
   // the selection ring and the selected area's links (never text or fills).
-  '.sb-opt[aria-selected="true"]',
-  '.sb-canvas',
+  // Why allowed: CTO sign-off, 18 Nov 2026: "Sign-off given for the two edition-light 'current place' uses (the map's selected area and its links) … The approved design uses the edition accent to mark the current or verified place."
+  '.sb-opt[aria-selected="true"]',   // the map's selected area, in the List view (same sign-off)
+  '.sb-canvas',                       // the map's selection ring and the selected area's links (same sign-off)
   '.xs-nav--rail .xs-q.is-current',
   '.a-aurora i',
   '.pri-working'

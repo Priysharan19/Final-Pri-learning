@@ -116,6 +116,7 @@ html.ui-instrument.skin-aurora .xs-nav--rail .xs-q.is-current::after { box-shado
 
 /* ── The syllabus map's current place (verified-page spec §2) ──────────────
    The selected focus area in the list, and the canvas's own colour — what the
-   map draws its selection ring and the selected area's links in (never text). */
+   map draws its selection ring and the selected area's links in (never text).
+   Why allowed: CTO sign-off, 18 Nov 2026: "Sign-off given for the two edition-light 'current place' uses (the map's selected area and its links) … The approved design uses the edition accent to mark the current or verified place." */
 html.ui-instrument.skin-aurora .sb-opt[aria-selected="true"] { border-color: var(--au-light); background: var(--au-light-soft); }
 html.ui-instrument.skin-aurora .sb-canvas { color: var(--au-light); }
