@@ -978,6 +978,9 @@ jobs:
               ;;
             a11y-boot)
             npm run test:a11y 2>&1 | tee -a browser.log
+            # The diagram kit (shared by Notes and questions) at phone width, in light and dark,
+            # by keyboard, with reduced motion.
+            node client/test/diagram-kit-browser-check.mjs 2>&1 | tee -a browser.log
             # Plan E5: a built Prithagoras client on a Prithagoras server shows
             # no price, plan or purchase control and reaches no store.
             node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log
