@@ -16,6 +16,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { MathText } from '../lib/latex.jsx';
+import { ReadableFormula } from '../lib/ReadableFormula.jsx';
 import StudyDiagram from '../notes/StudyDiagram.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
@@ -656,13 +657,14 @@ function Concepts({ concepts }) {
 }
 
 function Formula({ f, i }) {
-  // Rendered through MathText, the one escaped KaTeX sink, in display style.
-  const text = useMemo(() => `$\\displaystyle ${f.tex}$`, [f.tex]);
+  // Rendered through the one escaped KaTeX sink, in display style, with a "Read formula" button.
+  const t = useT();
+  const tex = useMemo(() => `\\displaystyle ${f.tex}`, [f.tex]);
   return (
     <figure className="nt-formula nt-reveal" style={{ '--i': i }}>
       <figcaption><MathText text={f.label} /></figcaption>
       <div className="nt-ink">
-        <MathText block className="nt-ink-tex" text={text} />
+        <ReadableFormula className="nt-ink-tex" tex={tex} label={t('math.formula')} readLabel={t('math.readFormula')} hideLabel={t('math.hideReading')} />
         <span className="nt-ink-veil" aria-hidden="true" />
       </div>
       <svg className="nt-ink-stroke" viewBox="0 0 300 10" preserveAspectRatio="none" aria-hidden="true">
@@ -697,7 +699,7 @@ function Example({ ex, n }) {
       ) : (
         <div className="nt-answer nt-step">
           <span className="nt-tag">{t('notes.answer')}</span>
-          <MathText text={ex.answer} />
+          {/^\$[^$]+\$$/.test(ex.answer) ? <ReadableFormula tex={ex.answer.slice(1, -1)} label={t('notes.answer')} readLabel={t('math.readFormula')} hideLabel={t('math.hideReading')} /> : <MathText text={ex.answer} />}
           <span className="nt-checked">{t('notes.engineChecked')}</span>
           {ex.alternative && (
             <details className="nt-alternative">

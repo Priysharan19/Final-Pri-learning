@@ -4538,4 +4538,7 @@ export default {
   'home.vp.marks': '{possible} में से {earned} अंक',
   'home.vp.atStake': 'दाँव पर अंक',
   'home.vp.atStakeRange': 'एक सामान्य प्रश्नपत्र में {lo}–{hi} अंक',
+  'math.formula': 'सूत्र',
+  'math.readFormula': 'सूत्र पढ़ें',
+  'math.hideReading': 'पाठ छिपाएँ',
 };

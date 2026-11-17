@@ -306,11 +306,15 @@ function buildRenderer() {
   const source = readFileSync(new URL('lib/latex.jsx', SRC), 'utf8');
   const compiled = compileJsx(source)
     .replace(/^\s*import\s+[^;]*?['"][^'"]*\.css['"];?\s*$/gm, '')
-    .replace(/(['"])(\.[^'"]*)\1/g, (whole, q, rel) => `'${new URL(rel, `${SRC}lib/`).href}'`)
+    .replace(/(['"])(\.[^'"]*)\1/g, (whole, q, rel) => (/^\.\.\/(i18n\/index|brand\/edition)\.js$/.test(rel) ? whole : `'${new URL(rel, `${SRC}lib/`).href}'`))
+    .replace(/(['"])\.\.\/i18n\/index\.js\1/g, '\'./i18n.mjs\'')
+    .replace(/(['"])\.\.\/brand\/edition\.js\1/g, '\'./edition.mjs\'')
     .replace(/(['"])react\1/g, '\'./react.mjs\'')
     .replace(/(['"])katex\1/g, '\'./katex.mjs\'');
 
-  writeFileSync(join(dir, 'react.mjs'), 'export const useMemo = (fn) => fn();\nexport default { useMemo };\n');
+  writeFileSync(join(dir, 'react.mjs'), 'export const useMemo = (fn) => fn();\nexport const useState = (v) => [v, () => {}];\nexport default { useMemo, useState };\n');
+  writeFileSync(join(dir, 'i18n.mjs'), "export const useLanguage = () => ({ language: 'en' });\n");
+  writeFileSync(join(dir, 'edition.mjs'), "export const EDITION_ID = 'priyabhata';\n");
   writeFileSync(join(dir, 'katex.mjs'), `
 // A stand-in for KaTeX with the two behaviours latex.jsx has to survive: the
 // ordinary render, and the throw that is not a ParseError. KaTeX only swallows
@@ -326,6 +330,7 @@ export function renderToString(tex, options) {
 export default { renderToString };
 `);
   writeFileSync(join(dir, 'latex.mjs'), H_SHIM + compiled);
+  if (process.env.DEBUG_LATEX) console.error('LATEX_DIR', dir);
   return dir;
 }
 

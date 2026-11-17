@@ -4490,4 +4490,7 @@ export default {
   'home.vp.marks': '{earned} / {possible} marks',
   'home.vp.atStake': 'Marks at stake',
   'home.vp.atStakeRange': '{lo}–{hi} marks in a typical paper',
+  'math.formula': 'Formula',
+  'math.readFormula': 'Read formula',
+  'math.hideReading': 'Hide reading',
 };
