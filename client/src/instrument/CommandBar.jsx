@@ -42,7 +42,8 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
   // While the palette is open the page behind is pushed back (UI6): a
   // root attribute the stylesheet reads, cleared on close.
   useEffect(() => {
-    if (!open) return undefined;
+    // The exam room and the desk never push (their clock never animates).
+    if (!open || /^\/(exam|desk)(\/|$)/.test(window.location.pathname)) return undefined;
     const root = document.documentElement;
     root.dataset.pushed = '';
     return () => { delete root.dataset.pushed; };
