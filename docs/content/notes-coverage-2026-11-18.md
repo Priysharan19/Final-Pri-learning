@@ -8,7 +8,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 ## Summary
 
-**71 of 196 chapters at standard.**
+**84 of 196 chapters at standard.**
 
 | Band | Chapters | With notes | At standard | Missing sections (count of chapters) | ≥2 diagrams | Interactive | KaTeX issues |
 |---|---|---|---|---|---|---|---|
@@ -17,7 +17,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 | CBSE Class 9 | 8 | 8 | 8 | — | 8 | 8 | 0 |
 | CBSE Class 10 | 14 | 14 | 14 | — | 14 | 13 | 0 |
 | CBSE Class 11 | 14 | 14 | 14 | — | 14 | 12 | 0 |
-| CBSE Class 12 | 13 | 13 | 0 | objective 13, intuition 13, checkpoint 13 | 0 | 0 | 0 |
+| CBSE Class 12 | 13 | 13 | 13 | — | 13 | 13 | 0 |
 | Olympiad | 7 | 7 | 7 | — | 7 | 5 | 0 |
 | NSW Stage 4 (Years 7–8) | 16 | 16 | 0 | objective 16, intuition 16 | 2 | 1 | 0 |
 | NSW Stage 5 (Years 9–10) | 41 | 41 | 0 | objective 41, intuition 41 | 8 | 3 | 0 |
@@ -135,19 +135,19 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `c12-relations-functions` Relations and Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 41 | ok | **no** |
-| `c12-inverse-trigonometric` Inverse Trigonometric Functions | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 20 | ok | **no** |
-| `c12-matrices` Matrices | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 12 | ok | **no** |
-| `c12-determinants` Determinants | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 9 | ok | **no** |
-| `c12-continuity-differentiability` Continuity and Differentiability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 21 | ok | **no** |
-| `c12-applications-derivatives` Application of Derivatives | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 33 | ok | **no** |
-| `c12-integrals` Integrals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 8 | ok | **no** |
-| `c12-applications-integrals` Application of Integrals | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 46 | ok | **no** |
-| `c12-differential-equations` Differential Equations | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 23 | ok | **no** |
-| `c12-vector-algebra` Vector Algebra | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 33 | ok | **no** |
-| `c12-3d-geometry` Three Dimensional Geometry | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 10 | ok | **no** |
-| `c12-linear-programming` Linear Programming | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 21 | ok | **no** |
-| `c12-probability` Probability | yes | **no** | yes | **no** | yes | yes | yes | **no** | yes | 0 | **no** | 77 | ok | **no** |
+| `c12-relations-functions` Relations and Functions | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 41 | ok | yes |
+| `c12-inverse-trigonometric` Inverse Trigonometric Functions | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 20 | ok | yes |
+| `c12-matrices` Matrices | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 12 | ok | yes |
+| `c12-determinants` Determinants | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 9 | ok | yes |
+| `c12-continuity-differentiability` Continuity and Differentiability | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 21 | ok | yes |
+| `c12-applications-derivatives` Application of Derivatives | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 33 | ok | yes |
+| `c12-integrals` Integrals | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 8 | ok | yes |
+| `c12-applications-integrals` Application of Integrals | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 46 | ok | yes |
+| `c12-differential-equations` Differential Equations | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 23 | ok | yes |
+| `c12-vector-algebra` Vector Algebra | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 33 | ok | yes |
+| `c12-3d-geometry` Three Dimensional Geometry | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 10 | ok | yes |
+| `c12-linear-programming` Linear Programming | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 21 | ok | yes |
+| `c12-probability` Probability | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 77 | ok | yes |
 
 ### Olympiad
 
