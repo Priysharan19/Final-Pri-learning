@@ -4,9 +4,10 @@
 // Every case runs through the server's own modules, never a copy of them:
 //   tutor        validateTutorRequest → askTutorModel (the exact request body
 //                the server builds) → the deterministic answer guard
-//                (buildGuard + leakedExpressions) → what the student would see,
-//                exactly as tutor.js help() decides it: the model's message, or
-//                the authored hint after two guarded attempts.
+//                (buildGuard + leakedExpressions, and on trees that have them the
+//                distress check, the safety output check and the mark-claim
+//                check) → what the student would see, as tutor.js help() decides
+//                it: a safety reply, the model's message, or the authored hint.
 //   handwriting  transcribeHandwriting with a fetch that records the body it is
 //                given, so a suite can prove what the reader is (and is not) sent.
 //   contract     the static prompt and copy the server and client ship.
@@ -35,6 +36,11 @@ const { validateTutorRequest, deterministicHelp } = await server('tutor.js');
 const { askTutorModel, providerBody, providerConfig } = await server('tutorProvider.js');
 const { buildGuard, leakedExpressions } = await server('tutorGuard.js');
 const handwriting = await server('handwritingProvider.js');
+const guardModule = await server('tutorGuard.js');
+// Present only on branches that carry them (#989 and later); the provider
+// mirrors tutor.js help() on whichever tree it runs against.
+const safety = await server('tutorSafety.js').catch(() => null);
+const replyMarkClaims = guardModule.replyMarkClaimIssues || null;
 
 export const MODE = process.env.PRI_EVAL_MODE === 'live' ? 'live' : 'fixture';
 const FIXTURE_ENV = Object.freeze({ PRI_HANDWRITING_API_KEY: 'fixture-mode-not-a-key', NODE_ENV: 'test' });
@@ -71,6 +77,10 @@ async function tutorCase(vars) {
   const checked = validateTutorRequest(vars.body);
   if (!checked.ok) return { output: JSON.stringify({ refused: true, code: checked.code || checked.error?.code || null, message: checked.message || checked.error?.message || null }) };
   const request = checked.request;
+  if (safety?.distressReply) {
+    const distress = safety.distressReply(request, { edition: vars.edition || 'priyabhata' });
+    if (distress) return { output: JSON.stringify({ mode: MODE, fixture: null, request: null, attempts: [], source: 'safety', studentSees: distress.message }) };
+  }
   const sent = [];
   const env = MODE === 'live' ? process.env : FIXTURE_ENV;
   const replies = MODE === 'live' ? null : fixture(vars.fixture).replies;
@@ -86,7 +96,10 @@ async function tutorCase(vars) {
     catch (error) { attempts.push({ error: error.code || String(error) }); break; }
     const leaked = leakedExpressions(reply.message, guard, { prompt: request.question.prompt });
     attempts.push({ message: reply.message, revealsAnswer: reply.revealsAnswer, leaked });
-    if (reply.message && !reply.revealsAnswer && !leaked.length) { studentSees = reply.message; source = 'model'; }
+    const safetyIssues = safety?.safetyOutputIssues ? safety.safetyOutputIssues(reply.message) : [];
+    const markIssues = replyMarkClaims ? replyMarkClaims(reply.message, request.question) : [];
+    attempts[attempts.length - 1].guarded = [...safetyIssues, ...markIssues];
+    if (reply.message && !reply.revealsAnswer && !leaked.length && !safetyIssues.length && !markIssues.length) { studentSees = reply.message; source = 'model'; }
   }
   if (!studentSees) studentSees = deterministicHelp(request);
   const body = sent[0] || providerBody(request, providerConfig(env));
