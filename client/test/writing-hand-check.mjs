@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import { cleanHand, readHand, writeHand } from '../src/lib/writingHand.js';
+let n = 0; const ok = (c, m) => { assert.ok(c, m); n += 1; };
+const mem = () => { const m = new Map(); return { getItem: k => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, v) }; };
+const boom = { getItem() { throw new Error('blocked'); }, setItem() { throw new Error('blocked'); } };
+ok(cleanHand('left') === 'left' && cleanHand('right') === 'right', 'two hands');
+ok(cleanHand('both') === 'right' && cleanHand(undefined) === 'right', 'default is right');
+const s = mem();
+ok(readHand(s) === 'right', 'empty storage reads right');
+ok(writeHand('left', s) === 'left' && readHand(s) === 'left', 'left is kept');
+ok(readHand(boom) === 'right' && writeHand('left', boom) === 'left', 'blocked storage keeps the default and never throws');
+console.log(`WRITING HAND: PASS — ${n}/${n} checks — a device-only preference, right by default, safe when storage is blocked`);
