@@ -40,7 +40,7 @@ import { misconceptionKey, misconceptionLabel } from './adaptive.js';
 import { diagnoseStep } from './diagnose.js';
 
 /** Bumped when an ID is added. IDs are never removed or renamed. */
-export const ONTOLOGY_VERSION = 2;
+export const ONTOLOGY_VERSION = 3;
 
 const STEP = 'step-check';
 const AUTHORED = 'authored';
@@ -157,6 +157,34 @@ export const MISCONCEPTIONS = Object.freeze([
     name: 'misconception.diffSign.name', explain: 'misconception.diffSign.explain' },
   { id: 'diff-chain-inner-missing', category: 'calculus', detectors: [STEP],
     name: 'misconception.diffChainInnerMissing.name', explain: 'misconception.diffChainInnerMissing.explain' },
+
+  // ── Algebra and indices (topics/algebra.js, topics/indices.js) ────────────
+  { id: 'expand-first-and-last-only', category: 'expansion', detectors: [STEP],
+    name: 'misconception.expandFirstAndLastOnly.name', explain: 'misconception.expandFirstAndLastOnly.explain' },
+  { id: 'expand-last-term-added', category: 'expansion', detectors: [STEP],
+    name: 'misconception.expandLastTermAdded.name', explain: 'misconception.expandLastTermAdded.explain' },
+  { id: 'expand-difference-of-squares-sign', category: 'expansion', detectors: [STEP],
+    name: 'misconception.expandDifferenceOfSquaresSign.name', explain: 'misconception.expandDifferenceOfSquaresSign.explain' },
+  { id: 'expand-middle-terms-cancel', category: 'expansion', detectors: [STEP],
+    name: 'misconception.expandMiddleTermsCancel.name', explain: 'misconception.expandMiddleTermsCancel.explain' },
+  { id: 'factorise-fails-when-expanded', category: 'factorising', detectors: [STEP],
+    name: 'misconception.factoriseFailsWhenExpanded.name', explain: 'misconception.factoriseFailsWhenExpanded.explain' },
+  { id: 'solve-linear-constant-ignored', category: 'equation-balance', detectors: [STEP],
+    name: 'misconception.solveLinearConstantIgnored.name', explain: 'misconception.solveLinearConstantIgnored.explain' },
+  { id: 'solve-linear-divided-one-term', category: 'equation-balance', detectors: [STEP],
+    name: 'misconception.solveLinearDividedOneTerm.name', explain: 'misconception.solveLinearDividedOneTerm.explain' },
+  { id: 'solve-linear-subtracted-instead-of-divided', category: 'equation-balance', detectors: [STEP],
+    name: 'misconception.solveLinearSubtractedInsteadOfDivided.name', explain: 'misconception.solveLinearSubtractedInsteadOfDivided.explain' },
+  { id: 'solve-linear-multiplied-instead-of-divided', category: 'equation-balance', detectors: [STEP],
+    name: 'misconception.solveLinearMultipliedInsteadOfDivided.name', explain: 'misconception.solveLinearMultipliedInsteadOfDivided.explain' },
+  { id: 'index-power-not-applied-to-number', category: 'indices', detectors: [STEP],
+    name: 'misconception.indexPowerNotAppliedToNumber.name', explain: 'misconception.indexPowerNotAppliedToNumber.explain' },
+  { id: 'index-multiplied-instead-of-added', category: 'indices', detectors: [STEP],
+    name: 'misconception.indexMultipliedInsteadOfAdded.name', explain: 'misconception.indexMultipliedInsteadOfAdded.explain' },
+  { id: 'index-coefficients-added', category: 'indices', detectors: [STEP],
+    name: 'misconception.indexCoefficientsAdded.name', explain: 'misconception.indexCoefficientsAdded.explain' },
+  { id: 'surd-sum-under-one-root', category: 'surds', detectors: [STEP],
+    name: 'misconception.surdSumUnderOneRoot.name', explain: 'misconception.surdSumUnderOneRoot.explain' },
 
   // ── Not a misconception: the line is false and nothing more is known ──────
   { id: 'counterexample', category: 'unclassified', detectors: [STEP], recordable: false,
