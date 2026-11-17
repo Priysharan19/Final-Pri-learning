@@ -6,7 +6,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 
 ## Prithagoras
 
-107 skills measured; **33** meet both targets; **74** are below at least one.
+107 skills measured; **38** meet both targets; **69** are below at least one.
 
 | Skill (generator) | Cells | Distinct instances | Structural forms | Below target |
 | --- | --- | --- | --- | --- |
@@ -24,15 +24,12 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y12-func-model` | 4 | 386 | 1 | instances + forms |
 | `y7-decimals-perc` | 4 | 407 | 26 | instances |
 | `y8-probability` | 3 | 440 | 2 | instances + forms |
-| `mex-proof` | 4 | 440 | 5 | instances |
 | `y9-variation` | 4 | 442 | 1 | instances + forms |
-| `mex-integration` | 4 | 459 | 12 | instances |
 | `me12-induction` | 3 | 499 | 7 | instances |
 | `y8-indices` | 4 | 532 | 2 | instances + forms |
 | `y10-geometry-proof` | 4 | 541 | 1 | instances + forms |
 | `y10-surds` | 4 | 559 | 2 | instances + forms |
 | `y12-trig-model` | 4 | 576 | 2 | instances + forms |
-| `mex-demoivre` | 4 | 640 | 14 | instances |
 | `y12-trigcalc` | 4 | 642 | 40 | instances |
 | `y10-quadratics` | 3 | 693 | 6 | instances |
 | `me11-inversetrig` | 4 | 718 | 356 | instances |
@@ -50,7 +47,6 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `me12-projectile` | 4 | 1.8k | 1 | instances + forms |
 | `y12-explogcalc` | 4 | 2.0k | 5 | instances |
 | `y10-similarity` | 3 | 2.0k | 1 | instances + forms |
-| `mex-mechanics` | 4 | 2.1k | 3 | instances + forms |
 | `y12-integral-calc` | 4 | 2.1k | 6 | instances |
 | `y12-appdiff` | 3 | 2.1k | 8 | instances |
 | `y9-simint` | 2 | 2.2k | 26 | instances |
@@ -78,7 +74,11 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y11-lines` | 4 | 9.8k | 32 | instances |
 | `ms12-right-triangle` | 4 | 10.0k | 24 | — |
 | `ms12-rates` | 4 | 11.0k | 34 | — |
+| `mex-demoivre` | 4 | 11.8k | 36 | — |
+| `mex-proof` | 4 | 12.5k | 30 | — |
+| `mex-mechanics` | 4 | 13.1k | 30 | — |
 | `y8-equations` | 3 | 14.7k | 26 | — |
+| `mex-integration` | 4 | 15.4k | 130 | — |
 | `y10-simeq` | 4 | 17.0k | 6 | — |
 | `y10-probability` | 4 | 20.4k | 1 | forms |
 | `y8-algebra` | 4 | 21.6k | 25 | — |
@@ -106,7 +106,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms11-formulas` | 4 | 129.1k | 18 | — |
 | `me11-functions` | 3 | 159.7k | 92 | — |
 | `ms12-bivariate-fit` | 4 | 164.5k | 33 | — |
-| `mex-vectors` | 4 | 206.6k | 1 | forms |
+| `mex-vectors` | 4 | 173.4k | 48 | — |
 | `ms11-data` | 3 | 283.9k | 50 | — |
 | `ms12-bivariate` | 1 | 338.3k | 11 | — |
 | `y7-ratio` | 4 | 563.1k | 866 | — |
