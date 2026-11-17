@@ -38,20 +38,27 @@ export function typeset(text) {
 const ts = (steps = []) => steps.map(x => (typeof x === 'string' ? typeset(x) : { ...x, h: typeset(x.h), d: typeset(x.d) }));
 
 /** A numeric-answer payload. `traps` are common wrong answers with the reason. */
+const r6x = v => Math.round(v * 1e6) / 1e6;
 export function numeric(form, prompt, rawValue, { hints, steps, traps: rawTraps = [] }) {
   // Keys are kept to six places so no floating-point artefact (4.800000000000001) is ever served.
   const tidy = v => (Number.isInteger(v) ? v : Math.round(v * 1e6) / 1e6);
   const value = tidy(rawValue);
   const traps = rawTraps.map(t => ({ ...t, value: tidy(t.value) }));
-  const kept = traps.filter((t, i) => t.value !== value && Number.isFinite(t.value) && traps.findIndex(u => u.value === t.value) === i);
+  // A distractor is shown to the same number of decimal places as the key, so it must differ from the
+  // key and from every other distractor at that precision; it is stored at that precision too.
+  const dp = Math.min(6, (String(value).split('.')[1] || '').length), at = v => Math.round(v * 10 ** dp) / 10 ** dp;
+  const kept = traps.map(t => ({ ...t, value: at(t.value) })).filter((t, i, all) => t.value !== value && Number.isFinite(t.value) && all.findIndex(u => u.value === t.value) === i);
   // A designed distractor must always exist (it is what the multiple-choice view
   // and the misconception feedback use). When a form's own wrong answers all
   // coincide with the key for this draw, fall back to the two slips every
   // numeric answer can suffer.
   if (!kept.length) {
-    if (value !== 0) kept.push({ value: -value, why: 'Check the sign: a reversed order of subtraction or a dropped minus gives the opposite value.' });
+    if (value !== 0 && Number.isInteger(value)) kept.push({ value: -value, why: 'Check the sign: a reversed order of subtraction or a dropped minus gives the opposite value.' });
     kept.push({ value: value === 0 ? 1 : 2 * value, why: 'A stray factor of $2$ has crept in; recheck whether a halving or doubling step belongs.' });
+    if (!Number.isInteger(value)) kept.push({ value: r6x(value / 2), why: 'A halving step crept in; recheck whether the value should be halved.' });
   }
+  for (let i = kept.length - 1; i >= 0; i--) if (kept[i].value === value || kept.findIndex(u => u.value === kept[i].value) !== i) kept.splice(i, 1);
+  if (!kept.length) kept.push({ value: value + 1, why: 'Close, but one out: recheck the last step.' });
   return {
     form, prompt: typeset(prompt), answerType: 'numeric', answer: { value },
     traps: kept.map(t => ({ ...t, why: typeset(t.why) })),

@@ -7,5 +7,8 @@ import { BAND_11_A } from './forms/band-11-a.js';
 import { BAND_11_B } from './forms/band-11-b.js';
 import { BAND_10 } from './forms/band-10.js';
 import { BAND_789 } from './forms/band-789.js';
+import { SWEEP_789 } from './forms/band-sweep.js';
+import { SWEEP_HI } from './forms/band-sweep-hi.js';
+import { mergeForms } from './forms/loader.js';
 
-export const EXTRA_FORMS = { ...BAND_12_A, ...BAND_12_B, ...BAND_12_C, ...BAND_11_A, ...BAND_11_B, ...BAND_10, ...BAND_789 };
+export const EXTRA_FORMS = mergeForms({}, BAND_12_A, BAND_12_B, BAND_12_C, BAND_11_A, BAND_11_B, BAND_10, BAND_789, SWEEP_789, SWEEP_HI);

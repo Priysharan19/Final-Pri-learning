@@ -27,9 +27,10 @@ const INTS = () => [
   mk('mixed', (rng, d) => {
     const [a, b] = distinct(rng, -R(d), R(d), 2), c = nzs(rng, 12), e = nzs(rng, R(d));
     if (Math.abs(c) === 1 || (a - b) * c + e === 0) throw RETRY;
-    return { p: `Find the value of $(${a} - ${pr(b)}) \\times ${pr(c)} + ${pr(e)}$.`.replace('+ (-', '- (').replace(/\+ \((-\d+)\)/, (m, x) => `- ${-Number(x)}`), v: (a - b) * c + e,
-      h: ['Work out the bracket first.', 'Then multiply, keeping track of signs.', 'Add the last number.'], s: [{ h: 'Bracket', d: `$${a} - ${pr(b)} = ${a - b}$` }, { h: 'Multiply', d: `$${a - b}\\times ${pr(c)}$` }],
-      t: [{ v: a - b * c + e, w: 'The bracket is multiplied as a whole, not just its last number.' }].map(x => ({ value: x.v, why: x.w })), c: () => a * c - b * c + e };
+    const inner = `${a} ${b < 0 ? '+' : '-'} ${Math.abs(b)}`, tail = e < 0 ? `- ${-e}` : `+ ${e}`;
+    return { p: `Find the value of $(${inner}) \\times ${pr(c)} ${tail}$.`, v: (a - b) * c + e,
+      h: ['Work out the bracket first.', 'Then multiply, keeping track of signs.', 'Add or subtract the last number.'], s: [{ h: 'Bracket', d: `$${inner} = ${a - b}$` }, { h: 'Multiply', d: `$${a - b}\\times ${pr(c)}$` }],
+      t: [{ value: a - b * c + e, why: 'The bracket is multiplied as a whole, not just its last number.' }], c: () => a * c - b * c + e };
   }),
   mk('temperature', (rng, d) => {
     const t0 = ri(rng, -5, 15), r = ri(rng, 2, 9), h = ri(rng, 2, 6 + d);
@@ -56,21 +57,22 @@ const fracs = (b, a) => a / b;
 const FRACS = () => [
   mk('add', (rng, d) => {
     const q1 = DEN[ri(rng, 0, 6)], q2 = DEN[ri(rng, 0, 6)], p1 = ri(rng, 1, 3 * q1), p2 = ri(rng, 1, 3 * q2);
-    if (p1 % q1 === 0 || p2 % q2 === 0 || gcd(p1, q1) > 1 || gcd(p2, q2) > 1) throw RETRY;
+    if (p1 % q1 === 0 || p2 % q2 === 0 || gcd(p1, q1) > 1 || gcd(p2, q2) > 1 || (p1 === p2 && q1 === q2)) throw RETRY;
     return { p: `Find $\\dfrac{${p1}}{${q1}} + \\dfrac{${p2}}{${q2}}$ as a decimal.`, v: r6(p1 / q1 + p2 / q2), h: ['Make the denominators equal, or convert each fraction to a decimal.', 'Add.', 'Check the answer is a terminating decimal.'], s: [{ h: 'Decimals', d: `$${r6(p1 / q1)} + ${r6(p2 / q2)}$` }],
       t: [{ value: r6((p1 + p2) / (q1 + q2)), why: 'Add numerators and denominators separately is not how fractions add.' }], c: () => r6((p1 * q2 + p2 * q1) / (q1 * q2)) };
   }),
   mk('product', (rng, d) => {
     const q1 = DEN[ri(rng, 0, 6)], q2 = DEN[ri(rng, 0, 6)], p1 = ri(rng, 1, 2 * q1), p2 = ri(rng, 1, 2 * q2);
-    if (p1 % q1 === 0 || p2 % q2 === 0 || gcd(p1, q1) > 1 || gcd(p2, q2) > 1) throw RETRY;
+    if (p1 % q1 === 0 || p2 % q2 === 0 || gcd(p1, q1) > 1 || gcd(p2, q2) > 1 || (p1 === p2 && q1 === q2)) throw RETRY;
+    if (Math.abs((p1 * p2) / (q1 * q2) - 1) < 1e-9) throw RETRY;
     return { p: `Find $\\dfrac{${p1}}{${q1}} \\times \\dfrac{${p2}}{${q2}}$ as a decimal.`, v: r6((p1 * p2) / (q1 * q2)), h: ['Multiply the numerators and the denominators.', 'Then divide.', 'Or convert each to a decimal first.'], s: [{ h: 'Multiply', d: `$\\dfrac{${p1 * p2}}{${q1 * q2}}$` }],
       t: [{ value: r6(p1 / q1 + p2 / q2), why: 'The question asks for the product, not the sum.' }], c: () => r6((p1 / q1) * (p2 / q2)) };
   }),
   mk('division', (rng, d) => {
     const q1 = DEN[ri(rng, 0, 6)], q2 = DEN[ri(rng, 0, 6)], p1 = ri(rng, 1, 2 * q1), p2 = ri(rng, 1, 2 * q2);
-    if (p1 % q1 === 0 || p2 % q2 === 0 || gcd(p1, q1) > 1 || gcd(p2, q2) > 1) throw RETRY;
+    if (p1 % q1 === 0 || p2 % q2 === 0 || gcd(p1, q1) > 1 || gcd(p2, q2) > 1 || (p1 === p2 && q1 === q2)) throw RETRY;
     const val = (p1 * q2) / (q1 * p2);
-    if (!terminates((p1 * q2) / gcd(p1 * q2, q1 * p2) === 0 ? 1 : (q1 * p2) / gcd(p1 * q2, q1 * p2))) throw RETRY;
+    if (!terminates((q1 * p2) / gcd(p1 * q2, q1 * p2)) || Math.abs(val * 1e6 - Math.round(val * 1e6)) > 1e-6 || Math.abs(val - 1) < 1e-9) throw RETRY;
     return { p: `Find $\\dfrac{${p1}}{${q1}} \\div \\dfrac{${p2}}{${q2}}$ as a decimal.`, v: r6(val), h: ['Dividing by a fraction means multiplying by its reciprocal.', 'Flip the second fraction.', 'Multiply and simplify.'], s: [{ h: 'Reciprocal', d: `$\\dfrac{${p1}}{${q1}}\\times\\dfrac{${q2}}{${p2}}$` }],
       t: [{ value: r6((p1 * p2) / (q1 * q2)), why: 'Divide means multiply by the reciprocal; do not multiply straight across.' }], c: () => r6((p1 / q1) / (p2 / q2)) };
   }),
@@ -111,7 +113,7 @@ const SQC = () => [
   mk('square-root', (rng, d) => {
     const n = ri(rng, 12, 40 * d + 60);
     return { p: `Find the square root of $${n * n}$.`, v: n, h: ['Look at the last digit to narrow the choices.', 'Estimate between two known squares.', 'Check by squaring.'], s: [{ h: 'Estimate', d: 'between two perfect squares you know' }],
-      t: [{ value: n * 2, why: 'The square root is not half the number\'s square-root-base; check by squaring.' }], c: () => { for (let x = 1; x <= 400; x++) if (x * x === n * n) return x; return NaN; } };
+      t: [{ value: n * 2, why: 'Doubling a number is not the same as squaring it, so halving the square does not give the root.' }], c: () => { for (let x = 1; x <= 400; x++) if (x * x === n * n) return x; return NaN; } };
   }),
   mk('cube-root', (rng, d) => {
     const n = ri(rng, 3, 10 * d + 15);
@@ -132,8 +134,10 @@ const SQC = () => [
       t: [{ value: n, why: 'Only the missing primes are needed, not the whole number.' }], c: () => { for (let k = 1; k <= 20000; k++) { const v = n * k, r = Math.round(Math.cbrt(v)); if (r * r * r === v) return k; } return NaN; } };
   }),
   mk('count-squares', (rng, d) => {
-    const a = ri(rng, 10, 100 * d), b = a + ri(rng, 50, 400 * d);
-    return { p: `How many perfect squares lie between $${a}$ and $${b}$ (including both if they are squares)?`, v: Math.floor(Math.sqrt(b)) - Math.ceil(Math.sqrt(a)) + 1, h: ['Find the smallest square that is at least the lower number.', 'Find the largest square that is at most the upper number.', 'Count the squares between them.'], s: [{ h: 'Roots', d: `$\\lceil\\sqrt{${a}}\\rceil$ to $\\lfloor\\sqrt{${b}}\\rfloor$` }],
+    const a = ri(rng, 10, 100 * d), b = a + ri(rng, 80, 400 * d);
+    const v = Math.floor(Math.sqrt(b)) - Math.ceil(Math.sqrt(a)) + 1;
+    if (v < 2) throw RETRY;
+    return { p: `How many perfect squares lie between $${a}$ and $${b}$ (including both if they are squares)?`, v, h: ['Find the smallest square that is at least the lower number.', 'Find the largest square that is at most the upper number.', 'Count the squares between them.'], s: [{ h: 'Roots', d: `$\\lceil\\sqrt{${a}}\\rceil$ to $\\lfloor\\sqrt{${b}}\\rfloor$` }],
       t: [{ value: b - a, why: 'That counts all the numbers, not only the squares.' }], c: () => { let c = 0; for (let x = a; x <= b; x++) { const r = Math.round(Math.sqrt(x)); if (r * r === x) c += 1; } return c; } };
   })
 ];
@@ -142,6 +146,7 @@ const SQC = () => [
 const EXPO = () => [
   mk('laws', (rng, d) => {
     const base = ri(rng, 2, 5), m = ri(rng, 3, 9), n = ri(rng, 3, 9), k = ri(rng, 1, m + n - 1);
+    if (base ** (m + n - k) > 100000) throw RETRY;
     return { p: `Evaluate $\\dfrac{${base}^{${m}} \\times ${base}^{${n}}}{${base}^{${k}}}$.`, v: base ** (m + n - k), h: ['When multiplying powers of the same base, add the exponents.', 'When dividing, subtract.', 'Then evaluate the single power.'], s: [{ h: 'Combine', d: `$${base}^{${m} + ${n} - ${k}}$` }],
       t: [{ value: base ** (m * n - k), why: 'Multiplying powers adds the exponents; it does not multiply them.' }].filter(t => Number.isSafeInteger(t.value)), c: () => { let top = 1; for (let i = 0; i < m + n; i++) top *= base; let bot = 1; for (let i = 0; i < k; i++) bot *= base; return top / bot; } };
   }),
@@ -159,7 +164,7 @@ const EXPO = () => [
   }),
   mk('standard-form', (rng, d) => {
     const e = ri(rng, 3, 5 + d), mant = ri(rng, 11, 99) / 10;
-    return { p: `The distance between two stations is $${r6(mant * 10 ** e)}$ metres. Written as $a \\times 10^n$ with $1 \\le a < 10$, what is $n$?`, v: e, h: ['Move the decimal point until the number is between $1$ and $10$.', 'Count the places moved.', 'That count is the power of $10$.'], s: [{ h: 'Mantissa', d: `$${mant}$ is between $1$ and $10$` }],
+    return { p: `The distance between two cities is $${r6(mant * 10 ** e)}$ metres. Written as $a \\times 10^n$ with $1 \\le a < 10$, what is $n$?`, v: e, h: ['Move the decimal point until the number is between $1$ and $10$.', 'Count the places moved.', 'That count is the power of $10$.'], s: [{ h: 'Mantissa', d: `$${mant}$ is between $1$ and $10$` }],
       t: [{ value: e + 1, why: 'The decimal point of the mantissa already sits after the first digit.' }], c: () => Math.floor(Math.log10(mant * 10 ** e)) };
   })
 ];
@@ -202,7 +207,7 @@ const PROPF = () => [
       t: [{ value: days * f * f, why: 'More workers take fewer days, not more.' }], c: () => (w1 * days * f) / (w1 * f) };
   }),
   mk('speed-time', (rng, d) => {
-    const v1 = ri(rng, 20, 60), f = [2, 3, 4, 5][ri(rng, 0, 3)], t1 = ri(rng, 2, 10 + d);
+    const f = [2, 3, 4][ri(rng, 0, 2)], v1 = ri(rng, 15, Math.floor(100 / f)), t1 = ri(rng, 2, 10 + d);
     return { p: `A bus travelling at $${v1 * f}$ km/h covers a journey in $${t1}$ hours. How long would it take at $${v1}$ km/h, in hours?`, v: t1 * f, h: ['For a fixed distance, speed and time are inversely proportional.', 'Distance equals speed times time.', 'Divide the distance by the new speed.'], s: [{ h: 'Distance', d: `$${v1 * f}\\times ${t1}$` }],
       t: [{ value: t1, why: 'A lower speed means a longer time.' }], c: () => (v1 * f * t1) / v1 };
   }),
@@ -246,8 +251,8 @@ const ANGLES = () => [
       t: [{ value: a + b, why: 'That is the sum of the two known angles, not the third.' }], c: () => 180 - (a + b) };
   }),
   mk('exterior-angle', (rng, d) => {
-    const a = ri(rng, 20, 90), b = ri(rng, 20, 90);
-    return { p: `In a triangle, the interior angles opposite a side produced are $${a}^\\circ$ and $${b}^\\circ$. Find the exterior angle formed, in degrees.`, v: a + b, h: ['An exterior angle equals the sum of the two interior opposite angles.', 'Add them.', 'Check: it is also $180^\\circ$ minus the adjacent interior angle.'], s: [{ h: 'Sum', d: `$${a} + ${b}$` }],
+    const [a, b] = distinct(rng, 20, 75, 2);
+    return { p: `A side of a triangle is produced. The two interior opposite angles measure $${a}^\\circ$ and $${b}^\\circ$. Find the exterior angle formed, in degrees.`, v: a + b, h: ['An exterior angle equals the sum of the two interior opposite angles.', 'Add them.', 'Check: it is also $180^\\circ$ minus the adjacent interior angle.'], s: [{ h: 'Sum', d: `$${a} + ${b}$` }],
       t: [{ value: 180 - a - b, why: 'That is the third interior angle, not the exterior angle.' }], c: () => 180 - (180 - a - b) };
   }),
   mk('polygon-sum', (rng, d) => {
@@ -267,8 +272,9 @@ const ANGLES = () => [
   }),
   mk('parallel-lines', (rng, d) => {
     const a = ri(rng, 30, 150);
-    return { p: `A transversal cuts two parallel lines. One interior angle on one side of the transversal measures $${a}^\\circ$. Find the interior angle on the same side of the transversal at the other line, in degrees.`, v: 180 - a, h: ['Interior angles on the same side of a transversal between parallel lines are supplementary.', 'They add to $180^\\circ$.', 'Subtract.'], s: [{ h: 'Supplementary', d: `$180 - ${a}$` }],
-      t: [{ value: a, why: 'Those are corresponding or alternate angles, which are equal; co-interior angles add to $180^\\circ$.' }].filter(t => a !== 90), c: () => 180 - a };
+    if (a === 90) throw RETRY;
+    return { p: `A transversal cuts two parallel lines. At the first line, the interior angle on the left of the transversal is $${a}^\\circ$. Find the interior angle on the left of the transversal at the second line, in degrees.`, v: 180 - a, h: ['Interior angles on the same side of a transversal between parallel lines are supplementary.', 'They add to $180^\\circ$.', 'Subtract.'], s: [{ h: 'Supplementary', d: `$180 - ${a}$` }],
+      t: [{ value: a, why: 'Those would be alternate or corresponding angles, which are equal; co-interior angles add to $180^\\circ$.' }], c: () => 180 - a };
   })
 ];
 
@@ -289,7 +295,7 @@ const POLYQ = () => [
     const [a, b, c] = distinct(rng, 60, 130, 3);
     if (a + b + c >= 350) throw RETRY;
     return { p: `Three angles of a quadrilateral are $${a}^\\circ$, $${b}^\\circ$ and $${c}^\\circ$. Find the fourth angle in degrees.`, v: 360 - a - b - c, h: ['The angles of a quadrilateral add to $360^\\circ$.', 'Add the three known angles.', 'Subtract from $360^\\circ$.'], s: [{ h: 'Subtract', d: `$360 - ${a} - ${b} - ${c}$` }],
-      t: [{ value: 180 - a - b - c + 180, why: 'Check the angle sum: $360^\\circ$, not $180^\\circ$.' }].filter(t => t.value !== 360 - a - b - c), c: () => 360 - (a + b + c) };
+      t: [{ value: 180 - (a + b + c), why: 'The angles of a quadrilateral add to $360^\\circ$, not $180^\\circ$.' }], c: () => 360 - (a + b + c) };
   }),
   mk('rectangle-diagonal', (rng, d) => {
     const t = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [20, 21, 29]][ri(rng, 0, 3)], k = ri(rng, 1, 5 + d);
@@ -356,14 +362,19 @@ const SOLID = () => [
       t: [{ value: 2 * n, why: 'Do not forget the vertical edges joining the two bases.' }], c: () => { let e = 0; e += n; e += n; e += n; return e; } };
   }),
   mk('euler-faces', (rng, d) => {
-    const n = ri(rng, 3, 12 + 3 * d);
-    return { p: `A pyramid has a base with $${n}$ sides. Using Euler's formula $F + V - E = 2$, find the number of faces if it has $${n + 1}$ vertices and $${2 * n}$ edges.`, v: n + 1, h: ['Euler\'s formula: $F + V - E = 2$.', 'Substitute the vertices and edges.', 'Solve for $F$.'], s: [{ h: 'Solve', d: `$F = 2 + ${2 * n} - ${n + 1}$` }],
-      t: [{ value: n, why: 'The base is a face too, so there are $n$ side faces plus the base.' }], c: () => 2 + 2 * n - (n + 1) };
+    const [F2, V] = distinct(rng, 4, 12 + 4 * d, 2);
+    return { p: `A solid has $${F2}$ faces and $${V}$ vertices. Using Euler's formula $F + V - E = 2$, find the number of edges.`, v: F2 + V - 2, h: ["Euler's formula: $F + V - E = 2$.", 'Substitute the faces and vertices.', 'Solve for $E$.'], s: [{ h: 'Solve', d: `$E = ${F2} + ${V} - 2$` }],
+      t: [{ value: F2 + V, why: 'Euler\'s formula subtracts $2$ from $F + V$ to give $E$.' }], c: () => { for (let E = 1; E <= 100; E++) if (F2 + V - E === 2) return E; return NaN; } };
   }),
   mk('lines-of-symmetry', (rng, d) => {
-    const n = ri(rng, 3, 20 + 10 * d);
-    return { p: `How many lines of symmetry does a regular polygon with $${n}$ sides have?`, v: n, h: ['A regular polygon has one line of symmetry for each vertex or side.', 'The number equals the number of sides.', 'Think of the triangle, square and hexagon.'], s: [{ h: 'Rule', d: 'one per side' }],
-      t: [{ value: 2 * n, why: 'Each line passes through a vertex or the middle of a side, but is counted once.' }], c: () => { let c = 0; for (let i = 0; i < n; i++) c += 1; return c; } };
+    const [n1, n2] = distinct(rng, 3, 12 + 8 * d, 2);
+    return { p: `A regular polygon has $${n1}$ sides and another has $${n2}$ sides. How many lines of symmetry do the two have in all?`, v: n1 + n2, h: ['A regular polygon has one line of symmetry for each side.', 'Count the lines of each polygon.', 'Add them.'], s: [{ h: 'Rule', d: 'as many lines as sides' }],
+      t: [{ value: 2 * (n1 + n2), why: 'Each line of symmetry is counted once; a line is not counted separately for each end.' }], c: () => { let c = 0; for (let i = 0; i < n1; i++) c += 1; for (let i = 0; i < n2; i++) c += 1; return c; } };
+  }),
+  mk('turns', (rng, d) => {
+    const n = [3, 4, 5, 6, 8, 9, 10, 12][ri(rng, 0, 7)], k = ri(rng, 2, 20 * d);
+    return { p: `A regular polygon with $${n}$ sides is turned about its centre in steps of $\\dfrac{360^\\circ}{${n}}$. Through what total angle, in degrees, has it turned after $${k}$ steps?`, v: (360 * k) / n, h: ['One step is $360^\\circ$ divided by the number of sides.', 'Multiply by the number of steps.', 'The total can exceed $360^\\circ$.'], s: [{ h: 'Multiply', d: `$${k}\\times\\dfrac{360}{${n}}$` }],
+      t: [{ value: 360 / n, why: 'That is only one step.' }], c: () => { let t = 0; for (let i = 0; i < k; i++) t += 360 / n; return t; } };
   }),
   mk('rotation-angle', (rng, d) => {
     const n = [3, 4, 5, 6, 8, 9, 10, 12, 15, 18, 20, 24, 30, 36, 40, 45, 60, 72][ri(rng, 0, 17)];
@@ -376,6 +387,7 @@ const SOLID = () => [
 const LCMF = () => [
   mk('bells', (rng, d) => {
     const [a, b] = distinct(rng, 4, 20 + 5 * d, 2);
+    if (a % b === 0 || b % a === 0) throw RETRY;
     return { p: `Two temple bells in ${place(rng)} ring every $${a}$ minutes and every $${b}$ minutes. They ring together at $6$ a.m. After how many minutes will they next ring together?`, v: (a * b) / gcd(a, b), h: ['They ring together at common multiples of both intervals.', 'The first time again is the lowest common multiple.', 'Find the LCM of the two numbers.'], s: [{ h: 'LCM', d: `$\\operatorname{lcm}(${a}, ${b})$` }],
       t: [{ value: a * b, why: 'The product is a common multiple, but not always the lowest.' }].filter(t => t.value !== (a * b) / gcd(a, b)), c: () => { for (let t = Math.max(a, b); ; t += Math.max(a, b)) if (t % a === 0 && t % b === 0) return t; } };
   }),
@@ -420,8 +432,14 @@ const COORD9 = () => [
   mk('distance-from-axes', (rng, d) => {
     const x = nzs(rng, R(d)), y = nzs(rng, R(d));
     if (Math.abs(x) === Math.abs(y)) throw RETRY;
-    return { p: `A point has coordinates $(${x}, ${y})$. How far is it from the $y$-axis, in units?`, v: Math.abs(x), h: ['Distance from the $y$-axis is measured along the $x$ direction.', 'It equals the absolute value of the $x$-coordinate.', 'Distance is never negative.'], s: [{ h: 'Absolute value', d: `$|${x}|$` }],
-      t: [{ value: Math.abs(y), why: 'The distance from the $y$-axis uses the $x$-coordinate.' }], c: () => Math.sqrt(x * x) };
+    return { p: `A point has coordinates $(${x}, ${y})$. Find the sum of its distances from the $x$-axis and from the $y$-axis, in units.`, v: Math.abs(x) + Math.abs(y), h: ['The distance from the $y$-axis is $|x|$.', 'The distance from the $x$-axis is $|y|$.', 'Distances are never negative; add them.'], s: [{ h: 'Absolute values', d: `$|${x}| + |${y}|$` }],
+      t: [{ value: x + y, why: 'Distances are positive; use the absolute values before adding.' }].filter(t => t.value !== Math.abs(x) + Math.abs(y)), c: () => Math.sqrt(x * x) + Math.sqrt(y * y) };
+  }),
+  mk('same-line-distance', (rng, d) => {
+    const x1 = nzs(rng, R(d)), x2 = nzs(rng, R(d)), y = nzs(rng, R(d));
+    if (x1 === x2) throw RETRY;
+    return { p: `Find the distance between the points $(${x1}, ${y})$ and $(${x2}, ${y})$.`, v: Math.abs(x1 - x2), h: ['The two points have the same $y$-coordinate, so they lie on a horizontal line.', 'The distance is the difference of the $x$-coordinates.', 'Distance is never negative.'], s: [{ h: 'Subtract', d: `$|${x1} - ${pr(x2)}|$` }],
+      t: [{ value: Math.abs(x1 + x2), why: 'Subtract the $x$-coordinates; adding them gives something else.' }].filter(t => t.value !== Math.abs(x1 - x2)), c: () => Math.max(x1, x2) - Math.min(x1, x2) };
   }),
   mk('midpoint', (rng, d) => {
     const x1 = ri(rng, -R(d), R(d)), k = ri(rng, -R(d), R(d)), x2 = 2 * k - x1;
@@ -459,28 +477,157 @@ const CRYPT = () => [
   })
 ];
 
+
+// ── constructions, congruence and Euclid's geometry (Class 7 and 9) ───────────
+const CONSTR = () => [
+  mk('bisect-angle', (rng, d) => {
+    const x = 2 * ri(rng, 10, 85);
+    return { p: `An angle of $${x}^\\circ$ is bisected with a compass and ruler. How large is each of the two equal parts, in degrees?`, v: x / 2, h: ['A bisector splits an angle into two equal parts.', 'Divide the angle by $2$.', 'The two parts add back to the whole angle.'], s: [{ h: 'Halve', d: `$${x}\\div 2$` }],
+      t: [{ value: x * 2, why: 'Bisecting halves the angle; it does not double it.' }], c: () => { for (let a = 1; a <= 90; a++) if (a + a === x) return a; return NaN; } };
+  }),
+  mk('midpoint-length', (rng, d) => {
+    const m = ri(rng, 3, 40 * d + 20);
+    return { p: `The perpendicular bisector of segment $AB$ of length $${2 * m}$ cm meets it at $M$. Find $AM$ in cm.`, v: m, h: ['The perpendicular bisector passes through the midpoint.', 'So $AM = MB$.', 'Halve the length of $AB$.'], s: [{ h: 'Halve', d: `$${2 * m}\\div 2$` }],
+      t: [{ value: 2 * m, why: '$M$ is the midpoint, so $AM$ is half of $AB$.' }], c: () => { for (let x = 1; x <= 80 * d + 40; x++) if (x + x === 2 * m) return x; return NaN; } };
+  }),
+  mk('equal-distance', (rng, d) => {
+    const pa = ri(rng, 4, 40 * d + 20), ab = ri(rng, 6, 60);
+    return { p: `$P$ lies on the perpendicular bisector of a segment $AB$ of length $${ab}$ cm, and $PA = ${pa}$ cm. Find $PB$ in cm.`, v: pa, h: ['Every point on the perpendicular bisector is the same distance from both ends.', 'So $PA = PB$.', 'The length of $AB$ is not needed.'], s: [{ h: 'Property', d: '$PA = PB$' }],
+      t: [{ value: ab - pa, why: 'The distance from $P$ to each end is the same; it is not found by subtracting from $AB$.' }].filter(t => t.value !== pa && t.value > 0), c: () => pa };
+  }),
+  mk('corresponding-side', (rng, d) => {
+    const [a, b, c] = distinct(rng, 3, 12 + 6 * d, 3);
+    return { p: `Triangle $ABC$ is congruent to triangle $PQR$ with $A \\to P$, $B \\to Q$, $C \\to R$. If $AB = ${a}$ cm, $BC = ${b}$ cm and $CA = ${c}$ cm, find $QR$ in cm.`, v: b, h: ['Congruent triangles have equal corresponding sides.', '$QR$ corresponds to $BC$.', 'Read the correspondence from the order of the letters.'], s: [{ h: 'Correspondence', d: '$B \\to Q$ and $C \\to R$, so $BC \\to QR$' }],
+      t: [{ value: a, why: '$QR$ corresponds to $BC$; $PQ$ corresponds to $AB$.' }], c: () => { const map = { A: 'P', B: 'Q', C: 'R' }; const len = { AB: a, BC: b, CA: c }; for (const k of Object.keys(len)) if (map[k[0]] + map[k[1]] === 'QR') return len[k]; return NaN; } };
+  }),
+  mk('perimeter-congruent', (rng, d) => {
+    const [a, b, c] = distinct(rng, 3, 12 + 6 * d, 3);
+    if (a + b <= c || a + c <= b || b + c <= a) throw RETRY;
+    return { p: `Triangle $ABC$ with sides $${a}$ cm, $${b}$ cm and $${c}$ cm is congruent to triangle $PQR$. Find the perimeter of $PQR$ in cm.`, v: a + b + c, h: ['Congruent triangles are identical in size and shape.', 'So their perimeters are equal.', 'Add the sides of $ABC$.'], s: [{ h: 'Perimeter', d: `$${a} + ${b} + ${c}$` }],
+      t: [{ value: a * b * c, why: 'The perimeter is the sum of the sides, not their product.' }], c: () => a + b + c };
+  }),
+  mk('angle-congruent', (rng, d) => {
+    const a = ri(rng, 30, 80), b = ri(rng, 30, 80);
+    if (a === b) throw RETRY;
+    return { p: `Triangle $ABC$ is congruent to triangle $PQR$ with $A \\to P$, $B \\to Q$, $C \\to R$. If $\\angle A = ${a}^\\circ$ and $\\angle B = ${b}^\\circ$, find $\\angle R$ in degrees.`, v: 180 - a - b, h: ['$\\angle R$ corresponds to $\\angle C$.', 'Find $\\angle C$ from the angle sum of triangle $ABC$.', 'Equal corresponding angles carry across.'], s: [{ h: 'Angle $C$', d: `$180 - ${a} - ${b}$` }],
+      t: [{ value: a, why: '$\\angle R$ corresponds to $\\angle C$, not $\\angle A$.' }], c: () => 180 - (a + b) };
+  }),
+  mk('tiling-count', (rng, d) => {
+    const t = [[3, 60], [4, 90], [6, 120], [5, 108], [8, 135], [12, 150]][ri(rng, 0, 5)], k = ri(rng, 2, 10 + 5 * d);
+    return { p: `Regular polygons with $${t[0]}$ sides have an interior angle of $${t[1]}^\\circ$. How many degrees do $${k}$ of them add up to at one common corner if they were placed side by side around a point?`, v: t[1] * k, h: ['Each polygon contributes its interior angle at the corner.', 'Multiply by the number of polygons.', 'A full turn is $360^\\circ$.'], s: [{ h: 'Multiply', d: `$${k}\\times ${t[1]}$` }],
+      t: [{ value: 360, why: 'A full turn is the target for a perfect tiling, but the question asks for the sum of the angles placed.' }].filter(x => t[1] * k !== 360), c: () => { let s2 = 0; for (let i = 0; i < k; i++) s2 += ((t[0] - 2) * 180) / t[0]; return Math.round(s2); } };
+  })
+];
+const EUCLID = () => [
+  mk('segment-addition', (rng, d) => {
+    const [ab, bc] = distinct(rng, 3, 30 * d + 20, 2);
+    return { p: `$B$ lies on segment $AC$ between $A$ and $C$. If $AB = ${ab}$ cm and $BC = ${bc}$ cm, find $AC$ in cm.`, v: ab + bc, h: ['The whole is the sum of its parts.', 'Add the two segments.', 'This is one of Euclid\'s common notions.'], s: [{ h: 'Add', d: `$${ab} + ${bc}$` }],
+      t: [{ value: Math.abs(ab - bc), why: '$B$ is between $A$ and $C$, so the segments add.' }], c: () => ab + bc };
+  }),
+  mk('lines-through-points', (rng, d) => {
+    const n = ri(rng, 3, 20 * d + 10);
+    return { p: `$${n}$ points are marked on a sheet so that no three of them are on one line. How many different straight lines can be drawn, each through exactly two of the points?`, v: (n * (n - 1)) / 2, h: ['Exactly one line passes through two points.', 'Count the pairs of points.', 'Each pair is counted twice if you multiply $n(n-1)$.'], s: [{ h: 'Pairs', d: `$\\dfrac{${n}\\times ${n - 1}}{2}$` }],
+      t: [{ value: n * (n - 1), why: 'Each line has been counted twice, once from each of its two points.' }], c: () => { let c = 0; for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) c += 1; return c; } };
+  }),
+  mk('angles-at-point', (rng, d) => {
+    const [a, b, c] = distinct(rng, 40, 120, 3);
+    if (a + b + c >= 340) throw RETRY;
+    return { p: `Three angles of $${a}^\\circ$, $${b}^\\circ$ and $${c}^\\circ$ and one more angle fill the space around a point. Find the fourth angle in degrees.`, v: 360 - a - b - c, h: ['Angles around a point add up to $360^\\circ$.', 'Add the three known angles.', 'Subtract from $360^\\circ$.'], s: [{ h: 'Subtract', d: `$360 - ${a} - ${b} - ${c}$` }],
+      t: [{ value: 180 - (a + b + c), why: 'Angles around a point add to $360^\\circ$, not $180^\\circ$.' }], c: () => 360 - (a + b + c) };
+  }),
+  mk('linear-pair', (rng, d) => {
+    const a = ri(rng, 20, 160);
+    if (a === 90) throw RETRY;
+    return { p: `Two angles form a linear pair on a straight line. One measures $${a}^\\circ$. Find the other in degrees.`, v: 180 - a, h: ['A linear pair adds to $180^\\circ$.', 'Subtract the known angle.', 'The two angles together make a straight angle.'], s: [{ h: 'Subtract', d: `$180 - ${a}$` }],
+      t: [{ value: a, why: 'The two angles of a linear pair are equal only when each is $90^\\circ$.' }], c: () => 180 - a };
+  })
+];
+const GEOM7 = () => [ANGLES().find(f => f.form === 'triangle-sum'), ANGLES().find(f => f.form === 'exterior-angle'), ANGLES().find(f => f.form === 'parallel-lines'), ANGLES().find(f => f.form === 'third-side-count')];
+
+// ── Class 7 and 8 equations, rational properties and Heron's formula ─────────
+const LIN7 = () => [
+  ALGB().find(f => f.form === 'linear-both-sides'),
+  mk('one-step', (rng, d) => {
+    const x = ri(rng, 2, 20 * d + 20), a = ri(rng, 2, 50);
+    return { p: `Solve $x + ${a} = ${x + a}$.`, v: x, h: ['Do the same to both sides to isolate $x$.', 'Subtract the constant from both sides.', 'Check by substituting back.'], s: [{ h: 'Subtract', d: `$x = ${x + a} - ${a}$` }],
+      t: [{ value: x + 2 * a, why: 'To undo adding $' + a + '$, subtract it.' }], c: () => { for (let t = 1; t <= 20 * d + 25; t++) if (t + a === x + a) return t; return NaN; } };
+  }),
+  mk('two-step', (rng, d) => {
+    const x = ri(rng, 2, 15 * d + 10), a = ri(rng, 2, 9), b = ri(rng, 1, 30);
+    return { p: `Solve $${a}x + ${b} = ${a * x + b}$.`, v: x, h: ['Subtract the constant first.', 'Then divide by the coefficient of $x$.', 'Check by substituting back.'], s: [{ h: 'Subtract', d: `$${a}x = ${a * x}$` }, { h: 'Divide', d: `$x = ${x}$` }],
+      t: [{ value: a * x, why: 'After subtracting the constant, divide by the coefficient of $x$ too.' }], c: () => { for (let t = 1; t <= 15 * d + 12; t++) if (a * t + b === a * x + b) return t; return NaN; } };
+  }),
+  mk('number-puzzle', (rng, d) => {
+    const x = ri(rng, 2, 20 * d + 10), a = ri(rng, 2, 9), b = ri(rng, 1, 20), who = person(rng);
+    return { p: `${who} thinks of a number, multiplies it by $${a}$ and adds $${b}$. The result is $${a * x + b}$. What number did ${who} think of?`, v: x, h: ['Write the steps as an equation.', 'Undo the addition, then the multiplication.', 'Check by following the steps with your answer.'], s: [{ h: 'Equation', d: `$${a}x + ${b} = ${a * x + b}$` }],
+      t: [{ value: a * x, why: 'Undo both steps: subtract $' + b + '$, then divide by $' + a + '$.' }], c: () => { for (let t = 1; t <= 20 * d + 12; t++) if (t * a + b === a * x + b) return t; return NaN; } };
+  })
+];
+const RATP = () => [
+  mk('additive-inverse', (rng, d) => {
+    const q = DEN[ri(rng, 0, 6)], p = ri(rng, 1, 3 * q);
+    if (gcd(p, q) > 1) throw RETRY;
+    return { p: `Find the additive inverse of $\\dfrac{${p}}{${q}}$ as a decimal.`, v: r6(-p / q), h: ['The additive inverse is the number that adds to the given one to give $0$.', 'It has the same size and the opposite sign.', 'Write it as a decimal.'], s: [{ h: 'Negate', d: `$-\\dfrac{${p}}{${q}}$` }],
+      t: [{ value: r6(q / p), why: 'That is the reciprocal; the additive inverse changes the sign.' }].filter(t => Number.isFinite(t.value)), c: () => r6(0 - p / q) };
+  }),
+  mk('reciprocal', (rng, d) => {
+    const q = ri(rng, 1, 9), p = [2, 4, 5, 8, 10, 20, 25][ri(rng, 0, 6)] * q;
+    if (gcd(p, q) > 1) throw RETRY;
+    return { p: `Find the multiplicative inverse (reciprocal) of $\\dfrac{${p}}{${q}}$ as a decimal.`, v: r6(q / p), h: ['The reciprocal is the number that multiplies the given one to give $1$.', 'Flip the numerator and the denominator.', 'Write it as a decimal.'], s: [{ h: 'Flip', d: `$\\dfrac{${q}}{${p}}$` }],
+      t: [{ value: r6(-p / q), why: 'That is the additive inverse; the reciprocal flips the fraction.' }], c: () => r6(1 / (p / q)) };
+  }),
+  mk('distributive', (rng, d) => {
+    const q1 = DEN[ri(rng, 0, 6)], q2 = DEN[ri(rng, 0, 6)], q3 = DEN[ri(rng, 0, 6)], a = ri(rng, 1, 3 * q1), b = ri(rng, 1, 3 * q2), c = ri(rng, 1, 3 * q3);
+    if (gcd(a, q1) > 1 || gcd(b, q2) > 1 || gcd(c, q3) > 1) throw RETRY;
+    const v = (a / q1) * (b / q2 + c / q3);
+    if (Math.abs(v * 1e6 - Math.round(v * 1e6)) > 1e-6) throw RETRY;
+    return { p: `Use $x(y + z) = xy + xz$ to find $\\dfrac{${a}}{${q1}}\\left(\\dfrac{${b}}{${q2}} + \\dfrac{${c}}{${q3}}\\right)$ as a decimal.`, v: r6(v), h: ['Multiply the first number by each term in the bracket.', 'Add the two products.', 'Write the sum as a decimal.'], s: [{ h: 'Distribute', d: 'multiply each term separately' }],
+      t: [{ value: r6((a / q1) * (b / q2) + c / q3), why: 'The multiplier applies to both terms in the bracket.' }].filter(t => Math.abs(t.value - r6(v)) > 1e-9), c: () => r6((a / q1) * (b / q2) + (a / q1) * (c / q3)) };
+  })
+];
+const HERON = () => [
+  MENS2().find(f => f.form === 'heron'),
+  mk('semi-perimeter', (rng, d) => {
+    const t = TRI_H[ri(rng, 0, 5)], k = ri(rng, 1, 3 + d);
+    return { p: `The sides of a triangle are $${t[0] * k}$ cm, $${t[1] * k}$ cm and $${t[2] * k}$ cm. Find its semi-perimeter in cm.`, v: ((t[0] + t[1] + t[2]) * k) / 2, h: ['The semi-perimeter is half the perimeter.', 'Add the three sides.', 'Halve.'], s: [{ h: 'Halve', d: 'perimeter divided by $2$' }],
+      t: [{ value: (t[0] + t[1] + t[2]) * k, why: 'The semi-perimeter is half the perimeter.' }], c: () => ((t[0] * k) + (t[1] * k) + (t[2] * k)) / 2 };
+  }),
+  mk('isosceles-height', (rng, d) => {
+    const t = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25]][ri(rng, 0, 3)], k = ri(rng, 1, 4 + d);
+    return { p: `An isosceles triangle has two equal sides of $${t[2] * k}$ cm and a base of $${2 * t[0] * k}$ cm. Find its height on the base, in cm.`, v: t[1] * k, h: ['The height from the apex bisects the base.', 'Half the base, the height and an equal side form a right triangle.', 'Use Pythagoras.'], s: [{ h: 'Half base', d: `$${t[0] * k}$` }],
+      t: [{ value: t[0] * k, why: 'That is half the base, not the height.' }], c: () => Math.round(Math.sqrt((t[2] * k) ** 2 - (t[0] * k) ** 2)) };
+  }),
+  mk('area-base-height', (rng, d) => {
+    const [b, h] = distinct(rng, 4, 30 * d + 10, 2);
+    return { p: `A triangular signboard has a base of $${2 * b}$ cm and a height of $${h}$ cm. Find its area in square centimetres.`, v: b * h, h: ['Area of a triangle is half base times height.', 'Multiply the base and the height.', 'Halve.'], s: [{ h: 'Formula', d: `$\\dfrac12\\times ${2 * b}\\times ${h}$` }],
+      t: [{ value: 2 * b * h, why: 'The area of a triangle is half of base times height.' }], c: () => (2 * b * h) / 2 };
+  })
+];
+
 const F = {
-  ints: INTS(), fracs: FRACS(), cmp: CMP(), sqc: SQC(), expo: EXPO(), algb: ALGB(), prop: PROPF(), mens: MENS2(), angles: ANGLES(), polyq: POLYQ(), circ9: CIRC9(), stat7: STAT7(), solid: SOLID(), lcmf: LCMF(), coord9: COORD9(), crypt: CRYPT()
+  ints: INTS(), fracs: FRACS(), cmp: CMP(), sqc: SQC(), expo: EXPO(), algb: ALGB(), prop: PROPF(), mens: MENS2(), angles: ANGLES(), polyq: POLYQ(), circ9: CIRC9(), stat7: STAT7(), solid: SOLID(), lcmf: LCMF(), coord9: COORD9(), crypt: CRYPT(), constr: CONSTR(), euclid: EUCLID(), geom7: GEOM7(), lin7: LIN7(), ratp: RATP(), heron: HERON()
 };
 void [choice, person, fracs];
 
+export const FORMS_789 = F;
+
 export const BAND_789 = {
   'c7-integer-operations-current': F.ints, 'c7-number-play-current': [...F.ints, ...F.lcmf.slice(0, 1)], 'c7-decimal-operations-current': F.fracs, 'c7-fractions-current': F.fracs,
-  'c7-letter-numbers-current': F.algb, 'c7-finding-unknown-current': F.algb,
+  'c7-letter-numbers-current': F.lin7, 'c7-finding-unknown-current': F.lin7,
   'c7-lcm-reasoning': F.lcmf, 'c7-cryptarithm-reasoning': F.crypt,
   'c7-statistical-question-reasoning': F.stat7,
-  'c7-solid-shapes': F.solid, 'c7-symmetry': F.solid,
-  'c7-triangle-angles': F.angles, 'c7-triangles-current': F.angles, 'c7-parallel-intersecting-lines-current': F.angles, 'c7-triangle-inequality-reasoning': F.angles,
-  'c7-angle-construction-reasoning': F.angles, 'c7-congruence-inference-reasoning': F.angles, 'c7-geometric-twins-current': F.angles, 'c7-sss-sas-reasoning': F.angles,
-  'c7-perpendicular-bisector-reasoning': F.angles, 'c7-constructions-tilings-current': F.angles, 'c7-connecting-dots-current': F.angles, 'c7-common-ground-current': F.angles,
+  'c7-solid-shapes': F.solid, 'c7-symmetry': F.solid.filter(f => ['lines-of-symmetry', 'turns', 'rotation-angle'].includes(f.form)).concat(F.angles.filter(f => f.form === 'regular-exterior')),
+  'c7-triangle-angles': F.geom7, 'c7-triangles-current': F.geom7, 'c7-parallel-intersecting-lines-current': F.geom7, 'c7-triangle-inequality-reasoning': F.geom7,
+  'c7-angle-construction-reasoning': F.constr, 'c7-congruence-inference-reasoning': F.constr, 'c7-geometric-twins-current': F.constr, 'c7-sss-sas-reasoning': F.constr,
+  'c7-perpendicular-bisector-reasoning': F.constr, 'c7-constructions-tilings-current': F.constr, 'c7-connecting-dots-current': F.constr, 'c7-common-ground-current': F.constr,
   'c8-comparing-quantities-ncert-mastery': F.cmp,
   'c8-cubes-roots': F.sqc, 'c8-cubes-roots-ncert-mastery': F.sqc, 'c8-squares-roots': F.sqc, 'c8-squares-roots-ncert-mastery': F.sqc, 'c8-cube-pattern-reasoning': F.sqc, 'c8-cube-multiplier-reasoning': F.sqc, 'c8-square-pattern-reasoning': F.sqc,
-  'c8-rational-numbers': F.fracs, 'c8-rational-numbers-foundations': F.fracs, 'c8-rational-numbers-between': F.fracs, 'c8-rational-numbers-identities': F.fracs, 'c8-rational-numbers-closure': F.fracs, 'c8-rational-numbers-commutativity': F.fracs,
+  'c8-rational-numbers': F.fracs, 'c8-rational-numbers-foundations': F.fracs, 'c8-rational-numbers-between': F.fracs, 'c8-rational-numbers-identities': [...F.ratp, ...F.fracs.slice(0, 2)], 'c8-rational-numbers-closure': [...F.ratp, ...F.fracs.slice(0, 2)], 'c8-rational-numbers-commutativity': [...F.ratp, ...F.fracs.slice(0, 2)],
   'c8-exponents-ncert-mastery': F.expo,
-  'c8-algebraic-identities-ncert-mastery': F.algb, 'c8-identity-factorisation-reasoning': F.algb, 'c8-factorisation-ncert-mastery': F.algb, 'c8-linear-equations-foundations': F.algb,
+  'c8-algebraic-identities-ncert-mastery': F.algb, 'c8-identity-factorisation-reasoning': F.algb, 'c8-factorisation-ncert-mastery': F.algb, 'c8-linear-equations-foundations': F.lin7,
   'c8-proportions-ncert-mastery': F.prop, 'c8-proportions-dir-inv': F.prop,
-  'c8-mensuration-ncert-mastery': F.mens, 'c9-perimeter-area-ncert-mastery': F.mens, 'c9-herons-formula': F.mens,
-  'c8-quadrilaterals-ncert-mastery': F.polyq, 'c9-quadrilaterals': F.polyq, 'c9-euclid-geometry': F.angles, 'c9-triangles': F.angles,
+  'c8-mensuration-ncert-mastery': F.mens, 'c9-perimeter-area-ncert-mastery': F.mens, 'c9-herons-formula': F.heron,
+  'c8-quadrilaterals-ncert-mastery': F.polyq, 'c9-quadrilaterals': F.polyq, 'c9-euclid-geometry': F.euclid, 'c9-triangles': F.geom7,
   'c9-circles': F.circ9, 'c9-circles-ncert-mastery': F.circ9,
-  'c9-coordinate-geometry': F.coord9
+  'c9-coordinate-geometry': F.coord9.filter(f => f.form !== 'midpoint')
 };

@@ -6,12 +6,12 @@ Target (owner, Nov 2026): **≥ 10^8 distinct questions per class**. Status belo
 
 | Class | Cells | Distinct questions (≥ = lower bound) | Cells at lower bound (≥) | Cells under 10^4 | Target 10^8 |
 |---|---|---|---|---|---|
-| Class 7 | 103 | ≥ 2.99×10^8 | 2 | 68 | met |
-| Class 8 | 126 | ≥ 4.17×10^8 | 3 | 72 | met |
-| Class 9 | 32 | ≥ 2.43×10^8 | 2 | 10 | met |
+| Class 7 | 103 | ≥ 2.19×10^8 | 2 | 53 | met |
+| Class 8 | 126 | ≥ 4.11×10^8 | 3 | 70 | met |
+| Class 9 | 32 | ≥ 1.33×10^8 | 1 | 9 | met |
 | Class 10 | 110 | ≥ 1.39×10^8 | 1 | 73 | met |
-| Class 11 | 102 | ≥ 4.07×10^8 | 2 | 46 | met |
-| Class 12 | 93 | ≥ 3.85×10^8 | 2 | 48 | met |
+| Class 11 | 102 | ≥ 2.51×10^8 | 2 | 44 | met |
+| Class 12 | 93 | 1.90×10^7 | 0 | 45 | not met |
 
 A class can clear 10^8 through a few very large cells while many of its cells stay thin; the thin-cell count above is the breadth measure, and both are reported so neither hides the other.
 
@@ -23,165 +23,147 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 
 | Generator | D | Draws | Distinct seen | Estimate |
 |---|---|---|---|---|
-| `c7-large-numbers-current` | 1 | 2000 | 8 | 8 |
-| `c7-large-numbers-current` | 4 | 2000 | 24 | 24 |
-| `c7-large-numbers-current` | 3 | 2000 | 54 | 54 |
-| `c7-decimals-current` | 2 | 2000 | 620 | 648 |
-| `c7-decimals-current` | 1 | 2000 | 741 | 815 |
-| `c7-arithmetic-expressions-current` | 1 | 2000 | 1269 | 1935 |
-| `c7-parallel-intersecting-lines-current` | 1 | 2000 | 957 | 2758 |
-| `c7-connecting-dots-current` | 1 | 2000 | 878 | 3108 |
-| `c7-constructions-tilings-current` | 1 | 2000 | 878 | 3108 |
-| `c7-parallel-intersecting-lines-current` | 2 | 2000 | 1029 | 3194 |
-| `c7-common-ground-current` | 2 | 2000 | 1031 | 3321 |
 | `c7-fraction-context-reasoning` | 3 | 2000 | 1504 | 3364 |
-| `c7-connecting-dots-current` | 3 | 2000 | 1073 | 3458 |
-| `c7-triangles-current` | 2 | 2000 | 960 | 3479 |
-| `c7-common-ground-current` | 1 | 2000 | 1059 | 3494 |
-| `c7-connecting-dots-current` | 2 | 2000 | 1108 | 3514 |
-| `c7-constructions-tilings-current` | 2 | 2000 | 950 | 3604 |
-| `c7-geometric-twins-current` | 2 | 2000 | 974 | 3608 |
-| `c7-geometric-twins-current` | 3 | 2000 | 1028 | 3836 |
-| `c7-congruence-inference-reasoning` | 3 | 2000 | 1023 | 3856 |
-| `c7-geometric-twins-current` | 1 | 2000 | 1091 | 3952 |
-| `c7-angle-construction-reasoning` | 3 | 2000 | 996 | 3969 |
-| `c7-common-ground-current` | 3 | 2000 | 973 | 3985 |
-| `c7-triangles-current` | 3 | 2000 | 975 | 3987 |
-| `c7-triangles-current` | 1 | 2000 | 1092 | 3990 |
-| `c7-constructions-tilings-current` | 3 | 2000 | 981 | 3993 |
-| `c7-constructions-tilings-current` | 4 | 2000 | 1108 | 4070 |
-| `c7-common-ground-current` | 4 | 2000 | 1083 | 4074 |
-| `c7-connecting-dots-current` | 4 | 2000 | 1142 | 4132 |
-| `c7-parallel-intersecting-lines-current` | 3 | 2000 | 970 | 4211 |
-| `c7-triangle-inequality-reasoning` | 3 | 2000 | 1140 | 4514 |
-| `c7-lcm-reasoning` | 3 | 2000 | 1573 | 4516 |
+| `c7-parallel-intersecting-lines-current` | 1 | 2000 | 1147 | 3619 |
+| `c7-parallel-intersecting-lines-current` | 2 | 2000 | 1220 | 3833 |
+| `c7-triangles-current` | 2 | 2000 | 1144 | 4130 |
+| `c7-lcm-reasoning` | 3 | 2000 | 1568 | 4462 |
+| `c7-triangles-current` | 3 | 2000 | 1185 | 4536 |
 | `c7-equation-context-reasoning` | 3 | 2000 | 1570 | 4690 |
-| `c7-geometric-twins-current` | 4 | 2000 | 1028 | 4821 |
-| `c7-triangles-current` | 4 | 2000 | 1012 | 4899 |
+| `c7-triangles-current` | 1 | 2000 | 1362 | 4826 |
+| `c7-parallel-intersecting-lines-current` | 3 | 2000 | 1170 | 5114 |
+| `c7-hcf-reasoning` | 3 | 2000 | 1599 | 5184 |
 | `c7-rounding-bounds-reasoning` | 3 | 2000 | 1469 | 5213 |
-| `c7-letter-numbers-current` | 2 | 2000 | 1186 | 5378 |
+| `c7-triangle-inequality-reasoning` | 3 | 2000 | 1397 | 5332 |
 | `c7-angle-sum-reasoning` | 3 | 2000 | 1530 | 5533 |
-| `c7-finding-unknown-current` | 2 | 2000 | 1154 | 5928 |
-| `c7-perpendicular-bisector-reasoning` | 3 | 2000 | 1221 | 6035 |
+| `c7-triangles-current` | 4 | 2000 | 1219 | 5747 |
 | `c7-integer-operations-current` | 1 | 2000 | 1670 | 6055 |
-| `c7-sss-sas-reasoning` | 3 | 2000 | 1225 | 6310 |
-| `c7-decimal-operations-current` | 2 | 2000 | 1624 | 6381 |
-| `c7-letter-numbers-current` | 4 | 2000 | 1422 | 6741 |
+| `c7-connecting-dots-current` | 3 | 2000 | 1363 | 6340 |
+| `c7-decimal-operations-current` | 2 | 2000 | 1626 | 6341 |
+| `c7-common-ground-current` | 1 | 2000 | 1313 | 6424 |
 | `c7-integer-operations-current` | 2 | 2000 | 1676 | 6753 |
-| `c7-fractions-current` | 3 | 2000 | 1624 | 6880 |
-| `c7-fractions-current` | 1 | 2000 | 1627 | 6890 |
-| `c7-number-play-current` | 1 | 2000 | 1715 | 6906 |
-| `c7-letter-numbers-current` | 3 | 2000 | 1409 | 6921 |
-| `c7-decimal-operations-current` | 1 | 2000 | 1662 | 6927 |
+| `c7-common-ground-current` | 4 | 2000 | 1380 | 6856 |
+| `c7-constructions-tilings-current` | 4 | 2000 | 1398 | 6860 |
+| `c7-fractions-current` | 3 | 2000 | 1629 | 6865 |
+| `c7-decimal-operations-current` | 1 | 2000 | 1664 | 6882 |
+| `c7-fractions-current` | 1 | 2000 | 1632 | 6904 |
+| `c7-fractions-current` | 2 | 2000 | 1393 | 6908 |
+| `c7-fractions-current` | 4 | 2000 | 1396 | 6911 |
 | `c7-letter-pattern-reasoning` | 3 | 2000 | 1098 | 6932 |
-| `c7-fractions-current` | 2 | 2000 | 1391 | 6983 |
-| `c7-fractions-current` | 4 | 2000 | 1394 | 6986 |
-| `c7-decimal-operations-current` | 3 | 2000 | 1671 | 7005 |
+| `c7-decimal-operations-current` | 3 | 2000 | 1673 | 6960 |
+| `c7-connecting-dots-current` | 1 | 2000 | 1161 | 7003 |
+| `c7-constructions-tilings-current` | 1 | 2000 | 1161 | 7003 |
+| `c7-number-play-current` | 1 | 2000 | 1712 | 7016 |
+| `c7-congruence-inference-reasoning` | 3 | 2000 | 1317 | 7019 |
 | `c7-hcf-lcm-context-reasoning` | 3 | 2000 | 1735 | 7024 |
-| `c7-letter-numbers-current` | 1 | 2000 | 1133 | 7064 |
-| `c7-parallel-intersecting-lines-current` | 4 | 2000 | 1252 | 7204 |
-| `c7-finding-unknown-current` | 4 | 2000 | 1165 | 7643 |
-| `c7-finding-unknown-current` | 1 | 2000 | 1161 | 7720 |
+| `c7-geometric-twins-current` | 3 | 2000 | 1322 | 7185 |
+| `c7-connecting-dots-current` | 4 | 2000 | 1433 | 7278 |
+| `c7-connecting-dots-current` | 2 | 2000 | 1357 | 7556 |
+| `c7-geometric-twins-current` | 1 | 2000 | 1341 | 7697 |
+| `c7-common-ground-current` | 2 | 2000 | 1296 | 7724 |
+| `c7-angle-construction-reasoning` | 3 | 2000 | 1291 | 7754 |
+| `c7-common-ground-current` | 3 | 2000 | 1269 | 7847 |
+| `c7-constructions-tilings-current` | 3 | 2000 | 1277 | 7934 |
 | `c7-one-step-equation-reasoning` | 3 | 2000 | 1700 | 8129 |
-| `c7-arithmetic-expressions-current` | 3 | 2000 | 1783 | 8272 |
+| `c7-parallel-intersecting-lines-current` | 4 | 2000 | 1562 | 8463 |
 | `c7-congruent-matching-reasoning` | 3 | 2000 | 1775 | 8523 |
+| `c7-number-play-current` | 2 | 2000 | 1782 | 8542 |
 | `c7-magic-square-reasoning` | 3 | 2000 | 1548 | 8704 |
-| `c7-number-play-current` | 2 | 2000 | 1787 | 8737 |
+| `c7-geometric-twins-current` | 4 | 2000 | 1330 | 8779 |
 | `c7-mean-reasoning` | 3 | 2000 | 1716 | 8906 |
 | `c7-balance-reasoning` | 3 | 2000 | 1802 | 9259 |
 | `c7-factor-regroup-reasoning` | 3 | 2000 | 1655 | 9542 |
+| `c7-letter-numbers-current` | 1 | 2000 | 1715 | 9679 |
+| `c7-geometric-twins-current` | 2 | 2000 | 1244 | 9797 |
 | `c7-number-play-current` | 3 | 2000 | 1545 | 9999 |
 
 ### Class 8
 
 | Generator | D | Draws | Distinct seen | Estimate |
 |---|---|---|---|---|
-| `c8-data-handling-ncert-mastery` | 3 | 2000 | 2 | 2 |
-| `c8-data-handling-ncert-mastery` | 2 | 2000 | 20 | 20 |
 | `c8-rational-numbers-associativity` | 2 | 2000 | 24 | 24 |
 | `c8-rational-numbers-distributivity` | 1 | 2000 | 24 | 24 |
 | `c8-rational-numbers-strategy` | 4 | 2000 | 36 | 36 |
-| `c8-graphs-ncert-mastery` | 4 | 2000 | 48 | 48 |
-| `c8-data-handling-ncert-mastery` | 4 | 2000 | 64 | 64 |
 | `c8-rational-numbers-distributivity` | 3 | 2000 | 513 | 527 |
-| `c8-graphs-ncert-mastery` | 2 | 2000 | 685 | 730 |
-| `c8-comparing-quantities-ncert-mastery` | 1 | 2000 | 606 | 937 |
-| `c8-comparing-quantities-ncert-mastery` | 2 | 2000 | 766 | 1230 |
-| `c8-comparing-quantities-ncert-mastery` | 3 | 2000 | 877 | 1540 |
-| `c8-cube-pattern-reasoning` | 3 | 2000 | 743 | 1582 |
-| `c8-exponents-ncert-mastery` | 1 | 2000 | 700 | 1634 |
-| `c8-cubes-roots-ncert-mastery` | 4 | 2000 | 695 | 1755 |
-| `c8-cubes-roots-ncert-mastery` | 2 | 2000 | 605 | 1862 |
-| `c8-comparing-quantities-ncert-mastery` | 4 | 2000 | 942 | 1897 |
-| `c8-graphs-ncert-mastery` | 1 | 2000 | 1240 | 1922 |
-| `c8-squares-roots-ncert-mastery` | 3 | 2000 | 636 | 1984 |
-| `c8-cubes-roots-ncert-mastery` | 3 | 2000 | 657 | 2005 |
-| `c8-exponents-ncert-mastery` | 3 | 2000 | 976 | 2079 |
-| `c8-cube-multiplier-reasoning` | 3 | 2000 | 852 | 2110 |
-| `c8-exponents-ncert-mastery` | 4 | 2000 | 805 | 2154 |
-| `c8-squares-roots-ncert-mastery` | 2 | 2000 | 593 | 2203 |
-| `c8-cubes-roots-ncert-mastery` | 1 | 2000 | 603 | 2269 |
-| `c8-squares-roots-ncert-mastery` | 4 | 2000 | 925 | 2378 |
-| `c8-square-pattern-reasoning` | 3 | 2000 | 855 | 2405 |
-| `c8-squares-roots-ncert-mastery` | 1 | 2000 | 537 | 2735 |
-| `c8-exponents-ncert-mastery` | 2 | 2000 | 1091 | 3908 |
+| `c8-comparing-quantities-ncert-mastery` | 1 | 2000 | 1028 | 1825 |
+| `c8-comparing-quantities-ncert-mastery` | 2 | 2000 | 1211 | 2453 |
+| `c8-cubes-roots-ncert-mastery` | 1 | 2000 | 975 | 2597 |
+| `c8-squares-roots-ncert-mastery` | 1 | 2000 | 922 | 2749 |
+| `c8-exponents-ncert-mastery` | 1 | 2000 | 816 | 2885 |
+| `c8-squares-roots-ncert-mastery` | 2 | 2000 | 1060 | 2983 |
+| `c8-cubes-roots-ncert-mastery` | 2 | 2000 | 1064 | 3001 |
+| `c8-exponents-ncert-mastery` | 3 | 2000 | 998 | 3065 |
+| `c8-proportions-ncert-mastery` | 2 | 2000 | 1224 | 3148 |
+| `c8-comparing-quantities-ncert-mastery` | 3 | 2000 | 1323 | 3221 |
+| `c8-proportions-ncert-mastery` | 3 | 2000 | 1237 | 3251 |
+| `c8-cube-pattern-reasoning` | 3 | 2000 | 1228 | 3301 |
+| `c8-exponents-ncert-mastery` | 4 | 2000 | 888 | 3307 |
+| `c8-cubes-roots-ncert-mastery` | 3 | 2000 | 1163 | 3308 |
+| `c8-squares-roots-ncert-mastery` | 3 | 2000 | 1142 | 3314 |
+| `c8-proportions-ncert-mastery` | 4 | 2000 | 1257 | 3632 |
+| `c8-cubes-roots-ncert-mastery` | 4 | 2000 | 1217 | 3670 |
+| `c8-square-pattern-reasoning` | 3 | 2000 | 1276 | 3733 |
+| `c8-cube-multiplier-reasoning` | 3 | 2000 | 1281 | 3734 |
+| `c8-comparing-quantities-ncert-mastery` | 4 | 2000 | 1401 | 3887 |
 | `c8-mensuration-ncert-mastery` | 1 | 2000 | 1218 | 3944 |
-| `c8-proportions-ncert-mastery` | 2 | 2000 | 1295 | 4053 |
+| `c8-proportions-ncert-mastery` | 1 | 2000 | 1513 | 4161 |
 | `c8-quadrilaterals-ncert-mastery` | 4 | 2000 | 910 | 4221 |
-| `c8-proportions-ncert-mastery` | 3 | 2000 | 1302 | 4237 |
+| `c8-squares-roots-ncert-mastery` | 4 | 2000 | 1352 | 4246 |
 | `c8-mensuration-ncert-mastery` | 2 | 2000 | 1276 | 4515 |
 | `c8-quadrilaterals-ncert-mastery` | 3 | 2000 | 907 | 4515 |
-| `c8-proportions-ncert-mastery` | 4 | 2000 | 1319 | 4551 |
 | `c8-linear-equations-decimals` | 1 | 2000 | 1637 | 4859 |
 | `c8-linear-equations-decimals` | 2 | 2000 | 1637 | 4859 |
-| `c8-proportions-ncert-mastery` | 1 | 2000 | 1582 | 4955 |
 | `c8-square-root-reasoning` | 3 | 2000 | 1421 | 4978 |
 | `c8-identity-factorisation-reasoning` | 3 | 2000 | 1309 | 5045 |
 | `c8-quadrilaterals-ncert-mastery` | 1 | 2000 | 582 | 5098 |
-| `c8-linear-equations-foundations` | 3 | 2000 | 1323 | 5145 |
+| `c8-exponents-ncert-mastery` | 2 | 2000 | 1049 | 5184 |
 | `c8-algebraic-identities-ncert-mastery` | 4 | 2000 | 1314 | 5589 |
-| `c8-rational-numbers-closure` | 3 | 2000 | 1551 | 5674 |
 | `c8-mensuration-ncert-mastery` | 3 | 2000 | 1125 | 5731 |
-| `c8-rational-numbers-identities` | 1 | 2000 | 1571 | 5788 |
-| `c8-rational-numbers-identities` | 2 | 2000 | 1593 | 5965 |
-| `c8-rational-numbers-commutativity` | 4 | 2000 | 1505 | 5975 |
-| `c8-rational-numbers-between` | 2 | 2000 | 1580 | 5984 |
+| `c8-rational-numbers-between` | 2 | 2000 | 1582 | 5948 |
+| `c8-rational-numbers-closure` | 3 | 2000 | 1278 | 6152 |
 | `c8-mensuration-ncert-mastery` | 4 | 2000 | 1136 | 6163 |
-| `c8-rational-numbers-foundations` | 2 | 2000 | 1613 | 6241 |
-| `c8-rational-numbers-foundations` | 4 | 2000 | 1489 | 6249 |
-| `c8-rational-numbers-foundations` | 3 | 2000 | 1458 | 6539 |
+| `c8-rational-numbers-foundations` | 4 | 2000 | 1491 | 6198 |
+| `c8-rational-numbers-foundations` | 2 | 2000 | 1615 | 6203 |
+| `c8-graphs-ncert-mastery` | 1 | 2000 | 1602 | 6321 |
+| `c8-rational-numbers-identities` | 1 | 2000 | 1278 | 6396 |
+| `c8-rational-numbers-foundations` | 3 | 2000 | 1460 | 6479 |
+| `c8-rational-numbers-identities` | 2 | 2000 | 1296 | 6821 |
 | `c8-rational-numbers-distributivity` | 4 | 2000 | 1735 | 6828 |
-| `c8-rational-numbers-closure` | 2 | 2000 | 1644 | 6913 |
+| `c8-rational-numbers-between` | 1 | 2000 | 1370 | 6885 |
+| `c8-rational-numbers-between` | 3 | 2000 | 1370 | 6885 |
+| `c8-rational-numbers-foundations` | 1 | 2000 | 1393 | 6908 |
+| `c8-rational-numbers-between` | 4 | 2000 | 1393 | 6908 |
 | `c8-rational-numbers-distributivity` | 2 | 2000 | 1742 | 6957 |
-| `c8-rational-numbers-between` | 1 | 2000 | 1368 | 6960 |
-| `c8-rational-numbers-between` | 3 | 2000 | 1368 | 6960 |
-| `c8-rational-numbers-foundations` | 1 | 2000 | 1391 | 6983 |
-| `c8-rational-numbers-closure` | 4 | 2000 | 1391 | 6983 |
-| `c8-rational-numbers-commutativity` | 2 | 2000 | 1391 | 6983 |
-| `c8-rational-numbers-commutativity` | 3 | 2000 | 1391 | 6983 |
-| `c8-rational-numbers-identities` | 3 | 2000 | 1391 | 6983 |
-| `c8-rational-numbers-identities` | 4 | 2000 | 1391 | 6983 |
-| `c8-rational-numbers-between` | 4 | 2000 | 1391 | 6983 |
+| `c8-rational-numbers-commutativity` | 4 | 2000 | 1226 | 6993 |
+| `c8-graphs-ncert-mastery` | 2 | 2000 | 1636 | 7035 |
+| `c8-data-handling-ncert-mastery` | 2 | 2000 | 1356 | 7443 |
+| `c8-rational-numbers-closure` | 2 | 2000 | 1335 | 7502 |
 | `c8-factorisation-ncert-mastery` | 2 | 2000 | 1347 | 7704 |
 | `c8-monomial-product-reasoning` | 3 | 2000 | 1682 | 8266 |
+| `c8-data-handling-ncert-mastery` | 1 | 2000 | 1645 | 8286 |
 | `c8-factorisation-ncert-mastery` | 4 | 2000 | 1459 | 8375 |
 | `c8-algebraic-identities-ncert-mastery` | 2 | 2000 | 1357 | 8524 |
-| `c8-rational-numbers-closure` | 1 | 2000 | 1727 | 9322 |
+| `c8-data-handling-ncert-mastery` | 3 | 2000 | 1377 | 9174 |
 | `c8-factorisation-ncert-mastery` | 3 | 2000 | 1449 | 9709 |
+| `c8-data-handling-ncert-mastery` | 4 | 2000 | 1449 | 9749 |
+| `c8-rational-numbers-identities` | 3 | 2000 | 1115 | 9822 |
+| `c8-rational-numbers-closure` | 4 | 2000 | 1121 | 9828 |
+| `c8-rational-numbers-commutativity` | 2 | 2000 | 1121 | 9828 |
+| `c8-rational-numbers-commutativity` | 3 | 2000 | 1121 | 9828 |
+| `c8-rational-numbers-identities` | 4 | 2000 | 1121 | 9828 |
 
 ### Class 9
 
 | Generator | D | Draws | Distinct seen | Estimate |
 |---|---|---|---|---|
-| `c9-circles-ncert-mastery` | 2 | 2000 | 313 | 329 |
-| `c9-circles-ncert-mastery` | 4 | 2000 | 353 | 385 |
-| `c9-circles-ncert-mastery` | 3 | 2000 | 385 | 604 |
 | `c9-probability-ncert-mastery` | 3 | 2000 | 627 | 1707 |
-| `c9-circles-ncert-mastery` | 1 | 2000 | 554 | 1712 |
 | `c9-perimeter-area-ncert-mastery` | 1 | 2000 | 1099 | 2749 |
-| `c9-sequences-progressions-ncert-mastery` | 4 | 2000 | 1505 | 3491 |
+| `c9-circles-ncert-mastery` | 2 | 2000 | 1056 | 5102 |
+| `c9-circles-ncert-mastery` | 4 | 2000 | 1097 | 5724 |
 | `c9-perimeter-area-ncert-mastery` | 2 | 2000 | 1331 | 5767 |
 | `c9-perimeter-area-ncert-mastery` | 4 | 2000 | 1413 | 5864 |
+| `c9-circles-ncert-mastery` | 3 | 2000 | 1096 | 6820 |
+| `c9-circles-ncert-mastery` | 1 | 2000 | 1186 | 7117 |
 | `c9-perimeter-area-ncert-mastery` | 3 | 2000 | 1392 | 8127 |
 
 ### Class 10
@@ -266,7 +248,6 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 
 | Generator | D | Draws | Distinct seen | Estimate |
 |---|---|---|---|---|
-| `c11-3d-introduction` | 2 | 2000 | 4 | 4 |
 | `c11-probability` | 1 | 2000 | 10 | 10 |
 | `c11-complex-numbers` | 2 | 2000 | 12 | 12 |
 | `c11-probability` | 2 | 2000 | 13 | 13 |
@@ -288,7 +269,6 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c11-sets` | 2 | 2000 | 1590 | 4117 |
 | `c11-permutations-combinations` | 2 | 2000 | 1185 | 4269 |
 | `c11-limit-jee-reasoning` | 4 | 2000 | 1475 | 4293 |
-| `c11-linear-inequalities` | 3 | 2000 | 1570 | 4390 |
 | `c11-arrangement-jee-reasoning` | 4 | 2000 | 726 | 4493 |
 | `c11-radian-unit-circle-reasoning` | 3 | 2000 | 1357 | 4493 |
 | `c11-binomial-expansion-jee-reasoning` | 4 | 2000 | 1167 | 4601 |
@@ -327,13 +307,10 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c12-applications-derivatives` | 4 | 2000 | 52 | 52 |
 | `c12-vector-dot-product` | 3 | 2000 | 107 | 107 |
 | `c12-applications-derivatives` | 1 | 2000 | 144 | 144 |
-| `c12-determinants` | 3 | 2000 | 192 | 192 |
 | `c12-conditional-probability` | 1 | 2000 | 232 | 243 |
 | `c12-conditional-probability` | 3 | 2000 | 323 | 323 |
-| `c12-matrices` | 3 | 2000 | 497 | 504 |
 | `c12-3d-geometry` | 4 | 2000 | 546 | 624 |
 | `c12-vector-algebra` | 4 | 2000 | 874 | 994 |
-| `c12-matrices` | 4 | 2000 | 880 | 1025 |
 | `c12-definite-integrals` | 1 | 2000 | 1114 | 1542 |
 | `c12-applications-derivatives` | 2 | 2000 | 1163 | 1681 |
 | `c12-relations-equivalence` | 1 | 2000 | 780 | 2676 |
