@@ -9,7 +9,7 @@ commit you to, in plain English, so you can read them with the right questions i
 - **Privacy.** You are the person responsible. It describes what the app collects (email, name, answers,
   handwriting pictures, a guardian's details for under-18s), why, and who else sees it: **OpenAI** (reads
   handwriting and photos, only after a one-time yes from the student) and **Resend** (sends email). It says
-  handwriting pictures are not kept, answer records are kept 90 days and exam records up to five years, and
+  handwriting pictures are not kept on our server (OpenAI may hold a copy briefly, as the notice says), answer records are kept 90 days and exam records up to five years, and
   deletion is immediate. It lists overseas recipients (APP 8), explains access, correction and deletion,
   and says complaints go to you first and then to the **OAIC**. It says the OAIC's Children's Online
   Privacy Code is still being developed, and that you do **not** claim to comply with it.
