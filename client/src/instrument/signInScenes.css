@@ -1,0 +1,54 @@
+/* The sign-in scenes (SignInScenes.jsx). Instrument tokens only; the curve is a chart colour, never the edition accent. */
+.in-scenes { --sc-pad: 48px; }
+.sc-scene { position: absolute; inset: 0; }
+.sc-scene.is-in { animation: sc-fade .6s ease-out both; }
+.sc-scene.is-out { animation: sc-fade-out .6s ease-out both; pointer-events: none; }
+@keyframes sc-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sc-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes sc-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes sc-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes sc-pop { 0% { opacity: 0; transform: scale(.6); } 70% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes sc-sweep { from { stroke-dashoffset: 100; } to { stroke-dashoffset: 25; } }
+@keyframes sc-grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.sc-r1 { animation: sc-rise .5s .2s ease-out both; } .sc-r2 { animation: sc-rise .5s .9s ease-out both; }
+.sc-r3 { animation: sc-rise .5s 1.5s ease-out both; } .sc-r4 { animation: sc-rise .5s 2.1s ease-out both; }
+.sc-eyebrow { position: absolute; top: 36px; left: var(--sc-pad); margin: 0; font: 500 12px var(--in-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--in-tx-3); }
+.sc-graph { position: absolute; top: 56px; left: 0; width: 100%; height: calc(100% - 200px); }
+.sc-grid line { stroke: var(--in-edge); stroke-width: 1; }
+.sc-axis { stroke: var(--in-edge-3); stroke-width: 1.25; }
+.sc-curve { fill: none; stroke: var(--in-c2); stroke-width: 2.75; stroke-linejoin: round; stroke-linecap: round; stroke-dasharray: 1; animation: sc-draw 1.8s cubic-bezier(.4, 0, .2, 1) both; }
+.sc-curve.sc-thin { stroke: var(--in-tx); stroke-width: 2.5; }
+.sc-pop { transform-box: fill-box; transform-origin: center; fill: var(--in-void); stroke: var(--in-tx); stroke-width: 2; }
+.sc-pop1 { animation: sc-pop .45s 1.4s ease-out both; } .sc-pop2 { animation: sc-pop .45s 1.7s ease-out both; } .sc-pop3 { animation: sc-pop .45s 2s ease-out both; }
+.sc-dot { fill: var(--in-c2); stroke: none; }
+.sc-tick { fill: var(--in-tx-2); stroke: none; font: italic 400 16px 'STIX Two Text', 'Cambria Math', Georgia, serif; }
+.sc-foot { position: absolute; left: var(--sc-pad); right: var(--sc-pad); bottom: 88px; display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.sc-head { margin: 0; font: 600 clamp(24px, 2.2vw, 30px)/1.18 var(--in-ui); letter-spacing: -.015em; color: var(--in-tx); max-width: 14em; }
+.sc-head.sc-c { text-align: center; }
+.sc-card { display: grid; gap: 8px; min-width: 220px; padding: 12px 16px; border-radius: 10px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); }
+.sc-card p { margin: 0; display: flex; align-items: center; gap: 10px; }
+.sc-tick-ico { color: var(--in-good, var(--in-c1)); font-weight: 600; }
+.sc-m { font: italic 400 17px 'STIX Two Text', 'Cambria Math', Georgia, serif; color: var(--in-tx); }
+.sc-fact { position: absolute; left: var(--sc-pad); bottom: 60px; margin: 0; font: 500 12px var(--in-mono); color: var(--in-tx-3); }
+.sc-centre { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 26px; padding: 0 72px 56px; }
+.sc-centre.sc-left { align-items: stretch; padding: 0 72px 56px; gap: 16px; }
+.sc-centre .sc-eyebrow { position: static; }
+.sc-ring-svg { width: 200px; height: 200px; }
+.sc-ring-bg { fill: none; stroke: var(--in-l4); stroke-width: 6; }
+.sc-ring { fill: none; stroke: var(--in-c2); stroke-width: 6; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: 25; animation: sc-sweep 2.2s .3s cubic-bezier(.4, 0, .2, 1) both; }
+.sc-ring-t { fill: var(--in-tx); font: 500 15px var(--in-mono); } .sc-ring-s { fill: var(--in-tx-3); font: 400 8px var(--in-ui); }
+.sc-chips { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+.sc-chips span { padding: 6px 14px; border-radius: 999px; box-shadow: 0 0 0 1px var(--in-edge-3); font-size: 14px; color: var(--in-tx-2); }
+.sc-bars { width: 100%; max-width: 460px; height: auto; }
+.sc-bar { fill: var(--in-c2); fill-opacity: .25; stroke: var(--in-c2); stroke-opacity: .7; transform-box: fill-box; transform-origin: bottom; animation: sc-grow .5s ease-out both; }
+.sc-row { display: flex; justify-content: space-between; gap: 16px; padding: 14px 18px; border-radius: 10px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); font-size: 16px; color: var(--in-tx); }
+.sc-row em { font-style: normal; color: var(--in-tx-3); } .sc-row em.is-hot { color: var(--in-c2); }
+.sc-dots { position: absolute; left: calc(var(--sc-pad) - 5px); bottom: 24px; display: flex; gap: 2px; }
+.sc-dot-btn { width: 24px; height: 44px; border: 0; padding: 0; background: transparent; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.sc-dot-btn i { display: block; height: 3px; width: 14px; border-radius: 2px; background: var(--in-l4); transition: width .3s, background-color .3s; }
+.sc-dot-btn.is-on i { width: 28px; background: var(--in-c2); }
+.sc-dot-btn:focus-visible { outline: 2px solid var(--in-tx); outline-offset: 2px; border-radius: 4px; }
+@media (prefers-reduced-motion: reduce) {
+  .in-scenes *, .in-scenes *::before { animation: none !important; transition: none !important; }
+  .sc-curve { stroke-dasharray: none; }
+}
