@@ -1,0 +1,93 @@
+// Pri Learning — the curriculum identity every Priyabhata question is sealed with
+// (audit P0 #38), the counterpart of nswQuestionIdentity() in nswBanks.js.
+//
+// A sealed identity says WHERE in the India curriculum a question sits, so a
+// result, a report or an examiner can name the board, class, chapter and
+// syllabus it belongs to instead of trusting a generator id. It is the
+// curriculum's own claim (client/src/engine/curriculum-in.js, the chapter whose
+// covers draw on the generator) — not a claim that the question covers the
+// chapter's every outcome, not the board's wording, and not board approval.
+//
+//   · graded chapters (Classes 7–12) carry board CBSE and the NCERT chapter;
+//   · Olympiad topics carry no class or board;
+//   · previous-year banks (pyq-<track>-<chapter>, the reviewed JEE catalog) carry
+//     the track and, when the id names one, the chapter they were drawn for.
+//
+// `syllabusVersion` is the syllabus year the product declares for the board
+// course (INDIA_SYLLABUS_VERSION). A question the curriculum cannot place gets
+// null, and editionBanks.js then refuses to issue it.
+import { IN_CHAPTERS } from '../../client/src/engine/curriculum-in.js';
+import { practicePapersAllowed } from './indiaBanks.js';
+import { hasPyqGenerator } from '../../client/src/engine/pyq/pyqIndex.js';
+import { hasJeePyqGenerator } from '../../client/src/engine/generators/jee-pyq-runtime.js';
+
+/** The CBSE syllabus year the repository has source evidence for (the class-10 provenance uses the same string). */
+export const INDIA_SYLLABUS_VERSION = 'CBSE-2026-27';
+/**
+ * Classes whose 2026-27 syllabus the repository actually carries (client/src/engine/ncert/
+ * class7-2026-27-*, class9-2026-27-*, class10-2026-27-production). Classes 8, 11 and 12 have no
+ * 2026-27 audit, so their identity names the board, class and chapter and leaves the year null
+ * rather than claiming one.
+ */
+export const INDIA_VERSIONED_CLASSES = Object.freeze([7, 9, 10]);
+/** What an India outcome code is: the product curriculum's own dot point, not a CBSE/NCERT outcome code. */
+export const OUTCOME_BASIS = 'curriculum-dotpoint';
+const TRACKS = Object.freeze(['jee-advanced', 'jee-main', 'olympiad', 'cbse']);
+
+const CHAPTER_BY_ID = new Map(IN_CHAPTERS.map(c => [c.id, c]));
+const COVERS_BY_GENERATOR = new Map();
+for (const chapter of IN_CHAPTERS) for (const cover of chapter.covers) {
+  if (!COVERS_BY_GENERATOR.has(cover.gen)) COVERS_BY_GENERATOR.set(cover.gen, []);
+  COVERS_BY_GENERATOR.get(cover.gen).push({ chapter, cover });
+}
+
+const text = v => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+function chapterRecord(chapter, extra = {}) {
+  const graded = Number.isInteger(chapter.grade);
+  return {
+    jurisdiction: 'IN',
+    authority: graded ? 'CBSE' : 'Olympiad',
+    board: graded ? 'CBSE' : null,
+    class: graded ? chapter.grade : null,
+    syllabus: graded ? `cbse-mathematics-class-${chapter.grade}` : 'olympiad',
+    syllabusVersion: graded && INDIA_VERSIONED_CLASSES.includes(chapter.grade) ? INDIA_SYLLABUS_VERSION : null,
+    source: graded && /^c\d+-/.test(chapter.id) ? 'NCERT' : null,
+    chapterId: chapter.id,
+    chapterName: text(chapter.name),
+    strand: text(chapter.strand),
+    ...extra
+  };
+}
+
+/** The identity of an India question, or null when the curriculum cannot place it. */
+export function indiaQuestionIdentity(q, generator = q?._generator ?? q?.subtopic) {
+  if (!q || typeof q !== 'object' || typeof generator !== 'string') return null;
+  const placed = COVERS_BY_GENERATOR.get(generator);
+  if (placed?.length) {
+    const difficulty = Number(q.difficulty);
+    // The cover that serves this difficulty; failing that the nearest one below it (then the lowest).
+    const nearest = [...placed].filter(p => Array.isArray(p.cover.diff) && p.cover.diff.length)
+      .sort((x, y) => Math.abs(Math.min(...x.cover.diff.map(d => Math.abs(d - difficulty))) - 0) - Math.abs(Math.min(...y.cover.diff.map(d => Math.abs(d - difficulty))) - 0))[0];
+    const hit = placed.find(p => p.cover.diff?.includes(difficulty)) || nearest || placed[0];
+    const indexes = (hit.cover.dp || []).filter(i => Number.isInteger(i) && text(hit.chapter.dotpoints?.[i]));
+    const topics = indexes.map(i => text(hit.chapter.dotpoints[i]));
+    // The learning outcomes the curriculum itself states for the chapter (its dot points), coded
+    // `<chapter id>#<1-based dot point>`. Not a board code: no board outcome code is held for
+    // India, so none is claimed (basis says so). The code is stable while the chapter's dot-point
+    // order is; edition-parity / in-outcome-identity-check pin that every coded outcome resolves.
+    const outcomes = indexes.map(i => ({ code: `${hit.chapter.id}#${i + 1}`, text: text(hit.chapter.dotpoints[i]), basis: OUTCOME_BASIS }));
+    return chapterRecord(hit.chapter, { generator, topics, outcomes, kind: 'practice' });
+  }
+  if (hasPyqGenerator(generator) || hasJeePyqGenerator(generator)) {
+    const tail = generator.replace(/^pyq-/, '');
+    const track = TRACKS.find(t => tail === t || tail.startsWith(`${t}-`)) || null;
+    const chapter = track ? CHAPTER_BY_ID.get(tail.slice(track.length + 1)) : null;
+    if (chapter) return chapterRecord(chapter, { generator, topics: [], outcomes: [], kind: 'previous-year', track });
+    return { jurisdiction: 'IN', authority: 'previous-year bank', board: null, class: null, syllabus: null, syllabusVersion: null, source: null, chapterId: null, chapterName: null, strand: null, generator, topics: [], outcomes: [], kind: 'previous-year', track };
+  }
+  // A suite that borrows an NSW-era bank as a vehicle (allowBanksOutsideIndiaForTests, refused in
+  // production) gets a labelled identity, so the borrowed question is still issued in that suite.
+  if (practicePapersAllowed()) return { jurisdiction: 'IN', authority: 'test-vehicle', board: null, class: null, syllabus: null, syllabusVersion: null, source: null, chapterId: null, chapterName: null, strand: null, generator, topics: [], outcomes: [], kind: 'test-vehicle' };
+  return null;
+}
