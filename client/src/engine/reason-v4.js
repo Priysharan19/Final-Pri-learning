@@ -634,3 +634,27 @@ export function relateSolutionSets(a, b) {
   if (bInA) return 'subset';
   return 'different';
 }
+
+/**
+ * The unconditional case equations of `abs(Q) = P` — Q = P and -Q = P — each
+ * with its complete real root set, so a line that is exactly one case can be
+ * recognised as a BRANCH (valid to write down, whatever its condition decides).
+ */
+export function absCaseSets(eq, variable = null) {
+  if (!eq || eq.t !== 'equation') return null;
+  const v = inferSingleVariable(eq, null, variable);
+  if (!v) return null;
+  let left = unwrap(eq.l), right = unwrap(eq.r);
+  const isAbs = n => n?.t === 'call' && n.fn === 'abs';
+  if (!isAbs(left) && isAbs(right)) [left, right] = [right, left];
+  if (!isAbs(left) || isAbs(right)) return null;
+  const Q = quadraticFit(left.arg, v), P = quadraticFit(right, v);
+  if (!Q || !P) return null;
+  const out = [];
+  for (const co of [polySub(Q, P), Q.map((x, i) => -x - P[i])]) {
+    const r = realRootsUpTo4(co);
+    if (r === null) return null;
+    out.push({ kind: 'finite', variable: v, roots: uniqueNumbers(r), excluded: [] });
+  }
+  return out;
+}

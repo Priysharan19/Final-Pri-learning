@@ -726,6 +726,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
   let firstBreak = -1;
   let previousEquation = null;
   let previousEquationTrusted = false;
+  let absAnchor = null; // the latest verified absolute-value equation: its cases are valid branches
   let previousRelation = null;
   let previousRelationTrusted = false;
   let branchesOpen = false;
@@ -1081,7 +1082,8 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               previousEquationTrusted = true;
               if (productEqualsZero(ast)) branchesOpen = true;
             } else {
-              const assessed = assessEquationLine({ ast, previousAst: previousEquation, previousTrusted: previousEquationTrusted, meta });
+              const assessed = assessEquationLine({ ast, previousAst: previousEquation, previousTrusted: previousEquationTrusted, meta, anchorAst: absAnchor });
+              if (assessed.status === 'ok' && assessed.trusted && /abs\s*\(/.test(String(line))) absAnchor = ast;
               status = assessed.status;
               note = assessed.note;
               lineDiagnosis = assessed.diagnosis || null;
