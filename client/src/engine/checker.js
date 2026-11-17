@@ -12,6 +12,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, wit
 const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
 import { assessCalculusLine, calculusContext, refineDerivativeLine } from './calculusSteps.js';
+import { diagnoseTopicLine } from './misconceptions/topics/index.js';
 import { answerTooLong } from './checker-core.js';
 import { changedTerm } from './slips.js';
 import { checkGeometry } from './geometryFacts.js';
@@ -846,6 +847,13 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       note = 'Not checked — this question’s check covers the lines that lead to the answer.';
     }
 
+    // A break the check found but could not name: a topic catalogue may name
+    // it (misconceptions/topics). The status, the mark and the first break
+    // are already decided; only the note becomes specific.
+    if (status === 'break' && !lineDiagnosis) {
+      const named = diagnoseTopicLine({ line, previous: i > 0 ? rawLines[i - 1] : (meta.source ?? null), index: i, meta });
+      if (named) { note = named.message; lineDiagnosis = named; }
+    }
     if (status === 'break' && firstBreak === -1) firstBreak = i;
     out.push({ text: line, status, note, ...(restates ? { restates: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
   });
