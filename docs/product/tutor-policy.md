@@ -115,7 +115,7 @@ Decided on 2026-11-18 by the CTO session, under the owner's delegation, for PR #
 | --- | --- |
 | Never in an exam, a timed paper or the Exam Desk. | The policy is off in every exam, timed and one-try mode (`POLICY_OFF_MODES`). The route lives only in the practice router. The Exam Desk never renders the panel. The suite checks that an off decision never sets `causeShown`. |
 | No credit charge, and it is not a hint rung. | A plan never changes the ladder level or the weight. |
-| Recorded as light assistance. | A plan whose reason or prompt names a kind (`CAUSE_KIND_KEYS`) carries `causeShown: true`. The graded attempt records `causeShown: true` on the policy offer and at the top level. Learning evidence may treat it as light assistance. The experiment already excludes any item with a help request. |
+| Recorded as light assistance. | A plan whose reason or prompt names a kind, or says the working holds (also a verdict on it), carries `causeShown: true`. The set of such keys is `CAUSE_KIND_KEYS`. The graded attempt records `causeShown: true` on the policy offer and at the top level. Learning evidence may treat it as light assistance. The experiment already excludes any item with a help request. |
 | Only engine-verified classes are named. | Anything else says "not verified": a check that did not run, a bare counterexample, or a diagnosis below high confidence. The suite proves this across every context. |
 
 ## Known limits

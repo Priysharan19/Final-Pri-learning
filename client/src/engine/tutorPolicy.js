@@ -275,8 +275,12 @@ function reasonFor(action, c, faded) {
   return REASON_KEY[`${c.class}:${RUNG_ACTIONS.includes(action) ? 'rung' : action}`] || 'tutorPolicy.reason.none.rung';
 }
 
-/** The reason and prompt keys whose words name the kind of cause. */
+/**
+ * The reason and prompt keys whose words name the kind of cause — or give a
+ * verdict on the working ("nothing needs help" says every line verified).
+ */
 export const CAUSE_KIND_KEYS = Object.freeze(new Set([
+  'tutorPolicy.reason.keepGoing', 'tutorPolicy.reason.none.rung',
   'tutorPolicy.reason.recognition', 'tutorPolicy.reason.unverified', 'tutorPolicy.reason.unverifiedKeepGoing',
   'tutorPolicy.reason.arithmetic.selfCheck', 'tutorPolicy.reason.arithmetic.mistakeGraph', 'tutorPolicy.reason.arithmetic.rung',
   'tutorPolicy.reason.concept.mistakeGraph', 'tutorPolicy.reason.concept.prerequisite', 'tutorPolicy.reason.concept.rung',

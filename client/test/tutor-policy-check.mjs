@@ -191,7 +191,7 @@ eq('a calculation slip is named, and flagged', [decide(H('arithmetic')).causeSho
 eq('a doubtful reading is named "couldn\'t read", and flagged', decide(H('recognition')).causeShown, true);
 eq('below high confidence the student is told "not verified", never a guessed kind', [decide({ class: 'concept', line: 3, confidence: 'medium' }).reason.key, decide({ class: 'concept', line: 3, confidence: 'medium' }).causeShown], ['tutorPolicy.reason.unverified', true]);
 eq('no working seen: no cause kind, no flag', decide({ class: 'unseen' }).causeShown, false);
-eq('working that holds: no cause kind, no flag', decide({ class: 'none' }).causeShown, false);
+eq('working that holds: "nothing needs help" is a verdict on the working, so it is flagged too', [decide({ class: 'none' }).causeShown, decide({ class: 'none' }, { helpRequested: false }).causeShown], [true, true]);
 ok('no cause-kind key is a value-bearing or charging action by itself', [...P.CAUSE_KIND_KEYS].every(k => typeof EN[k] === 'string' && typeof HI[k] === 'string'));
 const spent = decide({ class: 'none' }, { rungLevel: 3 });
 eq('with only the solution left, the policy says so and keeps going', [spent.action, spent.reason.key], ['keep-going', 'tutorPolicy.reason.ladderSpent']);
