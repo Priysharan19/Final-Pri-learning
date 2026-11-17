@@ -275,6 +275,15 @@ function reasonFor(action, c, faded) {
   return REASON_KEY[`${c.class}:${RUNG_ACTIONS.includes(action) ? 'rung' : action}`] || 'tutorPolicy.reason.none.rung';
 }
 
+/** The reason and prompt keys whose words name the kind of cause. */
+export const CAUSE_KIND_KEYS = Object.freeze(new Set([
+  'tutorPolicy.reason.recognition', 'tutorPolicy.reason.unverified', 'tutorPolicy.reason.unverifiedKeepGoing',
+  'tutorPolicy.reason.arithmetic.selfCheck', 'tutorPolicy.reason.arithmetic.mistakeGraph', 'tutorPolicy.reason.arithmetic.rung',
+  'tutorPolicy.reason.concept.mistakeGraph', 'tutorPolicy.reason.concept.prerequisite', 'tutorPolicy.reason.concept.rung',
+  'tutorPolicy.reason.method.rung', 'tutorPolicy.reason.notation.selfCheck', 'tutorPolicy.reason.notation.rung',
+  'tutorPolicy.prompt.confirmReading', 'tutorPolicy.prompt.notation', 'tutorPolicy.prompt.arithmetic', 'tutorPolicy.prompt.concept', 'tutorPolicy.prompt.method'
+]));
+
 /** The reason sentence per (cause class, action), written out so the i18n suite can see every key. */
 export const REASON_KEY = Object.freeze({
   'arithmetic:self-check': 'tutorPolicy.reason.arithmetic.selfCheck',
@@ -315,13 +324,18 @@ function choose(action, c, evidence, ctx, reasonKey, faded) {
     reason: { key: reasonKey, params },
     prompt: promptFor(action, c),
     prerequisite: action === 'prerequisite' ? { id: ctx.prerequisite.id, name: params.name } : null,
+    // Does the wording name the KIND of cause (slip, rule, method, notation,
+    // reading, not verified)? Shown before resolution in practice only (CTO
+    // decision 2026-11-18, docs/product/tutor-policy.md); recorded on the
+    // attempt as light assistance, never charged.
+    causeShown: CAUSE_KIND_KEYS.has(reasonKey) || CAUSE_KIND_KEYS.has(promptFor(action, c)?.key),
     envelope: envelopeFor(action, c, ctx, faded),
     policyVersion: TUTOR_POLICY_VERSION
   };
 }
 
 function off(why, key) {
-  return { off: why, action: null, level: null, rung: null, charges: false, reason: { key, params: {} }, prompt: null, prerequisite: null,
+  return { off: why, action: null, level: null, rung: null, charges: false, causeShown: false, reason: { key, params: {} }, prompt: null, prerequisite: null,
     envelope: null, policyVersion: TUTOR_POLICY_VERSION };
 }
 

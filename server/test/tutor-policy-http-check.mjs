@@ -152,8 +152,16 @@ try {
   eq([rec.data.plan.action, rec.data.plan.rung, rec.data.plan.charges, rec.data.plan.prompt.key, rec.data.lineCheckSpent], ['confirm-reading', null, false, 'tutorPolicy.prompt.confirmReading', false], 'an unconfirmed reading: confirm it, no maths hint');
   eq(await lineChecks(), before, 'and no line check runs on an unconfirmed reading');
 
+  // The cause kind shown before resolution is recorded on the attempt as light,
+  // uncharged assistance (causeShown); a plan that names no kind records none.
+  eq(rec.data.plan.causeShown, true, 'naming "couldn\'t read" is flagged as a shown cause');
+  await grade(P.jar, q2.data.question.id, (await sealed(q2.data.question.id)).answer.value);
+  const recEvent = await eventOf(q2.data.question.id);
+  eq([recEvent.causeShown, recEvent.policyAssistance[0], recEvent.hintLevel, recEvent.markWeight], [true, { action: 'confirm-reading', level: 'A0', causeShown: true }, 0, 1], 'the attempt carries causeShown, with no rung and full weight: nothing charged');
+  ok(!('causeShown' in on.event), 'a plan that named no cause kind records none');
+  const q2b = await issue(P.jar, 4546);
   // A final-answer attempt in the lines: the policy cannot verify it and says so.
-  const fin = await plan(P.jar, q2.data.question.id, { helpRequested: true, lines: ['6m + 5 = m - 10', 'm = -3'] });
+  const fin = await plan(P.jar, q2b.data.question.id, { helpRequested: true, lines: ['6m + 5 = m - 10', 'm = -3'] });
   eq([fin.data.plan.action, fin.data.plan.reason.key, fin.data.lineCheckSpent], ['nudge', 'tutorPolicy.reason.unverified', false], 'final-answer lines: unverified, the question\'s own hint, nothing charged');
 
   // The line check's guards apply to the plan's lines: the per-question cap

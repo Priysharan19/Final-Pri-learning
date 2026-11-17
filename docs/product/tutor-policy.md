@@ -99,9 +99,24 @@ The readout works through these checks in order:
 
 With about 12 real accounts today, the readout will refuse for a long time. That is the intended behaviour.
 
-## Open owner decision
+## Decision: the cause kind is shown before resolution, in practice only
 
-Before a question is resolved, the plan's reason distinguishes a calculation slip from a rule that does not hold, and points at a line. `tutor.js` keeps the misconception itself hidden until resolution. The plan's wording is line-and-kind only, with no misconception name, value or correction. Whether even the kind should wait until resolution is an owner decision. The code supports either answer: collapsing the per-cause reasons to line-only wording is a copy-table change.
+Decided on 2026-11-18 by the CTO session, under the owner's delegation, for PR #996.
+
+**Decision.** Before a question is resolved, the plan's wording may name the kind of cause: a calculation slip, a rule that does not hold here, a reading Pri is not sure of, or "not verified". It never names the misconception itself, a value, a correction or the answer. `tutor.js` still keeps the misconception name and explanation until resolution.
+
+**Reasons.**
+- Step Check already shows where the first break is before resolution. The kind adds the least extra signal that still lets the student act on it (standard #21: differentiate error causes).
+- It reveals no answer and no method.
+
+**Conditions, and where each is enforced.**
+
+| Condition | Enforced by |
+| --- | --- |
+| Never in an exam, a timed paper or the Exam Desk. | The policy is off in every exam, timed and one-try mode (`POLICY_OFF_MODES`). The route lives only in the practice router. The Exam Desk never renders the panel. The suite checks that an off decision never sets `causeShown`. |
+| No credit charge, and it is not a hint rung. | A plan never changes the ladder level or the weight. |
+| Recorded as light assistance. | A plan whose reason or prompt names a kind (`CAUSE_KIND_KEYS`) carries `causeShown: true`. The graded attempt records `causeShown: true` on the policy offer and at the top level. Learning evidence may treat it as light assistance. The experiment already excludes any item with a help request. |
+| Only engine-verified classes are named. | Anything else says "not verified": a check that did not run, a bare counterexample, or a diagnosis below high confidence. The suite proves this across every context. |
 
 ## Known limits
 

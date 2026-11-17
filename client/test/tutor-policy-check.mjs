@@ -175,6 +175,24 @@ ok('only a rung action is marked as charged (and the server charges it, not the 
 ok('no action reveals the final answer; only the worked step reveals a next step', noAnswer);
 ok('escalation only goes up: nothing at or below an earlier offer is repeated', upOnly);
 ok('the same input always gives the same decision', deterministic);
+
+// ── Cause kind before resolution (CTO decision 2026-11-18) ──────────────────
+section('cause shown');
+let causeFlagOk = true, offNeverShows = true;
+for (const cause of EVERY_CAUSE) for (const offered of offeredSets) for (const evidence of evidences) for (const help of [true, false]) for (const mode of ['practice', ...P.POLICY_OFF_MODES]) {
+  const r = decide(cause, { offered, helpRequested: help, mode, mistakeGraph: true }, evidence);
+  if (r.off) { if (r.causeShown !== false) offNeverShows = false; continue; }
+  const named = P.CAUSE_KIND_KEYS.has(r.reason.key) || !!(r.prompt && P.CAUSE_KIND_KEYS.has(r.prompt.key));
+  if (r.causeShown !== named) causeFlagOk = false;
+}
+ok('causeShown is true exactly when the reason or prompt names a cause kind', causeFlagOk);
+ok('never in an exam, timed or one-try mode: the policy is off and shows nothing', offNeverShows);
+eq('a calculation slip is named, and flagged', [decide(H('arithmetic')).causeShown, decide(H('arithmetic')).reason.key], [true, 'tutorPolicy.reason.arithmetic.selfCheck']);
+eq('a doubtful reading is named "couldn\'t read", and flagged', decide(H('recognition')).causeShown, true);
+eq('below high confidence the student is told "not verified", never a guessed kind', [decide({ class: 'concept', line: 3, confidence: 'medium' }).reason.key, decide({ class: 'concept', line: 3, confidence: 'medium' }).causeShown], ['tutorPolicy.reason.unverified', true]);
+eq('no working seen: no cause kind, no flag', decide({ class: 'unseen' }).causeShown, false);
+eq('working that holds: no cause kind, no flag', decide({ class: 'none' }).causeShown, false);
+ok('no cause-kind key is a value-bearing or charging action by itself', [...P.CAUSE_KIND_KEYS].every(k => typeof EN[k] === 'string' && typeof HI[k] === 'string'));
 const spent = decide({ class: 'none' }, { rungLevel: 3 });
 eq('with only the solution left, the policy says so and keeps going', [spent.action, spent.reason.key], ['keep-going', 'tutorPolicy.reason.ladderSpent']);
 

@@ -989,7 +989,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (!row) return null;
     try {
       const served = JSON.parse(row.response_json).served;
-      return Array.isArray(served) && served.length ? served.map(x => ({ action: x.action, level: x.level })) : null;
+      return Array.isArray(served) && served.length ? served.map(x => ({ action: x.action, level: x.level, ...(x.causeShown === true ? { causeShown: true } : {}) })) : null;
     } catch { return null; }
   }
 
@@ -1553,6 +1553,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             // mark and the credit above are fixed; empty while none is active.
             ...experimentStamp(activeExperiments(env), accountId, { family: generatorOf(q), ms: body.ms ?? null }),
             ...(policyAssistance ? { policyAssistance } : {}),
+            // The cause kind was shown before resolution (light assistance, uncharged).
+            ...(policyAssistance?.some(x => x.causeShown === true) ? { causeShown: true } : {}),
             createdAt: now,
             serverAcknowledgedAt: now
           }), now, accountId]);
@@ -1681,7 +1683,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       try { served = row ? JSON.parse(row.response_json).served || [] : []; } catch { served = []; }
       // A request answered with no plan (the control arm, or nothing to offer)
       // is recorded as a request: action and level null.
-      served = [...served, { action: plan?.action || null, level: plan?.level || null, cause: plan?.envelope?.causeClass || null, at: now }].slice(-16);
+      served = [...served, { action: plan?.action || null, level: plan?.level || null, cause: plan?.envelope?.causeClass || null, ...(plan?.causeShown === true ? { causeShown: true } : {}), at: now }].slice(-16);
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-help-plan',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
         [accountId, qid, JSON.stringify({ served, policyVersion: TUTOR_POLICY_VERSION }), digest({ qid, served: served.length }), now, now + MAX_AGE]);
     }, { accountScope: accountId, lock: syncLockKey(accountId) });
