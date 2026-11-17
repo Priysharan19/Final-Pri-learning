@@ -44,7 +44,8 @@ function prose(text, where, { min = 1 } = {}) {
   const plain = outsideMath(text);
   ok(!UNICODE_MATH.test(plain), `${where}: maths outside KaTeX in "${plain.trim().slice(0, 80)}"`);
   ok(!MACHINE_TELL.test(plain), `${where}: machine-written maths in "${plain.trim().slice(0, 80)}"`);
-  ok(!FILLER.test(text), `${where}: filler or hype ("${(text.match(FILLER) || [''])[0]}")`);
+  const words = text.replace(/\$\$[\s\S]*?\$\$|\$[^$]*\$/g, ' '); // a factorial inside maths is not an exclamation
+  ok(!FILLER.test(words), `${where}: filler or hype ("${(words.match(FILLER) || [''])[0]}")`);
 }
 
 const close = (a, b, tol = 1e-6) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= tol * Math.max(1, Math.abs(a), Math.abs(b));
