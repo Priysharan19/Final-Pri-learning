@@ -10,7 +10,7 @@ Target (owner, Nov 2026): **≥ 10^8 distinct questions per class**. Status belo
 | Class 8 | 126 | ≥ 4.17×10^8 | 3 | 79 | met |
 | Class 9 | 32 | ≥ 2.43×10^8 | 2 | 9 | met |
 | Class 10 | 110 | ≥ 1.46×10^8 | 1 | 76 | met |
-| Class 11 | 102 | ≥ 4.01×10^8 | 2 | 61 | met |
+| Class 11 | 102 | ≥ 4.07×10^8 | 2 | 47 | met |
 | Class 12 | 93 | ≥ 3.85×10^8 | 2 | 48 | met |
 
 A class can clear 10^8 through a few very large cells while many of its cells stay thin; the thin-cell count above is the breadth measure, and both are reported so neither hides the other.
@@ -282,66 +282,52 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | Generator | D | Draws | Distinct seen | Estimate |
 |---|---|---|---|---|
 | `c11-3d-introduction` | 2 | 2000 | 4 | 4 |
-| `c11-conic-sections` | 3 | 2000 | 8 | 8 |
-| `c11-permutations-combinations` | 2 | 2000 | 9 | 9 |
 | `c11-probability` | 1 | 2000 | 10 | 10 |
-| `c11-trig-functions` | 4 | 2000 | 11 | 11 |
 | `c11-complex-numbers` | 2 | 2000 | 12 | 12 |
 | `c11-probability` | 2 | 2000 | 13 | 13 |
-| `c11-trig-functions` | 1 | 2000 | 15 | 15 |
-| `c11-trig-functions` | 2 | 2000 | 15 | 15 |
-| `c11-permutations-combinations` | 4 | 2000 | 16 | 16 |
-| `c11-binomial-theorem` | 3 | 2000 | 18 | 18 |
-| `c11-conic-sections` | 2 | 2000 | 18 | 18 |
-| `c11-permutations-combinations` | 3 | 2000 | 24 | 24 |
-| `c11-permutations-combinations` | 1 | 2000 | 25 | 25 |
-| `c11-arrangement-reasoning` | 3 | 2000 | 26 | 26 |
-| `c11-sequence-means` | 3 | 2000 | 42 | 42 |
 | `c11-limits-derivatives` | 1 | 2000 | 48 | 48 |
-| `c11-statistics` | 1 | 2000 | 48 | 48 |
-| `c11-statistics` | 2 | 2000 | 48 | 48 |
-| `c11-statistics` | 3 | 2000 | 48 | 48 |
-| `c11-statistics` | 4 | 2000 | 48 | 48 |
-| `c11-trig-functions` | 3 | 2000 | 60 | 60 |
-| `c11-binomial-theorem` | 2 | 2000 | 60 | 60 |
 | `c11-complex-numbers` | 3 | 2000 | 63 | 63 |
-| `c11-sequence-means` | 4 | 2000 | 64 | 64 |
 | `c11-limits-derivatives` | 2 | 2000 | 64 | 64 |
-| `c11-sequence-means` | 2 | 2000 | 66 | 66 |
 | `c11-straight-lines` | 3 | 2000 | 72 | 72 |
-| `c11-sample-space-jee-reasoning` | 4 | 2000 | 86 | 86 |
-| `c11-sequences-series` | 4 | 2000 | 110 | 110 |
-| `c11-binomial-theorem` | 1 | 2000 | 117 | 117 |
-| `c11-relations-functions` | 2 | 2000 | 163 | 163 |
-| `c11-sequences-series` | 3 | 2000 | 240 | 240 |
-| `c11-relations-functions` | 3 | 2000 | 252 | 252 |
-| `c11-conic-sections` | 1 | 2000 | 288 | 288 |
-| `c11-sample-space-reasoning` | 3 | 2000 | 342 | 445 |
-| `c11-relations-functions` | 4 | 2000 | 400 | 482 |
-| `c11-limit-reasoning` | 3 | 2000 | 318 | 490 |
-| `c11-trig-general-solution-reasoning` | 3 | 2000 | 597 | 681 |
-| `c11-complex-algebra-reasoning` | 4 | 2000 | 585 | 690 |
-| `c11-relations-functions` | 1 | 2000 | 736 | 809 |
-| `c11-trig-identity-reasoning` | 4 | 2000 | 818 | 1120 |
-| `c11-binomial-expansion-jee-reasoning` | 4 | 2000 | 835 | 1352 |
-| `c11-arrangement-jee-reasoning` | 4 | 2000 | 452 | 1378 |
-| `c11-complex-quadratic-reasoning` | 3 | 2000 | 830 | 1385 |
-| `c11-sequences-series` | 1 | 2000 | 1066 | 1402 |
-| `c11-sequence-means` | 1 | 2000 | 1127 | 1498 |
-| `c11-set-notation-jee-reasoning` | 4 | 2000 | 1057 | 1935 |
-| `c11-binomial-middle-term-jee-reasoning` | 4 | 2000 | 1151 | 2016 |
-| `c11-radian-unit-circle-reasoning` | 3 | 2000 | 889 | 2131 |
-| `c11-complex-polar-reasoning` | 4 | 2000 | 1222 | 2317 |
-| `c11-limit-jee-reasoning` | 4 | 2000 | 950 | 2570 |
-| `c11-sequences-series` | 2 | 2000 | 1488 | 3036 |
+| `c11-permutations-combinations` | 1 | 2000 | 959 | 2078 |
+| `c11-trig-functions` | 1 | 2000 | 964 | 2642 |
+| `c11-trig-functions` | 2 | 2000 | 1081 | 2832 |
+| `c11-trig-general-solution-reasoning` | 3 | 2000 | 1316 | 2857 |
+| `c11-binomial-theorem` | 1 | 2000 | 850 | 2967 |
+| `c11-trig-functions` | 3 | 2000 | 1198 | 3051 |
+| `c11-limit-reasoning` | 3 | 2000 | 1267 | 3116 |
+| `c11-trig-functions` | 4 | 2000 | 1195 | 3120 |
 | `c11-probability` | 3 | 2000 | 1190 | 3169 |
 | `c11-straight-lines` | 2 | 2000 | 1524 | 3429 |
+| `c11-trig-identity-reasoning` | 4 | 2000 | 961 | 3460 |
+| `c11-arrangement-jee-reasoning` | 4 | 2000 | 683 | 3762 |
 | `c11-sets` | 2 | 2000 | 1590 | 4117 |
+| `c11-permutations-combinations` | 2 | 2000 | 1185 | 4269 |
+| `c11-limit-jee-reasoning` | 4 | 2000 | 1478 | 4333 |
 | `c11-linear-inequalities` | 3 | 2000 | 1570 | 4390 |
+| `c11-radian-unit-circle-reasoning` | 3 | 2000 | 1359 | 4558 |
+| `c11-arrangement-reasoning` | 3 | 2000 | 866 | 4574 |
+| `c11-binomial-expansion-jee-reasoning` | 4 | 2000 | 1181 | 4692 |
+| `c11-complex-polar-reasoning` | 4 | 2000 | 1217 | 4791 |
+| `c11-conic-sections` | 1 | 2000 | 1097 | 5006 |
+| `c11-sequences-series` | 3 | 2000 | 1513 | 5110 |
+| `c11-sequences-series` | 4 | 2000 | 1460 | 5651 |
+| `c11-binomial-middle-term-jee-reasoning` | 4 | 2000 | 1214 | 5737 |
+| `c11-binomial-theorem` | 2 | 2000 | 858 | 5779 |
+| `c11-conic-sections` | 3 | 2000 | 1082 | 6176 |
 | `c11-parabola-jee-reasoning` | 4 | 2000 | 1428 | 6266 |
 | `c11-mean-deviation-jee-reasoning` | 4 | 2000 | 1069 | 6321 |
+| `c11-permutations-combinations` | 3 | 2000 | 1307 | 6349 |
 | `c11-domain-range-reasoning` | 4 | 2000 | 1667 | 6509 |
+| `c11-relations-functions` | 1 | 2000 | 1387 | 6823 |
+| `c11-sequences-series` | 2 | 2000 | 1615 | 7108 |
+| `c11-sequences-series` | 1 | 2000 | 1502 | 7179 |
+| `c11-permutations-combinations` | 4 | 2000 | 1379 | 8069 |
+| `c11-binomial-theorem` | 3 | 2000 | 841 | 8071 |
 | `c11-radian-circle-reasoning` | 4 | 2000 | 1695 | 8310 |
+| `c11-complex-quadratic-reasoning` | 3 | 2000 | 1665 | 9140 |
+| `c11-relations-functions` | 2 | 2000 | 1331 | 9659 |
+| `c11-sequence-means` | 1 | 2000 | 1803 | 9888 |
 
 ### Class 12
 

@@ -40,8 +40,9 @@ const ts = (steps = []) => steps.map(x => (typeof x === 'string' ? typeset(x) : 
 /** A numeric-answer payload. `traps` are common wrong answers with the reason. */
 export function numeric(form, prompt, rawValue, { hints, steps, traps: rawTraps = [] }) {
   // Keys are kept to six places so no floating-point artefact (4.800000000000001) is ever served.
-  const value = Math.round(rawValue * 1e6) / 1e6;
-  const traps = rawTraps.map(t => ({ ...t, value: Math.round(t.value * 1e6) / 1e6 }));
+  const tidy = v => (Number.isInteger(v) ? v : Math.round(v * 1e6) / 1e6);
+  const value = tidy(rawValue);
+  const traps = rawTraps.map(t => ({ ...t, value: tidy(t.value) }));
   const kept = traps.filter((t, i) => t.value !== value && Number.isFinite(t.value) && traps.findIndex(u => u.value === t.value) === i);
   // A designed distractor must always exist (it is what the multiple-choice view
   // and the misconception feedback use). When a form's own wrong answers all
