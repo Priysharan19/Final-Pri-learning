@@ -63,10 +63,15 @@ function ClassBoard({ classId }) {
 
   useEffect(() => { if (drill) drillRef.current?.focus(); }, [drill?.node]);
 
+  const askedRef = useRef('');
+  askedRef.current = `${classId}|${course}`;
   async function openDrill(node, event) {
     opener.current = event?.currentTarget || null;
+    const asked = `${classId}|${course}`;
     try {
       const r = await cloud.classBoard(classId, course, node.id);
+      // The class or course changed while this was in flight: drop the answer.
+      if (asked !== askedRef.current) return;
       setDrill({ node: node.id, code: node.code, group: node.groupName, states: r?.drill?.states || {} });
     } catch (err) { setError(errText(err, 'tw.board.loadFailed')); }
   }
