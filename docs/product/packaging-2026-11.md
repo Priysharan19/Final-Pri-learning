@@ -160,6 +160,93 @@ The paywall copy never says "free trial" or "guarantee" until the owner turns
 one on (`paywall-honesty-check`). The account panel already states a configured
 trial (`cloud.pricingSummaryTrial`) from `PRI_DISPLAY_TRIAL_DAYS`.
 
+## 4a. APPROVED: the 7-day trial unlocked by an invitation
+
+**Owner decision, 18 November 2026:** "i approve the 7 day free trial, provided
+they asked someone else to download the app." This section is how the decision
+is built (`server/platform/referral.js`). It is live once merged; it is not
+behind the packaging switch.
+
+- **No contact collection.** A student gets a personal invite code and link,
+  and shares it through the system share sheet or a copied link. The app and
+  the server never ask for, store or message a friend's email or phone number.
+- **What unlocks it.** A NEW account (created in the last 7 days), on the same
+  server and so the same edition, verifies its email and presents the code
+  (`POST /v1/referral/claim`). The friend gets 7 days of Premium. The inviter
+  also gets 7 days, if they have never had a trial and are not already paying.
+- **Anti-abuse.**
+  - One trial per account, ever (`billing_trial_claims`, shared with the
+    Stripe trial, so the two never stack).
+  - No self-referral: the account's own code, the same mailbox (+tags and Gmail
+    dots removed) and a shared device are all refused.
+  - At most 5 credited friends per inviter in any 30 days.
+  - Rate limits on both routes.
+  - We keep no payment-card fingerprint at all, so "same payment method" cannot
+    be checked. The trial needs no card, so no payment method is involved.
+- **No card, no charge.** The trial is a dated server-side grant
+  (`entitlement_support_grants`, product `referral-trial`, status `trialing`).
+  It lapses back to Free at its end on its own. No subscription or payment row
+  is ever created, so nothing can be charged or converted.
+  - From day 5, and for three days after the end, one line on Today and in the
+    account panel says exactly that: it ends on that date, goes back to Free
+    automatically, and nothing is charged.
+  - The reminder links to no purchase.
+- **Under 15s.** Both routes sit behind `requireGuardianConsent`: a child whose
+  guardian has not approved can neither share nor claim. The client also
+  claims only once the server has admitted the profile. The invite copy is
+  neutral: no "friends are waiting", no counts, no streaks, no leaderboard
+  (standards #41 and #42, enforced by `value-packaging-check`).
+- **What is stored.** Only who invited whom: one `audit_log` row for the code
+  (`referral.code`) and one per friend (`referral.joined`), with empty metadata.
+  This is the same append-only pattern the guardian confirmation uses, so there
+  is **no schema change** and no staging migration. The privacy notices (AU,
+  India in English and Hindi) say so.
+- **Edition isolation.** Each deployment's database is bound to one edition
+  (H2), so a code from the other edition is unknown. This is tested.
+
+### App stores: web only
+
+From the Apple App Store Review Guidelines
+(https://developer.apple.com/app-store/review/guidelines/). These were read
+through a page summary on 18 November 2026; **verify the exact wording before
+relying on it**:
+
+- **3.1.1:** "Apps may not use their own mechanisms to unlock content or
+  functionality, such as license keys, augmented reality markers, QR codes…"
+- **3.2.2(x):** apps must not force users to "download other apps, or other
+  store-related actions in order to access functionality".
+- **3.1.3(b):** content acquired on the web may be accessed in the app
+  "provided those items are also available as in-app purchases within the
+  app".
+
+From Google Play's Payments policy
+(https://support.google.com/googleplay/android-developer/answer/9858738):
+
+- In-app features must use Google Play's billing system.
+- Apps "may not lead users to a payment method other than Google Play's billing
+  system".
+- The policy does not speak to free grants.
+
+**Rule adopted:** the referral is offered and claimed on the website only.
+- A declared store app (`X-Pri-Client`) gets `available: false` and no code,
+  and its claim is refused with `REFERRAL_WEB_ONLY`.
+- The client neither captures nor claims an invite inside a native shell, and
+  shows nothing about it.
+- A trial earned on the web follows the account, like any other entitlement.
+  Under 3.1.3(b) this is clean for Priyabhata, which sells Premium as an
+  in-app purchase. **For Prithagoras, which sells only through Stripe on the
+  web, any Premium (paid or trial) used inside a store app raises the same
+  3.1.3(b) question as today's Stripe Premium. That is for the owner and
+  counsel.**
+
+### Legal review needed (owner)
+
+The AU terms, the India terms (English and Hindi) and the three privacy notices
+now carry the trial and referral terms: eligibility, one per person, no cash
+value, how it ends, no friend contact data, and web only. They are **marked
+for the owner's legal review**. The "not yet reviewed by a lawyer" banner stays
+on every notice until a person records a review.
+
 ## 5. When an upgrade is offered, and when it never is
 
 Upgrade offers appear only at natural value moments (`UPGRADE_MOMENTS`,
@@ -253,8 +340,9 @@ grant.
 
 ## 8. Decisions needed from the owner
 
-1. **Trial or guarantee:** a 7-day no-card trial (recommended), or a 30-day
-   money-back guarantee (needs legal review), or neither.
+1. **Trial:** DECIDED. A 7-day trial unlocked by an invitation (§4a). Still open:
+   whether to also turn on the Stripe no-card trial for direct sign-ups
+   (`PRI_STRIPE_TRIAL_NO_CARD`), and legal review of the new terms.
 2. **Final free allowances:** uncapped practice and 10 handwriting reads plus
    10 question photos a day (proposed), or other figures.
 3. **Premium read allowance:** 100 a day per kind (proposed), and the matching

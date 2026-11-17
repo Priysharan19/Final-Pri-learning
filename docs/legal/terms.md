@@ -1,6 +1,6 @@
 # Terms of use
 
-**Last updated: 8 November 2026**
+**Last updated: 18 November 2026**
 
 These terms are an agreement between you and Priysharan Tripathi,
 5 Juniper Pl, Oakville NSW 2765, Australia, about your use of Pri Learning on
@@ -62,6 +62,35 @@ renewal; see the [refund policy](/refund-policy). Deleting your Pri Learning
 account does not cancel a subscription in the store.
 
 If you are under 18, a parent or guardian must make or approve the purchase.
+
+## Free trial by invitation
+
+You can share your own invite link with a friend. If the friend creates a new
+account through that link, on the website, and confirms their email address,
+the friend gets 7 days of Premium free, and so do you if you have not had a
+free trial before.
+
+- **Eligibility:** the friend's account must be new (created in the last 7
+  days) and must not belong to you. An account made on the same device as
+  yours, or with the same email inbox, does not count. If you are under 18 and
+  your account needs a parent's or guardian's approval, you can share or use an
+  invite only once that approval is in place.
+- **One per person:** each account can have one free trial, ever, whether it
+  came from an invitation or from a subscription offer. An invite link credits
+  at most 5 friends in any 30 days.
+- **No card, no charge:** the trial needs no card and no payment details. At
+  the end of the 7 days your account goes back to the free plan by itself.
+  Nothing is charged, and nothing turns into a paid subscription unless you
+  later choose to buy one.
+- **No cash value:** the trial cannot be exchanged for money, transferred or
+  combined with another trial.
+- **Your friend's details:** you share the link yourself. We never ask you for
+  a friend's email address or phone number, and we do not contact them.
+- **Where it applies:** the invitation is offered on the website only. A trial
+  you have works wherever you sign in with the same account.
+- We may end or change the invitation offer for the future. A trial that has
+  already started runs to its end. If an invitation is used against these terms
+  (for example, to make accounts for yourself), we may end the trial early.
 
 ## Content
 

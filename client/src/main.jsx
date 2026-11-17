@@ -28,6 +28,7 @@ import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
 import { priNative } from './platform/native/index.js';
+import { captureInvite } from './platform/referral.js';
 import { installFormFactorAttributes } from './platform/formFactor.js';
 import { installBackNavigation } from './platform/backNavigation.js';
 import { featureEnabled, featureSnapshot } from './platform/features.js';
@@ -42,6 +43,8 @@ bootPhase('module');
 priNative.start();
 // data-ff / data-short / data-pointer on <html>: semantic form factor (CP-03).
 installFormFactorAttributes(window);
+// A friend's invite link (/?invite=CODE): kept on this device, taken out of the address (web only).
+captureInvite();
 // Android Back asks the page first: open sheets/dialogs close (CP-06).
 // (after first paint the body exists for the dialog observer)
 queueMicrotask(() => installBackNavigation(window));

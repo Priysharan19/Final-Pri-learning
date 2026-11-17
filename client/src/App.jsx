@@ -12,6 +12,7 @@ import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
+import { claimPendingInvite } from './platform/referral.js';
 import Login from './pages/Login.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
@@ -528,6 +529,13 @@ export default function App() {
   const activate = useCallback((ready) => {
     setActivated(ready && ready.profileId && ready.accountId && userIdRef.current != null && String(ready.profileId) === String(userIdRef.current) ? ready : null);
   }, []);
+  // A friend's invite kept from the link (platform/referral.js) is presented
+  // once this profile's account is admitted; the server alone grants the trial.
+  useEffect(() => {
+    if (!user?.id || activated?.profileId !== user.id) return;
+    claimPendingInvite().then(result => { if (result?.granted) toast(t('invite.claimed', { days: result.trialDays || 7 })); }).catch(() => {});
+  }, [activated?.profileId, user?.id]);
+
   const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate, activated }),
     [user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate, activated]);
 

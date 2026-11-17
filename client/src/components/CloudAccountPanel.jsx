@@ -24,6 +24,8 @@ import { priNative } from '../platform/native/index.js';
 import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
 import { acceptedCheckoutUrl } from '../platform/checkoutHosts.js';
 import { sellsPremium } from '../paywall/useSaleAvailable.js';
+import InviteFriend from './InviteFriend.jsx';
+import TrialNotice from './TrialNotice.jsx';
 
 // The optional reasons after cancelling: server/platform/billing.js CANCEL_REASONS.
 const CANCEL_REASONS = Object.freeze(['price', 'notUsing', 'examDone', 'missing', 'other']);
@@ -852,6 +854,10 @@ export default function CloudAccountPanel() {
               </button>
             )}
           </div>}
+
+          {canSync && <div style={{ marginTop: 12 }}><TrialNotice /></div>}
+          {/* The invite trial: website only, admitted accounts only (store rules, standard #42). */}
+          {canSync && !nativeShell && <InviteFriend />}
 
           {!sellsPremium(saleAvailable) && !premium && <div className="muted" style={{ fontSize: 12, marginTop: 12 }} data-premium-not-on-sale>
             {t('paywall.notOnSale')}

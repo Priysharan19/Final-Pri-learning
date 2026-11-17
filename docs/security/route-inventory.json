@@ -839,6 +839,48 @@
     },
     {
       "method": "GET",
+      "path": "/v1/referral/",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: the caller's own invite code and trial dates; a declared store app is offered no code",
+      "rateLimits": [
+        {
+          "key": "referral-read",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/referral/claim",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: the caller (a new, verified account) presents a code; the server resolves the inviter, refuses self-referral, grants each account at most one trial ever; no contact data is accepted or stored",
+      "rateLimits": [
+        {
+          "key": "referral-claim",
+          "limit": 5,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
       "path": "/v1/billing/status",
       "auth": "session",
       "roles": null,

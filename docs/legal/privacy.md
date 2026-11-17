@@ -1,6 +1,6 @@
 # Privacy notice
 
-**Last updated: 9 November 2026**
+**Last updated: 18 November 2026**
 
 This notice explains what Pri Learning collects, why, and what you can ask us to
 do about it. It is written for students and parents in India, and it is meant to
@@ -61,6 +61,10 @@ device can open a profile that has no password.
 
 ## What we receive if you create a cloud account
 
+- **Who invited whom**, if you use an invite link: we keep a record that your
+  account joined through another account's link (or that yours was used), your
+  invite code, and the dates of the free trial it gave. We never ask for or keep
+  a friend's email address or phone number; you share the link yourself.
 - **Your email address**, to sign you in and to send verification and password
   reset links and one-time sign-in codes. We do not offer sign-in by SMS; if we
   ever do, this notice will describe it first.

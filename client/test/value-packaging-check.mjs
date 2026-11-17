@@ -91,6 +91,23 @@ for (const f of FORBIDDEN_SURFACES) ok(`${f} never links to Premium`, !PREMIUM_L
     /const admitted = !!user\?\.id && activated\?\.profileId === user\.id;/.test(note) && /guardianConsentRequired: !admitted, \.\.\.context/.test(note) && /activate, activated \}\),/.test(read('src/App.jsx')));
 }
 
+// ── 2b · the invite trial: web only, never at a forbidden moment, neutral words
+{
+  const REFERRAL_UI = /InviteFriend|claimPendingInvite|captureInvite/;
+  for (const f of FORBIDDEN_SURFACES) ok(`${f} never shows or claims an invite`, !REFERRAL_UI.test(read(f)));
+  const panel = read('src/components/CloudAccountPanel.jsx');
+  ok('the invite section is in the account panel only, for an admitted account on the web', /\{canSync && !nativeShell && <InviteFriend \/>\}/.test(panel));
+  const ref = read('src/platform/referral.js');
+  ok('a store app neither captures nor claims an invite', /if \(!loc \|\| !web\(\)\) return null;/.test(ref) && /if \(!web\(\) \|\| !cloudAvailable\(\)\) return null;/.test(ref));
+  ok('the invite is claimed only after this profile is admitted', /if \(!user\?\.id \|\| activated\?\.profileId !== user\.id\) return;\s*claimPendingInvite\(\)/.test(read('src/App.jsx')));
+  ok('the app never asks for a friend\'s contact details', !/type="email"|type="tel"|friendEmail|friendPhone|navigator\.contacts/i.test(read('src/components/InviteFriend.jsx').replace(/^\s*\/\/.*$/gm, '')));
+  const words = Object.entries(en).filter(([k]) => /^(invite|trial)\./.test(k)).map(([, v]) => String(v)).join('\n');
+  ok('the invite words are neutral: no pressure, waiting friends, counts, streaks or leaderboards', !/waiting|hurry|don.t miss|last chance|streak|leaderboard|rank|friends? (have|are)|\d+ friends|limited/i.test(words));
+  ok('the reminders say it ends by itself and nothing is charged', /Nothing is charged/.test(en['trial.endsSoon']) && /Nothing was charged/.test(en['trial.ended']) && /automatically/.test(en['trial.endsSoon']));
+  ok('the reminder links to no purchase', !/PAYWALL_ROUTE|PageLink|\/premium/.test(read('src/components/TrialNotice.jsx')));
+  ok('every invite and trial string has Hindi', Object.keys(en).filter(k => /^(invite|trial)\./.test(k)).every(k => typeof hi[k] === 'string' && hi[k] !== en[k]));
+}
+
 // ── 3 · free never blocks core practice ─────────────────────────────────────
 {
   const backend = read('src/local/backend.js') + read('src/local/indiaExamBackend.js');
