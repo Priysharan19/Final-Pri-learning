@@ -1,5 +1,5 @@
 {
- "contentVersion": "2026.11.16",
+ "contentVersion": "2026.11.18",
  "draws": 6,
  "generators": {
   "c10-ap-daily-life-reasoning": "89254f1516b2b89a",
@@ -44,7 +44,7 @@
   "c10-trig-boundary-relations": "af03abebcc67a400",
   "c10-trig-ratio-reasoning": "9018a9a58a33ae68",
   "c10-trig-standard-reasoning": "7766dc4a93545a9d",
-  "c10-trigonometry-current": "59fc6e65752c7b8c",
+  "c10-trigonometry-current": "d2bf4eb9c4c03242",
   "c10-volume-combination-reasoning": "3f70c1642ce6223b",
   "c10-zero-coefficient-forms": "0b30b34e4bd584af",
   "c11-3d-distance-jee-reasoning": "d91dcaaa5c39c36f",

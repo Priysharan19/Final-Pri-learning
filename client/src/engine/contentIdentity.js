@@ -52,7 +52,10 @@
 // together; no single PR's version above describes the merged content.
 // 2026.11.16 — CBSE XII 2025 65/2/1 Q24, the first Section B record on the Board-scheme
 // contract (#846), restacked on Train 15.
-export const CONTENT_VERSION = '2026.11.16';
+// 2026.11.18 — "Prove that …" trigonometric identities as line-by-line working
+// (identityProofs.js): Extension 1 me11-trigid D4 and CBSE X trigonometry D4
+// each serve them beside their existing forms.
+export const CONTENT_VERSION = '2026.11.18';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

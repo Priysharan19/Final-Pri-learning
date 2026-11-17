@@ -117,7 +117,7 @@ function readStateOf(line, floor) {
   return isLowConfidence(line, floor) ? 'check' : 'read';
 }
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, lineMarkers = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -651,6 +651,19 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 );
               });
             })()}
+          </div>
+        )}
+        {/* Numbered markers linking each checked line to its card in the
+            Comments panel (AnnotatedWorking.jsx). Decoration: the numbered
+            list there is what assistive tech reads, in the same order. */}
+        {lineMarkers && rec.lines.some(l => l.box) && (
+          <div className="ink-marker-layer" aria-hidden="true">
+            {rec.lines.map((line, li) => {
+              const n = lineMarkers[li];
+              if (!Number.isInteger(n) || !line.box) return null;
+              const b = feedbackGeometry(line).anchor || line.box;
+              return <span key={li} className="ink-aw-marker" data-ink-marker={n} style={{ left: Math.max(2, b.x - 30), top: Math.max(2, b.y - 6) }}>{n}</span>;
+            })}
           </div>
         )}
         {/* v1.1 instrument: Pri's reading set beside each written line, as
