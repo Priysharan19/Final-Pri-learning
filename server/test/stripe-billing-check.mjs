@@ -148,6 +148,15 @@ const invoice = (over = {}) => ({
   eq([call.body.mode, call.body['line_items[0][price]'], call.body['line_items[0][quantity]'], call.body.client_reference_id, call.body['metadata[pri_account_id]'], call.body['metadata[pri_cadence]'], call.body['subscription_data[metadata][pri_account_id]'], call.body['subscription_data[trial_period_days]']],
     ['subscription', MONTHLY, '1', ACCOUNT, ACCOUNT, 'monthly', ACCOUNT, '7'], 'the session is bound to the account and the configured price, with the trial');
   ok(call.body.success_url === 'https://app.prithagoras.example/?billing=success' && call.body.cancel_url === 'https://app.prithagoras.example/?billing=cancelled', 'it returns to the configured public origin');
+  ok(call.body.payment_method_collection === undefined && call.body['subscription_data[trial_settings][end_behavior][missing_payment_method]'] === undefined,
+    'by default a trial still collects a card (the no-card trial is the owner\'s switch, PRI_STRIPE_TRIAL_NO_CARD)');
+  {
+    const src = readFileSync(new URL('../platform/stripe.js', import.meta.url), 'utf8');
+    ok(src.includes("...(trialApplied && cfg.trialWithoutCard ? { payment_method_collection: 'if_required' } : {}),") &&
+      src.includes("...(trialApplied && cfg.trialWithoutCard ? { trial_settings: { end_behavior: { missing_payment_method: 'cancel' } } } : {})") &&
+      src.includes("trialWithoutCard: String(process.env.PRI_STRIPE_TRIAL_NO_CARD || '').trim() === '1',"),
+      'with the switch on, a trial collects a card only if needed and cancels at its end with none on file — never an unpaid invoice');
+  }
   ok(!JSON.stringify(made).includes(SECRET_KEY) && !JSON.stringify(made).includes(WEBHOOK_SECRET), 'no secret is in the answer');
   const again = await stripe.checkout.web.create({ accountId: ACCOUNT, cadence: 'annual' });
   eq([again.trialApplied, calls.at(-1).body['line_items[0][price]'], calls.at(-1).body['subscription_data[trial_period_days]']], [false, ANNUAL, undefined], 'a second checkout gets no second trial, and the annual price');

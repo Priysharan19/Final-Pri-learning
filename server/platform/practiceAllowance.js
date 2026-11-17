@@ -124,9 +124,13 @@ export function practiceAllowanceConfigProblems(env = process.env) {
   return free.set && free.value === null ? ['PRI_FREE_PRACTICE_PER_DAY (a positive integer up to 100000)'] : [];
 }
 
-/** Capped questions a free account may be issued per day (deployment-tunable). */
+/**
+ * Capped questions a free account may be issued per day (deployment-tunable),
+ * or null when the active packaging leaves free practice uncapped
+ * (client/src/engine/packaging.js) and the deployment sets no cap of its own.
+ */
 export function freePracticePerDay(env = process.env) {
-  return parse(env.PRI_FREE_PRACTICE_PER_DAY).value ?? FREE_PRACTICE_ALLOWANCE.perDay;
+  return parse(env.PRI_FREE_PRACTICE_PER_DAY).value ?? FREE_PRACTICE_ALLOWANCE.perDay ?? null;
 }
 
 /** Whether an issue in `mode` counts toward (and is refused by) the cap. */
@@ -146,7 +150,7 @@ const COUNTER = 'SELECT response_json FROM idempotency_keys WHERE account_id=? A
  * verdict and the count it leads to cannot be split by a concurrent issue
  * from another device.
  */
-export async function practiceAllowanceVerdict(db, { accountId, now = Date.now(), env = process.env, edition = serverEdition(env) }) {
+export async function practiceAllowanceVerdict(db, { accountId, now = Date.now(), env = process.env, edition = serverEdition(env), freeLimit = freePracticePerDay(env) }) {
   db = asStore(db);
   const day = practiceDay(now, edition);
   const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
@@ -154,7 +158,9 @@ export async function practiceAllowanceVerdict(db, { accountId, now = Date.now()
   const used = issuedOf(await db.get(COUNTER, [accountId, PRACTICE_DAILY_SCOPE, day.key]));
   const base = { used, resetsAt: day.end, timeZone: day.timeZone, day: day.key };
   if (premium) return { ...base, allowed: true, plan: 'premium', unlimited: true, limit: null };
-  const limit = freePracticePerDay(env);
+  const limit = freeLimit;
+  // Packaging that does not cap free practice: never refused, still counted.
+  if (limit === null) return { ...base, allowed: true, plan: 'free', unlimited: true, limit: null };
   return { ...base, allowed: used < limit, plan: 'free', unlimited: false, limit };
 }
 

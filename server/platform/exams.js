@@ -1410,7 +1410,8 @@ export async function accountTargets(db, accountId, now) {
   return targetsFrom({ due, notebook: book.entries });
 }
 
-async function entitlementRefusal(db, accountId, spec, now) {
+/** Exported for server/test/packaging-enforcement-check.mjs. */
+export async function entitlementRefusal(db, accountId, spec, now) {
   const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
   const capabilities = serverEntitlementCapabilities(snapshot, now);
   // JEE Advanced is Premium content: the track's own gate comes first, so a

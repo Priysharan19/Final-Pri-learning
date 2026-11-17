@@ -9,6 +9,9 @@ import { stripeConfigStatus } from './stripe.js';
 import { webProviderOf } from './billingProviders.js';
 
 const PROVIDERS = new Set(['apple', 'google', 'web']);
+/** The optional reasons a student may give after cancelling (closed set). */
+export const CANCEL_REASONS = Object.freeze(['price', 'notUsing', 'examDone', 'missing', 'other']);
+const CANCEL_FEEDBACK_WINDOW_MS = 24 * 60 * 60 * 1000;
 // Lifecycle states in which a web (Razorpay) subscription still has a mandate
 // that can charge again and therefore something the student can cancel.
 const CANCELLABLE = new Set(['trialing', 'active', 'grace', 'past_due', 'paused']);
@@ -171,6 +174,29 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
       }
       res.json({ status: 'cancelling', currentPeriodEnd: result.currentPeriodEnd ?? null, provider: 'web', subscriptionId: result.subscriptionId || null, requestedAt: result.requestedAt || null });
     } catch (err) { next(err); }
+  });
+
+  // The optional one-tap reason a student gives AFTER cancelling (packaging
+  // proposal: cancel reasons). A closed set, no free text, never required: the
+  // cancellation has already happened and this changes nothing about it. It is
+  // accepted only from an account that asked to cancel in the last day, once
+  // per subscription, and kept as one audit row the admin funnel counts.
+  router.post('/cancel-feedback', requireSession(db), rateLimit(db, 'billing-cancel-feedback', { limit: 6, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+    const reason = String(req.body?.reason || '');
+    if (!CANCEL_REASONS.includes(reason)) return res.status(400).json({ error: { code: 'CANCEL_REASON_INVALID', message: 'Choose one of the listed reasons.' } });
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const sub = await db.get('SELECT provider,provider_subscription_id FROM billing_subscriptions WHERE account_id=? AND cancel_requested_at IS NOT NULL AND cancel_requested_at>=? ORDER BY cancel_requested_at DESC LIMIT 1',
+      [accountId, now - CANCEL_FEEDBACK_WINDOW_MS]);
+    if (!sub) return res.status(409).json({ error: { code: 'CANCEL_FEEDBACK_NOT_EXPECTED', message: 'There is no recent cancellation on this account.' } });
+    const target = `${sub.provider}:${sub.provider_subscription_id}`;
+    const already = await db.get("SELECT id FROM audit_log WHERE action='billing.cancel-feedback' AND target_kind='subscription' AND target_id=?", [target]);
+    if (!already) {
+      await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)',
+        [accountId, 'billing.cancel-feedback', 'subscription', target, JSON.stringify({ reason }), now]);
+    }
+    res.set('Cache-Control', 'no-store');
+    res.json({ ok: true });
   });
 
   router.get('/status', requireSession(db), async (req, res) => {

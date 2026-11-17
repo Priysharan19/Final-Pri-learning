@@ -11,7 +11,7 @@
 //
 // Read it through client/src/platform/edition.js, never directly.
 // ─────────────────────────────────────────────────────────────────────────────
-import { COMPANY, COMPANY_LINE, DEFAULT_EDITION, editionOf } from '../../edition.config.mjs';
+import { COMPANY, COMPANY_LINE, DEFAULT_EDITION, editionCommerce, editionOf } from '../../edition.config.mjs';
 import { CUT_PATHS, PRIYABHATA_WORDMARK, PRITHAGORAS_WORDMARK } from '../brand/paths.js';
 import { WORKING_FORMS } from '../instrument/workingForms.js';
 
@@ -38,6 +38,8 @@ export function editionRecord(id) {
     courses: Object.freeze([...e.courses]),
     languages: Object.freeze([...e.languages]),
     currency: e.currency,
+    // The pricing page's facts: list price and live differentiators (packaging proposal).
+    commerce: editionCommerce(id),
     identity: Object.freeze({
       brandHi: e.identity.brandHi,
       cut: e.identity.cut,

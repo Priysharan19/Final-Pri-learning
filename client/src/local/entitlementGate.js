@@ -151,6 +151,8 @@ export async function practiceAllowance(profile, now = clock()) {
   const resetsAt = nextDayStart(now, timeZone);
   const base = { used, resetsAt, timeZone, day, reason: decision.reason, refreshRequired: !!decision.refreshRequired };
   if (decision.allowed) return { ...base, allowed: true, plan: 'premium', unlimited: true, limit: null };
+  // Packaging that does not cap free practice (engine/packaging.js): never refused.
+  if (FREE_TIER.practicePerDay === null) return { ...base, allowed: true, plan: 'free', unlimited: true, limit: null };
   return { ...base, allowed: used < FREE_TIER.practicePerDay, plan: 'free', unlimited: false, limit: FREE_TIER.practicePerDay };
 }
 

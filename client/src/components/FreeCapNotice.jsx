@@ -14,6 +14,7 @@ import React from 'react';
 import PageLink from './PageLink.jsx';
 import { useT, useTx } from '../i18n/index.js';
 import { PAYWALL_ROUTE } from '../paywall/route.js';
+import { useUpgradeOffer } from '../paywall/UpgradeNote.jsx';
 // Where and how the reset is written (plan H7): lib/locale.js capResetClock.
 import { capResetClock as resetClock } from '../lib/locale.js';
 
@@ -37,8 +38,13 @@ function whenItResets(resetsAt, timeZone, profile = null) {
 export default function FreeCapNotice({ gate, onRetry, profile = null }) {
   const t = useT();
   const tx = useTx();
+  const isExam = !!gate && (gate.code === 'FREE_EXAM_CAP_REACHED' || gate.capability === 'premium-exams');
+  // The cap is a value moment; moments.js still refuses it in a forbidden
+  // context (an exam in progress, consent, a restriction…). Premium needing
+  // to reconnect is not an offer: it always leads to the account.
+  const offer = useUpgradeOffer(isExam ? 'exams-cap' : 'practice-cap');
   if (!gate) return null;
-  const isExam = gate.code === 'FREE_EXAM_CAP_REACHED' || gate.capability === 'premium-exams';
+  const offerPremium = gate.refreshRequired || offer?.show === true;
   const resets = whenItResets(gate.resetsAt ?? gate.nextAt, gate.timeZone, profile);
   const zone = resetClock(gate.timeZone, profile).timeZone;
 
@@ -76,10 +82,10 @@ export default function FreeCapNotice({ gate, onRetry, profile = null }) {
         <div className="row" style={{ gap: 10, marginTop: 14, flexWrap: 'wrap' }}>
           {/* A device whose Premium needs reconnecting is sent to its account;
               everyone else to the one Premium screen, which says why they came. */}
-          <PageLink className="btn btn-primary" to={gate.refreshRequired ? '/settings#cloud-account-title' : PAYWALL_ROUTE}
+          {offerPremium && <PageLink className="btn btn-primary" to={gate.refreshRequired ? '/settings#cloud-account-title' : PAYWALL_ROUTE}
             state={gate.refreshRequired ? undefined : { from: isExam ? 'exams' : 'practice' }}>
             {gate.refreshRequired ? t('freeCap.reconnect') : t('freeCap.seePremium')}
-          </PageLink>
+          </PageLink>}
           {onRetry && (
             <button className="btn btn-quiet" onClick={onRetry}>{t('common.tryAgain')}</button>
           )}

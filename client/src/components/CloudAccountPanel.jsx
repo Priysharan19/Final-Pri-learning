@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+
 import { useApp } from '../App.jsx';
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
 import {
@@ -23,6 +24,13 @@ import { priNative } from '../platform/native/index.js';
 import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
 import { acceptedCheckoutUrl } from '../platform/checkoutHosts.js';
 import { sellsPremium } from '../paywall/useSaleAvailable.js';
+
+// The optional reasons after cancelling: server/platform/billing.js CANCEL_REASONS.
+const CANCEL_REASONS = Object.freeze(['price', 'notUsing', 'examDone', 'missing', 'other']);
+const CANCEL_REASON_KEYS = Object.freeze({
+  price: 'cloud.cancelReason.price', notUsing: 'cloud.cancelReason.notUsing', examDone: 'cloud.cancelReason.examDone',
+  missing: 'cloud.cancelReason.missing', other: 'cloud.cancelReason.other'
+});
 
 function when(value, t) {
   if (!value) return t('cloud.never');
@@ -106,6 +114,8 @@ export default function CloudAccountPanel() {
   const [guardian, setGuardian] = useState(null);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
+  // After a cancellation: '' | 'ask' (optional one-tap reason) | 'thanks'.
+  const [cancelFeedback, setCancelFeedback] = useState('');
   const [error, setError] = useState('');
   const appleInFlight = useRef(new Set());
   // Sign in with Apple is offered only when the native shell advertises the
@@ -554,6 +564,7 @@ export default function CloudAccountPanel() {
       await refreshCloudEntitlement(user.id);
       await reload({ verify: false });
       setMessage(tLater('cloud.cancelled'));
+      setCancelFeedback('ask');
     } catch (err) {
       setError(err?.code === 'BILLING_SUBSCRIPTION_NOT_CANCELLABLE'
         ? tLater('cloud.nothingToCancel')
@@ -917,6 +928,20 @@ export default function CloudAccountPanel() {
       })()}
 
       {message && <div role="status" style={{ marginTop: 12, color: 'var(--good)' }}>{message}</div>}
+      {cancelFeedback === 'ask' && (
+        <div style={{ marginTop: 8 }} data-cancel-feedback>
+          <div className="muted" style={{ fontSize: 13 }}>{t('cloud.cancelReasonAsk')}</div>
+          <div className="row" style={{ gap: 8, flexWrap: 'wrap', marginTop: 6 }}>
+            {CANCEL_REASONS.map(reason => (
+              <button key={reason} type="button" className="btn btn-sm btn-quiet" data-cancel-reason={reason}
+                onClick={() => { setCancelFeedback('thanks'); cloud.cancelFeedback(reason).catch(() => {}); }}>
+                {t(CANCEL_REASON_KEYS[reason])}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {cancelFeedback === 'thanks' && <div className="muted" style={{ marginTop: 8, fontSize: 13 }} data-cancel-feedback-thanks>{t('cloud.cancelReasonThanks')}</div>}
       {error && <div role="alert" style={{ marginTop: 12, color: 'var(--bad)' }}>{error}</div>}
     </section>
   );
