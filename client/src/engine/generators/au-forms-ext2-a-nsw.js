@@ -109,7 +109,7 @@ const proofForms = [
   } },
   // Divisibility: the coefficient that makes the inductive step work.
   { make: (rng, diff) => {
-    const a = ri(rng, 3 + diff, 12 + 6 * diff), c = ri(rng, 1, a - 1);
+    const a = ri(rng, 3 + diff, 12 + 6 * diff), c = ri(rng, 1, a - 2);
     const key = a - c;
     // a^(k+1) - c^(k+1) = a(a^k - c^k) + m c^k
     const k = 3, lhs = a ** (k + 1) - c ** (k + 1), rest = a * (a ** k - c ** k) + key * c ** k;
@@ -660,11 +660,12 @@ const mechanicsForms = [
   { make: (rng, diff) => {
     const N = ri(rng, 2, 9 + diff), T = ri(rng, 3, 20 + 5 * diff);
     const n = (2 * Math.PI * N) / T;
+    const pf = new Frac(T, N).latex();
     const who = rc(rng, ['A buoy off Bondi bobs', 'A mass on a spring oscillates', 'A tuning fork prong vibrates', 'A piston moves']);
     return num(`${who} in simple harmonic motion, completing $${N}$ full oscillations in $${T}$ seconds. Find the angular frequency $n$ in $x = A\\cos(nt)$, correct to 2 decimal places.`, r2(n),
-      { tol: 0.011, suffix: 'rad/s', traps: [{ value: r2(N / T), why: 'That is the frequency in oscillations per second; $n = 2\\pi f$.' }, { value: r2((2 * Math.PI * T) / N), why: `The period is $\\dfrac{${T}}{${N}}$ s, and $n = \\dfrac{2\\pi}{\\text{period}}$.` }],
-        hints: [`Period $= \\dfrac{${T}}{${N}}$ seconds.`, '$n = \\dfrac{2\\pi}{\\text{period}}$.', `$n = \\dfrac{2\\pi \\times ${N}}{${T}}$.`],
-        steps: [{ h: 'Period', d: `$T = \\dfrac{${T}}{${N}}$ s` }, { h: 'Angular frequency', d: `$n = \\dfrac{2\\pi}{T} = \\dfrac{${2 * N}\\pi}{${T}} \\approx ${r2(n)}$ rad/s` }] });
+      { tol: 0.011, suffix: 'rad/s', traps: [{ value: r2(N / T), why: 'That is the frequency in oscillations per second; $n = 2\\pi f$.' }, { value: r2((2 * Math.PI * T) / N), why: `The period is $${pf}$ s, and $n = \\dfrac{2\\pi}{\\text{period}}$.` }],
+        hints: [`Period $= ${pf}$ ${pf === '1' ? 'second' : 'seconds'}.`, '$n = \\dfrac{2\\pi}{\\text{period}}$.', `$n = \\dfrac{2\\pi \\times ${N}}{${T}}$.`],
+        steps: [{ h: 'Period', d: `$T = ${pf}$ s` }, { h: 'Angular frequency', d: `$n = \\dfrac{2\\pi}{T} = \\dfrac{${2 * N}\\pi}{${T}} \\approx ${r2(n)}$ rad/s` }] });
   } },
   // Centre of motion offset.
   { make: (rng, diff) => {
@@ -713,9 +714,9 @@ const mechanicsForms = [
   { diffs: [2, 3, 4], make: (rng, diff) => {
     const k = rc(rng, [0.2, 0.25, 0.4, 0.5, 0.8, 2]), t = ri(rng, 1, 8);
     const vT = 10 / k, v = vT * (1 - Math.exp(-k * t));
-    return num(`A parachutist falls from rest with $\\ddot{x} = 10 - ${k}v$ (in m/s², with downward positive). It can be shown that $v = \\dfrac{10}{${k}}\\left(1 - e^{-${k}t}\\right)$. Find the speed after $${t}$ ${t === 1 ? 'second' : 'seconds'}, correct to 2 decimal places.`, r2(v),
+    return num(`A parachutist falls from rest with $\\ddot{x} = 10 - ${k}v$ (in m/s², with downward positive). It can be shown that $v = ${bigRound(10 / k, 3)}\\left(1 - e^{-${k}t}\\right)$. Find the speed after $${t}$ ${t === 1 ? 'second' : 'seconds'}, correct to 2 decimal places.`, r2(v),
       { tol: 0.011, suffix: 'm/s', traps: [{ value: r2(vT), why: 'That is the terminal velocity, which is only approached as $t \\to \\infty$.' }, { value: r2(10 * t), why: 'That ignores the resistance — free fall would give $10t$.' }],
-        hints: [`The terminal velocity is $\\dfrac{10}{${k}} = ${bigRound(vT, 3)}$ m/s.`, `$e^{-${k} \\times ${t}} = e^{-${bigRound(k * t, 3)}}$.`, 'Multiply $v_T$ by $1 - e^{-kt}$.'],
+        hints: [`The terminal velocity is $10 \\div ${k} = ${bigRound(vT, 3)}$ m/s.`, `$e^{-${k} \\times ${t}} = e^{-${bigRound(k * t, 3)}}$.`, 'Multiply $v_T$ by $1 - e^{-kt}$.'],
         steps: [{ h: 'Terminal velocity', d: `$v_T = ${bigRound(vT, 3)}$ m/s` }, { h: 'Substitute', d: `$v(${t}) = ${bigRound(vT, 3)}\\left(1 - e^{-${bigRound(k * t, 3)}}\\right)$` }, { h: 'Evaluate', d: `$\\approx ${r2(v)}$ m/s` }] });
   } },
   // MCQ: which equation describes SHM?

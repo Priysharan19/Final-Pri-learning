@@ -75,7 +75,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms12-right-triangle` | 4 | 10.0k | 24 | — |
 | `ms12-rates` | 4 | 11.0k | 34 | — |
 | `mex-demoivre` | 4 | 11.8k | 36 | — |
-| `mex-proof` | 4 | 12.5k | 30 | — |
+| `mex-proof` | 4 | 12.6k | 30 | — |
 | `mex-mechanics` | 4 | 13.1k | 30 | — |
 | `y8-equations` | 3 | 14.7k | 26 | — |
 | `mex-integration` | 4 | 15.3k | 130 | — |
