@@ -555,7 +555,7 @@ export const cloud = Object.freeze({
   // The NSW papers this server lists (Prithagoras, plan G4): released or not, and why.
   nswExams: () => cloudRequest('/v1/exams/nsw'),
   // The Paper Generator (both editions): the choices, a feasibility check, a printable paper, and the marking guide once the paper is submitted.
-  examGeneratorOptions: query => cloudRequest('/v1/exams/generator/options' + (query ? '?' + String(query).replace(/[^A-Za-z0-9=&_.-]/g, '') : '')),
+  examGeneratorOptions: body => cloudRequest('/v1/exams/generator/options', { method: 'POST', body }),
   examGeneratorCheck: body => cloudRequest('/v1/exams/generator/check', { method: 'POST', body }),
   examGeneratorPdf: body => cloudRequest('/v1/exams/generator/pdf', { method: 'POST', body, timeoutMs: 30000 }),
   examGuide: examId => cloudRequest('/v1/exams/' + pathId(examId, 'exam id') + '/guide'),

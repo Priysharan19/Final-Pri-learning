@@ -75,7 +75,7 @@ try {
   const sealed = async id => JSON.parse((await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='exam-paper' AND key=?", [id])).response_json);
 
   // ── Prithagoras (HSC-style) ───────────────────────────────────────────────
-  const opt = await h.request('/v1/exams/generator/options?year=9', { jar: a.jar });
+  const opt = await h.request('/v1/exams/generator/options', { method: 'POST', jar: a.jar, body: { year: 9 } });
   c.eq(opt.status, 200, 'Prithagoras: the options answer');
   c.deq([opt.data.edition, opt.data.style, opt.data.marks, opt.data.minutes], ['prithagoras', 'hsc', [10, 20, 40], [30, 60, 90]], 'HSC-style, 10/20/40 marks or 30/60/90 minutes');
   c.ok(opt.data.topics.length >= 3 && /not a NESA paper/.test(opt.data.note), 'it lists the year\'s topics and says it is not a NESA paper');
@@ -174,7 +174,7 @@ try {
 
   // ── Priyabhata (CBSE/JEE styles) ──────────────────────────────────────────
   process.env.PRI_EDITION = 'priyabhata';
-  const iopt = await h.request('/v1/exams/generator/options?year=10', { jar: e.jar });
+  const iopt = await h.request('/v1/exams/generator/options', { method: 'POST', jar: e.jar, body: { year: 10 } });
   c.deq([iopt.status, iopt.data.edition, iopt.data.style], [200, 'priyabhata', 'cbse'], 'Priyabhata: CBSE-style options');
   c.ok(iopt.data.topics.length >= 3 && /not a CBSE paper/.test(iopt.data.note), 'chapters, and "not a CBSE paper"');
   const itopics = iopt.data.topics.slice(0, 3).map(t => t.id);

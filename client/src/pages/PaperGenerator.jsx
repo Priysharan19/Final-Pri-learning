@@ -6,7 +6,7 @@ import { tLater, useLanguage, useT } from '../i18n/index.js';
 import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { CheckRefusal } from '../components/CheckRefusal.jsx';
 import { saveBase64File } from '../lib/files.js';
-import { generatedRequest, optionsQuery } from '../local/generatedPaperBackend.js';
+import { generatedRequest, optionsBody } from '../local/generatedPaperBackend.js';
 import Working from '../instrument/Working.jsx';
 
 // The Paper Generator (both editions). The student chooses; the server
@@ -42,9 +42,9 @@ export default function PaperGenerator() {
 
   useEffect(() => {
     let live = true;
-    api.get(`/exams/generator/options?${optionsQuery(user)}`)
+    api.post('/exams/generator/options', optionsBody(user))
       .then(r => { if (live) setOptions(r); })
-      .catch(err => { console.log('GEN-OPTIONS', err?.status, err?.code, err?.message); if (live) setUnavailable(true); });
+      .catch(() => { if (live) setUnavailable(true); });
     return () => { live = false; };
   }, [user.year, user.pathway, user.indiaTrack]);
 

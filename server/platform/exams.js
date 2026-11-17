@@ -2277,12 +2277,14 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
 
   // ── The Paper Generator ──
   // What a student may choose, from this edition's own curriculum model.
-  router.get('/generator/options', rateLimit(db, 'exam-generator', { limit: 300, windowMs: 60 * 60 * 1000 }), async (req, res) => {
+  router.post('/generator/options', rateLimit(db, 'exam-generator', { limit: 300, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     const curriculum = bankPolicy().curriculum;
     if (curriculum !== 'in' && curriculum !== 'nsw') return reject(res, 404, 'EXAM_KIND_UNAVAILABLE', 'Generated papers are not available here.');
-    const year = Number(req.query.year);
-    const pathway = req.query.pathway ? String(req.query.pathway) : null;
-    const track = req.query.track ? String(req.query.track) : (curriculum === 'in' ? 'cbse' : undefined);
+    const body = plain(req.body) ? req.body : {};
+    if (unknown(body, new Set(['year', 'pathway', 'track'])).length) return reject(res, 400, 'EXAM_SPEC_INVALID', 'Name the year.');
+    const year = Number(body.year);
+    const pathway = typeof body.pathway === 'string' && /^[a-z0-9-]{1,24}$/.test(body.pathway) ? body.pathway : null;
+    const track = typeof body.track === 'string' && /^[a-z0-9-]{1,24}$/.test(body.track) ? body.track : (curriculum === 'in' ? 'cbse' : undefined);
     if (!Number.isInteger(year) || year < 6 || year > 12) return reject(res, 400, 'EXAM_SPEC_INVALID', 'Name the year.');
     const model = generatorModel({ year, pathway, track });
     return res.status(200).json({

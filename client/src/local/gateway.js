@@ -258,6 +258,9 @@ const BODY_RULES = [
     // The Paper Generator: a request (year, topics, length, mix), never a question.
     if (body.generated !== undefined && !plainObject(body.generated)) throw apiError('generated must be an object.', 400, 'INVALID_FIELD');
   }],
+  [/^POST \/exams\/generator\/options$/, body => {
+    requireObject(body, 'generator options'); optionalNumber(body, 'year'); optionalString(body, 'pathway', 24); optionalString(body, 'track', 24);
+  }],
   [/^POST \/exams\/generator\/(check|pdf)$/, body => {
     requireObject(body, 'generated paper request');
     if (!plainObject(body.generated)) throw apiError('generated must be an object.', 400, 'INVALID_FIELD');
@@ -343,9 +346,7 @@ const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 const validDay = v => ISO_DAY.test(v) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
 const QUERY_RULES = {
   'GET /report/series': { period: v => ['week', 'month', 'term'].includes(v) },
-  'GET /marks/by-chapter': { since: validDay },
-  // The Paper Generator's choices for a year (the server re-validates every value).
-  'GET /exams/generator/options': { year: v => /^\d{1,2}$/.test(v), pathway: v => /^[a-z0-9-]{1,24}$/.test(v), track: v => /^[a-z0-9-]{1,24}$/.test(v) }
+  'GET /marks/by-chapter': { since: validDay }
 };
 
 function splitQuery(verb, path) {

@@ -73,7 +73,6 @@ async function tour(edition) {
     const ctx = await browser.newContext({ viewport: { width: 1180, height: 860 }, acceptDownloads: true });
     const page = await ctx.newPage();
     const writes = [];
-    page.on('console', m => { if (/GEN-OPTIONS/.test(m.text())) console.log('  ', m.text()); });
     page.on('pageerror', e => console.log('  pageerror:', String(e.message).slice(0, 300)));
     page.on('response', r => { if (r.status() >= 400) console.log('  http', r.status(), new URL(r.url()).pathname); });
     page.on('response', r => { const u = new URL(r.url()); if (/^\/v1\/exams\/[^/]+\/finish$/.test(u.pathname)) writes.push(r.status()); });

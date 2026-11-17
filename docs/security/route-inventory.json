@@ -2732,7 +2732,7 @@
       "bodyLimit": "no-body"
     },
     {
-      "method": "GET",
+      "method": "POST",
       "path": "/v1/exams/generator/options",
       "auth": "session",
       "roles": [
@@ -2741,7 +2741,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "read-only: the Paper Generator's choices for a year from this server's own edition (Priyabhata: that grade's chapters; Prithagoras: the year's or pathway's subtopics), the lengths (10/20/40 marks or 30/60/90 minutes), the mixes and the edition's section wording; topic ids and names only, the same for every account; no question, answer, seed or other account's data; Cache-Control no-store",
+      "ownership": "eligible student asks for the Paper Generator's choices for a year (the body is year, pathway and track only) from this server's own edition (Priyabhata: that grade's chapters; Prithagoras: the year's or pathway's subtopics), the lengths (10/20/40 marks or 30/60/90 minutes), the mixes and the edition's section wording; topic ids and names only, the same for every account; no question, answer, seed or other account's data; Cache-Control no-store",
       "rateLimits": [
         {
           "key": "exam-generator",
@@ -2750,9 +2750,9 @@
           "identity": "account"
         }
       ],
-      "csrf": "not-applicable",
-      "origin": "not-applicable",
-      "bodyLimit": "no-body"
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
     },
     {
       "method": "POST",

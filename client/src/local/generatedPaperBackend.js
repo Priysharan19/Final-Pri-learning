@@ -16,7 +16,6 @@ import { cloud } from '../platform/cloudTransport.js';
 import { checkUnavailable } from './backend.js';
 import { requireExamAccount, unavailableKind } from './serverExam.js';
 
-const GENERATOR_PATH = /^\/exams\/generator\/(options|check|pdf)(\?.*)?$/;
 const GUIDE_PATH = /^\/exams\/([A-Za-z0-9._-]{8,100})\/guide$/;
 
 /** Does this profile get generated papers? Both editions do; the server is the authority. */
@@ -24,8 +23,8 @@ export const generatedPapersFor = profile => profile?.course === 'nsw' || profil
 
 /** The routes this module answers for a profile. */
 export function generatedRoute(method, path, body) {
-  if (method === 'GET' && (/^\/exams\/generator\/options(\?.*)?$/.test(path) || GUIDE_PATH.test(path))) return true;
-  if (method === 'POST' && /^\/exams\/generator\/(check|pdf)$/.test(path)) return true;
+  if (method === 'GET' && GUIDE_PATH.test(path)) return true;
+  if (method === 'POST' && /^\/exams\/generator\/(options|check|pdf)$/.test(path)) return true;
   return method === 'POST' && path === '/exams' && body?.generated !== undefined;
 }
 
@@ -39,12 +38,13 @@ export function generatedRequest(choice, profile) {
   return out;
 }
 
-/** The query the options are read with. */
-export function optionsQuery(profile, year) {
-  const parts = [`year=${Number(year || profile?.year)}`];
-  if (profile?.course === 'nsw' && Number(year || profile?.year) >= 11 && profile.pathway) parts.push(`pathway=${encodeURIComponent(profile.pathway)}`);
-  if (profile?.course === 'in' && profile.indiaTrack === 'jee-main') parts.push('track=jee-main');
-  return parts.join('&');
+/** The body the options are asked for with: year, pathway and track only. */
+export function optionsBody(profile, year) {
+  const y = Number(year || profile?.year);
+  const out = { year: y };
+  if (profile?.course === 'nsw' && y >= 11 && profile.pathway) out.pathway = String(profile.pathway);
+  if (profile?.course === 'in' && profile.indiaTrack === 'jee-main') out.track = 'jee-main';
+  return out;
 }
 
 const refusal = (cause, fallback) => {
@@ -62,7 +62,7 @@ export async function dispatchGeneratedPaper(profile, method, path, body) {
   const linked = await requireExamAccount(profile.id);
   let out;
   try {
-    if (method === 'GET' && GENERATOR_PATH.test(path)) out = await cloud.examGeneratorOptions(path.split('?')[1] || '');
+    if (method === 'POST' && path === '/exams/generator/options') out = await cloud.examGeneratorOptions({ year: body?.year, pathway: body?.pathway, track: body?.track });
     else if (method === 'POST' && path === '/exams/generator/check') out = await cloud.examGeneratorCheck({ generated: body?.generated });
     else if (method === 'POST' && path === '/exams/generator/pdf') out = await cloud.examGeneratorPdf({ generated: body?.generated });
     else if (method === 'GET' && GUIDE_PATH.test(path)) out = await cloud.examGuide(path.match(GUIDE_PATH)[1]);
