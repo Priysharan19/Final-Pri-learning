@@ -88,9 +88,21 @@ let PYQ_ARCHIVE_MEASURED = null;
 // is estimated at roughly 20-30 kB more, so the new ceiling leaves about
 // 46 kB of headroom for it. The other three ceilings are unchanged.
 
+// Raised again 2026-11-18 (au-skills bands: Standard 2 #973, Years 9-10 #975,
+// Years 7-8 #980; CTO under the same owner decision, "i dont care if the app is
+// 10gb just make it properly end to end"): FIRST_VISIT_RAW only, 3,450,000 ->
+// 3,900,000 bytes. The three Prithagoras capacity overlays (au-forms-*-nsw.js,
+// the extra tagged question forms that take every Standard 2 and Year 7-10 skill
+// to 10,000+ instances) ride in the year/stream bank chunks and so in the warm
+// pass: measured 3,674 kB (3,762,000 bytes) with all three bands built together,
+// over the 3,450,000 ceiling; each band alone is 3,378-3,448 kB. The 3,900,000
+// ceiling leaves about 135 kB for the rest of the Lit Instrument interface and
+// the Priyabhata capacity work. The gzip ceilings, the banned-from-install list,
+// render-from-install and offline coverage are unchanged and still pass.
+
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 3_450_000;
+const FIRST_VISIT_RAW_CEILING = 3_900_000;
 const FIRST_VISIT_GZIP_CEILING = 1_290_000;
 
 // Things that must never be in the install again, and what each one costs.
