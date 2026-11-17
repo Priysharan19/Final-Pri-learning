@@ -13,7 +13,7 @@
 import { readFileSync } from 'node:fs';
 import {
   FAMILIES, INSTALL_ATTEMPTS, INSTALL_TIMEOUT_MS, bootFamily, describeRuntimes, installApp, keepOnlySimulator, otherBooted, parseDevices, pickSimulator,
-  requiredRuntime, runtimeMatches,
+  requiredRuntime, runtimeMatches, selectedSimulatorRuntimeEvidence,
 } from '../../scripts/simulator-fleet.mjs';
 import { EXPECTED_CASES, MAX_DEVIATION_PX, judge } from '../../scripts/ink-native-check.mjs';
 import { judgeContentEnd } from '../../scripts/native-bridge-selfcheck.mjs';
@@ -72,6 +72,15 @@ ok(parseDevices('').length === 0 && parseDevices(null).length === 0, 'empty outp
   ok(pickSimulator(multi, { family: 'iPhone' })?.name === 'iPhone 17', 'the family filter applies');
   ok(pickSimulator(multi, { named: 'iPad Air' }) === null && pickSimulator('') === null, 'no match is null, not a guess');
   ok(pickSimulator(LISTING)?.udid === IPAD, 'the fixture listing picks its booted iPad');
+ok(selectedSimulatorRuntimeEvidence(pickSimulator(LISTING, { runtime: '27.0' }), '27.0') === 'iOS-27-0',
+  'iOS 27 evidence records the actual pinned runtime already observed in the device selection');
+ok(throwsWith(() => selectedSimulatorRuntimeEvidence(pickSimulator(LISTING, { runtime: '27.0' }), '26.5'), /differs from the pin/),
+  'evidence cannot relabel a real iOS27 simulator as iOS26');
+ok(throwsWith(() => selectedSimulatorRuntimeEvidence({ udid: IPAD, runtime: '' }, '27.0'), /unavailable/),
+  'missing observed runtime fails closed rather than claiming the environment pin');
+ok(throwsWith(() => selectedSimulatorRuntimeEvidence({ udid: null, runtime: 'iOS 27.0' }, '27.0'), /unavailable/),
+  'evidence cannot accept an unselected simulator without an actual UDID');
+
 }
 
 // ── the runtime is NAMED: a pin, never "the newest installed" ────────────────

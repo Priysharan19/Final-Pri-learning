@@ -79,9 +79,18 @@ let PYQ_ARCHIVE_MEASURED = null;
 // 1,290,000 gzipped), as are the banned-from-install list, render-from-install
 // and offline coverage.
 
+// Raised again 2026-11-17 (train editions-19, CTO under the same owner
+// decision, "i dont care if the app is 10gb just make it properly end to
+// end"): FIRST_VISIT_RAW only, 3,400,000 -> 3,450,000 bytes. The train-19
+// tree (main + F4c #917, UI6 #928, UI9a #933) measured 3,323 kB with both
+// editions built, over the old 3,320 kB ceiling. The rest of the Lit
+// Instrument interface (UI3 #926, UI4 #930, UI5 #934, UI7a #932, UI8 #935)
+// is estimated at roughly 20-30 kB more, so the new ceiling leaves about
+// 46 kB of headroom for it. The other three ceilings are unchanged.
+
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 3_400_000;
+const FIRST_VISIT_RAW_CEILING = 3_450_000;
 const FIRST_VISIT_GZIP_CEILING = 1_290_000;
 
 // Things that must never be in the install again, and what each one costs.

@@ -3681,4 +3681,8 @@ export default {
   'export.chapterRow': '{name}: {attempts} उत्तर, {correct} सही',
   'export.examRow': '{title}: {total} में से {score}',
   'export.noExams': 'कोई पूरा प्रश्नपत्र नहीं।',
+  'login.plotZeroes': 'शून्यक −2 और 4 पर',
+  'login.plotTurning': 'मोड़ बिंदु (1, −4) पर',
+  'login.plotAltP': 'p(x) = x² − 2x − 8 का आलेख',
+  'login.plotAltY': 'y = x² − 2x − 3 का आलेख',
 };

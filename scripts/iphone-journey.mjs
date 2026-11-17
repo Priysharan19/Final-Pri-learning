@@ -67,7 +67,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { openServerDesk } from './journey-oracle.mjs';
-import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime } from './simulator-fleet.mjs';
+import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime, selectedSimulatorRuntimeEvidence } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '..');
@@ -662,30 +662,18 @@ if (steps.nativeInk.ok && !steps.nativeInk.detail.startsWith(wantFacts)) {
 }
 const passed = Object.values(steps).filter(s => s.ok).length;
 const total = Object.keys(steps).length;
-// The journey may finish all of its assertions while a saturated hosted
-// CoreSimulator stops answering a *metadata-only* simctl query. Run 43929547593
-// finished its iPad step summaries without failures, then stalled before the
-// JSON evidence was written until the host cancelled the job. Bound these
-// informational reads separately; no step result is inferred from metadata.
-// The workflow still requires the exact pinned device runtime in the evidence.
-const META_TIMEOUT_MS = 30_000;
+// This exact runtime was observed when pickDevice() selected this UDID
+// from simctl's runtime-grouped list, before any test assertions ran.
+// Do not infer it from the environment pin or query hung CoreSimulator again
+// at postflight. Missing/mismatched live-selection evidence fails closed.
+const os = selectedSimulatorRuntimeEvidence(sim, PINNED_RUNTIME);
+const META_TIMEOUT_MS = 10_000;
 const metadataRun = (command, args, opts = {}) =>
   run(command, args, { timeout: META_TIMEOUT_MS, killSignal: 'SIGKILL', ...opts });
-let os = '';
-try { os = metadataRun('xcrun', ['simctl', 'list', 'runtimes']).split('\n').find(l => /iOS/.test(l))?.trim() || ''; }
-catch (e) { console.warn('Simulator runtime metadata unavailable:', String(e?.code || e?.signal || e?.message).slice(0, 80)); }
 let sha = '';
 let dirty = null;
 try { sha = metadataRun('git', ['rev-parse', 'HEAD'], { cwd: ROOT }).trim(); } catch { /* not a checkout */ }
 try { dirty = metadataRun('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: ROOT }).trim().length > 0; } catch { /* not a checkout */ }
-// The device's own runtime, not just the first one installed. If this cannot
-// be obtained, the workflow's existing pinned-runtime validation still fails.
-try {
-  const devices = JSON.parse(metadataRun('xcrun', ['simctl', 'list', 'devices', '-j'])).devices;
-  for (const [runtime, list] of Object.entries(devices)) if (list.some(d => d.udid === udid)) os = runtime.replace(/^com\.apple\.CoreSimulator\.SimRuntime\./, '');
-} catch (e) {
-  console.warn('Simulator device metadata unavailable:', String(e?.code || e?.signal || e?.message).slice(0, 80));
-}
 
 const evidence = {
   schemaVersion: 1,

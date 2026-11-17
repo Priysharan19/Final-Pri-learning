@@ -55,8 +55,3 @@
 .xs-notes { display: grid; gap: 6px; }
 .xs-notes-input { width: 100%; min-height: 180px; resize: vertical; font: inherit; line-height: 1.5; }
 .xs-notes-hint { margin: 0; }
-.xs-keys { display: grid; gap: 8px; margin: 12px 0; }
-.xs-keys div { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: baseline; }
-.xs-keys dt { display: flex; gap: 4px; }
-.xs-keys dd { margin: 0; }
-.xs-keys kbd { min-width: 24px; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 0 1px var(--in-edge-3); background: var(--in-l2); font: 500 0.8rem var(--in-mono); text-align: center; }

@@ -162,7 +162,7 @@
         {"has":"LIBRARY UI: PASS — 56/56 checks","note":"39 → 56 (plan F2): the save toggle and its pending state, the hidden-count line, saved-first order, and the local route that never touches the question bookmarks."},
         {"has":"COMMAND BAR LIBRARY: PASS — 18/18 checks","note":"Plan F2: the command bar's Library group — flag-gated, saved first, no call per keystroke."},
         {"has":"RESOURCE PUBLISHING UI: PASS — 14/14 checks","note":"Plan F3: the staff Library section and the part-by-part PDF upload."},
-        {"has":"DESK UI: PASS — 191/191 checks","note":"The exam shell and the Exam Desk as drawn (plan F4b): navigator labels, shortcuts inert while typing, a clock face that computes nothing, autosave order, the save merge, no mark wording in either language."},
+        {"has":"DESK UI: PASS — 192/192 checks","note":"The exam shell and the Exam Desk as drawn (plan F4b): navigator labels, shortcuts inert while typing, a clock face that computes nothing, autosave order, the save merge, no mark wording in either language."},
         {"has":"DESK CLOCK: PASS — 30/30 checks"},
         {"has":"DESK IMPORT: PASS — 18/18 checks"},
         {"has":"EDITION CLIENT (E2): PASS — 137/137 checks","note":"Plan E2: the app knows its own edition from its build, declares it on every /v1 request, and shows a blocking screen at the other's server. 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen). 136 → 137 (Lit Instrument D6): the identity also carries its own cut's working-indicator form."},

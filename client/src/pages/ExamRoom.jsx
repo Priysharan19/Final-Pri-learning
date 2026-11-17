@@ -44,6 +44,10 @@ import { tLater, useT, useTx } from '../i18n/index.js';
 import Icon from '../components/Icon.jsx';
 import { CheckSignIn } from '../components/CheckRefusal.jsx';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
+import ConfirmSheet from '../examShell/ConfirmSheet.jsx';
+import ShortcutsSheet from '../examShell/ShortcutsSheet.jsx';
+import { useAnnounce } from '../examShell/useAnnounce.js';
+import { useExamShortcuts } from '../examShell/useExamShortcuts.js';
 import '../workspace.css';
 import Working from '../instrument/Working.jsx';
 
@@ -175,7 +179,8 @@ export default function ExamRoom() {
   const [submitError, setSubmitError] = useState('');
   const [inkOpenKey, setInkOpenKey] = useState(null);
   const [inkPhase, setInkPhase] = useState(inkModule ? 'ready' : 'idle');   // idle | loading | ready | failed
-  const [announce, setAnnounce] = useState('');
+  // The shell's polite live region: `setAnnounce(text)` says a thing once.
+  const { announce: setAnnounce, region: announceRegion } = useAnnounce();
 
   const startedAtRef = useRef(Date.now());
   const submissionKey = useRef(newSubmissionKey());
@@ -196,14 +201,17 @@ export default function ExamRoom() {
   // Flags are the student's own marks to come back to; they ride in the draft.
   const [flagged, setFlagged] = useState(() => readDraft('exam', id)?.flagged || {});
   const [confirming, setConfirming] = useState(false);
-  const confirmRef = useRef(null);
-  useEffect(() => {
-    if (!confirming) return;
-    confirmRef.current?.querySelector('button')?.focus();
-    const onKey = e => { if (e.key === 'Escape') setConfirming(false); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [confirming]);
+  const [keysOpen, setKeysOpen] = useState(false);
+  // The shell's shortcuts, the marked room's share of them: ← → between
+  // questions, F to flag, ? for the list. Nothing here submits or sets a
+  // mark, and Enter keeps its meaning. They act only while the paper is open
+  // and no sheet is up.
+  useExamShortcuts({
+    ArrowLeft: () => setCur(c => Math.max(0, c - 1)),
+    ArrowRight: () => setCur(c => Math.min((exam?.questions.length || 1) - 1, c + 1)),
+    f: () => { const q = exam?.questions[cur]; if (q) setFlagged(f => ({ ...f, [q.id]: !f[q.id] })); },
+    '?': () => setKeysOpen(true)
+  }, { enabled: phase === 'sitting' && !confirming && !keysOpen });
   const deadlineFired = useRef(false);
   // The backend's clock only moves forward (examSession observeClock). If the
   // device clock reads earlier than the time the paper has already seen, the
@@ -468,7 +476,7 @@ export default function ExamRoom() {
         warned.current.add(mark);
         // Said with the time: handwriting that has not been read yet.
         const unread = unreadInkKeys(latest.current.inks, latest.current.answers).length;
-        setAnnounce(unread ? <>{tLater(key)} {tLater('examRoom.unreadWarning', { count: unread, n: unread })}</> : tLater(key));
+        setAnnounce(unread ? `${tLater(key)} ${tLater('examRoom.unreadWarning', { count: unread, n: unread })}` : tLater(key));
       }
     }
     // The clock submits once. If that submit fails, the student is offered a
@@ -1116,7 +1124,7 @@ export default function ExamRoom() {
           {phase === 'finalising' ? t('verdict.marking') : t('exam.reviewSubmit')}
         </button>
       </header>
-      <div className="sr-only" role="status" aria-live="polite">{announce}</div>
+      {announceRegion}
 
       <div className="exam-body">
       {reading && (
@@ -1239,25 +1247,20 @@ export default function ExamRoom() {
         </div>
       </section>
       <p className="exam-rules">{t('examRoom.conditionsNote')}</p>
+      <button type="button" className="btn btn-ghost btn-sm" data-exam-keys onClick={() => setKeysOpen(true)}>{t('shell.shortcuts')}</button>
       </div>
 
-      {confirming && (
-        <>
-          <button type="button" className="sheet-scrim" aria-label={t('exam.keepWorking')} onClick={() => setConfirming(false)} />
-          <div className="sheet" role="dialog" aria-modal="true" aria-labelledby="exam-confirm-title" ref={confirmRef}>
-            <h2 id="exam-confirm-title">{t('exam.confirmTitle')}</h2>
-            <p className="sub">{t('exam.confirmAnswered', { answered: answeredCount, total: exam.questions.length })}</p>
-            {unanswered > 0 && <p className="sub" style={{ marginTop: 6 }}><b>{t('exam.confirmUnanswered', { count: unanswered, n: unanswered })}</b></p>}
-            {unreadKeys.length > 0 && <p className="sub" style={{ marginTop: 6 }} data-exam-confirm-unread={unreadKeys.length}><b>{t('exam.confirmUnread', { count: unreadKeys.length, n: unreadKeys.length })}</b></p>}
-            {flaggedCount > 0 && <p className="sub" style={{ marginTop: 6 }}>{t('exam.confirmFlagged', { count: flaggedCount, n: flaggedCount })}</p>}
-            <p className="muted" style={{ marginTop: 10 }}>{t('exam.confirmFinal')}</p>
-            <div className="sheet-actions">
-              <button className="btn btn-ghost" onClick={() => setConfirming(false)}>{t('exam.keepWorking')}</button>
-              <button className="btn btn-primary" onClick={() => { setConfirming(false); finalise('student'); }} disabled={locked}>{t('exam.submitPaper')}</button>
-            </div>
-          </div>
-        </>
-      )}
+      <ConfirmSheet open={confirming} title={t('exam.confirmTitle')} cancelLabel={t('exam.keepWorking')} confirmLabel={t('exam.submitPaper')}
+        onCancel={() => setConfirming(false)} onConfirm={() => { setConfirming(false); finalise('student'); }} busy={locked}>
+        <p className="sub">{t('exam.confirmAnswered', { answered: answeredCount, total: exam.questions.length })}</p>
+        {unanswered > 0 && <p className="sub" style={{ marginTop: 6 }}><b>{t('exam.confirmUnanswered', { count: unanswered, n: unanswered })}</b></p>}
+        {unreadKeys.length > 0 && <p className="sub" style={{ marginTop: 6 }} data-exam-confirm-unread={unreadKeys.length}><b>{t('exam.confirmUnread', { count: unreadKeys.length, n: unreadKeys.length })}</b></p>}
+        {flaggedCount > 0 && <p className="sub" style={{ marginTop: 6 }}>{t('exam.confirmFlagged', { count: flaggedCount, n: flaggedCount })}</p>}
+        <p className="muted" style={{ marginTop: 10 }}>{t('exam.confirmFinal')}</p>
+      </ConfirmSheet>
+      <ShortcutsSheet open={keysOpen} onClose={() => setKeysOpen(false)} shortcuts={[
+        { keys: ['←', '→'], label: t('desk.keyMove') }, { keys: ['F'], label: t('desk.keyFlag') }, { keys: ['?'], label: t('shell.shortcuts') }
+      ]} />
     </div>
   );
 }
