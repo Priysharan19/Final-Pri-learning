@@ -55,3 +55,33 @@
 .xs-notes { display: grid; gap: 6px; }
 .xs-notes-input { width: 100%; min-height: 180px; resize: vertical; font: inherit; line-height: 1.5; }
 .xs-notes-hint { margin: 0; }
+
+.xs-keys { display: grid; gap: 8px; margin: 12px 0; }
+.xs-keys div { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: baseline; }
+.xs-keys dt { display: flex; gap: 4px; }
+.xs-keys dd { margin: 0; }
+.xs-keys kbd { min-width: 24px; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 0 1px var(--in-edge-3); background: var(--in-l2); font: 500 0.8rem var(--in-mono); text-align: center; }
+
+/* ── UI7a · Pencil layout on the desk (D4) ───────────────────────────────────
+   iPad landscape (wide, coarse pointer): a 64 px rail of ticks, a 380 px
+   question column, a full-height sheet with the dot grid. Phones and portrait
+   keep the stacked room; the desktop keeps the grid above. The edition light
+   marks only the current place; flagged is the slip notch, never red or green. */
+.xs-rule[data-tone="last"] i { background: var(--in-slip); }
+@media (min-width: 1024px) and (pointer: coarse) and (orientation: landscape) {
+  .xs-grid { grid-template-columns: 64px 380px minmax(0, 1fr); gap: 0; align-items: stretch; min-height: calc(100dvh - 190px); }
+  .xs-qcol { padding: 22px; }
+  .xs-rail { padding: 10px 0; border-right: 1px solid var(--in-edge-2); overflow-y: auto; }
+  .xs-rail .in-note { display: none; }
+  .xs-sheet-col { border-radius: 0; border-width: 0; background: var(--in-l2) radial-gradient(var(--in-dot, var(--in-l4)) 1px, transparent 1.2px) 0 0 / 22px 22px; }
+  .xs-nav--rail { gap: 6px; justify-items: center; }
+  .xs-nav--rail .xs-nav-label { margin: 0; font-size: 9.5px; text-align: center; }
+  .xs-nav--rail .xs-nav-grid { display: grid; grid-template-columns: 1fr; gap: 0; }
+  .xs-nav--rail .xs-q { width: 44px; min-height: 44px; border: 0; background: none; box-shadow: none; font-size: 0; color: transparent; }
+  .xs-nav--rail .xs-q::after { content: ''; position: absolute; left: 11px; top: 18px; width: 22px; height: 7px; right: auto; bottom: auto; border-radius: 1.5px; background: var(--in-l4); }
+  .xs-nav--rail .xs-q.is-done::after { background: var(--in-tx-2); }
+  .xs-nav--rail .xs-q.is-noted::after { height: 7px; left: 11px; right: auto; bottom: auto; background: var(--in-tx-2); }
+  .xs-nav--rail .xs-q.is-flagged::before { top: 18px; right: 6px; width: 3px; height: 5px; border-radius: 0; }
+  .xs-nav--rail .xs-q.is-current::after { left: 7px; width: 30px; background: var(--in-tx); }
+  .xs-nav--rail .xs-q.is-current { border: 0; box-shadow: none; }
+}

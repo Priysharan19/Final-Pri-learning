@@ -34,6 +34,7 @@ import ClockFace, { ElapsedRule } from '../examShell/ClockFace.jsx';
 import ConfirmSheet from '../examShell/ConfirmSheet.jsx';
 import ShortcutsSheet from '../examShell/ShortcutsSheet.jsx';
 import PaperHeader from '../examShell/PaperHeader.jsx';
+import { readHand } from '../lib/writingHand.js';
 import { saveStateKey, useAutosave } from '../examShell/useAutosave.js';
 import { useExamShortcuts } from '../examShell/useExamShortcuts.js';
 import { useAnnounce } from '../examShell/useAnnounce.js';
@@ -119,6 +120,7 @@ function Desk({ attemptId }) {
   const [current, setCurrent] = useState(1);
   const [sheet, setSheet] = useState(null); // 'close' | 'delete' | 'keys'
   const [clockHidden, setClockHidden] = useState(false);
+  const [hand] = useState(readHand);
   const [busy, setBusy] = useState(false);
   const [startError, setStartError] = useState(null);
   const notesRef = useRef(null);
@@ -479,7 +481,7 @@ function Desk({ attemptId }) {
 
   return (
     <div className="dk-page xs-room" data-desk-attempt={attempt.id} data-desk-phase={clock.phase} data-desk-running={clock.running ? 'true' : 'false'}
-      data-desk-rev={attempt.rev} data-desk-queued={view.intents?.length || 0} data-desk-save={view.problem || saveState} data-desk-estimate={estimate ? 'true' : undefined}>
+      data-hand={hand} data-desk-rev={attempt.rev} data-desk-queued={view.intents?.length || 0} data-desk-save={view.problem || saveState} data-desk-estimate={estimate ? 'true' : undefined}>
       <header className="xs-head">
         {back}
         <PaperHeader title={attempt.resource.title || paper.title} eyebrow={<UnmarkedPlate t={t} />}
@@ -497,7 +499,7 @@ function Desk({ attemptId }) {
           )}
         </div>
       </header>
-      {!finished && <ElapsedRule fraction={allotted ? elapsed / allotted : 0} tone={clock.phase === 'reading' ? 'reading' : null} />}
+      {!finished && <ElapsedRule fraction={allotted ? elapsed / allotted : 0} tone={clock.phase === 'reading' ? 'reading' : (clock.phase === 'working' && !over && clock.remainingMs <= 10 * MINUTE ? 'last' : null)} />}
       {region}
 
       <p className="dk-status" data-desk-status>
@@ -532,7 +534,7 @@ function Desk({ attemptId }) {
 
       <div className="xs-grid">
         <div className="xs-rail">
-          <QuestionNavigator groups={groups} current={current} onSelect={select}
+          <QuestionNavigator variant="rail" groups={groups} current={current} onSelect={select}
             stateOf={q => { const e = entryOf(questions, q); return { done: e.done, flagged: e.flagged, noted: !!e.note }; }} />
           <p className="in-note xs-tally" data-desk-tally>{t('desk.tallies', { done: tallies.done, flagged: tallies.flagged, notes: tallies.notes })}</p>
         </div>

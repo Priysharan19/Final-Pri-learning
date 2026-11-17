@@ -70,6 +70,7 @@ const AURORA_PLACES = [
   '.in-index .in-resume',
   '.in-index .in-ch[aria-pressed="true"]',
   '.in-pal-item[aria-selected="true"]',
+  '.xs-nav--rail .xs-q.is-current',
   '.a-aurora i',
   '.pri-working'
 ];

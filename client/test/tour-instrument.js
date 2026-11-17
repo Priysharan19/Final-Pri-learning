@@ -511,21 +511,31 @@ export const writeFlow = {
     await page.waitForSelector('.eval-card, .verdict[data-verdict-of]', { timeout: 30000 }).catch(() => {});
     await check('Ctrl+↵ checks the working, as the primary does', await page.locator('.verdict, .eval-card').count() > 0);
     await check('Check marks the shell for the scan', await shell.getAttribute('data-marked') === 'yes');
-    const scan = await page.evaluate(() => {
-      const el = document.querySelector('.editor-shell[data-marked="yes"] .ink-stage');
+    const sweep = await page.evaluate(() => {
+      const el = document.querySelector('.editor-shell[data-marked="yes"] .in-sweep i');
       if (!el) return null;
-      const s = getComputedStyle(el, '::after');
-      return { name: s.animationName, border: s.borderBottomColor, pointer: s.pointerEvents };
+      const s = getComputedStyle(el);
+      return { name: s.animationName, dur: s.animationDuration, image: s.backgroundImage, shadow: s.boxShadow, pointer: getComputedStyle(el.parentElement).pointerEvents, bg: s.backgroundColor };
     });
-    const signal = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--in-signal').trim());
-    await check('the scan runs once, in the signal colour', scan?.name === 'in-scan', JSON.stringify({ scan, signal }));
-    await check('the scan never takes the pen: it ignores pointer input', scan?.pointer === 'none');
+    await check('the sweep is one ink hairline, 900 ms, once: no gradient, no glow', sweep?.name === 'in-sweep' && sweep.dur === '0.9s' && sweep.image === 'none' && sweep.shadow === 'none', JSON.stringify(sweep));
+    await check('the sweep never takes the pen: it ignores pointer input', sweep?.pointer === 'none');
+    await check('each mark carries its own stamp delay from the line geometry', await page.locator('.editor-shell[data-marked="yes"] .ink-verdict').evaluateAll(els => els.length > 0 && els.every(e => e.style.getPropertyValue('--d').endsWith('ms'))));
+    // Reduced motion: no hairline, and the marks are there within 200 ms.
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const still = await page.evaluate(() => new Promise(r => setTimeout(() => {
+      const sw = document.querySelector('.in-sweep');
+      const marks = [...document.querySelectorAll('.editor-shell[data-marked="yes"] .ink-verdict')];
+      r({ sweep: sw ? getComputedStyle(sw).display : 'absent', marks: marks.length, shown: marks.every(m => Number(getComputedStyle(m).opacity) === 1), anim: marks[0] && getComputedStyle(marks[0]).animationName });
+    }, 200)));
+    await check('reduced motion: no hairline, every mark visible within 200 ms (a 120 ms fade)', still.sweep !== 'block' && still.marks > 0 && still.shown && still.anim === 'in-fade', JSON.stringify(still));
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
     const verdict = page.locator('.verdict').first();
     await check('a wrong answer gets the slip verdict panel, not the failure one', await verdict.evaluate(el => el.classList.contains('verdict-bad') && !el.classList.contains('verdict-technical')));
     await page.waitForTimeout(1300);
     writeFileSync(join(outDir, 'write-marked-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
-    const slipChip = page.locator('[data-reading-chips] .in-read.is-slip');
-    await check('the slipped line’s chip carries the slip tag and the line is underlined', await slipChip.count() === 1 && await page.locator('.ink-verdict-layer .ink-underline').count() >= 1, `${await slipChip.count()} slip chips`);
+    writeFileSync(join(outDir, 'write-swept-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
+    const slipChip = page.locator('[data-reading-chips] .in-read[data-read-state]');
+    await check('the reading chip names only what was read (no slip tag, UI4) and the slipped line is underlined', await slipChip.count() >= 1 && await page.locator('[data-reading-chips] .in-read-tg').filter({ hasText: /slip|checks/i }).count() === 0 && await page.locator('.ink-verdict-layer .ink-underline').count() >= 1, `${await slipChip.count()} chips`);
     await shootAll(page, outDir, 'marked', SIZES.filter(sz => sz.id === 'web'));
 
     // A second wrong try resolves the question: the reply now carries the

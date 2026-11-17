@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
 import { practiceHref } from '../lib/practiceLinks.js';
@@ -38,6 +38,21 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
   const [resources, setResources] = useState([]);
   const [savedIds, setSavedIds] = useState(() => new Set());
   const input = useRef(null);
+  const loc = useLocation();
+  // Inside an exam room or the desk the palette only moves around the paper's
+  // own controls: no form search, chapters, scripts or library.
+  const inExam = /^\/(exam|exams|desk)(\/|$)/.test(loc.pathname);
+  // Search by form (UI8): the matcher is loaded on the first open, so it is
+  // never in the main chunk. It runs on this device, with no network call.
+  const [formLib, setFormLib] = useState(null);
+  const [syllabus, setSyllabus] = useState([]);
+
+  useEffect(() => {
+    if (!open || inExam) return undefined;
+    let live = true;
+    import('./formSearch.js').then(m => { if (live) setFormLib(m); }).catch(() => { });
+    return () => { live = false; };
+  }, [open, inExam]);
 
   // While the palette is open the page behind is pushed back (UI6): a
   // root attribute the stylesheet reads, cleared on close.
@@ -57,7 +72,9 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     api.get('/curriculum').then(c => {
       if (!live) return;
       const scope = scopeFor(c, user);
-      setChapters((scope?.chapters || scope?.subtopics || []).map((row, i) => ({ row, index: i, colour: colourFor(i) })));
+      const rows = scope?.chapters || scope?.subtopics || [];
+      setChapters(rows.map((row, i) => ({ row, index: i, colour: colourFor(i) })));
+      setSyllabus(rows);
     }).catch(() => { });
     api.post('/history/list', { page: 0, pageSize: 5 }).then(r => { if (live) setScripts(r?.items || []); }).catch(() => { });
     // Read once when the bar opens, never per keystroke: the list is the
@@ -78,7 +95,14 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
     const needle = (commands ? q.trimStart().slice(1) : q).trim().toLowerCase();
     const match = s => !needle || String(s).toLowerCase().includes(needle);
     const track = practiceTrack(user);
+    const form = !commands && !inExam && formLib ? formLib.parseForm(q) : null;
+    const formRows = form ? formLib.matchTemplates(form, formLib.syllabusIndex(syllabus)).map(r => ({
+      id: `fm-${r.chapterId}-${r.point ?? 'c'}`, label: r.topic, glyph: 'pen', content: true, meta: r.chapterName,
+      hint: r.count > 1 ? t('inst.cmdFormCount', { n: r.count }) : t('inst.cmdPractise'),
+      run: () => nav(practiceHref({ subtopic: r.chapterId, dotpoint: r.point ?? null, track }))
+    })) : [];
     const groups = [
+      { key: 'forms', label: t('inst.cmdForms'), rows: formRows },
       { key: 'chapters', label: t('inst.cmdChapters'), rows: chapters.filter(c => match(c.row.name)).slice(0, 6).map(c => ({
         id: `ch-${c.row.id}`, label: c.row.name, hint: t('inst.cmdPractise'), colour: c.colour, meta: t('inst.chapterN', { n: c.index + 1 }),
         run: () => nav(practiceHref({ subtopic: c.row.id, track }))
@@ -95,11 +119,12 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
       { key: 'pages', label: t('inst.cmdPages'), rows: pages.filter(p => match(p.label)).map(p => ({ id: `pg-${p.to}`, label: p.label, glyph: PAGE_GLYPH[p.to] || 'doc', run: () => nav(p.to) })) },
       { key: 'actions', label: t('inst.cmdActions'), rows: actions.filter(a => match(a.label)).map(a => ({ id: `ac-${a.id}`, label: a.label, glyph: 'gear', run: a.run })) }
     ];
-    return groups.filter(g => g.rows.length && (!commands || g.key === 'actions'));
+    return groups.filter(g => g.rows.length && (!commands || g.key === 'actions') && (!inExam || g.key === 'actions' || g.key === 'pages'));
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [q, chapters, scripts, resources, savedIds, pages, actions, nav, t, user?.indiaTrack, user?.country, user?.course]);
+  }, [q, chapters, scripts, resources, savedIds, pages, actions, nav, t, formLib, syllabus, inExam, user?.indiaTrack, user?.country, user?.course]);
 
   const flat = items.flatMap(g => g.rows);
+  const echo = !inExam && formLib ? formLib.parseForm(q)?.key : null;
   useEffect(() => { setSel(s => Math.min(s, Math.max(0, flat.length - 1))); }, [flat.length]);
 
   if (!open) return null;
@@ -124,6 +149,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
             placeholder={t('inst.cmdPlaceholder')} aria-label={t('inst.cmdPlaceholder')}
             role="combobox" aria-expanded="true" aria-controls="in-pal-list"
             aria-activedescendant={flat[sel] ? `in-pal-${flat[sel].id}` : undefined} />
+          {echo && <span className="in-pal-form" data-pal-form>{t('inst.cmdFormEcho')} · <b>{echo}</b></span>}
           <span className="in-kbd">esc</span>
         </div>
         <div className="in-pal-list" id="in-pal-list" role="listbox" aria-label={t('inst.cmdLabel')}>
@@ -153,6 +179,7 @@ export default function CommandBar({ open, onClose, user, pages, actions, return
           <span><span className="in-kbd">esc</span>{t('inst.cmdClose')}</span>
           <span>{t('inst.cmdPrefixHint')}</span>
         </div>
+        {!inExam && <p className="in-pal-honest" data-pal-honest>{t('inst.cmdNotAi')}</p>}
       </div>
     </div>
   );

@@ -11,6 +11,7 @@ import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { BrandMark } from '../components/BrandMark.jsx';
 import { CUT } from '../brand/edition.js';
+import { HANDS, readHand, writeHand } from '../lib/writingHand.js';
 
 // The content-operations and admin console is for support and admin accounts
 // only, and the server enforces that on every call it makes. A student never
@@ -65,6 +66,25 @@ function AboutEdition() {
   );
 }
 
+// The Pencil layout's dock sits on the side of the hand that isn't writing.
+// Kept on this device only.
+function WritingHand() {
+  const t = useT();
+  const [hand, setHand] = useState(readHand);
+  return (
+    <div className="card" data-writing-hand style={{ marginTop: 18 }}>
+      <h2 style={{ marginBottom: 8 }}>{t('hand.title')}</h2>
+      <div role="radiogroup" aria-label={t('hand.title')} style={{ display: 'flex', gap: 8 }}>
+        {HANDS.map(h => (
+          <button key={h} type="button" role="radio" aria-checked={hand === h} className={`btn ${hand === h ? 'btn-primary' : 'btn-ghost'}`}
+            style={{ minHeight: 44 }} data-hand={h} onClick={() => setHand(writeHand(h))}>{t(h === 'left' ? 'hand.left' : 'hand.right')}</button>
+        ))}
+      </div>
+      <p className="muted" style={{ margin: '8px 0 0' }}>{t('hand.note')}</p>
+    </div>
+  );
+}
+
 export default function Settings() {
   const { user } = useApp();
   // The classroom product is outside public V1 (PRI_V1_RELEASE_SCOPE §11): a
@@ -79,6 +99,7 @@ export default function Settings() {
       <RemindersPanel />
       {classroom && <AssignmentInboxPanel />}
       {classroom && <ClassroomPanel />}
+      <WritingHand />
       <AboutEdition />
       <StaffOperations />
     </>

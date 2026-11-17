@@ -299,6 +299,9 @@ export const flow = {
       // check always has something to measure.
       // Showing the solution ends the attempt with no marks, so it takes two
       // deliberate presses (the first arms it).
+      // On a phone (UI3) Show solution lives under More in the action bar.
+      const more = page.locator('.ws-actions .ws-more > summary');
+      if (await more.count()) await more.first().click({ timeout: 5000 }).catch(() => {});
       const show = page.getByRole('button', { name: 'Show solution' });
       for (let press = 0; press < 2 && await show.count(); press++) {
         await show.first().click({ timeout: 5000 }).catch(() => {});

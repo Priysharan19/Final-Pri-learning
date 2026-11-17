@@ -478,8 +478,8 @@ html.ui-instrument .ink-line-math.is-uncertain {
 }
 html.ui-instrument .ink-line-low { background: none; }
 html.ui-instrument .ink-line-doubt { border-color: var(--in-unc); color: var(--in-unc); border-style: dashed; }
-html.ui-instrument .ink-correct-btn { border-radius: 4px; border: 0; box-shadow: 0 0 0 1px var(--in-edge-2); background: var(--in-l3); color: var(--in-tx-2); font: 500 12.5px var(--in-ui); }
-html.ui-instrument .ink-correct-btn:hover { background: var(--in-l4); color: var(--in-tx); }
+html.ui-instrument .ink-correct-btn, html.ui-instrument .ink-accept-btn { border-radius: 4px; border: 0; box-shadow: 0 0 0 1px var(--in-edge-2); background: var(--in-l3); color: var(--in-tx-2); font: 500 12.5px var(--in-ui); }
+html.ui-instrument .ink-correct-btn:hover, html.ui-instrument .ink-accept-btn:hover { background: var(--in-l4); color: var(--in-tx); }
 html.ui-instrument .ink-line-verdict.good { color: var(--in-good); }
 html.ui-instrument .ink-line-verdict.bad { color: var(--in-slip); }
 
@@ -496,25 +496,35 @@ html.ui-instrument .ink-comment { border-radius: 4px; }
 html.ui-instrument .status-line { font: 400 12.5px var(--in-ui); color: var(--in-tx-3); }
 html.ui-instrument .ws-answer-preview { color: var(--in-tx); font-variant-numeric: tabular-nums; }
 
-/* The scan: on Check, one signal line passes down the page. Animates `top`
-   and opacity once, on one small layer; off under reduced motion (the
-   existing rule hides it). */
-html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after {
-  inset: auto 0 auto 0; top: -90px; height: 90px; border-top: 0;
-  border-bottom: 1px solid var(--in-signal);
-  background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--in-signal) 7%, transparent));
-  animation: in-scan 1200ms cubic-bezier(.45, 0, .2, 1) 1 both;
+/* ── UI5 · The Check sweep: one ink hairline, each line's mark stamps in as it
+   reaches the line. Marks the server already committed; MarginMarks.jsx mounts
+   the layer only with a receipt's verdicts, and only under data-marked="yes".
+   No gradient, no glow, no signal colour. Compositor-only (transform, opacity). */
+html.ui-instrument .editor-shell .ink-stage::after { display: none; }
+.in-sweep { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; display: none; }
+.editor-shell[data-marked="yes"] .in-sweep { display: block; }
+.in-sweep i {
+  position: absolute; left: 0; right: 0; top: 0; height: 1px; opacity: 0;
+  background: color-mix(in srgb, var(--in-tx) 55%, transparent);
+  animation: in-sweep var(--in-dur-sweep) cubic-bezier(.45, 0, .2, 1) 1 both;
 }
-/* `top` rather than a transform, so the line reaches the foot of a page of
-   any height (a tall iPad stage included); it is one small layer. */
-@keyframes in-scan {
-  0% { top: -90px; opacity: 1; }
-  90% { opacity: 1; }
-  100% { top: 100%; opacity: 0; }
+@keyframes in-sweep {
+  0% { transform: translateY(var(--y0)); opacity: 0; }
+  6% { opacity: 1; }
+  94% { opacity: 1; }
+  100% { transform: translateY(var(--y1)); opacity: 0; }
 }
+.editor-shell[data-marked="yes"] :is(.ink-verdict, .ink-linebox, .ink-underline) { animation: in-stamp 160ms var(--in-ease-spring) var(--d, 0ms) both; }
+.editor-shell[data-marked="yes"] .ink-underline { animation: in-ul 200ms var(--in-ease-out) var(--d, 0ms) both; transform-origin: left; }
+@keyframes in-stamp { from { opacity: 0; transform: scale(.92); } to { opacity: 1; transform: none; } }
+@keyframes in-ul { from { transform: scaleX(0); } to { transform: none; } }
+/* A marked page: the verdict mark replaces the reading chip beside the line. */
+.editor-shell[data-marked="yes"] .in-read-layer { opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
-  html.ui-instrument .editor-shell[data-marked="yes"] .ink-stage::after { animation: none; display: none; }
+  .in-sweep { display: none !important; }
+  .editor-shell[data-marked="yes"] :is(.ink-verdict, .ink-linebox, .ink-underline) { animation: in-fade 120ms linear both; }
 }
+@keyframes in-fade { from { opacity: 0; } to { opacity: 1; } }
 /* The line the engine marked as the slip carries the copper edge on its chip,
    and an earned line a faint green one — never on a line Pri read with low
    confidence: that keeps its indigo "unsure" edge whatever the verdict. */
@@ -1161,7 +1171,7 @@ html.ui-instrument .in-led-tools .in-led-bar { padding-bottom: 0; border-bottom:
 html.ui-instrument {
   --in-ease-out: cubic-bezier(.2, 0, 0, 1);
   --in-ease-spring: cubic-bezier(.2, 1.1, .4, 1);
-  --in-dur-1: 120ms; --in-dur-2: 200ms; --in-dur-3: 320ms;
+  --in-dur-1: 120ms; --in-dur-2: 200ms; --in-dur-3: 320ms; --in-dur-sweep: 900ms;
   --in-sh-1: 0 0 0 1px var(--in-edge), 0 1px 0 var(--in-edge);
   --in-sh-2: 0 0 0 1px var(--in-edge-2), 0 1px 2px var(--in-edge), 0 8px 24px -14px var(--in-shadow);
   --in-sh-3: inset 0 1px 0 var(--in-hi), 0 0 0 1px var(--in-edge-3), 0 24px 64px -24px var(--in-shadow);
@@ -1321,6 +1331,43 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
   html.ui-instrument .ws-actions-btns > * { min-width: 0; max-width: 100%; }
 }
 
+/* ── UI3 · Answer first on phones: the hint ladder folds into one row ── */
+.in-hintrow { display: none; }
+.ws-more { position: relative; }
+.ws-more > summary { list-style: none; min-height: 44px; }
+.ws-more > summary::-webkit-details-marker { display: none; }
+@media (max-width: 560px) {
+  .in-hintrow {
+    display: grid; gap: 8px;
+    padding: 10px 12px; border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2);
+  }
+  .in-hintrow-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+  .in-meter { display: inline-flex; gap: 2px; flex: none; }
+  .in-meter i { width: 14px; height: 4px; border-radius: 1px; background: var(--in-l4); }
+  .in-meter i.is-used { background: var(--in-tx); }
+  .in-hintrow-label { flex: 1; font: 400 13px var(--in-ui); color: var(--in-tx-2); }
+  .in-hintrow-all { min-height: 44px; }
+  .in-hintrow-next { width: 100%; min-height: 44px; justify-content: space-between; }
+  .in-hintrow-next small { font: 500 11px var(--in-mono); color: var(--in-tx-3); }
+  .in-hintsheet-scrim {
+    position: fixed; inset: 0; z-index: 60; border: 0; background: rgba(0, 0, 0, .4);
+  }
+  .in-hintsheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 61; max-height: 78vh; overflow-y: auto;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom)); background: var(--in-l1); color: var(--in-tx);
+    border-radius: 10px 10px 0 0; box-shadow: 0 0 0 1px var(--in-edge-2);
+    animation: in-hs-rise var(--in-dur-3) var(--in-ease-out);
+  }
+  .in-hintsheet .hints-block { display: grid; gap: 8px; margin: 0 0 12px; }
+  .in-hintsheet-close { width: 100%; }
+  .ws-more-menu { position: absolute; left: 0; bottom: 100%; z-index: 5; width: 220px; padding: 6px; border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); }
+  .ws-more-menu .btn { width: 100%; min-height: 44px; white-space: normal; }
+}
+@keyframes in-hs-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .in-hintsheet { animation: none; }
+}
+
 /* ── UI-IND · the working indicator, "Construction" (Lit Instrument D6) ──────
    instrument/Working.jsx. Three points gather into the edition's cut (0–34%),
    the line draws (36–62%), holds (to 80%), then lets go. Transform, opacity and
@@ -1385,3 +1432,29 @@ html[data-pushed] .shell .main { transform: scale(var(--in-push-scale)); transfo
   .in-pager-n { font: 500 12px var(--in-mono); color: var(--in-tx-3); }
   .in-ch { grid-template-columns: 32px 1fr auto auto; }
 }
+
+/* ── UI4 · Reading strip v2: read, check this, can't read ── */
+.in-read { background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2), 0 6px 18px -12px var(--in-shadow); border-radius: 6px; }
+.in-read.is-check { box-shadow: 0 0 0 1.5px var(--in-unc), 0 6px 18px -12px var(--in-shadow); transition: box-shadow var(--in-dur-2) var(--in-ease-out); }
+.in-read.is-cant { box-shadow: none; border: 1px dashed var(--in-tx-3); }
+.in-read-cf { width: auto; height: 3px; display: inline-flex; gap: 2px; background: none; overflow: visible; }
+.in-read-cf i { display: block; width: 7px; height: 3px; border-radius: 1px; background: var(--in-l5); }
+.in-read-cf i.on { background: var(--in-tx-2); }
+.in-read.is-check .in-read-cf i.on { background: var(--in-unc); }
+.in-read-tg { font: 500 10.5px var(--in-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--in-tx-3); }
+.in-read.is-check .in-read-tg { color: var(--in-unc); }
+.in-rstate { display: inline-flex; align-items: center; gap: 6px; margin-right: 8px; font: 500 10.5px var(--in-mono); text-transform: uppercase; letter-spacing: 0.06em; color: var(--in-tx-3); }
+.in-rstate i, .in-strip-i i { flex: none; width: 9px; height: 9px; border-radius: 2px; background: var(--in-tx-2); }
+[data-read-state="check"] > i { background: var(--in-unc); }
+[data-read-state="cant"] > i { background: none; border: 1px dashed var(--in-tx-3); box-sizing: border-box; }
+.in-rstate[data-read-state="check"] { color: var(--in-unc); }
+.in-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; min-height: 40px; padding: 8px 12px; margin-top: 10px; border-radius: 6px; background: var(--in-l1); box-shadow: 0 -1px 0 var(--in-edge-2); font: 400 11.5px var(--in-mono); color: var(--in-tx-2); }
+.in-strip-i { display: inline-flex; align-items: center; gap: 6px; }
+@media (prefers-reduced-motion: reduce) { .in-read.is-check { transition: none; } }
+
+/* ── UI8 · Palette v2: search by form ────────────────────────────────────────
+   The panel, glass and selected-row wash stay as they were (aurora.css); this
+   adds the form echo and the honest footer line. */
+.in-pal-form { margin-left: auto; font: 500 10.5px var(--in-mono); letter-spacing: 0.04em; color: var(--in-tx-3); white-space: nowrap; }
+.in-pal-form b { font: 500 12px var(--in-mono); color: var(--in-tx-2); }
+.in-pal-honest { margin: 0; padding: 0 18px 10px; font: 400 11px var(--in-mono); color: var(--in-tx-3); text-align: right; }
