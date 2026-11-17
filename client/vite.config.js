@@ -591,6 +591,10 @@ export function editionLanguages(edition) {
     load(id) {
       const clean = id.split('?')[0].replace(/\\/g, '/');
       if (dropped.some(rel => clean.endsWith(`/${rel}`))) return 'export default {};\n';
+      // The en-AU wording belongs to the Prithagoras edition alone (i18n/strings.au.js, read by i18n/core.js behind an
+      // EDITION_ID check the bundler cannot fold away). Any other edition loads it empty, so its core chunk carries none of
+      // it; the object used to ride along harmlessly until it named the edition ("Prithagoras stores the student's name").
+      if (edition !== 'prithagoras' && clean.endsWith('/src/i18n/strings.au.js')) return 'export const AU_STRINGS = Object.freeze({});\n';
       return null;
     },
     transform(code, id) {
