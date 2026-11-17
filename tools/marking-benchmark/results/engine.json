@@ -1204,11 +1204,11 @@
   "verdicts": [
    "given",
    "valid",
-   "abstain",
-   "valid"
+   "invalid",
+   "invalid"
   ],
-  "solution": "correct",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 2
  },
  "eq-074": {
   "verdicts": [
@@ -1223,12 +1223,12 @@
   "verdicts": [
    "given",
    "valid",
-   "abstain",
+   "invalid",
    "abstain",
    "abstain"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 2
  },
  "eq-076": {
   "verdicts": [
