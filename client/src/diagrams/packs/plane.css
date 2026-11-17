@@ -1,0 +1,26 @@
+/* Diagram pack "plane" (plane.jsx). The kit's diagram tones only (diagrams.css derives
+   every --dg-* from an Instrument token), so light and dark follow the theme. */
+.dgp-seg { fill: none; stroke: var(--dg-primary); stroke-width: 2; stroke-linecap: round; }
+.dgp-seg.is-transversal { stroke: var(--dg-accent); }
+.dgp-line { fill: none; stroke: var(--dg-secondary); stroke-width: 1.7; }
+.dgp-dashed { stroke-dasharray: 6 4; }
+.dgp-tick { stroke: var(--dg-primary); stroke-width: 1.6; }
+.dgp-outline { fill: none; stroke: var(--dg-primary); stroke-width: 2; stroke-linejoin: round; }
+.dgp-chev { fill: none; stroke: var(--dg-ink-2); stroke-width: 1.6; stroke-linejoin: round; }
+.dgp-mark-arc { fill: none; stroke: var(--dg-accent); stroke-width: 2; }
+.dgp-cell { fill: transparent; stroke: var(--dg-primary); stroke-width: 1.6; }
+.dgp-cell.is-b { fill: var(--dg-fill); }
+.dgp-frac { fill: transparent; stroke: var(--dg-primary); stroke-width: 1.4; }
+.dgp-frac.is-on { fill: color-mix(in srgb, var(--dg-accent) 30%, transparent); }
+.dgp-square { fill: color-mix(in srgb, var(--dg-good) 10%, transparent); stroke: var(--dg-good); stroke-width: 1.4; stroke-linejoin: round; }
+.dgp-square.is-c { fill: color-mix(in srgb, var(--dg-accent) 10%, transparent); stroke: var(--dg-accent); }
+.dg-shape.is-image { stroke: var(--dg-accent); }
+.dgp-foot { fill: none; stroke: var(--dg-ink-3); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.dgp .dgi-handle:focus-visible .dgi-ring { stroke: var(--dg-ink); stroke-width: 3.5; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .dgp .dg-shape, .dgp .dgp-square, .dgp .dgp-mark-arc { transition: d 160ms ease-out; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dgp *, .dgp-fig * { transition: none !important; animation: none !important; }
+}

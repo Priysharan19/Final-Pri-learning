@@ -86,16 +86,40 @@ unless stated. Every interactive kind has a static counterpart for questions and
   curves: [{ expr, label?, domain?: [a,b] }], param: [{ x: 'expr in t', y: 'expr in t', t: [a,b], label? }] }`.
   Covers coordinate geometry, constructions, congruence and similarity (two triangles side by side), quadrilaterals,
   conics (`param`), transformations, loci. The model computes every `auto` angle and every segment length.
-- `parallelLines` (static) — two parallel lines cut by a transversal. `{ angle (transversal, 20–160), mark: ['a','b',…'h'] |
-  'corresponding'|'alternate'|'coInterior'|'vertical', values = true }`. Angle values computed.
+- `parallelLines` (static) — two parallel lines cut by a transversal. `{ angle (transversal, 20–160, not 90), mark: ['a','b',…'h'] |
+  'corresponding'|'alternate'|'coInterior'|'vertical', values = true }`. Angle values computed. Letters: at the upper crossing
+  `a` above-right of the transversal, `b` above-left, `c` below-left, `d` below-right; `e`–`h` in the same places at the lower
+  crossing; `angle` is measured anticlockwise from the right-hand direction of the lines, so $a=c=e=g=$ `angle`. The named pairs
+  are corresponding `a,e`, alternate `c,e`, co-interior `c,f`, vertical `a,c`; any two letters are classified automatically.
+- `parallelLinesExplorer` (interactive; counterpart `parallelLines`) — the same params (`angle` a multiple of 5): a slider turns
+  the transversal (20°–160°, step 5) and the readout states the marked pair staying equal or adding to $180^\circ$, with live values.
 - `areaModel` (static) — rectangle split into a grid of labelled parts. `{ rows: [{ size, label }], cols: [{ size, label }],
-  cells?: [[tex,…],…] }` (e.g. $(x+3)(x+2)$, $(a+b)^2$, $23\times 14$).
+  cells?: [[tex,…],…] }` (e.g. $(x+3)(x+2)$, $(a+b)^2$, $23\times 14$). Without `cells` each part is the product of its labels
+  written as a teacher would ($x^2$, $2x$, $ab$, $200$); all-number labels also give the total.
 - `fractionBar` (static) — `{ bars: [{ parts, shaded, label? }] }` one bar per fraction, same width (comparison, equivalence).
 - `triangleExplorer` (interactive; counterpart `triangle`) — `{ mode: 'angleSum'|'pythagoras'|'trigRatios'|'similar'|'area',
   initial: { … } }`: sliders change the triangle; readout shows the invariant with live numbers (angle sum $180^\circ$,
   $a^2+b^2=c^2$, $\sin\theta$ … for the chosen angle, scale factor and area ratio $k^2$, $\tfrac12 ab\sin C$).
-- `circleExplorer` (interactive; counterpart `circleTheorem`) — `{ theorem: 'centre'|'segment'|'semicircle'|'cyclic'|'tangent'|'chords', initial }`:
+  `initial` by mode (any key may be left out for its default; an unknown key is an error naming the accepted ones):
+
+  | mode | `initial` | sliders (min–max, step) |
+  |---|---|---|
+  | `angleSum` | `{ A, B }` degrees; $C=180^\circ-A-B$ computed; $A+B\le170$ | A, B: 10–150, 1 |
+  | `pythagoras` | `{ a, b }` the legs (right angle at C), or `{ a, b, C }` SAS: away from $90^\circ$ the readout shows $c^2=a^2+b^2-2ab\cos C$ | a, b: 1–12, 0.5; C: 5–175, 1 |
+  | `trigRatios` | `{ angle, hyp }`, or legs `{ a, b }` (a opposite θ, b adjacent), or `{ a, b, C }` with `C: 90` | angle 5–85, 1; hyp 2–12, 0.5; a, b 1–12, 0.5 |
+  | `similar` | `{ a, b, c, k }` sides (fixed, 1–12, must close) and scale factor | k: 0.25–3, 0.25 |
+  | `area` | `{ a, b, C }` two sides and the included angle | a, b: 1–12, 0.5; C: 5–175, 1 |
+
+  Slider values must sit on the slider's step. Defaults: `{ A: 50, B: 60 }`, `{ a: 3, b: 4 }`, `{ angle: 30, hyp: 10 }`,
+  `{ a: 3, b: 4, c: 5, k: 2 }`, `{ a: 6, b: 5, C: 60 }`.
+- `circleExplorer` (interactive; counterpart `circleTheorem`) — `{ theorem: 'centre'|'segment'|'semicircle'|'cyclic'|'tangent'|'chords', initial, radius? }`:
   a point moved round the circle (keyboard slider + drag); the readout shows the angles that stay equal / in ratio.
+  `initial` uses `circleTheorem`'s own param names (degrees anticlockwise from the $+x$ axis): `centre` `{ a, b, r }` (R moves on the
+  major arc; arc AB 20°–160°), `segment` `{ a, b, r1, r2 }` (S = `r2` moves), `semicircle` `{ r }` (10°–170°), `cyclic` `{ a, b, c, d }`
+  in order round the circle (D moves), `tangent` `{ a }` (T moves), `chords` `{ a, b, c, d }` with C between A and B and D on the other
+  arc (C moves; lengths in a circle of `radius`, default 5). Moving points keep 10° from fixed ones.
+  In a question, `counterpartParams(kind, params)` (plane.kinds.js) gives the static counterpart its params; `chords` has no static
+  counterpart yet.
 
 **algebra pack** (functions, sequences, calculus, inequalities)
 - `paramGraph` (interactive; counterpart `function`) — `{ expr: 'a*x^2+b*x+c', params: [{ name, min, max, step, initial, label? }],
