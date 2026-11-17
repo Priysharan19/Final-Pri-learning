@@ -23,7 +23,7 @@ import {
 } from './reason-v2-safe.js';
 import { assessEvaluationLine, assessPointLine } from './reason-v3.js';
 import { assessFormulaLine, bareNumbers, chainDiagnosis, cleanLine, evaluateChain, givensLine, isNumberText, labelKey, listsValues, matchesShape, readChain, sameValue, substitutionShapes, valueUnder } from './reason-chain.js';
-import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v4.js';
+import { assessRelationChainLine, assessModulusInequalityLine, compareDomainAwareEquationClaims } from './reason-v4.js';
 import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 import { lostMarks, ruleKeyFor } from './lost-marks.js';
@@ -568,6 +568,78 @@ function unreadLines(rawLines) {
 }
 const unreadNote = entry => entry;
 
+/**
+ * After the first break, every later line is read against the line IMMEDIATELY
+ * ABOVE it, not against the question. Equivalent to it: the error is carried
+ * forward — a note, not a new break. Disproved against it (a mathematical
+ * disproof, never a guess): a second break, flagged `independent` with its own
+ * diagnosis. A line that cannot be decided either way is left as it was.
+ *
+ * (A derivative question is not read this way: each line there is its own
+ * claim, "this is the derivative of the source", judged against the source.)
+ *
+ * Feedback and evidence only: the marks follow the first break and nothing
+ * else, so one slip still costs one mark.
+ */
+function lineVersusPrevious(prevText, text, meta) {
+  const strip = s => String(s).trim().replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '');
+  const a = strip(prevText), b = strip(text);
+  if (meta?.kind === 'inequality') {
+    const pa = parseRelation(a), pb = parseRelation(b);
+    if (!pa || !pb) return 'unknown';
+    const r = assessRelationLine({ text: pb, previous: pa, previousTrusted: true, meta: {} });
+    return r.status === 'ok' ? 'same' : r.status === 'break' ? 'different' : 'unknown';
+  }
+  const na = normalize(a), nb = normalize(b);
+  if (meta?.kind === 'equation') {
+    if (!na.includes('=') || !nb.includes('=')) return 'unknown';
+    const pa = parse(na), pb = parse(nb);
+    if (pa.t !== 'equation' || pb.t !== 'equation') return 'unknown';
+    if (foreignLetters(pa, meta).length || foreignLetters(pb, meta).length) return 'unknown';
+    const cmp = compareDomainAwareEquationClaims(pa, pb, meta.variable);
+    if (cmp.decidable) return cmp.same ? 'same' : 'different';
+    return sameEquationClaim(pa, pb, meta.variable) ? 'same' : 'unknown';
+  }
+  if (meta?.kind === 'expression') {
+    const side = s => (s.includes('=') ? s.split('=').pop() : s);
+    const ea = side(na), eb = side(nb);
+    if (!ea.trim() || !eb.trim()) return 'unknown';
+    // Both sides must READ as expressions in the question's own unknown
+    // before a difference means anything: prose, units and other letters are
+    // not a disproof (exprEquivalent is also false on a parse failure).
+    const known = new Set([meta.variable].filter(Boolean));
+    for (const src of [meta.canonical, meta.source]) {
+      if (typeof src === 'string') { try { for (const v of variablesOf(parse(normalize(src)))) known.add(v); } catch { /* ignore */ } }
+    }
+    const pa = parse(ea), pb = parse(eb);
+    if (pa.t === 'equation' || pb.t === 'equation') return 'unknown';
+    for (const node of [pa, pb]) for (const v of variablesOf(node)) if (!known.has(v)) return 'unknown';
+    return exprEquivalent(ea, eb) ? 'same' : 'different';
+  }
+  return 'unknown';
+}
+
+function checkLinesAfterBreakAgainstPrevious(out, firstBreak, meta) {
+  for (let i = firstBreak + 1; i < out.length; i++) {
+    const row = out[i];
+    if (row.unread || row.check || row.otherUnknown || row.coversAll || row.branch) continue;
+    const prev = out[i - 1];
+    if (!prev || prev.unread || (i - 1 !== firstBreak && prev.status === 'note' && prev.note !== 'Follows from the earlier slip.')) continue;
+    let verdict = 'unknown';
+    try { verdict = lineVersusPrevious(prev.text, row.text, meta); } catch { verdict = 'unknown'; }
+    if (verdict === 'different' && (row.status === 'ok' || row.status === 'note')) {
+      let diagnosis = null;
+      try { diagnosis = diagnoseStep({ prevText: prev.text, brokenText: row.text, meta }); } catch { diagnosis = null; }
+      // A flag, not a status: every mark, count and "verified" test reads the
+      // status, and the marks policy is unchanged (one slip costs one mark).
+      row.secondBreak = true;
+      row.independent = true;
+      row.note = (diagnosis && diagnosis.message) || 'This line does not follow from the line above it — a second slip.';
+      if (diagnosis) row.diagnosis = withConfidence(diagnosis); else delete row.diagnosis;
+    }
+  }
+}
+
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, calculus = null, named = false } = {}) {
   const calculusStage = { claimed: false };   // calculusSteps.js: has a line made a claim yet?
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
@@ -888,6 +960,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       delete out[i].diagnosis;
     }
   }
+  checkLinesAfterBreakAgainstPrevious(out, firstBreak, meta);
 
   let prevText = null;
   for (let i = firstBreak - 1; i >= 0; i--) {

@@ -3567,6 +3567,7 @@ function StepReport({ report, instrument = false, correctAnswer = null }) {
         <span aria-hidden="true">{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
         <span>{l.text}</span>
         {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t(i === first ? 'verdict.mistakeIsHere' : 'verdict.alsoWrong')}</b>}
+        {l.secondBreak === true && l.status !== 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.alsoWrong')}</b>}
         {l.status === 'ok' && l.ecf === true && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.carriedForward')}</b>}
         {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
       </div>

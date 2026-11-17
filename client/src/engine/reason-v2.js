@@ -543,6 +543,29 @@ function relationFault(a, b) {
   }
   return null;
 }
+// The solution region of a linear inequality in one variable: `a·v + b op 0`
+// read as `v op' bound`, the sign of a deciding whether op flips. Null unless
+// the relation is exactly linear in a single variable (checked at five points).
+function linearRegion(rel) {
+  if (!rel || rel.t !== 'relation') return null;
+  const vars = new Set([...variablesOf(rel.l), ...variablesOf(rel.r)]);
+  if (vars.size !== 1) return null;
+  const v = [...vars][0];
+  const f = t => { const env = { [v]: t }; return evaluate(rel.l, env) - evaluate(rel.r, env); };
+  try {
+    const f0 = f(0), f1 = f(1), f2 = f(2), fm = f(-1), f7 = f(7);
+    if (![f0, f1, f2, fm, f7].every(Number.isFinite)) return null;
+    const a = f1 - f0;
+    const tol = 1e-9 * Math.max(1, Math.abs(f0), Math.abs(a));
+    if (Math.abs(a) < 1e-12 || Math.abs(f2 - (f0 + 2 * a)) > tol || Math.abs(fm - (f0 - a)) > tol || Math.abs(f7 - (f0 + 7 * a)) > tol) return null;
+    return { v, op: a > 0 ? rel.op : flipRelation(rel.op), bound: -f0 / a };
+  } catch { return null; }
+}
+function sameLinearRegion(a, b) {
+  const ra = linearRegion(a), rb = linearRegion(b);
+  if (!ra || !rb || ra.v !== rb.v) return null;
+  return ra.op === rb.op && numsClose(ra.bound, rb.bound, 1e-9);
+}
 export function assessRelationLine({ text, previous = null, previousTrusted = false, meta = null } = {}) {
   const rel = typeof text === 'string' ? parseRelation(text) : text;
   if (!rel) return { status: 'note', trusted: false, relation: null, note: 'Skipped — I couldn’t parse this inequality safely.' };
@@ -568,6 +591,21 @@ export function assessRelationLine({ text, previous = null, previousTrusted = fa
     }
   }
 
+  if (previous) {
+    // Proportional residuals did not settle it (collecting terms moves the
+    // coefficient's sign, or the sides were rearranged): compare the solution
+    // regions themselves. A disproof needs a verified line above it.
+    const same = sameLinearRegion(previous, rel);
+    if (same === true) {
+      return previousTrusted
+        ? { status: 'ok', trusted: true, relation: rel }
+        : { status: 'note', trusted: false, relation: rel, note: 'This follows from the previous inequality, but the starting line was not independently verified.' };
+    }
+    if (same === false && previousTrusted) {
+      const fault = { code: 'inequality-step-false', title: 'This step changes the solutions', message: 'This line does not have the same solutions as the line above it — check the arithmetic and the sign of each coefficient when collecting terms.', fix: 'Redo this step from the line above, keeping the sign of every term.', confidence: 'high' };
+      return { status: 'break', trusted: false, relation: rel, note: fault.message, diagnosis: fault };
+    }
+  }
   return { status: 'note', trusted: false, relation: rel, note: 'Pri cannot yet prove that this inequality has exactly the same solution region, so it is not marked correct.' };
 }
 

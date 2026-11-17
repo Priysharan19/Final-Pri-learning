@@ -1,0 +1,2220 @@
+{
+ "ca-001": {
+  "verdicts": [
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ca-002": {
+  "verdicts": [
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ca-003": {
+  "verdicts": [
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ca-004": {
+  "verdicts": [
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-005": {
+  "verdicts": [
+   "abstain",
+   "valid",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-006": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-007": {
+  "verdicts": [
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ca-008": {
+  "verdicts": [
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ca-009": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-010": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-011": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-012": {
+  "verdicts": [
+   "abstain",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ca-013": {
+  "verdicts": [
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-014": {
+  "verdicts": [
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ca-015": {
+  "verdicts": [
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-016": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-017": {
+  "verdicts": [
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-018": {
+  "verdicts": [
+   "valid",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-019": {
+  "verdicts": [
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ca-020": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-021": {
+  "verdicts": [
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ca-022": {
+  "verdicts": [
+   "valid",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-023": {
+  "verdicts": [
+   "valid",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-024": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-025": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-026": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-027": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-028": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-029": {
+  "verdicts": [
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-030": {
+  "verdicts": [
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-031": {
+  "verdicts": [
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-032": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-033": {
+  "verdicts": [
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-034": {
+  "verdicts": [
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-035": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-036": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-037": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-038": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-039": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-040": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-041": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-042": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-043": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-044": {
+  "verdicts": [
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-045": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-046": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-047": {
+  "verdicts": [
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-048": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-049": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-050": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-051": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-052": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-053": {
+  "verdicts": [
+   "valid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ca-054": {
+  "verdicts": [
+   "valid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ca-055": {
+  "verdicts": [
+   "abstain",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ca-056": {
+  "verdicts": [
+   "abstain",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ca-057": {
+  "verdicts": [
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-058": {
+  "verdicts": [
+   "abstain",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ca-059": {
+  "verdicts": [
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-060": {
+  "verdicts": [
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-061": {
+  "verdicts": [
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-062": {
+  "verdicts": [
+   "invalid",
+   "valid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-063": {
+  "verdicts": [
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-064": {
+  "verdicts": [
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-065": {
+  "verdicts": [
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-066": {
+  "verdicts": [
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "ca-067": {
+  "verdicts": [
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "ca-068": {
+  "verdicts": [
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 0
+ },
+ "eq-001": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-002": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-003": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-004": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-005": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-006": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-007": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 3
+ },
+ "eq-008": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-009": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-010": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-011": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-012": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-013": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-014": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-015": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "eq-016": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-017": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-018": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "eq-019": {
+  "verdicts": [
+   "given",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-020": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-021": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-022": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-023": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-024": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-025": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "eq-026": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-027": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 3
+ },
+ "eq-028": {
+  "verdicts": [
+   "given",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-029": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-030": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-031": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-032": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-033": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-034": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-035": {
+  "verdicts": [
+   "given",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-036": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-037": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-038": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-039": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-040": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-041": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-042": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-043": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-044": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-045": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-046": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-047": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-048": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-049": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-050": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-051": {
+  "verdicts": [
+   "given",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-052": {
+  "verdicts": [
+   "given",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-053": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-054": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-055": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-056": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-057": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-058": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-059": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-060": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-061": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-062": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "eq-063": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-064": {
+  "verdicts": [
+   "given",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-065": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-066": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-067": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-068": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-069": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "eq-070": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-071": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-072": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-073": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "eq-074": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "eq-075": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "eq-076": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "eq-077": {
+  "verdicts": [
+   "given",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "eq-078": {
+  "verdicts": [
+   "given",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-079": {
+  "verdicts": [
+   "given",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-080": {
+  "verdicts": [
+   "given",
+   "abstain"
+  ],
+  "solution": "abstain",
+  "firstBreak": null
+ },
+ "eq-081": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "eq-082": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-001": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-002": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-003": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-004": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-005": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-006": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-007": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-008": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-009": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-010": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-011": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-012": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-013": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-014": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-015": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-016": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "ex-017": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-018": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-019": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-020": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-021": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "ex-022": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "ex-023": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-024": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-025": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-026": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-027": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-028": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "ex-029": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-030": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-031": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-032": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-033": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-034": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-035": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-036": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-037": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-038": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-039": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-040": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-041": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-042": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-043": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-044": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-045": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-046": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-047": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-048": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "ex-049": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-050": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "ex-051": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-052": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-053": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-054": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-055": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-056": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-057": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-058": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "ex-059": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-060": {
+  "verdicts": [
+   "given",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-061": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-062": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-063": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-064": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-065": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-066": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-067": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-068": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-069": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-070": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-071": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-072": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-073": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-074": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-075": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "invalid",
+   "abstain",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 3
+ },
+ "ex-076": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain",
+   "abstain",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-077": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-078": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-079": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-080": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-081": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-082": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-083": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "invalid",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 3
+ },
+ "ex-084": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-085": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-086": {
+  "verdicts": [
+   "given",
+   "valid",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 2
+ },
+ "ex-087": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-088": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain",
+   "abstain",
+   "invalid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-089": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-090": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-091": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-092": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-093": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "abstain"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-094": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-095": {
+  "verdicts": [
+   "given",
+   "invalid",
+   "invalid",
+   "valid"
+  ],
+  "solution": "incorrect",
+  "firstBreak": 1
+ },
+ "ex-pr1005-pad": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-pr1005-domain": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-pr1005-foreign": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ }
+}

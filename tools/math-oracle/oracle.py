@@ -342,7 +342,9 @@ def cmd_candidates(a):
             q = json.loads(line)
             k = q['key']
             try:
-                if q['type'] == 'numeric':
+                if q.get('corpus'):
+                    cands = [tuple(c) for c in q['corpus']['candidates']]
+                elif q['type'] == 'numeric':
                     K, known = exact_key(k)
                     if K is None:
                         continue
@@ -644,6 +646,8 @@ def cmd_judge(a):
         rows = list(ex.map(_judge_one, jobs, chunksize=64))
     meta = json.load(open(a.meta)) if a.meta else {}
     report = summarise(rows, meta)
+    report['corpus_keys'] = [verify_corpus_key(q) for q in qs.values() if q.get('corpus')]
+    report['corpus_rows'] = [r for r in rows if r['qid'].startswith('corpus:')]
     json.dump(report, open(a.json, 'w'), indent=None, separators=(',', ':'), default=str)
     open(a.md, 'w').write(markdown(report))
     fc = report['totals'].get('FALSE_CREDIT', 0)
@@ -651,6 +655,38 @@ def cmd_judge(a):
           f"SYMPY_UNABLE={report['totals'].get('SYMPY_UNABLE', 0)} → {a.json}, {a.md}", file=sys.stderr)
     if a.strict and fc:
         sys.exit(1)
+
+
+def verify_corpus_key(q):
+    """Prove an authored corpus key true before trusting it as the reference."""
+    v = q['corpus'].get('verify') or {}
+    out = {'qid': q['qid'], 'prompt': q['corpus'].get('prompt'), 'how': v.get('how'), 'status': 'UNVERIFIED'}
+    try:
+        if v.get('how') == 'simplify':
+            d = sp.simplify(parse(v['claim']) - parse(v['equals']))
+            out['status'] = 'PROVED' if d == 0 else f'NOT PROVED (residue {d})'
+        elif v.get('how') == 'antiderivative':
+            # Fundamental theorem of calculus: F' equals the integrand, and F is
+            # continuous on the interval (the corpus note says why), so the
+            # integral is F(b) - F(a). Proved symbolically, never numerically.
+            x = sp.Symbol(v['var'], real=True)
+            ren = lambda e: e.xreplace({s: x for s in e.free_symbols if s.name == v['var']})
+            f, F = ren(parse(v['integrand'])), ren(parse(v['antiderivative']))
+            dF = sp.simplify(sp.diff(F, x) - f)
+            val = sp.simplify(F.subs(x, parse(v['to'])) - F.subs(x, parse(v['from'])))
+            ok = dF == 0 and sp.simplify(val - parse(v['equals'])) == 0
+            out['status'] = 'PROVED' if ok else f"NOT PROVED (F' - f = {dF}; F(b) - F(a) = {val})"
+            out['integral'] = str(val)
+        elif v.get('how') == 'integrate':
+            x = sp.Symbol(v['var'], real=True)
+            f = parse(v['integrand']).xreplace({s: x for s in parse(v['integrand']).free_symbols if s.name == v['var']})
+            val = sp.integrate(f, (x, parse(v['from']), parse(v['to'])))
+            d = sp.simplify(val - parse(v['equals']))
+            out['status'] = 'PROVED' if d == 0 else f'NOT PROVED (integral {val})'
+            out['integral'] = str(sp.simplify(val))
+    except Exception as err:
+        out['status'] = f'UNABLE ({type(err).__name__})'
+    return out
 
 
 DISAGREE = ('FALSE_CREDIT', 'FALSE_REJECTION', 'SYMPY_UNABLE')
@@ -733,6 +769,16 @@ def markdown(rep):
             L.extend(_row(r) for r in rows[:80])
             if len(rows) > 80:
                 L.append(f'\n…{len(rows) - 80} more in the JSON report.')
+    if rep.get('corpus_keys'):
+        L.append('\n## Authored corpus: keys proved before use\n')
+        L.append('| Question | Prompt | How | Key |\n|---|---|---|---|')
+        for k in rep['corpus_keys']:
+            L.append(f"| `{k['qid'].split('|')[0]}` | {k['prompt']} | {k['how']} | {k['status']} |")
+        rows = [r for r in rep.get('corpus_rows', [])]
+        if rows:
+            L.append('\n| Question | Candidate | Input | Engine | SymPy | Class |\n|---|---|---|---|---|---|')
+            for r in rows:
+                L.append(f"| `{r['qid'].split('|')[0]}` | {r['family']}/{r['label']} | `{r['input']}` | {'accept' if r['engine']['correct'] else 'refuse'} | {r['oracle']['status']} | {r['class']} |")
     L.append('\n## Policy buckets (not defects; listed so they stay visible)\n')
     for c in POLICY:
         labs = rep['policy_labels'][c]
