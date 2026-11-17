@@ -5,6 +5,7 @@
 // a marks criteria table. All marking logic is the verified v3 engine.
 // ─────────────────────────────────────────────────────────────────────────────
 import { confidenceFloorOf, isLowConfidence } from '../ink/readingCorrection.js';
+import { needsConfirmation, confirmedRevision } from '../ink/confirmGate.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { answerToTex } from '../engine/answerTex.js';
@@ -1260,7 +1261,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const inkAnswer = !inkProposal ? reading
     : inkAnswerEdit !== null ? inkAnswerEdit
       : inkProposal.status === 'proposed' ? inkProposal.answer : '';
-  const needsCheck = !!doubt && !!reading && !inkStale && vouched !== reading;
+  // Every handwritten reading is confirmed before it is sent (P0 #11): a
+  // doubted one through the check-this-reading step, any other with one
+  // combined "Confirm and submit" tap. The gate is the pure confirmGate.js.
+  const needsCheck = needsConfirmation({ writeMode, resolved, reading, stale: inkStale, vouched });
+  const confirmOnly = needsCheck && !doubt;
   // The page as it stands now. Submit records it; a graded result is shown as
   // a result of what is on screen only while this has not changed since.
   const photoIdentity = useMemo(() => photoFingerprint(photo), [photo]);
@@ -1361,10 +1366,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   /** One tap: the student stands behind this reading, and it goes. */
   function acceptReading() {
+    // Which revision of the reading was confirmed travels with the submission
+    // record on this device; the strokes are sent with it as always, so both
+    // the original ink and the confirmed reading are there for grading.
+    confirmedRef.current = confirmedRevision({ reading, signature: inkSignature, text: inkResult?.text, edited: (inkResult?.lines || []).some(l => l?.corrected === true) });
     setVouched(reading);
     setChecking(false);
     submit(reading);
   }
+  const confirmedRef = useRef(null);
 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
@@ -1446,7 +1456,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     // A placement answer is not replayed through practice on relaunch: the
     // placement session itself resumes at this exact question.
     if (!diagnostic && !savePendingSubmission(question.id,
-      { submissionId, answer: String(given), steps, viaInk, sourceMode, ms, lines },
+      { submissionId, answer: String(given), steps, viaInk, sourceMode, ms, lines, confirmed: viaInk ? confirmedRef.current : null },
       { label: question.subtopicName })) {
       // Without durable idempotency identity, a response lost after COMMIT
       // cannot be recovered safely. Do not send the answer and then pretend
@@ -2251,6 +2261,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       // that can — never a Submit that is bound to be refused. A teacher's
       // own question has no such replacement, so it offers none.
       ? (unmarkable.replace ? { label: t(replaceArmed ? 'check.draftConfirmAction' : 'check.draftAction'), run: replaceQuestion, disabled: busy } : null)
+    : confirmOnly
+      ? { label: t('verdict.confirmAndSubmit'), run: acceptReading, disabled: busy || !canSubmit }
     : needsCheck && checking
       ? { label: t('verdict.confirmReading'), run: acceptReading, disabled: busy }
       : needsCheck
@@ -2264,7 +2276,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // check (never Next, never a confirmation the student has to read). No other
   // shortcut in the app uses a modifier with Enter; Enter alone keeps its
   // field behaviour.
-  const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable && !(needsCheck && checking);
+  const instrumentCheckKey = INSTRUMENT && !!primary && !resolved && !state.res?.conflict && !unmarkable && !needsCheck;
   const checkKeyRef = useRef(null);
   checkKeyRef.current = instrumentCheckKey && !primary.disabled ? primary.run : null;
   useEffect(() => {
@@ -2903,7 +2915,24 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
         {/* A reading in doubt asks about the smallest useful region — one
             symbol — instead of asking for the whole solution again. */}
-        {needsCheck && checking && (
+        {confirmOnly && (
+          <div className="ws-check ws-confirm" role="group" aria-label={t('verdict.confirmTitle')} data-confirm-reading>
+            <div className="ws-check-title"><Icon name="check" />{t('verdict.confirmTitle')}</div>
+            <div className="ws-confirm-lines">
+              {(inkResult?.lines || []).map((l, i) => (
+                <div key={i} className={`ws-confirm-line${isLowConfidence(l, confidenceFloorOf(inkResult)) ? ' is-unsure' : ''}`} data-confirm-line={i}>
+                  <MathText text={`$${texOf(String(l?.text ?? ''))}$`} />
+                  {isLowConfidence(l, confidenceFloorOf(inkResult)) && <span className="ws-confirm-unsure">{t('verdict.confirmUnsure')}</span>}
+                </div>
+              ))}
+            </div>
+            <div className="ws-confirm-acts">
+              <button type="button" className="btn btn-quiet btn-sm" data-confirm-edit
+                onClick={() => inkControlRef.current?.edit?.((inkResult?.lines || []).findIndex(l => isLowConfidence(l, confidenceFloorOf(inkResult))))}>{t('verdict.confirmEdit')}</button>
+            </div>
+          </div>
+        )}
+        {needsCheck && checking && !confirmOnly && (
           <div className="ws-check" role="status">
             <div className="ws-check-title"><Icon name="uncertain" />{t('verdict.checkReadingFirst')}</div>
             <div className="ws-check-body">{checkCopy}</div>

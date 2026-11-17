@@ -542,7 +542,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
   // v1.1 instrument: the footer's Reset is the toolbar's Clear (with its undo).
   useEffect(() => {
     if (!controlRef) return undefined;
-    controlRef.current = { clear: () => act('clear')(), read: () => readNow() };
+    controlRef.current = {
+      clear: () => act('clear')(), read: () => readNow(),
+      // "Edit" on the confirmation: open the correction for a line (the first
+      // doubted one, else the last, which carries the answer).
+      edit: (index) => { const lines = recRef.current.lines; if (!lines.length) return; const i = index >= 0 && index < lines.length ? index : lines.length - 1; setCorrecting({ index: i, text: lines[i].text }); }
+    };
     return () => { controlRef.current = null; };
   });
 
