@@ -69,11 +69,12 @@ export function prerequisiteFor(q) {
  */
 export function causeFromWork(work, { recognition = null, linesSent = false, checkRan = true } = {}) {
   if (recognition === 'unconfirmed' || recognition === 'low-confidence') return causeClassOf({ recognition });
-  if (!linesSent) return causeClassOf({});
+  if (!linesSent) return causeClassOf({ seen: false });
   if (!checkRan || !work) return causeClassOf({ checked: false });
   if (work.status === 'limit' || work.status === 'unchecked' || work.status === 'final' || work.status === 'unread') return causeClassOf({ checked: false });
   const reply = work.reply || {};
-  if (reply.status === 'held') return causeClassOf({});
+  // 'held' says at least one line verified; only all of them is "holds".
+  if (reply.status === 'held') return Number(reply.verifiedLines) >= Number(work.lineCount) && Number(work.lineCount) > 0 ? causeClassOf({ allLinesHold: true }) : causeClassOf({ checked: false });
   if (reply.status === 'break' && Number.isInteger(reply.line)) {
     // The engine's diagnosis code names an ontology entry only when Step Check
     // can detect it deterministically; that is the confidence this path has.

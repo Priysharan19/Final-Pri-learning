@@ -45,7 +45,7 @@ const FRESH = P.skillEvidence([], { skill: 'dp-1', now: NOW });
 // ── Menu and levels ─────────────────────────────────────────────────────────
 section('menu');
 eq('the fixed menu, smallest dose first', P.ACTIONS, ['keep-going', 'confirm-reading', 'self-check', 'mistake-graph', 'nudge', 'prerequisite', 'method', 'worked']);
-eq('every cause class is named', P.CAUSE_CLASSES, ['concept', 'arithmetic', 'method', 'notation', 'recognition', 'unverified', 'none']);
+eq('every cause class is named', P.CAUSE_CLASSES, ['concept', 'arithmetic', 'method', 'notation', 'recognition', 'unverified', 'none', 'unseen']);
 eq('assistance levels follow the PMR ladder and never decrease along the menu',
   P.ACTIONS.map(a => P.ASSISTANCE_LEVEL[a]), ['A0', 'A0', 'A2', 'A2', 'A3', 'A3', 'A4', 'A5']);
 eq('rung actions are exactly the three hint rungs below the solution', P.RUNG_ACTIONS, HINT_RUNGS.slice(0, 3));
@@ -82,6 +82,10 @@ eq('unverified never carries a line-specific self-check', decide({ class: 'unver
 // none
 eq('no break, no help asked → keep going', [act(decide({ class: 'none' }, { helpRequested: false })), decide({ class: 'none' }, { helpRequested: false }).level], ['keep-going', 'A0']);
 eq('no break, help asked → next rung', act(decide({ class: 'none' })), 'nudge');
+const unseen = decide({ class: 'unseen' });
+eq('no working seen, help asked → next rung, saying the working was not seen', [unseen.action, unseen.reason.key], ['nudge', 'tutorPolicy.reason.unseen.rung']);
+eq('no working seen, no help asked → keep going without a claim', decide({ class: 'unseen' }, { helpRequested: false }).reason.key, 'tutorPolicy.reason.unseenKeepGoing');
+ok('only an all-lines-verified cause may be told its working needs nothing', ['concept', 'arithmetic', 'method', 'notation', 'recognition', 'unverified', 'unseen'].every(cls => ![decide({ class: cls }, { helpRequested: false }), decide({ class: cls })].some(r => r.reason.key === 'tutorPolicy.reason.keepGoing' || r.reason.key === 'tutorPolicy.reason.none.rung')));
 eq('no break, help asked, faded → general self-check first', [act(decide({ class: 'none' }, {}, FADED)), decide({ class: 'none' }, {}, FADED).prompt.key], ['self-check', 'tutorPolicy.prompt.general']);
 // confidence
 for (const cls of ['concept', 'arithmetic']) {
@@ -99,7 +103,9 @@ eq('a low-confidence reading is recognition', P.causeClassOf({ recognition: 'low
 eq('an ambiguous parse is notation', P.causeClassOf({ parse: 'ambiguous', firstBreak: 0 }), { class: 'notation', line: 1, confidence: 'high' });
 eq('a check that did not run is unverified', P.causeClassOf({ checked: false, firstBreak: 2 }).class, 'unverified');
 eq('every line holds but the answer is not reached → method selection', P.causeClassOf({ allLinesHold: true, reachedAnswer: false }).class, 'method');
-eq('nothing to check → none', P.causeClassOf({}).class, 'none');
+eq('every line checked and holding → none', P.causeClassOf({ allLinesHold: true }).class, 'none');
+eq('no working sent → unseen: nothing is claimed about it', P.causeClassOf({ seen: false }), { class: 'unseen', line: null, confidence: 'high' });
+eq('some lines verified, no break, not all → unverified, never "holds"', P.causeClassOf({}).class, 'unverified');
 eq('a bare counterexample is unverified', P.causeClassOf({ firstBreak: 1, diagnosis: { code: 'counterexample', confidence: 'high' }, category: 'unclassified' }).class, 'unverified');
 eq('a medium-confidence diagnosis is unverified, with its line', P.causeClassOf({ firstBreak: 1, diagnosis: { code: 'sign-flipped', confidence: 'medium' }, category: 'copying' }), { class: 'unverified', line: 2, confidence: 'medium' });
 const byCategory = {};
@@ -121,6 +127,7 @@ ok('a reveal is never independent', !P.supportFaded(P.skillEvidence([att({ at: N
 const helped = P.skillEvidence([att({ at: NOW - 2 * DAY, policyAssistance: [{ action: 'self-check', level: 'A2' }] }), att({ at: NOW - DAY, policyAssistance: [{ action: 'self-check', level: 'A2' }] })], { skill: 'dp-1', now: NOW });
 eq('an attempt the policy helped above A0 is assisted, not independent', [helped.independentSuccesses, helped.assistedSuccesses, P.supportFaded(helped)], [0, 2, false]);
 eq('an A0 offer (keep going / confirm the reading) keeps it independent', P.skillEvidence([att({ policyAssistance: [{ action: 'keep-going', level: 'A0' }] })], { skill: 'dp-1', now: NOW }).independentSuccesses, 1);
+eq('a recorded request with no plan (level null) is help asked for', P.skillEvidence([att({ policyAssistance: [{ action: null, level: null }] })], { skill: 'dp-1', now: NOW }).independentSuccesses, 0);
 eq('evidence is per skill: another dot point does not count', P.skillEvidence([att({ dotpoint: 'dp-2' }), att({ dotpoint: 'dp-2' })], { skill: 'dp-1', now: NOW }).attempts, 0);
 eq('the last attempt\'s rungs are kept', P.skillEvidence([att({ hintLevel: 2, hintRungs: ['nudge', 'method'] })], { skill: 'dp-1', now: NOW }).lastRungs, ['nudge', 'method']);
 eq('faded support starts LOWER than unfaded for every cause with a line',
@@ -173,7 +180,7 @@ eq('with only the solution left, the policy says so and keeps going', [spent.act
 
 // ── Copy: every reachable key, en + hi, no values, no efficacy claims ──────
 section('copy');
-const keys = new Set(['tutorPolicy.ask', 'tutorPolicy.asking', 'tutorPolicy.title', 'tutorPolicy.why', 'tutorPolicy.unavailable', 'tutorPolicy.ladderCost', 'tutorPolicy.action.rung',
+const keys = new Set(['tutorPolicy.reason.unseenKeepGoing', 'tutorPolicy.ask', 'tutorPolicy.asking', 'tutorPolicy.title', 'tutorPolicy.why', 'tutorPolicy.unavailable', 'tutorPolicy.ladderCost', 'tutorPolicy.action.rung',
   'tutorPolicy.action.keepGoing', 'tutorPolicy.action.confirmReading', 'tutorPolicy.action.selfCheck', 'tutorPolicy.action.mistakeGraph', 'tutorPolicy.action.prerequisite']);
 const rendered = [];
 for (const cause of EVERY_CAUSE) for (const rungLevel of [0, 1, 2, 3]) for (const offered of offeredSets) for (const evidence of evidences)
@@ -183,7 +190,7 @@ for (const cause of EVERY_CAUSE) for (const rungLevel of [0, 1, 2, 3]) for (cons
     if (r.prompt) keys.add(r.prompt.key);
     rendered.push(r);
   }
-const GENERAL = new Set(['tutorPolicy.reason.faded', 'tutorPolicy.reason.keepGoing', 'tutorPolicy.reason.unverified', 'tutorPolicy.reason.unverifiedKeepGoing', 'tutorPolicy.reason.ladderSpent', 'tutorPolicy.reason.recognition', 'tutorPolicy.reason.exam']);
+const GENERAL = new Set(['tutorPolicy.reason.noMore', 'tutorPolicy.reason.unseenKeepGoing', 'tutorPolicy.reason.faded', 'tutorPolicy.reason.keepGoing', 'tutorPolicy.reason.unverified', 'tutorPolicy.reason.unverifiedKeepGoing', 'tutorPolicy.reason.ladderSpent', 'tutorPolicy.reason.recognition', 'tutorPolicy.reason.exam']);
 const unmapped = rendered.filter(r => !GENERAL.has(r.reason.key) && P.REASON_KEY[`${r.envelope.causeClass}:${r.rung ? 'rung' : r.action}`] !== r.reason.key)
   .map(r => `${r.envelope.causeClass}:${r.action}`);
 eq('every specific reason is the table\'s sentence for that cause and action — none falls through', [...new Set(unmapped)], []);

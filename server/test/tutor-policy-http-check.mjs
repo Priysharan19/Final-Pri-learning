@@ -75,7 +75,7 @@ async function run(jar, seed, { rungs = 1, asks = false } = {}) {
 try {
   // Accounts until there is one in each arm of the tutor experiment.
   const accounts = [];
-  for (let i = 0; i < 16 && !(accounts.some(a => a.arm === 'control') && accounts.some(a => a.arm === 'policy')); i++) {
+  for (let i = 0; i < 40 && !(accounts.some(a => a.arm === 'control') && accounts.filter(a => a.arm === 'policy').length >= 2); i++) {
     const a = await registerAccount(h, { email: `policy.${i}@example.test`, deviceId: `ipad-policy-${i}` });
     assert.equal((await verifyEmail(h, a.account.id)).status, 200);
     accounts.push({ ...a, arm: assignArm(TUTOR, a.account.id) });
@@ -83,7 +83,8 @@ try {
   const P = accounts.find(a => a.arm === 'policy');
   const C = accounts.find(a => a.arm === 'control');
   const O = accounts.find(a => a !== P && a !== C) || await (async () => { const a = await registerAccount(h, { email: 'policy.other@example.test', deviceId: 'ipad-policy-other' }); await verifyEmail(h, a.account.id); return a; })();
-  ok(P && C, 'an account in each arm');
+  const P2 = accounts.find(a => a.arm === 'policy' && a !== P);
+  ok(P && C && P2, 'an account in the control arm and two in the policy arm');
 
   // ── Dark by default ──────────────────────────────────────────────────────
   const q0 = await issue(P.jar, 4100);
@@ -114,10 +115,11 @@ try {
   eq(on.plans.map(p => [p.status, p.data.plan?.action, p.data.plan?.rung, p.data.plan?.charges]), [[200, 'nudge', 'nudge', true], [200, 'method', 'method', true]], 'the plans pointed at the next rung each time');
   eq(on.event.experiment, { assignments: [{ id: 'tutor-first-help-v1', version: 1, arm: 'policy' }], family: LINEAR, ms: 42000 }, 'the event carries the arm, the item family and the time');
   eq(on.event.policyAssistance, [{ action: 'nudge', level: 'A3' }, { action: 'method', level: 'A4' }], 'and the offers, so it is assisted evidence');
+  const reqRow = await h.db.get("SELECT response_json FROM idempotency_keys WHERE scope='practice-help-plan' AND key=?", [on.id]);
+  ok(!!reqRow, 'the offers are kept under the account\'s practice-help-plan scope');
 
   // Same seed, same rungs, same answer on two fresh accounts: identical marks.
-  const P2 = accounts.find(a => a.arm === 'policy' && a !== P);
-  if (P2) {
+  {
     delete process.env.PRI_FEATURE_TUTOR_POLICY; delete process.env.PRI_EXPERIMENTS;
     const a = await run(P2.jar, 5555, { rungs: 1 });
     process.env.PRI_FEATURE_TUTOR_POLICY = '1'; process.env.PRI_EXPERIMENTS = 'tutor-first-help-v1';
@@ -132,7 +134,8 @@ try {
   eq([p1.status, p1.data.plan.action, p1.data.plan.level, p1.data.experiment], [200, 'nudge', 'A3', { id: 'tutor-first-help-v1', arm: 'policy' }], 'a plan: the next rung, with its level and arm');
   eq(await hintLevelRow(id1), undefined, 'asking for a plan opens no rung');
   ok(!('hint' in p1.data) && !('markWeight' in p1.data.plan), 'and serves no hint text and states no weight');
-  eq(p1.data.plan.reason.key, 'tutorPolicy.reason.none.rung', 'with its plain reason');
+  eq(p1.data.plan.reason.key, 'tutorPolicy.reason.unseen.rung', 'with its plain reason, claiming nothing about working it has not seen');
+  ok(!('envelope' in p1.data.plan), 'the envelope (with its cause class) stays on the server');
   const nudge1 = await hint(P.jar, id1, 'nudge');
   eq([nudge1.data.level, nudge1.data.markWeight], [1, 0.9], 'the rung is charged by the hint route, exactly as before');
 
@@ -153,6 +156,26 @@ try {
   const fin = await plan(P.jar, q2.data.question.id, { helpRequested: true, lines: ['6m + 5 = m - 10', 'm = -3'] });
   eq([fin.data.plan.action, fin.data.plan.reason.key, fin.data.lineCheckSpent], ['nudge', 'tutorPolicy.reason.unverified', false], 'final-answer lines: unverified, the question\'s own hint, nothing charged');
 
+  // The line check's guards apply to the plan's lines: the per-question cap
+  // and the daily tutor allowance, peeked before any check runs.
+  {
+    const { sha256 } = await import('../platform/security.js');
+    const qa = await issue(P.jar, 5050);
+    const ida = qa.data.question.id;
+    await h.db.run('INSERT INTO rate_limits(bucket, window_start, count) VALUES (?,?,?)', [`line-check:${sha256(`${P.account.id}:${ida}`).slice(0, 32)}`, Date.now(), 2]);
+    const capped = await plan(P.jar, ida, { helpRequested: true, lines: ['6m + 5 = m - 10', '5m + 5 = -10'] });
+    eq([capped.data.plan.reason.key, capped.data.lineCheckSpent], ['tutorPolicy.reason.unverified', false], 'two line checks used: the plan cannot check, says so, spends nothing');
+    const lc = await post('/v1/practice/' + ida + '/hint', { rung: 'nudge', lines: ['6m + 5 = m - 10'] }, P.jar);
+    eq(lc.data.work, { status: 'limit' }, 'and the nudge\'s line check is still capped');
+    const qb = await issue(P.jar, 5151);
+    const dayBucket = `tutor-day:${sha256(P.account.id).slice(0, 24)}`;
+    const before2 = await lineChecks();
+    await h.db.run('INSERT INTO rate_limits(bucket, window_start, count) VALUES (?,?,?) ON CONFLICT(bucket) DO UPDATE SET window_start=excluded.window_start, count=excluded.count', [dayBucket, Date.now(), 100000]);
+    const spentDay = await plan(P.jar, qb.data.question.id, { helpRequested: true, lines: ['6m + 5 = m - 10', '5m + 5 = -10'] });
+    eq([spentDay.data.plan.reason.key, spentDay.data.lineCheckSpent, await lineChecks()], ['tutorPolicy.reason.unverified', false, before2], 'the daily tutor allowance spent: no check runs and none is charged');
+    await h.db.run('DELETE FROM rate_limits WHERE bucket = ?', [dayBucket]);
+  }
+
   // ── The control arm ──────────────────────────────────────────────────────
   const checksBefore = await lineChecks();
   const qc = await issue(C.jar, 4646);
@@ -161,7 +184,7 @@ try {
   eq(await lineChecks(), checksBefore, 'and no line check is spent for it');
   const ctrl = await run(C.jar, 4747, { rungs: 1, asks: true });
   eq(ctrl.event.experiment.assignments, [{ id: 'tutor-first-help-v1', version: 1, arm: 'control' }], 'the control account\'s attempts carry its arm');
-  ok(!('policyAssistance' in ctrl.event), 'and no policy offers');
+  eq(ctrl.event.policyAssistance, [{ action: null, level: null }], 'and the help REQUEST is recorded in the control arm too (so the outcome exclusion is the same in both arms)');
   eq(ctrl.receipt.markWeight, 0.9, 'and the ladder charges as always');
 
   // ── Flag on, experiment off: everyone gets the plan, events are unstamped ─
@@ -187,10 +210,11 @@ try {
   eq(causeFromWork({ charge: true, code: 'sign-on-transfer', reply: { status: 'break', verifiedLines: 0, line: 1 } }, { linesSent: true }).class, 'concept', 'a named misconception → concept');
   eq(causeFromWork({ charge: true, code: 'counterexample', reply: { status: 'break', verifiedLines: 0, line: 1 } }, { linesSent: true }).class, 'unverified', 'a bare counterexample → unverified');
   eq(causeFromWork({ charge: true, code: null, reply: { status: 'break', verifiedLines: 0, line: 3 } }, { linesSent: true }).class, 'unverified', 'a break with no code → unverified');
-  eq(causeFromWork({ charge: true, reply: { status: 'held', verifiedLines: 2 } }, { linesSent: true }).class, 'none', 'held lines → no break');
+  eq(causeFromWork({ charge: true, lineCount: 2, reply: { status: 'held', verifiedLines: 2 } }, { linesSent: true }).class, 'none', 'every line held → no break');
+  eq(causeFromWork({ charge: true, lineCount: 3, reply: { status: 'held', verifiedLines: 2 } }, { linesSent: true }).class, 'unverified', 'some lines held, not all → unverified, never "holds"');
   eq(['limit', 'unchecked', 'final', 'unread'].map(status => causeFromWork({ status }, { linesSent: true }).class), ['unverified', 'unverified', 'unverified', 'unverified'], 'a check that did not run or could not judge → unverified');
   eq(causeFromWork(null, { linesSent: true, checkRan: false }).class, 'unverified', 'lines with the line check switched off → unverified');
-  eq(causeFromWork(null, { linesSent: false }).class, 'none', 'no lines → nothing to check');
+  eq(causeFromWork(null, { linesSent: false }).class, 'unseen', 'no lines → unseen: nothing claimed');
   eq(causeFromWork({ charge: true, code: 'sign-on-transfer', reply: { status: 'break', line: 1 } }, { recognition: 'low-confidence', linesSent: true }).class, 'recognition', 'a doubtful reading outranks any diagnosis');
 
   console.log(`TUTOR POLICY HTTP: PASS — ${count}/${count} checks`);

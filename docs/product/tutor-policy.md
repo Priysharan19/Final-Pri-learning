@@ -38,7 +38,8 @@ The cause class comes from engine outputs only, never from a model.
 | method | Every line holds, but the answer is not reached. |
 | concept / arithmetic | The Step Check diagnosis code maps to an ontology entry, by category. Copying and arithmetic slips count as arithmetic. |
 | unverified | A bare counterexample, a diagnosis below high confidence, or a check that did not run. |
-| none | Nothing to check, or the working so far holds. |
+| none | Every line sent was checked and holds. Only then does the copy say nothing needs help. |
+| unseen | No working was sent. The copy makes no claim about it. |
 
 ### Rules that never bend
 
@@ -59,10 +60,10 @@ These are proven by `client/test/tutor-policy-check.mjs` across 35,840 contexts.
 
 - It answers 404 unless `PRI_FEATURE_TUTOR_POLICY=1`.
 - It reads the escrowed question, the committed rung level and the account's graded attempts.
-- When working lines are sent, it runs the same guarded line check as the nudge. That costs one of the question's two line checks, and only when the check ran.
+- When working lines are sent, it runs the same guarded line check as the nudge. Like "Check this line so far", that costs one of the question's two line checks and one unit of the daily tutor allowance, both only when the check ran. With either spent, no check runs and the plan says it could not check.
 - It never serves hint text, opens a rung, or touches a mark, credit or receipt.
 
-A served plan is recorded under the `practice-help-plan` scope and copied onto the graded attempt as `policyAssistance`, so a policy-helped attempt is never read as independent evidence. The scope is included in the account data export.
+Every request is recorded under the `practice-help-plan` scope and copied onto the graded attempt as `policyAssistance`, in every arm, the control arm included (there it is a request with no plan). A policy-helped attempt is never read as independent evidence, and the experiment excludes any item on which help was asked for, by the same rule in both arms. The scope is included in the account data export. The decision's envelope, with its cause class, stays on the server.
 
 ## Experiments
 
@@ -95,6 +96,10 @@ The readout works through these checks in order:
 6. It never names a winner. Promotion requires all of: the lower bound above zero, no breached guardrail, a recorded A/A pass, and an owner decision.
 
 With about 12 real accounts today, the readout will refuse for a long time. That is the intended behaviour.
+
+## Open owner decision
+
+Before a question is resolved, the plan's reason distinguishes a calculation slip from a rule that does not hold, and points at a line. `tutor.js` keeps the misconception itself hidden until resolution. The plan's wording is line-and-kind only, with no misconception name, value or correction. Whether even the kind should wait until resolution is an owner decision. The code supports either answer: collapsing the per-cause reasons to line-only wording is a copy-table change.
 
 ## Known limits
 

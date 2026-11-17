@@ -31,9 +31,9 @@
   "trigger": "Assignment is computed for every eligible account from a stable hash of (salt, account id) and stamped on each graded-attempt event while the experiment is active (intention to treat). Exposure to the panel is not required for inclusion.",
   "primaryOutcome": {
     "id": "delayed-independent-transfer",
-    "definition": "Per account, the first index attempt after assignment on skill S (dot point, else generator) whose skill has a later qualifying outcome: the first graded attempt on S from a DIFFERENT item family (generator) made at least delayHours after the index attempt, with no hint-ladder rung opened, no tutor-policy offer above A0, not a reveal and not a repeat. Success = that outcome attempt is correct. One binary outcome per account.",
+    "definition": "Per account, the first index attempt after assignment on skill S (dot point, else generator) whose skill has a later qualifying outcome: the first graded attempt on S from a DIFFERENT item family (generator) made at least delayHours after the index attempt, with no hint-ladder rung opened, no help requested through the help plan, not a reveal and not a repeat. Success = that outcome attempt is correct. One binary outcome per account.",
     "delayHours": 24,
-    "independence": "hintLevel 0, revealed false, repeat false, and no tutor-policy offer above A0 on the item (policyAssistance). Tutor-panel use is device-observed and not on the event; it is a recorded limitation, not an assumption of independence.",
+    "independence": "hintLevel 0, revealed false, repeat false, and no help requested on the item through the help plan, in either arm (policyAssistance: a request is recorded in the control arm too, so the exclusion does not depend on the arm). Tutor-panel use is device-observed and not on the event; it is a recorded limitation, not an assumption of independence.",
     "missing": "An account with no qualifying outcome is missing, never a failure. Outcome observation rates are reported per arm and checked for imbalance."
   },
   "guardrails": [

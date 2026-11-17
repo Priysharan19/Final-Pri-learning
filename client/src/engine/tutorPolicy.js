@@ -43,8 +43,12 @@ import { HINT_RUNGS, rungLevelOf } from './hintLadder.js';
 
 export const TUTOR_POLICY_VERSION = 'tutor-policy-v1';
 
-/** The cause classes of a verified first break. `none` = no break found. */
-export const CAUSE_CLASSES = Object.freeze(['concept', 'arithmetic', 'method', 'notation', 'recognition', 'unverified', 'none']);
+/**
+ * The cause classes of a verified first break. `none` = every line sent was
+ * verified and none breaks; `unseen` = no working was sent, so nothing is
+ * claimed about it either way.
+ */
+export const CAUSE_CLASSES = Object.freeze(['concept', 'arithmetic', 'method', 'notation', 'recognition', 'unverified', 'none', 'unseen']);
 
 /** The fixed menu, in dose order (smallest first). */
 export const ACTIONS = Object.freeze(['keep-going', 'confirm-reading', 'self-check', 'mistake-graph', 'nudge', 'prerequisite', 'method', 'worked']);
@@ -88,16 +92,20 @@ const clampInt = (v, lo, hi, d) => (Number.isInteger(v) ? Math.max(lo, Math.min(
  *   concept / arithmetic   a HIGH-confidence step diagnosis of that category
  *   unverified    anything else: a counterexample with no named cause, a
  *                 medium/low-confidence diagnosis, or a check that did not run
- *   none          nothing to check yet, or the working so far holds
+ *   none          every line checked holds (allLinesHold) and none breaks
+ *   unseen        no working was sent: nothing is claimed about it
  */
-export function causeClassOf({ recognition = null, parse = null, diagnosis = null, category = null, firstBreak = -1, allLinesHold = false, reachedAnswer = null, checked = true } = {}) {
+export function causeClassOf({ recognition = null, parse = null, diagnosis = null, category = null, firstBreak = -1, allLinesHold = false, reachedAnswer = null, checked = true, seen = true } = {}) {
   const line = Number.isInteger(firstBreak) && firstBreak >= 0 ? firstBreak + 1 : null;
   if (recognition === 'unconfirmed' || recognition === 'low-confidence') return { class: 'recognition', line, confidence: 'high' };
   if (parse === 'ambiguous' || parse === 'unread') return { class: 'notation', line, confidence: 'high' };
+  if (!seen) return { class: 'unseen', line: null, confidence: 'high' };
   if (!checked) return { class: 'unverified', line: null, confidence: 'low' };
   if (line === null) {
     if (allLinesHold && reachedAnswer === false) return { class: 'method', line: null, confidence: 'high' };
-    return { class: 'none', line: null, confidence: 'high' };
+    // Only a check that verified every line may say the working holds.
+    if (allLinesHold) return { class: 'none', line: null, confidence: 'high' };
+    return { class: 'unverified', line: null, confidence: 'low' };
   }
   const confidence = diagnosis?.confidence === 'high' ? 'high' : diagnosis?.confidence === 'medium' ? 'medium' : 'low';
   if (!diagnosis || diagnosis.code === 'counterexample') return { class: 'unverified', line, confidence: 'low' };
@@ -121,7 +129,8 @@ export function skillEvidence(attempts = [], { skill = null, now = Date.now() } 
   for (const a of rows) {
     const rungs = rungLevelOf(a.hintLevel);
     // Help this policy offered on the item above A0 makes it assisted too.
-    const policyHelped = Array.isArray(a.policyAssistance) && a.policyAssistance.some(x => x?.level && x.level !== 'A0');
+    // A recorded request with no plan (level null) counts as help asked for.
+    const policyHelped = Array.isArray(a.policyAssistance) && a.policyAssistance.some(x => x?.level !== 'A0');
     const independent = a.correct === true && rungs === 0 && !policyHelped && a.revealed !== true && a.repeat !== true;
     if (independent) { independentSuccesses += 1; independentStreak += 1; }
     else { if (a.correct === true && (rungs > 0 || policyHelped)) assistedSuccesses += 1; if (a.repeat !== true) independentStreak = 0; }
@@ -164,7 +173,8 @@ function nextRungAction(rungLevel, ladderAvailable) {
 function candidates(cause, { faded, ev, hasLine, help }) {
   switch (cause.class) {
     case 'recognition': return ['confirm-reading'];
-    case 'none': return help ? (faded ? ['self-check', 'rung'] : ['rung']) : ['keep-going'];
+    case 'none':
+    case 'unseen': return help ? (faded ? ['self-check', 'rung'] : ['rung']) : ['keep-going'];
     case 'notation': return hasLine ? ['self-check'] : ['keep-going'];
     case 'arithmetic': return hasLine ? ['self-check', 'mistake-graph', 'rung'] : ['rung'];
     case 'concept': {
@@ -258,7 +268,9 @@ function normaliseCause(cause) {
 
 function reasonFor(action, c, faded) {
   if (c.class === 'unverified') return action === 'keep-going' ? 'tutorPolicy.reason.unverifiedKeepGoing' : 'tutorPolicy.reason.unverified';
-  if (action === 'keep-going') return 'tutorPolicy.reason.keepGoing';
+  if (c.class === 'unseen' && action === 'keep-going') return 'tutorPolicy.reason.unseenKeepGoing';
+  // "Nothing needs help" is said only of working that was checked and holds.
+  if (action === 'keep-going') return c.class === 'none' ? 'tutorPolicy.reason.keepGoing' : 'tutorPolicy.reason.noMore';
   if (faded && (action === 'self-check')) return 'tutorPolicy.reason.faded';
   return REASON_KEY[`${c.class}:${RUNG_ACTIONS.includes(action) ? 'rung' : action}`] || 'tutorPolicy.reason.none.rung';
 }
@@ -273,6 +285,7 @@ export const REASON_KEY = Object.freeze({
   'concept:rung': 'tutorPolicy.reason.concept.rung',
   'method:rung': 'tutorPolicy.reason.method.rung',
   'none:rung': 'tutorPolicy.reason.none.rung',
+  'unseen:rung': 'tutorPolicy.reason.unseen.rung',
   'notation:self-check': 'tutorPolicy.reason.notation.selfCheck',
   'notation:rung': 'tutorPolicy.reason.notation.rung'
 });

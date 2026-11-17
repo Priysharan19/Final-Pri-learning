@@ -45,6 +45,7 @@ eq(definitionDigest({ b: 1, a: [2, { d: 3, c: 4 }] }), definitionDigest({ a: [2,
 
 // ── Activation ──────────────────────────────────────────────────────────────
 eq(activeExperiments({}), [], 'nothing is active by default');
+eq(activeExperiments({}, [{ get id() { throw new Error('read'); } }]), [], 'with nothing listed no definition is even read');
 eq(activeExperiments({ PRI_FEATURE_TUTOR_POLICY: '1' }).map(d => d.id), [], 'the flag alone activates no experiment');
 eq(activeExperiments({ PRI_EXPERIMENTS: 'tutor-first-help-v1' }).map(d => d.id), [], 'the tutor experiment does not run with the policy dark');
 eq(activeExperiments({ PRI_EXPERIMENTS: 'tutor-first-help-v1', PRI_FEATURE_TUTOR_POLICY: '1' }).map(d => d.id), ['tutor-first-help-v1'], 'listed and flagged: active');
@@ -134,7 +135,9 @@ eq(primaryOutcomeOf([row(id0, T0), row(id0, T0 + 30 * H, { family: 'gen-b', dotp
 eq(primaryOutcomeOf([row(id0, T0), row(id0, T0 + 30 * H, { family: 'gen-b', hintLevel: 1 })].map(r => ({ ...JSON.parse(r.payload_json), at: r.occurred_at })), 24), { observed: false }, 'a hinted outcome is not independent');
 eq(primaryOutcomeOf([row(id0, T0), row(id0, T0 + 30 * H, { family: 'gen-b', policyAssistance: [{ action: 'self-check', level: 'A2' }] })].map(r => ({ ...JSON.parse(r.payload_json), at: r.occurred_at })), 24), { observed: false }, 'an outcome the policy helped is not independent');
 eq(primaryOutcomeOf([row(id0, T0), row(id0, T0 + 30 * H, { family: 'gen-b', revealed: true, correct: false })].map(r => ({ ...JSON.parse(r.payload_json), at: r.occurred_at })), 24), { observed: false }, 'a reveal is not an outcome');
-eq(primaryOutcomeOf([row(id0, T0), row(id0, T0 + 30 * H, { family: 'gen-b', policyAssistance: [{ action: 'confirm-reading', level: 'A0' }], correct: false })].map(r => ({ ...JSON.parse(r.payload_json), at: r.occurred_at })), 24).success, false, 'an A0 offer keeps an outcome independent (and a wrong one is a failure)');
+eq(primaryOutcomeOf([row(id0, T0), row(id0, T0 + 30 * H, { family: 'gen-b', policyAssistance: [{ action: 'confirm-reading', level: 'A0' }] })].map(r => ({ ...JSON.parse(r.payload_json), at: r.occurred_at })), 24), { observed: false }, 'ANY help request excludes the item, even an A0 offer — the same rule in both arms');
+eq(primaryOutcomeOf([row(id0, T0), row(id0, T0 + 30 * H, { family: 'gen-b', policyAssistance: [{ action: null, level: null }] })].map(r => ({ ...JSON.parse(r.payload_json), at: r.occurred_at })), 24), { observed: false }, 'a control-arm request (no plan) excludes the item too');
+eq(primaryOutcomeOf([row(id0, T0), row(id0, T0 + 30 * H, { family: 'gen-b', correct: false })].map(r => ({ ...JSON.parse(r.payload_json), at: r.occurred_at })), 24).success, false, 'an unhelped wrong outcome is a failure');
 const exam = readout(tutor, ids.slice(0, 12).flatMap(id => pair(id, true)).map(r => ({ ...r, payload_json: r.payload_json.replace('"mode":"practice"', '"mode":"exam"') })));
 eq(exam.counts.control.assigned + exam.counts.policy.assigned, 0, 'exam-mode attempts never count');
 eq(readout(tutor, [{ account_id: id0, occurred_at: T0, payload_json: JSON.stringify({ correct: true, mode: 'practice' }) }]).counts.control.assigned + readout(tutor, [{ account_id: id0, occurred_at: T0, payload_json: JSON.stringify({ correct: true, mode: 'practice' }) }]).counts.policy.assigned, 0, 'unstamped events (experiment off) are not in the experiment');

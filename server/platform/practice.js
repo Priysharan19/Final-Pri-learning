@@ -32,7 +32,7 @@ import { loadAllBanks, generateQuestion } from '../../client/src/engine/generato
 // below, which read the server's own question and run no student text through
 // the engine, are used directly here.
 import { stepMetaFor, marksPossibleFor, practiceMarksEarned } from './markerOps.js';
-import { LINE_CHECKS_PER_QUESTION, LINE_CHECK_WINDOW_MS, lineCheckFeatureEnabled } from './tutor.js';
+import { LINE_CHECKS_PER_QUESTION, LINE_CHECK_WINDOW_MS, lineCheckFeatureEnabled, tutorDailyLimit } from './tutor.js';
 import { markRowsFor } from './markRows.js';
 import {
   markerPool, markerCooldownUntil, recordMarkerKills, sendMarkerCooldown, sendMarkerBusy,
@@ -55,7 +55,7 @@ import { courseAllowedForTests } from './indiaBanks.js';
 import { serverEdition } from './edition.js';
 import { figureHasExternalRef } from './figureRefs.js';
 import { activeArm, activeExperiments, experimentStamp } from './experiments.js';
-import { buildHelpPlan, causeFromWork, helpPlanBodyError, HELP_PLAN_ATTEMPTS, TUTOR_POLICY_EXPERIMENT, tutorPolicyServerEnabled } from './helpPlan.js';
+import { buildHelpPlan, causeFromWork, helpPlanBodyError, HELP_PLAN_ATTEMPTS, TUTOR_POLICY_EXPERIMENT, TUTOR_POLICY_VERSION, tutorPolicyServerEnabled } from './helpPlan.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -977,7 +977,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // `code` (the engine's diagnosis code) stays on the server: the hint route
     // sends only `reply`; the help plan reads it for the cause class.
     if (evidence.firstBreak >= 0) return { charge: true, capBucket, code: typeof evidence.misconception === 'string' ? evidence.misconception : null, reply: { status: 'break', verifiedLines, line: evidence.firstBreak + 1 } };
-    if (verifiedLines > 0) return { charge: true, capBucket, reply: { status: 'held', verifiedLines } };
+    // `lineCount` stays on the server like `code`: the help plan says the
+    // working holds only when every line sent was verified.
+    if (verifiedLines > 0) return { charge: true, capBucket, lineCount: lines.length, reply: { status: 'held', verifiedLines } };
     return { status: 'unread' };
   }
 
@@ -1631,17 +1633,32 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const q = JSON.parse(escrow.response_json);
     const arm = activeArm(TUTOR_POLICY_EXPERIMENT, accountId, env);
     const base = { authoritative: true, questionId: qid, experiment: arm ? { id: TUTOR_POLICY_EXPERIMENT, arm } : null };
-    if (arm === 'control') return res.status(200).json({ ...base, plan: null });
+    // A help request is recorded in EVERY arm, control included, before
+    // anything else: the experiment's outcome excludes any item on which help
+    // was asked for, the same way in both arms (experimentReadout.js).
+    if (arm === 'control') {
+      await recordPolicyAssistance(accountId, qid, null, now);
+      return res.status(200).json({ ...base, plan: null });
+    }
     const oneTry = ONE_TRY_MODES.includes(q._practiceMode);
     const lines = Array.isArray(body.lines) ? body.lines.map(l => l.trim()).filter(Boolean) : [];
-    const checkRan = lineCheckFeatureEnabled(env);
+    // Lines are checked as "Check this line so far" is: one of the question's
+    // LINE_CHECKS_PER_QUESTION and one unit of the account's daily tutor
+    // allowance (tutor.js), peeked before the check runs and taken only after
+    // it ran. With the allowance spent the lines are not checked at all.
+    const dailyBucket = `tutor-day:${sha256(accountId).slice(0, 24)}`;
+    const dailyLimit = await tutorDailyLimit(db, accountId, env);
+    const dailyRow = lines.length ? await db.get('SELECT window_start, count FROM rate_limits WHERE bucket = ?', [dailyBucket]) : null;
+    const dailySpent = !!dailyRow && Number(dailyRow.count) >= dailyLimit && now - Number(dailyRow.window_start) < 24 * 60 * 60 * 1000;
+    const checkRan = lineCheckFeatureEnabled(env) && !dailySpent;
     const work = !oneTry && lines.length && checkRan && body.recognition !== 'unconfirmed' && body.recognition !== 'low-confidence'
       ? await hintWorkEvidence(accountId, qid, lines, now) : null;
     let lineCheckSpent = false;
     if (work?.charge) {
       const cap = await consumeRateLimit(db, work.capBucket, { limit: LINE_CHECKS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, now);
-      if (!cap.allowed) work.status = 'limit';
-      else lineCheckSpent = true;
+      const daily = cap.allowed ? await consumeRateLimit(db, dailyBucket, { limit: dailyLimit, windowMs: 24 * 60 * 60 * 1000 }, now) : null;
+      if (!cap.allowed || !daily.allowed) work.status = 'limit';
+      lineCheckSpent = cap.allowed;
     }
     const cause = causeFromWork(work, { recognition: body.recognition || null, linesSent: lines.length > 0, checkRan });
     const { plan } = buildHelpPlan({ q, hintLevel: await hintLevelOf(accountId, qid), attempts: await serverAttempts(accountId, HELP_PLAN_ATTEMPTS),
@@ -1650,8 +1667,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // the graded attempt carries it, so an attempt helped by the policy is
     // never read as independent evidence. A rung action is recorded too — the
     // rung itself is charged only if the student opens it.
-    if (plan?.action) await recordPolicyAssistance(accountId, qid, plan, now);
-    return res.status(200).json({ ...base, plan, lineCheckSpent });
+    await recordPolicyAssistance(accountId, qid, plan, now);
+    // The envelope stays on the server (its cause class is a diagnosis of open
+    // work); the device gets the action, its reason and prompt.
+    const { envelope, ...shown } = plan || {};
+    return res.status(200).json({ ...base, plan: plan ? shown : null, lineCheckSpent });
   });
 
   async function recordPolicyAssistance(accountId, qid, plan, now) {
@@ -1659,9 +1679,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-help-plan' AND key=?", [accountId, qid]);
       let served = [];
       try { served = row ? JSON.parse(row.response_json).served || [] : []; } catch { served = []; }
-      served = [...served, { action: plan.action, level: plan.level, cause: plan.envelope?.causeClass || null, at: now }].slice(-16);
+      // A request answered with no plan (the control arm, or nothing to offer)
+      // is recorded as a request: action and level null.
+      served = [...served, { action: plan?.action || null, level: plan?.level || null, cause: plan?.envelope?.causeClass || null, at: now }].slice(-16);
       await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-help-plan',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
-        [accountId, qid, JSON.stringify({ served, policyVersion: plan.policyVersion }), digest({ qid, served: served.length }), now, now + MAX_AGE]);
+        [accountId, qid, JSON.stringify({ served, policyVersion: TUTOR_POLICY_VERSION }), digest({ qid, served: served.length }), now, now + MAX_AGE]);
     }, { accountScope: accountId, lock: syncLockKey(accountId) });
   }
 

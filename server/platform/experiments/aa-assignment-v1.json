@@ -28,7 +28,7 @@
     "id": "delayed-independent-transfer",
     "definition": "Identical to tutor-first-help-v1.",
     "delayHours": 24,
-    "independence": "hintLevel 0, revealed false, repeat false, no tutor-policy offer above A0.",
+    "independence": "hintLevel 0, revealed false, repeat false, no help requested through the help plan.",
     "missing": "Missing, never a failure."
   },
   "guardrails": [

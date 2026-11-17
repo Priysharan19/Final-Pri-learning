@@ -102,9 +102,11 @@ export function validateRegistry({ definitions = experimentDefinitions(), locked
 }
 
 /** The experiments this deployment runs: listed in PRI_EXPERIMENTS and every required flag on. */
-export function activeExperiments(env = process.env, definitions = experimentDefinitions()) {
+export function activeExperiments(env = process.env, definitions = null) {
   const listed = new Set(String(env?.PRI_EXPERIMENTS || '').split(',').map(s => s.trim()).filter(Boolean));
-  return definitions.filter(d => listed.has(d.id) && d.requires.every(flag => String(env?.[flag] || '').trim() === '1'));
+  // Nothing listed: no file is read (this runs inside the grading transaction).
+  if (!listed.size) return [];
+  return (definitions || experimentDefinitions()).filter(d => listed.has(d.id) && d.requires.every(flag => String(env?.[flag] || '').trim() === '1'));
 }
 
 /** A number in [0, 1) from (salt, account id). */

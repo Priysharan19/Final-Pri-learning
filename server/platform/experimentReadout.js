@@ -91,9 +91,10 @@ export function sampleRatio(def, counts) {
   return { total, chi2, p, mismatch: p < 0.001 };
 }
 
-// Help the tutor policy offered on the item above A0 (helpPlan.js): such an
-// attempt is assisted, whatever the ladder says.
-const policyHelped = e => Array.isArray(e.policyAssistance) && e.policyAssistance.some(x => x?.level && x.level !== 'A0');
+// Help was ASKED FOR on the item through the help plan (helpPlan.js records a
+// request in every arm, control included). Any request excludes the item as an
+// outcome, whatever was offered, so the exclusion cannot depend on the arm.
+const policyHelped = e => Array.isArray(e.policyAssistance) && e.policyAssistance.length > 0;
 const skillOf = e => (typeof e.dotpoint === 'string' && e.dotpoint) ? e.dotpoint : (typeof e.subtopic === 'string' ? e.subtopic : null);
 const median = xs => { if (!xs.length) return null; const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 

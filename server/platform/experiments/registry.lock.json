@@ -1,7 +1,7 @@
 {
   "about": "Frozen digests of the pre-registered experiment definitions (server/platform/experiments.js definitionDigest). A changed definition needs a new version and a new entry here; an entry is never edited.",
   "digests": {
-    "aa-assignment-v1@1": "74d831e8c5b140a782f50bcd4ba860f693fe0e143884444bd6166affdfee6fad",
-    "tutor-first-help-v1@1": "47297dca2d8b58d2b2394aa2252b3781555250c390c941c6e5190792382bea25"
+    "aa-assignment-v1@1": "107a8caae9c3479e68124962ab812dc4d65e5a1140e946b41a87bf95c71f7e80",
+    "tutor-first-help-v1@1": "abda671389a517f74f657761b6af684cb28097a2c958919d58de77ecf90f6a28"
   }
 }
