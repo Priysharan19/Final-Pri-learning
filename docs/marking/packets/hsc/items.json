@@ -9,7 +9,7 @@
     "nsw-mathematics-standard-11-12-2024@2024"
   ],
   "dossier": "docs/marking/hsc-examiner-certification-dossier.md",
-  "dossierDigest": "17fdb5d1e995148c46af5d5ab2deb8d8add857f7566c4f6c34756fe4f2c9c5f8",
+  "dossierDigest": "b01bdc563359af435b895662d35cc0cb6267acd4d00f1235607d127697e564fa",
   "minExaminers": 2,
   "items": [
     "nsw-convention:final-answer-only",
@@ -420,7 +420,6 @@
     "nsw-method:y8-equations/D2",
     "nsw-method:y8-equations/D3",
     "nsw-method:y10-quadratics/D1",
-    "nsw-method:y10-quadratics/D3",
     "nsw-method:y11-explog/D3",
     "nsw-method:y11-diff/D1",
     "nsw-method:y11-diff/D2",

@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `2c13172754f840c993f7388d5304061b60e79133cb69f34c5b63418cb9467d88` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `9636dc45f75a8868b6d942c5dbbc05c3c53373c1e27ecb04c078f47cf61b5865` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -1065,7 +1065,7 @@ Final answer: 6
 
 ## `cbse-bank:y10-quadratics/D1` — seed 1009
 
-> Solve $(x - 3)(x - 2) = 0$.
+> Solve $6x^2 - 294 = 0$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -1083,9 +1083,29 @@ Final answer: 0
 ```
 </details>
 
-## `cbse-bank:y10-quadratics/D3` — seed 1009
+## `cbse-bank:y10-quadratics/D2` — seed 72280
 
-> Solve $x^2 - 5x + 6 = 0$ by factorising.
+> Solve $6(x - 8)(x + 11) = 0$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 0
+```
+</details>
+
+## `cbse-bank:y10-quadratics/D3` — seed 32685
+
+> Solve $x^2 - 36 = 0$ by factorising.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -1105,14 +1125,14 @@ Final answer: 0
 
 ## `cbse-bank:y10-quadratics/D4` — seed 1009
 
-> Use the quadratic formula to solve $2x^2 + 2x - 1 = 0$. Give both solutions, correct to 2 decimal places if needed.
+> Solve $6x^2 - 294 = 0$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/4 | 0/4 | The keyed answer as the server prints it. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/4 | 0/4 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
