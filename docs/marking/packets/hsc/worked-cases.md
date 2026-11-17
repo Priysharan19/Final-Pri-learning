@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `954ba0790603e1ae622ebe02ebaedf6bd1413457a9a402c5acc0098e3ab9cb54` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `4b8497122f2002f377ccd32b6fc23e655a22ce7e7cd1da8f99e0db96bbe486b5` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2267,36 +2267,36 @@ Final answer: 0
 
 ## `nsw-final:y11-quadfunc/D2` — seed 1009
 
-> By completing the square, find the **minimum value** of $y = 3x^2 + 6x + 1$.
+> Which is the completed-square form of $y = 3x^2 + 12x + 9$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-2.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `-1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-quadfunc/D3` — seed 1009
 
-> Without solving, find the **sum** of the roots of $x^2 - 5x + 6 = 0$.
+> Which quadratic equation has roots with sum $3$ and product $-4$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-quadfunc/D4` — seed 1009
 
-> Find the value of $k$ for which $4x^2 - 24x + k = 0$ has **equal roots**.
+> Which statement about the roots of $x^2 - 2x - 2 = 0$ is correct?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `36` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `36.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `37` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `37` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-polynomials/D1` — seed 1009
 
@@ -2344,18 +2344,18 @@ Final answer: 0
 
 ## `nsw-final:y11-lines/D1` — seed 1009
 
-> A line has gradient $\\frac{4}{7}$. What is the gradient of a line **perpendicular** to it?
+> Find the gradient of a line perpendicular to $2x - y = -2$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-7/4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `-7/4` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `-3/4` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-3/4` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-1/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `-1/2` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `1/2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1/2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-lines/D2` — seed 1009
 
-> Find the equation of the line **parallel** to $y = 2x + 2$ passing through $(-1, -1)$. Answer in the form $y = mx + c$.
+> Which equation gives the line through $(-1, 3)$ that is **perpendicular** to $y = 2x - 1$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2366,7 +2366,7 @@ Final answer: 0
 
 ## `nsw-final:y11-lines/D3` — seed 1009
 
-> Find the equation of the line through $(6, 2)$ **perpendicular** to $y = \\frac{3}{4}x - 2$. Answer in the form $y = mx + c$.
+> A student finds the equation of the line through $(-21, -4)$ that is perpendicular to $y = -\\frac{7}{3}x - 2$. Each line of the working follows from the previous lines, so an earlier error carries forward.  **Line 1:** $m_1 = -\\frac{7}{3}$  **Line 2:** $m_2 = \\frac{3}{7}$  **Line 3:** Substituting $(-21, -4)$ into $y = m_2x + c$ gives $c = 5$  **Line 4:** $y = \\frac{3}{7}x - 5$  Which line contains the **first** error?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2377,257 +2377,212 @@ Final answer: 0
 
 ## `nsw-final:y11-lines/D4` — seed 1009
 
-> Find the point of intersection of $y = -x + 4$ and $y =  + 2$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y11-trigfunc/D1` — seed 1009
-
-> A right-angled triangle has hypotenuse $10$ cm and an acute angle of $45°$. Using the **exact value** of $\\sin(45°)$, find the exact length of the side opposite that angle.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `7.071068` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | `7.071068` | no | 0/1 | 0/1 | The same value written in another equivalent form. |
-| common wrong | `8.071068` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `8.071068` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y11-trigfunc/D2` — seed 1009
-
-> Find the **exact value** of $\\tan(225°)$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y11-sine-cosine-rule/D1` — seed 1009
-
-> In triangle $ABC$, $\\angle A = 63°$, $\\angle B = 66°$ and side $a = 17$ cm (opposite $\\angle A$). Find side $b$, correct to 1 decimal place.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `87/5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `87/5` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `92/5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `92/5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y11-sine-cosine-rule/D2` — seed 1009
-
-> In triangle $ABC$, $\\angle A = 68°$, side $a = 25$ m and side $b = 15$ m. Find the acute angle $B$, correct to the nearest degree.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `34` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `34.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `35` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `35` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y11-sine-cosine-rule/D3` — seed 1009
-
-> In triangle $ABC$, sides $b = 12$ cm and $c = 12$ cm enclose the angle $\\angle A = 70°$. Find side $a$, correct to 1 decimal place.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `69/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `69/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `74/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `74/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y11-sine-cosine-rule/D4` — seed 1009
-
-> Two sides of a triangle measure $12$ m and $11$ m, with an included angle of $75°$. Find the area of the triangle, correct to 1 decimal place.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `319/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `319/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `324/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `324/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y11-explog/D1` — seed 1009
-
-> Evaluate $\\log_{8}\\left(512\\right)$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `3` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `3.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `4` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `4` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y11-explog/D2` — seed 1009
-
-> Evaluate $\\log_{5}(175) - \\log_{5}(7)$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `2.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y11-explog/D3` — seed 1009
-
-> Solve $6^{x + 1} = 216$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `2.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `3` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
-
-<details><summary>Pages</summary>
-
-partial:
-```text
-(working with the right method, ending in a wrong value)
-Final answer: 3
-```
-</details>
-
-## `nsw-final:y11-explog/D4` — seed 1009
-
-> Solve $8^x = 258$, correct to 2 decimal places.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `267/100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `267/100` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `367/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `367/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y11-diff/D1` — seed 1009
-
-> Differentiate $y = 4x^{7}$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
-
-<details><summary>Pages</summary>
-
-partial:
-```text
-(working with the right method, ending in a wrong value)
-Final answer: 0
-```
-</details>
-
-## `nsw-final:y11-diff/D2` — seed 1009
-
-> Differentiate $f(x) = 3x^3 + x^2 - x - 1$.
+> Which point lies on both $y = x + 4$ and $y = -x + 2$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
 | correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-<details><summary>Pages</summary>
+## `nsw-final:y11-trigfunc/D1` — seed 1009
 
-partial:
-```text
-(working with the right method, ending in a wrong value)
-Final answer: 0
-```
-</details>
+> Find the **exact value** of $11\\cos\\left(\\dfrac{\\pi}{3}\\right) - 8\\tan\\left(\\dfrac{\\pi}{4}\\right) - 8\\sin\\left(\\dfrac{\\pi}{6}\\right)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-13/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `-13/2` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `-11/2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-11/2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-trigfunc/D2` — seed 1009
+
+> Which of the following is equal to $\\sin(218°)$?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-sine-cosine-rule/D1` — seed 1009
+
+> In triangle $ABC$, $\\angle A = 62°$, $\\angle B = 51°$ and $a = 22$ cm. Which expression gives the length of side $b$?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-sine-cosine-rule/D2` — seed 1009
+
+> In triangle $ABC$, $\\angle A = 53°$, $a = 17$ cm and $b = 33$ cm. Which statement is correct?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-sine-cosine-rule/D3` — seed 1009
+
+> In triangle $ABC$ you are given $a = 21$ cm, $b = 22$ cm and $c = 74$ cm; find $\\angle C$. Which is the best first step?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-sine-cosine-rule/D4` — seed 1009
+
+> A triangle has sides 15 cm, 12 cm and 12 cm. Find its area, correct to 1 decimal place, by first using the cosine rule to find the angle between the sides of length 15 cm and 12 cm.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `703/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `703/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `713/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `713/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-explog/D1` — seed 1009
+
+> Evaluate $\\log_{9} 27$ as a fraction in simplest form.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `3/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `3/2` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `5/2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5/2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-explog/D2` — seed 1009
+
+> Solve $\\log_{5} x + \\log_{5} (x - 20) = 3$. Reject any value of $x$ outside the domain.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `25` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `25.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `26` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `26` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-explog/D3` — seed 1009
+
+> A colony of yeast cells has $N = 13 \\times 3^t$ cells after $t$ hours. After how many hours are there $1053$ cells?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `4` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-explog/D4` — seed 1009
+
+> Solve $7 \\times 5^{x} = 1204$, correct to 2 decimal places.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `16/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `16/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `21/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `21/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-diff/D1` — seed 1009
+
+> Given $f(x) = 4\\sqrt{x}$, find $f'(16)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `1/2` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `3/2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3/2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-diff/D2` — seed 1009
+
+> Given $f(x) = (x - 1)(-x + 3)$, expand and differentiate to find $f'(-2)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `8` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `8.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `9` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-diff/D3` — seed 1009
 
-> Find the gradient of the tangent to $y = 3x^2 + 2x - 1$ at the point where $x = -1$.
+> The curve $y = x^2 - x - 1$ passes through the points $P$ and $Q$ where $x = 1$ and $x = 1.1$. Find the gradient of the chord $PQ$, as a decimal.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `-3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-3` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
-
-<details><summary>Pages</summary>
-
-partial:
-```text
-(working with the right method, ending in a wrong value)
-Final answer: -3
-```
-</details>
+| correct | `11/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `11/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `21/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `21/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-diff/D4` — seed 1009
 
-> Find the point on the curve $y = x^2 + 3x + 2$ where the gradient equals $-1$.
+> The tangent to $y = ax^2 + 2x - 1$ is horizontal at $x = -1$. Find $a$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
-
-<details><summary>Pages</summary>
-
-partial:
-```text
-(working with the right method, ending in a wrong value)
-Final answer: 0
-```
-</details>
+| correct | `1` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `1.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-probability/D1` — seed 1009
 
-> Evaluate $^{11}C_{5}$.
+> Evaluate $\\dfrac{n!}{(n - 2)!}$ when $n = 9$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `462` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `462.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `463` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `463` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `72` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `72.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `73` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `73` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-probability/D2` — seed 1009
 
-> How many different arrangements can be made using **all** the letters of the word BRIDGE? (All its letters are distinct.)
+> A Year 11 maths team is chosen from $11$ boys and $9$ girls. The team must have exactly $2$ boys and $3$ girls. How many different teams are possible?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `720` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `720.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `721` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `721` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `4620` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4620.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `4621` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4621` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-probability/D3` — seed 1009
 
-> For two events, $P(B) = \\frac{13}{30}$ and $P(A \\mid B) = \\frac{6}{13}$. Find $P(A \\cap B)$ as a fraction in simplest form.
+> A Sydney cafe buys pies from two bakeries. Bakery $X$ supplies $65\\%$ of them and Bakery $Y$ supplies the rest. A pie from $X$ is burnt with probability $3\\%$, and a pie from $Y$ with probability $6\\%$. A pie is chosen at random and is burnt. Find the probability that it came from Bakery $X$, as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1/5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `1/5` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `6/5` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6/5` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `13/27` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `13/27` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `40/27` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `40/27` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-probability/D4` — seed 1009
 
-> A drawer holds $9$ black socks and $8$ white socks. Two socks are taken at random without replacement. Find the probability they **match**, as a fraction in simplest form.
+> A bag holds $7$ red, $5$ green and $5$ blue counters. Three are drawn at random without replacement. Find the probability that all three are **different colours**, as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `8/17` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `8/17` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `25/17` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `25/17` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `35/136` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `35/136` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `171/136` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `171/136` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-diff/D1` — seed 1009
 
