@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `954ba0790603e1ae622ebe02ebaedf6bd1413457a9a402c5acc0098e3ab9cb54` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `e45a5d123611b21ae409f8046cdf661e3335a824e03d28772648ea78c04eb659` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2895,194 +2895,18 @@ Final answer: 0
 
 ## `nsw-final:y12-integral-calc/D1` — seed 1009
 
-> Find $\\displaystyle\\int 10\\sin(5x)\\,dx$. (You may omit the $+C$.)
+> Find the exact value of $\\displaystyle\\int_0^{\\ln 3} 14e^{2x}\\,dx$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `56` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `56.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `57` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `57` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-integral-calc/D2` — seed 1009
 
-> Evaluate $\\displaystyle\\int_0^{2} \\left(6x^2 + 4\\right)dx$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `24` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `24.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `25` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `25` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-integral-calc/D3` — seed 1009
-
-> Find $\\displaystyle\\int 10e^{5x - 1}\\,dx$. (You may omit the $+C$.)
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-integral-calc/D4` — seed 1009
-
-> A particle moves along a line with velocity $v(t) = 6t^2 + 3t$ metres per second. It starts at the origin. Find its displacement, in metres, from the origin after $6$ seconds.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `486` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `486.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `487` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `487` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-random-var/D1` — seed 1009
-
-> A discrete random variable $X$ has $P(X=3) = \\dfrac{3}{20}$, $P(X=4) = \\dfrac{4}{20}$, $P(X=5) = \\dfrac{3}{20}$, $P(X=6) = \\dfrac{k}{20}$. Find $E(X)$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-random-var/D2` — seed 1009
-
-> A random variable $X$ takes the values $5, 9, 13$ with probabilities $\\dfrac{1}{8}, \\dfrac{6}{8}, \\dfrac{1}{8}$. Find $\\mathrm{Var}(X)$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-random-var/D3` — seed 1009
-
-> Scores on a test are normally distributed with mean $75$ and standard deviation $6$. A student scores $93$. Find the $z$-score of this result.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `3.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-random-var/D4` — seed 1009
-
-> A normally distributed variable has a value of $72$ with $z$-score $1$ and a value of $58$ with $z$-score $-1$. Find the mean $\\mu$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `65` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `65.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `66` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `66` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-fin-exact/D1` — seed 1009
-
-> \\$16,000 is invested at 5% per annum, compounded annually. Find the value of the investment after 2 years, in dollars.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `17640` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `17640.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `17641` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `17641` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-fin-exact/D2` — seed 1009
-
-> A loan of \\$28,000 is charged 5% interest per year, added at the end of each year. A repayment of \\$800 is made at the end of the first year, straight after the interest is added. Find the balance owing after the first repayment, in dollars.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `28600` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `28600.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `28601` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `28601` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-fin-exact/D3` — seed 1009
-
-> A loan of \\$16,000 has 5% interest per year added annually, with a repayment of \\$1,600 at the end of each year straight after the interest is added. Find the balance owing after the second repayment, in dollars.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `14360` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `14360.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `14361` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `14361` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-fin-exact/D4` — seed 1009
-
-> \\$2,800 is deposited at the end of each year for 3 years into an account paying 5% per annum, compounded annually. Find the value of the account immediately after the last deposit, in dollars.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `8827` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `8827.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `8828` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `8828` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-trig-model/D1` — seed 1009
-
-> Find the maximum value of $y = 6\\sin\\left(\\dfrac{\\pi x}{4}\\right) + 10$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `16` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `16.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `17` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `17` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-trig-model/D2` — seed 1009
-
-> Find the period of $y = 6\\cos\\left(\\dfrac{\\pi x}{5}\\right) - 10$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `10.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `11` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `11` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-trig-model/D3` — seed 1009
-
-> The depth of water at a jetty is modelled by $h(t) = 10 + 6\\sin\\left(\\dfrac{\\pi t}{6}\\right)$ metres, where $t$ is in hours after midnight. Find the depth at $t = 1$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `13` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `13.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `14` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `14` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-trig-model/D4` — seed 1009
-
-> A quantity is modelled by $y = A\\cos(bt) + k$ with $b > 0$. Its maximum value is $16$ and its minimum value is $4$, its maximum occurs at $t = 0$, and its period is $12$. Find $y$ when $t = 2$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `13` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `13.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `14` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `14` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-func-model/D1` — seed 1009
-
-> A culture of bacteria numbers $350$ and doubles every $4$ hours, so $N(t) = 350\\times 2^{t/4}$. How many bacteria are there after $12$ hours?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `2800` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `2800.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `2801` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2801` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-func-model/D2` — seed 1009
-
-> A sample of a radioactive substance has a half-life of $6$ days. Its mass is modelled by $M(t) = 448\\times\\left(\\tfrac12\\right)^{t/6}$ grams. Find its mass after $18$ days.
+> Find the exact value of $\\displaystyle\\int_0^{\\ln 3} 14e^{2x}\\,dx$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -3091,27 +2915,203 @@ Final answer: 0
 | common wrong | `57` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `57` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-## `nsw-final:y12-func-model/D3` — seed 1009
+## `nsw-final:y12-integral-calc/D3` — seed 1009
 
-> A population is modelled by $P(t) = 150\\times 2^{t/5}$, where $t$ is in years. After how many years does the population reach $2400$?
+> Show that the substitution $u = x^2 + 3$ transforms $\\displaystyle\\int_{2}^{3} 10x\\left(x^2 + 3\\right)^{5}dx$ into $\\displaystyle 5\\int_{7}^{B} u^{5}\\,du$. Find the upper limit $B$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `20` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `20.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `21` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `21` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `12` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `12.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `13` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `13` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-integral-calc/D4` — seed 1009
+
+> Show that the substitution $u = x^2 + 3$ transforms $\\displaystyle\\int_{2}^{3} 10x\\left(x^2 + 3\\right)^{5}dx$ into $\\displaystyle 5\\int_{7}^{B} u^{5}\\,du$. Find the upper limit $B$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `12` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `12.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `13` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `13` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-random-var/D1` — seed 1009
+
+> $X$ is a random variable with $E(X) = 13$. Find $E(5X + 2)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `67` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `67.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `68` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `68` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-random-var/D2` — seed 1009
+
+> $\\mathrm{Var}(X) = 20$. Find $\\mathrm{Var}(5X + 2)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `500` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `500.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `501` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `501` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-random-var/D3` — seed 1009
+
+> A machine fills 5000 packets with a mass that is normally distributed with mean $74$ g and standard deviation $5$ g. Using the 68–95–99.7 rule, about how many packets have a mass between $64$ g and $84$ g?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `4750` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4750.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `4751` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4751` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-random-var/D4` — seed 1009
+
+> The heights of 2000 trees are normally distributed with mean $74$ cm and standard deviation $5$ cm. Using the 68–95–99.7 rule, about how many trees are taller than $84$ cm?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `50` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `50.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `51` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `51` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-fin-exact/D1` — seed 1009
+
+> A school building fund invests \\$64,400 at 10% per annum, with interest compounded annually. How much interest has been earned after 2 years, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `13524` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `13524.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `13525` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `13525` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-fin-exact/D2` — seed 1009
+
+> A school building fund invests \\$64,400 at 10% per annum, with interest compounded annually. How much interest has been earned after 2 years, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `13524` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `13524.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `13525` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `13525` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-fin-exact/D3` — seed 1009
+
+> A fund invested at 10% per annum, compounded annually, grows to \\$77,924 in 2 years. What was invested, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `64400` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `64400.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `64401` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `64401` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-fin-exact/D4` — seed 1009
+
+> \\$3,400 is deposited at the end of each year for 3 years into an account paying 10% per annum, compounded annually. What is the value of the account just after the last deposit, in dollars?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `11254` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `11254.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `11255` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11255` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-trig-model/D1` — seed 1009
+
+> The number of hours of daylight in a town is modelled by $h(t) = 12 + 3\\cos\\left(\\dfrac{\\pi t}{6}\\right)$, with $t$ in months after the longest day. Which statement is correct?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-trig-model/D2` — seed 1009
+
+> The number of hours of daylight in a town is modelled by $h(t) = 12 + 3\\cos\\left(\\dfrac{\\pi t}{6}\\right)$, with $t$ in months after the longest day. Which statement is correct?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-trig-model/D3` — seed 1009
+
+> The number of hours of daylight in a town is modelled by $h(t) = 12 + 3\\cos\\left(\\dfrac{\\pi t}{6}\\right)$, with $t$ in months after the longest day. Which statement is correct?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-trig-model/D4` — seed 1009
+
+> The number of hours of daylight in a town is modelled by $h(t) = 12 + 3\\cos\\left(\\dfrac{\\pi t}{6}\\right)$, with $t$ in months after the longest day. Which statement is correct?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-func-model/D1` — seed 1009
+
+> A radioactive sample has a half-life of 6 days. Its mass is modelled by $M(t) = 4960\\times\\left(\\tfrac12\\right)^{t/6}$ grams, where $t$ is in days. Find the mass after 30 days.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `155` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `155.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `156` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `156` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-func-model/D2` — seed 1009
+
+> A phone app is modelled by $N = 425b^{t}$ where $t$ is in weeks. After 2 weeks the number is 3825. Find the positive value of $b$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-func-model/D3` — seed 1009
+
+> A school fundraiser has fixed costs of \\$1,500. Each item costs \\$25 to make and sells for \\$55. How many items must be sold to break even?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `50` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `50.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `51` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `51` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-func-model/D4` — seed 1009
 
-> A school sells $n$ tickets to a fundraiser and the revenue, in dollars, is modelled by $R(n) = 5n(18 - n)$ for $0 \\le n \\le 18$. Find the maximum revenue, in dollars.
+> A club sells $n$ tickets and the revenue, in dollars, is modelled by $R(n) = 4n(34 - n)$ for $0 \\le n \\le 34$. How many tickets give the maximum revenue?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `405` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `405.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `406` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `406` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `17` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-formulas/D1` — seed 1009
 
