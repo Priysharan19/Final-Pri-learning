@@ -55,4 +55,6 @@
 .aw-line, .aw-num, .aw-marks, .aw-receipt { font-family: var(--font-mono, ui-monospace, monospace); }
 .aw-receipt { color: var(--ink-3); font-size: 12px; margin: 2px 0; }
 .aw-criteria tr.is-found td:last-child { color: var(--accent); }
-.aw-criteria tr.is-missing td:last-child { color: var(--correction); }
+.aw-criteria tr.is-missing td:last-child { color: var(--ink-3); }
+.aw-criteria tr.is-pending td:last-child { color: var(--ink-2); }
+.aw-attempt, .aw-follow { color: var(--ink-2); font-size: 13px; margin: 4px 0; }

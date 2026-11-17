@@ -13,7 +13,7 @@ import React, { useEffect, useMemo } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import Icon from './Icon.jsx';
 import { useT } from '../i18n/index.js';
-import { buildAnnotatedWorking } from './annotatedWorkingModel.js';
+import { buildAnnotatedWorking, lineRange } from './annotatedWorkingModel.js';
 import './AnnotatedWorking.css';
 
 const STATUS_ICON = { checked: 'check', 'first-error': 'alert', follows: 'arrowRight', 'not-verified': 'uncertain', unread: 'uncertain' };
@@ -123,16 +123,18 @@ export function AnnotatedComments({ model, renderBreakDetail = null }) {
 export function AnnotatedEvaluation({ model }) {
   const t = useT();
   if (!model) return null;
-  const { marks, summary, criteria, jumps, source } = model;
+  const { marks, summary, criteria, jumps, followThrough = [], source, attempt } = model;
   return (
     <section className="aw-eval" aria-labelledby="aw-eval-title" data-aw-summary={summary.key}>
       <div className="aw-eval-head">
         <h3 id="aw-eval-title" className="aw-h">{t('aw.eval.title')}</h3>
         {marks && <b className="aw-marks" data-aw-marks={`${marks.awarded}/${marks.possible}`}>{t('aw.eval.marksConfirmed', { earned: marks.awarded, total: marks.possible })}</b>}
       </div>
+      {attempt && <p className="aw-attempt" data-aw-attempt={attempt}>{t('aw.eval.markedAgain', { n: attempt })}</p>}
       {marks?.receiptId && <p className="aw-receipt">{t('aw.eval.receipt', { id: marks.receiptId })}</p>}
       <p className="aw-provenance">{t(source === 'handwriting' ? 'aw.eval.provenanceInk' : 'aw.eval.provenanceTyped')}</p>
       <p className="aw-summary">{t(summary.key, { ...summary.vars, count: summary.vars.rules ?? summary.vars.checked })}</p>
+      {followThrough.length > 0 && <p className="aw-follow" data-aw-follow-through={followThrough.join(',')}>{t('aw.eval.followThrough', { list: lineRange(followThrough), count: followThrough.length })}</p>}
       {jumps.length > 0 && <p className="aw-jumps">{t('aw.eval.jumps', { list: listOf(jumps), count: jumps.length })}</p>}
       {criteria.length > 0 && (
         <table className="criteria-table aw-criteria">
@@ -140,11 +142,18 @@ export function AnnotatedEvaluation({ model }) {
           <thead><tr><th scope="col">{t('aw.criteria.criterion')}</th><th scope="col">{t('aw.criteria.evidence')}</th></tr></thead>
           <tbody>
             {criteria.map((c, i) => (
-              <tr key={i} className={c.lines.length ? 'is-found' : 'is-missing'} data-aw-evidence={c.lines.length ? 'found' : 'missing'}>
+              <tr key={i} className={c.lines.length ? 'is-found' : c.followThrough ? 'is-pending' : 'is-missing'} data-aw-evidence={c.lines.length ? 'found' : c.followThrough ? 'not-counted' : 'missing'}>
                 <td>{c.kind === 'reaches-rhs' ? t('aw.criteria.reachesRhs') : <MathText text={c.text} />}</td>
                 <td>
-                  <span className="aw-met"><Icon name={c.lines.length ? 'check' : 'correction'} size={13} /> {t(c.lines.length ? 'aw.criteria.met' : 'aw.criteria.notMet')}</span>
-                  {c.lines.length > 0 && <span className="aw-evlines"> · {t('aw.criteria.found', { list: listOf(c.lines), count: c.lines.length })}</span>}
+                  {c.lines.length > 0 ? (
+                    <><span className="aw-met"><Icon name="check" size={13} /> {t('aw.criteria.met')}</span>
+                      <span className="aw-evlines"> · {t('aw.criteria.found', { list: listOf(c.lines), count: c.lines.length })}</span></>
+                  ) : c.followThrough ? (
+                    <><span className="aw-met"><Icon name="clock" size={13} /> {t('aw.criteria.notCounted')}</span>
+                      <span className="aw-evlines"> · {t('aw.criteria.found', { list: listOf(c.followThrough), count: c.followThrough.length })}</span></>
+                  ) : (
+                    <span className="aw-met"><Icon name="uncertain" size={13} /> {t('aw.criteria.notShown')}</span>
+                  )}
                 </td>
               </tr>
             ))}

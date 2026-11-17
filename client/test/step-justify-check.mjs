@@ -16,7 +16,7 @@
 import { justifyStep, annotateWorking, STEP_RULE_IDS } from '../src/engine/stepJustify.js';
 import { checkWorking, stepCheck } from '../src/engine/checker.js';
 import { identityProof, identityProofCatalogue } from '../src/engine/generators/identityProofs.js';
-import { buildAnnotatedWorking } from '../src/components/annotatedWorkingModel.js';
+import { buildAnnotatedWorking, lineRange } from '../src/components/annotatedWorkingModel.js';
 
 let pass = 0;
 const failures = [];
@@ -148,7 +148,11 @@ const NOT = [
   ['x^2 - 9', '(x + 3)(x - 3)', ['factorise', 'expand']],
   ['1/x + 1/y', '(x + y)/(xy)', ['split-fraction', 'factorise']],
   ['(a + b)/c', 'a/c + b/c', ['common-denominator', 'expand']],
-  ['x^2 + 3x', 'x(x + 3)', ['expand', 'cancel-common-factor']]
+  ['x^2 + 3x', 'x(x + 3)', ['expand', 'cancel-common-factor']],
+  // two relations sampled at one angle must not stand in for the quotient and reciprocal identities
+  ['tan(x)^2', 'sin(x)^2*sec(x)^2', ['pythagorean', 'pythagorean-tan']],
+  ['sin(x)^2*sec(x)^2', 'tan(x)^2', ['pythagorean', 'pythagorean-tan']],
+  ['tan(x)^4', 'sin(x)^4*sec(x)^4', ['pythagorean', 'pythagorean-tan']]
 ];
 for (const [from, to, never] of NOT) {
   const got = names(justifyStep(from, to));
@@ -213,6 +217,11 @@ const straight = ['LHS = (secθ - cosθ)/(cscθ - sinθ)', '= (1/cosθ - cosθ)/
   ok('panel: line 4 follows from line 3', m.cards[3].status === 'follows' && m.cards[3].followsFrom === 3);
   ok('panel: line 5 does not follow from line 4', m.cards[4].status === 'not-verified');
   ok('panel: a broken proof is summarised by its first error', m.summary.key === 'aw.summary.breaks' && m.summary.vars.n === 3);
+  ok('panel: follow-through lines are listed as not counted yet', JSON.stringify(m.followThrough) === '[4]');
+  ok('panel: a criterion evidenced only after the error is not counted, never met', m.criteria.every(c => !c.followThrough || c.lines.length === 0));
+  ok('panel: lines 6, 7, 8 read as a range', lineRange([6, 7, 8]) === '6–8' && lineRange([2, 4]) === '2, 4' && lineRange([2, 3]) === '2, 3');
+  ok('panel: a first attempt says nothing about re-marking', m.attempt === null);
+  ok('panel: a second marked attempt says so', buildAnnotatedWorking({ lines, stepReport: r.stepReport, attempt: 2, solution: { answerText: q.answer.canonicalWorking, steps: q.steps } }).attempt === 2);
   ok('panel: no evidence is counted after the first error', m.criteria.every(c => c.lines.every(n => n < 3)));
   const good = q.answer.canonicalWorking.split('\n');
   const g = buildAnnotatedWorking({ lines: good, stepReport: checkWorking(q, good.join('\n')).stepReport, receipt: { awarded: 4, possible: 4 }, solution: { answerText: q.answer.canonicalWorking, steps: q.steps } });
@@ -234,8 +243,11 @@ for (const ed of ['nsw', 'cbse']) {
     const lines = q.answer.canonicalWorking.split('\n');
     const label = `${ed} proof ${i + 1} (${lines[0]})`;
     ok(`${label}: the worked proof is correct`, checkWorking(q, lines.join('\n')).correct === true);
-    ok(`${label}: ending "= RHS" is correct`, checkWorking(q, [...lines.slice(0, -1), '= RHS'].join('\n')).correct === true);
-    ok(`${label}: ending "= R.H.S." is correct`, checkWorking(q, [...lines.slice(0, -1), '= R.H.S.'].join('\n')).correct === true);
+    ok(`${label}: ending "= RHS" after the right-hand side is correct`, checkWorking(q, [...lines, '= RHS'].join('\n')).correct === true);
+    ok(`${label}: "… = R.H.S." on the right-hand side's own line is correct`, checkWorking(q, [...lines.slice(0, -1), `${lines[lines.length - 1]} = R.H.S.`].join('\n')).correct === true);
+    ok(`${label}: a closing "Hence LHS = RHS" is correct`, checkWorking(q, [...lines, 'Hence LHS = RHS'].join('\n')).correct === true);
+    // FALSE CREDIT: "= RHS" in place of the right-hand side, under a line that is not it
+    if (lines.length > 2) ok(`${label}: "= RHS" under a line that is not yet the RHS earns no credit`, checkWorking(q, [...lines.slice(0, -1), '= RHS'].join('\n')).correct !== true);
     const half = Math.max(1, Math.floor(lines.length / 2));
     const meet = [`LHS = ${lines[0]}`, ...lines.slice(1, half + 1).map(l => `= ${l}`), `RHS = ${lines[lines.length - 1]}`,
       ...lines.slice(half, lines.length - 1).reverse().map(l => `= ${l}`)];
@@ -263,6 +275,54 @@ ok('the screenshot identity is a CBSE proof', identityProofCatalogue('cbse').som
   ok('without stated sides, "= RHS" is still not read as an expression', r.lines[2].status === 'break');
   const r2 = stepCheck({ ...meta, sides: { lhs: meta.canonical, rhs: 'tan(θ)^3' } }, 'LHS = (secθ - cosθ)/(cosecθ - sinθ)\n= tan^3θ\n= RHS');
   ok('with stated sides, "= RHS" is the stated right-hand side', r2.lines[2].status === 'ok');
+}
+
+// ── FALSE CREDIT: proof-shaped attacks on items that state their sides ──────
+// The reviewer's and the CTO's attacks on the "= RHS" path, each pinned. Every
+// one must earn no credit; the ones with a wrong line must show where it breaks.
+{
+  const q = identityProof(() => 0.01, 'nsw');       // (sec θ − cos θ)/(cosec θ − sin θ) = tan³θ
+  const L = q.answer.stepMeta.sides.lhs;
+  const lines = q.answer.canonicalWorking.split('\n');
+  const deny = (label, working, breakLine = null) => {
+    const r = checkWorking(q, working.join('\n'));
+    ok(`false credit refused: ${label}`, r.correct !== true);
+    if (breakLine != null) ok(`${label}: the first error is line ${breakLine + 1}`, r.stepReport?.firstBreak === breakLine);
+  };
+  // 1 · "= RHS" after a line that is not equivalent to the RHS
+  deny('"= RHS" after a wrong line', [L, 'sin(θ)^2/cos(θ)^3', '= RHS'], 1);
+  deny('"x = RHS" where x is false', [L, 'sin(θ)^2/cos(θ) = RHS'], 1);
+  deny('"1 = RHS"', [L, '1 = RHS'], 1);
+  deny('"= RHS" after an equal line that is not yet the RHS', [L, 'sin(θ)^3/cos(θ)^3', '= RHS'], 2);
+  // 2 · no working, or a jump straight from the LHS
+  deny('"RHS" then "RHS"', ['RHS', 'RHS']);
+  deny('"LHS" then "RHS"', ['LHS', 'RHS']);
+  deny('"LHS" then "= RHS"', ['LHS', '= RHS']);
+  deny('the LHS then "= RHS"', [L, '= RHS']);
+  deny('the LHS then the RHS (a jump)', [L, 'tan(θ)^3']);
+  deny('the LHS written twice, then the RHS', [L, L, 'tan(θ)^3']);
+  deny('"LHS = RHS" alone', ['LHS = RHS']);
+  // 3 · circular: the identity asserted, then "worked" towards
+  deny('the identity asserted at the top, then the RHS', [`${L} = tan(θ)^3`, 'tan(θ)^3']);
+  deny('"LHS = RHS" at the top, then RHS', ['LHS = RHS', 'tan(θ)^3', '= RHS']);
+  deny('the identity worked as an equation', [`${L} = tan(θ)^3`, '1/cos(θ) - cos(θ) = tan(θ)^3*(1/sin(θ) - sin(θ))'], 1);
+  deny('asserted, then an equation reduced to 1 = 1', ['LHS = RHS', `(${L})/tan(θ)^3 = 1`, '1 = 1']);
+  // 4 · two chains that do not meet, or meet only after an unequal line
+  deny('two chains ending on different expressions', ['LHS = ' + L, '= (sin(θ)^2/cos(θ))/(cos(θ)^2/sin(θ))', 'RHS = tan(θ)^3', '= sin(θ)^3/cos(θ)^3']);
+  deny('a meet reached through a wrong line', ['LHS = ' + L, '= sin(θ)^2/cos(θ)^3', 'RHS = tan(θ)^3', '= sin(θ)^2/cos(θ)^3'], 1);
+  deny('an RHS chain only', ['RHS = tan(θ)^3', '= sin(θ)^3/cos(θ)^3']);
+  // 5 · a different identity
+  deny('a different, true identity', ['sec(θ)^2 - tan(θ)^2', '= 1']);
+  deny('a different starting expression equal to the LHS', ['sin(θ)^3/cos(θ)^3', '= tan(θ)^3']);
+  // and the honest proofs still earn it
+  ok('a straight proof is credited', checkWorking(q, lines.join('\n')).correct === true);
+  ok('a "To prove: LHS = RHS" header does not stop a proof', checkWorking(q, ['To prove: LHS = RHS', ...lines].join('\n')).correct === true);
+  ok('a labelled straight proof is credited', checkWorking(q, [`LHS = ${lines[0]}`, ...lines.slice(1).map(l => `= ${l}`), '= RHS'].join('\n')).correct === true);
+  ok('meeting in the middle at the same expression is credited',
+    checkWorking(q, [`LHS = ${L}`, '= (sin(θ)^2/cos(θ))/(cos(θ)^2/sin(θ))', '= sin(θ)^3/cos(θ)^3', 'RHS = tan(θ)^3', '= sin(θ)^3/cos(θ)^3'].join('\n')).correct === true);
+  // an item WITHOUT stated sides reads exactly as before
+  const plain = { ...q, answer: { ...q.answer, stepMeta: { kind: 'expression', canonical: L } } };
+  ok('without stated sides, a one-step jump is read as before', checkWorking(plain, [L, 'tan(θ)^3'].join('\n')).correct === true);
 }
 
 // ── MARKS: the annotation never changes what the checker decided ─────────────

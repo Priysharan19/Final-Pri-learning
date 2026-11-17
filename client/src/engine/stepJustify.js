@@ -29,6 +29,9 @@
 // expression engine (expr.js), which has no derivative notation.
 
 import { parse, evaluate, exprEquivalent } from './expr.js';
+import { num, bin, call, strip, fmt, terms, factors, canonicalKey } from './proofShape.js';
+
+export { canonicalKey };
 
 const TRIG = new Set(['sin', 'cos', 'tan', 'sec', 'cosec', 'csc', 'cot']);
 const LOGS = new Set(['ln', 'log', 'log10', 'log2']);
@@ -36,72 +39,12 @@ const SIDE = /^\s*(l\.?\s*h\.?\s*s\.?|r\.?\s*h\.?\s*s\.?)\s*$/i;
 const MAX_NODES = 400;
 
 // ── AST helpers ──────────────────────────────────────────────────────────────
-const num = v => ({ t: 'num', v });
-const bin = (op, l, r) => ({ t: 'bin', op, l, r });
-const call = (fn, arg) => ({ t: 'call', fn, arg });
 const pow = (b, n) => bin('^', b, num(n));
 
 function size(n) {
   if (!n || typeof n !== 'object') return 0;
   return 1 + size(n.l) + size(n.r) + size(n.v && typeof n.v === 'object' ? n.v : null) + size(n.arg) +
     (Array.isArray(n.args) ? n.args.reduce((s, a) => s + size(a), 0) : 0);
-}
-
-/** A copy without grouping brackets, with csc spelled cosec. */
-function strip(n) {
-  if (!n || typeof n !== 'object') return n;
-  switch (n.t) {
-    case 'group': return strip(n.v);
-    case 'neg': return { t: 'neg', v: strip(n.v) };
-    case 'fact': return { t: 'fact', v: strip(n.v) };
-    case 'bin': return bin(n.op, strip(n.l), strip(n.r));
-    case 'call':
-      if (Array.isArray(n.args)) return { t: 'call', fn: n.fn, args: n.args.map(strip) };
-      return call(n.fn === 'csc' ? 'cosec' : n.fn, strip(n.arg));
-    default: return { ...n };
-  }
-}
-
-const fmt = v => (Number.isInteger(v) ? String(v) : String(Number(v.toPrecision(12))));
-
-/** Signed terms of a sum (a − b + c → [a, −b, c]). */
-function terms(n, sign = 1, out = []) {
-  if (n.t === 'bin' && (n.op === '+' || n.op === '-')) {
-    terms(n.l, sign, out);
-    terms(n.r, n.op === '-' ? -sign : sign, out);
-  } else if (n.t === 'neg') terms(n.v, -sign, out);
-  else out.push({ sign, n });
-  return out;
-}
-/** Factors of a product chain (a·b·c). Division is kept as its own node. */
-function factors(n, out = []) {
-  if (n.t === 'bin' && n.op === '*') { factors(n.l, out); factors(n.r, out); } else out.push(n);
-  return out;
-}
-
-/** A canonical spelling: + and × are flattened and sorted, nothing else changes. */
-export function canonicalKey(n) {
-  if (!n || typeof n !== 'object') return '?';
-  switch (n.t) {
-    case 'num': return fmt(n.v);
-    case 'const': case 'var': return n.v;
-    case 'group': return canonicalKey(n.v);
-    case 'fact': return `(${canonicalKey(n.v)})!`;
-    case 'call':
-      if (Array.isArray(n.args)) return `${n.fn}(${n.args.map(canonicalKey).join(';')})`;
-      return `${n.fn === 'csc' ? 'cosec' : n.fn}(${canonicalKey(n.arg)})`;
-    case 'neg': case 'bin': {
-      if (n.t === 'neg' || n.op === '+' || n.op === '-') {
-        const ts = terms(n).map(({ sign, n: m }) => (sign < 0 ? '-' : '+') + canonicalKey(m)).sort();
-        return ts.length === 1 ? (ts[0].startsWith('+') ? ts[0].slice(1) : ts[0]) : `[${ts.join('')}]`;
-      }
-      if (n.op === '*') return `{${factors(n).map(canonicalKey).sort().join('·')}}`;
-      if (n.op === '^' && n.l.t === 'num' && n.r.t === 'num' && Number.isInteger(n.r.v) && Math.abs(n.r.v) <= 6) return fmt(n.l.v ** n.r.v);
-      if (n.op === '^' && n.r.t === 'num' && n.r.v === 1) return canonicalKey(n.l);
-      return `<${canonicalKey(n.l)}${n.op}${canonicalKey(n.r)}>`;
-    }
-    default: return '?';
-  }
 }
 
 /** Rewrite every node bottom-up with f (which returns a node or null for "unchanged"). */
@@ -203,12 +146,12 @@ function agreeByAlgebra(a, b, rels) {
     const env = {};
     names.forEach((n, j) => { env[n] = sampleValue(i, j); });
     // relations: pairs of unknowns with the same argument
-    for (const rel of rels) {
+    for (const [ri, rel] of rels.entries()) {
       const byArg = new Map();
       for (const at of atoms) if (rel.includes(at.fn)) { if (!byArg.has(at.arg)) byArg.set(at.arg, {}); byArg.get(at.arg)[at.fn] = at.name; }
       let k = 0;
       for (const pair of byArg.values()) {
-        const phi = 0.31 + 0.17 * i + 0.23 * k; k += 1;
+        const phi = 0.31 + 0.17 * i + 0.23 * k + 0.37 * ri; k += 1;
         if (rel[0] === 'sin') { if (pair.sin) env[pair.sin] = Math.sin(phi); if (pair.cos) env[pair.cos] = Math.cos(phi); }
         else { const t = Math.tan(phi); if (pair[rel[0]]) env[pair[rel[0]]] = t; if (pair[rel[1]]) env[pair[rel[1]]] = Math.sqrt(1 + t * t); }
       }

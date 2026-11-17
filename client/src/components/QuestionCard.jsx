@@ -2047,14 +2047,22 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // The annotated panel reads only what the marked attempt already holds: the
   // step report, the lines that were checked, the receipt and the released
   // solution. It never marks: the receipt's marks are passed through as-is.
+  // "Marked again · attempt n": the distinct server submissions this card has
+  // seen marked, for this question only.
+  const markedSubmissions = useRef({ id: null, seen: new Set() });
+  if (markedSubmissions.current.id !== question?.id) markedSubmissions.current = { id: question?.id, seen: new Set() };
+  const markedId = (resolved ? res?.submissionId : state.res?.submissionId);
+  if (typeof markedId === 'string' && markedId && (resolved || gradedRetry)) markedSubmissions.current.seen.add(markedId);
+  const markedCount = markedSubmissions.current.seen.size;
   const awInput = useMemo(() => {
     if (!resolved || previousAttempt || !res || res.revealed || res.invalid || !Array.isArray(res.stepReport?.lines) || res.stepReport.lines.length < 2) return null;
     const lines = writeMode ? (judged?.lines || inkResult?.lines || []) : String(working || '').split('\n').filter(Boolean);
     return {
       lines, stepReport: res.stepReport, solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed',
-      receipt: shownGrade ? { awarded: shownGrade.awarded, possible: shownGrade.possible, id: typeof res.submissionId === 'string' ? res.submissionId : null } : null
+      receipt: shownGrade ? { awarded: shownGrade.awarded, possible: shownGrade.possible, id: typeof res.submissionId === 'string' ? res.submissionId : null } : null,
+      attempt: markedCount
     };
-  }, [resolved, previousAttempt, res, writeMode, judged, inkResult, working, shownGrade]);
+  }, [resolved, previousAttempt, res, writeMode, judged, inkResult, working, shownGrade, markedCount]);
   const [awModel, setAwModel] = useState(null);
   useEffect(() => { if (!awInput) setAwModel(null); }, [awInput]);
   const instrumentScore = INSTRUMENT && !!shownGrade && Number.isFinite(Number(shownGrade.awarded))
@@ -2757,7 +2765,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
                 <InkAnswer feedback liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
-                  lineMarkers={awModel && writeMode ? awModel.cards.map(c => c.n) : null}
+                  lineMarkers={awModel && writeMode && awModel.cards.length === (inkResult?.lines?.length || 0) ? awModel.cards.map(c => c.n) : null}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
                   focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}

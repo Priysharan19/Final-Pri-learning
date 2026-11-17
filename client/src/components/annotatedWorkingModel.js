@@ -16,6 +16,18 @@ import { annotateWorking } from '../engine/stepJustify.js';
 
 const MAX_LINES = 40;
 
+/** 6, 7, 8 → "6–8"; 2, 4 → "2, 4". */
+export function lineRange(ns) {
+  const out = [];
+  for (let i = 0; i < ns.length; i += 1) {
+    let j = i;
+    while (j + 1 < ns.length && ns[j + 1] === ns[j] + 1) j += 1;
+    out.push(j - i >= 2 ? `${ns[i]}–${ns[j]}` : j > i ? `${ns[i]}, ${ns[j]}` : `${ns[i]}`);
+    i = j;
+  }
+  return out.join(', ');
+}
+
 /** 'LHS = RHS' of a released "prove that" solution, or null. */
 export function proofStatementOf(solution) {
   const steps = Array.isArray(solution?.steps) ? solution.steps : [];
@@ -43,7 +55,7 @@ function mergeRules(steps) {
  *   solution, readStates?: ('read'|'check'|'cant')[], source?: 'handwriting'|'typed' }
  * @returns {null | { cards, proof, summary, marks, criteria, jumps, source }}
  */
-export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solution = null, readStates = null, source = 'typed' } = {}) {
+export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solution = null, readStates = null, source = 'typed', attempt = null } = {}) {
   const report = Array.isArray(stepReport?.lines) ? stepReport.lines.slice(0, MAX_LINES) : null;
   if (!report || report.length < 2) return null;
   const texts = report.map((l, i) => String(l?.text ?? lines?.[i] ?? ''));
@@ -101,11 +113,15 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
   const before = c => firstBreak < 0 || c.line < firstBreak;
   const criteria = evidenceSteps.map(s => {
     const linesSeen = cards.filter(c => before(c) && c.status === 'checked' && c.rules.some(r => s.rules.includes(r.rule))).map(c => c.n);
-    return { text: s.h, lines: linesSeen };
+    // shown only in lines that follow from the first error: follow-through,
+    // which is a teacher's decision and is not counted here
+    const following = linesSeen.length ? [] : cards.filter(c => c.status === 'follows' && c.rules.some(r => s.rules.includes(r.rule))).map(c => c.n);
+    return { text: s.h, lines: linesSeen, ...(following.length ? { followThrough: following } : {}) };
   });
+  const followThrough = cards.filter(c => c.status === 'follows').map(c => c.n);
   if (proof) criteria.push({ text: null, kind: 'reaches-rhs', lines: proof.complete ? (proof.meetLines || [cards.length - 1]).map(i => i + 1) : [] });
 
   const marks = receipt && Number.isFinite(Number(receipt.awarded)) && Number(receipt.possible) > 0
     ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible), receiptId: typeof receipt.id === 'string' && receipt.id ? receipt.id.slice(-8) : null } : null;
-  return { cards, proof, summary, marks, criteria, jumps, source };
+  return { cards, proof, summary, marks, criteria, jumps, followThrough, source, attempt: Number.isInteger(attempt) && attempt > 1 ? attempt : null };
 }
