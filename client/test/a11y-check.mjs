@@ -637,6 +637,24 @@ async function run() {
       await wait(page, 600);
     });
 
+    // ── signed out: the public landing and its plain pages (the verified page) ──
+    // The demo is driven to its end — confirm the reading, let the engine's
+    // verdicts lock, See why open — so the audit sees every state it shows.
+    await step('landing · demo waiting for the reading', '/welcome', async () => {
+      await page.goto(BASE + '/welcome', { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-landing-demo][data-demo-state="waiting"]', { timeout: 20000 });
+    });
+    await step('landing · demo checked, See why open', '/welcome', async () => {
+      await page.click('[data-demo-confirm]');
+      await page.waitForSelector('[data-landing-demo][data-demo-state="done"] [data-demo-seewhy] [role="slider"]', { timeout: 20000 });
+    });
+    for (const sub of ['marking', 'syllabus', 'teachers']) {
+      await step(`landing · ${sub}`, `/welcome/${sub}`, async () => {
+        await page.goto(`${BASE}/welcome/${sub}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector(`[data-landing-page="${sub}"]`, { timeout: 20000 });
+      });
+    }
+
     // ── the skip link, measured on a page nothing has focused yet ────────────
     try {
       await signInToDemo(page, BASE);
