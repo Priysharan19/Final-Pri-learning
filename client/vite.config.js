@@ -657,7 +657,7 @@ export const SHIPPABLE_FEATURE_FLAGS = Object.freeze(['TUTOR']);
 // flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
 // to it, but its value comes from client/interface.config.mjs in every build and
 // on the development server alike.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK', 'EXPORTS', 'NSW_EXAMS']);
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK', 'EXPORTS', 'NSW_EXAMS', 'SYLLABUS_BOARD']);
 //   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
 //   everywhere, the dev server included: off until a rights opinion exists
 //   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
@@ -678,6 +678,10 @@ export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HAN
 //   NSW_EXAMS — Prithagoras's HSC-style timed papers on the Exams page (plan
 //   G4). Off in a production build; the server has its own switch
 //   (PRI_NSW_EXAMS=on), also off by default.
+//   SYLLABUS_BOARD — the syllabus board, priorities and paper readiness on the
+//   Progress page (both editions). Off in a production build: the Prithagoras
+//   board names NSW outcome codes and focus areas to students, and whether that
+//   needs NESA permission is an open question (research §5.7).
 const OPT_IN_FLAGS = new Set(['PAST_PAPERS']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
@@ -699,6 +703,7 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_EXAM_DESK__: JSON.stringify(states.examDesk),
     __PRI_FEATURE_EXPORTS__: JSON.stringify(states.exports),
     __PRI_FEATURE_NSW_EXAMS__: JSON.stringify(states.nswExams),
+    __PRI_FEATURE_SYLLABUS_BOARD__: JSON.stringify(states.syllabusBoard),
     __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
     __PRI_EDITION__: JSON.stringify(states.edition),
     // Plan E5: false in a build of an edition with no payment provider, so its

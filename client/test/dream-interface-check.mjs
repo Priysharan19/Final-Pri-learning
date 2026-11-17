@@ -469,13 +469,13 @@ check('the reading line runs once, only on a page the engine marked, and not und
   assert.match(themeCss, /@media \(prefers-reduced-motion: reduce\) \{\s*\.editor-shell\[data-marked="yes"\] \.ink-stage::after \{ animation: none; display: none; \}/);
 });
 
-check('the result states the mark once and Progress shows whole marks, no percentile', () => {
+check('the result states the mark once and Progress shows no predicted mark, percentage or percentile', () => {
   const head = card.slice(card.indexOf('<span className="eval-marks">'), card.indexOf('</span>', card.indexOf('<span className="eval-marks">')));
   assert.doesNotMatch(head, /%/);
   assert.match(card, /boardAward\.rows\.length > 1 && <b/);
-  assert.match(progressJsx, /Math\.round\(unit\.atStake\)/);
-  assert.doesNotMatch(progressJsx, /\+\{unit\.atStake\}/);
-  assert.doesNotMatch(progressJsx, /className="card"[^>]*>\s*<div className="card-title"/);
+  // Progress no longer shows marks at stake or any predicted mark: it draws words from the
+  // student's own record (progress/EvidenceProgress.jsx), so there is no figure to round.
+  assert.doesNotMatch(progressJsx, /atStake|predict|%/);
 });
 
 check('a symbol correction never outlives the strokes it was made on, and finger writing is always offered', () => {

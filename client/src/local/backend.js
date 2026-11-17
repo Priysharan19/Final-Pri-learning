@@ -32,6 +32,7 @@ import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { nswIssuedLevels, nswIssuedForms, nswOfferedCell } from '../engine/nswOffer.js';
 import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
+import { evidenceProgress } from '../engine/progressEvidence.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { HINT_RUNGS, rungLevelOf, nextRungAfter, markWeightAfter, helpUnitsAfter } from '../engine/hintLadder.js';
 import { contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
@@ -4705,6 +4706,70 @@ const routes = {
       streak: await streakFor(pid, now, timezoneOf(p))
     };
   },
+  // What the student's own record supports, in words and bands (engine/progressEvidence.js):
+  // no mastery figure, percentage, predicted mark or band, for either edition.
+  'GET /progress/evidence': async () => {
+    const p = await requireProfile();
+    return evidenceProgress(await attemptsInOrder(p.id), { now: Date.now() });
+  },
+  // The syllabus board's inputs (progress/SyllabusBoard.jsx, engine/
+  // syllabusBoard.js): each attempt with the dot points its question named —
+  // Pri dot point ids for NSW, `${chapter}#${ordinal}` for India, none when the
+  // question named none — and the finished papers with who marked them. Only
+  // the fields the evidence reading uses leave this handler.
+  'GET /progress/board': async () => {
+    const p = await requireProfile();
+    const india = p.course === 'in';
+    const questions = new Map((await byIndex('questions', 'pid', p.id)).map(r => [r.id, r]));
+    const dotpointsOf = row => {
+      if (!row) return [];
+      if (india) {
+        const idx = row.india?.dotpointIndex;
+        return row.india?.chapterId && Number.isInteger(idx) ? [`${row.india.chapterId}#${idx}`] : [];
+      }
+      const q = row.payload || {};
+      if (typeof q.dotpoint === 'string' && q.dotpoint) return [q.dotpoint];
+      return Array.isArray(q.dotpoints) ? q.dotpoints.filter(id => typeof id === 'string' && id) : [];
+    };
+    const attempts = (await attemptsInOrder(p.id)).map(a => ({
+      createdAt: a.createdAt, subtopic: a.subtopic, generator: a.generator, correct: a.correct, support: a.support,
+      hintsUsed: a.hintsUsed, tutorLevel: a.tutorLevel, revealed: a.revealed, mode: a.mode,
+      ...(a.repeat === true ? { repeat: true } : {}),
+      dotpoints: dotpointsOf(questions.get(a.questionId))
+    }));
+    // Marks by section, from the server's per-question result and the section each
+    // question was sealed in; null unless every question has both.
+    const sectionsOf = e => {
+      const out = [];
+      for (const d of Array.isArray(e.detail) ? e.detail : []) {
+        const row = questions.get(String(d.id));
+        const id = row?.examSection ?? row?.indiaExamSection;
+        const marks = Number(d.marks), got = Number(d.awarded);
+        if (id == null || !Number.isFinite(marks) || !Number.isFinite(got)) return null;
+        let sec = out.find(x => x.id === String(id));
+        if (!sec) { sec = { id: String(id), label: String(row.examSectionLabel ?? row.indiaExamSectionLabel ?? ''), marks: 0, awarded: 0 }; out.push(sec); }
+        sec.marks += marks; sec.awarded += got;
+      }
+      return out.length ? out : null;
+    };
+    const papers = (await byIndex('exams', 'pid', p.id)).filter(e => e.finishedAt).map(e => ({
+      id: e.id, title: e.title, finishedAt: e.finishedAt, score: e.score, total: e.total,
+      durationMin: Number.isFinite(e.durationMin) ? e.durationMin : null, readingMin: Number.isFinite(e.readingMin) ? e.readingMin : null,
+      sections: sectionsOf(e),
+      deadlineAt: Number.isFinite(e.deadlineAt) ? e.deadlineAt : null, markedBy: markedByOf(e),
+      pending: !!e.pendingFinish, provisional: e.provisional === true || pendingSummary(e.detail).any,
+      full: e.nsw ? e.nsw.partial !== true : e.indiaExam ? e.indiaExam.fullPaper === true : false,
+      // The NSW course a blueprint paper was set for (its key matches the board's), else null.
+      course: e.nsw?.course || null
+    }));
+    if (!india) return { course: 'nsw', attempts, papers };
+    const trackId = cleanIndiaTrack(p.indiaTrack, p.year);
+    const chapters = indiaScope(trackId, p.year).map(ch => ({
+      id: ch.id, name: ch.name, strand: ch.strand || null,
+      dotpoints: (ch.dotpoints || []).map((text, ordinal) => ({ text, generated: (ch.covers || []).some(c => c.dp.includes(ordinal)) }))
+    }));
+    return { course: 'in', track: trackId, attempts, papers, chapters };
+  },
   'GET /badges': async () => {
     const p = await requireProfile();
     const earned = await byIndex('badges', 'pid', p.id);
@@ -5843,7 +5908,9 @@ function paperRowOf(pid, examId, sq, now, id = String(sq.id)) {
     id, pid, subtopic: q.multipart ? sq.generator : (q.subtopic || sq.generator), difficulty: q.multipart ? 3 : (q.difficulty || sq.difficulty || 2),
     // No answer, step or trap is on this device.
     payload: q, mode: 'exam', examId, taskId: null, answered: 0, tries: 0, hintsUsed: 0, createdAt: now,
-    examMarking: sq.marking, examServer: true
+    examMarking: sq.marking, examServer: true,
+    // The paper's section, as the server sealed it, so a result can be read by section.
+    ...(sq.section != null ? { examSection: String(sq.section), examSectionLabel: String(sq.sectionLabel || '') } : {})
   };
 }
 

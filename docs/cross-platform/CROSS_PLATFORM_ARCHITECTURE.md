@@ -92,7 +92,7 @@ None of the bridges carries a protocol version. Detection happens once at module
 | `client/src/ink/native.js` | Clip geometry hard-codes `.topbar` / `.sidebar` and `window.innerWidth/innerHeight` |
 | `client/src/ink/interactionGuard.js` | WebKit-only `-webkit-touch-callout` / `-webkit-user-drag` guards (harmless on Chromium, but untested there) |
 
-**Browser-only assumptions:** the service worker precache and warm-up (disabled under native), `navigator.storage.persist`, `window.print()` as the only PDF path (`client/src/pages/Exams.jsx`, `client/src/pages/ProgressLegacy.jsx`, `client/src/pages/Teach.jsx`), `<a download>` exports (`client/src/components/CloudAccountSecurity.jsx` has no native branch and relies on the shell's implicit `WKDownload` path; it revokes the blob URL on the next tick, a possible race with WebKit reading the blob, which is unverified on device), and `navigator.onLine` with no `online`/`offline` listeners.
+**Browser-only assumptions:** the service worker precache and warm-up (disabled under native), `navigator.storage.persist`, `window.print()` as the only PDF path (`client/src/pages/Exams.jsx`, `client/src/pages/ProgressExport.jsx`, `client/src/pages/Teach.jsx`), `<a download>` exports (`client/src/components/CloudAccountSecurity.jsx` has no native branch and relies on the shell's implicit `WKDownload` path; it revokes the blob URL on the next tick, a possible race with WebKit reading the blob, which is unverified on device), and `navigator.onLine` with no `online`/`offline` listeners.
 
 ## 4. The platform-neutral contract (target for CP-02)
 
