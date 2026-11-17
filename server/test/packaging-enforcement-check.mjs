@@ -37,7 +37,7 @@ const { consumeAiAllowance, AI_ALLOWANCE_DEFAULTS } = await import('../platform/
 const { entitlementRefusal } = await import('../platform/exams.js');
 const { PREMIUM_CAPABILITIES } = await import('../platform/entitlements.js');
 const { CANCEL_REASONS } = await import('../platform/billing.js');
-const { valueFunnel, cell, rate, FUNNEL_K } = await import('../platform/valueFunnel.js');
+const { valueFunnel, cell, rate, partOf, FUNNEL_K } = await import('../platform/valueFunnel.js');
 const { createPlatformDb } = await import('../platform/db.js');
 const { asStore } = await import('../platform/store.js');
 const { ensureBillingSchema } = await import('../platform/billingSchema.js');
@@ -147,15 +147,19 @@ const h = await startApp();
 try {
   const student = await registerAccount(h, { email: 'cancel@example.test' });
   const id = student.account.id;
+  const store = (await import('../platform/store.js')).asStore(h.db);
   const send = (reason, jar = student.jar) => h.request('/v1/billing/cancel-feedback', { method: 'POST', jar, body: { reason } });
   c.eq((await send('price')).status, 409, 'no reason is accepted from an account that has not cancelled');
-  const store = (await import('../platform/store.js')).asStore(h.db);
+  await store.run("INSERT INTO billing_subscriptions(provider,provider_subscription_id,account_id,product_id,cadence,trial_claimed,created_at,updated_at,cancel_requested_at,cancel_mode,cancel_reason) VALUES ('web','sub_test_0',?,'price_x','monthly',0,?,?,?,'cycle-end','provider')",
+    [id, Date.now() - DAY, Date.now(), Date.now() - 60_000]);
+  c.eq((await send('price')).status, 409, 'a cancellation the student did not ask for here (provider portal) takes no reason');
   await store.run("INSERT INTO billing_subscriptions(provider,provider_subscription_id,account_id,product_id,cadence,trial_claimed,created_at,updated_at,cancel_requested_at,cancel_mode,cancel_reason) VALUES ('web','sub_test_1',?,'price_x','monthly',0,?,?,?,'cycle-end','user')",
     [id, Date.now() - DAY, Date.now(), Date.now() - 60_000]);
   c.eq((await send('Too expensive!!')).status, 400, 'free text is refused: the reason is a closed set');
   c.deq(CANCEL_REASONS, ['price', 'notUsing', 'examDone', 'missing', 'other'], 'the closed set the panel offers');
   c.eq((await send('price')).status, 200, 'a listed reason after a real cancellation is kept');
-  c.eq((await send('other')).status, 200, 'a second tap is answered…');
+  await Promise.all([send('other'), send('missing')]);
+  c.ok(true, 'two more taps at once are answered…');
   const rows = await store.all("SELECT metadata_json FROM audit_log WHERE action='billing.cancel-feedback'");
   c.deq(rows.map(r => JSON.parse(r.metadata_json)), [{ reason: 'price' }], '…but only the first reason per subscription is counted');
 
@@ -188,6 +192,7 @@ try {
   c.deq([f.retention.d7.eligible, f.retention.d7.returned, f.retention.d7.rate], [30, 15, 0.5], 'D7 = a checked answer seven or more days after the first');
   c.deq([f.retention.d30.eligible, f.retention.d30.returned], [0, 0], 'D30 has no eligible account yet');
   c.deq([cell(3), cell(0), cell(10), rate(9, 100), rate(95, 100), rate(50, 100)], [null, 0, 10, null, null, 0.5], 'small cells and rates near 0 or 1 are suppressed');
+  c.deq([partOf(35, 40), partOf(30, 40), partOf(0, 40), partOf(40, 40)], [null, 30, 0, 40], 'a count beside its total is suppressed when the remainder is a small cell');
   db.close?.();
 }
 

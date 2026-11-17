@@ -94,7 +94,7 @@ export const BILLING_PROVIDERS = Object.freeze(['razorpay', 'stripe', 'apple', '
 export const DIFFERENTIATORS = Object.freeze({
   engineSteps: Object.freeze({ requires: 'stepFeedback' }),
   youConfirm: Object.freeze({ requires: 'handwritingRecognition' }),
-  syllabus: Object.freeze({ requires: null }),
+  syllabus: Object.freeze({ requires: 'notesAndWorkedExamples' }),
   examPapers: Object.freeze({ requires: 'timedExams' })
 });
 

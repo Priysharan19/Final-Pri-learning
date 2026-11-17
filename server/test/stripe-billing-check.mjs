@@ -151,11 +151,22 @@ const invoice = (over = {}) => ({
   ok(call.body.payment_method_collection === undefined && call.body['subscription_data[trial_settings][end_behavior][missing_payment_method]'] === undefined,
     'by default a trial still collects a card (the no-card trial is the owner\'s switch, PRI_STRIPE_TRIAL_NO_CARD)');
   {
-    const src = readFileSync(new URL('../platform/stripe.js', import.meta.url), 'utf8');
-    ok(src.includes("...(trialApplied && cfg.trialWithoutCard ? { payment_method_collection: 'if_required' } : {}),") &&
-      src.includes("...(trialApplied && cfg.trialWithoutCard ? { trial_settings: { end_behavior: { missing_payment_method: 'cancel' } } } : {})") &&
-      src.includes("trialWithoutCard: String(process.env.PRI_STRIPE_TRIAL_NO_CARD || '').trim() === '1',"),
-      'with the switch on, a trial collects a card only if needed and cancels at its end with none on file — never an unpaid invoice');
+    // The owner's switch on: a separate billing instance reads it, on a fresh
+    // trial (the claim is cleared and restored), then a second, trial-less checkout.
+    process.env.PRI_STRIPE_TRIAL_NO_CARD = '1';
+    const noCard = createStripeBilling(db, { fetchImpl: fakeFetch, now: () => clock });
+    const claim = await db.get('SELECT * FROM billing_trial_claims WHERE account_id=?', [ACCOUNT]);
+    await db.run('DELETE FROM billing_trial_claims WHERE account_id=?', [ACCOUNT]);
+    const first = await noCard.checkout.web.create({ accountId: ACCOUNT, cadence: 'monthly' });
+    const withTrial = calls.at(-1).body;
+    const second = await noCard.checkout.web.create({ accountId: ACCOUNT, cadence: 'monthly' });
+    const withoutTrial = calls.at(-1).body;
+    delete process.env.PRI_STRIPE_TRIAL_NO_CARD;
+    await db.run('DELETE FROM billing_trial_claims WHERE account_id=?', [ACCOUNT]);
+    if (claim) await db.run('INSERT INTO billing_trial_claims(account_id,provider,provider_subscription_id,claimed_at) VALUES (?,?,?,?)', [claim.account_id, claim.provider, claim.provider_subscription_id, claim.claimed_at]);
+    ok(first.trialApplied === true && withTrial.payment_method_collection === 'if_required' && withTrial['subscription_data[trial_settings][end_behavior][missing_payment_method]'] === 'cancel' && withTrial['subscription_data[trial_period_days]'] === '7' &&
+      second.trialApplied === false && withoutTrial.payment_method_collection === undefined && withoutTrial['subscription_data[trial_settings][end_behavior][missing_payment_method]'] === undefined,
+      'with the switch on, a trial collects a card only if needed and cancels at its end with none on file (never an unpaid invoice); a checkout without a trial always collects a card');
   }
   ok(!JSON.stringify(made).includes(SECRET_KEY) && !JSON.stringify(made).includes(WEBHOOK_SECRET), 'no secret is in the answer');
   const again = await stripe.checkout.web.create({ accountId: ACCOUNT, cadence: 'annual' });

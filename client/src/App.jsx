@@ -528,8 +528,8 @@ export default function App() {
   const activate = useCallback((ready) => {
     setActivated(ready && ready.profileId && ready.accountId && userIdRef.current != null && String(ready.profileId) === String(userIdRef.current) ? ready : null);
   }, []);
-  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate }),
-    [user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate]);
+  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate, activated }),
+    [user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate, activated]);
 
   if (user === undefined) {
     return (

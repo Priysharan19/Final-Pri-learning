@@ -86,6 +86,9 @@ for (const f of FORBIDDEN_SURFACES) ok(`${f} never links to Premium`, !PREMIUM_L
   const note = read('src/paywall/UpgradeNote.jsx');
   ok('the offer has no timer, countdown or modal', !/setTimeout|setInterval|countdown|role="dialog"|aria-modal/i.test(note));
   ok('the offer says what you get, the price where known, and cancel anytime', /MOMENT_KEYS\[moment\]/.test(note) && /upgrade\.price/.test(note) && /upgrade\.cancelAnytime/.test(note));
+  ok('a store build never states the web list price in an offer', /const price = nativeBillingStore\(\) \? null : listPriceOf\(edition\(\)\.commerce\);/.test(note));
+  ok('a profile the server has not let in (guardian pending or withdrawn, account held) is never offered Premium',
+    /const admitted = !!user\?\.id && activated\?\.profileId === user\.id;/.test(note) && /guardianConsentRequired: !admitted, \.\.\.context/.test(note) && /activate, activated \}\),/.test(read('src/App.jsx')));
 }
 
 // ── 3 · free never blocks core practice ─────────────────────────────────────
@@ -128,7 +131,8 @@ for (const f of FORBIDDEN_SURFACES) ok(`${f} never links to Premium`, !PREMIUM_L
       live.every(d => !DIFFERENTIATORS[d].requires || EDITIONS[id].capabilities[DIFFERENTIATORS[d].requires] === true));
     eq(`${EDITIONS[id].brand}: every differentiator has its copy`, WHY_KEYS(live).length, live.length);
   }
-  eq('Prithagoras claims only what is live today (step feedback and exam papers are still pending there)', editionCommerce('prithagoras').differentiators, ['youConfirm', 'syllabus']);
+  eq('Prithagoras claims only what is live today (step feedback, NSW notes and exam papers are still pending there)', editionCommerce('prithagoras').differentiators, ['youConfirm']);
+  ok('every differentiator rests on a named capability: none is shown unconditionally', Object.values(DIFFERENTIATORS).every(d => typeof d.requires === 'string' && d.requires.length > 0));
   const copy = [...Object.entries(en), ...Object.entries(AU_STRINGS)].filter(([k]) => /^(pricing|upgrade)\.|^paywall\.(free\.(questionsUncapped|allLevels)|from\.(priorities|papers))$/.test(k)).map(([, v]) => String(v)).join('\n');
   ok('no competitor is named', !/leibniz|cluey|atomi|khan|byju|unacademy|vedantu/i.test(copy));
   ok('no statistic or comparison is invented', !/%|\b\d+x\b|times (better|faster)|students (improve|scored)|better than|more than any/i.test(copy));

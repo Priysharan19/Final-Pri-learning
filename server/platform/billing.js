@@ -186,15 +186,15 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
     if (!CANCEL_REASONS.includes(reason)) return res.status(400).json({ error: { code: 'CANCEL_REASON_INVALID', message: 'Choose one of the listed reasons.' } });
     const accountId = req.platformSession.account_id;
     const now = Date.now();
-    const sub = await db.get('SELECT provider,provider_subscription_id FROM billing_subscriptions WHERE account_id=? AND cancel_requested_at IS NOT NULL AND cancel_requested_at>=? ORDER BY cancel_requested_at DESC LIMIT 1',
+    const sub = await db.get("SELECT provider,provider_subscription_id FROM billing_subscriptions WHERE account_id=? AND cancel_reason='user' AND cancel_requested_at IS NOT NULL AND cancel_requested_at>=? ORDER BY cancel_requested_at DESC LIMIT 1",
       [accountId, now - CANCEL_FEEDBACK_WINDOW_MS]);
     if (!sub) return res.status(409).json({ error: { code: 'CANCEL_FEEDBACK_NOT_EXPECTED', message: 'There is no recent cancellation on this account.' } });
     const target = `${sub.provider}:${sub.provider_subscription_id}`;
-    const already = await db.get("SELECT id FROM audit_log WHERE action='billing.cancel-feedback' AND target_kind='subscription' AND target_id=?", [target]);
-    if (!already) {
-      await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)',
-        [accountId, 'billing.cancel-feedback', 'subscription', target, JSON.stringify({ reason }), now]);
-    }
+    // One statement, so two taps at once still keep one reason per subscription.
+    await db.run(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at)
+      SELECT CAST(? AS TEXT),'billing.cancel-feedback','subscription',CAST(? AS TEXT),CAST(? AS TEXT),CAST(? AS BIGINT) WHERE NOT EXISTS
+        (SELECT 1 FROM audit_log WHERE action='billing.cancel-feedback' AND target_kind='subscription' AND target_id=CAST(? AS TEXT))`,
+    [accountId, target, JSON.stringify({ reason }), now, target]);
     res.set('Cache-Control', 'no-store');
     res.json({ ok: true });
   });

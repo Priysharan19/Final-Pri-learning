@@ -24,9 +24,12 @@
 // readout (PR #996), which owns its definition, delay and statistics. This
 // readout names where it lives so the two are read together.
 //
-// Small cells are suppressed: any count from 1 to K−1 is returned as null, and
-// a rate is returned only when its numerator, denominator and complement are
-// each at least K. Every figure is a count over many accounts; no account id,
+// Small cells are suppressed: any count from 1 to K−1 is returned as null, a
+// count published beside its total is also null when the remainder is 1 to
+// K−1, and a rate is returned only when its numerator, denominator and
+// complement are each at least K. The 7, 30 and 90-day windows overlap, so one
+// window's figures could in principle be subtracted from another's: the
+// readout is admin + second factor only, and carries no identifier. Every figure is a count over many accounts; no account id,
 // email, name or timestamp ever leaves this module. Definitions:
 // docs/product/value-metrics.md.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,6 +45,18 @@ const DAY = 24 * 60 * 60 * 1000;
 export function cell(n, k = FUNNEL_K) {
   const v = Math.max(0, Math.floor(Number(n) || 0));
   return v > 0 && v < k ? null : v;
+}
+
+/**
+ * A count that is part of a published total: null when it, or what is left of
+ * the total without it, is small enough to point at a person.
+ */
+export function partOf(num, den, k = FUNNEL_K) {
+  const a = Math.max(0, Math.floor(Number(num) || 0));
+  const b = Math.max(0, Math.floor(Number(den) || 0));
+  if (a > 0 && a < k) return null;
+  if (b - a > 0 && b - a < k) return null;
+  return a;
 }
 
 /** num / den to three places, or null unless num, den and den − num are each ≥ k. */
@@ -75,7 +90,7 @@ export async function valueFunnel(db, { days = 30, now = Date.now(), edition = n
   for (const n of RETENTION_DAYS) {
     const eligible = activity.filter(r => Number(r.first_at) <= now - n * DAY);
     const returned = eligible.filter(r => Number(r.last_at) - Number(r.first_at) >= n * DAY).length;
-    retention[`d${n}`] = { eligible: cell(eligible.length, k), returned: cell(returned, k), rate: rate(returned, eligible.length, k) };
+    retention[`d${n}`] = { eligible: cell(eligible.length, k), returned: partOf(returned, eligible.length, k), rate: rate(returned, eligible.length, k) };
   }
   const trials = await db.all(
     `SELECT t.account_id AS account,
@@ -98,9 +113,9 @@ export async function valueFunnel(db, { days = 30, now = Date.now(), edition = n
     window: { days: w.days, from: w.from, to: w.to },
     k,
     cohort: { accounts: cell(cohort, k) },
-    activation: { activated: cell(activated, k), rate: rate(activated, cohort, k) },
+    activation: { activated: partOf(activated, cohort, k), rate: rate(activated, cohort, k) },
     retention,
-    trial: { started: cell(trials.length, k), paid: cell(trialPaid, k), rate: rate(trialPaid, trials.length, k) },
+    trial: { started: cell(trials.length, k), paid: partOf(trialPaid, trials.length, k), rate: rate(trialPaid, trials.length, k) },
     cancellations: {
       requested: cell(cancels, k),
       reasonsGiven: cell(answered, k),
