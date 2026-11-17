@@ -120,6 +120,7 @@ function Desk({ attemptId }) {
   const [current, setCurrent] = useState(1);
   const [sheet, setSheet] = useState(null); // 'close' | 'delete' | 'keys'
   const [clockHidden, setClockHidden] = useState(false);
+  const [hand] = useState(readHand);
   const [busy, setBusy] = useState(false);
   const [startError, setStartError] = useState(null);
   const notesRef = useRef(null);
