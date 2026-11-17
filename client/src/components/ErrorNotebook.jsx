@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
 import { formatDate } from '../lib/locale.js';
 import { useApp } from '../App.jsx';
-import { useT } from '../i18n/index.js';
+import { useT, useLanguage } from '../i18n/index.js';
 import TermGloss from './TermGloss.jsx';
 import { isEntitlementGate } from '../local/entitlementGate.js';
 import { PAYWALL_ROUTE } from '../paywall/route.js';
@@ -56,6 +56,7 @@ export default function ErrorNotebook() {
   const [openKey, setOpenKey] = useState(null);
   const [busy, setBusy] = useState(false);
   const [slip, setSlip] = useState(null);
+  const { language } = useLanguage();
 
   useEffect(() => {
     let live = true;
@@ -91,7 +92,7 @@ export default function ErrorNotebook() {
       {book.available === false && <p className="muted notebook-empty">{t(book.reason === 'sign-in' ? 'notebook.signIn' : 'notebook.offline')}</p>}
       {book.available !== false && slip && (
         <div className="notebook-slip" data-slip-pattern={slip.misconceptionId} role="note">
-          <p style={{ margin: '0 0 6px' }}><b>{t('smart.slip.note', { move: t(slip.nameKey), n: slip.count, of: slip.of, topic: sections.find(x => x.subtopic === slip.subtopic)?.chapterName || slip.subtopic })}</b></p>
+          <p style={{ margin: '0 0 6px' }}><b>{t('smart.slip.note', { move: slip.nameKey ? t(slip.nameKey) : (slip.name?.[language] || slip.name?.en || t('smart.slip.generic')), n: slip.count, of: slip.of, topic: sections.find(x => x.subtopic === slip.subtopic)?.chapterName || slip.subtopic })}</b></p>
           <div className="muted" style={{ marginBottom: 6 }}>{t('smart.slip.drill')}</div>
           {slip.drill.filter(d => d.canTwin).map((d, i) => (
             <button key={d.id} type="button" className="btn btn-ghost btn-sm" data-slip-drill={d.id} disabled={busy} onClick={() => twin(d.id)} style={{ marginRight: 8 }}>{t('smart.slip.try', { n: i + 1 })}</button>

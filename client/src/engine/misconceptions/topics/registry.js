@@ -16,6 +16,9 @@
 //     slips: [{
 //       code: 'trig-exact-value-swap',       // unique diagnosis code
 //       misconceptionId: 'optional-ontology-id',
+//       name: { en: 'short name of the slip', hi: '…' },   // optional: names it in the "same slip again" note
+//       socratic: { en: 'One question about THAT step?', hi: '…' },   // optional: the Hint nudge
+//         (no digit, operator or value; client/test/slip-hint-check.mjs holds every registered one to it)
 //       // ctx: { line, previous, index, meta } — `previous` is the line before
 //       // (or the question's source for the first line). Return null, or:
 //       detect: ctx => ({ message, messages: { hi, 'en-AU' }, notesSectionId }),
@@ -60,6 +63,16 @@ export function diagnoseTopicLine(ctx) {
         return { code: s.code, message: hit.message, messages: hit.messages || {}, notesSectionId: hit.notesSectionId || null, misconceptionId: s.misconceptionId || null, topic: t.topic };
       }
     }
+  }
+  return null;
+}
+
+/** The registered slip with this diagnosis code: { topic, misconceptionId, name, socratic }, or null. */
+export function slipInfo(code) {
+  if (typeof code !== 'string') return null;
+  for (const t of TOPICS) {
+    const s = t.slips.find(x => x.code === code);
+    if (s) return { topic: t.topic, misconceptionId: s.misconceptionId || null, name: s.name || null, socratic: s.socratic || null };
   }
   return null;
 }

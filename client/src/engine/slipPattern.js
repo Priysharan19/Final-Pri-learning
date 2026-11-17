@@ -19,6 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { misconceptionById } from './misconceptions.js';
 import { NOTEBOOK_MODES } from './mistakeNotebook.js';
+import { slipInfo } from './misconceptions/topics/index.js';
 
 export const PATTERN_WINDOW = 5;
 export const PATTERN_MIN = 3;
@@ -30,7 +31,7 @@ const newestFirst = (x, y) => (Number(y.at) || 0) - (Number(x.at) || 0) || (Stri
 
 /**
  * @param {Array} attempts graded-attempt payloads { attemptId|id, at, correct, subtopic, misconception, twinOf, ... }
- * @returns {Array<{ subtopic, misconceptionId, nameKey, count, of, lastAt, drillFrom: string[] }>} strongest first
+ * @returns {Array<{ subtopic, misconceptionId (ontology id or topic slip code), nameKey, slipName, count, of, lastAt, drillFrom: string[] }>} strongest first
  */
 export function slipPatterns(attempts, { window = PATTERN_WINDOW, min = PATTERN_MIN } = {}) {
   const bySubtopic = new Map();
@@ -44,7 +45,11 @@ export function slipPatterns(attempts, { window = PATTERN_WINDOW, min = PATTERN_
     const counts = new Map();
     for (const a of recent) {
       if (a.correct) continue;
-      const move = typeof a.misconception === 'string' ? misconceptionById(a.misconception) : null;
+      // A named ontology move, else a topic slip code the engine recorded and
+      // the topic catalogue knows (never a free-text or unknown code).
+      const ontology = typeof a.misconception === 'string' ? misconceptionById(a.misconception) : null;
+      const topic = !ontology && typeof a.slipCode === 'string' ? slipInfo(a.slipCode) : null;
+      const move = ontology ? { id: ontology.id, name: ontology.name, slipName: null } : topic ? { id: a.slipCode, name: null, slipName: topic.name } : null;
       if (!move) continue;
       const row = counts.get(move.id) || counts.set(move.id, { move, ids: [] }).get(move.id);
       row.ids.push(String(a.attemptId || a.id || ''));
@@ -52,7 +57,7 @@ export function slipPatterns(attempts, { window = PATTERN_WINDOW, min = PATTERN_
     for (const { move, ids } of counts.values()) {
       if (ids.length < min) continue;
       out.push({
-        subtopic, misconceptionId: move.id, nameKey: move.name, count: ids.length, of: recent.length,
+        subtopic, misconceptionId: move.id, nameKey: move.name, slipName: move.slipName, count: ids.length, of: recent.length,
         lastAt: Number(recent[0].at) || 0, drillFrom: ids.filter(Boolean).slice(0, DRILL_SIZE)
       });
     }

@@ -45,6 +45,15 @@ const frozen = Object.freeze(five.map(a => Object.freeze({ ...a })));
 slipPatterns(frozen);
 ok(slipPatterns([null, 7, 'x', {}, undefined]).length === 0 && slipPatterns(undefined).length === 0, 'junk input gives no pattern');
 
+// Topic slip codes from the topic catalogues count like ontology moves; an unregistered code does not.
+const { registerTopic } = await import('../src/engine/misconceptions/topics/index.js');
+registerTopic({ topic: 'slip-pattern-fixture', appliesTo: () => false, slips: [{ code: 'fixture-trig-swap', name: { en: 'a swapped exact value', hi: 'बदला हुआ सटीक मान' }, detect: () => null }] });
+const trig = i => att(i, { subtopic: 'trig', misconception: undefined, slipCode: 'fixture-trig-swap' });
+const tp = topSlipPattern([trig(1), trig(2), att(3, { subtopic: 'trig', correct: true, misconception: undefined }), trig(4)]);
+ok(tp && tp.misconceptionId === 'fixture-trig-swap' && tp.nameKey === null && tp.slipName.en === 'a swapped exact value' && tp.count === 3, 'a topic slip code is a pattern, named by its catalogue');
+ok(topSlipPattern([1, 2, 3].map(i => att(i, { subtopic: 'trig', misconception: undefined, slipCode: 'not-registered' }))) === null, 'an unregistered code is not counted');
+ok(topSlipPattern([1, 2, 3].map(i => att(i, { subtopic: 'trig', misconception: undefined, slipCode: '<script>' }))) === null, 'free text is not counted');
+
 // Every hint id is a real ontology move.
 for (const id of Object.keys(SLIP_HINTS)) ok(MISCONCEPTION_IDS.includes(id), `${id} is an ontology move`);
 console.log(`SLIP PATTERN: PASS — ${n}/${n} checks — a repeated move is 3 of the last 5 marked answers on one topic, deterministic, per account, drill from its own mistakes`);

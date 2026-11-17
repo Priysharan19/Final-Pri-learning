@@ -21,6 +21,27 @@ for (const id of ids) {
 ok(slipHint('counterexample') === null && slipHint('not-a-move') === null && slipHint(undefined) === null && slipHint('__proto__') === null && slipHint('constructor') === null, 'an unknown id keeps the existing hint');
 ok(slipHint('int-sign', 'fr') === SLIP_HINTS['int-sign'].en, 'an unknown language falls back to English');
 
+// Topic catalogues (misconceptions/topics): every registered slip's own nudge obeys the same rules,
+// and a slip with none borrows the nudge of the ontology move it names. Registered here as a fixture.
+const { registerTopic, registeredTopics } = await import('../src/engine/misconceptions/topics/index.js');
+registerTopic({ topic: 'slip-hint-fixture', appliesTo: () => false, slips: [
+  { code: 'fixture-own-nudge', socratic: { en: 'Which angle does that ratio belong to in this triangle?', hi: 'यह अनुपात इस त्रिभुज के किस कोण का है?' }, detect: () => null },
+  { code: 'fixture-borrowed', misconceptionId: 'int-sign', detect: () => null },
+  { code: 'fixture-silent', detect: () => null }
+] });
+ok(slipHint('fixture-own-nudge', 'en').startsWith('Which angle') && /[ऀ-ॿ]/.test(slipHint('fixture-own-nudge', 'hi')), 'a topic slip carries its own nudge');
+ok(slipHint('fixture-borrowed', 'en') === SLIP_HINTS['int-sign'].en, 'a topic slip naming an ontology move borrows its nudge');
+ok(slipHint('fixture-silent') === null, 'a topic slip with none keeps the existing hint');
+for (const t of registeredTopics()) for (const sl of t.slips) {
+  if (!sl.socratic) continue;
+  for (const lang of ['en', 'hi']) {
+    const text = sl.socratic[lang];
+    ok(typeof text === 'string' && text.length > 15 && text.length < 220, `${sl.code}/${lang} socratic is one short sentence`);
+    ok(!/[0-9०-९]/.test(text) && !/[=+×÷*^<>≤≥√π$∫∑%\\]/.test(text), `${sl.code}/${lang} socratic holds no value, operator or maths span`);
+    ok((text.match(/[?？]/g) || []).length === 1, `${sl.code}/${lang} socratic asks one question`);
+  }
+}
+
 // The same text is returned whatever the student wrote: it depends on the id alone.
 ok(slipHint('int-sign', 'en') === slipHint('int-sign', 'en'), 'deterministic');
 

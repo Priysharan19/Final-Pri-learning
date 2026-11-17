@@ -11,6 +11,8 @@ process.env.PRI_AUTH_DELIVERY_KEY = '5f'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;
 const { startApp, registerAccount, verifyEmail, checks } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
+const { registerTopic } = await import('../../client/src/engine/misconceptions/topics/index.js');
+registerTopic({ topic: 'route-fixture', appliesTo: () => false, slips: [{ code: 'route-fixture-slip', name: { en: 'a fixture slip', hi: 'एक नमूना चूक' }, detect: () => null }] });
 const h = await startApp({ engine: requestedEngine() });
 const c = checks();
 const { stepNudge, hintWorkNote } = await import('../platform/practice.js');
@@ -55,6 +57,14 @@ try {
   for (const i of [1, 2, 3]) await put(o.account, i, { subtopic: 'c12-differentiation', misconception: 'diff-sign' });
   c.eq((await get(o.jar)).data.pattern?.misconceptionId, 'diff-sign', 'the other account has its own pattern');
   c.eq((await get(a.jar)).data.pattern?.misconceptionId, 'int-sign', 'and this account is unchanged');
+  // A topic slip code the engine recorded is a pattern too, named by its catalogue.
+  const tc = await registerAccount(h, { email: 'slip.topic@example.test', deviceId: 'ipad-slip-t' });
+  c.eq((await verifyEmail(h, tc.account.id)).status, 200, 'a verified account');
+  for (const i of [1, 2, 3]) await put(tc.account, i, { subtopic: 'c10-trig', misconception: undefined, slipCode: 'route-fixture-slip' });
+  const tp = (await get(tc.jar)).data.pattern;
+  c.deq([tp?.misconceptionId, tp?.nameKey, tp?.name?.en, tp?.count], ['route-fixture-slip', null, 'a fixture slip', 3], 'a topic slip code is read like an ontology move');
+  await put(tc.account, 4, { subtopic: 'c10-trig', misconception: undefined, slipCode: 'not-in-any-catalogue' });
+  c.eq((await get(tc.jar)).data.pattern?.count, 3, 'an unknown code adds nothing');
   c.eq((await h.request('/v1/practice/slip-pattern', { method: 'GET' })).status, 401, 'a signed-out request is refused');
 
   console.log(`engine: ${h.engine}`);

@@ -3955,4 +3955,5 @@ export default {
   'smart.slip.note': 'वही चूक, {move}, {topic} पर आपके पिछले {of} उत्तरों में से {n} में आई।',
   'smart.slip.drill': 'इसी पर तीन प्रश्न:',
   'smart.slip.try': 'प्रश्न {n}',
+  'smart.slip.generic': 'एक बार-बार आने वाली चूक',
 };

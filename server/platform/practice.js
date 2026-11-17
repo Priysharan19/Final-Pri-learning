@@ -1436,12 +1436,16 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // matched, or a high-confidence Step Check diagnosis. Nothing is
       // inferred, and a slip that names neither is not filed.
       let misconception = null;
+      let slipCode = null;
       if (resolved && !result.correct && !invalid) {
         if (trapWhy) misconception = { id: misconceptionIdForTrap(q.subtopic, trapWhy), source: 'trap', label: misconceptionLabel(trapWhy) };
         else {
           const diagnosis = counted?.stepReport?.diagnosis;
           const id = diagnosis && diagnosis.confidence === 'high' && diagnosis.code !== 'counterexample' ? misconceptionIdForDiagnosis(diagnosis) : null;
           if (id) misconception = { id, source: 'step', label: misconceptionLabel(diagnosis.title || '') || null };
+          // A topic catalogue's own code (misconceptions/topics), kept beside the
+          // ontology id so "the same slip again" can read topic slips too.
+          if (diagnosis && typeof diagnosis.topic === 'string' && typeof diagnosis.code === 'string' && /^[a-z0-9._:-]{1,80}$/i.test(diagnosis.code)) slipCode = diagnosis.code;
         }
       }
       const response = { authoritative: true, questionId: qid, submissionId, attemptId,
@@ -1538,6 +1542,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             ...ladder, creditedMarks,
             ...(misconception ? { misconception: misconception.id, misconceptionSource: misconception.source,
               ...(misconception.label ? { misconceptionLabel: misconception.label } : {}) } : {}),
+            ...(slipCode ? { slipCode } : {}),
             createdAt: now,
             serverAcknowledgedAt: now
           }), now, accountId]);
@@ -1653,7 +1658,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const q = prompts.get(byId.get(id)?.questionId) || null;
       return { id, canTwin: !!q && !q.multipart && !q.custom };
     });
-    return res.status(200).json({ pattern: { subtopic: top.subtopic, misconceptionId: top.misconceptionId, nameKey: top.nameKey, count: top.count, of: top.of, drill } });
+    return res.status(200).json({ pattern: { subtopic: top.subtopic, misconceptionId: top.misconceptionId, nameKey: top.nameKey, name: top.slipName || null, count: top.count, of: top.of, drill } });
   });
 
   // A twin: a NEW server-chosen question from the same generator, at the same

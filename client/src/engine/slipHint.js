@@ -15,6 +15,8 @@
 //
 // The id is the SERVER's (lineCheckEvidence), never the device's (audit D1).
 // ─────────────────────────────────────────────────────────────────────────────
+import { slipInfo } from './misconceptions/topics/index.js';
+
 const H = (en, hi) => Object.freeze({ en, hi });
 
 export const SLIP_HINTS = Object.freeze({
@@ -58,8 +60,17 @@ export const SLIP_HINTS = Object.freeze({
   'diff-chain-inner-missing': H('The function has something inside it. What else must you multiply by when you differentiate?', 'फलन के अंदर कुछ और है। अवकलन करते समय आपको और किससे गुणा करना होगा?')
 });
 
-/** The nudge for a misconception id in a language, or null (keep the existing hint). */
+/**
+ * The nudge for the engine's id in a language, or null (keep the existing hint).
+ * The id is an ontology move (the table above) or a topic slip code from the
+ * topic catalogues (misconceptions/topics), which may carry its own `socratic`
+ * question or name an ontology move.
+ */
 export function slipHint(id, locale = 'en') {
-  const row = typeof id === 'string' && Object.hasOwn(SLIP_HINTS, id) ? SLIP_HINTS[id] : null;
-  return row ? (locale === 'hi' ? row.hi : row.en) : null;
+  const pick = row => (row ? (locale === 'hi' ? row.hi : row.en) || null : null);
+  if (typeof id !== 'string') return null;
+  if (Object.hasOwn(SLIP_HINTS, id)) return pick(SLIP_HINTS[id]);
+  const info = slipInfo(id);
+  if (!info) return null;
+  return pick(info.socratic) || (info.misconceptionId && Object.hasOwn(SLIP_HINTS, info.misconceptionId) ? pick(SLIP_HINTS[info.misconceptionId]) : null);
 }

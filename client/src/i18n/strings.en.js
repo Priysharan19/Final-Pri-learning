@@ -3900,4 +3900,5 @@ export default {
   'smart.slip.note': 'The same slip, {move}, came up in {n} of your last {of} answers on {topic}.',
   'smart.slip.drill': 'Three questions aimed at it:',
   'smart.slip.try': 'Question {n}',
+  'smart.slip.generic': 'a repeated slip',
 };
