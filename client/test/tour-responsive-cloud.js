@@ -74,12 +74,13 @@ export const flow = {
         await check(`${phase}: typing has no long task over ${LONG_TASK_BUDGET_MS} ms`, typing.length === 0, JSON.stringify(typing));
         await check(`${phase}: the typed answer is still in its field`, (await field.inputValue()) === '12345', await field.inputValue());
       } else note(`${phase}: no typing field on this form; typing check not applicable`);
-      const nav = ['/progress', '/notes', '/'];
-      for (const path of nav) {
-        const link = page.locator(`a[href="${path}"]`).first();
-        if (!(await link.count())) continue;
+      // The practice screen is a focus view: its way out is the Index link; the shell's tabs follow.
+      const hops = [{ path: '/', link: page.getByRole('link', { name: 'Index' }).first() },
+        { path: '/progress', link: page.locator('a[href="/progress"]').first() }, { path: '/notes', link: page.locator('a[href="/notes"]').first() }];
+      for (const { path, link } of hops) {
+        if (!(await link.count())) { note(`${phase}: no visible link to ${path}`); continue; }
         const t0 = Date.now();
-        await inWindow(`${phase}:nav${path}`, async () => { await link.click(); await page.waitForSelector('main h1, main .qpage, .shell main', { timeout: NAV_MS }).catch(() => {}); });
+        await inWindow(`${phase}:nav${path}`, async () => { await link.click({ timeout: 5000 }); await page.waitForSelector('.shell main, main', { timeout: NAV_MS }).catch(() => {}); });
         const took = Date.now() - t0;
         const long = await longIn(`${phase}:nav${path}`);
         await check(`${phase}: moving to ${path} answers within ${NAV_MS} ms and without a long task`, took <= NAV_MS && long.length === 0, `${took} ms ${JSON.stringify(long)}`);
