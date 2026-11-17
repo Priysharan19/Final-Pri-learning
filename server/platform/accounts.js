@@ -887,7 +887,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       FROM assignment_handins WHERE student_account_id=? ORDER BY handed_in_at, assignment_id`, [accountId]);
     const reviewRows = await db.all(`SELECT id,assignment_id,exam_id,question_key,question_order,outcome_code,subtopic,marks_possible,engine_awarded,criterion,available,evidence_json,created_at
       FROM teacher_review_items WHERE student_account_id=? ORDER BY created_at, id`, [accountId]);
-    const teacherMarkRows = await db.all(`SELECT id,review_item_id,assignment_id,criterion,decision,marks,comment,engine_awarded,supersedes,created_at
+    const teacherMarkRows = await db.all(`SELECT id,review_item_id,assignment_id,criterion,decision,marks,comment,engine_awarded,ink_digest,supersedes,created_at
       FROM teacher_marks WHERE student_account_id=? ORDER BY created_at, id`, [accountId]);
     // A receipt with no personal data: the format and how many rows each
     // section carried, so a bulk read of an account is visible in the audit
@@ -960,7 +960,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
             available: Number(row.available), evidence: json(row.evidence_json, {}), createdAt: Number(row.created_at) })),
           teacherMarks: teacherMarkRows.map(row => ({ id: row.id, label: 'teacher', reviewItemId: row.review_item_id, assignmentId: row.assignment_id,
             criterion: row.criterion, decision: row.decision, marks: Number(row.marks), comment: row.comment || null,
-            engineAwardedAtDecision: Number(row.engine_awarded), supersedes: row.supersedes || null, decidedAt: Number(row.created_at) }))
+            engineAwardedAtDecision: Number(row.engine_awarded), inkDigest: row.ink_digest || null, supersedes: row.supersedes || null, decidedAt: Number(row.created_at) }))
         };
       })()
     });

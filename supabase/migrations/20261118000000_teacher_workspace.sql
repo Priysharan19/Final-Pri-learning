@@ -19,7 +19,10 @@
 -- teacher_marks         the TEACHER's decisions, append-only: award or decline,
 --                       marks, an optional comment, who (teacher_account_id),
 --                       when (created_at), which criterion, the engine's mark
---                       at that moment, and the row it supersedes. pri_server
+--                       at that moment, WHICH INK the teacher judged (the
+--                       SHA-256 of the handwritten page the server froze with
+--                       the paper; null for typed work), and the row it
+--                       supersedes. pri_server
 --                       may INSERT and SELECT only: no UPDATE, no DELETE (the
 --                       account erasure cascade still removes them).
 --
@@ -93,6 +96,7 @@ create table pri.teacher_marks (
   marks integer not null check ((decision = 'decline' and marks = 0) or (decision = 'award' and marks >= 1)),
   comment text check (comment is null or length(comment) <= 1000),
   engine_awarded integer not null check (engine_awarded >= 0),
+  ink_digest text check (ink_digest is null or length(ink_digest) = 64),
   supersedes text unique references pri.teacher_marks(id) on delete cascade,
   created_at bigint not null
 );

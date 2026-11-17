@@ -38,13 +38,14 @@
 //    nothing here calls a model.
 // ─────────────────────────────────────────────────────────────────────────────
 import { asyncRouter } from './asyncRouter.js';
-import { asStore, isDatabaseOverload } from './store.js';
+import { asStore } from './store.js';
 import { id, rateLimit, requireRole, requireSession, requireVerifiedEmail } from './security.js';
 import { consentBlockerCode, consentState } from './guardianConsent.js';
 import { markerPool } from './markerPool.js';
 import { resultMatchesTemplate } from './paperAssignments.js';
 import { boardCourses, classBoard } from './classBoard.js';
 import { writeStudentSubmission } from './classes.js';
+import { pageView } from './exams.js';
 import { clipText } from './text.js';
 import { resolveMisconceptionId } from '../../client/src/engine/misconceptions.js';
 
@@ -209,7 +210,9 @@ async function lineEvidence(q, lines, key) {
  */
 export async function handIn(db, { classId, assignmentId, studentId, examId, now = Date.now() }) {
   db = asStore(db);
-  const assignment = await db.get(`SELECT a.id,a.class_id,a.teacher_account_id,a.specification_json,a.created_at FROM assignments a
+  // The class OWNER is the teacher of a hand-in, whoever created the
+  // assignment (an admin may create one in any class; only the owner reviews).
+  const assignment = await db.get(`SELECT a.id,a.class_id,c.teacher_account_id,a.specification_json,a.created_at FROM assignments a
     JOIN classes c ON c.id=a.class_id JOIN class_members cm ON cm.class_id=c.id AND cm.student_account_id=? AND cm.removed_at IS NULL
     WHERE a.id=? AND a.class_id=? AND a.archived_at IS NULL AND c.archived_at IS NULL`, [studentId, assignmentId, classId]);
   if (!assignment) return { status: 404, code: 'ASSIGNMENT_NOT_FOUND', message: 'Assignment not found.' };
@@ -219,16 +222,33 @@ export async function handIn(db, { classId, assignmentId, studentId, examId, now
   const result = await record(db, studentId, 'exam-result', examId, now);
   const paper = await record(db, studentId, 'exam-paper', examId, now);
   if (!result || !paper) return { status: 404, code: 'EXAM_NOT_FOUND', message: 'That paper is not finished yet, or is not yours.' };
+  if (await db.get('SELECT 1 FROM assignment_handins WHERE student_account_id=? AND exam_id=?', [studentId, examId])) {
+    return { status: 409, code: 'HANDIN_EXAM_USED', message: 'That paper has been handed in for another assignment. Sit the paper again for this one.' };
+  }
   if (!resultMatchesTemplate(result, spec.paper)) return { status: 409, code: 'HANDIN_WRONG_PAPER', message: 'That is not the paper your teacher set.' };
   if (!(Number(paper.startedAt) >= Number(assignment.created_at))) return { status: 409, code: 'HANDIN_WRONG_PAPER', message: 'That paper was started before this assignment was set.' };
-  const pages = Object.values(result.handwriting?.pages || {});
-  if (pages.some(p => p.state === 'awaiting-reading')) {
+  // Handwriting as it stands NOW (exams.js pageView): a page that can still be
+  // read would change the engine's score after hand-in, so it is refused until
+  // read; a page past its window or out of tries is final and may be handed in.
+  const pages = Object.values(result.handwriting?.pages || {}).map(p => pageView(p, result.handwriting, now));
+  if (pages.some(p => p.state !== 'resolved' && p.triesLeft > 0)) {
     return { status: 409, code: 'HANDIN_HANDWRITING_PENDING', message: 'Some of your handwriting has not been read yet. Have it read, then hand the paper in.' };
   }
   if (await db.get('SELECT 1 FROM assignment_handins WHERE assignment_id=? AND student_account_id=?', [assignmentId, studentId])) {
     return { status: 409, code: 'HANDIN_ALREADY', message: 'You have handed this paper in already.' };
   }
 
+  // How each answer was written, and — for handwriting — WHICH ink: the
+  // SHA-256 of the page the server froze with the paper (exams.js). A teacher
+  // judges the student's own written work; the receipt of what they judged is
+  // that digest, recorded on the review item and on every teacher mark.
+  const snapshot = await record(db, studentId, 'exam-answers', examId, now);
+  const modes = plain(snapshot?.modes) ? snapshot.modes : {};
+  const inkOf = key => {
+    const page = result.handwriting?.pages?.[key];
+    const digest = typeof page?.digest === 'string' ? page.digest : (typeof snapshot?.ink?.[key] === 'string' ? snapshot.ink[key] : null);
+    return digest && /^[0-9a-f]{64}$/i.test(digest) ? digest.toLowerCase() : null;
+  };
   // Line verdicts for every wrong written answer (feedback only), outside any transaction.
   const units = unitsOf(result, paper);
   const questions = [];
@@ -254,8 +274,11 @@ export async function handIn(db, { classId, assignmentId, studentId, examId, now
         marksPossible: Number(line.marks), engineAwarded: Number(line.awarded), criterion, available: cap,
         evidence: {
           prompt: clipText(String(line.prompt || u.q?.prompt || ''), 2000),
+          // The typeset reading is secondary: "what Pri read". For handwriting,
+          // the original page (ink.digest) is the work being judged.
           reading: lines.map(text => clipText(text, 400)),
-          inputMode: line.inputMode || null,
+          inputMode: modes[u.key] === 'ink' || inkOf(u.key) ? 'ink' : 'typed',
+          ink: inkOf(u.key) ? { digest: inkOf(u.key) } : null,
           lineStatuses: evidence.lines,
           firstBreak: evidence.firstBreak >= 0 ? evidence.firstBreak + 1 : null,
           misconception
@@ -271,7 +294,10 @@ export async function handIn(db, { classId, assignmentId, studentId, examId, now
   try {
     await db.transaction(async () => {
       if (await db.get('SELECT 1 FROM assignment_handins WHERE assignment_id=? AND student_account_id=?', [assignmentId, studentId])) {
-        throw Object.assign(new Error('already'), { status: 409, code: 'HANDIN_ALREADY' });
+        throw Object.assign(new Error('You have handed this paper in already.'), { status: 409, code: 'HANDIN_ALREADY' });
+      }
+      if (await db.get('SELECT 1 FROM assignment_handins WHERE student_account_id=? AND exam_id=?', [studentId, examId])) {
+        throw Object.assign(new Error('That paper has been handed in for another assignment. Sit the paper again for this one.'), { status: 409, code: 'HANDIN_EXAM_USED' });
       }
       await db.run(`INSERT INTO assignment_handins(assignment_id,student_account_id,class_id,teacher_account_id,exam_id,paper_kind,score,total,questions_json,handed_in_at)
         VALUES (?,?,?,?,?,?,?,?,?,?)`, [assignmentId, studentId, classId, assignment.teacher_account_id, examId, String(result.kind),
@@ -285,7 +311,7 @@ export async function handIn(db, { classId, assignmentId, studentId, examId, now
       await audit(db, studentId, 'assignment.hand-in', 'assignment', assignmentId, { classId, examId, reviewItems: items.length }, now);
     });
   } catch (error) {
-    if (error?.status) return { status: error.status, code: error.code, message: error.code === 'HANDIN_ALREADY' ? 'You have handed this paper in already.' : error.message };
+    if (error?.status) return { status: error.status, code: error.code, message: error.message };
     throw error;
   }
   return { handin: { assignmentId, examId, handedInAt: now, score: Math.round(Number(result.score) || 0), total: Math.round(Number(result.total) || 0), reviewItems: items.length } };
@@ -298,7 +324,7 @@ export async function effectiveMarks(db, itemIds) {
   db = asStore(db);
   const out = new Map();
   if (!itemIds.length) return out;
-  const rows = await db.all(`SELECT id,review_item_id,teacher_account_id,criterion,decision,marks,comment,engine_awarded,supersedes,created_at
+  const rows = await db.all(`SELECT id,review_item_id,teacher_account_id,criterion,decision,marks,comment,engine_awarded,ink_digest,supersedes,created_at
     FROM teacher_marks WHERE review_item_id IN (${IN(itemIds)}) ORDER BY created_at,id`, itemIds);
   const superseded = new Set(rows.map(r => r.supersedes).filter(Boolean));
   for (const r of rows) if (!superseded.has(r.id)) out.set(r.review_item_id, r);
@@ -307,7 +333,7 @@ export async function effectiveMarks(db, itemIds) {
 
 const publicMark = (r, { withTeacher = true } = {}) => r ? ({
   id: r.id, label: TEACHER_MARK_LABEL, criterion: r.criterion, decision: r.decision, marks: Number(r.marks),
-  comment: r.comment || null, decidedAt: Number(r.created_at), engineAwardedAtDecision: Number(r.engine_awarded),
+  comment: r.comment || null, decidedAt: Number(r.created_at), engineAwardedAtDecision: Number(r.engine_awarded), inkDigest: r.ink_digest || null,
   ...(withTeacher ? { teacherId: r.teacher_account_id } : {})
 }) : null;
 
@@ -358,12 +384,14 @@ export async function decide(db, { teacherId, classId, itemId, body, now = Date.
       return { mark: publicMark(mine), unchanged: true };
     }
     const markId = id('tmk');
-    await db.run(`INSERT INTO teacher_marks(id,review_item_id,class_id,assignment_id,student_account_id,teacher_account_id,criterion,decision,marks,comment,engine_awarded,supersedes,created_at)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`, [markId, item.id, classId, item.assignment_id, item.student_account_id, teacherId, item.criterion,
-      checked.decision, checked.marks, checked.comment, Number(item.engine_awarded), mine?.id || null, now]);
+    // The ink version the teacher was shown (null for typed work).
+    const inkDigest = parse(item.evidence_json, {})?.ink?.digest || null;
+    await db.run(`INSERT INTO teacher_marks(id,review_item_id,class_id,assignment_id,student_account_id,teacher_account_id,criterion,decision,marks,comment,engine_awarded,ink_digest,supersedes,created_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`, [markId, item.id, classId, item.assignment_id, item.student_account_id, teacherId, item.criterion,
+      checked.decision, checked.marks, checked.comment, Number(item.engine_awarded), inkDigest, mine?.id || null, now]);
     await audit(db, teacherId, `teacher-mark.${checked.decision}`, 'review-item', item.id,
-      { classId, assignmentId: item.assignment_id, studentId: item.student_account_id, criterion: item.criterion, marks: checked.marks, supersedes: mine?.id || null }, now);
-    return { mark: publicMark({ id: markId, teacher_account_id: teacherId, criterion: item.criterion, decision: checked.decision, marks: checked.marks, comment: checked.comment, engine_awarded: item.engine_awarded, created_at: now }) };
+      { classId, assignmentId: item.assignment_id, studentId: item.student_account_id, criterion: item.criterion, marks: checked.marks, inkDigest, supersedes: mine?.id || null }, now);
+    return { mark: publicMark({ id: markId, teacher_account_id: teacherId, criterion: item.criterion, decision: checked.decision, marks: checked.marks, comment: checked.comment, engine_awarded: item.engine_awarded, ink_digest: inkDigest, created_at: now }) };
   });
 }
 
@@ -393,7 +421,7 @@ export async function reviewQueue(db, { teacherId, classId, state = 'open' }) {
 /** The decision history of one item (the audit trail), oldest first. */
 export async function markHistory(db, itemId) {
   db = asStore(db);
-  const rows = await db.all(`SELECT id,review_item_id,teacher_account_id,criterion,decision,marks,comment,engine_awarded,supersedes,created_at
+  const rows = await db.all(`SELECT id,review_item_id,teacher_account_id,criterion,decision,marks,comment,engine_awarded,ink_digest,supersedes,created_at
     FROM teacher_marks WHERE review_item_id=? ORDER BY created_at,id`, [itemId]);
   return rows.map(r => ({ ...publicMark(r), supersedes: r.supersedes || null }));
 }
@@ -408,8 +436,9 @@ export async function markHistory(db, itemId) {
  */
 export async function assignmentResults(db, { teacherId, classId, assignmentId }) {
   db = asStore(db);
-  const assignment = await db.get('SELECT id,title,specification_json,due_at,created_at FROM assignments WHERE id=? AND class_id=? AND teacher_account_id=? AND archived_at IS NULL',
-    [assignmentId, classId, teacherId]);
+  if (!(await ownedClass(db, teacherId, classId))) return null;
+  const assignment = await db.get('SELECT id,title,specification_json,due_at,created_at FROM assignments WHERE id=? AND class_id=? AND archived_at IS NULL',
+    [assignmentId, classId]);
   if (!assignment) return null;
   const { students, withheld } = await visibleStudents(db, classId);
   const handins = new Map((await db.all('SELECT * FROM assignment_handins WHERE assignment_id=?', [assignmentId])).map(h => [h.student_account_id, h]));
@@ -579,7 +608,8 @@ export function createClassroomRouter(db) {
     const classId = String(req.params.classId || '');
     const teacherId = req.platformSession.account_id;
     if (!(await ownedClass(db, teacherId, classId))) return notFound(res);
-    const item = await db.get('SELECT id,student_account_id FROM teacher_review_items WHERE id=? AND class_id=? AND teacher_account_id=?', [String(req.params.itemId || ''), classId, teacherId]);
+    const item = await db.get(`SELECT i.id,i.student_account_id FROM teacher_review_items i JOIN assignments a ON a.id=i.assignment_id
+      WHERE i.id=? AND i.class_id=? AND i.teacher_account_id=? AND a.archived_at IS NULL`, [String(req.params.itemId || ''), classId, teacherId]);
     if (!item || !(await visibleStudent(db, classId, item.student_account_id))) return notFound(res, 'REVIEW_ITEM_NOT_FOUND', 'This item is not in your review queue.');
     res.set('Cache-Control', 'no-store');
     res.json({ history: await markHistory(db, item.id) });
@@ -587,17 +617,12 @@ export function createClassroomRouter(db) {
 
   router.post('/classes/:classId/review/:itemId', requireVerifiedEmail, requireRole('teacher'),
     rateLimit(db, 'classroom-teacher-mark', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
-      try {
-        const out = await decide(db, {
-          teacherId: req.platformSession.account_id, classId: String(req.params.classId || ''),
-          itemId: String(req.params.itemId || ''), body: req.body
-        });
-        if (out.status) return res.status(out.status).json({ error: { code: out.code, message: out.message } });
-        res.status(out.unchanged ? 200 : 201).json(out);
-      } catch (error) {
-        if (isDatabaseOverload(error)) throw error;
-        throw error;
-      }
+      const out = await decide(db, {
+        teacherId: req.platformSession.account_id, classId: String(req.params.classId || ''),
+        itemId: String(req.params.itemId || ''), body: req.body
+      });
+      if (out.status) return res.status(out.status).json({ error: { code: out.code, message: out.message } });
+      res.status(out.unchanged ? 200 : 201).json(out);
     });
 
   return router;
