@@ -143,11 +143,54 @@ export default function IndexPage() {
   const phone = useSyncExternalStore(subscribePhone, isPhone, () => false);
   const name = (user.name || '').split(' ')[0];
   const markOf = id => (marks[id]?.possible ? marks[id] : null);
-  const chapterSub = c => {
+  // The tick scale reads the dot points the plate already lists, from the same
+  // evidence: a dot point is "practised" once it has the answers the progress floor
+  // calls practised (a count of answers, not a judgement of how well they went), "started" with any answer
+  // (its own evidence, or a server-certified answer filed under it), else empty.
+  // No new measure: only the existing floors, applied per dot point.
+  const dotStates = c => {
+    const dps = Array.isArray(c.row.dotpoints) ? c.row.dotpoints : [];
+    const seen = marks[c.row.id]?.dotpoints || {};
+    return dps.map((dp, i) => {
+      const ev = typeof dp === 'object' && dp ? chapterEvidence(dp, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy) : null;
+      const key = typeof dp === 'object' && dp?.id ? String(dp.id) : String(i);
+      if (ev && ev.accuracy != null && ev.attempts >= PROGRESS_THRESHOLDS.chapterPractised) return 'practised';
+      const any = (ev?.attempts || 0) > 0 || Number(seen[key]?.questions) > 0 || Number(seen[String(i)]?.questions) > 0;
+      return any ? 'started' : 'empty';
+    });
+  };
+  const chapterTicks = c => {
+    const st = dotStates(c);
+    const n = st.length;
+    const secure = st.filter(x => x === 'practised').length;
+    const building = st.filter(x => x === 'started').length;
+    // One tick per topic up to 8; beyond that, 8 ticks in proportion (a tick is
+    // secure when most of its share is, building when any of it has started).
+    const cells = n <= 8 ? st : Array.from({ length: 8 }, (_, k) => {
+      const part = st.slice(Math.floor((k * n) / 8), Math.floor(((k + 1) * n) / 8));
+      const sec = part.filter(x => x === 'practised').length;
+      return sec * 2 > part.length ? 'practised' : part.some(x => x !== 'empty') ? 'started' : 'empty';
+    });
+    return { n, secure, building, cells };
+  };
+  const chapterSub = (c, ticks) => {
+    if (ticks.n) {
+      if (ticks.secure) return t('inst.tickPractised', { s: ticks.secure, n: ticks.n });
+      if (ticks.building) return t('inst.tickStarted', { b: ticks.building, n: ticks.n });
+      return t('inst.notStarted');
+    }
     const m = markOf(c.row.id);
     if (m) return `${m.earned}/${m.possible} ${t('inst.mapMarks')}`;
     return c.evidence.attempts ? t('inst.answered', { n: c.evidence.attempts }) : t('inst.notStarted');
   };
+  // Phone paging: swipe the scope, or the ‹ › buttons (also for a mouse and for
+  // assistive tech). Existing selection state, a new gesture target.
+  const step = d => {
+    if (!current) return;
+    const next = chapters[(current.index + d + chapters.length) % chapters.length];
+    if (next) setPick(next.row.id);
+  };
+  const swipe = React.useRef(null);
   // "Covered": the share of the chapter's dot points with at least one answer
   // — the dot point's own evidence from /curriculum (the figure its tile
   // shows), or a server-certified answer filed under exactly that dot point
@@ -208,21 +251,26 @@ export default function IndexPage() {
 
         {phone && current && (
           <>
-            <div className="in-next" style={{ '--cc': `var(${current.colour})` }} data-instrument-next={current.row.id}>
+            <div className="in-next" style={{ '--cc': `var(${current.colour})` }} data-instrument-next={current.row.id}
+              onTouchStart={e => { swipe.current = [e.touches[0].clientX, e.touches[0].clientY]; }}
+              onTouchCancel={() => { swipe.current = null; }}
+              onTouchEnd={e => {
+                const from = swipe.current; swipe.current = null;
+                if (!from) return;
+                const dx = e.changedTouches[0].clientX - from[0];
+                const dy = e.changedTouches[0].clientY - from[1];
+                if (Math.abs(dx) > 48 && Math.abs(dx) > 1.5 * Math.abs(dy)) step(dx < 0 ? 1 : -1);
+              }}>
               <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />
-              <span className="in-next-ghost" aria-hidden="true">{String(current.index + 1).padStart(2, '0')}</span>
               <div className="in-next-label">
                 <small>{t('inst.chapterN', { n: current.index + 1 })}{markOf(current.row.id) ? ` · ${markOf(current.row.id).earned}/${markOf(current.row.id).possible}` : ''}</small>
                 <b lang="en"><TermGloss text={current.row.name} /></b>
               </div>
             </div>
-            <div className="in-strip" aria-hidden="true">
-              {chapters.map(c => (
-                <button key={c.row.id} type="button" tabIndex={-1} style={{ '--cc': `var(${c.colour})` }}
-                  aria-label={c.row.name}
-                  className={c.evidence.attempts ? undefined : 'is-new'}
-                  aria-current={current.row.id === c.row.id ? 'true' : undefined} onClick={() => setPick(c.row.id)} />
-              ))}
+            <div className="in-pager">
+              <button type="button" className="in-pager-b" aria-label={t('inst.chapterPrev')} onClick={() => step(-1)}>‹</button>
+              <span className="in-pager-n" aria-live="polite">{t('inst.chapterOf', { n: current.index + 1, total: chapters.length })}</span>
+              <button type="button" className="in-pager-b" aria-label={t('inst.chapterNext')} onClick={() => step(1)}>›</button>
             </div>
           </>
         )}
@@ -234,6 +282,7 @@ export default function IndexPage() {
             <ul className="in-chs">
               {chapters.map(c => {
                 const on = current?.row.id === c.row.id;
+                const ticks = chapterTicks(c);
                 return (
                   <li key={c.row.id}>
                     <button type="button" className="in-ch" style={{ '--cc': `var(${c.colour})` }}
@@ -241,28 +290,25 @@ export default function IndexPage() {
                       onClick={() => setPick(c.row.id)} onFocus={() => setPick(c.row.id)}>
                       <span className="in-ch-n">{String(c.index + 1).padStart(2, '0')}</span>
                       <span className="in-ch-t"><span lang="en"><TermGloss text={c.row.name} /></span>
-                        <small>{chapterSub(c)}</small>
+                        <small className="in-ch-sub">{chapterSub(c, ticks)}</small>
                       </span>
+                      {ticks.n > 0 && (
+                        <span className="in-ticks" role="img" aria-label={t('inst.tickLabel', { count: ticks.n, s: ticks.secure, n: ticks.n, b: ticks.building })}>
+                          {ticks.cells.map((x, k) => <i key={k} className={x === 'empty' ? undefined : x === 'practised' ? 's' : 'b'} />)}
+                        </span>
+                      )}
                       <Ring value={c.evidence.mastery} colourVar={c.colour} />
                     </button>
                   </li>
                 );
               })}
             </ul>
-            <div className="in-thumbs" aria-hidden="true">
-              {chapters.map(c => (
-                <button key={c.row.id} type="button" tabIndex={-1} className="in-thumb" style={{ '--cc': `var(${c.colour})` }}
-                  aria-current={current?.row.id === c.row.id ? 'true' : undefined}
-                  onMouseEnter={() => setPick(c.row.id)} onClick={() => setPick(c.row.id)}><span>{c.index + 1}</span></button>
-              ))}
-            </div>
           </nav>
         )}
       </div>
 
       {current && (
         <section className="in-plate" style={{ '--cc': `var(${current.colour})` }} aria-labelledby="in-plate-title" data-instrument-plate={current.row.id}>
-          <span className="in-ghost" aria-hidden="true">{String(current.index + 1).padStart(2, '0')}</span>
           <div className="in-plate-head">
             <div>
               <small>{t('inst.chapterN', { n: current.index + 1 })}</small>
