@@ -69,7 +69,7 @@ export const flow = {
       if (await kind.count()) await kind.click().catch(() => {});
       const field = page.locator('input.answer-input, .editor-body input').first();
       if (await field.count()) {
-        await inWindow(`${phase}:type`, async () => { await field.click(); await page.keyboard.type('12345', { delay: 20 }); });
+        await inWindow(`${phase}:type`, async () => { await field.click(); await field.fill(''); await page.keyboard.type('12345', { delay: 20 }); });
         const typing = await longIn(`${phase}:type`);
         await check(`${phase}: typing has no long task over ${LONG_TASK_BUDGET_MS} ms`, typing.length === 0, JSON.stringify(typing));
         await check(`${phase}: the typed answer is still in its field`, (await field.inputValue()) === '12345', await field.inputValue());
@@ -78,6 +78,7 @@ export const flow = {
       const hops = [{ path: '/', link: page.locator('a:visible, button:visible', { hasText: /^Index$/ }).first() },
         { path: '/progress', link: page.locator('a[href="/progress"]:visible').first() }, { path: '/notes', link: page.locator('a[href="/notes"]:visible').first() }];
       for (const { path, link } of hops) {
+        await link.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
         if (!(await link.count())) { note(`${phase}: no visible link to ${path}`); continue; }
         const t0 = Date.now();
         await inWindow(`${phase}:nav${path}`, async () => { await link.click({ timeout: 5000 }); await page.waitForSelector('.shell main, main', { timeout: NAV_MS }).catch(() => {}); });
