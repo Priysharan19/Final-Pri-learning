@@ -42,7 +42,10 @@ const ALLOW = [
   [/^login\.olympiadTrack$/, 'Indian track chooser at sign-up'],
   [/^signup\.trackJeeHint$/, 'Indian track chooser at sign-up'],
   [/^board\.ready\.whyIn$/, 'the Priyabhata honesty box under exam readiness (progress/SyllabusBoard.jsx draws whyNsw for Prithagoras, whyIn only for edition "in")'],
-  [/^tw\.paper\.(cbse10Standard|cbse10Basic|cbse11|cbse12|jeeMain|jeeAdvanced|indiaOther)$/, 'the India paper templates a teacher sets (classroom/classroomWords.js INDIA_PAPERS); TeacherWorkspace.jsx offers them only when the edition\'s default course is not NSW, and a Prithagoras server refuses an india paper (server/platform/paperAssignments.js paperKindsForEdition)'],  [/^board\.prio\.sourceIndia$/, 'the CBSE unit-weightage note under syllabus-board priorities (progress/SyllabusBoard.jsx draws it only when india is true, i.e. an Indian course)']
+  [/^tw\.paper\.(cbse10Standard|cbse10Basic|cbse11|cbse12|jeeMain|jeeAdvanced|indiaOther)$/, 'the India paper templates a teacher sets (classroom/classroomWords.js INDIA_PAPERS); TeacherWorkspace.jsx offers them only when the edition\'s default course is not NSW, and a Prithagoras server refuses an india paper (server/platform/paperAssignments.js paperKindsForEdition)'],  [/^notes\.olympiad(Tab|Topics|Lede|Eyebrow|Scope)$/, 'the Olympiad tab of the India notes page (pages/Notes.jsx); a Prithagoras build routes /notes to pages/NswNotes.jsx and does not carry the India page'],
+  [/^landing\.proofSyllabusIn$/, 'the verified landing page picks proofSyllabusAu for Prithagoras (landing/Landing.jsx syllabusKey)'],
+  [/^landing\.syllabus\.in$/, 'the plain syllabus page picks landing.syllabus.au for Prithagoras (landing/PublicInfo.jsx)'],
+  [/^board\.prio\.sourceIndia$/, 'the CBSE unit-weightage note under syllabus-board priorities (progress/SyllabusBoard.jsx draws it only when india is true, i.e. an Indian course)']
 ];
 
 let pass = 0;
@@ -93,7 +96,7 @@ check('every year selector and tab goes through common.classNumber (Year N in Pr
 });
 check('the welcome page\'s hard-coded track kicker is not drawn in Prithagoras', () => {
   const login = readFileSync(fileURLToPath(new URL('../src/pages/Login.jsx', here)), 'utf8');
-  assert.match(login, /EDITION_ID === 'prithagoras' \? t\('login\.brandKicker'\) : featureEnabled\('extendedTracks'\)/);
+  assert.match(login, /!offersCourse\('in'\) \? t\('login\.brandKicker'\) : featureEnabled\('extendedTracks'\)/);
 });
 check('the Prithagoras sign-in screen: its own eyebrow and value line, no language switch, no India footer links, one short note', () => {
   assert.equal(AU_STRINGS['login.brandKicker'], 'NSW Years 7–10 · Stage 6 Standard, Advanced, Extension 1 & 2');
