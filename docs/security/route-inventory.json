@@ -2725,6 +2725,29 @@
     },
     {
       "method": "GET",
+      "path": "/v1/practice/slip-pattern",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; derived from this account's own server-graded attempts (learning_events where account_id = the session's account) and this account's escrowed prompts: the one slip repeated on 3 of the last 5 marked answers on a topic, with the attempts it is drilled from; no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "practice-slip-pattern",
+          "limit": 240,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/habits/",
       "auth": "session",
       "roles": [
