@@ -50,6 +50,8 @@ export const EDITION_SUITES = [
   'client/test/desk-import-check.mjs',
   'client/test/export-file-check.mjs',
   'client/test/edition-terms-check.mjs',
+  'client/test/diagram-kit-i18n-check.mjs',
+  'client/test/value-packaging-check.mjs',
   'client/test/progress-export-check.mjs',
   'client/test/desk-ui-check.mjs',
   // The server: edition agreement, billing per edition, budgets per region,
