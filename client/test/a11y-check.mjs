@@ -1090,6 +1090,16 @@ async function run() {
 
     await step('exams', '/exams', async () => { await goTo(page, BASE, '/exams'); });
 
+    // The Paper Generator (both editions): choose a topic, and the server answers
+    // whether its banks can fill the paper — the screen the student actually uses.
+    await step('paper generator', '/paper-generator', async () => {
+      await goTo(page, BASE, '/paper-generator');
+      await page.waitForSelector('[data-paper-generator]', { timeout: 30000 });
+      await page.locator('[data-topic]').first().check();
+      await page.waitForSelector('[data-gen-fit="ready"], [data-gen-fit="short"]', { timeout: 30000 });
+      await wait(page, SETTLE);
+    });
+
     if (!INDIA) {
       // D15 (server/platform/exams.js readSpec): the server composes no
       // generated practice paper outside the India course yet; the NSW papers

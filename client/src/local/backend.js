@@ -4339,6 +4339,14 @@ const routes = {
       const issued = await issueServerExam(p.id, nswExamSpec(body.nsw), `nsw:${body.nsw}`);
       return storeServerPaper(p, issued, { year: 12, pathway: null, title: issued.title, readingMin: issued.readingMin, nsw: issued.nsw });
     }
+    // A generated paper (both editions): the request goes to the server, which
+    // assembles it from the edition's approved banks and keeps its seed.
+    if (body?.generated !== undefined) {
+      const g = body.generated;
+      const signature = `generated:${g.year}:${g.marks ?? `m${g.minutes}`}:${g.mix}:${g.weak ? 'w' : ''}:${(g.topics || []).join(',')}`;
+      const issued = await issueServerExam(p.id, { kind: 'generated', generated: g }, signature);
+      return storeServerPaper(p, issued, { year: g.year, pathway: g.pathway ?? null, title: issued.title, generated: true });
+    }
     const length = [10, 15, 20].includes(Number(body?.length)) ? Number(body.length) : 10;
     const minutes = Math.round(Math.min(90, Math.max(10, Number(body?.minutes) || (length * 3))));
     const year = Math.min(12, Math.max(7, Math.round(Number(body?.year) || p.year)));
@@ -5781,7 +5789,7 @@ async function examFor(pid, examId) {
     if (!row) continue;
     questions.push(sanitize(row.payload, row));
   }
-  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e), ...(e.nsw ? { nsw: e.nsw } : {}) };
+  return { id: e.id, title: e.title, year: e.year, durationMin: e.durationMin, createdAt: e.createdAt, finishedAt: e.finishedAt, score: e.score, total: e.total, questions, detail: e.detail || null, session: { ...examSessionView(e, viewedAt), pending: pendingView(e) }, markedBy: markedByOf(e), serverIssued: isServerPaper(e), ...(e.nsw ? { nsw: e.nsw } : {}), ...(e.generated ? { generated: true } : {}) };
 }
 
 /**
@@ -5789,7 +5797,7 @@ async function examFor(pid, examId) {
  * paper (plan G4) — as this profile's open paper: its public questions, the
  * server's clock, and for an NSW paper its reading time and what it is.
  */
-async function storeServerPaper(p, issued, { year, pathway, title, readingMin = null, nsw = null }) {
+async function storeServerPaper(p, issued, { year, pathway, title, readingMin = null, nsw = null, generated = false }) {
   const examId = String(issued.id);
   const now = Date.now();
   const qids = [];
@@ -5807,6 +5815,7 @@ async function storeServerPaper(p, issued, { year, pathway, title, readingMin = 
     id: examId, pid: p.id, year, pathway, title, durationMin: issued.durationMin, questionIds: qids,
     createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null,
     paperVersion: issued.paperVersion,
+    ...(generated ? { generated: true } : {}),
     ...(Number.isFinite(Number(readingMin)) && Number(readingMin) > 0 ? { readingMin: Number(readingMin) } : {}),
     ...(nsw && typeof nsw === 'object' ? { nsw: {
       label: String(nsw.label || ''), markingNote: String(nsw.markingNote || ''), blueprintId: String(nsw.blueprintId || ''), course: String(nsw.course || ''),

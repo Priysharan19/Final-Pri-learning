@@ -141,6 +141,48 @@ async function pyqAboutArchive() {
 }
 const pyqAbsenceFor = (about, track) => about.pyqAbsenceFor(track);
 
+/**
+ * A generated paper (the Paper Generator) for an India profile: the server
+ * assembles it from the India banks and keeps its seed; the device stores the
+ * public questions in this module's own shape so the room, the submit and the
+ * result read it like any India paper. Marking is the server's.
+ */
+async function createGeneratedIndiaExam(profile, body) {
+  const g = body.generated;
+  const track = cleanIndiaTrack(profile.indiaTrack || 'cbse', Number(profile.year));
+  const issued = await issueServerExam(profile.id, { kind: 'generated', generated: g },
+    `generated:${g.year}:${g.marks ?? `m${g.minutes}`}:${g.mix}:${g.weak ? 'w' : ''}:${(g.topics || []).join(',')}`);
+  const examId = String(issued.id);
+  const now = Date.now();
+  const questionIds = [];
+  try {
+    for (const sq of issued.questions) { const row = rowOf(profile.id, track, examId, sq, now); await put('questions', row); questionIds.push(row.id); }
+  } catch (err) {
+    await Promise.all(questionIds.map(id => del('questions', id).catch(() => {})));
+    throw err;
+  }
+  const sections = (issued.generated?.sections || []).map(s => ({
+    id: s.id, label: s.label, questions: s.questions, marks: s.marks, marksEach: null, negative: 0, partialPerOption: null, types: ['any']
+  }));
+  const exam = {
+    id: examId, pid: profile.id, year: profile.year, pathway: null, title: issued.title, generated: true,
+    durationMin: issued.durationMin, questionIds, createdAt: now, finishedAt: null, score: null, total: issued.total, detail: null, summary: null,
+    indiaExam: {
+      blueprintId: 'generated', claimBlueprintId: 'generated', label: issued.generated?.label || issued.title, track, variant: 'standard', grade: Number(profile.year),
+      authenticity: 'generated', sourceSession: null, fullPaper: false, sectionTimerOfficial: false, fullPaperDurationMinutes: null, seed: null,
+      sections, units: [], pyq: { used: 0, questions: issued.questions.length, archive: null, absent: null },
+      composition: { pyq: 0, authored: issued.questions.length, nativeMcq: 0, numericToMcq: 0, assertionReason: 0, caseStudy: 0, multiCorrect: 0, matrixMatch: 0, internalChoice: 0 },
+      reducedPattern: false, composerNotes: [], sources: []
+    },
+    paperVersion: issued.paperVersion,
+    server: serverFieldOf(issued, await requireExamAccount(profile.id).catch(() => null))
+  };
+  startExamClock(exam, localStartOf(issued));
+  await put('exams', exam);
+  noteReconciled(exam.id);
+  return { exam: await examView(profile, exam.id) };
+}
+
 async function createIndiaExam(profile, body = {}) {
   const pyqAbout = await pyqAboutArchive();
   const grade = Number(profile.year);
@@ -378,6 +420,7 @@ async function examView(profile, id) {
     serverIssued: isServerPaper(exam),
     // A board mock (D22) is labelled on every surface and sat typed.
     ...(exam.mock ? { mock: true, mockLabel: MOCK_LABEL } : {}),
+    ...(exam.generated ? { generated: true } : {}),
     // A targeted paper (Premium) carries the server's "why these questions" key.
     ...(exam.targeted ? { targeted: true, targetedLabel: TARGETED_LABEL, why: exam.why || null } : {}),
     indiaExam: exam.indiaExam
@@ -654,6 +697,7 @@ export function indiaExamRoute(method, path) {
 export async function dispatchIndiaExam(profile, method, path, body = {}) {
   if (!profile?.id || profile.course !== 'in') throw error('India exam routing requires an India profile.', 400, 'INDIA_PROFILE_REQUIRED');
   if (path === '/exams' && method === 'GET') return listExams(profile);
+  if (path === '/exams' && method === 'POST' && body?.generated !== undefined) return createGeneratedIndiaExam(profile, body);
   if (path === '/exams' && method === 'POST') {
     // A paper is marked work, so it starts only for a signed-in account: the
     // same refusal a practice check gives (SIGN_IN_TO_CHECK). Whether the

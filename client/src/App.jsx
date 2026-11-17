@@ -31,6 +31,7 @@ import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 // is only about what has to arrive before a student can do anything.
 const ProgressPage = React.lazy(() => import('./pages/Progress.jsx'));
 const Exams = React.lazy(() => import('./pages/Exams.jsx'));
+const PaperGenerator = React.lazy(() => import('./pages/PaperGenerator.jsx'));
 const ExamRoom = React.lazy(() => import('./pages/ExamRoom.jsx'));
 const Rush = React.lazy(() => import('./pages/Rush.jsx'));
 const Match = React.lazy(() => import('./pages/Match.jsx'));
@@ -193,7 +194,7 @@ function isDestinationActive(location, to) {
 
 const TITLE_KEYS = {
   '/': 'nav.home', '/practice': 'nav.practice', '/progress': 'nav.progress', '/parent-report': 'nav.parentReport', '/tasks': 'nav.tasks', '/map': 'inst.tabMap',
-  '/exams': 'nav.exams', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
+  '/exams': 'nav.exams', '/paper-generator': 'gen.title', '/rush': 'nav.rush', '/match': 'nav.match', '/teach': 'nav.teacherWorkspace',
   '/notes': 'nav.notes', '/library': 'nav.library', '/review': 'nav.review', '/history': 'nav.review', '/favorites': 'nav.review', '/classes': 'nav.classes', '/settings': 'nav.settings'
 };
 
@@ -672,6 +673,7 @@ export default function App() {
                     <Route path="/tasks" element={studentOnly(<Tasks />, '/teach#teacher-assignments')} />
                     <Route path="/teach" element={teacherOnly(<Teach />)} />
                     <Route path="/exams" element={studentOnly(<Exams />)} />
+                    <Route path="/paper-generator" element={studentOnly(<PaperGenerator />)} />
                     <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
                     <Route path="/notes" element={studentOnly(<Notes />)} />
                     <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />

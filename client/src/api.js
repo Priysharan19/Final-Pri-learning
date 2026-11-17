@@ -29,6 +29,7 @@ import { restoreBackupSafely } from './local/restoreGuard.js';
 import { recordProfileMutation } from './platform/profileOutbox.js';
 import { dispatchIndiaExam, indiaExamRoute } from './local/indiaExamBackend.js';
 import { dispatchNswExam, nswExamRoute } from './local/nswExamBackend.js';
+import { dispatchGeneratedPaper, generatedRoute } from './local/generatedPaperBackend.js';
 import { scopeForYear } from './engine/curriculum.js';
 import { indiaGeneratorsForScope, indiaChapter, cleanIndiaTrack } from './engine/indiaProduct.js';
 import { loadBanks, loadBanksFor, loadAllBanks } from './engine/generators/index.js';
@@ -168,6 +169,15 @@ async function preload(method, path, body) {
 }
 
 async function localDispatch(method, path, body) {
+  // The Paper Generator (both editions): the choices, the check, the printable
+  // paper and the guide go to the server. Starting one is the one POST /exams
+  // that names `generated`, and the device's own handlers below store it.
+  if (generatedRoute(method, path, body) && !(method === 'POST' && path === '/exams')) {
+    return dispatchGeneratedPaper(activeUser, method, path, body);
+  }
+  if (method === 'POST' && path === '/exams' && body?.generated !== undefined) {
+    return activeUser?.course === 'in' ? dispatchIndiaExam(activeUser, method, path, body) : dispatch(method, path, body);
+  }
   // Never let an India profile fall through to local/backend.js's legacy paper
   // builder: that path appends an HSC-style multipart Section II. The India exam
   // module owns the full /exams namespace for Indian profiles and fails closed
