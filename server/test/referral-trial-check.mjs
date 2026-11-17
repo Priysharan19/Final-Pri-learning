@@ -137,6 +137,17 @@ try {
     c.eq((await claim(p1, (await codeOf(i1)).code)).status, 200, 'pat+one claims a trial');
     const p2 = await adult('p2', { email: 'pat+two@example.test' });
     c.eq((await claim(p2, (await codeOf(i2)).code)).data?.error?.code, 'REFERRAL_ALREADY_USED', 'pat+two, the same inbox, gets no second invitation trial');
+    const q1 = await adult('q1', { email: 'quinn+one@example.test' });
+    const qf1 = await adult('qf1');
+    c.eq((await claim(qf1, (await codeOf(q1)).code)).status, 200, 'quinn+one earns an inviter trial');
+    const q2 = await adult('q2', { email: 'quinn+two@example.test' });
+    const qf2 = await adult('qf2');
+    await claim(qf2, (await codeOf(q2)).code);
+    c.ok(!await premiumAt(q2.id, Date.now()), 'quinn+two, the same inbox, earns no second inviter trial');
+    const late = await adult('late');
+    await store.run('UPDATE accounts SET created_at=? WHERE id=?', [Date.now() - 20 * DAY, late.id]);
+    await store.run("INSERT INTO guardian_consents(account_id,guardian_name,guardian_email,notice_version,requested_at,confirmed_at,method) VALUES (?,?,?,?,?,?,?)", [late.id, 'P', 'p@home.example', 'v1', Date.now() - 20 * DAY, Date.now() - DAY, 'email-link']);
+    c.eq((await claim(late, (await codeOf(i1)).code)).status, 200, 'a child approved by a guardian in the last 7 days still counts as new');
     const racer = await adult('racer');
     const [ra, rb] = await Promise.all([
       h.request('/v1/referral/claim', { method: 'POST', jar: racer.jar, body: { code: (await codeOf(i1)).code } }),

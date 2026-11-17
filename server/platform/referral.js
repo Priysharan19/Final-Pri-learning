@@ -154,9 +154,10 @@ async function claimUnderLock(db, { inviteeId, code, now }) {
   if (mailbox(inviter.email) === mailbox(invitee.email) || await sharesDevice(db, inviterId, inviteeId)) return { status: 409, code: 'REFERRAL_SELF' };
   // One invitation trial per person, not per address: another account at the
   // same mailbox (+tags, Gmail dots) that already had one rules this one out.
-  const trialled = await db.all(`SELECT a.email FROM accounts a JOIN entitlement_support_grants g ON g.account_id = a.id
-    WHERE g.product_id=? AND a.id<>?`, [REFERRAL.productId, inviteeId]);
-  if (trialled.some(row => mailbox(row.email) === mailbox(invitee.email))) return { status: 409, code: 'REFERRAL_ALREADY_USED' };
+  const trialled = await db.all(`SELECT a.id, a.email FROM accounts a JOIN entitlement_support_grants g ON g.account_id = a.id
+    WHERE g.product_id=?`, [REFERRAL.productId]);
+  const inboxHadTrial = (who) => trialled.some(row => row.id !== who.id && mailbox(row.email) === mailbox(who.email));
+  if (inboxHadTrial(invitee)) return { status: 409, code: 'REFERRAL_ALREADY_USED' };
   const credited = Number((await db.get("SELECT COUNT(*) AS n FROM audit_log WHERE action='referral.joined' AND target_id=? AND created_at>?", [inviterId, now - 30 * DAY]))?.n || 0);
   if (credited >= REFERRAL.inviterCreditsPer30Days) return { status: 429, code: 'REFERRAL_LIMIT' };
 
@@ -170,7 +171,8 @@ async function claimUnderLock(db, { inviteeId, code, now }) {
   // The inviter's own trial: once, ever, and never spent while they already pay.
   const inviterSnapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [inviterId]);
   const inviterPaying = serverEntitlementCapabilities(inviterSnapshot, now).length > 0;
-  const inviterGranted = inviterPaying ? false : await grantReferralTrial(db, inviterId, now);
+  // The same one-per-inbox rule holds for the inviter.
+  const inviterGranted = inviterPaying || inboxHadTrial(inviter) ? false : await grantReferralTrial(db, inviterId, now);
   return { status: 200, granted, inviterGranted, endsAt: granted ? now + REFERRAL.trialDays * DAY : null };
 }
 

@@ -64,7 +64,7 @@ If you are under 18, a parent or guardian must make or approve any purchase.
 You can share your own invite link with a friend. If the friend creates a new
 account through that link, on the website, and confirms their email address,
 the friend gets 7 days of Premium free, and so do you if you have not had a
-free trial before.
+free trial before and are not already paying for Premium.
 
 - **Eligibility:** the friend's account must be new (created in the last 7
   days, or approved by a parent or guardian in the last 7 days) and must not
