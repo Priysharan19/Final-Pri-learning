@@ -49,7 +49,17 @@ ok(!r.lines.slice(2).some(l => l.secondBreak), 'unreadable, prose, unit and fore
 // Inequality kind: a later line unrelated to the wrong one.
 const iq = { kind: 'inequality', variable: 'x', source: '2x+3>5x-6', canonical: 'x < 3' };
 r = run(iq, ['2x+3>5x-6', '2x-5x>-6-3', '3x>-9', 'x>-3']);
-ok(r.firstBreak === 2 || r.firstBreak === -1, 'inequality chain is read');
+
+// eq-073: 2x - 5x is -3x, not 3x. The slip is on line 3 and the correct-looking
+// final line is NOT credited over it.
+const ineq = { kind: 'inequality', variable: 'x', source: '2x+3>5x-6', canonical: 'x < 3' };
+r = run(ineq, ['2x+3>5x-6', '2x-5x>-6-3', '3x>-9', 'x<3']);
+ok(r.firstBreak === 2, 'inequality: the wrong coefficient sign is the first break (eq-073)');
+ok(r.lines[3].secondBreak === true, 'inequality: the final line is flagged against the line above, not credited over the break');
+r = run(ineq, ['2x+3>5x-6', '2x-5x>-6-3', '-3x>-9', 'x<3']);
+ok(r.firstBreak === -1 && r.lines[2].status === 'ok' && r.lines[3].status === 'ok', 'inequality: -3x>-9 then x<3 (sign flipped) is verified');
+r = run(ineq, ['2x+3>5x-6', '2x-5x>-6-3', '-3x>-9', 'x>3']);
+ok(r.firstBreak === 3, 'inequality: failing to flip the sign is a break');
 
 // Correct working is untouched.
 r = run(eq, ['3x-6=12', '3x=12+6', 'x=6']);
