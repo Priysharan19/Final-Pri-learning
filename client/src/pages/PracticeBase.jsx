@@ -670,7 +670,7 @@ function ProfilePractice() {
             <div className="skeleton" style={{ height: 22, marginBottom: 10 }} />
             <div className="skeleton" style={{ height: 22, width: '70%' }} />
           </div>
-          <p className="muted" role="status" style={{ textAlign: 'center' }}><Working pending size={24} /><span>{t('practice.loading')}</span></p>
+          <p className="muted" role="status" style={{ textAlign: 'center' }}><Working pending={!serve && !error} size={24} /><span>{t('practice.loading')}</span></p>
         </div>
       )}
 
