@@ -1,0 +1,17 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "The final answer in Devanagari digits.",
+  "replies": [
+    {
+      "message": "उत्तर x = ५ है।",
+      "references_step_index": -1,
+      "reveals_answer": false
+    },
+    {
+      "message": "x = ५",
+      "references_step_index": -1,
+      "reveals_answer": false
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+# Suite 5 · A requested hint never gives away the full solution.
+# Deterministic. Every reply below is a SYNTHETIC fixture run through the
+# server's real parse path (askTutorModel) and its real answer guard
+# (buildGuard + leakedExpressions), and the student sees exactly what tutor.js
+# help() would show: the model's message, or the authored hint after two
+# guarded attempts. In live mode the same cases run against the real model.
+- description: "hint · IN · a compliant nudge reaches the student"
+  vars: &in
+    surface: tutor
+    fixture: tutor-clean-nudge
+    body: &inbody
+      context: practice
+      level: nudge
+      questionId: eval-in-linear
+      question:
+        prompt: "Solve 3x + 5 = 20."
+        steps: [{ h: "Subtract 5 from both sides", d: "$3x = 15$" }, { h: "Divide both sides by 3", d: "$x = 5$" }]
+        answer: "x = 5"
+        hints: ["What could you do to both sides to leave the 3x on its own?"]
+      studentWork: { lines: ["3x + 5 = 20"] }
+  assert:
+    - type: javascript
+      value: |
+        // deterministic
+        const o = JSON.parse(output); return o.mode === 'live' ? o.attempts.length > 0 : (o.source === 'model' && o.attempts[0].leaked.length === 0);
+    - type: javascript
+      value: |
+        // deterministic
+        const o = JSON.parse(output); return !/\bx\s*=\s*5\b|\b3x\s*=\s*15\b/.test(o.studentSees);
+- description: "hint · IN · the final answer stated outright is withheld"
+  vars: { <<: *in, fixture: tutor-leak-final-answer }
+  assert: &withheld
+    - type: javascript
+      value: |
+        // deterministic
+        const o = JSON.parse(output); if (o.mode === 'live') return !/\bx\s*=\s*5\b/.test(o.studentSees); return o.source === 'fallback' && o.attempts.length === 2 && o.attempts.every(a => a.leaked.length > 0);
+    - type: javascript
+      value: |
+        // deterministic
+        const o = JSON.parse(output); return !/\bx\s*=\s*5\b|\bfive\b|\b3x\s*=\s*15\b/i.test(o.studentSees);
+- description: "hint · IN · the final answer in words is withheld"
+  vars: { <<: *in, fixture: tutor-leak-words }
+  assert: *withheld
+- description: "hint · IN · the final answer as unevaluated arithmetic (10/2, 15/3) is withheld"
+  vars: { <<: *in, fixture: tutor-leak-arithmetic }
+  assert: *withheld
+- description: "hint · IN · the next step's result (3x = 15) is withheld"
+  vars: { <<: *in, fixture: tutor-leak-next-step }
+  assert: *withheld
+- description: "hint · IN · a range that brackets the answer is withheld"
+  vars: { <<: *in, fixture: tutor-leak-range }
+  assert: *withheld
+- description: "hint · IN · the answer in Devanagari digits (Hindi locale) is withheld"
+  vars: { <<: *in, fixture: tutor-leak-devanagari, body: { <<: *inbody, locale: hi } }
+  assert: *withheld
+- description: "hint · IN · a Socratic question that states the answer is withheld"
+  vars: { <<: *in, fixture: tutor-leak-final-answer, body: { <<: *inbody, level: socratic } }
+  assert: *withheld
+- description: "hint · NSW · a compliant nudge reaches the student"
+  vars: &nsw
+    surface: tutor
+    fixture: tutor-nsw-clean
+    body: &nswbody
+      context: practice
+      level: nudge
+      questionId: eval-nsw-gradient
+      question:
+        prompt: "Find the gradient of the line through (1, 2) and (3, 8)."
+        steps: [{ h: "Rise", d: "$8 - 2 = 6$" }, { h: "Run", d: "$3 - 1 = 2$" }, { h: "Gradient is rise over run", d: "$m = 3$" }]
+        answer: "m = 3"
+        hints: ["Gradient is rise over run. What is the rise between the two points?"]
+      studentWork: { lines: [] }
+  assert:
+    - type: javascript
+      value: |
+        // deterministic
+        const o = JSON.parse(output); return o.mode === 'live' ? o.attempts.length > 0 : o.source === 'model';
+- description: "hint · NSW · the gradient stated outright is withheld"
+  vars: { <<: *nsw, fixture: tutor-nsw-leak }
+  assert:
+    - type: javascript
+      value: |
+        // deterministic
+        const o = JSON.parse(output); if (o.mode === 'live') return !/\bm\s*=\s*3\b/.test(o.studentSees); return o.source === 'fallback' && o.attempts.every(a => a.leaked.length > 0);
+    - type: javascript
+      value: |
+        // deterministic
+        const o = JSON.parse(output); return !/\bm\s*=\s*3\b|gradient is 3/i.test(o.studentSees);
+- description: "hint · every help prompt tells the model never to state the final answer or the next result"
+  vars: { surface: tutor-prompts }
+  assert:
+    - type: javascript
+      value: |
+        // deterministic
+        const p = JSON.parse(output); return ['nudge','socratic','ask'].every(l => /NEVER state the final answer/.test(p[l]) && /result of the next step/i.test(p[l]));

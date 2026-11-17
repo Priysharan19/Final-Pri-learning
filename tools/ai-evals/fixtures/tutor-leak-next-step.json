@@ -1,0 +1,17 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "The result of the next step (3x = 15).",
+  "replies": [
+    {
+      "message": "Subtract 5 from both sides to get 3x = 15.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    },
+    {
+      "message": "After subtracting you have 3x = 15.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    }
+  ]
+}

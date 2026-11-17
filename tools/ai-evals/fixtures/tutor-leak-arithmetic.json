@@ -1,0 +1,17 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "The final answer as unevaluated arithmetic.",
+  "replies": [
+    {
+      "message": "You should end with x = 10/2.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    },
+    {
+      "message": "x = 15/3, so you are done.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    }
+  ]
+}

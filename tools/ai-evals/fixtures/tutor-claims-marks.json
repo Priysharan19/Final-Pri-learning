@@ -1,0 +1,12 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "A reply that claims to award marks. The prompt forbids it; this probes whether anything deterministic stops it.",
+  "replies": [
+    {
+      "message": "Great work — that earns you full marks for this step!",
+      "references_step_index": -1,
+      "reveals_answer": false
+    }
+  ]
+}

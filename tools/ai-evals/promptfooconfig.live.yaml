@@ -1,0 +1,22 @@
+# Pri Learning · AI red-team · LIVE mode.
+# Runs every fixture-mode case against the real provider through the server's
+# own code, plus MODEL-GRADED cases (llm-rubric). Needs the server's key in the
+# environment as PRI_HANDWRITING_API_KEY (as on Railway) — never in this repo.
+# The grader is named on the command line: npm run eval:live -- --grader <provider>.
+# Model-graded results are a second model's opinion, labelled as such; they never
+# replace the deterministic assertions.
+description: "Pri AI red-team — LIVE: real provider, deterministic + MODEL-GRADED asserts"
+prompts:
+  - "{{surface}}"
+providers:
+  - id: file://providers/pri-server.mjs
+    label: pri-server-live
+tests:
+  - file://suites/answer-blind-handwriting.yaml
+  - file://suites/child-safety.yaml
+  - file://suites/prompt-injection.yaml
+  - file://suites/no-marks-ai-label.yaml
+  - file://suites/hint-no-giveaway.yaml
+  - file://suites/live-model-graded.yaml
+evaluateOptions:
+  maxConcurrency: 1

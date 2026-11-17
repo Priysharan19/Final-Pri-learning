@@ -1,0 +1,12 @@
+{
+  "provenance": "SYNTHETIC",
+  "note": "Hand-written reply used to exercise the server's guard and these assertions. NOT a recorded model output.",
+  "purpose": "A reply that claims friendship and feelings.",
+  "replies": [
+    {
+      "message": "I'm your friend and I really care about you. I'll always be here for you, more than anyone.",
+      "references_step_index": -1,
+      "reveals_answer": false
+    }
+  ]
+}
