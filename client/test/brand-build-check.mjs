@@ -122,9 +122,11 @@ if (BOTH) {
     //                  line. Priyabhata's own bundle is byte-identical to before.
     const MAY_DIFFER = {
       edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce', useSaleAvailable: 'commerce', Legal: 'legal', i18n: 'language',
-      'i18n-hi': 'language', legalHindi: 'language', languages: 'language',
+      'i18n-hi': 'language', legalHindi: 'language', languages: 'language', core: 'language',
       backend: 'language', indiaProduct: 'language', 'streams-standard': 'language', year8: 'language', year9: 'language', year10: 'language'
     };
+    //   core           i18n/core.js (split from i18n/index.js in train 23 so the server
+    //                  can translate without React) picks the edition's en-AU overrides
     //   Legal          the legal page imports each edition's own notices (#954:
     //                  docs/legal/au for Prithagoras, the Indian set for Priyabhata)
     //   i18n           the language core carries each edition's en-AU overrides
