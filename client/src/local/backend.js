@@ -27,7 +27,7 @@ import {
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
 import { reportSeries, needsAnotherLookIds, HISTORY_FILTERS, HISTORY_SORTS } from '../engine/reportSeries.js';
-import { attemptTotals, isCreditedCorrect, isRepeat as isRepeatAttempt, quotedTotals } from '../engine/progressTruth.js';
+import { attemptTotals, evidenceByKey, isCreditedCorrect, isRepeat as isRepeatAttempt, quotedTotals } from '../engine/progressTruth.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { nswIssuedLevels, nswIssuedForms, nswOfferedCell } from '../engine/nswOffer.js';
@@ -981,6 +981,19 @@ function loadMultipart() {
       .catch(err => { multipartBank = null; throw err; });
   }
   return multipartBank;
+}
+
+// The HSC priorities engine (Prithagoras): its NESA metadata is a chunk of its
+// own (vite.config.js 'hsc-priorities'), fetched only when an NSW Year 11–12
+// student asks for a paper weighted by the priorities.
+let hscPracticeModule = null;
+
+function loadHscPractice() {
+  if (!hscPracticeModule) {
+    hscPracticeModule = import('../engine/hsc/hscPractice.js')
+      .catch(err => { hscPracticeModule = null; throw err; });
+  }
+  return hscPracticeModule;
 }
 
 const indiaGeneratorIds = chapter => [...new Set((chapter?.covers || []).map(c => c.gen))];
@@ -3397,6 +3410,15 @@ const routes = {
       }));
       return { country: 'in', years, streams, userYear: p.year, pathway: null, course: 'in', indiaTrack: trackId, aheadUnlocked, window: indiaDifficultyWindow(trackId, p.year) };
     }
+    // Learning evidence per subtopic from the attempt rows (engine/progressTruth.js):
+    // answers, right answers, and right answers with no help. The HSC priorities
+    // view (Prithagoras) reads `independentCorrect`; the ratings above stay the
+    // adaptive engine's and are not changed by this.
+    const evidence = evidenceByKey(await byIndex('attempts', 'pid', p.id));
+    const evidenceOf = id => {
+      const e = evidence[id];
+      return { attempts: e?.attempts || 0, correct: e?.correct || 0, independentCorrect: e?.independentCorrect || 0 };
+    };
     /** Dot points with their own mastery, and an honest `generated` flag. */
     // Only what the server can issue is offered (engine/nswOffer.js): a dot
     // point's levels, its `generated` flag and the `requestable` list the
@@ -3422,7 +3444,7 @@ const routes = {
           id: s.id, name: s.name, strand: s.strand, weight: s.weight, code: s.code || null,
           dotpoints: dotpointRows(s, st), requestable: [...nswIssuedLevels(s.id)],
           mastery: Math.round(m * 100), band: st ? masteryBand(m) : 'unseen',
-          attempts: st?.attempts || 0, correct: st?.correct || 0,
+          attempts: st?.attempts || 0, correct: st?.correct || 0, evidence: evidenceOf(s.id),
           due: due.has(s.id), rating: st?.rating || null
         };
       })
@@ -3447,7 +3469,7 @@ const routes = {
             id: s2.id, name: s2.name, strand: s2.strand, weight: s2.weight, code: s2.code,
             dotpoints: dotpointRows(s2, st), requestable: [...nswIssuedLevels(s2.id)],
             mastery: Math.round(m * 100), band: st ? masteryBand(m) : 'unseen',
-            attempts: st?.attempts || 0, correct: st?.correct || 0,
+            attempts: st?.attempts || 0, correct: st?.correct || 0, evidence: evidenceOf(s2.id),
             due: due.has(s2.id), rating: st?.rating || null
           };
         })
@@ -4395,8 +4417,27 @@ const routes = {
     const subtopics = examPw ? scopeForYear(year, examPw).own : subtopicsForYear(year);
     const diffs = [];
     for (let i = 0; i < length; i++) { const t = i / length; diffs.push(t < 0.2 ? 1 : t < 0.6 ? 2 : t < 0.9 ? 3 : 4); }
+    // A paper weighted by the HSC 2027 priorities (Prithagoras, Year 12 only):
+    // the same practice paper — Pri's own questions from the issued banks, the
+    // same ladder, checked by the server — whose subtopics are drawn in
+    // proportion to the priorities' expected marks share instead of the
+    // syllabus weights. It predicts nothing; its title says how it was weighted.
+    const hsc = body?.hscPriorities;
+    let hscWeights = null;
+    if (hsc !== undefined) {
+      const { hscCoursesFor, hscPaperWeights } = await loadHscPractice();
+      if (year !== 12 || !hscCoursesFor({ ...p, course: p.course || 'nsw', year, pathway: examPw }).includes(hsc)) {
+        throw Object.assign(new Error('A paper weighted by the HSC priorities is for Year 12 Advanced or Extension 1 only.'), { status: 400, code: 'EXAM_KIND_UNAVAILABLE' });
+      }
+      hscWeights = hscPaperWeights(hsc, subtopics.map(s => s.id));
+      if (Object.keys(hscWeights).length < 2) throw Object.assign(new Error('Not enough Pri practice behind the priorities for this paper yet.'), { status: 409, code: 'EXAM_BLUEPRINT_NOT_RELEASED' });
+    }
     const bag = [];
-    for (const s of subtopics) for (let i = 0; i < Math.max(1, Math.round(s.weight / 3)); i++) bag.push(s.id);
+    if (hscWeights) {
+      for (const [id, w] of Object.entries(hscWeights)) for (let i = 0; i < Math.max(1, Math.round(w * 40)); i++) bag.push(id);
+    } else {
+      for (const s of subtopics) for (let i = 0; i < Math.max(1, Math.round(s.weight / 3)); i++) bag.push(s.id);
+    }
     const slots = [];
     let lastPick = null;
     for (let i = 0; i < length; i++) {
@@ -4412,10 +4453,10 @@ const routes = {
     if (mpIds.length) slots.push({ multipart: mpIds[Math.floor(Math.random() * mpIds.length)] });
     const count = (await byIndex('exams', 'pid', p.id)).length;
     const pwLabel = examPw && examPw !== 'advanced' ? ` ${PATHWAYS[examPw].short}` : '';
-    const title = `Year ${year}${pwLabel} Practice Paper ${count + 1}`;
+    const title = `Year ${year}${pwLabel} Practice Paper ${count + 1}${hscWeights ? ` · weighted by HSC 2027 priorities (${hsc === 'extension1' ? 'Extension 1' : 'Advanced'})` : ''}`;
     const issued = await issueServerExam(p.id, {
       kind: 'practice-paper', paper: { year, minutes, ...(examPw ? { pathway: examPw } : {}) }, slots
-    }, `practice-paper:${year}:${examPw || ''}:${length}:${minutes}`);
+    }, `practice-paper:${year}:${examPw || ''}:${length}:${minutes}${hscWeights ? `:hsc-${hsc}` : ''}`);
     return storeServerPaper(p, issued, { year, pathway: examPw, title });
   },
   'GET /exams': async () => {

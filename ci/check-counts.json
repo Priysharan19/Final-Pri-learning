@@ -613,6 +613,10 @@
         {
           "has": "STEP JUSTIFY: PASS — 731/731 checks",
           "note": "Annotated working: named rules for valid steps (27 rules, negative and must-not-name cases), identity proofs straight, \"= RHS\" and meet-in-the-middle, receipt marks unchanged by the panel, no praise words."
+        },
+        {
+          "has": "HSC PRIORITIES · 1437/1437 checks passed",
+          "note": "Prithagoras HSC 2027 priorities: NESA mapping-grid metadata (no text), the old → new map held to the NSW model, the pinned ranking, the backtest evidence doc, edition isolation, en-AU copy and a render."
         }
       ]
     },

@@ -98,6 +98,9 @@ export const CHUNK_GROUPS = [
   // a name of its own, so the service worker can leave it out of the install
   // (see ON_DEMAND) and the budget check can prove it did.
   { name: 'exam-desk', test: /\/src\/(?:desk\/[^?]*|examShell\/(?!(?:ConfirmSheet|ShortcutsSheet|useAnnounce|useExamShortcuts)\.|shortcuts\.css)[^?]*|engine\/desk(?:Clock|Import)\.js)$/, priority: 40 },
+  // The HSC 2027 priorities (Prithagoras): the view and the NESA paper metadata
+  // behind it, in one named chunk so the install can leave it out (ON_DEMAND).
+  { name: 'hsc-priorities', test: /\/src\/(?:hsc\/|engine\/hsc\/)[^?]*$/, priority: 40 },
   { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//, priority: 30 },
   { name: 'vendor-katex', test: /\/node_modules\/katex\//, priority: 30 }
 ];
@@ -192,6 +195,15 @@ export const ON_DEMAND = [
   // room moves onto the shell (plan F4c) the shell leaves this chunk and is
   // warmed with the room.
   [/(^|\/)(exam-desk|Desk(Page|Import|Entry)|deskCache)-[^/]*\.(js|css)$/, 'exam desk (started online)'],
+
+  // The HSC 2027 priorities (Prithagoras): the view and its NESA paper
+  // metadata, behind import() in pages/ProgressLegacy.jsx and local/backend.js
+  // (a paper weighted by the priorities). Only an NSW Year 11–12 student ever
+  // reaches it, so an Indian install would carry it for nothing; the paper it
+  // weights is issued by the server, so that half needs a connection anyway.
+  // A student who has opened the view once has it from the runtime cache; the
+  // one case lost is opening it for the very first time offline.
+  [/(^|\/)(hsc-priorities|HscPriorities)-[^/]*\.(js|css)$/, 'HSC priorities (Prithagoras)'],
 
   // The live step coach's practice route (F1, #826): behind import() in
   // local/backend.js, reached only when the server has the coach on for this
