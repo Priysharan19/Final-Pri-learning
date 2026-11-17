@@ -1,7 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · AI red-team · promptfoo provider over the REAL server code
 //
-// Every case runs through the server's own modules, never a copy of them:
+// Every case runs through the server's own modules. The one thing mirrored rather
+// than called is help()'s two-attempt decision, which lives inside the route
+// closure; it is restated below from tutor.js and can drift, so re-check it when
+// tutor.js help() changes:
 //   tutor        validateTutorRequest → askTutorModel (the exact request body
 //                the server builds) → the deterministic answer guard
 //                (buildGuard + leakedExpressions, and on trees that have them the
