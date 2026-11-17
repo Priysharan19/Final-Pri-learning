@@ -65,6 +65,14 @@ export async function cloudAccountLink(pid, { strict = false } = {}) {
     // cannot be reached at all.
     activatedAt: Number(row.activatedAt) || null,
     activatedAccountId: row.activatedAccountId ? String(row.activatedAccountId) : null,
+    // A durable consent-revocation generation, separate from activation time.
+    // Legacy approvals have generation 0 and remain valid only before any
+    // guardian refusal was recorded for the same cloud account.
+    activatedGeneration: Number(row.activatedGeneration) || 0,
+    // Recovery fence is persisted with a successful online consent. Reading
+    // this value back is mandatory: without it offline access would always
+    // compare null to the live account-scoped revocation token.
+    activatedRecoveryFence: row.activatedRecoveryFence ?? null,
     // The latest device time the grace has seen: a clock earlier than this
     // has moved backwards, and the grace refuses it.
     clockSeenAt: Number(row.clockSeenAt) || null,
@@ -102,6 +110,10 @@ async function saveAccount(pid, account, patch = {}) {
     // above guarantees it is the same one); a new link starts without it.
     activatedAt: prior?.accountId ? prior.activatedAt || null : null,
     activatedAccountId: prior?.accountId ? prior.activatedAccountId || null : null,
+    activatedGeneration: prior?.accountId ? Number(prior.activatedGeneration) || 0 : 0,
+    // Preserve the denial witness on /me refresh of this same linked account.
+    // It is a veto, not affirmative consent, and is cleared for a new link.
+    activatedRecoveryFence: prior?.accountId ? (prior.activatedRecoveryFence ?? null) : null,
     clockSeenAt: prior?.clockSeenAt || null,
     ...patch
   };
@@ -247,13 +259,15 @@ export async function markCloudSynced(pid, at = Date.now()) {
  * Record (at) or clear (null) the server's last full "this account may enter"
  * for this profile. Written only by platform/accountActivation.js.
  */
-export async function recordCloudActivation(pid, accountId, at = Date.now()) {
+export async function recordCloudActivation(pid, accountId, at = Date.now(), generation = null, fence = undefined) {
   const id = linkRowId(pid);
   const prior = await get('device', id);
   if (!prior) return;
   if (accountId && String(prior.accountId) !== String(accountId)) return;
   await put('device', {
     ...prior, activatedAt: accountId ? at : null, activatedAccountId: accountId ? String(accountId) : null,
+    activatedGeneration: accountId ? (generation === null ? Number(prior.activatedGeneration) || 0 : generation) : 0,
+    activatedRecoveryFence: accountId ? (fence === undefined ? (prior.activatedRecoveryFence ?? null) : fence) : null,
     clockSeenAt: Math.max(Number(prior.clockSeenAt) || 0, at)
   });
 }

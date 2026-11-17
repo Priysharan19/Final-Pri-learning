@@ -326,23 +326,21 @@ export async function issuedQuestionForTutor(db, accountId, questionId, now = Da
 // Marking is awaited on another thread, between the request's own session
 // check and the transaction that commits the mark. During that wait a student
 // may sign out, a session may expire or be revoked, or a guardian may withdraw
-// consent. The practice submission and the examination finish both read the
-// consent state before marking (`consentBlockedNow`) and call
-// `authorityAtCommit` first thing INSIDE the committing transaction: no live
-// session of this account → 401; consent that was in place and is now blocked
-// → 403. Either way nothing is written. (Consent that was already blocked
-// before marking is not newly enforced here: these routes did not refuse on
-// it before marking moved off the request thread, and still do not.)
+// consent. The pre-mark consent read is NOT authorization: withdrawal can land
+// before that read and the marker can finish much later. Every new write must
+// recheck current guardian consent under the committing transaction's lock,
+// regardless of the pre-mark result. Invalid session → 401; invalid consent
+// → 403. Either way no student evidence is committed.
 export async function consentBlockedNow(db, accountId) {
   return consentBlockerCode(await consentState(asStore(db), accountId));
 }
-export async function authorityAtCommit(db, req, accountId, consentBlockedBefore) {
+export async function authorityAtCommit(db, req, accountId, _consentBlockedBefore) {
   db = asStore(db);
   const liveSession = await sessionFromRequest(db, req);
   if (!liveSession || liveSession.account_id !== accountId) {
     return { status: 401, code: 'AUTH_REQUIRED', message: 'Sign in again before retrying.' };
   }
-  if (consentBlockedBefore) return null;
+  // The cached pre-mark blocker must never short-circuit this final read.
   // A concurrent PostgreSQL guardian withdrawal updates this exact row. It is
   // locked by the final consent check itself (consentState `lock`), so the
   // withdrawal cannot commit between validation and the mark. SQLite

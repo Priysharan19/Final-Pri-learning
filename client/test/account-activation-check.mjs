@@ -42,7 +42,7 @@ globalThis.fetch = async (url, options = {}) => {
   server.calls.push(`${options.method || 'GET'} ${path}`);
   if (path === '/v1/account/login') return json({ account: ACCOUNT_A });
   if (path === '/v1/account/me') { const r = server.me(); return r.status === 200 ? json(r.body) : refusal(r.status, r.code || 'AUTH_REQUIRED'); }
-  if (path === '/v1/account/guardian/state') { const r = server.guardian(); return r.status === 200 ? json(r.body) : refusal(r.status, r.code || 'SERVICE_UNAVAILABLE'); }
+  if (path === '/v1/account/guardian/state') { const r = await server.guardian(); return r.status === 200 ? json(r.body) : refusal(r.status, r.code || 'SERVICE_UNAVAILABLE'); }
   if (path === '/v1/account/logout') return json({ ok: true });
   if (path === '/v1/entitlements') return json({ entitlement: { plan: 'free', status: 'free', provider: 'none', sourceVersion: 0 } });
   if (path.startsWith('/v1/sync/pull/')) {
@@ -367,6 +367,14 @@ reset();
   await put('profiles', { id: 'p6', name: 'Zoya', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
   await loginCloudAccount('p6', { email: 'a@example.test', password: 'test-password-only' });
   ok('a fresh online answer to start from', !!(await gate('p6')).ready);
+  const p6Link = await cloudAccountLink('p6');
+  const { get: readDevice } = await import('../src/local/idb.js');
+  const accountDenial = await readDevice('device', 'pri-activation-denial-v1:acct-A:');
+  ok('a new profile approved after the other profile future-clock test has a real, not future, activation time',
+    p6Link.activatedAt <= Date.now() && Date.now() - p6Link.activatedAt < 60_000,
+    JSON.stringify({ activatedAt: p6Link.activatedAt, now: Date.now() }));
+  eq('new approval belongs to the current shared-account denial generation',
+    p6Link.activatedGeneration, accountDenial?.generation);
   const origin = globalThis.__PRI_CLOUD_ORIGIN__;
   const realFetch = globalThis.fetch;
   const hadLocation = Object.getOwnPropertyDescriptor(globalThis, 'location');
@@ -424,6 +432,212 @@ reset();
   ok('an offline entry with no verification time is expired', offlineGraceExpired(null, now) && offlineGraceExpired(undefined, now) && offlineGraceExpired(0, now) && offlineGraceExpired('x', now));
   ok('one verified an hour ago is not', !offlineGraceExpired(now - 60 * 60 * 1000, now));
   ok('one verified 72 hours ago, or in the future, is', offlineGraceExpired(now - OFFLINE_GRACE_MS, now) && offlineGraceExpired(now + 1000, now));
+}
+
+
+// ── 12 · concurrent guardian checks: an older success cannot undo denial ────
+// The actual activation function is used with two controlled HTTP replies.
+// Old code let the delayed success record a fresh 72-hour offline grant after
+// the newer withdrawn response had already cleared it.
+reset();
+{
+  await put('profiles', { id: 'p-race', name: 'Devika', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+  await loginCloudAccount('p-race', { email: 'a@example.test', password: 'test-password-only' });
+  ok('race fixture begins with a real approved activation', !!(await gate('p-race')).ready);
+  let enterOld, releaseOld;
+  const oldEntered = new Promise(resolve => { enterOld = resolve; });
+  const oldHeld = new Promise(resolve => { releaseOld = resolve; });
+  let calls = 0;
+  server.guardian = async () => {
+    if (++calls === 1) {
+      enterOld();
+      await oldHeld;
+      return { status: 200, body: { accountId: 'acct-A', required: false, state: 'not-required', eligible: true, emailVerified: true, blockerCode: null } };
+    }
+    return { status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } };
+  };
+  const oldRequest = gate('p-race', { sync: false });
+  await oldEntered;
+  const denied = await gate('p-race', { sync: false });
+  eq('the newer authoritative withdrawal is not delayed by the older request', denied.code, 'GUARDIAN_CONSENT_WITHDRAWN');
+  ok('denial clears the saved offline grant immediately', (await cloudAccountLink('p-race')).activatedAt === null);
+  releaseOld();
+  const stale = await oldRequest;
+  ok('the older successful HTTP answer cannot return a usable activation', !stale.ready && stale.code === 'CONSENT_UNAVAILABLE' && stale.retryable === true, JSON.stringify(stale));
+  ok('the older success cannot restore the withdrawn account offline-grace record', (await cloudAccountLink('p-race')).activatedAt === null);
+  eq('withdrawal leaves no offline grace on a subsequent offline reload', await offlineGraceFor('p-race'), null);
+  reset();
+  ok('a fresh guardian-approved recheck after withdrawal can recover normally', !!(await gate('p-race', { sync: false })).ready);
+  ok('that fresh approval is now recorded for the same account', (await cloudAccountLink('p-race')).activatedAccountId === 'acct-A' && Number((await cloudAccountLink('p-race')).activatedAt) > 0);
+}
+
+
+// ── 13 · a second tab has a DIFFERENT in-memory activation epoch ────────────
+// Two independent module instances share the same IndexedDB device store. A
+// guardian denial in tab 1 must fence an older success from tab 2, including
+// after a reload. An in-memory map alone cannot provide that guarantee.
+reset();
+{
+  await put('profiles', { id: 'p-multitab', name: 'Ananya', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+  await loginCloudAccount('p-multitab', { email: 'a@example.test', password: 'test-password-only' });
+  ok('the second-tab fixture has a real approved activation', !!(await gate('p-multitab')).ready);
+  const secondTab = await import('../src/platform/accountActivation.js?step05-second-tab');
+  let entered, release;
+  const reachedGuardian = new Promise(resolve => { entered = resolve; });
+  const held = new Promise(resolve => { release = resolve; });
+  let calls = 0;
+  server.guardian = async () => {
+    if (++calls === 1) {
+      entered();
+      await held;
+      return { status: 200, body: { accountId: 'acct-A', required: false, state: 'not-required', eligible: true, emailVerified: true, blockerCode: null } };
+    }
+    return { status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } };
+  };
+  const staleInOtherTab = secondTab.ensureAccountActivated('p-multitab', { sync: false })
+    .then(ready => ({ ready }), error => ({ code: error?.code, retryable: error?.retryable }));
+  await reachedGuardian;
+  const withdrawnInThisTab = await gate('p-multitab', { sync: false });
+  eq('guardian withdrawal in tab one is authoritative', withdrawnInThisTab.code, 'GUARDIAN_CONSENT_WITHDRAWN');
+  release();
+  const stale = await staleInOtherTab;
+  ok('a success held in a separate tab cannot reactivate the withdrawn student',
+    !stale.ready && stale.code === 'CONSENT_UNAVAILABLE', JSON.stringify(stale));
+  eq('a separate tab cannot recreate offline grace after guardian withdrawal', await secondTab.offlineGraceFor('p-multitab'), null);
+  const { all: readDeviceRows } = await import('../src/local/idb.js');
+  const markerCount = async () => (await readDeviceRows('device')).filter(row =>
+    row?.id?.startsWith?.('pri-activation-denial-v1:acct-A:')).length;
+  const firstDenials = await markerCount();
+  eq('an additional withdrawn recheck remains denied', (await gate('p-multitab', { sync: false })).code, 'GUARDIAN_CONSENT_WITHDRAWN');
+  eq('repeated denied rechecks do not accumulate unbounded device rows', await markerCount(), firstDenials);
+  const { advanceDeviceDenialGeneration } = await import('../src/local/idb.js');
+  const denialRow = 'pri-activation-denial-v1:acct-A:';
+  const previousGeneration = (await readDeviceRows('device')).find(row => row?.id === denialRow)?.generation;
+  ok('the account has a durable refusal generation independent of wall time',
+    Number.isSafeInteger(previousGeneration) && previousGeneration > 0);
+  const nextGeneration = await advanceDeviceDenialGeneration(denialRow);
+  eq('atomic withdrawal generation increases by exactly one', nextGeneration, previousGeneration + 1);
+  eq('the account-scoped denial record cannot be duplicated', await markerCount(), firstDenials);
+  eq('a new refusal invalidates the earlier online approval across tabs',
+    await secondTab.offlineGraceFor('p-multitab'), null);
+  reset();
+  const recovered = await gate('p-multitab', { sync: false });
+  ok('a new authorized request can recover after two independent refusals', !!recovered.ready);
+  eq('the recovery records the current generation without synthetic future time',
+    (await cloudAccountLink('p-multitab')).activatedGeneration, nextGeneration);
+  const beforeRefresh = await cloudAccountLink('p-multitab');
+  const { verifyCloudSession } = await import('../src/platform/cloudAccount.js');
+  await verifyCloudSession('p-multitab');
+  const afterRefresh = await cloudAccountLink('p-multitab');
+  eq('same-account /me refresh retains the denial recovery witness',
+    afterRefresh.activatedRecoveryFence, beforeRefresh.activatedRecoveryFence);
+  ok('server-approved reactivation keeps 72-hour offline access after session refresh',
+    (await secondTab.offlineGraceFor('p-multitab'))?.offline === true);
+}
+
+
+// ── 14 · offline grant paused across ANOTHER TAB'S guardian withdrawal ──
+reset();
+{
+  const pid = 'p-offline-inflight';
+  await put('profiles', { id: pid, name: 'Isha', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+  await loginCloudAccount(pid, { email: 'a@example.test', password: 'test-password-only' });
+  ok('offline race begins with a genuine approved server grant', !!(await gate(pid)).ready);
+  const anotherTab = await import('../src/platform/accountActivation.js?step05-offline-inflight');
+  const db = globalThis.indexedDB.open().result;
+  const actualTransaction = db.transaction;
+  // Prepare the clock fixture BEFORE installing the interception hook:
+  // otherwise the test's own preparation write would be paused.
+  const { get: readDevice } = await import('../src/local/idb.js');
+  const linkKey = `pri-cloud-account-link-v1:${pid}`;
+  const linkRow = await readDevice('device', linkKey);
+  await put('device', { ...linkRow, clockSeenAt: Date.now() - 30_000 });
+  let signalPaused, releasePaused;
+  const paused = new Promise(resolve => { signalPaused = resolve; });
+  const resume = new Promise(resolve => { releasePaused = resolve; });
+  let intercepted = false;
+  db.transaction = function (name, mode) {
+    const tr = actualTransaction.call(this, name, mode);
+    if (name === 'device' && mode === 'readwrite' && !intercepted) {
+      intercepted = true;
+      const nativeStore = tr.objectStore.bind(tr);
+      tr.objectStore = function (key) {
+        const handle = nativeStore(key);
+        const nativePut = handle.put.bind(handle);
+        handle.put = (...args) => {
+          const req = nativePut(...args);
+          let callback = null;
+          Object.defineProperty(req, 'onsuccess', {
+            configurable: true,
+            get: () => callback,
+            set: fn => { callback = event => { signalPaused(); resume.then(() => fn(event)); }; }
+          });
+          return req;
+        };
+        return handle;
+      };
+    }
+    return tr;
+  };
+  try {
+    const heldOffline = anotherTab.offlineGraceFor(pid);
+    await Promise.race([
+      paused,
+      new Promise((_, reject) => setTimeout(() =>
+        reject(new Error('offline-grace interleaving did not reach the clock write')), 5000))
+    ]);
+    server.guardian = () => ({ status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } });
+    const revoked = await gate(pid, { sync: false });
+    eq('other tab commits authoritative guardian withdrawal', revoked.code, 'GUARDIAN_CONSENT_WITHDRAWN');
+    releasePaused();
+    eq('an in-flight offline request cannot return an old grant after cross-tab withdrawal', await heldOffline, null);
+    eq('the withdrawn account stays offline-blocked after a reload', await anotherTab.offlineGraceFor(pid), null);
+  } finally {
+    releasePaused();
+    db.transaction = actualTransaction;
+  }
+  reset();
+  ok('normal 72-hour grace recovers after fresh online consent', !!(await gate(pid, { sync: false })).ready && !!(await anotherTab.offlineGraceFor(pid))?.offline);
+}
+
+// ── 15 · aborted IndexedDB denial writes cannot resurrect old offline grant ──
+reset();
+{
+  const pid = 'p-aborted-denial';
+  await put('profiles', { id: pid, name: 'Meera', avatar: '🙂', year: 10, role: 'student', course: 'in', indiaTrack: 'cbse', theme: 'dark', dailyGoal: 10, handwriting: true });
+  await loginCloudAccount(pid, { email: 'a@example.test', password: 'test-password-only' });
+  ok('failed-denial fixture has a legitimate pre-existing grant', !!(await gate(pid)).ready);
+  const oldLink = await cloudAccountLink(pid);
+  const markerKey = 'pri-activation-denial-recovery-v1:acct-A:';
+  const oldMarker = globalThis.localStorage.getItem(markerKey);
+  const db = globalThis.indexedDB.open().result;
+  const nativeTransaction = db.transaction;
+  let failuresToInject = 2;
+  const denialWriteFailure = function (name, mode) {
+    if (name === 'device' && mode === 'readwrite' && failuresToInject > 0) {
+      failuresToInject--;
+      throw new DOMException('IndexedDB transaction aborted', 'AbortError');
+    }
+    return nativeTransaction.call(this, name, mode);
+  };
+  // Inject failures only AFTER the real guardian endpoint has replied with
+  // withdrawal. Earlier sync/session bookkeeping must not consume the faults.
+  server.guardian = () => {
+    db.transaction = denialWriteFailure;
+    return { status: 200, body: { accountId: 'acct-A', required: true, state: 'withdrawn', eligible: false, emailVerified: true, blockerCode: 'GUARDIAN_CONSENT_WITHDRAWN' } };
+  };
+  let blocked;
+  try { blocked = await gate(pid, { sync: false }); }
+  finally { db.transaction = nativeTransaction; }
+  eq('authoritative withdrawal still refuses access when BOTH IDB writes abort', blocked.code, 'GUARDIAN_CONSENT_WITHDRAWN');
+  eq('the forced generation and clearing transactions both aborted', failuresToInject, 0);
+  const survivingLink = await cloudAccountLink(pid);
+  eq('the test preserves the earlier durable grant despite the aborted writes', survivingLink.activatedAt, oldLink.activatedAt);
+  ok('independent durable denial fence records the withdrawal', !!globalThis.localStorage.getItem(markerKey) && globalThis.localStorage.getItem(markerKey) !== oldMarker);
+  const reloaded = await import('../src/platform/accountActivation.js?step05-abort-reload');
+  eq('after storage recovers and module reloads, prior offline grant cannot be reused', await reloaded.offlineGraceFor(pid), null);
+  reset();
+  ok('new genuine online approval restores bounded offline access after failed persistence', !!(await gate(pid, { sync: false })).ready && !!(await reloaded.offlineGraceFor(pid))?.offline);
 }
 
 if (failures.length) {

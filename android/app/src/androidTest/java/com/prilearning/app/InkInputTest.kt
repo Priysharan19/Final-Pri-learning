@@ -181,8 +181,34 @@ class InkInputTest {
             assumeTrue("the WebView is below the floor on this image", supported)
             // Account-first (#477): Home only once the gate has let the signed-in student in.
             waitFor(s, AccountFirst.HOME_OPEN, 90_000)
-            eval(s, "(function(){window.__PRI_INK_METRICS_ENABLED__=true;history.pushState({},'','/practice');dispatchEvent(new PopStateEvent('popstate'));return true;})()")
-            waitFor(s, "document.querySelector('.q-prompt')")
+            // Exercise real app navigation, as the passing ShellJourneyTest
+            // does. A synthetic popstate need not mount the React route.
+            // Still require a genuine Practice question before any ink check.
+            waitFor(s, """(function(){
+                window.__PRI_INK_METRICS_ENABLED__=true;
+                var link=[].slice.call(document.querySelectorAll('a[href="/practice"]'))
+                    .find(function(a){return a.offsetParent;});
+                if(!link)return false;
+                link.click();
+                return true;
+            })()""")
+            try {
+                waitFor(s, "document.querySelector('.q-prompt') && location.pathname === '/practice'")
+            } catch (e: AssertionError) {
+                val state = eval(s, """(function(){
+                    var gate=document.querySelector('[data-testid="account-activation-gate"]');
+                    var main=document.querySelector('main#main');
+                    return JSON.stringify({
+                        path: location.pathname,
+                        gate: gate ? gate.getAttribute('data-activation-status') : null,
+                        question: !!document.querySelector('.q-prompt'),
+                        workspace: !!document.querySelector('.qpage'),
+                        main: main ? main.textContent.trim().slice(0,350) : null
+                    });
+                })()""")
+                Log.e("PRITEST", "Practice navigation reached no issued question: $state", e)
+                throw AssertionError("Practice navigation did not render the question: $state", e)
+            }
 
             // A question that offers handwriting.
             var writable = false
