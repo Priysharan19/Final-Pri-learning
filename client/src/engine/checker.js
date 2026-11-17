@@ -722,6 +722,7 @@ function flagUnfinishedFinalLine(out, meta) {
   }
 }
 
+const sameRootSet = (a, b) => a.length === b.length && a.every(x => b.some(y => numsClose(x, y)));
 function stepCheckSingle(meta, workingText, system = null, { loneBranches = false, prompt = '' } = {}) {
   const rawLines = String(workingText || '').split('\n').map(l => l.trim()).filter(Boolean);
   const unread = unreadLines(rawLines);
@@ -1072,8 +1073,25 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               // One branch of a factorisation already shown. It is true of the
               // roots it names; whether the working keeps the rest is settled
               // once every line has been read.
+              // A VALUE line (x = 5) written straight under a branch (x - 3 = 0)
+              // must be what that branch gives: a true root of the question that
+              // the line above does not produce is a slip, however true it is.
+              const above = branchLines[branchLines.length - 1];
+              if (valued && above && above.index === i - 1 && !above.valued && !sameRootSet(above.covered, held)) {
+                status = 'break';
+                lineDiagnosis = {
+                  code: 'branch-value-mismatch', title: 'This value does not follow from the line above',
+                  message: `The line above gives ${meta.variable} = ${above.covered.map(v => Number(v.toPrecision(8))).join(' or ')}, not ${meta.variable} = ${held.map(v => Number(v.toPrecision(8))).join(' or ')}.`,
+                  fix: 'Solve the line above for the unknown, then write that value.', confidence: 'high'
+                };
+                lineDiagnosis = withConfidence(lineDiagnosis);
+                note = lineDiagnosis.message;
+                if (firstBreak === -1) firstBreak = i;
+                out.push({ text: line, status, note, diagnosis: lineDiagnosis });
+                return;
+              }
               status = 'ok';
-              branchLines.push({ index: i, covered: held, lone });
+              branchLines.push({ index: i, covered: held, lone, valued });
               out.push({ text: line, status, branch: true });
               return;
             }
@@ -1169,7 +1187,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       for (const b of branchLines) {
         out[b.index].note = `True for ${meta.variable} = ${b.covered.join(' or ')} — the equation has ${wanted.length} solutions, and the other is still to find.`;
       }
-    } else if (!listedInFull && !complete) {
+    } else if (!listedInFull && !complete && firstBreak === -1) {
       const { index } = branchLines[0];
       const diagnosis = lostRootDiagnosis(meta.variable, covered.join(' or ') || 'this branch', wanted.length);
       out[index] = { text: out[index].text, status: 'break', note: diagnosis.message, diagnosis };
@@ -1991,6 +2009,8 @@ export function plainTex(tex) {
     s = s.replace(/\\d?frac\s*(\{[^{}]*\}|[0-9a-zA-Z])\s*(\{[^{}]*\}|[0-9a-zA-Z])/g, (_, a, b) =>
       `((${a.replace(/^\{|\}$/g, '')})/(${b.replace(/^\{|\}$/g, '')}))`);
   }
+  // An exponent in braces is a grouped exponent: 2^{x+1} is 2^(x+1), never 2^x+1.
+  for (let guard = 0; guard < 6 && /\^\s*\{/.test(s); guard++) s = s.replace(/\^\s*\{([^{}]*)\}/g, '^($1)');
   s = s.replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)')
     .replace(/\\(times|cdot)/g, '*').replace(/\\div/g, '/')
     .replace(/\\le(q|qslant)?\b/g, '<=').replace(/\\ge(q|qslant)?\b/g, '>=')

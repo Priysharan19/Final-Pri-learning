@@ -840,6 +840,8 @@ function expressionCounterexample(expected, candidate, variable) {
 export function assessDerivativeLine({ text, meta = null } = {}) {
   if (!meta?.source) return { status: 'note', trusted: false, note: 'Pri needs the original function before it can verify differentiation.' };
   const variable = meta.variable || 'x';
+  // `e` as the variable of differentiation is a letter here, never Euler's number.
+  if (variable === 'e') return { status: 'note', trusted: false, note: 'This derivative uses a rule outside Pri’s verified calculus vocabulary.' };
   let source, expected;
   try {
     source = parse(meta.source);
