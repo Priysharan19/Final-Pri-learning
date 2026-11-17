@@ -109,6 +109,48 @@ function finish(row) {
   };
 }
 
+
+// ── Where the marks went, by cause ───────────────────────────────────────────
+// Every mark lost lands in exactly one cause, decided from the marked row
+// alone (no answer key, no model):
+//   time    a question never reached — no time spent, no answer — after the
+//           last question the sitting did reach (only on a paper whose room
+//           measured time per question; otherwise it is simply blank)
+//   blank   a question left unanswered that the sitting passed over or reached
+//   slip    the working earned some marks but the answer did not earn them all:
+//           the method was credited and marks were lost after it
+//   method  an answer that earned nothing (or a JEE negative mark): no method
+//           credit was earned, so the approach itself is the place to look
+// The four sum to the marks lost on the paper, so the breakdown cannot
+// disagree with the score. It says where marks were lost, not why a student
+// slipped, and it predicts nothing.
+export const LOSS_CAUSES = Object.freeze(['method', 'slip', 'blank', 'time']);
+
+function lossCauses(sorted, timed) {
+  let lastReached = -1;
+  sorted.forEach((d, i) => { if (!d.unanswered || (Number(d.ms) || 0) > 0) lastReached = i; });
+  const causes = { method: 0, slip: 0, blank: 0, time: 0 };
+  const byChapter = new Map();
+  sorted.forEach((d, i) => {
+    const lost = Math.max(0, (Number(d.marks) || 0) - (Number(d.awarded) || 0));
+    if (!lost) return;
+    const outcome = outcomeOf(d);
+    let cause;
+    if (outcome === 'unattempted') cause = timed && i > lastReached ? 'time' : 'blank';
+    else if (outcome === 'partial') cause = 'slip';
+    else cause = 'method';
+    causes[cause] += lost;
+    const cid = d.chapterId || d.subtopic || 'unlabelled';
+    if (!byChapter.has(cid)) byChapter.set(cid, { id: cid, label: d.subtopicName || cid, lost: 0, method: 0, slip: 0, blank: 0, time: 0 });
+    const row = byChapter.get(cid);
+    row.lost += lost;
+    row[cause] += lost;
+  });
+  const topics = [...byChapter.values()].filter(c => c.id !== 'unlabelled')
+    .sort((a, b) => (b.lost - a.lost) || String(a.label).localeCompare(String(b.label))).slice(0, 5);
+  return { total: causes.method + causes.slip + causes.blank + causes.time, ...causes, topics };
+}
+
 /**
  * The analysis of one marked paper.
  * @param {{ detail: object[], indiaExam?: object }} paper
@@ -181,6 +223,7 @@ export function analyseExam({ detail, indiaExam } = {}) {
           .slice(0, 3)
           .map(c => ({ id: c.id, label: c.label, questions: c.questions, marks: c.marks, awarded: c.awarded, lost: c.lost, unattempted: c.unattempted, wrong: c.wrong, partial: c.partial, scorePct: c.scorePct }))
       };
+  out.causes = lossCauses(sorted, timed);
   if (out.focus.kind === 'mostLost' && !out.focus.chapters.length) out.focus = { kind: 'none', chapters: [] };
 
   if (pattern === 'cbse') {

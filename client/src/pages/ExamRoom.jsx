@@ -34,6 +34,8 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { clearDraft, queueDraft, readDraft } from '../components/drafts.js';
 import ExamAnalysis from '../components/ExamAnalysis.jsx';
+import LossBreakdown from '../components/LossBreakdown.jsx';
+import { analyseExam } from '../local/examAnalysis.js';
 import SectionTime from '../components/SectionTime.jsx';
 import { compactStrokes, expandStrokes } from '../local/examSession.js';
 import { freezePage, pendingSummary, unreadInkKeys } from '../local/examPages.js';
@@ -806,6 +808,7 @@ export default function ExamRoom() {
         </div>
 
         <ExamAnalysis analysis={result.analysis} track={exam.indiaExam?.track} />
+        <LossBreakdown causes={(result.analysis || analyseExam({ detail: result.detail, indiaExam: exam.indiaExam }))?.causes} />
         <SectionTime report={result.timeReport} offered={result.timeReportOffered} />
 
         {result.detail.map((d, i) => d.multipart ? (

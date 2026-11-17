@@ -73,7 +73,7 @@ function TopicList({ topics, t, empty }) {
 
 function PlanStep({ step, t }) {
   if (step.kind === 'start-practising') return <li>{t('parent.planStart', { count: step.minimumAttempts, n: step.minimumAttempts })}</li>;
-  if (step.kind === 'revisit-topic') return <li>{t('parent.planRevisit', { topic: step.name })}</li>;
+  if (step.kind === 'revisit-topic') return <li>{t('parent.planRevisit', { topic: step.name, n: step.minutes || 15 })}</li>;
   if (step.kind === 'fix-mistakes') return <li>{t('parent.planMistakes', { count: step.count, n: step.count })}</li>;
   if (step.kind === 'practise-days') return <li>{t('parent.planDays', { count: step.days, n: step.days })}</li>;
   return null;
