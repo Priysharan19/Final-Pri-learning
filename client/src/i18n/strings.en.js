@@ -3202,7 +3202,6 @@ export default {
   "inst.ladderHead": "Hint ladder · {used} of {total} used",
   "inst.ladderRow": "Hints · {used} of {total} used",
   "inst.allHints": "All hints",
-  "inst.hintSheetClose": "Close hints",
   "inst.rungCost": "−{percent}% of marks",
   "inst.rungEnds": "ends the attempt",
   "inst.rungLocked": "locked until the rung before it is open",

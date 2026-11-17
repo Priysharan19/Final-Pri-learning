@@ -3259,7 +3259,6 @@ export default {
   "inst.ladderHead": "संकेत सीढ़ी · {total} में से {used} इस्तेमाल",
   "inst.ladderRow": "संकेत · {total} में से {used} इस्तेमाल",
   "inst.allHints": "सभी संकेत",
-  "inst.hintSheetClose": "संकेत बंद करें",
   "inst.rungCost": "अंकों का −{percent}%",
   "inst.rungEnds": "प्रयास समाप्त करता है",
   "inst.rungLocked": "पिछला पायदान खुलने तक बंद",
