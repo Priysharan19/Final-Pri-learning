@@ -799,9 +799,11 @@ html.ui-instrument .crash-card > .card-title { margin: 0 0 18px; padding: 12px 1
 html.ui-instrument .crash-card > :not(.card-title) { margin-left: 18px; margin-right: 18px; }
 html.ui-instrument .crash-title { font: 500 22px/1.2 var(--in-ui); letter-spacing: -0.02em; }
 
-/* Notes (s13, "two voices"): prose talks in the interface sans; Computer
-   Modern stays for mathematics, which KaTeX draws in its own faces. */
-html.ui-instrument .nt { --nt-serif: var(--in-ui); }
+/* Notes: reading text is Computer Modern (CMU Serif, notes/notesFonts.css, fetched
+   with the notes chunk) in both editions, as the notes Experience 3 brief of
+   18 Nov 2026 sets (replacing s13's "prose in the interface sans"); KaTeX draws the
+   mathematics in its own faces and labels and controls stay in Instrument Sans. */
+html.ui-instrument .nt { --nt-serif: 'CMU Serif', 'Latin Modern Roman', var(--in-ui); }
 html.ui-instrument .nt-title { font-weight: 500; letter-spacing: -0.035em; }
 html.ui-instrument .nt-lede { font-size: 16px; }
 

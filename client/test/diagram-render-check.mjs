@@ -51,6 +51,11 @@ const SPECS = {
   circleSemi: { kind: 'circleTheorem', theorem: 'semicircle' },
   circleCyclic: { kind: 'circleTheorem', theorem: 'cyclic' },
   circleTangent: { kind: 'circleTheorem', theorem: 'tangent' },
+  network: { kind: 'network', nodes: [{ id: 'A', x: 0, y: 0 }, { id: 'B', x: 4, y: 2 }, { id: 'C', x: 4, y: -2 }, { id: 'D', x: 8, y: 0 }], edges: [{ from: 'A', to: 'B', weight: 5 }, { from: 'A', to: 'C', weight: 3 }, { from: 'B', to: 'D', weight: 4 }, { from: 'C', to: 'D', weight: 6 }], path: ['A', 'B', 'D'] },
+  networkFlow: { kind: 'network', directed: true, nodes: [{ id: 'S', x: 0, y: 0 }, { id: 'T', x: 6, y: 0 }], edges: [{ from: 'S', to: 'T', label: '7/10' }] },
+  scatter: { kind: 'scatter', points: [[1, 2], [2, 3], [3, 5], [4, 4], [5, 6]], line: 'fit', xLabel: 'x', yLabel: 'y' },
+  solidPrism: { kind: 'solid', shape: 'rectPrism', l: 4, w: 3, h: 5 }, solidCylinder: { kind: 'solid', shape: 'cylinder', r: 2, h: 5 },
+  solidCone: { kind: 'solid', shape: 'cone', r: 2, h: 5 }, solidSphere: { kind: 'solid', shape: 'sphere', r: 2 }, solidPyramid: { kind: 'solid', shape: 'pyramid', l: 4, w: 3, h: 5 },
   numberLine: { kind: 'numberLine', min: -5, max: 5, intervals: [{ from: -2, to: null, fromOpen: true }], points: [{ value: 3, open: true, label: 'x=3' }] },
   tree: { kind: 'tree', branches: [{ label: 'R', p: [2, 5], children: [{ label: 'R', p: [1, 4] }, { label: 'B', p: [3, 4] }] }, { label: 'B', p: [3, 5], children: [{ label: 'R', p: [2, 4] }, { label: 'B', p: [2, 4] }] }] },
   venn2: { kind: 'venn', sets: 2, counts: { A: 12, B: 7, AB: 5, none: 6 }, labels: ['A', 'B'] },
@@ -73,7 +78,11 @@ try {
   const { createElement: h } = React;
   const draw = (spec, interactive = false) => renderToStaticMarkup(h(reg.default, { spec, interactive }));
 
-  ok(reg.DIAGRAM_KINDS.length === 25, `25 diagram kinds are registered (${reg.DIAGRAM_KINDS.length})`);
+  // The registry and the React-free name list (diagrams/kinds.js, read by node tools) agree exactly:
+  // the 28 core kinds plus every pack kind.
+  const names = await server.ssrLoadModule('/src/diagrams/kinds.js');
+  const listed = [...names.STATIC_KIND_NAMES, ...names.INTERACTIVE_KIND_NAMES];
+  ok(listed.length >= 28 && reg.DIAGRAM_KINDS.length === listed.length && listed.every(k => reg.DIAGRAM_KINDS.includes(k)), `every listed kind is registered and nothing else (${reg.DIAGRAM_KINDS.length} registered, ${listed.length} listed)`);
   for (const k of ['function', 'trig', 'unitCircle', 'triangle', 'polygon', 'circleTheorem', 'numberLine', 'tree', 'venn', 'table', 'histogram', 'boxPlot', 'normal', 'vector', 'sequence', 'compound', 'timeline', 'secantTangent', 'riemann']) ok(reg.DIAGRAM_KINDS.includes(k), `kind ${k} is covered`);
 
   for (const [name, spec] of Object.entries(SPECS)) {
@@ -108,6 +117,10 @@ try {
   const geo = await server.ssrLoadModule('/src/diagrams/geometry.js');
   const tri = draw(SPECS.triangle);
   ok(/36\.8699/.test(tri) && /53\.1301/.test(tri) && /area 6/.test(tri) && /right angle at C/.test(tri), 'triangle: the description gives the computed angles, area and right angle');
+  ok(/total 9/.test(draw(SPECS.network)) && /A joined to B, 5/.test(draw(SPECS.network)), 'network: the description names the edges and the highlighted route total (5 + 4 = 9)');
+  ok(/7\/10/.test(draw(SPECS.networkFlow)) && /directed/.test(draw(SPECS.networkFlow)) && /marker-end/.test(draw(SPECS.networkFlow)), 'a directed network draws arrowheads and states the flow label');
+  ok(/gradient 0\.9/.test(draw(SPECS.scatter)) && /y-intercept 1\.3/.test(draw(SPECS.scatter)) && /correlation coefficient is 0\.9/.test(draw(SPECS.scatter)), 'scatter: the description gives the least-squares line (0.9x + 1.3) and r = 0.9');
+  ok(/volume is 62\.83 cubic/.test(draw(SPECS.solidCylinder)) && /volume is 60 cubic/.test(draw(SPECS.solidPrism)) && /volume is 20\.94 cubic/.test(draw(SPECS.solidCone)) && /volume is 33\.51 cubic/.test(draw(SPECS.solidSphere)) && /volume is 20 cubic/.test(draw(SPECS.solidPyramid)), 'solids: each description gives its exact volume (60, 62.83, 20.94, 33.51, 20)');
   const circ = draw(SPECS.unitCircle);
   ok(/135 degrees/.test(circ) && new RegExp(String(geo.unitCirclePoint(135).cos)).test(circ), 'unit circle: the description gives the cosine and sine of the angle');
   ok(/6\.875|area/.test(draw(SPECS.riemann)) && new RegExp(String(geo.riemannModel({ expr: 'x^2', a: 0, b: 3, n: 6, mode: 'left' }).sum)).test(draw(SPECS.riemann)), 'Riemann: the description gives the rectangles\' total area');

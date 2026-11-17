@@ -70,7 +70,7 @@ try {
     return out;
   });
   ok(layout.scrollW <= layout.vw + 1, `the page does not scroll sideways at ${layout.vw} px (scroll width ${layout.scrollW})`);
-  ok(layout.svgs >= 35 && layout.kinds >= 36, `every kind is on the page (${layout.svgs} diagrams, ${layout.kinds} cases)`);
+  ok(layout.svgs >= 42 && layout.kinds >= 43, `every kind is on the page (${layout.svgs} diagrams, ${layout.kinds} cases)`);
   ok(layout.wide.length === 0, `no svg runs past the phone's edge (${layout.wide.join(',')})`);
   ok(layout.tiny.length === 0, `no svg is shrunk to unreadable size (${layout.tiny.join(',')})`);
   ok(layout.labels > 300 && layout.plainLabels === 0, `every label is typeset by KaTeX (${layout.labels} labels, ${layout.plainLabels} plain)`);

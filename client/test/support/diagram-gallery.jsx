@@ -24,8 +24,12 @@ const STATIC = [
   { kind: 'normal', mu: 70, sigma: 5, from: 65, to: 80, mode: 'x' },
   { kind: 'vector', vectors: [{ dx: 3, dy: 1, label: '\\mathbf{a}' }, { dx: 1, dy: 3, label: '\\mathbf{b}' }] },
   { kind: 'sequence', first: 2, step: 3, n: 6 }, { kind: 'sequence', type: 'geometric', first: 3, step: 2, n: 6 },
-  { kind: 'compound', principal: 1000, rate: 0.05, years: 10 },
+  { kind: 'compound', principal: 1000, rate: 0.05, years: 10, currency: '$' }, { kind: 'compound', principal: 100000, rate: 0.08, years: 5, currency: '₹' },
   { kind: 'timeline', events: [{ t: 0, amount: -500 }, { t: 1, amount: 200 }, { t: 2, amount: 200 }, { t: 3, amount: 200 }] },
+  { kind: 'network', nodes: [{ id: 'A', x: 0, y: 0 }, { id: 'B', x: 4, y: 2 }, { id: 'C', x: 4, y: -2 }, { id: 'D', x: 8, y: 0 }], edges: [{ from: 'A', to: 'B', weight: 5 }, { from: 'A', to: 'C', weight: 3 }, { from: 'B', to: 'D', weight: 4 }, { from: 'C', to: 'D', weight: 6 }], path: ['A', 'B', 'D'] },
+  { kind: 'scatter', points: [[1, 2], [2, 3], [3, 5], [4, 4], [5, 6]], line: 'fit', xLabel: 'x', yLabel: 'y' },
+  { kind: 'solid', shape: 'rectPrism', l: 4, w: 3, h: 5 }, { kind: 'solid', shape: 'cylinder', r: 2, h: 5 }, { kind: 'solid', shape: 'cone', r: 2, h: 5 },
+  { kind: 'solid', shape: 'sphere', r: 2 }, { kind: 'solid', shape: 'pyramid', l: 4, w: 3, h: 5 },
   { kind: 'secantTangent', expr: 'x^2', x0: 1, h: 1 }, { kind: 'riemann', expr: 'x^2', a: 0, b: 3, n: 6, mode: 'left' }
 ];
 const INTERACTIVE = [

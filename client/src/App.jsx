@@ -78,7 +78,14 @@ const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
 // downloads them.
 const Landing = React.lazy(() => import('./landing/Landing.jsx'));
 const PublicInfo = React.lazy(() => import('./landing/PublicInfo.jsx'));
-const Notes = React.lazy(() => import('./pages/Notes.jsx'));
+// The Prithagoras edition has its own NSW notes page, built from the NSW curriculum
+// model; it never loads or shows the India notes (client/test/nsw-notes-no-india-check.mjs).
+// __PRI_EDITION__ is a literal in a build, so the other edition's page, and its
+// whole notes data, is dead code and is not emitted (nor warmed offline).
+const NSW_NOTES_BUILD = typeof __PRI_EDITION__ === 'string' && __PRI_EDITION__ === 'prithagoras';
+const Notes = NSW_NOTES_BUILD
+  ? React.lazy(() => import('./pages/NswNotes.jsx'))
+  : React.lazy(() => import('./pages/Notes.jsx'));
 const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
 // The shared resource library (ADR-0002 plan F1): its own chunk, built only
 // where PRI_FEATURE_LIBRARY is on.

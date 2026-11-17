@@ -1328,15 +1328,22 @@ async function run() {
       await wait(page, 600);
     });
 
+    // The Prithagoras edition's notes are the NSW page (Year tabs, topics; plan nsw-notes),
+    // never the India chapter map.
     await step('notes · index and chapter map', '/notes', async () => {
-      await goTo(page, BASE, '/notes?class=10');
-      await page.waitForSelector('.nt-map-node', { timeout: 20000 });
+      if (INDIA) {
+        await goTo(page, BASE, '/notes?class=10');
+        await page.waitForSelector('.nt-map-node', { timeout: 20000 });
+      } else {
+        await goTo(page, BASE, '/notes?year=7');
+        await page.waitForSelector('[data-nsw-notes] [data-testid="notes-chapter"]', { timeout: 20000 });
+      }
       await wait(page, 1200);
     });
 
     await step('notes · a chapter read through', '/notes/:chapterId', async () => {
-      await goTo(page, BASE, '/notes/c10-quadratic-equations');
-      await page.waitForSelector('.nt-formula', { timeout: 20000 });
+      await goTo(page, BASE, INDIA ? '/notes/c10-quadratic-equations' : '/notes/ma4-equ-c-01?year=7');
+      await page.waitForSelector(INDIA ? '.nt-formula' : '.nn-formula', { timeout: 20000 });
       await page.evaluate(() => document.querySelectorAll('.nt-reveal').forEach(el => el.classList.add('is-in')));
       await wait(page, 1600);
     });
