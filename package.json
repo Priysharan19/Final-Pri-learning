@@ -74,7 +74,7 @@
     "test:real": "node client/test/inkcheck-real.mjs",
     "test:real:gate": "node client/test/inkcheck-real.mjs --gate",
     "test:real:floor": "node client/test/ink-real-floor-check.mjs",
-    "test:ink:blind": "node client/test/ink-answer-blind-static-check.mjs && node client/test/original-ink-check.mjs",
+    "test:ink:blind": "node client/test/ink-answer-blind-static-check.mjs && node client/test/original-ink-check.mjs && node client/test/original-work-render-check.mjs",
     "test:ink:cloud-eval": "node client/test/ink-cloud-reader-eval-check.mjs",
     "test:ink:collector": "node client/test/ink-collector-check.mjs",
     "test:ink:feedback": "node client/test/ink-feedback-geometry-check.mjs",

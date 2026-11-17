@@ -523,6 +523,11 @@ export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_0
 
 export const cloud = Object.freeze({
   health: () => cloudRequest('/v1/health'),
+  // The student's original work kept with a mark (standard #08): their own,
+  // by the id the grade reply named; or, for their teacher, through the class.
+  original: id => cloudRequest('/v1/originals/' + pathId(id, 'original id')),
+  teacherOriginal: (classId, studentId, id) => cloudRequest('/v1/originals/class/' + pathId(classId, 'class id') + '/student/'
+    + pathId(studentId, 'student id') + '/' + pathId(id, 'original id')),
   // The device never computes a grade: question and attempt authority are on
   // the authenticated server. Transport failures are propagated, not converted
   // into local answers or queued pseudo-receipts.
