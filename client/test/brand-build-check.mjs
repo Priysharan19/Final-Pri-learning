@@ -108,7 +108,7 @@ if (BOTH) {
     // Hashed chunks: compared by normalised content. Exactly these may differ,
     // each for a stated reason; any other difference fails.
     //   edition        the edition record, which holds this edition's name, cut and wordmark (E2, E4)
-    //   Paywall, CloudAccountPanel, useGooglePlayPurchase
+    //   Paywall, CloudAccountPanel, useGooglePlayPurchase, useSaleAvailable
     //                  commercial configuration: __PRI_PREMIUM_ON_SALE__ folds the
     //                  purchase paths of an edition that sells nothing (plan E5)
     //   i18n-hi, legalHindi, languages
@@ -121,7 +121,7 @@ if (BOTH) {
     //                  streams-standard, year8-10) carry the other hash in their import
     //                  line. Priyabhata's own bundle is byte-identical to before.
     const MAY_DIFFER = {
-      edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce',
+      edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce', useSaleAvailable: 'commerce',
       'i18n-hi': 'language', legalHindi: 'language', languages: 'language',
       backend: 'language', indiaProduct: 'language', 'streams-standard': 'language', year8: 'language', year9: 'language', year10: 'language'
     };
