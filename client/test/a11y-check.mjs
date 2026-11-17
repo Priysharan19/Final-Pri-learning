@@ -547,7 +547,10 @@ async function run() {
   const views = [];
   const skipped = [];
   const notApplicable = [];
-  const notApplicableRoutes = new Set();
+  // Served only by the Prithagoras build (App.jsx LEGAL_ROUTES_EXTRA: its contact
+  // page, and the /refunds alias). This walk builds Priyabhata, where they are not
+  // routes; legal-pages-au-check.mjs holds their wiring and their notices.
+  const notApplicableRoutes = new Set(['/contact', '/refunds']);
   let liveVerdict = null;
   let skipLink = null;
   let selfTest = null;

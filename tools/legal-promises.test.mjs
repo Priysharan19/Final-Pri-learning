@@ -108,6 +108,17 @@ const cleanRow = cleanReport.results.find(row => row.label === ROW);
 ok(cleanRow?.ok === true, 'nomination passes that row once the code is at the commit');
 const settingRow = cleanReport.results.find(row => /production settings the notices depend on/.test(row.label));
 ok(settingRow?.ok === null && /PRI_CHILD_ERASURE=enforce/.test(settingRow.detail || ''), 'and prints PRI_CHILD_ERASURE=enforce for the operator to confirm, without claiming it is set');
+// The Australian privacy notice makes the same promises and is held to the same code;
+// a commit without it is not a gap.
+{
+  const quiet = { 'docs/legal/privacy.md': 'No such promise.' };   // the Indian notice, making none
+  const au = { 'docs/legal/au/privacy.md': PROMISE, ...quiet };
+  ok((await legalPromiseGaps(reader({ ...au, ...housekeeping, ...route }))).length === 0, 'the Australian notice with the job and the route has no gap');
+  const gaps = await legalPromiseGaps(reader({ ...au }));
+  ok(gaps.length === 2 && gaps.every(gap => /docs\/legal\/au\/privacy\.md/.test(gap)), 'the Australian notice promising it without the code is two gaps, named for that file');
+  ok((await legalPromiseGaps(reader({ 'docs/legal/privacy.md': 'No such promise.' }))).length === 0, 'a commit with no Australian notice at all is not a gap');
+  ok((await legalPromiseGaps(reader({ ...au, ...notice, ...housekeeping, ...route }))).length === 0, 'both notices with the code at the commit: no gap');
+}
 const source = readFileSync(join(ROOT, 'scripts/release-nominate.mjs'), 'utf8');
 ok(/legalPromiseGaps\(path => git\(\['show', `\$\{expected\}:\$\{path\}`\]\)\)/.test(source),
   'the nomination asks about the nominated commit, not the working tree');

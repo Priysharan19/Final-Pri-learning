@@ -3,6 +3,7 @@ import Aurora from './instrument/Aurora.jsx';
 import Working from './instrument/Working.jsx';
 import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import { Routes, Route, useLocation, useNavigate, Navigate } from 'react-router-dom';
+import { EDITION } from './platform/edition.js';
 import PageLink from './components/PageLink.jsx';
 import { api } from './api.js';
 import { DEFAULT_THEME_PREF, applyTheme, cleanThemePref, followSystemTheme, storedThemePref } from './lib/theme.js';
@@ -56,6 +57,17 @@ const Placement = React.lazy(() => import('./pages/Placement.jsx'));
 // /privacy is online, and the warm pass keeps it for offline, so it no longer
 // rides in the install every student downloads before the first screen.
 const Legal = React.lazy(() => import('./pages/Legal.jsx'));
+// The notices that differ by edition. Priyabhata publishes the DPDP Act's
+// grievance contact at /grievance. Prithagoras publishes its contact page at
+// /contact (it has no Grievance Officer), sends the old /grievance address there,
+// and answers /refunds with the refund policy.
+const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
+  <>
+    <Route path="/contact" element={<Legal />} />
+    <Route path="/grievance" element={<Navigate to="/contact" replace />} />
+    <Route path="/refunds" element={<Navigate to="/refund-policy" replace />} />
+  </>
+) : <Route path="/grievance" element={<Legal />} />;
 const Notes = React.lazy(() => import('./pages/Notes.jsx'));
 const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
 // The shared resource library (ADR-0002 plan F1): its own chunk, built only
@@ -536,7 +548,7 @@ export default function App() {
             <Route path="/privacy" element={<Legal />} />
             <Route path="/terms" element={<Legal />} />
             <Route path="/refund-policy" element={<Legal />} />
-            <Route path="/grievance" element={<Legal />} />
+            {LEGAL_ROUTES_EXTRA}
             <Route path="/third-party-notices" element={<Legal />} />
             <Route path="*" element={<Login />} />
           </Routes>
@@ -573,7 +585,7 @@ export default function App() {
             <Route path="/privacy" element={<Legal />} />
             <Route path="/terms" element={<Legal />} />
             <Route path="/refund-policy" element={<Legal />} />
-            <Route path="/grievance" element={<Legal />} />
+            {LEGAL_ROUTES_EXTRA}
             <Route path="/third-party-notices" element={<Legal />} />
             <Route path="*" element={<AccountActivationGate key={user.id} user={user} onReady={setActivated} onSwitch={switchLocal} />} />
           </Routes>
@@ -689,7 +701,7 @@ export default function App() {
                     <Route path="/privacy" element={<Legal />} />
                     <Route path="/terms" element={<Legal />} />
                     <Route path="/refund-policy" element={<Legal />} />
-                    <Route path="/grievance" element={<Legal />} />
+                    {LEGAL_ROUTES_EXTRA}
                     <Route path="/third-party-notices" element={<Legal />} />
                     <Route path="/settings" element={<Settings />} />
                     <Route path="*" element={<Navigate to={roleLanding} replace />} />
