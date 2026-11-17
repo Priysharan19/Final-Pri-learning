@@ -56,6 +56,12 @@ ok(allOk(run('abs(x)>=3', ['abs(x)>=3', 'x^2>=9', '(x-3)(x+3)>=0'])), 'abs(x)>=3
 r = run('abs(x)>=3', ['abs(x)>=3', 'x>=3']);
 ok(r.firstBreak === 1, 'abs(x)>=3 -> x>=3 is a break');
 
+// An absolute value in another unknown is another region.
+r = stepCheck({ kind: 'inequality', variable: 'x', source: 'abs(x)<3' }, 'abs(x)<3\nabs(y)<3');
+ok(r.lines.every(l => l.status !== 'ok' || l.text === 'abs(x)<3'), 'abs(x)<3 then abs(y)<3 is not the same region');
+r = stepCheck({ kind: 'inequality', variable: 'x', source: 'abs(x)<3' }, 'abs(x)<3\ny^2<9');
+ok(r.lines.every(l => l.status !== 'ok' || l.text === 'abs(x)<3'), 'abs(x)<3 then y^2<9 is not the same region');
+
 // Not piecewise polynomial in one variable: abstain, never guess.
 r = run('abs(x)+abs(x-1)<3', ['abs(x)+abs(x-1)<3', 'x<2']);
 ok(r.lines.every(l => l.status !== 'break'), 'two absolute values are not decided by this method');

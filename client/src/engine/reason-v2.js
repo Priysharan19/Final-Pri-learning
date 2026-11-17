@@ -668,7 +668,9 @@ function holds(fit, t, atRoot) {
 function sameRegion(a, b) {
   const fa = regionFit(a), fb = regionFit(b);
   if (!fa || !fb) return null;
-  if (fa.co?.length > 1 && fb.co?.length > 1 && fa.v !== fb.v) return null;
+  // Different unknowns are different regions: a constant relation has no unknown to compare.
+  const nonConstant = fit => !fit.co || degreeOf(fit.co) > 0;
+  if (nonConstant(fa) && nonConstant(fb) && fa.v !== fb.v) return null;
   const tol = Math.max(fa.tol, fb.tol);
   const cuts = [...fa.cuts, ...fb.cuts].filter(Number.isFinite).sort((x, y) => x - y);
   const uniq = [];
