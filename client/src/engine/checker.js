@@ -1246,7 +1246,9 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               for (let k = branchLines.length - 1, at = i - 1; k >= 0 && branchLines[k].index === at && !branchLines[k].valued && !branchLines[k].expLog; k--, at--) run.push(branchLines[k]);
               const above = run[0];
               const given = run.flatMap(b => b.covered);
-              if (valued && above && run.length === 1 && run[0].covered.length === 1 && !held.every(h => given.some(c => numsClose(h, c)))) {
+              // A residual product (`(x-2)(x-3)=0` after the first factor was split off) is an open
+              // line, not a solved branch: a value beside it may be the factor that was split off.
+              if (valued && above && !run.some(b => b.product) && !held.every(h => given.some(c => numsClose(h, c)))) {
                 status = 'break';
                 lineDiagnosis = {
                   code: 'branch-value-mismatch', title: 'This value does not follow from the line above',
@@ -1274,7 +1276,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
                   if (workedFrom) workedFrom.closed = true;
                 } else if (workedFrom) expLogSteps.push(workedFrom);
               }
-              branchLines.push({ index: i, covered: held, lone, expLog: expLogLine, value: !expLogLine && valued, valued });
+              branchLines.push({ index: i, covered: held, lone, product: productEqualsZero(ast), expLog: expLogLine, value: !expLogLine && valued, valued });
               out.push({ text: line, status, branch: true });
               return;
             }

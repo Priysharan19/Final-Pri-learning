@@ -4,7 +4,7 @@
 //  3. A value line under a branch of a product (x-3=0 then x=5) was not checked against that branch.
 //  4. `e` as the variable of differentiation is a letter, not Euler's number.
 import { parse, normalize, evaluate } from '../src/engine/expr.js';
-import { stepCheck, plainTex, questionClaims } from '../src/engine/checker.js';
+import { stepCheck, plainTex, questionClaims, checkAnswer } from '../src/engine/checker.js';
 
 let pass = 0, fail = 0;
 const ok = (c, m) => { if (c) pass++; else { fail++; console.error('FAIL:', m); } };
@@ -50,6 +50,36 @@ r = run(['(x-3)(x-5)=0', 'x-3=0', 'x-5=0', 'x=3', 'x=5']);
 ok(r.firstBreak === -1, 'both branches written first, then their values in order, is correct');
 r = run(['(x-3)(x-5)=0', 'x-3=0', 'x-5=0', 'x=3', 'x=6']);
 ok(r.firstBreak === 4, 'a value no branch above gives is still a break');
+
+// A value under a multi-root branch, or under a run of two or more branch lines, that none of them
+// gives is a break at the value line, and the page is never marked correct (review of #1054).
+{
+  const eqMeta = sol => ({ kind: 'equation', variable: 'x', solutions: sol });
+  const wrong = [
+    [[3, -3, 5], '(x^2-9)(x-5)=0 | x^2-9=0 | x=5', 2],
+    [[1, -1, 2], '(x^2-1)(x-2)=0 | x^2-1=0 | x=2', 2],
+    [[2, -2, 3], '(x^2-4)(x-3)=0 | x^2-4=0 | x=3', 2],
+    [[1, 2, 3], '(x-1)(x-2)(x-3)=0 | x-1=0 | x-2=0 | x=3', 3],
+    [[1, 2, 3, 4], '(x-1)(x-2)(x-3)(x-4)=0 | x-1=0 | x-2=0 | x=3', 3],
+    [[1, 2, 3], '(x-1)(x-2)(x-3)=0 ; x-1=0 ; x-2=0 ; x=3 ; x=1 or x=2 or x=3', 3],
+    [[4, -4, 1], '(x^2-16)(x-1)=0 | x^2-16=0 | x=1', 2],
+    [[1, 2, 3, 4], '(x-1)(x-2)(x-3)(x-4)=0 | x-1=0 | x-2=0 | x-3=0 | x=4', 4]
+  ];
+  for (const [sol, page, at] of wrong) {
+    const lines = page.split(/\s*[|;]\s*/);
+    const res = stepCheck(eqMeta(sol), lines.join('\n'));
+    ok(res.firstBreak === at && res.lines[at].status === 'break', `${page} breaks at its value line`);
+    const mark = checkAnswer({ answerType: 'working', answer: { stepMeta: eqMeta(sol), minLines: 1 } }, lines.join('\n'));
+    ok(mark.correct !== true, `${page} is not marked correct`);
+  }
+  // What the earlier review required stays accepted.
+  r = stepCheck(eqMeta([3, -3]), 'x^2=9\nx=3\nx=-3');
+  ok(r.firstBreak === -1, 'x^2=9 split across value lines is still correct');
+  r = stepCheck(eqMeta([3, 5]), 'x-3=0\nx-5=0\nx=3\nx=5');
+  ok(r.firstBreak === -1, 'x-3=0, x-5=0, x=3, x=5 is still correct');
+  r = stepCheck(eqMeta([1, 2, 3]), '(x-1)(x-2)(x-3)=0\n(x-2)(x-3)=0\nx=1\nx=2\nx=3');
+  ok(r.firstBreak === -1, 'a residual product, then each root read off, is still correct');
+}
 
 // 4. `e` as the variable.
 r = stepCheck({ kind: 'derivative', variable: 'e', source: 'e^2' }, '2e');
