@@ -307,7 +307,7 @@ export default function SignUpFlow({
       if (pendingSocial) {
         const p = profile();
         const result = await cloud.socialSignIn(pendingSocial.provider, {
-          ...pendingSocial.token, deviceId, createAccount: true, name: p.name, year: p.year, isAdult: p.isAdult, guardianLater: true
+          ...pendingSocial.token, deviceId, createAccount: true, name: p.name, year: p.year, isAdult: p.isAdult, age: p.age, guardianLater: true
         });
         setPendingSocial(null);
         await signedIn({ ...result, guardianConsent: result.guardianConsentRequired ? { required: true, state: 'pending' } : { required: false, state: 'not-required' } });

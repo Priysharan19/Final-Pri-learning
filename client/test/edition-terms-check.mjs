@@ -126,6 +126,7 @@ check('Prithagoras onboarding: Year (not Class), NSW courses for Year 11 and 12,
   assert.match(src, /\{!au && <div className="signup-segment" role="radiogroup" aria-labelledby="signup-track-label">/);
   assert.match(src, /const jee = !au && track !== 'cbse';/);
   assert.match(src, /isAdult: age === null \? undefined : age >= 18, age: age === null \? undefined : age/);
+  assert.match(src, /isAdult: p\.isAdult, age: p\.age, guardianLater: true/, 'social sign-up sends the stated age too');
   assert.equal(AU_STRINGS['signup.classTitle'], 'Which year are you in?');
   assert.match(AU_STRINGS['signup.ageLead'], /under 15/);
   assert.ok(!/under 18|class|CBSE/i.test(AU_STRINGS['signup.ageLead']));

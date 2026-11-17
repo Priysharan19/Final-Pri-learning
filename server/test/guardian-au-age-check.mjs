@@ -36,6 +36,12 @@ check('AU: a request that says nothing about age is refused, not guessed', () =>
   assert.equal(hasAgeDeclaration({}), false);
   assert.equal(ageDecision({}, { edition: AU }).code, 'AGE_DECLARATION_REQUIRED');
 });
+check('a stated age is a declaration in Prithagoras only; India still refuses an age-only body', () => {
+  assert.equal(hasAgeDeclaration({ age: 16 }, AU), true);
+  assert.equal(hasAgeDeclaration({ age: 16 }, IN), false);
+  assert.equal(ageDecision({ age: 16 }, { edition: IN }).code, 'AGE_DECLARATION_REQUIRED');
+  assert.equal(ageDecision({ age: 16 }, { edition: AU }).basis, 'adult');
+});
 check('AU: an explicit 18+ is taken at its word', () => assert.equal(learnerIsChild({ isAdult: true }, AU), false));
 check('India is unchanged: everyone not 18+ is a child, whatever age they state', () => {
   for (const age of [14, 15, 16, 17]) assert.equal(learnerIsChild({ isAdult: false, age }, IN), true);

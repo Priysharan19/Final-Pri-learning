@@ -115,9 +115,10 @@ export function learnerIsChild({ isAdult, age } = {}, edition = serverEdition())
  * boolean, or the learner must name a school class (which makes them a child).
  * A request that says nothing is refused rather than guessed about.
  */
-export function hasAgeDeclaration({ isAdult, year, age } = {}) {
+export function hasAgeDeclaration({ isAdult, year, age } = {}, edition = serverEdition()) {
   if (typeof isAdult === 'boolean') return true;
-  if (typeof age === 'number' && Number.isInteger(age) && age >= 5 && age <= 120) return true;
+  // A stated age counts as a declaration in Prithagoras only (the age rule there); India is unchanged.
+  if (edition === 'prithagoras' && typeof age === 'number' && Number.isInteger(age) && age >= 5 && age <= 120) return true;
   return CHILD_CLASS.test(String(year ?? '').trim());
 }
 
@@ -130,7 +131,7 @@ export function hasAgeDeclaration({ isAdult, year, age } = {}) {
  */
 export function ageDecision(body = {}, { guardianLater = false, edition = serverEdition() } = {}) {
   const declaration = { isAdult: body.isAdult, year: body.year, age: body.age };
-  if (!hasAgeDeclaration(declaration)) {
+  if (!hasAgeDeclaration(declaration, edition)) {
     return { ok: false, code: 'AGE_DECLARATION_REQUIRED', message: 'Say whether you are 18 or older, or which class you are in.' };
   }
   // `basis: 'adult'` means "no guardian is required in this edition" (Prithagoras: 15 and over).
