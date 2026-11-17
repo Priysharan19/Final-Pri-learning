@@ -11,6 +11,7 @@ import { useStoreKitPurchase } from './useStoreKitPurchase.js';
 import { useGooglePlayPurchase } from './useGooglePlayPurchase.js';
 import { planOffers, aboutPerMonth, yearlySavingPercent } from './pricing.js';
 import { ARRIVAL_KEYS, FREE_ROWS, PREMIUM_ROWS } from './plans.js';
+import { EDITION_ID } from '../brand/edition.js';
 
 // The Premium screen (D22: "the compliant paywall ships").
 //
@@ -127,7 +128,7 @@ export default function Paywall() {
           <div data-paywall-premium-rows>
             <h2 className="sc-label" style={{ margin: 0 }}>{t('paywall.premiumTitle')}</h2>
             <ul style={{ margin: 'var(--space-2) 0 0', paddingLeft: 'var(--space-5)', lineHeight: 1.5 }}>
-              {PREMIUM_ROWS.map(r => <li key={r.key}>{t(r.key, r.vars)}</li>)}
+              {PREMIUM_ROWS.filter(r => !(EDITION_ID === 'prithagoras' && r.key === 'paywall.premium.jeeAdvanced')).map(r => <li key={r.key}>{t(r.key, r.vars)}</li>)}
             </ul>
           </div>
         </div>

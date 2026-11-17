@@ -10,13 +10,13 @@
 // given an override or a reason. Priyabhata keeps its words: the catalogue
 // itself is unchanged and the override applies only in a Prithagoras build.
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import en from '../src/i18n/strings.en.js';
 import { AU_STRINGS } from '../src/i18n/strings.au.js';
 
 const here = new URL('.', import.meta.url);
-const BAN = /\bclass(es)?\s*[0-9]|\bclass\s*\{|ncert|cbse|\bjee\b|olympiad|₹|\binr\b|lakh|\bboard (exam|paper|marks)|rupee/i;
+const BAN = /\bclass(es)?\s*[0-9]|\bclass\s*\{|ncert|cbse|\bjee\b|olympiad|₹|\binr\b|lakh|\bboard (exam|paper|marks|mode|score)|\bindia(n)?\b|rupee/i;
 
 // India-only surfaces: each is gated to an Indian course or track and is not
 // drawn for a Prithagoras profile. The reason is the gate.
@@ -31,7 +31,13 @@ const ALLOW = [
   [/^progress\.honesty$/, 'drawn by IndiaProgress.jsx only'],
   [/^practice\.pyqOnlyTitle$/, 'past-paper (JEE, CBSE) filter; Indian courses only, behind PRI_FEATURE_PAST_PAPERS'],
   [/^settings\.(helpBodyIndia|courseIndia|trackCbseDesc|trackJeeMainDesc|trackJeeAdvancedDesc|trackOlympiad)$/, 'Indian course and track pickers'],
-  [/^paywall\.(premium|from)\.jeeAdvanced$/, 'the JEE Advanced premium track'],
+  [/^settings\.indiaTrack$/, 'the India track row of Settings (SettingsLegacy.jsx), drawn for an India course only'],
+  [/^paywall\.premium\.jeeAdvanced$/, 'the row is filtered out of the Prithagoras paywall (paywall/Paywall.jsx)'],
+  [/^paywall\.from\.jeeAdvanced$/, 'reached only from the jee-advanced arrival path, an Indian track'],
+  [/^home\.pickTrack$/, 'drawn only for an India course (TopicGenerator.jsx, india flag)'],
+  [/^progress\.evidenceSub$/, 'drawn by IndiaProgress.jsx only'],
+  [/^login\.placementOffer$/, 'the placement offer, behind the placement flag (off by default; placement is India-only)'],
+  [/^library\.course\.in$/, 'the label of an India resource; Prithagoras lists NSW resources only'],
   [/^home\.next\.firstIndia$/, 'first-step copy for Indian courses'],
   [/^login\.olympiadTrack$/, 'Indian track chooser at sign-up'],
   [/^signup\.trackJeeHint$/, 'Indian track chooser at sign-up']
@@ -69,6 +75,19 @@ check('Priyabhata keeps Class and NCERT: the shared catalogue is unchanged', () 
 check('the override applies only to a Prithagoras build in English', () => {
   const idx = readFileSync(fileURLToPath(new URL('../src/i18n/index.js', here)), 'utf8');
   assert.match(idx, /EDITION_ID === 'prithagoras' && language === 'en' && Object\.hasOwn\(AU_STRINGS, key\)/);
+});
+check('every year selector and tab goes through common.classNumber (Year N in Prithagoras), never a literal "Class N" in a screen', () => {
+  const walk = d => readdirSync(d).flatMap(n => { const p = `${d}/${n}`; return statSync(p).isDirectory() ? walk(p) : [p]; });
+  const root = fileURLToPath(new URL('../src', here));
+  const screens = walk(root).filter(p => /\.jsx$/.test(p));
+  assert.ok(screens.length > 100);
+  for (const f of screens) {
+    const code = readFileSync(f, 'utf8').split('\n').filter(l => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+    assert.ok(!/(['"`>])Class [0-9{$]/.test(code), `${f} spells a literal "Class N"`);
+  }
+  for (const f of ['pages/Notes.jsx', 'pages/Login.jsx', 'instrument/IndexPage.jsx', 'pages/PracticeBase.jsx', 'pages/SettingsLegacy.jsx']) {
+    assert.match(readFileSync(`${root}/${f}`, 'utf8'), /common\.(classNumber|yearNumber)/, `${f} does not use the year label key`);
+  }
 });
 check('every allowlist entry still matches a key (a dead entry is removed)', () => {
   for (const [re] of ALLOW) assert.ok(Object.keys(en).some(k => re.test(k)), `${re} matches no key`);

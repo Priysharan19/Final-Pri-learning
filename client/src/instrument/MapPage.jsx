@@ -178,7 +178,7 @@ export default function MapPage() {
   const yearName = user?.year ? t('common.classNumber', { n: user.year }) : null;
   const scopeName = user?.indiaTrack === 'jee-main' ? 'JEE Main'
     : user?.indiaTrack === 'jee-advanced' ? 'JEE Advanced' : yearName;
-  // Priyabhata: "Class 12 mathematics". Prithagoras: the NSW course, "Year 12 Mathematics Advanced".
+  // Priyabhata reads, e.g., Class 12 mathematics; Prithagoras reads the NSW course, e.g., Year 12 Mathematics Advanced.
   const title = user?.course !== 'in' && user?.pathwayName && yearName
     ? t('inst.mapTitleCourse', { year: yearName, course: user.pathwayName })
     : scopeName ? t('inst.mapTitleScope', { scope: scopeName }) : t('inst.mapTitle');
