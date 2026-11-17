@@ -131,6 +131,26 @@ const a4 = analyseExam({ detail: io, indiaExam: { track: 'olympiad', sections: [
 eq([a4.pattern, a4.totals.awarded, a4.totals.negative, a4.negativeMarking, a4.sections.map(s => s.label)],
   ['ioqm', 2, 0, undefined, ['Section 2', 'Section 3', 'Section 5']], 'IOQM: tiers as sections, no negative marking');
 
+// ── Where marks were lost, by cause ──────────────────────────────────────────
+// CBSE fixture above: lost = 19 − 9 = 10. q2 wrong = 1 (method); q5 q6 q8
+// partial = 1+1+1 = 3 (slip); q3 (1) and q7 (5) unanswered with later
+// questions reached = 6 (blank); nothing after the last reached question = 0 time.
+eq(pick(a1.causes, ['total', 'method', 'slip', 'blank', 'time']), { total: 10, method: 1, slip: 3, blank: 6, time: 0 }, 'causes: CBSE marks lost split by method / slip / blank / time');
+eq(a1.causes.total, a1.lost.marks, 'causes add up to the marks lost on the paper');
+// Time: the last two questions are never reached on a timed paper (ms 0, unanswered) → time.
+const tm = [
+  q({ id: 't1', order: 1, section: 'A', marks: 2, awarded: 2, chapterId: 'a', subtopicName: 'Alpha', ms: 60000 }),
+  q({ id: 't2', order: 2, section: 'A', marks: 3, awarded: 0, unanswered: true, chapterId: 'a', subtopicName: 'Alpha', ms: 0 }),
+  q({ id: 't3', order: 3, section: 'A', marks: 4, awarded: -1, chapterId: 'b', subtopicName: 'Beta', ms: 90000 }),
+  q({ id: 't4', order: 4, section: 'A', marks: 4, awarded: 0, unanswered: true, chapterId: 'b', subtopicName: 'Beta', ms: 0 }),
+  q({ id: 't5', order: 5, section: 'A', marks: 5, awarded: 0, unanswered: true, chapterId: 'c', subtopicName: 'Gamma', ms: 0 })
+];
+const aT = analyseExam({ detail: tm, indiaExam: { track: 'jee-main', sections: [{ id: 'A' }] } });
+// lost: t2 3 blank; t3 4−(−1) = 5 method (JEE negative mark); t4 4 + t5 5 = 9 time. total 17 = 18 − 1.
+eq(pick(aT.causes, ['total', 'method', 'slip', 'blank', 'time']), { total: 17, method: 5, slip: 0, blank: 3, time: 9 }, 'causes: JEE negative marks count as lost, unreached tail is time');
+eq(aT.causes.topics.map(t => [t.id, t.lost]), [['b', 9], ['c', 5], ['a', 3]], 'causes: topics ordered by marks lost');
+eq(analyseExam({ detail: tm.map(d => ({ ...d, timed: false })), indiaExam: { track: 'jee-main', sections: [{ id: 'A' }] } }).causes.time, 0, 'causes: no time cause when time was not measured');
+
 // ── Outcomes, determinism, refusals ──────────────────────────────────────────
 eq(['full', 'partial', 'wrong', 'wrong', 'unattempted'],
   [outcomeOf({ marks: 4, awarded: 4 }), outcomeOf({ marks: 4, awarded: 1 }), outcomeOf({ marks: 4, awarded: 0 }), outcomeOf({ marks: 4, awarded: -2 }), outcomeOf({ marks: 4, awarded: 0, unanswered: true })],
