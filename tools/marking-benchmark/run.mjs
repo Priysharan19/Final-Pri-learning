@@ -66,7 +66,9 @@ function engineMark(item, opts = {}) {
     if (s === 'ok' && incomplete[i] && !opts.ignoreIncompleteNote) return 'invalid';
     return s === 'ok' ? 'valid' : s === 'break' ? 'invalid' : 'abstain';
   });
-  const anyBreak = verdicts.includes('invalid');
+  // A last line the engine flags as not the answer (it still allows a root the question rules out) is an incorrect solution.
+  const finalNotAnswer = !!rep?.lines?.[rep.lines.length - 1]?.incomplete;
+  const anyBreak = verdicts.includes('invalid') || finalNotAnswer;
   const lastOk = verdicts[verdicts.length - 1] === 'valid' || (verdicts.length === 1 && verdicts[0] === 'given');
   const solution = anyBreak ? 'incorrect' : lastOk ? 'correct' : 'abstain';
   const fb = verdicts.findIndex(v => v === 'invalid');

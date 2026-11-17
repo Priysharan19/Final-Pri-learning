@@ -845,9 +845,9 @@
  "eq-035": {
   "verdicts": [
    "given",
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "incorrect",
   "firstBreak": null
  },
  "eq-036": {
@@ -866,7 +866,7 @@
    "abstain",
    "abstain"
   ],
-  "solution": "abstain",
+  "solution": "incorrect",
   "firstBreak": null
  },
  "eq-038": {
@@ -876,7 +876,7 @@
    "abstain",
    "abstain"
   ],
-  "solution": "abstain",
+  "solution": "incorrect",
   "firstBreak": null
  },
  "eq-039": {
@@ -910,22 +910,22 @@
  "eq-042": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
-   "abstain",
-   "abstain"
+   "valid",
+   "valid",
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "incorrect",
   "firstBreak": null
  },
  "eq-043": {
   "verdicts": [
    "given",
-   "abstain",
+   "invalid",
    "abstain"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 1
  },
  "eq-044": {
   "verdicts": [
@@ -1054,7 +1054,7 @@
    "valid",
    "abstain"
   ],
-  "solution": "abstain",
+  "solution": "incorrect",
   "firstBreak": null
  },
  "eq-058": {
@@ -1113,17 +1113,17 @@
    "valid",
    "abstain"
   ],
-  "solution": "abstain",
+  "solution": "incorrect",
   "firstBreak": null
  },
  "eq-064": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
-   "abstain"
+   "valid",
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "incorrect",
   "firstBreak": null
  },
  "eq-065": {
