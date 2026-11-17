@@ -79,6 +79,16 @@ examination (ADR-0002 §7). Resource-library items (F1) record their state, and 
 | O5 | Cross-edition curriculum opt-in at launch, and which content is approved | E3 (default: off) |
 | O6 | Who certifies Australian rubrics | G6 |
 
+### Open follow-up · F4c remainder (marked room onto the shared exam shell)
+
+Done (mission `f4c-examroom-on-shell`, reduced): the marked exam room shares the shell's confirm sheet, announcer and the ← → F ? shortcuts; it takes no autosave, clock or navigator change, so its requests are unchanged.
+
+Still open: the navigator, `ClockFace`, and autosave unification, plus the request-trace parity harness they need. Reasons they were not done:
+
+1. Existing tours and a11y walks (`tour-exam-deadline`, `tour-exam-india`, `tour-exam-unread-handwriting`, `a11y-check`) select `.exam-nav`, `.exam-dot` and `.exam-timer` and read the timer as MM:SS with `data-deadline`; the shell's navigator and clock render `xs-nav`/`xs-q` and HH:MM:SS, so they cannot be swapped without compat class props or editing those tests.
+2. `useAutosave` differs from the room's save chain (queue capped at 2, an extra 'leave' flush and an 'online' flush, no 50 ms ink follow-up, no `EXAM_DEADLINE_PASSED` skew handling); matching it means changing the hook with a desk regression run, and any miss changes the marked room's request trace.
+3. No request-trace harness exists to prove "same requests, same order"; it is new browser infrastructure (record before/after traces of the exam tours in Chromium and WebKit).
+
 ## Ordering and parallelism
 
 E1 first (everything reads it). Then E2–E6 can run as the writer pool allows (E2 and E5 are R4 and touch server

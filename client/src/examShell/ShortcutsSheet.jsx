@@ -3,6 +3,7 @@
 import React from 'react';
 import { useT } from '../i18n/index.js';
 import { Sheet } from './ConfirmSheet.jsx';
+import './shortcuts.css';
 
 export default function ShortcutsSheet({ open, onClose, shortcuts }) {
   const t = useT();
