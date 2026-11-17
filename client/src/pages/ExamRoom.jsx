@@ -49,6 +49,7 @@ import ShortcutsSheet from '../examShell/ShortcutsSheet.jsx';
 import { useAnnounce } from '../examShell/useAnnounce.js';
 import { useExamShortcuts } from '../examShell/useExamShortcuts.js';
 import '../workspace.css';
+import Working from '../instrument/Working.jsx';
 
 const SAVE_DEBOUNCE_MS = 600;
 // A submitted paper waiting for the server is asked about again this often.
@@ -756,7 +757,7 @@ export default function ExamRoom() {
           )}
           <div className="row" style={{ marginTop: 16 }}>
             <button className="btn btn-primary" onClick={recheck} disabled={rechecking}>
-              {rechecking ? t('examRoom.pendingChecking') : t('examRoom.pendingRetry')}
+              <Working pending={rechecking} size={16} />{rechecking ? t('examRoom.pendingChecking') : t('examRoom.pendingRetry')}
             </button>
             <button className="btn btn-ghost" onClick={() => nav('/exams')}>{t('examRoom.pendingLeave')}</button>
           </div>
@@ -1237,7 +1238,7 @@ export default function ExamRoom() {
 
         <div className="exam-foot">
           <span className="status-line" data-state={saveState === 'error' ? 'failed' : saveState === 'saved' ? 'saved' : saveState === 'saving' ? 'working' : 'idle'}>
-            {saveLabel && <span className="dot" aria-hidden="true" />}{saveLabel}
+            {saveLabel && <span className="status-mark" aria-hidden="true"><Working pending={saveState === 'saving'} size={16} />{saveState !== 'saving' && <span className="dot" />}</span>}{saveLabel}
           </span>
           <button className="btn btn-ghost" disabled={cur === 0} onClick={() => setCur(c => c - 1)}>{t('examRoom.previous')}</button>
           {cur < exam.questions.length - 1
