@@ -126,8 +126,8 @@ export default {
     diagrams: [
       {
         title: 'When the dot product is zero',
-        spec: { kind: 'vectorExplorer', a: [2, 3], b: [6, -4], mode: 'dot' },
-        note: 'With $\\mathbf{a}=2\\mathbf{i}+3\\mathbf{j}$ and $\\mathbf{b}=6\\mathbf{i}-4\\mathbf{j}$ the dot product is $2\\times6+3\\times(-4)=0$, so the vectors are perpendicular; this is $k=2$ in the example. Move $\\mathbf{a}$: the dot product is positive while the angle between the vectors is acute and negative once it is obtuse.'
+        spec: { kind: 'vectorExplorer', a: [2, 3], b: [3, -2], mode: 'dot' },
+        note: 'With $\\mathbf{a}=2\\mathbf{i}+3\\mathbf{j}$ and $\\mathbf{b}=3\\mathbf{i}-2\\mathbf{j}$, which is half of $6\\mathbf{i}-4\\mathbf{j}$ and points the same way, the dot product is $2\\times3+3\\times(-2)=0$, so the vectors are perpendicular; this is $k=2$ in the example. Move $\\mathbf{a}$: the dot product is positive while the angle between the vectors is acute and negative once it is obtuse.'
       }
     ]
   },
