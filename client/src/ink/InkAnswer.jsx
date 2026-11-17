@@ -752,7 +752,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               )}
               {INSTRUMENT_PLOT && (() => {
                 const st = readStateOf(line, lineConfidenceFloor);
-                return <span className="in-state" data-read-state={st}><i aria-hidden="true" />{t(READ_STATE_KEY[st])}<span className="sr-only"> {t('inst.readStateSr', { n: li + 1, state: t(READ_STATE_KEY[st]) })}</span></span>;
+                return <span className="in-rstate" data-read-state={st}><i aria-hidden="true" />{t(READ_STATE_KEY[st])}<span className="sr-only"> {t('inst.readStateSr', { n: li + 1, state: t(READ_STATE_KEY[st]) })}</span></span>;
               })()}
               <span className="ink-line-math"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
