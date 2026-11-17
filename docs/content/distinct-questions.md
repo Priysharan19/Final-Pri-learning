@@ -217,9 +217,9 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c10-surface-area-combo` | 3 | 2000 | 1409 | 5664 |
 | `c10-quadratic-discriminant` | 3 | 2000 | 1452 | 5719 |
 | `c10-circles` | 4 | 2000 | 1640 | 5735 |
+| `c10-trigonometry-current` | 4 | 2000 | 885 | 5796 |
 | `c10-ap-sum-forms` | 1 | 2000 | 1287 | 5809 |
 | `c10-trig-boundary-relations` | 4 | 2000 | 881 | 5886 |
-| `c10-trigonometry-current` | 4 | 2000 | 881 | 5886 |
 | `c10-quadratic-context` | 2 | 2000 | 1397 | 5899 |
 | `c10-quadratic-roots` | 2 | 2000 | 1409 | 6085 |
 | `c10-trig-boundary-relations` | 3 | 2000 | 863 | 6203 |
@@ -332,8 +332,8 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c12-relations-equivalence` | 4 | 2000 | 972 | 4599 |
 | `c12-random-variable` | 1 | 2000 | 1500 | 4915 |
 | `c12-applications-integrals` | 1 | 2000 | 1459 | 4948 |
-| `c12-integrals-methods` | 1 | 2000 | 1497 | 5297 |
-| `c12-integrals-methods` | 2 | 2000 | 1510 | 6272 |
+| `c12-integrals-methods` | 1 | 2000 | 1498 | 5331 |
+| `c12-integrals-methods` | 2 | 2000 | 1511 | 6319 |
 | `c12-inverse-trig-branch-reasoning` | 4 | 2000 | 1307 | 7038 |
 | `c12-bijection-reasoning` | 3 | 2000 | 1092 | 8121 |
 | `c12-optimisation-reasoning` | 3 | 2000 | 666 | 8780 |
@@ -341,4 +341,4 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 | `c12-differentiation-rules` | 1 | 2000 | 1578 | 9324 |
 | `c12-continuity-mvt` | 4 | 2000 | 1566 | 9445 |
 | `c12-random-variable` | 2 | 2000 | 1556 | 9800 |
-| `c12-integrals-methods` | 3 | 2000 | 1399 | 9975 |
+| `c12-integrals-methods` | 3 | 2000 | 1398 | 9851 |
