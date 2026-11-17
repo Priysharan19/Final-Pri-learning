@@ -910,6 +910,11 @@ for (const id of ids.filter(id => !ONLY || id.startsWith(ONLY))) {
     const seed = SEED(id, i);
     let q;
     try { q = generateQuestion(id, rungOf[id], seed); } catch (err) { ok(`${id} seed ${seed} generates`, false, err.message); continue; }
+    // An extra structural form (generators/forms) is not the skill's authored D3/D4
+    // form: it varies with difficulty by design and carries its own independent
+    // key check plus a run through the real marker in india-extra-forms-check.mjs.
+    // This suite keeps proving the authored form's solver on every other draw.
+    if (q.form) continue;
     prompts.add(q.prompt);
     const problems = inspect(q);
     if (ok(`${id} seed ${seed} passes the engine self-check`, problems.length === 0, problems.slice(0, 2).join('; '))) inspected++;

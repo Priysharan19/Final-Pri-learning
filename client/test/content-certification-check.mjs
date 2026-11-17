@@ -52,7 +52,7 @@ const {
   CONTENT_VERSION, LEGACY_CONTENT_VERSION, contentHashOf, contentIdOf, contentRefOf,
   stampContent, stampExamItem, drawDistinct
 } = await import('../src/engine/contentIdentity.js');
-const { generateQuestion, loadAllBanks } = await import('../src/engine/generators/index.js');
+const { generateQuestion, loadAllBanks, EXTRA_FORMS } = await import('../src/engine/generators/index.js');
 const { IN_CURRICULUM, IN_CHAPTER_BY_ID } = await import('../src/engine/curriculum-in.js');
 const { resolveIndiaTarget, indiaRequestableDifficulties } = await import('../src/engine/indiaProduct.js');
 const { CONTENT_EMPTY_CODES, isContentEmpty, servable, contentEmptySignal } = await import('../src/lib/contentServe.js');
@@ -500,6 +500,12 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
 // The precondition below still refuses a fixture that has grown.
 {
   const CELL = 'c12-random-variable', DOTPOINT = 2, D = 2, SITTINGS = 3;
+  // The skill now carries extra structural forms (generators/forms), so its cell is
+  // no longer small. This fixture needs a cell that IS small, so it serves the
+  // skill's authored direct form alone for the length of this block — the cell as
+  // it was before the extra forms — and restores them after.
+  const heldForms = EXTRA_FORMS[CELL];
+  delete EXTRA_FORMS[CELL];
   // Hashes on a served row are the server's opaque form of the content hash.
   const { opaqueContentHash } = await import('../../server/platform/contentSeen.js');
   const pool = new Set();
@@ -537,6 +543,7 @@ const student = await premiumProfile({ name: 'Cert Student', course: 'in', india
   }
   ok(online.traffic.issue - issuesBefore > chapterAsked + SITTINGS * (pool.size + 1),
     `the device asked the server again on another cell when a chapter-level request landed on the spent one (${online.traffic.issue - issuesBefore} issues for ${chapterAsked + SITTINGS * (pool.size + 1)} questions; seed ${suiteSeed()})`);
+  EXTRA_FORMS[CELL] = heldForms;
 }
 
 // ── 5. Versioning gate ──────────────────────────────────────────────────────
