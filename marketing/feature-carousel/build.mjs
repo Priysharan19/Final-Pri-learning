@@ -300,11 +300,6 @@ const foot = i => `<div class="footer">
   <span class="idx">${String(i).padStart(2, '0')} / 07</span>
 </div>`;
 
-const stat = (label, value, note) => `<div class="stat">
-  <div class="label">${label}</div>
-  <div class="value">${value}</div>
-</div>${note ? `<div class="foot">${note}</div>` : ''}`;
-
 // ─── the seven slides ─────────────────────────────────────────────────────
 const SLIDES = [
   // The whole post on one artboard. Every line is true of the shipped app

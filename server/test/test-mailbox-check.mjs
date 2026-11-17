@@ -215,7 +215,7 @@ try {
     'the deletion code is kept with purpose "delete" and its real subject');
   await freshLimits();
   const child = reserved('child.one');
-  r = await post('/v1/account/otp/request', { channel: 'email', destination: child });
+  await post('/v1/account/otp/request', { channel: 'email', destination: child });
   const childCode = (await latest(child)).data.code;
   const childChallenge = (await h.db.get('SELECT id FROM otp_challenges ORDER BY created_at DESC LIMIT 1')).id;
   r = await post('/v1/account/otp/verify', { channel: 'email', destination: child, challengeId: childChallenge, code: childCode });
