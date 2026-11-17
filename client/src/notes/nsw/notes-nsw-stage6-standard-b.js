@@ -136,7 +136,7 @@ export default {
     ],
     diagrams: [
       { title: '$\\$8000$ at $6\\%$ p.a. compounded monthly', spec: { kind: 'compound', principal: 8000, rate: 0.06, years: 3, perYear: 12 }, note: 'The solid curve ends at $\\$9573.44$ after $3$ years. The dashed line is simple interest, which ends lower at $\\$9440.00$.' },
-      { title: 'Explore rate, time and compounding', spec: { kind: 'compoundExplorer', principal: 8000, initialRate: 6, initialYears: 3 } }
+      { title: 'Explore rate, time and compounding', spec: { kind: 'compoundExplorer', principal: 8000, initialRate: 6, initialYears: 3  }, note: 'It opens at yearly compounding. Choose monthly to see the \\$9573.44 of the example above.' }
     ],
     check: [
       { question: 'Find the value of $\\$5000$ at $4\\%$ p.a. compounded yearly for $2$ years.', answer: '$\\$5408.00$', verify: { kind: 'value', expr: '5000*1.04^2', answer: '5408' } },

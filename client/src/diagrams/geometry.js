@@ -453,7 +453,12 @@ export function boxPlotModel({ data = null, summary = null, width = 480, height 
   const span = f.max - f.min || 1;
   const frame = makeFrame({ xmin: f.min - span * pad, xmax: f.max + span * pad, ymin: 0, ymax: 1, width, height, pad: { l: 28, r: 28, t: 18, b: 36 } });
   const yMid = frame.sy(0.5); const h = 34;
-  return { frame, summary: f, y: yMid, h, px: { min: frame.sx(f.min), q1: frame.sx(f.q1), median: frame.sx(f.median), q3: frame.sx(f.q3), max: frame.sx(f.max) }, ticks: niceTicks(frame.xmin, frame.xmax, 8).map(v => ({ value: v, px: frame.sx(v) })) };
+  // Whiskers end at the lowest and highest values inside the fences (Q1 - 1.5 IQR, Q3 + 1.5 IQR); values beyond are outliers.
+  const fenceLo = f.q1 - 1.5 * f.iqr; const fenceHi = f.q3 + 1.5 * f.iqr;
+  const inside = data ? data.filter(v => v >= fenceLo && v <= fenceHi) : [];
+  const whisker = data ? { lo: Math.min(...inside), hi: Math.max(...inside) } : { lo: f.min, hi: f.max };
+  const outliers = data ? [...data].filter(v => v < fenceLo || v > fenceHi).sort((a, b) => a - b) : [];
+  return { frame, summary: f, whisker, outliers, fences: { lo: r3(fenceLo, 6), hi: r3(fenceHi, 6) }, y: yMid, h, px: { min: frame.sx(whisker.lo), q1: frame.sx(f.q1), median: frame.sx(f.median), q3: frame.sx(f.q3), max: frame.sx(whisker.hi) }, outlierPx: outliers.map(v => ({ value: v, px: frame.sx(v) })), ticks: niceTicks(frame.xmin, frame.xmax, 8).map(v => ({ value: v, px: frame.sx(v) })) };
 }
 /** The error function (Abramowitz–Stegun 7.1.26 refined by a series; accurate to ~1e-9 over the range used here). */
 export function erf(x) {
@@ -481,7 +486,7 @@ export function normalCurveModel({ mu = 0, sigma = 1, from = -1, to = 1, mode = 
   for (let i = 0; i <= 80; i++) { const x = lo + ((hi - lo) * i) / 80; shade.push([frame.sx(x), frame.sy(normalPdf(x, mu, sigma))]); }
   const area = normalCdf(Math.max(xa, xb), mu, sigma) - normalCdf(Math.min(xa, xb), mu, sigma);
   const xTicks = [-3, -2, -1, 0, 1, 2, 3].map(k => ({ z: k, x: r3(mu + k * sigma, 6), px: frame.sx(mu + k * sigma) }));
-  return { frame, mu, sigma, za: r3(Math.min(za, zb), 6), zb: r3(Math.max(za, zb), 6), xa: r3(Math.min(xa, xb), 6), xb: r3(Math.max(xa, xb), 6), area: r3(area, 6), curve, shade: shade.length ? [...shade, [frame.sx(hi), frame.sy(0)], [frame.sx(lo), frame.sy(0)]] : [], xTicks };
+  return { frame, mu, sigma, za: r3(Math.min(za, zb), 6), zb: r3(Math.max(za, zb), 6), xa: r3(Math.min(xa, xb), 6), xb: r3(Math.max(xa, xb), 6), area: r3(area, 6), areaExact: area, curve, shade: shade.length ? [...shade, [frame.sx(hi), frame.sy(0)], [frame.sx(lo), frame.sy(0)]] : [], xTicks };
 }
 
 // ── Vectors ──────────────────────────────────────────────────────────────────

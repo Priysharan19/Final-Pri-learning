@@ -99,7 +99,7 @@ export function FunctionGraph({ title = 'Graph of a function', caption = null, x
   const m = functionGraphModel(spec);
   const desc = sentence(
     `Axes: x from ${r3(m.frame.xmin, 2)} to ${r3(m.frame.xmax, 2)}, y from ${r3(m.frame.ymin, 2)} to ${r3(m.frame.ymax, 2)}.`,
-    m.curves.map(c => `${c.label ? `Curve ${c.label.replace(/[\\${}]/g, '')}` : 'A curve'}: y = ${c.expr}.${c.shade ? ` The area between it and the x-axis from x = ${c.shade.from} to x = ${c.shade.to} is shaded.` : ''}`).join(' '),
+    m.curves.map(c => `Curve: y = ${c.expr}.${c.shade ? ` The area between it and the x-axis from x = ${c.shade.from} to x = ${c.shade.to} is shaded.` : ''}`).join(' '),
     m.curves.flatMap(c => [c.yIntercept ? `It crosses the y-axis at ${c.yIntercept.y}.` : '', c.xIntercepts?.length ? `It crosses the x-axis at x = ${c.xIntercepts.map(i => i.x).join(', ')}.` : '']).join(' '),
     m.asymptotes.map(a => `${a.axis === 'x' ? 'Vertical' : 'Horizontal'} asymptote ${a.axis} = ${a.value}.`).join(' ')
   );
@@ -113,7 +113,7 @@ export function FunctionGraph({ title = 'Graph of a function', caption = null, x
       ))}
       {m.curves.map(c => c.shade && c.shade.path.length > 0 && <path key={`sh${c.id}`} className="dg-shade" d={`${poly(c.shade.path)} Z`} />)}
       {m.curves.map(c => c.segments.map((seg, k) => <path key={`${c.id}${k}`} className={`dg-curve is-${c.tone}`} d={poly(seg)} />))}
-      {!hideIntercepts && m.curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean).map((p, i) => <g key={`ic${c.id}${i}`}><circle className="dg-dot" cx={p.px[0]} cy={p.px[1]} r="4" /><PTex tex={`(${p.x},\\,${p.y})`} cands={pointCands(p.px)} obstacles={fnObstacles} w={80} /></g>))}
+      {!hideIntercepts && m.curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean).filter((p, i, all) => all.findIndex(q => q.x === p.x && q.y === p.y) === i).map((p, i) => <g key={`ic${c.id}${i}`}><circle className="dg-dot" cx={p.px[0]} cy={p.px[1]} r="4" /><PTex tex={`(${p.x},\\,${p.y})`} cands={pointCands(p.px)} obstacles={fnObstacles} w={80} /></g>))}
       {m.points.map((p, i) => <g key={`pt${i}`}><circle className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" />{p.label && <PTex tex={p.label} cands={pointCands(p.px)} obstacles={fnObstacles} w={90} />}</g>)}
       {m.curves.map(c => c.label && (() => { const ex = Math.min(m.frame.right - 40, (c.segments.at(-1)?.at(-1)?.[0] ?? m.frame.right) - 4); const ey = c.segments.at(-1)?.at(-1)?.[1] ?? m.frame.top; return <PTex key={`lb${c.id}`} tex={c.label} cands={[[ex, ey - 12, 'end'], [ex - 14, ey + 16, 'end'], [ex - 70, ey - 18, 'end'], [m.frame.right - 6, m.frame.top + 12, 'end'], [m.frame.left + 8, m.frame.top + 12, 'start'], ...[30, 50, 70, 96, 130, 170].flatMap(d => [[ex, ey - 12 + d, 'end'], [ex - d, ey - 12, 'end'], [ex - d, ey + 16, 'end'], [m.frame.right - 6, m.frame.top + 12 + d, 'end'], [m.frame.left + 8, m.frame.top + 12 + d, 'start'], [m.frame.left + 8, m.frame.bottom - 14 - d, 'start']])]} obstacles={fnObstacles} w={110} className="dg-curve-label" />; })())}
     </Figure>
@@ -322,7 +322,7 @@ export function Histogram({ title = 'A histogram', caption = null, xLabel = null
 export function BoxPlot({ title = 'A box plot', caption = null, ...spec }) {
   const m = boxPlotModel(spec);
   const s = m.summary; const px = m.px; const y = m.y; const h = m.h;
-  const desc = `A box plot: minimum ${s.min}, lower quartile ${s.q1}, median ${s.median}, upper quartile ${s.q3}, maximum ${s.max}; range ${s.range}, interquartile range ${s.iqr}.`;
+  const desc = `A box plot: minimum ${s.min}, lower quartile ${s.q1}, median ${s.median}, upper quartile ${s.q3}, maximum ${s.max}; range ${s.range}, interquartile range ${s.iqr}.${m.outliers.length ? ` The whiskers end at ${m.whisker.lo} and ${m.whisker.hi}; ${m.outliers.join(' and ')} ${m.outliers.length > 1 ? 'are outliers' : 'is an outlier'}, beyond the fences ${m.fences.lo} and ${m.fences.hi}.` : ''}`;
   return (
     <Figure frame={m.frame} width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
       <g className="dg-axes">{m.ticks.map(t => <g key={t.value}><line className="dg-tick" x1={t.px} x2={t.px} y1={m.frame.bottom} y2={m.frame.bottom + 5} /><Tex x={t.px} y={m.frame.bottom + 18} tex={String(t.value)} w={40} h={20} /></g>)}<line className="dg-axis" x1={m.frame.left} x2={m.frame.right} y1={m.frame.bottom} y2={m.frame.bottom} /></g>
@@ -330,7 +330,8 @@ export function BoxPlot({ title = 'A box plot', caption = null, ...spec }) {
       <line className="dg-curve is-secondary" x1={px.min} y1={y - h / 3} x2={px.min} y2={y + h / 3} /><line className="dg-curve is-secondary" x1={px.max} y1={y - h / 3} x2={px.max} y2={y + h / 3} />
       <rect className="dg-box" x={px.q1} y={y - h / 2} width={px.q3 - px.q1} height={h} />
       <line className="dg-curve is-primary" x1={px.median} y1={y - h / 2} x2={px.median} y2={y + h / 2} />
-      {[['min', s.min], ['q1', s.q1], ['median', s.median], ['q3', s.q3], ['max', s.max]].map(([k, v], i) => <Tex key={k} x={px[k]} y={y - h / 2 - (i % 2 ? 22 : 12)} tex={String(v)} w={46} h={20} className="dg-small" />)}
+      {[['min', m.whisker.lo], ['q1', s.q1], ['median', s.median], ['q3', s.q3], ['max', m.whisker.hi]].map(([k, v]) => <PTex small key={k} tex={String(v)} cands={[12, 30, 48].map(d => [px[k], y - h / 2 - d])} w={46} h={20} className="dg-small" />)}
+      {m.outlierPx.map(o => <g key={`o${o.value}`}><circle className="dg-open" cx={o.px} cy={y} r="4.5" /><PTex small tex={String(o.value)} cands={[12, 30, 48].map(d => [o.px, y - h / 2 - d])} w={46} h={20} className="dg-small" /></g>)}
     </Figure>
   );
 }
@@ -344,7 +345,7 @@ export function NormalCurve({ title = 'The normal distribution', caption = null,
       {m.shade.length > 0 && <path className="dg-shade" d={`${poly(m.shade)} Z`} />}
       <path className="dg-curve is-primary" d={poly(m.curve)} fill="none" />
       {m.xTicks.map(t => <g key={t.z}><line className="dg-tick" x1={t.px} x2={t.px} y1={f.sy(0)} y2={f.sy(0) + 5} /><Tex x={t.px} y={f.sy(0) + 16} tex={m.sigma === 1 && m.mu === 0 ? String(t.z) : String(t.x)} w={44} h={20} /><Tex x={t.px} y={f.sy(0) + 31} tex={`z=${t.z}`} w={44} h={16} className="dg-small" /></g>)}
-      <Tex x={(f.sx(m.xa) + f.sx(m.xb)) / 2} y={f.sy(0) - 26} tex={`${r3(m.area * 100, 1)}\\%`} w={80} className="dg-area" />
+      <Tex x={(f.sx(m.xa) + f.sx(m.xb)) / 2} y={f.sy(0) - 26} tex={`${r3(m.areaExact * 100, 1)}\\%`} w={80} className="dg-area" />
     </Figure>
   );
 }

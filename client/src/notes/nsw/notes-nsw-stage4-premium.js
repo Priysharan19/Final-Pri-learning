@@ -34,7 +34,7 @@ export default {
       'Money is given to two decimal places with the dollar sign, for example $\\$59.50$.'
     ],
     diagrams: [
-      { title: 'One value, three names', spec: { kind: 'numberLine', min: 0, max: 1, points: [{ value: 0.25, label: '\\dfrac{1}{4}' }, { value: 0.5, label: '\\dfrac{1}{2}' }, { value: 0.75, label: '\\dfrac{3}{4}' }] }, note: 'Each mark is a fraction, a decimal and a percentage at once: $\\tfrac{3}{4}=0.75=75\\%$.' }
+      { title: 'One value, three names', spec: { kind: 'numberLine', min: 0, max: 1, points: [{ value: 0.25, label: '\\dfrac{1}{4}=25\\%' }, { value: 0.5, label: '\\dfrac{1}{2}=50\\%' }, { value: 0.75, label: '\\dfrac{3}{4}=75\\%' }] }, note: 'Each mark is a fraction, a decimal and a percentage at once: $\\tfrac{3}{4}=0.75=75\\%$.' }
     ],
     working: [
       '\\begin{aligned}\\text{Sale price}&=85\\times(1-0.30)\\\\&=85\\times0.70\\\\&=59.50\\end{aligned}',
@@ -72,7 +72,7 @@ export default {
       'A negative value is substituted inside brackets, so $a^2$ at $a=-4$ is $(-4)^2=16$.'
     ],
     diagrams: [
-      { title: 'An expression as a graph', spec: { kind: 'function', xmin: -6, xmax: 6, ymin: -4, ymax: 40, curves: [{ expr: 'x^2-3*x', intercepts: true, label: 'y=x^2-3x' }] }, note: 'Reading the curve at $x=-4$ gives $y=28$, the value of $a^2-3a$ when $a=-4$.' }
+      { title: 'An expression as a graph', spec: { kind: 'function', xmin: -6, xmax: 6, ymin: -4, ymax: 40, curves: [{ expr: 'x^2-3*x', intercepts: true, label: 'y=x^2-3x' }], points: [{ x: -4, y: 28, label: '(-4,\\,28)' }] }, note: 'Reading the curve at $x=-4$ gives $y=28$, the value of $a^2-3a$ when $a=-4$.' }
     ],
     working: [
       '\\begin{aligned}3(x+2)+2(x-4)&=3x+6+2x-8\\\\&=5x-2\\end{aligned}',

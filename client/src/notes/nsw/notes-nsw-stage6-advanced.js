@@ -486,8 +486,8 @@ export default {
       'The conclusion about an outlier is stated against the fence it crosses.'
     ],
     diagrams: [
-      { title: 'Two counters, no replacement', spec: { kind: 'tree', branches: [{ label: 'R', p: [2, 5], children: [{ label: 'R', p: [1, 3] }, { label: 'B', p: [2, 3] }] }, { label: 'B', p: [3, 5], children: [{ label: 'R', p: [4, 9] }, { label: 'B', p: [5, 9] }] }] }, note: 'The path $RR$ has probability $\\tfrac{2}{5}\\times\\tfrac{1}{3}=\\tfrac{2}{15}$. The paths $RB$ and $BR$ add to $\\tfrac{8}{15}$.' },
-      { title: 'The data set as a box plot', spec: { kind: 'boxPlot', data: [4, 7, 8, 9, 10, 12, 13, 30] }, note: 'The median is $9.5$, the quartiles are $7.5$ and $12.5$, and $30$ lies beyond the upper fence of $20$.' }
+      { title: 'Two counters from a bag of 4 red and 6 blue, no replacement', spec: { kind: 'tree', branches: [{ label: 'R', p: [2, 5], children: [{ label: 'R', p: [1, 3] }, { label: 'B', p: [2, 3] }] }, { label: 'B', p: [3, 5], children: [{ label: 'R', p: [4, 9] }, { label: 'B', p: [5, 9] }] }] }, note: 'The path $RR$ has probability $\\tfrac{2}{5}\\times\\tfrac{1}{3}=\\tfrac{2}{15}$. The paths $RB$ and $BR$ add to $\\tfrac{8}{15}$.' },
+      { title: 'The data set as a box plot', spec: { kind: 'boxPlot', data: [4, 7, 8, 9, 10, 12, 13, 30] }, note: 'The median is $9.5$, the quartiles are $7.5$ and $12.5$, and $30$ lies beyond the upper fence of $20$, so the whisker ends at $13$ and $30$ is plotted separately as an outlier.' }
     ],
     check: [
       { question: '$A$ and $B$ are independent with $P(A)=0.3$ and $P(B)=0.5$. Find $P(A\\cup B)$.', answer: '$0.65$', verify: { kind: 'value', expr: '0.3+0.5-0.3*0.5', answer: '0.65' } },

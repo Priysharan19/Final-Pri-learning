@@ -84,7 +84,8 @@ export function TransformSliders({ base = 'quadratic', title = null, initial = {
         <div className="dgi-buttons"><button type="button" onClick={reset}>Reset</button></div>
       </>}>
       <FunctionGraph xmin={B.xmin} xmax={B.xmax} ymin={B.ymin} ymax={B.ymax} hideIntercepts title={base === 'linear' ? 'The line y = mx + c' : `Graph of y = ${B.name.replace(/\\/g, '')} and its transformation`}
-        curves={[{ expr: B.expr, tone: 'secondary', id: 'base' }, { expr, label: tex, tone: 'primary', id: 'moved' }]} />
+        curves={[{ expr: B.expr, tone: 'secondary', id: 'base' }, { expr, label: tex, tone: 'primary', id: 'moved' }]}
+        asymptotes={base === 'exponential' ? [{ y: k, label: `y=${k}` }] : []} />
     </Shell>
   );
 }
@@ -110,7 +111,7 @@ export function UnitCircleDrag({ initial = 30, title = 'Drag the point around th
     else if (e.key === 'Home') { e.preventDefault(); set(0); }
     else if (e.key === 'End') { e.preventDefault(); set(359); }
   };
-  const readout = `$\\theta=${p.deg}^{\\circ}$: $\\cos\\theta=${p.cos}$, $\\sin\\theta=${p.sin}$, ${p.tan === null ? '$\\tan\\theta$ is undefined' : `$\\tan\\theta=${p.tan}$`}. ${p.quadrant ? `Quadrant ${p.quadrant}; reference angle ${p.reference}°.` : 'On an axis.'}`;
+  const readout = `$\\theta=${p.deg}^{\\circ}$: $\\cos\\theta=${r3(p.cos, 3)}$, $\\sin\\theta=${r3(p.sin, 3)}$, ${p.tan === null ? '$\\tan\\theta$ is undefined' : `$\\tan\\theta=${r3(p.tan, 3)}$`}. ${p.quadrant ? `Quadrant ${p.quadrant}; reference angle ${p.reference}°.` : 'On an axis.'}`;
   return (
     <Shell title={title} readout={readout} className="dg-square"
       controls={<>
@@ -170,7 +171,7 @@ export function NormalAreaByZ({ initial = [-1, 1], title = 'Shade the area betwe
   const a = Math.min(lo, hi); const bz = Math.max(lo, hi);
   const m = normalCurveModel({ from: a, to: bz, mode: 'z' });
   return (
-    <Shell title={title} readout={`$P(${a}\\le Z\\le ${bz})=${m.area}$, which is ${r3(m.area * 100, 2)}% of the distribution. About 68%, 95% and 99.7% lie within 1, 2 and 3 standard deviations of the mean.`}
+    <Shell title={title} readout={`$P(${a}\\le Z\\le ${bz})=${m.area}$, which is ${r3(m.areaExact * 100, 2)}% of the distribution. About 68%, 95% and 99.7% lie within 1, 2 and 3 standard deviations of the mean.`}
       controls={<>
         <Slider label="Lower z" min={-3.5} max={3.5} step={0.1} value={lo} onChange={setLo} format={v => `z = ${r3(v, 1)}`} />
         <Slider label="Upper z" min={-3.5} max={3.5} step={0.1} value={hi} onChange={setHi} format={v => `z = ${r3(v, 1)}`} />

@@ -486,7 +486,7 @@ export default {
       'A comparison uses a measure of centre and a measure of spread, named, and is written in the context of the question.'
     ],
     diagrams: [
-      { title: 'Box plot of the data', spec: { kind: 'boxPlot', data: [3, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 25] }, note: 'The five numbers are $3$, $6.5$, $8.5$, $12.5$ and $25$. This plot draws the whisker to the maximum; by the fence test above, $25$ is an outlier.' }
+      { title: 'Box plot of the data', spec: { kind: 'boxPlot', data: [3, 5, 6, 7, 8, 8, 9, 10, 12, 13, 14, 25] }, note: 'The five-number summary is $3$, $6.5$, $8.5$, $12.5$ and $25$. The whisker ends at $14$, the last value inside the fence of $21.5$; $25$ is plotted separately as an outlier.' }
     ],
     check: [
       { question: 'Find the mean of $4,8,9,15$.', answer: '$9$', verify: { kind: 'value', expr: '(4+8+9+15)/4', answer: '9' } },

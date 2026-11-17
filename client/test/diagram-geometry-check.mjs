@@ -188,6 +188,16 @@ const throws = (fn, label) => { let t = false; try { fn(); } catch { t = true; }
   eq(place('x', [[10, 50], [140, 50]], [wall]), [10, 50], 'placement: a clear first candidate is kept');
   ok(crossings(boxOf('abc', [100, 50, 'middle']), [wall]) > 0 && crossings(boxOf('abc', [200, 50, 'middle']), [wall]) === 0, 'placement: crossings counts stroke points inside the label box');
 }
+// Box-plot whiskers and outliers; a percentage label is rounded once
+{
+  const b = g.boxPlotModel({ data: [4, 7, 8, 9, 10, 12, 13, 30] });
+  // By hand: halves 4,7,8,9 and 10,12,13,30 give Q1 = 7.5, Q3 = 12.5, IQR 5; fences 0 and 20; the whisker ends at 13 and 30 is an outlier.
+  eq([b.summary.q1, b.summary.q3, b.fences.hi, b.whisker.hi, b.outliers], [7.5, 12.5, 20, 13, [30]], 'box plot: the upper fence is 20, the whisker ends at 13 and 30 is an outlier');
+  eq(g.boxPlotModel({ data: [2, 4, 4, 5, 7, 9, 10] }).outliers, [], 'box plot: no outliers when every value is inside the fences');
+  const n = g.normalCurveModel({ mu: 70, sigma: 8, from: 54, to: 86, mode: 'x' });
+  // By hand: P(-2 < Z < 2) = 0.9544997, so the label reads 95.4 (not 95.5 from a rounded 0.9545).
+  eq(g.r3(n.areaExact * 100, 1), 95.4, 'normal: within 2 standard deviations is labelled 95.4%');
+}
 // Pinned coordinates (one reference diagram per kind)
 {
   const q = g.functionGraphModel({ curves: [{ type: 'quadratic', a: 1, h: 1, k: -4, intercepts: true }], xmin: -4, xmax: 6, ymin: -6, ymax: 8 });
