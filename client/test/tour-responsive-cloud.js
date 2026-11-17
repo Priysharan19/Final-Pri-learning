@@ -96,15 +96,20 @@ export const flow = {
     await page.unroute('**/v1/**', slow);
 
     // ── FAILING cloud and a down reader ─────────────────────────────────────
-    reader.down = true;
-    const failing = route => (/\/v1\/(auth\/session|me)\b/.test(route.request().url()) ? route.continue() : route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'UNAVAILABLE', message: 'down' } }) }));
-    await page.route('**/v1/**', failing);
-    await page.goto(`${base}/practice?subtopic=${TOPIC}&difficulty=2`, { waitUntil: 'domcontentloaded' }).catch(() => {});
-    await page.waitForSelector('.shell, .auth-wrap', { timeout: 30000 }).catch(() => {});
+    // The question is opened while the cloud is healthy (the server issues it); the cloud then fails under the student's hands.
+    await page.goto(`${base}/practice?subtopic=${TOPIC}&difficulty=2`, { waitUntil: 'domcontentloaded' });
+    await page.waitForSelector('.q-prompt', { timeout: 30000 });
+    await settle();
+    const tab2 = page.getByRole('button', { name: 'Answer by handwriting' });
+    if (await tab2.count()) await tab2.click();
+    await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     await page.evaluate(() => { window.__long = []; window.__window = null; new PerformanceObserver(l => { for (const e of l.getEntries()) window.__long.push({ ms: Math.round(e.duration), window: window.__window }); }).observe({ type: 'longtask' }); });
-    if (await page.locator('.ink-canvas-live').count() || await page.waitForSelector('.ink-canvas-live', { timeout: 20000 }).then(() => true).catch(() => false)) {
-      await driveInput('failing');
-    } else note('failing: no question could be opened while every call fails (a question is issued by the server); input on the screens that remain was driven instead');
+    reader.down = true;
+    let refused = 0;
+    const failing = route => { refused++; return route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'UNAVAILABLE', message: 'down' } }) }); };
+    await page.route('**/v1/**', failing);
+    await driveInput('failing');
+    await check('failing: calls really were being refused while the student wrote', refused > 0, String(refused));
     await page.unroute('**/v1/**', failing);
     reader.down = false;
 
