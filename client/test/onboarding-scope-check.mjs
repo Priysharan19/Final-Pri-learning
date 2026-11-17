@@ -55,6 +55,9 @@ export async function bundleLogin({ extended, tag = 'scope', edition = null }) {
   // lazy chunk of its own with a stylesheet the bundler will not take; it is
   // not what these checks render, so it is stubbed too.
   writeFileSync(join(dir, 'signup-stub.jsx'), "import React from 'react';\nexport default function SignUpFlow() { return null; }\n");
+  // The left panel's animated scenes are a lazy chunk with a stylesheet the
+  // bundler will not take either; these checks read the landing copy, not the panel.
+  writeFileSync(join(dir, 'scenes-stub.jsx'), "import React from 'react';\nexport default function SignInScenes() { return null; }\n");
   writeFileSync(join(dir, 'entry.jsx'), [
     "import React from 'react';",
     "import { renderToStaticMarkup } from 'react-dom/server';",
@@ -88,7 +91,7 @@ export async function bundleLogin({ extended, tag = 'scope', edition = null }) {
     }] : [],
     resolve: {
       modules: [join(CLIENT, 'node_modules')],
-      alias: { '../App.jsx': join(dir, 'app-stub.jsx'), '../api.js': join(dir, 'api-stub.js'), '../components/SignUpFlow.jsx': join(dir, 'signup-stub.jsx') }
+      alias: { '../App.jsx': join(dir, 'app-stub.jsx'), '../api.js': join(dir, 'api-stub.js'), '../components/SignUpFlow.jsx': join(dir, 'signup-stub.jsx'), '../instrument/SignInScenes.jsx': join(dir, 'scenes-stub.jsx') }
     }
   });
   const { output } = await bundle.generate({ format: 'esm' });

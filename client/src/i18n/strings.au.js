@@ -42,6 +42,7 @@ export const AU_STRINGS = Object.freeze({
   'board.sentenceMethod': '{awarded}/{total}. The answer is not right, but the method is, and an examiner may award marks for that.',
   'teach.newClassPlaceholder': 'New class name (e.g. Year 10 A)',
   'teach.rosterHelp': 'Roster files: one student per line — {format}. Names already on this device join; new names get a student profile.',
+  'scn.hand.eyebrow': 'Year 11 · Advanced · Quadratics',
   'exams.indiaHeading': 'Exams',
   'placement.provenance': 'The prerequisite map behind it is Pri’s own teaching judgement (version {version}), not a NESA publication.'
 });

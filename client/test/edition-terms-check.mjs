@@ -27,6 +27,7 @@ const ALLOW = [
   [/^mock\./, 'CBSE board-format mock papers (engine/boardMock.js, Indian courses only)'],
   [/^teach\.(.*India|noPredictionClassReport|noPredictionStudentReport)/, 'teacher-panel copy gated on the India flag (Teach.jsx)'],
   [/^exams\.(bp\.|jee|cbse|buildingJee|startJee|classPractice)/, 'Indian exam blueprints and tracks (CBSE, JEE, IOQM)'],
+  [/^scn\.papers\./, 'the board-format papers scene, listed only for Priyabhata (SignInScenes.jsx scenesFor)'],
   [/^placement\./, 'the placement diagnostic walks the NCERT prerequisite spine (engine/placement.js); Indian courses only'],
   [/^gloss\./, 'NCERT Hindi term glossary; Prithagoras offers no Hindi'],
   [/^practice\.pyqOnlyTitle$/, 'past-paper (JEE, CBSE) filter; Indian courses only, behind PRI_FEATURE_PAST_PAPERS'],
@@ -110,6 +111,12 @@ check('the Prithagoras sign-in screen: its own eyebrow and value line, no langua
   assert.match(login, /t\('login\.heroNote'\)/);
   assert.ok(!/t\('login\.heroSub'\)/.test(login) && /<details className="login-more">/.test(login), 'the marketing paragraph is gone and the data statement is folded, not a wall of text');
   assert.ok(en['login.heroNote'].length < 120, 'the note stays one short line');
+});
+check('the sign-in scenes: Prithagoras lists only scenes that are live there (no board papers, no India notes; the desk only when it is switched on)', async () => {
+  const { scenesFor } = await import('../src/instrument/SignInScenes.jsx').catch(() => ({ scenesFor: null }));
+  const src = readFileSync(fileURLToPath(new URL('../src/instrument/SignInScenes.jsx', here)), 'utf8');
+  assert.match(src, /prithagoras'\) return \['hand', \.\.\.\(flags\.desk \? \['desk'\] : \[\]\), 'daily'\]/);
+  assert.match(src, /return \['hand', 'papers', 'notes', 'daily'\]/);
 });
 check('every allowlist entry still matches a key (a dead entry is removed)', () => {
   for (const [re] of ALLOW) assert.ok(Object.keys(en).some(k => re.test(k)), `${re} matches no key`);
