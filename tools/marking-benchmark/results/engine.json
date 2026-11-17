@@ -2189,5 +2189,32 @@
   ],
   "solution": "incorrect",
   "firstBreak": 1
+ },
+ "ex-pr1005-pad": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-pr1005-domain": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
+ },
+ "ex-pr1005-foreign": {
+  "verdicts": [
+   "given",
+   "valid",
+   "valid"
+  ],
+  "solution": "correct",
+  "firstBreak": null
  }
 }

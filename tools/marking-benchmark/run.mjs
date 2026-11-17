@@ -29,6 +29,10 @@ const flag = name => process.argv.includes(`--${name}`);
 const MODELS = {
   fable: { id: 'claude-fable-5-2', label: 'Claude Fable 5.2', inPerM: 8, outPerM: 40, effort: 'high' },
   opus: { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', inPerM: 4, outPerM: 20, effort: 'high' },
+  // The OpenAI model Pri's server already uses for its display-only working
+  // hints (server/platform/workingProvider.js). Prices are not recorded here:
+  // the report gives its token counts, not a guessed dollar figure.
+  terra: { provider: 'openai', id: 'gpt-5.6-terra', label: 'OpenAI gpt-5.6-terra (Pri server model)', inPerM: null, outPerM: null, effort: 'high' },
 };
 
 // ── Corpus and SymPy ground truth ───────────────────────────────────────────
@@ -97,8 +101,47 @@ const schema = {
   },
 };
 
+function readVerdict(item, out, ms, usage) {
+  const byLine = Object.fromEntries((out.lines || []).map(l => [l.line, l.verdict]));
+  const verdicts = item.lines.map((_, i) => {
+    if (i === 0 && item.kind !== 'derivative') return 'given';
+    const v = byLine[i + 1];
+    return v === 'valid' ? 'valid' : v === 'invalid' ? 'invalid' : 'abstain';
+  });
+  return { ms, usage, verdicts, solution: out.solution_fully_correct ? 'correct' : 'incorrect',
+    firstBreak: typeof out.first_invalid_line === 'number' ? out.first_invalid_line - 1 : null };
+}
+
+// OpenAI Responses API, the same endpoint and structured-output form Pri's
+// server uses. Key: OPENAI_API_KEY for this process only.
+async function openaiMark(model, item) {
+  const t0 = Date.now();
+  const res = await fetch('https://api.openai.com/v1/responses', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
+    body: JSON.stringify({
+      model: model.id,
+      reasoning: { effort: model.effort },
+      instructions: SYSTEM,
+      input: userPrompt(item),
+      text: { format: { type: 'json_schema', name: 'marking', strict: true, schema } },
+    }),
+    signal: AbortSignal.timeout(15 * 60 * 1000),
+  });
+  const ms = Date.now() - t0;
+  if (!res.ok) throw Object.assign(new Error(`OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`), { status: res.status });
+  const body = await res.json();
+  const usage = { input: body.usage?.input_tokens || 0, output: body.usage?.output_tokens || 0 };
+  const text = body.output_text ?? (body.output || []).flatMap(o => o.content || []).filter(c => c.type === 'output_text').map(c => c.text).join('');
+  const refusal = (body.output || []).flatMap(o => o.content || []).some(c => c.type === 'refusal');
+  if (refusal) return { refusal: true, ms, usage, verdicts: item.lines.map(() => 'abstain'), solution: 'abstain', firstBreak: null };
+  try { return readVerdict(item, JSON.parse(text), ms, usage); }
+  catch { return { parseError: true, ms, usage, verdicts: item.lines.map(() => 'abstain'), solution: 'abstain', firstBreak: null }; }
+}
+
 let client = null;
 async function llmMark(model, item) {
+  if (model.provider === 'openai') return openaiMark(model, item);
   if (!client) {
     const { default: Anthropic } = await import('@anthropic-ai/sdk');
     client = new Anthropic({ maxRetries: 4, timeout: 15 * 60 * 1000 });
@@ -190,8 +233,12 @@ report.contenders.push(score('Pri deterministic engine', engineMarks));
 writeFileSync(join(HERE, 'results', 'engine.json'), JSON.stringify(engineMarks, null, 1));
 
 if (!flag('engine-only')) {
-  if (!process.env.ANTHROPIC_API_KEY) { console.error('No ANTHROPIC_API_KEY: run with --engine-only or load the key for this process.'); process.exit(2); }
-  const names = arg('models', 'fable,opus').split(',');
+  const names = arg('models', 'fable,opus,terra').split(',');
+  for (const n of names) {
+    const need = MODELS[n]?.provider === 'openai' ? 'OPENAI_API_KEY' : 'ANTHROPIC_API_KEY';
+    if (!MODELS[n]) { console.error(`Unknown model ${n}`); process.exit(2); }
+    if (!process.env[need]) { console.error(`No ${need} for ${n}: load the key for this process, or leave ${n} out of --models.`); process.exit(2); }
+  }
   const conc = Number(arg('concurrency', 6));
   for (const name of names) {
     const model = MODELS[name];
@@ -205,7 +252,8 @@ if (!flag('engine-only')) {
     }), conc);
     const sc = score(model.label, done);
     const tokens = Object.values(done).reduce((a, r) => ({ input: a.input + (r.usage?.input || 0), output: a.output + (r.usage?.output || 0) }), { input: 0, output: 0 });
-    sc.cost = { ...tokens, usd: +(tokens.input / 1e6 * model.inPerM + tokens.output / 1e6 * model.outPerM).toFixed(2), perItemUsd: +((tokens.input / 1e6 * model.inPerM + tokens.output / 1e6 * model.outPerM) / Math.max(1, Object.keys(done).length)).toFixed(4) };
+    sc.cost = model.inPerM == null ? { ...tokens, usd: null, note: 'price not recorded; tokens only' }
+      : { ...tokens, usd: +(tokens.input / 1e6 * model.inPerM + tokens.output / 1e6 * model.outPerM).toFixed(2), perItemUsd: +((tokens.input / 1e6 * model.inPerM + tokens.output / 1e6 * model.outPerM) / Math.max(1, Object.keys(done).length)).toFixed(4) };
     const lat = Object.values(done).map(r => r.ms).filter(Boolean).sort((a, b) => a - b);
     sc.latencyMs = { median: lat[Math.floor(lat.length / 2)] || null, p90: lat[Math.floor(lat.length * 0.9)] || null };
     sc.refusals = Object.values(done).filter(r => r.refusal).length;
