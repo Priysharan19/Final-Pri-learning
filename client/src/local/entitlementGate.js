@@ -22,7 +22,7 @@ import { get, put } from './idb.js';
 import { cloudLinkRowId } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, FREE_EXAM_ALLOWANCE, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
 import { FREE_PRACTICE_ALLOWANCE } from '../engine/practiceAllowance.js';
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 
 const DAY = 86_400_000;
 const USAGE_PREFIX = 'pri-free-usage-v1:';

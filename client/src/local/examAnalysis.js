@@ -31,7 +31,7 @@
 // measurement and is not presented as one. Weak chapters are the chapters where the paper lost at
 // least half of what they were worth, ordered by marks lost.
 // ─────────────────────────────────────────────────────────────────────────────
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 
 const pct = (n, d) => (d > 0 ? Math.round(1000 * n / d) / 10 : null);
 

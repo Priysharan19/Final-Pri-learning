@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { useT } from '../i18n/index.js';
 import ErrorNotebook from '../components/ErrorNotebook.jsx';
 
@@ -13,7 +13,7 @@ export default function ErrorLog() {
       <h1 style={{ marginBottom: 6 }}>{t('errorLog.title')}</h1>
       <p className="muted" style={{ margin: '0 0 14px', lineHeight: 1.5 }}>{t('errorLog.how')}</p>
       <ErrorNotebook />
-      <p><Link to="/today">{t('errorLog.todayLink')}</Link></p>
+      <p><PageLink to="/today">{t('errorLog.todayLink')}</PageLink></p>
     </div>
   );
 }

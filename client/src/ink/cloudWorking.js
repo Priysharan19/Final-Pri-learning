@@ -23,7 +23,7 @@
 //   · Off until the student turns it on.
 // ─────────────────────────────────────────────────────────────────────────────
 import { cloud, cloudAvailable } from '../platform/cloudTransport.js';
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 
 /** How a merged verdict is labelled so History and evidence can tell them apart. */
 export const CLOUD_WORKING_ENGINE = 'cloud-working';
