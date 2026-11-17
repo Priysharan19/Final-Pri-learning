@@ -14,11 +14,12 @@
 //   outside      the refusal for one that is not
 //   admits(q)    null, or a question-level test a generated question must pass
 //                before it is issued (NSW: a final answer and an outcome code)
-//   identityOf   null, or the curriculum identity sealed with every question
+//   identityOf   the curriculum identity sealed with every question (both editions)
 //   marking      null, or the marking this edition is limited to whatever the
 //                process-wide switch says (markingPolicy.js)
 import { serverEdition } from './edition.js';
 import { indiaBank, BANK_OUTSIDE_INDIA } from './indiaBanks.js';
+import { indiaQuestionIdentity } from './indiaIdentity.js';
 import { nswBank, nswIssuable, nswQuestionIdentity, BANK_OUTSIDE_NSW, NSW_COURSE } from './nswBanks.js';
 
 /** Sealed on a question whose mark is its final answer's alone, whatever the working shows. */
@@ -27,7 +28,7 @@ export const FINAL_ANSWER_MARKING = 'final-answer-only';
 const POLICIES = Object.freeze({
   priyabhata: Object.freeze({
     edition: 'priyabhata', curriculum: 'in', issues: indiaBank, outside: BANK_OUTSIDE_INDIA,
-    admits: null, identityOf: null, marking: null
+    admits: null, identityOf: indiaQuestionIdentity, marking: null
   }),
   prithagoras: Object.freeze({
     edition: 'prithagoras', curriculum: NSW_COURSE, issues: nswBank, outside: BANK_OUTSIDE_NSW,
@@ -45,7 +46,8 @@ export function bankPolicy(edition = serverEdition()) {
  * Seal what an edition requires onto a question about to be issued: its
  * curriculum identity and its marking limit. Returns false — and the question
  * must then not be issued — when the edition requires an identity and this
- * question has none. Priyabhata seals nothing: its questions are unchanged.
+ * question has none. Both editions seal an identity (audit P0 #38); only
+ * Prithagoras also seals a marking limit (declared in edition.config.mjs).
  */
 export function sealForEdition(q, banks, generator = q?._generator ?? q?.subtopic) {
   if (banks.admits && !banks.admits(q, generator)) return false;
