@@ -1,0 +1,51 @@
+/* "See why it's wrong" — the first break as two graphs. Ink for the line before,
+   the correction colour for the student's line; the dash pattern and the name
+   carry the difference too, so nothing depends on colour alone. No transitions
+   and no animation: the marker moves only when the student moves it. */
+.mistake-graph { margin: 4px 0 10px; }
+.mistake-graph .mg-toggle, .mistake-graph .mg-reset { font-size: 13px; padding: 6px 10px; }
+.mg-body {
+  margin-top: 8px; padding: 12px 14px; border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm); background: var(--surface-raised);
+}
+.mg-say { margin: 0 0 6px; font-family: var(--font); font-size: 13.5px; line-height: 1.55; color: var(--ink); }
+.mg-note, .mg-how { margin: 0 0 6px; font-family: var(--font); font-size: 12.5px; line-height: 1.5; color: var(--ink-3); }
+.mg-plot {
+  position: relative; margin: 8px 0 4px; cursor: ew-resize; touch-action: pan-y;
+  border-radius: var(--radius-sm); -webkit-user-select: none; user-select: none;
+}
+.mg-plot:focus { outline: none; }
+.mg-plot:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.mg-plot svg { display: block; width: 100%; height: auto; max-height: 320px; overflow: visible; }
+.mg-grid line { stroke: var(--hairline); stroke-width: 1; }
+.mg-axes line { stroke: var(--ink-3); stroke-width: 1.4; }
+.mg-axes text {
+  font: 12px var(--font, system-ui, sans-serif); fill: var(--ink-3);
+  /* A paper halo, as the diagram kit does, so a curve never runs through a label. */
+  paint-order: stroke; stroke: var(--surface-raised); stroke-width: 3.5px; stroke-linejoin: round;
+}
+.mg-curve { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.mg-curve.mg-before { stroke: var(--ink-2); }
+.mg-curve.mg-yours { stroke: var(--correction); stroke-linecap: butt; }
+.mg-marker { stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 2 4; }
+.mg-gap { stroke: var(--correction); stroke-width: 2; opacity: 0.55; }
+.mg-dot.mg-before { fill: var(--ink-2); stroke: var(--surface-raised); stroke-width: 2; }
+.mg-dot.mg-yours { fill: var(--correction); stroke: var(--surface-raised); stroke-width: 2; }
+.mg-handle { fill: var(--ink); }
+.mg-swatch { flex: none; }
+.mg-swatch line { stroke-width: 2.6; }
+.mg-swatch.mg-before line { stroke: var(--ink-2); }
+.mg-swatch.mg-yours line { stroke: var(--correction); }
+.mg-read { display: grid; gap: 4px; margin: 6px 0; font-family: var(--font); font-size: 13px; }
+.mg-read-at { font-size: 12px; color: var(--ink-3); letter-spacing: 0.04em; }
+.mg-read-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mg-read-name { flex: none; color: var(--ink-2); }
+.mg-read-line {
+  flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-family: var(--font-math, var(--font)); color: var(--ink-3);
+}
+.mg-read-v { flex: none; font-variant-numeric: tabular-nums; color: var(--ink); }
+.mg-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) {
+  .mistake-graph * { transition: none !important; animation: none !important; }
+}
