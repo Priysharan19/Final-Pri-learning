@@ -157,6 +157,14 @@ const inkKey = p1.result.detail.find(d => !d.parts && !d.correct && d.working)?.
   await db.run("UPDATE idempotency_keys SET response_json=? WHERE account_id=? AND scope='exam-result' AND key=?", [JSON.stringify(r), S1.id, p1.id]);
 }
 
+// The original-ink lane stores the original and names it on the graded-attempt event.
+const ORIGINAL = { id: 'orig_abc123', sha256: 'ef'.repeat(32), kind: 'ink' };
+const origLine = p1.result.detail.filter(d => !d.parts && !d.correct && d.working)[0];
+{
+  const ev = await db.get('SELECT payload_json FROM learning_events WHERE account_id=? AND id=?', [S1.id, origLine.attemptId]);
+  await db.run('UPDATE learning_events SET payload_json=? WHERE account_id=? AND id=?', [JSON.stringify({ ...JSON.parse(ev.payload_json), original: ORIGINAL }), S1.id, origLine.attemptId]);
+}
+
 // Snapshot everything the engine wrote, to prove it never changes.
 const engineState = async who => ({
   result: (await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='exam-result'", [who.id]))?.response_json,
@@ -222,6 +230,8 @@ const inked = queue.data.items.filter(i => i.question.key === inkKey);
 c.ok(inked.length >= 1 && inked.every(i => i.evidence.inputMode === 'ink' && i.evidence.ink?.digest === INK), 'a handwritten answer carries the digest of the original page the teacher judges');
 c.ok(queue.data.items.filter(i => i.question.key !== inkKey).every(i => i.evidence.inputMode === 'typed' && i.evidence.ink === null), 'typed answers carry no ink');
 const item = inked[0] || queue.data.items[0];
+c.ok(queue.data.items.filter(i => i.question.key === origLine.id).every(i => JSON.stringify(i.evidence.original) === JSON.stringify(ORIGINAL))
+  && queue.data.items.filter(i => i.question.key !== origLine.id).every(i => i.evidence.original === null), 'the stored original the teacher judges is named on its item, and only there');
 // The input mode is the server's record of the marked answer, never an autosave's.
 c.ok(queue.data.items.filter(i => i.question.key !== inkKey).every(i => i.evidence.inputMode === 'typed'), 'typed answers are typed by the graded-attempt record');
 c.ok(item.evidence.reading.length >= 2 && item.evidence.lineStatuses.length === item.evidence.reading.length, 'the teacher sees the working as read and a verdict per line');

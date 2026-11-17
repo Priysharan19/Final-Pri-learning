@@ -254,10 +254,18 @@ export async function handIn(db, { classId, assignmentId, studentId, examId, now
   const units = unitsOf(result, paper);
   const attemptIds = units.map(u => u.line?.attemptId).filter(x => typeof x === 'string' && x);
   const modeByAttempt = new Map();
+  // The stored original (original-ink lane, #1018): the id the teacher's
+  // original-work route serves, and its SHA-256. Copied only when well formed.
+  const originalByAttempt = new Map();
   if (attemptIds.length) {
     for (const row of await db.all(`SELECT id,payload_json FROM learning_events WHERE account_id=? AND device_id='server-grader' AND kind='graded-attempt' AND id IN (${IN(attemptIds)})`, [studentId, ...attemptIds])) {
-      const mode = parse(row.payload_json, {})?.inputMode;
+      const payload = parse(row.payload_json, {});
+      const mode = payload?.inputMode;
       if (mode === 'ink' || mode === 'typed') modeByAttempt.set(row.id, mode);
+      const o = payload?.original;
+      if (plain(o) && typeof o.id === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(o.id) && typeof o.sha256 === 'string' && /^[0-9a-f]{64}$/i.test(o.sha256)) {
+        originalByAttempt.set(row.id, { id: o.id, sha256: o.sha256.toLowerCase(), kind: typeof o.kind === 'string' ? clipText(o.kind, 20) : null });
+      }
     }
   }
   const modeOf = u => (inkOf(u.key) ? 'ink' : modeByAttempt.get(u.line?.attemptId) || null);
@@ -289,6 +297,7 @@ export async function handIn(db, { classId, assignmentId, studentId, examId, now
           reading: lines.map(text => clipText(text, 400)),
           inputMode: modeOf(u),
           ink: inkOf(u.key) ? { digest: inkOf(u.key) } : null,
+          original: originalByAttempt.get(u.line?.attemptId) || null,
           lineStatuses: evidence.lines,
           firstBreak: evidence.firstBreak >= 0 ? evidence.firstBreak + 1 : null,
           misconception

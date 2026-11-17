@@ -355,7 +355,7 @@
       "job": "platform-contracts",
       "log": "classroom.log",
       "pins": [
-        {"has":"classroom-check (sqlite): 122 checks passed"},
+        {"has":"classroom-check (sqlite): 123 checks passed"},
         {"has":"class-board-check (sqlite): 23 checks passed"}
       ]
     },
