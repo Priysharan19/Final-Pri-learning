@@ -113,7 +113,8 @@ export async function helpRecordsFor(db, accountId, questionId, q = null, held =
     params.push(accountId, MARKER_SCOPE, questionId, accountId, questionId);
   }
   if (tried.length) {
-    arms.push(`SELECT 'copy', key, response_json FROM idempotency_keys WHERE account_id=? AND scope=? AND key IN (${marks})`);
+    // One '?' per tried-content key, concatenated, not interpolated: the same shape as contentSeen.js (sql-parameterisation-check).
+    arms.push("SELECT 'copy', key, response_json FROM idempotency_keys WHERE account_id=? AND scope=? AND key IN (" + marks + ')');
     params.push(accountId, CONTENT_SCOPE, ...tried);
   }
   const rows = await db.all(arms.join(' UNION ALL '), params);
