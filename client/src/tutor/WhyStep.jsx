@@ -62,7 +62,7 @@ export default function WhyStep({ questionId, stepIndex, locale, onClose }) {
         {turns.map((turn, i) => (
           <div key={i} className={`tutor-note tutor-note-${turn.role === 'tutor' ? (turn.source || 'tutor') : 'you'}`}>
             <span className="tutor-note-src">{turn.role === 'tutor' ? (turn.source === 'tutor' ? null : turn.source === 'safety' ? t('tutor.safety') : t('tutor.why.fromSolution')) : t('tutor.you')}</span>
-            {turn.role === 'tutor' && turn.source === 'tutor' && <AiLabel labelKey="tutor.fromTutor" />}
+            {turn.role === 'tutor' && turn.source === 'tutor' && <AiLabel labelKey={'tutor.fromTutor'} />}
             <MathText text={turn.text} />
           </div>
         ))}

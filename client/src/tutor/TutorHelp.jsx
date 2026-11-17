@@ -231,7 +231,7 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
               {t('tutor.levelButton', { n: n.level, name: text[n.level].name })}
               {n.source === 'deterministic' && n.level < 3 ? ` · ${t('tutor.fromHint')}` : ''}
             </span>
-            {n.source === 'tutor' && <AiLabel labelKey="tutor.fromTutor" />}
+            {n.source === 'tutor' && <AiLabel labelKey={'tutor.fromTutor'} />}
             {n.offline && <small className="tutor-note-why">{t('tutor.fallbackOffline')}</small>}
             {n.text ? <MathText text={n.text} /> : <span>{t('tutor.noHint')}</span>}
           </div>
@@ -247,7 +247,7 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
                 <span className="tutor-note-src">
                   {turn.role === 'student' ? t('tutor.you') : turn.source === 'tutor' ? null : turn.source === 'safety' ? t('tutor.safety') : t('tutor.fromHint')}
                 </span>
-                {turn.source === 'tutor' && <AiLabel labelKey="tutor.fromTutor" />}
+                {turn.source === 'tutor' && <AiLabel labelKey={'tutor.fromTutor'} />}
                 {turn.offline && <small className="tutor-note-why">{t('tutor.fallbackOffline')}</small>}
                 {turn.guarded && <small className="tutor-note-why">{t('tutor.fallbackGuarded')}</small>}
                 {turn.text ? <MathText text={turn.text} /> : <span>{t('tutor.noHint')}</span>}
@@ -255,7 +255,7 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
             ))}
             {asking && (
               <div className="tutor-turn tutor-turn-tutor tutor-turn-streaming" data-tutor-turn="tutor" data-tutor-source="streaming">
-                <span className="tutor-note-src">{t('tutor.fromTutor')}</span>
+                <AiLabel labelKey={'tutor.fromTutor'} />
                 {streaming ? <MathText text={streaming} /> : <span className="tutor-thinking" role="status">{t('tutor.thinking')}</span>}
               </div>
             )}

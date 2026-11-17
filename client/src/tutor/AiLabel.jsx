@@ -8,12 +8,12 @@ import { useT } from '../i18n/index.js';
 export default function AiLabel({ labelKey }) {
   const t = useT();
   return (
-    <span className="ai-label-wrap">
+    <div className="ai-label-wrap">
       <span className="ai-label" data-ai-label>{t(labelKey)}</span>
       <details className="ai-checked" data-ai-checked>
         <summary>{t('ai.checked.link')}</summary>
         <p>{t('ai.checked.body')}</p>
       </details>
-    </span>
+    </div>
   );
 }

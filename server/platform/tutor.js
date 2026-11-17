@@ -756,6 +756,13 @@ export function tutorFeatureEnabled(env = process.env) {
   return String(env.PRI_FEATURE_TUTOR || '').trim() === '1';
 }
 
+/** The free text of a raw (unvalidated) tutor body, in the shape distressReply reads. Never throws. */
+function rawStudentRequest(body) {
+  const b = body && typeof body === 'object' ? body : {};
+  const w = b.studentWork && typeof b.studentWork === 'object' ? b.studentWork : {};
+  return { level: typeof b.level === 'string' ? b.level : 'ask', locale: b.locale === 'hi' ? 'hi' : 'en', message: b.message, history: b.history, studentWork: { lines: w.lines, typedAnswer: w.typedAnswer } };
+}
+
 export function createTutorRouter(db, {
   ask = askTutorModel,
   stream = streamTutorModel,
@@ -977,6 +984,10 @@ export function createTutorRouter(db, {
       if (size > MAX_TUTOR_BODY_BYTES) {
         return res.status(413).json({ error: { code: 'TUTOR_REQUEST_TOO_LARGE', message: `A tutor request is at most ${MAX_TUTOR_BODY_BYTES} bytes.` } });
       }
+      // Read the student's words BEFORE validation, so a long or non-maths message
+      // that validation would refuse still gets the support message (tutorSafety.js).
+      const earlyDistress = distressReply(rawStudentRequest(req.body), { edition: serverEdition(env) });
+      if (earlyDistress) { res.set('Cache-Control', 'no-store'); return res.json({ tutor: earlyDistress }); }
       const checked = validateTutorRequest(req.body);
       if (!checked.ok) return res.status(checked.status).json({ error: { code: checked.code, message: checked.message } });
 
@@ -1177,17 +1188,17 @@ export function createTutorRouter(db, {
       res.status(413).json({ error: { code: 'TUTOR_REQUEST_TOO_LARGE', message: `A tutor request is at most ${MAX_TUTOR_BODY_BYTES} bytes.` } });
       return null;
     }
-    const checked = validateTutorRequest(req.body);
-    if (!checked.ok) { res.status(checked.status).json({ error: { code: checked.code, message: checked.message } }); return null; }
-    const distress = distressReply(checked.request, { edition: serverEdition(env) });
-    if (distress) {
+    const early = distressReply(rawStudentRequest(req.body), { edition: serverEdition(env) });
+    if (early) {
+      // Only a `done` event: no text streams under an AI label before it settles.
       const send = openStream(res);
-      send('meta', { level: distress.level, source: 'safety', model: null, cached: false });
-      send('delta', { text: distress.message });
-      send('done', distress);
+      send('meta', { level: early.level, source: 'safety', model: null, cached: false });
+      send('done', early);
       res.end();
       return null;
     }
+    const checked = validateTutorRequest(req.body);
+    if (!checked.ok) { res.status(checked.status).json({ error: { code: checked.code, message: checked.message } }); return null; }
     if (!TUTOR_STREAM_LEVELS.includes(checked.request.level)) {
       res.status(400).json({ error: { code: 'TUTOR_BODY_INVALID', message: `Only ${TUTOR_STREAM_LEVELS.join(', ')} are streamed; a walkthrough uses /help.` } });
       return null;
