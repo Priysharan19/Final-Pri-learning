@@ -364,6 +364,8 @@ const INDIA_BANK_OF = {
 
 /** Holds the generators of every bank loaded so far, keyed by subtopic id. */
 export const GENERATORS = {};
+/** Further structural forms per skill id: [{ form, make(rng, diff) => { payload, check } }]. */
+export const EXTRA_FORMS = {};
 
 const loaded = new Set();
 const inflight = new Map();
@@ -405,13 +407,19 @@ function bankLoader(name) {
   };
 }
 
+/** Extra structural forms ride with the Indian banks only (india-forms-extra.js), as their own chunk. */
+function extraFormsFor(name) {
+  return String(name).startsWith('india-') ? import('./india-forms-extra.js').then(m => m.EXTRA_FORMS) : Promise.resolve({});
+}
+
 function loadBank(name) {
   const loader = bankLoader(name);
   if (!loader || loaded.has(name)) return Promise.resolve();
   let job = inflight.get(name);
   if (!job) {
-    job = loader().then(bank => {
+    job = Promise.all([loader(), extraFormsFor(name)]).then(([bank, extra]) => {
       Object.assign(GENERATORS, bank);
+      Object.assign(EXTRA_FORMS, extra);
       loaded.add(name);
       inflight.delete(name);
     }, err => {
@@ -592,7 +600,12 @@ export function generateQuestion(subtopicId, difficulty, seed, dotpointId) {
   }
   const rng = makeRng(s);
   const d = Math.min(4, Math.max(1, want | 0));
-  const payload = gen(rng, d);
+  // The established generator is the skill's direct form. Skills with extra
+  // forms draw one from the seed through a separate rng, so the direct form's
+  // own stream (and every seed it already served) is unchanged.
+  const extra = Object.hasOwn(EXTRA_FORMS, subtopicId) ? EXTRA_FORMS[subtopicId] : null;
+  const pick = extra ? Math.floor(makeRng((s ^ 0x2f6b9c1d) >>> 0)() * (extra.length + 1)) : 0;
+  const payload = pick === 0 ? gen(rng, d) : extra[pick - 1].make(rng, d).payload;
   const q = { seed: s, subtopic: subtopicId, difficulty: d, ...payload };
   const { list, source, perQuestion } = dotpointsOf(gen, subtopicId, d, payload);
   q.dotpoints = list.map(dp => dp.id);

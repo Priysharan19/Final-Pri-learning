@@ -11,7 +11,7 @@ Target (owner, Nov 2026): **≥ 10^8 distinct questions per class**. Status belo
 | Class 9 | 32 | ≥ 2.43×10^8 | 2 | 9 | met |
 | Class 10 | 110 | ≥ 1.46×10^8 | 1 | 76 | met |
 | Class 11 | 102 | ≥ 4.01×10^8 | 2 | 61 | met |
-| Class 12 | 93 | ≥ 3.83×10^8 | 2 | 69 | met |
+| Class 12 | 93 | ≥ 3.85×10^8 | 2 | 48 | met |
 
 A class can clear 10^8 through a few very large cells while many of its cells stay thin; the thin-cell count above is the breadth measure, and both are reported so neither hides the other.
 
@@ -347,72 +347,51 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 
 | Generator | D | Draws | Distinct seen | Estimate |
 |---|---|---|---|---|
-| `c12-relations-equivalence` | 3 | 2000 | 3 | 3 |
-| `c12-inverse-trigonometric` | 1 | 2000 | 4 | 4 |
-| `c12-applications-integrals` | 3 | 2000 | 6 | 6 |
-| `c12-continuity-mvt` | 2 | 2000 | 7 | 7 |
-| `c12-applications-integrals` | 4 | 2000 | 7 | 7 |
-| `c12-relations-equivalence` | 4 | 2000 | 8 | 8 |
 | `c12-vector-algebra` | 2 | 2000 | 8 | 8 |
-| `c12-inverse-trigonometric` | 3 | 2000 | 9 | 9 |
-| `c12-applications-integrals` | 2 | 2000 | 9 | 9 |
-| `c12-inverse-trigonometric` | 2 | 2000 | 11 | 11 |
 | `c12-functions-onto-inverse` | 4 | 2000 | 14 | 14 |
-| `c12-random-variable` | 2 | 2000 | 14 | 14 |
 | `c12-functions-onto-inverse` | 2 | 2000 | 16 | 16 |
 | `c12-vector-algebra` | 1 | 2000 | 16 | 16 |
-| `c12-random-variable` | 4 | 2000 | 16 | 16 |
-| `c12-integrals-methods` | 3 | 2000 | 18 | 18 |
-| `c12-integrals-methods` | 4 | 2000 | 19 | 19 |
 | `c12-definite-integrals` | 4 | 2000 | 19 | 19 |
 | `c12-definite-integrals` | 2 | 2000 | 20 | 20 |
-| `c12-differential-equations` | 4 | 2000 | 20 | 20 |
-| `c12-differentiation-rules` | 4 | 2000 | 23 | 23 |
-| `c12-relations-equivalence` | 1 | 2000 | 24 | 24 |
-| `c12-random-variable` | 3 | 2000 | 24 | 24 |
-| `c12-inverse-trigonometric` | 4 | 2000 | 25 | 25 |
-| `c12-integral-properties` | 4 | 2000 | 29 | 29 |
-| `c12-differentiation-rules` | 3 | 2000 | 32 | 32 |
 | `c12-conditional-probability` | 2 | 2000 | 36 | 36 |
-| `c12-probability-bayes` | 4 | 2000 | 36 | 36 |
-| `c12-integral-properties` | 2 | 2000 | 40 | 40 |
-| `c12-relations-equivalence` | 2 | 2000 | 48 | 48 |
 | `c12-applications-derivatives` | 4 | 2000 | 52 | 52 |
-| `c12-applications-integrals` | 1 | 2000 | 56 | 56 |
-| `c12-continuity-mvt` | 3 | 2000 | 72 | 72 |
-| `c12-differentiation-rules` | 1 | 2000 | 90 | 90 |
 | `c12-vector-dot-product` | 3 | 2000 | 107 | 107 |
-| `c12-random-variable` | 1 | 2000 | 118 | 118 |
 | `c12-applications-derivatives` | 1 | 2000 | 144 | 144 |
-| `c12-integral-properties` | 1 | 2000 | 144 | 144 |
 | `c12-determinants` | 3 | 2000 | 192 | 192 |
-| `c12-integrals-methods` | 2 | 2000 | 212 | 212 |
-| `c12-differentiation-rules` | 2 | 2000 | 216 | 216 |
-| `c12-continuity-mvt` | 4 | 2000 | 225 | 225 |
 | `c12-conditional-probability` | 1 | 2000 | 232 | 243 |
-| `c12-differential-equations` | 2 | 2000 | 323 | 323 |
 | `c12-conditional-probability` | 3 | 2000 | 323 | 323 |
-| `c12-related-rates-reasoning` | 3 | 2000 | 351 | 358 |
-| `c12-integrals-methods` | 1 | 2000 | 359 | 361 |
-| `c12-integral-properties` | 3 | 2000 | 360 | 362 |
 | `c12-matrices` | 3 | 2000 | 497 | 504 |
-| `c12-differential-equations` | 1 | 2000 | 503 | 554 |
 | `c12-3d-geometry` | 4 | 2000 | 546 | 624 |
-| `c12-continuity-mvt` | 1 | 2000 | 828 | 927 |
 | `c12-vector-algebra` | 4 | 2000 | 874 | 994 |
 | `c12-matrices` | 4 | 2000 | 880 | 1025 |
-| `c12-probability-bayes` | 1 | 2000 | 974 | 1441 |
-| `c12-probability-bayes` | 2 | 2000 | 974 | 1441 |
-| `c12-probability-bayes` | 3 | 2000 | 974 | 1441 |
 | `c12-definite-integrals` | 1 | 2000 | 1114 | 1542 |
 | `c12-applications-derivatives` | 2 | 2000 | 1163 | 1681 |
-| `c12-differential-equations` | 3 | 2000 | 1202 | 1805 |
-| `c12-rate-approximation-reasoning` | 4 | 2000 | 1001 | 1951 |
-| `c12-inverse-trig-evaluate-reasoning` | 4 | 2000 | 1190 | 2040 |
-| `c12-principal-value-reasoning` | 3 | 2000 | 803 | 2054 |
-| `c12-bijection-reasoning` | 3 | 2000 | 1242 | 2525 |
+| `c12-relations-equivalence` | 1 | 2000 | 780 | 2676 |
+| `c12-probability-bayes` | 4 | 2000 | 887 | 2944 |
+| `c12-principal-value-reasoning` | 3 | 2000 | 1300 | 3337 |
 | `c12-differentiability-reasoning` | 3 | 2000 | 1460 | 3466 |
+| `c12-probability-bayes` | 1 | 2000 | 1158 | 3510 |
 | `c12-monotonic-tangent-reasoning` | 4 | 2000 | 1423 | 3596 |
 | `c12-functions-onto-inverse` | 1 | 2000 | 1541 | 3689 |
+| `c12-probability-bayes` | 2 | 2000 | 1161 | 3819 |
+| `c12-probability-bayes` | 3 | 2000 | 1166 | 3989 |
+| `c12-inverse-trigonometric` | 1 | 2000 | 1254 | 4032 |
+| `c12-relations-equivalence` | 3 | 2000 | 910 | 4133 |
+| `c12-inverse-trigonometric` | 2 | 2000 | 1272 | 4175 |
+| `c12-relations-equivalence` | 2 | 2000 | 907 | 4216 |
+| `c12-inverse-trigonometric` | 3 | 2000 | 1277 | 4280 |
+| `c12-inverse-trigonometric` | 4 | 2000 | 1295 | 4365 |
+| `c12-inverse-trig-evaluate-reasoning` | 4 | 2000 | 968 | 4460 |
+| `c12-relations-equivalence` | 4 | 2000 | 972 | 4599 |
+| `c12-random-variable` | 1 | 2000 | 1500 | 4915 |
+| `c12-applications-integrals` | 1 | 2000 | 1459 | 4948 |
+| `c12-integrals-methods` | 1 | 2000 | 1497 | 5297 |
+| `c12-integrals-methods` | 2 | 2000 | 1510 | 6272 |
 | `c12-inverse-trig-branch-reasoning` | 4 | 2000 | 1307 | 7038 |
+| `c12-bijection-reasoning` | 3 | 2000 | 1092 | 8121 |
 | `c12-optimisation-reasoning` | 3 | 2000 | 666 | 8780 |
+| `c12-differentiation-rules` | 2 | 2000 | 1737 | 9265 |
+| `c12-differentiation-rules` | 1 | 2000 | 1578 | 9324 |
+| `c12-continuity-mvt` | 4 | 2000 | 1566 | 9445 |
+| `c12-random-variable` | 2 | 2000 | 1556 | 9800 |
+| `c12-integrals-methods` | 3 | 2000 | 1399 | 9975 |

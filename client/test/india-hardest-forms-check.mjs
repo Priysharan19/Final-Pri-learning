@@ -42,7 +42,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
 const { inspect } = await import('../../server/test/selfcheck.mjs');
-const { generateQuestion, loadAllBanks, bankOf, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
+const { generateQuestion, loadAllBanks, bankOf, GENERATORS, EXTRA_FORMS } = await import(`${SRC}engine/generators/index.js`);
 await loadAllBanks();
 const { IN_CHAPTERS, IN_CHAPTER_BY_ID, OWN_GENERATOR, INDIA_RETIRED_LOG } = await import(`${SRC}engine/curriculum-in.js`);
 const { INDIA_NATIVE_COVERS } = await import(`${SRC}engine/curriculum-in-native-covers.js`);
@@ -910,6 +910,11 @@ for (const id of ids.filter(id => !ONLY || id.startsWith(ONLY))) {
     const seed = SEED(id, i);
     let q;
     try { q = generateQuestion(id, rungOf[id], seed); } catch (err) { ok(`${id} seed ${seed} generates`, false, err.message); continue; }
+    // An extra structural form (generators/forms) is not the skill's authored D3/D4
+    // form: it varies with difficulty by design and carries its own independent
+    // key check plus a run through the real marker in india-extra-forms-check.mjs.
+    // This suite keeps proving the authored form's solver on every other draw.
+    if (q.form && (EXTRA_FORMS[id] || []).some(f => f.form === q.form)) continue;
     prompts.add(q.prompt);
     const problems = inspect(q);
     if (ok(`${id} seed ${seed} passes the engine self-check`, problems.length === 0, problems.slice(0, 2).join('; '))) inspected++;
