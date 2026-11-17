@@ -82,8 +82,8 @@ export default {
     diagrams: [
       {
         title: '$0.3$ and $0.25$ of the same whole',
-        spec: { kind: 'fractionBar', bars: [{ parts: 10, shaded: 3, label: '0.3' }, { parts: 100, shaded: 25, label: '0.25' }] },
-        note: 'Both bars are the same whole. The first shades $3$ tenths. The second shades $25$ hundredths, which is $2$ tenths and $5$ hundredths. The first shaded part is longer, so $0.3>0.25$.'
+        spec: { kind: 'fractionBar', bars: [{ parts: 10, shaded: 3, label: '0.3' }, { parts: 20, shaded: 5, label: '0.25' }] },
+        note: 'Both bars are the same whole. The first shades $3$ tenths. The second is cut into $20$ parts of $5$ hundredths each and shades $5$ of them: $25$ hundredths, which is $2$ tenths and $5$ hundredths. The first shaded part is longer, so $0.3>0.25$.'
       },
       {
         title: '$0.507$ and $0.57$ between $0.5$ and $0.6$',
@@ -501,7 +501,7 @@ export default {
       },
       {
         title: 'Filling a full turn with $120^\\circ$ corners',
-        spec: { kind: 'numberLineStepper', op: 'multiply', a: 3, b: 120, min: 0, max: 360, step: 30 },
+        spec: { kind: 'numberLineStepper', op: 'multiply', a: 120, b: 3, min: 0, max: 360, step: 30 },
         note: 'Each jump is one hexagon corner of $120^\\circ$. Three jumps land exactly on $360^\\circ$. Regular pentagon corners are $108^\\circ$: three give $324^\\circ$, short of $360^\\circ$, and four give $432^\\circ$, too many. So regular pentagons alone cannot tile.'
       }
     ],
