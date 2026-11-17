@@ -180,6 +180,37 @@ const groups = B.indiaBoardGroups(chapters);
   eq(B.nswAreas(B.syllabusBoard(B.nswBoardGroups(NSW_BOARD_COURSES['k10-stage5']), [], { now: NOW }), null).paperMarks, null, 'Years 7–10: no exam, no marks');
 }
 
+// ── 3b. The focus-area link tables (Pri's teaching maps) ─────────────────────
+{
+  const { NSW_FOCUS_LINKS, autoLayout } = await import('../src/engine/nswFocusLinks.js');
+  eq(Object.keys(NSW_FOCUS_LINKS).sort(), ['advanced', 'extension-1', 'k10-stage4', 'k10-stage5', 'standard-2'], 'link tables for Advanced, Extension 1, Standard 2 and Stages 4 and 5');
+  for (const [key, table] of Object.entries(NSW_FOCUS_LINKS)) {
+    const ids = NSW_BOARD_COURSES[key].groups.map(g => g.id);
+    eq(Object.keys(table.layout).sort(), [...ids].sort(), `${key}: the map places exactly the course's ${ids.length} focus areas`);
+    ok(table.links.every(([a, b]) => ids.includes(a) && ids.includes(b) && a !== b), `${key}: every link joins two of the course's focus areas`);
+    eq(new Set(table.links.map(l => l.join('>'))).size, table.links.length, `${key}: no link is listed twice`);
+    // No cycle: an order exists in which every area comes after what it builds on.
+    const into = new Map(ids.map(id => [id, table.links.filter(([, b]) => b === id).map(([a]) => a)]));
+    const done = new Set(); let progress = true;
+    while (progress) { progress = false; for (const id of ids) if (!done.has(id) && into.get(id).every(a => done.has(a))) { done.add(id); progress = true; } }
+    eq(done.size, ids.length, `${key}: the links have no cycle`);
+    // Generated layouts: strictly left to right. Advanced is the approved hand layout, whose
+    // Integral → Applications of calculus link runs down its last column: never right to left.
+    ok(table.links.every(([a, b]) => (key === 'advanced' ? table.layout[a][0] <= table.layout[b][0] : table.layout[a][0] < table.layout[b][0])),
+      `${key}: every link runs ${key === 'advanced' ? 'left to right or down a column' : 'left to right'} (an area never sits left of what it builds on)`);
+    eq(new Set(Object.values(table.layout).map(c => c.join(','))).size, ids.length, `${key}: no two areas share a place`);
+    ok(Object.values(table.layout).every(([c, r]) => Number.isInteger(c) && Number.isInteger(r) && c >= 0 && r >= 0), `${key}: whole, non-negative columns and rows`);
+  }
+  // autoLayout: deterministic, and it refuses a cycle or an unknown area.
+  const L = [['a', 'b'], ['b', 'c'], ['a', 'c']];
+  eq(autoLayout(['a', 'b', 'c'], L), autoLayout(['a', 'b', 'c'], L), 'the layout is the same every time');
+  eq(autoLayout(['a', 'b', 'c'], L).c[0], 2, 'an area goes one column past the longest chain into it');
+  let threw = ''; try { autoLayout(['a', 'b'], [['a', 'b'], ['b', 'a']]); } catch (e) { threw = e.message; }
+  ok(/cycle/.test(threw), 'a cyclic table is refused');
+  threw = ''; try { autoLayout(['a'], [['a', 'zz']]); } catch (e) { threw = e.message; }
+  ok(/unknown/.test(threw), 'a link to an unknown area is refused');
+}
+
 // ── 4b. hsc-forecast's ranges (PR #1003 API), the area roll-up ──────────────
 {
   const adv = B.syllabusBoard(B.nswBoardGroups(NSW_BOARD_COURSES.advanced), [], { now: NOW });
