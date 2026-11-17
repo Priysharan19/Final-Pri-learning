@@ -147,6 +147,10 @@ const StepCoachLive = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor
 // fetched only when a step report actually has a break. A chunk that cannot
 // load (offline, a stale deploy) shows nothing rather than breaking the card.
 const MistakeGraph = React.lazy(() => import('./MistakeGraph.jsx').catch(() => ({ default: () => null })));
+// Annotated working: each checked line's named rule, numbered against the ink,
+// and the evaluation built from the receipt. Engine-only, feedback only, and
+// its own chunk; a chunk that cannot load shows the plain step report instead.
+const AnnotatedWorkingPart = React.lazy(() => import('./AnnotatedWorking.jsx').catch(() => ({ default: () => null })));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -2130,6 +2134,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // its verdict is shown without a marks figure rather than with a claim that
   // marks are missing.
   const shownGrade = committedGrade;
+  // The annotated panel reads only what the marked attempt already holds: the
+  // step report, the lines that were checked, the receipt and the released
+  // solution. It never marks: the receipt's marks are passed through as-is.
+  // "Marked again · attempt n": the distinct server submissions this card has
+  // seen marked, for this question only.
+  const markedSubmissions = useRef({ id: null, seen: new Set() });
+  if (markedSubmissions.current.id !== question?.id) markedSubmissions.current = { id: question?.id, seen: new Set() };
+  const markedId = (resolved ? res?.submissionId : state.res?.submissionId);
+  if (typeof markedId === 'string' && markedId && (resolved || gradedRetry)) markedSubmissions.current.seen.add(markedId);
+  const markedCount = markedSubmissions.current.seen.size;
+  const awInput = useMemo(() => {
+    if (!resolved || previousAttempt || !res || res.revealed || res.invalid || !Array.isArray(res.stepReport?.lines) || res.stepReport.lines.length < 2) return null;
+    const lines = writeMode ? (judged?.lines || inkResult?.lines || []) : String(working || '').split('\n').filter(Boolean);
+    return {
+      lines, stepReport: res.stepReport, solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed',
+      receipt: shownGrade ? { awarded: shownGrade.awarded, possible: shownGrade.possible, id: typeof res.submissionId === 'string' ? res.submissionId : null } : null,
+      attempt: markedCount
+    };
+  }, [resolved, previousAttempt, res, writeMode, judged, inkResult, working, shownGrade, markedCount]);
+  const [awModel, setAwModel] = useState(null);
+  useEffect(() => { if (!awInput) setAwModel(null); }, [awInput]);
   const instrumentScore = INSTRUMENT && !!shownGrade && Number.isFinite(Number(shownGrade.awarded))
     && Number(shownGrade.possible) > 0 && Number(shownGrade.awarded) >= 0 && Number(shownGrade.awarded) <= Number(shownGrade.possible);
 
@@ -2843,13 +2868,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             </div>
           </div>
         ) : (
-          <div className="ink-row">
+          <div className={`ink-row${awModel ? ' aw-row' : ''}`}>
             {/* data-marked starts the reading sweep (theme.css): it appears only
                 when the deterministic engine has actually marked this page. */}
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
                 <InkAnswer feedback autoRead={!resolved} liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                  lineMarkers={awModel && writeMode && awModel.cards.length === (inkResult?.lines?.length || 0) ? awModel.cards.map(c => c.n) : null}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
                   focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
@@ -2949,6 +2975,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </div>
               )}
             </div>
+            {awInput && writeMode && awModel && (
+              <React.Suspense fallback={null}>
+                <AnnotatedWorkingPart part="comments" input={awInput} />
+              </React.Suspense>
+            )}
           </div>
         )}
 
@@ -3169,7 +3200,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </div>
         )}
 
-        {firstBad && (
+        {firstBad && !awModel && (
           <div className="ink-comments">
             <div className="ink-comment bad">
               <div className="ic-head">{t('verdict.lookHere')}<span className="ic-line">{t('verdict.onLine', { n: firstBad.line })}</span></div>
@@ -3201,7 +3232,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             )}
           </div>
         )}
-        {!firstBad && cloudWorkingNote && (
+        {(!firstBad || awModel) && cloudWorkingNote && (
           <div className="ink-comments">
             <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`}>
               <div className="ic-head">{t(cloudWorkingNote.tone === 'break' ? 'verdict.whereItBreaks' : cloudWorkingNote.tone === 'maybe' ? 'verdict.possibly' : 'verdict.yourAlgebra')}</div>
@@ -3287,7 +3318,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {!verdictGood && res.solution && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={answerToTex(res.solution.answerText)} /></b></div>
                 )}
-                {res.stepReport && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}
+                {awInput && (
+                  <React.Suspense fallback={null}>
+                    <AnnotatedWorkingPart part={writeMode ? 'evaluation' : 'both'} input={awInput} onModel={setAwModel} />
+                  </React.Suspense>
+                )}
+                {res.stepReport && !awModel && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}
                 {/* Only display the matched server receipt after resolution. */}
                 {serverAuthoritative && shownGrade && <VerifiedMarkBreakdown result={res} grade={shownGrade} />}
                 {boardAward && (

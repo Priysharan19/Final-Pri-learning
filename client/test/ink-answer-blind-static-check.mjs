@@ -39,6 +39,11 @@ export const ALLOWED_MEMBERS = Object.freeze(['answerType']);
 export const INK_ANSWER_PROPS = Object.freeze([
   'key', 'onRecognized', 'onReaderState', 'onStrokes', 'initialStrokes', 'height', 'disabled',
   'lineVerdicts', 'focusSymbol', 'recognitionContext',
+  // Reviewed 2026-11-18 (annotated working): the card number of each line's
+  // comment (1, 2, 3 …), drawn beside the ink after marking. Only integers
+  // derived from the line order of the step report; nothing about the
+  // question or its answer, and it never reaches the reader request.
+  'lineMarkers',
   // Reviewed 2026-10-10: a boolean, `saveState === 'saved'` on the card (the
   // IndexedDB readback of the student's own strokes). It only chooses whether
   // the waiting sentence may say "saved"; it carries nothing about the

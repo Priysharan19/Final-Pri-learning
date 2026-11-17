@@ -17,6 +17,7 @@ import { answerTooLong } from './checker-core.js';
 import { changedTerm } from './slips.js';
 import { checkGeometry } from './geometryFacts.js';
 import { checkProof } from './proofSteps.js';
+import { SIDE_LABEL, labelConfirms, proofVerdict } from './proofShape.js';
 import {
   assessEquationLine, sameEquationClaim, sameExpressionClaim,
   assessRelationLine, assessDerivativeLine, differentiateAst, parseRelation
@@ -231,6 +232,49 @@ function readSolutionList(raw, meta) {
   return { values: uniqueNumeric(values), invalid: false };
 }
 
+// ── A proof's lines (items that state their sides) ──────────────────────────
+// A "prove LHS = RHS" item may state its two sides (stepMeta.sides). For such
+// an item the target is printed in the prompt, and every expression equal to
+// the left-hand side passes the equivalence test, so its lines are read more
+// strictly than other working (proofShape.js says why):
+//   · every '='-segment of a line is checked, not only the last;
+//   · "LHS" / "RHS" stands for the stated side, and a closing "= RHS" counts
+//     only directly after a line that already is the right-hand side;
+//   · a line that only states the identity (LHS = RHS) is a note, not a step.
+// An item without stated sides is read exactly as before.
+const hasSides = meta => !!meta?.sides && typeof meta.sides.lhs === 'string' && typeof meta.sides.rhs === 'string';
+function statedSide(candidate, meta) {
+  const m = SIDE_LABEL.exec(String(candidate ?? ''));
+  if (!m || !hasSides(meta)) return candidate;
+  return m[1].toLowerCase() === 'l' ? meta.sides.lhs : meta.sides.rhs;
+}
+const PROOF_SLIP = 'This line is no longer equal to the expression you started with — the slip is here.';
+function proofLine(text, cleaned, previousText, meta) {
+  const body = cleaned.replace(/^\s*(to\s+prove\s*:?|hence|so|thus|therefore|∴)\s*/i, '').replace(/^\s*=\s*/, '');
+  const segments = body.split('=').map(x => x.trim());
+  if (segments.some(x => !x)) return { status: 'break', note: PROOF_SLIP };
+  const labels = segments.map(x => SIDE_LABEL.test(x));
+  if (segments.length >= 2 && labels.every(Boolean)) {
+    return { status: 'note', note: 'This line states what is to be proved; the lines of working are what is checked.' };
+  }
+  const lastIsLabel = labels[labels.length - 1];
+  if (lastIsLabel && (segments.length >= 2 || /^\s*=/.test(cleaned)) && !labelConfirms(text, previousText, meta.sides)) {
+    const side = /^\s*l/i.test(segments[segments.length - 1]) ? 'left' : 'right';
+    return { status: 'break', note: `This line says it has reached the ${side}-hand side, but the expression before it is not yet the ${side}-hand side.` };
+  }
+  for (const seg of segments) {
+    if (!exprEquivalent(statedSide(seg, meta), meta.canonical, { positiveOnly: meta.positiveOnly })) return { status: 'break', note: PROOF_SLIP };
+  }
+  return { status: 'ok' };
+}
+const PROOF_SHAPE_NOTE = {
+  start: 'A proof starts from one side of the identity, written as the question gives it.',
+  'no-steps': 'A proof needs the steps between the two sides: write the working that turns one side into the other.',
+  end: 'The working does not reach the other side of the identity yet.',
+  'no-meet': 'The two sides were worked separately but do not reach the same expression.',
+  unread: 'Pri could not read this proof as a chain of equal expressions.'
+};
+
 export function checkWorking(q, workingText) {
   return withEvaluationBudget(EVALUATION_BUDGET, () => checkWorkingWithinBudget(q, workingText));
 }
@@ -266,7 +310,7 @@ function checkWorkingWithinBudget(q, workingText) {
     } else {
       const cleaned = normalize(lastLine.text).replace(/^∴\s*/, '');
       if (ans.final?.kind === 'expr') {
-        const cand = cleaned.includes('=') ? cleaned.split('=').pop() : cleaned;
+        const cand = statedSide(cleaned.includes('=') ? cleaned.split('=').pop() : cleaned, meta);
         reached = exprEquivalent(cand, ans.final.expr, { positiveOnly: ans.final.positiveOnly, isolatedDomain: true, strictDomain: ans.final.strictDomain === true });
       } else if (meta.kind === 'equation') {
         const re = new RegExp(`${meta.variable}\\s*=`);
@@ -283,6 +327,19 @@ function checkWorkingWithinBudget(q, workingText) {
     }
   } catch { reached = false; }
 
+  // A proof is complete only in the shape of a proof (proofShape.js). For an
+  // item that states its sides the shape decides: a chain of checked lines
+  // that reaches the other side, written out, or two chains that meet at the
+  // same written expression. The last-line test above cannot see a proof
+  // worked from the right-hand side towards a left-hand side, or one that
+  // meets in the middle, when the right-hand side is a constant (… = 1): the
+  // last line still holds the angle. The shape needs every checked line and
+  // a written side, so it never credits what the lines do not show.
+  if (hasSides(meta)) {
+    const verdict = proofVerdict(report.lines.filter(l => l.status === 'ok').map(l => normalize(String(l.text))), meta.sides);
+    if (!verdict.ok) return { correct: false, feedback: PROOF_SHAPE_NOTE[verdict.reason] || PROOF_SHAPE_NOTE.unread, stepReport: report, validLines: okLines.length, proofShape: verdict.reason };
+    reached = true;
+  }
   if (!reached) {
     return { correct: false, feedback: 'Your verified steps do not yet end with the complete result — state every solution or the requested simplified expression on the final line.', stepReport: report, validLines: okLines.length };
   }
@@ -1108,6 +1165,11 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             pendingExtraneous = []; expLogChain = false;
           }
         }
+      } else if (meta.kind === 'expression' && hasSides(meta)) {
+        const before = [...out].reverse().find(l => l.status === 'ok');
+        const judged = proofLine(line, cleaned, before ? normalize(String(before.text)) : '', meta);
+        status = judged.status;
+        if (judged.note) note = judged.note;
       } else if (meta.kind === 'expression') {
         // An indefinite integral or a derivative is read as calculus
         // (calculusSteps.js): the question restated is the START, an

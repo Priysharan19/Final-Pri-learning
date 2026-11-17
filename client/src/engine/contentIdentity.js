@@ -58,6 +58,9 @@
 // carried from 30/2/1 (#859; its Q12 is 30/2/1 Q15 word for word).
 // 2026.11.19 — #856 and #859 together (salvaged from Train 18); neither PR's own version describes
 // the merged content.
+// 2026.11.18 (annotated-working) — "Prove that …" trigonometric identities as line-by-line working
+// (identityProofs.js): Extension 1 me11-trigid D4 and CBSE X trigonometry D4
+// each serve them beside their existing forms.
 // 2026.11.20 — review fix: 30/2/3 prompts had single-backslash LaTeX (tab and lost-backslash
 // corruption), its Q12 duplicated 30/2/1 Q15 and is dropped, and a stray tab in 30/2/1 Q1's step is mended.
 export const CONTENT_VERSION = '2026.11.20';

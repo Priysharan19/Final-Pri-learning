@@ -5,6 +5,7 @@
 // more than two right triangles.
 import { ri, rc, Frac, mcq, rad, r1 } from '../qhelpers.js';
 import { figRightTriangle } from '../figures.js';
+import { identityProof } from './identityProofs.js';
 
 // Primitive Pythagorean triples [a, b, c] with c < 1700 (Euclid's formula),
 // so every ratio is an exact fraction already in lowest terms.
@@ -121,6 +122,8 @@ export function currentClass10Trigonometry(rng, diff) {
     };
   }
 
+  // "Prove that …": an identity proved line by line (identityProofs.js).
+  if (rng() < 0.5) return { ...identityProof(rng, 'cbse'), dotpoint: 3, trigSkill: 'identity-proof' };
   const m = mcq(rng, '$1-\\sin^2A=\\cos^2A$', [
     { text: '$1-\\sin A=\\cos A$', why: 'The Pythagorean identity involves squares; removing the powers is not a valid algebraic consequence.' },
     { text: '$1+\\sin^2A=\\cos^2A$', why: 'Rearranging $\\sin^2A+\\cos^2A=1$ requires subtracting $\\sin^2A$ from both sides.' },

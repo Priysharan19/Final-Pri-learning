@@ -134,3 +134,9 @@
 .ink-read-hint { font-size: 12.5px; }
 .ink-preview.is-stale .ink-line-math { opacity: 0.55; }
 .ink-stale { font-weight: 600; }
+
+/* Numbered markers that link a checked line to its comment card. */
+.ink-marker-layer { position: absolute; inset: 0; pointer-events: none; z-index: 5; }
+.ink-aw-marker { position: absolute; display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 10px; border: 1px solid var(--hairline-strong); background: var(--surface-raised); color: var(--ink);
+  font: 600 11.5px/1 var(--font); font-variant-numeric: tabular-nums; }
