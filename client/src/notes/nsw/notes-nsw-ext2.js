@@ -167,7 +167,7 @@ export default {
     prereqs: ['mav-12-05', 'me1-12-04'],
     concepts: [
       { title: 'Integration by parts', body: 'Reverse the product rule: $\\int u\\,dv=uv-\\int v\\,du$. Choose $u$ to be the factor that gets simpler when differentiated, such as $x$ or $\\ln x$, and $dv$ the factor you can integrate, such as $e^x$.' },
-      { title: 'Partial fractions and standard forms', body: 'Split a rational function with distinct linear factors into simple fractions, for example $\\dfrac{1}{(x-1)(x+2)}=\\dfrac13\\left(\\dfrac1{x-1}-\\dfrac1{x+2}\\right)$, and integrate each to a logarithm. Quadratics with no real roots lead to $\\dfrac1a\\tan^{-1}\\dfrac xa$; square roots of $a^2-x^2$ lead to $\\sin^{-1}\\dfrac xa$.' },
+      { title: 'Partial fractions and standard forms', body: 'Split a rational function with distinct linear factors into simple fractions, for example $\\dfrac{1}{(x-1)(x+2)}=\\dfrac13\\left(\\dfrac1{x-1}-\\dfrac1{x+2}\\right)$, and integrate each to a logarithm. A quadratic with no real roots is first written as $(x+b)^2+a^2$ by completing the square, and then gives $\\dfrac1a\\tan^{-1}\\dfrac{x+b}a$; square roots of $a^2-x^2$ lead to $\\sin^{-1}\\dfrac xa$.' },
       { title: 'Reduction formulae', body: 'A reduction formula writes $I_n$ in terms of an earlier member such as $I_{n-2}$, found by parts. Compute the smallest cases directly, then build up to the one you need, keeping the limits in each step.' }
     ],
     definitions: [
@@ -239,7 +239,7 @@ export default {
     ],
     mistakes: [
       { wrong: 'Terminal velocity means the body has stopped.', right: 'It is the constant speed at which the resistance balances the weight. The acceleration is zero, not the velocity.' },
-      { wrong: 'Using $\\ddot x=g-kv$ for a body moving upwards with downward positive left unchanged.', right: 'The resistance acts against the motion. Choose the positive direction first and write the sign of every force from it.' },
+      { wrong: 'Using $\\ddot x=g-kv^2$ for a body moving upwards with downward positive, left unchanged.', right: 'When $v<0$ the resistance still acts downwards, so write $\\ddot x=g+kv^2$ for the upward motion, or $\\ddot x=g-kv|v|$ for both directions. Choose the positive direction first and write the sign of every force from it.' },
       { wrong: 'The period of $\\ddot x=-9x$ is $\\tfrac{2\\pi}{9}$.', right: 'The coefficient is $n^2=9$, so $n=3$ and the period is $\\tfrac{2\\pi}{3}$.' }
     ],
     examples: [
