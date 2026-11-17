@@ -239,29 +239,29 @@ Answer type: mcq. Printed answer: `A` (options: 0: B; 1: A; 2: C; 3: All equal).
 
 ## Squares and Square Roots (Class 8) · `c8-squares-roots-ncert-mastery` D1 seed 1
 
-> Find the square root of $4489$.
+> The perfect square $4562496$ has how many digits in its square root?
 
-Answer type: numeric. Printed answer: `67`.
+Answer type: numeric. Printed answer: `4`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `67` | ✓ credited | |
-| as a sum still to do | `66 + 1` | refused (D13) | |
-| a neighbouring value | `68` | ✗ wrong | |
-| a contradicting unit | `67 kg` | unread | |
+| key | `4` | ✓ credited | |
+| as a sum still to do | `3 + 1` | refused (D13) | |
+| a neighbouring value | `5` | ✗ wrong | |
+| a contradicting unit | `4 kg` | unread | |
 
 ## Cubes and Cube Roots (Class 8) · `c8-cubes-roots-ncert-mastery` D1 seed 1
 
-> Find the square root of $4489$.
+> The perfect square $4562496$ has how many digits in its square root?
 
-Answer type: numeric. Printed answer: `67`.
+Answer type: numeric. Printed answer: `4`.
 
 | Writing | Input | Pri's verdict | Examiner |
 |---|---|---|---|
-| key | `67` | ✓ credited | |
-| as a sum still to do | `66 + 1` | refused (D13) | |
-| a neighbouring value | `68` | ✗ wrong | |
-| a contradicting unit | `67 kg` | unread | |
+| key | `4` | ✓ credited | |
+| as a sum still to do | `3 + 1` | refused (D13) | |
+| a neighbouring value | `5` | ✗ wrong | |
+| a contradicting unit | `4 kg` | unread | |
 
 ## Comparing Quantities (Class 8) · `c8-comparing-quantities-ncert-mastery` D1 seed 1
 
@@ -1062,4 +1062,4 @@ Answer type: numeric. Printed answer: `378`.
 | a neighbouring value | `379` | ✗ wrong | |
 | a contradicting unit | `378 kg` | unread | |
 
-**Sample digest (sha256 of everything above this line):** `5122bf26d9b00468ee754ca46e202aea458288b9cb31ddfd98e0db3ba0f34a12`
+**Sample digest (sha256 of everything above this line):** `2a7688357cf21399fd2744b6554711e16fddece54612c83fbe2fa0bc891095d1`

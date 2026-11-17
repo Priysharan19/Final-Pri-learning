@@ -8,6 +8,8 @@ Legend: **AI-A** nothing found wrong · **AI-C** a change is suggested (wording,
 
 Items: 56 of 56 · AI-A 18 · AI-C 38 · AI-R 0
 
+> **Not pre-reviewed (4 items).** These cells joined the packet on train 25, after this file was written. The rows at the end of the table carry AI-C only because the table needs a verdict; none was formed. No pre-review has looked at them, and nothing here says they are right or wrong. A human examiner reviews them like every other item.
+
 | Item | AI verdict | Reason | Defect to fix |
 |---|---|---|---|
 | cbse-policy:ap-ecf | AI-C | No worked case; "AP/ECF" is not defined in the packet, so I cannot confirm it matches Board practice (one arithmetic/accuracy penalty, then ECF). | State the rule explicitly: one deduction per slip, ECF only while the method stays valid. |
@@ -66,3 +68,7 @@ Items: 56 of 56 · AI-A 18 · AI-C 38 · AI-R 0
 | cbse-bank:y8-equations/D1 | AI-A | x = 6 is correct; acceptable. | — |
 | cbse-bank:y8-equations/D2 | AI-A | x = 5 is correct; acceptable. | — |
 | cbse-bank:y8-equations/D3 | AI-C | x = 5 is correct, but 3 marks with no step credit. | Add step marks. |
+| cbse-bank:y10-quadratics/D2 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:y7-angles/D1 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:y7-angles/D2 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:y7-angles/D3 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
