@@ -56,7 +56,7 @@ export default function Today() {
           </ol>
         </>
       )}
-      <p><Link to="/error-log" data-today-errorlog>{t('today.errorLogLink')}</Link></p>
+      <p style={{ marginTop: 16 }}><Link to="/error-log" className="btn btn-ghost btn-sm" data-today-errorlog>{t('today.errorLogLink')}</Link></p>
     </div>
   );
 }
