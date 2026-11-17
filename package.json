@@ -246,6 +246,7 @@
     "test:a11y:prithagoras": "PRI_EDITION=prithagoras node client/test/a11y-gate.mjs",
     "test:paywall:edition": "node client/test/tour-paywall-edition.js",
     "test:nsw:exams:tour": "node client/test/tour-nsw-exams.js",
+    "test:paper-generator:tour": "node client/test/tour-paper-generator.js",
     "test:aurora": "node client/test/aurora-skin-check.mjs",
     "test:focus:push": "node client/test/focus-push-check.mjs",
     "test:working": "node client/test/working-indicator-check.mjs",
