@@ -46,6 +46,11 @@ function pair(q) {
     case 'numeric': {
       if (a.simplestFraction) return { right: `${a.simplestFraction.n}/${a.simplestFraction.d}`, wrong: `${a.simplestFraction.n + a.simplestFraction.d}/${a.simplestFraction.d}`, rule: 'numerator + denominator' };
       if (a.surdForm) return { right: `${a.surdForm.k}sqrt(${a.surdForm.r})`, wrong: `${a.surdForm.k + 1}sqrt(${a.surdForm.r})`, rule: 'coefficient + 1' };
+      // An exact-value demand is answered in its authored exact form: a
+      // twelve-figure decimal of 3π/4 is a calculator display, not the value.
+      if (a.requireExact && typeof a.canonicalInput === 'string' && Number.isFinite(a.value)) {
+        return { right: a.canonicalInput, wrong: fmt(a.value + Math.max(1, Math.abs(a.value) * 0.1)), rule: 'value + max(1, 10%)' };
+      }
       if (!Number.isFinite(a.value)) return null;
       const step = Math.max(1, Math.abs(a.value) * 0.1, (a.tol || 0) * 4);
       return { right: fmt(a.value), wrong: fmt(a.value + step), rule: 'value + max(1, 10%, 4·tol)' };

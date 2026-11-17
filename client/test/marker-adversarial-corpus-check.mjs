@@ -204,8 +204,154 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   else failures.push(`${G} · c10-arithmetic-progressions D2 seed 1009: normal [${normal}] vs slow clock [${slow}]`);
 }
 
+// ── SymPy differential oracle, 2026-11-18 · 75 cases ────────────────────────
+// tools/math-oracle found the checker crediting each wrong answer below
+// (docs/evidence/sympy-oracle-2026-11-18.md, PR #993): a calculator display of an exact
+// value on a question that demands the exact value, and final-answer
+// expressions that agree with the key only at the published sample points or
+// only within the 1e-6 sampling band. Each sits beside a right answer the
+// repair must keep. Not covered, and recorded as residual in the report: a
+// perturbation below binary64 noise of a large expression ((x² + 9)⁶/3 +
+// 0.0000001x), which sampling cannot see; that needs an exact polynomial path.
+{
+  const G = 'sympy-oracle-2026-11-18';
+  const exprQ = (expr, extra = {}) => ({ answerType: 'expression', answer: { expr, ...extra } });
+  const vanishing = '(x - 0.7)(x - 1.3)(x + 0.6)(x - 2.1)(x + 1.7)(x - 0.35)(x - 3.4)(x + 2.3)';
+  for (const [id, d, seed, right, wrong] of [
+    ['me11-inversetrig', 4, 28001, ['3pi/4', '2.356194490192345'], ['2.3561944902', '2.356194490', '2.35619449']],
+    ['me12-calc', 3, 21002, ['1400pi/3'], ['1466.076572', '1466.0765716752']],
+    ['me12-calc', 3, 21001, ['9pi'], ['28.2743338823']],
+    ['y11-trigfunc', 1, 7001, ['4', '4.0'], ['4.0000000001']],
+    ['y12-trigcalc', 3, 21001, ['-1'], ['-0.9999999999']],
+    ['c8-rational-numbers-distributivity', 4, 28001, ['0'], ['0.0000000001']],
+    ['y9-algebra', 3, 21001, ['(x - 13)(x + 13)'], ['x^2 - 169 + 0.0000001*x', `x^2 - 169 + ${vanishing}`]],
+    ['mex-proof', 3, 21001, ['32n'], ['32*n + 0.00001*n']],
+    ['y11-diff', 1, 7001, ['18x'], ['18*x + 0.00001*x']]
+  ]) {
+    const q = generateQuestion(id, d, seed);
+    for (const r of right) expect(G, `${id}-right-${r}`, q, r, true);
+    for (const w of wrong) expect(G, `${id}-wrong-${w.slice(0, 24)}`, q, w, false);
+  }
+  const square = exprQ('x^2');
+  for (const r of ['x*x', '(-x)^2', 'x^2']) expect(G, `x^2-right-${r}`, square, r, true);
+  for (const w of ['x^2 + 0.0000001x', `x^2 + ${vanishing}`, 'x^2 + 0.000001x^3']) expect(G, `x^2-wrong-${w.slice(0, 24)}`, square, w, false);
+  // Padded with zero of a huge size, so an answer could widen its own band (#992 review).
+  const y9 = generateQuestion('y9-algebra', 3, 21001);
+  for (const [q, w] of [
+    [square, 'x^2 + 0.0000001x + (10^20 - 10^20)'], [square, 'x^2 + 0.0000001x + 100000 - 100000'],
+    [square, `x^2 + ${vanishing} + (10^20 - 10^20)`], [square, 'x^2 + 0.0000001x + 10^6 x - 10^6 x'],
+    [y9, 'x^2 - 169 + 0.0000001*x + (10^20 - 10^20)'], [y9, 'x^2 - 169 + 0.0000001*x + (x^12 - x^12)'],
+    [y9, `x^2 - 169 + ${vanishing} + (10^20-10^20)`],
+    [generateQuestion('mex-proof', 3, 21001), '32*n + 0.00001*n + (10^20 - 10^20)'],
+    [generateQuestion('y11-diff', 1, 7001), '18*x + 0.00001*x + (10^20 - 10^20)'],
+    // round 4: a zero padded just under the readability limit, and a zero
+    // defined only near the published sample points
+    [square, 'x^2 + 0.0000001x + (20000000.5 - 20000000.5)'], [square, 'x^2 + 0.0000001x + (1.1-1.1)*15000000'],
+    [y9, 'x^2 - 169 + 0.0000001*x + (1.1-1.1)*10^9'],
+    [generateQuestion('mex-proof', 3, 21001), '32n + 0.00001n + (1.1-1.1)*640000000n'],
+    [generateQuestion('mex-proof', 3, 21001), '32n + 0.000001n + 12! - 12!'],
+    [generateQuestion('y11-diff', 1, 7001), '18x + 0.00001x + (1.1-1.1)*450000000x'],
+    [square, `x^2 + 0.0000001x + 0*sqrt(0.0001 - (${vanishing})^2)`], [square, `x^2 + 0.0000001x + 0*ln(0.0001 - (${vanishing})^2)`],
+    // round 5: a zero noisy only where the answer is wrong (H = x + |x|), a term
+    // that vanishes on the sampled interval only, and a sub-binary64 coefficient
+    [square, `x^2 + ${vanishing}*(x+abs(x)) + (1.1-1.1)*10^20*(x+abs(x))`], [square, `x^2 + ${vanishing}*(x+abs(x)) + (1.1-1.1)*10^15*(x+abs(x))`],
+    [square, 'x^2 + 0.0000001*(x+abs(x)) + (1.1-1.1)*10^20*(x+abs(x))'], [y9, 'x^2 - 169 + 0.0000001*(x+abs(x)) + (1.1-1.1)*10^20*(x+abs(x))'],
+    [generateQuestion('mex-proof', 3, 21001), '32n + 0.00001*(n-4.5+abs(n-4.5)) + (1.1-1.1)*10^20*(n-4.5+abs(n-4.5))'],
+    [square, 'x^2 + 0.0000001x + (sin(x)^2 + cos(x)^2 - 1)*10^20*(x+abs(x))'], [square, 'x^2 + 0.0000000001x'],
+    // round 6: a function call or a power past the exact bounds used to leave the
+    // wide probes behind
+    [square, 'x^2 + 1000(x-4+abs(x-4))*cos(0)'], [square, 'x^2 + 1000(x-4+sqrt((x-4)^2))'], [square, 'x^2 + 1000(x-4+abs(x-4)) + 0*sin(x)'],
+    [square, 'x^2 + 1000(x-4+abs(x-4)) + 0*(x^2+1)^70'], [y9, 'x^2 - 169 + 1000(x-4+abs(x-4))*cos(0)'],
+    [generateQuestion('mex-proof', 3, 21001), '32n + (n-8.5+abs(n-8.5))*cos(0)'], [square, 'x^2 + 0.0000001x*cos(0)'],
+    // round 7: a term negligible near the origin that dominates far out, past the exact bounds
+    [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x^30/1e90'], [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x^30/10^90'],
+    [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x^80/10^300'], [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x^100/10^300'],
+    [square, 'x^2+x^30/1e90'],
+    // round 8: the wide probes visit every decade from 10 to 10^6
+    [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x^8/1e40'], [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x*abs(x)^20/1e130'],
+    [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+sqrt(abs(x))^60/1e90'], [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+exp(x)/1e50'],
+    [{ answerType: 'expression', answer: { expr: 'abs(2x + 7)^7' } }, '128x^7 + 3136x^6 + 32928x^5 + 192080x^4 + 672280x^3 + 1411788x^2 + 1647086x + 823543']
+  ]) expect(G, `padded-${w.slice(0, 48)}`, q, w, false);
+  const thirdExact = { answerType: 'numeric', prompt: 'Find the exact value.', answer: { value: 1 / 3, requireExact: true } };
+  for (const r of ['1/3', '0.333333333333']) expect(G, `third-right-${r}`, thirdExact, r, true);
+  for (const w of ['0.3333333333', '0.33333333']) expect(G, `third-wrong-${w}`, thirdExact, w, false);
+}
+
+// ── The probe keeps right answers right · 1091 cases ─────────────────────────
+// Independent review of the probe above (PR #992): an expanded high-degree
+// polynomial is a difference of large terms and carries their rounding, so a
+// band on the result alone refused (2x + 7)⁷ written out. Every expansion of
+// (ax + b)ⁿ for n 2–7, a 1–5, b ±1–9 must stay right.
+{
+  const G = 'sympy-oracle-2026-11-18-controls';
+  const binom = (n, k) => { let r = 1n; for (let i = 1n; i <= BigInt(k); i++) r = r * (BigInt(n) - i + 1n) / i; return r; };
+  const expand = (a, b, n) => {
+    const terms = [];
+    for (let k = n; k >= 0; k--) {
+      const c = binom(n, k) * BigInt(a) ** BigInt(k) * BigInt(b) ** BigInt(n - k);
+      terms.push(`${c}${k ? `x${k > 1 ? `^${k}` : ''}` : ''}`);
+    }
+    return terms.join(' + ').replace(/\+ -/g, '- ');
+  };
+  for (let n = 2; n <= 7; n++) for (let a = 1; a <= 5; a++) for (const b of [-9, -8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    expect(G, `expanded-(${a}x+${b})^${n}`, { answerType: 'expression', answer: { expr: `(${a}x + ${b})^${n}` } }, expand(a, b, n), true);
+  }
+  expect(G, 'expanded-(2x+7)^7-review', { answerType: 'expression', answer: { expr: '(2x + 7)^7' } }, '128x^7 + 3136x^6 + 32928x^5 + 192080x^4 + 672280x^3 + 1411788x^2 + 1647086x + 823543', true);
+  // …and the reverse (key expanded, answer factored), and keys whose noise is in
+  // a denominator, an abs or a root (third review of #992).
+  for (let n = 2; n <= 7; n++) for (let a = 1; a <= 5; a++) for (const b of [-9, -8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+    expect(G, `factored-(${a}x+${b})^${n}`, { answerType: 'expression', answer: { expr: expand(a, b, n) } }, `(${a}x + ${b})^${n}`, true);
+  }
+  for (const [key, answer, extra] of [
+    ['abs(2x + 7)^7', expand(2, 7, 7), { positiveOnly: true }], ['abs(2x - 5)^8', expand(2, -5, 8)], ['sqrt((2x - 5)^16)', expand(2, -5, 8)],
+    ['(2x + 7)^(-7)', `1/(${expand(2, 7, 7)})`], ['1/(x - 3)^4', '1/(x^4 - 12x^3 + 54x^2 - 108x + 81)', { positiveOnly: true }],
+    ['sqrt(abs((3x - 9)^4(2x - 8)^3))', 'sqrt(abs(648x^7 - 15552x^6 + 159408x^5 - 904608x^4 + 3069576x^3 - 6228576x^2 + 6998400x - 3359232))'],
+    // a written decimal gets the numeric noise floor (marking-tolerance.md), both ways
+    ['x/3', '0.333333333333333x'], ['x/7', '0.142857142857143x'], ['0.333333333333333x', 'x/3']
+  ]) expect(G, `noise-in-${key}`, { answerType: 'expression', answer: { expr: key, ...(extra || {}) } }, answer, true);
+  expect(G, 'expanded-(x-3)^10-positive', { answerType: 'expression', answer: { expr: '(x - 3)^10', positiveOnly: true } }, expand(1, -3, 10), true);
+}
+
+// ── Once XFAIL, now refused · 5 cases ────────────────────────────────────────
+// Each is the key plus a term below one part in 10⁹ of the answer's value at
+// every probe point, which binary64 sampling could not see. The exact probe
+// (rationals, no rounding) sees it (#992 review, round 5).
+{
+  const G = 'formerly-XFAIL-exact-probe';
+  for (const [id, d, seed, input] of [
+    ['me12-calc', 1, 7001, '(x^2 + 9)^3 + 0.0000001*x'],
+    ['me12-calc', 1, 7002, '(x^2 + 9)^6/3 + 0.0000001*x'],
+    ['me12-calc', 1, 7002, '(x^2 + 9)^6/3 + 0.00001*x'],
+    ['y11-diff', 1, 7002, '64*x^7 + 0.0000001*x'],
+    ['y12-diff', 1, 7001, '20*(5*x - 6)^3 + 0.0000001*x']
+  ]) expect(G, `refused-${id}-${input.slice(0, 30)}`, generateQuestion(id, d, seed), input, false);
+}
+
+// ── Policy and residual · 3 cases ────────────────────────────────────────────
+// A written decimal within the numeric noise floor (1e-12 of the value) is the
+// value, as 0.333333333333 is 1/3 (marking-tolerance.md): x² + 1e-15x is x².
+// XFAIL, pinned so it cannot spread: behind a function call the float probe
+// cannot resolve a term between 1e-12 and 1e-9 of the value (x² − 169 +
+// 0.0000000001x·cos 0). Follow-up: an exact path that treats a function of a
+// constant as an exact symbol. When it lands, flip `true` to `false`.
+{
+  const G = 'noise-floor-and-XFAIL';
+  const sq = { answerType: 'expression', answer: { expr: 'x^2' } };
+  expect(G, 'noise-floor-1e-15', sq, 'x^2 + 1e-15x', true);
+  expect(G, 'beyond-noise-floor-1e-12x-refused', sq, 'x^2 + 1e-12x', false);
+  expect(G, 'XFAIL-float-path-1e-10-behind-a-function', generateQuestion('y9-algebra', 3, 21001), 'x^2-169 + 0.0000000001x*cos(0)', true);
+  // Residual class, pinned (round 8): a term below ~1e-9 of the value inside the
+  // probed range (|x| <= 10^6, 1/1024 grid) cannot be resolved by sampling when
+  // a function is involved, or when it is a polynomial that only matters past
+  // 10^6. Main credits all of these too. Each needs a deliberately constructed
+  // coefficient of 1e-9 or smaller; no plausible slip produces one.
+  const lin = { answerType: 'expression', answer: { expr: 'x' } };
+  for (const w of ['x+sin(x)/1e9', 'x+ln(x)/1e10', 'x+(x^2-1e12)^2/1e40']) expect(G, `XFAIL-${w}`, lin, w, true);
+  expect(G, 'XFAIL-sin(x)+x^30/1e90', { answerType: 'expression', answer: { expr: 'sin(x)' } }, 'sin(x)+x^30/1e90', true);
+}
+
 // ── Counts are part of the contract ─────────────────────────────────────────
-const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11 };
+const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 75, 'sympy-oracle-2026-11-18-controls': 1091, 'formerly-XFAIL-exact-probe': 5, 'noise-floor-and-XFAIL': 7 };
 for (const [g, n] of Object.entries(EXPECTED)) if (groups[g]?.total !== n) failures.push(`${g}: built ${groups[g]?.total} cases, the corpus has ${n}`);
 
 const pass = Object.values(groups).reduce((s, g) => s + g.pass, 0);
