@@ -2,10 +2,18 @@
 // notes pages (the India notes in pages/Notes.jsx and the NSW notes in
 // pages/NswNotes.jsx). Pure presentation: no curriculum data is imported here,
 // so the NSW page can use these without any India code reaching its bundle.
+//
+// The Experience 3 parts (objective, builds on, intuition, teaching diagrams, the
+// checkpoint, the next step into Practice) are here too, so both editions draw them
+// the same way, in CMU Serif (notesFonts.css) with the maths in KaTeX.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { MathText } from '../lib/latex.jsx';
+import PageLink from '../components/PageLink.jsx';
 import StudyDiagram from './StudyDiagram.jsx';
+import DiagramFromSpec from '../diagrams/DiagramFromSpec.jsx';
 import { useT } from '../i18n/index.js';
+import './notesFonts.css';
+import './notesSheet.css';
 
 const reducedMotion = () => {
   try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
@@ -32,10 +40,87 @@ export function useReveal(rootRef, deps) {
 
 export function Section({ id, title, children }) {
   return (
-    <section className="nt-section" id={id} aria-labelledby={`nt-s-${id}`}>
+    <section className="nt-section" id={id} aria-labelledby={`nt-s-${id}`} data-nn-section={id}>
       <h2 className="nt-section-h nt-reveal" id={`nt-s-${id}`}>{title}</h2>
       {children}
     </section>
+  );
+}
+
+// ── Experience 3 parts, shared by both editions ───────────────────────────────
+
+/** What the student can do at the end: one sentence. */
+export function Objective({ text }) {
+  return <MathText block className="nn-read nn-objective" text={text} />;
+}
+
+/** The chapters this one builds on, each a link to its notes. `links`: [{ to, label, sub? }]. */
+export function BuildsOn({ links }) {
+  return (
+    <ul className="nn-builds">
+      {links.map(l => (
+        <li key={l.to}><PageLink to={l.to}>{l.label}{l.sub ? <small>{l.sub}</small> : null}</PageLink></li>
+      ))}
+    </ul>
+  );
+}
+
+/** The picture or the reason before the formalism. A blank line starts a new paragraph. */
+export function Intuition({ text }) {
+  const paras = String(text).split(/\n\s*\n/).map(p => p.trim()).filter(Boolean);
+  return (
+    <div className="nn-intuition">
+      {paras.map((p, i) => <MathText key={i} block className="nn-read" text={p} />)}
+    </div>
+  );
+}
+
+/** Teaching diagrams from the kit, each with the note that says what to look at. Interactive kinds stay interactive here. */
+export function TeachingDiagrams({ items }) {
+  return (
+    <div className="nn-diagrams">
+      {items.map((d, i) => (
+        <div key={i} className="nn-diagram">
+          {d.title && <h3 className="nn-diagram-t"><MathText text={d.title} /></h3>}
+          <DiagramFromSpec spec={d.spec} interactive />
+          {d.note && <MathText block className="nn-diagram-note" text={d.note} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** The checkpoint: each question first, its answer only when the student asks (a real button, aria-expanded). */
+export function SelfCheck({ items }) {
+  const t = useT();
+  const [open, setOpen] = useState(() => new Set());
+  const toggle = i => setOpen(prev => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; });
+  return (
+    <ol className="nn-check">
+      {items.map((c, i) => {
+        const isOpen = open.has(i);
+        return (
+          <li key={i}>
+            <MathText block className="nn-read nn-q" text={c.question} />
+            <button type="button" className="nt-link-btn" aria-expanded={isOpen} aria-controls={`nn-a-${i}`} onClick={() => toggle(i)}>
+              {isOpen ? t('notes.hideAnswer') : t('notes.showAnswer')}
+            </button>
+            <div id={`nn-a-${i}`} hidden={!isOpen} className="nn-check-a"><MathText block className="nn-read" text={c.answer} /></div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** The next step into Practice: what it will practise (the chapter and the course or year), an optional note, and the action. */
+export function NextPractice({ what, note = null, children }) {
+  return (
+    <div className="nn-next">
+      <p className="nn-read nn-next-what">{what}</p>
+      {note && <p className="nn-next-note">{note}</p>}
+      {children}
+    </div>
   );
 }
 

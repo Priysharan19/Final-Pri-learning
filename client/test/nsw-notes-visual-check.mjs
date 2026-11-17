@@ -6,9 +6,15 @@
 //
 //   MATHS     no KaTeX render error anywhere (no .katex-error, no [data-katex-error]);
 //             every diagram label is KaTeX;
-//   ORDER     the sections are the same, in the same order, on every chapter:
-//             ideas, definitions, formulas, diagram, examiners, mistakes, examples, check
-//             (a chapter with no solid-figure diagram may omit "diagram" only);
+//   ORDER     the sections follow Experience 3 of the Learning Experience Standard, in the
+//             same order on every chapter: objective, prerequisites (builds on), intuition,
+//             ideas, definitions, formulas, diagram, examples, examiners, mistakes, check,
+//             practice (the next step). A section is left out exactly when the chapter has
+//             no content for it (no objective, no prerequisite topics, no intuition, no
+//             diagram, no examiners' points, no self-check); every other one is required,
+//             and the next step into Practice is always last;
+//   CHECK     every self-check answer is hidden behind a real button with aria-expanded
+//             that opens it, and opened answers are visible;
 //   FACES     reading text paints in CMU Serif, section labels in Instrument Sans,
 //             maths in KaTeX; no other family appears on any text in the sheet, and
 //             CMU Serif really loaded (document.fonts);
@@ -39,7 +45,12 @@ const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 const written = {};
 for (const [stage, course] of [[4, null], [5, null], [6, 'advanced'], [6, 'standard'], [6, 'ext1'], [6, 'ext2']]) Object.assign(written, (await loadNswNotesForStage(stage, course)) || {});
 const topics = NSW_NOTES_TOPICS.filter(t => Object.hasOwn(written, t.id));
-const ORDER = ['ideas', 'definitions', 'formulas', 'diagram', 'examiners', 'mistakes', 'examples', 'check'];
+const ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'diagram', 'examples', 'examiners', 'mistakes', 'check', 'practice'];
+// The sections a chapter may leave out, and when: exactly when it has nothing to put in them.
+const present = n => ({
+  objective: !!n.objective, prerequisites: (n.prereqs || []).some(p => NSW_NOTES_TOPICS.some(x => x.id === p)), intuition: !!n.intuition,
+  diagram: n.diagrams?.length > 0, examiners: n.examiners?.length > 0, check: n.check?.length > 0
+});
 
 const server = await createServer({
   root: CLIENT, configFile: fileURLToPath(new URL('../vite.config.js', import.meta.url)), logLevel: 'error',
@@ -54,6 +65,13 @@ const urlFor = (id, theme) => `${origin}/test/support/nsw-notes-gallery.html?top
 async function openAll(page) {
   while (await page.locator('.nn-more .nt-link-btn').count()) await page.locator('.nn-more .nt-link-btn').first().click();
   while (await page.locator('.nn-check .nt-link-btn[aria-expanded="false"]').count()) await page.locator('.nn-check .nt-link-btn[aria-expanded="false"]').first().click();
+}
+// Before anything is opened: every self-check answer is hidden, behind a button that says so.
+async function checkClosed(page) {
+  return page.evaluate(() => [...document.querySelectorAll('.nn-check li')].map(li => {
+    const b = li.querySelector('button[aria-expanded]'); const a = b && document.getElementById(b.getAttribute('aria-controls'));
+    return !!b && b.getAttribute('aria-expanded') === 'false' && !!a && a.hidden && li.contains(a);
+  }));
 }
 
 const browser = await chromium.launch();
@@ -71,8 +89,12 @@ try {
       await page.goto(urlFor(t.id, theme), { waitUntil: 'networkidle' });
       await page.waitForSelector('[data-chapter-sheet]');
       await page.evaluate(() => document.fonts.ready);
+      const closed = await checkClosed(page);
+      ok(closed.every(Boolean), `${where}: a self-check answer is shown before it is asked for, or has no aria-expanded button`);
       // Open every worked example and every self-check answer, as a student who has asked for them.
       await openAll(page);
+      const opened = await page.evaluate(() => [...document.querySelectorAll('.nn-check .nn-check-a')].map(a => !a.hidden && a.getBoundingClientRect().height > 0));
+      ok(opened.length === closed.length && opened.every(Boolean), `${where}: a self-check answer did not open from its button`);
       await page.evaluate(() => document.fonts.ready);
 
       const r = await page.evaluate(() => {
@@ -97,8 +119,11 @@ try {
           if (/gradient/.test(cs.backgroundImage) && !el.closest('svg')) gradients.push(el.className?.toString?.() || el.tagName);
         }
         const read = sheet.querySelector('.nn-read'); const label = sheet.querySelector('.nn-h');
+        // h1 (the page) then h2 per section and h3 within one: no level is skipped.
+        const levels = [...document.querySelectorAll('h1, h2, h3, h4')].map(h => Number(h.tagName[1]));
+        const headingsInOrder = levels[0] === 1 && levels.every((l, i) => i === 0 || l <= levels[i - 1] + 1);
         return {
-          sections, families: Object.fromEntries(families), stripes, gradients, text,
+          sections, families: Object.fromEntries(families), stripes, gradients, text, headingsInOrder,
           katexErrors: document.querySelectorAll('.katex-error, [data-katex-error]').length,
           katexCount: sheet.querySelectorAll('.katex').length,
           plainLabels: [...sheet.querySelectorAll('.dg-tex-in')].filter(e => !e.querySelector('.katex')).length,
@@ -112,8 +137,10 @@ try {
       ok(r.katexErrors === 0, `${where}: ${r.katexErrors} KaTeX render errors`);
       ok(r.katexCount > 10, `${where}: the maths is drawn by KaTeX (${r.katexCount} elements)`);
       ok(r.plainLabels === 0, `${where}: a diagram label is not KaTeX`);
-      const expected = ORDER.filter(s => s !== 'diagram' || r.sections.includes('diagram'));
-      ok(JSON.stringify(r.sections) === JSON.stringify(expected), `${where}: sections out of order (${r.sections.join(', ')})`);
+      const has = present(written[t.id]);
+      const expected = ORDER.filter(s => !(s in has) || has[s]);
+      ok(JSON.stringify(r.sections) === JSON.stringify(expected), `${where}: sections out of order or missing (${r.sections.join(', ')}; expected ${expected.join(', ')})`);
+      ok(r.headingsInOrder, `${where}: the sheet's headings skip a level`);
       ok(r.sections.includes('diagram') === (written[t.id].diagrams?.length > 0), `${where}: the diagram section does not match the chapter's diagrams`);
       ok(/^"?CMU Serif/.test(r.readFont), `${where}: reading text is not CMU Serif (${r.readFont})`);
       ok(/Instrument Sans/.test(r.labelFont), `${where}: section labels are not Instrument Sans (${r.labelFont})`);
@@ -154,4 +181,4 @@ if (failures.length) {
   for (const f of failures.slice(0, 40)) console.error(`  · ${f}`);
   process.exit(1);
 }
-console.log(`NSW NOTES VISUAL: PASS — ${pass}/${pass} checks — every Stage 4 chapter, light and dark: no KaTeX error, the same section order, CMU Serif for reading and Instrument Sans for labels, no accent stripe, gradient, emoji or Unicode script, and no overflow at phone width`);
+console.log(`NSW NOTES VISUAL: PASS — ${pass}/${pass} checks — every written chapter, light and dark: no KaTeX error, the Experience 3 section order, self-check answers behind aria-expanded buttons, headings in order, CMU Serif for reading and Instrument Sans for labels, no accent stripe, gradient, emoji or Unicode script, and no overflow at phone width`);

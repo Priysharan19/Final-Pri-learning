@@ -13,8 +13,9 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import '../notes/Notes.css';
-import { Flashcards, useReveal } from '../notes/NotesParts.jsx';
+import { Flashcards, NextPractice, useReveal } from '../notes/NotesParts.jsx';
 import { ChapterSheet } from '../notes/nsw/NswParts.jsx';
+import { nswPracticeSubtopic, nswPracticeHref } from '../notes/nsw/nswPractice.js';
 import {
   NSW_NOTES_COURSES, NSW_NOTES_TOPIC_BY_ID, NSW_NOTES_YEARS, loadNswNotesForStage, topicSearchText, topicsFor, yearOfTopic
 } from '../notes/nsw/nswNotesIndex.js';
@@ -171,6 +172,15 @@ function TopicNotes({ topicId }) {
   useEffect(() => { window.scrollTo?.(0, 0); }, [topicId]);
   useReveal(root, [topicId, notes]);
   const back = `/notes?year=${year ?? ''}${topic?.course ? `&course=${topic.course}` : ''}`;
+  // The next step into Practice: the topic's own practice where an issued subtopic teaches it,
+  // otherwise Practice for the student's own year and course, and the page says which.
+  const practiceExact = topic ? !!nswPracticeSubtopic(topic) : false;
+  const practiceHref = topic ? nswPracticeHref(topic) : '/practice';
+  const courseLabel = topic?.course ? t(NSW_NOTES_COURSES.find(c => c.id === topic.course).labelKey) : null;
+  const scope = `${t('notes.nsw.yearTab', { n: year })}${courseLabel ? ` · ${courseLabel}` : ''}`;
+  const practiseLabel = practiceExact ? t('notes.practise') : t('notes.nsw.openPractice');
+  const buildsOn = (notes?.prereqs || []).filter(p => NSW_NOTES_TOPIC_BY_ID[p])
+    .map(p => ({ to: `/notes/${p}?year=${yearOfTopic(NSW_NOTES_TOPIC_BY_ID[p], year)}`, label: NSW_NOTES_TOPIC_BY_ID[p].name }));
 
   if (!topic) {
     return <div className="nt"><p className="nt-quiet">{t('notes.nsw.notFound')}</p><PageLink className="nt-back" to="/notes">← {t('notes.nsw.back')}</PageLink></div>;
@@ -179,23 +189,14 @@ function TopicNotes({ topicId }) {
     <article className="nt nt-article" ref={root} aria-labelledby="nt-ch-title" data-nsw-notes>
       <PageLink className="nt-back" to={back}>← {t('notes.nsw.back')}</PageLink>
       <header className="nt-ch-head">
-        <p className="nt-eyebrow">{t('notes.nsw.yearTab', { n: year })}{topic.course ? ` · ${t(NSW_NOTES_COURSES.find(c => c.id === topic.course).labelKey)}` : ''} · {t('notes.nsw.stage', { n: topic.stage })}{topic.strandKey ? ` · ${t(topic.strandKey)}` : ''}</p>
+        <p className="nt-eyebrow">{scope} · {t('notes.nsw.stage', { n: topic.stage })}{topic.strandKey ? ` · ${t(topic.strandKey)}` : ''}</p>
         <h1 className="nt-title" id="nt-ch-title">{topic.name}</h1>
         <p className="nt-quiet">{t('notes.nsw.outcomes', { codes: topic.outcomes.join(', ') })}</p>
         {notes && <MathText block className="nt-lede" text={notes.summary} />}
-        {notes && (
-          <div className="nt-actions">
-            <button type="button" className="btn btn-secondary" onClick={() => setCards(true)} data-testid="notes-revise">{t('notes.revise')}</button>
-          </div>
-        )}
-        {notes?.prereqs?.length > 0 && (
-          <p className="nt-builds">
-            <span>{t('notes.buildsOn')}</span>
-            {notes.prereqs.filter(p => NSW_NOTES_TOPIC_BY_ID[p]).map(p => (
-              <PageLink key={p} to={`/notes/${p}?year=${year}`}>{NSW_NOTES_TOPIC_BY_ID[p].name}</PageLink>
-            ))}
-          </p>
-        )}
+        <div className="nt-actions">
+          <button type="button" className="btn btn-primary" onClick={() => nav(practiceHref)} data-testid="notes-practise">{practiseLabel}</button>
+          {notes && <button type="button" className="btn btn-secondary" onClick={() => setCards(true)} data-testid="notes-revise">{t('notes.revise')}</button>}
+        </div>
       </header>
 
       {failed && <LoadFailed retry={retry} t={t} />}
@@ -205,7 +206,12 @@ function TopicNotes({ topicId }) {
       )}
 
       {notes && (
-        <ChapterSheet notes={notes} topicId={topicId} />
+        <ChapterSheet notes={notes} topicId={topicId} buildsOn={buildsOn} next={(
+          <NextPractice what={t('notes.nextWhat', { chapter: topic.name, scope })}
+            note={practiceExact ? null : t('notes.nsw.nextNone', { topic: topic.name })}>
+            <button type="button" className="btn btn-primary" onClick={() => nav(practiceHref)} data-testid="notes-next-practise">{practiseLabel}</button>
+          </NextPractice>
+        )} />
       )}
       {cards && notes && <Flashcards chapter={{ name: topic.name }} points={notes.points} onClose={() => setCards(false)} />}
     </article>
