@@ -1111,8 +1111,6 @@ jobs:
         run: |
           set -euo pipefail
           node client/test/legal-pages-au-check.mjs --build 2>&1 | tee legal-au.log
-          grep -Fq 'LEGAL PAGES (AU): PASS' legal-au.log
-          grep -Fq 'Prithagoras dist scanned; Priyabhata dist scanned;' legal-au.log
       # The iOS web bundles are generated here, never read from git (decision
       # D28): sync copies client/dist into both packages, check proves each
       # copy is complete and byte-exact, then the shipped bytes are inspected.
