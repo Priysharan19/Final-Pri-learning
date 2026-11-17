@@ -905,7 +905,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
   // per-line pass above never offered them). Status, mark and first break are already decided.
   if (diagnosis && diagnosis.code === 'counterexample') {
     try {
-      const named = diagnoseTopicLine({ line: out[firstBreak].text, previous: prevText ?? (meta.source ?? null), index: firstBreak, meta });
+      const named = diagnoseTopicLine({ line: out[firstBreak].text, previous: prevText, index: firstBreak, meta });
       if (named) diagnosis = named;
     } catch { /* keep the counterexample */ }
   }

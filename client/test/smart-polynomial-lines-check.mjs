@@ -17,6 +17,8 @@ const { polynomialOf } = await import(`${SRC}engine/misconceptions/topics/polyno
 const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
 const { stepCheck, checkAnswer } = await import(`${SRC}engine/checker.js`);
 const { NSW_ISSUED_CELLS } = await import(`${SRC}engine/nswIssuedCells.js`);
+const { checkWorking } = await import(`${SRC}engine/checker.js`);
+const nsw = await import(`${SRC}engine/curriculum-nsw/index.js`);
 const { exprEquivalent } = await import(`${SRC}engine/expr.js`);
 const { stepMetaFor } = await import('../../server/platform/markerOps.js');
 await loadAllBanks();
@@ -37,7 +39,7 @@ const DESIGNED = [
   ['4*n^3 - 4*n', '= 4*n*(n^2 + 1)', 'poly-term-sign', /term in n has the opposite sign/],
   ['(4n+8)^2', '= 16n^2 + 64', 'poly-term-missing', /no term|has none/],
   ['5x^2 + 2x + 3', '= 5x^2 + 2x + 1', 'poly-constant-off', /Only the constant term changed/],
-  ['x^3 + 2x^2 - 5x + 6', '= x^3 + 2x^2 - 5x + 7', 'poly-constant-off', /out by 1/],
+  ['x^3 + 2x^2 - 5x + 6', '= x^3 + 2x^2 - 5x + 7', 'poly-constant-off', /not right/],
   ['x^2 + 6x + 9', '= x^2 + 5x + 9', 'poly-coefficient-off', /coefficient 5, but the line above gives 6/],
   ['2x^2 + 4x + 6', '= 4x^2 + 8x + 12', 'poly-scaled', /2 times/],
   ['3x^2 - 12', '= 3x^2 + 12', 'poly-term-sign', /constant term has the opposite sign/]
@@ -64,6 +66,25 @@ ok(sign && sign.notesSectionId === 'me1-11-02#mistakes', 'its Notes link is the 
 ok(diagnoseTopicLine({ line: 'k = 7', previous: null, index: 0, meta: eq }) === null, 'a wrong value that is not the opposite sign is not named');
 ok(diagnoseTopicLine({ line: 'k = 0', previous: null, index: 0, meta: { kind: 'equation', variable: 'k', solutions: [0] } }) === null, 'zero has no opposite');
 
+// B2 · rules the review added: a first line is never compared with the expanded source as if it were a line the
+// student wrote, nothing quantifies the answer, the verdict sentence never shows 'undefined', and every Notes link is a real chapter.
+const spansOf = p => [...String(p || '').matchAll(/\$([^$]+)\$/g)].map(m => m[1].replace(/\\left|\\right|\\,|\;|\\displaystyle/g, '').replace(/\\cdot|\\times/g, '*').replace(/\^\{([^{}]*)\}/g, '^($1)').replace(/\\dfrac|\\frac/g, ''));
+const withSource = { kind: 'expression', canonical: 'x^2+6*x+9', source: '(x+3)^2' };
+for (const w of ['= x^2 + 5*x + 9', '= x^2 + 6*x + 8', '= 2*x^2 + 12*x + 18']) {
+  const r = diagnoseTopicLine({ line: w, previous: withSource.source, index: 0, meta: withSource });
+  ok(!r || !/above|out by|times|coefficient \d|[^a-z\d]6[^\d]|[^a-z\d]9[^\d]/.test(r.message.replace(/x\^\d/g, '')), `a first line against the source stated a number: ${r?.message}`);
+}
+const fq = generateQuestion('mex-proof', 3, 7003);
+const fm = stepMetaFor(fq);
+const fstart = spansOf(fq.prompt).find(s => { try { return !/=/.test(s) && exprEquivalent(s, fm.canonical); } catch { return false; } });
+const fb = checkWorking({ answer: { stepMeta: fm, minLines: 2 } }, `${fstart}\n= ${fq.traps[0].expr}`);
+ok(!/undefined/.test(JSON.stringify(fb)), `the working feedback shows "undefined": ${JSON.stringify(fb).slice(0, 200)}`);
+ok(fb.stepReport?.firstBreak === 1 && /This looks like: a |slip|Check|term|coefficient|constant/i.test(String(fb.feedback)), `the working feedback names the slip: ${String(fb.feedback).slice(0, 160)}`);
+const chapters = new Set(['ME1-11-02', 'ME1-12-01', 'ME2-12-01', 'MA5-ALG-C-01'].map(s => s.toLowerCase()));
+const known = new Set([nsw.NSW_MATHEMATICS_K10_2022, nsw.NSW_MATHEMATICS_EXTENSION1_2024, nsw.NSW_MATHEMATICS_EXTENSION2_2024].flatMap(sy => sy.focusAreas.map(fa => fa.outcomes[0].toLowerCase())));
+for (const id of chapters) ok(known.has(id), `Notes chapter ${id} is not a focus area of the NSW curriculum model`);
+for (const s of mine.slips) { const h = s.detect({ line: '= x', previous: 'x', index: 1, meta: { kind: 'expression', canonical: 'x' } }); void h; }
+
 // C · correct (equivalent) lines are never named
 const CORRECT = [['(4n+8)^2', '= 16n^2 + 64n + 64'], ['4*n^3 - 4*n', '= 4*n*(n^2 - 1)'], ['n^3 - 9n', '= n*(n-3)*(n+3)'], ['17(16p+1) - 1', '= 16(17p + 1)'], ['k^2 + 2k + 1', '= (k+1)^2'], ['x^2 - 9', '= (x-3)(x+3)']];
 for (const [prev, line] of CORRECT) ok(probe(prev, line) === null, `correct step ${prev} → ${line} was named`);
@@ -72,7 +93,6 @@ ok(probe('what is n?', '= 4n') === null, 'a line above that is not a polynomial 
 ok(polynomialOf('x^7') === null || polynomialOf('x^7').coeffs.every(Number.isFinite), 'a polynomial above the cap never gives a wrong fit');
 
 // D · the Extension questions that have a Step Check
-const spansOf = p => [...String(p || '').matchAll(/\$([^$]+)\$/g)].map(m => m[1].replace(/\\left|\\right|\\,|\;|\\displaystyle/g, '').replace(/\\cdot|\\times/g, '*').replace(/\^\{([^{}]*)\}/g, '^($1)').replace(/\\dfrac|\\frac/g, ''));
 let items = 0, named = 0, wrongLine = 0, leaks = 0, specificCodes = {};
 for (const g of ['me11-poly', 'me12-induction', 'mex-proof']) {
   for (const d of NSW_ISSUED_CELLS[g] || []) for (let i = 0; i < 10; i++) {

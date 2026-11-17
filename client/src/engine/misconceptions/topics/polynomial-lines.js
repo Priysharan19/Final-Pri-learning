@@ -56,7 +56,7 @@ export function polynomialOf(text) {
 }
 
 const termName = (v, j) => (j === 0 ? 'constant term' : j === 1 ? `term in ${v}` : `term in ${v}^${j}`);
-const termHi = (v, j) => (j === 0 ? 'अचर पद' : j === 1 ? `${v} वाला पद` : `${v}^${j} वाला पद`);
+const termHi = (v, j, oblique = false) => (j === 0 ? 'अचर पद' : `${j === 1 ? v : `${v}^${j}`} ${oblique ? 'वाले' : 'वाला'} पद`);
 const NOTES = { sign: 'me1-11-02#mistakes', other: 'ma5-alg-c-01#mistakes' };
 const SECTION = meta => (meta?.kind === 'equation' ? 'me1-11-02#mistakes' : null);
 
@@ -74,20 +74,28 @@ function singleDifference(line, previous) {
 
 const fix = n => String(Math.round(n * 1e6) / 1e6);
 
+const TITLES = {
+  'poly-term-sign': 'a sign slip in one term', 'poly-term-missing': 'a term that went missing', 'poly-constant-off': 'a slip in the constant term',
+  'poly-coefficient-off': 'one coefficient out', 'poly-scaled': 'a constant factor gained or lost', 'binomial-power-constant': 'the root of the constant not taken',
+  'poly-final-term-sign': 'a sign slip in one term', 'poly-final-term-missing': 'a term that went missing', 'poly-final-constant': 'a slip in the constant term',
+  'poly-final-coefficient': 'one coefficient out', 'solution-sign-flipped': 'a sign slip when isolating the unknown'
+};
+const titled = slips => slips.map(sl => ({ ...sl, detect: ctx => { const h = sl.detect(ctx); return h ? { ...h, title: TITLES[sl.code] } : h; } }));
+
 registerTopic({
   topic: 'polynomial-lines',
   appliesTo: meta => meta?.kind === 'expression' || meta?.kind === 'equation',
-  slips: [
+  slips: titled([
     {
       code: 'poly-term-sign', misconceptionId: 'sign-flipped',
-      detect: ({ line, previous }) => {
-        const d = previous != null ? singleDifference(line, previous) : null;
+      detect: ({ line, previous, index }) => {
+        const d = index > 0 && previous != null ? singleDifference(line, previous) : null;
         if (!d || d.from === 0 || !near(d.to, -d.from)) return null;
         const t = termName(d.variable, d.degree);
         return {
           message: `Your ${t} has the opposite sign to the same ${t} in the line above, and nothing else changed. Check the sign where it came from: a bracket, or a term moved across.`,
           messages: {
-            hi: `आपके ${termHi(d.variable, d.degree)} का चिह्न ऊपर वाली पंक्ति के उसी पद से उलटा है, और कुछ और नहीं बदला। देखिए कि चिह्न कहाँ से आया: कोष्ठक से, या पद इधर-उधर करने से।`,
+            hi: `आपके ${termHi(d.variable, d.degree, true)} का चिह्न ऊपर वाली पंक्ति के उसी पद से उलटा है, और कुछ और नहीं बदला। देखिए कि चिह्न कहाँ से आया: कोष्ठक से, या पद इधर-उधर करने से।`,
             'en-AU': `Your ${t} has the opposite sign to the same ${t} in the line above, and nothing else changed. Check the sign where it came from: a bracket, or a term moved across.`
           },
           notesSectionId: 'ma5-alg-c-01#mistakes'
@@ -96,8 +104,8 @@ registerTopic({
     },
     {
       code: 'poly-term-missing', misconceptionId: 'term-dropped',
-      detect: ({ line, previous }) => {
-        const d = previous != null ? singleDifference(line, previous) : null;
+      detect: ({ line, previous, index }) => {
+        const d = index > 0 && previous != null ? singleDifference(line, previous) : null;
         if (!d || d.from === 0 || d.to !== 0) return null;
         const t = termName(d.variable, d.degree);
         return {
@@ -112,14 +120,14 @@ registerTopic({
     },
     {
       code: 'poly-constant-off',
-      detect: ({ line, previous }) => {
-        const d = previous != null ? singleDifference(line, previous) : null;
+      detect: ({ line, previous, index }) => {
+        const d = index > 0 && previous != null ? singleDifference(line, previous) : null;
         if (!d || d.degree !== 0 || d.from === 0 || d.to === 0) return null;
         return {
-          message: `Only the constant term changed between the line above and yours, so it is out by ${fix(Math.abs(d.to - d.from))}. Recheck the constants: the amount left over when a common factor is taken out folds into the bracket.`,
+          message: `Only the constant term changed between the line above and yours, so that term is not right. Recheck the constants: the amount left over when a common factor is taken out folds into the bracket.`,
           messages: {
-            hi: `ऊपर वाली पंक्ति और आपकी पंक्ति में केवल अचर पद बदला है, इसलिए वह ${fix(Math.abs(d.to - d.from))} से ग़लत है। अचरों को दोबारा जाँचिए: उभयनिष्ठ गुणनखंड निकालने पर बचा हुआ भाग कोष्ठक में जुड़ जाता है।`,
-            'en-AU': `Only the constant term changed between the line above and yours, so it is out by ${fix(Math.abs(d.to - d.from))}. Recheck the constants: the amount left over when a common factor is taken out folds into the bracket.`
+            hi: `ऊपर वाली पंक्ति और आपकी पंक्ति में केवल अचर पद बदला है, इसलिए वही पद सही नहीं है। अचरों को दोबारा जाँचिए: उभयनिष्ठ गुणनखंड निकालने पर बचा हुआ भाग कोष्ठक में जुड़ जाता है।`,
+            'en-AU': `Only the constant term changed between the line above and yours, so that term is not right. Recheck the constants: the amount left over when a common factor is taken out folds into the bracket.`
           },
           notesSectionId: 'me1-12-01#mistakes'
         };
@@ -127,14 +135,14 @@ registerTopic({
     },
     {
       code: 'poly-coefficient-off',
-      detect: ({ line, previous }) => {
-        const d = previous != null ? singleDifference(line, previous) : null;
+      detect: ({ line, previous, index }) => {
+        const d = index > 0 && previous != null ? singleDifference(line, previous) : null;
         if (!d || d.degree === 0 || d.from === 0 || d.to === 0 || near(d.to, -d.from)) return null;
         const t = termName(d.variable, d.degree);
         return {
           message: `Your ${t} has coefficient ${fix(d.to)}, but the line above gives ${fix(d.from)}, and every other term agrees. Recompute that one coefficient.`,
           messages: {
-            hi: `आपके ${termHi(d.variable, d.degree)} का गुणांक ${fix(d.to)} है, पर ऊपर वाली पंक्ति में ${fix(d.from)} है, जबकि बाकी सभी पद मेल खाते हैं। उसी एक गुणांक को दोबारा निकालिए।`,
+            hi: `आपके ${termHi(d.variable, d.degree, true)} का गुणांक ${fix(d.to)} है, पर ऊपर वाली पंक्ति में ${fix(d.from)} है, जबकि बाकी सभी पद मेल खाते हैं। उसी एक गुणांक को दोबारा निकालिए।`,
             'en-AU': `Your ${t} has coefficient ${fix(d.to)}, but the line above gives ${fix(d.from)}, and every other term agrees. Recompute that one coefficient.`
           },
           notesSectionId: 'ma5-alg-c-01#mistakes'
@@ -143,8 +151,8 @@ registerTopic({
     },
     {
       code: 'poly-scaled',
-      detect: ({ line, previous }) => {
-        const a = previous != null ? polynomialOf(previous) : null; const b = polynomialOf(line);
+      detect: ({ line, previous, index }) => {
+        const a = index > 0 && previous != null ? polynomialOf(previous) : null; const b = polynomialOf(line);
         if (!a || !b || a.variable !== b.variable) return null;
         let m = null;
         for (let j = 0; j < Math.max(a.coeffs.length, b.coeffs.length); j++) {
@@ -168,7 +176,8 @@ registerTopic({
     {
       // (n + c)^e written from an expansion whose constant term is c itself: the root of the constant was not taken.
       code: 'binomial-power-constant',
-      detect: ({ line, previous }) => {
+      detect: ({ line, previous, index }) => {
+        if (!(index > 0)) return null;
         const m = String(line ?? '').replace(/\s+/g, '').match(/^(?:[a-zA-Z]*=)?\(([a-zA-Z])([+-])(\d+(?:\.\d+)?)\)\^\(?(\d)\)?$/);
         const a = previous != null ? polynomialOf(previous) : null;
         if (!m || !a || a.variable !== m[1]) return null;
@@ -191,12 +200,12 @@ registerTopic({
       ['poly-final-term-sign', 'sign-flipped', 'sign', d => `A term in your line has the wrong sign: it is the ${termName(d.variable, d.degree)}. Check the sign where it came from.`, d => `आपकी पंक्ति के एक पद का चिह्न ग़लत है: वह ${termHi(d.variable, d.degree)} है। देखिए कि चिह्न कहाँ से आया।`],
       ['poly-final-term-missing', 'term-dropped', 'missing', d => `Your line has no ${termName(d.variable, d.degree)}, and it should have one. Check whether a cross term or a product was left out.`, d => `आपकी पंक्ति में ${termHi(d.variable, d.degree)} नहीं है, जबकि होना चाहिए। देखिए कि कहीं कोई क्रॉस पद या गुणनफल छूट तो नहीं गया।`],
       ['poly-final-constant', null, 'constant', () => 'Your constant term is not right. Recheck the constants: the amount left over when a common factor is taken out folds into the bracket.', () => 'आपका अचर पद सही नहीं है। अचरों को दोबारा जाँचिए: उभयनिष्ठ गुणनखंड निकालने पर बचा हुआ भाग कोष्ठक में जुड़ जाता है।'],
-      ['poly-final-coefficient', null, 'coefficient', d => `The coefficient of your ${termName(d.variable, d.degree)} is not right and every other term is. Recompute that one coefficient.`, d => `आपके ${termHi(d.variable, d.degree)} का गुणांक सही नहीं है, जबकि बाकी सभी पद सही हैं। उसी एक गुणांक को दोबारा निकालिए।`]
+      ['poly-final-coefficient', null, 'coefficient', d => `The coefficient of your ${termName(d.variable, d.degree)} is not right and every other term is. Recompute that one coefficient.`, d => `आपके ${termHi(d.variable, d.degree, true)} का गुणांक सही नहीं है, जबकि बाकी सभी पद सही हैं। उसी एक गुणांक को दोबारा निकालिए।`]
     ].map(([code, misconceptionId, kind, en, hi]) => ({
       code, ...(misconceptionId ? { misconceptionId } : {}),
-      detect: ({ line, previous, meta }) => {
+      detect: ({ line, previous, index, meta }) => {
         if (meta?.kind !== 'expression' || typeof meta.canonical !== 'string') return null;
-        if (previous != null && polynomialOf(previous)) return null;          // a line above exists: the slips above handle it
+        if (index > 0 && previous != null && polynomialOf(previous)) return null;          // a line above exists: the slips above handle it
         const d = singleDifference(line, meta.canonical);
         if (!d) return null;
         const got = d.to, want = d.from;                                      // from = the held form, to = the student's line
@@ -226,5 +235,5 @@ registerTopic({
         };
       }
     }
-  ]
+  ])
 });
