@@ -183,6 +183,8 @@ const again = await handin(S1, C1, asg2.data.assignment.id, p1.id);
 c.deq([again.status, again.data?.error?.code], [409, 'HANDIN_EXAM_USED'], 'one paper is handed in to one assignment');
 // A paper assignment is submitted only by hand-in, and its template is frozen once handed in.
 c.deq((await req(S1, `/v1/classes/${C1}/assignments/${A1}/submission`, { method: 'PATCH', body: { state: 'submitted', summary: { questionsAnswered: 10, correct: 10 } } })).data?.error?.code, 'ASSIGNMENT_IS_A_PAPER', 'a device summary cannot submit a paper');
+const practice = await req(T1, `/v1/classes/${C1}/assignments`, { method: 'POST', body: { title: 'Set', specification: { kind: 'practice', questionCount: 5 } } });
+c.deq((await req(T1, `/v1/classes/${C1}/assignments/${practice.data.assignment.id}`, { method: 'PATCH', body: { specification: { kind: 'paper', paper: PAPER } } })).data?.error?.code, 'ASSIGNMENT_KIND_CHANGE', 'a practice set cannot be turned into a paper');
 c.deq((await req(T1, `/v1/classes/${C1}/assignments/${A1}`, { method: 'PATCH', body: { specification: { kind: 'paper', paper: { kind: 'practice-paper', year: 8, minutes: 30 } } } })).data?.error?.code, 'ASSIGNMENT_HANDED_IN', 'a handed-in paper cannot be retargeted');
 c.eq((await db.get('SELECT state FROM assignment_submissions WHERE assignment_id=? AND student_account_id=?', [A1, S1.id])).state, 'submitted', 'the submission is submitted');
 
@@ -220,6 +222,8 @@ const inked = queue.data.items.filter(i => i.question.key === inkKey);
 c.ok(inked.length >= 1 && inked.every(i => i.evidence.inputMode === 'ink' && i.evidence.ink?.digest === INK), 'a handwritten answer carries the digest of the original page the teacher judges');
 c.ok(queue.data.items.filter(i => i.question.key !== inkKey).every(i => i.evidence.inputMode === 'typed' && i.evidence.ink === null), 'typed answers carry no ink');
 const item = inked[0] || queue.data.items[0];
+// The input mode is the server's record of the marked answer, never an autosave's.
+c.ok(queue.data.items.filter(i => i.question.key !== inkKey).every(i => i.evidence.inputMode === 'typed'), 'typed answers are typed by the graded-attempt record');
 c.ok(item.evidence.reading.length >= 2 && item.evidence.lineStatuses.length === item.evidence.reading.length, 'the teacher sees the working as read and a verdict per line');
 c.ok(item.evidence.lineStatuses.every(s => REVIEW_LINE_STATUSES.includes(s)), 'line verdicts are the closed set');
 c.ok(item.engineAwarded + item.available < item.marksPossible, 'the cap never reaches full marks for a wrong answer');

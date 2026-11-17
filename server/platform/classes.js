@@ -427,6 +427,13 @@ export function createClassRouter(db) {
       const checked = validateAssignmentSpecification(body.specification);
       if (!checked.ok) return res.status(400).json({ error: { code: checked.code, message: checked.message } });
       const encoded = JSON.stringify(checked.spec);
+      let priorKind = null;
+      try { priorKind = JSON.parse(row.specification_json || '{}')?.kind || null; } catch { priorKind = null; }
+      // A practice set never becomes a paper (or back): a paper's "set after"
+      // date is when it was created as a paper.
+      if ((checked.spec.kind === 'paper') !== (priorKind === 'paper')) {
+        return res.status(409).json({ error: { code: 'ASSIGNMENT_KIND_CHANGE', message: 'A practice set cannot become a paper, or a paper a practice set. Set a new assignment instead.' } });
+      }
       if (encoded !== row.specification_json) {
         // A paper's template is what hand-ins were checked against: once any
         // student has handed one in, it cannot be retargeted (classroom.js).

@@ -242,15 +242,25 @@ export async function handIn(db, { classId, assignmentId, studentId, examId, now
   // SHA-256 of the page the server froze with the paper (exams.js). A teacher
   // judges the student's own written work; the receipt of what they judged is
   // that digest, recorded on the review item and on every teacher mark.
-  const snapshot = await record(db, studentId, 'exam-answers', examId, now);
-  const modes = plain(snapshot?.modes) ? snapshot.modes : {};
+  // Both come from what the SERVER finally marked, never from an autosave
+  // (a finish replaces the snapshot's modes and ink, exams.js): the input mode
+  // from the graded-attempt event of that answer, the digest only from a page
+  // the server froze with the result. Neither known → null, never a guess.
   const inkOf = key => {
-    const page = result.handwriting?.pages?.[key];
-    const digest = typeof page?.digest === 'string' ? page.digest : (typeof snapshot?.ink?.[key] === 'string' ? snapshot.ink[key] : null);
-    return digest && /^[0-9a-f]{64}$/i.test(digest) ? digest.toLowerCase() : null;
+    const digest = result.handwriting?.pages?.[key]?.digest;
+    return typeof digest === 'string' && /^[0-9a-f]{64}$/i.test(digest) ? digest.toLowerCase() : null;
   };
   // Line verdicts for every wrong written answer (feedback only), outside any transaction.
   const units = unitsOf(result, paper);
+  const attemptIds = units.map(u => u.line?.attemptId).filter(x => typeof x === 'string' && x);
+  const modeByAttempt = new Map();
+  if (attemptIds.length) {
+    for (const row of await db.all(`SELECT id,payload_json FROM learning_events WHERE account_id=? AND device_id='server-grader' AND kind='graded-attempt' AND id IN (${IN(attemptIds)})`, [studentId, ...attemptIds])) {
+      const mode = parse(row.payload_json, {})?.inputMode;
+      if (mode === 'ink' || mode === 'typed') modeByAttempt.set(row.id, mode);
+    }
+  }
+  const modeOf = u => (inkOf(u.key) ? 'ink' : modeByAttempt.get(u.line?.attemptId) || null);
   const questions = [];
   const items = [];
   for (const u of units) {
@@ -277,7 +287,7 @@ export async function handIn(db, { classId, assignmentId, studentId, examId, now
           // The typeset reading is secondary: "what Pri read". For handwriting,
           // the original page (ink.digest) is the work being judged.
           reading: lines.map(text => clipText(text, 400)),
-          inputMode: modes[u.key] === 'ink' || inkOf(u.key) ? 'ink' : 'typed',
+          inputMode: modeOf(u),
           ink: inkOf(u.key) ? { digest: inkOf(u.key) } : null,
           lineStatuses: evidence.lines,
           firstBreak: evidence.firstBreak >= 0 ? evidence.firstBreak + 1 : null,
