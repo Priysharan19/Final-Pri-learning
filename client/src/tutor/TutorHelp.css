@@ -37,3 +37,12 @@
 .tutor-diagnosis-parts dt:first-child { margin-top: 0; }
 .tutor-diagnosis-parts dd { margin: 0; }
 [data-tutor-diagnose] { min-height: 44px; }
+
+/* Model-written text is marked as unverified and set apart from the engine's own feedback. */
+.tutor-note-tutor, .tutor-turn-tutor { border-left-style: dashed; }
+.ai-label-wrap { display: flex; flex-direction: column; gap: 2px; }
+.ai-label { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.ai-label::before { content: 'AI'; margin-right: 6px; padding: 0 5px; border: 1px solid var(--hairline-strong); border-radius: 3px; font-size: 11px; }
+.ai-checked summary { font-size: 12.5px; color: var(--ink-3); cursor: pointer; text-decoration: underline; width: fit-content; }
+.ai-checked p { margin: 4px 0 0; font-size: 12.5px; color: var(--ink-2); }
+.tutor-note-safety { border-left-color: var(--ink-2); background: var(--surface-2, transparent); }

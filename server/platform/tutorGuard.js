@@ -513,14 +513,14 @@ function firstSentenceEnd(text) {
  * nothing. `maxChars` bounds the reply; text past it is dropped and `capped`
  * is reported so the caller can end the stream.
  */
-export function createReleaseGate(guard, { prompt = '', maxChars = 900 } = {}) {
+export function createReleaseGate(guard, { prompt = '', maxChars = 900, extraIssues = () => [] } = {}) {
   let released = '';
   let buffer = '';
   let closed = false;
   let capped = false;
 
   function check(candidate) {
-    const leaks = leakedExpressions(candidate, guard, { prompt });
+    const leaks = [...leakedExpressions(candidate, guard, { prompt }), ...extraIssues(candidate)];
     if (leaks.length) closed = true;
     return leaks;
   }

@@ -3819,7 +3819,8 @@ const routes = {
     return {
       level, tutorLevel,
       message: fromModel ? sanitizeText(outcome.tutor.message, 600) : (sanitizeText(outcome?.tutor?.message, 600) || authored),
-      source: fromModel ? 'tutor' : 'deterministic',
+      source: fromModel ? 'tutor' : outcome?.tutor?.source === 'safety' ? 'safety' : 'deterministic',
+      ...(outcome?.tutor?.source === 'safety' ? { distress: true } : {}),
       // Why the deterministic text is showing, as a code the UI can name — never
       // the server's own message, which is not written for a student.
       code: fromModel ? null : (outcome?.error?.code || outcome?.tutor?.reason || null)
@@ -3906,6 +3907,11 @@ const routes = {
       nextStep: sanitizeText(d.nextStep, 400) || '',
       wentWrongLine: Number.isInteger(d.wentWrongLine) ? d.wentWrongLine : -1
     } : null;
+    // A student's text that signals distress is met with a calm message and a
+    // support line, not a diagnosis (server tutorSafety.js).
+    if (outcome?.tutor?.source === 'safety' && typeof outcome.tutor.message === 'string') {
+      return { diagnosis: null, source: 'safety', distress: true, message: sanitizeText(outcome.tutor.message, 900), code: 'DISTRESS_SUPPORT', tutorLevel: Number(row.tutorLevel) || 0 };
+    }
     return {
       diagnosis: clean && clean.wentWrong ? clean : null,
       source: outcome?.tutor?.source === 'model' ? 'tutor' : 'deterministic',
@@ -3939,7 +3945,7 @@ const routes = {
     const outcome = await requestTutorHelp({ ...base, stepIndex, ...(message ? { message, history } : {}) });
     const tutor = outcome?.tutor;
     if (!tutor || typeof tutor.message !== 'string') return { message: null, source: 'deterministic', code: outcome?.error?.code || 'TUTOR_FAILED' };
-    return { message: sanitizeText(tutor.message, 1200), source: tutor.source === 'model' ? 'tutor' : 'deterministic', code: tutor.source === 'model' ? null : (tutor.reason || null) };
+    return { message: sanitizeText(tutor.message, 1200), source: tutor.source === 'model' ? 'tutor' : tutor.source === 'safety' ? 'safety' : 'deterministic', ...(tutor.source === 'safety' ? { distress: true } : {}), code: tutor.source === 'model' ? null : (tutor.reason || null) };
   },
 
   // "Check this line so far": the server's Step Check of the lines on an OPEN

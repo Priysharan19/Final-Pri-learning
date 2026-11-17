@@ -13,6 +13,7 @@
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
+import AiLabel from './AiLabel.jsx';
 import { useT } from '../i18n/index.js';
 import './TutorHelp.css';
 
@@ -28,7 +29,7 @@ export default function MistakeDiagnosis({ questionId, work, finalAnswer, locale
       .then(r => {
         if (!live) return;
         if (Number.isInteger(r?.tutorLevel)) onUsed?.(r.tutorLevel);
-        setState(r?.diagnosis ? { phase: 'done', diagnosis: r.diagnosis, source: r.source } : { phase: 'empty' });
+        setState(r?.distress ? { phase: 'safety', message: r.message } : r?.diagnosis ? { phase: 'done', diagnosis: r.diagnosis, source: r.source } : { phase: 'empty' });
       })
       .catch(() => { if (live) setState({ phase: 'empty' }); });
     return () => { live = false; };
@@ -47,11 +48,13 @@ export default function MistakeDiagnosis({ questionId, work, finalAnswer, locale
       <div aria-live="polite">
         {state.phase === 'asking' && <p className="tutor-thinking" role="status">{t('tutor.diagnose.asking')}</p>}
         {state.phase === 'empty' && <p>{t('tutor.diagnose.unavailable')}</p>}
+        {state.phase === 'safety' && <div className="tutor-note tutor-note-safety" role="status" data-tutor-source="safety"><MathText text={state.message} /></div>}
         {state.phase === 'done' && d && (
           <div className={`tutor-note tutor-note-${state.source}`} data-tutor-source={state.source}>
             <span className="tutor-note-src">
-              {state.source === 'tutor' ? t('tutor.diagnose.fromTutor') : t('tutor.diagnose.fromChecker')}
+              {state.source === 'tutor' ? null : t('tutor.diagnose.fromChecker')}
             </span>
+            {state.source === 'tutor' && <AiLabel labelKey={'tutor.diagnose.fromTutor'} />}
             <dl className="tutor-diagnosis-parts">
               {d.didRight ? (<><dt>{t('tutor.diagnose.right')}</dt><dd><MathText text={d.didRight} /></dd></>) : null}
               <dt>{t('tutor.diagnose.wrong')}</dt><dd><MathText text={d.wentWrong} /></dd>

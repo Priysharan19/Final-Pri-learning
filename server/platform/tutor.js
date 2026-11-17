@@ -82,6 +82,8 @@ import { asStore, sqliteHandle } from './store.js';
 import { consumeRateLimit, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import { issuedQuestionForTutor } from './practice.js';
+import { distressReply, safetyOutputIssues } from './tutorSafety.js';
+import { serverEdition } from './edition.js';
 import { buildGuard, captionWordingOk, markClaimIssues, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
 import {
   MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_DIAGNOSE_LEVEL, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
@@ -577,7 +579,7 @@ export function diagnosisIssues(reply, request) {
   const parts = [reply.didRight, reply.wentWrong, reply.nextStep];
   const issues = parts.flatMap(part => diagnosisGroundingIssues(part, { question: request.question, studentLines: request.studentWork.lines }));
   // A model explanation never states or implies a mark, open attempt or resolved.
-  for (const part of parts) issues.push(...markClaimIssues(part));
+  for (const part of parts) issues.push(...markClaimIssues(part), ...safetyOutputIssues(part));
   if (!request.resolved) {
     if (reply.revealsAnswer) issues.push('declared');
     const guard = buildGuard(request.question, { studentLines: request.studentWork.lines, verifiedLines: request.studentWork.verifiedLines });
@@ -819,7 +821,7 @@ export function createTutorRouter(db, {
       const reply = await ask(request, { env });
       model = reply.model || model;
       const leaked = leakedExpressions(reply.message, guard, { prompt: request.question.prompt });
-      if (reply.message && !reply.revealsAnswer && !leaked.length) {
+      if (reply.message && !reply.revealsAnswer && !leaked.length && !safetyOutputIssues(reply.message).length) {
         return {
           tutor: {
             level: request.level, message: reply.message, referencesStepIndex: reply.referencesStepIndex,
@@ -926,7 +928,7 @@ export function createTutorRouter(db, {
       return fallback(error instanceof TutorProviderError ? error.code : 'TUTOR_FAILED');
     }
     const issues = reply?.message
-      ? diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines })
+      ? [...diagnosisGroundingIssues(reply.message, { question: request.question, studentLines: request.studentWork.lines }), ...safetyOutputIssues(reply.message)]
       : ['empty'];
     if (issues.length) {
       // The student got the step itself, not an explanation: the try is given back.
@@ -951,7 +953,7 @@ export function createTutorRouter(db, {
     let rejected = 0;
     const captions = request.captions.map((caption, index) => {
       const proposed = reply.captions?.get?.(index);
-      if (proposed && proposed.length <= MAX_CAPTION_CHARS && captionWordingOk(proposed, caption.text, spans)) {
+      if (proposed && proposed.length <= MAX_CAPTION_CHARS && captionWordingOk(proposed, caption.text, spans) && !safetyOutputIssues(proposed).length) {
         return { id: caption.id, text: proposed, source: 'model' };
       }
       if (proposed) rejected += 1;
@@ -978,6 +980,10 @@ export function createTutorRouter(db, {
       const checked = validateTutorRequest(req.body);
       if (!checked.ok) return res.status(checked.status).json({ error: { code: checked.code, message: checked.message } });
 
+      // A student's own words are read first: distress is met with a calm message and the
+      // region's support line, no model call, no spend, no tutoring (tutorSafety.js).
+      const distress = distressReply(checked.request, { edition: serverEdition(env) });
+      if (distress) { res.set('Cache-Control', 'no-store'); return res.json({ tutor: distress }); }
       const at = now();
       const grounded = await groundIssued(db, req.platformSession.account_id, checked.request, at);
       if (!grounded.ok) return res.status(grounded.status).json({ error: { code: grounded.code, message: grounded.message } });
@@ -1173,6 +1179,15 @@ export function createTutorRouter(db, {
     }
     const checked = validateTutorRequest(req.body);
     if (!checked.ok) { res.status(checked.status).json({ error: { code: checked.code, message: checked.message } }); return null; }
+    const distress = distressReply(checked.request, { edition: serverEdition(env) });
+    if (distress) {
+      const send = openStream(res);
+      send('meta', { level: distress.level, source: 'safety', model: null, cached: false });
+      send('delta', { text: distress.message });
+      send('done', distress);
+      res.end();
+      return null;
+    }
     if (!TUTOR_STREAM_LEVELS.includes(checked.request.level)) {
       res.status(400).json({ error: { code: 'TUTOR_BODY_INVALID', message: `Only ${TUTOR_STREAM_LEVELS.join(', ')} are streamed; a walkthrough uses /help.` } });
       return null;
@@ -1249,7 +1264,7 @@ export function createTutorRouter(db, {
       req.on('close', onClose);
 
       const guard = buildGuard(request.question, { studentLines: request.studentWork.lines, verifiedLines: request.studentWork.verifiedLines });
-      const gate = createReleaseGate(guard, { prompt: request.question.prompt, maxChars: MAX_STREAM_CHARS });
+      const gate = createReleaseGate(guard, { prompt: request.question.prompt, maxChars: MAX_STREAM_CHARS, extraIssues: safetyOutputIssues });
       const model = providerConfig(env).model;
       send('meta', { level: request.level, source: 'model', model, cached: false });
 
