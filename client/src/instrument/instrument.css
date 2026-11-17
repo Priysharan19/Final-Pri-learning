@@ -1368,3 +1368,19 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
   .pri-working path { stroke-dashoffset: 0; animation: pri-w-br var(--in-dur-work) ease-in-out infinite; }
 }
 @media (forced-colors: active) { .pri-working * { animation: none !important; stroke-dashoffset: 0; } }
+
+/* ── UI6 · Focus push ────────────────────────────────────────────────────────
+   Going into something pushes the plane behind back and the new one rises.
+   Routes: a View Transition on :root (viewTransition.js, "into" links only).
+   Palette: [data-pushed] on <html> while it is open. Nothing here is on the
+   Aurora chrome, and the exam room and desk never push. */
+:root { --in-push-scale: .985; --in-rise: 8px; }
+@keyframes in-push-old { to { transform: scale(var(--in-push-scale)); opacity: .92; } }
+@keyframes in-push-new { from { transform: translateY(var(--in-rise)); opacity: 0; } }
+html[data-vt="in"]::view-transition-old(root) { animation: in-push-old var(--in-dur-3) var(--in-ease-out) both; transform-origin: 50% 0; }
+html[data-vt="in"]::view-transition-new(root) { animation: in-push-new var(--in-dur-3) var(--in-ease-out) both; }
+html[data-pushed] .shell .main { transform: scale(var(--in-push-scale)); transform-origin: 50% 0; filter: brightness(.96); transition: transform 240ms var(--in-ease-out), filter 240ms var(--in-ease-out); }
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
+  html[data-pushed] .shell .main { transform: none; transition: none; }
+}
