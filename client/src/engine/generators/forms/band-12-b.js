@@ -1,5 +1,6 @@
 // Extra forms · Class 12 and Olympiad, part B. See forms/kit.js.
 import { ri, numeric, choice, span, person, place, simpson, numDeriv, r6, C } from './kit.js';
+import * as D from './diagrams.js';
 
 const R = d => span(d, 30, 20);
 
@@ -9,6 +10,7 @@ const areas = [
     const j = ri(rng, 1, R(d)), b = ri(rng, 1, R(d)), k = 3 * j;
     return {
       payload: numeric('parabola-area', `Find the area of the region bounded by $y = ${k}x^2$, the $x$-axis and the line $x = ${b}$, in square units.`, j * b ** 3, {
+        figure: D.coordPlane({ curves: [{ fn: x => k * x * x, x0: 0, x1: b, shade: true, label: `y = ${k}x²` }] }).svg,
         hints: ['The curve lies above the $x$-axis, so the area is a definite integral from $0$ to the given line.', '$\\int x^2\\,dx = \\dfrac{x^3}{3}$, and the constant multiplies through.', 'The factor $3$ in the coefficient cancels the $3$ in the denominator.'],
         steps: [{ h: 'Set up', d: `$A = \\displaystyle\\int_0^{${b}} ${k}x^2\\,dx$` }, { h: 'Integrate', d: `$= \\left[${j}x^3\\right]_0^{${b}}$` }, { h: 'Evaluate', d: 'substitute the upper limit; the lower limit gives $0$' }],
         traps: [{ value: k * b ** 3, why: 'The antiderivative of $x^2$ is $\\dfrac{x^3}{3}$; dropping the $3$ in the denominator inflates the area threefold.' }, { value: j * b ** 2, why: 'The power rises by one: $x^2$ integrates to a cubic, not a square.' }]
@@ -20,6 +22,7 @@ const areas = [
     const u = ri(rng, 1, R(d)), a = 2 * u, c = ri(rng, 0, R(d)), p = ri(rng, 0, R(d)), q = p + ri(rng, 1, R(d));
     return {
       payload: numeric('line-area', `Find the area under the line $y = ${a}x + ${c}$ from $x = ${p}$ to $x = ${q}$, in square units.`, u * (q * q - p * p) + c * (q - p), {
+        figure: D.coordPlane({ curves: [{ fn: x => a * x + c, x0: p, x1: q, shade: true, label: `y = ${a}x + ${c}` }] }).svg,
         hints: ['The line stays above the $x$-axis for $x \\ge 0$, so the area is a definite integral.', 'Integrate term by term: $ax \\to \\dfrac{ax^2}{2}$ and $c \\to cx$.', 'Subtract the value at the lower limit from the value at the upper limit.'],
         steps: [{ h: 'Set up', d: `$A = \\displaystyle\\int_{${p}}^{${q}} (${a}x + ${c})\\,dx$` }, { h: 'Integrate', d: `$= \\left[${u}x^2 + ${c}x\\right]_{${p}}^{${q}}$` }, { h: 'Evaluate', d: 'upper limit minus lower limit' }],
         traps: [{ value: (a * q + c) * (q - p), why: 'The height changes along the line; using the height at $x = ' + q + '$ throughout overstates the area.' }]
@@ -31,6 +34,7 @@ const areas = [
     const i = ri(rng, 1, R(d)), s = ri(rng, 1, R(d)), c = 3 * i;
     return {
       payload: numeric('between-curves', `Find the area enclosed between the parabola $y = ${c}x^2$ and the line $y = ${c * s * s}$, in square units.`, 4 * i * s ** 3, {
+        figure: D.coordPlane({ curves: [{ fn: x => c * s * s, x0: -s, x1: s, stroke: '#3987e5', label: `y = ${c * s * s}` }, { fn: x => c * x * x, x0: -s, x1: s, label: `y = ${c}x²` }] }).svg,
         hints: ['Find where the line meets the parabola: set $y$ equal.', 'Between the two points of intersection the line is above the parabola.', 'The region is symmetric about the $y$-axis, so you may integrate over $[0, s]$ and double.'],
         steps: [{ h: 'Intersections', d: `$${c}x^2 = ${c * s * s}$ gives $x = \\pm ${s}$` }, { h: 'Set up', d: `$A = \\displaystyle\\int_{-${s}}^{${s}} (${c * s * s} - ${c}x^2)\\,dx$` }, { h: 'Evaluate', d: `$= 2\\left[${c * s * s}x - ${i}x^3\\right]_0^{${s}}$` }],
         traps: [{ value: 2 * i * s ** 3, why: 'Integrating only over $[0, s]$ gives half the region; the area is symmetric and needs both sides.' }, { value: c * s ** 3, why: 'That is the rectangle height times width only; the parabola cuts away a share of it.' }]

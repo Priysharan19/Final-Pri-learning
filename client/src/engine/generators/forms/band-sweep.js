@@ -2,6 +2,7 @@
 // Each export is merged onto a skill's existing list (loader.js). See band-789.js for the builder.
 import { ri, numeric, span, place, r6, terminates } from './kit.js';
 import { FORMS_789 } from './band-789.js';
+import * as D from './diagrams.js';
 
 const R = d => span(d, 20, 15);
 const gcd = (x, y) => (y ? gcd(y, x % y) : x);
@@ -14,7 +15,7 @@ const mk = (name, gen) => ({
     for (let i = 0; i < 500; i++) {
       let g;
       try { g = gen(rng, d); } catch (e) { if (e === RETRY) continue; throw e; }
-      return { payload: numeric(name, g.p, g.v, { hints: g.h, steps: g.s, traps: g.t || [] }), check: g.c };
+      return { payload: numeric(name, g.p, g.v, { hints: g.h, steps: g.s, traps: g.t || [], figure: g.f ? g.f.svg : null }), check: g.c };
     }
     throw new Error(`${name}: retry exhausted`);
   }
@@ -195,7 +196,7 @@ const ARITH = () => [
       t: [{ value: a + b * c - e, why: 'The bracket makes the addition happen first.' }], c: () => { const br = a + b; return br * c - e; } };
   }),
   mk('indian-places', (rng, d) => {
-    const lakh = ri(rng, 1, 99), th = ri(rng, 0, 99), rest = ri(rng, 100, 999), n = lakh * 100000 + th * 1000 + rest;
+    const lakh = ri(rng, 2, 99), th = ri(rng, 0, 99), rest = ri(rng, 100, 999), n = lakh * 100000 + th * 1000 + rest;
     return { p: `In the Indian place-value system, how many lakhs are there in $${n}$? (Give the whole number of lakhs.)`, v: lakh, h: ['One lakh is $1{,}00{,}000$.', 'Divide by $1{,}00{,}000$ and ignore the remainder.', 'The whole number part is the answer.'], s: [{ h: 'Divide', d: `$${n}\\div 100000$` }],
       t: [{ value: Math.floor(n / 1000), why: 'That counts thousands, not lakhs.' }], c: () => Math.floor(n / 100000) };
   }),
@@ -236,7 +237,7 @@ const DEC = () => [
   mk('round', (rng, d) => {
     const n = ri(rng, 1000, 99999 * d) / 1000;
     const r = Math.round(n * 10) / 10;
-    if (Math.abs(n * 100 - Math.floor(n * 100) - 0.5) < 1e-9) throw RETRY;
+    if (Math.abs(n * 100 - Math.floor(n * 100) - 0.5) < 1e-9 || Math.abs(r - n) < 1e-9) throw RETRY;
     return { p: `Round $${n}$ to one decimal place.`, v: r6(r), h: ['Look at the second decimal digit.', 'If it is $5$ or more, round the first up.', 'Otherwise leave it.'], s: [{ h: 'Rule', d: 'the digit after the place decides' }],
       t: [{ value: r6(Math.floor(n * 10) / 10), why: 'Check whether the next digit is five or more before leaving the digit unchanged.' }].filter(t => t.value !== r6(r)), c: () => r6(Math.round((n + 1e-9) * 10) / 10) };
   })
@@ -257,6 +258,7 @@ const DATA = () => [
   }),
   mk('bar-difference', (rng, d) => {
     const [a, b] = distinct(rng, 10, 90 * d, 2);
+    if (Math.abs(a - b) < 2) throw RETRY;
     return { p: `A bar chart shows ${a} students in Class VIII-A and ${b} in Class VIII-B. How many more students are in the larger class?`, v: Math.abs(a - b), h: ['Read both bar heights.', 'Subtract the smaller from the larger.', 'The answer is a positive number.'], s: [{ h: 'Subtract', d: `$${Math.max(a, b)} - ${Math.min(a, b)}$` }],
       t: [{ value: a + b, why: 'The question asks for the difference, not the total.' }], c: () => Math.max(a, b) - Math.min(a, b) };
   }),

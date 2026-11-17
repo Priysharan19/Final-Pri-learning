@@ -179,7 +179,6 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `c7-equation-context-reasoning` | 4 | 16.6k | 278 | — |
 | `c11-permutations-combinations` | 4 | 16.6k | 321 | — |
 | `c8-mensuration-ncert-mastery` | 4 | 16.7k | 17 | — |
-| `c7-solid-shapes` | 4 | 16.7k | 31 | — |
 | `c9-polynomial-basics` | 4 | 16.9k | 289 | — |
 | `c7-triangle-angles` | 4 | 17.1k | 6 | — |
 | `c12-applications-derivatives` | 4 | 17.3k | 434 | — |
@@ -201,6 +200,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `c7-angle-sum-reasoning` | 4 | 18.3k | 60 | — |
 | `c7-rounding-bounds-reasoning` | 4 | 18.3k | 315 | — |
 | `c10-surface-area-combo` | 4 | 18.6k | 18 | — |
+| `c7-solid-shapes` | 4 | 18.7k | 28 | — |
 | `c7-symmetry` | 4 | 18.9k | 13 | — |
 | `c9-circles` | 4 | 19.1k | 8 | — |
 | `c10-tangent-length-reasoning` | 4 | 19.5k | 9 | — |

@@ -2,6 +2,7 @@
 // factory so each skill still carries its own list of forms. Written with a compact
 // builder: g(rng, d) returns { p prompt, v key, h hints, s steps, t traps, c check }.
 import { ri, numeric, choice, span, person, place, r6, terminates } from './kit.js';
+import * as D from './diagrams.js';
 
 const R = d => span(d, 20, 15);
 const gcd = (x, y) => (y ? gcd(y, x % y) : x);
@@ -15,7 +16,7 @@ const mk = (name, gen) => ({
     for (let i = 0; i < 500; i++) {
       let g;
       try { g = gen(rng, d); } catch (e) { if (e === RETRY) continue; throw e; }
-      return { payload: numeric(name, g.p, g.v, { hints: g.h, steps: g.s, traps: g.t || [] }), check: g.c };
+      return { payload: numeric(name, g.p, g.v, { hints: g.h, steps: g.s, traps: g.t || [], figure: g.f ? g.f.svg : null }), check: g.c };
     }
     throw new Error(`${name}: retry exhausted`);
   }
@@ -224,11 +225,13 @@ const MENS2 = () => [
   mk('trapezium', (rng, d) => {
     const [a, b] = distinct(rng, 3, R(d), 2), h = 2 * ri(rng, 1, 10 + 3 * d);
     return { p: `A trapezium-shaped field in ${place(rng)} has parallel sides $${a}$ m and $${b}$ m, and the distance between them is $${h}$ m. Find its area in square metres.`, v: ((a + b) * h) / 2, h: ['Area of a trapezium is $\\dfrac12(a + b)h$.', 'Add the parallel sides.', 'Multiply by the height and halve.'], s: [{ h: 'Formula', d: `$\\dfrac12(${a} + ${b})(${h})$` }],
+      f: D.trapeziumFigure({ a, b, h, shown: { a: `${a} m`, b: `${b} m`, h: `${h} m` } }),
       t: [{ value: (a + b) * h, why: 'The factor $\\frac12$ is part of the formula.' }], c: () => { let s = 0; for (let y = 0; y < h; y++) s += (a + b) / 2; return s; } };
   }),
   mk('rhombus', (rng, d) => {
     const [p, q] = distinct(rng, 2, 10 + 3 * d, 2);
     return { p: `The diagonals of a rhombus are $${2 * p}$ cm and $${2 * q}$ cm. Find its area in square centimetres.`, v: 2 * p * q, h: ['Area of a rhombus is half the product of its diagonals.', 'Multiply the diagonals.', 'Halve.'], s: [{ h: 'Formula', d: `$\\dfrac12\\times ${2 * p}\\times ${2 * q}$` }],
+      f: D.rhombusFigure({ d1: 2 * p, d2: 2 * q, shown: { d1: `${2 * p} cm`, d2: `${2 * q} cm` } }),
       t: [{ value: 4 * p * q, why: 'The area is half the product of the diagonals.' }], c: () => (2 * p * 2 * q) / 2 };
   }),
   mk('cuboid-surface', (rng, d) => {
@@ -239,6 +242,7 @@ const MENS2 = () => [
   mk('heron', (rng, d) => {
     const t = TRI_H[ri(rng, 0, 5)], k = ri(rng, 1, 3 + d);
     return { p: `The sides of a triangle are $${t[0] * k}$ cm, $${t[1] * k}$ cm and $${t[2] * k}$ cm. Use Heron's formula to find its area in square centimetres.`, v: t[3] * k * k, h: ["Heron's formula needs the semi-perimeter $s$.", '$A = \\sqrt{s(s-a)(s-b)(s-c)}$.', 'The product under the root is a perfect square.'], s: [{ h: 'Semi-perimeter', d: `$s = ${(t[0] + t[1] + t[2]) * k / 2}$` }],
+      f: D.triangle({ a: t[0] * k, b: t[1] * k, c: t[2] * k, shown: { a: `${t[0] * k} cm`, b: `${t[1] * k} cm`, c: `${t[2] * k} cm` } }),
       t: [{ value: t[3] * k, why: 'Area scales with the square of the scale factor.' }].filter(x => k > 1), c: () => { const s0 = ((t[0] + t[1] + t[2]) * k) / 2; return Math.round(Math.sqrt(s0 * (s0 - t[0] * k) * (s0 - t[1] * k) * (s0 - t[2] * k))); } };
   })
 ];
@@ -289,6 +293,7 @@ const POLYQ = () => [
   mk('rhombus-side', (rng, d) => {
     const t = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25]][ri(rng, 0, 3)], k = ri(rng, 1, 4 + d);
     return { p: `The diagonals of a rhombus are $${2 * t[0] * k}$ cm and $${2 * t[1] * k}$ cm. Find its side in cm.`, v: t[2] * k, h: ['The diagonals of a rhombus bisect each other at right angles.', 'Half the diagonals and a side form a right triangle.', 'Use Pythagoras.'], s: [{ h: 'Half diagonals', d: `$${t[0] * k}$ and $${t[1] * k}$` }],
+      f: D.rhombusFigure({ d1: 2 * t[0] * k, d2: 2 * t[1] * k, shown: { d1: `${2 * t[0] * k} cm`, d2: `${2 * t[1] * k} cm`, side: '?' } }),
       t: [{ value: (t[0] + t[1]) * k, why: 'The side is the hypotenuse, not the sum of the half-diagonals.' }], c: () => Math.round(Math.hypot(t[0] * k, t[1] * k)) };
   }),
   mk('angle-sum', (rng, d) => {
@@ -325,6 +330,7 @@ const CIRC9 = () => [
   mk('chord-distance', (rng, d) => {
     const t = [[3, 4, 5], [5, 12, 13], [8, 15, 17], [7, 24, 25]][ri(rng, 0, 3)], k = ri(rng, 1, 5 + d);
     return { p: `A chord $${2 * t[0] * k}$ cm long lies in a circle of radius $${t[2] * k}$ cm. Find its distance from the centre in cm.`, v: t[1] * k, h: ['The perpendicular from the centre bisects the chord.', 'Half the chord, the distance and the radius form a right triangle.', 'Use Pythagoras.'], s: [{ h: 'Half chord', d: `$${t[0] * k}$` }],
+      f: D.chordFigure({ r: t[2] * k, dist: t[1] * k, shown: { r: `${t[2] * k} cm`, chord: `${2 * t[0] * k} cm`, dist: '?' } }),
       t: [{ value: t[0] * k, why: 'That is half the chord, not its distance from the centre.' }], c: () => Math.round(Math.sqrt((t[2] * k) ** 2 - (t[0] * k) ** 2)) };
   })
 ];
@@ -422,6 +428,7 @@ const COORD9 = () => [
     const x1 = ri(rng, -9, 0), y1 = ri(rng, -9, 0), w = ri(rng, 2, 10 + 3 * d), h = ri(rng, 2, 10 + 3 * d);
     if (w === h) throw RETRY;
     return { p: `A rectangle has vertices $(${x1}, ${y1})$, $(${x1 + w}, ${y1})$, $(${x1 + w}, ${y1 + h})$ and $(${x1}, ${y1 + h})$. Find its area in square units.`, v: w * h, h: ['The sides are parallel to the axes.', 'Find the width and the height from the coordinates.', 'Multiply.'], s: [{ h: 'Sides', d: `$${w}$ and $${h}$` }],
+      f: D.coordPlane({ points: [{ x: x1, y: y1, label: `A(${x1}, ${y1})` }, { x: x1 + w, y: y1, label: `B(${x1 + w}, ${y1})` }, { x: x1 + w, y: y1 + h, label: `C(${x1 + w}, ${y1 + h})` }, { x: x1, y: y1 + h, label: `D(${x1}, ${y1 + h})` }], polygon: true }),
       t: [{ value: 2 * (w + h), why: 'That is the perimeter.' }], c: () => Math.abs((x1 + w) - x1) * Math.abs((y1 + h) - y1) };
   }),
   mk('reflection', (rng, d) => {
@@ -433,12 +440,14 @@ const COORD9 = () => [
     const x = nzs(rng, R(d)), y = nzs(rng, R(d));
     if (Math.abs(x) === Math.abs(y)) throw RETRY;
     return { p: `A point has coordinates $(${x}, ${y})$. Find the sum of its distances from the $x$-axis and from the $y$-axis, in units.`, v: Math.abs(x) + Math.abs(y), h: ['The distance from the $y$-axis is $|x|$.', 'The distance from the $x$-axis is $|y|$.', 'Distances are never negative; add them.'], s: [{ h: 'Absolute values', d: `$|${x}| + |${y}|$` }],
+      f: D.coordPlane({ points: [{ x, y, label: `P(${x}, ${y})` }] }),
       t: [{ value: x + y, why: 'Distances are positive; use the absolute values before adding.' }].filter(t => t.value !== Math.abs(x) + Math.abs(y)), c: () => Math.sqrt(x * x) + Math.sqrt(y * y) };
   }),
   mk('same-line-distance', (rng, d) => {
     const x1 = nzs(rng, R(d)), x2 = nzs(rng, R(d)), y = nzs(rng, R(d));
     if (x1 === x2) throw RETRY;
     return { p: `Find the distance between the points $(${x1}, ${y})$ and $(${x2}, ${y})$.`, v: Math.abs(x1 - x2), h: ['The two points have the same $y$-coordinate, so they lie on a horizontal line.', 'The distance is the difference of the $x$-coordinates.', 'Distance is never negative.'], s: [{ h: 'Subtract', d: `$|${x1} - ${pr(x2)}|$` }],
+      f: D.coordPlane({ points: [{ x: x1, y, label: `A(${x1}, ${y})` }, { x: x2, y, label: `B(${x2}, ${y})` }], segments: [[0, 1]] }),
       t: [{ value: Math.abs(x1 + x2), why: 'Subtract the $x$-coordinates; adding them gives something else.' }].filter(t => t.value !== Math.abs(x1 - x2)), c: () => Math.max(x1, x2) - Math.min(x1, x2) };
   }),
   mk('midpoint', (rng, d) => {
@@ -514,8 +523,8 @@ const CONSTR = () => [
   }),
   mk('tiling-count', (rng, d) => {
     const t = [[3, 60], [4, 90], [6, 120], [5, 108], [8, 135], [12, 150]][ri(rng, 0, 5)], k = ri(rng, 2, 10 + 5 * d);
-    return { p: `Regular polygons with $${t[0]}$ sides have an interior angle of $${t[1]}^\\circ$. How many degrees do $${k}$ of them add up to at one common corner if they were placed side by side around a point?`, v: t[1] * k, h: ['Each polygon contributes its interior angle at the corner.', 'Multiply by the number of polygons.', 'A full turn is $360^\\circ$.'], s: [{ h: 'Multiply', d: `$${k}\\times ${t[1]}$` }],
-      t: [{ value: 360, why: 'A full turn is the target for a perfect tiling, but the question asks for the sum of the angles placed.' }].filter(x => t[1] * k !== 360), c: () => { let s2 = 0; for (let i = 0; i < k; i++) s2 += ((t[0] - 2) * 180) / t[0]; return Math.round(s2); } };
+    return { p: `A regular polygon with $${t[0]}$ sides has an interior angle of $${t[1]}^\\circ$. Find the sum of the interior angles, in degrees, of $${k}$ such polygons.`, v: t[1] * k, h: ['Each polygon contributes its interior angle at the corner.', 'Multiply by the number of polygons.', 'A full turn is $360^\\circ$.'], s: [{ h: 'Multiply', d: `$${k}\\times ${t[1]}$` }],
+      t: [{ value: t[1] + k, why: 'Each polygon contributes its own interior angle, so multiply by the number of polygons.' }], c: () => { let s2 = 0; for (let i = 0; i < k; i++) s2 += ((t[0] - 2) * 180) / t[0]; return Math.round(s2); } };
   })
 ];
 const EUCLID = () => [
@@ -616,7 +625,7 @@ export const BAND_789 = {
   'c7-letter-numbers-current': F.lin7, 'c7-finding-unknown-current': F.lin7,
   'c7-lcm-reasoning': F.lcmf, 'c7-cryptarithm-reasoning': F.crypt,
   'c7-statistical-question-reasoning': F.stat7,
-  'c7-solid-shapes': F.solid, 'c7-symmetry': F.solid.filter(f => ['lines-of-symmetry', 'turns', 'rotation-angle'].includes(f.form)).concat(F.angles.filter(f => f.form === 'regular-exterior')),
+  'c7-solid-shapes': F.solid.filter(f => !['turns', 'rotation-angle', 'lines-of-symmetry'].includes(f.form)), 'c7-symmetry': F.solid.filter(f => ['lines-of-symmetry', 'turns', 'rotation-angle'].includes(f.form)).concat(F.angles.filter(f => f.form === 'regular-exterior')),
   'c7-triangle-angles': F.geom7, 'c7-triangles-current': F.geom7, 'c7-parallel-intersecting-lines-current': F.geom7, 'c7-triangle-inequality-reasoning': F.geom7,
   'c7-angle-construction-reasoning': F.constr, 'c7-congruence-inference-reasoning': F.constr, 'c7-geometric-twins-current': F.constr, 'c7-sss-sas-reasoning': F.constr,
   'c7-perpendicular-bisector-reasoning': F.constr, 'c7-constructions-tilings-current': F.constr, 'c7-connecting-dots-current': F.constr, 'c7-common-ground-current': F.constr,
