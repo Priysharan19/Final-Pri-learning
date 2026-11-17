@@ -136,6 +136,11 @@ try {
   const q1 = pa.questions[0].payload;
   const keyed = String(q1.answer?.canonicalInput ?? q1.answer?.correctIndex ?? '');
   c.ok(!/Answer:|marking guide/.test(text), 'and no answer or guide in the paper');
+  const shown = [...text.matchAll(/\((.*)\) Tj/g)].map(m => m[1]).join('\n');
+  c.ok(!/\$|\\\\[a-z]|\?/.test(shown) && shown.length > 200, 'the printed questions carry no LaTeX markup and no replaced character');
+  const { latexToText, unprintable } = await import('../platform/pdfLite.js');
+  c.deq([latexToText('Simplify $x^{3} \\times x^{8}$'), latexToText('\\dfrac{5x}{2} costs \\$5')], ['Simplify x^(3) x x^(8)', '(5x)/(2) costs 5'], 'LaTeX is turned into plain text');
+  c.ok(unprintable('\u2220ABC and \u03b1 \u2208 A') && !unprintable('x^{2} \\le 5'), 'a question the page cannot carry faithfully is not printed');
   c.deq(leaks({ ...pdf.data, pdfBase64: undefined }), [], 'no key in the PDF reply');
   const locked = await h.request(`/v1/exams/${first.data.exam.id}/guide`, { jar: a.jar });
   c.deq([locked.status, locked.data?.error?.code], [403, 'GUIDE_LOCKED'], 'the marking guide is locked before the paper is submitted');

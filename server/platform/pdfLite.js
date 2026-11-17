@@ -17,6 +17,23 @@ const clean = s => [...String(s ?? '')].map(ch => {
   const code = ch.codePointAt(0);
   return code >= 32 && code <= 126 ? ch : (code === 9 ? ' ' : (code >= 160 && code <= 255 ? ch : (ch === '\n' ? ' ' : '?')));
 }).join('');
+const GREEK = { alpha: 'alpha', beta: 'beta', gamma: 'gamma', delta: 'delta', theta: 'theta', pi: 'pi', sigma: 'sigma', mu: 'mu', lambda: 'lambda' };
+const SYMBOL = { times: 'x', cdot: '.', div: '/', leq: '<=', le: '<=', geq: '>=', ge: '>=', neq: '!=', approx: '~', pm: '+/-', infty: 'infinity', degree: ' deg', circ: ' deg', ldots: '...', dots: '...', to: '->', rightarrow: '->', angle: 'angle ', triangle: 'triangle ', parallel: '||', perp: ' perpendicular to ', in: ' in ', cup: ' union ', cap: ' intersection ' };
+/** Maths as the engine writes it (LaTeX) → plain text a printed page can carry. */
+export function latexToText(input) {
+  let s = String(input ?? '').replace(/<[^>]*>/g, ' ');
+  for (let i = 0; i < 6; i++) {
+    s = s.replace(/\\[dt]?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}/g, '($1)/($2)').replace(/\\sqrt\s*\[([^\]]*)\]\s*\{([^{}]*)\}/g, 'root$1($2)').replace(/\\sqrt\s*\{([^{}]*)\}/g, 'sqrt($1)')
+      .replace(/\^\s*\{([^{}]*)\}/g, '^($1)').replace(/_\s*\{([^{}]*)\}/g, '_($1)').replace(/\\(?:text|mathrm|mathbf|textbf|operatorname)\s*\{([^{}]*)\}/g, '$1');
+  }
+  return s.replace(/\\([A-Za-z]+)/g, (m, w) => (w in SYMBOL ? SYMBOL[w] : (w in GREEK ? GREEK[w] : (/^(left|right|displaystyle|quad|qquad|,|;)$/.test(w) ? '' : m))))
+    .replace(/\\([%$&#_{}])/g, '$1').replace(/\\[,;! ]/g, ' ').replace(/\$/g, '').replace(/\s+/g, ' ').trim();
+}
+/** Would printing this text change it (a backslash command left over, or a character the page cannot draw)? */
+export function unprintable(text) {
+  const t = latexToText(text);
+  return /\\|[{}]/.test(t) || [...t].some(ch => { const c = ch.codePointAt(0); return !((c >= 32 && c <= 126) || (c >= 160 && c <= 255) || STAND_IN.has(ch)); });
+}
 const esc = s => clean(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
 
 // Helvetica's average advance is about half the point size; wrapping by that is
@@ -24,7 +41,7 @@ const esc = s => clean(s).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/
 function wrap(text, size, width) {
   const per = Math.max(1, Math.floor(width / (size * 0.5)));
   const out = [];
-  for (const para of clean(text).split(/\s*\n\s*/)) {
+  for (const para of clean(latexToText(text)).split(/\s*\n\s*/)) {
     let line = '';
     for (const word of para.split(/\s+/).filter(Boolean)) {
       if ((line + ' ' + word).trim().length > per) { if (line) out.push(line); line = word.slice(0, per); }

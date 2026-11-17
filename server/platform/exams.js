@@ -202,7 +202,7 @@ import {
   GENERATED_LABEL, PAPER_MARKS, PAPER_MINUTES, MIXES, MAX_TOPICS, marksForMinutes, minutesForMarks,
   generatorTopics, assemblePaper, publicSummary
 } from './paperGenerator.js';
-import { buildPdf } from './pdfLite.js';
+import { buildPdf, unprintable } from './pdfLite.js';
 import { indiaBank } from './indiaBanks.js';
 import { nswBank } from './nswBanks.js';
 
@@ -644,6 +644,8 @@ function generatedAdmit(style, { print = false } = {}) {
   return (q, gen, slot) => {
     // A figure is drawn on screen; a printed paper carries text only, so it omits those questions.
     if (!q?.prompt || q.multipart || (print && q.figure) || q.matchList || Array.isArray(q.boardScheme)) return false;
+    // Nor one whose maths a printed page could not carry faithfully (a character it would replace).
+    if (print && (unprintable(q.prompt) || optionsOf(q).some(o => unprintable(optionText(o))))) return false;
     if (style === 'hsc') {
       if (!NSW_GENERATED_TYPES.has(q.answerType)) return false;
       if (slot.objective !== (q.answerType === 'mcq')) return false;
