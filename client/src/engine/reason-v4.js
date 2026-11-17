@@ -602,8 +602,6 @@ function absSurdSignature(eq, variable = null) {
       roots.push(...r.filter(keep));
     }
   } else {
-    const diff = polySub(polyMul(P, [1, 0, 0]).slice(0, 3).map((_, i) => P[i]), P); // keep type checker honest
-    void diff;
     const sq = polyMul(P, P);
     const co = sq.map((x, i) => x - (Q[i] || 0));
     const r = (() => {
