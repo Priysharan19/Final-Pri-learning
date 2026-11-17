@@ -77,7 +77,11 @@ export function mergePremium(base, premium) {
   return out;
 }
 
+// Stage 6 notes are written per course (each one an on-demand chunk of its own); their
+// modules are already complete (the premium layer is written into each topic).
 const LOADERS = Object.freeze({
+  'six:advanced': () => import('./notes-nsw-stage6-advanced.js'),
+  'six:standard': () => import('./notes-nsw-stage6-standard.js'),
   4: async () => {
     const [base, premium] = await Promise.all([import('./notes-nsw-stage4.js'), import('./notes-nsw-stage4-premium.js')]);
     return { default: mergePremium(base.default, premium.default) };
@@ -85,14 +89,14 @@ const LOADERS = Object.freeze({
 });
 
 /** The notes of every topic in a stage (an object keyed by topic id), or null when none are written yet. */
-export async function loadNswNotesForStage(stage) {
-  const load = LOADERS[stage];
+export async function loadNswNotesForStage(stage, course = null) {
+  const load = stage === 6 ? LOADERS[`six:${course}`] : LOADERS[stage];
   if (!load) return null;
   return (await load()).default;
 }
 
 /** Whether a topic's stage has a notes module at all (the topic may still have none). */
-export const stageHasNotes = stage => Object.hasOwn(LOADERS, stage);
+export const stageHasNotes = (stage, course = null) => Object.hasOwn(LOADERS, stage === 6 ? `six:${course}` : stage);
 
 /** The year a student studies a topic in, for headings: the Year tab if given, else the topic's first year. */
 export const yearOfTopic = (topic, year = null) => (year && topic.years.includes(year) ? year : topic.years[0]);

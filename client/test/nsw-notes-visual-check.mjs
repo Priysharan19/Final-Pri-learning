@@ -28,6 +28,8 @@ import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { NSW_NOTES_TOPICS } from '../src/notes/nsw/nswNotesIndex.js';
 import base from '../src/notes/nsw/notes-nsw-stage4.js';
+import adv from '../src/notes/nsw/notes-nsw-stage6-advanced.js';
+import std from '../src/notes/nsw/notes-nsw-stage6-standard.js';
 
 const CLIENT = fileURLToPath(new URL('..', import.meta.url));
 const SHOTS_DIR = fileURLToPath(new URL('../../docs/design/nsw-notes-screens/', import.meta.url));
@@ -37,7 +39,8 @@ let pass = 0;
 const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 
-const topics = NSW_NOTES_TOPICS.filter(t => t.stage === 4 && Object.hasOwn(base, t.id));
+const written = { ...base, ...adv, ...std };
+const topics = NSW_NOTES_TOPICS.filter(t => Object.hasOwn(written, t.id));
 const ORDER = ['ideas', 'definitions', 'formulas', 'diagram', 'examiners', 'mistakes', 'examples', 'check'];
 
 const server = await createServer({

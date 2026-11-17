@@ -19,6 +19,8 @@ import { evalNumeric, exprEquivalent } from '../src/engine/expr.js';
 import { NSW_NOTES_TOPICS, NSW_NOTES_TOPIC_BY_ID, mergePremium } from '../src/notes/nsw/nswNotesIndex.js';
 import base4 from '../src/notes/nsw/notes-nsw-stage4.js';
 import premium4 from '../src/notes/nsw/notes-nsw-stage4-premium.js';
+import six6a from '../src/notes/nsw/notes-nsw-stage6-advanced.js';
+import six6s from '../src/notes/nsw/notes-nsw-stage6-standard.js';
 import { readFileSync } from 'node:fs';
 
 const stage4 = mergePremium(base4, premium4);
@@ -74,12 +76,18 @@ const INDIA = /NCERT|CBSE|\bJEE\b|\bClass\s*\d|\bIndian?\b|rupee|₹|\bRs\.?\s*\
 // en-AU: a few spellings that differ from en-US in maths writing.
 const NOT_AU = /\b(meter|meters|liter|liters|center|color|favorite|gray|neighbor)s?\b/i;
 
-const all = Object.entries(stage4);
-for (const [id, n] of all) {
+// Every written module: Stage 4 (base + premium merged) and the Stage 6 course modules (complete as written).
+const MODULES = [
+  { data: stage4, stage: 4, course: null },
+  { data: six6a, stage: 6, course: 'advanced' },
+  { data: six6s, stage: 6, course: 'standard' }
+];
+const all = MODULES.flatMap(m => Object.entries(m.data).map(([id, n]) => [id, n, m]));
+for (const [id, n, mod] of all) {
   const where = `topic ${id}`;
   const topic = NSW_NOTES_TOPIC_BY_ID[id];
   ok(!!topic, `${where}: not a focus area of the NSW curriculum model`);
-  ok(topic?.stage === 4, `${where}: the stage 4 module holds a stage ${topic?.stage} topic`);
+  ok(topic?.stage === mod.stage && (mod.course === null || topic?.course === mod.course), `${where}: the stage ${mod.stage} ${mod.course ?? ''} module holds a stage ${topic?.stage} ${topic?.course ?? ''} topic`);
   checkProse(n.summary, `${where} summary`);
   ok(Array.isArray(n.prereqs) && n.prereqs.every(p => NSW_NOTES_TOPIC_BY_ID[p]), `${where}: a prerequisite is not a topic`);
   ok(n.concepts?.length >= 3, `${where}: needs at least 3 ideas`);

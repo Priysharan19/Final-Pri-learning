@@ -12,12 +12,14 @@ import { ChapterSheet } from '../../src/notes/nsw/NswParts.jsx';
 import { mergePremium, NSW_NOTES_TOPIC_BY_ID } from '../../src/notes/nsw/nswNotesIndex.js';
 import base from '../../src/notes/nsw/notes-nsw-stage4.js';
 import premium from '../../src/notes/nsw/notes-nsw-stage4-premium.js';
+import adv from '../../src/notes/nsw/notes-nsw-stage6-advanced.js';
+import std from '../../src/notes/nsw/notes-nsw-stage6-standard.js';
 import { MathText } from '../../src/lib/latex.jsx';
 
 const params = new URLSearchParams(location.search);
 const id = params.get('topic') || 'ma4-frc-c-01';
 const topic = NSW_NOTES_TOPIC_BY_ID[id];
-const notes = mergePremium(base, premium)[id];
+const notes = { ...mergePremium(base, premium), ...adv, ...std }[id];
 document.documentElement.classList.add('ui-instrument');
 document.documentElement.setAttribute('data-theme', params.get('theme') === 'dark' ? 'dark' : 'light');
 document.documentElement.style.colorScheme = params.get('theme') === 'dark' ? 'dark' : 'light';
@@ -25,7 +27,7 @@ document.documentElement.style.colorScheme = params.get('theme') === 'dark' ? 'd
 createRoot(document.getElementById('root')).render(
   <article className="nt nt-article" style={{ padding: "8px 16px 72px" }} data-nsw-notes data-topic={id}>
     <header className="nt-ch-head">
-      <p className="nt-eyebrow">Year {topic.years[0]} · Stage {topic.stage}</p>
+      <p className="nt-eyebrow">Year {topic.years[0]} · Stage {topic.stage}{topic.course ? ` · ${topic.course}` : ''}</p>
       <h1 className="nt-title">{topic.name}</h1>
       <MathText block className="nt-lede" text={notes.summary} />
     </header>

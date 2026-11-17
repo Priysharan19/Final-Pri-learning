@@ -27,17 +27,17 @@ function ownYear(user) {
   return yearOf(user?.year) || 7;
 }
 
-function useStageNotes(stage) {
+function useStageNotes(stage, course = null) {
   const [state, setState] = useState({ notes: null, failed: false, done: false });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
     setState({ notes: null, failed: false, done: false });
-    loadNswNotesForStage(stage)
+    loadNswNotesForStage(stage, course)
       .then(notes => { if (live) setState({ notes, failed: false, done: true }); })
       .catch(() => { if (live) setState({ notes: null, failed: true, done: true }); });
     return () => { live = false; };
-  }, [stage, attempt]);
+  }, [stage, course, attempt]);
   return [state, () => setAttempt(a => a + 1)];
 }
 
@@ -68,7 +68,7 @@ function NotesIndex() {
   const root = useRef(null);
   const topics = useMemo(() => topicsFor(year, course), [year, course]);
   const stage = topics[0]?.stage;
-  const [{ notes, failed }, retry] = useStageNotes(stage ?? 0);
+  const [{ notes, failed }, retry] = useStageNotes(stage ?? 0, topics[0]?.course ?? null);
   const needle = query.trim().toLowerCase();
   const shown = needle.length >= 2 ? topics.filter(x => topicSearchText(x).includes(needle)) : topics;
   const hasNotes = topic => !!notes && Object.hasOwn(notes, topic.id);
@@ -164,7 +164,7 @@ function TopicNotes({ topicId }) {
   const [params] = useSearchParams();
   const topic = NSW_NOTES_TOPIC_BY_ID[topicId] || null;
   const year = topic ? yearOfTopic(topic, yearOf(params.get('year'))) : null;
-  const [{ notes: all, failed, done }, retry] = useStageNotes(topic?.stage ?? 0);
+  const [{ notes: all, failed, done }, retry] = useStageNotes(topic?.stage ?? 0, topic?.course ?? null);
   const [cards, setCards] = useState(false);
   const notes = all && topic ? all[topic.id] : null;
   const root = useRef(null);
