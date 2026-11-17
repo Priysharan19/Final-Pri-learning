@@ -3187,7 +3187,7 @@ export default {
   "inst.mapLegendBuilding": "building",
   "inst.mapLegendNew": "not started",
   "inst.mapLegendSize": "size and fill = how secure",
-  "inst.mapCardNew": "Not started yet. Its links show the chapters it builds on.",
+  "inst.mapCardNew": "Not started yet.",
   "inst.mapCardBuilding": "Started — not enough answers yet to say how secure it is.",
   "inst.mapCardSecure": "{n}% secure, from the answers checked so far.",
   "inst.reportStreakEm": "streak {n}",
