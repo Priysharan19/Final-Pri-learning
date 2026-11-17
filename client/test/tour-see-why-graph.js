@@ -97,7 +97,7 @@ async function runEdition(spec, browser) {
     await page.goto(`${platform.origin}/practice?subtopic=${spec.pin.generator}`, { waitUntil: 'domcontentloaded' });
     const front = page.locator('.qpage[data-question-id]');
     await front.locator('.q-prompt').waitFor({ timeout: 30000 });
-    for (let n = 0; n < 4 && !(await front.locator('.q-prompt').innerText()).replace(/\s+/g, ' ').includes(spec.prompt); n++) {
+    for (let n = 0; n < 4 && !(await front.locator('.q-prompt').innerText()).replace(/\s+/g, '').includes(spec.prompt.replace(/\s+/g, '')); n++) {
       const before = await front.getAttribute('data-question-id');
       await page.locator('.ctx-next').click();
       await page.waitForFunction(id => {
@@ -105,13 +105,15 @@ async function runEdition(spec, browser) {
         return next && next.getAttribute('data-question-id') !== id && !!next.querySelector('.q-prompt');
       }, before, { timeout: 30000 });
     }
-    const prompt = (await front.locator('.q-prompt').innerText()).replace(/\s+/g, ' ');
-    if (!check(`${spec.edition}: the server issued the pinned question`, prompt.includes(spec.prompt), prompt)) return;
+    const prompt = (await front.locator('.q-prompt').innerText()).replace(/\s+/g, '');
+    if (!check(`${spec.edition}: the server issued the pinned question`, prompt.includes(spec.prompt.replace(/\s+/g, '')), prompt)) return;
 
     const typing = page.getByRole('button', { name: 'Answer by typing' });
     if (await typing.count()) await typing.click();
     await page.locator('[data-final-answer]').fill(spec.answer);
     const work = page.locator('[data-typed-working]');
+    const disclose = page.locator('.btn-disclose[aria-controls]', { hasText: 'Show working' });
+    if (!await work.isVisible() && await disclose.count()) await disclose.first().click();
     await work.waitFor({ state: 'visible', timeout: 10000 });
     await work.click();
     await work.fill(spec.working);
