@@ -178,4 +178,4 @@ if (failures.length) {
   for (const f of failures) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
-console.log(`BRAND BUILD: PASS — ${pass}/${pass} checks${BOTH ? ' — both editions built; they differ only in brand files, the edition record, the E5 commercial chunks, the languages an edition does not offer, each edition's own notes, and the importers of those by minified name' : ''}`);
+console.log(`BRAND BUILD: PASS — ${pass}/${pass} checks${BOTH ? ' — both editions built; they differ only in brand files, the edition record, the E5 commercial chunks, the languages an edition does not offer, the notes of each edition, and the importers of those by minified name' : ''}`);
