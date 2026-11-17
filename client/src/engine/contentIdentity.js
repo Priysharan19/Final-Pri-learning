@@ -55,7 +55,10 @@
 // 2026.11.37 — Train editions-25: the merged content of the 33 branches together; the extra Priyabhata
 // forms no longer draw a "- 0" term (Class 7 integers) or a "0^3" limit (Class 12 average value), which the
 // zero-term typesetting rule of the content certification refuses.
-export const CONTENT_VERSION = '2026.11.37';
+// 2026.11.38 — Train editions-25 review fixes: no floating-point artefacts in the Years 9-10 overlays (variation,
+// scale drawings), no "${" at the start of a combinations span, and every extra form that states a number of
+// decimal places keys the matching tolerance band.
+export const CONTENT_VERSION = '2026.11.38';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */
