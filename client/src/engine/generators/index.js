@@ -585,10 +585,17 @@ function difficultyFor(dp, difficulty, seed) {
 // `pick` (server only, F7 band practice) replaces the generator's own draw: it is
 // handed the seeded rng and returns the payload of the one item it chose, which
 // is then stamped exactly as a drawn one. It may not be combined with a dot point.
+// A suite that names a question by (skill, difficulty, seed) pins the skill's direct form; the extra
+// structural forms and the capacity overlays draw other forms from the same seeds. Such a suite turns them
+// off for its own process with directFormsOnly(true). Nothing in the app calls it.
+let directOnly = false;
+export function directFormsOnly(on = true) { directOnly = on === true; }
+
 export function generateQuestion(subtopicId, difficulty, seed, dotpointId, pick = null) {
   // Own entries only: a subtopic id from a request such as "constructor" must
   // resolve to no generator, not to an inherited Object.prototype member.
-  const gen = typeof subtopicId === 'string' && Object.hasOwn(GENERATORS, subtopicId) ? GENERATORS[subtopicId] : undefined;
+  const entry = typeof subtopicId === 'string' && Object.hasOwn(GENERATORS, subtopicId) ? GENERATORS[subtopicId] : undefined;
+  const gen = directOnly && typeof entry?.direct === 'function' ? entry.direct : entry;
   if (!gen) {
     const bank = bankOf(subtopicId);
     if (bank && !loaded.has(bank)) {
@@ -611,7 +618,7 @@ export function generateQuestion(subtopicId, difficulty, seed, dotpointId, pick 
   // forms draw one from the seed through a separate rng, so the direct form's
   // own stream (and every seed it already served) is unchanged. (A picked item
   // is its own form: no extra form is drawn for it.)
-  const extra = !pick && Object.hasOwn(EXTRA_FORMS, subtopicId) ? EXTRA_FORMS[subtopicId] : null;
+  const extra = !pick && !directOnly && Object.hasOwn(EXTRA_FORMS, subtopicId) ? EXTRA_FORMS[subtopicId] : null;
   const formPick = extra ? Math.floor(makeRng((s ^ 0x2f6b9c1d) >>> 0)() * (extra.length + 1)) : 0;
   const payload = pick ? pick(rng) : formPick === 0 ? gen(rng, d) : extra[formPick - 1].make(rng, d).payload;
   const q = { seed: s, subtopic: subtopicId, difficulty: pick ? payload.difficulty : d, ...payload };

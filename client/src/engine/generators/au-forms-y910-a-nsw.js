@@ -817,16 +817,16 @@ const similar = [
         return numQ(`A house plan is drawn to scale $1 : ${s}$. A room is $${L}$ m long in real life. How long is it on the plan, in millimetres?`, t, {
           suffix: 'mm',
           traps: [{ value: L * s, why: 'Convert units: metres to millimetres means $\\times 1000$, then divide by the scale.' }, { value: L / s, why: 'Divide the real length (in mm) by the scale number.' }],
-          hints: ['Plan length = real length $\\div$ scale (in the same units).', `$${L}\\text{ m} = ${L * 1000}$ mm.`, `$${L * 1000}\\div ${s}$.`],
-          steps: [{ h: 'Convert to mm', d: `$${L}$ m $= ${L * 1000}$ mm` }, { h: 'Divide by the scale', d: `$${L * 1000}\\div ${s} = ${t}$ mm` }]
+          hints: ['Plan length = real length $\\div$ scale (in the same units).', `$${L}\\text{ m} = ${t * s}$ mm.`, `$${t * s}\\div ${s}$.`],
+          steps: [{ h: 'Convert to mm', d: `$${L}$ m $= ${t * s}$ mm` }, { h: 'Divide by the scale', d: `$${t * s}\\div ${s} = ${t}$ mm` }]
         });
       }
       const s = rc(rng, [10000, 20000, 25000, 40000, 50000, 80000, 100000, 150000, 200000, 250000, 500000]), cm = ri(rng, 2, 24), km = cm * s / 100000;
       return numQ(`Two lookouts are $${km}$ km apart. On a map with scale $1 : ${s.toLocaleString('en-AU')}$, how far apart are they, in centimetres?`, cm, {
         suffix: 'cm',
         traps: [{ value: km * 1000 / s, why: 'Convert km to cm first ($1$ km $= 100\\,000$ cm), then divide by the scale.' }],
-        hints: ['Map distance = real distance $\\div$ scale (same units).', `$${km}$ km $= ${km * 100000}$ cm.`, `$${km * 100000}\\div ${s.toLocaleString('en-AU')}$.`],
-        steps: [{ h: 'Convert to cm', d: `$${km}\\times 100\\,000 = ${km * 100000}$ cm` }, { h: 'Divide by the scale', d: `$${km * 100000}\\div ${s.toLocaleString('en-AU')} = ${cm}$ cm` }]
+        hints: ['Map distance = real distance $\\div$ scale (same units).', `$${km}$ km $= ${cm * s}$ cm.`, `$${cm * s}\\div ${s.toLocaleString('en-AU')}$.`],
+        steps: [{ h: 'Convert to cm', d: `$${km}\\times 100\\,000 = ${cm * s}$ cm` }, { h: 'Divide by the scale', d: `$${cm * s}\\div ${s.toLocaleString('en-AU')} = ${cm}$ cm` }]
       });
     }
   },

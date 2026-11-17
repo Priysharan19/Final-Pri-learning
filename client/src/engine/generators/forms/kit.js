@@ -39,6 +39,22 @@ const ts = (steps = []) => steps.map(x => (typeof x === 'string' ? typeset(x) : 
 
 /** A numeric-answer payload. `traps` are common wrong answers with the reason. */
 const r6x = v => Math.round(v * 1e6) / 1e6;
+/**
+ * A prompt that states a precision ("to 3 decimal places", "to the nearest tenth") is marked against the band
+ * that precision means: half a unit in the last place (marker-precision-tol-content-check.mjs holds every
+ * numeric form to it). A prompt that states none keeps the marker's default band.
+ */
+const WORD_DIGITS = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
+const NEAREST = { whole: 0.5, integer: 0.5, tenth: 0.05, hundredth: 0.005, thousandth: 0.0005 };
+export function statedBand(prompt) {
+  const text = String(prompt ?? '');
+  const dp = text.match(/\$?(\d|one|two|three|four|five|six)\$?\s*(?:decimal places?|d\.?p\.?)(?![a-z])/i);
+  if (dp) return 0.5 * 10 ** -(WORD_DIGITS[dp[1].toLowerCase()] ?? Number(dp[1]));
+  const near = text.match(/nearest (whole|tenth|hundredth|thousandth|integer)/i);
+  if (near) return NEAREST[near[1].toLowerCase()];
+  return null;
+}
+
 export function numeric(form, prompt, rawValue, { hints, steps, traps: rawTraps = [], figure = null }) {
   // Keys are kept to six places so no floating-point artefact (4.800000000000001) is ever served.
   const tidy = v => (Number.isInteger(v) ? v : Math.round(v * 1e6) / 1e6);
@@ -59,8 +75,9 @@ export function numeric(form, prompt, rawValue, { hints, steps, traps: rawTraps 
   }
   for (let i = kept.length - 1; i >= 0; i--) if (kept[i].value === value || kept.findIndex(u => u.value === kept[i].value) !== i) kept.splice(i, 1);
   if (!kept.length) kept.push({ value: value + 1, why: 'Close, but one out: recheck the last step.' });
+  const tol = statedBand(prompt);
   return {
-    form, prompt: typeset(prompt), answerType: 'numeric', answer: { value }, ...(figure ? { figure } : {}),
+    form, prompt: typeset(prompt), answerType: 'numeric', answer: tol == null ? { value } : { value, tol }, ...(figure ? { figure } : {}),
     traps: kept.map(t => ({ ...t, why: typeset(t.why) })),
     hints: hints.map(typeset), steps: ts(steps)
   };

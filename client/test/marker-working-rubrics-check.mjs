@@ -21,7 +21,7 @@
 //
 // Deterministic: fixed seeds, no model, no clock.
 // ─────────────────────────────────────────────────────────────────────────────
-import { GENERATORS, loadAllBanks, generateQuestion } from '../src/engine/generators/index.js';
+import { GENERATORS, loadAllBanks, generateQuestion } from './support/direct-forms.mjs';
 import { checkAnswer, stepCheck } from '../src/engine/checker.js';
 import { marksPossibleFor, stepEvidence } from '../../server/platform/markerOps.js';
 import { everyLineVerified } from '../src/components/workingEvidence.js';

@@ -24,7 +24,7 @@
 import { methodMarks, ruleKeyFor, lostMarks, checkAnswer } from '../src/engine/checker.js';
 import { LOST_MARK_KEYS } from '../src/engine/lost-marks.js';
 import { awardStepMarks } from '../src/engine/cbseMarking.js';
-import { loadAllBanks, generateQuestion } from '../src/engine/generators/index.js';
+import { loadAllBanks, generateQuestion } from './support/direct-forms.mjs';
 import { stepEvidence } from '../../server/platform/markerOps.js';
 import en from '../src/i18n/strings.en.js';
 import hi from '../src/i18n/strings.hi.js';

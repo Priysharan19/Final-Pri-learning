@@ -642,9 +642,9 @@ const probForms = [
   // D1 — reverse: find n from nCr or nPr
   { diffs: [1], make: rng => {
     const useC = rng() < 0.5, r = rc(rng, [2, 3]), n = ri(rng, 5, 16), V = useC ? nCr(n, r) : nPr(n, r), L = useC ? 'C' : 'P';
-    return numQ(`Given that ${'$'}{}^{n}${L}_{${r}} = ${V}${'$'}, find $n$.`, n, {
+    return numQ(`Given that ${'$'} {}^{n}${L}_{${r}} = ${V}${'$'}, find $n$.`, n, {
       hint: 'e.g. 8',
-      traps: [{ value: n + 1, why: 'Check your factorised equation: substitute your $n$ back in and compare with $' + V + '$.' }, { value: n - 1, why: 'Substitute your $n$ back into ${}^{n}' + L + '_{' + r + '}$ to check.' }],
+      traps: [{ value: n + 1, why: 'Check your factorised equation: substitute your $n$ back in and compare with $' + V + '$.' }, { value: n - 1, why: 'Substitute your $n$ back into $ {}^{n}' + L + '_{' + r + '}$ to check.' }],
       hints: [useC ? `$ {}^{n}C_{${r}} = \\dfrac{n(n-1)${r === 3 ? '(n-2)' : ''}}{${fact(r)}}$.` : `$ {}^{n}P_{${r}} = n(n-1)${r === 3 ? '(n-2)' : ''}$.`, `Set this equal to $${V}$.`, 'Look for consecutive integers whose product matches, or solve the equation.'],
       steps: [{ h: 'Expand', d: useC ? `$\\dfrac{n(n-1)${r === 3 ? '(n-2)' : ''}}{${fact(r)}} = ${V}$` : `$n(n-1)${r === 3 ? '(n-2)' : ''} = ${V}$` }, { h: 'Solve', d: `$n = ${n}$` }, { h: 'Check', d: `$${useC ? nCr(n, r) : nPr(n, r)}$ ✓` }]
     });
@@ -683,7 +683,7 @@ const probForms = [
     const stem = ordered
       ? rc(rng, [`Which expression gives the number of ways to award $${r}$ ranked prizes (1st, 2nd and so on), one to each of $${r}$ different people chosen from $${n}$ entrants?`, `Which expression gives the number of ways to assign $${r}$ different jobs, one each to $${r}$ people chosen from $${n}$ volunteers?`])
       : rc(rng, [`Which expression gives the number of ways to choose a committee of $${r}$ people from $${n}$ nominees?`, `Which expression gives the number of ways to select $${r}$ players from a squad of $${n}$ to form a team?`]);
-    const P = `{}^{${n}}P_{${r}}`, C = `{}^{${n}}C_{${r}}`;
+    const P = `\\,{}^{${n}}P_{${r}}`, C = `\\,{}^{${n}}C_{${r}}`;   // a leading thin space: "${" at the start of a maths span reads as a leaked template
     const ds = ordered
       ? [{ text: `$${C}$`, v: nCr(n, r), why: 'That counts unordered groups. Here the positions are different, so order matters.' }, { text: `$${n}^{${r}}$`, v: Math.pow(n, r), why: 'That allows the same person to be chosen more than once.' }, { text: `$\\dfrac{${n}!}{${r}!}$`, v: fact(n) / fact(r), why: 'The count of ordered selections divides by $(n - r)!$, not $r!$.' }]
       : [{ text: `$${P}$`, v: nPr(n, r), why: 'That counts ordered arrangements. Here only who is chosen matters, not the order.' }, { text: `$${n}^{${r}}$`, v: Math.pow(n, r), why: 'That allows the same person to be chosen more than once.' }, { text: `$\\dfrac{${n}!}{${r}!}$`, v: fact(n) / fact(r), why: 'The count of unordered selections divides by $r!\\,(n - r)!$.' }];
@@ -694,11 +694,11 @@ const probForms = [
   // D1 — symmetry of combinations (show that): find the other value
   { diffs: [1], make: rng => {
     const n = ri(rng, 8, 16), r = ri(rng, 2, Math.floor((n - 1) / 2)), k = n - r;
-    return numQ(`It is known that ${'$'}{}^{${n}}C_{${r}} = {}^{${n}}C_{k}${'$'} for a value of $k$ different from $${r}$. Find $k$.`, k, {
+    return numQ(`It is known that ${'$'} {}^{${n}}C_{${r}} = {}^{${n}}C_{k}${'$'} for a value of $k$ different from $${r}$. Find $k$.`, k, {
       hint: 'e.g. 9',
       traps: [{ value: k + 1, why: 'Selecting $' + r + '$ to include is the same as selecting $' + (n - r) + '$ to leave out — exactly $n - r$, with no adjustment.' }, { value: k - 1, why: 'Selecting $' + r + '$ to include is the same as selecting $' + (n - r) + '$ to leave out — exactly $n - r$, with no adjustment.' }, { value: n, why: 'The lower index is $n - r$, not $n$.' }],
-      hints: ['Choosing $r$ items to include is the same as choosing the $n - r$ items to leave out.', `So ${'$'}{}^{n}C_{r} = {}^{n}C_{n-r}${'$'}.`, `$k = ${n} - ${r}$.`],
-      steps: [{ h: 'Symmetry', d: `${'$'}{}^{n}C_{r} = {}^{n}C_{n-r}${'$'}` }, { h: 'Substitute', d: `$k = ${n} - ${r} = ${k}$` }]
+      hints: ['Choosing $r$ items to include is the same as choosing the $n - r$ items to leave out.', `So ${'$'} {}^{n}C_{r} = {}^{n}C_{n-r}${'$'}.`, `$k = ${n} - ${r}$.`],
+      steps: [{ h: 'Symmetry', d: `${'$'} {}^{n}C_{r} = {}^{n}C_{n-r}${'$'}` }, { h: 'Substitute', d: `$k = ${n} - ${r} = ${k}$` }]
     });
   } },
   // D1 — factorial quotient

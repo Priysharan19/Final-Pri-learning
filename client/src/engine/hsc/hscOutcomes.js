@@ -144,16 +144,16 @@ export function hscTopicsOf(course) {
  * left with none says so rather than linking somewhere else.
  */
 export const HSC_PRACTICE_LINKS = Object.freeze({
-  'MAV-11-01': Object.freeze(['y11-quadfunc']),
+  'MAV-11-01': Object.freeze(['y11-quadfunc', 'y11-functions-more']),
   'MAV-11-02': Object.freeze(['y11-functions', 'y11-quadfunc', 'y11-lines', 'me11-functions']),
-  'MAV-11-03': Object.freeze([]),
+  'MAV-11-03': Object.freeze(['y11-transform']),
   'MAV-11-04': Object.freeze(['y11-trigfunc', 'y11-sine-cosine-rule', 'me12-trigeq']),
-  'MAV-11-05': Object.freeze(['y11-trigfunc', 'y12-trigcalc', 'me12-trigeq']),
+  'MAV-11-05': Object.freeze(['y11-trigfunc', 'y12-trigcalc', 'me12-trigeq', 'y11-trig-ident']),
   'MAV-11-06': Object.freeze(['y11-diff', 'y12-diff', 'y12-appdiff', 'y12-motion', 'y12-integral-calc', 'me11-rates']),
   'MAV-11-07': Object.freeze(['y11-explog']),
-  'MAV-11-08': Object.freeze(['y11-explog']),
+  'MAV-11-08': Object.freeze(['y11-explog', 'y11-explog-more']),
   'MAV-11-09': Object.freeze(['y11-probability']),
-  'MAV-11-10': Object.freeze([]),
+  'MAV-11-10': Object.freeze(['y11-data-sets']),
   'MAV-12-01': Object.freeze(['y12-trig-model']),
   'MAV-12-02': Object.freeze(['y12-func-model']),
   'MAV-12-03': Object.freeze(['y12-series']),
@@ -166,11 +166,11 @@ export const HSC_PRACTICE_LINKS = Object.freeze({
   'ME1-11-02': Object.freeze(['y11-quadfunc', 'y11-polynomials', 'me11-poly']),
   'ME1-11-03': Object.freeze(['me11-trigid', 'me12-trigeq']),
   'ME1-11-04': Object.freeze(['y11-probability', 'me11-comb']),
-  'ME1-11-05': Object.freeze([]),
-  'ME1-12-01': Object.freeze(['me12-induction']),
-  'ME1-12-02': Object.freeze(['me12-vectors', 'me12-projectile', 'mex-vectors']),
+  'ME1-11-05': Object.freeze(['me11-binomial']),
+  'ME1-12-01': Object.freeze(['me12-induction', 'me12-induction-forms']),
+  'ME1-12-02': Object.freeze(['me12-vectors', 'me12-projectile', 'me12-vectors-forms', 'me12-projectile-forms', 'mex-vectors']),
   'ME1-12-03': Object.freeze(['me11-inversetrig']),
-  'ME1-12-04': Object.freeze(['me12-calc']),
+  'ME1-12-04': Object.freeze(['me12-calc', 'me12-further-calc']),
   'ME1-12-05': Object.freeze(['y12-integration', 'me11-rates', 'me12-calc']),
-  'ME1-12-06': Object.freeze(['me12-binomial'])
+  'ME1-12-06': Object.freeze(['me12-binomial', 'me12-binomial-forms'])
 });

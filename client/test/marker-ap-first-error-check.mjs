@@ -40,7 +40,7 @@
 //
 // Everything here is deterministic: fixed seeds, no model, no clock.
 // ─────────────────────────────────────────────────────────────────────────────
-import { loadAllBanks, generateQuestion } from '../src/engine/generators/index.js';
+import { loadAllBanks, generateQuestion } from './support/direct-forms.mjs';
 import { checkAnswer, stepCheck, methodMarks } from '../src/engine/checker.js';
 import { marksPossibleFor, stepEvidence } from '../../server/platform/markerOps.js';
 import { everyLineVerified, lineMarks } from '../src/components/workingEvidence.js';
