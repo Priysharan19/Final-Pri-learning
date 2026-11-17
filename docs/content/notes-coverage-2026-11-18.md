@@ -19,15 +19,15 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 | CBSE Class 11 | 14 | 14 | 14 | — | 14 | 12 | 0 |
 | CBSE Class 12 | 13 | 13 | 13 | — | 13 | 13 | 0 |
 | Olympiad | 7 | 7 | 7 | — | 7 | 5 | 0 |
-| NSW Stage 4 (Years 7–8) | 16 | 16 | 0 | objective 16, intuition 16, practice 16 | 2 | 1 | 0 |
+| NSW Stage 4 (Years 7–8) | 16 | 16 | 0 | practice 16 | 16 | 14 | 0 |
 | NSW Stage 5 (Years 9–10) | 41 | 41 | 0 | practice 41 | 41 | 38 | 0 |
-| NSW Standard Year 11 | 8 | 8 | 0 | objective 8, intuition 8, practice 8 | 1 | 0 | 0 |
-| NSW Standard Year 12 | 17 | 17 | 0 | objective 17, intuition 17, practice 17 | 2 | 2 | 0 |
-| NSW Advanced Year 11 | 7 | 7 | 0 | objective 7, intuition 7, practice 7 | 6 | 4 | 0 |
-| NSW Advanced Year 12 | 7 | 7 | 0 | objective 7, intuition 7, practice 7 | 7 | 5 | 0 |
-| NSW Extension 1 Year 11 | 5 | 5 | 0 | objective 5, intuition 5, practice 5 | 2 | 0 | 0 |
-| NSW Extension 1 Year 12 | 6 | 6 | 0 | objective 6, intuition 6, practice 6 | 4 | 0 | 0 |
-| NSW Extension 2 Year 12 | 5 | 5 | 0 | objective 5, intuition 5, practice 5 | 1 | 1 | 0 |
+| NSW Standard Year 11 | 8 | 8 | 0 | practice 8 | 8 | 6 | 0 |
+| NSW Standard Year 12 | 17 | 17 | 0 | practice 17 | 17 | 17 | 0 |
+| NSW Advanced Year 11 | 7 | 7 | 0 | practice 7 | 7 | 7 | 0 |
+| NSW Advanced Year 12 | 7 | 7 | 0 | practice 7 | 7 | 7 | 0 |
+| NSW Extension 1 Year 11 | 5 | 5 | 0 | practice 5 | 5 | 4 | 0 |
+| NSW Extension 1 Year 12 | 6 | 6 | 0 | practice 6 | 6 | 6 | 0 |
+| NSW Extension 2 Year 12 | 5 | 5 | 0 | practice 5 | 5 | 5 | 0 |
 
 **Typesetting.** Priyabhata: Instrument Sans + KaTeX; Prithagoras: CMU Serif + KaTeX.
 
@@ -39,9 +39,14 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 - `c11-3d-introduction` Introduction to Three Dimensional Geometry — The ideas here are read from a fixed drawing: octants, the distance formula and the section formula. The kit has no rotatable three-dimensional view, and moving a slider would not teach these formulas better than the two figures.
 - `olymp-number-theory` Number Theory — Congruence arguments are about remainders of whole numbers; the cycle of residues is read completely from one static chart, and no slider over a continuous quantity would show the reason a cycle exists.
 - `olymp-functional-equations` Functional Equations — A functional equation is decided by substitutions on paper; sliding a parameter on a graph shows a candidate but never why it is the only one, so a moving picture here would mislead.
+- `ma4-are-c-01` Area — Each area here comes from fixed measurements of one shape and its rearrangement. The cut-and-move figures show the reason for each formula, and a slider would only change the numbers, not the idea.
+- `ma4-len-c-01` Length — Perimeter and circumference come from adding fixed lengths or one formula with one measurement. The labelled figures show every number a slider would, and nothing changes shape in a way that teaches more.
 - `ma5-mag-c-01` Numbers of any magnitude — Scientific notation and significant figures are place-value rules. Moving a slider would only redisplay a number; the conversions and the rounding are clearer worked on the page digit by digit.
 - `ma5-geo-p-02` Properties of geometrical figures C (Path) — A congruence proof is a chain of stated reasons about one fixed figure; moving a vertex changes the figure but does not teach which facts prove the triangles identical.
 - `ma5-net-p-01` Introduction to networks (Path) — These skills are counting and comparing on one fixed network; there is no quantity whose movement teaches more than the two highlighted networks with their weights.
+- `mst-11-06` Time and location — This topic rests on one fixed rate, $15^\circ$ of longitude per hour, and on offsets that each question states; there is no quantity to vary whose effect a slider would show more clearly than the two number lines.
+- `mst-11-07` Networks, paths and trees — Shortest paths and spanning trees come from step-by-step methods on one fixed network; nothing varies continuously, and the two highlighted diagrams show each result with its total.
+- `me1-11-04` Permutations and combinations — Counting here is exact reasoning about discrete choices. No quantity varies smoothly, so a slider would only replay the tree and Pascal's triangle without showing anything they do not.
 
 ## Every chapter
 
@@ -168,22 +173,22 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `ma4-alg-c-01` Algebraic techniques | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-ang-c-01` Angle relationships | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-are-c-01` Area | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-dat-c-01` Data classification and visualisation | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-dat-c-02` Data analysis | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-equ-c-01` Equations | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-frc-c-01` Fractions, decimals and percentages | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-geo-c-01` Properties of geometrical figures | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-| `ma4-ind-c-01` Indices | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-int-c-01` Computation with integers | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-len-c-01` Length | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-lin-c-01` Linear relationships | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
-| `ma4-pro-c-01` Probability | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-pyt-c-01` Right-angled triangles (Pythagoras’ theorem) | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-rat-c-01` Ratios and rates | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `ma4-vol-c-01` Volume | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 0 | **no** | 0 | ok | **no** |
+| `ma4-alg-c-01` Algebraic techniques | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `ma4-ang-c-01` Angle relationships | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `ma4-are-c-01` Area | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | reason | 0 | ok | **no** |
+| `ma4-dat-c-01` Data classification and visualisation | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `ma4-dat-c-02` Data analysis | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `ma4-equ-c-01` Equations | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `ma4-frc-c-01` Fractions, decimals and percentages | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `ma4-geo-c-01` Properties of geometrical figures | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 4 | yes | 0 | ok | **no** |
+| `ma4-ind-c-01` Indices | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `ma4-int-c-01` Computation with integers | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `ma4-len-c-01` Length | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | reason | 0 | ok | **no** |
+| `ma4-lin-c-01` Linear relationships | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `ma4-pro-c-01` Probability | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `ma4-pyt-c-01` Right-angled triangles (Pythagoras’ theorem) | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `ma4-rat-c-01` Ratios and rates | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `ma4-vol-c-01` Volume | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
 
 ### NSW Stage 5 (Years 9–10)
 
@@ -235,89 +240,89 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `mst-11-01` Formulas and equations | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-11-02` Linear relationships | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-11-03` Earning money | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-11-04` Managing money | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-11-05` Applications of measurement | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-| `mst-11-06` Time and location | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-11-07` Networks, paths and trees | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-11-08` Data analysis | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
+| `mst-11-01` Formulas and equations | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-11-02` Linear relationships | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-11-03` Earning money | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-11-04` Managing money | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-11-05` Applications of measurement | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `mst-11-06` Time and location | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | reason | 0 | ok | **no** |
+| `mst-11-07` Networks, paths and trees | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | reason | 0 | ok | **no** |
+| `mst-11-08` Data analysis | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
 
 ### NSW Standard Year 12
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `mst-12-s1-01` Algebraic relationships | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-02` Investment | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-03` Depreciation and loans | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-04` Right-angled triangles | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-05` Ratios and rates | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-06` Bivariate data analysis | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s1-07` Relative frequency and probability | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-01` Algebraic relationships | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-02` Investment and loans | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
-| `mst-12-s2-03` Annuities | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-04` Trigonometry | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-05` Ratios and rates | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-06` Network flow | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-07` Critical path analysis | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-08` Bivariate data analysis | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-09` Relative frequency and probability | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mst-12-s2-10` The normal distribution | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s1-01` Algebraic relationships | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `mst-12-s1-02` Investment | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s1-03` Depreciation and loans | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s1-04` Right-angled triangles | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `mst-12-s1-05` Ratios and rates | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s1-06` Bivariate data analysis | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `mst-12-s1-07` Relative frequency and probability | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s2-01` Algebraic relationships | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s2-02` Investment and loans | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s2-03` Annuities | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s2-04` Trigonometry | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s2-05` Ratios and rates | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `mst-12-s2-06` Network flow | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `mst-12-s2-07` Critical path analysis | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `mst-12-s2-08` Bivariate data analysis | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s2-09` Relative frequency and probability | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mst-12-s2-10` The normal distribution | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
 
 ### NSW Advanced Year 11
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `mav-11-01` Working with functions | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-| `mav-11-03` Graph transformations | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
-| `mav-11-04` Trigonometry and measure of angles | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
-| `mav-11-05` Trigonometric identities and equations | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
-| `mav-11-06` Introduction to differentiation | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
-| `mav-11-07` Exponential and logarithmic functions | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `mav-11-09` Probability and data | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
+| `mav-11-01` Working with functions | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `mav-11-03` Graph transformations | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mav-11-04` Trigonometry and measure of angles | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mav-11-05` Trigonometric identities and equations | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mav-11-06` Introduction to differentiation | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mav-11-07` Exponential and logarithmic functions | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mav-11-09` Probability and data | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
 
 ### NSW Advanced Year 12
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `mav-12-01` Further graph transformations and modelling | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
-| `mav-12-03` Sequences and series | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-| `mav-12-04` Differential calculus | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
-| `mav-12-05` Integral calculus | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
-| `mav-12-06` Applications of calculus | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-| `mav-12-07` Random variables | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
-| `mav-12-08` Financial mathematics | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mav-12-01` Further graph transformations and modelling | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mav-12-03` Sequences and series | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `mav-12-04` Differential calculus | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mav-12-05` Integral calculus | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mav-12-06` Applications of calculus | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `mav-12-07` Random variables | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `mav-12-08` Financial mathematics | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
 
 ### NSW Extension 1 Year 11
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `me1-11-01` Further work with functions | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-| `me1-11-02` Polynomials | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `me1-11-03` Further trigonometry | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-| `me1-11-04` Permutations and combinations | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 0 | **no** | 0 | ok | **no** |
-| `me1-11-05` The binomial theorem | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
+| `me1-11-01` Further work with functions | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `me1-11-02` Polynomials | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `me1-11-03` Further trigonometry | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `me1-11-04` Permutations and combinations | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | reason | 0 | ok | **no** |
+| `me1-11-05` The binomial theorem | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
 
 ### NSW Extension 1 Year 12
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `me1-12-01` Proof by mathematical induction | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 0 | **no** | 0 | ok | **no** |
-| `me1-12-02` Introduction to vectors | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-| `me1-12-03` Inverse trigonometric functions | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-| `me1-12-04` Further calculus skills | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `me1-12-05` Further applications of calculus | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
-| `me1-12-06` The binomial distribution and sampling distribution of the mean | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
+| `me1-12-01` Proof by mathematical induction | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `me1-12-02` Introduction to vectors | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `me1-12-03` Inverse trigonometric functions | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `me1-12-04` Further calculus skills | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `me1-12-05` Further applications of calculus | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `me1-12-06` The binomial distribution and sampling distribution of the mean | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
 
 ### NSW Extension 2 Year 12
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `me2-12-01` The nature of proof | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `me2-12-02` Further work with vectors | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `me2-12-03` Introduction to complex numbers | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | **no** | 0 | ok | **no** |
-| `me2-12-04` Further integration | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 1 | yes | 0 | ok | **no** |
-| `me2-12-05` Applications of calculus to mechanics | yes | **no** | yes | **no** | yes | yes | yes | yes | **no** | 2 | **no** | 0 | ok | **no** |
+| `me2-12-01` The nature of proof | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `me2-12-02` Further work with vectors | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `me2-12-03` Introduction to complex numbers | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
+| `me2-12-04` Further integration | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 2 | yes | 0 | ok | **no** |
+| `me2-12-05` Applications of calculus to mechanics | yes | yes | yes | yes | yes | yes | yes | yes | **no** | 3 | yes | 0 | ok | **no** |
 
