@@ -204,7 +204,7 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   else failures.push(`${G} · c10-arithmetic-progressions D2 seed 1009: normal [${normal}] vs slow clock [${slow}]`);
 }
 
-// ── SymPy differential oracle, 2026-11-18 · 51 cases ────────────────────────
+// ── SymPy differential oracle, 2026-11-18 · 60 cases ────────────────────────
 // tools/math-oracle found the checker crediting each wrong answer below
 // (docs/evidence/sympy-oracle-2026-11-18.md, PR #993): a calculator display of an exact
 // value on a question that demands the exact value, and final-answer
@@ -251,7 +251,14 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
     [generateQuestion('mex-proof', 3, 21001), '32n + 0.00001n + (1.1-1.1)*640000000n'],
     [generateQuestion('mex-proof', 3, 21001), '32n + 0.000001n + 12! - 12!'],
     [generateQuestion('y11-diff', 1, 7001), '18x + 0.00001x + (1.1-1.1)*450000000x'],
-    [square, `x^2 + 0.0000001x + 0*sqrt(0.0001 - (${vanishing})^2)`], [square, `x^2 + 0.0000001x + 0*ln(0.0001 - (${vanishing})^2)`]
+    [square, `x^2 + 0.0000001x + 0*sqrt(0.0001 - (${vanishing})^2)`], [square, `x^2 + 0.0000001x + 0*ln(0.0001 - (${vanishing})^2)`],
+    // round 5: a zero noisy only where the answer is wrong (H = x + |x|), a term
+    // that vanishes on the sampled interval only, and a sub-binary64 coefficient
+    [square, `x^2 + ${vanishing}*(x+abs(x)) + (1.1-1.1)*10^20*(x+abs(x))`], [square, `x^2 + ${vanishing}*(x+abs(x)) + (1.1-1.1)*10^15*(x+abs(x))`],
+    [square, 'x^2 + 0.0000001*(x+abs(x)) + (1.1-1.1)*10^20*(x+abs(x))'], [y9, 'x^2 - 169 + 0.0000001*(x+abs(x)) + (1.1-1.1)*10^20*(x+abs(x))'],
+    [generateQuestion('mex-proof', 3, 21001), '32n + 0.00001*(n-4.5+abs(n-4.5)) + (1.1-1.1)*10^20*(n-4.5+abs(n-4.5))'],
+    [square, 'x^2 + 0.0000001x + (sin(x)^2 + cos(x)^2 - 1)*10^20*(x+abs(x))'], [square, 'x^2 + 1e-15x'], [square, 'x^2 + 0.0000000001x'],
+    [{ answerType: 'expression', answer: { expr: 'abs(2x + 7)^7' } }, '128x^7 + 3136x^6 + 32928x^5 + 192080x^4 + 672280x^3 + 1411788x^2 + 1647086x + 823543']
   ]) expect(G, `padded-${w.slice(0, 48)}`, q, w, false);
   const thirdExact = { answerType: 'numeric', prompt: 'Find the exact value.', answer: { value: 1 / 3, requireExact: true } };
   for (const r of ['1/3', '0.333333333333']) expect(G, `third-right-${r}`, thirdExact, r, true);
@@ -284,34 +291,29 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
     expect(G, `factored-(${a}x+${b})^${n}`, { answerType: 'expression', answer: { expr: expand(a, b, n) } }, `(${a}x + ${b})^${n}`, true);
   }
   for (const [key, answer, extra] of [
-    ['abs(2x + 7)^7', expand(2, 7, 7)], ['abs(2x - 5)^8', expand(2, -5, 8)], ['sqrt((2x - 5)^16)', expand(2, -5, 8)],
+    ['abs(2x + 7)^7', expand(2, 7, 7), { positiveOnly: true }], ['abs(2x - 5)^8', expand(2, -5, 8)], ['sqrt((2x - 5)^16)', expand(2, -5, 8)],
     ['(2x + 7)^(-7)', `1/(${expand(2, 7, 7)})`], ['1/(x - 3)^4', '1/(x^4 - 12x^3 + 54x^2 - 108x + 81)', { positiveOnly: true }]
   ]) expect(G, `noise-in-${key}`, { answerType: 'expression', answer: { expr: key, ...(extra || {}) } }, answer, true);
   expect(G, 'expanded-(x-3)^10-positive', { answerType: 'expression', answer: { expr: '(x - 3)^10', positiveOnly: true } }, expand(1, -3, 10), true);
 }
 
-// ── XFAIL · residual below the probe's resolution · 5 cases ──────────────────
-// KNOWN FALSE CREDIT, pinned so it cannot silently disappear or spread. Each is
-// the key plus a deliberately appended term smaller than one part in 10⁹ of the
-// answer's value at every probe point (64x⁷ + 0.0000001x near |x| = 3). Sampled
-// binary64 evaluation cannot tell these apart; only an exact polynomial
-// comparison can (follow-up: "exact-polynomial-path" for final-answer
-// expressions). When that lands these flip to refused: change `true` to
-// `false` here and move them into the oracle group above. No plausible slip
-// produces them; each needs a hand-made perturbation of relative size ≤ 1e-9.
+// ── Once XFAIL, now refused · 5 cases ────────────────────────────────────────
+// Each is the key plus a term below one part in 10⁹ of the answer's value at
+// every probe point, which binary64 sampling could not see. The exact probe
+// (rationals, no rounding) sees it (#992 review, round 5).
 {
-  const G = 'XFAIL-exact-polynomial-path';
+  const G = 'formerly-XFAIL-exact-probe';
   for (const [id, d, seed, input] of [
     ['me12-calc', 1, 7001, '(x^2 + 9)^3 + 0.0000001*x'],
     ['me12-calc', 1, 7002, '(x^2 + 9)^6/3 + 0.0000001*x'],
     ['me12-calc', 1, 7002, '(x^2 + 9)^6/3 + 0.00001*x'],
     ['y11-diff', 1, 7002, '64*x^7 + 0.0000001*x'],
     ['y12-diff', 1, 7001, '20*(5*x - 6)^3 + 0.0000001*x']
-  ]) expect(G, `XFAIL-${id}-${input.slice(0, 30)}`, generateQuestion(id, d, seed), input, true);
+  ]) expect(G, `refused-${id}-${input.slice(0, 30)}`, generateQuestion(id, d, seed), input, false);
 }
 
 // ── Counts are part of the contract ─────────────────────────────────────────
-const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 51, 'sympy-oracle-2026-11-18-controls': 1087, 'XFAIL-exact-polynomial-path': 5 };
+const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 60, 'sympy-oracle-2026-11-18-controls': 1087, 'formerly-XFAIL-exact-probe': 5 };
 for (const [g, n] of Object.entries(EXPECTED)) if (groups[g]?.total !== n) failures.push(`${g}: built ${groups[g]?.total} cases, the corpus has ${n}`);
 
 const pass = Object.values(groups).reduce((s, g) => s + g.pass, 0);

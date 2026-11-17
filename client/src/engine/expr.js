@@ -692,22 +692,30 @@ const apart = (u, v) => abs(u - v) > 1e-6 * Math.max(1, abs(u), abs(v));
  * roots are read as real, as the domain probe reads them: (−x)^(1/3) is −x^(1/3).
  */
 const EPS = Number.EPSILON;
-function withError(ast, env) {
+function withError(ast, env, memo = new Map()) {
+  // A function-free subtree is computed exactly and rounded once, so an expanded
+  // polynomial beside a function carries no cancellation noise of its own
+  // (sin(x)·(expanded sextic) against sin(x)·(its factors)).
+  if (ast.t === 'bin' || ast.t === 'group' || ast.t === 'neg') {
+    const q = exactOrUndefined(ast, env, memo);
+    if (q === null) return [NaN, NaN];
+    if (q !== undefined) { const v = xqNumber(q); if (fin(v)) return [v, abs(v) * EPS]; }
+  }
   switch (ast.t) {
-    case 'group': return withError(ast.v, env);
-    case 'neg': { const [v, e] = withError(ast.v, env); return [-v, e]; }
+    case 'group': return withError(ast.v, env, memo);
+    case 'neg': { const [v, e] = withError(ast.v, env, memo); return [-v, e]; }
     case 'num': { const v = ast.v; return [v, Number.isSafeInteger(v) ? 0 : abs(v) * EPS]; }   // a whole literal is exact
     case 'bin': {
       if (ast.op === '^') {
-        const [l, el] = withError(ast.l, env);
-        const [r, er] = withError(ast.r, env);
+        const [l, el] = withError(ast.l, env, memo);
+        const [r, er] = withError(ast.r, env, memo);
         const v = evaluate(ast, env, DOMAIN_EVAL);
         const shift = (dl, dr) => abs(evaluate({ t: 'bin', op: '^', l: { t: 'num', v: l + dl }, r: { t: 'num', v: r + dr } }, env, DOMAIN_EVAL) - v);
         const dl = el ? Math.max(shift(el, 0), shift(-el, 0)) : 0, dr = er ? Math.max(shift(0, er), shift(0, -er)) : 0;
         return [v, dl + dr + abs(v) * 2 * EPS];
       }
-      const [l, el] = withError(ast.l, env);
-      const [r, er] = withError(ast.r, env);
+      const [l, el] = withError(ast.l, env, memo);
+      const [r, er] = withError(ast.r, env, memo);
       switch (ast.op) {
         case '+': { const v = l + r; return [v, el + er + abs(v) * EPS]; }
         case '-': { const v = l - r; return [v, el + er + abs(v) * EPS]; }
@@ -723,13 +731,91 @@ function withError(ast, env) {
     case 'call': {
       const v = evaluate(ast, env, DOMAIN_EVAL);
       if (Array.isArray(ast.args) || !Object.hasOwn(FUNCTIONS, ast.fn)) return [v, abs(v) * 1e-13];   // sums, counting: Lanczos-level
-      const [a, ea] = withError(ast.arg, env);
+      const [a, ea] = withError(ast.arg, env, memo);
       const f = FUNCTIONS[ast.fn];
       return [v, (ea ? Math.max(abs(f(a + ea) - v), abs(f(a - ea) - v)) : 0) + abs(v) * 2 * EPS];
     }
     // a probe variable is exact by construction; π and e are rounded once
     default: { const v = evaluate(ast, env, DOMAIN_EVAL); return [v, ast.t === 'var' && Object.hasOwn(env, ast.v) ? 0 : abs(v) * EPS]; }
   }
+}
+
+// ── Exact probe: polynomial-identity testing in rationals ────────────────────
+// An answer built only from + − × ÷, whole powers, abs and decimal literals is
+// evaluated EXACTLY (BigInt fractions) at each probe point, the reference too.
+// No rounding means nothing an answer writes can hide behind rounding: a padded
+// zero, a term that vanishes on half the line (#992 review, round 5) or a
+// coefficient one part in 10¹⁵ off are all seen. Past the bounds, or with any
+// other function, the float probe below is used instead.
+const XQ_BITS = 512n, XQ_POW = 64n;
+const xqGcd = (a, b) => { a = a < 0n ? -a : a; b = b < 0n ? -b : b; while (b) [a, b] = [b, a % b]; return a; };
+const xqBits = n => BigInt((n < 0n ? -n : n).toString(2).length);
+class XqLimit extends Error {}
+function xq(n, d = 1n) {
+  if (d === 0n) return null;
+  if (d < 0n) { n = -n; d = -d; }
+  const g = xqGcd(n, d) || 1n; n /= g; d /= g;
+  if (xqBits(n) > XQ_BITS || xqBits(d) > XQ_BITS) throw new XqLimit();
+  return { n, d };
+}
+function xqDecimal(text) {
+  const m = /^(-?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/.exec(String(text));
+  if (!m || (m[2] === '' && !m[3])) return undefined;
+  const digits = BigInt((m[2] || '0') + (m[3] || '')) * (m[1] ? -1n : 1n);
+  const exp = BigInt(m[4] || '0') - BigInt((m[3] || '').length);
+  if (exp > 400n || exp < -400n) throw new XqLimit();
+  return exp >= 0n ? xq(digits * 10n ** exp) : xq(digits, 10n ** -exp);
+}
+/** Exact value, null where undefined (÷ 0), undefined where this probe cannot say. */
+function exactAt(ast, env, memo = null) {
+  if (memo) {
+    if (memo.has(ast)) return memo.get(ast);
+    const v = exactNode(ast, env, memo);
+    memo.set(ast, v);
+    return v;
+  }
+  return exactNode(ast, env, null);
+}
+function exactNode(ast, env, memo) {
+  switch (ast.t) {
+    case 'num': return typeof ast.s === 'string' ? xqDecimal(ast.s) : Number.isSafeInteger(ast.v) ? xq(BigInt(ast.v)) : undefined;
+    case 'var': case 'const': return Object.hasOwn(env, ast.v) ? xqDecimal(String(env[ast.v])) : undefined;
+    case 'group': return exactAt(ast.v, env, memo);
+    case 'neg': { const v = exactAt(ast.v, env, memo); return v ? xq(-v.n, v.d) : v; }
+    case 'call': {
+      if (ast.fn !== 'abs' || Array.isArray(ast.args)) return undefined;
+      const v = exactAt(ast.arg, env, memo); return v ? xq(v.n < 0n ? -v.n : v.n, v.d) : v;
+    }
+    case 'bin': {
+      const l = exactAt(ast.l, env, memo); if (l === undefined) return undefined;
+      const r = exactAt(ast.r, env, memo); if (r === undefined) return undefined;
+      if (l === null || r === null) return null;
+      switch (ast.op) {
+        case '+': return xq(l.n * r.d + r.n * l.d, l.d * r.d);
+        case '-': return xq(l.n * r.d - r.n * l.d, l.d * r.d);
+        case '*': return xq(l.n * r.n, l.d * r.d);
+        case '/': return r.n === 0n ? null : xq(l.n * r.d, l.d * r.n);
+        case '^': {
+          if (r.d !== 1n) return undefined;
+          const e = r.n < 0n ? -r.n : r.n;
+          if (e > XQ_POW || xqBits(l.n) * e > XQ_BITS || xqBits(l.d) * e > XQ_BITS) throw new XqLimit();
+          if (r.n < 0n && l.n === 0n) return null;
+          const p = xq(l.n ** e, l.d ** e);
+          return r.n < 0n ? xq(p.d, p.n) : p;
+        }
+        default: return undefined;
+      }
+    }
+    default: return undefined;
+  }
+}
+/** A rational as the nearest double, or NaN when it is past what a double holds. */
+function xqNumber(q) {
+  if (xqBits(q.n) < 1000n && xqBits(q.d) < 1000n) return Number(q.n) / Number(q.d);
+  return NaN;
+}
+function exactOrUndefined(ast, env, memo = null) {
+  try { return exactAt(ast, env, memo); } catch (err) { if (err instanceof XqLimit) return undefined; throw err; }
 }
 
 /** FNV-1a over both sides as written: the probe points follow from the answer, not from a published table. */
@@ -745,40 +831,81 @@ function probeSeed(a, b) {
  * to within evaluation noise? A point where either side is undefined says
  * nothing and is skipped; the domain probe judges definedness.
  */
-function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed) {
+function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed, wide = false) {
   let x = seed >>> 0;
   // mulberry32: xorshift32's first draws from nearby seeds bunch together
   const next = () => { x = (x + 0x6D2B79F5) >>> 0; let t = x; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
-  let readable = 0, unreadable = 0, gaps = 0;
-  // Up to 24 draws for 6 readable points: near a root an expanded form loses its
-  // digits honestly, and such a point is replaced, not counted against it.
-  for (let k = 0; k < 24 && readable < 6; k++) {
+  let readable = 0, undefinedHere = 0;
+  // Up to 24 draws for 6 readable points (8 with a whole-number variable, whose
+  // values 1‥8 are each visited in turn, so a term that is zero for n ≤ 4 and
+  // not after is always seen).
+  const wanted = integers.size ? 8 : 6;
+  const offset = seed % 8;
+  for (let k = 0; k < 24 && readable < wanted; k++) {
     const env = {};
-    for (const n of names) {
+    for (const [idx, n] of names.entries()) {
       const u = next();
-      if (integers.has(n)) { env[n] = 1 + Math.floor(u * 8); continue; }
+      if (integers.has(n)) { env[n] = 1 + ((k + offset + idx * 3) % 8); continue; }
       env[n] = domain[0] + u * (domain[1] - domain[0]);
       if (positiveOnly) env[n] = abs(env[n]) + 0.3;
+      // on a 1/1024 grid: exact in binary64 and short as a decimal, so the
+      // exact probe's denominators stay small
+      env[n] = Math.round(env[n] * 1024) / 1024;
     }
-    const [va, ea] = withError(astA, env), [vb, eb] = withError(astB, env);
+    // Exact first: both sides in rationals, no rounding to hide behind.
+    const qa = exactOrUndefined(astA, env), qb = exactOrUndefined(astB, env);
+    if (qa !== undefined && qb !== undefined) {
+      if (qb === null) continue;                              // the reference is undefined here
+      if (qa === null) { undefinedHere++; continue; }          // the answer is undefined where the reference is not
+      readable++;
+      if (qa.n !== qb.n || qa.d !== qb.d) return false;
+      continue;
+    }
+    // One side exact, the other not (a function): the exact side is its true
+    // value, rounded once, so an expanded polynomial carries no rounding of its own.
+    const [va, ea] = qa === null ? [NaN, NaN] : qa ? [xqNumber(qa), abs(xqNumber(qa)) * EPS] : withError(astA, env);
+    const [vb, eb] = qb === null ? [NaN, NaN] : qb ? [xqNumber(qb), abs(xqNumber(qb)) * EPS] : withError(astB, env);
     if (!fin(vb)) continue;                                   // the reference is undefined here: nothing to compare
-    if (!fin(va)) { gaps++; continue; }                        // the answer is undefined where the reference is not
+    if (!fin(va)) { undefinedHere++; continue; }               // the answer is undefined where the reference is not
     const size = Math.max(1, abs(va), abs(vb));
     // Only the REFERENCE's rounding widens the band (the second argument: the
-    // key, in every marking call). The answer's own rounding can only make a
-    // point unreadable: otherwise an answer could pad itself with a zero just
-    // under any limit and widen its own band (#992 review, round 4).
+    // key, in every marking call); the answer's own rounding never does (#992
+    // review, round 4). A point the reference cannot read says nothing. A point
+    // only the ANSWER makes unreadable refuses it: otherwise an answer could
+    // choose where it is compared (round 5: a padded zero that is noisy only
+    // where the answer is wrong).
     const band = Math.max(1e-9 * size, 64 * eb);
-    if (!(64 * eb <= 1e-6 * size) || !(64 * ea <= band)) { unreadable++; continue; }
+    if (!(64 * eb <= 1e-6 * size)) continue;
+    if (!(64 * ea <= band)) return false;
     readable++;
     if (abs(va - vb) > band) return false;
   }
-  if (readable >= 3) return true;
-  // Too few readable points. An answer that cannot be read, or is undefined,
-  // where the reference can (+ 10²⁰ − 10²⁰, + 0·sqrt(tiny − …²)) is not shown
-  // equal; a reference that is itself undefined almost everywhere leaves the
-  // judgement to the sampling above.
-  return unreadable + gaps < 3;
+  // An answer undefined almost everywhere it could be compared (+ 0·sqrt(tiny −
+  // …²), defined only near the published samples) is not shown equal. Where the
+  // reference itself is mostly undefined or unreadable, the sampling above decides.
+  // (An interval difference is the domain policy's to judge, not this probe's:
+  // ln x + ln y for ln(xy) is undefined on half the reference's domain and is
+  // accepted by default. Only an answer undefined almost everywhere the
+  // reference is defined is refused here.)
+  if ((readable < 3 && undefinedHere >= 3) || undefinedHere > 3 * readable) return false;
+  // With no authored domain, an exactly computable pair is also compared far
+  // out (|x| from 1 to 10⁶): a term that vanishes on the sampled interval and
+  // not beyond it (0.00001·(n − 4.5 + |n − 4.5|)) is seen there (round 5).
+  if (wide) {
+    for (let k = 0; k < 6; k++) {
+      const env = {};
+      for (const n of names) {
+        if (integers.has(n)) { env[n] = 1 + Math.floor(next() * 8); continue; }
+        const mag = 10 ** (next() * 6), sign = positiveOnly || next() < 0.5 ? 1 : -1;
+        env[n] = sign * Math.round(mag * 1024) / 1024;
+      }
+      const qa = exactOrUndefined(astA, env), qb = exactOrUndefined(astB, env);
+      if (qa === undefined || qb === undefined) break;          // not exactly computable: the interval probe stands
+      if (qb === null) continue;
+      if (qa === null || qa.n !== qb.n || qa.d !== qb.d) return false;
+    }
+  }
+  return true;
 }
 
 // Guard kinds, one letter each because they ship in the install bundle:
@@ -1113,7 +1240,7 @@ function exprEquivalentUncached(a, b, opts) {
   // (x² + (x − 0.7)(x − 1.3)…(x + 2.3)) agreed with x² there, and the 1e-6 band
   // forgave a coefficient written one part in ten million off (x² + 0.0000001x).
   // Both were marked right for x² (SymPy differential oracle, 2026-11-18).
-  if (finalAnswer && !agreesAtProbes(astA, astB, names, integers, domain, opts.positiveOnly, probeSeed(a, b))) return false;
+  if (finalAnswer && !agreesAtProbes(astA, astB, names, integers, domain, opts.positiveOnly, probeSeed(a, b), !opts.domain)) return false;
   if (finalAnswer) {
     // Without an authored domain, look along the whole real line: a hole at
     // x = 25 is as real as one at x = 1.
