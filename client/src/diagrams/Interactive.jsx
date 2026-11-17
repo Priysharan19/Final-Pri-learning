@@ -63,7 +63,8 @@ export function TransformSliders({ base = 'quadratic', title = null, initial = {
   const expr = useMemo(() => `(${a})*(${place(B.expr, `((${b})*(x-(${h})))`)})+(${k})`, [B, a, b, h, k]);
   const coef = a === 1 ? '' : a === -1 ? '-' : `${a}`;
   const bs = b === 1 ? '' : b === -1 ? '-' : `${b}`;
-  const inner = b === 1 && h === 0 ? 'x' : `${bs}(x${h === 0 ? '' : h > 0 ? `-${h}` : `+${-h}`})`;
+  const shifted = `x${h === 0 ? '' : h > 0 ? `-${h}` : `+${-h}`}`;
+  const inner = b === 1 && h === 0 ? 'x' : b === 1 ? shifted : `${bs}(${shifted})`;
   const body = inner === 'x' ? B.name : ({
     quadratic: `\\left(${inner}\\right)^2`, cubic: `\\left(${inner}\\right)^3`, abs: `\\left|${inner}\\right|`,
     sin: `\\sin\\left(${inner}\\right)`, exponential: `2^{${inner}}`

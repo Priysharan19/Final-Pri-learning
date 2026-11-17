@@ -8,14 +8,14 @@
 // light and dark follow the theme. Nothing here is interactive: the Notes-only
 // interactive variants are in Interactive.jsx.
 // ─────────────────────────────────────────────────────────────────────────────
-import React, { useId } from 'react';
+import React, { createContext, useContext, useId } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import './diagrams.css';
-import { place, circlePath, labelSize } from './placement.js';
+import { place, circlePath, labelSize, boxOf, outline } from './placement.js';
 import {
   functionGraphModel, unitCircleModel, triangleModel, regularPolygonModel, circleTheoremModel, numberLineModel, treeModel, vennModel,
   twoWayModel, histogramModel, boxPlotModel, normalCurveModel, vectorModel, sequenceModel, compoundModel, timelineModel,
-  secantTangentModel, riemannModel, networkModel, scatterModel, solidModel, ftex, ftext, r3
+  secantTangentModel, riemannModel, networkModel, niceTicks, axesOf, scatterModel, solidModel, ftex, ftext, r3
 } from './geometry.js';
 
 const poly = pts => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x} ${y}`).join(' ');
@@ -32,20 +32,35 @@ export function Tex({ x, y, tex, w = 64, h = 26, anchor = 'middle', baseline = '
 }
 
 /** A KaTeX label at the first candidate position [x, y, anchor] that touches no obstacle polyline. */
+/** Candidate positions for a label beside a point, nearest first. */
+const pointCands = ([x, y]) => [[8, -16], [8, 18], [-8, -16], [-8, 18], ...[32, 48, 64, 82].flatMap(d => [[8, -d], [8, d], [-8, -d], [-8, d]])].map(([dx, dy]) => [x + dx, y + dy, dx > 0 ? 'start' : 'end']);
+/** An axis label: a single letter stays maths; words are set as text. */
+const axisTex = s => (/^[A-Za-z]$|\\|[\^_{}]/.test(String(s)) ? String(s) : `\\text{${s}}`);
+const PlacedLabels = createContext(null);
+
+/** A short break mark across an axis, drawn where the axis does not start at zero. */
+function AxisBreak({ x, y, vertical }) {
+  const d = vertical ? `M${x - 7} ${y - 3} L${x + 7} ${y - 8} M${x - 7} ${y + 3} L${x + 7} ${y - 2}` : `M${x - 3} ${y + 7} L${x + 2} ${y - 7} M${x + 3} ${y + 7} L${x + 8} ${y - 7}`;
+  return <path className="dg-break" d={d} fill="none" />;
+}
 export function PTex({ tex, cands, obstacles = [], small = false, ...rest }) {
-  const [x, y, anchor] = place(tex, cands, obstacles, { small });
+  // Labels in one figure are placed in order; each placed label is an obstacle for the next.
+  const placed = useContext(PlacedLabels);
+  const [x, y, anchor] = place(tex, cands, placed ? [...obstacles, ...placed] : obstacles, { small });
+  if (placed) placed.push(outline(boxOf(tex, [x, y, anchor], { small })));
   return <Tex x={x} y={y} anchor={anchor || 'middle'} tex={tex} {...rest} />;
 }
 
 /** The figure shell: an accessible SVG with a title, a description (the text alternative) and an optional caption. */
-export function Figure({ width, height, title, description, caption = null, children, className = '', svgProps = {} }) {
+export function Figure({ width, height, title, description, caption = null, children, className = '', svgProps = {}, frame = null }) {
   const id = useId();
+  const placed = [];
   return (
     <figure className={`dg ${className}`} data-diagram>
-      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${id}-t ${id}-d`} preserveAspectRatio="xMidYMid meet" className="dg-svg" {...svgProps}>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`${id}-t ${id}-d`} preserveAspectRatio="xMidYMid meet" className="dg-svg" data-frame={frame ? JSON.stringify({ xmin: frame.xmin, xmax: frame.xmax, ymin: frame.ymin, ymax: frame.ymax, left: frame.left, right: frame.right, top: frame.top, bottom: frame.bottom }) : undefined} {...svgProps}>
         <title id={`${id}-t`}>{title}</title>
         <desc id={`${id}-d`}>{description}</desc>
-        {children}
+        <PlacedLabels.Provider value={placed}>{children}</PlacedLabels.Provider>
       </svg>
       {caption && <figcaption className="dg-caption"><MathText text={caption} /></figcaption>}
     </figure>
@@ -56,16 +71,20 @@ function Axes({ m, grid = true, labels = true, xLabel = null, yLabel = null, obs
   const f = m.frame;
   const x0 = m.axes.x[0][1]; const y0 = m.axes.y[0][0];
   const obs = [...obstacles, [[f.left, x0], [f.right, x0]], [[y0, f.bottom], [y0, f.top]]];
+  const origin = f.xmin <= 0 && f.xmax >= 0 && f.ymin <= 0 && f.ymax >= 0;
   return (
     <g className="dg-axes">
       {grid && m.xTicks.map(t => <line key={`gx${t.value}`} className="dg-grid" x1={t.px} x2={t.px} y1={f.top} y2={f.bottom} />)}
       {grid && m.yTicks.map(t => <line key={`gy${t.value}`} className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} />)}
       <line className="dg-axis" x1={m.axes.x[0][0]} x2={m.axes.x[1][0]} y1={x0} y2={x0} markerEnd="url(#dg-arrow)" />
       <line className="dg-axis" x1={y0} x2={y0} y1={m.axes.y[1][1]} y2={m.axes.y[0][1]} markerEnd="url(#dg-arrow)" />
-      {labels && m.xTicks.filter(t => t.value !== 0).map(t => <PTex key={`lx${t.value}`} tex={String(t.value)} cands={[[t.px, x0 + 14], [t.px, x0 - 14], [t.px, f.bottom + 14]]} obstacles={obs} w={40} h={20} />)}
-      {labels && m.yTicks.filter(t => t.value !== 0).map(t => <PTex key={`ly${t.value}`} tex={String(t.value)} cands={[[y0 - 6, t.px, 'end'], [y0 + 6, t.px, 'start'], [f.left - 6, t.px, 'end']]} obstacles={obs} w={40} h={20} />)}
-      {xLabel && <PTex tex={xLabel} cands={[[f.right, x0 - 12, 'end'], [f.right, x0 + 14, 'end'], [f.right, f.bottom + 14, 'end']]} obstacles={obs} w={36} h={20} />}
-      {yLabel && <PTex tex={yLabel} cands={[[y0 + 8, f.top - 2, 'start'], [y0 - 8, f.top - 2, 'end'], [f.left + 8, f.top - 2, 'start']]} obstacles={obs} w={36} h={20} />}
+      {labels && m.xTicks.filter(t => !(t.value === 0 && origin)).map(t => <PTex key={`lx${t.value}`} tex={String(t.value)} cands={[[t.px, x0 + 14], [t.px, x0 - 14], [t.px, f.bottom + 14]]} obstacles={obs} w={40} h={20} />)}
+      {labels && m.yTicks.filter(t => !(t.value === 0 && origin)).map(t => <PTex key={`ly${t.value}`} tex={String(t.value)} cands={[[y0 - 6, t.px, 'end'], [y0 + 6, t.px, 'start'], [f.left - 6, t.px, 'end']]} obstacles={obs} w={40} h={20} />)}
+      {labels && origin && <PTex tex="0" cands={[[y0 - 8, x0 + 13, 'end'], [y0 + 8, x0 + 13, 'start'], [y0 - 8, x0 - 13, 'end']]} obstacles={obs} w={20} h={20} />}
+      {!(f.ymin <= 0 && f.ymax >= 0) && <AxisBreak x={y0} y={f.bottom - 14} vertical />}
+      {!(f.xmin <= 0 && f.xmax >= 0) && <AxisBreak x={f.left + 14} y={x0} vertical={false} />}
+      {xLabel && <PTex tex={axisTex(xLabel)} cands={[[f.right, x0 - 12, 'end'], [f.right, x0 + 14, 'end'], [f.right, f.bottom + 14, 'end'], [f.right, x0 - 30, 'end'], [f.right, x0 + 32, 'end'], [f.right - 36, x0 - 12, 'end'], [f.right - 36, x0 + 14, 'end']]} obstacles={obs} w={36} h={20} />}
+      {yLabel && <PTex tex={axisTex(yLabel)} cands={[[y0 + 8, f.top - 2, 'start'], [y0 - 8, f.top - 2, 'end'], [f.left + 8, f.top - 2, 'start'], [y0 + 8, f.top + 18, 'start'], [y0 - 8, f.top + 18, 'end']]} obstacles={obs} w={36} h={20} />}
     </g>
   );
 }
@@ -86,17 +105,17 @@ export function FunctionGraph({ title = 'Graph of a function', caption = null, x
   );
   const fnObstacles = [...m.curves.flatMap(c => c.segments), ...m.asymptotes.map(a => a.px), m.axes.x, m.axes.y];
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
+    <Figure frame={m.frame} width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
       <Defs />
       <Axes m={m} xLabel={xLabel} yLabel={yLabel} obstacles={fnObstacles} />
       {m.asymptotes.map((a, i) => (
-        <g key={`as${i}`}><line className="dg-asymptote" x1={a.px[0][0]} y1={a.px[0][1]} x2={a.px[1][0]} y2={a.px[1][1]} />{a.label && <PTex tex={a.label} cands={a.axis === 'x' ? [[a.px[0][0] + 4, a.px[0][1] + 12, 'start'], [a.px[0][0] - 4, a.px[0][1] + 12, 'end'], [a.px[0][0] + 4, a.px[0][1] + 36, 'start']] : [[a.px[1][0] - 4, a.px[0][1] - 12, 'end'], [a.px[1][0] - 4, a.px[0][1] + 12, 'end'], [m.frame.left + 6, a.px[0][1] - 12, 'start']]} obstacles={fnObstacles} w={70} />}</g>
+        <g key={`as${i}`}><line className="dg-asymptote" x1={a.px[0][0]} y1={a.px[0][1]} x2={a.px[1][0]} y2={a.px[1][1]} />{a.label && <PTex tex={a.label} cands={a.axis === 'x' ? [[a.px[0][0] + 4, a.px[0][1] + 12, 'start'], [a.px[0][0] - 4, a.px[0][1] + 12, 'end'], [a.px[0][0] + 4, a.px[0][1] + 36, 'start'], [a.px[0][0] - 4, a.px[0][1] + 36, 'end'], [a.px[0][0] + 4, a.px[0][1] + 70, 'start'], [a.px[0][0] - 4, a.px[0][1] + 70, 'end'], [a.px[0][0] + 4, a.px[0][1] + 110, 'start'], [a.px[0][0] - 4, a.px[0][1] + 110, 'end']] : [[a.px[1][0] - 4, a.px[0][1] - 12, 'end'], [a.px[1][0] - 4, a.px[0][1] + 12, 'end'], [m.frame.left + 6, a.px[0][1] - 12, 'start']]} obstacles={fnObstacles} w={70} />}</g>
       ))}
       {m.curves.map(c => c.shade && c.shade.path.length > 0 && <path key={`sh${c.id}`} className="dg-shade" d={`${poly(c.shade.path)} Z`} />)}
       {m.curves.map(c => c.segments.map((seg, k) => <path key={`${c.id}${k}`} className={`dg-curve is-${c.tone}`} d={poly(seg)} />))}
-      {!hideIntercepts && m.curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean).map((p, i) => <g key={`ic${c.id}${i}`}><circle className="dg-dot" cx={p.px[0]} cy={p.px[1]} r="4" /><PTex tex={`(${p.x},\\,${p.y})`} cands={[[p.px[0] + 8, p.px[1] - 12, 'start'], [p.px[0] + 8, p.px[1] + 14, 'start'], [p.px[0] - 8, p.px[1] - 12, 'end'], [p.px[0] - 8, p.px[1] + 14, 'end']]} obstacles={fnObstacles} w={80} /></g>))}
-      {m.points.map((p, i) => <g key={`pt${i}`}><circle className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" />{p.label && <PTex tex={p.label} cands={[[p.px[0] + 8, p.px[1] - 12, 'start'], [p.px[0] + 8, p.px[1] + 14, 'start'], [p.px[0] - 8, p.px[1] - 12, 'end'], [p.px[0] - 8, p.px[1] + 14, 'end']]} obstacles={fnObstacles} w={90} />}</g>)}
-      {m.curves.map(c => c.label && (() => { const ex = Math.min(m.frame.right - 40, (c.segments.at(-1)?.at(-1)?.[0] ?? m.frame.right) - 4); const ey = c.segments.at(-1)?.at(-1)?.[1] ?? m.frame.top; return <PTex key={`lb${c.id}`} tex={c.label} cands={[[ex, ey - 12, 'end'], [ex - 14, ey + 16, 'end'], [ex - 70, ey - 18, 'end'], [m.frame.right - 6, m.frame.top + 12, 'end'], [m.frame.left + 8, m.frame.top + 12, 'start']]} obstacles={fnObstacles} w={110} className="dg-curve-label" />; })())}
+      {!hideIntercepts && m.curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean).map((p, i) => <g key={`ic${c.id}${i}`}><circle className="dg-dot" cx={p.px[0]} cy={p.px[1]} r="4" /><PTex tex={`(${p.x},\\,${p.y})`} cands={pointCands(p.px)} obstacles={fnObstacles} w={80} /></g>))}
+      {m.points.map((p, i) => <g key={`pt${i}`}><circle className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" />{p.label && <PTex tex={p.label} cands={pointCands(p.px)} obstacles={fnObstacles} w={90} />}</g>)}
+      {m.curves.map(c => c.label && (() => { const ex = Math.min(m.frame.right - 40, (c.segments.at(-1)?.at(-1)?.[0] ?? m.frame.right) - 4); const ey = c.segments.at(-1)?.at(-1)?.[1] ?? m.frame.top; return <PTex key={`lb${c.id}`} tex={c.label} cands={[[ex, ey - 12, 'end'], [ex - 14, ey + 16, 'end'], [ex - 70, ey - 18, 'end'], [m.frame.right - 6, m.frame.top + 12, 'end'], [m.frame.left + 8, m.frame.top + 12, 'start'], ...[30, 50, 70, 96, 130, 170].flatMap(d => [[ex, ey - 12 + d, 'end'], [ex - d, ey - 12, 'end'], [ex - d, ey + 16, 'end'], [m.frame.right - 6, m.frame.top + 12 + d, 'end'], [m.frame.left + 8, m.frame.top + 12 + d, 'start'], [m.frame.left + 8, m.frame.bottom - 14 - d, 'start']])]} obstacles={fnObstacles} w={110} className="dg-curve-label" />; })())}
     </Figure>
   );
 }
@@ -105,23 +124,40 @@ export function FunctionGraph({ title = 'Graph of a function', caption = null, x
 export function UnitCircle({ deg = 30, showTan = false, title = 'The unit circle', caption = null, overlay = null, svgProps = {} }) {
   const m = unitCircleModel({ deg });
   const p = m.point;
-  const ucObs = [[[m.frame.left, m.centre[1]], [m.frame.right, m.centre[1]]], [[m.centre[0], m.frame.bottom], [m.centre[0], m.frame.top]], circlePath(m.centre[0], m.centre[1], m.radius), m.arc, [m.centre, m.px], [m.px, m.foot], [m.centre, m.foot]];
+  const ucObs = [[[m.frame.left, m.centre[1]], [m.frame.right, m.centre[1]]], [[m.centre[0], m.frame.bottom], [m.centre[0], m.frame.top]], circlePath(m.centre[0], m.centre[1], m.radius), m.arc, [m.centre, m.px], [m.px, m.foot], [m.centre, m.foot], circlePath(m.px[0], m.px[1], 13, 20)];
+  // Labels are placed one after another; each placed label is an obstacle for the next, so none overlaps another.
+  const boxes = [];
+  const put = (tex, cands, small = false) => { const c = place(tex, cands, [...ucObs, ...boxes], { small }); boxes.push(outline(boxOf(tex, c, { small }))); return c; };
+  const ux = m.px[0] - m.centre[0]; const uy = m.px[1] - m.centre[1]; const un = Math.hypot(ux, uy) || 1;
+  const coordTex = `(${r3(p.cos, 2)},\\,${r3(p.sin, 2)})`;
+  const est = labelSize(coordTex).w + 6;
+  const lim = x => (ux >= 0 ? Math.min(x, m.frame.width - est) : Math.max(x, est));
+  const a = ux >= 0 ? 'start' : 'end';
+  const coordAt = put(coordTex, [[lim(m.px[0] + (ux / un) * 16), m.px[1] + (uy / un) * 18 + (uy / un < 0 ? -6 : 6), a], [lim(m.px[0] + (ux / un) * 38), m.px[1] + (uy / un) * 32, a], [lim(m.px[0] + (ux >= 0 ? 16 : -16)), m.px[1] + (p.sin >= 0 ? -26 : 26), a], [lim(m.px[0] + (ux >= 0 ? 16 : -16)), m.px[1] + (p.sin >= 0 ? 26 : -26), a], [ux >= 0 ? Math.min(m.px[0] + 10, m.frame.width - est / 2 - 2) : Math.max(m.px[0] - 10, est / 2 + 2), m.px[1] + (p.sin >= 0 ? -34 : 34), 'middle'], [ux >= 0 ? Math.min(m.px[0] + 10, m.frame.width - est / 2 - 2) : Math.max(m.px[0] - 10, est / 2 + 2), m.px[1] + (p.sin >= 0 ? -52 : 52), 'middle'], [m.px[0] - (ux >= 0 ? est / 2 - 4 : -(est / 2 - 4)), m.px[1] + (p.sin >= 0 ? -34 : 34), 'middle'], [m.px[0] - (ux >= 0 ? est / 2 - 4 : -(est / 2 - 4)), m.px[1] + (p.sin >= 0 ? -50 : 50), 'middle'], [m.px[0] - (ux >= 0 ? est / 2 - 4 : -(est / 2 - 4)), m.px[1] + (p.sin >= 0 ? 34 : -34), 'middle']]);
+  const thetaTex = `\\theta=${p.deg}^{\\circ}`;
+  const thetaAt = put(thetaTex, [[m.centre[0] + 36, m.centre[1] - 8, 'start'], [m.centre[0] + 36, m.centre[1] + 16, 'start'], [m.centre[0] - 36, m.centre[1] - 8, 'end'], [m.centre[0] - 36, m.centre[1] + 16, 'end'], [m.centre[0] + 60, m.centre[1] - 30, 'start'], [m.centre[0] - 60, m.centre[1] - 30, 'end'], [m.centre[0] + 60, m.centre[1] + 30, 'start'], [m.centre[0] - 60, m.centre[1] + 30, 'end']], true);
+  const tanTex = showTan && p.tan !== null ? `\\tan\\theta=${r3(p.tan, 2)}` : null;
+  if (tanTex) boxes.push(outline(boxOf(tanTex, [m.frame.left + 8, m.frame.top + 12, 'start'])));
+  const tickAt = m.ticks.map(t => {
+    const tx = t.px[0] - m.centre[0]; const ty = t.px[1] - m.centre[1]; const n = Math.hypot(tx, ty) || 1; const nx = -ty / n; const ny = tx / n; const rx = tx / n; const ry = ty / n;
+    return put(`${t.deg}^{\\circ}`, [[t.px[0] + nx * 17, t.px[1] + ny * 12], [t.px[0] - nx * 17, t.px[1] - ny * 12], [t.px[0] + rx * 12 + nx * 20, t.px[1] + ry * 12 + ny * 14], [t.px[0] + rx * 12 - nx * 20, t.px[1] + ry * 12 - ny * 14], [t.px[0] + rx * 26, t.px[1] + ry * 22], [t.px[0] + rx * 40 + nx * 6, t.px[1] + ry * 30 + ny * 6], [t.px[0] + rx * 40 - nx * 6, t.px[1] + ry * 30 - ny * 6], [t.px[0] + rx * 56, t.px[1] + ry * 40], [t.px[0] + rx * 56 + nx * 16, t.px[1] + ry * 40 + ny * 16], [t.px[0] + rx * 56 - nx * 16, t.px[1] + ry * 40 - ny * 16]], true);
+  });
   const desc = `A point on the unit circle at ${p.deg} degrees: cosine ${p.cos}, sine ${p.sin}${p.tan !== null ? `, tangent ${p.tan}` : ', tangent undefined'}. Quadrant ${p.quadrant || 'on an axis'}, reference angle ${p.reference} degrees.`;
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption} className="dg-square" svgProps={svgProps}>
+    <Figure frame={m.frame} width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption} className="dg-square" svgProps={svgProps}>
       <Defs />
       <line className="dg-axis" x1={m.frame.left} x2={m.frame.right} y1={m.centre[1]} y2={m.centre[1]} markerEnd="url(#dg-arrow)" />
       <line className="dg-axis" x1={m.centre[0]} x2={m.centre[0]} y1={m.frame.bottom} y2={m.frame.top} markerEnd="url(#dg-arrow)" />
       <circle className="dg-curve is-secondary" cx={m.centre[0]} cy={m.centre[1]} r={m.radius} fill="none" />
-      {m.ticks.map(t => { const ux = t.px[0] - m.centre[0]; const uy = t.px[1] - m.centre[1]; const n = Math.hypot(ux, uy) || 1; const nx = -uy / n; const ny = ux / n; return <g key={t.deg}><circle className="dg-tick-dot" cx={t.on[0]} cy={t.on[1]} r="2.2" /><PTex small tex={`${t.deg}^{\\circ}`} cands={[[t.px[0] + nx * 17, t.px[1] + ny * 12], [t.px[0] - nx * 17, t.px[1] - ny * 12], [t.px[0] + (ux / n) * 12 + nx * 20, t.px[1] + (uy / n) * 12 + ny * 14]]} obstacles={ucObs} w={44} h={18} className="dg-small" /></g>; })}
+      {m.ticks.map((t, i) => <g key={t.deg}><circle className="dg-tick-dot" cx={t.on[0]} cy={t.on[1]} r="2.2" /><Tex x={tickAt[i][0]} y={tickAt[i][1]} anchor={tickAt[i][2] || 'middle'} tex={`${t.deg}^{\\circ}`} w={44} h={18} className="dg-small" /></g>)}
       <path className="dg-arc" d={poly(m.arc)} fill="none" />
       <line className="dg-curve is-primary" x1={m.centre[0]} y1={m.centre[1]} x2={m.px[0]} y2={m.px[1]} />
       <line className="dg-dash is-cos" x1={m.px[0]} y1={m.px[1]} x2={m.foot[0]} y2={m.foot[1]} />
       <line className="dg-dash is-sin" x1={m.centre[0]} y1={m.centre[1]} x2={m.foot[0]} y2={m.foot[1]} />
       <circle className="dg-dot is-key" cx={m.px[0]} cy={m.px[1]} r="5" />
-      <PTex tex={`(${r3(p.cos, 3)},\\,${r3(p.sin, 3)})`} cands={(() => { const ux = m.px[0] - m.centre[0]; const uy = m.px[1] - m.centre[1]; const n = Math.hypot(ux, uy) || 1; const a = ux >= 0 ? 'start' : 'end'; const est = labelSize(`(${r3(p.cos, 3)},\\,${r3(p.sin, 3)})`).w + 6; const lim = x => (ux >= 0 ? Math.min(x, m.frame.width - est) : Math.max(x, est)); return [[lim(m.px[0] + (ux / n) * 14), m.px[1] + (uy / n) * 16 + (uy / n < 0 ? -4 : 4), a], [lim(m.px[0] + (ux / n) * 34), m.px[1] + (uy / n) * 30, a], [lim(m.px[0] + (ux >= 0 ? 12 : -12)), m.px[1] + (p.sin >= 0 ? -22 : 22), a]]; })()} obstacles={ucObs} w={120} />
-      <PTex small tex={`\\theta=${p.deg}^{\\circ}`} cands={[[m.centre[0] + 36, m.centre[1] - 8, 'start'], [m.centre[0] + 36, m.centre[1] + 16, 'start'], [m.centre[0] - 36, m.centre[1] - 8, 'end'], [m.centre[0] - 36, m.centre[1] + 16, 'end'], [m.centre[0] + 60, m.centre[1] - 30, 'start'], [m.centre[0] - 60, m.centre[1] - 30, 'end'], [m.centre[0] + 60, m.centre[1] + 30, 'start'], [m.centre[0] - 60, m.centre[1] + 30, 'end']]} obstacles={ucObs} w={90} className="dg-small" />
-      {showTan && p.tan !== null && <Tex x={m.frame.left + 8} y={m.frame.top + 12} tex={`\\tan\\theta=${p.tan}`} w={150} anchor="start" />}
+      <Tex x={coordAt[0]} y={coordAt[1]} anchor={coordAt[2] || 'middle'} tex={coordTex} w={120} />
+      <Tex x={thetaAt[0]} y={thetaAt[1]} anchor={thetaAt[2] || 'middle'} tex={thetaTex} w={90} className="dg-small" />
+      {tanTex && <Tex x={m.frame.left + 8} y={m.frame.top + 12} tex={tanTex} w={150} anchor="start" />}
       {overlay && overlay(m)}
     </Figure>
   );
@@ -135,13 +171,14 @@ export function TrigGraph({ fn = 'sin', a = 1, b = 1, c = 0, d = 0, title = null
   const trigObs = [...m.curves.flatMap(c => c.segments), ...m.asymptotes.map(a => a.px), [[f.left, y0], [f.right, y0]], [[m.axes.y[0][0], f.bottom], [m.axes.y[0][0], f.top]]];
   const piLabel = v => ({ [-6.283]: '-2\\pi', [-3.142]: '-\\pi', 3.142: '\\pi', 6.283: '2\\pi' })[r3(v, 3)] || null;
   return (
-    <Figure width={f.width} height={f.height} title={title || `Graph of y = ${a}${fn}(${b}(x - ${c})) + ${d}`} description={`A ${fn} curve with amplitude ${fn === 'tan' ? 'none' : Math.abs(a)}, period ${r3(period, 4)} radians, shifted ${c} right and ${d} up.`} caption={caption}>
+    <Figure frame={f} width={f.width} height={f.height} title={title || `Graph of y = ${a}${fn}(${b}(x - ${c})) + ${d}`} description={`A ${fn} curve with amplitude ${fn === 'tan' ? 'none' : Math.abs(a)}, period ${r3(period, 4)} radians, shifted ${c} right and ${d} up.`} caption={caption}>
       <Defs />
       <g className="dg-axes">
         {m.yTicks.map(t => <line key={`gy${t.value}`} className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} />)}
         {m.xTicks.map(t => <line key={`gx${t.value}`} className="dg-grid" x1={t.px} x2={t.px} y1={f.top} y2={f.bottom} />)}
         <line className="dg-axis" x1={f.left} x2={f.right} y1={y0} y2={y0} markerEnd="url(#dg-arrow)" />
         <line className="dg-axis" x1={m.axes.y[0][0]} x2={m.axes.y[0][0]} y1={f.bottom} y2={f.top} markerEnd="url(#dg-arrow)" />
+        <PTex tex="0" cands={[[m.axes.y[0][0] - 8, y0 + 13, 'end'], [m.axes.y[0][0] + 8, y0 + 13, 'start'], [m.axes.y[0][0] - 8, y0 - 13, 'end'], [m.axes.y[0][0] + 8, y0 - 13, 'start']]} obstacles={trigObs} w={20} h={20} />
         {m.xTicks.map(t => piLabel(t.value) && <PTex key={`lx${t.value}`} tex={piLabel(t.value)} cands={[[t.px, y0 + 14], [t.px, y0 - 14], [t.px, f.bottom + 14]]} obstacles={trigObs} w={44} h={20} />)}
         {m.yTicks.filter(t => t.value !== 0).map(t => <PTex key={`ly${t.value}`} tex={String(t.value)} cands={[[m.axes.y[0][0] - 6, t.px, 'end'], [m.axes.y[0][0] + 6, t.px, 'start'], [f.left - 6, t.px, 'end']]} obstacles={trigObs} w={40} h={20} />)}
       </g>
@@ -163,7 +200,7 @@ export function Triangle({ a, b, c, C, labels = { sides: true, angles: true }, t
   const rightMark = m.right ? (() => { const p = V[m.right]; const others = Object.keys(V).filter(k => k !== m.right).map(k => V[k]); const u = others.map(q => { const dx = q[0] - p[0]; const dy = q[1] - p[1]; const n = Math.hypot(dx, dy) || 1; return [dx / n * 14, dy / n * 14]; }); return `M${p[0] + u[0][0]} ${p[1] + u[0][1]} L${p[0] + u[0][0] + u[1][0]} ${p[1] + u[0][1] + u[1][1]} L${p[0] + u[1][0]} ${p[1] + u[1][1]}`; })() : null;
   const desc = `Triangle ABC with sides a = ${m.sides.a}, b = ${m.sides.b}, c = ${m.sides.c}; angles A = ${m.angles.A}°, B = ${m.angles.B}°, C = ${m.angles.C}°${m.right ? `, a right angle at ${m.right}` : ''}; area ${m.area}.`;
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
+    <Figure frame={m.frame} width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
       <path className="dg-shape" d={`M${V.A[0]} ${V.A[1]} L${V.B[0]} ${V.B[1]} L${V.C[0]} ${V.C[1]} Z`} />
       {rightMark && <path className="dg-rightmark" d={rightMark} fill="none" />}
       {labels.sides && <>{sideLabel('a', m.midpoints.a, away(m.midpoints.a))}{sideLabel('b', m.midpoints.b, away(m.midpoints.b))}{sideLabel('c', m.midpoints.c, away(m.midpoints.c))}</>}
@@ -177,7 +214,7 @@ export function RegularPolygon({ n = 5, side = 1, title = null, caption = null }
   const m = regularPolygonModel({ n, side });
   const cx = m.frame.sx(0); const cy = m.frame.sy(0);
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title || `A regular polygon with ${n} sides`} description={`A regular polygon with ${n} sides each of length ${m.side}; each interior angle is ${m.interior}°, each exterior angle ${m.exterior}°, and the interior angles add to ${m.angleSum}°.`} caption={caption}>
+    <Figure frame={m.frame} width={m.frame.width} height={m.frame.height} title={title || `A regular polygon with ${n} sides`} description={`A regular polygon with ${n} sides each of length ${m.side}; each interior angle is ${m.interior}°, each exterior angle ${m.exterior}°, and the interior angles add to ${m.angleSum}°.`} caption={caption}>
       <path className="dg-shape" d={`${poly(m.vertices)} Z`} />
       {m.vertices.map((v, i) => <circle key={i} className="dg-tick-dot" cx={v[0]} cy={v[1]} r="2.6" />)}
       <Tex x={cx} y={cy - 10} tex={`n=${n}`} w={60} />
@@ -195,7 +232,7 @@ export function CircleTheorem({ theorem = 'centre', params = {}, title = null, c
   const nudge = (name) => { const p = P[name]; const dx = p[0] - m.centre[0]; const dy = p[1] - m.centre[1]; const n = Math.hypot(dx, dy) || 1; return [p[0] + (dx / n) * 16 || p[0] + 16, p[1] + (dy / n) * 16]; };
   const markPos = k => { const v = P[k.at]; const a = P[k.between[0]]; const b = P[k.between[1]]; const mx = (a[0] + b[0]) / 2 - v[0]; const my = (a[1] + b[1]) / 2 - v[1]; const n = Math.hypot(mx, my) || 1; return [v[0] + (mx / n) * 38, v[1] + (my / n) * 38]; };
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title || labelOf} description={desc} caption={caption || labelOf} className="dg-square">
+    <Figure frame={m.frame} width={m.frame.width} height={m.frame.height} title={title || labelOf} description={desc} caption={caption || labelOf} className="dg-square">
       <circle className="dg-shape" cx={m.centre[0]} cy={m.centre[1]} r={m.radius} />
       {m.lines.map(([p, q], i) => <line key={i} className={`dg-curve is-${theorem === 'tangent' && i === 1 ? 'primary' : 'secondary'}`} x1={P[p][0]} y1={P[p][1]} x2={P[q][0]} y2={P[q][1]} />)}
       {Object.keys(P).map(k => <g key={k}><circle className="dg-dot" cx={P[k][0]} cy={P[k][1]} r={k === 'O' ? 3 : 4} />{!/^E/.test(k) && <PTex tex={k} cands={(() => { const dx = P[k][0] - m.centre[0]; const dy = P[k][1] - m.centre[1]; const n = Math.hypot(dx, dy) || 1; const ux = dx / n; const uy = dy / n; return k === 'O' ? [[P[k][0] + 12, P[k][1] + 14], [P[k][0] - 12, P[k][1] + 14], [P[k][0] + 12, P[k][1] - 14], [P[k][0] - 12, P[k][1] - 14], [P[k][0], P[k][1] + 24]] : [16, 24, 32, 42].flatMap(d => [[P[k][0] + ux * d, P[k][1] + uy * d], [P[k][0] + ux * d - uy * 12, P[k][1] + uy * d + ux * 12], [P[k][0] + ux * d + uy * 12, P[k][1] + uy * d - ux * 12]]); })()} obstacles={ctObs} w={24} h={22} className="dg-vertex" />}</g>)}
@@ -209,7 +246,7 @@ export function NumberLine({ title = 'A number line', caption = null, ...spec })
   const m = numberLineModel(spec);
   const desc = sentence(m.points.map(p => `${p.open ? 'Open' : 'Closed'} point at ${p.value}.`).join(' '), m.intervals.map(i => `Shaded from ${i.from === null ? 'the left' : `${i.from}${i.fromOpen ? ' (not included)' : ''}`} to ${i.to === null ? 'the right' : `${i.to}${i.toOpen ? ' (not included)' : ''}`}.`).join(' '));
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc || 'An empty number line.'} caption={caption}>
+    <Figure frame={m.frame} width={m.frame.width} height={m.frame.height} title={title} description={desc || 'An empty number line.'} caption={caption}>
       <Defs />
       <line className="dg-axis" x1={m.frame.left - 6} x2={m.frame.right + 6} y1={m.y} y2={m.y} markerStart="url(#dg-arrow)" markerEnd="url(#dg-arrow)" />
       {m.ticks.map(t => <g key={t.value}><line className="dg-tick" x1={t.px} x2={t.px} y1={m.y - 6} y2={m.y + 6} /><Tex x={t.px} y={m.y + 20} tex={String(t.value)} w={40} h={20} /></g>)}
@@ -268,14 +305,14 @@ export function Histogram({ title = 'A histogram', caption = null, xLabel = null
   const f = m.frame;
   const desc = `A histogram of ${m.total} values in ${m.counts.length} bins: ${m.bars.map(b => `${b.from} to ${b.to}: ${b.count}`).join('; ')}.`;
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure frame={f} width={f.width} height={f.height} title={title} description={desc} caption={caption}>
       <Defs />
       <g className="dg-axes">
         {m.yTicks.map(t => <g key={t.value}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={String(t.value)} w={36} h={20} anchor="end" /></g>)}
         <line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(0)} y2={f.sy(0)} />
         <line className="dg-axis" x1={f.left} x2={f.left} y1={f.sy(0)} y2={f.top} />
       </g>
-      {m.bars.map((b, i) => <rect key={i} className="dg-bar" x={b.x1} y={b.y} width={Math.max(0, b.x2 - b.x1 - 1)} height={Math.max(0, b.base - b.y)} />)}
+      {m.bars.map((b, i) => <rect key={i} className="dg-bar" x={b.x1} y={b.y} width={Math.max(0, b.x2 - b.x1)} height={Math.max(0, b.base - b.y)} />)}
       {m.edges.map((e, i) => <Tex key={`e${i}`} x={f.sx(e)} y={f.sy(0) + 14} tex={String(e)} w={40} h={20} />)}
       {m.bars.map((b, i) => b.count > 0 && <Tex key={`c${i}`} x={(b.x1 + b.x2) / 2} y={b.y - 9} tex={String(b.count)} w={30} h={18} className="dg-small" />)}
       {xLabel && <Tex x={f.right} y={f.height - 6} tex={xLabel} w={140} anchor="end" />}
@@ -287,7 +324,7 @@ export function BoxPlot({ title = 'A box plot', caption = null, ...spec }) {
   const s = m.summary; const px = m.px; const y = m.y; const h = m.h;
   const desc = `A box plot: minimum ${s.min}, lower quartile ${s.q1}, median ${s.median}, upper quartile ${s.q3}, maximum ${s.max}; range ${s.range}, interquartile range ${s.iqr}.`;
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
+    <Figure frame={m.frame} width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
       <g className="dg-axes">{m.ticks.map(t => <g key={t.value}><line className="dg-tick" x1={t.px} x2={t.px} y1={m.frame.bottom} y2={m.frame.bottom + 5} /><Tex x={t.px} y={m.frame.bottom + 18} tex={String(t.value)} w={40} h={20} /></g>)}<line className="dg-axis" x1={m.frame.left} x2={m.frame.right} y1={m.frame.bottom} y2={m.frame.bottom} /></g>
       <line className="dg-curve is-secondary" x1={px.min} y1={y} x2={px.q1} y2={y} /><line className="dg-curve is-secondary" x1={px.q3} y1={y} x2={px.max} y2={y} />
       <line className="dg-curve is-secondary" x1={px.min} y1={y - h / 3} x2={px.min} y2={y + h / 3} /><line className="dg-curve is-secondary" x1={px.max} y1={y - h / 3} x2={px.max} y2={y + h / 3} />
@@ -302,7 +339,7 @@ export function NormalCurve({ title = 'The normal distribution', caption = null,
   const f = m.frame;
   const desc = `A normal curve with mean ${m.mu} and standard deviation ${m.sigma}. The shaded area from z = ${m.za} (x = ${m.xa}) to z = ${m.zb} (x = ${m.xb}) is ${m.area}, which is ${r3(m.area * 100, 2)}% of the distribution.`;
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure frame={f} width={f.width} height={f.height} title={title} description={desc} caption={caption}>
       <line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(0)} y2={f.sy(0)} />
       {m.shade.length > 0 && <path className="dg-shade" d={`${poly(m.shade)} Z`} />}
       <path className="dg-curve is-primary" d={poly(m.curve)} fill="none" />
@@ -320,7 +357,7 @@ export function VectorDiagram({ title = 'Vectors', caption = null, ...spec }) {
   const desc = `${m.vectors.map(v => `Vector ${v.label || ''} = (${v.dx}, ${v.dy}), magnitude ${v.magnitude}, direction ${v.angle}°.`).join(' ')}${m.resultant ? ` Resultant = (${m.resultant.dx}, ${m.resultant.dy}), magnitude ${m.resultant.magnitude}.` : ''}`;
   const arrow = (a, b, cls, key) => <line key={key} className={`dg-vector ${cls}`} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} markerEnd="url(#dg-arrow)" />;
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure frame={f} width={f.width} height={f.height} title={title} description={desc} caption={caption}>
       <Defs />
       <g className="dg-axes">{m.xTicks.map(t => <line key={`gx${t.value}`} className="dg-grid" x1={t.px} x2={t.px} y1={f.top} y2={f.bottom} />)}{m.yTicks.map(t => <line key={`gy${t.value}`} className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} />)}
         <line className="dg-axis" x1={f.left} x2={f.right} y1={x0} y2={x0} markerEnd="url(#dg-arrow)" /><line className="dg-axis" x1={y0} x2={y0} y1={f.bottom} y2={f.top} markerEnd="url(#dg-arrow)" /></g>
@@ -334,7 +371,7 @@ export function SequenceDiagram({ type = 'arithmetic', title = 'A sequence', cap
   const m = sequenceModel({ ...spec, kind: type }); const f = m.frame;
   const desc = `The first ${m.n} terms of a ${m.kind} sequence starting at ${m.first} with ${m.kind === 'arithmetic' ? 'common difference' : 'common ratio'} ${m.step}: ${m.terms.join(', ')}. Their sum is ${m.total}.`;
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure frame={f} width={f.width} height={f.height} title={title} description={desc} caption={caption}>
       <g className="dg-axes">{m.yTicks.map(t => <g key={t.value}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={String(t.value)} w={40} h={20} anchor="end" /></g>)}<line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(Math.max(0, f.ymin))} y2={f.sy(Math.max(0, f.ymin))} /></g>
       <path className="dg-curve is-secondary" d={poly(m.points.map(p => p.px))} fill="none" strokeDasharray="4 4" />
       {m.points.map(p => <g key={p.k}><line className="dg-stem" x1={p.px[0]} x2={p.px[0]} y1={f.sy(0)} y2={p.px[1]} /><circle className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" /><Tex x={p.px[0]} y={p.px[1] - 14} tex={String(p.value)} w={44} h={20} className="dg-small" /><Tex x={p.px[0]} y={f.sy(0) + 14} tex={`T_{${p.k}}`} w={40} h={20} className="dg-small" /></g>)}
@@ -345,7 +382,7 @@ export function CompoundGrowth({ title = 'Compound interest', caption = null, ..
   const m = compoundModel(spec); const f = m.frame;
   const desc = `A $${m.principal} investment at ${r3(m.rate * 100, 3)}% per year compounded ${m.perYear} time${m.perYear === 1 ? '' : 's'} a year grows to $${m.final} after ${m.years} years, earning $${m.interest} in interest; simple interest would give $${m.simpleFinal}.`;
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure frame={f} width={f.width} height={f.height} title={title} description={desc} caption={caption}>
       <g className="dg-axes">{m.yTicks.map(t => <g key={t.value}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={`\\$${t.value}`} w={52} h={20} anchor="end" /></g>)}{m.xTicks.map(t => <Tex key={t.value} x={t.px} y={f.bottom + 14} tex={String(t.value)} w={36} h={20} />)}
         <line className="dg-axis" x1={f.left} x2={f.right} y1={f.bottom} y2={f.bottom} /><line className="dg-axis" x1={f.left} x2={f.left} y1={f.bottom} y2={f.top} /></g>
       <path className="dg-curve is-secondary" d={poly(m.simplePx)} fill="none" strokeDasharray="5 4" />
@@ -360,7 +397,7 @@ export function Timeline({ title = 'A timeline of payments', caption = null, ...
   const m = timelineModel(spec);
   const desc = `A timeline of ${m.events.length} payments over ${m.end} years: ${m.events.map(e => `${e.amount >= 0 ? 'receive' : 'pay'} $${Math.abs(e.amount)} at year ${e.t}`).join('; ')}. Net ${m.net >= 0 ? '+' : '-'}$${Math.abs(m.net)}.`;
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
+    <Figure frame={m.frame} width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
       <Defs />
       <line className="dg-axis" x1={m.frame.left} x2={m.frame.right} y1={m.y} y2={m.y} markerEnd="url(#dg-arrow)" />
       {m.ticks.map(t => <g key={t.value}><line className="dg-tick" x1={t.px} x2={t.px} y1={m.y - 5} y2={m.y + 5} /><PTex small tex={String(t.value)} cands={[[t.px, m.y + 20], [t.px, m.y - 20], [t.px + 14, m.y + 20], [t.px - 14, m.y + 20]]} obstacles={m.events.map(e => [[e.px[0], m.y], [e.px[0], e.up ? m.y - 34 : m.y + 34]])} w={36} h={18} className="dg-small" /></g>)}
@@ -374,9 +411,9 @@ export function SecantTangent({ title = 'A secant and a tangent', caption = null
   const m = secantTangentModel(spec); const f = m.frame;
   const desc = `The curve y = ${m.expr}. The secant through x = ${m.x0} and x = ${r3(m.x0 + m.h, 4)} has gradient ${m.secantSlope}; the tangent at x = ${m.x0} has gradient ${m.tangentSlope}.`;
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure frame={f} width={f.width} height={f.height} title={title} description={desc} caption={caption}>
       <Defs />
-      <line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(0)} y2={f.sy(0)} markerEnd="url(#dg-arrow)" /><line className="dg-axis" x1={f.sx(0)} x2={f.sx(0)} y1={f.bottom} y2={f.top} markerEnd="url(#dg-arrow)" />
+      <Axes m={{ ...m, xTicks: niceTicks(f.xmin, f.xmax, 8).map(v => ({ value: v, px: f.sx(v) })), yTicks: niceTicks(f.ymin, f.ymax, 6).map(v => ({ value: v, px: f.sy(v) })) }} obstacles={[...m.curve, m.tangent, ...(m.secant ? [m.secant] : [])]} />
       {m.curve.map((s, i) => <path key={i} className="dg-curve is-primary" d={poly(s)} fill="none" />)}
       <line className="dg-curve is-tangent" x1={m.tangent[0][0]} y1={m.tangent[0][1]} x2={m.tangent[1][0]} y2={m.tangent[1][1]} />
       {m.secant && <line className="dg-curve is-secant" x1={m.secant[0][0]} y1={m.secant[0][1]} x2={m.secant[1][0]} y2={m.secant[1][1]} />}
@@ -393,10 +430,9 @@ export function RiemannRectangles({ title = 'Riemann rectangles', caption = null
   // The readout sits in the caption, outside the plot, so it can never collide with the curve.
   const readout = caption ?? `$\\text{sum}=${r3(m.sum, 2)}$ and $\\text{area}=${r3(m.area, 2)}$`;
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={readout}>
+    <Figure frame={f} width={f.width} height={f.height} title={title} description={desc} caption={readout}>
       <Defs />
-      <g className="dg-axes">{m.xTicks.map(t => <g key={t.value}><line className="dg-grid" x1={t.px} x2={t.px} y1={f.top} y2={f.bottom} /><Tex x={t.px} y={f.bottom + 14} tex={String(t.value)} w={36} h={20} /></g>)}{m.yTicks.map(t => <g key={t.value}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={String(t.value)} w={40} h={20} anchor="end" /></g>)}
-        <line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(0)} y2={f.sy(0)} markerEnd="url(#dg-arrow)" /><line className="dg-axis" x1={f.left} x2={f.left} y1={f.bottom} y2={f.top} markerEnd="url(#dg-arrow)" /></g>
+      <Axes m={m} obstacles={m.curve} />
       {m.rects.map((r, i) => <rect key={i} className="dg-bar" x={r.x1} y={r.y} width={Math.max(0, r.x2 - r.x1)} height={Math.max(0, r.base - r.y)} />)}
       {m.curve.map((s, i) => <path key={i} className="dg-curve is-primary" d={poly(s)} fill="none" />)}
     </Figure>
@@ -440,14 +476,16 @@ export function Scatter({ points, line = null, xLabel = 'x', yLabel = 'y', title
     m.r !== null ? `The correlation coefficient is ${m.r}.` : ''
   );
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure frame={f} width={f.width} height={f.height} title={title} description={desc} caption={caption}>
       <Defs />
       {m.xTicks.map(t => <g key={`x${t.value}`}><line className="dg-grid" x1={t.px} x2={t.px} y1={f.top} y2={f.bottom} /><Tex x={t.px} y={f.bottom + 14} tex={String(t.value)} w={40} h={20} /></g>)}
       {m.yTicks.map(t => <g key={`y${t.value}`}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={String(t.value)} w={40} h={20} anchor="end" /></g>)}
-      <line className="dg-axis" x1={f.left} y1={f.bottom} x2={f.right + 6} y2={f.bottom} markerEnd="url(#dg-arrow)" />
-      <line className="dg-axis" x1={f.left} y1={f.bottom} x2={f.left} y2={f.top - 6} markerEnd="url(#dg-arrow)" />
-      <Tex x={(f.left + f.right) / 2} y={f.bottom + 30} tex={xLabel} w={140} h={20} />
-      <Tex x={f.left + 8} y={f.top - 4} tex={yLabel} w={140} h={20} anchor="start" />
+      <line className="dg-axis" x1={f.left} y1={axesOf(f).x[0][1]} x2={f.right + 6} y2={axesOf(f).x[0][1]} markerEnd="url(#dg-arrow)" />
+      <line className="dg-axis" x1={axesOf(f).y[0][0]} y1={f.bottom} x2={axesOf(f).y[0][0]} y2={f.top - 6} markerEnd="url(#dg-arrow)" />
+      <PTex tex={axisTex(xLabel)} cands={[[(f.left + f.right) / 2, f.bottom + 30]]} w={140} h={20} />
+      <PTex tex={axisTex(yLabel)} cands={[[f.left + 8, f.top - 4, 'start']]} w={140} h={20} />
+      {!(f.ymin <= 0 && f.ymax >= 0) && <AxisBreak x={axesOf(f).y[0][0]} y={f.bottom - 14} vertical />}
+      {!(f.xmin <= 0 && f.xmax >= 0) && <AxisBreak x={f.left + 14} y={axesOf(f).x[0][1]} vertical={false} />}
       {m.line?.segment && <line className="dg-curve is-secant" x1={m.line.segment[0][0]} y1={m.line.segment[0][1]} x2={m.line.segment[1][0]} y2={m.line.segment[1][1]} style={{ strokeDasharray: 'none' }} />}
       {m.points.map((p, i) => <circle key={i} className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" />)}
     </Figure>

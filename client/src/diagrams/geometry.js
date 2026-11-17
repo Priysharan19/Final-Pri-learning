@@ -72,6 +72,12 @@ export function makeFrame({ xmin, xmax, ymin, ymax, width = DEFAULT_SIZE.width, 
   });
 }
 
+/** Axis lines for a frame: through the data origin when 0 is inside the range, else at the range edge. */
+export function axesOf(frame) {
+  const ay = frame.sy(clamp(0, frame.ymin, frame.ymax)); const ax = frame.sx(clamp(0, frame.xmin, frame.xmax));
+  return { x: [[frame.left, ay], [frame.right, ay]], y: [[ax, frame.top], [ax, frame.bottom]] };
+}
+
 // ── Functions from the engine ────────────────────────────────────────────────
 /** f(x) for an engine expression in x; NaN where it is undefined. */
 export function compile(expr, extra = {}) {
@@ -219,7 +225,7 @@ export function unitCirclePoint(deg) {
   return { deg: r3(norm, 4), rad: r3(t, 6), cos: r3(cos, 6), sin: r3(sin, 6), tan: tan === null ? null : r3(tan, 6), quadrant, reference: r3(ref, 4) };
 }
 export function unitCircleModel({ deg = 30, width = 420, height = 420 } = {}) {
-  const frame = makeFrame({ xmin: -1.4, xmax: 1.4, ymin: -1.4, ymax: 1.4, width, height, pad: { l: 20, r: 20, t: 20, b: 20 }, equal: true });
+  const frame = makeFrame({ xmin: -1.7, xmax: 1.7, ymin: -1.7, ymax: 1.7, width, height, pad: { l: 20, r: 20, t: 20, b: 20 }, equal: true });
   const p = unitCirclePoint(deg);
   const arc = [];
   const sweep = ((deg % 360) + 360) % 360;
@@ -540,7 +546,7 @@ export function secantTangentModel({ expr = 'x^2', x0 = 1, h = 1, xmin = -1, xma
     }
     return [[frame.sx(xa), frame.sy(y0 + slope * (xa - x0))], [frame.sx(xb), frame.sy(y0 + slope * (xb - x0))]];
   };
-  return { frame, expr, x0, h, y0: r3(y0, 6), y1: r3(y1, 6), secantSlope: r3(secantSlope, 6), tangentSlope: r3(tangentSlope, 4), curve: sampleSegments(f, frame.xmin, frame.xmax, { ymin: frame.ymin, ymax: frame.ymax }).map(s => s.map(([x, y]) => [frame.sx(x), frame.sy(y)])), secant: Number.isFinite(secantSlope) ? line(secantSlope) : null, tangent: line(tangentSlope), p0: [frame.sx(x0), frame.sy(y0)], p1: [frame.sx(x0 + h), frame.sy(y1)] };
+  return { frame, axes: axesOf(frame), expr, x0, h, y0: r3(y0, 6), y1: r3(y1, 6), secantSlope: r3(secantSlope, 6), tangentSlope: r3(tangentSlope, 4), curve: sampleSegments(f, frame.xmin, frame.xmax, { ymin: frame.ymin, ymax: frame.ymax }).map(s => s.map(([x, y]) => [frame.sx(x), frame.sy(y)])), secant: Number.isFinite(secantSlope) ? line(secantSlope) : null, tangent: line(tangentSlope), p0: [frame.sx(x0), frame.sy(y0)], p1: [frame.sx(x0 + h), frame.sy(y1)] };
 }
 /** Riemann rectangles for f on [a, b] with n equal strips; 'left', 'right' or 'mid'. The reference area is a fine midpoint sum. */
 export function riemannModel({ expr = 'x^2', a = 0, b = 3, n = 6, mode = 'left', xmin = null, xmax = null, ymin = 0, ymax = null, width = 480, height = 320 } = {}) {
@@ -553,8 +559,8 @@ export function riemannModel({ expr = 'x^2', a = 0, b = 3, n = 6, mode = 'left',
   const x0 = xmin ?? a - (b - a) * 0.12; const x1 = xmax ?? b + (b - a) * 0.12;
   const top = Math.max(...heights, ...Array.from({ length: 80 }, (_, i) => f(x0 + ((x1 - x0) * i) / 79)).filter(isNum));
   const frame = makeFrame({ xmin: x0, xmax: x1, ymin, ymax: ymax ?? top * 1.15, width, height });
-  return { frame, expr, a, b, n, mode, width: r3(w, 6), sum: r3(sum, 4), area: r3(ref, 4), error: r3(Math.abs(sum - ref), 4), rects: heights.map((hv, i) => ({ x: r3(a + i * w, 6), height: r3(hv, 6), x1: frame.sx(a + i * w), x2: frame.sx(a + (i + 1) * w), y: frame.sy(Math.max(0, hv)), base: frame.sy(0) })),
-    curve: sampleSegments(f, frame.xmin, frame.xmax, { ymin: frame.ymin, ymax: frame.ymax }).map(s => s.map(([x, y]) => [frame.sx(x), frame.sy(y)])), xTicks: niceTicks(frame.xmin, frame.xmax, 8).map(v => ({ value: v, px: frame.sx(v) })), yTicks: niceTicks(frame.ymin, frame.ymax, 6).map(v => ({ value: v, px: frame.sy(v) })) };
+  return { frame, axes: axesOf(frame), expr, a, b, n, mode, width: r3(w, 6), sum: r3(sum, 4), area: r3(ref, 4), error: r3(Math.abs(sum - ref), 4), rects: heights.map((hv, i) => ({ x: r3(a + i * w, 6), height: r3(hv, 6), x1: frame.sx(a + i * w), x2: frame.sx(a + (i + 1) * w), y: frame.sy(Math.max(0, hv)), base: frame.sy(0) })),
+    curve: sampleSegments(f, a, b, { ymin: frame.ymin, ymax: frame.ymax }).map(s => s.map(([x, y]) => [frame.sx(x), frame.sy(y)])), xTicks: niceTicks(frame.xmin, frame.xmax, 8).map(v => ({ value: v, px: frame.sx(v) })), yTicks: niceTicks(frame.ymin, frame.ymax, 6).map(v => ({ value: v, px: frame.sy(v) })) };
 }
 
 // ── Networks: paths, trees, flow and activity networks ───────────────────────

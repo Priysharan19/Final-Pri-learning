@@ -12,6 +12,7 @@ const STATIC = [
   { kind: 'function', xmin: -1, xmax: 4, ymin: -1, ymax: 10, curves: [{ expr: 'x^2', shade: { from: 0, to: 3 } }] },
   { kind: 'trig', fn: 'sin', a: 2 }, { kind: 'trig', fn: 'tan' },
   { kind: 'unitCircle', deg: 135, showTan: true },
+  { kind: 'unitCircle', deg: 150, showTan: true }, { kind: 'unitCircle', deg: 225 }, { kind: 'unitCircle', deg: 300, showTan: true }, { kind: 'unitCircle', deg: 90 }, { kind: 'unitCircle', deg: 15 },
   { kind: 'triangle', a: 3, b: 4, c: 5, showArea: true }, { kind: 'triangle', a: 5, b: 7, C: 60 }, { kind: 'polygon', n: 6, side: 2 },
   { kind: 'circleTheorem', theorem: 'centre' }, { kind: 'circleTheorem', theorem: 'segment' }, { kind: 'circleTheorem', theorem: 'semicircle' },
   { kind: 'circleTheorem', theorem: 'cyclic' }, { kind: 'circleTheorem', theorem: 'tangent' },

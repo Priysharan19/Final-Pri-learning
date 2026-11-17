@@ -197,8 +197,8 @@ const throws = (fn, label) => { let t = false; try { fn(); } catch { t = true; }
   // By hand: B = (0,0), C = (3,0), A = (3,4); one scale 47.103 px/unit (the tighter of 372/4.5 and 252/5.35), centred on (1.5, 2.075).
   eq([t.vertices.B, t.vertices.C, t.vertices.A], [[139.346, 247.738], [280.654, 247.738], [280.654, 59.327]], 'pinned: the 3-4-5 triangle');
   const u = g.unitCircleModel({ deg: 30 });
-  // By hand: a 380 px square over ±1.4 gives 135.714 px/unit; (cos 30°, sin 30°) = (0.866025, 0.5) → (210 + 117.53, 210 − 67.857).
-  eq([u.px, u.centre, u.radius], [[327.532, 142.143], [210, 210], 135.714], 'pinned: the unit circle at 30°');
+  // By hand: a 380 px square over ±1.7 gives 380/3.4 = 111.765 px/unit (room for the coordinate label beside the point); (cos 30°, sin 30°) = (0.866025, 0.5) → (210 + 96.791, 210 − 55.882).
+  eq([u.px, u.centre, u.radius], [[306.791, 154.118], [210, 210], 111.765], 'pinned: the unit circle at 30°');
 }
 
 if (failures.length) {

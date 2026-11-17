@@ -26,6 +26,7 @@ import { chromium } from '@playwright/test';
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { auditLabels } from './support/label-audit.mjs';
 import { NSW_NOTES_TOPICS } from '../src/notes/nsw/nswNotesIndex.js';
 import base from '../src/notes/nsw/notes-nsw-stage4.js';
 import adv from '../src/notes/nsw/notes-nsw-stage6-advanced.js';
@@ -111,6 +112,8 @@ try {
           widest: [...sheet.querySelectorAll('*')].filter(e => !e.closest('svg') && e.getBoundingClientRect().right > document.documentElement.clientWidth + 0.5).slice(0, 3).map(e => `${e.tagName}.${e.className?.toString?.().slice(0, 40)}`)
         };
       });
+      const audit = await auditLabels(page, '[data-chapter-sheet]', t.id);
+      ok(audit.found.length === 0, `${where}: a diagram label sits on a stroke or on another label: ${audit.found.slice(0, 6).join(' | ')}`);
       ok(r.katexErrors === 0, `${where}: ${r.katexErrors} KaTeX render errors`);
       ok(r.katexCount > 10, `${where}: the maths is drawn by KaTeX (${r.katexCount} elements)`);
       ok(r.plainLabels === 0, `${where}: a diagram label is not KaTeX`);

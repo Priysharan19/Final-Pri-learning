@@ -13,8 +13,8 @@ export function labelSize(tex, { small = false } = {}) {
   const s = String(tex);
   const plain = s.replace(/\\(?:text|mathbf|mathrm)\{([^}]*)\}/g, '$1').replace(/\\[a-zA-Z]+/g, 'x').replace(/[{}^_\\,;\s]/g, '');
   const tall = /\\(?:d?frac|tfrac|begin|sqrt)/.test(s);
-  const per = small ? 6.6 : 7.6;
-  return { w: Math.max(12, plain.length * per + 4), h: tall ? (/begin/.test(s) ? 44 : 34) : 17 };
+  const per = small ? 7.4 : 9.2;
+  return { w: Math.max(12, plain.length * per + 4), h: tall ? (/begin/.test(s) ? 44 : 34) : (/[()|]/.test(s) ? 23 : 18) };
 }
 
 /** The box a label occupies for a candidate [x, y, anchor] (the Tex component's own anchoring). */
@@ -29,6 +29,10 @@ export function crossings(box, polylines, pad = 2) {
   let n = 0;
   const L = box.l - pad; const R = box.r + pad; const T = box.t - pad; const B = box.b + pad;
   for (const line of polylines) {
+    if (!Array.isArray(line)) { // a placed label: a filled box
+      if (line.box.l < R && line.box.r > L && line.box.t < B && line.box.b > T) n += 4;
+      continue;
+    }
     for (let i = 0; i + 1 < line.length; i++) {
       const [x0, y0] = line[i]; const [x1, y1] = line[i + 1];
       const len = Math.hypot(x1 - x0, y1 - y0);
@@ -52,6 +56,9 @@ export function place(tex, candidates, obstacles, opts) {
   }
   return best;
 }
+
+/** A placed label as an obstacle for the labels placed after it (a filled box, so containment counts too). */
+export const outline = b => ({ box: b });
 
 /** A circle as a closed polyline. */
 export const circlePath = (cx, cy, r, n = 72) => Array.from({ length: n + 1 }, (_, i) => [cx + Math.cos((2 * Math.PI * i) / n) * r, cy + Math.sin((2 * Math.PI * i) / n) * r]);

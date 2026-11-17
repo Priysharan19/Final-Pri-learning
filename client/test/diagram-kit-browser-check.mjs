@@ -21,6 +21,7 @@
 import { chromium } from '@playwright/test';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
+import { auditLabels } from './support/label-audit.mjs';
 
 const CLIENT = fileURLToPath(new URL('..', import.meta.url));
 let pass = 0;
@@ -70,7 +71,7 @@ try {
     return out;
   });
   ok(layout.scrollW <= layout.vw + 1, `the page does not scroll sideways at ${layout.vw} px (scroll width ${layout.scrollW})`);
-  ok(layout.svgs >= 42 && layout.kinds >= 43, `every kind is on the page (${layout.svgs} diagrams, ${layout.kinds} cases)`);
+  ok(layout.svgs >= 47 && layout.kinds >= 48, `every kind is on the page (${layout.svgs} diagrams, ${layout.kinds} cases)`);
   ok(layout.wide.length === 0, `no svg runs past the phone's edge (${layout.wide.join(',')})`);
   ok(layout.tiny.length === 0, `no svg is shrunk to unreadable size (${layout.tiny.join(',')})`);
   ok(layout.labels > 300 && layout.plainLabels === 0, `every label is typeset by KaTeX (${layout.labels} labels, ${layout.plainLabels} plain)`);
@@ -78,44 +79,10 @@ try {
   ok(layout.errors === 0, 'no KaTeX error is shown');
   ok(layout.tables === 0, 'a table is scrollable, never clipped');
 
-  // ── Labels never sit on a stroked path ─────────────────────────────────────
-  // For every figure: the tight box of each KaTeX label against points sampled along every stroked
-  // outline (curves, axes, edges, shapes, bar and box outlines, circles, hidden edges). Gridlines,
-  // ticks and fills are not strokes a label can be misread against.
-  const overlaps = await page.evaluate(() => {
-    const STROKES = '.dg-curve, .dg-shape, .dg-solid, .dg-hidden, .dg-edge, .dg-axis, .dg-vector, .dg-bar, .dg-box, .dg-venn, .dg-node, .dg-asymptote, .dg-rightmark, .dg-arc, .dg-dash, .dg-interval';
-    const found = [];
-    let figures = 0; let samples = 0; let labels = 0;
-    for (const fig of document.querySelectorAll('[data-case]')) {
-      for (const svg of fig.querySelectorAll('svg.dg-svg')) {
-        figures += 1;
-        const boxes = [];
-        for (const inner of svg.querySelectorAll('.dg-tex-in')) {
-          const target = inner.querySelector('.katex-html') || inner;
-          const range = document.createRange(); range.selectNodeContents(target);
-          const r = range.getBoundingClientRect();
-          if (r.width > 0 && r.height > 0) boxes.push({ r, text: (inner.querySelector(".katex-html") || inner).textContent.trim().slice(0, 18), own: inner.closest('foreignObject') });
-        }
-        labels += boxes.length;
-        for (const el of svg.querySelectorAll(STROKES)) {
-          if (!el.getTotalLength || el.closest('defs')) continue;
-          const ctm = el.getScreenCTM(); if (!ctm) continue;
-          const len = el.getTotalLength(); const step = 2;
-          for (let d = 0; d <= len; d += step) {
-            const q = el.getPointAtLength(d);
-            const x = q.x * ctm.a + q.y * ctm.c + ctm.e; const y = q.x * ctm.b + q.y * ctm.d + ctm.f;
-            samples += 1;
-            for (const b of boxes) {
-              if (x > b.r.left + 1 && x < b.r.right - 1 && y > b.r.top + 1 && y < b.r.bottom - 1) found.push(`${fig.dataset.case}: "${b.text}" is crossed by a ${el.getAttribute('class')}`);
-            }
-          }
-        }
-      }
-    }
-    return { found: [...new Set(found)], figures, samples, labels };
-  });
-  ok(overlaps.figures >= 42 && overlaps.samples > 5000 && overlaps.labels > 300, `the overlap audit covered ${overlaps.figures} figures, ${overlaps.labels} labels, ${overlaps.samples} stroke samples`);
-  ok(overlaps.found.length === 0, `no label sits on a stroked path (${overlaps.found.length}): ${overlaps.found.slice(0, 80).join(' | ')}`);
+  // ── Labels never sit on a stroked path or on each other (support/label-audit.mjs) ──
+  const overlaps = await auditLabels(page, '[data-case]');
+  ok(overlaps.figures >= 46 && overlaps.samples > 5000 && overlaps.labels > 300, `the overlap audit covered ${overlaps.figures} figures, ${overlaps.labels} labels, ${overlaps.samples} stroke samples`);
+  ok(overlaps.found.length === 0, `no label sits on a stroked path or on another label (${overlaps.found.length}): ${overlaps.found.slice(0, 80).join(' | ')}`);
 
   // ── Accessible names and the tab order of the interactive variants ─────────
   const named = await page.evaluate(() => {
