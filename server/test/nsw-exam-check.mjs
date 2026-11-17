@@ -179,7 +179,8 @@ try {
     if (!paper.released) assert.ok(paper.missingOutcomes.length + paper.thinOutcomes.length > 0, `${paper.id} says what it lacks`);
   }
   c.ok(true, 'each paper\'s release, floor, omissions, title, scaled marks and time, and cited source are the engine\'s on G2/G3 data');
-  c.ok(list.data.papers.some(p => !p.released && p.year12.covered > 0), 'a blueprint with some covered outcomes but below the floor is refused');
+  // Once every course has enough approved forms none is refused; a refused paper, if any is left, is below the floor.
+  c.ok(list.data.papers.filter(p => !p.released).every(p => p.year12.covered / p.year12.total < NSW_RELEASE_FLOOR), 'any blueprint that is refused is below the floor');
   c.deq([leaks(list.data), bandKeys(list.data)], [[], []], 'no question, answer or band is in the list');
   c.eq(list.data.label, NSW_EXAM_LABEL, `every paper is an "${NSW_EXAM_LABEL}"`);
   released = list.data.papers.filter(p => p.released).map(p => p.id);
@@ -212,8 +213,14 @@ try {
   const partials = list.data.papers.filter(p => p.released && p.partial);
   c.ok(partials.length > 0, `partial papers released on G3's pool: ${partials.map(p => `${p.id} (${p.year12.covered}/${p.year12.total})`).join(', ')}`);
   for (const [i, entry] of partials.entries()) {
-    const jar = more[i]?.jar;
-    assert.ok(jar, 'an account per partial paper');
+    // One account per partial paper: more partial papers release as the pool grows, so the pool's own seven are topped up.
+    let student = more[i];
+    if (!student) {
+      await h.db.run('DELETE FROM rate_limits');   // the seven accounts above used this address's registration allowance
+      student = await registerAccount(h, { email: `nsw.exam.partial.${i}@example.test`, deviceId: `ipad-nsw-exam-partial-${i}` });
+      assert.equal((await verifyEmail(h, student.account.id)).status, 200, 'a verified account per partial paper');
+    }
+    const jar = student.jar;
     const made = await create(jar, { kind: 'nsw', blueprint: { id: entry.id } });
     assert.equal(made.status, 201, `${entry.id} starts`);
     const ex = made.data.exam;
