@@ -1274,7 +1274,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // is confirmed as written, changed to what they wrote, or (photo) left out.
   const [ackedDoubt, setAckedDoubt] = useState(null);
   const unsureLines = writeMode
-    ? (inkResult?.lines || []).map((l, i) => (isLowConfidence(l, confidenceFloorOf(inkResult)) ? i : -1)).filter(i => i >= 0)
+    ? (inkResult?.lines || []).map((l, i) => (isLowConfidence(inkResult?.lineMeta?.[i] || { conf: 1 }, confidenceFloorOf(inkResult)) ? i : -1)).filter(i => i >= 0)
     : photoInUse ? (photoLines.lines || []).map((l, i) => (l.check && !l.edited && !l.excluded ? i : -1)).filter(i => i >= 0) : [];
   const doubtOnly = writeMode && !!doubt && unsureLines.length === 0 && ackedDoubt !== readingId;
   const toConfirm = unsureLines.length + (doubtOnly ? 1 : 0);
@@ -2938,9 +2938,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             <p className="ws-confirm-blind muted">{t('verdict.confirmBlind')}</p>
             <div className="ws-confirm-lines">
               {(writeMode ? (inkResult?.lines || []) : (photoLines?.lines || []).filter(l => !l.excluded)).map((l, i) => {
-                const unsure = writeMode ? isLowConfidence(l, confidenceFloorOf(inkResult)) : !!(l.check && !l.edited);
-                const text = String(l?.text ?? '');
-                const swaps = writeMode && unsure ? relationChoices(l) : null;
+                const unsure = writeMode ? isLowConfidence(inkResult?.lineMeta?.[i] || { conf: 1 }, confidenceFloorOf(inkResult)) : !!(l.check && !l.edited);
+                const text = String(typeof l === 'string' ? l : l?.text ?? '');
+                const swaps = writeMode && unsure ? relationChoices({ ...(inkResult?.lineMeta?.[i] || {}), text }) : null;
                 return (
                   <div key={i} className={`ws-confirm-line${unsure ? ' is-unsure' : ''}`} data-confirm-line={i} data-unsure={unsure ? 'true' : undefined}>
                     <span className="ws-confirm-n" aria-hidden="true">{i + 1}</span>

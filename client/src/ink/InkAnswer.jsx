@@ -211,6 +211,9 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     const sure = Number(r.confidence ?? (r.lines.length ? 0 : 1));
     onRecognized?.({
       lines: r.lines.map(l => l.text),
+      // What the reader said about each line (confidence, its own doubt, the
+      // student's correction): the card's confirmation lists the unsure ones.
+      lineMeta: r.lines.map(l => ({ conf: l.conf, doubt: l.doubt, corrected: l.corrected === true })),
       lineBoxes: r.lines.map(l => l.box),
       text: r.text,
       answerLine: r.lines.length ? r.lines[r.lines.length - 1].text : '',
