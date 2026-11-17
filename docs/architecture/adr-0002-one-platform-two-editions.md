@@ -137,8 +137,12 @@ student data off the device.
   same way `PRI_FEATURE_INSTRUMENT` was retired by `client/interface.config.mjs`.
 - Brand text, logo, legal copy and marketing become edition-supplied; "Pri Learning" remains the parent-company and
   technology name, never the student-facing product name in either edition.
-- Billing becomes provider-per-edition. Razorpay serves Priyabhata. The Prithagoras provider and AUD price points are
-  an owner decision; billing changes are R4.
+- Billing becomes provider-per-edition. Razorpay serves Priyabhata. **Owner decision O2: Stripe (AUD) serves
+  Prithagoras** (`server/platform/stripe.js`, behind the same `web` route family; the edition table in
+  `client/edition.config.mjs` decides which provider that family is). Neither edition ever accepts the other's provider:
+  a Priyabhata server refuses Stripe's variables and a Prithagoras server refuses Razorpay's (start-up), and a delivery
+  signed for the other provider is refused by the edition's own verifier. AUD price points are the owner's to set in
+  Stripe (the two Price ids are server variables); billing changes are R4.
 - Every CI gate that today assumes one brand (i18n coverage pins, the examiner dossier digest, accessibility walks,
   bundle budgets) must run for both editions before an edition can be certified. Phase 1 must budget for this.
 - The Australian content gap is real: the NSW curriculum model exists, but approved Australian question banks,
