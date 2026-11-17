@@ -46,7 +46,7 @@ import { INTERFACE_SKIN as SETTING_SKIN } from '../../interface.config.mjs';
 
 
 /* global __PRI_FEATURE_PLACEMENT__, __PRI_FEATURE_EXTENDED_TRACKS__, __PRI_FEATURE_EXAM_HANDWRITING__, __PRI_FEATURE_INSTRUMENT__, __PRI_FEATURE_PARENT_REPORT__, __PRI_FEATURE_LIBRARY__, __PRI_FEATURE_EXAM_DESK__, __PRI_FEATURE_EXPORTS__ */
-/* global __PRI_FEATURE_NSW_EXAMS__ */
+/* global __PRI_FEATURE_NSW_EXAMS__, __PRI_FEATURE_TUTOR_POLICY__ */
 const BUILT = {
   placement: typeof __PRI_FEATURE_PLACEMENT__ === 'boolean' ? __PRI_FEATURE_PLACEMENT__ : null,
   extendedTracks: typeof __PRI_FEATURE_EXTENDED_TRACKS__ === 'boolean' ? __PRI_FEATURE_EXTENDED_TRACKS__ : null,
@@ -77,7 +77,13 @@ const BUILT = {
   // PRI_FEATURE_NSW_EXAMS=1 — Prithagoras's HSC-style timed papers on the
   // Exams page (plan G4). OFF in a production build: it ships dark, and the
   // server is off too unless PRI_NSW_EXAMS=on (server/platform/nswExamPool.js).
-  nswExams: typeof __PRI_FEATURE_NSW_EXAMS__ === 'boolean' ? __PRI_FEATURE_NSW_EXAMS__ : null
+  nswExams: typeof __PRI_FEATURE_NSW_EXAMS__ === 'boolean' ? __PRI_FEATURE_NSW_EXAMS__ : null,
+  // PRI_FEATURE_TUTOR_POLICY=1 — the tutor policy's "smallest next step" above
+  // the hint ladder (src/engine/tutorPolicy.js). Opt-in everywhere, the dev
+  // server included, and OFF in the Node suites unless a test turns it on
+  // (false, not null, so no default-on): turning it on is an owner decision.
+  // The server answers 404 too unless PRI_FEATURE_TUTOR_POLICY=1.
+  tutorPolicy: typeof __PRI_FEATURE_TUTOR_POLICY__ === 'boolean' ? __PRI_FEATURE_TUTOR_POLICY__ : false
 };
 
 // The student interface as a build constant (client/interface.config.mjs).

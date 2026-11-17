@@ -54,6 +54,8 @@ import { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } from './editionBanks
 import { courseAllowedForTests } from './indiaBanks.js';
 import { serverEdition } from './edition.js';
 import { figureHasExternalRef } from './figureRefs.js';
+import { activeArm, activeExperiments, experimentStamp } from './experiments.js';
+import { buildHelpPlan, causeFromWork, helpPlanBodyError, HELP_PLAN_ATTEMPTS, TUTOR_POLICY_EXPERIMENT, tutorPolicyServerEnabled } from './helpPlan.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -182,6 +184,8 @@ function acceptableWorking(steps) {
 // attempt records it: jurisdiction, syllabus id and version, outcome codes
 // (ADR-0002 decision 7). Absent on an edition that seals none.
 const curriculumOf = q => (plain(q?._curriculum) ? { curriculum: q._curriculum } : {});
+// The item family an experiment's outcome analysis compares: the generator.
+const generatorOf = q => (typeof q?._generator === 'string' && q._generator ? q._generator : (typeof q?.subtopic === 'string' ? q.subtopic : null));
 
 // The aggregate mark rows of a question limited to its final answer carry no
 // method row: there is no method mark to report, awarded or not.
@@ -947,6 +951,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ...curriculumOf(q),
         mode: q._practiceMode || 'practice', hintsUsed: Math.max(1, ladder.hintHelpUnits), support: 'supported',
         ...ladder, markWeight: 0, creditedMarks: 0,
+        // An active experiment's arm (server/platform/experiments.js); empty, and
+        // the event unchanged, while none is active.
+        ...experimentStamp(activeExperiments(env), accountId, { family: generatorOf(q) }),
         createdAt: now, serverAcknowledgedAt: now }), now]);
     return { response };
   }
@@ -967,9 +974,21 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     if (evidence.unchecked) return { status: 'unchecked' };
     if (evidence.attemptAt >= 0) return { status: 'final' };
     const verifiedLines = Math.max(0, Math.min(lines.length, Number(evidence.verifiedLines) || 0));
-    if (evidence.firstBreak >= 0) return { charge: true, capBucket, reply: { status: 'break', verifiedLines, line: evidence.firstBreak + 1 } };
+    // `code` (the engine's diagnosis code) stays on the server: the hint route
+    // sends only `reply`; the help plan reads it for the cause class.
+    if (evidence.firstBreak >= 0) return { charge: true, capBucket, code: typeof evidence.misconception === 'string' ? evidence.misconception : null, reply: { status: 'break', verifiedLines, line: evidence.firstBreak + 1 } };
     if (verifiedLines > 0) return { charge: true, capBucket, reply: { status: 'held', verifiedLines } };
     return { status: 'unread' };
+  }
+
+  // The tutor policy's offers on this item (oldest first), or null when none.
+  async function policyAssistanceOf(accountId, qid) {
+    const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-help-plan' AND key=?", [accountId, qid]);
+    if (!row) return null;
+    try {
+      const served = JSON.parse(row.response_json).served;
+      return Array.isArray(served) && served.length ? served.map(x => ({ action: x.action, level: x.level })) : null;
+    } catch { return null; }
   }
 
   async function hintLevelOf(accountId, qid) {
@@ -1498,6 +1517,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // own). Safe for the reason it always was: this transaction holds the
         // account's sync lock, so no other writer of this stream can run.
         const cursor = await nextSyncCursor(db, accountId);
+        // What the tutor policy offered on this item, if it was asked (helpPlan.js).
+        const policyAssistance = await policyAssistanceOf(accountId, qid);
         await db.run(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
           SELECT ?,?,?, 'server-grader', COALESCE(MAX(device_seq), 0) + 1, 'graded-attempt',?,?,?,?
           FROM learning_events WHERE account_id=? AND device_id='server-grader'`,
@@ -1525,6 +1546,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             ...ladder, creditedMarks,
             ...(misconception ? { misconception: misconception.id, misconceptionSource: misconception.source,
               ...(misconception.label ? { misconceptionLabel: misconception.label } : {}) } : {}),
+            // An active experiment's arm, the item family and the device-reported
+            // time on the item (server/platform/experiments.js). Added after the
+            // mark and the credit above are fixed; empty while none is active.
+            ...experimentStamp(activeExperiments(env), accountId, { family: generatorOf(q), ms: body.ms ?? null }),
+            ...(policyAssistance ? { policyAssistance } : {}),
             createdAt: now,
             serverAcknowledgedAt: now
           }), now, accountId]);
@@ -1578,6 +1604,66 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     }
     return out;
   };
+
+  // ── The tutor policy's smallest next step (helpPlan.js) ─────────────────
+  // One decision of client/src/engine/tutorPolicy.js for THIS account's open
+  // question: the escrow, the committed rung level and the account's own
+  // server-graded attempts are read here; working lines, when sent, are
+  // checked by the same guarded line check as the nudge (one of the
+  // question's LINE_CHECKS_PER_QUESTION, charged only for a check that ran).
+  // Reads, never writes: no rung is served or charged here and no mark,
+  // credit or receipt changes. 404 unless PRI_FEATURE_TUTOR_POLICY=1; while
+  // the experiment tutor-first-help-v1 is active its control arm is answered
+  // `plan: null` (today's ladder) before anything is checked.
+  router.post('/:id/help-plan', rateLimit(db, 'practice-help-plan', { limit: 400, windowMs: 3600000 }), async (req, res) => {
+    if (!tutorPolicyServerEnabled(env)) return reject(res, 404, 'NOT_FOUND', 'Not found.');
+    const qid = String(req.params.id || '');
+    const body = req.body ?? {};
+    if (!UUID.test(qid)) return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+    const invalid = helpPlanBodyError(body);
+    if (invalid) return reject(res, 400, 'HELP_PLAN_INVALID', invalid);
+    const accountId = req.platformSession.account_id;
+    const now = Date.now();
+    const escrow = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-question' AND key=? AND expires_at>?", [accountId, qid, now]);
+    if (!escrow) return reject(res, 404, 'QUESTION_NOT_FOUND', 'This question does not belong to this account.');
+    const completed = await db.get("SELECT key FROM idempotency_keys WHERE account_id=? AND scope='practice-completion' AND key=?", [accountId, qid]);
+    if (completed) return reject(res, 409, 'QUESTION_ALREADY_GRADED', 'This question has been completed.');
+    const q = JSON.parse(escrow.response_json);
+    const arm = activeArm(TUTOR_POLICY_EXPERIMENT, accountId, env);
+    const base = { authoritative: true, questionId: qid, experiment: arm ? { id: TUTOR_POLICY_EXPERIMENT, arm } : null };
+    if (arm === 'control') return res.status(200).json({ ...base, plan: null });
+    const oneTry = ONE_TRY_MODES.includes(q._practiceMode);
+    const lines = Array.isArray(body.lines) ? body.lines.map(l => l.trim()).filter(Boolean) : [];
+    const checkRan = lineCheckFeatureEnabled(env);
+    const work = !oneTry && lines.length && checkRan && body.recognition !== 'unconfirmed' && body.recognition !== 'low-confidence'
+      ? await hintWorkEvidence(accountId, qid, lines, now) : null;
+    let lineCheckSpent = false;
+    if (work?.charge) {
+      const cap = await consumeRateLimit(db, work.capBucket, { limit: LINE_CHECKS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, now);
+      if (!cap.allowed) work.status = 'limit';
+      else lineCheckSpent = true;
+    }
+    const cause = causeFromWork(work, { recognition: body.recognition || null, linesSent: lines.length > 0, checkRan });
+    const { plan } = buildHelpPlan({ q, hintLevel: await hintLevelOf(accountId, qid), attempts: await serverAttempts(accountId, HELP_PLAN_ATTEMPTS),
+      cause, body, ladder: ladderAvailable(q), oneTry, now });
+    // The help this item was offered (AssistanceEnvelope provenance, PMR §6):
+    // the graded attempt carries it, so an attempt helped by the policy is
+    // never read as independent evidence. A rung action is recorded too — the
+    // rung itself is charged only if the student opens it.
+    if (plan?.action) await recordPolicyAssistance(accountId, qid, plan, now);
+    return res.status(200).json({ ...base, plan, lineCheckSpent });
+  });
+
+  async function recordPolicyAssistance(accountId, qid, plan, now) {
+    await db.transaction(async () => {
+      const row = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-help-plan' AND key=?", [accountId, qid]);
+      let served = [];
+      try { served = row ? JSON.parse(row.response_json).served || [] : []; } catch { served = []; }
+      served = [...served, { action: plan.action, level: plan.level, cause: plan.envelope?.causeClass || null, at: now }].slice(-16);
+      await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-help-plan',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
+        [accountId, qid, JSON.stringify({ served, policyVersion: plan.policyVersion }), digest({ qid, served: served.length }), now, now + MAX_AGE]);
+    }, { accountScope: accountId, lock: syncLockKey(accountId) });
+  }
 
   router.get('/notebook', rateLimit(db, 'practice-notebook', { limit: 240, windowMs: 3600000 }), async (req, res) => {
     const accountId = req.platformSession.account_id;

@@ -58,7 +58,7 @@ import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 import { asksForInequality } from '../ink/relationSwap.js';
 import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../tutor/diagnoseGate.js';
-import { INSTRUMENT_UI } from '../platform/features.js';
+import { INSTRUMENT_UI, featureEnabled } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
 import { haptic } from '../platform/native/haptics.js';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
@@ -74,6 +74,11 @@ const CHECK_KEY_GLYPH = '⌘/Ctrl ↵';
 // keeps TutorHelp.jsx out of a dark build entirely (install-budget-check.mjs).
 /* global __PRI_FEATURE_TUTOR__, __PRI_PRODUCTION_BUILD__ */
 const TUTOR_BUILT_OUT = typeof __PRI_PRODUCTION_BUILD__ === 'boolean' && __PRI_PRODUCTION_BUILD__ && __PRI_FEATURE_TUTOR__ !== true;
+// The tutor policy's panel (PRI_FEATURE_TUTOR_POLICY, opt-in everywhere): a
+// build made without it folds the lazy import away, so the panel is not built.
+/* global __PRI_FEATURE_TUTOR_POLICY__ */
+const POLICY_BUILT_OUT = typeof __PRI_FEATURE_TUTOR_POLICY__ === 'boolean' && __PRI_FEATURE_TUTOR_POLICY__ !== true;
+const HelpPlan = POLICY_BUILT_OUT ? null : React.lazy(() => import('./HelpPlan.jsx'));
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 // Public question metadata may constrain what a single answer glyph can be,
@@ -346,6 +351,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const { language } = useLanguage();
   // Dark by default (src/tutor/flag.js): off, the card offers only the hints.
   const tutorEnabled = useMemo(() => tutorFeatureEnabled(), []);
+  const tutorPolicyOn = useMemo(() => !!HelpPlan && featureEnabled('tutorPolicy'), []);
   const [working, setWorking] = useState('');
   const [showWorking, setShowWorking] = useState(false);
   const [showScribble, setShowScribble] = useState(false);
@@ -2412,6 +2418,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
         {showWhy && why && <p className="q-why">{why}</p>}
 
+        {/* The tutor policy's smallest next step (engine/tutorPolicy.js), above
+            the ladder; a rung it suggests is opened by getHint, as the rung is. */}
+        {HelpPlan && tutorPolicyOn && ladderOffered && !resolved && !diagnostic && (
+          <React.Suspense fallback={null}>
+            <HelpPlan key={question.id} questionId={question.id} nextRung={nextRung} busy={busy} onOpenRung={getHint}
+              lines={writeMode && !inkStale ? (inkResult?.lines || []).map(l => String(typeof l === 'string' ? l : l?.text ?? '').trim()).filter(Boolean).slice(0, 40) : null}
+              recognition={writeMode && !inkStale && inkResult?.lines?.length ? (doubtOf(inkResult) ? 'unconfirmed' : 'confirmed') : null} />
+          </React.Suspense>
+        )}
         {INSTRUMENT && ladderOffered && (!resolved || hints.length > 0) ? (
           // v1.1 instrument: every rung of the ladder, the locked ones closed.
           // Each states the charge the server's table makes (engine/hintLadder.js);

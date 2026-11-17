@@ -1752,6 +1752,25 @@ async function run() {
     eq('— with the limit code', lcLimit?.code, 'LINE_CHECK_LIMIT');
     eq('empty lines are refused before any charge', (await POST(`/practice/${openDiag.question.id}/tutor/line-check`, { lines: [] })).code, 'TUTOR_NOTHING_TO_DIAGNOSE');
     setLineCheckTransportForTests(null);
+    // The tutor policy's smallest next step (components/HelpPlan.jsx): dark in
+    // the build and on the server unless each turns it on; then forwarded to the
+    // server's own issued question, charging nothing on the device.
+    {
+      const hpQ = await answerableQuestion({ mode: 'topic', subtopic: topicId });
+      const priorOverrides = globalThis.__PRI_FEATURE_OVERRIDES__;
+      await rejects('the help plan is dark unless the build turns it on', POST(`/practice/${hpQ.question.id}/help-plan`, { helpRequested: true }), { status: 404 });
+      globalThis.__PRI_FEATURE_OVERRIDES__ = { ...(priorOverrides || {}), tutorPolicy: true };
+      await rejects('and dark on the server unless it turns it on too', POST(`/practice/${hpQ.question.id}/help-plan`, { helpRequested: true }), { status: 404 });
+      process.env.PRI_FEATURE_TUTOR_POLICY = '1';
+      try {
+        const hp = await POST(`/practice/${hpQ.question.id}/help-plan`, { helpRequested: true });
+        eq('switched on, the server answers one plan for its own question', [hp.plan?.action, hp.plan?.rung, hp.plan?.charges, hp.experiment], ['nudge', 'nudge', true, null]);
+        eq('asking opens no rung on the device', Number((await idb.get('questions', hpQ.question.id)).hintLevel) || 0, 0);
+      } finally {
+        delete process.env.PRI_FEATURE_TUTOR_POLICY;
+        globalThis.__PRI_FEATURE_OVERRIDES__ = priorOverrides;
+      }
+    }
     // The live step coach (F1): status per finished line, no value, no charge;
     // a shown tick or break is recorded as assistance provenance on the attempt.
     {

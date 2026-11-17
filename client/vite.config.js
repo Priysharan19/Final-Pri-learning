@@ -611,7 +611,7 @@ export const SHIPPABLE_FEATURE_FLAGS = Object.freeze(['TUTOR']);
 // flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
 // to it, but its value comes from client/interface.config.mjs in every build and
 // on the development server alike.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK', 'EXPORTS', 'NSW_EXAMS']);
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK', 'EXPORTS', 'NSW_EXAMS', 'TUTOR_POLICY']);
 //   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
 //   everywhere, the dev server included: off until a rights opinion exists
 //   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
@@ -632,7 +632,11 @@ export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HAN
 //   NSW_EXAMS — Prithagoras's HSC-style timed papers on the Exams page (plan
 //   G4). Off in a production build; the server has its own switch
 //   (PRI_NSW_EXAMS=on), also off by default.
-const OPT_IN_FLAGS = new Set(['PAST_PAPERS']);
+//   TUTOR_POLICY — the tutor policy's "smallest next step" panel above the hint
+//   ladder (src/engine/tutorPolicy.js, src/components/HelpPlan.jsx). Opt-in
+//   everywhere, the dev server included: turning it on is an owner decision,
+//   and the server answers 404 too unless PRI_FEATURE_TUTOR_POLICY=1.
+const OPT_IN_FLAGS = new Set(['PAST_PAPERS', 'TUTOR_POLICY']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
@@ -653,6 +657,7 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_EXAM_DESK__: JSON.stringify(states.examDesk),
     __PRI_FEATURE_EXPORTS__: JSON.stringify(states.exports),
     __PRI_FEATURE_NSW_EXAMS__: JSON.stringify(states.nswExams),
+    __PRI_FEATURE_TUTOR_POLICY__: JSON.stringify(states.tutorPolicy),
     __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
     __PRI_EDITION__: JSON.stringify(states.edition),
     // Plan E5: false in a build of an edition with no payment provider, so its
