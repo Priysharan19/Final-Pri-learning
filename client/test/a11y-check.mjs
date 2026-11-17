@@ -238,8 +238,8 @@ function auditPage() {
 
   const out = {
     headings: [], unnamedFields: [], positiveTabindex: [], inertFocusable: [],
-    unreachable: [], colourOnly: [], liveRegions: [],
-    counts: { controls: 0, fields: 0, elements: 0, handlers: 0, colours: verdictColours.size }
+    unreachable: [], colourOnly: [], liveRegions: [], mathFaults: [],
+    counts: { controls: 0, fields: 0, elements: 0, handlers: 0, colours: verdictColours.size, math: 0 }
   };
 
   for (const h of document.querySelectorAll('h1, [role="heading"][aria-level="1"]')) {
@@ -268,6 +268,24 @@ function auditPage() {
         : el.getAttribute('title') ? 'its title alone' : 'nothing at all';
       out.unnamedFields.push({ el: el2str(el), detail: `no <label> and no aria-label — named by ${via}` });
     }
+  }
+
+  // Spoken mathematics: every rendered formula is a role="math" node with a spoken accessible name, its
+  // KaTeX (and the MathML inside it) is kept out of the accessibility tree so it is announced once, and
+  // a role="math" never sits inside another.
+  for (const k of document.querySelectorAll('.katex')) {
+    if (!shown(k)) continue;
+    out.counts.math++;
+    const wrap = k.closest('[role="math"]');
+    if (!wrap) { out.mathFaults.push({ el: el2str(k), detail: 'a formula with no role="math" wrapper, so it has no spoken name' }); continue; }
+    const name = (wrap.getAttribute('aria-label') || '').trim();
+    if (!name) out.mathFaults.push({ el: el2str(wrap), detail: 'role="math" with no aria-label: nothing is spoken for this formula' });
+    else if (!/[\p{L}\p{N}]/u.test(name)) out.mathFaults.push({ el: el2str(wrap), detail: `role="math" is named "${name}": not words` });
+    if (/\\[a-zA-Z]+|[{}^_]/.test(name)) out.mathFaults.push({ el: el2str(wrap), detail: `the spoken name still carries LaTeX: "${name.slice(0, 60)}"` });
+    if (!k.closest('[aria-hidden="true"]')) out.mathFaults.push({ el: el2str(wrap), detail: 'the formula is exposed to assistive technology as well as named, so it would be announced twice' });
+    if (wrap.parentElement && wrap.parentElement.closest('[role="math"]')) out.mathFaults.push({ el: el2str(wrap), detail: 'a role="math" inside another role="math"' });
+    for (const inner of wrap.querySelectorAll('[role="math"]')) out.mathFaults.push({ el: el2str(inner), detail: 'a role="math" inside another role="math"' });
+    if (wrap.hasAttribute('tabindex') && !hiddenFromAT(wrap) && Number(wrap.getAttribute('tabindex')) > 0) out.mathFaults.push({ el: el2str(wrap), detail: 'a formula with a positive tabindex' });
   }
 
   for (const el of document.querySelectorAll('[tabindex]')) {
@@ -620,9 +638,12 @@ async function run() {
       for (const f of res.inertFocusable) file('inert', view, f.el, f.detail);
       for (const f of res.unreachable) file('reachable', view, f.el, f.detail);
       for (const f of res.colourOnly) file('colour', view, f.el, f.detail);
+      for (const f of res.mathFaults) file('math', view, f.el, f.detail);
+      mathSeen += res.counts.math;
       return res;
     }
 
+    let mathSeen = 0;
     const indiaOnly = (view, why) => { notApplicable.push(`${view} — ${why}`); };
     const step = async (view, route, drive) => {
       try {
@@ -1679,6 +1700,10 @@ async function run() {
       refusals.read?.stale?.label?.role === 'status' && /\p{L}/u.test(refusals.read.stale.label.text) && refusals.read.stale.again?.tag === 'button' &&
         /\p{L}/u.test(refusals.read.stale.again.name) && refusals.read.stale.reason?.key === 'ink.submitReadAgain' && refusals.read.stale.reason.describes === true,
       JSON.stringify(refusals.read?.stale));
+
+    section('spoken mathematics');
+    ok('formulas were seen, so the rule is alive', mathSeen >= 20, `only ${mathSeen} formulas were found across the views`);
+    ok('every formula is a role="math" with a spoken name, announced once, never nested', findingsFor('math').length === 0, show(findingsFor('math')));
 
     section('colour is never alone');
     ok('correct / incorrect is never carried by colour alone', findingsFor('colour').length === 0, show(findingsFor('colour')));

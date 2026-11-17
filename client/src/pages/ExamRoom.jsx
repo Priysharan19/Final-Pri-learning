@@ -835,8 +835,8 @@ export default function ExamRoom() {
                   {pt.pending ? (
                     <span className="tag" data-exam-pending-line={pt.pendingState}>{t('examRoom.tagPending', { n: pt.marks })}</span>
                   ) : (
-                    <span className="tag" style={{ color: pt.correct ? 'var(--good)' : 'var(--bad)' }}>
-                      {pt.awarded}/{pt.marks}<span className="sr-only"> {t(pt.correct ? 'examRoom.srMarksCorrect' : 'examRoom.srMarksIncorrect')}</span>
+                    <span className="tag" style={{ color: pt.correct ? 'var(--good)' : 'var(--bad)' }} data-part-verdict={pt.correct ? 'correct' : 'incorrect'}>
+                      <Icon name={pt.correct ? 'check' : 'correction'} size={14} className="tag-icon" /> {pt.awarded}/{pt.marks}<span className="sr-only"> {t(pt.correct ? 'examRoom.srMarksCorrect' : 'examRoom.srMarksIncorrect')}</span>
                     </span>
                   )}
                 </div>

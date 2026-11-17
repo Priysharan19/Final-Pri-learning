@@ -3897,4 +3897,7 @@ export default {
   'badge.sage.desc': 'Reach level 10.',
   'badge.extension.name': 'Extension Thinker',
   'badge.extension.desc': 'Answer a D4 Exam-Extension question correctly without hints.',
+  'math.formula': 'Formula',
+  'math.readFormula': 'Read formula',
+  'math.hideReading': 'Hide reading',
 };
