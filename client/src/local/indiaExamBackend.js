@@ -19,6 +19,7 @@
 // shown as server-certified. A paper an earlier version started and did not
 // finish cannot be marked at all.
 import { get, put, del, byIndex } from './idb.js';
+import { translate } from '../i18n/index.js';
 import { indiaScope, indiaChapter, cleanIndiaTrack } from '../engine/indiaProduct.js';
 import { indiaPyqCells, narrowCells } from '../engine/indiaExamCells.js';
 import { generateQuestion, loadBanksFor } from '../engine/generators/index.js';
@@ -77,7 +78,7 @@ function publicQuestion(row) {
   const chapter = indiaChapter(row.india?.chapterId);
   const marking = row.examMarking || { correct: 1, incorrect: 0, unanswered: 0 };
   const base = {
-    id: row.id, order: row.examOrder, section: row.indiaExamSection, sectionLabel: row.indiaExamSectionLabel || `Section ${row.indiaExamSection}`,
+    id: row.id, order: row.examOrder, section: row.indiaExamSection, sectionLabel: row.indiaExamSectionLabel || translate('msg.section', { id: row.indiaExamSection }),
     item: row.indiaExamItem, marks: Number(marking.correct), negativeMarks: Math.abs(Number(marking.incorrect || 0)),
     partialPerOption: marking.partialPerOption ?? null,
     subtopic: chapter?.id || q.subtopic, subtopicName: chapter?.name || q.subtopic, chapterId: chapter?.id || null,
@@ -319,7 +320,7 @@ async function createIndiaExam(profile, body = {}) {
       // server's; no seed on this device reproduces them.
       seed: composed.seed,
       sections: spec.sections.map(s => ({
-        id: s.id, label: s.label || `Section ${s.id}`, questions: s.questions, marks: s.marks,
+        id: s.id, label: s.label || translate('msg.section', { id: s.id }), questions: s.questions, marks: s.marks,
         marksEach: s.marksEach ?? s.correct, negative: Math.abs(Number(s.incorrect || 0)), partialPerOption: s.partialPerOption ?? null,
         types: s.types || [s.type]
       })),
@@ -456,10 +457,10 @@ async function listExams(profile) {
 function criteriaFor(q, marks, marking) {
   if (objectiveTypes.has(q.answerType) || (marking.incorrect || 0) < 0) {
     const negative = Math.abs(Number(marking.incorrect || 0));
-    return [{ mark: marks, text: `Correct response +${marks}${negative ? ` · incorrect response −${negative}` : ''} · unanswered ${marking.unanswered || 0}` }];
+    return [{ mark: marks, text: translate('msg.markScheme', { marks, negative: negative ? translate('msg.markNegative', { n: negative }) : '', unanswered: marking.unanswered || 0 }) }];
   }
   const key = (q.steps || []).filter(s => s?.h && !/^(check|note|bonus)/i.test(s.h)).slice(0, marks);
-  if (!key.length) return [{ mark: marks, text: 'Correct final answer' }];
+  if (!key.length) return [{ mark: marks, text: translate('msg.correctFinal') }];
   return key.map((s, i) => ({
     mark: i === key.length - 1 ? marks - (key.length - 1) : 1,
     text: i === key.length - 1 ? `${s.h} — leading to the correct answer` : s.h
@@ -661,7 +662,7 @@ async function paper(profile, id) {
             alt: pt.alt ? { key: pt.key, marks: pt.marks, ...printView(pt.alt), ...solved('or', dp?.choiceTaken === 'or' ? dp : null) } : null
           };
         }),
-        criteria: finished ? (q.parts || []).map(pt => ({ mark: pt.marks, text: `Part (${pt.key})` })) : undefined
+        criteria: finished ? (q.parts || []).map(pt => ({ mark: pt.marks, text: translate('msg.part', { key: pt.key }) })) : undefined
       });
       continue;
     }

@@ -31,6 +31,7 @@
 // measurement and is not presented as one. Weak chapters are the chapters where the paper lost at
 // least half of what they were worth, ordered by marks lost.
 // ─────────────────────────────────────────────────────────────────────────────
+import { translate } from '../i18n/index.js';
 
 const pct = (n, d) => (d > 0 ? Math.round(1000 * n / d) / 10 : null);
 
@@ -165,14 +166,14 @@ export function analyseExam({ detail, indiaExam } = {}) {
   // (an older paper) follows in the order it first appears.
   const order = [];
   const labels = new Map();
-  for (const s of indiaExam?.sections || []) { order.push(String(s.id)); labels.set(String(s.id), s.label || `Section ${s.id}`); }
+  for (const s of indiaExam?.sections || []) { order.push(String(s.id)); labels.set(String(s.id), s.label || translate('msg.section', { id: s.id })); }
   const sorted = [...rows].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
   for (const d of sorted) {
     const id = String(d.section);
-    if (!order.includes(id)) { order.push(id); labels.set(id, d.sectionLabel || `Section ${id}`); }
+    if (!order.includes(id)) { order.push(id); labels.set(id, d.sectionLabel || translate('msg.section', { id })); }
   }
   const bySection = new Map(order.map(id => [id, blank(id, labels.get(id))]));
-  const total = blank('paper', 'Whole paper');
+  const total = blank('paper', translate('msg.wholePaper'));
   const chapters = new Map();
   for (const d of sorted) {
     add(bySection.get(String(d.section)), d);

@@ -1,6 +1,7 @@
 // Assignment targets on the India syllabus — the one description of a target
 // that the teacher's publish form, the student's inbox card and Practice share.
 import { indiaProductSections, indiaChapter, indiaChapterGrade, indiaTrack } from '../engine/indiaProduct.js';
+import { translate } from '../i18n/index.js';
 
 let sectionsCache = null;
 
@@ -10,12 +11,12 @@ export function assignmentSections() {
   const product = indiaProductSections();
   const rows = [];
   for (const y of product.years) {
-    rows.push({ key: y.key, track: 'cbse', year: y.year, label: `Class ${y.year} · CBSE / NCERT`, difficultyCeiling: y.difficultyCeiling, chapters: y.chapters });
+    rows.push({ key: y.key, track: 'cbse', year: y.year, label: translate('msg.classCbse', { n: y.year }), difficultyCeiling: y.difficultyCeiling, chapters: y.chapters });
   }
   for (const s of product.streams) {
     rows.push({
       key: s.key, track: s.track, year: s.allYears ? null : s.year,
-      label: s.allYears ? s.title : `Class ${s.year} · ${s.title}`,
+      label: s.allYears ? s.title : translate('msg.classTitle', { n: s.year, title: s.title }),
       difficultyCeiling: s.difficultyCeiling, chapters: s.chapters
     });
   }
@@ -42,14 +43,14 @@ export function describeAssignmentTarget(spec = {}) {
   const parts = [];
   if (chapters.length) {
     const grades = [...new Set(chapters.map(ch => indiaChapterGrade(ch)).filter(Boolean))];
-    if (grades.length === 1) parts.push(`Class ${grades[0]}`);
+    if (grades.length === 1) parts.push(translate('msg.classOnly', { n: grades[0] }));
     parts.push(chapters.map(ch => ch.name).join(', '));
     if (chapters.length === 1 && Number.isInteger(Number(spec.dotpoint)) && spec.dotpoint !== null && spec.dotpoint !== '') {
       const dp = chapters[0].dotpoints[Number(spec.dotpoint)];
       if (dp) parts.push(`dot point ${Number(spec.dotpoint) + 1}`);
     }
   } else if (spec.track) {
-    parts.push('Any chapter');
+    parts.push(translate('msg.anyChapter'));
   } else return null;
   const d = Number(spec.difficulty);
   if (Number.isFinite(d) && d >= 1 && d <= 4) parts.push(`D${d}`);
@@ -76,7 +77,7 @@ export function describeTaskTargets(targets = []) {
   if (!chapters.length) return null;
   const grades = [...new Set(chapters.map(ch => indiaChapterGrade(ch)).filter(Boolean))];
   const parts = [];
-  if (grades.length === 1) parts.push(`Class ${grades[0]}`);
+  if (grades.length === 1) parts.push(translate('msg.classOnly', { n: grades[0] }));
   parts.push(chapters.map(ch => ch.name).join(', '));
   const dp = Number(list[0]?.dotpoint);
   if (chapters.length === 1 && list[0]?.dotpoint != null && Number.isInteger(dp) && chapters[0].dotpoints[dp]) parts.push(`dot point ${dp + 1}`);
