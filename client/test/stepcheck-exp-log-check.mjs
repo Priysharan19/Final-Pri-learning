@@ -235,6 +235,25 @@ breaksAt('a far negative root after 2^(−x) = 1/4', eqMeta([2]), ['2^(-x)=1/4',
   ok(`"2 3" is not read as 23, got ${JSON.stringify(s)}`, s[1] !== 'ok' && s[0] !== 'break');
 }
 
+// Review of head 362570240: an exponential or logarithmic product that loses
+// a root is a lost-root break, as a polynomial product is; only a line with
+// one linear factor names a single root on its own.
+breaksAt('wrong factor loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-1)(2^x+3)=0', 'x=0', 'x=2'], 1);
+breaksAt('wrong factor loses a root, with source', eqMeta([0, 2], { source: '4^x-5*2^x+4=0' }), ['4^x-5*2^x+4=0', '(2^x-1)(2^x+3)=0', 'x=0', 'x=2'], 1);
+breaksAt('2^x(2^x−1) loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '2^x(2^x-1)=0', 'x=0'], 1);
+breaksAt('(2^x−4)^2 loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-4)^2=0', 'x=2'], 1);
+breaksAt('(2^x−4)(2^x+1) loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-4)(2^x+1)=0', 'x=2'], 1);
+{
+  const rep = report(eqMeta([0, 2]), ['(2^x-1)(2^x+3)=0', 'x=0', 'x=2'], { prompt: 'Solve $4^x-5\\cdot 2^x+4=0$.' });
+  ok(`a first line that loses a root breaks, with a prompt, got ${JSON.stringify(rep.lines.map(l => l.status))}`, rep.firstBreak === 0);
+  const rep2 = report(eqMeta([0, 2]), ['(2^x-1)(2^x-5)=0', '2^x=1', 'x=0', 'x=2']);
+  ok(`a wrong first factorisation breaks, got ${JSON.stringify(rep2.lines.map(l => l.status))}`, rep2.firstBreak === 0);
+  const rep3 = report(eqMeta([1, 100]), ['log(x)(log(x)-3)=0']);
+  ok(`log x (log x − 3) = 0 for roots 1 and 100 breaks, got ${JSON.stringify(rep3.lines.map(l => l.status))}`, rep3.firstBreak === 0);
+  const s = statuses(eqMeta([1, 100]), ['log(x)(log(x)-2)=0', 'log(x)=0', 'x=1', 'log(x)=2', 'x=100']);
+  ok(`log x (log x − 2) = 0 by branches: no break, branches verified, got ${JSON.stringify(s)}`, !s.includes('break') && s.slice(1).every(v => v === 'ok'));
+}
+
 // Abstain: lines outside the proved families are notes, never credit, never a break.
 {
   const s = statuses(eqMeta([2]), ['x*2^x=8', '2^x=8/x']);

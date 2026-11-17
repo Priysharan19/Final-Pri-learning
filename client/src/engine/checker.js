@@ -914,15 +914,17 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             // product was written first.
             const names = side => unwrapGroup(side)?.t === 'var' && unwrapGroup(side).v === meta.variable;
             const valued = (names(ast.l) && !variablesOf(ast.r).size) || (names(ast.r) && !variablesOf(ast.l).size) || namesValue(ast, meta.variable);
-            // An exponential or logarithmic line whose whole solution set is
-            // proved to be some of the question's roots (`e^x = 1` when the
-            // roots are 0 and 2) names those roots, like `x − 3 = 0` does.
-            const expLogNames = expLogLine && !!expLog && expLog.roots.length > 0 && expLog.roots.length < wantedRoots.length
-              && expLog.roots.every(r => wantedRoots.some(w => sameRoot(r, w)));
+            // An exponential or logarithmic line that reduces to one linear
+            // factor (`e^x = 1`, `2^x = 4`, `ln x = 0`) and whose one solution is
+            // proved to be a root of the question names that root, like
+            // `x − 3 = 0` does. A product (`(2^x − 1)(2^x + 3) = 0`) never does:
+            // it is held to every root, as a polynomial product is.
+            const expLogNames = expLogLine && !!expLog && !expLog.hidden && Array.isArray(expLog.poly) && expLog.poly.length === 2
+              && expLog.roots.length === 1 && wantedRoots.some(w => sameRoot(expLog.roots[0], w));
             // (Only where the whole working is read at once: a stage of a plan
             // is checked a line at a time, and one limit is not the pair.)
             const lone = loneBranches && !branchesOpen && wantedRoots.length > 1 && (valued || expLogNames || !!linearState({ kind: 'equation', ast }, meta.variable));
-            const held = (branchesOpen || lone || expLogLine) && wantedRoots.length > 1 ? solutionsSatisfying(ast, meta) : [];
+            const held = (branchesOpen || lone) && wantedRoots.length > 1 ? solutionsSatisfying(ast, meta) : [];
             // A branch names roots of the question and nothing else. A line
             // of higher degree that is true of one root but also of a value
             // that solves nothing — `(x - 3)(x - 7) = 0` under
@@ -935,10 +937,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             // solution set is proved to be roots of the question.
             let expLogBranchUnproved = false;
             if (partial && extra === null && expLogLine) {
-              // Outside a branch context an exponential or logarithmic line
-              // true of some roots is never a mistake by default: it is a
-              // branch when proved, otherwise a note.
-              if (!expLog || (!branchesOpen && !lone)) expLogBranchUnproved = true;
+              if (!expLog) expLogBranchUnproved = true;
               else {
                 const stray = expLog.roots.find(r => !wantedRoots.some(w => sameRoot(r, w)));
                 if (stray !== undefined) extra = shownRoot(stray);
