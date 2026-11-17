@@ -21,6 +21,7 @@ export default function StepMarks({ markRows }) {
         <span className="sc-label" style={{ margin: 0 }}>{t('verdict.markedStepByStep')}</span>
         {rows.length > 1 && <b style={{ fontVariantNumeric: 'tabular-nums' }}>{earned} / {total}</b>}
       </div>
+      <p className="muted" style={{ fontSize: 12, margin: '4px 0 0' }}>{t('inst.markedOnServer')}</p>
       {rows.map((row, i) => {
         const full = row.earned === row.outOf;
         const label = row.kind === 'answer' ? t('board.labelAnswer') : row.label || t('inst.workingStep', { n: row.step });

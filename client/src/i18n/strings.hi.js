@@ -3259,6 +3259,7 @@ export default {
   "inst.readStrip.cant": "{n} पढ़ नहीं सका",
   "inst.readThatsIt": "यही है",
   "inst.readThatsItAria": "पंक्ति {n}: यही पढ़त रखें",
+  "inst.markedOnServer": "Pri के सर्वर पर, उसी प्रश्न के विरुद्ध जाँचा गया जो उसने जारी किया था।",
   "inst.unsettledOne": "· 1 पंक्ति तय नहीं",
   "inst.unsettledMany": "· {n} पंक्तियाँ तय नहीं",
   "inst.qNumber": "प्र{n}",

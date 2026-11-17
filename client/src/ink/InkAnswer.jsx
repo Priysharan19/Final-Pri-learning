@@ -43,6 +43,7 @@ import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
 import { inkCanvasHeight, useFormFactor } from '../platform/formFactor.js';
 import { useLanguage, useT } from '../i18n/index.js';
+import MarginMarks, { stampDelay, sweepSpan } from '../instrument/MarginMarks.jsx';
 import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
@@ -609,10 +610,12 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             <span>{t('ink.pageLabel', { n: i + 2 })}</span>
           </div>
         ))}
+        {INSTRUMENT_PLOT && lineVerdicts && <MarginMarks lines={rec.lines} lineVerdicts={lineVerdicts} />}
         {lineVerdicts && rec.lines.some(l => l.box) && (
           <div className="ink-verdict-layer" aria-hidden="true">
             {(() => {
               let noted = false;
+              const span = sweepSpan(rec.lines, lineVerdicts);
               return rec.lines.map((line, li) => {
                 const v = lineVerdicts[li];
                 if (!v || !line.box) return null;
@@ -624,18 +627,19 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 const geometry = feedbackGeometry(line);
                 const b = geometry.anchor || line.box;
                 const boxes = geometry.boxes.length ? geometry.boxes : [b];
+                const at = { '--d': `${stampDelay(span, line.box)}ms` };
                 return (
                   <React.Fragment key={li}>
                     {boxes.map((gb, gi) => (
                       <span key={`box-${gi}`} className={`ink-linebox ${good ? 'good' : 'bad'}`}
-                        style={{ left: gb.x - 5, top: gb.y - 5, width: gb.w + 10, height: gb.h + 10 }} />
+                        style={{ left: gb.x - 5, top: gb.y - 5, width: gb.w + 10, height: gb.h + 10, ...at }} />
                     ))}
                     <span className={`ink-verdict ${good ? 'good' : 'bad'}`}
-                      style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16 }}
+                      style={{ top: b.y + b.h / 2 - 14, left: b.x + b.w + 16, ...at }}
                       title={v.note || (good ? t('ink.lineOk') : t('ink.lineBreaks'))}>{good ? <Icon name="check" size={18} /> : <Icon name="correction" size={18} />}</span>
                     {bad && boxes.map((gb, gi) => (
                       <span key={`underline-${gi}`} className="ink-underline"
-                        style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6 }} />
+                        style={{ left: gb.x - 3, top: gb.y + gb.h + 4, width: gb.w + 6, ...at }} />
                     ))}
                     {showNote && (
                       <span className="ink-note" style={{ left: Math.max(4, b.x - 2), top: b.y + b.h + 16 }}>
