@@ -4,6 +4,7 @@
 // photo), an evaluation card with reasoning, worked solution, final answer and
 // a marks criteria table. All marking logic is the verified v3 engine.
 // ─────────────────────────────────────────────────────────────────────────────
+import { confidenceFloorOf, isLowConfidence } from '../ink/readingCorrection.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { MathText } from '../lib/latex.jsx';
@@ -2176,6 +2177,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             : saveState === 'saved' ? t(offline ? 'verdict.statusSavedOffline' : mode === 'photo' && photo ? 'photo.statusSaved' : 'verdict.statusSaved')
               : (writeMode && !isMcq ? t('verdict.statusWriteHint') : '');
 
+  // Lines the reading marks "check this" or "can't read": said on Check, never a block on it.
+  const unsettledLines = INSTRUMENT && writeMode && !inkStale && inkResult?.lines?.length
+    ? inkResult.lines.filter(l => !String(l?.text ?? '').trim() || isLowConfidence(l, confidenceFloorOf(inkResult))).length : 0;
+
   // ── The one dominant next move ─────────────────────────────────────────────
   const primary = resolved || state.res?.conflict
     ? { label: t('practice.nextQuestion'), run: () => onNext?.(), disabled: false }
@@ -2189,7 +2194,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       : needsCheck
         ? { label: t('verdict.checkReadingFirst'), run: () => submit(), disabled: busy || !canSubmit }
         : {
-          label: t(busy ? 'verdict.marking' : 'verdict.submit'),
+          label: t(busy ? 'verdict.marking' : 'verdict.submit') + (unsettledLines === 1 ? ' ' + t('inst.unsettledOne') : unsettledLines > 1 ? ' ' + t('inst.unsettledMany', { n: unsettledLines }) : ''),
           run: () => submit(), disabled: busy || !canSubmit
         };
 

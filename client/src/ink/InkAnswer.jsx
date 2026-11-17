@@ -107,6 +107,12 @@ const MAX_PAGES = 4;
 /** The pen rests this long on a new line before the line above is read (liveRead). */
 export const LIVE_READ_REST_MS = 1500;
 
+/** The three things a reading can say about one line: it never says right or wrong. */
+function readStateOf(line, floor) {
+  if (!String(line?.text ?? '').trim()) return 'cant';
+  return isLowConfidence(line, floor) ? 'check' : 'read';
+}
+
 export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
@@ -650,25 +656,22 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             {rec.lines.map((line, li) => {
               if (!line.box) return null;
               const b = line.box;
-              const low = isLowConfidence(line, lineConfidenceFloor);
-              const v = lineVerdicts ? lineVerdicts[li] : null;
-              const slip = !low && !!v && (v.status === 'break' || v.status === 'wrong');
-              const ok = !low && !!v && v.status === 'ok';
+              const state = readStateOf(line, lineConfidenceFloor);
+              const low = state === 'check';
               // toReading() writes 0 when the reader gave no confidence at all,
-              // so 0 is drawn as no bar rather than as an empty one.
+              // so 0 is drawn as no meter rather than as an empty one.
               const conf = line.conf == null || Number(line.conf) <= 0 ? NaN : Number(line.conf);
-              const tag = low ? t('inst.readUnsure') : slip ? t('inst.readSlip') : ok ? t('inst.readOk') : null;
               return (
                 <React.Fragment key={li}>
                   {low && <span className="in-read-unc" style={{ left: b.x - 6, top: b.y - 6, width: b.w + 12, height: b.h + 12 }} />}
-                  <span className={`in-read${slip ? ' is-slip' : ''}${low ? ' is-unc' : ''}`} data-read-chip={li} style={{ top: b.y + b.h / 2 }}>
-                    <span className="in-read-m"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
-                    {Number.isFinite(conf) && (
+                  <span className={`in-read is-${state}`} data-read-chip={li} data-read-state={state} style={{ top: b.y + b.h / 2 }}>
+                    {state !== 'cant' && <span className="in-read-m"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>}
+                    {Number.isFinite(conf) && state !== 'cant' && (
                       <span className="in-read-cf" data-read-confidence={Math.round(Math.max(0, Math.min(1, conf)) * 100)}>
-                        <i style={{ width: `${Math.round(Math.max(0, Math.min(1, conf)) * 100)}%` }} />
+                        {[0, 1, 2].map(k => <i key={k} className={k < (low ? 2 : 3) ? 'on' : undefined} />)}
                       </span>
                     )}
-                    {tag && <span className={`in-read-tg ${low ? 'is-u' : slip ? 'is-s' : 'is-g'}`}>{tag}</span>}
+                    <span className="in-read-tg">{t(`inst.readState.${state}`)}</span>
                   </span>
                 </React.Fragment>
               );
@@ -689,7 +692,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           notice stays the one sentence it is announced as. */}
       {canAskToRead && (
         <div className="ink-status-action ink-read-action">
-          <button type="button" className="btn btn-primary" data-ink-read={stale ? 'again' : 'first'} onClick={readNow}>
+          <button type="button" className={`btn ${stale && INSTRUMENT_PLOT ? 'btn-ghost' : 'btn-primary'}`} data-ink-read={stale ? 'again' : 'first'} onClick={readNow}>
             {t(stale ? 'ink.readAgain' : 'ink.readMyAnswer')}
           </button>
           <span className="muted ink-read-hint">{t(stale ? (expired ? 'ink.readExpiredHint' : 'ink.readAgainHint') : 'ink.readMyAnswerHint')}</span>
@@ -741,6 +744,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                   <span className="sr-only">{lineVerdicts[li].status === 'ok' ? t('ink.lineOkSpoken', { n: li + 1 }) : t('ink.lineBreaksSpoken', { n: li + 1 })} </span>
                 </span>
               )}
+              {INSTRUMENT_PLOT && (() => {
+                const st = readStateOf(line, lineConfidenceFloor);
+                return <span className="in-state" data-read-state={st}><i aria-hidden="true" />{t(`inst.readState.${st}`)}<span className="sr-only"> {t('inst.readStateSr', { n: li + 1, state: t(`inst.readState.${st}`) })}</span></span>;
+              })()}
               <span className="ink-line-math"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
                 <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
@@ -776,6 +783,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                   data-line-doubt={isLowConfidence(line, lineConfidenceFloor) ? 'low' : undefined}
                   onClick={() => setCorrecting({ index: li, text: line.text })}>{isLowConfidence(line, lineConfidenceFloor) ? t('ink.iWrote') : t('ink.editLine')}</button>
               )}
+              {INSTRUMENT_PLOT && !disabled && !stale && correcting?.index !== li && isLowConfidence(line, lineConfidenceFloor) && String(line.text ?? '').trim() && (
+                <button type="button" className="ink-correct-btn" data-line-accept
+                  aria-label={t('inst.readThatsItAria', { n: li + 1 })}
+                  onClick={() => correctLine(li, line.text)}>{t('inst.readThatsIt')}</button>
+              )}
               {!disabled && !stale && correcting?.index === li && (
                 <form className="ink-correct" onSubmit={e => { e.preventDefault(); correctLine(li, correcting.text); }}>
                   <input autoFocus value={correcting.text} aria-label={t('ink.correctionAria', { n: li + 1 })}
@@ -790,6 +802,17 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
           {!disabled && !stale && lowConfidenceLines(rec).length > 0 && (
             <div className="ink-doubt-note" role="status">{t('ink.lowConfidenceLine', { n: lowConfidenceLines(rec)[0] + 1 })}</div>
           )}
+          {INSTRUMENT_PLOT && !stale && (() => {
+            const n = { read: 0, check: 0, cant: 0 };
+            rec.lines.forEach(l => { n[readStateOf(l, lineConfidenceFloor)] += 1; });
+            return (
+              <div className="in-strip" role="status" aria-live="polite" data-read-strip>
+                {['read', 'check', 'cant'].map(k => n[k] > 0 && (
+                  <span key={k} className="in-strip-i" data-read-state={k}><i aria-hidden="true" />{t(`inst.readStrip.${k}`, { n: n[k] })}</span>
+                ))}
+              </div>
+            );
+          })()}
           {INSTRUMENT_PLOT && !stale && <ReadingPlot lines={rec.lines} />}
         </div>
       )}
