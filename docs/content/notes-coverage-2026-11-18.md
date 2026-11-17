@@ -8,7 +8,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 ## Summary
 
-**84 of 196 chapters at standard.**
+**141 of 196 chapters at standard.**
 
 | Band | Chapters | With notes | At standard | Missing sections (count of chapters) | ≥2 diagrams | Interactive | KaTeX issues |
 |---|---|---|---|---|---|---|---|
@@ -19,8 +19,8 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 | CBSE Class 11 | 14 | 14 | 14 | — | 14 | 12 | 0 |
 | CBSE Class 12 | 13 | 13 | 13 | — | 13 | 13 | 0 |
 | Olympiad | 7 | 7 | 7 | — | 7 | 5 | 0 |
-| NSW Stage 4 (Years 7–8) | 16 | 16 | 0 | objective 16, intuition 16 | 2 | 1 | 0 |
-| NSW Stage 5 (Years 9–10) | 41 | 41 | 0 | objective 41, intuition 41 | 8 | 3 | 0 |
+| NSW Stage 4 (Years 7–8) | 16 | 16 | 16 | — | 16 | 14 | 0 |
+| NSW Stage 5 (Years 9–10) | 41 | 41 | 41 | — | 41 | 38 | 0 |
 | NSW Standard Year 11 | 8 | 8 | 0 | objective 8, intuition 8 | 1 | 0 | 0 |
 | NSW Standard Year 12 | 17 | 17 | 0 | objective 17, intuition 17 | 2 | 2 | 0 |
 | NSW Advanced Year 11 | 7 | 7 | 0 | objective 7, intuition 7 | 6 | 4 | 0 |
@@ -39,6 +39,11 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 - `c11-3d-introduction` Introduction to Three Dimensional Geometry — The ideas here are read from a fixed drawing: octants, the distance formula and the section formula. The kit has no rotatable three-dimensional view, and moving a slider would not teach these formulas better than the two figures.
 - `olymp-number-theory` Number Theory — Congruence arguments are about remainders of whole numbers; the cycle of residues is read completely from one static chart, and no slider over a continuous quantity would show the reason a cycle exists.
 - `olymp-functional-equations` Functional Equations — A functional equation is decided by substitutions on paper; sliding a parameter on a graph shows a candidate but never why it is the only one, so a moving picture here would mislead.
+- `ma4-are-c-01` Area — Each area here comes from fixed measurements of one shape and its rearrangement. The cut-and-move figures show the reason for each formula, and a slider would only change the numbers, not the idea.
+- `ma4-len-c-01` Length — Perimeter and circumference come from adding fixed lengths or one formula with one measurement. The labelled figures show every number a slider would, and nothing changes shape in a way that teaches more.
+- `ma5-mag-c-01` Numbers of any magnitude — Scientific notation and significant figures are place-value rules. Moving a slider would only redisplay a number; the conversions and the rounding are clearer worked on the page digit by digit.
+- `ma5-geo-p-02` Properties of geometrical figures C (Path) — A congruence proof is a chain of stated reasons about one fixed figure; moving a vertex changes the figure but does not teach which facts prove the triangles identical.
+- `ma5-net-p-01` Introduction to networks (Path) — These skills are counting and comparing on one fixed network; there is no quantity whose movement teaches more than the two highlighted networks with their weights.
 
 ## Every chapter
 
@@ -165,68 +170,68 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `ma4-alg-c-01` Algebraic techniques | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-ang-c-01` Angle relationships | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-are-c-01` Area | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-dat-c-01` Data classification and visualisation | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-dat-c-02` Data analysis | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-equ-c-01` Equations | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-frc-c-01` Fractions, decimals and percentages | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-geo-c-01` Properties of geometrical figures | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `ma4-ind-c-01` Indices | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-int-c-01` Computation with integers | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-len-c-01` Length | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-lin-c-01` Linear relationships | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `ma4-pro-c-01` Probability | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-pyt-c-01` Right-angled triangles (Pythagoras’ theorem) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-rat-c-01` Ratios and rates | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma4-vol-c-01` Volume | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 0 | **no** | 0 | ok | **no** |
+| `ma4-alg-c-01` Algebraic techniques | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma4-ang-c-01` Angle relationships | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma4-are-c-01` Area | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | reason | 0 | ok | yes |
+| `ma4-dat-c-01` Data classification and visualisation | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma4-dat-c-02` Data analysis | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma4-equ-c-01` Equations | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma4-frc-c-01` Fractions, decimals and percentages | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma4-geo-c-01` Properties of geometrical figures | yes | yes | yes | yes | yes | yes | yes | yes | yes | 4 | yes | 0 | ok | yes |
+| `ma4-ind-c-01` Indices | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma4-int-c-01` Computation with integers | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma4-len-c-01` Length | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | reason | 0 | ok | yes |
+| `ma4-lin-c-01` Linear relationships | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma4-pro-c-01` Probability | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma4-pyt-c-01` Right-angled triangles (Pythagoras’ theorem) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma4-rat-c-01` Ratios and rates | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma4-vol-c-01` Volume | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
 
 ### NSW Stage 5 (Years 9–10)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `ma5-alg-c-01` Algebraic techniques A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-are-c-01` Area and surface area A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 0 | **no** | 0 | ok | **no** |
-| `ma5-dat-c-01` Data analysis A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-dat-c-02` Data analysis B | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-equ-c-01` Equations A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-fin-c-01` Financial mathematics A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-fin-c-02` Financial mathematics B | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-geo-c-01` Properties of geometrical figures A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `ma5-ind-c-01` Indices A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-lin-c-01` Linear relationships A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-lin-c-02` Linear relationships B | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-mag-c-01` Numbers of any magnitude | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-nli-c-01` Non-linear relationships A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | **no** |
-| `ma5-nli-c-02` Non-linear relationships B | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `ma5-pro-c-01` Probability A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `ma5-trg-c-01` Trigonometry A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-trg-c-02` Trigonometry B | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `ma5-vol-c-01` Volume A | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 0 | **no** | 0 | ok | **no** |
-| `ma5-alg-p-01` Algebraic techniques B (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-alg-p-02` Algebraic techniques C (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-are-p-01` Area and surface area B (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 0 | **no** | 0 | ok | **no** |
-| `ma5-cir-p-01` Circle geometry (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `ma5-dat-p-01` Data analysis C (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-equ-p-01` Equations B (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-equ-p-02` Equations C (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-fnc-p-01` Functions and other graphs (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-geo-p-01` Properties of geometrical figures B (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-geo-p-02` Properties of geometrical figures C (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-ind-p-01` Indices B (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-ind-p-02` Indices C (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `ma5-lin-p-01` Linear relationships C (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-log-p-01` Logarithms (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-net-p-01` Introduction to networks (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 0 | **no** | 0 | ok | **no** |
-| `ma5-nli-p-01` Non-linear relationships C (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-pol-p-01` Polynomials (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-pro-p-01` Probability B (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `ma5-rat-p-01` Variation and rates of change A (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-rat-p-02` Variation and rates of change B (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | yes | 0 | ok | **no** |
-| `ma5-trg-p-01` Trigonometry C (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `ma5-trg-p-02` Trigonometry D (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | yes | 0 | ok | **no** |
-| `ma5-vol-p-01` Volume B (Path) | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 0 | **no** | 0 | ok | **no** |
+| `ma5-alg-c-01` Algebraic techniques A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-are-c-01` Area and surface area A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-dat-c-01` Data analysis A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-dat-c-02` Data analysis B | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma5-equ-c-01` Equations A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-fin-c-01` Financial mathematics A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-fin-c-02` Financial mathematics B | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-geo-c-01` Properties of geometrical figures A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-ind-c-01` Indices A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma5-lin-c-01` Linear relationships A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-lin-c-02` Linear relationships B | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-mag-c-01` Numbers of any magnitude | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | reason | 0 | ok | yes |
+| `ma5-nli-c-01` Non-linear relationships A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma5-nli-c-02` Non-linear relationships B | yes | yes | yes | yes | yes | yes | yes | yes | yes | 4 | yes | 0 | ok | yes |
+| `ma5-pro-c-01` Probability A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-trg-c-01` Trigonometry A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma5-trg-c-02` Trigonometry B | yes | yes | yes | yes | yes | yes | yes | yes | yes | 4 | yes | 0 | ok | yes |
+| `ma5-vol-c-01` Volume A | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-alg-p-01` Algebraic techniques B (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-alg-p-02` Algebraic techniques C (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma5-are-p-01` Area and surface area B (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-cir-p-01` Circle geometry (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 4 | yes | 0 | ok | yes |
+| `ma5-dat-p-01` Data analysis C (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma5-equ-p-01` Equations B (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-equ-p-02` Equations C (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-fnc-p-01` Functions and other graphs (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-geo-p-01` Properties of geometrical figures B (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-geo-p-02` Properties of geometrical figures C (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | reason | 0 | ok | yes |
+| `ma5-ind-p-01` Indices B (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-ind-p-02` Indices C (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-lin-p-01` Linear relationships C (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-log-p-01` Logarithms (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-net-p-01` Introduction to networks (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | reason | 0 | ok | yes |
+| `ma5-nli-p-01` Non-linear relationships C (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-pol-p-01` Polynomials (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-pro-p-01` Probability B (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-rat-p-01` Variation and rates of change A (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-rat-p-02` Variation and rates of change B (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma5-trg-p-01` Trigonometry C (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `ma5-trg-p-02` Trigonometry D (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `ma5-vol-p-01` Volume B (Path) | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
 
 ### NSW Standard Year 11
 
