@@ -17,7 +17,12 @@ assert.match(backend, /Array\.isArray\(pt\) \? pt\[0\]/, 'backend must decode co
 // timer exists any more, and a page that is being read is never sent again.
 assert.doesNotMatch(ink, /SETTLE_MS/, 'no settle window may send a page to the reader');
 assert.doesNotMatch(ink, /setTimeout\([^;]*readNow/, 'no timer may send a page to the reader');
-assert.equal((ink.match(/\breadNow\(\)/g) || []).length, 1, 'the only call of readNow outside the Read button is the explicit Try again');
+// Two explicit, user-initiated calls and no others: the Try again button, and
+// the control the card's Submit uses when the writing changed after it was read
+// (#942, owner-approved: Submit reads the page again and sends nothing until the
+// student has seen the new reading). Neither is a timer or an automatic read.
+assert.equal((ink.match(/\breadNow\(\)/g) || []).length, 2, 'readNow is called only by the explicit Try again and the Submit control');
+assert.equal((ink.match(/read: \(\) => readNow\(\)/g) || []).length, 1, 'the Submit control is the one other caller');
 assert.match(ink, /data-ink-read=\{[^}]+\} onClick=\{readNow\}/, 'a read is sent by the student pressing Read my answer');
 assert.match(ink, /if \(flyingRef\.current === signature\) return;/, 'a page that is being read is never sent again');
 assert.match(ink, /readRef\.current === nowSignature && recRef\.current\.lines\.length/, 'a late reading of other ink never replaces the transcript of the page as it stands');
