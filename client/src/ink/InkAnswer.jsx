@@ -786,7 +786,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                   onClick={() => setCorrecting({ index: li, text: line.text })}>{isLowConfidence(line, lineConfidenceFloor) ? t('ink.iWrote') : t('ink.editLine')}</button>
               )}
               {INSTRUMENT_PLOT && !disabled && !stale && correcting?.index !== li && isLowConfidence(line, lineConfidenceFloor) && String(line.text ?? '').trim() && (
-                <button type="button" className="ink-correct-btn" data-line-accept
+                <button type="button" className="ink-accept-btn" data-line-accept
                   aria-label={t('inst.readThatsItAria', { n: li + 1 })}
                   onClick={() => correctLine(li, line.text)}>{t('inst.readThatsIt')}</button>
               )}
