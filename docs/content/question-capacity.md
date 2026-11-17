@@ -6,14 +6,13 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 
 ## Prithagoras
 
-107 skills measured; **33** meet both targets; **74** are below at least one.
+107 skills measured; **41** meet both targets; **66** are below at least one.
 
 | Skill (generator) | Cells | Distinct instances | Structural forms | Below target |
 | --- | --- | --- | --- | --- |
 | `y10-trig-any-angle` | 4 | 89 | 5 | instances |
 | `y12-fin-exact` | 4 | 97 | 2 | instances + forms |
 | `y9-volume-solids` | 4 | 114 | 3 | instances + forms |
-| `y12-stats` | 1 | 129 | 1 | instances + forms |
 | `y10-logarithms` | 4 | 140 | 1 | instances + forms |
 | `y9-surface-solids` | 4 | 153 | 1 | instances + forms |
 | `y11-trigfunc` | 2 | 154 | 12 | instances |
@@ -33,10 +32,8 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y10-surds` | 4 | 559 | 2 | instances + forms |
 | `y12-trig-model` | 4 | 576 | 2 | instances + forms |
 | `mex-demoivre` | 4 | 640 | 14 | instances |
-| `y12-trigcalc` | 4 | 642 | 40 | instances |
 | `y10-quadratics` | 3 | 693 | 6 | instances |
 | `me11-inversetrig` | 4 | 718 | 356 | instances |
-| `y12-integration` | 1 | 907 | 3 | instances + forms |
 | `y9-surface-area` | 4 | 916 | 2 | instances + forms |
 | `y9-probability` | 4 | 1.0k | 35 | instances |
 | `y8-volume` | 3 | 1.0k | 1 | instances + forms |
@@ -46,13 +43,10 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `me12-binomial` | 3 | 1.2k | 1 | instances + forms |
 | `y9-algebra` | 4 | 1.2k | 5 | instances |
 | `y7-fractions` | 4 | 1.4k | 26 | instances |
-| `y12-diff` | 4 | 1.5k | 8 | instances |
 | `me12-projectile` | 4 | 1.8k | 1 | instances + forms |
-| `y12-explogcalc` | 4 | 2.0k | 5 | instances |
 | `y10-similarity` | 3 | 2.0k | 1 | instances + forms |
 | `mex-mechanics` | 4 | 2.1k | 3 | instances + forms |
 | `y12-integral-calc` | 4 | 2.1k | 6 | instances |
-| `y12-appdiff` | 3 | 2.1k | 8 | instances |
 | `y9-simint` | 2 | 2.2k | 26 | instances |
 | `y10-functions` | 4 | 2.5k | 4 | instances + forms |
 | `y10-polynomials` | 4 | 2.7k | 16 | instances |
@@ -65,7 +59,6 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y7-equations` | 4 | 4.2k | 26 | instances |
 | `y12-random-var` | 4 | 4.6k | 2 | instances + forms |
 | `y9-trig` | 4 | 5.2k | 2 | instances + forms |
-| `y12-motion` | 4 | 5.6k | 31 | instances |
 | `y10-trig` | 4 | 5.7k | 1 | instances + forms |
 | `y8-geo-figures` | 4 | 5.9k | 1 | instances + forms |
 | `y11-probability` | 4 | 6.1k | 44 | instances |
@@ -73,12 +66,14 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y11-diff` | 4 | 7.0k | 62 | instances |
 | `me11-poly` | 3 | 7.1k | 64 | instances |
 | `y8-linear` | 3 | 8.0k | 6 | instances |
-| `y12-series` | 3 | 9.5k | 3 | instances + forms |
 | `y8-rates` | 3 | 9.6k | 26 | instances |
 | `y11-lines` | 4 | 9.8k | 32 | instances |
 | `ms12-right-triangle` | 4 | 10.0k | 24 | — |
 | `ms12-rates` | 4 | 11.0k | 34 | — |
+| `y12-appdiff` | 3 | 14.6k | 140 | — |
 | `y8-equations` | 3 | 14.7k | 26 | — |
+| `y12-integration` | 1 | 15.4k | 53 | — |
+| `y12-stats` | 1 | 16.8k | 18 | — |
 | `y10-simeq` | 4 | 17.0k | 6 | — |
 | `y10-probability` | 4 | 20.4k | 1 | forms |
 | `y8-algebra` | 4 | 21.6k | 25 | — |
@@ -88,12 +83,17 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y9-indices-sci` | 4 | 23.6k | 2 | forms |
 | `ms12-invest-loans` | 4 | 24.5k | 16 | — |
 | `ms11-measure` | 3 | 26.3k | 32 | — |
+| `y12-explogcalc` | 4 | 30.3k | 73 | — |
 | `y7-integers` | 4 | 30.4k | 10 | — |
 | `ms12-depreciation` | 4 | 30.4k | 22 | — |
+| `y12-motion` | 4 | 30.4k | 126 | — |
 | `me12-vectors` | 4 | 33.6k | 4 | forms |
 | `y9-linear` | 4 | 34.1k | 20 | — |
 | `y11-polynomials` | 4 | 34.7k | 95 | — |
+| `y12-series` | 3 | 36.3k | 119 | — |
 | `ms12-algebraic` | 4 | 38.5k | 17 | — |
+| `y12-diff` | 4 | 38.8k | 70 | — |
+| `y12-trigcalc` | 4 | 39.5k | 184 | — |
 | `ms11-relfreq` | 3 | 44.6k | 53 | — |
 | `y10-stats` | 4 | 46.1k | 15 | — |
 | `ms12-networks` | 4 | 47.9k | 999 | — |

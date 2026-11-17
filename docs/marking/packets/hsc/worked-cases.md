@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `954ba0790603e1ae622ebe02ebaedf6bd1413457a9a402c5acc0098e3ab9cb54` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `9ab51b1918b8ce0c6e7f89ba9500cc2131b04ccd6c30afbdd27a25a6a261f290` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -2631,7 +2631,7 @@ Final answer: 0
 
 ## `nsw-final:y12-diff/D1` — seed 1009
 
-> Differentiate $y = (4x + 2)^{4}$ using the chain rule.
+> Which expression is $\\dfrac{dy}{dx}$ when $y = (7x - 2)^{5}$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2642,40 +2642,40 @@ Final answer: 0
 
 ## `nsw-final:y12-diff/D2` — seed 1009
 
-> Use the product rule to differentiate $y = x^{2}(3x + 1)$, giving your answer expanded and simplified.
+> A rectangular pond is being enlarged. At time $t$ days its length is $(4t + 4)$ m and its width is $(3t + 7)$ m. Find the rate at which its area is increasing after 2 days.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `88` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `88.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `89` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `89` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-diff/D3` — seed 1009
 
-> If $y = \\dfrac{3x + 1}{x + 3}$, find the gradient $\\dfrac{dy}{dx}$ at $x = 2$, correct to 3 decimal places where needed.
+> The concentration of a drug in the blood is $C = \\dfrac{7t + 3}{2t + 1}$ mg/L, $t$ hours after it is given. Find the rate of change of the concentration after 2 hours, as a decimal. (A negative answer means the concentration is falling.)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `8/25` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `8/25` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `33/25` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `33/25` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1/25` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `1/25` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `26/25` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `26/25` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-diff/D4` — seed 1009
 
-> If $y = (3x^2 + 2)^{3}$, find $\\dfrac{dy}{dx}$ at $x = 2$.
+> The curve $y = (3x^2 + k)^2$ has gradient $-12$ at the point where $x = 1$. Find the value of the constant $k$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `7056` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `7056.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `7057` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `7057` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-4` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `-4.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `-3` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-3` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-appdiff/D1` — seed 1009
 
-> Find the x-coordinates of the stationary points of $y = 2x^3 - 15x^2 + 36x$.
+> The curve $y = (x + 1)^3 - 1$ has $\\dfrac{dy}{dx} = 0$ at $x = -1$. What is the nature of this stationary point?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2686,29 +2686,40 @@ Final answer: 0
 
 ## `nsw-final:y12-appdiff/D2` — seed 1009
 
-> The curve $y = -(x - 1)^2 - 1$ has a stationary point at $x = 1$. What is its nature?
+> The curve $y = 4x^2 + 8x - 1$ is increasing for all $x > k$ and decreasing for all $x < k$. Find the value of $k$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| correct | `-1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
 | common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-appdiff/D4` — seed 1009
 
-> Two positive numbers add to $80$. Using calculus, find the **greatest possible value of their product**.
+> Two numbers $x$ and $y$ satisfy $x + y = 78$. Find the **minimum** value of $x^2 + y^2$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1600` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
-| alternative | `1600.0` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
-| common wrong | `1601` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1601` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `3042` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
+| alternative | `3042.0` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
+| common wrong | `3043` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3043` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-integration/D1` — seed 1009
 
-> Find $\\displaystyle\\int \\left(24x^{5} - 1\\right)\\,dx$. (You may omit the $+C$.)
+> Use the substitution $u = 2x^2 - 1$ to evaluate $\\displaystyle\\int_0^{3} -12x(2x^2 - 1)^{2}\\,dx$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-4914` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `-4914.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `-4913` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-4913` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-trigcalc/D1` — seed 1009
+
+> Find $\\displaystyle\\int -2\\cos(4x + 4)\\,dx$. (You may omit the $+C$.)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2717,53 +2728,42 @@ Final answer: 0
 | common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-## `nsw-final:y12-trigcalc/D1` — seed 1009
-
-> Differentiate $y = \\cos(4x)$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | yes | 1/1 | 1/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | yes | 1/1 | 1/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
 ## `nsw-final:y12-trigcalc/D2` — seed 1009
 
-> Find $\\displaystyle\\int \\sin(4x)\\,dx$.
+> A function satisfies $f'(x) = -\\cos(4x)$ and $f(0) = 4$. Find $f\\left(\\dfrac{\\pi}{8}\\right)$ exactly.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | yes | 2/2 | 2/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | yes | 2/2 | 2/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `15/4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `15/4` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `19/4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `19/4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trigcalc/D3` — seed 1009
 
-> If $y = \\cos(3x)$, find the **exact** gradient of the curve at $x = \\dfrac{\\pi}{9}$.
+> The substitution $u = \\sin(4x)$ turns $\\displaystyle\\int 5\\cos(4x)\\sin^{4}(4x)\\,dx$ into $c\\displaystyle\\int u^{4}\\,du$. Find $c$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-2.598076` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | `-2.598076` | no | 0/3 | 0/3 | The same value written in another equivalent form. |
-| common wrong | `-1.598076` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-1.598076` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `5/4` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `5/4` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `9/4` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9/4` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trigcalc/D4` — seed 1009
 
-> How many stationary points does $y = 4\\sin(2x)$ have in the domain $0 \\le x \\le 2\\pi$?
+> Find the **smallest positive** value of $x$ at which the curve $y = -\\sin(5x) - 4x$ has a point of inflection. Give an exact answer.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
-| alternative | `4.0` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
-| common wrong | `5` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `0.628319` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| alternative | `0.628319` | no | 0/3 | 0/3 | The same value written in another equivalent form. |
+| common wrong | `1.628319` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1.628319` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-explogcalc/D1` — seed 1009
 
-> Differentiate $y = e^{5x}$.
+> Find $\\displaystyle\\int \\dfrac{-2x}{x^{2} + 6}\\,dx$. (You may omit the $+C$.)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2774,7 +2774,95 @@ Final answer: 0
 
 ## `nsw-final:y12-explogcalc/D2` — seed 1009
 
-> Find $\\displaystyle\\int \\dfrac{15}{5x + 4}\\,dx$ for $x > 0$. (You may omit the $+C$.)
+> The number of cells in a culture is $N(t) = 250e^{0.1t}$, where $t$ is in hours. Find the rate at which the number of cells is increasing after $9$ hours, in cells per hour, correct to 1 decimal place.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `123/2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `123/2` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `125/2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `125/2` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-explogcalc/D3` — seed 1009
+
+> Show that $y = 4e^{x} + 7e^{-x}$ satisfies $\\dfrac{d^2y}{dx^2} + p\\dfrac{dy}{dx} + q\\,y = 0$ for constants $p$ and $q$. Find the value of $q$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-1` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `-1.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-explogcalc/D4` — seed 1009
+
+> Show that $y = 4e^{x} + 7e^{-x}$ satisfies $\\dfrac{d^2y}{dx^2} + p\\dfrac{dy}{dx} + q\\,y = 0$ for constants $p$ and $q$. Find the value of $q$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-1` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `-1.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-series/D1` — seed 1009
+
+> A club's video is watched by $6$ people on day 1. Each day the number of viewers is double the number on the previous day. How many views has the video had in total at the end of day $7$?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `762` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `762.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `763` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `763` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-series/D2` — seed 1009
+
+> Evaluate $\\displaystyle\\sum_{k=1}^{7} 4\\cdot 2^{k}$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1016` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `1016.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `1017` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1017` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-series/D4` — seed 1009
+
+> Evaluate $\\displaystyle\\sum_{k=1}^{7} 4\\cdot 2^{k}$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1016` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `1016.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `1017` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1017` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-stats/D2` — seed 1009
+
+> A random variable $X$ has $E(X) = 2.8$ and $E(X^2) = 13.13$. Find the standard deviation of $X$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `23/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `23/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `33/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `33/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-motion/D1` — seed 1009
+
+> A particle's displacement is $x(t) = t^3 - t^2 - 2t$ metres after $t$ seconds. At $t = 5$, which statement is correct?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-motion/D2` — seed 1009
+
+> A particle's displacement is $x(t) = t^3 - t^2 - 2t$ metres after $t$ seconds. At $t = 5$, which statement is correct?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -2783,115 +2871,27 @@ Final answer: 0
 | common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-## `nsw-final:y12-explogcalc/D3` — seed 1009
-
-> A bacteria population grows according to $N(t) = 1500e^{0.12t}$ (t in hours). Find the population after $7$ hours, to the nearest whole number.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `3475` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `3475.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `3476` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3476` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-explogcalc/D4` — seed 1009
-
-> An investment grows continuously at rate $k = 0.08$ per year: $A(t) = A_0 e^{0.08t}$. How long until it **grow to $5$ times its starting value**? Answer in years, correct to 1 decimal place.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `201/10` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `201/10` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `211/10` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `211/10` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-series/D1` — seed 1009
-
-> An arithmetic sequence has first term $a = 7$ and common difference $d = 3$. Find the $22$th term.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `70` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `70.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `71` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `71` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-series/D2` — seed 1009
-
-> Find the sum of the first $18$ terms of the arithmetic series $11 + 17 + 23 + \\cdots$
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `1116` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `1116.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `1117` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1117` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-series/D4` — seed 1009
-
-> Find the limiting sum of the geometric series $17 + \\frac{17}{4} + \\frac{17}{16} + \\cdots$
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `68/3` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `68/3` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `71/3` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `71/3` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-stats/D2` — seed 1009
-
-> $X$ takes values $0, 1, 2$ with $P(X=0) = 0.45$, $P(X=1) = 0.15$, $P(X=2) = 0.4$. Find $\\text{Var}(X)$, correct to 2 decimal places.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `17/20` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `17/20` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `37/20` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `37/20` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-motion/D1` — seed 1009
-
-> A particle moves along a line with displacement $x(t) = 3t^3 + 2t^2 - t$ metres after $t$ seconds. Find its **velocity** at $t = 2$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `43` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `43.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `44` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `44` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:y12-motion/D2` — seed 1009
-
-> The velocity–time graph shows a particle over the first $12$ seconds of its motion. It accelerates uniformly from rest until $t = 3$, travels at constant velocity until $t = 6$, slows uniformly to rest at $t = 9$, then moves in the negative direction until $t = 12$.  How far does the particle travel in the first $9$ seconds?
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `36` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `36.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `37` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `37` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
 ## `nsw-final:y12-motion/D3` — seed 1009
 
-> A particle's velocity is $v(t) = 3t^2 - 51t + 216$ m/s. At what times is the particle **at rest**?
+> A float on a Sydney Harbour swell bobs vertically so that its height above the mean water level is $x(t) = -\\cos(5t)$ metres after $t$ seconds. Find its exact velocity when $t = \\dfrac{\\pi}{6}$ seconds.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `5/2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `5/2` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `7/2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7/2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-motion/D4` — seed 1009
 
-> A particle starts at $x(0) = 13$ m and moves with velocity $v(t) = 18t$ m/s. Find its displacement $x$ at $t = 4$ seconds.
+> A float on a Sydney Harbour swell bobs vertically so that its height above the mean water level is $x(t) = -\\cos(5t)$ metres after $t$ seconds. Find its exact velocity when $t = \\dfrac{\\pi}{6}$ seconds.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `157` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `157.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `158` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `158` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `5/2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `5/2` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `7/2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7/2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-integral-calc/D1` — seed 1009
 
