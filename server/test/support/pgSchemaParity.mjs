@@ -31,7 +31,10 @@ const POSTGRES_INTEGER = new Set([
 
 // Constraints Postgres carries that SQLite expresses another way. Each is
 // required on Postgres, not merely tolerated.
-const POSTGRES_ONLY_CHECKS = new Set(['accounts.email']); // email = lower(email): SQLite folds with COLLATE NOCASE
+// accounts.email: email = lower(email), SQLite folds with COLLATE NOCASE.
+// resource_revisions.author_account_id: the one cross-column CHECK (reviewer <> author)
+// is declared once, on reviewer_account_id, in SQLite; Postgres attributes it to both columns.
+const POSTGRES_ONLY_CHECKS = new Set(['accounts.email', 'resource_revisions.author_account_id']);
 // …and exactly what each of them says.
 const POSTGRES_ONLY_CHECK_EXPRESSIONS = new Map([['accounts', ['email=loweremail']]]);
 // Tables the server may read but never write on Postgres.
@@ -61,7 +64,9 @@ const ACCOUNT_SCOPED = new Set([
   // 20261022000000_parent_report.sql: the parent weekly report's link and send ledger.
   'parent_report_links', 'parent_report_sends',
   // 20261113010000_desk_attempts.sql: the Exam Desk's practice attempts.
-  'desk_attempts'
+  'desk_attempts',
+  // 20261114000000_resource_publishing.sql: revision history names staff accounts, as content_revisions does.
+  'resource_revisions'
 ]);
 // The ownership predicate of each pri_account_scope policy (default account_id).
 const ACCOUNT_OWNER = new Map([
@@ -69,7 +74,7 @@ const ACCOUNT_OWNER = new Map([
   ['assignments', ['teacher_account_id']], ['assignment_submissions', ['student_account_id']],
   ['assignment_feedback', ['student_account_id', 'teacher_account_id']], ['audit_log', ['actor_account_id']],
   ['content_revisions', ['author_account_id', 'reviewer_account_id']], ['teacher_invites', ['created_by', 'used_by']],
-  ['feature_flags', ['updated_by']]
+  ['feature_flags', ['updated_by']], ['resource_revisions', ['author_account_id', 'reviewer_account_id']]
 ]);
 const scopeExpressionFor = table => SCOPE_EXPRESSION.replace("account_id = current_setting('pri.account_id', true)",
   (ACCOUNT_OWNER.get(table) || ['account_id']).map(column => `${column} = current_setting('pri.account_id', true)`).join(' or '));

@@ -21,7 +21,7 @@
 //   ms12-right-triangle MST-12-S1-04  Right-angled triangles (Standard 1)
 // ms12-algebraic, -rates and -bivariate-fit also serve Standard 1 (S1-01, S1-05, S1-06).
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz } from '../qhelpers.js';
+import { ri, rc } from '../qhelpers.js';
 
 const trim = v => String(Number(v.toFixed(6)));
 const dollars = v => String(v).replace(/\B(?=(\d{3})+(?!\d))/g, ',');

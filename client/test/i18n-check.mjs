@@ -79,7 +79,7 @@ import { parseAst } from 'vite';
 import en from '../src/i18n/strings.en.js';
 import hi from '../src/i18n/strings.hi.js';
 import { DEFAULT_LANGUAGE, LANGUAGES, cleanLanguage, isLanguage, pluralCategory } from '../src/i18n/languages.js';
-import { PRECACHE_SKIP, ON_DEMAND, CHUNK_GROUPS } from '../vite.config.js';
+import { PRECACHE_SKIP, ON_DEMAND, CHUNK_GROUPS, unofferedLanguageModules, editionLanguages, clampLanguagesSource } from '../vite.config.js';
 
 // The build's chunker moved from a chunkFor() function to a priority-ordered
 // CHUNK_GROUPS table, because manualChunks had silently stopped being honoured
@@ -890,6 +890,35 @@ const exported = await GET('/data/export');
 ok(JSON.stringify(exported).includes('"language":"hi"'), 'a backup carries the profile’s language');
 
 // ─────────────────────────────────────────────────────────────────────────────
+// An edition ships only the languages it offers: Prithagoras (English only)
+// loads the Hindi catalogue and the Hindi legal notices as an empty stub, so a
+// Prithagoras build carries and warms none of it; Priyabhata is untouched.
+{
+  const au = editionLanguages('prithagoras'), india = editionLanguages('priyabhata');
+  const hiPath = '/repo/client/src/i18n/strings.hi.js', legalPath = '/repo/client/src/i18n/legalHindi.js?raw';
+  eq(unofferedLanguageModules('priyabhata'), [], 'Priyabhata offers Hindi, so no language module is dropped from its build');
+  eq(unofferedLanguageModules('prithagoras'), ['src/i18n/strings.hi.js', 'src/i18n/legalHindi.js'], 'Prithagoras offers English only, so its build drops the Hindi catalogue and the Hindi legal notices');
+  eq([au.load(hiPath), au.load(legalPath)], ['export default {};\n', 'export default {};\n'], 'in a Prithagoras build both Hindi modules load as an empty stub (their 460 kB and 65 kB are never read)');
+  eq([india.load(hiPath), india.load(legalPath)], [null, null], 'in a Priyabhata build the same modules load from disk, unchanged');
+  eq([au.load('/repo/client/src/i18n/strings.en.js'), au.load('/repo/client/src/i18n/index.js')], [null, null], 'English and the i18n runtime are never stubbed');
+  eq(au.enforce, 'pre', 'the stub is applied before anything reads the file');
+  // The runtime half: a build whose edition offers English only can never be set to Hindi.
+  eq([india.transform('x', '/repo/client/src/i18n/languages.js')], [null], 'Priyabhata\'s i18n/languages.js is not transformed, so its bundle is unchanged');
+  {
+    // Run the module a Prithagoras build really substitutes (the real file, transformed), not a copy of its logic.
+    const real = readFileSync(new URL('../src/i18n/languages.js', import.meta.url), 'utf8');
+    const out = au.transform(real, '/repo/client/src/i18n/languages.js?x').code;
+    const clamped = await import(`data:text/javascript;base64,${Buffer.from(out).toString('base64')}`);
+    eq([clamped.LANGUAGES.map(l => l.id), clamped.cleanLanguage('hi'), clamped.cleanLanguage(' hi'), clamped.cleanLanguage(null), clamped.cleanLanguage('en')], [['en'], 'en', 'en', 'en', 'en'], 'in a Prithagoras build the switch list is English alone and a stored, synced or restored "hi" is English');
+    eq([clamped.isLanguage('hi'), clamped.htmlLangOf('hi'), clamped.pluralCategory(2, 'hi')], [true, 'en', 'other'], 'while the table still knows every registered language (the edition table is validated against it) and a stray hi reads as English');
+    const whole = await import(new URL('../src/i18n/languages.js', import.meta.url).href);
+    eq([whole.LANGUAGES.map(l => l.id), whole.cleanLanguage('hi')], [['en', 'hi'], 'hi'], 'and the file itself, which every other edition builds, still offers both');
+    let stopped = false;
+    try { clampLanguagesSource(real.replace('const BY_ID = new Map(', 'const BY_ID_RENAMED = new Map('), ['en']); } catch { stopped = true; }
+    ok(stopped, 'a change to languages.js that the clamp can no longer apply stops the build instead of quietly turning it off');
+  }
+}
+
 await online.close();
 console.log(failures.length
   ? `I18N: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`

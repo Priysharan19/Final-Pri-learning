@@ -111,7 +111,20 @@ if (BOTH) {
     //   Paywall, CloudAccountPanel, useGooglePlayPurchase
     //                  commercial configuration: __PRI_PREMIUM_ON_SALE__ folds the
     //                  purchase paths of an edition that sells nothing (plan E5)
-    const MAY_DIFFER = { edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce' };
+    //   i18n-hi, legalHindi, languages
+    //                  the Prithagoras trim: an edition that offers fewer languages
+    //                  ships a stub for the one it does not carry and a languages.js
+    //                  clamped to the offered ones (clampLanguagesSource in
+    //                  vite.config.js). Every export keeps its place, so no importer
+    //                  differs in content; but a chunk is named by its content hash, so the
+    //                  chunks that import `languages` by name (backend, indiaProduct,
+    //                  streams-standard, year8-10) carry the other hash in their import
+    //                  line. Priyabhata's own bundle is byte-identical to before.
+    const MAY_DIFFER = {
+      edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce',
+      'i18n-hi': 'language', legalHindi: 'language', languages: 'language',
+      backend: 'language', indiaProduct: 'language', 'streams-standard': 'language', year8: 'language', year9: 'language', year10: 'language'
+    };
     const base = rel => rel.replace(/^assets\//, '').replace(/-[A-Za-z0-9_-]{8}\.\w+$/, '');
     const hashed = m => [...m.entries()].filter(([rel]) => !plain(rel));
     const contentsOf = m => new Set(hashed(m).map(([, c]) => c));
@@ -137,4 +150,4 @@ if (failures.length) {
   for (const f of failures) console.error(`  ✗ ${f}`);
   process.exit(1);
 }
-console.log(`BRAND BUILD: PASS — ${pass}/${pass} checks${BOTH ? ' — both editions built; they differ only in brand files, the edition record and the E5 commercial chunks' : ''}`);
+console.log(`BRAND BUILD: PASS — ${pass}/${pass} checks${BOTH ? ' — both editions built; they differ only in brand files, the edition record, the E5 commercial chunks and the languages an edition does not offer' : ''}`);
