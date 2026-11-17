@@ -750,7 +750,8 @@ function withError(ast, env, memo = new Map()) {
 // zero, a term that vanishes on half the line (#992 review, round 5) or a
 // coefficient one part in 10¹⁵ off are all seen. Past the bounds, or with any
 // other function, the float probe below is used instead.
-const XQ_BITS = 512n, XQ_POW = 64n;
+let XQ_BITS = 512n, XQ_POW = 64n;
+let xqHitLimit = false;   // set when an exact evaluation passed its bounds
 const xqGcd = (a, b) => { a = a < 0n ? -a : a; b = b < 0n ? -b : b; while (b) [a, b] = [b, a % b]; return a; };
 const xqBits = n => BigInt((n < 0n ? -n : n).toString(2).length);
 class XqLimit extends Error {}
@@ -818,7 +819,7 @@ function xqNumber(q) {
   return NaN;
 }
 function exactOrUndefined(ast, env, memo = null) {
-  try { return exactAt(ast, env, memo); } catch (err) { if (err instanceof XqLimit) return undefined; throw err; }
+  try { return exactAt(ast, env, memo); } catch (err) { if (err instanceof XqLimit) { xqHitLimit = true; return undefined; } throw err; }
 }
 
 /** FNV-1a over both sides as written: the probe points follow from the answer, not from a published table. */
@@ -926,10 +927,22 @@ function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed,
       // Far out, floats overflow and lose their argument (e^x, sec x at 10⁵): the
       // float comparison is used only to |x| ≤ 10³, and there only a clear
       // disagreement refuses; the exact comparison runs at every magnitude.
-      const exactPair = exactOrUndefined(astA, env) !== undefined && exactOrUndefined(astB, env) !== undefined;
-      if (!exactPair && names.some(n => abs(env[n]) > 1000)) continue;
-      const r = comparePoint(astA, astB, env, decimals);
-      if (r === 'differ' || (exactPair && r === 'noisy')) return false;
+      // Far out the exact bounds are widened (x^30 at 10⁶ is 600 bits). An
+      // answer that still passes them where the key does not carries a term the
+      // key cannot have (x + x^300/10^900) and is not shown equal (round 7).
+      const [b0, p0] = [XQ_BITS, XQ_POW]; XQ_BITS = 32768n; XQ_POW = 512n;
+      let pair, answerOverflow = false;
+      try {
+        xqHitLimit = false; const qb = exactOrUndefined(astB, env); const keyLimited = xqHitLimit;
+        xqHitLimit = false; const qa = exactOrUndefined(astA, env); answerOverflow = xqHitLimit && !keyLimited && qb !== undefined;
+        pair = qa !== undefined && qb !== undefined;
+      } finally { XQ_BITS = b0; XQ_POW = p0; }
+      if (answerOverflow) return false;
+      if (!pair && names.some(n => abs(env[n]) > 1000)) continue;
+      const wideBits = XQ_BITS; XQ_BITS = 32768n; XQ_POW = 512n;
+      let r;
+      try { r = comparePoint(astA, astB, env, decimals); } finally { XQ_BITS = wideBits; XQ_POW = p0; }
+      if (r === 'differ' || (pair && r === 'noisy')) return false;
     }
   }
   return true;
