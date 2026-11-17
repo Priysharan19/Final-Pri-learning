@@ -1,0 +1,121 @@
+/* Public landing — "the verified page" §3. Interface tokens are the
+   Instrument's (light and dark follow html[data-theme]); the paper stays light
+   in both themes because it is physical. States are shape + word; colour only
+   repeats them. The edition accent is not used: the editions decision keeps it
+   off verdicts (docs/brand/editions-decision.md, brand-usage-check). Motion is
+   under 300 ms; the only loop is the unsure-glyph pulse, which stops once the
+   reading is confirmed. Reduced motion: no motion at all, final state at once. */
+.lp {
+  --lp-ease: cubic-bezier(.23, 1, .32, 1);
+  --lp-paper: #f4efe3; --lp-paper-ink: #1f2b47; --lp-paper-2: #6a665c;
+  --lp-ok: #2f6a3f; --lp-err: #a3361f; --lp-unc: #4f58a6;
+  min-height: 100dvh; display: flex; flex-direction: column;
+  background: var(--in-base, var(--bg)); color: var(--in-tx, var(--ink));
+  font-family: var(--in-ui, var(--font));
+}
+.lp-head { display: flex; align-items: center; gap: 28px; padding: 12px 56px; min-height: 64px; }
+.lp-brand { display: inline-flex; align-items: center; min-height: 44px; min-width: 44px; color: inherit; }
+.lp-nav { display: flex; gap: 4px; font-size: 14px; }
+.lp-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 10px; color: var(--in-tx-2, var(--ink-2)); text-decoration: none; border-radius: 6px; }
+.lp-nav a:hover { color: var(--in-tx, var(--ink)); }
+.lp-signin { margin-left: auto; }
+
+.lp-btn {
+  display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 20px;
+  border-radius: 10px; font: 500 15px var(--in-ui, var(--font)); text-decoration: none; cursor: pointer;
+  border: 1px solid var(--in-edge-3, var(--hairline-strong)); background: transparent; color: var(--in-tx, var(--ink));
+  transition: transform 160ms var(--lp-ease), background-color .15s ease, border-color .15s ease;
+}
+.lp-btn:active { transform: scale(.97); }
+.lp-btn-pri { background: var(--in-action, var(--ink)); color: var(--in-on-action, var(--bg)); border-color: var(--in-action, var(--ink)); font-weight: 600; }
+.lp-btn-quiet { border-color: transparent; color: var(--in-tx-2, var(--ink-2)); }
+.lp a:focus-visible, .lp button:focus-visible { outline: 2px solid var(--in-tx, var(--ink)); outline-offset: 2px; }
+
+.lp-main { flex: 1; padding: 20px 56px 32px; }
+.lp-hero { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 640px); gap: 48px; align-items: start; }
+.lp-copy { display: flex; flex-direction: column; gap: 24px; padding-top: 28px; }
+.lp-title { margin: 0; font-size: clamp(40px, 5.2vw, 64px); font-weight: 600; letter-spacing: -.035em; line-height: 1.02; text-wrap: balance; }
+.lp-title-2 { color: var(--in-tx-3, var(--ink-3)); }
+.lp-sub { margin: 0; max-width: 470px; font-size: 18px; line-height: 1.55; color: var(--in-tx-2, var(--ink-2)); text-wrap: pretty; }
+.lp-ctas { display: flex; flex-wrap: wrap; gap: 10px; margin: 0; }
+.lp-proofs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.lp-proofs li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; font-size: 15px; line-height: 1.45; color: var(--in-tx-2, var(--ink-2)); max-width: 520px; }
+.lp-tick { color: var(--in-good, var(--lp-ok)); padding-top: 2px; }
+
+/* ── the demo ──────────────────────────────────────────────────────────── */
+.lp-demo { border: 1px solid var(--in-edge-2, var(--hairline)); border-radius: 14px; background: var(--in-l1, var(--surface)); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.lp-demo-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.lp-demo-q { margin: 0; font-size: 15px; font-weight: 400; line-height: 1.5; color: var(--in-tx-2, var(--ink-2)); }
+.lp-demo-tag { flex: none; font-size: 12px; color: var(--in-tx-3, var(--ink-3)); }
+.lp-paper { list-style: none; margin: 0; padding: 10px 8px; background: var(--lp-paper); color: var(--lp-paper-ink); border-radius: 8px; display: flex; flex-direction: column; gap: 4px; }
+.lp-line {
+  position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  min-height: 56px; padding: 4px 10px; border: 1.5px solid transparent; border-radius: 5px;
+  transition: border-color .24s var(--lp-ease);
+}
+.lp-line.is-checked { border-color: rgba(47, 106, 63, .45); }
+.lp-line.is-error { border: 2px solid var(--lp-err); }
+.lp-line.is-follows { border-color: #8a857a; border-style: dashed; }
+.lp-line.is-unverified { border-color: rgba(79, 88, 166, .55); border-style: dashed; }
+.lp-ln { font: 500 11px var(--in-mono, ui-monospace); font-variant-numeric: tabular-nums; color: var(--lp-paper-2); }
+.lp-work { display: flex; flex-direction: column; min-width: 0; overflow-x: auto; }
+/* The ink. The product shows the stored stroke image; the demo stands in with
+   the system's handwriting face (no web font is downloaded for it). */
+.lp-ink { font-family: 'Bradley Hand', 'Segoe Print', 'Comic Neue', cursive; font-size: 22px; line-height: 1.2; color: var(--lp-paper-ink); white-space: nowrap; }
+.lp-read { font-size: 15px; color: #3b4a6b; white-space: nowrap; animation: lp-mat .26s var(--lp-ease) both; }
+.lp-read .katex { font-size: 1.05em; }
+.lp-read.is-unsure .fbox, .lp-read.is-unsure .boxpad { border: 1.5px dashed #8a5d00 !important; border-radius: 3px; animation: lp-pulse 1.4s ease-in-out infinite; }
+.lp-st { display: inline-flex; align-items: center; gap: 6px; font: 600 12.5px var(--in-ui, var(--font)); white-space: nowrap; min-height: 24px; color: var(--lp-paper-2); }
+.lp-line.is-checked .lp-st { color: var(--lp-ok); }
+.lp-line.is-error .lp-st { color: var(--lp-err); }
+.lp-line.is-unverified .lp-st { color: var(--lp-unc); }
+.lp-chip { font-weight: 500; font-size: 11.5px; padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(31, 43, 71, .2); color: var(--lp-paper-2); }
+.lp-trace { position: absolute; left: 42px; right: 140px; bottom: 5px; height: 2px; background: var(--lp-ok); transform-origin: left; animation: lp-trace .24s var(--lp-ease) both; }
+.lp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+
+.lp-demo-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 48px; }
+.lp-say { flex: 1; min-width: 200px; margin: 0; font-size: 14px; line-height: 1.45; color: var(--in-tx-2, var(--ink-2)); }
+.lp-demo-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.lp-demo-bar .lp-btn { min-height: 44px; font-size: 14px; padding: 0 16px; }
+.lp-note, .lp-fine { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--in-tx-3, var(--ink-3)); }
+.lp-seewhy { display: flex; flex-direction: column; gap: 6px; animation: lp-mat .26s var(--lp-ease) both; }
+.lp-h3 { margin: 0; font-size: 13.5px; font-weight: 600; }
+.lp-correct { margin: 0; font-size: 14px; }
+.lp-correct-k { font-size: 12.5px; color: var(--in-tx-3, var(--ink-3)); }
+.lp-seewhy .mg-body { margin-top: 0; }
+
+.lp-proofs-social { list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; padding: 0; margin: 28px 0 0; }
+
+.lp-info { max-width: 720px; }
+.lp-info-title { font-size: 36px; letter-spacing: -.03em; margin: 12px 0 18px; }
+.lp-info-p { font-size: 17px; line-height: 1.6; color: var(--in-tx-2, var(--ink-2)); margin: 0 0 14px; max-width: 65ch; }
+.lp-info .lp-ctas { margin-top: 24px; }
+
+.lp-foot { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px 56px 24px; font-size: 13px; }
+.lp-foot a { display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; color: var(--in-tx-3, var(--ink-3)); }
+
+@keyframes lp-mat { from { opacity: 0; transform: translateY(-4px); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes lp-trace { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes lp-pulse { 0%, 100% { border-color: rgba(138, 93, 0, .3); } 50% { border-color: rgba(138, 93, 0, 1); } }
+
+@media (max-width: 900px) {
+  .lp-head { padding: 8px 16px; gap: 8px; }
+  .lp-nav { display: none; }
+  .lp-main { padding: 8px 16px 24px; }
+  .lp-hero { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .lp-copy { display: contents; }
+  .lp-title { order: 1; font-size: 40px; }
+  .lp-sub { order: 2; font-size: 16px; }
+  .lp-demo { order: 3; }
+  .lp-ctas { order: 4; }
+  .lp-ctas .lp-btn { flex: 1 1 auto; }
+  .lp-proofs { order: 5; }
+  .lp-chip, .lp-trace { display: none; }
+  .lp-ink { font-size: 19px; }
+  .lp-read { font-size: 13px; }
+  .lp-foot { padding: 8px 16px 24px; }
+  .lp-proofs-social { grid-template-columns: minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lp *, .lp *::before, .lp *::after { animation: none !important; transition: none !important; }
+}

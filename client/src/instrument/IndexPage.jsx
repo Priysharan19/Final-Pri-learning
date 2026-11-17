@@ -15,6 +15,7 @@ import { actionOpenable } from '../home/recommendation.js';
 import { featureEnabled } from '../platform/features.js';
 import { useHomeDecision, usePlacement, actionCopy, PlacementCard, GoalCard } from '../pages/Home.jsx';
 import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
+import HomeAside, { NextMeta } from '../home/HomeVerified.jsx';
 
 // The v1.1 home: the student's syllabus as a thumb-indexed book. The list and
 // the coloured tabs choose a chapter; its plate shows what the evidence says
@@ -89,6 +90,7 @@ function NextAction({ action, copy, online, nav, lang }) {
         <small className="in-nextact-k">{copy.kicker}</small>
         <b id="home-next-title" lang={lang}>{copy.title}</b>
         <small id={reasonId}>{openable ? copy.reason : t('home.needsConnection')}</small>
+        <NextMeta action={action} />
       </div>
       <button type="button" className="in-btn is-primary" data-home-primary-cta aria-describedby={reasonId}
         disabled={!openable} onClick={() => nav(action.destination)}>{copy.cta} <span className="in-kbd" aria-hidden="true">↵</span></button>
@@ -216,39 +218,45 @@ export default function IndexPage() {
 
   return (
     <div className="in-index" data-instrument-index>
-      <div className="in-spine">
-        <div className="in-greet">
-          <small>{user.year ? t('common.classNumber', { n: user.year }) : ''}</small>
-          <h1 className="home-greet">{t(greetingKey(hour), { name })}</h1>
-        </div>
-
-        {(() => {
-          const primary = homeDecision.primary;
-          if (primary && (primary.priority >= URGENT || recent === null)) {
-            return <NextAction action={primary} copy={actionCopy(primary, user, t, topicName, local?.resume)} online={online} nav={nav} lang={topicLang(primary, topicName, local?.resume)} />;
-          }
-          return null;
-        })()}
-        {/* Teacher-set assignments are the classroom product, hidden from
-            students in V1 (D10): only where it is on does their absence matter. */}
-        {assignments === false && CLASSROOM_ON && (
-          <p className="in-note in-cloud-note" role="status">{t('home.cloudUnavailable')}</p>
-        )}
-        {recent && !(homeDecision.primary && homeDecision.primary.priority >= URGENT) && (
-          <div className="in-resume" data-instrument-resume data-home-primary data-kind="last-chapter">
-            <div>
-              <b id="home-next-title">{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
-              <small>{resumeMarks ? t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible }) : t('inst.resumeSub')}</small>
-            </div>
-            <PageLink into className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })} data-home-primary-cta>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></PageLink>
-            {resumeMarks && resumeMarks.possible <= 10 && (
-              <div className="in-seg10" aria-hidden="true">
-                {Array.from({ length: 10 }, (_, i) => <i key={i} className={i < resumeMarks.earned ? 'd' : i < resumeMarks.possible ? 'x' : undefined} />)}
-              </div>
-            )}
+      {/* The verified page's Home (§5): the one next action, and beside it
+          the papers trend and the latest marked work (home/HomeVerified.jsx). */}
+      <div className="vp-home" data-verified-home>
+        <div className="vp-next">
+          <div className="in-greet">
+            <small>{user.year ? t('common.classNumber', { n: user.year }) : ''}</small>
+            <h1 className="home-greet">{t(greetingKey(hour), { name })}</h1>
           </div>
-        )}
 
+          {(() => {
+            const primary = homeDecision.primary;
+            if (primary && (primary.priority >= URGENT || recent === null)) {
+              return <NextAction action={primary} copy={actionCopy(primary, user, t, topicName, local?.resume)} online={online} nav={nav} lang={topicLang(primary, topicName, local?.resume)} />;
+            }
+            return null;
+          })()}
+          {/* Teacher-set assignments are the classroom product, hidden from
+              students in V1 (D10): only where it is on does their absence matter. */}
+          {assignments === false && CLASSROOM_ON && (
+            <p className="in-note in-cloud-note" role="status">{t('home.cloudUnavailable')}</p>
+          )}
+          {recent && !(homeDecision.primary && homeDecision.primary.priority >= URGENT) && (
+            <div className="in-resume" data-instrument-resume data-home-primary data-kind="last-chapter">
+              <div>
+                <b id="home-next-title">{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
+                <small>{resumeMarks ? t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible }) : t('inst.resumeSub')}</small>
+              </div>
+              <PageLink into className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })} data-home-primary-cta>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></PageLink>
+              {resumeMarks && resumeMarks.possible <= 10 && (
+                <div className="in-seg10" aria-hidden="true">
+                  {Array.from({ length: 10 }, (_, i) => <i key={i} className={i < resumeMarks.earned ? 'd' : i < resumeMarks.possible ? 'x' : undefined} />)}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <HomeAside exams={local?.exams} recent={recent} action={homeDecision.primary} />
+      </div>
+      <div className="in-spine">
         {phone && current && (
           <>
             <div className="in-next" style={{ '--cc': `var(${current.colour})` }} data-instrument-next={current.row.id}

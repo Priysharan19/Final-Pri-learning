@@ -594,6 +594,10 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
               {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
               <p className="muted" style={{ marginTop: 26, textAlign: 'center' }}>{t('login.heroPrivacy')}</p>
               <p className="muted" style={{ marginTop: 10, textAlign: 'center', fontSize: 13 }}>{t('login.heroSub')}</p>
+              {/* The public landing's live demo: see a line checked before signing in. */}
+              <p style={{ marginTop: 6, textAlign: 'center', fontSize: 13 }}>
+                <PageLink to="/welcome" className="linklike" data-testid="hero-landing-link">{t('login.seeHowMarking')}</PageLink>
+              </p>
               {appleEntry}
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for
