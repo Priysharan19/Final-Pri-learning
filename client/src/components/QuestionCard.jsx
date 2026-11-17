@@ -2049,6 +2049,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const instrumentScore = INSTRUMENT && !!shownGrade && Number.isFinite(Number(shownGrade.awarded))
     && Number(shownGrade.possible) > 0 && Number(shownGrade.awarded) >= 0 && Number(shownGrade.awarded) <= Number(shownGrade.possible);
 
+  const firstBad = inkComments?.find(c => c.kind === 'bad') || null;
+  // One message after a wrong answer with a marked line: that line is where it went wrong. The server's
+  // "checked when this question is finished" note would contradict it, so it is not shown beside it.
+  const markedLineFix = !!(state.res?.stepReport?.lines?.some(l => l.status === 'break') || firstBad);
   // The verdict lands in the middle of a long page. Spoken as one sentence, a
   // screen reader hears whether the answer was right without hunting for it.
   const verdictSpeech = useMemo(() => {
@@ -2059,7 +2063,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (previousAttempt) return `${t(state.res?.invalid ? 'verdict.previousAttemptUnread' : 'verdict.previousAttemptWrong')} ${t('verdict.newWorkNotChecked')}`;
       return state.res?.invalid
         ? t('verdict.speechUnreadable', { feedback: state.res.feedback || '' })
-        : t('verdict.speechRetry', { feedback: state.res?.feedback || t('verdict.oneMoreGo') });
+        : t('verdict.speechRetry', { feedback: (markedLineFix && /checked when this question is finished/.test(String(state.res?.feedback || ''))) ? '' : (state.res?.feedback || t('verdict.oneMoreGo')) });
     }
     if (!resolved) return '';
     const marks = shownGrade
@@ -2069,7 +2073,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (verdictGood) return marks ? t('verdict.speechCorrect', { marks }) : t('verdict.correct');
     return (marks ? t('verdict.speechIncorrect', { marks }) : t('verdict.notThisTime'))
       + (res.solution?.answerText ? t('verdict.speechExpected', { answer: res.solution.answerText }) : '');
-  }, [state.phase, state.res, resolved, res, verdictGood, shownGrade?.awarded, shownGrade?.possible, previousAttempt, t]);
+  }, [state.phase, state.res, resolved, res, verdictGood, shownGrade?.awarded, shownGrade?.possible, previousAttempt, markedLineFix, t]);
 
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
@@ -2284,10 +2288,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     </div>
   ) : null;
 
-  const firstBad = inkComments?.find(c => c.kind === 'bad') || null;
-  // One message after a wrong answer with a marked line: that line is where it went wrong. The server's
-  // "checked when this question is finished" note would contradict it, so it is not shown beside it.
-  const markedLineFix = !!(state.res?.stepReport?.lines?.some(l => l.status === 'break') || firstBad);
   // Once submitted, the bar shows the answer the attempt was marked on; a
   // reading that lands later can redraw the panel but never this line.
   // It is the answer the student CONFIRMED and the server marked — never the
