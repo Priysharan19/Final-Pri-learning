@@ -58,11 +58,11 @@
 .lp-line.is-follows { border-color: #8a857a; border-style: dashed; }
 .lp-line.is-unverified { border-color: rgba(79, 88, 166, .55); border-style: dashed; }
 .lp-ln { font: 500 11px var(--in-mono, ui-monospace); font-variant-numeric: tabular-nums; color: var(--lp-paper-2); }
-.lp-work { display: flex; flex-direction: column; min-width: 0; overflow-x: auto; }
+.lp-work { display: flex; flex-direction: column; min-width: 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0 6px; }
 /* The ink. The product shows the stored stroke image; the demo stands in with
    the system's handwriting face (no web font is downloaded for it). */
 .lp-ink { font-family: 'Bradley Hand', 'Segoe Print', 'Comic Neue', cursive; font-size: 22px; line-height: 1.2; color: var(--lp-paper-ink); white-space: nowrap; }
-.lp-read { font-size: 15px; color: #3b4a6b; white-space: nowrap; animation: lp-mat .26s var(--lp-ease) both; }
+.lp-read { font-size: 15px; line-height: 1.7; color: #3b4a6b; white-space: nowrap; animation: lp-mat .26s var(--lp-ease) both; }
 .lp-read .katex { font-size: 1.05em; }
 .lp-read.is-unsure .fbox, .lp-read.is-unsure .boxpad { border: 1.5px dashed #8a5d00 !important; border-radius: 3px; animation: lp-pulse 1.4s ease-in-out infinite; }
 .lp-st { display: inline-flex; align-items: center; gap: 6px; font: 600 12.5px var(--in-ui, var(--font)); white-space: nowrap; min-height: 24px; color: var(--lp-paper-2); }
@@ -70,7 +70,7 @@
 .lp-line.is-error .lp-st { color: var(--lp-err); }
 .lp-line.is-unverified .lp-st { color: var(--lp-unc); }
 .lp-chip { font-weight: 500; font-size: 11.5px; padding: 2px 7px; border-radius: 999px; border: 1px solid rgba(31, 43, 71, .2); color: var(--lp-paper-2); }
-.lp-trace { position: absolute; left: 42px; right: 140px; bottom: 5px; height: 2px; background: var(--lp-ok); transform-origin: left; animation: lp-trace .24s var(--lp-ease) both; }
+.lp-trace { position: absolute; left: 42px; right: 140px; bottom: 2px; height: 2px; background: var(--lp-ok); transform-origin: left; animation: lp-trace .24s var(--lp-ease) both; }
 .lp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
 
 .lp-demo-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-height: 48px; }
@@ -111,7 +111,7 @@
   .lp-ctas .lp-btn { flex: 1 1 auto; }
   .lp-proofs { order: 5; }
   .lp-chip, .lp-trace { display: none; }
-  .lp-ink { font-size: 19px; }
+  .lp-ink { font-size: 17px; }
   .lp-read { font-size: 13px; }
   .lp-foot { padding: 8px 16px 24px; }
   .lp-proofs-social { grid-template-columns: minmax(0, 1fr); }
