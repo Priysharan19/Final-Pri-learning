@@ -41,6 +41,7 @@ import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconcepti
 import { strokeSignature, createStrokeSignature } from '../ink/strokeSignature.js';
 import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
+import { practiceWorkState } from '../platform/workState.js';
 import { HINT_RUNGS, RUNG_COST, markWeightAfter } from '../engine/hintLadder.js';
 
 // The hint ladder's rungs, as catalogue keys.
@@ -2222,15 +2223,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     // A photo on the page that could not be kept on the device.
                     : mode === 'photo' && !!photo && !isMcq ? 'unsaved'
                     : 'idle';
-  const statusText = busy ? t('verdict.statusChecking')
-    : cloudPending ? t('verdict.statusMethod')
-      : saveState === 'failed' ? t('verdict.statusNotSaved')
-        : saveState === 'saving' ? t('verdict.statusSaving')
-          : resolved ? (serverAuthoritative ? t(verdictGood ? 'verdict.correct' : res?.revealed ? 'verdict.revealed' : 'verdict.notThisTime') : t('verdict.statusMarked'))
-            : inkUnread ? t('verdict.statusInkUnread')
-            : workState === 'waiting-sign-in' ? t(photoWaitingSignIn ? 'verdict.statusPhotoWaitingSignIn' : 'verdict.statusSavedWaitingSignIn')
-            : saveState === 'saved' ? t(offline ? 'verdict.statusSavedOffline' : mode === 'photo' && photo ? 'photo.statusSaved' : 'verdict.statusSaved')
-              : (writeMode && !isMcq ? t('verdict.statusWriteHint') : '');
+  // One vocabulary for the work's state (platform/workState.js): the label is the state's, never the card's own.
+  const vocab = practiceWorkState({
+    busy, cloudPending, resolved, serverAuthoritative, saveState, offline, inkUnread,
+    inkWaitingSignIn, photoWaitingSignIn, readerLimit, readerDown, awaitingReading,
+    reading: writeMode && !isMcq && inkReaderState?.kind === INK_READER_STATE.READING,
+    readOnScreen: workState === 'read',
+    photoSaved: mode === 'photo' && !!photo
+  });
+  const statusText = resolved && serverAuthoritative ? t(verdictGood ? 'verdict.correct' : res?.revealed ? 'verdict.revealed' : 'verdict.notThisTime')
+    : vocab.key ? t(vocab.key)
+      : (writeMode && !isMcq ? t('verdict.statusWriteHint') : '');
 
   // Lines the reading marks "check this" or "can't read": said on Check, never a block on it.
   const unsettledLines = INSTRUMENT && writeMode && !inkStale && inkResult?.lines?.length
@@ -3319,7 +3322,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
         {/* ── One obvious next move; everything else stays reachable and quiet ── */}
         <div className="ws-actions editor-foot no-print">
-          <span className="status-line" data-state={statusState} data-work-state={workState} role="status" aria-live="polite">
+          <span className="status-line" data-state={statusState} data-work-state={workState} data-work-vocab={vocab.state || undefined} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="status-mark" aria-hidden="true"><Working pending={statusState === 'working'} />{statusState !== 'working' && <span className="dot" />}</span>}
             {writeMode && shownAnswerLine && !inkStale && !needsCheck && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
               ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
