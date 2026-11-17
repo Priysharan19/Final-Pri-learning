@@ -81,6 +81,6 @@
   .xs-nav--rail .xs-q.is-done::after { background: var(--in-tx-2); }
   .xs-nav--rail .xs-q.is-noted::after { height: 7px; left: 11px; right: auto; bottom: auto; background: var(--in-tx-2); }
   .xs-nav--rail .xs-q.is-flagged::before { top: 18px; right: 6px; width: 3px; height: 5px; border-radius: 0; }
-  .xs-nav--rail .xs-q.is-current::after { left: 7px; width: 30px; background: var(--au-light, var(--in-tx)); box-shadow: 0 0 0 3px var(--au-light-soft, var(--in-edge-3)); }
+  .xs-nav--rail .xs-q.is-current::after { left: 7px; width: 30px; background: var(--in-tx); }
   .xs-nav--rail .xs-q.is-current { border: 0; box-shadow: none; }
 }

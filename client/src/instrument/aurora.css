@@ -110,3 +110,6 @@ html.ui-instrument.skin-aurora.a11y-reduce-transparency[data-aurora-pools] body 
 @media (prefers-reduced-motion: reduce) {
   html.ui-instrument.skin-aurora .a-aurora i { animation: none; }
 }
+
+/* UI7a: the current question on an exam rail is a current place (D1): an ink bar with an edition-light halo and a 2 px rule. */
+html.ui-instrument.skin-aurora .xs-nav--rail .xs-q.is-current::after { box-shadow: 0 0 0 3px var(--au-light-soft), 0 3px 0 -1px var(--au-light); }
