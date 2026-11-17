@@ -97,6 +97,20 @@ const en = read('client/src/i18n/strings.en.js'), hi = read('client/src/i18n/str
 ok(/'legal\.unreviewedBodyAu': '[^']*Australian law/.test(en) && /'legal\.unreviewedBodyAu'/.test(hi) && /'login\.contact'/.test(en) && /'login\.contact'/.test(hi), 'the Australian banner and the Contact link are translated');
 ok(/EDITION === 'prithagoras' \? <PageLink to="\/contact">/.test(read('client/src/pages/Login.jsx')), 'the sign-in footer links Contact for Prithagoras and Grievances for Priyabhata');
 
+// Real builds: handed over (--dist-au / --dist-in), or built here (--build: both editions
+// into temporary folders, the way brand-build-check --both builds the other one).
+if (process.argv.includes('--build')) {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const base = mkdtempSync(join(tmpdir(), 'pri-legal-build-'));
+  for (const [edition, flag] of [['prithagoras', '--dist-au'], ['priyabhata', '--dist-in']]) {
+    const out = join(base, edition);
+    execFileSync('npx', ['vite', 'build', '--outDir', out, '--emptyOutDir'], { cwd: join(ROOT, 'client'), env: { ...process.env, PRI_EDITION: edition }, stdio: ['ignore', 'ignore', 'inherit'] });
+    process.argv.push(flag, out);
+  }
+  process.on('exit', () => rmSync(base, { recursive: true, force: true }));
+}
 // Real builds, when the CI build jobs hand them over.
 const arg = flag => { const i = process.argv.indexOf(flag); return i > 0 ? process.argv[i + 1] : null; };
 function textOf(dir) {
