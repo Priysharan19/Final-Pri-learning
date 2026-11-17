@@ -27,6 +27,7 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { checkRefusal, checkRefusalCopy } from '../components/checkAccess.js';
 import { MathText } from '../lib/latex.jsx';
+import AiLabel from './AiLabel.jsx';
 import { useT } from '../i18n/index.js';
 import { buildDeterministicStoryboard } from '../explain/visualEngine.js';
 import { safeCaptions } from './captionRule.js';
@@ -135,8 +136,8 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
       } else {
         note(level, {
           text: r?.message || null,
-          source: r?.source === 'tutor' ? 'tutor' : 'deterministic',
-          offline: r?.source !== 'tutor' && ['TUTOR_OFFLINE', 'TUTOR_TIMEOUT', 'TUTOR_UNAVAILABLE', 'CLOUD_DISABLED', 'AUTH_REQUIRED', 'RATE_LIMITED', 'PAID_CAPACITY_REACHED', 'TUTOR_NOT_CONFIGURED'].includes(r?.code)
+          source: r?.source === 'tutor' ? 'tutor' : r?.source === 'safety' ? 'safety' : 'deterministic',
+          offline: r?.source !== 'tutor' && r?.source !== 'safety' && ['TUTOR_OFFLINE', 'TUTOR_TIMEOUT', 'TUTOR_UNAVAILABLE', 'CLOUD_DISABLED', 'AUTH_REQUIRED', 'RATE_LIMITED', 'PAID_CAPACITY_REACHED', 'TUTOR_NOT_CONFIGURED'].includes(r?.code)
         });
       }
     } catch (error) {
@@ -172,8 +173,8 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
       historyRef.current = Array.isArray(r?.history) ? r.history : historyRef.current;
       setTurns(list => [...list, {
         id: `${turnId}-t`, role: 'tutor', text,
-        source: r?.source === 'tutor' ? 'tutor' : 'deterministic',
-        offline: r?.source !== 'tutor' && OFFLINE_CODES.has(r?.code),
+        source: r?.source === 'tutor' ? 'tutor' : r?.source === 'safety' ? 'safety' : 'deterministic',
+        offline: r?.source !== 'tutor' && r?.source !== 'safety' && OFFLINE_CODES.has(r?.code),
         guarded: r?.code === 'TUTOR_ANSWER_GUARD'
       }]);
     } catch (error) {
@@ -228,8 +229,9 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
           <div key={n.level} className={`tutor-note tutor-note-${n.source}`} data-tutor-note={n.level} data-tutor-source={n.source}>
             <span className="tutor-note-src">
               {t('tutor.levelButton', { n: n.level, name: text[n.level].name })}
-              {n.source === 'tutor' ? ` · ${t('tutor.fromTutor')}` : n.source === 'deterministic' && n.level < 3 ? ` · ${t('tutor.fromHint')}` : ''}
+              {n.source === 'deterministic' && n.level < 3 ? ` · ${t('tutor.fromHint')}` : ''}
             </span>
+            {n.source === 'tutor' && <AiLabel labelKey={'tutor.fromTutor'} />}
             {n.offline && <small className="tutor-note-why">{t('tutor.fallbackOffline')}</small>}
             {n.text ? <MathText text={n.text} /> : <span>{t('tutor.noHint')}</span>}
           </div>
@@ -243,8 +245,9 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
             {turns.map(turn => (
               <div key={turn.id} className={`tutor-turn tutor-turn-${turn.role} tutor-turn-${turn.source || 'student'}`} data-tutor-turn={turn.role} data-tutor-source={turn.source || 'student'}>
                 <span className="tutor-note-src">
-                  {turn.role === 'student' ? t('tutor.you') : turn.source === 'tutor' ? t('tutor.fromTutor') : t('tutor.fromHint')}
+                  {turn.role === 'student' ? t('tutor.you') : turn.source === 'tutor' ? null : turn.source === 'safety' ? t('tutor.safety') : t('tutor.fromHint')}
                 </span>
+                {turn.source === 'tutor' && <AiLabel labelKey={'tutor.fromTutor'} />}
                 {turn.offline && <small className="tutor-note-why">{t('tutor.fallbackOffline')}</small>}
                 {turn.guarded && <small className="tutor-note-why">{t('tutor.fallbackGuarded')}</small>}
                 {turn.text ? <MathText text={turn.text} /> : <span>{t('tutor.noHint')}</span>}
@@ -252,7 +255,7 @@ export default function TutorHelp({ question, work, locale, onUsed, onResolved, 
             ))}
             {asking && (
               <div className="tutor-turn tutor-turn-tutor tutor-turn-streaming" data-tutor-turn="tutor" data-tutor-source="streaming">
-                <span className="tutor-note-src">{t('tutor.fromTutor')}</span>
+                <AiLabel labelKey={'tutor.fromTutor'} />
                 {streaming ? <MathText text={streaming} /> : <span className="tutor-thinking" role="status">{t('tutor.thinking')}</span>}
               </div>
             )}
