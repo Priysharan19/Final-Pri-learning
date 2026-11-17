@@ -35,5 +35,5 @@ for (const f of ['cloud-handwriting-client-check.mjs', 'ink-real-page-stability-
 
 const en = (await import('../src/i18n/strings.en.js')).default;
 const hi = (await import('../src/i18n/strings.hi.js')).default;
-for (const k of ['ink.autoOffline', 'ink.autoRead', 'ink.autoReadCheck', 'ink.autoCant', 'autoRead.title', 'autoRead.label', 'autoRead.note']) ok(en[k] && hi[k], `${k} exists in English and Hindi`);
+for (const k of ['ink.autoOffline', 'ink.autoRead', 'ink.autoReadCheck', 'ink.autoCant', 'autoRead.title', 'autoRead.label', 'autoRead.note', 'autoRead.on', 'autoRead.off']) ok(en[k] && hi[k], `${k} exists in English and Hindi`);
 console.log(`AUTO READ: PASS — ${n}/${n} checks — on by default, device-only, never opens the prompt, never marks, not in the exam room, decision recorded`);

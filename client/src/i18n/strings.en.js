@@ -2481,6 +2481,8 @@ export default {
   'ink.mistakeHere': "Look here",
   'ink.serverReading': 'Reading your handwriting…',
   'ink.autoOffline': "Offline: will read when you’re online",
+  'autoRead.on': "On",
+  'autoRead.off': "Off",
   'autoRead.title': "Reading my handwriting",
   'autoRead.label': "Read my handwriting automatically after a pause",
   'autoRead.note': "Pri reads what you write once you stop for a moment, without seeing the answer, only after you have agreed to it. Nothing is marked until you confirm. Turn this off to read only when you press Read my answer. Kept on this device.",

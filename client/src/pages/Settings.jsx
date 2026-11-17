@@ -93,10 +93,11 @@ function AutoRead() {
   return (
     <div className="card" data-auto-read style={{ marginTop: 18 }}>
       <h2 style={{ marginBottom: 8 }}>{t('autoRead.title')}</h2>
-      <label style={{ display: 'flex', gap: 10, alignItems: 'center', minHeight: 44 }}>
-        <input type="checkbox" checked={on} onChange={e => setOn(setAutoRead(e.target.checked))} />
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <button type="button" role="switch" aria-checked={on} aria-label={t('autoRead.label')} className={`btn ${on ? 'btn-primary' : 'btn-ghost'}`}
+          style={{ minHeight: 44, minWidth: 64 }} data-auto-read-switch onClick={() => setOn(setAutoRead(!on))}>{on ? t('autoRead.on') : t('autoRead.off')}</button>
         <span>{t('autoRead.label')}</span>
-      </label>
+      </div>
       <p className="muted" style={{ margin: '8px 0 0' }}>{t('autoRead.note')}</p>
     </div>
   );
