@@ -13,11 +13,12 @@ export function registrySlips(defs) {
       if (!line || !previous) return null;
       const hit = detectSlip([slip], previous, line, meta?.substitutions || null);
       if (!hit) return null;
-      const en = slip.copy(hit.detail, { edition: 'in' }).message;
+      const copy = slip.copy(hit.detail, { edition: 'in' });
+      const en = copy.message;
       const au = slip.copy(hit.detail, { edition: 'au' }).message;
       const messages = { hi: slip.hi(hit.detail).message };
       if (au !== en) messages['en-AU'] = au;
-      return { message: en, messages, notesSectionId: null };
+      return { title: copy.title, fix: copy.fix, confidence: 'medium', message: en, messages, notesSectionId: null };
     }
   }));
 }

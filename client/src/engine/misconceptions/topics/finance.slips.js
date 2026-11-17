@@ -22,8 +22,8 @@ export const FINANCE_SLIPS = [
         return null;
       });
     },
-    copy: (d) => ({ title: 'Simple interest used where the interest compounds', message: `(1 + ${d.r})^${d.n} grows by ${d.r} on the new total each time; 1 + ${d.r} × ${d.n} adds the same amount every time.`, fix: 'Compound: multiply by (1 + r) once per period. Simple: add P r t once.' }),
-    hi: d => ({ message: `(1 + ${d.r})^${d.n} हर बार नई राशि पर बढ़ता है; 1 + ${d.r} × ${d.n} हर बार समान राशि जोड़ता है।` })
+    copy: d => ({ title: `Simple interest used where the interest compounds`, message: `With compound interest each period grows on the new total; the line adds the same amount every period instead.`, fix: `Compound: multiply by (1 + r) once per period. Simple: add P r t once.` }),
+    hi: d => ({ message: `चक्रवृद्धि में हर अवधि नई राशि पर बढ़ती है; रेखा में हर बार समान राशि जोड़ी गई है।` })
   },
   {
     code: 'rate-not-per-period', category: 'interest',
@@ -41,8 +41,8 @@ export const FINANCE_SLIPS = [
         return null;
       });
     },
-    copy: d => ({ title: 'The yearly rate was used for each period', message: `Compounding ${d.m} times a year, each period earns ${d.r} ÷ ${d.m}, not the whole yearly ${d.r}.`, fix: 'Divide the annual rate by the number of periods per year, and multiply the years by that number.' }),
-    hi: d => ({ message: `साल में ${d.m} बार चक्रवृद्धि पर हर अवधि में ${d.r} ÷ ${d.m} लगता है, पूरा ${d.r} नहीं।` })
+    copy: d => ({ title: `The yearly rate was used for each period`, message: `Compounding ${d.m} times a year, each period earns only a share of the yearly rate; the line uses the whole yearly rate each period.`, fix: `Divide the annual rate by the number of periods per year.` }),
+    hi: d => ({ message: `साल में ${d.m} बार चक्रवृद्धि पर हर अवधि में वार्षिक दर का एक भाग लगता है; रेखा में हर अवधि पूरी वार्षिक दर ली गई है।` })
   },
   {
     code: 'periods-not-multiplied', category: 'interest',
@@ -60,8 +60,8 @@ export const FINANCE_SLIPS = [
         return null;
       });
     },
-    copy: d => ({ title: 'The number of periods was not multiplied out', message: `${d.n} years with ${d.m} periods a year is ${d.m} × ${d.n} periods, not ${d.n}.`, fix: 'Periods = periods per year × years.' }),
-    hi: d => ({ message: `${d.n} वर्ष और साल में ${d.m} अवधि का मतलब ${d.m} × ${d.n} अवधियाँ हैं, ${d.n} नहीं।` })
+    copy: d => ({ title: `The number of periods was not multiplied out`, message: `With ${d.m} periods in a year the exponent counts periods, not years; the line counts years only.`, fix: `Periods = periods per year × years.` }),
+    hi: d => ({ message: `साल में ${d.m} अवधियाँ हों तो घात अवधियों की गिनती है, वर्षों की नहीं; रेखा में केवल वर्ष गिने गए हैं।` })
   },
   {
     code: 'percent-rate-not-converted', category: 'interest',
@@ -77,8 +77,8 @@ export const FINANCE_SLIPS = [
         return null;
       });
     },
-    copy: d => ({ title: 'The percentage was not turned into a decimal', message: `${d.pct}% goes into the formula as ${d.r}, not ${d.pct}: the rate is ${d.pct} ÷ 100.`, fix: 'Rate in the formula = percentage ÷ 100.' }),
-    hi: d => ({ message: `${d.pct}% सूत्र में ${d.r} के रूप में जाता है, ${d.pct} नहीं: दर = प्रतिशत ÷ 100।` })
+    copy: d => ({ title: `The percentage was not turned into a decimal`, message: `The percentage goes into the formula as a decimal rate; the line uses the percentage figure itself.`, fix: `Rate in the formula = percentage ÷ 100.` }),
+    hi: d => ({ message: `प्रतिशत सूत्र में दशमलव दर के रूप में जाता है; रेखा में प्रतिशत की संख्या ही ली गई है।` })
   },
   {
     code: 'depreciation-added', category: 'depreciation',
@@ -92,8 +92,8 @@ export const FINANCE_SLIPS = [
         return null;
       });
     },
-    copy: d => ({ title: 'Depreciation worked as growth', message: `Losing ${d.r} of the value each period multiplies by 1 − ${d.r}, not 1 + ${d.r}.`, fix: 'Reducing balance: V = V₀ (1 − r)ⁿ.' }),
-    hi: d => ({ message: `हर अवधि मूल्य का ${d.r} घटने पर गुणक 1 − ${d.r} है, 1 + ${d.r} नहीं।` })
+    copy: d => ({ title: `Depreciation worked as growth`, message: `A value that loses a share each period is multiplied by one minus the rate; the line uses one plus.`, fix: `Reducing balance: V = V₀ (1 − r)ⁿ.` }),
+    hi: d => ({ message: `जिस मूल्य का हर अवधि एक भाग घटता है उसका गुणक 1 में से दर घटाकर आता है; रेखा में धन चिह्न है।` })
   },
   {
     code: 'reducing-balance-as-straight-line', category: 'depreciation',
@@ -108,8 +108,8 @@ export const FINANCE_SLIPS = [
         return null;
       });
     },
-    copy: d => ({ title: 'Straight-line used for reducing balance', message: `(1 − ${d.r})^${d.n} takes ${d.r} off the new value each year; 1 − ${d.r} × ${d.n} takes the same amount each year.`, fix: 'Reducing balance multiplies by (1 − r) each period; straight-line subtracts a fixed amount.' }),
-    hi: d => ({ message: `(1 − ${d.r})^${d.n} हर साल नए मूल्य पर घटाता है; 1 − ${d.r} × ${d.n} हर साल बराबर राशि घटाता है।` })
+    copy: d => ({ title: `Straight-line used for reducing balance`, message: `On a reducing balance each year takes its share of the new value; the line takes the same amount off every year.`, fix: `Reducing balance multiplies by (1 − r) each period; straight-line subtracts a fixed amount.` }),
+    hi: d => ({ message: `घटते शेष में हर साल नए मूल्य का भाग घटता है; रेखा में हर साल समान राशि घटाई गई है।` })
   },
   {
     code: 'annuity-not-divided-by-rate', category: 'annuities',
@@ -123,7 +123,7 @@ export const FINANCE_SLIPS = [
         return null;
       });
     },
-    copy: (d, ctx) => ({ title: 'The division by the rate was left out', message: `A regular payment of ${money(1, ctx)} accumulates to ((1 + ${d.r})ⁿ − 1) ÷ ${d.r}; without ÷ ${d.r} the line is only the growth factor.`, fix: 'Future value of an annuity = payment × ((1 + r)ⁿ − 1) ÷ r.' }),
-    hi: d => ({ message: `नियमित किस्त का योग ((1 + ${d.r})ⁿ − 1) ÷ ${d.r} है; ÷ ${d.r} के बिना रेखा केवल वृद्धि-गुणक है।` })
+    copy: d => ({ title: `The division by the rate was left out`, message: `A regular payment accumulates to growth minus one, divided by the rate; the line stops before the division.`, fix: `Future value of an annuity = payment × ((1 + r)ⁿ − 1) ÷ r.` }),
+    hi: d => ({ message: `नियमित किस्त का संचय वृद्धि में से एक घटाकर दर से भाग देने पर आता है; रेखा में भाग देना छूट गया।` })
   }
 ];

@@ -8,6 +8,7 @@ import { SEQUENCE_SLIPS } from '../src/engine/misconceptions/topics/sequences.sl
 import { FINANCE_SLIPS } from '../src/engine/misconceptions/topics/finance.slips.js';
 import { detectSlip } from '../src/engine/misconceptions/topics/_run.js';
 import { stepCheck } from '../src/engine/checker.js';
+import { normalize, parse, evaluate } from '../src/engine/expr.js';
 import { topicDiagnosisCodes, registeredTopics } from '../src/engine/misconceptions/topics/index.js';
 
 const ALL = [...NUMBER_SLIPS, ...SEQUENCE_SLIPS, ...FINANCE_SLIPS];
@@ -22,9 +23,6 @@ const WRONG = [
   ['percent-not-divided', '15/100 × 80', '1200'], ['percent-not-divided', '8/100 × 250', '2000'],
   ['percent-change-wrong-base', '240 × (1 + 0.15)', '240.15'], ['percent-change-wrong-base', '500 × (1 - 0.2)', '499.8'],
   ['subtract-negative-as-subtract', '7 - -3', '4'], ['subtract-negative-as-subtract', '2 - -5', '-3'],
-  ['round-down-only', '3.678', '3.67'], ['round-down-only', '12.8', '12'],
-  ['significant-figures-as-decimals', '0.004567', '0.005'], ['significant-figures-as-decimals', '12.3456', '12.35'],
-  ['ratio-share-by-part', '600 × (2/5)', '300'], ['ratio-share-by-part', '84 × (3/7)', '28'],
   ['ap-term-n-not-n-minus-1', '3 + (10 - 1) × 4', '3 + 10 × 4'], ['ap-term-n-not-n-minus-1', '7 + (20 - 1) × 2', '7 + 20 × 2'],
   ['gp-term-power-n', '3 × 2^(8 - 1)', '3 × 2^8'], ['gp-term-power-n', '5 × 3^(6 - 1)', '5 × 3^6'],
   ['ap-sum-half-dropped', '(10/2) × (4 + 31)', '10 × (4 + 31)'], ['ap-sum-half-dropped', '(20/2) × (3 + 60)', '20 × (3 + 60)'],
@@ -41,7 +39,7 @@ const WRONG = [
 // Correct working: each pair is an equivalent step.
 const RIGHT = [
   ['2 + 3 × 4', '2 + 12'], ['2 + 12', '14'], ['1/2 + 1/3', '3/6 + 2/6'], ['3/6 + 2/6', '5/6'], ['15/100 × 80', '12'], ['240 × (1 + 0.15)', '276'],
-  ['7 - -3', '7 + 3'], ['7 + 3', '10'], ['3.678', '3.678'], ['600 × (2/5)', '240'], ['3 + (10 - 1) × 4', '3 + 36'], ['3 + 36', '39'],
+  ['7 - -3', '7 + 3'], ['7 + 3', '10'], ['3 + (10 - 1) × 4', '3 + 36'], ['3 + 36', '39'],
   ['3 × 2^(8 - 1)', '3 × 128'], ['(10/2) × (4 + 31)', '5 × 35'], ['12 / (1 - 0.25)', '12 / 0.75'], ['12 / 0.75', '16'], ['(12 - 4) + 1', '9'],
   ['5000 × (1 + 0.08)^3', '5000 × 1.259712'], ['8000 × (1 + 0.06/12)^36', '8000 × (1 + 0.005)^36'], ['30000 × (1 - 0.2)^3', '30000 × 0.512'],
   ['9000 × (1 + 0.05/4)^(4 × 3)', '9000 × (1 + 0.0125)^12'], ['200 × ((1 + 0.05)^10 - 1)/0.05', '200 × 12.5778925']
@@ -80,15 +78,20 @@ for (const [code, prev, broken] of WRONG) {
   if (first?.status !== 'break') continue;
   if (first.diagnosis?.code === code) viaRegistry += 1; else if (first.diagnosis) viaChecker += 1; else generic += 1;
   if (r.firstBreak !== 0) moved += 1;
-  if (first.diagnosis?.code === code) {
-    ok(typeof first.note === 'string' && first.note.length > 20 && first.diagnosis.messages?.hi?.length > 10, `${code}: en and hi messages present`);
-  }
+  ok(first.diagnosis?.code === code, `${code}: "${prev}" → "${broken}" is named through the checker (got ${first.diagnosis?.code})`);
+  ok(typeof first.note === 'string' && first.note.length > 20 && first.diagnosis?.messages?.hi?.length > 10 && first.diagnosis?.title, `${code}: en, hi and a title are present`);
+  // No answer leakage: the message must not state the value the working should reach.
+  const truth = evaluate(parse(normalize(prev)), {});
+  const bare = String(first.note).split(prev).join('');
+  for (const v of [truth, Math.round(truth * 1e6) / 1e6]) ok(!new RegExp(`(^|[^0-9.])${String(v).replace('.', '\\.')}([^0-9]|$)`).test(bare), `${code}: the message does not state the true value ${v}`);
+  ok(!/(^|\s)(1\.15|1\.2|0\.85)\b/.test(bare), `${code}: no multiplier is given away`);
 }
+ok(viaRegistry === WRONG.length, `every wrong fixture is named by its topic slip through the checker (${viaRegistry}/${WRONG.length})`);
 ok(moved === 0, 'the first break is on the line the check found, every time');
 let flagged = 0;
 for (const [prev, next] of RIGHT) { const r = stepCheck({ kind: 'expression', source: prev, canonical: next }, next); if (r.lines.some(l => l.status === 'break' || l.diagnosis)) flagged += 1; }
 ok(flagged === 0, `correct working is never flagged or named through the real checker (${flagged})`);
-console.log(`through the checker: ${viaRegistry}/${WRONG.length} broken lines are now named by the specific topic slip (measured on train-editions-23 before this change: 41/44 carried only the existing thin names — arithmetic-slip 24, term-dropped 6, sign-flipped 6 — and 3 carried none; only 3 fraction-across and 2 distribute-partial were specific, the latter wrong here); ${viaChecker} named otherwise, ${generic} still generic`);
+console.log(`through the checker: ${viaRegistry}/${WRONG.length} broken lines are now named by the specific topic slip (one-off hand measurement on train-editions-23 over the earlier 44-fixture set (rounding and ratio slips since removed), not computed here: 41/44 carried only the existing thin names — arithmetic-slip 24, term-dropped 6, sign-flipped 6 — and 3 carried none; only 3 fraction-across and 2 distribute-partial were specific, the latter wrong here); ${viaChecker} named otherwise, ${generic} still generic`);
 const bySlip = Object.fromEntries(ALL.map(s => [s.code, WRONG.filter(w => w[0] === s.code).length]));
 ok(Object.values(bySlip).every(n => n >= 2), 'every slip has at least two wrong-line fixtures');
 ok(ALL.every(s => typeof s.copy === 'function' && s.copy({ n: 3, r: 0.1, d: 2, m: 12, a: 2, tot: 5, p: 15, line: 'x', got: '1', left: 'a', right: 'b', op: '+', value: '1', dp: 1, cut: '1', rounded: '1', up: true, top: 9, bottom: 1, pct: 8 }, { edition: 'au' }).message.length > 20), 'every slip has a one-sentence message');
