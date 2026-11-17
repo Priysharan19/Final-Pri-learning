@@ -3,3 +3,6 @@
 export { diagnoseTopicLine, registerTopic, registeredTopics, slipInfo, topicDiagnosisCodes } from './registry.js';
 import './algebra.js';
 import './indices.js';
+import './number.js';
+import './sequences.js';
+import './finance.js';
