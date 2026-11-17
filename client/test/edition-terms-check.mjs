@@ -39,7 +39,8 @@ const ALLOW = [
   [/^library\.course\.in$/, 'the course option for an India resource in the staff-only resource-publishing panel, and the label of such a resource; a data value, not copy a Prithagoras student reads'],
   [/^home\.next\.firstIndia$/, 'first-step copy for Indian courses'],
   [/^login\.olympiadTrack$/, 'Indian track chooser at sign-up'],
-  [/^signup\.trackJeeHint$/, 'Indian track chooser at sign-up']
+  [/^signup\.trackJeeHint$/, 'Indian track chooser at sign-up'],
+  [/^board\.prio\.sourceIndia$/, 'the CBSE unit-weightage note under syllabus-board priorities (progress/SyllabusBoard.jsx draws it only when india is true, i.e. an Indian course)']
 ];
 
 let pass = 0;

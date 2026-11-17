@@ -3,6 +3,8 @@ import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { tLater, useT } from '../i18n/index.js';
 import EvidenceProgress from '../progress/EvidenceProgress.jsx';
+import SyllabusBoard from '../progress/SyllabusBoard.jsx';
+import { featureEnabled } from '../platform/features.js';
 
 /**
  * A Prithagoras student's Progress: the same evidence page as Priyabhata's
@@ -43,6 +45,8 @@ export default function ProgressAustralia() {
       practiseTo={row => `/practice?subtopic=${row.id}`}
       teacher={user.role === 'teacher'}
       ownHeading
-    />
+    >
+      {featureEnabled('syllabusBoard') && <SyllabusBoard user={user} india={false} />}
+    </EvidenceProgress>
   );
 }
