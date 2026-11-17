@@ -38,7 +38,7 @@ import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusalForQu
 import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
-import { strokeSignature } from '../ink/strokeSignature.js';
+import { strokeSignature, createStrokeSignature } from '../ink/strokeSignature.js';
 import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
 import { HINT_RUNGS, RUNG_COST, markWeightAfter } from '../engine/hintLadder.js';
@@ -1060,15 +1060,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // Ink is kept in the profile-scoped recovery store (practiceRecovery.js) the
   // moment the pen lifts. The status line says "saved" only after the record
   // has been read back from the store, never on the strength of having asked.
+  // The page's signature folded incrementally (exactly strokeSignature()).
+  const inkSignatureOf = useRef(null);
+  if (!inkSignatureOf.current) inkSignatureOf.current = createStrokeSignature();
   const onInkStrokes = useCallback((strokes) => {
     // The page's content, whatever else is going on: an annotation of an
     // earlier revision must not outlive a single new stroke.
-    setInkSignature(Array.isArray(strokes) && strokes.length ? strokeSignature(strokes) : null);
+    setInkSignature(Array.isArray(strokes) && strokes.length ? inkSignatureOf.current(strokes) : null);
     if (inFlightRef.current) {
       deferredInkRef.current = { questionId: String(question.id), strokes };
       // Written during a relaunch replay: kept on disk now, whatever the
       // replay's answer (edit detection waits for the replay to settle).
-      if (replayingRef.current) { setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0); saveInk(strokes); }
+      if (replayingRef.current) { setInkHasStrokes(Array.isArray(strokes) && strokes.length > 0); saveInk(strokes); flushInkSave(); }
       return;
     }
     if (attemptRef.current) return;
@@ -1092,7 +1095,48 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
    * missing row or a different page is a failed save, said as one, with the
    * strokes still on the canvas and a retry. Saving never reads the page.
    */
+  // The write is trailing-debounced (the page is compacted and sealed once the
+  // pen has rested a moment, not at every pen-up), and flushed at once when the
+  // page goes away, the card unmounts, or the page was cleared.
+  const inkPendingSave = useRef(null);
+  const inkDebounce = useRef(null);
+  const flushInkSave = () => {
+    if (inkDebounce.current) { clearTimeout(inkDebounce.current); inkDebounce.current = null; }
+    const pending = inkPendingSave.current;
+    if (!pending) return;
+    inkPendingSave.current = null;
+    // A page written on another question than the one now showing is kept
+    // under its own id, state-free; this card's status line is not about it.
+    if (String(pending.questionId) !== String(question.id)) {
+      saveInkDraft(pending.questionId, pending.strokes, { label: question.subtopicName, ...inkExtrasRef.current });
+      void flushInkDrafts();
+      return;
+    }
+    writeInk(pending.strokes);
+  };
   const saveInk = (strokes) => {
+    inkPendingSave.current = { strokes, questionId: question.id };
+    if (!Array.isArray(strokes) || !strokes.length) { flushInkSave(); return; }
+    if (!inkDebounce.current) inkDebounce.current = setTimeout(() => { inkDebounce.current = null; flushInkSave(); }, 300);
+  };
+  const flushInkSaveRef = useRef(flushInkSave);
+  flushInkSaveRef.current = flushInkSave;
+  useEffect(() => {
+    const now = () => flushInkSaveRef.current();
+    const hidden = () => { if (document.visibilityState === 'hidden') now(); };
+    window.addEventListener('pagehide', now);
+    document.addEventListener('visibilitychange', hidden);
+    return () => {
+      window.removeEventListener('pagehide', now);
+      document.removeEventListener('visibilitychange', hidden);
+      // Leaving the card keeps the page: write what is pending, state-free.
+      const pending = inkPendingSave.current;
+      if (inkDebounce.current) clearTimeout(inkDebounce.current);
+      inkPendingSave.current = null;
+      if (pending?.strokes?.length) { saveInkDraft(pending.questionId, pending.strokes, { label: question.subtopicName, ...inkExtrasRef.current }); void flushInkDrafts(); }
+    };
+  }, [question.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const writeInk = (strokes) => {
     if (inkSaveTimer.current) { clearTimeout(inkSaveTimer.current); inkSaveTimer.current = null; }
     const revision = ++inkSaveRevision.current;
     const extras = { ...inkExtrasRef.current };
@@ -1211,7 +1255,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (resolved || inFlightRef.current || attemptRef.current || !writeMode) return;
     // Written at once, not on the coalescing timer: a transcript is the one
     // thing on the page that cost a paid read to produce.
-    if (latestInk.current?.length) { saveInk(latestInk.current); void flushInkDrafts(); }
+    if (latestInk.current?.length) { saveInk(latestInk.current); flushInkSave(); void flushInkDrafts(); }
   }, [inkKeptKey, inkAnswerEdit]); // eslint-disable-line react-hooks/exhaustive-deps
   const inkAnswer = !inkProposal ? reading
     : inkAnswerEdit !== null ? inkAnswerEdit

@@ -47,7 +47,7 @@ import MarginMarks, { stampDelay, sweepSpan } from '../instrument/MarginMarks.js
 import Icon from '../components/Icon.jsx';
 import './InkAnswer.css';
 import { priNative } from '../platform/native/index.js';
-import { strokeSignature } from './strokeSignature.js';
+import { strokeSignature, createStrokeSignature } from './strokeSignature.js';
 import { askReaderPermission, PROMPT_ANSWER, READER_PERMISSION, readerPermission } from './readerPermission.js';
 import { applyLineCorrection, confidenceFloorOf, isLowConfidence, lowConfidenceLines } from './readingCorrection.js';
 import { featureEnabled } from '../platform/features.js';
@@ -383,6 +383,10 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     publish(next, strokesRef.current, { stale });
   }, [rec, publish, stale]);
 
+  // The signature folded incrementally: a pen-up adds one stroke, so it costs
+  // that stroke, not the whole page (the value is exactly strokeSignature()).
+  const signatureOfRef = useRef(null);
+  if (!signatureOfRef.current) signatureOfRef.current = createStrokeSignature();
   const onStrokesChange = useCallback((strokes) => {
     if (strokes?.length) setCleared(null);
     strokesRef.current = strokes;
@@ -406,7 +410,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     // Kept the moment the pen lifts, whatever happens to reading: a page
     // written in the second before the app went away is still the student's.
     try { onStrokesRef.current?.(strokes); } catch { /* keeping ink is best-effort */ }
-    const signature = strokes.length ? strokeSignature(strokes) : null;
+    const signature = strokes.length ? signatureOfRef.current(strokes) : null;
     // A page that could not be read at all is a different page once it changes.
     if (emptyRef.current && emptyRef.current !== signature) { emptyRef.current = null; setStatus(prev => (prev?.kind === 'empty' ? null : prev)); }
     if (!rec.lines.length) return;
