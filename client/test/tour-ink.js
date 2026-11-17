@@ -746,7 +746,8 @@ export const flow = {
       const submitsBefore = await submitCalls();
       const readsBefore = (await online.practiceCalls(/^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/)).length;
       await ctx.setOffline(true);
-      await page.getByRole('button', { name: 'Submit Answer' }).click();
+      // The page knows it is offline: Submit may already be waiting with the reason (a press, if it is offered, still sends nothing).
+      await page.getByRole('button', { name: 'Submit Answer' }).click({ timeout: 3000 }).catch(() => {});
       await page.waitForFunction(() => /needs a connection/.test(document.body.innerText), null, { timeout: 10000 }).catch(() => {});
       const reasonNow = await page.evaluate(() => (document.querySelector('.qpage')?.innerText || '').replace(/\s+/g, ' '));
       await check('stale + Submit while offline sends nothing, reads nothing, and shows the existing reason',
