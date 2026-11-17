@@ -7,7 +7,7 @@ Since support version 2, the server decides `support` from its **own** records o
 | Value | When | Server record that decides it |
 | --- | --- | --- |
 | `revealed` | The solution was shown: Show solution, or the ladder's last rung. | The reveal commit. |
-| `supported` | Any help on this item. | One or more of: a charged hint rung (`practice-hints`); tutor help served on this issued question (`practice-tutor-help`, written by `/v1/tutor/help` and `/v1/tutor/stream`); a line check or step-coach reading that ran (their per-question buckets); a tutor-policy request or a shown cause kind (`practice-help-plan`, PR #996, recorded as light assistance); a repeat of content whose solution this account has already seen; or `deviceHelp: true` on the submission, help the device showed that the server never served (the tutor's offline fallback). That last is the only device statement taken. It can only lower the claim, and the body refuses `deviceHelp: false` or any `support` field, so nothing can claim independence. |
+| `supported` | Any help on this item. | One or more of: a charged hint rung; tutor help served on this issued question, a line check or a step-coach reading that ran (each written to a durable `practice-tutor-help` record that lives as long as the question, 90 days; the per-question rate-limit buckets are only a second witness, since housekeeping sweeps them after a day); help of any kind on **another copy of the same content** issued to this account (`help-on-copy`, via `practice-content-helped`); a tutor-policy request or a shown cause kind (`practice-help-plan`, PR #996, recorded as light assistance; nothing writes that scope until #996 merges, and this reads it generically); a repeat of content whose solution this account has already seen; or `deviceHelp: true` on the submission, help the device showed that the server never served (the tutor's offline fallback). That last is the only device statement taken. It can only lower the claim, and the body refuses `deviceHelp: false` or any `support` field, so nothing can claim independence. |
 | `after-feedback` | No help, but resolved on a later try after seeing a verdict on an earlier one. | The question's try count (or a try spent on a copy of the same content). |
 | `independent` | First try, no help of any kind. | Absence of all of the above. |
 
@@ -35,6 +35,9 @@ Graded-attempt events are append-only learning evidence, and none is rewritten. 
 It means no help that this product gave on this item. Help the server cannot see (a calculator, another tab, a person) is outside every version of `support`.
 
 Edge cases:
+- A modified client that asks the tutor about a question without sending its server id gets stateless help that the server cannot tie to the attempt. It is the same class as help outside the product.
+- An exam item whose content was tried in practice but not yet resolved, so the student saw a verdict but no solution, is still `independent`; only a seen solution makes it `supported`.
+- Deploy order: a client that sends `deviceHelp` needs a server that accepts it. Promote the server before any native build carrying this client.
 - A tutor stream is recorded as help when it is admitted. If the provider then fails mid-stream, the attempt still says `supported`. This errs towards supported, never towards independent.
 - A line check or step-coach reading that the server refuses before it runs records nothing.
 - A tutor-policy request is recorded whether or not a check ran: asking for help is itself part of the record (PR #996).

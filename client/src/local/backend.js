@@ -6463,7 +6463,8 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
         // Tutor help this device showed (the server marks what it served
         // itself; this covers the offline fallback). One-way: it can only
         // make the attempt count as supported.
-        ...(Number(row.tutorLevel) > 0 ? { deviceHelp: true } : {})
+        // (the live step coach also records its reads on row.assistance)
+        ...(Number(row.tutorLevel) > 0 || row.assistance?.stepCoach?.reads > 0 ? { deviceHelp: true } : {})
       };
   // `at` lets a sync pull tell a grade in flight from one abandoned after the
   // server committed it (cloudSyncRestore: issued-here events).

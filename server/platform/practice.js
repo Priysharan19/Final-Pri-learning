@@ -54,7 +54,7 @@ import { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } from './editionBanks
 import { courseAllowedForTests } from './indiaBanks.js';
 import { serverEdition } from './edition.js';
 import { figureHasExternalRef } from './figureRefs.js';
-import { deriveSupport, helpRecordsFor } from './attemptSupport.js';
+import { deriveSupport, helpRecordsFor, markHelp } from './attemptSupport.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -941,7 +941,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
       [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
         // A reveal: support 'revealed' (attemptSupport.js), with the other help it had.
-        ...deriveSupport({ revealed: true, hintLevel: ladder.hintLevel, records: await helpRecordsFor(db, accountId, qid), solutionSeen: q._repeat === true }),
+        ...deriveSupport({ revealed: true, hintLevel: ladder.hintLevel, records: await helpRecordsFor(db, accountId, qid, q), solutionSeen: q._repeat === true }),
         revealed: true, marksEarned: 0, marksPossible: response.marksPossible,
         ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         contentId: opaqueContentId(q.contentId),
@@ -1044,6 +1044,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (reached > level) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-hints',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
           [accountId, qid, JSON.stringify({ level: reached, rungs: HINT_RUNGS.slice(0, reached), at: now }), digest({ qid, level: reached }), now, now + MAX_AGE]);
+        // Also recorded per content, so a hint on this copy follows the item
+        // to any other copy's support (attemptSupport.js, help-on-copy).
+        await markHelp(db, accountId, qid, `hint:${HINT_RUNGS[reached - 1]}`, now);
       }
       if (body.rung === 'solution') {
         const revealed = await commitReveal(accountId, qid, now, true);
@@ -1061,6 +1064,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (work.charge) {
         const cap = await consumeRateLimit(db, work.capBucket, { limit: LINE_CHECKS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, now);
         shown = cap.allowed ? work.reply : { status: 'limit' };
+        if (cap.allowed) await markHelp(db, accountId, qid, 'line-check', now);
       }
       const locale = body.locale === 'hi' ? 'hi' : 'en';
       result.response.work = shown;
@@ -1512,7 +1516,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         const cursor = await nextSyncCursor(db, accountId);
         // What help this attempt had, from the server's own records of this
         // question (attemptSupport.js): never the device's word.
-        const support = deriveSupport({ hintLevel: ladder.hintLevel, records: { ...await helpRecordsFor(db, accountId, qid), deviceHelp: body.deviceHelp === true },
+        const support = deriveSupport({ hintLevel: ladder.hintLevel, records: { ...await helpRecordsFor(db, accountId, qid, q), deviceHelp: body.deviceHelp === true },
           solutionSeen: q._repeat === true, priorTries: tries > 0 ? tries : (spent ? 1 : 0) });
         await db.run(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
           SELECT ?,?,?, 'server-grader', COALESCE(MAX(device_seq), 0) + 1, 'graded-attempt',?,?,?,?

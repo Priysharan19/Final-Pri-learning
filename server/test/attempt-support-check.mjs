@@ -25,6 +25,7 @@ process.env.NODE_ENV = 'test';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = '6b'.repeat(32);
 process.env.PRI_FEATURE_TUTOR = '1';
+process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
 delete process.env.PRI_HANDWRITING_API_KEY;   // the tutor is on but has no provider: refusals are real
 delete process.env.PRI_TUTOR_ENDPOINT;
 delete process.env.PRI_PUBLIC_ORIGIN;
@@ -115,6 +116,27 @@ try {
     [a.account.id, hp.id, JSON.stringify({ served: [{ action: 'self-check', level: 'A2', causeShown: true }] }), 'x', Date.now(), Date.now() + 1e9]);
   await grade(a.jar, hp.id, hp.q.answer.value);
   eq(view(await eventOf(hp.id)), ['supported', ['help-plan', 'cause-shown'], 2, 0], 'a tutor-policy request with a shown cause kind → supported (light assistance)');
+
+  // ── durable: bucket rows swept by housekeeping do not erase the help ──────
+  const swept = await fresh(IN, 9410);
+  await h.db.run('INSERT INTO rate_limits(bucket, window_start, count) VALUES (?,?,?)', [S.lineCheckBucket(a.account.id, swept.id), Date.now(), 1]);
+  await S.markHelp(h.db, a.account.id, swept.id, 'line-check');
+  await h.db.run('DELETE FROM rate_limits WHERE bucket LIKE ?', ['line-check:%']);
+  await grade(a.jar, swept.id, swept.q.answer.value);
+  eq(view(await eventOf(swept.id)).slice(0, 2), ['supported', ['line-check']], 'a line check stays on the record after its rate-limit row is swept');
+  const sweptCoach = await fresh(IN, 9411);
+  await S.markHelp(h.db, a.account.id, sweptCoach.id, 'step-coach');
+  await grade(a.jar, sweptCoach.id, sweptCoach.q.answer.value);
+  eq(view(await eventOf(sweptCoach.id)).slice(0, 2), ['supported', ['step-coach']], 'and so does a step-coach reading, with no bucket row at all');
+
+  // ── help on one copy follows the content to another copy ──────────────────
+  const copyA = await fresh(IN, 9420);
+  await post(`/v1/practice/${copyA.id}/hint`, { rung: 'nudge' }, a.jar);
+  const copyB = await fresh(IN, 9420);
+  eq(copyB.id === copyA.id, false, 'a second copy of the same content is a different question');
+  await grade(a.jar, copyB.id, copyB.q.answer.value);
+  const evB = await eventOf(copyB.id);
+  eq([evB.support, evB.supportSources], ['supported', ['help-on-copy']], 'a hint opened on another copy makes this one supported (help-on-copy)');
 
   // ── supported: a repeat of content whose solution was already shown ───────
   const shown = await fresh(IN, 9501);

@@ -82,7 +82,7 @@ import { asStore, sqliteHandle } from './store.js';
 import { consumeRateLimit, rateLimit, requireSession, requireVerifiedEmail, sha256 } from './security.js';
 import { consumePaidCall, refusePaidCall } from './spendCeiling.js';
 import { issuedQuestionForTutor } from './practice.js';
-import { markTutorHelp } from './attemptSupport.js';
+import { markHelp, markTutorHelp } from './attemptSupport.js';
 import { buildGuard, captionWordingOk, createReleaseGate, diagnosisGroundingIssues, leakedExpressions, mathSpans, normalizeMath, proseKey, solutionSpans } from './tutorGuard.js';
 import {
   MAX_CAPTION_CHARS, MAX_HISTORY_TURNS, MAX_STREAM_CHARS, MAX_TURN_CHARS, TUTOR_DIAGNOSE_LEVEL, TUTOR_LEVELS, TUTOR_LOCALES, TUTOR_REQUEST_LEVELS,
@@ -1113,6 +1113,8 @@ export function createTutorRouter(db, {
       if (reply.status === 'unchecked') return res.json({ lineCheck: reply });
       const cap = await consumeRateLimit(db, capBucket, { limit: LINE_CHECKS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, at);
       if (!cap.allowed) return refuse(409, 'LINE_CHECK_LIMIT', 'Two line checks per question.');
+      // Durable help record for the attempt's support (attemptSupport.js).
+      await markHelp(db, accountId, b.serverQuestionId, 'line-check', at);
       const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
         { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
       if (!daily.allowed) return refuse(429, 'TUTOR_DAILY_LIMIT', "You have used today's tutor help.");
@@ -1161,6 +1163,8 @@ export function createTutorRouter(db, {
       if (!rows) return res.json({ stepCoach: { lines: lines.map(() => ({ status: 'unsure' })), unchecked: true } });
       const cap = await consumeRateLimit(db, capBucket, { limit: STEP_COACH_READS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, at);
       if (!cap.allowed) return refuse(409, 'STEP_COACH_LIMIT', 'This question has had all its live checks.');
+      // Durable help record for the attempt's support (attemptSupport.js).
+      await markHelp(db, accountId, b.serverQuestionId, 'step-coach', at);
       const daily = await consumeRateLimit(db, `tutor-day:${sha256(accountId).slice(0, 24)}`,
         { limit: await tutorDailyLimit(db, accountId, env), windowMs: 24 * 60 * 60 * 1000 }, at);
       if (!daily.allowed) return refuse(429, 'TUTOR_DAILY_LIMIT', "You have used today's tutor help.");
