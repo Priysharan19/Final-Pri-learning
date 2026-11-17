@@ -6495,7 +6495,11 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
     // anything): the answer is still the student's to have marked. This same
     // press goes again under the same key without it; the page stays on this
     // device and the reply says the server did not keep it.
-    if (payload.original && !sentBefore && Number(cause?.status) >= 400 && Number(cause?.status) < 500 && /^ORIGINAL_/.test(String(cause?.code || '')) && keepOriginal) {
+    // A server that does not take an original yet refuses the request by its
+    // shape (PRACTICE_SUBMISSION_INVALID) before reading or marking anything:
+    // the same press goes without it too.
+    if (payload.original && !sentBefore && Number(cause?.status) >= 400 && Number(cause?.status) < 500 && keepOriginal
+      && (/^ORIGINAL_/.test(String(cause?.code || '')) || cause?.code === 'PRACTICE_SUBMISSION_INVALID')) {
       row.pendingGrade = null;
       await put('questions', row).catch(() => {});
       return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow, keepOriginal: false });

@@ -204,7 +204,10 @@ try {
   await db.run('INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES (?,?,?,?,?)', ['orig-class', carol.id, 'Year 8', 'orig-join-hash', now]);
   await db.run('INSERT INTO classes(id,teacher_account_id,name,join_code_hash,created_at) VALUES (?,?,?,?,?)', ['dave-class', dave.id, 'Year 8 B', 'dave-join-hash', now]);
   c.eq((await h.request(teacherPath('orig-class'), { jar: carol.jar })).status, 404, 'a teacher whose class the student is not in is refused');
+  // Joined AFTER the work was done: joining opens none of it.
   await db.run('INSERT INTO class_members(class_id,student_account_id,joined_at) VALUES (?,?,?)', ['orig-class', alice.id, now]);
+  c.eq((await h.request(teacherPath('orig-class'), { jar: carol.jar })).status, 404, 'work done before the student joined the class is not opened to the teacher');
+  await db.run('UPDATE class_members SET joined_at=? WHERE class_id=? AND student_account_id=?', [now - 3600_000, 'orig-class', alice.id]);
   const served = await h.request(teacherPath('orig-class'), { jar: carol.jar });
   c.deq([served.status, served.data?.original?.sha256], [200, sha(bytes)], 'their teacher sees the student\'s own ink, by the same digest');
   c.eq((await h.request(teacherPath('dave-class'), { jar: dave.jar })).status, 404, 'another teacher, through their own class, is refused');
@@ -212,6 +215,13 @@ try {
   c.eq((await h.request(teacherPath('orig-class', bob.id), { jar: carol.jar })).status, 404, 'a teacher cannot reach it under another student');
   c.eq((await h.request(teacherPath('orig-class'), { jar: bob.jar })).status, 403, 'a student cannot use the teacher route');
   c.eq((await h.request(`/v1/originals/${id}`, { jar: carol.jar })).status, 403, 'a teacher cannot use the student route');
+  // A child whose guardian consent is blocked shares nothing, with their teacher included.
+  await db.run("UPDATE accounts SET age_basis='child' WHERE id=?", [alice.id]);
+  await db.run("INSERT INTO guardian_consents(account_id,guardian_name,guardian_email,notice_version,requested_at,withdrawn_at,method) VALUES (?,?,?,?,?,?,?)", [alice.id, 'Parent', 'parent@example.test', '2026-10', now, now, 'email-link']);
+  c.eq((await h.request(teacherPath('orig-class'), { jar: carol.jar })).status, 404, 'a withdrawn guardian consent closes the teacher route');
+  await db.run('DELETE FROM guardian_consents WHERE account_id=?', [alice.id]);
+  await db.run("UPDATE accounts SET age_basis='adult' WHERE id=?", [alice.id]);
+  c.eq((await h.request(teacherPath('orig-class'), { jar: carol.jar })).status, 200, 'and it reopens only with consent in place');
   await db.run('UPDATE class_members SET removed_at=? WHERE class_id=? AND student_account_id=?', [now, 'orig-class', alice.id]);
   c.eq((await h.request(teacherPath('orig-class'), { jar: carol.jar })).status, 404, 'after the student leaves the class, the teacher is refused');
   await db.run('UPDATE class_members SET removed_at=NULL WHERE class_id=? AND student_account_id=?', ['orig-class', alice.id]);
@@ -270,6 +280,10 @@ try {
     c.eq(v4.data.original.data, photo, 'and serves the very photograph back');
     const mismatched = await submit(bob.jar, await issue(bob.jar, 104733), 'orig-photo-2', { answer: '9', mode: 'photo', image: photo, original: { kind: 'image', origin: 'photo', samePicture: true, sha256: 'a'.repeat(64) } });
     c.eq(mismatched.data?.error?.code, 'ORIGINAL_DIGEST_MISMATCH', 'a photograph whose digest does not match is refused');
+    const otherImage = jpegDataUrl('a different picture, never read');
+    const unread = await submit(bob.jar, await issue(bob.jar, 104734), 'orig-photo-3', { answer: '9', mode: 'photo', image: photo,
+      original: { kind: 'image', origin: 'photo', data: otherImage, sha256: sha(Buffer.from(otherImage.split(',')[1], 'base64')) } });
+    c.eq(unread.data?.error?.code, 'ORIGINAL_INVALID', 'a photo original that is not the picture that was read is refused');
   }
 
   // ══ 9 · Account deletion removes the ink ══════════════════════════════════

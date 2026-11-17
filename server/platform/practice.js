@@ -1504,7 +1504,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         response.reading = { receipt, corrected: reading.corrected, reused: reading.reused };
       }
       // The original, kept with the mark in this transaction and named in the
-      // reply by its digest: the mark is provably on THIS handwriting. An
+      // reply by its digest: the mark is recorded with THIS handwriting. An
       // entry that is not an attempt (invalid) keeps nothing. A page over the
       // account's quota is not kept on the server — the reply says so and the
       // device keeps its copy; the mark is unaffected.

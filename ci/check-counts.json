@@ -340,7 +340,7 @@
       "job": "platform-contracts",
       "log": "original-work.log",
       "pins": [
-        {"has":"original-work-check (sqlite): 66 checks passed"}
+        {"has":"original-work-check (sqlite): 70 checks passed"}
       ]
     },
     "platform/desk.log#2": {
@@ -464,7 +464,7 @@
       "log": "security-p2.log",
       "pins": [
         {"has":"admin-mfa-class-routes-check: 77/77 checks passed (sqlite)"},
-        {"has":"account-export-completeness-check (sqlite): 89 checks passed","note":"78 → 82 (plan F4a): the Exam Desk's attempts are exported, never their idempotency key or digest. 82 → 89 (standard #08): the kept originals are exported with their bytes, digest, line links and reading layer."},
+        {"has":"account-export-completeness-check (sqlite): 90 checks passed","note":"78 → 82 (plan F4a): the Exam Desk's attempts are exported, never their idempotency key or digest. 82 → 90 (standard #08): the kept originals are exported as stored (gzip), with their digest, line links and reading layer."},
         {"has":"RLS ACCOUNT COVERAGE: PASS — 20/20 checks"},
         {"has":"OTP DELETE ASYMMETRY: PASS — 15/15 checks"}
       ]

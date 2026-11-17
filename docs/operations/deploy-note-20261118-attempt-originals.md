@@ -35,8 +35,8 @@ Production databases need the owner's go-ahead (AGENTS.md: production operations
 Neon's Free plan gives each project 0.5 GB of storage. Stored sizes: a page of strokes is typically
 5–40 kB (gzip), a photographed page up to 750 kB. Per-account quotas (40 MB strokes, 24 MB images,
 `ORIGINAL_QUOTA` in `server/platform/originalWork.js`) bound one account; a page over quota is
-**not** kept on the server — the mark still commits, the reply says `saved: false, reason: 'quota'`,
-and the device keeps its copy. Rough capacity of 0.5 GB with nothing else in the database:
+**not** kept on the server — the mark still commits and the reply says `saved: false, reason: 'quota'`.
+The device keeps only its usual history copy (compacted points), not the raw original. Rough capacity of 0.5 GB with nothing else in the database:
 ≈ 25,000 stroke pages, or ≈ 1,000 photos. Photos are the risk: if the database nears the limit,
 lower `ORIGINAL_QUOTA.imageBytes` or provision an object store (not wired today — no bucket exists
 for either edition). Watch `select pg_total_relation_size('pri.attempt_originals')`.

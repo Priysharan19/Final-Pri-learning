@@ -53,11 +53,18 @@ export async function buildInkOriginal({ strokes, removed = [], page = null, ink
   const onPage = (Array.isArray(strokes) ? strokes : []).filter(s => (s?.points?.length || s?.raw?.length));
   if (!onPage.length) return null;
   const size = page && page.width > 0 && page.height > 0 ? page : extentOf(onPage);
-  let bytes;
-  try {
-    bytes = encodeInk({ strokes: onPage, removed: Array.isArray(removed) ? removed : [], width: size.width, height: size.height,
-      source: inkSource === 'pencilkit' ? 'pencilkit' : 'web-pointer' });
-  } catch { return null; }
+  const source = inkSource === 'pencilkit' ? 'pencilkit' : 'web-pointer';
+  const gone = Array.isArray(removed) ? removed : [];
+  let bytes = null;
+  try { bytes = encodeInk({ strokes: onPage, removed: gone, width: size.width, height: size.height, source }); } catch { bytes = null; }
+  // A long page of raw pen samples can pass the limit. Rather than keep
+  // nothing, keep the drawn points (fewer: near-duplicates are dropped) —
+  // flagged CONDITIONED inside the format, never passed off as raw — and
+  // then, if still too large, the page without its crossed-out strokes.
+  const drawnOnly = list => list.map(({ raw: _raw, ...s }) => s);
+  if (!bytes) try { bytes = encodeInk({ strokes: drawnOnly(onPage), removed: drawnOnly(gone), width: size.width, height: size.height, source }); } catch { bytes = null; }
+  if (!bytes) try { bytes = encodeInk({ strokes: drawnOnly(onPage), width: size.width, height: size.height, source }); } catch { bytes = null; }
+  if (!bytes) return null;
   const sha256 = await sha256Hex(bytes);
   const zipped = await gzip(bytes);
   const wire = zipped && zipped.byteLength < bytes.byteLength ? { encoding: 'gzip', data: bytesToBase64(zipped) } : { encoding: 'identity', data: bytesToBase64(bytes) };

@@ -884,7 +884,8 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     // strokes or photographed page itself, its digest, each line's strokes and
     // the reading layer (what was read, what they confirmed, their edits).
     const originalRows = await db.all('SELECT * FROM attempt_originals WHERE account_id=? ORDER BY created_at, id', [accountId]);
-    const originals = originalRows.map(row => { try { return originalView(row); } catch { return { ...originalView(row, { withBytes: false }), data: null, corrupt: true }; } });
+    // The bytes as stored (gzip for strokes, `encoding` says so): not inflated here.
+    const originals = originalRows.map(row => originalView(row, { stored: true }));
     // A receipt with no personal data: the format and how many rows each
     // section carried, so a bulk read of an account is visible in the audit
     // trail without copying any of it.
@@ -945,8 +946,9 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
           createdAt: Number(row.created_at), updatedAt: Number(row.updated_at), finishedAt: row.finished_at == null ? null : Number(row.finished_at)
         };
       }),
-      // Strokes are pri-ink-v1 bytes (base64; client/src/engine/originalInk.js
-      // documents the format); an image is a data URL.
+      // Strokes are pri-ink-v1 bytes (client/src/engine/originalInk.js
+      // documents the format), gzip when `encoding` says so; an image's bytes
+      // are its own; both base64, with the SHA-256 of the canonical bytes.
       originals
     });
   });

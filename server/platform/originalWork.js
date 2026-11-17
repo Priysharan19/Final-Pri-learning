@@ -9,8 +9,12 @@
 // keeps it in the SAME transaction as the mark, bound to it by SHA-256:
 //
 //   · the grade reply (the receipt the device keeps) names the original's
-//     digest, and so does the graded-attempt event, so a mark is provably tied
-//     to that exact handwriting;
+//     digest, and so does the graded-attempt event, so the mark is recorded
+//     with that exact handwriting. For a photo, the original IS the picture
+//     that was read (same bytes, samePicture). For strokes, the server checks
+//     the bytes against their digest and the page against the format; the
+//     picture that was read is rendered by the device from the same strokes,
+//     which the server cannot re-render to compare;
 //   · the original is stored as received and never rewritten: no smoothing,
 //     no beautifying, no typeset version. A row is inserted once and never
 //     updated (a replay under the same submission finds the row it wrote);
@@ -32,7 +36,8 @@
 // a page of strokes is typically 5–40 kB stored, a photo up to 750 kB. Neon's
 // Free plan gives 0.5 GB per project, so per-account quotas below bound what
 // one account can take, and a page over quota is refused for the SERVER copy
-// only — the device keeps it and says so ("saved on this device").
+// only — the reply says so (saved: false, reason 'quota'); the device keeps
+// the strokes in its own history as before.
 //
 // PRIVACY. Account-owned under RLS (pri_scope_required + RESTRICTIVE
 // pri_account_scope) and server authorization on every read: the student, or a
@@ -123,8 +128,10 @@ export function parseOriginal(original, { mode, picture = null } = {}) {
     if (!ORIGIN.has(original.origin) || original.origin === 'ink') throw new OriginalRefused('ORIGINAL_INVALID', 'Name where the image came from: photo or pdf-page.');
     if (original.encoding !== undefined) throw new OriginalRefused('ORIGINAL_INVALID', 'An image is kept as its own bytes.');
     if (original.lines !== undefined) throw new OriginalRefused('ORIGINAL_INVALID', 'Line regions are stroke indices; an image has none.');
-    const dataUrl = original.samePicture === true ? picture : original.data;
-    if (original.samePicture === true && original.data !== undefined) throw new OriginalRefused('ORIGINAL_INVALID', 'Send the image once.');
+    // A photo's original is the very picture this request sends to be read
+    // (samePicture): never a separate image that was not read.
+    if (original.samePicture !== true || original.data !== undefined) throw new OriginalRefused('ORIGINAL_INVALID', 'A photographed original is the picture this answer was read from.');
+    const dataUrl = picture;
     if (typeof dataUrl !== 'string') throw new OriginalRefused('ORIGINAL_INVALID', 'The original image is missing.');
     let format;
     try { ({ mime: format } = validateImage(dataUrl)); } catch (error) { throw new OriginalRefused(error.code || 'ORIGINAL_INVALID', error.message, error.status || 400); }
@@ -194,8 +201,13 @@ export function originalBytes(row) {
   return bytes;
 }
 
-/** The read view of one row: metadata, the reading layer, the line regions and the original's bytes (base64, canonical). */
-export function originalView(row, { withBytes = true } = {}) {
+/**
+ * The read view of one row: metadata, the reading layer, the line regions and
+ * the original's bytes (base64, canonical). `stored: true` gives the bytes as
+ * stored instead (gzip for strokes, with `encoding`), without decompressing —
+ * what the account export uses, so a large export is not inflated in memory.
+ */
+export function originalView(row, { withBytes = true, stored = false } = {}) {
   let reading = null, lines = [];
   try { reading = JSON.parse(row.reading_json); } catch { reading = null; }
   try { lines = JSON.parse(row.lines_json); } catch { lines = []; }
@@ -204,13 +216,14 @@ export function originalView(row, { withBytes = true } = {}) {
     questionId: row.question_id, submissionId: row.submission_id, attemptId: row.attempt_id,
     createdAt: Number(row.created_at), expiresAt: Number(row.expires_at), byteLength: Number(row.canonical_bytes),
     lines, reading,
-    ...(withBytes ? { data: row.kind === 'image' ? `data:${row.format};base64,${originalBytes(row).toString('base64')}` : originalBytes(row).toString('base64') } : {})
+    ...(withBytes && stored ? { encoding: row.encoding, data: Buffer.from(row.content).toString('base64') } : {}),
+    ...(withBytes && !stored ? { data: row.kind === 'image' ? `data:${row.format};base64,${originalBytes(row).toString('base64')}` : originalBytes(row).toString('base64') } : {})
   };
 }
 
 /** Whether `teacherId` teaches an active class `studentId` is an active member of. */
-async function teachesStudent(db, teacherId, classId, studentId) {
-  return !!await db.get(`SELECT c.id FROM classes c JOIN class_members m ON m.class_id = c.id
+async function membershipOf(db, teacherId, classId, studentId) {
+  return db.get(`SELECT m.joined_at FROM classes c JOIN class_members m ON m.class_id = c.id
     WHERE c.id=? AND c.teacher_account_id=? AND c.archived_at IS NULL AND m.student_account_id=? AND m.removed_at IS NULL`, [classId, teacherId, studentId]);
 }
 
@@ -244,11 +257,14 @@ export function createOriginalsRouter(db, { edition = serverEdition(process.env)
     // active class. Only then is the student's row read (system scope: RLS
     // confines account scope to the caller's own rows, and this row is the
     // student's, so the authorization above is the boundary).
-    if (!await teachesStudent(db, session.account_id, String(classId), String(studentId))) return fail(res, 404, 'ORIGINAL_NOT_FOUND', 'No such work.');
+    const member = await membershipOf(db, session.account_id, String(classId), String(studentId));
+    if (!member) return fail(res, 404, 'ORIGINAL_NOT_FOUND', 'No such work.');
     // A child whose guardian has not given (or has withdrawn) consent shares
     // nothing with anyone, their teacher included.
     if (consentBlockerCode(await consentState(db, String(studentId)))) return fail(res, 404, 'ORIGINAL_NOT_FOUND', 'No such work.');
-    const row = await db.get('SELECT * FROM attempt_originals WHERE id=? AND account_id=? AND edition=?', [id, String(studentId), edition]);
+    // Only work the student did while in this teacher's class: nothing from
+    // before they joined is opened to the teacher by joining.
+    const row = await db.get('SELECT * FROM attempt_originals WHERE id=? AND account_id=? AND edition=? AND created_at >= ?', [id, String(studentId), edition, Number(member.joined_at)]);
     return row ? send(res, row) : fail(res, 404, 'ORIGINAL_NOT_FOUND', 'No such work.');
   });
 

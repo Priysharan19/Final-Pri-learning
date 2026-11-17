@@ -94,6 +94,16 @@ const stroke = (x0, y0, n, t0, { raw = true } = {}) => {
   const photo = 'data:image/png;base64,' + Buffer.from('a photographed page').toString('base64');
   const named = await builder.buildImageOriginal(photo, { samePicture: true });
   eq(named, { kind: 'image', origin: 'photo', samePicture: true, sha256: sha(Buffer.from('a photographed page')) }, 'a photo is named by its digest when the request already carries it');
+  // A long page of raw samples past the limit keeps its drawn points instead
+  // (flagged CONDITIONED), rather than nothing.
+  const long = Array.from({ length: 4 }, (_, k) => {
+    const rawS = Array.from({ length: 12000 }, (_, i) => ({ x: (i % 500) + 0.37, y: k * 60 + (i % 7), t: k * 100 + i / 240, p: 0.5 }));
+    return { raw: rawS, points: rawS.filter((_, i) => i % 40 === 0) };
+  });
+  const big = await builder.buildInkOriginal({ strokes: long, page: { width: 600, height: 300 } });
+  const bigWire = Buffer.from(big.data, 'base64');
+  const bigPage = ink.decodeInk(big.encoding === 'gzip' ? gunzipSync(bigWire) : bigWire);
+  ok(bigPage.strokes.length === 4 && bigPage.strokes.every(s => s.conditioned && s.points.length === 300), 'a page too long to keep raw keeps its drawn points, labelled CONDITIONED');
   eq(builder.originalState({ original: built, sent: true }).state, 'uploading', 'state: uploading while the answer is out');
   eq(builder.originalState({ reply: { original: { saved: true, sha256: built.sha256, id: 'x' } } }).state, 'saved', 'state: saved when the server says so');
   eq(builder.originalState({ reply: { original: { saved: false, reason: 'quota' } } }), { state: 'device', reason: 'quota' }, 'state: on this device when the server did not keep it');
@@ -151,6 +161,44 @@ try {
   const grade = (await online.db.all("SELECT response_json FROM idempotency_keys WHERE scope='practice-grade'")).map(r => JSON.parse(r.response_json)).find(r => r.submissionId === submissionId);
   eq([grade?.original?.saved, grade?.original?.sha256], [true, original.sha256], 'the committed receipt is bound to the same handwriting');
   ok(online.reader.calls >= 1 && !JSON.stringify(online.traffic).includes(original.data.slice(0, 40)), 'the reader was sent pictures only');
+
+  // The server refuses an original (here: one whose digest is wrong, as a
+  // device bug would send): the answer is still marked, without it.
+  const fallbackQ = async seed => {
+    for (let i = 0; i < 40; i++) {
+      const { question } = await POST('/practice/next', { mode: 'smart', resume: false });
+      const q = await online.answerKey(await idb.get('questions', question.id));
+      if (q?.answerType === 'numeric' && String(q.answer?.value) !== '7') return question.id;
+      await POST(`/practice/${question.id}/discard`, {}).catch(() => {});
+    }
+    throw new Error('no numeric question ' + seed);
+  };
+  {
+    const q2 = await fallbackQ(2);
+    const before = (await kept()).length;
+    const broken = { ...original, sha256: 'f'.repeat(64) };
+    const res2 = await POST(`/practice/${q2}/submit`, { ...body, submissionId: nextSubmissionId(), ink: { ...body.ink, original: broken } });
+    ok(res2 && !res2.error, 'a refused original never blocks the mark: the same press goes again without it');
+    eq((await kept()).length, before, 'and nothing unverified is kept');
+  }
+  // A server that does not take originals yet (a rollback to schema 17) refuses
+  // the request by its shape: handwritten answers are still marked.
+  {
+    const q3 = await fallbackQ(3);
+    const realFetch = globalThis.fetch;
+    let refusedOnce = 0;
+    globalThis.fetch = async (url, options = {}) => {
+      if (/\/v1\/practice\/[^/]+\/submit$/.test(String(url)) && String(options.body || '').includes('"original"')) {
+        refusedOnce += 1;
+        return new Response(JSON.stringify({ error: { code: 'PRACTICE_SUBMISSION_INVALID', message: 'A server-issued question and allowed answer fields are required.' } }), { status: 400, headers: { 'content-type': 'application/json' } });
+      }
+      return realFetch(url, options);
+    };
+    try {
+      const res3 = await POST(`/practice/${q3}/submit`, { ...body, submissionId: nextSubmissionId() });
+      ok(refusedOnce >= 1 && res3 && !res3.error, 'an older server that refuses the field still marks the handwritten answer, sent without it');
+    } finally { globalThis.fetch = realFetch; }
+  }
 } finally {
   await online.close();
 }

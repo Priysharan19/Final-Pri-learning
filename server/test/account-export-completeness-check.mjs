@@ -18,7 +18,7 @@ import './support/hermetic.mjs';
 import { requestedEngine } from './support/engine.mjs';
 import { checks, registerAccount, startApp } from './support/app-harness.mjs';
 import { createHash } from 'node:crypto';
-import { gzipSync } from 'node:zlib';
+import { gunzipSync, gzipSync } from 'node:zlib';
 import { encodeInk } from '../../client/src/engine/originalInk.js';
 
 // table.column → the export section that carries it.
@@ -189,7 +189,8 @@ try {
   // The original itself, byte for byte, under its digest.
   c.eq(x.originals?.length, 1, 'Alice\'s one kept original is exported');
   const kept = x.originals[0];
-  c.eq(createHash('sha256').update(Buffer.from(kept.data, 'base64')).digest('hex'), kept.sha256, 'the exported strokes are the kept bytes (their SHA-256 matches)');
+  c.eq(kept.encoding, 'gzip', 'exported as stored (gzip), not inflated in memory');
+  c.eq(createHash('sha256').update(gunzipSync(Buffer.from(kept.data, 'base64'))).digest('hex'), kept.sha256, 'the exported strokes are the kept bytes (their SHA-256 matches)');
   c.deq(kept.lines, [{ strokes: [0] }], 'with each reading line\'s strokes');
   c.ok(!('content' in kept) && !('account_id' in kept), 'raw column names are not exported');
 
