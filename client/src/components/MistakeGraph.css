@@ -19,7 +19,11 @@
 .mg-plot svg { display: block; width: 100%; height: auto; max-height: 320px; overflow: visible; }
 .mg-grid line { stroke: var(--hairline); stroke-width: 1; }
 .mg-axes line { stroke: var(--ink-3); stroke-width: 1.4; }
-.mg-axes text { font: 12px var(--font, system-ui, sans-serif); fill: var(--ink-3); }
+.mg-axes text {
+  font: 12px var(--font, system-ui, sans-serif); fill: var(--ink-3);
+  /* A paper halo, as the diagram kit does, so a curve never runs through a label. */
+  paint-order: stroke; stroke: var(--surface-raised); stroke-width: 3.5px; stroke-linejoin: round;
+}
 .mg-curve { fill: none; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .mg-curve.mg-before { stroke: var(--ink-2); }
 .mg-curve.mg-yours { stroke: var(--correction); stroke-linecap: butt; }
