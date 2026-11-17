@@ -30,6 +30,15 @@ export const AU_STRINGS = Object.freeze({
   'explain.kicker': 'Pri Explain · Exam mode',
   'insights.lead': 'Read from your own marked practice. Nothing here is a predicted exam score.',
   'insights.forecastHonesty': 'An estimate from your practice, not a predicted exam score. The range is over the marks you have practised only, and it is wide when the evidence is thin.',
+  'board.whyUnitMissing': 'the value is right but the unit ({unit}) is missing — an examiner may withhold this mark',
+  'board.sentenceNoWorking': Object.freeze({
+    one: '{awarded}/{total}. You wrote only the answer, so {n} step mark was not available. In an exam those are marks you had already earned and did not claim — show the working.',
+    other: '{awarded}/{total}. You wrote only the answer, so {n} step marks were not available. In an exam those are marks you had already earned and did not claim — show the working.'
+  }),
+  'board.sentenceFull': '{awarded}/{total}. Full marks, and the working would earn them in an exam.',
+  'board.sentenceMethod': '{awarded}/{total}. The answer is not right, but the method is, and an examiner may award marks for that.',
+  'teach.newClassPlaceholder': 'New class name (e.g. Year 10 A)',
+  'teach.rosterHelp': 'Roster files: one student per line — {format}. Names already on this device join; new names get a student profile.',
   'exams.indiaHeading': 'Exams',
   'placement.provenance': 'The prerequisite map behind it is Pri’s own teaching judgement (version {version}), not a NESA publication.'
 });

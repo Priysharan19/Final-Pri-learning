@@ -23,8 +23,7 @@ const BAN = /\bclass(es)?\s*[0-9]|\bclass\s*\{|ncert|cbse|\bjee\b|olympiad|₹|\
 const ALLOW = [
   [/^ncert\./, 'the NCERT chapter library and release notes (Indian courses only)'],
   [/^mock\./, 'CBSE board-format mock papers (engine/boardMock.js, Indian courses only)'],
-  [/^board\./, 'CBSE board-style step marking sentences (Indian tracks only)'],
-  [/^teach\.(.*India|noPredictionClassReport|noPredictionStudentReport|newClassPlaceholder|rosterHelp)/, 'teacher panel copy for Indian classes'],
+  [/^teach\.(.*India|noPredictionClassReport|noPredictionStudentReport)/, 'teacher-panel copy gated on the India flag (Teach.jsx)'],
   [/^exams\.(bp\.|jee|cbse|buildingJee|startJee|classPractice)/, 'Indian exam blueprints and tracks (CBSE, JEE, IOQM)'],
   [/^placement\./, 'the placement diagnostic walks the NCERT prerequisite spine (engine/placement.js); Indian courses only'],
   [/^gloss\./, 'NCERT Hindi term glossary; Prithagoras offers no Hindi'],
@@ -36,8 +35,8 @@ const ALLOW = [
   [/^paywall\.from\.jeeAdvanced$/, 'reached only from the jee-advanced arrival path, an Indian track'],
   [/^home\.pickTrack$/, 'drawn only for an India course (TopicGenerator.jsx, india flag)'],
   [/^progress\.evidenceSub$/, 'drawn by IndiaProgress.jsx only'],
-  [/^login\.placementOffer$/, 'the placement offer, behind the placement flag (off by default; placement is India-only)'],
-  [/^library\.course\.in$/, 'the label of an India resource; Prithagoras lists NSW resources only'],
+  [/^login\.placementOffer$/, 'a sentence about India-curriculum students at sign-up, drawn only when the placement flag is on (off by default; placement is India-only); revisit if placement ever ships to Prithagoras'],
+  [/^library\.course\.in$/, 'the course option for an India resource in the staff-only resource-publishing panel, and the label of such a resource; a data value, not copy a Prithagoras student reads'],
   [/^home\.next\.firstIndia$/, 'first-step copy for Indian courses'],
   [/^login\.olympiadTrack$/, 'Indian track chooser at sign-up'],
   [/^signup\.trackJeeHint$/, 'Indian track chooser at sign-up']
@@ -57,9 +56,9 @@ check('no shared string carries an India-only term into Prithagoras without an o
 check('every override replaces a key that exists, and removes the India-only term', () => {
   for (const [k, v] of Object.entries(AU_STRINGS)) {
     assert.ok(Object.hasOwn(en, k), `${k} is not in the English catalogue`);
-    assert.ok(!BAN.test(v), `${k} override still carries an India-only term`);
-    const need = new Set([...en[k].matchAll(/\{(\w+)\}/g)].map(m => m[1]));
-    const have = new Set([...v.matchAll(/\{(\w+)\}/g)].map(m => m[1]));
+    assert.ok(!BAN.test(stringOf(v)), `${k} override still carries an India-only term`);
+    const need = new Set([...stringOf(en[k]).matchAll(/\{(\w+)\}/g)].map(m => m[1]));
+    const have = new Set([...stringOf(v).matchAll(/\{(\w+)\}/g)].map(m => m[1]));
     for (const p of have) assert.ok(need.has(p), `${k} override uses {${p}} which the original does not take`);
   }
 });
