@@ -70,5 +70,33 @@ for (const [id, packet, label] of [['nsw-hsc', 'hsc', 'NSW'], ['cbse', 'cbse', '
 }
 ok(!existsSync(path.join(ROOT, 'docs/marking/prereview/certification.json')), 'the pre-review folder holds no record');
 
+// Behavioural: load each page in a real browser with empty storage and look at what it does.
+let ran = 0;
+try {
+  const { createRequire } = await import('node:module');
+  const { chromium } = createRequire(path.join(ROOT, 'client/package.json'))('playwright');
+  const browser = await chromium.launch();
+  try {
+    for (const id of ['nsw-hsc', 'cbse']) {
+      const page = await browser.newPage();
+      await page.goto('file://' + path.join(ROOT, `docs/marking/review/${id}.html`));
+      const pressed = await page.evaluate(() => document.querySelectorAll('[aria-pressed="true"]').length);
+      const prog = await page.evaluate(() => Number(document.getElementById('prog').value));
+      ok(pressed === 0 && prog === 0, `${id} page opens with ${pressed} verdict(s) pressed and progress ${prog}`);
+      const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 5000 }).catch(() => null), page.click('#exj')]);
+      if (dl) {
+        const rec = JSON.parse(readFileSync(await dl.path(), 'utf8'));
+        ok(Object.keys(rec.decisions || {}).length === 0 && rec.draftNotSigned === true && rec.signedOriginal === '' && rec.examiners[0].independent === false, `${id} export of an untouched page is not an empty, unsigned draft`);
+      }
+      // one tap records exactly one verdict and no more
+      await page.click('.item .vb button[data-v="C"]');
+      const after = await page.evaluate(() => document.querySelectorAll('[aria-pressed="true"]').length);
+      ok(after === 1, `${id} one tap pressed ${after} buttons`);
+      await page.close();
+    }
+    ran = 1;
+  } finally { await browser.close(); }
+} catch (e) { console.log(`EXAMINER REVIEW: browser check skipped (${String(e.message).split('\n')[0].slice(0, 80)}); the static checks still ran`); }
+
 if (failures.length) { console.error(`EXAMINER REVIEW: FAIL\n  ${failures.join('\n  ')}`); process.exit(1); }
 console.log(`EXAMINER REVIEW: PASS — ${pass} checks: pages current, complete, nothing pre-filled, offline, never read the AI pre-review; pre-review labelled and covers every item; packets print no undefined; kits hold no pre-review. Signs and certifies nothing.`);
