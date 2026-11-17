@@ -1,6 +1,10 @@
-// Pri Learning · NSW Notes — the parts of one chapter, in the order every chapter
-// uses: ideas, definitions, formulas (boxed), diagram, what examiners look for,
-// traps, worked examples, self-check. Presentation only; no curriculum data.
+// Pri Learning · NSW Notes — the parts of one chapter, in the order of Experience 3 of
+// the Learning Experience Standard: objective, builds on, intuition, ideas, definitions,
+// formulas (boxed), diagrams, worked examples, what examiners look for, traps,
+// self-check, and the next step into Practice. A section whose content the chapter does
+// not have is left out, never stubbed. Presentation only; no curriculum data.
+// The parts both editions share (objective, intuition, diagrams, self-check, next step)
+// are in ../NotesParts.jsx.
 //
 // All mathematics goes through KaTeX (lib/latex.jsx for running text, DisplayMath
 // below for display and aligned working). Nothing here builds maths from HTML or
@@ -11,7 +15,9 @@ import { MathText } from '../../lib/latex.jsx';
 import Icon from '../../components/Icon.jsx';
 import DiagramFromSpec from '../../diagrams/DiagramFromSpec.jsx';
 import { useT } from '../../i18n/index.js';
-import './nswFonts.css';
+import { Objective, BuildsOn, Intuition, TeachingDiagrams, SelfCheck } from '../NotesParts.jsx';
+import '../notesFonts.css';
+import '../notesSheet.css';
 import './nswNotes.css';
 
 const escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -71,20 +77,6 @@ export function FormulaBox({ f }) {
   );
 }
 
-export function Diagrams({ items }) {
-  return (
-    <div className="nn-diagrams">
-      {items.map((d, i) => (
-        <div key={i} className="nn-diagram">
-          {d.title && <h3 className="nn-diagram-t"><MathText text={d.title} /></h3>}
-          <DiagramFromSpec spec={d.spec} interactive />
-          {d.note && <MathText block className="nn-diagram-note" text={d.note} />}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function Examiners({ items }) {
   return (
     <ul className="nn-examiners">
@@ -141,45 +133,30 @@ export function WorkedExample({ ex, n }) {
   );
 }
 
-export function SelfCheck({ items }) {
-  const t = useT();
-  const [open, setOpen] = useState(() => new Set());
-  const toggle = i => setOpen(prev => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; });
-  return (
-    <ol className="nn-check">
-      {items.map((c, i) => {
-        const isOpen = open.has(i);
-        return (
-          <li key={i}>
-            <MathText block className="nn-read nn-q" text={c.question} />
-            <button type="button" className="nt-link-btn" aria-expanded={isOpen} aria-controls={`nn-a-${i}`} onClick={() => toggle(i)}>
-              {isOpen ? t('notes.nsw.hideAnswer') : t('notes.nsw.showAnswer')}
-            </button>
-            <div id={`nn-a-${i}`} hidden={!isOpen} className="nn-check-a"><MathText block className="nn-read" text={c.answer} /></div>
-          </li>
-        );
-      })}
-    </ol>
-  );
-}
-
-/** The body of a chapter, in the order every chapter uses. */
-export function ChapterSheet({ notes, topicId }) {
+/**
+ * The body of a chapter, in the order every chapter uses. `buildsOn`: [{ to, label }] for
+ * the topics it builds on; `next`: the next step into Practice (NextPractice), always last.
+ */
+export function ChapterSheet({ notes, topicId, buildsOn = [], next = null }) {
   const t = useT();
   return (
     <div className="nt-sheet" data-chapter-sheet>
+      {notes.objective && <SectionBlock id="objective" title={t('notes.sectionObjective')}><Objective text={notes.objective} /></SectionBlock>}
+      {buildsOn.length > 0 && <SectionBlock id="prerequisites" title={t('notes.buildsOn')}><BuildsOn links={buildsOn} /></SectionBlock>}
+      {notes.intuition && <SectionBlock id="intuition" title={t('notes.sectionIntuition')}><Intuition text={notes.intuition} /></SectionBlock>}
       <SectionBlock id="ideas" title={t('notes.sectionIdeas')}><Ideas concepts={notes.concepts} /></SectionBlock>
       <SectionBlock id="definitions" title={t('notes.sectionDefinitions')}><Definitions items={notes.definitions} /></SectionBlock>
       <SectionBlock id="formulas" title={t('notes.sectionFormulas')}>
         <div className="nn-formulas">{notes.formulas.map((f, i) => <FormulaBox key={i} f={f} />)}</div>
       </SectionBlock>
-      {notes.diagrams?.length > 0 && <SectionBlock id="diagram" title={t('notes.nsw.sectionDiagram')}><Diagrams items={notes.diagrams} /></SectionBlock>}
-      {notes.examiners?.length > 0 && <SectionBlock id="examiners" title={t('notes.nsw.sectionExaminers')}><Examiners items={notes.examiners} /></SectionBlock>}
-      <SectionBlock id="mistakes" title={t('notes.nsw.sectionTraps')}><Traps items={notes.mistakes} /></SectionBlock>
+      {notes.diagrams?.length > 0 && <SectionBlock id="diagram" title={t('notes.sectionDiagrams')}><TeachingDiagrams items={notes.diagrams} /></SectionBlock>}
       <SectionBlock id="examples" title={t('notes.sectionExamples')}>
         {notes.examples.map((ex, i) => <WorkedExample key={topicId + ':' + ex.question} ex={ex} n={i + 1} />)}
       </SectionBlock>
-      {notes.check?.length > 0 && <SectionBlock id="check" title={t('notes.nsw.sectionCheck')}><SelfCheck items={notes.check} /></SectionBlock>}
+      {notes.examiners?.length > 0 && <SectionBlock id="examiners" title={t('notes.nsw.sectionExaminers')}><Examiners items={notes.examiners} /></SectionBlock>}
+      <SectionBlock id="mistakes" title={t('notes.nsw.sectionTraps')}><Traps items={notes.mistakes} /></SectionBlock>
+      {notes.check?.length > 0 && <SectionBlock id="check" title={t('notes.sectionCheck')}><SelfCheck items={notes.check} /></SectionBlock>}
+      {next && <SectionBlock id="practice" title={t('notes.sectionNext')}>{next}</SectionBlock>}
     </div>
   );
 }

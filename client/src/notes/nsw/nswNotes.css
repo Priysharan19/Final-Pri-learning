@@ -1,27 +1,15 @@
-/* NSW notes: the chapter sheet.
+/* NSW notes: the chapter sheet's NSW-only parts (ideas, definitions, boxed formulas,
+   what examiners look for, traps, worked examples with aligned working). The parts both
+   editions share — reading tokens, section heads, objective, intuition, diagrams, the
+   checkpoint and the next step — are in ../notesSheet.css.
    Reading text is CMU Serif, maths is KaTeX, interface labels are Instrument Sans.
-   One spacing scale (4 8 12 16 24 32 48), one box (hairline border, 6px radius),
-   no left-border cards, no gradients. Colours are the notes' own tokens, so light
-   and dark follow the theme. Scoped to [data-nsw-notes]; the India notes are untouched. */
+   No left-border cards, no gradients. Scoped to [data-nsw-notes]. */
 [data-nsw-notes] {
-  --nn-s1: 4px; --nn-s2: 8px; --nn-s3: 12px; --nn-s4: 16px; --nn-s5: 24px; --nn-s6: 32px; --nn-s7: 48px;
-  --nn-read: 'CMU Serif', 'Latin Modern Roman', 'Times New Roman', serif;
-  --nn-ui: var(--in-ui, 'Instrument Sans Variable', system-ui, sans-serif);
   --nt-serif: var(--nn-read);
-  --nn-box: var(--nt-raised);
-  --nn-line: var(--nt-rule);
 }
 [data-nsw-notes] .nt-title, [data-nsw-notes] .nt-lede { font-family: var(--nn-read); font-weight: 400; }
 [data-nsw-notes] .nt-lede { font-size: 20px; line-height: 1.6; }
 
-.nn-read { font-family: var(--nn-read); font-size: 19px; line-height: 1.65; color: var(--nt-ink); }
-.nn-read .katex { font-size: 1.04em; }
-.nn-section { padding-top: var(--nn-s6); }
-.nn-section + .nn-section { margin-top: var(--nn-s2); }
-.nn-h { font-family: var(--nn-ui); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nt-ink-3); margin: 0 0 var(--nn-s4); padding-bottom: var(--nn-s2); border-bottom: 1px solid var(--nn-line); }
-.nn-label { font-family: var(--nn-ui); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nt-ink-3); margin: 0 0 var(--nn-s2); }
-.nn-tag { display: flex; align-items: center; gap: var(--nn-s1); font-family: var(--nn-ui); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: var(--nn-s1); }
-.nn-ico { flex: none; }
 
 /* Ideas */
 .nn-ideas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--nn-s5); }
@@ -44,11 +32,6 @@
 .nn-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: var(--nn-s1) 0; }
 .nn-display .katex-display { margin: var(--nn-s2) 0; }
 .nn-display .katex { font-size: 1.2em; }
-
-/* Diagrams */
-.nn-diagrams { display: grid; gap: var(--nn-s5); }
-.nn-diagram-t { font-family: var(--nn-ui); font-size: 15px; font-weight: 600; margin: 0 0 var(--nn-s1); }
-.nn-diagram-note { font-family: var(--nn-read); font-size: 17px; line-height: 1.5; color: var(--nt-ink-2); text-align: left; max-width: 64ch; margin: var(--nn-s2) 0 0; }
 
 /* What examiners look for */
 .nn-examiners { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--nn-s3); }
@@ -76,13 +59,7 @@
 .nn-final { font-weight: 700; }
 .nn-working .katex { font-size: 1.15em; }
 
-/* Self-check */
-.nn-check { margin: 0; padding-left: var(--nn-s5); display: grid; gap: var(--nn-s5); }
-.nn-check li::marker { font-family: var(--nn-ui); font-size: 14px; color: var(--nt-ink-3); }
-.nn-check-a { margin-top: var(--nn-s2); padding: var(--nn-s2) var(--nn-s4); border: 1px solid var(--nn-line); border-radius: var(--nt-r); background: var(--nn-box); }
-
 @media (max-width: 640px) {
-  .nn-read { font-size: 18px; }
   .nn-defs > div { grid-template-columns: 1fr; gap: var(--nn-s1); }
   .nn-traps li { grid-template-columns: 1fr; }
   .nn-wrong { border-right: 0; border-bottom: 1px solid var(--nn-line); }

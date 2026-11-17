@@ -134,7 +134,7 @@ export default {
       'Exact answers are left as surds unless the question asks for a rounded value, and the number of decimal places requested is respected.'
     ],
     diagrams: [
-      { title: 'Two irrational roots', spec: { kind: 'function', xmin: -2, xmax: 4, ymin: -6, ymax: 10, curves: [{ expr: '2*x^2-5*x-1', intercepts: true, label: 'y=2x^2-5x-1' }] }, note: 'Here $\\Delta=33>0$, so the parabola crosses the axis twice, near $x=-0.19$ and $x=2.69$.' }
+      { title: 'Two irrational roots', spec: { kind: 'function', xmin: -2, xmax: 4, ymin: -6, ymax: 10, curves: [{ expr: '2*x^2-5*x-1', label: 'y=2x^2-5x-1' }] }, note: 'Here $\\Delta=33>0$, so the parabola crosses the axis twice, near $x=-0.19$ and $x=2.69$.' }
     ],
     working: [
       '\\begin{aligned}x^2+6x&=-2\\\\(x+3)^2&=7\\\\x&=-3\\pm\\sqrt{7}\\end{aligned}',
@@ -275,7 +275,7 @@ export default {
       'A calculator answer is rounded only at the end, to the number of decimal places requested, with the exact form shown first.'
     ],
     diagrams: [
-      { title: 'A logarithm is the inverse of a power', spec: { kind: 'function', xmin: -3, xmax: 8, ymin: -3, ymax: 8, curves: [{ expr: '2^x', label: 'y=2^x' }, { expr: 'log2(x)', label: 'y=\\log_2 x' }, { expr: 'x', label: 'y=x', tone: 'secondary' }], points: [{ x: 3, y: 8, label: '(3,8)' }, { x: 8, y: 3, label: '(8,3)' }] }, note: 'The point $(3,8)$ on $y=2^x$ becomes $(8,3)$ on $y=\\log_2 x$. The two curves are reflections in the line $y=x$, so $\\log_2 8=3$.' }
+      { title: 'A logarithm is the inverse of a power', spec: { kind: 'function', xmin: -3, xmax: 8, ymin: -3, ymax: 8, curves: [{ expr: '2^x', label: 'y=2^x' }, { expr: 'ln(x)/ln(2)', label: 'y=\\log_2 x' }, { expr: 'x', label: 'y=x', tone: 'secondary' }], points: [{ x: 3, y: 8, label: '(3,8)' }, { x: 8, y: 3, label: '(8,3)' }] }, note: 'The point $(3,8)$ on $y=2^x$ becomes $(8,3)$ on $y=\\log_2 x$. The two curves are reflections in the line $y=x$, so $\\log_2 8=3$.' }
     ],
     working: [
       '\\begin{aligned}\\log_2 32&=y\\\\2^y&=32=2^5\\\\y&=5\\end{aligned}',

@@ -130,7 +130,7 @@ export default {
       'The shares are added back to check they make the original total.'
     ],
     diagrams: [
-      { title: 'A constant speed is a straight line', spec: { kind: 'function', xmin: 0, xmax: 5.5, ymin: 0, ymax: 420, curves: [{ expr: '76*x', intercepts: true, label: 'd=76t' }] }, note: 'The gradient, $76$ km/h, is the speed. After $5$ hours the car has gone $380$ km.' }
+      { title: 'A constant speed is a straight line', spec: { kind: 'function', xmin: 0, xmax: 5.5, ymin: 0, ymax: 420, curves: [{ expr: '76*x', label: 'd=76t' }] }, note: 'The gradient, $76$ km/h, is the speed. After $5$ hours the car has gone $380$ km.' }
     ],
     working: [
       '\\begin{aligned}4+5&=9\\ \\text{parts}\\\\450\\div9&=50\\ \\text{per part}\\\\5\\times50&=250\\end{aligned}',
@@ -219,18 +219,18 @@ export default {
     examiners: [
       'The hypotenuse is named first: it is opposite the right angle and is the longest side.',
       'The squares are added to find the hypotenuse and subtracted to find a shorter side.',
-      'The answer is rounded at the end, given with units, and checked to be longer than each leg if it is a hypotenuse.'
+      'The answer is rounded at the end, given with units, and checked to be longer than each of the shorter sides if it is a hypotenuse.'
     ],
     diagrams: [
-      { title: 'A right-angled triangle with legs $9$ and $12$', spec: { kind: 'triangle', a: 9, b: 12, C: 90 }, note: 'The hypotenuse is $15$, because $9^2+12^2=81+144=225=15^2$.' }
+      { title: 'A right-angled triangle with shorter sides $9$ and $12$', spec: { kind: 'triangle', a: 9, b: 12, C: 90 }, note: 'The hypotenuse is $15$, because $9^2+12^2=81+144=225=15^2$.' }
     ],
     working: [
       '\\begin{aligned}h^2+1.4^2&=5^2\\\\h^2&=25-1.96=23.04\\\\h&=4.8\\end{aligned}',
       '\\begin{aligned}c^2&=9^2+12^2\\\\&=81+144=225\\\\c&=15\\end{aligned}'
     ],
     check: [
-      { question: 'Find the hypotenuse of a right-angled triangle with legs $6$ cm and $8$ cm.', answer: '$10$ cm', verify: { kind: 'value', expr: 'sqrt(6^2+8^2)', answer: '10' } },
-      { question: 'The hypotenuse is $13$ cm and one leg is $5$ cm. Find the other leg.', answer: '$12$ cm', verify: { kind: 'value', expr: 'sqrt(13^2-5^2)', answer: '12' } }
+      { question: 'Find the hypotenuse of a right-angled triangle with shorter sides $6$ cm and $8$ cm.', answer: '$10$ cm', verify: { kind: 'value', expr: 'sqrt(6^2+8^2)', answer: '10' } },
+      { question: 'The hypotenuse is $13$ cm and one of the shorter sides is $5$ cm. Find the other shorter side.', answer: '$12$ cm', verify: { kind: 'value', expr: 'sqrt(13^2-5^2)', answer: '12' } }
     ]
   },
 

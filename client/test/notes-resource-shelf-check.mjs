@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { STUDY_RESOURCE_LINKS, studyResourcesForGrade } from '../src/notes/data/notes-study-resources.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const view = readFileSync(join(__dirname, '../src/pages/Notes.jsx'), 'utf8');
+// The page and the parts it draws chapters with (the worked example lives in NotesParts.jsx).
+const view = readFileSync(join(__dirname, '../src/pages/Notes.jsx'), 'utf8') + readFileSync(join(__dirname, '../src/notes/NotesParts.jsx'), 'utf8');
 assert.ok(view.includes('data-testid="notes-study-resources"'), 'Study resources missing from student Notes');
 assert.ok(view.includes('target="_blank" rel="noopener noreferrer"'), 'External link must be isolated from opener');
 assert.ok(view.includes('aria-label={resource.title}'), 'External links require an accessible name');

@@ -28,7 +28,8 @@ check('CBSE D4 not silently preserved',selectedStudyContext(chapter,new URLSearc
 check('invalid dotpoint not silently selected',selectedStudyContext(chapter,new URLSearchParams('dotpoint=999')).dotpoint===null);
 // The study choices live in the exact-topic generator (home/TopicGenerator.jsx),
 // which the instrument Index (the one home) renders.
-const home=read('home/TopicGenerator.jsx'), notes=read('pages/Notes.jsx'), content=read('notes/data/notes-class11.js');
+// The notes page and the parts it draws a chapter with (the worked example is in NotesParts.jsx).
+const home=read('home/TopicGenerator.jsx'), notes=read('pages/Notes.jsx')+read('notes/NotesParts.jsx'), content=read('notes/data/notes-class11.js');
 // The home is the Instrument's Index (the v1.0 Home page is gone; pages/Home.jsx
 // keeps only the shared decision and renders no generator of its own).
 check('both homes render the generator that exposes the choices', read('instrument/IndexPage.jsx').includes('<TopicGenerator') && !read('pages/Home.jsx').includes('<TopicGenerator'));

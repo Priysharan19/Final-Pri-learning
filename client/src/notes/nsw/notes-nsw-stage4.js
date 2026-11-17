@@ -485,7 +485,7 @@ export default {
       { label: 'Pythagoras’ theorem', tex: 'c^2=a^2+b^2' }
     ],
     points: [
-      { front: 'The hypotenuse of a triangle with legs $6$ and $8$', back: '$10$.' },
+      { front: 'The hypotenuse of a triangle with shorter sides $6$ and $8$', back: '$10$.' },
       { front: 'Is $5,12,13$ a right-angled triangle?', back: 'Yes: $25+144=169$.' },
       { front: 'Which side is $c$?', back: 'The hypotenuse, the longest side.' },
       { front: 'The diagonal of a $5$ by $12$ rectangle', back: '$13$.' }
@@ -502,7 +502,7 @@ export default {
         verify: { kind: 'value', expr: 'sqrt(5^2-1.4^2)', answer: '4.8' }
       },
       {
-        question: 'Find the hypotenuse of a right-angled triangle with legs $9$ cm and $12$ cm.',
+        question: 'Find the hypotenuse of a right-angled triangle with shorter sides $9$ cm and $12$ cm.',
         steps: ['$c^2=9^2+12^2=81+144=225$.', '$c=15$.'],
         answer: '$15$ cm',
         verify: { kind: 'value', expr: 'sqrt(9^2+12^2)', answer: '15' }

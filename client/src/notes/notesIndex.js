@@ -20,6 +20,7 @@
 // for the deterministic engine; client/test/notes-content-check.mjs re-derives
 // every answer from it, so no worked answer ships on its author's say-so.
 import { practiceHref } from '../lib/practiceLinks.js';
+import { mergeE3 } from './e3.js';
 
 const LOADERS = {
   7: () => import('./data/notes-class7.js'),
@@ -121,6 +122,17 @@ const VISUAL_WAVE8_LOADERS = {
   12: () => import('./data/notes-visual-wave8-class12.js')
 };
 
+// The Experience 3 layer of each class (objective, intuition, checkpoint, teaching
+// diagrams): notes/e3.js. Its own chunk beside the class, never in another class.
+const E3_LOADERS = {
+  7: () => import('./data/notes-e3-class7.js'),
+  8: () => import('./data/notes-e3-class8.js'),
+  9: () => import('./data/notes-e3-class9.js'),
+  10: () => import('./data/notes-e3-class10.js'),
+  11: () => import('./data/notes-e3-class11.js'),
+  12: () => import('./data/notes-e3-class12.js')
+};
+
 function mergeOptionalComplexStudies(notes, extra) {
   for (const [id, section] of Object.entries(extra || {})) {
     if (!Object.hasOwn(notes,id) || !Array.isArray(section.examples) || !section.examples.every(x => x.question && Array.isArray(x.steps) && x.steps.length && x.answer && x.verify)) {
@@ -149,19 +161,27 @@ export function loadNotesForGrade(grade) {
       VISUAL_WAVE5_LOADERS[g](),
       VISUAL_INQUIRY_LOADERS[g](),
       VISUAL_WAVE7_LOADERS[g](),
-      VISUAL_WAVE8_LOADERS[g]()
+      VISUAL_WAVE8_LOADERS[g](),
+      E3_LOADERS[g]()
     ])
-      .then(([original, supplement, optional, challenges, visuals, extendedVisuals, inquiry, wave7, wave8]) => {
+      .then(([original, supplement, optional, challenges, visuals, extendedVisuals, inquiry, wave7, wave8, e3]) => {
         // Merge every supplement in source chronology; the published 120-item Wave7 stays intact.
         let notes = mergeStudySupplements(original.default || {}, supplement.default || {});
         for (const pack of [optional, challenges, visuals, extendedVisuals, inquiry, wave7, wave8]) {
           notes = mergeOptionalComplexStudies(notes, pack.default || {});
         }
-        return notes;
+        return mergeE3(notes, e3.default || {}, `Class ${g}`);
       })
       .catch(err => { cache.delete(g); throw err; }));
   }
   return cache.get(g);
+}
+
+let olympiad = null;
+/** The Olympiad topic notes (olymp-…), one chunk of their own. Rejects if it cannot be fetched. */
+export function loadOlympiadNotes() {
+  if (!olympiad) olympiad = import('./data/notes-olympiad.js').then(m => m.default || {}).catch(err => { olympiad = null; throw err; });
+  return olympiad;
 }
 
 /** The grade a chapter id belongs to: c10-… → 10. */

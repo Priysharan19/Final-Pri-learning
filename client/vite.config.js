@@ -357,8 +357,14 @@ export const ON_DEMAND = [
   // name and offers a retry; practice, which needs none of it, is unaffected.
   // The Prithagoras edition's NSW notes page and its Stage data chunks are the same
   // idea (pages/NswNotes.jsx, notes/nsw/): opened on demand, never installed.
-  [/(^|\/)cmu-serif-[^/]*\.woff2$/, 'CMU Serif, the NSW notes reading face: fetched with a chapter, then kept like the chapter itself'],
-  [/(^|\/)(Notes|NswNotes|notes-class(7|8|9|10|11|12)|notes-nsw-stage[0-9]+)-[A-Za-z0-9_-]+\.(js|css)$/, 'chapter notes'],
+  // Every notes data chunk is in this rule, not only the base class and stage files: a
+  // class's notes load as one Promise.all of its base, supplements, figure waves and
+  // Experience 3 layer (notesIndex.js), so warming the supplements without the base buys
+  // nothing offline. The same holds for the NSW course bands (notes-nsw-ext1-a, …), the
+  // NSW Experience 3 layers and the Olympiad topic notes, and for the loaders themselves.
+  // The diagram kit rides inside the notes page chunk (NotesParts.jsx, nsw/NswParts.jsx).
+  [/(^|\/)cmu-serif-[^/]*\.woff2$/, 'CMU Serif, the notes reading face (both editions): fetched with a chapter, then kept like the chapter itself'],
+  [/(^|\/)(Notes|NswNotes|notesIndex|nswNotesIndex|notes-[a-z0-9]+(-[a-z0-9]+)*)-[A-Za-z0-9_-]{8}\.(js|css)$/, 'chapter notes'],
 
   // "Practise this": photograph a question and practise its skill. The page
   // cannot do anything without a connection — reading the photo is a server
