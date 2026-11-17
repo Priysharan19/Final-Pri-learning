@@ -19,7 +19,7 @@
 // calls resolve false and the product carries on.
 // ─────────────────────────────────────────────────────────────────────────────
 import { priNative } from '../platform/native/index.js';
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 import { renderReminder } from './schedule.js';
 
 const QUEUE_KEY = pid => `pri-reminders-queue:${pid}`;

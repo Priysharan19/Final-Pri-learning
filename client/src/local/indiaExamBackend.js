@@ -19,7 +19,7 @@
 // shown as server-certified. A paper an earlier version started and did not
 // finish cannot be marked at all.
 import { get, put, del, byIndex } from './idb.js';
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 import { indiaScope, indiaChapter, cleanIndiaTrack } from '../engine/indiaProduct.js';
 import { indiaPyqCells, narrowCells } from '../engine/indiaExamCells.js';
 import { generateQuestion, loadBanksFor } from '../engine/generators/index.js';

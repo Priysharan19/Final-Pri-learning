@@ -950,6 +950,8 @@ jobs:
             # Maths at 200% text (375 and 430 pt iPhones): superscripted formulas
             # wrap or scroll in their own box, nothing cut (WCAG 1.4.10).
             node client/test/tour-math-reflow.js --no-build 2>&1 | tee -a browser.log
+            # Ink smoothness on emulated Chromium and WebKit (synthesized pen events; not iPad evidence).
+            node client/test/ink-smooth-check.mjs 2>&1 | tee -a browser.log
               ;;
             webkit-layout)
             node client/test/tour-responsive-matrix.js --no-build --browser=webkit 2>&1 | tee -a browser.log

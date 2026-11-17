@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { useT } from '../i18n/index.js';
 import { useToday } from './useToday.js';
 
@@ -14,7 +14,7 @@ export default function TodayCard({ user }) {
       <span className="sc-label">{t('today.kicker')}</span>
       <h3 id="today-card-title" className="review-queue-title">{t('today.size', { n: set.items.length, count: set.items.length, minutes: set.minutes })}</h3>
       <p className="muted">{t('today.cardWhy')}</p>
-      <Link className="btn btn-ghost btn-sm" to="/today" data-today-open>{t('today.open')}</Link>
+      <PageLink className="btn btn-ghost btn-sm" to="/today" data-today-open>{t('today.open')}</PageLink>
     </article>
   );
 }

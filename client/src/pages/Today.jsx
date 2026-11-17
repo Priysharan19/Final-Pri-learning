@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
@@ -56,7 +57,7 @@ export default function Today() {
           </ol>
         </>
       )}
-      <p><Link to="/error-log" data-today-errorlog>{t('today.errorLogLink')}</Link></p>
+      <p><PageLink to="/error-log" data-today-errorlog>{t('today.errorLogLink')}</PageLink></p>
     </div>
   );
 }

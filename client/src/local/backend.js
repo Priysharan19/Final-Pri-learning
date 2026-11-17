@@ -12,7 +12,7 @@ import {
 } from './store.js';
 import { cleanTimezone, dayKey, defaultTimezone, timezoneOf, localeOf } from '../lib/locale.js';
 import { cleanLanguage } from '../i18n/languages.js';
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 import { DEFAULT_THEME_PREF, THEME_PREFS, cleanThemePref } from '../lib/theme.js';
 import {
   CURRICULUM, STREAM_CURRICULUM, PATHWAYS, streamSubtopics, SUBTOPIC_BY_ID, subtopicsForYear,

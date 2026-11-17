@@ -39,7 +39,7 @@ import { profileCloudAccountId } from './entitlementGate.js';
 import { checkUnavailable, withExamLock } from './backend.js';
 import { examMarkingInputs, ensureExamClock } from './examSession.js';
 import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js';
-import { translate } from '../i18n/index.js';
+import { translate } from '../i18n/core.js';
 
 /**
  * D17: a frozen exam page is a picture of the student's writing, read by
