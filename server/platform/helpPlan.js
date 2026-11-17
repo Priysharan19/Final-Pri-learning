@@ -30,7 +30,7 @@ import { IN_CHAPTERS } from '../../client/src/engine/curriculum-in.js';
 import { prerequisitesOf } from '../../client/src/engine/prerequisites.js';
 
 export const TUTOR_POLICY_EXPERIMENT = 'tutor-first-help-v1';
-export const HELP_PLAN_FIELDS = new Set(['lines', 'recognition', 'offered', 'mistakeGraph', 'helpRequested']);
+export const HELP_PLAN_FIELDS = new Set(['lines', 'recognition', 'offered', 'mistakeGraph', 'drawable', 'helpRequested']);
 export const HELP_PLAN_LIMITS = Object.freeze({ lines: 40, line: 400, offered: ACTIONS.length });
 export const HELP_PLAN_ATTEMPTS = 300;
 
@@ -46,6 +46,8 @@ export function helpPlanBodyError(body) {
     || !body.lines.every(l => typeof l === 'string' && l.length <= HELP_PLAN_LIMITS.line))) return 'lines: at most 40 strings of 400 characters.';
   if (body.recognition !== undefined && !['confirmed', 'unconfirmed', 'low-confidence'].includes(body.recognition)) return 'recognition is confirmed, unconfirmed or low-confidence.';
   if (body.offered !== undefined && (!Array.isArray(body.offered) || body.offered.length > HELP_PLAN_LIMITS.offered || !body.offered.every(a => ACTIONS.includes(a)))) return 'offered lists plan actions.';
+  if (body.drawable !== undefined && (!Array.isArray(body.drawable) || body.drawable.length > HELP_PLAN_LIMITS.lines
+    || !body.drawable.every(n => Number.isInteger(n) && n >= 2 && n <= HELP_PLAN_LIMITS.lines))) return 'drawable lists line numbers 2–40.';
   for (const k of ['mistakeGraph', 'helpRequested']) if (body[k] !== undefined && typeof body[k] !== 'boolean') return `${k} is a boolean.`;
   return null;
 }
@@ -98,7 +100,8 @@ export function buildHelpPlan({ q, hintLevel, attempts, cause, body = {}, ladder
     cause, evidence,
     context: {
       mode: q?._practiceMode || 'practice', oneTry, rungLevel: hintLevel, ladderAvailable: ladder,
-      mistakeGraph: body.mistakeGraph === true, prerequisite, helpRequested: body.helpRequested !== false,
+      // The view is offered only for a break on a line the device can draw.
+      mistakeGraph: body.mistakeGraph === true && Array.isArray(body.drawable) && body.drawable.includes(cause?.line), prerequisite, helpRequested: body.helpRequested !== false,
       offered: Array.isArray(body.offered) ? body.offered : []
     }
   });

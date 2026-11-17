@@ -32,7 +32,7 @@ delete process.env.PRI_PUBLIC_ORIGIN;
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 const { assignArm, experimentById } = await import('../platform/experiments.js');
-const { causeFromWork } = await import('../platform/helpPlan.js');
+const { causeFromWork, buildHelpPlan, helpPlanBodyError } = await import('../platform/helpPlan.js');
 console.log(`engine: ${requestedEngine()}`);
 const h = await startApp({ engine: requestedEngine() });
 let count = 0;
@@ -216,6 +216,16 @@ try {
   eq(causeFromWork(null, { linesSent: true, checkRan: false }).class, 'unverified', 'lines with the line check switched off → unverified');
   eq(causeFromWork(null, { linesSent: false }).class, 'unseen', 'no lines → unseen: nothing claimed');
   eq(causeFromWork({ charge: true, code: 'sign-on-transfer', reply: { status: 'break', line: 1 } }, { recognition: 'low-confidence', linesSent: true }).class, 'recognition', 'a doubtful reading outranks any diagnosis');
+
+  // ── The see-why view: only for a break on a line the device can draw ─────
+  const concept = { class: 'concept', line: 3, confidence: 'high' };
+  const pick = body => buildHelpPlan({ q: { subtopic: LINEAR, _practiceMode: 'practice' }, hintLevel: 0, attempts: [], cause: concept, body }).plan.action;
+  eq(pick({ mistakeGraph: true, drawable: [3] }), 'mistake-graph', 'the break\'s line is drawable: the picture');
+  eq(pick({ mistakeGraph: true, drawable: [2, 4] }), 'nudge', 'another line is drawable, not the break\'s: no picture');
+  eq(pick({ mistakeGraph: true }), 'nudge', 'no drawable list: no picture');
+  eq(pick({ mistakeGraph: false, drawable: [3] }), 'nudge', 'the view not on: no picture');
+  eq([helpPlanBodyError({ drawable: [1] }), helpPlanBodyError({ drawable: ['3'] }), helpPlanBodyError({ drawable: [2, 41] }), helpPlanBodyError({ drawable: [2, 3] })].map(Boolean), [true, true, true, false], 'drawable is a list of line numbers 2–40');
+  eq((await plan(C.jar, qn.data.question.id, { drawable: [1] })).data.error?.code, 'HELP_PLAN_INVALID', 'and a bad list is 400 over HTTP');
 
   console.log(`TUTOR POLICY HTTP: PASS — ${count}/${count} checks`);
 } finally {

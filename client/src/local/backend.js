@@ -3938,7 +3938,13 @@ const routes = {
     const recognition = ['confirmed', 'unconfirmed', 'low-confidence'].includes(body?.recognition) ? body.recognition : undefined;
     const r = await viaServer(() => cloud.helpPlanPractice(row.serverQuestionId, {
       ...(lines.length ? { lines } : {}), ...(recognition ? { recognition } : {}), offered,
-      mistakeGraph: body?.mistakeGraph === true, helpRequested: body?.helpRequested !== false
+      // Line numbers are the server's count of the lines it receives: if
+      // cleaning dropped any line here, the device's drawable numbers no
+      // longer match, so the view is not offered at all.
+      ...(Array.isArray(body?.drawable) && lines.length === (Array.isArray(body?.lines) ? body.lines.length : -1)
+        ? { mistakeGraph: body?.mistakeGraph === true, drawable: body.drawable.filter(n => Number.isInteger(n) && n >= 2 && n <= lines.length).slice(0, 40) }
+        : { mistakeGraph: false }),
+      helpRequested: body?.helpRequested !== false
     }));
     if (r?.lineCheckSpent === true) { row.lineChecks = usedChecks + 1; await put('questions', row); }
     return { plan: r?.plan && typeof r.plan === 'object' ? r.plan : null, experiment: r?.experiment || null };

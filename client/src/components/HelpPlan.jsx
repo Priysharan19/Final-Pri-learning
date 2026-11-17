@@ -23,13 +23,19 @@ const SEE_WHY = import.meta.glob(['../engine/mistakeView.js', './MistakeGraph.js
 const SEE_WHY_ON = !!SEE_WHY['../engine/mistakeView.js'] && !!SEE_WHY['./MistakeGraph.jsx'];
 const MistakeGraph = SEE_WHY_ON ? React.lazy(() => SEE_WHY['./MistakeGraph.jsx']().catch(() => ({ default: () => null }))) : null;
 
-/** Can the see-why view draw line `n` (1-based) of `lines` against the line above it? */
-async function canDraw(lines, n) {
-  if (!SEE_WHY_ON || !Array.isArray(lines) || !Number.isInteger(n) || n < 2 || n > lines.length) return false;
+/**
+ * The 1-based lines the see-why view can draw against the line above them,
+ * decided on the device BEFORE asking, so the server picks the picture only for
+ * a break it can show and one press is one request (one line check at most).
+ */
+async function drawableLines(lines) {
+  if (!SEE_WHY_ON || !Array.isArray(lines) || lines.length < 2) return [];
   try {
     const { mistakeView } = await SEE_WHY['../engine/mistakeView.js']();
-    return !!mistakeView({ prevText: lines[n - 2], brokenText: lines[n - 1] });
-  } catch { return false; }
+    const out = [];
+    for (let n = 2; n <= lines.length; n++) if (mistakeView({ prevText: lines[n - 2], brokenText: lines[n - 1] })) out.push(n);
+    return out;
+  } catch { return []; }
 }
 
 const ACTION_KEY = {
@@ -51,28 +57,25 @@ export default function HelpPlan({ questionId, lines = null, recognition = null,
 
   if (hidden) return null;
 
-  async function ask(prior = offered) {
+  async function ask() {
     if (asking) return;
     setAsking(true); setNote(null);
     const sent = Array.isArray(lines) && lines.length ? lines : null;
     try {
+      const drawable = await drawableLines(sent);
       const r = await api.post(`/practice/${questionId}/help-plan`, {
         ...(sent ? { lines: sent } : {}),
         ...(recognition ? { recognition } : {}),
-        // The view needs a line above the break; the server picks the line.
-        offered: prior, mistakeGraph: SEE_WHY_ON && !!sent && sent.length >= 2 && !prior.includes('mistake-graph'), helpRequested: true
+        offered, mistakeGraph: drawable.length > 0, ...(drawable.length ? { drawable } : {}), helpRequested: true
       });
       if (r?.experiment?.arm === 'control') { setHidden(true); return; }
       if (!r?.plan || !r.plan.action) { setNote(r?.plan?.reason?.key || 'tutorPolicy.unavailable'); setPlan(null); return; }
-      const next = [...prior, r.plan.action];
-      // The server chose the picture for a line it located; if the engine
-      // cannot draw that step honestly, ask once more past it.
-      if (r.plan.action === 'mistake-graph' && !(await canDraw(sent, r.plan.reason?.params?.line))) {
-        setOffered(next); setAsking(false);
-        return ask(next);
-      }
-      setPlan({ ...r.plan, drawn: r.plan.action === 'mistake-graph' ? { prevText: sent[r.plan.reason.params.line - 2], brokenText: sent[r.plan.reason.params.line - 1] } : null });
-      setOffered(next);
+      // Drawn only for a line this device already proved drawable; anything
+      // else (it cannot happen with an honest server) shows the reason alone.
+      const n = r.plan.reason?.params?.line;
+      const drawn = r.plan.action === 'mistake-graph' && drawable.includes(n) ? { prevText: sent[n - 2], brokenText: sent[n - 1] } : null;
+      setPlan({ ...r.plan, drawn });
+      setOffered(list => [...list, r.plan.action]);
     } catch (e) {
       if (e?.status === 404) { setHidden(true); return; }
       setNote('tutorPolicy.unavailable');
