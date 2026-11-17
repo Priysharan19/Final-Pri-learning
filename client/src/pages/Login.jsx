@@ -14,6 +14,7 @@ import PageLink from '../components/PageLink.jsx';
 import { api } from '../api.js';
 import { useApp, Logo } from '../App.jsx';
 import { EditionByline } from '../components/BrandMark.jsx';
+import { EDITION_ID } from '../brand/edition.js';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
 import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
 import { defaultCourse, offersCourse } from '../platform/edition.js';
@@ -572,7 +573,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
           <Logo large byline />
           {atStart && (
             <>
-              <div className="hero-kicker">{featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
+              <div className="hero-kicker">{EDITION_ID === 'prithagoras' ? t('login.brandKicker') : featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
               <h1 className="hero-title">{t('login.welcomeTitle')}</h1>
               <p className="hero-sub">{t('login.welcomeSub')}</p>
             </>

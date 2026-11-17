@@ -89,6 +89,10 @@ check('every year selector and tab goes through common.classNumber (Year N in Pr
     assert.match(readFileSync(`${root}/${f}`, 'utf8'), /common\.(classNumber|yearNumber)/, `${f} does not use the year label key`);
   }
 });
+check('the welcome page\'s hard-coded track kicker is not drawn in Prithagoras', () => {
+  const login = readFileSync(fileURLToPath(new URL('../src/pages/Login.jsx', here)), 'utf8');
+  assert.match(login, /EDITION_ID === 'prithagoras' \? t\('login\.brandKicker'\) : featureEnabled\('extendedTracks'\)/);
+});
 check('every allowlist entry still matches a key (a dead entry is removed)', () => {
   for (const [re] of ALLOW) assert.ok(Object.keys(en).some(k => re.test(k)), `${re} matches no key`);
 });
