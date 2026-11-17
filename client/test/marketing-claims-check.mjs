@@ -90,8 +90,7 @@ const APP = [
   [/₹\s?999\b/, 'the approved prices are ₹199 and ₹1,499']
 ];
 const APP_ALLOW = new Map([
-  ['verifiedMarks.finalAccepted', 'denies that every line was independently verified'],
-  ['progress.honesty', 'denies the percentile and rank prediction']
+  ['verifiedMarks.finalAccepted', 'denies that every line was independently verified']
 ]);
 
 const TEXT = new Set(['.md', '.mjs', '.js', '.jsx', '.ts', '.tsx', '.html', '.json', '.cjs', '.srt', '.txt', '.css']);

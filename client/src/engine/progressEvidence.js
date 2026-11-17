@@ -43,7 +43,7 @@ export const EVIDENCE_FLOORS = Object.freeze({
   /** Marked answers overall before the overall picture is described. */
   overall: 10
 });
-/** An answer counts as "after a delay" when it comes this many days after the last earlier right answer. */
+/** An answer counts as "after a delay" when it opens a sitting at least this many days after the topic was last touched. */
 export const RETENTION_GAP_DAYS = 2;
 
 /** Word cut-points. Wording choices, not thresholds from the literature. */
@@ -89,19 +89,23 @@ function independenceBand(correct, independent) {
 }
 
 /**
- * Retention: among this topic's answers that came at least RETENTION_GAP_DAYS
- * after an earlier right answer, how many were right again.
+ * Retention: the first answer of each new sitting, after the student had
+ * already been right on this topic and had not touched it for at least
+ * RETENTION_GAP_DAYS. One trial per break: the rest of that sitting is not
+ * more evidence that it held. "Kept" means right without help.
  */
 function retentionOf(rows) {
-  let lastRight = null;
+  let everRight = false;
+  let lastTouch = null;
   let delayed = 0;
   let kept = 0;
   for (const r of rows) {
-    if (lastRight !== null && r.at - lastRight >= RETENTION_GAP_DAYS * DAY) {
+    if (everRight && lastTouch !== null && r.at - lastTouch >= RETENTION_GAP_DAYS * DAY) {
       delayed++;
       if (r.correct && !r.supported) kept++;
     }
-    if (r.correct) lastRight = r.at;
+    if (r.correct) everRight = true;
+    lastTouch = r.at;
   }
   const band = delayed < EVIDENCE_FLOORS.retention ? 'thin' : ratio(kept, delayed) >= CUTS.kept ? 'holding' : 'slipping';
   return { band, delayed, kept };

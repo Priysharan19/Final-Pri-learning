@@ -64,6 +64,16 @@ const topic = (r, id) => r.topics.find(t => t.id === id);
   eq(topic(evidenceProgress(aided, { now: NOW }), 'x').retention, 'slipping', 'retention: a delayed right answer that needed help is not "kept"');
 }
 
+// One sitting after a break is one trial, not one per row.
+{
+  const retry = [at('r', true, 0), ...Array.from({ length: 6 }, (_, i) => at('r', false, 10 + i * 0.01))];
+  const t = topic(evidenceProgress(retry, { now: NOW }), 'r');
+  eq([t.counts.delayed, t.retention], [1, 'thin'], 'retention: six wrong answers in one later sitting are one delayed trial, below the floor');
+  const twoBreaks = [at('q', true, 0), at('q', false, 10), at('q', false, 10.01), at('q', false, 20), at('q', false, 20.01)];
+  const q = topic(evidenceProgress(twoBreaks, { now: NOW }), 'q');
+  eq([q.counts.delayed, q.counts.delayedKept, q.retention], [2, 0, 'slipping'], 'retention: two separate breaks are two trials');
+}
+
 // ── Transfer: a different kind of question in the same topic ───────────────
 {
   const carries = [at('c', true, 0), at('c', true, 1), at('c', true, 2, { generator: 'g2' }), at('c', true, 3, { generator: 'g3' }), at('c', true, 4, { generator: 'g2' })];

@@ -60,9 +60,7 @@ const COVERAGE_CLAIMS = [
 ];
 // Strings that mention a phrase only to deny it. Each carries its reason.
 const ALLOW = new Map([
-  ['verifiedMarks.finalAccepted', 'says full marks do NOT mean every line was independently verified'],
-  ['progress.honesty', 'says Pri does NOT predict a percentile or a rank'],
-  ['progress.noPercentile', 'the heading of that denial']
+  ['verifiedMarks.finalAccepted', 'says full marks do NOT mean every line was independently verified']
 ]);
 
 const { indiaProductSections, cbseProductLabel } = await import('../src/engine/indiaProduct.js');
