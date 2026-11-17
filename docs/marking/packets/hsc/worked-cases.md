@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `954ba0790603e1ae622ebe02ebaedf6bd1413457a9a402c5acc0098e3ab9cb54` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `461f74dcd6f34af338908b2ffbb3203587db3cc35bb9f450f095a66f2fa3edfe` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -3863,36 +3863,36 @@ Final answer: 0
 
 ## `nsw-final:me11-poly/D1` — seed 1009
 
-> Find the remainder when $P(x) = x^3 + 2x^2 + 2x - 1$ is divided by $(x + 1)$.
+> Without long division, which value is the remainder when $P(x) = -x^3 + 3x^2 - 3x + 2$ is divided by $(3x + 1)$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `-2.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `-1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-poly/D2` — seed 1009
 
-> Find $k$ such that $(x - 1)$ is a factor of $x^3 + 1x^2 - 1x + k$.
+> Which of the following is a factor of $P(x) = x^3 - x^2 - 4x + 4$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-poly/D3` — seed 1009
 
-> For the cubic $x^3 - 2x^2 - 1x + 2 = 0$ with roots $\\alpha, \\beta, \\gamma$, find $\\alpha + \\beta + \\gamma$ without solving.
+> The zeroes of $P(x) = 2x^3 - 4x^2 - 18x + 36$ are $\\alpha$, $\\beta$ and $\\gamma$. Without finding them, evaluate $\\alpha^2 + \\beta^2 + \\gamma^2$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `2.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `22` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-functions/D1` — seed 1009
 
@@ -3929,150 +3929,183 @@ Final answer: 0
 
 ## `nsw-final:me11-trigid/D1` — seed 1009
 
-> Collapse $\\cos 68°\\cos 23° + \\sin 68°\\sin 23°$ with a compound-angle formula, then state its **exact value**.
+> Which single ratio is equal to $\\sin 20x\\cos 16x - \\cos 20x\\sin 16x$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0.707107` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
-| alternative | `0.707107` | no | 0/1 | 0/1 | The same value written in another equivalent form. |
-| common wrong | `1.707107` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1.707107` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-trigid/D2` — seed 1009
 
-> $A$ and $B$ are acute angles with $\\sin A = \\dfrac{28}{53}$ and $\\cos B = \\dfrac{21}{29}$. Find $\\sin(A - B)$ as a fraction in simplest form.
+> Given $\\cos x = \\frac{3}{8}$, find $\\cos 2x$ as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-312/1537` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-312/1537` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `1225/1537` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1225/1537` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-23/32` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-23/32` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `9/32` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9/32` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-trigid/D3` — seed 1009
 
-> Given $\\cos\\theta = \\dfrac{60}{61}$ with $\\theta$ acute, use a double-angle formula to find $\\cos 2\\theta$ as a fraction in simplest form.
+> Let $t = \\tan\\dfrac{\\theta}{2} = -\\frac{2}{7}$. Use the $t$-formulae to find $\\cos\\theta$ as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0.934964` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | `0.934964` | no | 0/3 | 0/3 | The same value written in another equivalent form. |
-| common wrong | `1.934964` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1.934964` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `45/53` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `45/53` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `98/53` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `98/53` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-trigid/D4` — seed 1009
 
-> $\\theta$ lies in the **third quadrant** and $\\sin\\theta = -\\frac{11}{61}$. Find $\\cos 2\\theta$ as a fraction in simplest form.
+> Let $t = \\tan\\dfrac{\\theta}{2} = -\\frac{2}{7}$. Use the $t$-formulae to find $\\cos\\theta$ as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0.934964` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | `0.934964` | no | 0/3 | 0/3 | The same value written in another equivalent form. |
-| common wrong | `1.934964` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1.934964` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `45/53` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `45/53` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `98/53` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `98/53` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-inversetrig/D1` — seed 1009
 
-> Find $x$, the exact value that satisfies $\\tan^{-1}(x) = 45°$.
+> Which interval is the range of $f(x) = -2\\cos^{-1}(x) - 1$?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `1.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-inversetrig/D2` — seed 1009
 
-> Find the exact value of $\\cos^{-1}\\left(\\frac{\\sqrt{3}}{2}\\right) + \\cos^{-1}\\left(-\\frac{\\sqrt{3}}{2}\\right)$, in radians.
+> A 7-metre ladder reaches 3.5 metres up a wall. Find the angle the ladder makes with the ground, in degrees correct to 1 decimal place. (Use $\\theta = \\sin^{-1}\\left(\\dfrac{3.5}{7}\\right)$.)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `3.141593` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `3.141593` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
-| common wrong | `4.141593` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `4.141593` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `30` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `30.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `31` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `31` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-inversetrig/D3` — seed 1009
 
-> Find the exact value of $\\tan\\left(\\sin^{-1}\\left(\\dfrac{11}{61}\\right)\\right)$ as a fraction in simplest form.
+> Solve $\\cos^{-1}(-2x + 4) = \\frac{\\pi}{2}$ for $x$. Give your answer as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `11/60` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `11/60` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `71/60` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `71/60` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-inversetrig/D4` — seed 1009
 
-> Evaluate $\\tan^{-1}\\left(\\tan\\left(\\frac{5\\pi}{4}\\right)\\right)$ exactly. (Careful — the answer is **not** $\\frac{5\\pi}{4}$.)
+> Find the exact value of $\\sin\\left(\\cos^{-1}\\dfrac{45}{53} + \\sin^{-1}\\dfrac{20}{29}\\right)$ as a fraction in simplest form.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0.785398` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | `0.785398` | no | 0/2 | 0/2 | The same value written in another equivalent form. |
-| common wrong | `1.785398` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1.785398` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `1488/1537` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `1488/1537` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `3025/1537` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3025/1537` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-rates/D1` — seed 1009
 
-> A culture grows so that $\\dfrac{dN}{dt} = 0.1N$, giving $N = 800e^{0.1t}$. Find $N$ after $8$ hours, to the nearest whole number.
+> Growth is modelled by $\\dfrac{dN}{dt} = 0.16N$, where $N$ is the number of koalas on an island. The population is growing at $140.8$ per week. Find $N$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1780` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `1780.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `1781` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1781` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `880` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `880.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `881` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `881` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-rates/D2` — seed 1009
 
-> A population satisfies $\\dfrac{dP}{dt} = -0.08P$. How long until it **falls to $\\frac{1}{4}$ of its present size**? Answer in years, correct to 1 decimal place.
+> A cyclist riding along a straight path in Centennial Park has displacement $x = t^3 - 2t^2 - 2t$ metres from a marker at time $t$ seconds. Find its velocity at $t = 5$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `173/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `173/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `183/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `183/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `53` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `53.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `54` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `54` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-rates/D3` — seed 1009
 
-> A spherical bubble expands with its radius growing at $2$ cm/s. Using $S = 4\\pi r^2$, find the rate of change of **surface area** when $r = 8$, correct to 1 decimal place.
+> A cyclist riding along a straight path in Centennial Park has displacement $x = t^3 - 2t^2 - 2t$ metres from a marker at time $t$ seconds. Find its velocity at $t = 5$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4021/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `4021/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `4031/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `4031/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `53` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `53.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `54` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `54` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-rates/D4` — seed 1009
 
-> A particle's displacement is $x = t^3 - 15t^2 + 72t$ metres at time $t$ seconds. Find its **acceleration** at the first instant it is at rest.
+> A particle moves along a straight line so that its velocity is $v = 2x - 2$ m/s, where $x$ is its displacement in metres. Find its acceleration when $x = -1$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-6` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
-| alternative | `-6.0` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
-| common wrong | `-5` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-5` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-8` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `-8.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `-7` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-7` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-induction/D1` — seed 1009
 
-> A proof by induction of $1\\cdot 2 + 2\\cdot 3 + \\cdots + n(n+1) = \\dfrac{n(n+1)(n+2)}{3}$ begins by checking the claim at $n = 4$. What value do **both sides** take there?
+> Induction proves that $a + (a + 6) + (a + 12) + \\cdots$ with $n$ terms has sum $\\dfrac{n\\left(2a + 6(n-1)\\right)}{2}$. The sum of the first $7$ terms is $259$. Find the first term $a$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `40` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `40.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `41` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `41` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `19` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `19.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `20` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `20` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-induction/D2` — seed 1009
 
-> In the inductive step for $1\\cdot 2 + 2\\cdot 3 + \\cdots + n(n+1) = \\dfrac{n(n+1)(n+2)}{3}$, assume the result for $n = k$ and add the next term. Simplify $\\dfrac{k(k+1)(k+2)}{3} + (k+1)(k+2)$ into factored form.
+> To prove $1\\cdot 5 + 2\\cdot 6 + \\cdots + n(n + 4) = \\dfrac{n(n+1)(2n + 13)}{6}$ by induction, the inductive step assumes the result for $n = k$ and adds the $(k + 1)$th term. What must the result be shown to equal?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-induction/D3` — seed 1009
+
+> To prove $7^{2n} - 3^{2n}$ is divisible by $10$ by induction, assume $7^{2k} - 3^{2k} = 10p$. The inductive step writes $7^{2k+2} - 3^{2k+2} = 10(\\;?\\;)$. Find the value of the bracket when $k = 2$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `11692` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `11692.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `11693` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11693` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-vectors/D1` — seed 1009
+
+> $PQRS$ is a parallelogram with vertices in that order, where $P(-6, -3)$, $Q(6, -4)$ and $R(3, -2)$. Find the $x$-coordinate of $S$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-9` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `-9.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `-8` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-8` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-vectors/D2` — seed 1009
+
+> For $\\underset{\\sim}{a} = \\begin{pmatrix} 2 \\\\ -1 \\end{pmatrix}$ and $\\underset{\\sim}{b} = \\begin{pmatrix} 4 \\\\ -3 \\end{pmatrix}$, the angle between the vectors is...
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -4081,137 +4114,104 @@ Final answer: 0
 | common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-## `nsw-final:me12-induction/D3` — seed 1009
-
-> To prove $10^n - 6^n$ is divisible by $4$ by induction, assume $10^k - 6^k = 4p$. Then $10^{k+1} - 6^{k+1} = 10(10^k - 6^k) + 6^k(10 - 6) = 4(\\;?\\;)$. Find the bracket.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:me12-vectors/D1` — seed 1009
-
-> $A$ is the point $(2, -2)$ and $B$ is the point $(22, -23)$. Find $\\left\|\\overrightarrow{AB}\\right\|$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `29` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `29.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `30` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `30` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
-## `nsw-final:me12-vectors/D2` — seed 1009
-
-> Find the scalar (dot) product $\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b}$ for $\\underset{\\sim}{a} = \\begin{pmatrix} 2 \\\\ -1 \\end{pmatrix}$, $\\underset{\\sim}{b} = \\begin{pmatrix} -1 \\\\ 3 \\end{pmatrix}$.
-
-| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
-|---|---|---|---|---|---|
-| correct | `-5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `-5.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `-4` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-4` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
-
 ## `nsw-final:me12-vectors/D3` — seed 1009
 
-> Find the angle between $\\underset{\\sim}{a} = \\begin{pmatrix} 4 \\\\ 3 \\end{pmatrix}$ and $\\underset{\\sim}{b} = \\begin{pmatrix} 3 \\\\ 2 \\end{pmatrix}$, to the nearest degree.
+> Find the angle between $\\underset{\\sim}{a} = \\begin{pmatrix} 4 \\\\ 3 \\end{pmatrix}$ and $\\underset{\\sim}{b} = \\begin{pmatrix} 3 \\\\ 3 \\end{pmatrix}$ in **radians**, correct to 2 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `3` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `3.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `4` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `4` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `7/50` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `7/50` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `57/50` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `57/50` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-vectors/D4` — seed 1009
 
-> Find the **scalar projection** of $\\underset{\\sim}{a} = \\begin{pmatrix} 5 \\\\ -1 \\end{pmatrix}$ onto $\\underset{\\sim}{b} = \\begin{pmatrix} 5 \\\\ 12 \\end{pmatrix}$, correct to 2 decimal places.
+> A trolley is pushed along a track in the direction $\\begin{pmatrix} 12 \\\\ 16 \\end{pmatrix}$ by a force $\\underset{\\sim}{F} = \\begin{pmatrix} 10 \\\\ 5 \\end{pmatrix}$ N. Find the component of the force acting along the track, correct to 2 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `10.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `11` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-binomial/D1` — seed 1009
 
-> A free-throw shooter scores with probability $0.6$. In $9$ independent shots, find $P(\\text{exactly } 4 \\text{ scores})$, correct to 4 decimal places.
+> A binomial random variable has $n = 17$ trials and success probability $p = 0.44$. In the formula $P(X = 4) = \\binom{n}{k}p^k(1 - p)^{n - k}$, evaluate the binomial coefficient $\\binom{17}{4}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `209/1250` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `209/1250` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `1459/1250` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1459/1250` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2380` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `2380.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `2381` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2381` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-binomial/D3` — seed 1009
 
-> For a binomial variable with $n = 9$, $p = 0.6$, find the **standard deviation**, correct to 2 decimal places.
+> A factory knows that $13\\%$ of the phone cases it makes have a surface flaw, independently. In a box of $165$ cases, find the standard deviation of the number of flawed cases, correct to 2 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `147/100` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `147/100` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `247/100` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `247/100` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `108/25` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `108/25` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `133/25` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `133/25` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-binomial/D4` — seed 1009
 
-> A archer hits gold with probability $0.6$ per arrow. Over $9$ arrows, find $P(\\text{at least one gold})$, correct to 4 decimal places.
+> $X$ is the number of successes in $12$ independent trials, each with probability $0.45$. Find $P(3 \\le X \\le 6)$, correct to 4 decimal places.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0.9997` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| correct | `0.6972` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `1.9997` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1.9997` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `1.6972` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1.6972` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-projectile/D1` — seed 1009
 
-> A ball is kicked at $35$ m/s at $55°$ above the horizontal. Taking $g = 10$ m/s², find the **horizontal** component of its initial velocity, correct to 1 decimal place.
+> A ball is kicked at $42$ m/s at $39°$ above the horizontal. Take $g = 10$ m/s². Ignoring air resistance, how far has it travelled horizontally after $4$ seconds? Give your answer correct to 1 decimal place.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `201/10` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `201/10` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `211/10` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `211/10` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `653/5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `653/5` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `658/5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `658/5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-projectile/D2` — seed 1009
 
-> For the same projectile ($35$ m/s at $55°$, $g = 10$), find the **time of flight** on level ground, correct to 2 decimal places.
+> A ball is fired from level ground at $30°$ above the horizontal and is in the air for exactly $5.5$ seconds. Take $g = 10$ m/s². Find its launch speed.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `573/100` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `573/100` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `673/100` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `673/100` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `55` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `55.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `56` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `56` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-projectile/D3` — seed 1009
 
-> Find the **range** of the projectile ($35$ m/s at $55°$, $g = 10$) on level ground, correct to 1 decimal place.
+> A shot-putter can launch the shot at $53$ m/s at any angle. Take $g = 10$ m/s². Ignoring the height of release, what is the greatest possible range on level ground, in metres?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1151/10` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `1151/10` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `1161/10` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1161/10` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2809/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2809/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `2819/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2819/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-projectile/D4` — seed 1009
 
-> Find the **greatest height** reached by the projectile ($35$ m/s at $55°$, $g = 10$), correct to 1 decimal place.
+> The path of a thrown ball is $y = 2.1x - 0.023x^2$, where $x$ is the horizontal distance and $y$ the height, both in metres. Find the greatest height reached, correct to 1 decimal place.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `411/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `411/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `421/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `421/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `479/10` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `479/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `489/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `489/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:mex-proof/D1` — seed 1009
 
