@@ -30,6 +30,22 @@ ok(r.firstBreak === 1, 'a closed boundary made open (and a wrong right-hand side
 r = run('x^2<4', ['x^2<4', 'x^2-4<=0']);
 ok(r.firstBreak === 1, 'strict -> non-strict changes the boundary');
 
+// Far from the origin the boundary must still be exact (a value-scaled zero
+// tolerance once let these through).
+r = run('(x-100)(x-101)<0', ['(x-100)(x-101)<0', 'x>100']);
+ok(r.firstBreak === 1, '(x-100)(x-101)<0 -> x>100 is a break');
+r = run('(x-1000)(x-1001)<0', ['(x-1000)(x-1001)<0', '(x-1000)^2<0']);
+ok(r.firstBreak === 1, 'roots near 1000: a different region is a break');
+r = run('x^2>4', ['x^2>4', 'x^2>4.00000001']);
+ok(r.firstBreak === 1, 'a shifted boundary is a break');
+ok(allOk(run('(x-100)(x-101)<0', ['(x-100)(x-101)<0', 'x^2-201x+10100<0'])), 'large roots: an expanded form keeps its region');
+ok(allOk(run('(x-1)^2>=0', ['(x-1)^2>=0', 'x^2-2x+1>=0'])), 'a tangent root stays included (non-strict)');
+r = run('(x-1)^2>0', ['(x-1)^2>0', 'x^2-2x+1>=0']);
+ok(r.firstBreak === 1, 'a tangent root excluded (strict) vs included is a break');
+ok(allOk(run('(x-1)(x-2)(x-3)(x-4)<0', ['(x-1)(x-2)(x-3)(x-4)<0', 'x^4-10x^3+35x^2-50x+24<0'])), 'a quartic expanded keeps its region');
+r = run('(x-1)(x-2)(x-3)(x-4)<0', ['(x-1)(x-2)(x-3)(x-4)<0', '(x-1)(x-2)(x-3)(x-5)<0']);
+ok(r.firstBreak === 1, 'a quartic with one root moved is a break');
+
 // Not polynomial: abstain, never guess.
 r = run('abs(x-2)<5', ['abs(x-2)<5', '(x-2)^2<25']);
 ok(r.lines.every(l => l.status !== 'break'), 'an absolute-value inequality is not decided by this method');
