@@ -17,7 +17,7 @@
 // verdict it records is used to set a mark: the oracle measures the engine, the
 // engine stays the authority (AGENTS.md: the AI proposes, the engine decides).
 // ─────────────────────────────────────────────────────────────────────────────
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,6 +46,17 @@ const KEY_FIELDS = ['value', 'tol', 'simplestFraction', 'surdForm', 'requireExac
 
 const qid = (id, d, seed) => `${id}|${d}|${seed}`;
 
+// Authored corpus questions (tools/math-oracle/corpus/*.json): keys a person
+// wrote, marked by the same checkAnswer. Their qid is `corpus:<id>|0|0`.
+const CORPUS_DIR = join(ROOT, 'tools/math-oracle/corpus');
+const corpus = new Map();
+try {
+  for (const f of readdirSync(CORPUS_DIR).filter(n => n.endsWith('.json')).sort()) {
+    for (const q of JSON.parse(readFileSync(join(CORPUS_DIR, f), 'utf8')).questions) corpus.set(`corpus:${q.id}|0|0`, q);
+  }
+} catch { /* no corpus */ }
+const corpusQuestion = q => ({ answerType: q.type, answer: q.key, prompt: q.prompt });
+
 function draw(id, d, seed) {
   try { return generateQuestion(id, d, seed); } catch { return null; }
 }
@@ -70,6 +81,9 @@ if (mode === 'dump') {
       }
     }
   }
+  for (const [id, q] of corpus) {
+    lines.push(JSON.stringify({ qid: id, id: `corpus:${q.id}`, d: 0, seed: 0, bank: 'corpus', edition: q.edition || 'both', type: q.type, key: q.key, suffix: null, corpus: { candidates: q.candidates, verify: q.verify || null, prompt: q.prompt } }));
+  }
   writeFileSync(out, lines.join('\n') + '\n');
   writeFileSync(out.replace(/\.jsonl$/, '') + '.skipped.json', JSON.stringify(skipped, null, 2));
   console.error(`dump: ${lines.length} in-scope questions → ${out}; out of scope by type: ${JSON.stringify(skipped)}`);
@@ -81,7 +95,10 @@ if (mode === 'dump') {
   for (const raw of readFileSync(inp, 'utf8').split('\n')) {
     if (!raw.trim()) continue;
     const c = JSON.parse(raw);
-    if (!cache.has(c.qid)) { const [id, d, seed] = c.qid.split('|'); cache.set(c.qid, draw(id, Number(d), Number(seed))); }
+    if (!cache.has(c.qid)) {
+      if (corpus.has(c.qid)) cache.set(c.qid, corpusQuestion(corpus.get(c.qid)));
+      else { const [id, d, seed] = c.qid.split('|'); cache.set(c.qid, draw(id, Number(d), Number(seed))); }
+    }
     const q = cache.get(c.qid);
     let r;
     try { r = q ? checkAnswer(q, c.input) : { correct: false, invalid: true, feedback: 'question not reproducible' }; }

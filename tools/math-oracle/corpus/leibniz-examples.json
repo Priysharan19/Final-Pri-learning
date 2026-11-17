@@ -1,0 +1,179 @@
+{
+  "about": "Authored corpus: the two worked examples a competitor (Leibniz) shows. Each key is verified by SymPy before any candidate is judged (see `verify`). Candidates are written by hand; nothing here is a student answer.",
+  "questions": [
+    {
+      "id": "leibniz-trig-identity",
+      "edition": "both",
+      "type": "expression",
+      "prompt": "Simplify (secθ − cosθ)/(cosecθ − sinθ).",
+      "key": {
+        "expr": "tan(t)^3"
+      },
+      "verify": {
+        "claim": "(sec(t) - cos(t))/(cosec(t) - sin(t)) - tan(t)^3",
+        "equals": "0",
+        "how": "simplify"
+      },
+      "candidates": [
+        [
+          "correct",
+          "the-left-side-itself",
+          "(sec(t) - cos(t))/(cosec(t) - sin(t))"
+        ],
+        [
+          "correct",
+          "sin-cubed-over-cos-cubed",
+          "sin(t)^3/cos(t)^3"
+        ],
+        [
+          "correct",
+          "tan-cubed",
+          "tan(t)^3"
+        ],
+        [
+          "correct",
+          "tan-times-tan-squared",
+          "tan(t)*tan(t)^2"
+        ],
+        [
+          "correct",
+          "sec-squared-minus-one-times-tan",
+          "(sec(t)^2 - 1)*tan(t)"
+        ],
+        [
+          "slip",
+          "tan-squared",
+          "tan(t)^2"
+        ],
+        [
+          "slip",
+          "tan",
+          "tan(t)"
+        ],
+        [
+          "slip",
+          "sin-cubed-over-cos-squared",
+          "sin(t)^3/cos(t)^2"
+        ],
+        [
+          "slip",
+          "cot-cubed",
+          "cot(t)^3"
+        ],
+        [
+          "slip",
+          "sign-in-denominator",
+          "(sec(t) - cos(t))/(cosec(t) + sin(t))"
+        ],
+        [
+          "slip",
+          "sec-squared-plus-one-times-tan",
+          "(sec(t)^2 + 1)*tan(t)"
+        ],
+        [
+          "adversarial",
+          "plus-1e-7-t",
+          "tan(t)^3 + 0.0000001*t"
+        ],
+        [
+          "adversarial",
+          "times-1-plus-1e-8",
+          "1.00000001*tan(t)^3"
+        ]
+      ]
+    },
+    {
+      "id": "leibniz-definite-integral",
+      "edition": "both",
+      "type": "numeric",
+      "prompt": "Evaluate ∫₀^{π/4} tan²x sec²x/(5 − sec²x) dx. Give the exact value.",
+      "key": {
+        "value": 0.09861228866810978,
+        "requireExact": true,
+        "canonicalInput": "ln(3) - 1"
+      },
+      "verify": {
+        "how": "antiderivative",
+        "integrand": "tan(x)^2*sec(x)^2/(5 - sec(x)^2)",
+        "var": "x",
+        "from": "0",
+        "to": "pi/4",
+        "antiderivative": "ln((2 + tan(x))/(2 - tan(x))) - tan(x)",
+        "equals": "ln(3) - 1",
+        "note": "u = tan x turns it into ∫₀¹ u²/(4 − u²) du; F is continuous on [0, π/4] (tan x < 2 there), so F′ = integrand and F(π/4) − F(0) prove the value."
+      },
+      "candidates": [
+        [
+          "correct",
+          "canonical",
+          "ln(3) - 1"
+        ],
+        [
+          "correct",
+          "reordered",
+          "-1 + ln(3)"
+        ],
+        [
+          "correct",
+          "half-log-nine",
+          "ln(9)/2 - 1"
+        ],
+        [
+          "correct",
+          "log-of-three-over-e",
+          "ln(3/e)"
+        ],
+        [
+          "correct",
+          "full-precision-decimal",
+          "0.09861228866810978"
+        ],
+        [
+          "approximation",
+          "calculator-display-10dp",
+          "0.0986122887"
+        ],
+        [
+          "approximation",
+          "rounded-4dp",
+          "0.0986"
+        ],
+        [
+          "slip",
+          "base-ten-log",
+          "log(3) - 1"
+        ],
+        [
+          "slip",
+          "sign-of-constant",
+          "ln(3) + 1"
+        ],
+        [
+          "slip",
+          "dropped-constant",
+          "ln(3)"
+        ],
+        [
+          "slip",
+          "reversed",
+          "1 - ln(3)"
+        ],
+        [
+          "slip",
+          "partial-fraction-coefficient",
+          "ln(3)/4 - 1"
+        ],
+        [
+          "slip",
+          "wrong-limit-substitution",
+          "ln(5) - 1"
+        ],
+        [
+          "adversarial",
+          "near-miss-1e-10",
+          "0.0986122888"
+        ]
+      ]
+    }
+  ]
+}
