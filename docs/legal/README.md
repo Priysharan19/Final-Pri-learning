@@ -41,8 +41,8 @@ Indian notices.
   if any file it would write contains the Indian notices' words (DPDP, Data Protection Board, Grievance
   Officer). Priyabhata builds are unchanged. Routes: `/privacy`, `/terms`, `/refund-policy` (also
   `/refunds`) and `/contact`; `/grievance` is not served by Prithagoras and redirects to `/contact`.
-- **Four placeholders** are left on purpose, because the code and repository cannot supply them: where
-  the Australian service is hosted and its database held, who takes payment, and the contact address.
+- **Three placeholders** are left on purpose, because the code and repository cannot supply them: where
+  the Australian service is hosted and and its database held, and the contact address (Stripe takes payment and is named in the notices).
   A notice with one unfilled shows the "template" banner. `docs/legal/counsel/AU-QUESTIONS-FOR-COUNSEL.md`
   records what engineering was told for each and what the repository shows.
 - **The review switch is separate**: `docs/legal/au/review-status.json`, `reviewed: false`, never set by

@@ -15,9 +15,9 @@ commit you to, in plain English, so you can read them with the right questions i
   Privacy Code is still being developed, and that you do **not** claim to comply with it.
 - **Terms.** Australian law and the NSW courts (non-exclusive). Marking is of the **final answer only**. It is
   not NESA-approved and not an official HSC resource, and it does not predict an HSC mark, band or ATAR.
-  Consumer-law guarantees cannot be excluded. Premium is **not on sale yet**.
-- **Refunds.** Premium is not on sale, so nothing to refund today. When it is: Australian Consumer Law rights
-  apply, there is no "no refunds" wording, prices are in AUD with GST included where it applies, and the page
+  Consumer-law guarantees cannot be excluded. Premium is described as a subscription at **A$9.99 a month or A$99 a year**, paid on a Stripe page.
+- **Refunds.** Price, Stripe as processor (we never see a card number), cancelling in the app (Premium runs to the end
+  of the paid period), and Australian Consumer Law rights apply; a full refund of the current period ends Premium at once; there is no "no refunds" wording, prices are in AUD with GST included where it applies, and the page
   does **not** say you are registered for GST.
 - **Contact.** Where to write, a reply within 48 hours and an answer within 30 days, then the OAIC (privacy)
   or NSW Fair Trading (purchases). This replaces the Indian Grievance Officer page.
@@ -29,14 +29,13 @@ commit you to, in plain English, so you can read them with the right questions i
 - Telling people (and the OAIC where the law requires) about a serious data breach.
 - Erasing an under-18's account that no guardian confirmed after 30 days (plus 7), and keeping records only for
   the periods stated. Each of these is enforced by code and checked by a test.
-- Updating the notice before Premium goes on sale (processor, cancellation, price).
+- Keeping the prices in the notices equal to the prices set in Stripe (they are not in the code), and keeping the cancel button working: the notice promises both.
 
-## Four blanks you must fill before this is live
+## Three blanks you must fill before this is live
 
-The notices leave four facts as `{{PLACEHOLDERS}}`, because the code cannot show them. Until they are filled,
+The notices leave three facts as `{{PLACEHOLDERS}}`, because the code cannot show them. Until they are filled,
 the page shows "Template". Please confirm the real answers: where the Australian **server** runs, where the
-**database** is held (the brief said Neon, Sydney; the repository's plan says Supabase, Sydney), the **payment
-processor** (the brief said Stripe; no payment code exists yet), and the **contact email**.
+**database** is held (the brief said Neon, Sydney; the repository's plan says Supabase, Sydney), the and the **contact email**. Stripe is now named in the notices (the code sells through Stripe only).
 
 ## The five points most worth a lawyer's look
 

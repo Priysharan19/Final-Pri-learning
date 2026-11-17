@@ -27,16 +27,16 @@ no longer the text in the file it names, or if a location below no longer exists
    refuses the flag without those fields or if a notice is edited after the review date. Nothing in the
    code or any agent sets it.
 
-## Facts the notices leave open (the four placeholders)
+## Facts the notices leave open (the placeholders)
 
-The Australian notices say only what the code and the repository show. Four facts are not in either, so
+The Australian notices say only what the code and the repository show. Three facts are not in either, so
 they are left as placeholders, and a notice with one unfilled shows as a template:
 
 | Placeholder | What it must say | What engineering was told, and what the repository shows |
 | --- | --- | --- |
 | `{{AU_HOSTING_PROVIDER_AND_REGION}}` | Where the Australian server runs | Told: Railway, Singapore. The repository records no Australian service (`docs/operations/region-isolation-verification.md`: "The Prithagoras (Australia) deployment does not exist yet") |
 | `{{AU_DATABASE_PROVIDER_AND_REGION}}` | Where the Australian database is held | Told: Neon Postgres, Sydney. The repository's plan names Supabase, Sydney (`ap-southeast-2`) |
-| `{{AU_PAYMENT_PROCESSOR}}` | Who takes payment | Told: Stripe. The repository has no Stripe code, and Prithagoras sells through no provider (`client/edition.config.mjs`, `billing.providers` is empty; plan E5, H3) |
+| Payment processor (no longer a placeholder) | Who takes payment | Stripe: `client/edition.config.mjs` lists `stripe` for Prithagoras, in AUD, and `server/platform/stripe.js` hosts Checkout on Stripe. The prices (A$9.99 a month, A$99 a year) are set in Stripe and `PRI_DISPLAY_*`, not in code: the owner must keep the notices and Stripe in step |
 | `{{CONTACT_EMAIL}}` | The contact address | The address the Indian notices use; an agent session was prevented from writing it into a new file |
 
 Counsel should be told which of these are real at the date they review. The notices must not name a
@@ -165,13 +165,11 @@ this).
 
 ## 7. Refunds, GST and the payment processor [refunds]
 
-Prithagoras sells nothing today. The policy says so, states the Consumer Law rights, and names no refund
-window of its own.
+Prithagoras sells Premium through Stripe (a hosted Checkout). The policy states the prices, the cancellation rule (at the period end), the Consumer Law rights, and names no refund window of its own; a full refund of the current period ends Premium at once.
 
 **Current text** · `docs/legal/au/refund-policy.md`
 
-> Prithagoras Premium is not on sale at the date of this policy**, so there is
-> nothing to cancel or refund today.
+> Premium is **A$9.99 a month** or **A$99 a year**, in Australian dollars (AUD).
 
 **Current text** · `docs/legal/au/refund-policy.md`
 
@@ -179,10 +177,10 @@ window of its own.
 > purchase, the price you see includes it. This policy is not a statement that we
 > are registered for GST
 
-**Lives in** · `client/edition.config.mjs` · `providers: Object.freeze([])`
+**Lives in** · `client/edition.config.mjs` · `providers: Object.freeze(['stripe'])`
 
 **For counsel:** the wording of the consumer-guarantee and remedy paragraph; GST on a digital service and
-whether any statement about it is needed before registration; the processor's terms once chosen;
+whether any statement about it is needed before registration; Stripe's terms and its overseas processing (APP 8);
 subscription and auto-renewal rules; whether the 48-hour and 3-business-day response times are
 commitments we should make.
 

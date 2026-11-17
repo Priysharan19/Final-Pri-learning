@@ -44,5 +44,5 @@ Trading.
 
 ## Purchases
 
-Premium is not on sale yet. When it is, billing questions go to the address
-above; see the [refund policy](/refund-policy).
+Billing questions about Premium go to the address above; see the
+[refund policy](/refund-policy).

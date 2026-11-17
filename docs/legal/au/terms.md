@@ -49,9 +49,13 @@ has no standing outside it.
 
 The free plan includes a daily allowance of practice questions; the app tells
 you what it is and when it resets. Prithagoras Premium, which removes those
-limits, is **not on sale** at the date of these terms. This section will say how
-it is sold, and at what price in Australian dollars, before you can buy it. See
-the [refund policy](/refund-policy) for your rights when it is.
+limits, is sold as a subscription at A$9.99 a month or A$99 a year, in Australian
+dollars. Where GST applies, the price includes it. You pay on a page hosted by
+Stripe, our payment processor; we do not receive or store your card number. The
+subscription renews each month or year until you cancel it. You can cancel in the
+app, and Premium then stays on until the end of the period you have paid for.
+See the [refund policy](/refund-policy) for cancelling, refunds and your rights
+under the Australian Consumer Law.
 
 If you are under 18, a parent or guardian must make or approve any purchase.
 

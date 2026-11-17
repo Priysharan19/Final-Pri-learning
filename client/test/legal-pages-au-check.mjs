@@ -163,12 +163,12 @@ ok(/aim to handle your information in line with the APPs/.test(privacy), 'it say
 for (const [label, re] of [
   ['Australian Consumer Law guarantees that cannot be excluded', /guarantees that cannot be excluded under the Australian\s+Consumer Law/], ['New South Wales law', /governed by the laws of New South Wales/],
   ['NSW courts', /courts of New South Wales/], ['final answer only', /Marking is of the final answer only/], ['not NESA-approved, not an official HSC resource', /not endorsed by,\s+affiliated with or approved by NESA[\s\S]{0,200}not an official HSC resource/],
-  ['no prediction of an HSC mark, band or ATAR', /not a prediction of an HSC mark, band or ATAR/], ['Premium not on sale', /not on sale/], ['no whole-syllabus claim', /does not cover the whole of any syllabus/]
+  ['no prediction of an HSC mark, band or ATAR', /not a prediction of an HSC mark, band or ATAR/], ['the Premium price in AUD', /A\$9\.99 a month or A\$99 a year/], ['Stripe as the processor', /Stripe, our payment processor/], ['cancelling at the end of the paid period', /You can cancel in the app,\s+and Premium then stays on until the end of the period/], ['no whole-syllabus claim', /does not cover the whole of any syllabus/]
 ]) ok(re.test(terms), `the terms have ${label}`);
 ok(!/exclusive jurisdiction/.test(terms.replace(/non-exclusive/g, '')), 'the terms do not impose an exclusive jurisdiction on a consumer');
 for (const [label, re] of [
   ['the ACL guarantees and remedies', /Australian\s+Consumer Law[\s\S]*major failure[\s\S]*refund/], ['AUD', /Australian dollars \(AUD\)/], ['GST included where it applies', /Where GST applies to a\s+purchase, the price you see includes it/],
-  ['an explicit non-statement about GST registration', /not a statement that we\s+are registered for GST/], ['a processor to be named', /\{\{AU_PAYMENT_PROCESSOR\}\}/], ['NSW Fair Trading', /NSW Fair Trading/]
+  ['an explicit non-statement about GST registration', /not a statement that we\s+are registered for GST/], ['Stripe named as the processor', /Payments are taken by Stripe, our payment processor/], ['the prices', /A\$9\.99 a month\*\* or \*\*A\$99 a year/], ['no card number received or stored', /never receive or store a\s+card number/], ['cancelling at the end of the paid period', /Premium then stays on\s+until the end of the period you have already paid for/], ['a full refund ending Premium at once', /refunded in full, Premium for that period ends at once/], ['NSW Fair Trading', /NSW Fair Trading/]
 ]) ok(re.test(refund), `the refund policy has ${label}`);
 ok(!/no refund|non-refundable|all sales (?:are )?final|refunds? (?:are )?not (?:given|available|offered)/i.test(refund + terms), 'no "no refunds" wording anywhere');
 ok(!/registered for GST(?! and)/.test(refund.replace(/not a statement that we\s+are registered for GST/, '')) && !/\bABN\b/.test(all), 'no claim to be registered for GST, no ABN');
@@ -178,9 +178,17 @@ ok(!/grievance/i.test(all), 'no notice uses the word grievance: Prithagoras has 
 // ── 4 · True of the code ────────────────────────────────────────────────────
 const edition = await import(pathToFileURL(join(ROOT, 'client/edition.config.mjs')).href);
 const prithagoras = edition.EDITIONS.prithagoras;
-ok(prithagoras.billing.providers.length === 0 && prithagoras.billing.currency === 'AUD', 'Prithagoras sells through no provider and in AUD, so "Premium is not on sale" and "Australian dollars" are true (edition.config.mjs)');
-ok(/not on sale/.test(privacy), 'the privacy notice says Premium is not on sale');
-ok(/available:\s*false|answers `available: false`/.test(read('server/platform/billing.js')), 'the server answers that Premium is not available on an edition with no provider (billing.js)');
+ok(JSON.stringify(prithagoras.billing.providers) === '["stripe"]' && prithagoras.billing.currency === 'AUD', 'Prithagoras sells through Stripe and only Stripe, in AUD (edition.config.mjs), so the notices name Stripe and "Australian dollars"');
+const stripeCode = read('server/platform/stripe.js');
+ok(/cancel_at_period_end: true/.test(stripeCode) && /at the cycle end by the student's choice/.test(stripeCode), 'cancelling asks Stripe to stop at the period end, so Premium stays until then (stripe.js)');
+ok(/immediately for account erasure/.test(stripeCode), 'deleting the account cancels a subscription at once (stripe.js)');
+ok(/FULL refund of the CURRENT period/.test(stripeCode), 'a full refund of the current period ends Premium at once (stripe.js)');
+ok(/checkout\.stripe\.com/.test(stripeCode) && /customer_email: account\.email/.test(stripeCode), 'payment is taken on Stripe\'s hosted page and the account email is the only identifier sent (stripe.js)');
+ok(!/card_number|cardNumber|pan\b/i.test(stripeCode), 'no card number is handled in the Stripe code');
+ok(/stays on\s+until the end of the period/.test(terms) && /A\$9\.99 a month or A\$99 a year/.test(terms) && /Stripe, our payment processor/.test(terms), 'the terms state the price, the processor and the cancellation rule');
+ok(/never receive or store a card number/.test(privacy) && /\*\*Stripe\*\* is our payment processor/.test(privacy) && /Three things are kept after deletion/.test(privacy), 'the privacy notice names Stripe, says no card number is held, and lists the payment record kept after deletion');
+ok(/ON DELETE SET NULL/.test(read('server/platform/billingSchema.js')), 'a payment record outlives the account without its link (billingSchema.js)');
+ok(!/not on sale/.test(all), 'no notice still says Premium is not on sale');
 const marking = read('server/platform/editionMarking.js');
 ok(/UNCERTIFIED_EDITIONS = Object\.freeze\(\[[^\]]*'prithagoras'/.test(marking), 'Prithagoras marks the final answer only: its method marks cannot be switched on (editionMarking.js)');
 ok(/FINAL_ANSWER_MARKING/.test(read('server/platform/editionBanks.js')) && /marking: FINAL_ANSWER_MARKING/.test(read('server/platform/editionBanks.js')), 'and its questions are sealed final-answer-only (editionBanks.js)');
@@ -201,7 +209,7 @@ ok(/'\/account\/delete-request'/.test(read('client/src/main.jsx')) && existsSync
 ok(/48 hours/.test(contact) && /48 hours/.test(privacy), 'the 48-hour acknowledgement is stated the same way on both pages');
 
 // ── 5 · Placeholders, and the review switch ─────────────────────────────────
-const DECLARED = new Set(['AU_HOSTING_PROVIDER_AND_REGION', 'AU_DATABASE_PROVIDER_AND_REGION', 'AU_PAYMENT_PROCESSOR', 'CONTACT_EMAIL']);
+const DECLARED = new Set(['AU_HOSTING_PROVIDER_AND_REGION', 'AU_DATABASE_PROVIDER_AND_REGION', 'CONTACT_EMAIL']);
 const found = new Set((all.match(/\{\{[A-Z_]+\}\}/g) || []).map(p => p.slice(2, -2)));
 for (const name of found) ok(DECLARED.has(name), `placeholder {{${name}}} is one of the declared four`);
 for (const name of DECLARED) ok(found.has(name), `declared placeholder {{${name}}} is used`);
@@ -265,5 +273,5 @@ ok(Array.from(AU.map(d => d.text)).every(t => /been\s+reviewed by a\s+lawyer; th
 console.log(`${scanned ? scanned.trim() + ' ' : ''}placeholders left in the Australian notices: ${[...found].sort().join(', ') || 'none'}`);
 console.log(failures.length
   ? `LEGAL PAGES (AU): FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.slice(0, 50).join('\n  · ')}`
-  : `LEGAL PAGES (AU): PASS — ${pass} checks — the Prithagoras build serves Australian notices (APPs, OAIC, ACL, NSW law, AUD, final-answer-only marking, premium not on sale) and never the DPDP / Grievance Officer text; Priyabhata still serves its own; every stated number is read from the code; not reviewed by a lawyer.`);
+  : `LEGAL PAGES (AU): PASS — ${pass} checks — the Prithagoras build serves Australian notices (APPs, OAIC, ACL, NSW law, AUD, final-answer-only marking, Premium sold via Stripe in AUD) and never the DPDP / Grievance Officer text; Priyabhata still serves its own; every stated number is read from the code; not reviewed by a lawyer.`);
 process.exit(failures.length ? 1 : 0);

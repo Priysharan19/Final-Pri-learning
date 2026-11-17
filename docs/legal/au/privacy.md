@@ -34,8 +34,8 @@ permission, naming OpenAI, and nothing is sent until you agree. A second
 setting, off unless you turn it on, sends your working to the same service to
 find where a mistake is. Both are described below.
 
-**Some of your information goes overseas.** The handwriting reading service and
-our email delivery service are outside our control and are likely to handle
+**Some of your information goes overseas.** The handwriting reading service, our
+email delivery service and our payment processor are outside our control and are likely to handle
 your information outside Australia. See "Sending information overseas".
 
 Without an account you can open the app and look around, but nothing about your
@@ -46,9 +46,9 @@ learning is sent anywhere, and nothing is marked.
 - **Our server** runs on {{AU_HOSTING_PROVIDER_AND_REGION}}.
 - **Our database**, which holds your account and learning records, is
   {{AU_DATABASE_PROVIDER_AND_REGION}}.
-- **OpenAI** reads handwriting, photos and (if you turn it on) your working, and
-  **our email delivery provider** sends our messages. Both process what they are
-  sent in their own locations, which we do not control. See "Sending information
+- **OpenAI** reads handwriting, photos and (if you turn it on) your working,
+  **our email delivery provider** sends our messages, and **Stripe** takes
+  payment if you buy Premium. Each processes what it is sent in its own locations, which we do not control. See "Sending information
   overseas".
 
 This notice does not say where your information is held until the first two
@@ -141,8 +141,14 @@ device can open a profile that has no password.
   the app's build number. Never the error message, the page address, the
   question, your writing or anything you typed.
 
-We do not collect payment details. Premium is not on sale in Prithagoras at the
-date of this notice; see the [refund policy](/refund-policy).
+**If you buy Premium**, you pay on a page hosted by Stripe, our payment
+processor. You type your card details into Stripe's page, not ours: we never
+receive or store a card number. We send Stripe your account's email address so
+that it can set up the payment, and we keep three kinds of record about the
+subscription: Stripe's reference for it, which plan (monthly or yearly) it is
+and whether it is active, and a record of each payment (Stripe's reference for
+it, the amount, the currency, the date and its status). See the
+[refund policy](/refund-policy).
 
 ## Why we use it
 
@@ -225,6 +231,10 @@ This is the list of the overseas recipients we know of.
 - **OpenAI** is a company based in the United States. It receives the images,
   photos and (if you turn it on) working described above, so that they can be
   read. We do not control where it processes them.
+- **Stripe** is our payment processor. It receives your account's email address
+  and, on its own page, the card details you choose to enter if you buy Premium.
+  Stripe operates in many countries, and we have not been able to confirm where
+  it processes this information, so we treat it as likely to be outside Australia.
 - **Resend**, our email delivery provider, receives the email address and the
   message for each email we send. We have not been able to confirm the country
   where it processes them, and we treat the delivery as likely to be outside
@@ -259,7 +269,10 @@ the handwriting setting off and type your answers.
   synced work and answer records, your exam papers, your class memberships and
   submissions, your telemetry and any guardian's details. Your email address can
   then be used to create a new, empty account.
-- Two things are kept after deletion, with nothing in them that identifies you:
+- Three things are kept after deletion, with nothing in them that identifies you:
+  the record of each payment you made (Stripe's reference, the amount, the
+  currency, the date and its status), kept without your name, email or account so
+  that a later refund can still be matched to it;
   any problem report you sent about a question, with everything you typed into it
   removed; and a log entry saying that an account was deleted, with no name or
   email.
