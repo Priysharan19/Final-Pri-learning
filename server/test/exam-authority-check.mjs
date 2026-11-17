@@ -635,8 +635,8 @@ try {
   const attempted = result.detail.flatMap(d => (d.multipart ? d.parts : [d])).filter(x => x.attemptId);
   eq(graded.length, attempted.length, 'one graded-attempt event per attempted question or part');
   eq(graded.map(e => e.id).sort(), attempted.map(x => x.attemptId).sort(), 'keyed by the attempt ids the result carries');
-  ok(graded.every(e => { const p = JSON.parse(e.payload_json); return e.device_id === 'server-grader' && p.attemptId === e.id && p.questionId === e.entity_id && p.mode === 'exam' && p.examId === exam.id && p.support === 'supported' && /^srv:/.test(p.contentId || '') && typeof p.subtopic === 'string' && (p.correct === true || p.correct === false); }),
-    'in the practice payload conventions, by the server grader, in exam mode, with opaque content ids and no claim of unaided work');
+  ok(graded.every(e => { const p = JSON.parse(e.payload_json); return e.device_id === 'server-grader' && p.attemptId === e.id && p.questionId === e.entity_id && p.mode === 'exam' && p.examId === exam.id && p.supportVersion === 2 && p.support === (p.repeat ? 'supported' : 'independent') && p.hintsUsed === 0 && /^srv:/.test(p.contentId || '') && typeof p.subtopic === 'string' && (p.correct === true || p.correct === false); }),
+    'in the practice payload conventions, by the server grader, in exam mode, with opaque content ids; independent by the server\'s own records (no hint, tutor or second try is offered on a paper), supported only for a repeat of content already seen solved');
   const examEvents = await events(a.account.id, 'exam-result');
   eq(examEvents.length, 1, 'one exam-level event');
   const examPayload = JSON.parse(examEvents[0].payload_json);

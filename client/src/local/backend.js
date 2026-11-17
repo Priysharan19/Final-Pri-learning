@@ -2827,7 +2827,7 @@ const IMPORT_ROWS = {
     answerGiven: sanitizeText(r.answerGiven, 300), ms: safeInt(r.ms, 0, 1e9, 0),
     hintsUsed: safeInt(r.hintsUsed, 0, 20, 0), mode: sanitizeText(r.mode, 20) || 'practice',
     tutorLevel: safeInt(r.tutorLevel, 0, 3, 0),
-    support: r.support === 'independent' ? 'independent' : (r.support === 'supported' ? 'supported' : undefined),
+    support: ['independent', 'after-feedback', 'supported', 'revealed'].includes(r.support) ? r.support : undefined,
     viaInk: !!r.viaInk, ratingBefore: safeNum(r.ratingBefore, 0), ratingAfter: safeNum(r.ratingAfter, 0),
     createdAt: safeTime(r.createdAt) || Date.now(),
     // A repeat stays a repeat: restored without the flag it would count as
@@ -6575,7 +6575,12 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
   const payload = resend
     || {
         submissionId, answer: String(body.answer), mode, steps: body.steps,
-        ms: body.ms, ...(receipt ? { transcriptionReceipt: receipt } : picture ? { image: picture } : {})
+        ms: body.ms, ...(receipt ? { transcriptionReceipt: receipt } : picture ? { image: picture } : {}),
+        // Tutor help this device showed (the server marks what it served
+        // itself; this covers the offline fallback). One-way: it can only
+        // make the attempt count as supported.
+        // (the live step coach also records its reads on row.assistance)
+        ...(Number(row.tutorLevel) > 0 || row.assistance?.stepCoach?.reads > 0 ? { deviceHelp: true } : {})
       };
   // `at` lets a sync pull tell a grade in flight from one abandoned after the
   // server committed it (cloudSyncRestore: issued-here events).

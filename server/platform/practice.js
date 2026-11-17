@@ -62,6 +62,7 @@ import { JEE_BAND_IDS, jeeBandCatalog, jeeBandRecords } from '../../client/src/e
 import { figureHasExternalRef } from './figureRefs.js';
 import { activeArm, activeExperiments, experimentStamp } from './experiments.js';
 import { buildHelpPlan, causeFromWork, helpPlanBodyError, HELP_PLAN_ATTEMPTS, TUTOR_POLICY_EXPERIMENT, TUTOR_POLICY_VERSION, tutorPolicyServerEnabled } from './helpPlan.js';
+import { deriveSupport, helpRecordsFor, markHelp } from './attemptSupport.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
 const ID = /^[a-zA-Z0-9_-]{8,100}$/;
@@ -128,7 +129,7 @@ const DOTPOINT = /^[a-zA-Z0-9._:-]{1,80}$/;
 // which need the same question twice; they are honoured in NODE_ENV=test and
 // nowhere else, and a suite can switch them off to exercise the real contract.
 const fixedSeedsAllowed = env => env.NODE_ENV === 'test' && env.PRI_PRACTICE_SERVER_SEEDS_ONLY !== '1';
-const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms', 'image']);
+const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms', 'image', 'deviceHelp']);
 // One reading per request to /recognize, and per submission that carries its
 // own picture: the two share this bucket, so the one-request Submit cannot be
 // used to read more pictures an hour than the receipt route allows.
@@ -989,13 +990,15 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const cursor = await nextSyncCursor(db, accountId);
     await db.run("INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at) VALUES (?,?,?, 'server-grader',?,'graded-attempt',?,?,?,?)",
       [cursor, attemptId, accountId, Number(last?.n || 0) + 1, qid, now, JSON.stringify({ attemptId, questionId: qid, correct: false,
+        // A reveal: support 'revealed' (attemptSupport.js), with the other help it had.
+        ...deriveSupport({ revealed: true, hintLevel: ladder.hintLevel, records: await helpRecordsFor(db, accountId, qid, q), solutionSeen: q._repeat === true }),
         revealed: true, marksEarned: 0, marksPossible: response.marksPossible,
         ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         contentId: opaqueContentId(q.contentId),
         subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
         dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
         ...curriculumOf(q),
-        mode: q._practiceMode || 'practice', hintsUsed: Math.max(1, ladder.hintHelpUnits), support: 'supported',
+        mode: q._practiceMode || 'practice', hintsUsed: Math.max(1, ladder.hintHelpUnits),
         ...ladder, markWeight: 0, creditedMarks: 0,
         // An active experiment's arm (server/platform/experiments.js); empty, and
         // the event unchanged, while none is active.
@@ -1108,6 +1111,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (reached > level) {
         await db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-hints',?,?,?,?,?) ON CONFLICT(account_id,scope,key) DO UPDATE SET response_json=excluded.response_json",
           [accountId, qid, JSON.stringify({ level: reached, rungs: HINT_RUNGS.slice(0, reached), at: now }), digest({ qid, level: reached }), now, now + MAX_AGE]);
+        // Also recorded per content, so a hint on this copy follows the item
+        // to any other copy's support (attemptSupport.js, help-on-copy).
+        await markHelp(db, accountId, qid, `hint:${HINT_RUNGS[reached - 1]}`, now);
       }
       if (body.rung === 'solution') {
         const revealed = await commitReveal(accountId, qid, now, true);
@@ -1125,6 +1131,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (work.charge) {
         const cap = await consumeRateLimit(db, work.capBucket, { limit: LINE_CHECKS_PER_QUESTION, windowMs: LINE_CHECK_WINDOW_MS }, now);
         shown = cap.allowed ? work.reply : { status: 'limit' };
+        if (cap.allowed) await markHelp(db, accountId, qid, 'line-check', now);
       }
       const locale = body.locale === 'hi' ? 'hi' : 'en';
       result.response.work = shown;
@@ -1161,6 +1168,14 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     }
     if (body.ms !== undefined && (!Number.isSafeInteger(body.ms) || body.ms < 0 || body.ms > 86_400_000)) {
       return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'Invalid answer duration.');
+    }
+    // `deviceHelp: true` — help the device showed that the server never served
+    // (the tutor's offline fallback, the authored hint shown with no
+    // connection). It can only make an attempt LESS independent, so the
+    // device's word is enough for it; nothing can claim independence
+    // (attemptSupport.js). Only `true` is accepted.
+    if (body.deviceHelp !== undefined && body.deviceHelp !== true) {
+      return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'deviceHelp, when sent, is true.');
     }
     // ── A handwritten or photographed answer may carry its own picture ──────
     // Submit used to be three requests for one press: /recognize (mint a
@@ -1202,7 +1217,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // digest). A request without a picture hashes exactly as it always did, so
     // a submission in flight across a deploy still replays.
     const hash = digest({ qid, submissionId, answer: body.answer, mode, steps: body.steps ?? [], transcriptionReceipt: body.transcriptionReceipt || null, ms: body.ms ?? null,
-      ...(withPicture ? { picture: createHash('sha256').update(body.image).digest('hex') } : {}) });
+      ...(withPicture ? { picture: createHash('sha256').update(body.image).digest('hex') } : {}),
+      ...(body.deviceHelp === true ? { deviceHelp: true } : {}) });
     const now = Date.now();
     const idKey = qid + ':' + submissionId;
     const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
@@ -1575,6 +1591,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         const cursor = await nextSyncCursor(db, accountId);
         // What the tutor policy offered on this item, if it was asked (helpPlan.js).
         const policyAssistance = await policyAssistanceOf(accountId, qid);
+        // What help this attempt had, from the server's own records of this
+        // question (attemptSupport.js): never the device's word.
+        const support = deriveSupport({ hintLevel: ladder.hintLevel, records: { ...await helpRecordsFor(db, accountId, qid, q), deviceHelp: body.deviceHelp === true },
+          solutionSeen: q._repeat === true, priorTries: tries > 0 ? tries : (spent ? 1 : 0) });
         await db.run(`INSERT INTO learning_events(server_cursor,id,account_id,device_id,device_seq,kind,entity_id,occurred_at,payload_json,created_at)
           SELECT ?,?,?, 'server-grader', COALESCE(MAX(device_seq), 0) + 1, 'graded-attempt',?,?,?,?
           FROM learning_events WHERE account_id=? AND device_id='server-grader'`,
@@ -1594,11 +1614,12 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             // names the mistake it retries, so a right answer here fixes it.
             ...(!response.correct && !invalid ? firstErrorOf(stepReport) : {}),
             ...(typeof q._twinOf === 'string' && q._twinOf ? { twinOf: q._twinOf } : {}),
-            // Hint rungs are now server-committed (`hintLevel`, `hintRungs`,
-            // `markWeight`, `creditedMarks`); tutor levels are still
-            // client-observed, so restored progress must not claim independent
-            // mastery for a result whose help is unknown.
-            hintsUsed: Math.max(1, ladder.hintHelpUnits), support: 'supported',
+            // Hint rungs are server-committed (`hintLevel`, `hintRungs`,
+            // `markWeight`, `creditedMarks`), and so, since support version 2,
+            // is the rest of the help this item had (`support`,
+            // `supportSources`). `hintsUsed` is the ladder's help units, 0 when
+            // no rung was opened.
+            hintsUsed: ladder.hintHelpUnits, ...support,
             ...ladder, creditedMarks,
             ...(misconception ? { misconception: misconception.id, misconceptionSource: misconception.source,
               ...(misconception.label ? { misconceptionLabel: misconception.label } : {}) } : {}),

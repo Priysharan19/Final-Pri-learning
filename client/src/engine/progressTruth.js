@@ -79,10 +79,16 @@ export function quotedTotals(attempts = []) {
 /**
  * An answer that needed help — a hint, tutor help or a second try. Attempts
  * written before `support` existed are read from the help they recorded.
+ *
+ * The server writes four values since support version 2
+ * (server/platform/attemptSupport.js): only `independent` is on your own;
+ * `after-feedback` (re-submitted after seeing a verdict), `supported` and
+ * `revealed` are all help. A server event without `supportVersion` said
+ * `supported` for "help unknown" and stays supported.
  */
 export function isSupported(a) {
-  if (a?.support === 'supported') return true;
   if (a?.support === 'independent') return false;
+  if (a?.support === 'supported' || a?.support === 'after-feedback' || a?.support === 'revealed') return true;
   return (Number(a?.hintsUsed) || 0) + (Number(a?.tutorLevel) || 0) > 0;
 }
 

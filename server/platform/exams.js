@@ -205,6 +205,7 @@ import {
 import { buildPdf, unprintable } from './pdfLite.js';
 import { indiaBank } from './indiaBanks.js';
 import { nswBank } from './nswBanks.js';
+import { deriveSupport } from './attemptSupport.js';
 
 /** How long after the deadline a finish may still carry its own answers. */
 export const FINISH_GRACE_MS = 2 * 60 * 1000;
@@ -1250,10 +1251,13 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       ...(extra.repeat ? { repeat: true } : {}),
       ...(extra.repeat && extra.repeatEvidence ? { repeatEvidence: extra.repeatEvidence } : {}),
       mode: 'exam', inputMode: extra.inputMode, ms: extra.ms,
-      // The server offers an exam question no hint, tutor or second try, but it
-      // cannot see what else was open beside the paper. As with practice, an
-      // attempt whose help is unknown is not recorded as independent.
-      hintsUsed: 1, support: 'supported', createdAt: now, serverAcknowledgedAt: now
+      // The server offers an exam question no hint, tutor (TUTOR_EXAM_LOCKED)
+      // or second try, so its own records say independent — unless the
+      // content's solution was already seen (a repeat). Help the server cannot
+      // see (another tab, a calculator) is outside every version of `support`
+      // (attemptSupport.js); attempts written before support version 2 said
+      // 'supported' for "unknown" and are left as they are.
+      hintsUsed: 0, ...deriveSupport({ solutionSeen: !!extra.repeat }), createdAt: now, serverAcknowledgedAt: now
     });
     return attemptId;
   };

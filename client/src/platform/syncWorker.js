@@ -80,8 +80,10 @@ function attemptPayload(attempt, fallbackAt = Date.now()) {
     hintsUsed: Math.max(0, Number(attempt?.hintsUsed) || 0),
     tutorLevel: Math.max(0, Math.min(3, Number(attempt?.tutorLevel) || 0)),
     // Older attempts predate the field: help of any kind made them supported.
-    support: ['independent', 'supported'].includes(attempt?.support)
-      ? attempt.support
+    // Support v2 values (server/platform/attemptSupport.js): only independent is
+    // on your own; after-feedback and revealed are pushed as supported.
+    support: attempt?.support === 'independent' ? 'independent'
+      : ['supported', 'after-feedback', 'revealed'].includes(attempt?.support) ? 'supported'
       : ((Number(attempt?.hintsUsed) || 0) + (Number(attempt?.tutorLevel) || 0) > 0 ? 'supported' : 'independent'),
     mode: String(attempt?.mode || 'practice').slice(0, 30),
     viaInk: !!attempt?.viaInk,
