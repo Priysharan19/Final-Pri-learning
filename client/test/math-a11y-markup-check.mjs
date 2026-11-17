@@ -47,15 +47,11 @@ try {
     ok(wraps.length === n.length, `"${text.slice(0, 30)}…": every formula's KaTeX is aria-hidden inside its wrapper (${wraps.length}/${n.length})`);
     ok(!/role="math"[^>]*>(?:(?!<\/span><\/span>).)*role="math"/s.test(html), `"${text.slice(0, 30)}…": no role="math" nested`);
     ok((html.match(/role="math"/g) || []).length === n.length, `"${text.slice(0, 30)}…": nothing but the formulas has role="math"`);
-    ok(!/tabindex/.test(html), `"${text.slice(0, 30)}…": formulas are not tab stops unless asked`);
+    ok(!/tabindex/.test(html), `"${text.slice(0, 30)}…": a formula is not a tab stop (it is not a control)`);
   }
   ok(mathNodes(render(h(MathText, { text: 'a $x^2-2x-3$ b' })))[0].name === 'x squared minus 2 x minus 3', 'the spoken name of x^2-2x-3 is "x squared minus 2 x minus 3"');
   ok(mathNodes(render(h(MathText, { text: '$\\frac{64}{3}$' })))[0].name === '64 over 3', 'the spoken name of 64/3 is "64 over 3"');
   ok(!/role="math"/.test(render(h(MathText, { text: 'plain *text*, no maths' }))), 'text with no formula carries no role="math"');
-
-  // focusable (notes and worked examples)
-  const focus = render(h(MathText, { text: 'Step: $x=5$', focusable: true }));
-  ok(/role="math"[^>]*tabindex="0"/.test(focus), 'a focusable formula is a tab stop (tabindex 0, never positive)');
 
   // a formula KaTeX cannot parse is still a named math node, escaped
   const bad = render(h(MathText, { text: '$\\unknowncommand{x}^{$' }));
@@ -68,7 +64,7 @@ try {
   const rf = render(h(ReadableFormula, { tex: 'x^2-2x-3', label: 'Formula', readLabel: 'Read formula', hideLabel: 'Hide reading' }));
   ok(/<button type="button"[^>]*aria-expanded="false"[^>]*aria-label="Read formula: Formula"/.test(rf), '"Read formula" is a named button, collapsed at first');
   ok(/role="status" aria-live="polite"/.test(rf), 'the reading is announced through a polite live region');
-  ok(/role="math"[^>]*tabindex="0"/.test(rf), 'the formula itself is focusable');
+  ok(!/tabindex/.test(rf), 'no non-interactive tab stop: the keyboard stop is the Read formula button');
   ok(/aria-label="x squared minus 2 x minus 3"/.test(rf), 'the formula carries its spoken name');
 
   // language follows the interface

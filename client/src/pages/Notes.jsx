@@ -657,7 +657,7 @@ function Concepts({ concepts }) {
 }
 
 function Formula({ f, i }) {
-  // Rendered through the one escaped KaTeX sink, in display style; focusable, with a "Read formula" button.
+  // Rendered through the one escaped KaTeX sink, in display style, with a "Read formula" button.
   const t = useT();
   const tex = useMemo(() => `\\displaystyle ${f.tex}`, [f.tex]);
   return (
@@ -687,7 +687,7 @@ function Example({ ex, n }) {
       {ex.figure && <StudyDiagram figure={ex.figure} />}
       <ol className="nt-steps">
         {ex.steps.slice(0, shown).map((s, i) => <li key={i} className="nt-step">
-          <MathText focusable text={s} />
+          <MathText text={s} />
           {ex.reasons?.[i] && <p className="nt-step-reason"><MathText text={ex.reasons[i]} /></p>}
         </li>)}
       </ol>
@@ -699,7 +699,7 @@ function Example({ ex, n }) {
       ) : (
         <div className="nt-answer nt-step">
           <span className="nt-tag">{t('notes.answer')}</span>
-          <MathText focusable text={ex.answer} />
+          {/^\$[^$]+\$$/.test(ex.answer) ? <ReadableFormula tex={ex.answer.slice(1, -1)} label={t('notes.answer')} readLabel={t('math.readFormula')} hideLabel={t('math.hideReading')} /> : <MathText text={ex.answer} />}
           <span className="nt-checked">{t('notes.engineChecked')}</span>
           {ex.alternative && (
             <details className="nt-alternative">

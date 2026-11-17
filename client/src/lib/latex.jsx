@@ -29,9 +29,9 @@ export function useMathLocale() {
  * KaTeX output (its MathML stays in the DOM for copy, search and tools, but is hidden from the
  * accessibility tree so a formula is announced once, as its spoken name).
  */
-export function renderMath(tex, displayMode = false, locale = 'en', focusable = false) {
+export function renderMath(tex, displayMode = false, locale = 'en') {
   const spoken = speakMath(tex, locale);
-  const open = ['<span class=', Q, 'pri-math', displayMode ? ' is-display' : '', Q, ' role=', Q, 'math', Q, ' aria-label=', Q, attr(spoken), Q, focusable ? ' tabindex=' + Q + '0' + Q : '', '><span aria-hidden=', Q, 'true', Q, '>'].join('');
+  const open = ['<span class=', Q, 'pri-math', displayMode ? ' is-display' : '', Q, ' role=', Q, 'math', Q, ' aria-label=', Q, attr(spoken), Q, '><span aria-hidden=', Q, 'true', Q, '>'].join('');
   const close = '</span></span>';
   try {
     return open + katex.renderToString(tex, { throwOnError: false, displayMode, strict: false }) + close;
@@ -45,7 +45,7 @@ export function renderMath(tex, displayMode = false, locale = 'en', focusable = 
 }
 
 /** Split on $...$ (math), then apply light markdown to the text parts. */
-export function MathText({ text, block = false, className, focusable = false }) {
+export function MathText({ text, block = false, className }) {
   const locale = useMathLocale();
   const html = useMemo(() => {
     if (text == null) return '';
@@ -54,7 +54,7 @@ export function MathText({ text, block = false, className, focusable = false }) 
     let out = '';
     parts.forEach((part, i) => {
       if (i % 2 === 1) {
-        out += renderMath(part, false, locale, focusable);
+        out += renderMath(part, false, locale);
       } else {
         out += escapeHtml(part)
           .replace(/\\\$/g, '$')
@@ -63,7 +63,7 @@ export function MathText({ text, block = false, className, focusable = false }) 
       }
     });
     return out;
-  }, [text, locale, focusable]);
+  }, [text, locale]);
   const Tag = block ? 'div' : 'span';
   return <Tag className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
