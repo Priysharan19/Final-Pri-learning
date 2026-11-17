@@ -8,7 +8,7 @@
 // first break, and no model is involved.
 import { registerTopic } from './registry.js';
 import { parse, normalize } from '../../expr.js';
-import { sameAsPrevious, coeffOf, degreeIn, fmt, fmtPoly, polyAdd, polyConst, polyEqual, polyFromAst, polyMul, polyOfExpression, polyOfText, polyVar, productFactors, sumTerms, unwrap } from './poly.js';
+import { resetPolyBudget, sameAsPrevious, coeffOf, degreeIn, fmt, fmtPoly, polyAdd, polyConst, polyEqual, polyFromAst, polyMul, polyOfExpression, polyOfText, polyVar, productFactors, sumTerms, unwrap } from './poly.js';
 
 const astOf = text => {
   const s = String(text ?? '').replace(/[−–—]/g, '-').trim();
@@ -60,7 +60,7 @@ function expandSlips(ctx) {
     return {
       message: `${written} means ${bracketText(g1, v)} times itself, so it has four products, not two. Squaring each term misses the middle term, 2 × ${a === 1 ? '' : `${fmt(a)}`}${v} × ${fmt(b)}.`,
       messages: { hi: `${written} का अर्थ है ${bracketText(g1, v)} को स्वयं से गुणा करना, इसमें चार गुणनफल होते हैं, दो नहीं। हर पद का अलग वर्ग लेने से बीच का पद छूट जाता है: 2 × ${a === 1 ? '' : fmt(a)}${v} × ${fmt(b)}।` },
-      code: 'expand-square-no-middle'
+      code: 'power-of-sum'
     };
   }
   if (!same && polyEqual(line, q(a * c, 0, b * d))) {
@@ -133,7 +133,7 @@ function bracketSlips(ctx) {
     return {
       message: `The ${fmt(first.k)} outside ${bracketText(first.g, v)} multiplies every term inside it, not only the first: ${fmt(first.k)} × ${fmt(first.g.b)} as well.`,
       messages: { hi: `${bracketText(first.g, v)} के बाहर का ${fmt(first.k)} कोष्ठक के अंदर के हर पद को गुणा करता है, केवल पहले को नहीं: ${fmt(first.k)} × ${fmt(first.g.b)} भी।` },
-      code: 'expand-bracket-first-term-only'
+      code: 'distribute-partial'
     };
   }
   // A minus in front of the bracket treated as a plus.
@@ -142,7 +142,7 @@ function bracketSlips(ctx) {
     return {
       message: `The minus sign in front of ${fmt(neg.k)}${bracketText(neg.g, v)} belongs to the whole bracket: ${neg.sign < 0 ? '−' : ''}${fmt(neg.k)} multiplies ${fmt(neg.g.a)}${v} and ${fmt(neg.g.b)}, so every term in it changes sign.`,
       messages: { hi: `${fmt(neg.k)}${bracketText(neg.g, v)} के सामने का ऋण चिह्न पूरे कोष्ठक का है: −${fmt(neg.k)} से ${fmt(neg.g.a)}${v} और ${fmt(neg.g.b)} दोनों गुणा होते हैं।` },
-      code: 'expand-minus-bracket-treated-as-plus'
+      code: 'distribute-sign'
     };
   }
   return null;
@@ -160,20 +160,24 @@ function factorSlips(ctx) {
   const v = soleVariable(prev) || soleVariable(now);
   if (!v) return null;
   const written = String(ctx.line).replace(/[−–—]/g, '-').split('=').pop().trim().replace(/\*/g, '').replace(/\s*\+\s*-\s*/g, ' - ');
-  const back = fmtPoly(now, v), want = fmtPoly(prev, v);
+  const back = fmtPoly(now, v);
+  // Only for a line above with no brackets of its own (a polynomial to factorise): on an
+  // expand question the "question's expansion" would be the answer.
+  if (/[()]/.test(String(ctx.previous ?? ''))) return null;
+  const want = fmtPoly(prev, v);
   const twoLinear = fs.length === 2 && brackets.length === 2 && degreeIn(prev, v) === 2 && coeffOf(prev, v, 2) === 1;
   if (twoLinear) {
     const S = coeffOf(prev, v, 1), P = prev.get('')?.c || 0;
     return {
-      message: `Multiply your brackets back out to check: ${written} gives ${back}, but the question has ${want}. You need two numbers that multiply to ${fmt(P)} and add to ${fmt(S)}.`,
-      messages: { hi: `जाँचने के लिए अपने कोष्ठकों को वापस गुणा करें: ${written} से ${back} मिलता है, पर प्रश्न में ${want} है। आपको ऐसी दो संख्याएँ चाहिए जिनका गुणनफल ${fmt(P)} और योग ${fmt(S)} हो।` },
+      message: `Multiply your brackets back out to check: ${written} gives ${back}, but the line above is ${want}. You need two numbers that multiply to ${fmt(P)} and add to ${fmt(S)}.`,
+      messages: { hi: `जाँचने के लिए अपने कोष्ठकों को वापस गुणा करें: ${written} से ${back} मिलता है, पर ऊपर की पंक्ति ${want} है। आपको ऐसी दो संख्याएँ चाहिए जिनका गुणनफल ${fmt(P)} और योग ${fmt(S)} हो।` },
       code: 'factorise-fails-when-expanded'
     };
   }
   const k = fs.find(x => x?.t === 'num');
   return {
-    message: `Multiply your answer back out to check: ${written} gives ${back}, but the question has ${want}. ${k ? `After taking out ${fmt(k.v)}, the bracket must hold what is left when every term is divided by ${fmt(k.v)}.` : 'The bracket must hold what is left when every term is divided by the common factor.'}`,
-    messages: { hi: `जाँचने के लिए अपने उत्तर को वापस गुणा करें: ${written} से ${back} मिलता है, पर प्रश्न में ${want} है। साझा गुणनखंड निकालने के बाद कोष्ठक में हर पद को उस गुणनखंड से भाग देने पर जो बचे, वह होना चाहिए।` },
+    message: `Multiply your answer back out to check: ${written} gives ${back}, but the line above is ${want}. ${k ? `After taking out ${fmt(k.v)}, the bracket must hold what is left when every term is divided by ${fmt(k.v)}.` : 'The bracket must hold what is left when every term is divided by the common factor.'}`,
+    messages: { hi: `जाँचने के लिए अपने उत्तर को वापस गुणा करें: ${written} से ${back} मिलता है, पर ऊपर की पंक्ति ${want} है। साझा गुणनखंड निकालने के बाद कोष्ठक में हर पद को उस गुणनखंड से भाग देने पर जो बचे, वह होना चाहिए।` },
     code: 'factorise-fails-when-expanded'
   };
 }
@@ -215,7 +219,7 @@ function linearSlips(ctx) {
     if (near(got, (c + b) / a)) return {
       message: `The ${fmt(b)} moved to the other side with the wrong sign: ${b > 0 ? `${fmt(b)} is added in ${eqn}, so subtract it` : `${fmt(-b)} is subtracted in ${eqn}, so add it`}.`,
       messages: { hi: `${fmt(b)} दूसरे पक्ष में गलत चिह्न के साथ गया: उलटी क्रिया करनी होती है।` },
-      code: 'solve-linear-wrong-inverse'
+      code: 'sign-on-transfer'
     };
   }
   if (b === 0 && a !== 1) {
@@ -233,20 +237,20 @@ function linearSlips(ctx) {
   if (a === 1 && b !== 0 && near(got, c + b)) return {
     message: `The ${fmt(b)} has to be undone, not repeated: ${b > 0 ? `subtract ${fmt(b)} from` : `add ${fmt(-b)} to`} both sides.`,
     messages: { hi: `${fmt(b)} को पलटना है, दोहराना नहीं: दोनों पक्षों पर उलटी क्रिया करें।` },
-    code: 'solve-linear-wrong-inverse'
+    code: 'sign-on-transfer'
   };
   return null;
 }
 
-const slip = (code, fn, misconceptionId = null) => ({ code, misconceptionId, detect: ctx => { if (sameAsPrevious(ctx)) return null; const r = fn(ctx); return r && r.code === code ? r : null; } });
-const codes = ['expand-square-no-middle', 'expand-first-and-last-only', 'expand-last-term-added', 'expand-difference-of-squares-sign', 'expand-middle-terms-cancel'];
+const slip = (code, fn, misconceptionId = null) => ({ code, misconceptionId, detect: ctx => { resetPolyBudget(); if (sameAsPrevious(ctx)) return null; const r = fn(ctx); return r && r.code === code ? r : null; } });
+const codes = ['power-of-sum', 'expand-first-and-last-only', 'expand-last-term-added', 'expand-difference-of-squares-sign', 'expand-middle-terms-cancel'];
 registerTopic({
   topic: 'algebra',
   appliesTo: () => true,
   slips: [
     ...codes.map(c => slip(c, ctx => (isExpression(ctx.meta) ? expandSlips(ctx) : null), null)),
-    ...['expand-bracket-first-term-only', 'expand-minus-bracket-treated-as-plus'].map(c => slip(c, ctx => (isExpression(ctx.meta) ? bracketSlips(ctx) : null), null)),
+    ...['distribute-partial', 'distribute-sign'].map(c => slip(c, ctx => (isExpression(ctx.meta) ? bracketSlips(ctx) : null), null)),
     slip('factorise-fails-when-expanded', ctx => (isExpression(ctx.meta) ? factorSlips(ctx) : null)),
-    ...['solve-linear-constant-ignored', 'solve-linear-divided-one-term', 'solve-linear-wrong-inverse', 'solve-linear-subtracted-instead-of-divided', 'solve-linear-multiplied-instead-of-divided'].map(c => slip(c, ctx => (ctx.meta?.kind === 'equation' ? linearSlips(ctx) : null), null))
+    ...['solve-linear-constant-ignored', 'solve-linear-divided-one-term', 'sign-on-transfer', 'solve-linear-subtracted-instead-of-divided', 'solve-linear-multiplied-instead-of-divided'].map(c => slip(c, ctx => (ctx.meta?.kind === 'equation' ? linearSlips(ctx) : null), null))
   ]
 });

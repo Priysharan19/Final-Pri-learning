@@ -4,7 +4,7 @@
 // Feedback only; no status, mark or first break moves.
 import { registerTopic } from './registry.js';
 import { parse, normalize, evaluate } from '../../expr.js';
-import { sameAsPrevious, fmt, polyAdd, polyConst, polyEqual, polyFromAst, polyOfText, productFactors, unwrap } from './poly.js';
+import { resetPolyBudget, sameAsPrevious, fmt, polyAdd, polyConst, polyEqual, polyFromAst, polyOfText, productFactors, unwrap } from './poly.js';
 
 const astOf = text => {
   const s = String(text ?? '').replace(/[−–—]/g, '-').trim();
@@ -96,17 +96,19 @@ function indexSlips(ctx) {
     return {
       message: `A power of a power multiplies the indices: ${fmt(f.exps[v])} × ${fmt(f.outer)}, not ${fmt(f.exps[v])} + ${fmt(f.outer)}. Adding is for multiplying two powers of the same base.`,
       messages: { hi: `घात की घात में घातांक गुणा होते हैं: ${fmt(f.exps[v])} × ${fmt(f.outer)}, ${fmt(f.exps[v])} + ${fmt(f.outer)} नहीं। जोड़ना तब होता है जब एक ही आधार की दो घातों को गुणा किया जाए।` },
-      code: 'index-power-of-power-added'
+      code: 'power-of-power'
     };
   }
   if (powered && r.coefPower === 'keep') {
     const f = factors.find(x => x.power && Math.abs(x.coef) !== 1);
     if (f) return {
-      message: `The power also applies to the number in front: ${fmt(f.coef)}^${fmt(f.outer)} = ${fmt(Math.pow(f.coef, f.outer))}, not ${fmt(f.coef)}.`,
-      messages: { hi: `घात सामने की संख्या पर भी लागू होती है: ${fmt(f.coef)}^${fmt(f.outer)} = ${fmt(Math.pow(f.coef, f.outer))}, ${fmt(f.coef)} नहीं।` },
+      message: `The power also applies to the number in front: (${fmt(f.coef)})^${fmt(f.outer)} = ${fmt(Math.pow(f.coef, f.outer))}, not ${fmt(f.coef)}.`,
+      messages: { hi: `घात सामने की संख्या पर भी लागू होती है: (${fmt(f.coef)})^${fmt(f.outer)} = ${fmt(Math.pow(f.coef, f.outer))}, ${fmt(f.coef)} नहीं।` },
       code: 'index-power-not-applied-to-number'
     };
   }
+  const singleVar = mult && factors.length === 2 && factors.every(f => Object.keys(f.exps).length === 1 && Object.keys(f.exps)[0] === Object.keys(factors[0].exps)[0]);
+  if (mult && !singleVar) return null;
   if (mult && r.expAcross === 'mul') {
     const [a, b] = factors.map(f => f.exps[v] ?? 0);
     return {
@@ -147,12 +149,12 @@ function surdSlips(ctx) {
   };
 }
 
-const slip = (code, fn, id = null) => ({ code, misconceptionId: id, detect: ctx => { if (sameAsPrevious(ctx)) return null; const r = fn(ctx); return r && r.code === code ? r : null; } });
+const slip = (code, fn, id = null) => ({ code, misconceptionId: id, detect: ctx => { resetPolyBudget(); if (sameAsPrevious(ctx)) return null; const r = fn(ctx); return r && r.code === code ? r : null; } });
 registerTopic({
   topic: 'indices',
   appliesTo: meta => meta?.kind !== 'equation' && meta?.kind !== 'plan',
   slips: [
-    slip('index-power-of-power-added', indexSlips),
+    slip('power-of-power', indexSlips),
     slip('index-power-not-applied-to-number', indexSlips),
     slip('index-multiplied-instead-of-added', indexSlips),
     slip('index-coefficients-added', indexSlips),

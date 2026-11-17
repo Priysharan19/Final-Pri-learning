@@ -27,7 +27,7 @@ for (const [b, d] of NUMS) {
 }
 for (const p of [2, 3, 4]) for (const q of [5, 6, -7]) {
   const sq = `(${p}x ${sg(q)})^2`;
-  T.push(['expand-square-no-middle', { kind: 'expression', canonical: `${p * p}x^2 ${sg(2 * p * q)}x ${sg(q * q)}`.replace(/\s/g, '') }, [sq, `= ${p * p}x^2 ${sg(q * q)}`], 1, ['middle term']]);
+  T.push(['power-of-sum', { kind: 'expression', canonical: `${p * p}x^2 ${sg(2 * p * q)}x ${sg(q * q)}`.replace(/\s/g, '') }, [sq, `= ${p * p}x^2 ${sg(q * q)}`], 1, ['middle term']]);
 }
 for (const b of [3, 5, 9]) {
   const meta = { kind: 'expression', canonical: `x^2-${b * b}` };
@@ -36,17 +36,17 @@ for (const b of [3, 5, 9]) {
 }
 for (const [k, a, b] of [[6, 3, 4], [3, 5, 8], [4, 2, 2]]) {
   const meta = { kind: 'expression', canonical: `${k * a}x+${k * b + 1}` };
-  T.push(['expand-bracket-first-term-only', meta, [`${k}(${a}x + ${b}) + 1`, `= ${k * a}x + ${b + 1}`], 1, [`${k} × ${b}`]]);
+  T.push(['distribute-partial', meta, [`${k}(${a}x + ${b}) + 1`, `= ${k * a}x + ${b + 1}`], 1, [`${k} × ${b}`]]);
 }
 for (const [m, k, a, b] of [[2, 2, 2, -3], [6, 5, 2, -2], [8, 4, 5, -1]]) {
   const meta = { kind: 'expression', canonical: `${m}-${k * a}x${k * b > 0 ? '-' : '+'}${Math.abs(k * b)}`.replace(/\s/g, '') };
-  T.push(['expand-minus-bracket-treated-as-plus', meta, [`${m} - ${k}(${a}x ${sg(b)})`, `= ${k * a}x ${sg(m + k * b)}`], 1, ['sign']]);
+  T.push(['distribute-sign', meta, [`${m} - ${k}(${a}x ${sg(b)})`, `= ${k * a}x ${sg(m + k * b)}`], 1, ['sign']]);
 }
 for (const [s, c] of [[2, -3], [3, -4], [6, -7]]) {
   T.push(['factorise-fails-when-expanded', { kind: 'expression', canonical: `(x+${s + 1})(x-1)` }, [`x^2 ${sg(s)}x ${sg(c)}`, `= (x + ${s})(x - 1)`], 1, ['multiply']]);
 }
 for (const [a, b] of [[5, 9], [3, 8], [8, 3]]) T.push(['index-multiplied-instead-of-added', { kind: 'expression', canonical: `x^${a + b}` }, [`x^(${a}) * x^(${b})`, `= x^${a * b}`], 1, [`${a} + ${b}`]]);
-for (const [a, b] of [[2, 4], [3, 5], [4, 3]]) T.push(['index-power-of-power-added', { kind: 'expression', canonical: `x^${a * b}` }, [`(x^(${a}))^(${b})`, `= x^${a + b}`], 1, [`${a} × ${b}`]]);
+for (const [a, b] of [[2, 4], [3, 5], [4, 3]]) T.push(['power-of-power', { kind: 'expression', canonical: `x^${a * b}` }, [`(x^(${a}))^(${b})`, `= x^${a + b}`], 1, [`${a} × ${b}`]]);
 for (const [c, e, p] of [[4, 4, 3], [2, 3, 3], [3, 2, 2]]) T.push(['index-power-not-applied-to-number', { kind: 'expression', canonical: `${c ** p}x^${e * p}` }, [`(${c}x^(${e}))^(${p})`, `= ${c}x^${e * p}`], 1, [`${c ** p}`]]);
 for (const [c1, a, c2, b] of [[5, 6, 3, 4], [2, -2, 3, -3], [7, 6, 6, 3]]) T.push(['index-coefficients-added', { kind: 'expression', canonical: `${c1 * c2}x^${a + b}` }, [`${c1}x^(${a}) * ${c2}x^(${b})`, `= ${c1 + c2}x^(${a + b})`], 1, [`${c1} × ${c2}`]]);
 T.push(['surd-sum-under-one-root', { kind: 'expression', canonical: 'sqrt(2)+sqrt(3)' }, ['sqrt(2) + sqrt(3)', '= sqrt(5)'], 1, ['√2 + √3']]);
@@ -113,6 +113,19 @@ for (const [meta, lines] of CORRECT) {
   const meta = { kind: 'expression', canonical: 'x^2+3x-28' };
   const r = stepCheck(meta, '(x + 7)(x - 4)\n= x^2 + 11x + 1', { prompt: '' });
   ok(r.lines[1].status === 'break' && !topicDiagnosisCodes().includes(r.lines[1].diagnosis?.code), 'an unexplained wrong line is not given a guessed slip');
+}
+// R4 review regressions: bounded cost, no answer printed on an expand question, true index messages.
+{
+  const timed = (meta, lines) => { const t = Date.now(); const r = stepCheck(meta, lines.join('\n'), { prompt: '' }); return { r, ms: Date.now() - t }; };
+  const heavy = timed({ kind: 'expression', canonical: '2' }, ['((x+y+1)^6)^6', '= 2']);
+  ok(heavy.ms < 2000, `a huge power of a sum is bounded (${heavy.ms} ms)`);
+  const heavy2 = timed({ kind: 'expression', canonical: '1' }, ['(a+b+c+d+e+f)^12', '= 1']);
+  ok(heavy2.ms < 2000, `a twelfth power of six terms is bounded (${heavy2.ms} ms)`);
+  const ex = stepCheck({ kind: 'expression', canonical: 'x^2+5x+6' }, '(x + 2)(x + 3)\n= (x + 1)(x + 6)', { prompt: '' });
+  ok(!/x² \+ 5x \+ 6/.test(String(ex.lines[1]?.note)), 'an expand question never has its expansion printed by the factorise check');
+  const neg = diagnoseTopicLine({ line: '= -2x^6', previous: '(-2x^(3))^(2)', index: 1, meta: { kind: 'expression' } });
+  ok(!neg || /\(−2\)\^2 = 4/.test(neg.message), `the power of a negative number is written (−2)^2 = 4: ${neg?.message}`);
+  ok(diagnoseTopicLine({ line: '= x^6*y^2', previous: 'x^2*y * x^3*y^2', index: 1, meta: { kind: 'expression' } }) === null, 'a product over two variables is not named by the single-variable rule');
 }
 ok(registeredTopics().map(t => t.topic).includes('algebra') && registeredTopics().map(t => t.topic).includes('indices'), 'algebra and indices register themselves');
 ok(topicDiagnosisCodes().length >= 18, `${topicDiagnosisCodes().length} slip codes registered`);
