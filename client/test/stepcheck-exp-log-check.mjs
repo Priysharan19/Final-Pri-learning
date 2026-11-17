@@ -254,6 +254,157 @@ breaksAt('(2^x−4)(2^x+1) loses a root', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^
   ok(`log x (log x − 2) = 0 by branches: no break, branches verified, got ${JSON.stringify(s)}`, !s.includes('break') && s.slice(1).every(v => v === 'ok'));
 }
 
+// Review of head e335858e8: a line worked from an exponential or logarithmic
+// branch must keep that branch's root (x = 1 straight after 3^x = 9 is wrong
+// even though 1 is the other root).
+breaksAt('x = 1 straight after 3^x = 9', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', 'x=1', '3^x=3', 'x=1'], 2);
+breaksAt('answers swapped across branches', eqMeta([0, 2]), ['(2^x-1)(2^x-4)=0', '2^x=1', 'x=2', '2^x=4', 'x=0'], 2);
+breaksAt('a root repeated across branches', eqMeta([0, 2]), ['4^x-5*2^x+4=0', '(2^x-1)(2^x-4)=0', '2^x=1', 'x=2', '2^x=4', 'x=2'], 3);
+breaksAt('lone branches with the wrong value', eqMeta([0, 2]), ['2^x=4', 'x=0', '2^x=1', 'x=0'], 1);
+{
+  const rep = report(eqMeta([1, 100]), ['log(x)(log(x)-2)=0', 'log(x)=0', 'x=100', 'log(x)=2', 'x=100']);
+  ok(`a log branch with the wrong value breaks on that line, got ${JSON.stringify(rep.lines.map(l => l.status))}`, rep.firstBreak === 2 && !rep.lines.slice(0, 2).some(l => l.status === 'break'));
+}
+{
+  const s = statuses(eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', 'x=1', '3^x=3', 'x=1'], { prompt: 'Solve $(3^x - 9)(3^x - 3) = 0$.' });
+  ok(`x = 1 after 3^x = 9 breaks with a prompt too, got ${JSON.stringify(s)}`, s.indexOf('break') === 2);
+  const s2 = statuses(eqMeta([1, 2]), ['(2^x-2)(2^x-4)=0', '2^x=2', 'x=1', '2^x=2', 'x=2']);
+  ok(`a branch written twice never leaves the working without a break, got ${JSON.stringify(s2)}`, s2.includes('break'));
+  const s3 = statuses(eqMeta([0, 2]), ['(2^x-1)(2^x-4)=0', '2^x=1', '2^x=4', 'x=0', 'x=2']);
+  ok(`both branches written before their values: no false credit, got ${JSON.stringify(s3)}`, s3.includes('break') || s3.every(v => v === 'ok'));
+}
+
+// Review of head 30bd32a95: the branch a line is worked from stays in force
+// through any line in between, and branches written first are matched to the
+// values that follow them.
+function firstBreakAt(label, meta, lines, at) {
+  const rep = report(meta, lines);
+  ok(`${label}: first break at line ${at + 1}, got ${JSON.stringify(rep.lines.map(l => l.status))}`, rep.firstBreak === at && !rep.lines.slice(0, at).some(l => l.status === 'break'));
+}
+// A page that never gives a complete answer is not credited as one: it has a
+// break, or its last value says a root is still to find.
+function notCreditedAsComplete(label, meta, lines, options = null) {
+  const rep = report(meta, lines, options);
+  ok(`${label}: not credited as a complete answer, got ${JSON.stringify(rep.lines.map(l => l.status))}`,
+    rep.firstBreak !== -1 || rep.lines.some(l => /still to find/.test(l.note || '')));
+}
+for (const sep of ['x*ln(3)=ln(9)', 'x=log(9)/log(3)', '9 = 3^2', 'so', 'therefore']) {
+  firstBreakAt(`x = 1 after 3^x = 9 with "${sep}" between`, eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', sep, 'x=1', '3^x=3', 'x=1'], 3);
+}
+firstBreakAt('a log branch, x = 10^0, then the wrong value', eqMeta([1, 100]), ['log(x)(log(x)-2)=0', 'log(x)=0', 'x=10^0', 'x=100', 'log(x)=2', 'x=100'], 3);
+breaksAt('a lone branch, the log ratio, then the wrong value', eqMeta([0, 2]), ['2^x=4', 'x=log(4)/log(2)', 'x=0', '2^x=1', 'x=0'], 2);
+notCreditedAsComplete('both branches first, one value twice', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x=1', 'x=1']);
+notCreditedAsComplete('both branches first, worked towards one, the other value given', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x*ln(3)=ln(9)', 'x=1']);
+// Its value stated, a branch is answered; the other root may then be stated.
+allOk('x = 2 for 3^x = 9, then the other root stated', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', 'x=2', 'x=1']);
+// Review of head ec8b5ff20: correct orders of working are never broken.
+allOk('e^x = e as a branch', eqMeta([1, 0]), ['(e^x-e)(e^x-1)=0', 'e^x=1', 'x=0', 'e^x=e', 'x=1']);
+{
+  const s = statuses(eqMeta([1, 0]), ['(e^x-e)(e^x-1)=0', 'e^x=1', 'x=0', 'e^x=e', 'x=1'], { prompt: 'Solve $(e^x - e)(e^x - 1) = 0$.' });
+  ok(`e^x = e as a branch, with a prompt: all verified, got ${JSON.stringify(s)}`, s.every(v => v === 'ok'));
+}
+allOk('branches first with e, values in either order', eqMeta([1, 0]), ['(e^x-e)(e^x-1)=0', 'e^x=1', 'e^x=e', 'x=1', 'x=0']);
+allOk('the second branch line skipped', eqMeta([0, Math.log(3)]), ['(e^x-1)(e^x-3)=0', 'e^x=1', 'x=0', 'x=ln(3)']);
+allOk('the second branch line skipped, e^2', eqMeta([2, 0]), ['(e^x-e^2)(e^x-1)=0', 'e^x=1', 'x=0', 'x=2']);
+allOk('both branches solved side by side', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x*ln(3)=ln(9)', 'x*ln(3)=ln(3)', 'x=2', 'x=1']);
+allOk('three roots solved side by side', eqMeta([0, 1, 2]), ['(2^x-1)(2^x-2)(2^x-4)=0', '2^x=1', '2^x=2', '2^x=4', 'x*ln(2)=ln(4)', 'x*ln(2)=ln(2)', 'x=2', 'x=1', 'x=0']);
+allOk('e branches with 2x lines', eqMeta([1, 0]), ['(e^x-e^1)(e^x-1)=0', 'e^x=e^1', 'e^x=1', '2x=0', '2x=2', 'x=0', 'x=1']);
+allOk('both branches first, values in either order', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x=1', 'x=2']);
+allOk('both branches first, worked in turn', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x*ln(3)=ln(3)', 'x=1', 'x*ln(3)=ln(9)', 'x=2']);
+allOk('each branch worked through a separator', eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', 'x*ln(3)=ln(9)', 'x=2', '3^x=3', 'x*ln(3)=ln(3)', 'x=1']);
+{
+  const s = statuses(eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', 'so', 'x=1', '3^x=3', 'x=1'], { prompt: 'Solve $(3^x - 9)(3^x - 3) = 0$.' });
+  ok(`the same with a prompt, got ${JSON.stringify(s)}`, s.indexOf('break') === 3);
+  const rep = report(eqMeta([0, 2]), ['(2^x-1)(2^x-4)=0', '2^x=1', 'x=0', '2^x=4']);
+  ok(`a branch never solved, values stated: no break, ${JSON.stringify(rep.lines.map(l => l.status))}`, rep.firstBreak === -1);
+  const rep2 = report(eqMeta([2, 1]), ['(3^x-9)(3^x-3)=0', '3^x=9', '3^x=3', 'x=1']);
+  ok(`one branch's value never stated: the last value says the other is still to find`, /still to find/.test(rep2.lines[3].note || ''));
+}
+
+// Seeded order differential (from the R4 reviews of PR #1027). Two- and
+// three-root questions in 3 families (b^x, log x, e^x) are worked in ten
+// orders of branch lines (B), intermediate lines (I) and values (V):
+// interleaved, separated, branches first, values first, duplicated, reopened,
+// a full list mid-working. Ground truth comes from the generator, not the
+// engine. A correct page must never break; a page with a slip (a value naming
+// another branch's root, a dropped value, an intermediate line for the wrong
+// root) must break or say a root is still to find.
+{
+  let seed = 20261118;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+  const ri = (a, b) => a + Math.floor(rnd() * (b - a + 1));
+  const pick = a => a[ri(0, a.length - 1)];
+  const shuffle = a => { a = a.slice(); for (let k = a.length - 1; k > 0; k--) { const j = ri(0, k); [a[k], a[j]] = [a[j], a[k]]; } return a; };
+  const sg = n => (n < 0 ? `- ${-n}` : `+ ${n}`);
+  const orders = ['inter', 'inter-sep', 'reopen', 'dup', 'listmid', 'bfirstIV', 'bfirstIV-sep', 'bfirstIIV', 'bfirstV', 'valsfirst'];
+  let correctPages = 0, correctBroken = 0, wrongPages = 0, wrongCredited = 0;
+  const firstFailures = [];
+  for (let n = 0; n < 600; n++) {
+    const fam = ri(0, 2), k = ri(2, 3);
+    const roots = [], factors = [], blocks = [];
+    const picks = shuffle([0, 1, 2, 3]).slice(0, k);
+    if (fam === 0) {
+      const b = pick([2, 3, 5]);
+      for (const e of picks) { roots.push(e); factors.push(`(${b}^x ${sg(-(b ** e))})`); blocks.push({ r: e, B: `${b}^x = ${b ** e}`, I: o => `x*ln(${b}) = ln(${b ** o})`, C: `${b}^${e} = ${b ** e}` }); }
+    } else if (fam === 1) {
+      for (const p of picks) { roots.push(10 ** p); factors.push(`(log(x) ${sg(-p)})`); blocks.push({ r: 10 ** p, B: `log(x) = ${p}`, I: o => `x/${o} = 1`, C: `log(${10 ** p}) = ${p}` }); }
+    } else {
+      for (const e of picks) { roots.push(e); factors.push(e === 0 ? '(e^x - 1)' : `(e^x - e^${e})`); blocks.push({ r: e, B: e === 0 ? 'e^x = 1' : `e^x = e^${e}`, I: o => `2x = ${2 * o}`, C: 'so' }); }
+    }
+    const question = `${factors.join('')} = 0`;
+    const options = ri(0, 1) ? { prompt: `Solve $${question}$.` } : null;
+    const order = pick(orders);
+    const bl = shuffle(blocks);
+    const mut = pick(['none', 'none', 'swap', 'drop', 'iwrong']);
+    if (mut === 'iwrong' && (order === 'bfirstV' || order === 'valsfirst')) continue;
+    const m = ri(0, k - 1), other = bl[(m + 1) % k].r;
+    const V = j => `x = ${mut === 'swap' && j === m ? other : bl[j].r}`;
+    const I = j => bl[j].I(mut === 'iwrong' && j === m ? other : bl[j].r);
+    const dropV = j => mut === 'drop' && j === m;
+    const sep = j => pick([bl[j].C, 'so', 'hence', 'therefore']);
+    const L = [question];
+    let wroteWrongI = false;
+    const pushI = j => { L.push(I(j)); if (mut === 'iwrong' && j === m) wroteWrongI = true; };
+    if (['inter', 'inter-sep', 'reopen', 'dup', 'listmid'].includes(order)) {
+      bl.forEach((b, j) => {
+        L.push(b.B);
+        if (order === 'dup' && j === 0) L.push(b.B);
+        if (order === 'inter-sep') L.push(sep(j));
+        if (ri(0, 1) || mut === 'iwrong') pushI(j);
+        if (!dropV(j)) L.push(V(j));
+        if (order === 'listmid' && j === 0 && mut !== 'drop') L.push(roots.map(r => `x = ${r}`).join(' or '));
+      });
+      if (order === 'reopen') { let j = ri(0, k - 1); if (mut === 'drop' && j === m) j = (j + 1) % k; L.push(bl[j].B); L.push(`x = ${bl[j].r}`); }
+    } else if (order === 'bfirstIV' || order === 'bfirstIV-sep') {
+      bl.forEach(b => L.push(b.B));
+      shuffle([...bl.keys()]).forEach(j => { if (order === 'bfirstIV-sep') L.push(sep(j)); pushI(j); if (!dropV(j)) L.push(V(j)); });
+    } else if (order === 'bfirstIIV') {
+      bl.forEach(b => L.push(b.B));
+      const ord = shuffle([...bl.keys()]);
+      ord.forEach(j => pushI(j));
+      ord.forEach(j => { if (!dropV(j)) L.push(V(j)); });
+    } else if (order === 'bfirstV') {
+      bl.forEach(b => L.push(b.B));
+      shuffle([...bl.keys()]).forEach(j => { if (!dropV(j)) L.push(V(j)); });
+    } else {
+      bl.forEach((b, j) => { if (!dropV(j)) L.push(V(j)); L.push(b.B); });
+    }
+    const wrong = mut === 'swap' || mut === 'drop' || (mut === 'iwrong' && wroteWrongI);
+    const rep = stepCheck(eqMeta(roots.slice()), L.join('\n'), options);
+    const broke = rep.lines.some(l => l.status === 'break');
+    if (!wrong) {
+      correctPages++;
+      if (broke) { correctBroken++; if (firstFailures.length < 3) firstFailures.push({ correct: true, order, roots, L }); }
+    } else {
+      wrongPages++;
+      const flagged = broke || rep.lines.some(l => /still to find/.test(l.note || ''));
+      if (!flagged) { wrongCredited++; if (firstFailures.length < 3) firstFailures.push({ wrong: mut, order, roots, L }); }
+    }
+  }
+  ok(`order differential: ${correctBroken} of ${correctPages} correct pages broken ${JSON.stringify(firstFailures.filter(f => f.correct))}`, correctPages > 100 && correctBroken === 0);
+  ok(`order differential: ${wrongCredited} of ${wrongPages} pages with a slip credited ${JSON.stringify(firstFailures.filter(f => f.wrong))}`, wrongPages > 100 && wrongCredited === 0);
+}
+
 // Abstain: lines outside the proved families are notes, never credit, never a break.
 {
   const s = statuses(eqMeta([2]), ['x*2^x=8', '2^x=8/x']);
@@ -286,4 +437,4 @@ if (fail) {
   console.log(`\nSTEP CHECK EXP/LOG: FAIL — ${pass}/${total} checks`);
   process.exit(1);
 }
-console.log(`STEP CHECK EXP/LOG: PASS — ${total}/${total} checks — exponential and logarithmic lines are verified when their complete real solution set on its domain is the question's, each slip breaks on its own line, an unrejected extraneous root is never credited, and anything else abstains.`);
+console.log(`STEP CHECK EXP/LOG: PASS — ${total}/${total} checks — exponential and logarithmic lines are verified when their complete real solution set on its domain is the question's, each slip tested here breaks on its own line or is not credited, an unrejected extraneous root is never credited, and anything else abstains.`);

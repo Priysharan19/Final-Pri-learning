@@ -503,11 +503,12 @@ function foreignLetters(ast, meta, system = null) {
     if (typeof text !== 'string') continue;
     try { variablesOf(parse(normalize(text)), own); } catch { /* an unreadable source names no letters */ }
   }
-  // `e^(2x) = 7`, `x = e^2`: an e written only as the base of a power, in a
-  // question with no second unknown, is Euler's number, not another letter.
+  // `e^(2x) = 7`, `e^x = e`, `x = e^2`: on an exponential or logarithmic line,
+  // or the unknown set equal to a value, in a question with no second
+  // unknown, e is Euler's number, not another letter.
   // Only on a line Pri can then read as one: an exponential or logarithmic
   // equation, or the unknown set equal to a value.
-  if (!system && !own.has('e') && eOnlyAsBase(ast) && (isExpLogLine(ast, meta.variable) || namesValue(ast, meta.variable))) own.add('e');
+  if (!system && !own.has('e') && (isExpLogLine(ast, meta.variable) || namesValue(ast, meta.variable))) own.add('e');
   return [...variablesOf(ast)].filter(name => !own.has(name));
 }
 
@@ -787,7 +788,44 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     return questionFormsRead;
   };
 
+  // Exponential or logarithmic branches being worked (`2^x = 1` names 0).
+  // Every later branch line that is not itself one (`x·ln 2 = 0`, `x = 0`) is
+  // worked from an open branch and must keep the root of one of them, through
+  // any prose, check or other line in between. Branches written one after
+  // another (`3^x = 9`, `3^x = 3`) are open together; a value stated as a plain
+  // number closes the branch it names, and after lines worked towards
+  // branches (`x·ln 3 = ln 9`) it must answer one of those. A branch whose root
+  // was stated before it is already answered. Once every open branch is
+  // answered, a value may name a root no branch has given yet.
+  // A line that keeps none of them is a break only when that is certain: an
+  // open branch is still unanswered and no equation line Pri could not read
+  // came in between (it may have been a branch). Otherwise it is a note.
+  let expLogOpen = [];
+  let expLogSteps = [];
+  let expLogStated = [];
+  let expLogJustBranched = false;
+  let expLogUncertain = false;
+  const closeExpLogBranches = () => { expLogOpen = []; expLogSteps = []; expLogJustBranched = false; expLogUncertain = false; };
+  // The roots that exponential or logarithmic lines after line i give, read
+  // ahead once when first needed.
+  let expLogAhead = null;
+  const laterExpLogRoots = i => {
+    if (!expLogAhead) {
+      const wanted = uniqueNumeric(meta?.solutions);
+      expLogAhead = rawLines.map(text => {
+        try {
+          const ast = parse(normalize(String(text).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '')));
+          if (ast.t !== 'equation' || !isExpLogLine(ast, meta.variable)) return [];
+          return expLogSolutionSet(ast, meta.variable, wanted)?.roots || [];
+        } catch { return []; }
+      });
+    }
+    return expLogAhead.slice(i + 1).flat();
+  };
+
   rawLines.forEach((line, i) => {
+    const before = out[out.length - 1];
+    if (expLogOpen.length && before && before.status === 'note' && !before.check && String(before.text).includes('=')) expLogUncertain = true;
     const skipped = unreadNote(unread[i]);
     if (skipped) { out.push({ text: line, status: 'note', note: skipped, unread: true }); return; }
     let status = 'note';
@@ -815,6 +853,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           } else {
             status = 'ok';
             pendingExtraneous = []; expLogChain = false;
+            closeExpLogBranches();
           }
         }
         if (status === 'break' && firstBreak === -1) firstBreak = i;
@@ -1020,6 +1059,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
                 expLogDecided = true;
                 expLogPrevForm = expLog;
                 pendingExtraneous = [];
+                closeExpLogBranches();
                 if (productEqualsZero(ast)) branchesOpen = true;
                 out.push({ text: line, status });
                 return;
@@ -1095,12 +1135,80 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               out.push({ text: line, status, note });
               return;
             }
+            // Lines worked from the open exponential or logarithmic branches.
+            const namesRoot = b => held.some(h => b.roots.some(r => sameRoot(r, h)));
+            const plainSide = side => { const n = unwrapGroup(side); return n?.t === 'num' || (n?.t === 'neg' && unwrapGroup(n.v)?.t === 'num'); };
+            const plainValue = valued && (plainSide(ast.l) || plainSide(ast.r));
+            const fromBranches = partial && !expLogLine && expLogOpen.length > 0;
+            const unanswered = expLogOpen.filter(b => !b.closed);
+            let workedFrom = null, queued = -1, mismatch = null;
+            if (fromBranches) {
+              if (plainValue && expLogSteps.length) {
+                // A value after lines worked towards branches answers one of them.
+                queued = expLogSteps.findIndex(namesRoot);
+                if (queued < 0) mismatch = expLogSteps[0];
+                else workedFrom = expLogSteps[queued];
+              } else {
+                workedFrom = expLogOpen.find(namesRoot) || null;
+                // Every branch answered: the value may be a root no branch gave yet.
+                // Every branch answered: a value may state a root no branch gave
+                // yet, unless it comes straight after a branch line it does not
+                // follow from — and even then when a later exponential or
+                // logarithmic line gives that root (the value written first).
+                const statesNewRoot = valued && !unanswered.length
+                  && (!expLogJustBranched || held.every(h => laterExpLogRoots(i).some(r => sameRoot(r, h))));
+                if (!workedFrom && !statesNewRoot) mismatch = unanswered[0] || expLogOpen[expLogOpen.length - 1];
+              }
+            }
+            if (mismatch && expLogUncertain) {
+              status = 'note';
+              note = `True for ${meta.variable} = ${held.map(shownRoot).join(' or ')}, but it does not follow from line ${mismatch.index + 1}, so it is not marked correct.`;
+              out.push({ text: line, status, note });
+              return;
+            }
+            if (mismatch) {
+              // `x = 1` after `3^x = 9`: a root of the question, but not the one
+              // that branch gives. Worked from it, it is wrong.
+              const from = mismatch;
+              status = 'break';
+              const r = from.roots[0];
+              let reads = '';
+              try {
+                const env = { [meta.variable]: r };
+                reads = ` and it reads ${shownRoot(evaluate(ast.l, env))} = ${shownRoot(evaluate(ast.r, env))}`;
+              } catch { reads = ''; }
+              lineDiagnosis = {
+                code: 'counterexample',
+                title: 'This line is no longer true',
+                message: `${meta.variable} = ${shownRoot(r)} makes line ${from.index + 1} true; put it into this line${reads}.`,
+                fix: 'Compare it term by term with the line above — the change between them is where to look.',
+                confidence: 'high'
+              };
+              note = lineDiagnosis.message;
+              if (firstBreak === -1) firstBreak = i;
+              out.push({ text: line, status, note, diagnosis: lineDiagnosis });
+              return;
+            }
             if (partial) {
               // One branch of a factorisation already shown. It is true of the
               // roots it names; whether the working keeps the rest is settled
               // once every line has been read.
               status = 'ok';
-              branchLines.push({ index: i, covered: held, lone });
+              if (valued) expLogStated.push(...held);
+              if (expLogLine && expLog) {
+                if (!expLogJustBranched) { expLogOpen = []; expLogSteps = []; expLogUncertain = false; }
+                // A branch whose roots were already stated is already answered.
+                const answered = expLog.roots.every(r => expLogStated.some(s => sameRoot(r, s)));
+                expLogOpen.push({ roots: expLog.roots.slice(), index: i, closed: answered });
+                expLogJustBranched = true;
+              } else if (fromBranches) {
+                expLogJustBranched = false;
+                if (plainValue) {
+                  if (queued >= 0) expLogSteps.splice(queued, 1);
+                  if (workedFrom) workedFrom.closed = true;
+                } else if (workedFrom) expLogSteps.push(workedFrom);
+              }
+              branchLines.push({ index: i, covered: held, lone, expLog: expLogLine, value: !expLogLine && valued });
               out.push({ text: line, status, branch: true });
               return;
             }
@@ -1223,6 +1331,21 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       const diagnosis = lostRootDiagnosis(meta.variable, covered.join(' or ') || 'this branch', wanted.length);
       out[index] = { text: out[index].text, status: 'break', note: diagnosis.message, diagnosis };
       firstBreak = firstBreak === -1 ? index : Math.min(firstBreak, index);
+    }
+  }
+
+  // Exponential or logarithmic branches whose values are stated: when the
+  // working states values (`x = 0`), the answer is those values. If they miss
+  // a root a branch promised (`3^x = 9` never solved), the last stated value
+  // carries the note that a root is still to find, as a lone branch does.
+  if (firstBreak === -1 && branchLines.some(b => b.expLog) && !out.some(l => l.status === 'ok' && l.coversAll)) {
+    const wanted = uniqueNumeric(meta.solutions);
+    const values = branchLines.filter(b => b.value);
+    const stated = uniqueNumeric(values.flatMap(b => b.covered));
+    const complete = wanted.every(sol => stated.some(v => numsClose(v, sol)));
+    if (values.length && !complete) {
+      const last = values[values.length - 1];
+      out[last.index].note = `True for ${meta.variable} = ${stated.map(shownRoot).join(' or ')} — the equation has ${wanted.length} solutions, and the other is still to find.`;
     }
   }
 
