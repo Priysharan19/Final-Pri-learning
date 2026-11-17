@@ -95,7 +95,7 @@
         {"has":"Pri Reason V2 safety gate: PASS"},
         {"has":"Pri Reason V3 regression gate: PASS"},
         {"has":"Pri Reason V4 regression gate: PASS"},
-        {"has":"STEP CHECK EXP/LOG: PASS — 106/106 checks","note":"Exponential and logarithmic equation lines: root consistency on the real domain, each slip a break on its own line, an unrejected extraneous root never credited, everything else abstains."},
+        {"has":"STEP CHECK EXP/LOG: PASS — 138/138 checks","note":"Exponential and logarithmic equation lines: root consistency on the real domain, each slip a break on its own line, an unrejected extraneous root never credited, everything else abstains."},
         {"has":"Pri Reason V2 curriculum integration gate: PASS"},
         {"has":"INDIA NATIVE BANKS: PASS — 313/313 checks — 19 chapters rewired onto 20 NCERT-native generators"},
         {"has":"INDIA EXAM FLOW: PASS — 163/163 checks"},

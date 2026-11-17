@@ -150,6 +150,33 @@ breaksAt('a value the exponential allows brought in by squaring', eqMeta([2]), [
 breaksAt('wrong factor beside a right one', eqMeta([0, 2]), ['2^(2x)-5*2^x+4=0', '(2^x-1)(2^x-4)=0', '(2^x-1)(2^x-8)=0'], 2, 'extraneous-solution');
 breaksAt('a branch lost', eqMeta([0, 2]), ['2^(2x)-5*2^x+4=0', '(2^x-1)(2^x-4)=0', '2^x=4', 'x=2'], 2, 'lost-root');
 
+// Review of head df72d5348 (PR #1027): wrong algebra inside a chain that is
+// still carrying a rejected value. Each new value must be checked against the
+// line above, not only against the domain of the verified log line.
+breaksAt('wrong factorisation after combining logs', eqMeta([5]), ['ln(x)+ln(x-3)=ln(10)', 'x^2-3x-10=0', '(x-5)(x+3)=0', 'x=5'], 2, 'extraneous-solution');
+breaksAt('wrong factorisation after x(x−3) = 10', eqMeta([5]), ['log(x)+log(x-3)=1', 'x(x-3)=10', 'x^2-3x-10=0', '(x-5)(x+1)=0', 'x=5'], 3, 'extraneous-solution');
+breaksAt('wrong expansion after combining logs', eqMeta([5]), ['ln(x)+ln(x-3)=ln(10)', 'x(x-3)=10', 'x^2-4x-5=0', '(x-5)(x+1)=0', 'x=5'], 2, 'extraneous-solution');
+breaksAt('wrong factorisation, ln x + ln(x+2) = ln 15', eqMeta([3]), ['ln(x)+ln(x+2)=ln(15)', 'x^2+2x-15=0', '(x-3)(x+4)=0', 'x=3'], 2, 'extraneous-solution');
+breaksAt('the rejected value swapped for another', eqMeta([5]), ['ln(x)+ln(x-3)=ln(10)', 'x^2-3x-10=0', '(x-5)(x+2)=0', '(x-5)(x-1)=0', 'x=5'], 3, 'extraneous-solution');
+breaksAt('wrong factorisation after ln(x^2)', eqMeta([2]), ['ln(x)=ln(2)', 'ln(x^2)=ln(4)', 'x^2=4', '(x-2)(x+3)=0', 'x=2'], 3, 'extraneous-solution');
+breaksAt('wrong factorisation after clearing a log quotient', eqMeta([2]), ['ln(x+2)-ln(x-1)=ln(4)', '(x+2)(x-1)=4(x-1)^2', '(x-2)(x+0.5)=0', 'x=2'], 2, 'extraneous-solution');
+// An exponential is defined everywhere: overflow at a large value is not a domain.
+breaksAt('a far root after 10^(3x) = 1000', eqMeta([1]), ['10^(3x)=1000', '(x-1)(x-150)=0', 'x=1'], 1);
+breaksAt('a far root after 2^x = 4', eqMeta([2]), ['2^x=4', '(x-2)(x-2000)=0', 'x=2'], 1);
+breaksAt('a far root after e^x = e^2', eqMeta([2]), ['e^x=e^2', '(x-2)(x-800)=0', 'x=2'], 1);
+breaksAt('a far negative root after 2^(−x) = 1/4', eqMeta([2]), ['2^(-x)=1/4', '(x-2)(x+1100)=0', 'x=2'], 1);
+{
+  // A wrong factor with no real root has the right solutions but is not the
+  // line above: it is not credited (the polynomial path abstains the same way).
+  const s = statuses(eqMeta([2]), ['4^x-2^(x+1)-8=0', '(2^x-4)(2^x+2)=0', '(2^x-4)(2^x+3)=0', '2^x=4', 'x=2']);
+  ok(`(2^x−4)(2^x+3) after (2^x−4)(2^x+2) is not credited, got ${JSON.stringify(s)}`, s[2] !== 'ok' && s[1] === 'ok');
+  const s2 = statuses(eqMeta([2]), ['4^x-2^(x+1)-8=0', '(2^x-4)(2^x+5)=0']);
+  ok(`(2^x−4)(2^x+5) is not credited, got ${JSON.stringify(s2)}`, s2[1] !== 'ok');
+  // A list-shaped authored solution is not read as one number ("2, 3" is not 23).
+  const s3 = statuses(eqMeta(['2, 3']), ['x^2-5x+6=0', 'x=23']);
+  ok(`"2, 3" is not read as 23, got ${JSON.stringify(s3)}`, s3[1] !== 'ok');
+}
+
 // Abstain: lines outside the proved families are notes, never credit, never a break.
 {
   const s = statuses(eqMeta([2]), ['x*2^x=8', '2^x=8/x']);

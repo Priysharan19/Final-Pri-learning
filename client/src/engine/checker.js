@@ -25,7 +25,7 @@ import { assessRelationChainLine, assessModulusInequalityLine } from './reason-v
 import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 import { lostMarks, ruleKeyFor } from './lost-marks.js';
-import { expLogSolutionSet, isExpLogLine, undefinedAt } from './reason-explog.js';
+import { expLogSolutionSet, isExpLogLine, domainAt, sameReducedForm } from './reason-explog.js';
 
 export { lostMarks, ruleKeyFor };
 
@@ -613,6 +613,8 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
   let expLogAnchor = null;
   let expLogAnchorIndex = -1;
   let expLogChain = false;
+  let expLogDecided = false;
+  let expLogPrevForm = null;
   let pendingExtraneous = [];
   let pendingIndex = -1;
 
@@ -642,7 +644,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             note = lineDiagnosis.message;
           } else {
             status = 'ok';
-            pendingExtraneous = [];
+            pendingExtraneous = []; expLogChain = false;
           }
         }
         if (status === 'break' && firstBreak === -1) firstBreak = i;
@@ -777,47 +779,69 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               ? expLogSolutionSet(ast, meta.variable, wantedRoots) : null;
             const expLogCoversAll = !!expLog && wantedRoots.every(w => expLog.roots.some(r => numsClose(r, w)));
             if (expLogCoversAll) {
+              const v = meta.variable;
               const extras = expLog.roots.filter(r => !wantedRoots.some(w => numsClose(r, w)));
-              if (!extras.length) {
+              // The line above was decided here too, so its solution set is
+              // exactly the answer plus `pendingExtraneous`. A value this line
+              // allows that the line above did not is new.
+              const fresh = extras.filter(r => !(expLogChain && pendingExtraneous.some(p => numsClose(r, p))));
+              const freshAbove = expLogChain && previousEquation ? fresh.map(r => domainAt(previousEquation, v, r)) : [];
+              if (fresh.length && freshAbove.some(s => s === 'defined')) {
+                // The line above is defined there and that value does not solve
+                // it: this step brought it in.
+                const inside = fresh[freshAbove.indexOf('defined')];
+                status = 'break';
+                lineDiagnosis = extraneousLineRootDiagnosis(v, shownRoot(inside));
+                note = lineDiagnosis.message;
+                if (firstBreak === -1) firstBreak = i;
+                out.push({ text: line, status, note, diagnosis: lineDiagnosis });
+                return;
+              }
+              // Two lines with the same solutions can still differ in roots
+              // that are not solutions (`(2^x − 4)(2^x + 2)` and `(2^x − 4)(2^x + 3)`
+              // both give only x = 2). Such a line is credited only where the
+              // working starts, or when it reduces to the same polynomial as
+              // the line above; otherwise it falls through to the checks below.
+              const hiddenOk = !expLog.hidden || !expLogDecided || (expLogChain && sameReducedForm(expLogPrevForm, expLog));
+              const domainDrop = fresh.length > 0 && expLogAnchor && isExpLogLine(expLogAnchor, v)
+                && freshAbove.length === fresh.length && freshAbove.every(s => s === 'undefined')
+                && fresh.every(r => domainAt(expLogAnchor, v, r) === 'undefined');
+              if (hiddenOk && !extras.length) {
                 status = 'ok';
                 previousEquation = ast;
                 previousEquationTrusted = true;
                 expLogAnchor = ast;
                 expLogAnchorIndex = i;
                 expLogChain = true;
+                expLogDecided = true;
+                expLogPrevForm = expLog;
                 pendingExtraneous = [];
                 if (productEqualsZero(ast)) branchesOpen = true;
                 out.push({ text: line, status });
                 return;
               }
-              if (expLogAnchor && expLogChain && isExpLogLine(expLogAnchor, meta.variable)) {
-                const inside = extras.find(r => !undefinedAt(expLogAnchor, meta.variable, r));
-                if (inside === undefined) {
-                  // A true consequence of the line above that dropped its
-                  // logarithm domain (`ln x + ln(x − 3)` → `ln(x(x − 3))`): every
-                  // value it adds is one where that line is undefined. A valid
-                  // step, but the value is still to be rejected; if the working
-                  // ends before it is, the last such line is not credited.
-                  status = 'ok';
-                  note = `True for ${meta.variable} = ${wantedRoots.map(shownRoot).join(' or ')}. It also allows ${extras.map(r => `${meta.variable} = ${shownRoot(r)}`).join(' and ')}, but line ${expLogAnchorIndex + 1} is undefined there, so that is not a solution: reject it before giving the answer.`;
-                  previousEquation = ast;
-                  previousEquationTrusted = false;
-                  pendingExtraneous = extras;
-                  pendingIndex = i;
-                  out.push({ text: line, status, note, extraneousPending: extras.map(shownRoot) });
-                  return;
-                }
-                // A value the line above allows and does not solve: this step
-                // brought it in.
-                status = 'break';
-                lineDiagnosis = extraneousLineRootDiagnosis(meta.variable, shownRoot(inside));
-                note = lineDiagnosis.message;
-                if (firstBreak === -1) firstBreak = i;
-                out.push({ text: line, status, note, diagnosis: lineDiagnosis });
+              if (hiddenOk && extras.length && (domainDrop || (!fresh.length && expLogChain))) {
+                // A true consequence of the line above that dropped a
+                // logarithm's domain (`ln x + ln(x − 3)` → `ln(x(x − 3))`), or a
+                // rearrangement that keeps exactly the values it let in. Each
+                // such value is one where the verified line is undefined. A
+                // valid step, but the value is still to be rejected; if the
+                // working ends before it is, the last such line is not credited.
+                status = 'ok';
+                note = `True for ${v} = ${wantedRoots.map(shownRoot).join(' or ')}. It also allows ${extras.map(r => `${v} = ${shownRoot(r)}`).join(' and ')}, but line ${expLogAnchorIndex + 1} is undefined there, so that is not a solution: reject it before giving the answer.`;
+                previousEquation = ast;
+                previousEquationTrusted = false;
+                expLogChain = true;
+                expLogDecided = true;
+                expLogPrevForm = expLog;
+                pendingExtraneous = extras;
+                pendingIndex = i;
+                out.push({ text: line, status, note, extraneousPending: extras.map(shownRoot) });
                 return;
               }
             }
             expLogChain = false;
+            expLogPrevForm = null;
             // A line of lower degree than the equation — `x - 3 = 4` after
             // `(x - 3)^2 = 16`, one branch of the quadratic formula — names
             // one root and is true of it. It is a branch whether or not a
@@ -927,7 +951,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             note = lineDiagnosis.message;
           } else {
             status = 'ok';
-            pendingExtraneous = [];
+            pendingExtraneous = []; expLogChain = false;
           }
         }
       } else if (meta.kind === 'expression') {
@@ -1744,6 +1768,8 @@ function numericSolutions(meta) {
   if (meta?.kind !== 'equation' || !Array.isArray(meta.solutions) || !meta.solutions.some(s => typeof s === 'string')) return meta;
   const solutions = meta.solutions.map(s => {
     if (typeof s !== 'string' || Number.isFinite(Number(s))) return s;
+    // One value per entry: a list, a ± or a word is not read here.
+    if (/[,;±]|\b(or|and)\b/i.test(s)) return s;
     try {
       const ast = parse(normalize(s));
       if (ast.t === 'equation' || [...variablesOf(ast)].some(name => name !== 'e')) return s;

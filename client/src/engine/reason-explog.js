@@ -96,12 +96,45 @@ function holds(ast, variable, x) {
   } catch { return false; }
 }
 
-/** Is the line undefined (a side is not a real number) at this value? */
-export function undefinedAt(ast, variable, x) {
-  try {
-    const env = { [variable]: x };
-    return !Number.isFinite(evaluate(ast.l, env)) || !Number.isFinite(evaluate(ast.r, env));
-  } catch { return true; }
+/**
+ * Is the line defined on the reals at this value? 'undefined' when a
+ * logarithm's argument is zero or negative, a square root's is negative, a
+ * denominator is zero, or a negative base has a fractional power, each with
+ * finite operands; 'defined' when both sides are finite real numbers;
+ * 'unknown' otherwise (an overflow, or a value within rounding of a domain
+ * edge). Only 'undefined' is evidence that the value is outside the domain.
+ */
+export function domainAt(ast, variable, x) {
+  const env = { [variable]: x };
+  const val = node => { try { return evaluate(node, env); } catch { return NaN; } };
+  const edge = v => Math.abs(v) <= 1e-9 * Math.max(1, Math.abs(x));
+  let unknown = false, violated = false;
+  const walk = node => {
+    if (!node || typeof node !== 'object' || violated) return;
+    if (node.t === 'call' && !Array.isArray(node.args) && (node.fn in LOG_BASE || node.fn === 'sqrt')) {
+      const a = val(node.arg);
+      if (!Number.isFinite(a)) unknown = true;
+      else if (edge(a)) { if (a === 0 && node.fn !== 'sqrt') violated = true; else unknown = true; }
+      else if (a < 0) violated = true;
+    } else if (node.t === 'bin' && node.op === '/') {
+      const d = val(node.r);
+      if (!Number.isFinite(d)) unknown = true;
+      else if (d === 0) violated = true;
+      else if (edge(d)) unknown = true;
+    } else if (node.t === 'bin' && node.op === '^') {
+      const b = val(node.l), e = val(node.r);
+      if (!Number.isFinite(b) || !Number.isFinite(e)) unknown = true;
+      else if ((b < 0 && !Number.isInteger(e)) || (b === 0 && e <= 0)) violated = true;
+    }
+    children(node).forEach(walk);
+  };
+  if (!ast || ast.t !== 'equation') return 'unknown';
+  walk(ast.l);
+  walk(ast.r);
+  if (violated) return 'undefined';
+  if (unknown) return 'unknown';
+  const L = val(ast.l), R = val(ast.r);
+  return Number.isFinite(L) && Number.isFinite(R) ? 'defined' : 'unknown';
 }
 
 // ── Complete real roots of a polynomial (coefficients low → high) ────────────
@@ -165,6 +198,38 @@ export function completeRealRoots(poly, hints = []) {
   return null;
 }
 
+/** The degree left once every accepted root is divided out as often as it divides. */
+function hiddenDegree(poly, accepted) {
+  let p = trimmed(poly);
+  if (!p) return Infinity;
+  for (const h of accepted) {
+    while (p.length > 1) {
+      if (Math.abs(polyValue(p, h)) > 1e-9 * Math.max(1e-300, polySize(p, h))) break;
+      const n = p.length - 1;
+      const q = new Array(n).fill(0);
+      let carry = p[n];
+      for (let k = n - 1; k >= 0; k--) { q[k] = carry; carry = p[k] + carry * h; }
+      p = trimmed(q);
+      if (!p) return Infinity;
+    }
+  }
+  return p.length - 1;
+}
+
+/** Are two reduced polynomials the same up to a non-zero factor? */
+function proportional(a, b) {
+  a = trimmed(a); b = trimmed(b);
+  if (!a || !b || a.length !== b.length) return false;
+  const k = a[a.length - 1] / b[b.length - 1];
+  if (!Number.isFinite(k) || k === 0) return false;
+  return a.every((c, i) => Math.abs(c - k * b[i]) <= 1e-9 * Math.max(1, Math.abs(c), Math.abs(k * b[i])));
+}
+
+/** Do two solved lines reduce to the same polynomial in the same unknown? */
+export function sameReducedForm(a, b) {
+  return !!a && !!b && a.space === b.space && proportional(a.poly, b.poly);
+}
+
 /** Small whole multiples of one unit: { unit, n } with Σ wᵢ = nᵢ·unit, or null. */
 function wholeMultiples(weights) {
   const nonzero = weights.filter(w => Math.abs(w) > 1e-12);
@@ -180,17 +245,24 @@ function wholeMultiples(weights) {
   return null;
 }
 
-/** Real roots of a rational equation in `variable`, with every denominator excluded. */
-function rationalRoots(eq, variable, hints) {
+/** Real roots of a rational equation in `variable`, every denominator excluded, with its numerator polynomial. */
+function rationalSolve(eq, variable, hints) {
   const res = rationalResidual(eq, variable);
   if (!res) return null;
   const roots = completeRealRoots(res.n, hints);
   if (!roots) return null;
   const forbidden = [res.d, ...(res.exclusions || [])];
-  return roots.filter(r => !forbidden.some(p => {
+  const kept = roots.filter(r => !forbidden.some(p => {
     const q = trimmed(p);
     return q && Math.abs(polyValue(q, r)) <= 1e-9 * Math.max(1e-300, polySize(q, r));
   }));
+  return { kept, poly: trimmed(res.n) };
+}
+
+function rationalRoots(eq, variable, hints) {
+  const solved = rationalSolve(eq, variable, hints);
+  if (!solved) return null;
+  return { roots: solved.kept, space: 'x', poly: solved.poly, hidden: hiddenDegree(solved.poly, solved.kept) > 0 };
 }
 
 // ── Exponential family ───────────────────────────────────────────────────────
@@ -264,15 +336,16 @@ function exponentialRoots(ast, variable, hints) {
   if (!multiples || multiples.n.some(n => n === 0)) return null;
   const { unit } = multiples;
   const tEq = { t: 'equation', l: substituteAtoms(l, unit), r: substituteAtoms(r, unit) };
-  const tRoots = rationalRoots(tEq, T, hints.map(h => Math.exp(unit * h)));
-  if (!tRoots) return null;
-  const out = [];
-  for (const t of tRoots) {
+  const solved = rationalSolve(tEq, T, hints.map(h => Math.exp(unit * h)));
+  if (!solved) return null;
+  const out = [], accepted = [];
+  for (const t of solved.kept) {
     if (t <= 0) continue; // t = e^(u·x) is never zero or negative
     if (t < 1e-12) return null; // too close to the edge to call
+    accepted.push(t);
     addUnique(out, Math.log(t) / unit);
   }
-  return out;
+  return { roots: out, space: `t:${unit.toPrecision(12)}`, poly: solved.poly, hidden: hiddenDegree(solved.poly, accepted) > 0 };
 }
 
 // ── Logarithmic family ───────────────────────────────────────────────────────
@@ -351,10 +424,10 @@ function logarithmicRoots(ast, variable, hints) {
     if (n < 0) down.push(power(m.arg, -n));
   });
   const polyEq = { t: 'equation', l: product(up), r: { t: 'bin', op: '*', l: { t: 'num', v: K }, r: product(down) } };
-  const candidates = rationalRoots(polyEq, variable, hints);
-  if (!candidates) return null;
+  const solved = rationalSolve(polyEq, variable, hints);
+  if (!solved) return null;
   const out = [];
-  for (const x of candidates) {
+  for (const x of solved.kept) {
     let inside = true;
     for (const m of merged) {
       let A;
@@ -364,24 +437,29 @@ function logarithmicRoots(ast, variable, hints) {
     }
     if (inside) addUnique(out, x);
   }
-  return out;
+  return { roots: out, space: 'x', poly: solved.poly, hidden: hiddenDegree(solved.poly, out) > 0 };
 }
 
 /**
  * The complete real solution set of an equation line in one unknown, on the
- * line's own real domain: `{ roots }` sorted ascending, or null when Pri cannot
- * prove it. `hints` are values worth dividing out first (the question's roots).
+ * line's own real domain, or null when Pri cannot prove it. `hints` are values
+ * worth dividing out first (the question's roots). The result also carries
+ * the polynomial the line reduces to (`space` names its unknown: x, or
+ * t = e^(u·x)) and `hidden`: whether that polynomial has roots that are not
+ * solutions (non-real, t ≤ 0, or outside a logarithm's domain). Two lines
+ * with the same solutions can differ in that hidden part (a wrong factor with
+ * no real root), so the caller decides when such a line may be credited.
  */
 export function expLogSolutionSet(ast, variable, hints = []) {
   if (!ast || ast.t !== 'equation' || !variable) return null;
   if (!mentions(ast, variable) || otherLetter(ast, variable)) return null;
-  let roots = null;
+  let solved = null;
   try {
-    if (isExpLogLine(ast, variable)) roots = exponentialRoots(ast, variable, hints) ?? logarithmicRoots(ast, variable, hints);
-    else roots = rationalRoots(ast, variable, hints);
-  } catch { roots = null; }
-  if (!roots) return null;
+    if (isExpLogLine(ast, variable)) solved = exponentialRoots(ast, variable, hints) ?? logarithmicRoots(ast, variable, hints);
+    else solved = rationalRoots(ast, variable, hints);
+  } catch { solved = null; }
+  if (!solved || !solved.poly) return null;
   // Every root must make the written line true.
-  if (!roots.every(x => holds(ast, variable, x))) return null;
-  return { roots: [...roots].sort((p, q) => p - q) };
+  if (!solved.roots.every(x => holds(ast, variable, x))) return null;
+  return { ...solved, roots: [...solved.roots].sort((p, q) => p - q) };
 }
