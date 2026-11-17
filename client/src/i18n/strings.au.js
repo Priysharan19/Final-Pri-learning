@@ -12,6 +12,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 export const AU_STRINGS = Object.freeze({
   'common.classNumber': 'Year {n}',
+  'msg.classTitle': 'Year {n} · {title}',
+  'msg.classOnly': 'Year {n}',
   'inst.mapTitleScope': '{scope} Mathematics',
   'inst.mapProvenance': 'Prerequisite links are Pri’s own teaching map, not a NESA publication.',
   'login.heroSub': 'Maths practice for NSW students — your working marked line by line, with worked solutions. Answers are checked by Pri’s server, so checking needs a Pri account and a connection.',

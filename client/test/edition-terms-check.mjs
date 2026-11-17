@@ -21,6 +21,8 @@ const BAN = /\bclass(es)?\s*[0-9]|\bclass\s*\{|ncert|cbse|\bjee\b|olympiad|₹|\
 // India-only surfaces: each is gated to an Indian course or track and is not
 // drawn for a Prithagoras profile. The reason is the gate.
 const ALLOW = [
+  [/^msg\.classCbse$/, 'the CBSE / NCERT assignment track label (platform/assignmentTarget.js builds it only for the cbse track, an Indian course)'],
+  [/^msg\.ent\.jeeAdvanced$/, 'the JEE Advanced Premium gate (entitlementGate.js), reachable only on the Indian JEE track'],
   [/^ncert\./, 'the NCERT chapter library and release notes (Indian courses only)'],
   [/^mock\./, 'CBSE board-format mock papers (engine/boardMock.js, Indian courses only)'],
   [/^teach\.(.*India|noPredictionClassReport|noPredictionStudentReport)/, 'teacher-panel copy gated on the India flag (Teach.jsx)'],
@@ -72,7 +74,7 @@ check('Priyabhata keeps Class and NCERT: the shared catalogue is unchanged', () 
   assert.match(en['inst.mapProvenance'], /NCERT or CBSE publication/);
 });
 check('the override applies only to a Prithagoras build in English', () => {
-  const idx = readFileSync(fileURLToPath(new URL('../src/i18n/index.js', here)), 'utf8');
+  const idx = readFileSync(fileURLToPath(new URL('../src/i18n/core.js', here)), 'utf8');
   assert.match(idx, /EDITION_ID === 'prithagoras' && language === 'en' && Object\.hasOwn\(AU_STRINGS, key\)/);
 });
 check('every year selector and tab goes through common.classNumber (Year N in Prithagoras), never a literal "Class N" in a screen', () => {
@@ -98,7 +100,13 @@ check('the Prithagoras sign-in screen: its own eyebrow and value line, no langua
   assert.ok(!BAN.test(AU_STRINGS['login.welcomeSub']));
   const login = readFileSync(fileURLToPath(new URL('../src/pages/Login.jsx', here)), 'utf8');
   assert.match(login, /function LanguagePicker\(\) \{[\s\S]{0,260}if \(EDITION_ID === 'prithagoras'\) return null;/);
-  assert.match(login, /EDITION_ID !== 'prithagoras' && <> · <PageLink to="\/refund-policy">[\s\S]{0,160}\/grievance/);
+  // The footer's contact link is edition-aware (#954): Prithagoras links its
+  // Australian contact page, Priyabhata keeps the DPDP grievance page. Refunds
+  // is shown in both: Prithagoras has its own ACL refund policy.
+  assert.match(login, /<LegalContactLink \/>/);
+  const contact = readFileSync(fileURLToPath(new URL('../src/components/LegalContactLink.jsx', here)), 'utf8');
+  assert.match(contact, /EDITION === 'prithagoras'\s*\?\s*<PageLink to="\/contact">[\s\S]{0,80}:\s*<PageLink to="\/grievance">/);
+  assert.ok(!/to="\/grievance"/.test(login), 'Login.jsx links no grievance page directly; only LegalContactLink chooses it, by edition');
   assert.match(login, /t\('login\.heroNote'\)/);
   assert.ok(!/t\('login\.heroSub'\)/.test(login) && /<details className="login-more">/.test(login), 'the marketing paragraph is gone and the data statement is folded, not a wall of text');
   assert.ok(en['login.heroNote'].length < 120, 'the note stays one short line');
