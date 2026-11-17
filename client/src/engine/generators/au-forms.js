@@ -8,7 +8,7 @@ export const AU_OVERLAYS = {
   year9: () => Promise.all([import('./au-forms-y910-a-nsw.js'), import('./au-forms-y910-b-nsw.js'), import('./au-forms-y910-c-nsw.js')]),
   year10: () => Promise.all([import('./au-forms-y910-a-nsw.js'), import('./au-forms-y910-b-nsw.js'), import('./au-forms-y910-c-nsw.js')]),
   year11: () => Promise.all([import('./au-forms-adv11-a-nsw.js'), import('./au-forms-adv11-b-nsw.js')]),
-  year12: () => Promise.all([import('./au-forms-adv12-a-nsw.js'), import('./au-forms-adv12-b-nsw.js')])
+  year12: () => Promise.all([import('./au-forms-adv12-a-nsw.js'), import('./au-forms-adv12-b-nsw.js'), import('./au-forms-adv12-core-nsw.js')])
 };
 
 export async function loadAuForms(bank) {
