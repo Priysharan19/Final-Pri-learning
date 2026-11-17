@@ -4291,7 +4291,7 @@ export default {
   'tw.join.show': 'Show join code',
   'tw.join.loadFailed': 'The join code could not be loaded.',
   'tw.join.free': 'Free for teachers. Name the class and you get the join code straight away.',
-  'tw.board.notYet': 'The class board needs each answer’s syllabus dot point on Pri’s server. Priyabhata answers do not carry it yet, so the board would show every outcome as not started. It is not shown until it can be right.',
+  'tw.board.notYet': 'The class board needs each answer’s syllabus dot point on Pri’s server. {brand} answers do not carry it yet, so the board would show every outcome as not started. It is not shown until it can be right.',
   'tw.board.loadFailed': 'The class board could not be loaded.',
   'tw.board.evidenceNote': 'Counts come only from answers Pri’s server marked. The server records every answer as answered with help for now (it does not yet see whether the tutor helped), so “Shown on your own” and “Held after a gap” stay at 0 until that evidence is recorded.',
   'tw.board.withheld': { one: '{n} student is waiting for a guardian’s consent, so their work is not counted or named here.', other: '{n} students are waiting for a guardian’s consent, so their work is not counted or named here.' },

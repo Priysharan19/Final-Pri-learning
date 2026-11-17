@@ -42,7 +42,7 @@ const vite = await import('../vite.config.js');
   ok(helper.EDITION === table.DEFAULT_EDITION && helper.EDITION === 'priyabhata', 'outside a build the app is the default edition, Priyabhata');
   const e = helper.edition();
   const { identity, ...defaults } = e;
-  eq(defaults, { id: 'priyabhata', brand: 'Priyabhata', region: 'IN', defaultCourse: 'in', courses: ['in'], languages: ['en', 'hi'], currency: 'INR', family: { parentFeatures: true } }, 'edition() is the record: identity, defaults and the family switch');
+  eq(defaults, { id: 'priyabhata', brand: 'Priyabhata', region: 'IN', defaultCourse: 'in', courses: ['in'], languages: ['en', 'hi'], currency: 'INR', commerce: { currency: 'INR', listPrice: null, differentiators: ['engineSteps', 'youConfirm', 'syllabus', 'examPapers'] }, family: { parentFeatures: true } }, 'edition() is the record: identity, defaults, the pricing facts and the family switch');
   // Plan E4: the brand the app draws — Hindi name, cut, its path, the wordmark, the company line — and nothing more;
   // Lit Instrument D6 adds the working indicator's form for that same cut.
   eq(Object.keys(identity).sort(), ['brandHi', 'companyLine', 'company', 'cut', 'cutPath', 'wordmark', 'working'].sort(), 'record.identity holds exactly the brand the app draws');
@@ -53,7 +53,11 @@ const vite = await import('../vite.config.js');
   ok(Object.isFrozen(e) && Object.isFrozen(e.courses) && Object.isFrozen(e.languages), 'the record is frozen, with its lists');
   ok(helper.edition() === e, 'and is the same object every time');
   ok(!('capabilities' in e), 'the capability table (planning debt) is not part of what the app knows about itself');
-  for (const key of Object.keys(defaults)) eq(e[key], india[key], `record.${key} is the table's`);
+  for (const key of Object.keys(defaults)) {
+    if (key === 'commerce') continue;   // the table's commerce plus the edition's currency (checked below)
+    eq(e[key], india[key], `record.${key} is the table's`);
+  }
+  eq(e.commerce, { currency: india.currency, ...india.commerce }, 'record.commerce is the table\'s commerce with the edition\'s currency');
   ok(helper.defaultCourse() === 'in', 'a new Priyabhata profile starts on the India course');
   ok(helper.offersCourse('in') && !helper.offersCourse('nsw') && !helper.offersCourse(undefined) && !helper.offersCourse('IN'), 'Priyabhata offers the India course and no other');
   ok(helper.EDITION_HEADER === 'X-Pri-Edition', 'the header the build declares itself in');
