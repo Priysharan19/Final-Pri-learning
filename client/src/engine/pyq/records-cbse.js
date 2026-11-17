@@ -826,7 +826,7 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
     mcqOptions: ['$30^{\\circ}$', '$45^{\\circ}$', '$60^{\\circ}$', '$90^{\\circ}$'],
     answer: { correctIndex: 2 },
     steps: [
-      { h: 'Use $\\sin^2	heta = 1 - \\cos^2	heta$', d: '$7\\cos^2\\theta + 3 - 3\\cos^2\\theta = 4$, so $4\\cos^2\\theta = 1$.' },
+      { h: 'Use $\\sin^2\\theta = 1 - \\cos^2\\theta$', d: '$7\\cos^2\\theta + 3 - 3\\cos^2\\theta = 4$, so $4\\cos^2\\theta = 1$.' },
       { h: 'Solve', d: '$\\cos\\theta = \\dfrac{1}{2}$ (the options are acute angles), so $\\theta = 60^{\\circ}$.' }
     ]
   },
@@ -1181,11 +1181,11 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
     questionNumber: 1,
     chapterId: 'c10-probability',
     difficulty: 1,
-    prompt: 'If for any event $E$, $P(E) + P(\overline{E}) = q$, then the value of $q^2 - 3$ is',
+    prompt: 'If for any event $E$, $P(E) + P(\\overline{E}) = q$, then the value of $q^2 - 3$ is',
     mcqOptions: ['$0$', '$-2$', '$2$', '$1$'],
     answer: { correctIndex: 1 },
     steps: [
-      { h: 'Complementary events', d: '$P(E) + P(\overline{E}) = 1$, so $q = 1$.' },
+      { h: 'Complementary events', d: '$P(E) + P(\\overline{E}) = 1$, so $q = 1$.' },
       { h: 'Evaluate', d: '$q^2 - 3 = 1 - 3 = -2$.' }
     ]
   },
@@ -1195,12 +1195,12 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
     questionNumber: 2,
     chapterId: 'c10-trigonometry',
     difficulty: 1,
-    prompt: 'If $\sin\theta = \cos\theta$ $(0^{\circ} < \theta < 90^{\circ})$, then the value of $\sec\theta \cdot \sin\theta$ is',
-    mcqOptions: ['$\dfrac{1}{\sqrt{2}}$', '$\sqrt{2}$', '$0$', '$1$'],
+    prompt: 'If $\\sin\\theta = \\cos\\theta$ $(0^{\\circ} < \\theta < 90^{\\circ})$, then the value of $\\sec\\theta \\cdot \\sin\\theta$ is',
+    mcqOptions: ['$\\dfrac{1}{\\sqrt{2}}$', '$\\sqrt{2}$', '$0$', '$1$'],
     answer: { correctIndex: 3 },
     steps: [
-      { h: 'Rewrite', d: '$\sec\theta \cdot \sin\theta = \dfrac{\sin\theta}{\cos\theta} = \tan\theta$.' },
-      { h: 'Use the condition', d: '$\sin\theta = \cos\theta$ gives $\tan\theta = 1$.' }
+      { h: 'Rewrite', d: '$\\sec\\theta \\cdot \\sin\\theta = \\dfrac{\\sin\\theta}{\\cos\\theta} = \\tan\\theta$.' },
+      { h: 'Use the condition', d: '$\\sin\\theta = \\cos\\theta$ gives $\\tan\\theta = 1$.' }
     ]
   },
   {
@@ -1209,12 +1209,12 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
     questionNumber: 3,
     chapterId: 'c10-areas-circles',
     difficulty: 1,
-    prompt: 'If an arc of a circle of diameter $10$ cm subtends an angle of $144^{\circ}$ at the centre of the circle, then the length of the arc is',
-    mcqOptions: ['$2\pi$ cm', '$4\pi$ cm', '$5\pi$ cm', '$6\pi$ cm'],
+    prompt: 'If an arc of a circle of diameter $10$ cm subtends an angle of $144^{\\circ}$ at the centre of the circle, then the length of the arc is',
+    mcqOptions: ['$2\\pi$ cm', '$4\\pi$ cm', '$5\\pi$ cm', '$6\\pi$ cm'],
     answer: { correctIndex: 1 },
     steps: [
       { h: 'Radius', d: '$r = 5$ cm.' },
-      { h: 'Arc length', d: '$\dfrac{144}{360} \times 2\pi \times 5 = \dfrac{2}{5} \times 10\pi = 4\pi$ cm.' }
+      { h: 'Arc length', d: '$\\dfrac{144}{360} \\times 2\\pi \\times 5 = \\dfrac{2}{5} \\times 10\\pi = 4\\pi$ cm.' }
     ]
   },
   {
@@ -1241,7 +1241,7 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
     mcqOptions: ['$-1$', '$1$', '$-2$', '$2$'],
     answer: { correctIndex: 3 },
     steps: [
-      { h: 'Product of zeros', d: 'Reciprocal zeros multiply to $1$: $\dfrac{4p}{p^2 + 4} = 1$.' },
+      { h: 'Product of zeros', d: 'Reciprocal zeros multiply to $1$: $\\dfrac{4p}{p^2 + 4} = 1$.' },
       { h: 'Solve', d: '$p^2 - 4p + 4 = 0$, so $(p - 2)^2 = 0$ and $p = 2$.' }
     ]
   },
@@ -1257,20 +1257,6 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
     steps: [
       { h: 'Parallel to the y-axis', d: 'Such a line has the form $x = c$.' },
       { h: 'To the right', d: '$5$ units to the right means $x = 5$.' }
-    ]
-  },
-  {
-    ...CBSE_2025_X_2_3,
-    id: 'cbse-2025-x-30-2-3-q12',
-    questionNumber: 12,
-    chapterId: 'c10-arithmetic-progressions',
-    difficulty: 1,
-    prompt: 'The $10^{\text{th}}$ term of the AP $5, \dfrac{19}{4}, \dfrac{9}{2}, \dfrac{17}{4}, \ldots$ is',
-    mcqOptions: ['$\dfrac{11}{4}$', '$\dfrac{4}{11}$', '$\dfrac{13}{4}$', '$\dfrac{4}{13}$'],
-    answer: { correctIndex: 0 },
-    steps: [
-      { h: 'Common difference', d: '$d = \dfrac{19}{4} - 5 = -\dfrac{1}{4}$.' },
-      { h: 'Tenth term', d: '$a_{10} = 5 + 9\left(-\dfrac{1}{4}\right) = \dfrac{11}{4}$.' }
     ]
   },
   // ── CBSE Class 12 Mathematics (041) · 2025 · Set 65/2/1 · Section A ─────────
@@ -1434,7 +1420,7 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
   },
   {
     ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q19', questionNumber: 19, chapterId: 'c12-matrices', difficulty: 1,
-    prompt: 'Assertion (A): $A = \\mathrm{diag}\\,[3\\ 5\\ 2]$ is a scalar matrix of order $3 \\times 3$.\n\nReason (R): If a diagonal matrix has all non-zero elements equal, it is known as a scalar matrix.',
+    prompt: 'Assertion (A): $A = \\mathrm{diag}\\,[3\\ 5\\ 2]$ is a scalar matrix of order $3 \\times 3$.\\n\\nReason (R): If a diagonal matrix has all non-zero elements equal, it is known as a scalar matrix.',
     mcqOptions: [...AR_CODES],
     answer: { correctIndex: 3 },
     steps: [
@@ -1444,7 +1430,7 @@ export const CBSE_PYQ_RECORDS = Object.freeze([
   },
   {
     ...CBSE_2025_XII_2_1, id: 'cbse-2025-xii-65-2-1-q20', questionNumber: 20, chapterId: 'c12-linear-programming', difficulty: 2,
-    prompt: 'Assertion (A): Every point of the feasible region of a Linear Programming Problem is an optimal solution.\n\nReason (R): The optimal solution for a Linear Programming Problem exists only at one or more corner point(s) of the feasible region.',
+    prompt: 'Assertion (A): Every point of the feasible region of a Linear Programming Problem is an optimal solution.\\n\\nReason (R): The optimal solution for a Linear Programming Problem exists only at one or more corner point(s) of the feasible region.',
     mcqOptions: [...AR_CODES],
     answer: { correctIndex: 3 },
     steps: [

@@ -25,7 +25,7 @@ export { pyqGeneratorId, hasPyqGenerator, pyqCoversChapter, pyqCellsFor };
  */
 export const PYQ_COVERAGE = Object.freeze({
   'pyq-cbse-c10-areas-circles': Object.freeze({ track: 'cbse', chapterId: 'c10-areas-circles', exams: Object.freeze(['cbse-class-10']), difficulties: Object.freeze([1, 2]), years: Object.freeze([2025]), records: 5 }),
-  'pyq-cbse-c10-arithmetic-progressions': Object.freeze({ track: 'cbse', chapterId: 'c10-arithmetic-progressions', exams: Object.freeze(['cbse-class-10']), difficulties: Object.freeze([1, 2]), years: Object.freeze([2025]), records: 7 }),
+  'pyq-cbse-c10-arithmetic-progressions': Object.freeze({ track: 'cbse', chapterId: 'c10-arithmetic-progressions', exams: Object.freeze(['cbse-class-10']), difficulties: Object.freeze([1, 2]), years: Object.freeze([2025]), records: 6 }),
   'pyq-cbse-c10-circles': Object.freeze({ track: 'cbse', chapterId: 'c10-circles', exams: Object.freeze(['cbse-class-10']), difficulties: Object.freeze([1]), years: Object.freeze([2025]), records: 2 }),
   'pyq-cbse-c10-coordinate-geometry': Object.freeze({ track: 'cbse', chapterId: 'c10-coordinate-geometry', exams: Object.freeze(['cbse-class-10']), difficulties: Object.freeze([1, 2]), years: Object.freeze([2025]), records: 7 }),
   'pyq-cbse-c10-pair-linear-equations': Object.freeze({ track: 'cbse', chapterId: 'c10-pair-linear-equations', exams: Object.freeze(['cbse-class-10']), difficulties: Object.freeze([1, 2]), years: Object.freeze([2025]), records: 4 }),
@@ -119,7 +119,7 @@ export const PYQ_MANIFEST = Object.freeze({
     Object.freeze({ exam: 'cbse-class-10', year: 2025, setCode: '30/1/3', section: 'Section A', records: 8 }),
     Object.freeze({ exam: 'cbse-class-10', year: 2025, setCode: '30/2/1', section: 'Section A', records: 17 }),
     Object.freeze({ exam: 'cbse-class-10', year: 2025, setCode: '30/2/2', section: 'Section A', records: 8 }),
-    Object.freeze({ exam: 'cbse-class-10', year: 2025, setCode: '30/2/3', section: 'Section A', records: 7 }),
+    Object.freeze({ exam: 'cbse-class-10', year: 2025, setCode: '30/2/3', section: 'Section A', records: 6 }),
     Object.freeze({ exam: 'cbse-class-12', year: 2025, setCode: '65/2/1', section: 'Section A', records: 17 }),
     Object.freeze({ exam: 'cbse-class-12', year: 2025, setCode: '65/2/1', section: 'Section B', records: 1 }),
     Object.freeze({ exam: 'jee-main', year: 2026, paper: '1 (B.E./B.Tech)', section: 'Mathematics · 2 April 2026 Shift 1', records: 25 })
