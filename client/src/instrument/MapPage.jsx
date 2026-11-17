@@ -149,7 +149,7 @@ export default function MapPage() {
     const placed = layered(
       nodes.map(n => ({ id: n.row.id, name: n.row.name, mastery: n.evidence.mastery, strand: strandName(n) })),
       preIds,
-      reserve ? { width: MAP_W - reserve.w, card: reserve } : {}
+      reserve ? { width: MAP_W - reserve.w, card: reserve, top: 96 } : {}
     );
     const at = new Map(placed.nodes.map(p => [p.id, p]));
     nodes.forEach(n => Object.assign(n, { x: at.get(n.row.id).x, y: at.get(n.row.id).y, r: at.get(n.row.id).r, lines: at.get(n.row.id).lines, layer: at.get(n.row.id).layer }));
@@ -190,7 +190,8 @@ export default function MapPage() {
     return dps.length ? t('inst.mapMetaTopics', { n: practised, total: dps.length }) : t('inst.mapMetaAnswers', { count: node.evidence.attempts, n: node.evidence.attempts });
   };
   const H = layout.height;
-  const litId = hover || current?.row.id || null;
+  // Only a chapter the student points at or focuses lights its links; at rest the map is even.
+  const litId = hover || pick || null;
   const litSet = new Set(litId ? [litId, ...(layout.builds.get(litId) || []), ...(layout.feeds.get(litId) || [])] : []);
 
   // The card's prose: fixed sentences over the chapter's own figures.

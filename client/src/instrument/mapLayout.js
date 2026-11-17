@@ -68,10 +68,11 @@ export function layersOf(chapters, prereqOf) {
 /**
  * @param chapters [{ id, name, mastery, strand }] in syllabus order
  * @param prereqOf id → [prerequisite id] (any scope; out-of-scope ids are ignored)
- * @param opts     { width, card: {w, h} | null } — the drawing's width in map units
- *                 (less than MAP_W when a floating card takes the right edge)
+ * @param opts     { width, card: {w, h} | null, top } — the drawing's width in map units
+ *                 (less than MAP_W when a floating card takes the right edge) and where
+ *                 the first lane starts (below the title, when the title floats over it)
  */
-export function layered(chapters, prereqOf, { width = MAP_W, card = null } = {}) {
+export function layered(chapters, prereqOf, { width = MAP_W, card = null, top: start = 8 } = {}) {
   const order = new Map(chapters.map((c, i) => [c.id, i]));
   const depth = layersOf(chapters, prereqOf);
   const layerCount = Math.max(1, ...chapters.map(c => depth.get(c.id) + 1));
@@ -82,7 +83,7 @@ export function layered(chapters, prereqOf, { width = MAP_W, card = null } = {})
   const placed = [];
   const nodes = [];
   const blocked = card ? [{ x1: MAP_W - card.w, y1: 0, x2: MAP_W + 1, y2: card.h }] : [];
-  let top = 8;
+  let top = start;
   for (const lane of lanes) {
     const rows = Math.max(1, ...Array.from({ length: layerCount }, (_, l) => cell(lane, l).length));
     const band = { strand: lane, top, height: LANE_HEAD + rows * ROW };
