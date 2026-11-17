@@ -113,8 +113,9 @@ export async function grantReferralTrial(db, accountId, now = Date.now()) {
 }
 
 async function sharesDevice(db, a, b) {
+  // 'web' is the server's stand-in when a client names no device: it is not a device.
   return !!await db.get(`SELECT 1 AS shared FROM account_sessions x JOIN account_sessions y ON x.device_id = y.device_id
-    WHERE x.account_id=? AND y.account_id=? LIMIT 1`, [a, b]);
+    WHERE x.account_id=? AND y.account_id=? AND x.device_id NOT IN ('web','') LIMIT 1`, [a, b]);
 }
 
 /**
@@ -123,6 +124,15 @@ async function sharesDevice(db, a, b) {
  */
 export async function claimReferral(db, { inviteeId, code, now = Date.now() }) {
   db = asStore(db);
+  // One claim at a time, all or nothing: the friend's record, both grants and
+  // the checks before them commit together (a failure leaves no half-spent
+  // trial), and the per-inviter cap, the one-trial-per-mailbox rule and the
+  // once-per-friend rule cannot be raced by simultaneous claims (Postgres runs
+  // statements outside a transaction at READ COMMITTED).
+  return db.transaction(() => claimUnderLock(db, { inviteeId, code, now }), { lock: 'referral-claim' });
+}
+
+async function claimUnderLock(db, { inviteeId, code, now }) {
   const clean = String(code || '').trim().toUpperCase();
   if (!CODE.test(clean)) return { status: 400, code: 'REFERRAL_CODE_INVALID' };
   const owner = await db.get(`SELECT l.actor_account_id AS inviter FROM audit_log l JOIN accounts a ON a.id = l.actor_account_id
@@ -136,9 +146,17 @@ export async function claimReferral(db, { inviteeId, code, now = Date.now() }) {
   ]);
   if (!inviter || !invitee) return { status: 404, code: 'REFERRAL_CODE_UNKNOWN' };
   if (!invitee.email_verified_at) return { status: 403, code: 'EMAIL_UNVERIFIED' };
-  if (now - Number(invitee.created_at) > REFERRAL.newAccountDays * DAY) return { status: 409, code: 'REFERRAL_NOT_NEW_ACCOUNT' };
+  // New = created in the last 7 days, or (a child) approved by a guardian in
+  // the last 7 days: a slow approval does not cost the friend their trial.
+  const approved = Number((await db.get('SELECT confirmed_at FROM guardian_consents WHERE account_id=? AND withdrawn_at IS NULL', [inviteeId]))?.confirmed_at) || 0;
+  if (now - Math.max(Number(invitee.created_at), approved) > REFERRAL.newAccountDays * DAY) return { status: 409, code: 'REFERRAL_NOT_NEW_ACCOUNT' };
   if (await db.get("SELECT 1 AS joined FROM audit_log WHERE action='referral.joined' AND actor_account_id=? LIMIT 1", [inviteeId])) return { status: 409, code: 'REFERRAL_ALREADY_USED' };
   if (mailbox(inviter.email) === mailbox(invitee.email) || await sharesDevice(db, inviterId, inviteeId)) return { status: 409, code: 'REFERRAL_SELF' };
+  // One invitation trial per person, not per address: another account at the
+  // same mailbox (+tags, Gmail dots) that already had one rules this one out.
+  const trialled = await db.all(`SELECT a.email FROM accounts a JOIN entitlement_support_grants g ON g.account_id = a.id
+    WHERE g.product_id=? AND a.id<>?`, [REFERRAL.productId, inviteeId]);
+  if (trialled.some(row => mailbox(row.email) === mailbox(invitee.email))) return { status: 409, code: 'REFERRAL_ALREADY_USED' };
   const credited = Number((await db.get("SELECT COUNT(*) AS n FROM audit_log WHERE action='referral.joined' AND target_id=? AND created_at>?", [inviterId, now - 30 * DAY]))?.n || 0);
   if (credited >= REFERRAL.inviterCreditsPer30Days) return { status: 429, code: 'REFERRAL_LIMIT' };
 

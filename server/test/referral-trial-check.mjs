@@ -28,6 +28,8 @@ process.env.PRI_AUTH_DELIVERY_KEY = 'd5'.repeat(32);
 delete process.env.PRI_PUBLIC_ORIGIN;
 
 const { startApp, verifyEmail, checks } = await import('./support/app-harness.mjs');
+const { requestedEngine } = await import('./support/engine.mjs');
+const { valueFunnel } = await import('../platform/valueFunnel.js');
 const { asStore } = await import('../platform/store.js');
 const { claimReferral, referralTrialState, mailbox, REFERRAL, CODE } = await import('../platform/referral.js');
 const { serverEntitlementCapabilities } = await import('../platform/entitlements.js');
@@ -36,7 +38,8 @@ const c = checks();
 const DAY = 86_400_000;
 const NATIVE = { 'X-Pri-Client': 'ios-native-v1' };
 
-const h = await startApp();
+const ENGINE = requestedEngine();
+const h = await startApp({ engine: ENGINE });
 const store = asStore(h.db);
 let serial = 0;
 const fresh = () => store.run('DELETE FROM rate_limits');
@@ -126,6 +129,28 @@ try {
     c.eq(last.status, 429, 'the claim route is rate-limited per account');
   }
 
+  // ── 3b · review fixes: one trial per inbox, races, the 'web' stand-in device ─
+  {
+    const i1 = await adult('inboxInviter1');
+    const i2 = await adult('inboxInviter2');
+    const p1 = await adult('p1', { email: 'pat+one@example.test' });
+    c.eq((await claim(p1, (await codeOf(i1)).code)).status, 200, 'pat+one claims a trial');
+    const p2 = await adult('p2', { email: 'pat+two@example.test' });
+    c.eq((await claim(p2, (await codeOf(i2)).code)).data?.error?.code, 'REFERRAL_ALREADY_USED', 'pat+two, the same inbox, gets no second invitation trial');
+    const racer = await adult('racer');
+    const [ra, rb] = await Promise.all([
+      h.request('/v1/referral/claim', { method: 'POST', jar: racer.jar, body: { code: (await codeOf(i1)).code } }),
+      h.request('/v1/referral/claim', { method: 'POST', jar: racer.jar, body: { code: (await codeOf(i2)).code } })
+    ]);
+    c.eq([ra.status, rb.status].filter(x => x === 200).length, 1, 'two simultaneous claims by one friend: exactly one succeeds');
+    c.eq(Number((await store.get("SELECT COUNT(*) AS n FROM audit_log WHERE action='referral.joined' AND actor_account_id=?", [racer.id])).n), 1, 'and one who-invited-whom row is kept');
+    const w1 = await adult('webA', { deviceId: 'web' });
+    const w2 = await adult('webB', { deviceId: 'web' });
+    c.eq((await claim(w2, (await codeOf(w1)).code)).status, 200, 'the server\'s "web" stand-in is not a shared device');
+    const f = await valueFunnel(store, { days: 30 });
+    c.ok('referralTrials' in f && f.trial.started !== undefined, 'the funnel counts invitation trials apart from card trials');
+  }
+
   // ── 4 · back to Free at day 7, with nothing charged ───────────────────────
   {
     const t0 = Date.now();
@@ -176,7 +201,7 @@ try {
 
 // ── 7 · edition isolation: another deployment's database knows no code ─────
 {
-  const other = await startApp();
+  const other = await startApp({ engine: ENGINE });
   try {
     const os = asStore(other.db);
     await os.run('DELETE FROM rate_limits');
@@ -203,4 +228,5 @@ try {
 
 for (const k of keys) { if (before[k] === undefined) delete process.env[k]; else process.env[k] = before[k]; }
 rmSync(scratch, { recursive: true, force: true });
+console.log(`engine: ${ENGINE || 'sqlite'}`);
 console.log(`REFERRAL TRIAL: PASS — ${c.count()}/${c.count()} checks`);

@@ -44,6 +44,7 @@ const { ensureBillingSchema } = await import('../platform/billingSchema.js');
 const { CAPABILITY_ENFORCEMENT } = await import('../../client/src/local/entitlementGate.js');
 const { PREMIUM_ROWS } = await import('../../client/src/paywall/plans.js');
 const { startApp, registerAccount, promoteRole, checks } = await import('./support/app-harness.mjs');
+const { requestedEngine } = await import('./support/engine.mjs');
 
 const c = checks();
 const DAY = 86_400_000;
@@ -143,7 +144,7 @@ for (const r of PREMIUM_ROWS) {
 }
 
 // ── 6 · the optional cancel reason, and 7 · the admin funnel, over HTTP ─────
-const h = await startApp();
+const h = await startApp({ engine: requestedEngine() });
 try {
   const student = await registerAccount(h, { email: 'cancel@example.test' });
   const id = student.account.id;

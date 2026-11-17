@@ -95,7 +95,9 @@ export async function valueFunnel(db, { days = 30, now = Date.now(), edition = n
   const trials = await db.all(
     `SELECT t.account_id AS account,
             (SELECT COUNT(*) FROM billing_payments p WHERE p.account_id=t.account_id AND p.amount>0 AND p.captured_at>=t.claimed_at) AS paid
-       FROM billing_trial_claims t WHERE t.claimed_at>=? AND t.claimed_at<?`, [w.from, w.to]);
+       FROM billing_trial_claims t WHERE t.claimed_at>=? AND t.claimed_at<? AND t.provider_subscription_id NOT LIKE 'referral:%'`, [w.from, w.to]);
+  // Invitation trials (no card, they never convert by themselves) are counted on their own.
+  const referralTrials = Number((await db.get("SELECT COUNT(*) AS n FROM billing_trial_claims WHERE claimed_at>=? AND claimed_at<? AND provider_subscription_id LIKE 'referral:%'", [w.from, w.to]))?.n || 0);
   const trialPaid = trials.filter(r => Number(r.paid) > 0).length;
   const cancels = Number((await db.get(
     "SELECT COUNT(*) AS n FROM billing_subscriptions WHERE cancel_requested_at>=? AND cancel_requested_at<? AND cancel_reason='user'",
@@ -115,6 +117,7 @@ export async function valueFunnel(db, { days = 30, now = Date.now(), edition = n
     cohort: { accounts: cell(cohort, k) },
     activation: { activated: partOf(activated, cohort, k), rate: rate(activated, cohort, k) },
     retention,
+    referralTrials: { started: cell(referralTrials, k) },
     trial: { started: cell(trials.length, k), paid: partOf(trialPaid, trials.length, k), rate: rate(trialPaid, trials.length, k) },
     cancellations: {
       requested: cell(cancels, k),

@@ -104,6 +104,8 @@ for (const f of FORBIDDEN_SURFACES) ok(`${f} never links to Premium`, !PREMIUM_L
   const words = Object.entries(en).filter(([k]) => /^(invite|trial)\./.test(k)).map(([, v]) => String(v)).join('\n');
   ok('the invite words are neutral: no pressure, waiting friends, counts, streaks or leaderboards', !/waiting|hurry|don.t miss|last chance|streak|leaderboard|rank|friends? (have|are)|\d+ friends|limited/i.test(words));
   ok('the reminders say it ends by itself and nothing is charged', /Nothing is charged/.test(en['trial.endsSoon']) && /Nothing was charged/.test(en['trial.ended']) && /automatically/.test(en['trial.endsSoon']));
+  ok('the store apps show no trial reminder either (web only)', /const key = priNative\.isNativeShell\(\) \? null : trialNoticeKey\(trial\);/.test(read('src/components/TrialNotice.jsx')));
+  ok('the share text speaks only for the friend, never promising the sharer anything', !/we both|us both|both get/i.test(en['invite.shareText']));
   ok('the reminder links to no purchase', !/PAYWALL_ROUTE|PageLink|\/premium/.test(read('src/components/TrialNotice.jsx')));
   ok('every invite and trial string has Hindi', Object.keys(en).filter(k => /^(invite|trial)\./.test(k)).every(k => typeof hi[k] === 'string' && hi[k] !== en[k]));
 }

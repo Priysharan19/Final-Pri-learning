@@ -190,11 +190,12 @@ export function createBillingRouter(db, { verifiers = {}, checkout = {}, native 
       [accountId, now - CANCEL_FEEDBACK_WINDOW_MS]);
     if (!sub) return res.status(409).json({ error: { code: 'CANCEL_FEEDBACK_NOT_EXPECTED', message: 'There is no recent cancellation on this account.' } });
     const target = `${sub.provider}:${sub.provider_subscription_id}`;
-    // One statement, so two taps at once still keep one reason per subscription.
-    await db.run(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at)
+    // Under a lock per subscription, so two taps at once keep one reason (on
+    // Postgres a lone statement runs at READ COMMITTED and could insert twice).
+    await db.transaction(() => db.run(`INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at)
       SELECT CAST(? AS TEXT),'billing.cancel-feedback','subscription',CAST(? AS TEXT),CAST(? AS TEXT),CAST(? AS BIGINT) WHERE NOT EXISTS
         (SELECT 1 FROM audit_log WHERE action='billing.cancel-feedback' AND target_kind='subscription' AND target_id=CAST(? AS TEXT))`,
-    [accountId, target, JSON.stringify({ reason }), now, target]);
+    [accountId, target, JSON.stringify({ reason }), now, target]), { lock: `cancel-feedback:${target}` });
     res.set('Cache-Control', 'no-store');
     res.json({ ok: true });
   });

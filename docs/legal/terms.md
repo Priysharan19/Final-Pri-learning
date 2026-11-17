@@ -71,13 +71,15 @@ the friend gets 7 days of Premium free, and so do you if you have not had a
 free trial before.
 
 - **Eligibility:** the friend's account must be new (created in the last 7
-  days) and must not belong to you. An account made on the same device as
+  days, or approved by a parent or guardian in the last 7 days) and must not
+  belong to you. An account made on the same device as
   yours, or with the same email inbox, does not count. If you are under 18 and
   your account needs a parent's or guardian's approval, you can share or use an
   invite only once that approval is in place.
-- **One per person:** each account can have one free trial, ever, whether it
-  came from an invitation or from a subscription offer. An invite link credits
-  at most 5 friends in any 30 days.
+- **One per person:** each person can have one invitation trial, ever, and an
+  account that has already had a free trial bought on our website does not get
+  another. Accounts at the same email inbox count as one person. An invite link
+  credits at most 5 friends in any 30 days.
 - **No card, no charge:** the trial needs no card and no payment details. At
   the end of the 7 days your account goes back to the free plan by itself.
   Nothing is charged, and nothing turns into a paid subscription unless you

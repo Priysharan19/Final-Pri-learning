@@ -935,7 +935,7 @@ export default {
   'invite.share': "Share link",
   'invite.copy': "Copy link",
   'invite.copied': "Link copied",
-  'invite.shareText': "I use {brand} for maths practice. If you join with this link, we both get {brand} Premium free for a week.",
+  'invite.shareText': "A link to join {brand} for maths practice. If you join with it and confirm your email, you get a week of Premium free.",
   'invite.claimed': "You have {days} days of Premium, free. No card is needed: it goes back to Free by itself, and nothing is charged.",
   'trial.endsSoon': "Your free Premium trial ends on {when}. After that you go back to Free automatically. Nothing is charged.",
   'trial.ended': "Your free Premium trial has ended, and you are on Free. Nothing was charged.",
