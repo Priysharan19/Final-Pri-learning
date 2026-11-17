@@ -1251,26 +1251,26 @@
  "eq-078": {
   "verdicts": [
    "given",
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 1
  },
  "eq-079": {
   "verdicts": [
    "given",
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 1
  },
  "eq-080": {
   "verdicts": [
    "given",
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 1
  },
  "eq-081": {
   "verdicts": [
