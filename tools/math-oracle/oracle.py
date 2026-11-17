@@ -683,7 +683,8 @@ def _row(r):
     key = r['key'].get('expr') or r['key'].get('values') or r['key'].get('simplestFraction') or r['key'].get('value')
     if r['type'] == 'point':
         key = (r['key']['x'], r['key']['y'])
-    return (f"| `{r['qid']}` | {r['edition']} | {r['type']} | `{key}` | {r['family']}/{r['label']} | `{r['input']}` | "
+    gid, d, seed = r['qid'].split('|')
+    return (f"| `{gid}` d{d} s{seed} | {r['edition']} | {r['type']} | `{key}` | {r['family']}/{r['label']} | `{r['input']}` | "
             f"{'accept' if r['engine']['correct'] else 'refuse'} | {r['oracle']['status']} ({r['oracle']['why'][:60]}) | {fb} |")
 
 

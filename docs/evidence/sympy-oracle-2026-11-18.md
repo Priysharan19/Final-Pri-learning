@@ -66,86 +66,86 @@
 
 | Question | Edition | Type | Key | Candidate | Input | Engine | SymPy | Engine feedback |
 |---|---|---|---|---|---|---|---|---|
-| `c8-rational-numbers-distributivity|4|28001` | priyabhata | numeric | `{'n': 0, 'd': 1}` | adversarial/near-miss-abs-1e-10 | `0.0000000001` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-functions|1|7001` | prithagoras | expression | `(x - -7)/5` | adversarial/plus-1e-7-x | `x/5 + 7/5 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me11-functions|1|7001` | prithagoras | expression | `(x - -7)/5` | adversarial/sampling-aware-degree-8 | `x/5 + 7/5 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me11-functions|1|7002` | prithagoras | expression | `(x - 5)/5` | adversarial/plus-1e-7-x | `x/5 - 1 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me11-functions|1|7002` | prithagoras | expression | `(x - 5)/5` | adversarial/sampling-aware-degree-8 | `x/5 - 1 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me11-functions|4|28001` | prithagoras | expression | `(x - (-10))/(6)` | adversarial/plus-1e-7-x | `x/6 + 5/3 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me11-functions|4|28001` | prithagoras | expression | `(x - (-10))/(6)` | adversarial/sampling-aware-degree-8 | `x/6 + 5/3 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me11-functions|4|28002` | prithagoras | expression | `(x - 30)/((-25))` | adversarial/plus-1e-7-x | `6/5 - x/25 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me11-functions|4|28002` | prithagoras | expression | `(x - 30)/((-25))` | adversarial/sampling-aware-degree-8 | `6/5 - x/25 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me11-inversetrig|1|7001` | prithagoras | numeric | `0` | adversarial/near-miss-abs-1e-10 | `0.0000000001` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-inversetrig|1|7002` | prithagoras | numeric | `1.7320508075688772` | approximation/rounded-9dp | `1.732050808` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-inversetrig|1|7002` | prithagoras | numeric | `1.7320508075688772` | approximation/rounded-10dp | `1.7320508076` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-inversetrig|2|14002` | prithagoras | numeric | `1.5707963267948966` | approximation/rounded-9dp | `1.570796327` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-inversetrig|2|14002` | prithagoras | numeric | `1.5707963267948966` | approximation/rounded-10dp | `1.5707963268` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-inversetrig|4|28001` | prithagoras | numeric | `2.356194490192345` | approximation/rounded-8dp | `2.35619449` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-inversetrig|4|28001` | prithagoras | numeric | `2.356194490192345` | approximation/rounded-9dp | `2.356194490` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-inversetrig|4|28001` | prithagoras | numeric | `2.356194490192345` | approximation/rounded-10dp | `2.3561944902` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-inversetrig|4|28002` | prithagoras | numeric | `0.7853981633974483` | approximation/rounded-9dp | `0.785398163` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-inversetrig|4|28002` | prithagoras | numeric | `0.7853981633974483` | approximation/rounded-10dp | `0.7853981634` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-trigid|1|7002` | prithagoras | numeric | `0.8660254037844387` | approximation/rounded-9dp | `0.866025404` | accept | NOT_EQUAL (exact-required) |  |
-| `me11-trigid|1|7002` | prithagoras | numeric | `0.8660254037844387` | approximation/rounded-10dp | `0.8660254038` | accept | NOT_EQUAL (exact-required) |  |
-| `me12-calc|1|7001` | prithagoras | expression | `3*(x^2 + 9)^3/3` | adversarial/plus-1e-7-x | `(x^2 + 9)^3 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me12-calc|1|7001` | prithagoras | expression | `3*(x^2 + 9)^3/3` | adversarial/plus-1e-5-x | `(x^2 + 9)^3 + 0.00001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me12-calc|1|7001` | prithagoras | expression | `3*(x^2 + 9)^3/3` | adversarial/sampling-aware-degree-8 | `(x^2 + 9)^3 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me12-calc|1|7002` | prithagoras | expression | `2*(x^2 + 9)^6/6` | adversarial/plus-1e-7-x | `(x^2 + 9)^6/3 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me12-calc|1|7002` | prithagoras | expression | `2*(x^2 + 9)^6/6` | adversarial/plus-1e-5-x | `(x^2 + 9)^6/3 + 0.00001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me12-calc|1|7002` | prithagoras | expression | `2*(x^2 + 9)^6/6` | adversarial/sampling-aware-degree-8 | `(x^2 + 9)^6/3 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `me12-calc|3|21001` | prithagoras | numeric | `28.274333882308138` | approximation/rounded-8dp | `28.27433388` | accept | NOT_EQUAL (exact-required) |  |
-| `me12-calc|3|21001` | prithagoras | numeric | `28.274333882308138` | approximation/rounded-9dp | `28.274333882` | accept | NOT_EQUAL (exact-required) |  |
-| `me12-calc|3|21001` | prithagoras | numeric | `28.274333882308138` | approximation/rounded-10dp | `28.2743338823` | accept | NOT_EQUAL (exact-required) |  |
-| `me12-calc|3|21002` | prithagoras | numeric | `1466.0765716752367` | approximation/rounded-6dp | `1466.076572` | accept | NOT_EQUAL (exact-required) |  |
-| `me12-calc|3|21002` | prithagoras | numeric | `1466.0765716752367` | approximation/rounded-8dp | `1466.07657168` | accept | NOT_EQUAL (exact-required) |  |
-| `me12-calc|3|21002` | prithagoras | numeric | `1466.0765716752367` | approximation/rounded-9dp | `1466.076571675` | accept | NOT_EQUAL (exact-required) |  |
-| `me12-calc|3|21002` | prithagoras | numeric | `1466.0765716752367` | approximation/rounded-10dp | `1466.0765716752` | accept | NOT_EQUAL (exact-required) |  |
-| `me12-induction|2|14001` | prithagoras | expression | `(k+1)(k+2)(2k+3)/6` | adversarial/plus-1e-7-x | `(k + 1)*(k + 2)*(2*k + 3)/6 + 0.0000001*k` | accept | NOT_EQUAL (counterexample:{'k': '-7/2'}) |  |
-| `me12-induction|2|14002` | prithagoras | expression | `3*(3^(k+1) - 1)/2` | adversarial/plus-1e-7-x | `3*3^(k + 1)/2 - 3/2 + 0.0000001*k` | accept | NOT_EQUAL (counterexample:{'k': '-7/2'}) |  |
-| `me12-induction|3|21001` | prithagoras | expression | `6p + 1` | adversarial/plus-1e-7-x | `6*p + 1 + 0.0000001*p` | accept | NOT_EQUAL (counterexample:{'p': '-7/2'}) |  |
-| `me12-induction|3|21001` | prithagoras | expression | `6p + 1` | adversarial/sampling-aware-degree-8 | `6*p + 1 + (p - (0.7))*(p - (1.3))*(p - (-0.6))*(p - (2.1))*(p - (-1.7))*(p - (0.35))*(p - (3.4))*(p - (-2.3))` | accept | NOT_EQUAL (counterexample:{'p': '-7/2'}) |  |
-| `me12-induction|3|21002` | prithagoras | expression | `11p + 7^k` | adversarial/plus-1e-7-x | `7^k + 11*p + 0.0000001*k` | accept | NOT_EQUAL (counterexample:{'p': '-7/2', 'k': '12/5'}) |  |
-| `me12-induction|3|21002` | prithagoras | expression | `11p + 7^k` | adversarial/sampling-aware-degree-8 | `7^k + 11*p + (k - (0.7))*(k - (1.3))*(k - (-0.6))*(k - (2.1))*(k - (-1.7))*(k - (0.35))*(k - (3.4))*(k - (-2.3))` | accept | NOT_EQUAL (counterexample:{'p': '-7/2', 'k': '12/5'}) |  |
-| `mex-complex|3|21001` | prithagoras | numeric | `4.242640687119286` | approximation/rounded-8dp | `4.24264069` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-complex|3|21001` | prithagoras | numeric | `4.242640687119286` | approximation/rounded-9dp | `4.242640687` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-complex|3|21001` | prithagoras | numeric | `4.242640687119286` | approximation/rounded-10dp | `4.2426406871` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-complex|3|21002` | prithagoras | numeric | `0.7853981633974483` | approximation/rounded-9dp | `0.785398163` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-complex|3|21002` | prithagoras | numeric | `0.7853981633974483` | approximation/rounded-10dp | `0.7853981634` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-demoivre|2|14001` | prithagoras | numeric | `1.0471975511965976` | approximation/rounded-9dp | `1.047197551` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-demoivre|2|14001` | prithagoras | numeric | `1.0471975511965976` | approximation/rounded-10dp | `1.0471975512` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-demoivre|2|14002` | prithagoras | numeric | `76.36753236814717` | approximation/rounded-8dp | `76.36753237` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-demoivre|2|14002` | prithagoras | numeric | `76.36753236814717` | approximation/rounded-9dp | `76.367532368` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-demoivre|2|14002` | prithagoras | numeric | `76.36753236814717` | approximation/rounded-10dp | `76.3675323681` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-demoivre|3|21001` | prithagoras | numeric | `1.5707963267948966` | approximation/rounded-9dp | `1.570796327` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-demoivre|3|21001` | prithagoras | numeric | `1.5707963267948966` | approximation/rounded-10dp | `1.5707963268` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-demoivre|3|21002` | prithagoras | numeric | `5.140787978601479` | approximation/rounded-8dp | `5.14078798` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-demoivre|3|21002` | prithagoras | numeric | `5.140787978601479` | approximation/rounded-9dp | `5.140787979` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-demoivre|3|21002` | prithagoras | numeric | `5.140787978601479` | approximation/rounded-10dp | `5.1407879786` | accept | NOT_EQUAL (exact-required) |  |
-| `mex-integration|1|7001` | prithagoras | expression | `2*e^(4*x)*((x + (-4))/4 - 1/16)` | adversarial/plus-1e-7-x | `2*(x/4 - 17/16)*e^(4*x) + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `mex-integration|1|7002` | prithagoras | expression | `1*e^(4*x)*((x + 3)/4 - 1/16)` | adversarial/plus-1e-7-x | `(x/4 + 11/16)*e^(4*x) + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `mex-proof|2|14001` | prithagoras | expression | `4*n^2 + 12*n + 9` | adversarial/plus-1e-7-x | `4*n^2 + 12*n + 9 + 0.0000001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
-| `mex-proof|2|14001` | prithagoras | expression | `4*n^2 + 12*n + 9` | adversarial/sampling-aware-degree-8 | `4*n^2 + 12*n + 9 + (n - (0.7))*(n - (1.3))*(n - (-0.6))*(n - (2.1))*(n - (-1.7))*(n - (0.35))*(n - (3.4))*(n - (-2.3))` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
-| `mex-proof|2|14002` | prithagoras | expression | `49*n^2 + 56*n + 16` | adversarial/plus-1e-7-x | `49*n^2 + 56*n + 16 + 0.0000001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
-| `mex-proof|2|14002` | prithagoras | expression | `49*n^2 + 56*n + 16` | adversarial/sampling-aware-degree-8 | `49*n^2 + 56*n + 16 + (n - (0.7))*(n - (1.3))*(n - (-0.6))*(n - (2.1))*(n - (-1.7))*(n - (0.35))*(n - (3.4))*(n - (-2.3))` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
-| `mex-proof|3|21001` | prithagoras | expression | `32*n` | adversarial/plus-1e-7-x | `32*n + 0.0000001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
-| `mex-proof|3|21001` | prithagoras | expression | `32*n` | adversarial/plus-1e-5-x | `32*n + 0.00001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
-| `mex-proof|3|21001` | prithagoras | expression | `32*n` | adversarial/sampling-aware-degree-8 | `32*n + (n - (0.7))*(n - (1.3))*(n - (-0.6))*(n - (2.1))*(n - (-1.7))*(n - (0.35))*(n - (3.4))*(n - (-2.3))` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
-| `mex-proof|3|21002` | prithagoras | expression | `(n + 7)^3` | adversarial/plus-1e-7-x | `(n + 7)^3 + 0.0000001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
-| `mex-proof|3|21002` | prithagoras | expression | `(n + 7)^3` | adversarial/plus-1e-5-x | `(n + 7)^3 + 0.00001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
-| `mex-proof|3|21002` | prithagoras | expression | `(n + 7)^3` | adversarial/sampling-aware-degree-8 | `(n + 7)^3 + (n - (0.7))*(n - (1.3))*(n - (-0.6))*(n - (2.1))*(n - (-1.7))*(n - (0.35))*(n - (3.4))*(n - (-2.3))` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
-| `y10-indices-neg|1|7001` | prithagoras | expression | `x^(2)` | adversarial/plus-1e-7-x | `x^2 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|1|7001` | prithagoras | expression | `x^(2)` | adversarial/sampling-aware-degree-8 | `x^2 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|1|7002` | prithagoras | expression | `x^(10)` | adversarial/plus-1e-7-x | `x^10 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|1|7002` | prithagoras | expression | `x^(10)` | adversarial/sampling-aware-degree-8 | `x^10 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|2|14001` | prithagoras | expression | `x^(8)` | adversarial/plus-1e-7-x | `x^8 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|2|14001` | prithagoras | expression | `x^(8)` | adversarial/sampling-aware-degree-8 | `x^8 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|2|14002` | prithagoras | expression | `x^(-12)` | adversarial/plus-1e-7-x | `x^(-12) + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|2|14002` | prithagoras | expression | `x^(-12)` | adversarial/sampling-aware-degree-8 | `x^(-12) + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|3|21001` | prithagoras | expression | `20*x^(-3)` | adversarial/plus-1e-7-x | `20/x^3 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|3|21001` | prithagoras | expression | `20*x^(-3)` | adversarial/sampling-aware-degree-8 | `20/x^3 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|3|21002` | prithagoras | expression | `20*x^(9)` | adversarial/plus-1e-7-x | `20*x^9 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|3|21002` | prithagoras | expression | `20*x^(9)` | adversarial/sampling-aware-degree-8 | `20*x^9 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
-| `y10-indices-neg|4|28001` | prithagoras | expression | `6*x^(-4)` | adversarial/plus-1e-7-x | `6/x^4 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `c8-rational-numbers-distributivity` d4 s28001 | priyabhata | numeric | `{'n': 0, 'd': 1}` | adversarial/near-miss-abs-1e-10 | `0.0000000001` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-functions` d1 s7001 | prithagoras | expression | `(x - -7)/5` | adversarial/plus-1e-7-x | `x/5 + 7/5 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me11-functions` d1 s7001 | prithagoras | expression | `(x - -7)/5` | adversarial/sampling-aware-degree-8 | `x/5 + 7/5 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me11-functions` d1 s7002 | prithagoras | expression | `(x - 5)/5` | adversarial/plus-1e-7-x | `x/5 - 1 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me11-functions` d1 s7002 | prithagoras | expression | `(x - 5)/5` | adversarial/sampling-aware-degree-8 | `x/5 - 1 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me11-functions` d4 s28001 | prithagoras | expression | `(x - (-10))/(6)` | adversarial/plus-1e-7-x | `x/6 + 5/3 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me11-functions` d4 s28001 | prithagoras | expression | `(x - (-10))/(6)` | adversarial/sampling-aware-degree-8 | `x/6 + 5/3 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me11-functions` d4 s28002 | prithagoras | expression | `(x - 30)/((-25))` | adversarial/plus-1e-7-x | `6/5 - x/25 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me11-functions` d4 s28002 | prithagoras | expression | `(x - 30)/((-25))` | adversarial/sampling-aware-degree-8 | `6/5 - x/25 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me11-inversetrig` d1 s7001 | prithagoras | numeric | `0` | adversarial/near-miss-abs-1e-10 | `0.0000000001` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-inversetrig` d1 s7002 | prithagoras | numeric | `1.7320508075688772` | approximation/rounded-9dp | `1.732050808` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-inversetrig` d1 s7002 | prithagoras | numeric | `1.7320508075688772` | approximation/rounded-10dp | `1.7320508076` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-inversetrig` d2 s14002 | prithagoras | numeric | `1.5707963267948966` | approximation/rounded-9dp | `1.570796327` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-inversetrig` d2 s14002 | prithagoras | numeric | `1.5707963267948966` | approximation/rounded-10dp | `1.5707963268` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-inversetrig` d4 s28001 | prithagoras | numeric | `2.356194490192345` | approximation/rounded-8dp | `2.35619449` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-inversetrig` d4 s28001 | prithagoras | numeric | `2.356194490192345` | approximation/rounded-9dp | `2.356194490` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-inversetrig` d4 s28001 | prithagoras | numeric | `2.356194490192345` | approximation/rounded-10dp | `2.3561944902` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-inversetrig` d4 s28002 | prithagoras | numeric | `0.7853981633974483` | approximation/rounded-9dp | `0.785398163` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-inversetrig` d4 s28002 | prithagoras | numeric | `0.7853981633974483` | approximation/rounded-10dp | `0.7853981634` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-trigid` d1 s7002 | prithagoras | numeric | `0.8660254037844387` | approximation/rounded-9dp | `0.866025404` | accept | NOT_EQUAL (exact-required) |  |
+| `me11-trigid` d1 s7002 | prithagoras | numeric | `0.8660254037844387` | approximation/rounded-10dp | `0.8660254038` | accept | NOT_EQUAL (exact-required) |  |
+| `me12-calc` d1 s7001 | prithagoras | expression | `3*(x^2 + 9)^3/3` | adversarial/plus-1e-7-x | `(x^2 + 9)^3 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me12-calc` d1 s7001 | prithagoras | expression | `3*(x^2 + 9)^3/3` | adversarial/plus-1e-5-x | `(x^2 + 9)^3 + 0.00001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me12-calc` d1 s7001 | prithagoras | expression | `3*(x^2 + 9)^3/3` | adversarial/sampling-aware-degree-8 | `(x^2 + 9)^3 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me12-calc` d1 s7002 | prithagoras | expression | `2*(x^2 + 9)^6/6` | adversarial/plus-1e-7-x | `(x^2 + 9)^6/3 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me12-calc` d1 s7002 | prithagoras | expression | `2*(x^2 + 9)^6/6` | adversarial/plus-1e-5-x | `(x^2 + 9)^6/3 + 0.00001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me12-calc` d1 s7002 | prithagoras | expression | `2*(x^2 + 9)^6/6` | adversarial/sampling-aware-degree-8 | `(x^2 + 9)^6/3 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `me12-calc` d3 s21001 | prithagoras | numeric | `28.274333882308138` | approximation/rounded-8dp | `28.27433388` | accept | NOT_EQUAL (exact-required) |  |
+| `me12-calc` d3 s21001 | prithagoras | numeric | `28.274333882308138` | approximation/rounded-9dp | `28.274333882` | accept | NOT_EQUAL (exact-required) |  |
+| `me12-calc` d3 s21001 | prithagoras | numeric | `28.274333882308138` | approximation/rounded-10dp | `28.2743338823` | accept | NOT_EQUAL (exact-required) |  |
+| `me12-calc` d3 s21002 | prithagoras | numeric | `1466.0765716752367` | approximation/rounded-6dp | `1466.076572` | accept | NOT_EQUAL (exact-required) |  |
+| `me12-calc` d3 s21002 | prithagoras | numeric | `1466.0765716752367` | approximation/rounded-8dp | `1466.07657168` | accept | NOT_EQUAL (exact-required) |  |
+| `me12-calc` d3 s21002 | prithagoras | numeric | `1466.0765716752367` | approximation/rounded-9dp | `1466.076571675` | accept | NOT_EQUAL (exact-required) |  |
+| `me12-calc` d3 s21002 | prithagoras | numeric | `1466.0765716752367` | approximation/rounded-10dp | `1466.0765716752` | accept | NOT_EQUAL (exact-required) |  |
+| `me12-induction` d2 s14001 | prithagoras | expression | `(k+1)(k+2)(2k+3)/6` | adversarial/plus-1e-7-x | `(k + 1)*(k + 2)*(2*k + 3)/6 + 0.0000001*k` | accept | NOT_EQUAL (counterexample:{'k': '-7/2'}) |  |
+| `me12-induction` d2 s14002 | prithagoras | expression | `3*(3^(k+1) - 1)/2` | adversarial/plus-1e-7-x | `3*3^(k + 1)/2 - 3/2 + 0.0000001*k` | accept | NOT_EQUAL (counterexample:{'k': '-7/2'}) |  |
+| `me12-induction` d3 s21001 | prithagoras | expression | `6p + 1` | adversarial/plus-1e-7-x | `6*p + 1 + 0.0000001*p` | accept | NOT_EQUAL (counterexample:{'p': '-7/2'}) |  |
+| `me12-induction` d3 s21001 | prithagoras | expression | `6p + 1` | adversarial/sampling-aware-degree-8 | `6*p + 1 + (p - (0.7))*(p - (1.3))*(p - (-0.6))*(p - (2.1))*(p - (-1.7))*(p - (0.35))*(p - (3.4))*(p - (-2.3))` | accept | NOT_EQUAL (counterexample:{'p': '-7/2'}) |  |
+| `me12-induction` d3 s21002 | prithagoras | expression | `11p + 7^k` | adversarial/plus-1e-7-x | `7^k + 11*p + 0.0000001*k` | accept | NOT_EQUAL (counterexample:{'p': '-7/2', 'k': '12/5'}) |  |
+| `me12-induction` d3 s21002 | prithagoras | expression | `11p + 7^k` | adversarial/sampling-aware-degree-8 | `7^k + 11*p + (k - (0.7))*(k - (1.3))*(k - (-0.6))*(k - (2.1))*(k - (-1.7))*(k - (0.35))*(k - (3.4))*(k - (-2.3))` | accept | NOT_EQUAL (counterexample:{'p': '-7/2', 'k': '12/5'}) |  |
+| `mex-complex` d3 s21001 | prithagoras | numeric | `4.242640687119286` | approximation/rounded-8dp | `4.24264069` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-complex` d3 s21001 | prithagoras | numeric | `4.242640687119286` | approximation/rounded-9dp | `4.242640687` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-complex` d3 s21001 | prithagoras | numeric | `4.242640687119286` | approximation/rounded-10dp | `4.2426406871` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-complex` d3 s21002 | prithagoras | numeric | `0.7853981633974483` | approximation/rounded-9dp | `0.785398163` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-complex` d3 s21002 | prithagoras | numeric | `0.7853981633974483` | approximation/rounded-10dp | `0.7853981634` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-demoivre` d2 s14001 | prithagoras | numeric | `1.0471975511965976` | approximation/rounded-9dp | `1.047197551` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-demoivre` d2 s14001 | prithagoras | numeric | `1.0471975511965976` | approximation/rounded-10dp | `1.0471975512` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-demoivre` d2 s14002 | prithagoras | numeric | `76.36753236814717` | approximation/rounded-8dp | `76.36753237` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-demoivre` d2 s14002 | prithagoras | numeric | `76.36753236814717` | approximation/rounded-9dp | `76.367532368` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-demoivre` d2 s14002 | prithagoras | numeric | `76.36753236814717` | approximation/rounded-10dp | `76.3675323681` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-demoivre` d3 s21001 | prithagoras | numeric | `1.5707963267948966` | approximation/rounded-9dp | `1.570796327` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-demoivre` d3 s21001 | prithagoras | numeric | `1.5707963267948966` | approximation/rounded-10dp | `1.5707963268` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-demoivre` d3 s21002 | prithagoras | numeric | `5.140787978601479` | approximation/rounded-8dp | `5.14078798` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-demoivre` d3 s21002 | prithagoras | numeric | `5.140787978601479` | approximation/rounded-9dp | `5.140787979` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-demoivre` d3 s21002 | prithagoras | numeric | `5.140787978601479` | approximation/rounded-10dp | `5.1407879786` | accept | NOT_EQUAL (exact-required) |  |
+| `mex-integration` d1 s7001 | prithagoras | expression | `2*e^(4*x)*((x + (-4))/4 - 1/16)` | adversarial/plus-1e-7-x | `2*(x/4 - 17/16)*e^(4*x) + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `mex-integration` d1 s7002 | prithagoras | expression | `1*e^(4*x)*((x + 3)/4 - 1/16)` | adversarial/plus-1e-7-x | `(x/4 + 11/16)*e^(4*x) + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `mex-proof` d2 s14001 | prithagoras | expression | `4*n^2 + 12*n + 9` | adversarial/plus-1e-7-x | `4*n^2 + 12*n + 9 + 0.0000001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
+| `mex-proof` d2 s14001 | prithagoras | expression | `4*n^2 + 12*n + 9` | adversarial/sampling-aware-degree-8 | `4*n^2 + 12*n + 9 + (n - (0.7))*(n - (1.3))*(n - (-0.6))*(n - (2.1))*(n - (-1.7))*(n - (0.35))*(n - (3.4))*(n - (-2.3))` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
+| `mex-proof` d2 s14002 | prithagoras | expression | `49*n^2 + 56*n + 16` | adversarial/plus-1e-7-x | `49*n^2 + 56*n + 16 + 0.0000001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
+| `mex-proof` d2 s14002 | prithagoras | expression | `49*n^2 + 56*n + 16` | adversarial/sampling-aware-degree-8 | `49*n^2 + 56*n + 16 + (n - (0.7))*(n - (1.3))*(n - (-0.6))*(n - (2.1))*(n - (-1.7))*(n - (0.35))*(n - (3.4))*(n - (-2.3))` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
+| `mex-proof` d3 s21001 | prithagoras | expression | `32*n` | adversarial/plus-1e-7-x | `32*n + 0.0000001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
+| `mex-proof` d3 s21001 | prithagoras | expression | `32*n` | adversarial/plus-1e-5-x | `32*n + 0.00001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
+| `mex-proof` d3 s21001 | prithagoras | expression | `32*n` | adversarial/sampling-aware-degree-8 | `32*n + (n - (0.7))*(n - (1.3))*(n - (-0.6))*(n - (2.1))*(n - (-1.7))*(n - (0.35))*(n - (3.4))*(n - (-2.3))` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
+| `mex-proof` d3 s21002 | prithagoras | expression | `(n + 7)^3` | adversarial/plus-1e-7-x | `(n + 7)^3 + 0.0000001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
+| `mex-proof` d3 s21002 | prithagoras | expression | `(n + 7)^3` | adversarial/plus-1e-5-x | `(n + 7)^3 + 0.00001*n` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
+| `mex-proof` d3 s21002 | prithagoras | expression | `(n + 7)^3` | adversarial/sampling-aware-degree-8 | `(n + 7)^3 + (n - (0.7))*(n - (1.3))*(n - (-0.6))*(n - (2.1))*(n - (-1.7))*(n - (0.35))*(n - (3.4))*(n - (-2.3))` | accept | NOT_EQUAL (counterexample:{'n': '-7/2'}) |  |
+| `y10-indices-neg` d1 s7001 | prithagoras | expression | `x^(2)` | adversarial/plus-1e-7-x | `x^2 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d1 s7001 | prithagoras | expression | `x^(2)` | adversarial/sampling-aware-degree-8 | `x^2 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d1 s7002 | prithagoras | expression | `x^(10)` | adversarial/plus-1e-7-x | `x^10 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d1 s7002 | prithagoras | expression | `x^(10)` | adversarial/sampling-aware-degree-8 | `x^10 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d2 s14001 | prithagoras | expression | `x^(8)` | adversarial/plus-1e-7-x | `x^8 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d2 s14001 | prithagoras | expression | `x^(8)` | adversarial/sampling-aware-degree-8 | `x^8 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d2 s14002 | prithagoras | expression | `x^(-12)` | adversarial/plus-1e-7-x | `x^(-12) + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d2 s14002 | prithagoras | expression | `x^(-12)` | adversarial/sampling-aware-degree-8 | `x^(-12) + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d3 s21001 | prithagoras | expression | `20*x^(-3)` | adversarial/plus-1e-7-x | `20/x^3 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d3 s21001 | prithagoras | expression | `20*x^(-3)` | adversarial/sampling-aware-degree-8 | `20/x^3 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d3 s21002 | prithagoras | expression | `20*x^(9)` | adversarial/plus-1e-7-x | `20*x^9 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d3 s21002 | prithagoras | expression | `20*x^(9)` | adversarial/sampling-aware-degree-8 | `20*x^9 + (x - (0.7))*(x - (1.3))*(x - (-0.6))*(x - (2.1))*(x - (-1.7))*(x - (0.35))*(x - (3.4))*(x - (-2.3))` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
+| `y10-indices-neg` d4 s28001 | prithagoras | expression | `6*x^(-4)` | adversarial/plus-1e-7-x | `6/x^4 + 0.0000001*x` | accept | NOT_EQUAL (counterexample:{'x': '-7/2'}) |  |
 
 …113 more in the JSON report.
 
@@ -153,8 +153,8 @@
 
 | Question | Edition | Type | Key | Candidate | Input | Engine | SymPy | Engine feedback |
 |---|---|---|---|---|---|---|---|---|
-| `c8-rational-numbers-strategy|3|21001` | priyabhata | numeric | `{'n': -6, 'd': 5}` | correct/negative-numerator-bracketed | `(-6)/5` | refuse | EQUAL (authored) | The last product is subtracted; keep its sign when you factor. |
-| `y7-algebra|2|14001` | prithagoras | expression | `0x + -8` | correct/expanded | `-8` | refuse | EQUAL (symbolic) |  |
+| `c8-rational-numbers-strategy` d3 s21001 | priyabhata | numeric | `{'n': -6, 'd': 5}` | correct/negative-numerator-bracketed | `(-6)/5` | refuse | EQUAL (authored) | The last product is subtracted; keep its sign when you factor. |
+| `y7-algebra` d2 s14001 | prithagoras | expression | `0x + -8` | correct/expanded | `-8` | refuse | EQUAL (symbolic) |  |
 
 ## SymPy unable: 0
 
