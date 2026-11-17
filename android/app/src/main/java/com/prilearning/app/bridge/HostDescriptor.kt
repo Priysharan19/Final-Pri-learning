@@ -29,6 +29,7 @@ object HostDescriptor {
             .put("cloud", cap("transport" to "bridge", "configured" to cloudConfigured))
             .put("share", cap("transport" to "bridge", "binary" to true, "print" to true))
             .put("billing", cap("transport" to "bridge", "store" to "google-play"))
+            .put("haptics", cap("transport" to "bridge", "kinds" to JSONArray().put("confirm").put("selection")))
         if (smsCode) capabilities.put("otp", cap("transport" to "bridge", "sms" to true))
         for ((name, value) in extra) capabilities.put(name, value)
         return JSONObject()

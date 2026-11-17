@@ -11,6 +11,7 @@ import BarSlot from './BarSlot.jsx';
 import PageLink from '../components/PageLink.jsx';
 import { practiceHref } from '../lib/practiceLinks.js';
 import { trendSentence, worstDotpoint } from './reportNarrative.js';
+import { haptic } from '../platform/native/haptics.js';
 
 // The top of the v1.1 Report (design s7): the period, a fixed-template lede
 // built from the figures, four honest figures with their change against the
@@ -221,7 +222,7 @@ export default function ReportHead() {
         </div>
         <BarSlot><div className="in-segc" role="group" aria-label={t('inst.periodGroup')} data-report-periods>
           {PERIODS.map(p => (
-            <button key={p} type="button" aria-pressed={period === p} data-report-period-btn={p} onClick={() => setPeriod(p)}>
+            <button key={p} type="button" aria-pressed={period === p} data-report-period-btn={p} onClick={() => { if (p !== period) haptic('selection'); setPeriod(p); }}>
               {p === 'week' ? t('inst.periodWeek') : p === 'month' ? t('inst.periodMonth') : t('inst.periodTerm')}
             </button>
           ))}
