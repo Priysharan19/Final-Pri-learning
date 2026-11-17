@@ -108,6 +108,8 @@ const MAX_PAGES = 4;
 export const LIVE_READ_REST_MS = 1500;
 
 /** The three things a reading can say about one line: it never says right or wrong. */
+const READ_STATE_KEY = { read: 'inst.readState.read', check: 'inst.readState.check', cant: 'inst.readState.cant' };
+const READ_STRIP_KEY = { read: 'inst.readStrip.read', check: 'inst.readStrip.check', cant: 'inst.readStrip.cant' };
 function readStateOf(line, floor) {
   if (!String(line?.text ?? '').trim()) return 'cant';
   return isLowConfidence(line, floor) ? 'check' : 'read';
@@ -671,7 +673,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                         {[0, 1, 2].map(k => <i key={k} className={k < (low ? 2 : 3) ? 'on' : undefined} />)}
                       </span>
                     )}
-                    <span className="in-read-tg">{t(`inst.readState.${state}`)}</span>
+                    <span className="in-read-tg">{t(READ_STATE_KEY[state])}</span>
                   </span>
                 </React.Fragment>
               );
@@ -746,7 +748,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
               )}
               {INSTRUMENT_PLOT && (() => {
                 const st = readStateOf(line, lineConfidenceFloor);
-                return <span className="in-state" data-read-state={st}><i aria-hidden="true" />{t(`inst.readState.${st}`)}<span className="sr-only"> {t('inst.readStateSr', { n: li + 1, state: t(`inst.readState.${st}`) })}</span></span>;
+                return <span className="in-state" data-read-state={st}><i aria-hidden="true" />{t(READ_STATE_KEY[st])}<span className="sr-only"> {t('inst.readStateSr', { n: li + 1, state: t(READ_STATE_KEY[st]) })}</span></span>;
               })()}
               <span className="ink-line-math"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
@@ -808,7 +810,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
             return (
               <div className="in-strip" role="status" aria-live="polite" data-read-strip>
                 {['read', 'check', 'cant'].map(k => n[k] > 0 && (
-                  <span key={k} className="in-strip-i" data-read-state={k}><i aria-hidden="true" />{t(`inst.readStrip.${k}`, { n: n[k] })}</span>
+                  <span key={k} className="in-strip-i" data-read-state={k}><i aria-hidden="true" />{t(READ_STRIP_KEY[k], { n: n[k] })}</span>
                 ))}
               </div>
             );
