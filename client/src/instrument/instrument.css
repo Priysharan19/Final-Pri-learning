@@ -1364,6 +1364,7 @@ html[data-pushed] .shell .main { transform: scale(var(--in-push-scale)); transfo
 @media (prefers-reduced-motion: reduce) {
   ::view-transition-group(*), ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; }
   html[data-pushed] .shell .main { transform: none; transition: none; }
+}
 
 /* ── UI2 · Index tick scales ─────────────────────────────────────────────────
    Progress as an instrument scale: one 4×10 tick per topic (8 at most). No
