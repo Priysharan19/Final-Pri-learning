@@ -1360,7 +1360,6 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
     border: 0; border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); color: var(--in-tx); font: 500 14px var(--in-ui);
   }
   .in-hintrow-next small { font: 500 11px var(--in-mono); color: var(--in-tx-3); }
-  .in-hintrow-next.is-armed { box-shadow: 0 0 0 1px var(--in-slip); }
   .in-hintsheet-scrim {
     position: fixed; inset: 0; z-index: 60; border: 0; padding: 0; background: rgba(0, 0, 0, 0.4);
   }
@@ -1370,7 +1369,7 @@ html.ui-instrument .lang-note { max-width: 420px; margin: 10px auto 0; text-alig
     border-radius: 10px 10px 0 0; box-shadow: 0 0 0 1px var(--in-edge-2);
     animation: in-hs-rise var(--in-dur-3) var(--in-ease-out);
   }
-  .in-hintsheet .hints-block { display: flex; flex-direction: column; gap: 8px; margin: 0 0 12px; }
+  .in-hintsheet .hints-block { display: grid; gap: 8px; margin: 0 0 12px; }
   .in-hintsheet-close { width: 100%; min-height: 44px; }
   .ws-more-menu { position: absolute; left: 0; bottom: 100%; z-index: 5; width: 220px; padding: 6px; border-radius: 6px; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2); }
   .ws-more-menu .btn { width: 100%; min-height: 44px; white-space: normal; }
