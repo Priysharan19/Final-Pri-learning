@@ -52,7 +52,10 @@
 // together; no single PR's version above describes the merged content.
 // 2026.11.16 — CBSE XII 2025 65/2/1 Q24, the first Section B record on the Board-scheme
 // contract (#846), restacked on Train 15.
-export const CONTENT_VERSION = '2026.11.16';
+// 2026.11.17 — Advanced Year 12 generators widened into explicit forms (direct, reverse, missing-parameter,
+// multi-step, context): y12-random-var, y12-fin-exact, y12-trig-model, y12-func-model and wider parameters in
+// y12-integral-calc; the skill, answer type and difficulty ladder of each cell are unchanged in kind.
+export const CONTENT_VERSION = '2026.11.17';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */
