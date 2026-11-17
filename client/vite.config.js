@@ -503,6 +503,66 @@ export function editionBrand(edition) {
   };
 }
 
+// An edition ships only the languages it offers (client/edition.config.mjs
+// `languages`). Prithagoras offers English only, so its build carries no Hindi
+// catalogue and no Hindi legal notices: those modules load as an empty stub
+// and the 460 kB catalogue and its sibling are never emitted, installed or
+// warmed. Nothing in such a build can select Hindi: i18n/languages.js is
+// transformed so every switch lists only the offered languages and any stored,
+// synced or typed value is clamped to them. A build that offers the
+// language is untouched, byte for byte.
+// The module files a registered language owns, by the repository's naming:
+// its string catalogue (strings.<id>.js) and its legal notices (legal<English
+// name>.js, where it has them). Derived from the registration table, so the
+// build config names no language by hand.
+const languageModules = l => [`strings.${l.id}.js`, `legal${l.english}.js`];
+export function unofferedLanguageModules(edition, languages = LANGUAGES) {
+  const offered = editionOf(edition).languages;
+  return languages.filter(l => l.load && !offered.includes(l.id)).flatMap(l => languageModules(l).map(f => `src/i18n/${f}`));
+}
+/**
+ * i18n/languages.js as an edition that offers fewer languages sees it: the
+ * switch list (LANGUAGES) and cleanLanguage cover only the offered ones, so a
+ * stored, synced or typed value naming another is English, while isLanguage
+ * and the table behind it still know every registered language (the edition
+ * table is validated against them). Every export keeps its place, so the
+ * chunks that import them are unchanged. Each edit must find its text exactly
+ * once or the build stops, so a change to languages.js cannot quietly turn the
+ * clamp off.
+ */
+export function clampLanguagesSource(code, offered) {
+  const ids = JSON.stringify([...offered]);
+  const edits = [
+    ['export const LANGUAGES = [', 'const REGISTERED_LANGUAGES = ['],
+    ['\n];\n', `\n];\nexport const LANGUAGES = REGISTERED_LANGUAGES.filter(l => ${ids}.includes(l.id));\n`],
+    ['const BY_ID = new Map(LANGUAGES.map(', 'const BY_ID = new Map(REGISTERED_LANGUAGES.map('],
+    ['export const cleanLanguage = raw => (isLanguage(raw) ? raw : DEFAULT_LANGUAGE);', `export const cleanLanguage = raw => (isLanguage(raw) && ${ids}.includes(raw) ? raw : DEFAULT_LANGUAGE);`]
+  ];
+  let out = code;
+  for (const [from, to] of edits) {
+    if (!out.includes(from)) throw new Error(`i18n/languages.js changed: cannot clamp languages to the edition (missing ${JSON.stringify(from.slice(0, 50))})`);
+    out = out.replace(from, () => to);
+  }
+  return out;
+}
+export function editionLanguages(edition) {
+  const dropped = unofferedLanguageModules(edition);
+  const offered = editionOf(edition).languages;
+  return {
+    name: 'pri-edition-languages',
+    enforce: 'pre',
+    load(id) {
+      const clean = id.split('?')[0].replace(/\\/g, '/');
+      if (dropped.some(rel => clean.endsWith(`/${rel}`))) return 'export default {};\n';
+      return null;
+    },
+    transform(code, id) {
+      if (!dropped.length || !id.split('?')[0].replace(/\\/g, '/').endsWith('/src/i18n/languages.js')) return null;
+      return { code: clampLanguagesSource(code, offered), map: null };
+    }
+  };
+}
+
 // The app's own edition record (plan E2). client/src/platform/edition-record.js
 // is the one module that reads the edition table; a build or dev server loads
 // this edition's record in its place, so a bundle knows its own edition's
@@ -627,7 +687,7 @@ export default defineConfig(({ command }) => {
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
       __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
     },
-    plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), editionBrand(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
+    plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), editionBrand(featureStates(command).edition), editionLanguages(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
     build: {
       outDir: 'dist',
