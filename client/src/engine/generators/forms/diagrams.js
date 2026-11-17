@@ -179,13 +179,15 @@ function niceStep(span, target = 6) {
  * `segments` are [i, j] index pairs. Ticks are labelled at multiples of a nice step, and the
  * zero tick is labelled O once.
  */
-export function coordPlane({ points = [], segments = [], polygon = false, curves = [], circles = [], equal = curves.length === 0 }) {
+export function coordPlane({ points = [], segments = [], polygon = false, curves = [], circles = [], lines = [], equal = curves.length === 0 }) {
   const cv = new Canvas();
   const SAMPLES = 80;
   const sampled = curves.map(c => Array.from({ length: SAMPLES + 1 }, (_, i) => { const x = c.x0 + ((c.x1 - c.x0) * i) / SAMPLES; return [x, c.fn(x)]; }));
   const extra = sampled.flat();
-  const xs = [0, ...points.map(p => p.x), ...extra.map(q => q[0]), ...circles.flatMap(c => [c.cx - c.r, c.cx + c.r])];
-  const ys = [0, ...points.map(p => p.y), ...extra.map(q => q[1]), ...circles.flatMap(c => [c.cy - c.r, c.cy + c.r])];
+  // A line ax + by + c = 0 adds its intercepts to the window, so the part that matters is on the page.
+  const icpts = lines.flatMap(l => [l.b !== 0 ? [0, -l.c / l.b] : null, l.a !== 0 ? [-l.c / l.a, 0] : null].filter(Boolean));
+  const xs = [0, ...points.map(p => p.x), ...extra.map(q => q[0]), ...circles.flatMap(c => [c.cx - c.r, c.cx + c.r]), ...icpts.map(q => q[0])];
+  const ys = [0, ...points.map(p => p.y), ...extra.map(q => q[1]), ...circles.flatMap(c => [c.cy - c.r, c.cy + c.r]), ...icpts.map(q => q[1])];
   const xMin = Math.min(...xs), xMax = Math.max(...xs), yMin = Math.min(...ys), yMax = Math.max(...ys);
   const padX = (xMax - xMin) * 0.12 || 1, padY = (yMax - yMin) * 0.12 || 1;
   const x0 = xMin - padX, x1 = xMax + padX, y0 = yMin - padY, y1 = yMax + padY;
@@ -218,13 +220,21 @@ export function coordPlane({ points = [], segments = [], polygon = false, curves
     if (c.label) { const q = pts[Math.round(SAMPLES * 0.85)]; cv.label(q[0] + 10, q[1] - 8, c.label, { dx: 1, dy: -1, size: 12, style: 'italic' }); }
   });
   for (const c of circles) { cv.circle(px(c.cx), py(c.cy), c.r * sc); if (c.centre) cv.dot(px(c.cx), py(c.cy)); }
+  const linePx = [];
+  for (const l of lines) {
+    // clip ax + by + c = 0 to the window: take the two ends on the window's border
+    const ends = [];
+    if (l.b !== 0) for (const x of [x0, x1]) { const y = -(l.a * x + l.c) / l.b; if (y >= y0 - 1e-9 && y <= y1 + 1e-9) ends.push([x, y]); }
+    if (l.a !== 0) for (const y of [y0, y1]) { const x = -(l.b * y + l.c) / l.a; if (x >= x0 - 1e-9 && x <= x1 + 1e-9 && !ends.some(e => Math.abs(e[0] - x) < 1e-9 && Math.abs(e[1] - y) < 1e-9)) ends.push([x, y]); }
+    if (ends.length >= 2) { cv.line(px(ends[0][0]), py(ends[0][1]), px(ends[1][0]), py(ends[1][1]), { stroke: ACCENT }); linePx.push({ l, a: [px(ends[0][0]), py(ends[0][1])], b: [px(ends[1][0]), py(ends[1][1])] }); if (l.label) { const q = [px(ends[1][0]), py(ends[1][1])]; cv.label(q[0] - 6, q[1] - 6, l.label, { dx: -1, dy: -1, size: 12, style: 'italic', anchor: 'end' }); } }
+  }
   const cx = points.length ? points.reduce((s, p) => s + p.x, 0) / points.length : 0, cy = points.length ? points.reduce((s, p) => s + p.y, 0) / points.length : 0;
   for (const p of points) {
     cv.dot(px(p.x), py(p.y));
     const vx = p.x - cx, vy = p.y - cy, l = Math.hypot(vx, vy) || 1;
     cv.label(px(p.x) + (vx / l) * 16, py(p.y) - (vy / l) * 14 + 4, p.label, { dx: vx / l, dy: -vy / l, accent: p.accent });
   }
-  return cv.out('Coordinate plane', { px: { origin: [px(0), py(0)] }, origin: [px(0), py(0)], scale: sc, points: points.map(p => ({ ...p, X: px(p.x), Y: py(p.y) })), curves: curvePx, circles: circles.map(c => ({ ...c, X: px(c.cx), Y: py(c.cy), R: c.r * sc })), scaleY: scY, equal, ticks, step, stepY, win: { x0, x1, y0, y1 } });
+  return cv.out('Coordinate plane', { px: { origin: [px(0), py(0)] }, origin: [px(0), py(0)], scale: sc, points: points.map(p => ({ ...p, X: px(p.x), Y: py(p.y) })), curves: curvePx, circles: circles.map(c => ({ ...c, X: px(c.cx), Y: py(c.cy), R: c.r * sc })), lines: linePx, scaleY: scY, equal, ticks, step, stepY, win: { x0, x1, y0, y1 } });
 }
 
 // ── mensuration ──────────────────────────────────────────────────────────────
@@ -534,4 +544,25 @@ export function perpBisectorFigure({ ab, pa, shown = {} }) {
   if (shown.pa != null) cv.label((P[0] + A[0]) / 2 - 8, (P[1] + A[1]) / 2, lab(shown.pa), { dx: -1, anchor: 'end', accent: unk(shown.pa) });
   if (shown.pb != null) cv.label((P[0] + B[0]) / 2 + 8, (P[1] + B[1]) / 2, lab(shown.pb), { dx: 1, anchor: 'start', accent: unk(shown.pb) });
   return cv.out('Point on the perpendicular bisector of a segment', { A, B, M, P, scale: sc, ab, pa });
+}
+
+/** Grouped bars (several series per group) from the zero baseline; groups labelled, series named in a legend. */
+export function groupedBars({ groups, series }) {
+  const cv = new Canvas();
+  const max = Math.max(...groups.flatMap(g => g.values)), step = niceStep(max, 5), top = Math.ceil(max / step) * step, plotH = H - 2 * PAD - 30, x0 = PAD + 22, plotW = W - x0 - PAD;
+  const y = v => H - PAD - 16 - (v / top) * plotH;
+  cv.line(x0, y(0), x0 + plotW, y(0)); cv.line(x0, y(0), x0, y(top));
+  const ticks = [];
+  for (let v = 0; v <= top + 1e-9; v += step) { cv.line(x0 - 3, y(v), x0, y(v)); cv.label(x0 - 6, y(v) + 4, String(N(v)), { dx: -1, size: 11, anchor: 'end' }); ticks.push(N(v)); }
+  const gw = plotW / groups.length, bw = (gw * 0.7) / series.length, rects = [];
+  groups.forEach((g, gi) => {
+    g.values.forEach((v, si) => {
+      const bx = x0 + gw * gi + gw * 0.15 + bw * si, by = y(v);
+      cv.poly([[bx, by], [bx + bw, by], [bx + bw, y(0)], [bx, y(0)]], { fill: si === 0 ? ACCENT : undefined });
+      rects.push({ g: gi, s: si, x: bx, y: by, w: bw, h: y(0) - by, value: v });
+    });
+    cv.label(x0 + gw * gi + gw / 2, y(0) + 16, g.label, { dy: 1, size: 11 });
+  });
+  cv.label(W - PAD - 4, PAD - 8, series.join(' / '), { size: 11, anchor: 'end' });
+  return cv.out('Grouped bar chart', { baseline: y(0), top, ticks, rects, series });
 }
