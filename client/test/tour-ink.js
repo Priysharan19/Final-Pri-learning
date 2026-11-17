@@ -315,6 +315,13 @@ export const flow = {
     await page.waitForTimeout(2500);
     const markedByItself = await page.locator('.eval-card').count();
     const callsBeforeSubmit = reader.requests.length;
+    // P0 #11: a reading is confirmed before it is sent. The whole recognised
+    // answer is on screen, the primary is the one combined tap, and nothing has
+    // been sent to be marked yet.
+    await check('a read answer is confirmed first: the whole reading is on screen and the primary reads "Confirm and submit"',
+      await page.locator('[data-confirm-reading], .ink-line').count() > 0 && await page.getByRole('button', { name: /^Confirm and submit/ }).count() === 1,
+      `buttons ${JSON.stringify(await page.locator('.ws-actions .btn-primary').allInnerTexts())}`);
+    await check('nothing is sent to be marked before the confirming tap', (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === 0);
     await page.getByRole('button', SUBMIT).click();
     await page.waitForSelector('.eval-card', { timeout: 20000 }).catch(async () => {
       if (await confirm.count()) {
@@ -474,6 +481,11 @@ export const flow = {
       `${reader.requests.length - readsBeforeCorrection} extra request(s)`);
     await check('Submit is now a plain submit: the engine marks what the student wrote',
       await page.getByRole('button', SUBMIT).count() === 1 && await page.getByRole('button', { name: 'Check this reading first' }).count() === 0);
+    // The edit changed the reading, so it is confirmed again: nothing is sent
+    // until the tap, and what is sent is the edited reading.
+    const submitsBeforeEditedTap = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length;
+    await check('an edited reading is confirmed again: the primary reads "Confirm and submit" and nothing was sent by the edit',
+      await page.getByRole('button', { name: /^Confirm and submit/ }).count() === 1 && (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === submitsBeforeEditedTap);
     await page.getByRole('button', SUBMIT).click();
     await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 20000 });
     // Who decides: the server's deterministic engine, on what the STUDENT said
