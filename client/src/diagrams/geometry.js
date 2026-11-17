@@ -554,3 +554,152 @@ export function riemannModel({ expr = 'x^2', a = 0, b = 3, n = 6, mode = 'left',
   return { frame, expr, a, b, n, mode, width: r3(w, 6), sum: r3(sum, 4), area: r3(ref, 4), error: r3(Math.abs(sum - ref), 4), rects: heights.map((hv, i) => ({ x: r3(a + i * w, 6), height: r3(hv, 6), x1: frame.sx(a + i * w), x2: frame.sx(a + (i + 1) * w), y: frame.sy(Math.max(0, hv)), base: frame.sy(0) })),
     curve: sampleSegments(f, frame.xmin, frame.xmax, { ymin: frame.ymin, ymax: frame.ymax }).map(s => s.map(([x, y]) => [frame.sx(x), frame.sy(y)])), xTicks: niceTicks(frame.xmin, frame.xmax, 8).map(v => ({ value: v, px: frame.sx(v) })), yTicks: niceTicks(frame.ymin, frame.ymax, 6).map(v => ({ value: v, px: frame.sy(v) })) };
 }
+
+// ── Networks: paths, trees, flow and activity networks ───────────────────────
+/**
+ * A network drawn from node positions (any units) and weighted edges. `path` is a list of
+ * node ids; the edges between consecutive ids are the highlighted route, and `pathWeight` is
+ * their total. Edge labels default to the weight; a `label` overrides it (for example a flow
+ * written as 7/10). Edges stop at the node circle so a directed arrowhead is visible.
+ */
+export function networkModel({ nodes, edges, path = [], directed = false, width = 480, height = 300 } = {}) {
+  if (!Array.isArray(nodes) || !nodes.length) throw new RangeError('network needs nodes');
+  const byId = new Map(nodes.map(n => [n.id, n]));
+  if (byId.size !== nodes.length) throw new RangeError('network node ids must be distinct');
+  for (const e of edges || []) if (!byId.has(e.from) || !byId.has(e.to)) throw new RangeError(`network edge ${e.from}-${e.to} names a missing node`);
+  const xs = nodes.map(n => n.x); const ys = nodes.map(n => n.y);
+  const R = 17; const pad = 40;
+  const spanX = Math.max(...xs) - Math.min(...xs) || 1; const spanY = Math.max(...ys) - Math.min(...ys) || 1;
+  const scale = Math.min((width - 2 * pad) / spanX, (height - 2 * pad) / spanY);
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2; const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+  const at = n => [r3(width / 2 + (n.x - cx) * scale), r3(height / 2 - (n.y - cy) * scale)];
+  const pos = new Map(nodes.map(n => [n.id, at(n)]));
+  const steps = new Set();
+  for (let i = 0; i + 1 < path.length; i++) { steps.add(`${path[i]}>${path[i + 1]}`); if (!directed) steps.add(`${path[i + 1]}>${path[i]}`); }
+  let pathWeight = 0; let pathOk = path.length > 1;
+  for (let i = 0; i + 1 < path.length; i++) {
+    const e = (edges || []).find(k => (k.from === path[i] && k.to === path[i + 1]) || (!directed && k.from === path[i + 1] && k.to === path[i]));
+    if (!e) pathOk = false; else pathWeight += Number(e.weight) || 0;
+  }
+  const outEdges = (edges || []).map(e => {
+    const a = pos.get(e.from); const b = pos.get(e.to);
+    const dx = b[0] - a[0]; const dy = b[1] - a[1]; const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len; const uy = dy / len;
+    const start = [r3(a[0] + ux * R), r3(a[1] + uy * R)]; const end = [r3(b[0] - ux * (R + (directed ? 3 : 0))), r3(b[1] - uy * (R + (directed ? 3 : 0)))];
+    const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    // The label sits beside the edge, on the side away from the network's centre.
+    let nx = -uy; let ny = ux;
+    if ((mid[0] + nx - width / 2) * nx + (mid[1] + ny - height / 2) * ny < 0) { nx = -nx; ny = -ny; }
+    const label = e.label ?? (e.weight === undefined ? null : String(e.weight));
+    return { from: e.from, to: e.to, weight: e.weight ?? null, label, start, end, labelAt: [r3(mid[0] + nx * 13), r3(mid[1] + ny * 13)], inPath: steps.has(`${e.from}>${e.to}`) };
+  });
+  const degree = Object.fromEntries(nodes.map(n => [n.id, 0]));
+  for (const e of edges || []) { degree[e.from] += 1; degree[e.to] += 1; }
+  return {
+    width, height, directed, radius: R,
+    nodes: nodes.map(n => ({ id: n.id, label: n.label ?? n.id, px: pos.get(n.id), degree: degree[n.id], onPath: path.includes(n.id) })),
+    edges: outEdges, path: [...path], pathWeight: r3(pathWeight, 6), pathOk
+  };
+}
+
+// ── Bivariate data: scatterplot with an optional line of best fit ────────────
+/** Least squares of y on x, and Pearson's r. Throws when x does not vary. */
+export function leastSquares(points) {
+  const n = points.length;
+  if (n < 2) throw new RangeError('scatter needs at least two points');
+  const mx = points.reduce((s, p) => s + p[0], 0) / n; const my = points.reduce((s, p) => s + p[1], 0) / n;
+  let sxx = 0; let syy = 0; let sxy = 0;
+  for (const [x, y] of points) { sxx += (x - mx) ** 2; syy += (y - my) ** 2; sxy += (x - mx) * (y - my); }
+  if (sxx === 0) throw new RangeError('x does not vary');
+  const m = sxy / sxx;
+  return { n, meanX: mx, meanY: my, m, c: my - m * mx, r: syy === 0 ? 0 : sxy / Math.sqrt(sxx * syy) };
+}
+export function scatterModel({ points, line = null, xmin = null, xmax = null, ymin = null, ymax = null, width = 480, height = 320 } = {}) {
+  if (!Array.isArray(points) || points.length < 2) throw new RangeError('scatter needs at least two points');
+  const xs = points.map(p => p[0]); const ys = points.map(p => p[1]);
+  const span = (lo, hi) => { const d = (hi - lo) || 1; return [lo - d * 0.08, hi + d * 0.08]; };
+  const [ax0, ax1] = span(Math.min(...xs), Math.max(...xs)); const [ay0, ay1] = span(Math.min(...ys), Math.max(...ys));
+  const X0 = xmin ?? Math.floor(ax0); const X1 = xmax ?? Math.ceil(ax1); const Y0 = ymin ?? Math.floor(ay0); const Y1 = ymax ?? Math.ceil(ay1);
+  const frame = makeFrame({ xmin: X0, xmax: X1, ymin: Y0, ymax: Y1, width, height, pad: { l: 52, b: 40 } });
+  const fit = line === 'fit' ? leastSquares(points) : null;
+  const ln = fit ? { m: fit.m, c: fit.c } : (line && typeof line === 'object' ? line : null);
+  let segment = null;
+  if (ln) {
+    const ends = [frame.xmin, frame.xmax].map(x => [x, ln.m * x + ln.c]);
+    // Clip the line to the plot's y range.
+    const clipped = [];
+    for (const [x, y] of ends) clipped.push([x, y]);
+    const [p, q] = clipped;
+    let t0 = 0; let t1 = 1; const dy = q[1] - p[1];
+    if (dy !== 0) {
+      const ta = (frame.ymin - p[1]) / dy; const tb = (frame.ymax - p[1]) / dy;
+      t0 = Math.max(0, Math.min(ta, tb)); t1 = Math.min(1, Math.max(ta, tb));
+    } else if (p[1] < frame.ymin || p[1] > frame.ymax) { t0 = 1; t1 = 0; }
+    if (t0 < t1) segment = [[r3(frame.sx(p[0] + (q[0] - p[0]) * t0)), r3(frame.sy(p[1] + dy * t0))], [r3(frame.sx(p[0] + (q[0] - p[0]) * t1)), r3(frame.sy(p[1] + dy * t1))]];
+  }
+  return {
+    frame, n: points.length, points: points.map(([x, y]) => ({ x, y, px: [frame.sx(x), frame.sy(y)] })),
+    xTicks: niceTicks(frame.xmin, frame.xmax, 6).map(v => ({ value: v, px: frame.sx(v) })), yTicks: niceTicks(frame.ymin, frame.ymax, 6).map(v => ({ value: v, px: frame.sy(v) })),
+    line: ln ? { m: r3(ln.m, 6), c: r3(ln.c, 6), segment, fitted: !!fit } : null, r: fit ? r3(fit.r, 4) : null, meanX: fit ? r3(fit.meanX, 4) : null, meanY: fit ? r3(fit.meanY, 4) : null
+  };
+}
+
+// ── Solids: an oblique drawing with the measurements marked ─────────────────
+/**
+ * Prisms, cylinders, cones, spheres and pyramids in cabinet projection (the depth axis is drawn at
+ * 45° and half length). Hidden edges are separate dashed paths. `volume` is exact for the
+ * stated measurements, so the picture's words can state it.
+ */
+export function solidModel({ shape = 'rectPrism', l = 4, w = 3, h = 3, r = 2, width = 420, height = 300 } = {}) {
+  const k = Math.SQRT1_2 * 0.5;
+  const out = { shape, width, height, solid: [], hidden: [], marks: [], labels: [], volume: 0 };
+  const fit = (bw, bh) => Math.min((width - 90) / bw, (height - 70) / bh);
+  const P = (s, ox, oy) => (x, y) => [r3(ox + x * s), r3(oy - y * s)];
+  if (shape === 'rectPrism' || shape === 'pyramid') {
+    const dx = w * k; const dy = w * k; // depth offset in model units
+    const s = fit(l + dx, h + dy); const ox = (width - (l + dx) * s) / 2; const oy = height - 34;
+    const p = P(s, ox, oy);
+    const A = p(0, 0); const B = p(l, 0); const Cc = p(l + dx, dy); const D = p(dx, dy); // base: front-left, front-right, back-right, back-left
+    if (shape === 'rectPrism') {
+      const At = p(0, h); const Bt = p(l, h); const Ct = p(l + dx, h + dy); const Dt = p(dx, h + dy);
+      out.solid.push([A, B, Bt, At, A], [At, Dt, Ct, Bt], [B, Cc, Ct]);
+      out.hidden.push([A, D, Dt], [D, Cc]);
+      out.labels.push({ tex: String(l), at: [r3((A[0] + B[0]) / 2), r3(A[1] + 16)] }, { tex: String(h), at: [r3(A[0] - 14), r3((A[1] + At[1]) / 2)] }, { tex: String(w), at: [r3((B[0] + Cc[0]) / 2 + 14), r3((B[1] + Cc[1]) / 2 + 4)] });
+      out.volume = r3(l * w * h, 6);
+    } else {
+      const apex = p(l / 2 + dx / 2, h + dy / 2);
+      out.solid.push([A, B, Cc], [B, apex], [A, apex], [Cc, apex]);
+      out.hidden.push([A, D, Cc], [D, apex]);
+      const base = p(l / 2 + dx / 2, dy / 2);
+      out.marks.push({ kind: 'dash', from: apex, to: base });
+      out.labels.push({ tex: String(l), at: [r3((A[0] + B[0]) / 2), r3(A[1] + 16)] }, { tex: String(w), at: [r3((B[0] + Cc[0]) / 2 + 14), r3((B[1] + Cc[1]) / 2 + 4)] }, { tex: String(h), at: [r3(apex[0] + 14), r3((apex[1] + base[1]) / 2)] });
+      out.volume = r3((l * w * h) / 3, 6);
+    }
+  } else if (shape === 'cylinder' || shape === 'cone') {
+    const ry = r * 0.35; const s = fit(2 * r, h + 2 * ry); const cx = width / 2; const by = height - 34 - ry * s;
+    const ell = (cy, from, to) => { const pts = []; for (let i = 0; i <= 40; i++) { const a = from + ((to - from) * i) / 40; pts.push([r3(cx + Math.cos(a) * r * s), r3(cy + Math.sin(a) * ry * s)]); } return pts; };
+    const topY = by - h * s;
+    out.solid.push(ell(by, 0, Math.PI)); // the near half of the base
+    out.hidden.push(ell(by, Math.PI, 2 * Math.PI));
+    if (shape === 'cylinder') {
+      out.solid.push(ell(topY, 0, 2 * Math.PI), [[r3(cx - r * s), r3(by)], [r3(cx - r * s), r3(topY)]], [[r3(cx + r * s), r3(by)], [r3(cx + r * s), r3(topY)]]);
+      out.marks.push({ kind: 'dash', from: [r3(cx), r3(topY)], to: [r3(cx + r * s), r3(topY)] });
+      out.labels.push({ tex: String(r), at: [r3(cx + (r * s) / 2), r3(topY - 12)] }, { tex: String(h), at: [r3(cx + r * s + 16), r3((by + topY) / 2)] });
+      out.volume = r3(Math.PI * r * r * h, 6);
+    } else {
+      out.solid.push([[r3(cx - r * s), r3(by)], [r3(cx), r3(topY)]], [[r3(cx + r * s), r3(by)], [r3(cx), r3(topY)]]);
+      out.marks.push({ kind: 'dash', from: [r3(cx), r3(topY)], to: [r3(cx), r3(by)] }, { kind: 'dash', from: [r3(cx), r3(by)], to: [r3(cx + r * s), r3(by)] });
+      out.labels.push({ tex: String(h), at: [r3(cx - 14), r3((by + topY) / 2)] }, { tex: String(r), at: [r3(cx + (r * s) / 2), r3(by + 14)] });
+      out.volume = r3((Math.PI * r * r * h) / 3, 6);
+    }
+  } else if (shape === 'sphere') {
+    const s = fit(2 * r, 2 * r); const cx = width / 2; const cy = height / 2;
+    const circle = []; for (let i = 0; i <= 60; i++) { const a = (2 * Math.PI * i) / 60; circle.push([r3(cx + Math.cos(a) * r * s), r3(cy + Math.sin(a) * r * s)]); }
+    const eq = (from, to) => { const pts = []; for (let i = 0; i <= 30; i++) { const a = from + ((to - from) * i) / 30; pts.push([r3(cx + Math.cos(a) * r * s), r3(cy + Math.sin(a) * r * s * 0.3)]); } return pts; };
+    out.solid.push(circle, eq(0, Math.PI)); out.hidden.push(eq(Math.PI, 2 * Math.PI));
+    out.marks.push({ kind: 'dash', from: [r3(cx), r3(cy)], to: [r3(cx + r * s), r3(cy)] });
+    out.labels.push({ tex: String(r), at: [r3(cx + (r * s) / 2), r3(cy - 13)] });
+    out.volume = r3((4 / 3) * Math.PI * r ** 3, 6);
+  } else throw new RangeError(`unknown solid ${shape}`);
+  return out;
+}

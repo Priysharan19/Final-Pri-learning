@@ -14,7 +14,7 @@ import './diagrams.css';
 import {
   functionGraphModel, unitCircleModel, triangleModel, regularPolygonModel, circleTheoremModel, numberLineModel, treeModel, vennModel,
   twoWayModel, histogramModel, boxPlotModel, normalCurveModel, vectorModel, sequenceModel, compoundModel, timelineModel,
-  secantTangentModel, riemannModel, ftex, ftext, r3
+  secantTangentModel, riemannModel, networkModel, scatterModel, solidModel, ftex, ftext, r3
 } from './geometry.js';
 
 const poly = pts => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x} ${y}`).join(' ');
@@ -384,6 +384,73 @@ export function RiemannRectangles({ title = 'Riemann rectangles', caption = null
       {m.curve.map((s, i) => <path key={i} className="dg-curve is-primary" d={poly(s)} fill="none" />)}
       <Tex x={f.right - 6} y={f.top + 10} tex={`\\text{sum}=${m.sum}`} w={140} anchor="end" className="dg-small" />
       <Tex x={f.right - 6} y={f.top + 30} tex={`\\text{area}=${m.area}`} w={140} anchor="end" className="dg-small" />
+    </Figure>
+  );
+}
+
+// ── Networks ─────────────────────────────────────────────────────────────────
+export function Network({ nodes, edges, path = [], directed = false, title = 'A network', caption = null }) {
+  const m = networkModel({ nodes, edges, path, directed });
+  const desc = sentence(
+    `A ${directed ? 'directed ' : ''}network of ${m.nodes.length} nodes and ${m.edges.length} edges.`,
+    m.edges.map(e => `${e.from} ${directed ? 'to' : 'joined to'} ${e.to}${e.label ? `, ${e.label.replace(/[\\${}]/g, '')}` : ''}.`).join(' '),
+    m.path.length > 1 && m.pathOk ? `The route ${m.path.join(', ')} is highlighted${m.edges.every(e => e.weight !== null) ? `, with total ${m.pathWeight}` : ''}.` : ''
+  );
+  return (
+    <Figure width={m.width} height={m.height} title={title} description={desc} caption={caption}>
+      <Defs />
+      {m.edges.map((e, i) => (
+        <g key={i}>
+          <line className={`dg-edge${e.inPath ? ' is-path' : ''}`} x1={e.start[0]} y1={e.start[1]} x2={e.end[0]} y2={e.end[1]} markerEnd={directed ? 'url(#dg-arrow)' : undefined} />
+          {e.label && <Tex x={e.labelAt[0]} y={e.labelAt[1]} tex={e.label} w={56} h={20} className={e.inPath ? 'is-mark' : ''} />}
+        </g>
+      ))}
+      {m.nodes.map(n => (
+        <g key={n.id}>
+          <circle className={`dg-node${n.onPath ? ' is-path' : ''}`} cx={n.px[0]} cy={n.px[1]} r={m.radius} />
+          <Tex x={n.px[0]} y={n.px[1]} tex={n.label} w={32} h={22} className="dg-vertex" />
+        </g>
+      ))}
+    </Figure>
+  );
+}
+
+// ── Bivariate data ───────────────────────────────────────────────────────────
+export function Scatter({ points, line = null, xLabel = 'x', yLabel = 'y', title = 'A scatterplot', caption = null, ...range }) {
+  const m = scatterModel({ points, line, ...range });
+  const f = m.frame;
+  const desc = sentence(
+    `A scatterplot of ${m.n} points: ${m.points.map(p => `(${p.x}, ${p.y})`).join(', ')}.`,
+    m.line ? `A line ${m.line.fitted ? 'of best fit (least squares) ' : ''}with gradient ${m.line.m} and y-intercept ${m.line.c} is drawn.` : '',
+    m.r !== null ? `The correlation coefficient is ${m.r}.` : ''
+  );
+  return (
+    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+      <Defs />
+      {m.xTicks.map(t => <g key={`x${t.value}`}><line className="dg-grid" x1={t.px} x2={t.px} y1={f.top} y2={f.bottom} /><Tex x={t.px} y={f.bottom + 14} tex={String(t.value)} w={40} h={20} /></g>)}
+      {m.yTicks.map(t => <g key={`y${t.value}`}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={String(t.value)} w={40} h={20} anchor="end" /></g>)}
+      <line className="dg-axis" x1={f.left} y1={f.bottom} x2={f.right + 6} y2={f.bottom} markerEnd="url(#dg-arrow)" />
+      <line className="dg-axis" x1={f.left} y1={f.bottom} x2={f.left} y2={f.top - 6} markerEnd="url(#dg-arrow)" />
+      <Tex x={(f.left + f.right) / 2} y={f.bottom + 30} tex={xLabel} w={140} h={20} />
+      <Tex x={f.left + 8} y={f.top - 4} tex={yLabel} w={140} h={20} anchor="start" />
+      {m.line?.segment && <line className="dg-curve is-secant" x1={m.line.segment[0][0]} y1={m.line.segment[0][1]} x2={m.line.segment[1][0]} y2={m.line.segment[1][1]} style={{ strokeDasharray: 'none' }} />}
+      {m.points.map((p, i) => <circle key={i} className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" />)}
+    </Figure>
+  );
+}
+
+// ── Solids ───────────────────────────────────────────────────────────────────
+const SOLID_NAME = { rectPrism: 'rectangular prism', cylinder: 'cylinder', cone: 'cone', sphere: 'sphere', pyramid: 'rectangular pyramid' };
+export function Solid({ title = null, caption = null, ...spec }) {
+  const m = solidModel(spec);
+  const dims = { rectPrism: `length ${spec.l ?? 4}, width ${spec.w ?? 3}, height ${spec.h ?? 3}`, pyramid: `base ${spec.l ?? 4} by ${spec.w ?? 3}, height ${spec.h ?? 3}`, cylinder: `radius ${spec.r ?? 2}, height ${spec.h ?? 3}`, cone: `radius ${spec.r ?? 2}, height ${spec.h ?? 3}`, sphere: `radius ${spec.r ?? 2}` }[m.shape];
+  const desc = `A ${SOLID_NAME[m.shape]}: ${dims}. Its volume is ${r3(m.volume, 2)} cubic units.`;
+  return (
+    <Figure width={m.width} height={m.height} title={title || `A ${SOLID_NAME[m.shape]}`} description={desc} caption={caption} className="dg-square">
+      {m.hidden.map((pts, i) => <path key={`h${i}`} className="dg-hidden" d={poly(pts)} />)}
+      {m.solid.map((pts, i) => <path key={`s${i}`} className="dg-solid" d={poly(pts)} />)}
+      {m.marks.map((k, i) => <line key={`m${i}`} className="dg-hidden is-mark" x1={k.from[0]} y1={k.from[1]} x2={k.to[0]} y2={k.to[1]} />)}
+      {m.labels.map((l, i) => <Tex key={`l${i}`} x={l.at[0]} y={l.at[1]} tex={l.tex} w={44} h={20} className="dg-small" />)}
     </Figure>
   );
 }

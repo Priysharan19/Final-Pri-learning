@@ -6,14 +6,15 @@
 import React from 'react';
 import {
   FunctionGraph, TrigGraph, UnitCircle, Triangle, RegularPolygon, CircleTheorem, NumberLine, TreeDiagram, VennDiagram, ProbabilityTable,
-  Histogram, BoxPlot, NormalCurve, VectorDiagram, SequenceDiagram, CompoundGrowth, Timeline, SecantTangent, RiemannRectangles
+  Histogram, BoxPlot, NormalCurve, VectorDiagram, SequenceDiagram, CompoundGrowth, Timeline, SecantTangent, RiemannRectangles,
+  Network, Scatter, Solid
 } from './Diagram.jsx';
 import { TransformSliders, UnitCircleDrag, SecantToTangent, RiemannSlider, NormalAreaByZ, CompoundInterestExplorer } from './Interactive.jsx';
 
 export const STATIC_KINDS = Object.freeze({
   function: FunctionGraph, trig: TrigGraph, unitCircle: UnitCircle, triangle: Triangle, polygon: RegularPolygon, circleTheorem: CircleTheorem,
   numberLine: NumberLine, tree: TreeDiagram, venn: VennDiagram, table: ProbabilityTable, histogram: Histogram, boxPlot: BoxPlot, normal: NormalCurve,
-  vector: VectorDiagram, sequence: SequenceDiagram, compound: CompoundGrowth, timeline: Timeline, secantTangent: SecantTangent, riemann: RiemannRectangles
+  vector: VectorDiagram, sequence: SequenceDiagram, compound: CompoundGrowth, timeline: Timeline, secantTangent: SecantTangent, riemann: RiemannRectangles, network: Network, scatter: Scatter, solid: Solid
 });
 export const INTERACTIVE_KINDS = Object.freeze({
   transform: TransformSliders, unitCircleDrag: UnitCircleDrag, secantToTangent: SecantToTangent, riemannSlider: RiemannSlider, normalZ: NormalAreaByZ, compoundExplorer: CompoundInterestExplorer

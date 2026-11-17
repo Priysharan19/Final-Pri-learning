@@ -161,6 +161,20 @@ const throws = (fn, label) => { let t = false; try { fn(); } catch { t = true; }
   ok(bounds.sum < bounds.area && g.riemannModel({ expr: 'x^2', a: 0, b: 3, n: 6, mode: 'right' }).sum > bounds.area, 'for an increasing function the left sum is below the area and the right sum above');
   ok(bounds.rects.length === 6 && near(bounds.rects[3].height, 2.25), 'the fourth rectangle has height f(1.5) = 2.25');
 }
+// Networks, scatterplots and solids, by hand
+{
+  const n = g.networkModel({ nodes: [{ id: 'A', x: 0, y: 0 }, { id: 'B', x: 4, y: 2 }, { id: 'C', x: 4, y: -2 }, { id: 'D', x: 8, y: 0 }], edges: [{ from: 'A', to: 'B', weight: 5 }, { from: 'A', to: 'C', weight: 3 }, { from: 'B', to: 'D', weight: 4 }, { from: 'C', to: 'D', weight: 6 }], path: ['A', 'B', 'D'] });
+  eq([n.pathWeight, n.pathOk, n.nodes.map(v => v.degree), n.edges.filter(e => e.inPath).length], [9, true, [2, 2, 2, 2], 2], 'network: route A-B-D weighs 5 + 4 = 9, every node has degree 2, two edges are on the route');
+  eq(g.networkModel({ nodes: [{ id: 'A', x: 0, y: 0 }, { id: 'B', x: 4, y: 2 }, { id: 'C', x: 4, y: -2 }, { id: 'D', x: 8, y: 0 }], edges: [{ from: 'A', to: 'B', weight: 5 }, { from: 'A', to: 'C', weight: 3 }, { from: 'B', to: 'D', weight: 4 }, { from: 'C', to: 'D', weight: 6 }], path: ['A', 'D'] }).pathOk, false, 'a route that is not made of edges is flagged, not summed');
+  throws(() => g.networkModel({ nodes: [{ id: 'A', x: 0, y: 0 }], edges: [{ from: 'A', to: 'Z', weight: 1 }] }), 'an edge to a missing node is refused');
+  const s = g.scatterModel({ points: [[1, 2], [2, 3], [3, 5], [4, 4], [5, 6]], line: 'fit' });
+  // By hand: means (3, 4); Sxy = 9, Sxx = 10, Syy = 10, so m = 0.9, c = 4 - 2.7 = 1.3 and r = 9/10.
+  eq([s.line.m, s.line.c, s.r, s.meanX, s.meanY], [0.9, 1.3, 0.9, 3, 4], 'scatter: the least-squares line is y = 0.9x + 1.3 with r = 0.9');
+  throws(() => g.scatterModel({ points: [[2, 1], [2, 5]], line: 'fit' }), 'x that does not vary has no least-squares line');
+  const vols = ['rectPrism', 'cylinder', 'cone', 'sphere', 'pyramid'].map(shape => g.solidModel({ shape, l: 4, w: 3, h: 5, r: 2 }).volume);
+  // By hand: 4*3*5 = 60; 20*pi; 20*pi/3; 32*pi/3; 4*3*5/3 = 20.
+  ok(near(vols[0], 60) && near(vols[1], 20 * Math.PI, 1e-5) && near(vols[2], (20 * Math.PI) / 3, 1e-5) && near(vols[3], (32 * Math.PI) / 3, 1e-5) && near(vols[4], 20), 'solids: the volumes of the five shapes match their formulas');
+}
 // Pinned coordinates (one reference diagram per kind)
 {
   const q = g.functionGraphModel({ curves: [{ type: 'quadratic', a: 1, h: 1, k: -4, intercepts: true }], xmin: -4, xmax: 6, ymin: -6, ymax: 8 });
