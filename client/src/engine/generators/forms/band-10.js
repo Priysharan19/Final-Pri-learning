@@ -160,10 +160,10 @@ function circleForms() {
         check: () => 2 * Math.round(Math.sqrt(r * r - dist * dist))
       };
     } },
-    { form: 'angle-between-tangents', make(rng) {
-      const c = ri(rng, 20, 160);
+    { form: 'angle-between-tangents', make(rng, d) {
+      const c = ri(rng, 20, 160), rr = ri(rng, 3, 40 * d + 20);
       return {
-        payload: numeric('angle-between-tangents', `Two tangents $PA$ and $PB$ are drawn from a point $P$ to a circle with centre $O$, and $\\angle AOB = ${c}^\\circ$. Find $\\angle APB$ in degrees.`, 180 - c, {
+        payload: numeric('angle-between-tangents', `Two tangents $PA$ and $PB$ are drawn from a point $P$ to a circle of radius $${rr}$ cm with centre $O$, and $\\angle AOB = ${c}^\\circ$. Find $\\angle APB$ in degrees.`, 180 - c, {
           hints: ['Radii $OA$ and $OB$ are perpendicular to the tangents.', 'Quadrilateral $OAPB$ has two right angles.', 'Its four angles add to $360^\\circ$.'],
           steps: [{ h: 'Right angles', d: '$\\angle OAP = \\angle OBP = 90^\\circ$' }, { h: 'Angle sum', d: `$\\angle APB = 360^\\circ - 180^\\circ - ${c}^\\circ$` }],
           traps: [{ value: 90 - c / 2, why: 'That is an angle at the centre of triangle $OAP$, not the angle between the tangents.' }]

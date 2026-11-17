@@ -1,5 +1,5 @@
 {
- "contentVersion": "2026.11.28",
+ "contentVersion": "2026.11.29",
  "draws": 6,
  "generators": {
   "c10-ap-daily-life-reasoning": "89254f1516b2b89a",
@@ -10,7 +10,7 @@
   "c10-areas-circles": "6e9b5388134a3ac9",
   "c10-arithmetic-progressions": "f0039821f601f950",
   "c10-bpt-reasoning": "e3d8787006f04807",
-  "c10-circles": "9cca2b5388b30550",
+  "c10-circles": "114bee5a11e4fd1f",
   "c10-coordinate-geometry": "27744e693ac8247c",
   "c10-distance-reasoning": "63562ff7c5955590",
   "c10-grouped-mean-reasoning": "84f319878d6b67d4",
@@ -38,7 +38,7 @@
   "c10-statistics": "9e3db4495d630b0c",
   "c10-surface-area-combo": "f7868816bcf6adcb",
   "c10-surface-volume-combo": "22560a12858ed11d",
-  "c10-tangent-length-reasoning": "98c43991deef1202",
+  "c10-tangent-length-reasoning": "fded442ddfb8b760",
   "c10-triangles-current": "d941fa9d20f0e964",
   "c10-trig-applications-current": "e364bb09e1ea8d2a",
   "c10-trig-boundary-relations": "32af8c7595f3eba2",
