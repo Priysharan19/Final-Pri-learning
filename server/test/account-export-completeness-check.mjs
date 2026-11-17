@@ -34,7 +34,10 @@ const COVERED = {
   'account_phones.account_id': 'phones',
   'parent_report_links.account_id': 'parentReport',
   'parent_report_sends.account_id': 'parentReport',
-  'desk_attempts.account_id': 'deskAttempts'
+  'desk_attempts.account_id': 'deskAttempts',
+  'assignment_handins.student_account_id': 'teacherWorkspace',
+  'teacher_review_items.student_account_id': 'teacherWorkspace',
+  'teacher_marks.student_account_id': 'teacherWorkspace'
 };
 // table.column → why it is not in the export.
 const EXCLUDED = {
@@ -61,7 +64,10 @@ const EXCLUDED = {
   'content_revisions.reviewer_account_id': 'curriculum review records, operator content',
   'feature_flags.updated_by': 'operator configuration',
   'teacher_invites.created_by': 'operator-issued invite code hashes',
-  'teacher_invites.used_by': 'invite code hashes: secrets'
+  'teacher_invites.used_by': 'invite code hashes: secrets',
+  'assignment_handins.teacher_account_id': 'the teacher id on a student\'s hand-in; the hand-in is exported to the student without it',
+  'teacher_review_items.teacher_account_id': 'the teacher id on a review item; the item is exported to the student without it',
+  'teacher_marks.teacher_account_id': 'the teacher id on a teacher mark; the mark is exported to the student, labelled teacher, without it'
 };
 
 const c = checks();
@@ -132,6 +138,12 @@ try {
       VALUES (?,?,'prithagoras','unmarked','desk','2027-mathematics-advanced-assessment-1',?,?,?,'idle',0,?,?,?,?)`,
     [`00000000-0000-4000-8000-00000000000${tag === 'ALICE' ? 1 : 2}`, id, JSON.stringify({ title: 'Paper', questionCount: 27 }), JSON.stringify({ v: 1, events: [] }),
       JSON.stringify({ 3: { note: `${tag}-DESK-NOTE`, noteRev: 1 } }), `${tag}-DESK-KEY-SECRET`, `${tag}-DESK-DIGEST-SECRET`, now, now]);
+    await db.run('INSERT INTO assignment_handins(assignment_id,student_account_id,class_id,teacher_account_id,exam_id,paper_kind,score,total,questions_json,handed_in_at) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      ['asg-1', id, 'class-1', T, `${tag}-exam-done`, 'nsw', 3, 10, JSON.stringify([{ key: `${tag}-HANDIN-Q` }]), now]);
+    await db.run('INSERT INTO teacher_review_items(id,assignment_id,class_id,student_account_id,teacher_account_id,exam_id,question_key,question_order,marks_possible,engine_awarded,criterion,available,evidence_json,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [`rvw-${tag}`, 'asg-1', 'class-1', id, T, `${tag}-exam-done`, 'q1', 1, 3, 0, 'method', 2, JSON.stringify({ reading: [`${tag}-REVIEW-READING`] }), now]);
+    await db.run('INSERT INTO teacher_marks(id,review_item_id,class_id,assignment_id,student_account_id,teacher_account_id,criterion,decision,marks,comment,engine_awarded,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+      [`tmk-${tag}`, `rvw-${tag}`, 'class-1', 'asg-1', id, T, 'method', 'award', 1, `${tag}-TEACHER-COMMENT`, 0, now]);
     await receipt('exam-paper', `${tag}-exam-open`, { answer: `${tag}-PAPER-OPEN-SECRET` });
     await receipt('exam-answers', `${tag}-exam-open`, { answers: `${tag}-MY-EXAM-ANSWERS` });
     await receipt('exam-paper', `${tag}-exam-done`, { answer: `${tag}-PAPER-DONE` });
@@ -163,7 +175,8 @@ try {
 
   // Every covered table's seeded row is there.
   for (const marker of ['ALICE-EVENT', 'ALICE-ENTITY', 'ALICE-SUBMISSION', 'ALICE-FEEDBACK', 'ALICE-REPORT', 'ALICE-SURFACE',
-    'ALICE-MY-EXAM-ANSWERS', 'ALICE-PAPER-DONE', 'ALICE-EXAM-RESULT', 'ALICE-ANSWER-DONE', 'ALICE-COMPLETION', 'ALICE-TRANSCRIPT', 'ALICE-DESK-NOTE']) {
+    'ALICE-MY-EXAM-ANSWERS', 'ALICE-PAPER-DONE', 'ALICE-EXAM-RESULT', 'ALICE-ANSWER-DONE', 'ALICE-COMPLETION', 'ALICE-TRANSCRIPT', 'ALICE-DESK-NOTE',
+    'ALICE-HANDIN-Q', 'ALICE-REVIEW-READING', 'ALICE-TEACHER-COMMENT']) {
     c.ok(text.includes(marker), `the export carries Alice's ${marker}`);
   }
   c.ok(x.classes.some(row => row.id === 'class-1'), 'the class membership is exported');

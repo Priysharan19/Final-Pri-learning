@@ -34,7 +34,9 @@ const REVIEWED = {
   sql: 'authDelivery.js boot-time ALTER TABLE from a literal column list',
   list: 'db.js boot-time migration from a literal column list',
   table: 'billingSchema.js/db.js boot-time ALTER TABLE on literal table names',
-  ddl: 'billingSchema.js/db.js boot-time ALTER TABLE with literal column DDL'
+  ddl: 'billingSchema.js/db.js boot-time ALTER TABLE with literal column DDL',
+  'IN(itemIds)': "classroom.js: one '?' per review item id; the ids are bound separately",
+  'IN(ids)': "classroom.js: one '?' per visible student id; the ids are bound separately"
 };
 
 const SQL = /\b(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|PRAGMA|WITH)\b/;

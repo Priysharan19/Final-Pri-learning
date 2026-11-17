@@ -8,6 +8,7 @@ import { createAdminRouter } from './admin.js';
 import { createAssignmentExecutionRouter } from './assignments.js';
 import { createBillingRouter } from './billing.js';
 import { createClassRouter } from './classes.js';
+import { createClassroomRouter } from './classroom.js';
 import { createContentRouter } from './content.js';
 import { createEntitlementRouter } from './entitlements.js';
 import { createIdentityRouter } from './identities.js';
@@ -244,6 +245,10 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   }));
   router.use('/classes', requireGuardianConsent(db), createClassRouter(db));
   router.use('/assignments', requireGuardianConsent(db), createAssignmentExecutionRouter(db));
+  // The teacher workspace (classroom.js): hand-in, results, review queue and
+  // teacher marks. Same consent gate as the class routes: a child whose
+  // guardian has not consented, or has withdrawn, reaches none of it.
+  router.use('/classroom', requireGuardianConsent(db), createClassroomRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', requireGuardianConsent(db), createReportRouter(db));
   // The parent weekly report. The recipient's confirm/unsubscribe routes carry

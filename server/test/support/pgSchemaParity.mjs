@@ -26,7 +26,11 @@ const POSTGRES_INTEGER = new Set([
   'auth_delivery_outbox.attempt_count', 'login_attempts.failures', 'content_revisions.revision',
   'entitlement_snapshots.source_version', 'billing_events.verified', 'billing_subscriptions.trial_claimed',
   'billing_subscriptions.last_event_rank', 'sync_cursors.id', 'sync_entities.version', 'sync_entities.tombstone',
-  'feature_flags.enabled', 'rate_limits.count', 'billing_google_notifications.attempts'
+  'feature_flags.enabled', 'rate_limits.count', 'billing_google_notifications.attempts',
+  // 20261118000000_teacher_workspace.sql: paper scores and per-question marks.
+  'assignment_handins.score', 'assignment_handins.total',
+  'teacher_review_items.question_order', 'teacher_review_items.marks_possible', 'teacher_review_items.engine_awarded',
+  'teacher_review_items.available', 'teacher_marks.marks', 'teacher_marks.engine_awarded'
 ]);
 
 // Constraints Postgres carries that SQLite expresses another way. Each is
@@ -41,7 +45,8 @@ const POSTGRES_ONLY_CHECK_EXPRESSIONS = new Map([['accounts', ['email=loweremail
 const SERVER_READ_ONLY = new Set(['sync_cursors']);
 // Tables the server may read and insert into but never change or delete from:
 // the audit trail is append-only (supabase/migrations/20261005000000).
-const SERVER_APPEND_ONLY = new Set(['audit_log']);
+// Teacher marks are append-only too (20261118000000_teacher_workspace.sql).
+const SERVER_APPEND_ONLY = new Set(['audit_log', 'teacher_marks']);
 // Row-Level Security fails closed (supabase/migrations/20261016000000): every
 // table carries, beside the permissive pri_server_all policy, a RESTRICTIVE
 // pri_scope_required policy (no rows unless the statement declared pri.scope),
@@ -66,7 +71,9 @@ const ACCOUNT_SCOPED = new Set([
   // 20261113010000_desk_attempts.sql: the Exam Desk's practice attempts.
   'desk_attempts',
   // 20261114000000_resource_publishing.sql: revision history names staff accounts, as content_revisions does.
-  'resource_revisions'
+  'resource_revisions',
+  // 20261118000000_teacher_workspace.sql: hand-ins, review items and teacher marks (student or teacher).
+  'assignment_handins', 'teacher_review_items', 'teacher_marks'
 ]);
 // The ownership predicate of each pri_account_scope policy (default account_id).
 const ACCOUNT_OWNER = new Map([
@@ -74,7 +81,9 @@ const ACCOUNT_OWNER = new Map([
   ['assignments', ['teacher_account_id']], ['assignment_submissions', ['student_account_id']],
   ['assignment_feedback', ['student_account_id', 'teacher_account_id']], ['audit_log', ['actor_account_id']],
   ['content_revisions', ['author_account_id', 'reviewer_account_id']], ['teacher_invites', ['created_by', 'used_by']],
-  ['feature_flags', ['updated_by']], ['resource_revisions', ['author_account_id', 'reviewer_account_id']]
+  ['feature_flags', ['updated_by']], ['resource_revisions', ['author_account_id', 'reviewer_account_id']],
+  ['assignment_handins', ['student_account_id', 'teacher_account_id']], ['teacher_review_items', ['student_account_id', 'teacher_account_id']],
+  ['teacher_marks', ['student_account_id', 'teacher_account_id']]
 ]);
 const scopeExpressionFor = table => SCOPE_EXPRESSION.replace("account_id = current_setting('pri.account_id', true)",
   (ACCOUNT_OWNER.get(table) || ['account_id']).map(column => `${column} = current_setting('pri.account_id', true)`).join(' or '));

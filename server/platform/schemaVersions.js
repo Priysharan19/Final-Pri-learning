@@ -51,7 +51,14 @@
 //    history and the review state machine) and resource_assets (hosted PDF
 //    records), both global under the fail-closed RLS policy
 //    (supabase/migrations/20261114000000_resource_publishing.sql).
-export const SCHEMA_VERSION = 17;
+// 18: the teacher workspace — assignment_handins (a finished paper a student
+//    hands in for a class assignment), teacher_review_items (the method and
+//    follow-through criteria the engine leaves to a human under D12) and
+//    teacher_marks (append-only teacher decisions, kept apart from engine
+//    marks; pri_server may not UPDATE or DELETE them). All three account-owned
+//    under RESTRICTIVE pri_account_scope RLS (student or teacher column)
+//    (supabase/migrations/20261118000000_teacher_workspace.sql).
+export const SCHEMA_VERSION = 18;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).

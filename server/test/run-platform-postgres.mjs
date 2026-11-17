@@ -161,6 +161,9 @@ export const ENGINE_SUITES = [
   'desk-check.mjs',
   // Resource publishing (plan F3): the schema-16 → 17 upgrade/rollback and the state machine.
   'resource-publishing-check.mjs',
+  // The teacher workspace: hand-in, review queue and append-only teacher marks
+  // under RLS (schema 18), engine marks byte-identical, isolation and removal.
+  'classroom-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',

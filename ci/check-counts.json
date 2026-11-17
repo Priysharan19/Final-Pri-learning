@@ -351,6 +351,13 @@
         {"has":"DESK ISOLATION: PASS — 39/39 checks"}
       ]
     },
+    "platform/classroom.log": {
+      "job": "platform-contracts",
+      "log": "classroom.log",
+      "pins": [
+        {"has":"classroom-check (sqlite): 108 checks passed"}
+      ]
+    },
     "platform/edition-agreement.log": {
       "job": "platform-contracts",
       "log": "edition-agreement.log",
@@ -473,7 +480,7 @@
       "log": "security-p2.log",
       "pins": [
         {"has":"admin-mfa-class-routes-check: 77/77 checks passed (sqlite)"},
-        {"has":"account-export-completeness-check (sqlite): 82 checks passed","note":"78 → 82 (plan F4a): the Exam Desk's attempts are exported, never their idempotency key or digest."},
+        {"has":"account-export-completeness-check (sqlite): 86 checks passed","note":"78 → 82 (plan F4a): the Exam Desk's attempts are exported, never their idempotency key or digest. 82 → 86 (teacher workspace): hand-ins, review items and teacher marks are exported to the student."},
         {"has":"RLS ACCOUNT COVERAGE: PASS — 20/20 checks"},
         {"has":"OTP DELETE ASYMMETRY: PASS — 15/15 checks"}
       ]
@@ -527,7 +534,7 @@
       "pins": [
         {"has":"✓ hot-path-budget-check.mjs"},
         {"has":"✓ region-isolation-check.mjs","note":"plan H2: two regions share nothing; the database binding, on Postgres."},
-        {"has":"PLATFORM ON POSTGRES: PASS — 96/96 suites","note":"train editions-22: 94 + Stripe (#941) + paper generator (#948) = 96. 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
+        {"has":"PLATFORM ON POSTGRES: PASS — 97/97 suites","note":"96 → 97 (teacher workspace): classroom-check on Postgres (RLS, migration 18). train editions-22: 94 + Stripe (#941) + paper generator (#948) = 96. 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
         {"has":"✓ nsw-practice-check.mjs"},
         {"has":"✓ nsw-exam-check.mjs"},
         {"has":"✓ paper-generator-check.mjs"},
