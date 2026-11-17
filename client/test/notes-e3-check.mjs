@@ -147,6 +147,29 @@ if (!only || only === 'olympiad') {
   }
 }
 
+// Every teaching diagram in every chapter (written before this layer too): the expression only calls
+// functions the engine really has (log2(x) parses as log10(2)*x and once drew a straight line labelled
+// y = log_2 x), and a point drawn on a function graph lies on one of its curves unless it says `free`.
+if (!only) {
+  const FN_OK = new Set(['sin', 'cos', 'tan', 'sqrt', 'exp', 'ln', 'log', 'abs', 'asin', 'acos', 'atan', 'sec', 'csc', 'cot', 'floor', 'ceil', 'cbrt']);
+  const { loadNotesForGrade, loadOlympiadNotes } = await import('../src/notes/notesIndex.js');
+  const { loadNswNotesForStage } = await import('../src/notes/nsw/nswNotesIndex.js');
+  const books = [];
+  for (const g of IN_CURRICULUM) books.push(await loadNotesForGrade(g.grade));
+  books.push(await loadOlympiadNotes());
+  for (const [st, c] of [[4, null], [5, null], [6, 'standard'], [6, 'advanced'], [6, 'ext1'], [6, 'ext2']]) books.push((await loadNswNotesForStage(st, c)) || {});
+  for (const book of books) for (const [id, ch] of Object.entries(book)) (ch.diagrams || []).forEach((d, i) => {
+    const sp = d.spec || {}; const w = `${id} diagram ${i + 1}`;
+    const exprs = [...(sp.curves || []).map(c => c.expr), sp.expr].filter(e => typeof e === 'string');
+    for (const e of exprs) for (const [, f] of e.matchAll(/([A-Za-z_]\w*)\s*\(/g)) ok(FN_OK.has(f), `${w}: ${f}() is not an engine function (in ${e})`);
+    if (sp.kind === 'function') for (const p of sp.points || []) {
+      if (p.free) continue;
+      const on = (sp.curves || []).some(c => { try { const y = evalNumeric(c.expr, { x: p.x }); return Math.abs(y - p.y) <= 1e-3 * Math.max(1, Math.abs(p.y)); } catch { return false; } });
+      ok(on, `${w}: the point (${p.x}, ${p.y}) is on none of its curves (mark it free: true if that is intended)`);
+    }
+  });
+}
+
 console.log(`notes-e3-check: ${pass} passed, ${failures.length} failed`);
 for (const f of failures.slice(0, 60)) console.log('  FAIL', f);
 if (failures.length > 60) console.log(`  … and ${failures.length - 60} more`);

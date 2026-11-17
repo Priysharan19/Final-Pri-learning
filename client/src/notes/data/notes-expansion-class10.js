@@ -22,10 +22,10 @@ export default {
     ],
     "examples": [
       {
-        "question": "Use Euclid's algorithm to find HCF(252, 198).",
+        "question": "Use Euclid's algorithm to find $\\text{HCF}(252, 198)$.",
         "steps": [
-          "252 = 198 + 54 and 198 = 3 × 54 + 36.",
-          "54 = 36 + 18 and 36 = 2 × 18 + 0.",
+          "$252 = 198 + 54$ and $198 = 3 \\times 54 + 36$.",
+          "$54 = 36 + 18$ and $36 = 2 \\times 18 + 0$.",
           "The final non-zero remainder is 18."
         ],
         "answer": "18",
@@ -57,30 +57,30 @@ export default {
     "concepts": [
       {
         "title": "Roots and coefficients are two views of one structure",
-        "body": "For a monic quadratic with roots r and s, expansion of (x-r)(x-s) explains why the x-coefficient is -(r+s) and the constant is rs. Check both rather than guessing a factorisation."
+        "body": "For a monic quadratic with roots $r$ and $s$, expanding $(x-r)(x-s)$ explains why the coefficient of $x$ is $-(r+s)$ and the constant is $rs$. Check both rather than guessing a factorisation."
       }
     ],
     "points": [
       {
-        "front": "Why does a repeated root make a quadratic touch rather than cross the x-axis?",
-        "back": "At a double root the quadratic is a constant multiple of (x-r)^2, which has the same sign on either side of r."
+        "front": "Why does a repeated root make a quadratic touch rather than cross the $x$-axis?",
+        "back": "At a double root the quadratic is a constant multiple of $(x-r)^2$, which has the same sign on either side of $r$."
       }
     ],
     "mistakes": [
       {
-        "wrong": "The product of roots is always the coefficient of x.",
-        "right": "For ax²+bx+c, the product is c/a and the sum is -b/a (provided a is not zero)."
+        "wrong": "The product of the roots is always the coefficient of $x$.",
+        "right": "For $ax^2 + bx + c$ with $a \\ne 0$, the product of the roots is $\\tfrac{c}{a}$ and the sum is $-\\tfrac{b}{a}$."
       }
     ],
     "examples": [
       {
-        "question": "Factor x²-5x+6 and identify both zeros.",
+        "question": "Factorise $x^2 - 5x + 6$ and identify both zeros.",
         "steps": [
           "Find two numbers whose sum is 5 and product is 6: 2 and 3.",
-          "Write x²-5x+6 = (x-2)(x-3).",
-          "Hence x=2 or x=3."
+          "Write $x^2 - 5x + 6 = (x-2)(x-3)$.",
+          "Hence $x = 2$ or $x = 3$."
         ],
-        "answer": "x = 2, 3",
+        "answer": "$x = 2, 3$",
         "verify": {
           "kind": "roots",
           "f": "x^2-5*x+6",
@@ -102,7 +102,7 @@ export default {
     ],
     "points": [
       {
-        "front": "What does a zero coefficient row 0=5 mean in elimination?",
+        "front": "What does a row reading $0 = 5$ mean in elimination?",
         "back": "The equations are inconsistent: no ordered pair satisfies both."
       }
     ],
@@ -114,13 +114,13 @@ export default {
     ],
     "examples": [
       {
-        "question": "Solve x+y=11 and 2x-y=7.",
+        "question": "Solve $x + y = 11$ and $2x - y = 7$.",
         "steps": [
-          "Add the equations: 3x=18, so x=6.",
-          "Substitute x=6 into x+y=11: y=5.",
-          "Check 2(6)-5=7."
+          "Add the equations: $3x = 18$, so $x = 6$.",
+          "Substitute $x = 6$ into $x + y = 11$: $y = 5$.",
+          "Check: $2(6) - 5 = 7$."
         ],
-        "answer": "(x,y)=(6,5)",
+        "answer": "$(x, y) = (6, 5)$",
         "verify": {
           "kind": "system",
           "equations": [
@@ -145,7 +145,7 @@ export default {
     "points": [
       {
         "front": "How does the discriminant classify real roots?",
-        "back": "For real a,b,c with a≠0: b²-4ac positive gives two distinct real roots, zero one repeated root, negative no real roots."
+        "back": "For real $a, b, c$ with $a \\ne 0$: $b^2 - 4ac$ positive gives two distinct real roots, zero gives one repeated root, negative gives no real roots."
       }
     ],
     "mistakes": [
@@ -156,13 +156,13 @@ export default {
     ],
     "examples": [
       {
-        "question": "Solve 2x²-7x+3=0.",
+        "question": "Solve $2x^2 - 7x + 3 = 0$.",
         "steps": [
-          "Split the middle term: 2x²-6x-x+3=0.",
-          "Factor: (2x-1)(x-3)=0.",
-          "Thus x=1/2 or x=3."
+          "Split the middle term: $2x^2 - 6x - x + 3 = 0$.",
+          "Factorise: $(2x-1)(x-3) = 0$.",
+          "Thus $x = \\tfrac{1}{2}$ or $x = 3$."
         ],
-        "answer": "x = 1/2, 3",
+        "answer": "$x = \\tfrac{1}{2}, 3$",
         "verify": {
           "kind": "roots",
           "f": "2*x^2-7*x+3",
@@ -179,7 +179,7 @@ export default {
     "concepts": [
       {
         "title": "Pairing terms explains the sum formula",
-        "body": "For an AP, the first and last terms sum to the same amount as the second and penultimate. With n such pairs counted twice, S_n=n(a+l)/2; substitute l=a+(n-1)d to get n(2a+(n-1)d)/2."
+        "body": "For an AP, the first and last terms sum to the same amount as the second and the second-last. Counting the $n$ terms twice in such pairs gives $S_n = \\tfrac{n}{2}(a + l)$; substitute $l = a + (n-1)d$ to get $S_n = \\tfrac{n}{2}\\bigl(2a + (n-1)d\\bigr)$."
       }
     ],
     "points": [
@@ -190,19 +190,19 @@ export default {
     ],
     "mistakes": [
       {
-        "wrong": "The nth term and the sum of n terms are the same quantity.",
-        "right": "a_n is one entry, whereas S_n accumulates the first n entries."
+        "wrong": "The $n$th term and the sum of $n$ terms are the same quantity.",
+        "right": "$a_n$ is one entry, whereas $S_n$ adds up the first $n$ entries."
       }
     ],
     "examples": [
       {
-        "question": "An AP begins at 7 and increases by 3. Find its 20th term and S20.",
+        "question": "An AP begins at 7 and increases by 3. Find its 20th term and $S_{20}$.",
         "steps": [
-          "a20=7+19×3=64.",
-          "S20=20(7+64)/2.",
-          "Therefore S20=710."
+          "$a_{20} = 7 + 19 \\times 3 = 64$.",
+          "$S_{20} = \\tfrac{20}{2}(7 + 64)$.",
+          "Therefore $S_{20} = 710$."
         ],
-        "answer": "a20=64; S20=710",
+        "answer": "$a_{20} = 64$; $S_{20} = 710$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -223,7 +223,7 @@ export default {
     "concepts": [
       {
         "title": "Similarity scales lengths and areas differently",
-        "body": "When two triangles are similar with side-scale k, corresponding heights also scale by k. Their areas scale by k², not k; this follows directly from half × base × height."
+        "body": "When two triangles are similar with scale factor $k$, corresponding heights also scale by $k$. Their areas scale by $k^2$, not $k$; this follows directly from $\\tfrac{1}{2} \\times \\text{base} \\times \\text{height}$."
       }
     ],
     "points": [
@@ -234,19 +234,19 @@ export default {
     ],
     "mistakes": [
       {
-        "wrong": "If side lengths are in ratio 3:5, their areas are in ratio 3:5.",
+        "wrong": "If side lengths are in the ratio $3 : 5$, their areas are in the ratio $3 : 5$.",
         "right": "Areas of similar figures scale as the square of the corresponding length ratio."
       }
     ],
     "examples": [
       {
-        "question": "Two similar triangles have sides in ratio 3:5. The smaller area is 45 cm². Find the larger area.",
+        "question": "Two similar triangles have sides in the ratio $3 : 5$. The smaller area is $45\\text{ cm}^2$. Find the larger area.",
         "steps": [
-          "The area ratio is 3²:5²=9:25.",
-          "Let the larger area be A. Then 45/A=9/25.",
-          "A=45×25/9=125 cm²."
+          "The area ratio is $3^2 : 5^2 = 9 : 25$.",
+          "Let the larger area be $A$. Then $\\tfrac{45}{A} = \\tfrac{9}{25}$.",
+          "$A = \\tfrac{45 \\times 25}{9} = 125\\text{ cm}^2$."
         ],
-        "answer": "125 cm²",
+        "answer": "$125\\text{ cm}^2$",
         "verify": {
           "kind": "value",
           "expr": "45*25/9",
@@ -259,7 +259,7 @@ export default {
     "concepts": [
       {
         "title": "Distance is Pythagoras in disguise",
-        "body": "Horizontal separation is |x2-x1| and vertical separation is |y2-y1|. These are perpendicular legs; squaring their lengths gives the distance formula. Keep the signs inside the differences before squaring."
+        "body": "The horizontal separation is $|x_2 - x_1|$ and the vertical separation is $|y_2 - y_1|$. These are perpendicular legs; squaring their lengths gives the distance formula. Keep the signs inside the differences before squaring."
       }
     ],
     "points": [
@@ -270,17 +270,17 @@ export default {
     ],
     "mistakes": [
       {
-        "wrong": "Subtract x-coordinates for both coordinate differences.",
-        "right": "The other leg must use y2-y1; mixing coordinates measures the wrong shape."
+        "wrong": "Subtract the $x$-coordinates for both coordinate differences.",
+        "right": "The other leg must use $y_2 - y_1$; mixing coordinates measures the wrong shape."
       }
     ],
     "examples": [
       {
-        "question": "Find the distance between A(2,-1) and B(8,7).",
+        "question": "Find the distance between $A(2, -1)$ and $B(8, 7)$.",
         "steps": [
-          "The horizontal change is 8-2=6.",
-          "The vertical change is 7-(-1)=8.",
-          "Distance = sqrt(6²+8²)=10."
+          "The horizontal change is $8 - 2 = 6$.",
+          "The vertical change is $7 - (-1) = 8$.",
+          "Distance $= \\sqrt{6^2 + 8^2} = 10$."
         ],
         "answer": "10 units",
         "verify": {
@@ -295,13 +295,13 @@ export default {
     "concepts": [
       {
         "title": "Ratios depend on angle, not triangle size",
-        "body": "All right triangles with the same acute angle are similar, so opposite/hypotenuse, adjacent/hypotenuse and opposite/adjacent remain constant. First label the sides relative to the chosen angle."
+        "body": "All right triangles with the same acute angle are similar, so $\\tfrac{\\text{opposite}}{\\text{hypotenuse}}$, $\\tfrac{\\text{adjacent}}{\\text{hypotenuse}}$ and $\\tfrac{\\text{opposite}}{\\text{adjacent}}$ stay constant. First label the sides relative to the chosen angle."
       }
     ],
     "points": [
       {
-        "front": "When is tan(theta) undefined?",
-        "back": "When cos(theta)=0, because tan(theta)=sin(theta)/cos(theta)."
+        "front": "When is $\\tan\\theta$ undefined?",
+        "back": "When $\\cos\\theta = 0$, because $\\tan\\theta = \\dfrac{\\sin\\theta}{\\cos\\theta}$."
       }
     ],
     "mistakes": [
@@ -312,13 +312,13 @@ export default {
     ],
     "examples": [
       {
-        "question": "In a right triangle the sides opposite and adjacent to an acute angle are 3 and 4. Find sin and cos.",
+        "question": "In a right triangle the sides opposite and adjacent to an acute angle $\\theta$ are 3 and 4. Find $\\sin\\theta$ and $\\cos\\theta$.",
         "steps": [
-          "Hypotenuse = sqrt(3²+4²)=5.",
-          "sin(theta)=opposite/hypotenuse=3/5.",
-          "cos(theta)=adjacent/hypotenuse=4/5."
+          "Hypotenuse $= \\sqrt{3^2 + 4^2} = 5$.",
+          "$\\sin\\theta = \\tfrac{\\text{opposite}}{\\text{hypotenuse}} = \\tfrac{3}{5}$.",
+          "$\\cos\\theta = \\tfrac{\\text{adjacent}}{\\text{hypotenuse}} = \\tfrac{4}{5}$."
         ],
-        "answer": "sin(theta)=3/5; cos(theta)=4/5",
+        "answer": "$\\sin\\theta = \\tfrac{3}{5}$; $\\cos\\theta = \\tfrac{4}{5}$",
         "verify": {
           "kind": "values",
           "pairs": [
@@ -343,7 +343,7 @@ export default {
     "concepts": [
       {
         "title": "Sight lines demand careful vertical offsets",
-        "body": "Angles of elevation are measured from the observer's horizontal eye line, not from the ground. Draw the eye-height line before using tan(theta)=vertical rise/horizontal distance."
+        "body": "Angles of elevation are measured from the observer's horizontal eye line, not from the ground. Draw the eye-height line before using $\\tan\\theta = \\tfrac{\\text{vertical rise}}{\\text{horizontal distance}}$."
       }
     ],
     "points": [
@@ -360,10 +360,10 @@ export default {
     ],
     "examples": [
       {
-        "question": "A person with eye height 1.5 m observes a tower at 45° from 35 m away on level ground. Find tower height.",
+        "question": "A person with eye height 1.5 m sees the top of a tower at an angle of elevation of $45^\\circ$ from 35 m away on level ground. Find the height of the tower.",
         "steps": [
-          "Rise above eye level =35 tan45°=35 m.",
-          "Total height is 35+1.5 m.",
+          "Rise above eye level $= 35\\tan 45^\\circ = 35$ m.",
+          "The total height is $35 + 1.5$ m.",
           "The tower is 36.5 m high."
         ],
         "answer": "36.5 m",
@@ -379,13 +379,13 @@ export default {
     "concepts": [
       {
         "title": "Radius–tangent perpendicularity makes right triangles",
-        "body": "At a point of tangency, the radius is perpendicular to the tangent. If P is outside a circle of centre O and T is tangency, use OP²=OT²+PT² before calculating."
+        "body": "At a point of tangency, the radius is perpendicular to the tangent. If $P$ is outside a circle with centre $O$ and $T$ is the point of tangency, use $OP^2 = OT^2 + PT^2$ before calculating."
       }
     ],
     "points": [
       {
         "front": "Why are tangent segments from the same external point equally long?",
-        "back": "They are legs of congruent right triangles with shared hypotenuse OP and equal radii."
+        "back": "They are legs of congruent right triangles with the shared hypotenuse $OP$ and equal radii."
       }
     ],
     "mistakes": [
@@ -396,11 +396,11 @@ export default {
     ],
     "examples": [
       {
-        "question": "A circle has radius 5 cm and an external point 13 cm from its centre. Find tangent length.",
+        "question": "A circle has radius 5 cm and an external point 13 cm from its centre. Find the length of the tangent from that point.",
         "steps": [
-          "Form right triangle OPT with OT=5 and OP=13.",
-          "PT²=13²-5²=144.",
-          "PT=12 cm; reject negative length."
+          "Form the right triangle $OPT$ with $OT = 5$ and $OP = 13$.",
+          "$PT^2 = 13^2 - 5^2 = 144$.",
+          "$PT = 12$ cm; a length cannot be negative."
         ],
         "answer": "12 cm",
         "verify": {
@@ -415,13 +415,13 @@ export default {
     "concepts": [
       {
         "title": "Sector area is a fraction of a full turn",
-        "body": "A sector of central angle theta degrees occupies theta/360 of the circle, so its area is that fraction of pi r². Segment area needs an additional triangle subtraction."
+        "body": "A sector with central angle $\\theta$ degrees occupies $\\tfrac{\\theta}{360}$ of the circle, so its area is that fraction of $\\pi r^2$. The area of a segment needs a triangle subtracted as well."
       }
     ],
     "points": [
       {
-        "front": "Why cannot a 90° sector be treated as 90/180 of a circle?",
-        "back": "A full revolution is 360°, so 90° represents one quarter, not one half."
+        "front": "Why can a $90^\\circ$ sector not be treated as $\\tfrac{90}{180}$ of a circle?",
+        "back": "A full turn is $360^\\circ$, so $90^\\circ$ is one quarter, not one half."
       }
     ],
     "mistakes": [
@@ -432,13 +432,13 @@ export default {
     ],
     "examples": [
       {
-        "question": "Find the area of a 90° sector of radius 14 cm using pi=22/7.",
+        "question": "Find the area of a $90^\\circ$ sector of radius 14 cm, using $\\pi = \\tfrac{22}{7}$.",
         "steps": [
-          "A quarter circle has area (90/360)×pi×14².",
-          "Using pi=22/7 gives (1/4)×(22/7)×196.",
-          "The area is 154 cm²."
+          "A quarter circle has area $\\tfrac{90}{360} \\times \\pi \\times 14^2$.",
+          "Using $\\pi = \\tfrac{22}{7}$ gives $\\tfrac{1}{4} \\times \\tfrac{22}{7} \\times 196$.",
+          "The area is $154\\text{ cm}^2$."
         ],
-        "answer": "154 cm²",
+        "answer": "$154\\text{ cm}^2$",
         "verify": {
           "kind": "value",
           "expr": "(90/360)*(22/7)*14^2",
@@ -451,7 +451,7 @@ export default {
     "concepts": [
       {
         "title": "Separate curvature from end caps",
-        "body": "The curved surface area of a cylinder unrolls to a rectangle with width equal to base circumference 2 pi r and height h. Total surface area adds the two circular bases; volume multiplies base area by height."
+        "body": "The curved surface of a cylinder unrolls to a rectangle whose width is the base circumference $2\\pi r$ and whose height is $h$. The total surface area adds the two circular bases; the volume multiplies the base area by the height."
       }
     ],
     "points": [
@@ -468,13 +468,13 @@ export default {
     ],
     "examples": [
       {
-        "question": "A cylinder has radius 3 cm and height 10 cm. Find its volume as a multiple of pi.",
+        "question": "A cylinder has radius 3 cm and height 10 cm. Find its volume as a multiple of $\\pi$.",
         "steps": [
-          "Base area is pi×3²=9 pi cm².",
+          "Base area $= \\pi \\times 3^2 = 9\\pi\\text{ cm}^2$.",
           "Volume equals base area times height.",
-          "Volume =90 pi cm³."
+          "Volume $= 9\\pi \\times 10 = 90\\pi\\text{ cm}^3$."
         ],
-        "answer": "90 pi cm³",
+        "answer": "$90\\pi\\text{ cm}^3$",
         "verify": {
           "kind": "value",
           "expr": "3^2*10",
@@ -504,11 +504,11 @@ export default {
     ],
     "examples": [
       {
-        "question": "Values 2,5,8 have frequencies 2,3,5. Find the mean.",
+        "question": "The values 2, 5, 8 have frequencies 2, 3, 5. Find the mean.",
         "steps": [
-          "Compute weighted total 2×2+5×3+8×5=59.",
-          "Total frequency is 2+3+5=10.",
-          "Mean =59/10=5.9."
+          "Weighted total: $2 \\times 2 + 5 \\times 3 + 8 \\times 5 = 59$.",
+          "Total frequency: $2 + 3 + 5 = 10$.",
+          "Mean $= \\tfrac{59}{10} = 5.9$."
         ],
         "answer": "5.9",
         "verify": {
@@ -523,7 +523,7 @@ export default {
     "concepts": [
       {
         "title": "Use an outcome table before counting a sum",
-        "body": "For two fair independent dice there are 36 equally likely ordered pairs. A target sum can occur in different orderings, and (a,b) and (b,a) are distinct if a≠b."
+        "body": "For two fair independent dice there are 36 equally likely ordered pairs. A target sum can occur in different orders, and $(a, b)$ and $(b, a)$ are distinct outcomes when $a \\ne b$."
       }
     ],
     "points": [
@@ -534,7 +534,7 @@ export default {
     ],
     "mistakes": [
       {
-        "wrong": "Rolling (3,6) and (6,3) counts as one outcome with two dice.",
+        "wrong": "Rolling $(3, 6)$ and $(6, 3)$ counts as one outcome with two dice.",
         "right": "They are different ordered outcomes and both contribute to the sum 9."
       }
     ],
@@ -542,11 +542,11 @@ export default {
       {
         "question": "Two fair dice are rolled. Find the probability that their sum is 9.",
         "steps": [
-          "Favourable pairs: (3,6),(4,5),(5,4),(6,3).",
+          "Favourable pairs: $(3, 6)$, $(4, 5)$, $(5, 4)$, $(6, 3)$.",
           "There are 4 favourable outcomes out of 36.",
-          "Probability =4/36=1/9."
+          "Probability $= \\tfrac{4}{36} = \\tfrac{1}{9}$."
         ],
-        "answer": "1/9",
+        "answer": "$\\tfrac{1}{9}$",
         "verify": {
           "kind": "value",
           "expr": "4/36",

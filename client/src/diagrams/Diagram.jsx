@@ -11,6 +11,9 @@
 import React, { useId } from 'react';
 import { MathText } from '../lib/latex.jsx';
 import './diagrams.css';
+import { useKitText } from './kitText.js';
+import { CORE_TEXT } from './coreText.js';
+import { edition } from '../platform/edition.js';
 import {
   functionGraphModel, unitCircleModel, triangleModel, regularPolygonModel, circleTheoremModel, numberLineModel, treeModel, vennModel,
   twoWayModel, histogramModel, boxPlotModel, normalCurveModel, vectorModel, sequenceModel, compoundModel, timelineModel,
@@ -66,18 +69,33 @@ export function Defs() {
 }
 
 const sentence = (...parts) => parts.filter(Boolean).join(' ');
+// ── Money ────────────────────────────────────────────────────────────────────
+// The symbol the kit prints money with: a spec's `currency` ('$' or '₹'), else this
+// build's edition (Priyabhata INR → ₹, Prithagoras AUD → $), else '$'.
+const EDITION_SYMBOL = { INR: '₹', AUD: '$' };
+export const CURRENCIES = Object.freeze(['$', '₹']);
+export function currencySymbol(currency) {
+  if (CURRENCIES.includes(currency)) return currency;
+  return EDITION_SYMBOL[edition().currency] ?? '$';
+}
+/** The symbol inside KaTeX: \$ for the dollar, \text{₹} for the rupee. */
+export const currencyTex = symbol => (symbol === '₹' ? '\\text{₹}' : '\\$');
+
+/** The kit's words in the language on screen (coreText.js). */
+const useTk = () => useKitText(CORE_TEXT);
 
 // ── Function graphs ──────────────────────────────────────────────────────────
-export function FunctionGraph({ title = 'Graph of a function', caption = null, xLabel = 'x', yLabel = 'y', hideIntercepts = false, ...spec }) {
+export function FunctionGraph({ title, caption = null, xLabel = 'x', yLabel = 'y', hideIntercepts = false, ...spec }) {
+  const tk = useTk();
   const m = functionGraphModel(spec);
   const desc = sentence(
-    `Axes: x from ${r3(m.frame.xmin, 2)} to ${r3(m.frame.xmax, 2)}, y from ${r3(m.frame.ymin, 2)} to ${r3(m.frame.ymax, 2)}.`,
-    m.curves.map(c => `${c.label ? `Curve ${c.label.replace(/[\\${}]/g, '')}` : 'A curve'}: y = ${c.expr}.${c.shade ? ` The area between it and the x-axis from x = ${c.shade.from} to x = ${c.shade.to} is shaded.` : ''}`).join(' '),
-    m.curves.flatMap(c => [c.yIntercept ? `It crosses the y-axis at ${c.yIntercept.y}.` : '', c.xIntercepts?.length ? `It crosses the x-axis at x = ${c.xIntercepts.map(i => i.x).join(', ')}.` : '']).join(' '),
-    m.asymptotes.map(a => `${a.axis === 'x' ? 'Vertical' : 'Horizontal'} asymptote ${a.axis} = ${a.value}.`).join(' ')
+    tk('function.axes', { xmin: r3(m.frame.xmin, 2), xmax: r3(m.frame.xmax, 2), ymin: r3(m.frame.ymin, 2), ymax: r3(m.frame.ymax, 2) }),
+    m.curves.map(c => sentence(c.label ? tk('function.curveNamed', { name: c.label.replace(/[\\${}]/g, ''), expr: c.expr }) : tk('function.curve', { expr: c.expr }), c.shade ? tk('function.shade', { from: c.shade.from, to: c.shade.to }) : '')).join(' '),
+    m.curves.flatMap(c => [c.yIntercept ? tk('function.yIntercept', { y: c.yIntercept.y }) : '', c.xIntercepts?.length ? tk('function.xIntercepts', { xs: c.xIntercepts.map(i => i.x).join(', ') }) : '']).join(' '),
+    m.asymptotes.map(a => tk(a.axis === 'x' ? 'function.asymptoteVertical' : 'function.asymptoteHorizontal', { value: a.value })).join(' ')
   );
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
+    <Figure width={m.frame.width} height={m.frame.height} title={title ?? tk('function.title')} description={desc} caption={caption}>
       <Defs />
       <Axes m={m} xLabel={xLabel} yLabel={yLabel} />
       {m.asymptotes.map((a, i) => (
@@ -93,12 +111,16 @@ export function FunctionGraph({ title = 'Graph of a function', caption = null, x
 }
 
 // ── The unit circle and trig graphs ──────────────────────────────────────────
-export function UnitCircle({ deg = 30, showTan = false, title = 'The unit circle', caption = null, overlay = null, svgProps = {} }) {
+export function UnitCircle({ deg = 30, showTan = false, title, caption = null, overlay = null, svgProps = {} }) {
+  const tk = useTk();
   const m = unitCircleModel({ deg });
   const p = m.point;
-  const desc = `A point on the unit circle at ${p.deg} degrees: cosine ${p.cos}, sine ${p.sin}${p.tan !== null ? `, tangent ${p.tan}` : ', tangent undefined'}. Quadrant ${p.quadrant || 'on an axis'}, reference angle ${p.reference} degrees.`;
+  const desc = sentence(
+    tk('unitCircle.desc', { deg: p.deg, cos: p.cos, sin: p.sin, tan: p.tan !== null ? tk('unitCircle.tan', { tan: p.tan }) : tk('unitCircle.tanUndefined') }),
+    p.quadrant ? tk('unitCircle.quadrant', { quadrant: p.quadrant, reference: p.reference }) : tk('unitCircle.onAxis', { reference: p.reference })
+  );
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption} className="dg-square" svgProps={svgProps}>
+    <Figure width={m.frame.width} height={m.frame.height} title={title ?? tk('unitCircle.title')} description={desc} caption={caption} className="dg-square" svgProps={svgProps}>
       <Defs />
       <line className="dg-axis" x1={m.frame.left} x2={m.frame.right} y1={m.centre[1]} y2={m.centre[1]} markerEnd="url(#dg-arrow)" />
       <line className="dg-axis" x1={m.centre[0]} x2={m.centre[0]} y1={m.frame.bottom} y2={m.frame.top} markerEnd="url(#dg-arrow)" />
@@ -118,13 +140,14 @@ export function UnitCircle({ deg = 30, showTan = false, title = 'The unit circle
 }
 /** A sine, cosine or tangent graph y = a·f(b(x − c)) + d, with the period and amplitude named. */
 export function TrigGraph({ fn = 'sin', a = 1, b = 1, c = 0, d = 0, title = null, caption = null }) {
+  const tk = useTk();
   const period = fn === 'tan' ? Math.PI / b : (2 * Math.PI) / b;
   const spec = { xmin: -2 * Math.PI, xmax: 2 * Math.PI, ymin: fn === 'tan' ? -4 : Math.min(-1.5, d - Math.abs(a) - 0.5), ymax: fn === 'tan' ? 4 : Math.max(1.5, d + Math.abs(a) + 0.5), curves: [{ type: fn, a, b, c, d, label: `y=${a === 1 ? '' : a}\\${fn}${b === 1 && c === 0 ? '\\,x' : '(\\ldots)'}` }], asymptotes: fn === 'tan' ? Array.from({ length: 5 }, (_, k) => ({ x: r3(c + (k - 2) * period + period / 2, 6) })).filter(s => Math.abs(s.x) <= 2 * Math.PI + 1e-9) : [] };
   const m = functionGraphModel({ ...spec, xTicks: [-2 * Math.PI, -Math.PI, 0, Math.PI, 2 * Math.PI].map(v => r3(v, 6)) });
   const f = m.frame; const y0 = m.axes.x[0][1];
   const piLabel = v => ({ [-6.283]: '-2\\pi', [-3.142]: '-\\pi', 3.142: '\\pi', 6.283: '2\\pi' })[r3(v, 3)] || null;
   return (
-    <Figure width={f.width} height={f.height} title={title || `Graph of y = ${a}${fn}(${b}(x - ${c})) + ${d}`} description={`A ${fn} curve with amplitude ${fn === 'tan' ? 'none' : Math.abs(a)}, period ${r3(period, 4)} radians, shifted ${c} right and ${d} up.`} caption={caption}>
+    <Figure width={f.width} height={f.height} title={title || tk('trig.title', { a, fn, b, c, d })} description={tk('trig.desc', { fn, amplitude: fn === 'tan' ? tk('trig.noAmplitude') : Math.abs(a), period: r3(period, 4), c, d })} caption={caption}>
       <Defs />
       <g className="dg-axes">
         {m.yTicks.map(t => <line key={`gy${t.value}`} className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} />)}
@@ -141,7 +164,8 @@ export function TrigGraph({ fn = 'sin', a = 1, b = 1, c = 0, d = 0, title = null
 }
 
 // ── Triangles and polygons ───────────────────────────────────────────────────
-export function Triangle({ a, b, c, C, labels = { sides: true, angles: true }, title = 'A triangle', caption = null, showArea = false }) {
+export function Triangle({ a, b, c, C, labels = { sides: true, angles: true }, title, caption = null, showArea = false }) {
+  const tk = useTk();
   const m = triangleModel({ a, b, c, C });
   const V = m.vertices;
   const sideLabel = (k, p, away) => <Tex key={k} x={p[0] + away[0]} y={p[1] + away[1]} tex={String(m.sides[k])} w={46} h={22} className="dg-side" />;
@@ -149,23 +173,24 @@ export function Triangle({ a, b, c, C, labels = { sides: true, angles: true }, t
   const away = p => { const dx = p[0] - cx; const dy = p[1] - cy; const n = Math.hypot(dx, dy) || 1; return [(dx / n) * 16, (dy / n) * 16]; };
   const corner = (k) => { const p = V[k]; const dx = cx - p[0]; const dy = cy - p[1]; const n = Math.hypot(dx, dy) || 1; return [p[0] + (dx / n) * 46, p[1] + (dy / n) * 46]; };
   const rightMark = m.right ? (() => { const p = V[m.right]; const others = Object.keys(V).filter(k => k !== m.right).map(k => V[k]); const u = others.map(q => { const dx = q[0] - p[0]; const dy = q[1] - p[1]; const n = Math.hypot(dx, dy) || 1; return [dx / n * 14, dy / n * 14]; }); return `M${p[0] + u[0][0]} ${p[1] + u[0][1]} L${p[0] + u[0][0] + u[1][0]} ${p[1] + u[0][1] + u[1][1]} L${p[0] + u[1][0]} ${p[1] + u[1][1]}`; })() : null;
-  const desc = `Triangle ABC with sides a = ${m.sides.a}, b = ${m.sides.b}, c = ${m.sides.c}; angles A = ${m.angles.A}°, B = ${m.angles.B}°, C = ${m.angles.C}°${m.right ? `, a right angle at ${m.right}` : ''}; area ${m.area}.`;
+  const desc = tk('triangle.desc', { a: m.sides.a, b: m.sides.b, c: m.sides.c, A: m.angles.A, B: m.angles.B, C: m.angles.C, right: m.right ? tk('triangle.right', { vertex: m.right }) : '', area: m.area });
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
+    <Figure width={m.frame.width} height={m.frame.height} title={title ?? tk('triangle.title')} description={desc} caption={caption}>
       <path className="dg-shape" d={`M${V.A[0]} ${V.A[1]} L${V.B[0]} ${V.B[1]} L${V.C[0]} ${V.C[1]} Z`} />
       {rightMark && <path className="dg-rightmark" d={rightMark} fill="none" />}
       {labels.sides && <>{sideLabel('a', m.midpoints.a, away(m.midpoints.a))}{sideLabel('b', m.midpoints.b, away(m.midpoints.b))}{sideLabel('c', m.midpoints.c, away(m.midpoints.c))}</>}
       {['A', 'B', 'C'].map(k => <Tex key={k} x={V[k][0] + away(V[k])[0] * 1.4} y={V[k][1] + away(V[k])[1] * 1.4} tex={k} w={24} h={22} className="dg-vertex" />)}
       {labels.angles && ['A', 'B', 'C'].filter(k => k !== m.right).map(k => <Tex key={`an${k}`} x={corner(k)[0]} y={corner(k)[1]} tex={`${r3(m.angles[k], 1)}^{\\circ}`} w={60} h={20} className="dg-small" />)}
-      {showArea && <Tex x={cx} y={cy} tex={`\\text{area}=${m.area}`} w={110} className="dg-small" />}
+      {showArea && <Tex x={cx} y={cy} tex={`\\text{${tk('tex.area')}}=${m.area}`} w={110} className="dg-small" />}
     </Figure>
   );
 }
 export function RegularPolygon({ n = 5, side = 1, title = null, caption = null }) {
+  const tk = useTk();
   const m = regularPolygonModel({ n, side });
   const cx = m.frame.sx(0); const cy = m.frame.sy(0);
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title || `A regular polygon with ${n} sides`} description={`A regular polygon with ${n} sides each of length ${m.side}; each interior angle is ${m.interior}°, each exterior angle ${m.exterior}°, and the interior angles add to ${m.angleSum}°.`} caption={caption}>
+    <Figure width={m.frame.width} height={m.frame.height} title={title || tk('polygon.title', { n })} description={tk('polygon.desc', { n, side: m.side, interior: m.interior, exterior: m.exterior, sum: m.angleSum })} caption={caption}>
       <path className="dg-shape" d={`${poly(m.vertices)} Z`} />
       {m.vertices.map((v, i) => <circle key={i} className="dg-tick-dot" cx={v[0]} cy={v[1]} r="2.6" />)}
       <Tex x={cx} y={cy - 10} tex={`n=${n}`} w={60} />
@@ -176,9 +201,10 @@ export function RegularPolygon({ n = 5, side = 1, title = null, caption = null }
 
 // ── Circles and the circle theorems ──────────────────────────────────────────
 export function CircleTheorem({ theorem = 'centre', params = {}, title = null, caption = null }) {
+  const tk = useTk();
   const m = circleTheoremModel({ theorem, params });
-  const P = m.points; const labelOf = { centre: 'Angle at the centre is twice the angle at the circumference', segment: 'Angles in the same segment are equal', semicircle: 'The angle in a semicircle is a right angle', cyclic: 'Opposite angles of a cyclic quadrilateral add to 180°', tangent: 'A tangent is perpendicular to the radius at the point of contact' }[theorem];
-  const desc = `${labelOf}. Marked angles: ${m.marks.map(k => `${k.value}° at ${k.at}`).join('; ')}.`;
+  const P = m.points; const labelOf = tk(`circle.${theorem}`);
+  const desc = tk('circle.desc', { theorem: labelOf, marks: m.marks.map(k => tk('circle.mark', { value: k.value, at: k.at })).join('; ') });
   const nudge = (name) => { const p = P[name]; const dx = p[0] - m.centre[0]; const dy = p[1] - m.centre[1]; const n = Math.hypot(dx, dy) || 1; return [p[0] + (dx / n) * 16 || p[0] + 16, p[1] + (dy / n) * 16]; };
   const markPos = k => { const v = P[k.at]; const a = P[k.between[0]]; const b = P[k.between[1]]; const mx = (a[0] + b[0]) / 2 - v[0]; const my = (a[1] + b[1]) / 2 - v[1]; const n = Math.hypot(mx, my) || 1; return [v[0] + (mx / n) * 38, v[1] + (my / n) * 38]; };
   return (
@@ -192,11 +218,13 @@ export function CircleTheorem({ theorem = 'centre', params = {}, title = null, c
 }
 
 // ── Number lines ─────────────────────────────────────────────────────────────
-export function NumberLine({ title = 'A number line', caption = null, ...spec }) {
+export function NumberLine({ title, caption = null, ...spec }) {
+  const tk = useTk();
   const m = numberLineModel(spec);
-  const desc = sentence(m.points.map(p => `${p.open ? 'Open' : 'Closed'} point at ${p.value}.`).join(' '), m.intervals.map(i => `Shaded from ${i.from === null ? 'the left' : `${i.from}${i.fromOpen ? ' (not included)' : ''}`} to ${i.to === null ? 'the right' : `${i.to}${i.toOpen ? ' (not included)' : ''}`}.`).join(' '));
+  const end = (value, open, side) => (value === null ? tk(side) : open ? tk('numberLine.notIncluded', { value }) : String(value));
+  const desc = sentence(m.points.map(p => tk(p.open ? 'numberLine.open' : 'numberLine.closed', { value: p.value })).join(' '), m.intervals.map(i => tk('numberLine.shaded', { from: end(i.from, i.fromOpen, 'numberLine.left'), to: end(i.to, i.toOpen, 'numberLine.right') })).join(' '));
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc || 'An empty number line.'} caption={caption}>
+    <Figure width={m.frame.width} height={m.frame.height} title={title ?? tk('numberLine.title')} description={desc || tk('numberLine.empty')} caption={caption}>
       <Defs />
       <line className="dg-axis" x1={m.frame.left - 6} x2={m.frame.right + 6} y1={m.y} y2={m.y} markerStart="url(#dg-arrow)" markerEnd="url(#dg-arrow)" />
       {m.ticks.map(t => <g key={t.value}><line className="dg-tick" x1={t.px} x2={t.px} y1={m.y - 6} y2={m.y + 6} /><Tex x={t.px} y={m.y + 20} tex={String(t.value)} w={40} h={20} /></g>)}
@@ -207,23 +235,25 @@ export function NumberLine({ title = 'A number line', caption = null, ...spec })
 }
 
 // ── Probability: tree, Venn, two-way table ───────────────────────────────────
-export function TreeDiagram({ branches, title = 'A probability tree', caption = null, showOutcomes = true }) {
+export function TreeDiagram({ branches, title, caption = null, showOutcomes = true }) {
+  const tk = useTk();
   const m = treeModel({ branches });
-  const desc = `A probability tree. ${m.leaves.map(l => `${l.path.join(' then ')}: ${ftext(l.prob)}`).join('; ')}. The outcomes add to ${ftext(m.total)}.`;
+  const desc = tk('tree.desc', { outcomes: m.leaves.map(l => `${l.path.join(tk('tree.then'))}: ${ftext(l.prob)}`).join('; '), total: ftext(m.total) });
   return (
-    <Figure width={m.width} height={m.height} title={title} description={desc} caption={caption}>
+    <Figure width={m.width} height={m.height} title={title ?? tk('tree.title')} description={desc} caption={caption}>
       <circle className="dg-dot" cx={m.root.x} cy={m.root.y} r="3" />
       {m.flat.map((n, i) => <g key={i}><line className="dg-curve is-secondary" x1={n.fromX} y1={n.fromY} x2={n.x} y2={n.y} /><Tex x={(n.fromX + n.x) / 2} y={(n.fromY + n.y) / 2 - 11} tex={ftex(n.p)} w={44} h={20} className="dg-small" /><circle className="dg-dot" cx={n.x} cy={n.y} r="3" /><Tex x={n.x + 8} y={n.y - 1} tex={n.label} w={40} h={20} anchor="start" className="dg-vertex" /></g>)}
       {showOutcomes && m.leaves.map((l, i) => <Tex key={`o${i}`} x={m.width - 8} y={l.y} tex={`P=${ftex(l.prob)}`} w={86} h={22} anchor="end" className="dg-outcome" />)}
     </Figure>
   );
 }
-export function VennDiagram({ title = 'A Venn diagram', caption = null, ...spec }) {
+export function VennDiagram({ title, caption = null, ...spec }) {
+  const tk = useTk();
   const m = vennModel(spec);
   const names = m.labels;
-  const desc = `A Venn diagram of ${m.sets} sets. ${Object.entries(m.regions).map(([k, v]) => `${k}: ${v.count}`).join(', ')}, outside: ${m.outside.count}. Total ${m.total}.`;
+  const desc = tk('venn.desc', { sets: m.sets, regions: Object.entries(m.regions).map(([k, v]) => `${k}: ${v.count}`).join(', '), outside: m.outside.count, total: m.total });
   return (
-    <Figure width={m.width} height={m.height} title={title} description={desc} caption={caption}>
+    <Figure width={m.width} height={m.height} title={title ?? tk('venn.title')} description={desc} caption={caption}>
       <rect className="dg-shape is-universe" x="6" y="6" width={m.width - 12} height={m.height - 12} rx="6" />
       {m.centres.map((c, i) => <g key={i}><circle className={`dg-venn is-${i}`} cx={c[0]} cy={c[1]} r={m.r} /><Tex x={c[0] + (i === 0 ? -m.r * 0.72 : i === 1 ? m.r * 0.72 : 0)} y={c[1] + (i === 2 ? m.r + 12 : -m.r - 12)} tex={names[i]} w={40} h={22} className="dg-vertex" /></g>)}
       {Object.entries(m.regions).map(([k, v]) => <Tex key={k} x={v.at[0]} y={v.at[1]} tex={String(v.count)} w={44} h={22} />)}
@@ -233,15 +263,16 @@ export function VennDiagram({ title = 'A Venn diagram', caption = null, ...spec 
 }
 /** A two-way table as an HTML table (it is a table), with totals computed. */
 export function ProbabilityTable({ rows, cols, cells, caption = null, asFractions = false }) {
+  const tk = useTk();
   const m = twoWayModel({ rows, cols, cells });
   const cell = v => (asFractions ? `$${ftex({ n: v, d: m.total })}$` : String(v));
   return (
     <figure className="dg dg-table" data-diagram>
       <table className="dg-grid-table">
-        <caption className="dg-sr">Two-way table with row and column totals</caption>
-        <thead><tr><td />{m.cols.map(c => <th key={c} scope="col"><MathText text={c} /></th>)}<th scope="col">Total</th></tr></thead>
+        <caption className="dg-sr">{tk('table.caption')}</caption>
+        <thead><tr><td />{m.cols.map(c => <th key={c} scope="col"><MathText text={c} /></th>)}<th scope="col">{tk('common.total')}</th></tr></thead>
         <tbody>{m.rows.map((r, i) => <tr key={r}><th scope="row"><MathText text={r} /></th>{m.cells[i].map((v, j) => <td key={j}><MathText text={cell(v)} /></td>)}<td className="is-total"><MathText text={cell(m.rowTotals[i])} /></td></tr>)}</tbody>
-        <tfoot><tr><th scope="row">Total</th>{m.colTotals.map((v, j) => <td key={j} className="is-total"><MathText text={cell(v)} /></td>)}<td className="is-total"><MathText text={cell(m.total)} /></td></tr></tfoot>
+        <tfoot><tr><th scope="row">{tk('common.total')}</th>{m.colTotals.map((v, j) => <td key={j} className="is-total"><MathText text={cell(v)} /></td>)}<td className="is-total"><MathText text={cell(m.total)} /></td></tr></tfoot>
       </table>
       {caption && <figcaption className="dg-caption"><MathText text={caption} /></figcaption>}
     </figure>
@@ -249,12 +280,13 @@ export function ProbabilityTable({ rows, cols, cells, caption = null, asFraction
 }
 
 // ── Statistics ───────────────────────────────────────────────────────────────
-export function Histogram({ title = 'A histogram', caption = null, xLabel = null, ...spec }) {
+export function Histogram({ title, caption = null, xLabel = null, ...spec }) {
+  const tk = useTk();
   const m = histogramModel(spec);
   const f = m.frame;
-  const desc = `A histogram of ${m.total} values in ${m.counts.length} bins: ${m.bars.map(b => `${b.from} to ${b.to}: ${b.count}`).join('; ')}.`;
+  const desc = tk('histogram.desc', { total: m.total, bins: m.counts.length, bars: m.bars.map(b => tk('histogram.bar', { from: b.from, to: b.to, count: b.count })).join('; ') });
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure width={f.width} height={f.height} title={title ?? tk('histogram.title')} description={desc} caption={caption}>
       <Defs />
       <g className="dg-axes">
         {m.yTicks.map(t => <g key={t.value}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={String(t.value)} w={36} h={20} anchor="end" /></g>)}
@@ -268,12 +300,13 @@ export function Histogram({ title = 'A histogram', caption = null, xLabel = null
     </Figure>
   );
 }
-export function BoxPlot({ title = 'A box plot', caption = null, ...spec }) {
+export function BoxPlot({ title, caption = null, ...spec }) {
+  const tk = useTk();
   const m = boxPlotModel(spec);
   const s = m.summary; const px = m.px; const y = m.y; const h = m.h;
-  const desc = `A box plot: minimum ${s.min}, lower quartile ${s.q1}, median ${s.median}, upper quartile ${s.q3}, maximum ${s.max}; range ${s.range}, interquartile range ${s.iqr}.`;
+  const desc = tk('boxPlot.desc', { min: s.min, q1: s.q1, median: s.median, q3: s.q3, max: s.max, range: s.range, iqr: s.iqr });
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
+    <Figure width={m.frame.width} height={m.frame.height} title={title ?? tk('boxPlot.title')} description={desc} caption={caption}>
       <g className="dg-axes">{m.ticks.map(t => <g key={t.value}><line className="dg-tick" x1={t.px} x2={t.px} y1={m.frame.bottom} y2={m.frame.bottom + 5} /><Tex x={t.px} y={m.frame.bottom + 18} tex={String(t.value)} w={40} h={20} /></g>)}<line className="dg-axis" x1={m.frame.left} x2={m.frame.right} y1={m.frame.bottom} y2={m.frame.bottom} /></g>
       <line className="dg-curve is-secondary" x1={px.min} y1={y} x2={px.q1} y2={y} /><line className="dg-curve is-secondary" x1={px.q3} y1={y} x2={px.max} y2={y} />
       <line className="dg-curve is-secondary" x1={px.min} y1={y - h / 3} x2={px.min} y2={y + h / 3} /><line className="dg-curve is-secondary" x1={px.max} y1={y - h / 3} x2={px.max} y2={y + h / 3} />
@@ -283,12 +316,13 @@ export function BoxPlot({ title = 'A box plot', caption = null, ...spec }) {
     </Figure>
   );
 }
-export function NormalCurve({ title = 'The normal distribution', caption = null, ...spec }) {
+export function NormalCurve({ title, caption = null, ...spec }) {
+  const tk = useTk();
   const m = normalCurveModel(spec);
   const f = m.frame;
-  const desc = `A normal curve with mean ${m.mu} and standard deviation ${m.sigma}. The shaded area from z = ${m.za} (x = ${m.xa}) to z = ${m.zb} (x = ${m.xb}) is ${m.area}, which is ${r3(m.area * 100, 2)}% of the distribution.`;
+  const desc = tk('normal.desc', { mu: m.mu, sigma: m.sigma, za: m.za, xa: m.xa, zb: m.zb, xb: m.xb, area: m.area, percent: r3(m.area * 100, 2) });
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure width={f.width} height={f.height} title={title ?? tk('normal.title')} description={desc} caption={caption}>
       <line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(0)} y2={f.sy(0)} />
       {m.shade.length > 0 && <path className="dg-shade" d={`${poly(m.shade)} Z`} />}
       <path className="dg-curve is-primary" d={poly(m.curve)} fill="none" />
@@ -299,13 +333,14 @@ export function NormalCurve({ title = 'The normal distribution', caption = null,
 }
 
 // ── Vectors, sequences and finance ───────────────────────────────────────────
-export function VectorDiagram({ title = 'Vectors', caption = null, ...spec }) {
+export function VectorDiagram({ title, caption = null, ...spec }) {
+  const tk = useTk();
   const m = vectorModel(spec);
   const f = m.frame; const x0 = m.origin[1]; const y0 = m.origin[0];
-  const desc = `${m.vectors.map(v => `Vector ${v.label || ''} = (${v.dx}, ${v.dy}), magnitude ${v.magnitude}, direction ${v.angle}°.`).join(' ')}${m.resultant ? ` Resultant = (${m.resultant.dx}, ${m.resultant.dy}), magnitude ${m.resultant.magnitude}.` : ''}`;
+  const desc = `${m.vectors.map(v => tk('vector.one', { label: v.label || '', dx: v.dx, dy: v.dy, magnitude: v.magnitude, angle: v.angle })).join(' ')}${m.resultant ? ` ${tk('vector.resultant', { dx: m.resultant.dx, dy: m.resultant.dy, magnitude: m.resultant.magnitude })}` : ''}`;
   const arrow = (a, b, cls, key) => <line key={key} className={`dg-vector ${cls}`} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} markerEnd="url(#dg-arrow)" />;
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure width={f.width} height={f.height} title={title ?? tk('vector.title')} description={desc} caption={caption}>
       <Defs />
       <g className="dg-axes">{m.xTicks.map(t => <line key={`gx${t.value}`} className="dg-grid" x1={t.px} x2={t.px} y1={f.top} y2={f.bottom} />)}{m.yTicks.map(t => <line key={`gy${t.value}`} className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} />)}
         <line className="dg-axis" x1={f.left} x2={f.right} y1={x0} y2={x0} markerEnd="url(#dg-arrow)" /><line className="dg-axis" x1={y0} x2={y0} y1={f.bottom} y2={f.top} markerEnd="url(#dg-arrow)" /></g>
@@ -315,51 +350,59 @@ export function VectorDiagram({ title = 'Vectors', caption = null, ...spec }) {
   );
 }
 // `type` is 'arithmetic' or 'geometric' (the spec's own `kind` names the diagram).
-export function SequenceDiagram({ type = 'arithmetic', title = 'A sequence', caption = null, ...spec }) {
+export function SequenceDiagram({ type = 'arithmetic', title, caption = null, ...spec }) {
+  const tk = useTk();
   const m = sequenceModel({ ...spec, kind: type }); const f = m.frame;
-  const desc = `The first ${m.n} terms of a ${m.kind} sequence starting at ${m.first} with ${m.kind === 'arithmetic' ? 'common difference' : 'common ratio'} ${m.step}: ${m.terms.join(', ')}. Their sum is ${m.total}.`;
+  const desc = tk(m.kind === 'arithmetic' ? 'sequence.arithmetic' : 'sequence.geometric', { n: m.n, first: m.first, step: m.step, terms: m.terms.join(', '), total: m.total });
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure width={f.width} height={f.height} title={title ?? tk('sequence.title')} description={desc} caption={caption}>
       <g className="dg-axes">{m.yTicks.map(t => <g key={t.value}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={String(t.value)} w={40} h={20} anchor="end" /></g>)}<line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(Math.max(0, f.ymin))} y2={f.sy(Math.max(0, f.ymin))} /></g>
       <path className="dg-curve is-secondary" d={poly(m.points.map(p => p.px))} fill="none" strokeDasharray="4 4" />
       {m.points.map(p => <g key={p.k}><line className="dg-stem" x1={p.px[0]} x2={p.px[0]} y1={f.sy(0)} y2={p.px[1]} /><circle className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" /><Tex x={p.px[0]} y={p.px[1] - 14} tex={String(p.value)} w={44} h={20} className="dg-small" /><Tex x={p.px[0]} y={f.sy(0) + 14} tex={`T_{${p.k}}`} w={40} h={20} className="dg-small" /></g>)}
     </Figure>
   );
 }
-export function CompoundGrowth({ title = 'Compound interest', caption = null, ...spec }) {
+export function CompoundGrowth({ title, caption = null, currency, ...spec }) {
+  const tk = useTk();
+  const cur = currencySymbol(currency); const curTex = currencyTex(cur);
   const m = compoundModel(spec); const f = m.frame;
-  const desc = `A $${m.principal} investment at ${r3(m.rate * 100, 3)}% per year compounded ${m.perYear} time${m.perYear === 1 ? '' : 's'} a year grows to $${m.final} after ${m.years} years, earning $${m.interest} in interest; simple interest would give $${m.simpleFinal}.`;
+  const desc = tk(m.perYear === 1 ? 'compound.descOne' : 'compound.descMany', { cur, principal: m.principal, rate: r3(m.rate * 100, 3), perYear: m.perYear, final: m.final, years: m.years, interest: m.interest, simple: m.simpleFinal });
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
-      <g className="dg-axes">{m.yTicks.map(t => <g key={t.value}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={`\\$${t.value}`} w={52} h={20} anchor="end" /></g>)}{m.xTicks.map(t => <Tex key={t.value} x={t.px} y={f.bottom + 14} tex={String(t.value)} w={36} h={20} />)}
+    <Figure width={f.width} height={f.height} title={title ?? tk('compound.title')} description={desc} caption={caption}>
+      <g className="dg-axes">{m.yTicks.map(t => <g key={t.value}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={`${curTex}${t.value}`} w={52} h={20} anchor="end" /></g>)}{m.xTicks.map(t => <Tex key={t.value} x={t.px} y={f.bottom + 14} tex={String(t.value)} w={36} h={20} />)}
         <line className="dg-axis" x1={f.left} x2={f.right} y1={f.bottom} y2={f.bottom} /><line className="dg-axis" x1={f.left} x2={f.left} y1={f.bottom} y2={f.top} /></g>
       <path className="dg-curve is-secondary" d={poly(m.simplePx)} fill="none" strokeDasharray="5 4" />
       <path className="dg-curve is-primary" d={poly(m.px)} fill="none" />
       <circle className="dg-dot is-key" cx={m.px.at(-1)[0]} cy={m.px.at(-1)[1]} r="5" />
-      <Tex x={m.px.at(-1)[0] - 8} y={m.px.at(-1)[1] - 16} tex={`\\$${m.final}`} w={90} anchor="end" />
+      <Tex x={m.px.at(-1)[0] - 8} y={m.px.at(-1)[1] - 16} tex={`${curTex}${m.final}`} w={90} anchor="end" />
       <Tex x={f.left + 10} y={f.top + 10} tex={`A=P(1+r)^n`} w={130} anchor="start" className="dg-small" />
     </Figure>
   );
 }
-export function Timeline({ title = 'A timeline of payments', caption = null, ...spec }) {
+export function Timeline({ title, caption = null, currency, ...spec }) {
+  const tk = useTk();
+  const cur = currencySymbol(currency); const curTex = currencyTex(cur);
   const m = timelineModel(spec);
-  const desc = `A timeline of ${m.events.length} payments over ${m.end} years: ${m.events.map(e => `${e.amount >= 0 ? 'receive' : 'pay'} $${Math.abs(e.amount)} at year ${e.t}`).join('; ')}. Net ${m.net >= 0 ? '+' : '-'}$${Math.abs(m.net)}.`;
+  const desc = tk('timeline.desc', { count: m.events.length, end: m.end, events: m.events.map(e => tk(e.amount >= 0 ? 'timeline.receive' : 'timeline.pay', { cur, amount: Math.abs(e.amount), t: e.t })).join('; '), net: `${m.net >= 0 ? '+' : '-'}${cur}${Math.abs(m.net)}` });
   return (
-    <Figure width={m.frame.width} height={m.frame.height} title={title} description={desc} caption={caption}>
+    <Figure width={m.frame.width} height={m.frame.height} title={title ?? tk('timeline.title')} description={desc} caption={caption}>
       <Defs />
       <line className="dg-axis" x1={m.frame.left} x2={m.frame.right} y1={m.y} y2={m.y} markerEnd="url(#dg-arrow)" />
       {m.ticks.map(t => <g key={t.value}><line className="dg-tick" x1={t.px} x2={t.px} y1={m.y - 5} y2={m.y + 5} /><Tex x={t.px} y={m.y + 20} tex={String(t.value)} w={36} h={18} className="dg-small" /></g>)}
-      {m.events.map((e, i) => <g key={i}><line className={`dg-vector ${e.up ? 'is-resultant' : 'is-part'}`} x1={e.px[0]} y1={m.y} x2={e.px[0]} y2={e.up ? m.y - 34 : m.y + 34} markerEnd="url(#dg-arrow)" /><Tex x={e.px[0]} y={e.up ? m.y - 48 : m.y + 52} tex={`${e.amount >= 0 ? '+' : '-'}\\$${Math.abs(e.amount)}`} w={80} h={20} className="dg-small" /></g>)}
+      {m.events.map((e, i) => <g key={i}><line className={`dg-vector ${e.up ? 'is-resultant' : 'is-part'}`} x1={e.px[0]} y1={m.y} x2={e.px[0]} y2={e.up ? m.y - 34 : m.y + 34} markerEnd="url(#dg-arrow)" /><Tex x={e.px[0]} y={e.up ? m.y - 48 : m.y + 52} tex={`${e.amount >= 0 ? '+' : '-'}${curTex}${Math.abs(e.amount)}`} w={80} h={20} className="dg-small" /></g>)}
     </Figure>
   );
 }
 
 // ── Tangents, secants and Riemann rectangles ─────────────────────────────────
-export function SecantTangent({ title = 'A secant and a tangent', caption = null, ...spec }) {
+/** 'left', 'mid' or 'right' in the reader's language (any other mode is shown as given). */
+export const riemannMode = (tk, mode) => (['left', 'mid', 'right'].includes(mode) ? tk(`riemann.mode.${mode}`) : mode);
+export function SecantTangent({ title, caption = null, ...spec }) {
+  const tk = useTk();
   const m = secantTangentModel(spec); const f = m.frame;
-  const desc = `The curve y = ${m.expr}. The secant through x = ${m.x0} and x = ${r3(m.x0 + m.h, 4)} has gradient ${m.secantSlope}; the tangent at x = ${m.x0} has gradient ${m.tangentSlope}.`;
+  const desc = tk('secantTangent.desc', { expr: m.expr, x0: m.x0, x1: r3(m.x0 + m.h, 4), secant: m.secantSlope, tangent: m.tangentSlope });
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure width={f.width} height={f.height} title={title ?? tk('secantTangent.title')} description={desc} caption={caption}>
       <Defs />
       <line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(0)} y2={f.sy(0)} markerEnd="url(#dg-arrow)" /><line className="dg-axis" x1={f.sx(0)} x2={f.sx(0)} y1={f.bottom} y2={f.top} markerEnd="url(#dg-arrow)" />
       {m.curve.map((s, i) => <path key={i} className="dg-curve is-primary" d={poly(s)} fill="none" />)}
@@ -367,37 +410,39 @@ export function SecantTangent({ title = 'A secant and a tangent', caption = null
       {m.secant && <line className="dg-curve is-secant" x1={m.secant[0][0]} y1={m.secant[0][1]} x2={m.secant[1][0]} y2={m.secant[1][1]} />}
       <circle className="dg-dot is-key" cx={m.p0[0]} cy={m.p0[1]} r="5" />
       {Math.abs(m.h) > 1e-9 && <circle className="dg-dot" cx={m.p1[0]} cy={m.p1[1]} r="4.5" />}
-      <Tex x={f.left + 8} y={f.top + 10} tex={`\\text{secant: } ${m.secantSlope}`} w={150} anchor="start" className="dg-small is-secant" />
-      <Tex x={f.left + 8} y={f.top + 30} tex={`\\text{tangent: } ${m.tangentSlope}`} w={150} anchor="start" className="dg-small is-tangent" />
+      <Tex x={f.left + 8} y={f.top + 10} tex={`\\text{${tk('tex.secant')}: } ${m.secantSlope}`} w={150} anchor="start" className="dg-small is-secant" />
+      <Tex x={f.left + 8} y={f.top + 30} tex={`\\text{${tk('tex.tangent')}: } ${m.tangentSlope}`} w={150} anchor="start" className="dg-small is-tangent" />
     </Figure>
   );
 }
-export function RiemannRectangles({ title = 'Riemann rectangles', caption = null, ...spec }) {
+export function RiemannRectangles({ title, caption = null, ...spec }) {
+  const tk = useTk();
   const m = riemannModel(spec); const f = m.frame;
-  const desc = `${m.n} ${m.mode}-point rectangles under y = ${m.expr} from x = ${m.a} to x = ${m.b}, each of width ${m.width}. Their total area is ${m.sum}; the area under the curve is ${m.area}.`;
+  const desc = tk('riemann.desc', { n: m.n, mode: riemannMode(tk, m.mode), expr: m.expr, a: m.a, b: m.b, width: m.width, sum: m.sum, area: m.area });
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure width={f.width} height={f.height} title={title ?? tk('riemann.title')} description={desc} caption={caption}>
       <Defs />
       <g className="dg-axes">{m.xTicks.map(t => <g key={t.value}><line className="dg-grid" x1={t.px} x2={t.px} y1={f.top} y2={f.bottom} /><Tex x={t.px} y={f.bottom + 14} tex={String(t.value)} w={36} h={20} /></g>)}{m.yTicks.map(t => <g key={t.value}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={String(t.value)} w={40} h={20} anchor="end" /></g>)}
         <line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(0)} y2={f.sy(0)} markerEnd="url(#dg-arrow)" /><line className="dg-axis" x1={f.left} x2={f.left} y1={f.bottom} y2={f.top} markerEnd="url(#dg-arrow)" /></g>
       {m.rects.map((r, i) => <rect key={i} className="dg-bar" x={r.x1} y={r.y} width={Math.max(0, r.x2 - r.x1)} height={Math.max(0, r.base - r.y)} />)}
       {m.curve.map((s, i) => <path key={i} className="dg-curve is-primary" d={poly(s)} fill="none" />)}
-      <Tex x={f.right - 6} y={f.top + 10} tex={`\\text{sum}=${m.sum}`} w={140} anchor="end" className="dg-small" />
-      <Tex x={f.right - 6} y={f.top + 30} tex={`\\text{area}=${m.area}`} w={140} anchor="end" className="dg-small" />
+      <Tex x={f.right - 6} y={f.top + 10} tex={`\\text{${tk('tex.sum')}}=${m.sum}`} w={140} anchor="end" className="dg-small" />
+      <Tex x={f.right - 6} y={f.top + 30} tex={`\\text{${tk('tex.area')}}=${m.area}`} w={140} anchor="end" className="dg-small" />
     </Figure>
   );
 }
 
 // ── Networks ─────────────────────────────────────────────────────────────────
-export function Network({ nodes, edges, path = [], directed = false, title = 'A network', caption = null }) {
+export function Network({ nodes, edges, path = [], directed = false, title, caption = null }) {
+  const tk = useTk();
   const m = networkModel({ nodes, edges, path, directed });
   const desc = sentence(
-    `A ${directed ? 'directed ' : ''}network of ${m.nodes.length} nodes and ${m.edges.length} edges.`,
-    m.edges.map(e => `${e.from} ${directed ? 'to' : 'joined to'} ${e.to}${e.label ? `, ${e.label.replace(/[\\${}]/g, '')}` : ''}.`).join(' '),
-    m.path.length > 1 && m.pathOk ? `The route ${m.path.join(', ')} is highlighted${m.edges.every(e => e.weight !== null) ? `, with total ${m.pathWeight}` : ''}.` : ''
+    tk(directed ? 'network.summaryDirected' : 'network.summary', { nodes: m.nodes.length, edges: m.edges.length }),
+    m.edges.map(e => tk(directed ? 'network.edgeDirected' : 'network.edge', { from: e.from, to: e.to, label: e.label ? `, ${e.label.replace(/[\\${}]/g, '')}` : '' })).join(' '),
+    m.path.length > 1 && m.pathOk ? tk('network.route', { path: m.path.join(', '), total: m.edges.every(e => e.weight !== null) ? tk('network.routeTotal', { total: m.pathWeight }) : '' }) : ''
   );
   return (
-    <Figure width={m.width} height={m.height} title={title} description={desc} caption={caption}>
+    <Figure width={m.width} height={m.height} title={title ?? tk('network.title')} description={desc} caption={caption}>
       <Defs />
       {m.edges.map((e, i) => (
         <g key={i}>
@@ -416,16 +461,17 @@ export function Network({ nodes, edges, path = [], directed = false, title = 'A 
 }
 
 // ── Bivariate data ───────────────────────────────────────────────────────────
-export function Scatter({ points, line = null, xLabel = 'x', yLabel = 'y', title = 'A scatterplot', caption = null, ...range }) {
+export function Scatter({ points, line = null, xLabel = 'x', yLabel = 'y', title, caption = null, ...range }) {
+  const tk = useTk();
   const m = scatterModel({ points, line, ...range });
   const f = m.frame;
   const desc = sentence(
-    `A scatterplot of ${m.n} points: ${m.points.map(p => `(${p.x}, ${p.y})`).join(', ')}.`,
-    m.line ? `A line ${m.line.fitted ? 'of best fit (least squares) ' : ''}with gradient ${m.line.m} and y-intercept ${m.line.c} is drawn.` : '',
-    m.r !== null ? `The correlation coefficient is ${m.r}.` : ''
+    tk('scatter.points', { n: m.n, points: m.points.map(p => `(${p.x}, ${p.y})`).join(', ') }),
+    m.line ? tk(m.line.fitted ? 'scatter.fit' : 'scatter.line', { m: m.line.m, c: m.line.c }) : '',
+    m.r !== null ? tk('scatter.r', { r: m.r }) : ''
   );
   return (
-    <Figure width={f.width} height={f.height} title={title} description={desc} caption={caption}>
+    <Figure width={f.width} height={f.height} title={title ?? tk('scatter.title')} description={desc} caption={caption}>
       <Defs />
       {m.xTicks.map(t => <g key={`x${t.value}`}><line className="dg-grid" x1={t.px} x2={t.px} y1={f.top} y2={f.bottom} /><Tex x={t.px} y={f.bottom + 14} tex={String(t.value)} w={40} h={20} /></g>)}
       {m.yTicks.map(t => <g key={`y${t.value}`}><line className="dg-grid" x1={f.left} x2={f.right} y1={t.px} y2={t.px} /><Tex x={f.left - 6} y={t.px} tex={String(t.value)} w={40} h={20} anchor="end" /></g>)}
@@ -440,13 +486,14 @@ export function Scatter({ points, line = null, xLabel = 'x', yLabel = 'y', title
 }
 
 // ── Solids ───────────────────────────────────────────────────────────────────
-const SOLID_NAME = { rectPrism: 'rectangular prism', cylinder: 'cylinder', cone: 'cone', sphere: 'sphere', pyramid: 'rectangular pyramid' };
 export function Solid({ title = null, caption = null, ...spec }) {
+  const tk = useTk();
   const m = solidModel(spec);
-  const dims = { rectPrism: `length ${spec.l ?? 4}, width ${spec.w ?? 3}, height ${spec.h ?? 3}`, pyramid: `base ${spec.l ?? 4} by ${spec.w ?? 3}, height ${spec.h ?? 3}`, cylinder: `radius ${spec.r ?? 2}, height ${spec.h ?? 3}`, cone: `radius ${spec.r ?? 2}, height ${spec.h ?? 3}`, sphere: `radius ${spec.r ?? 2}` }[m.shape];
-  const desc = `A ${SOLID_NAME[m.shape]}: ${dims}. Its volume is ${r3(m.volume, 2)} cubic units.`;
+  const name = tk(`solid.${m.shape}`);
+  const dims = tk(`solid.dims.${m.shape}`, { l: spec.l ?? 4, w: spec.w ?? 3, h: spec.h ?? 3, r: spec.r ?? 2 });
+  const desc = tk('solid.desc', { name, dims, volume: r3(m.volume, 2) });
   return (
-    <Figure width={m.width} height={m.height} title={title || `A ${SOLID_NAME[m.shape]}`} description={desc} caption={caption} className="dg-square">
+    <Figure width={m.width} height={m.height} title={title || tk('solid.title', { name })} description={desc} caption={caption} className="dg-square">
       {m.hidden.map((pts, i) => <path key={`h${i}`} className="dg-hidden" d={poly(pts)} />)}
       {m.solid.map((pts, i) => <path key={`s${i}`} className="dg-solid" d={poly(pts)} />)}
       {m.marks.map((k, i) => <line key={`m${i}`} className="dg-hidden is-mark" x1={k.from[0]} y1={k.from[1]} x2={k.to[0]} y2={k.to[1]} />)}

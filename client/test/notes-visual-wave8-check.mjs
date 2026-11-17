@@ -68,8 +68,8 @@ for(const group of IN_CURRICULUM){
       figures.set(fig.type,(figures.get(fig.type)||0)+1);
       // The accessibility description represents GIVEN diagram data, not computed solutions.
       if(ex.question.includes('midpoint'))assert.ok(!/midpoint M\([^)]*\)/.test(fig.description),'midpoint answer leaked by SVG caption');
-      if(ex.question.includes('After reflection')&&ex.question.includes('coordinates of point P'))assert.ok(!/image P\(/.test(fig.description),'reflection answer leaked by SVG caption');
-      if(ex.question.includes('Find f⁻¹(')){
+      if(ex.question.includes('After reflection')&&ex.question.includes('coordinates of point $P$'))assert.ok(!/image P\(/.test(fig.description),'reflection answer leaked by SVG caption');
+      if(ex.question.includes('Find $f^{-1}(')){
         assert.ok(!/P['′]\(/.test(fig.description),'inverse answer leaked under a mismatched SVG point label');
         assert.ok(fig.description.includes('Q on the inverse'),'spoken inverse point label differs from plotted Q');
       }
@@ -109,7 +109,7 @@ for(const group of IN_CURRICULUM){
         assert.equal(fig.times.length,4);assert.equal(fig.velocities.length,4);
         assert.ok(fig.times.every((t,i)=>Number.isFinite(t)&&(i===0||t>fig.times[i-1]))&&fig.velocities.every(v=>v>=0),'invalid time/speed');
         const total=[0,1,2].reduce((s,i)=>s+(fig.times[i+1]-fig.times[i])*(fig.velocities[i]+fig.velocities[i+1])/2,0);
-        if(ex.question.includes('distance'))assert.ok(close(total,parseFloat(ex.answer)),'motion trapezoid area disagrees with solution');
+        if(ex.question.includes('distance'))assert.ok(close(total,parseFloat(ex.answer.replace(/^\$/,''))),'motion trapezoid area disagrees with solution');
       } else if(fig.type==='two-box'){
         for(const a of [fig.a,fig.b])assert.ok(a.length===5&&a.every((x,i)=>Number.isFinite(x)&&(i===0||x>a[i-1])),'quartile order invalid');
       } else if(fig.type==='network'){
