@@ -77,7 +77,7 @@ export function compileAst(ast) {
 const N = v => ({ t: 'num', v: Object.is(v, -0) ? 0 : v });
 const isZero = n => n.t === 'num' && n.v === 0;
 const asMul = n => (n.t === 'num' ? { c: n.v, f: [] } : n.t === 'mul' ? { c: n.c, f: n.f } : { c: 1, f: [n] });
-const ORDER = { sym: 0, var: 1, pow: 1, sum: 2, call: 3, div: 4 };
+const ORDER = { sym: 0, div: 0.5, var: 1, pow: 1, sum: 2, call: 3 };
 const keyOf = n => JSON.stringify(n);
 
 function mkMul(c, factors) {
@@ -93,7 +93,8 @@ function mkMul(c, factors) {
   }
   let cc = c; const ff = [];
   for (const m of merged) {
-    const n = m.node || mkPow(m.base, N(m.e));
+    let n = m.node || mkPow(m.base, N(m.e));
+    if (n.t === 'div' && isNegTerm(n.n)) { cc = -cc; n = { ...n, n: absTerm(n.n) }; }
     if (n.t === 'num') cc *= n.v; else if (n.t === 'mul') { cc *= n.c; ff.push(...n.f); } else ff.push(n);
   }
   if (cc === 0) return N(0);
@@ -144,6 +145,7 @@ function mkDiv(n, d) {
     if (n.t === 'num') { const v = n.v / d.v; if (foldable(v)) return N(v); }
     if (d.v === 1) return n;
     if (d.v === -1) return mkNeg(n);
+    if (d.v < 0) return mkDiv(mkNeg(n), N(-d.v));
   }
   return { t: 'div', n, d };
 }
@@ -190,7 +192,7 @@ function lower(ast, env) {
 // Rendering: TeX, plain text and engine syntax (the last only to check the formatter).
 const FN_TEX = { sin: '\\sin', cos: '\\cos', tan: '\\tan', sec: '\\sec', cot: '\\cot', csc: '\\csc', cosec: '\\operatorname{cosec}', ln: '\\ln', log: '\\log', asin: '\\sin^{-1}', acos: '\\cos^{-1}', atan: '\\tan^{-1}', arcsin: '\\sin^{-1}', arccos: '\\cos^{-1}', arctan: '\\tan^{-1}' };
 const isNegTerm = n => (n.t === 'num' && n.v < 0) || (n.t === 'mul' && n.c < 0) || (n.t === 'div' && isNegTerm(n.n));
-const absTerm = n => (n.t === 'num' ? N(-n.v) : n.t === 'mul' ? (n.c === -1 && n.f.length === 1 ? n.f[0] : { ...n, c: -n.c }) : n.t === 'div' ? { ...n, n: absTerm(n.n) } : n);
+const absTerm = n => (n.t === 'num' ? N(-n.v) : n.t === 'mul' ? { ...n, c: -n.c } : n.t === 'div' ? { ...n, n: absTerm(n.n) } : n);
 const simpleArg = a => a.t === 'var' || a.t === 'sym' || (a.t === 'num' && a.v >= 0) || (a.t === 'mul' && a.c > 0 && a.f.length === 1 && (a.f[0].t === 'var' || a.f[0].t === 'sym'));
 
 function joinFactors(parts, mode) {
@@ -213,7 +215,7 @@ export function renderTex(n) {
     case 'sum': return n.terms.map((t, i) => { const neg = isNegTerm(t); const body = renderTex(neg ? absTerm(t) : t); return i === 0 ? `${neg ? '-' : ''}${body}` : `${neg ? '-' : '+'}${body}`; }).join('');
     case 'mul': {
       if (n.c < 0) return `-${renderTex(absTerm(n))}`;
-      const fs = n.f.map(f => (f.t === 'sum' ? paren(renderTex(f)) : renderTex(f)));
+      const fs = n.f.map(f => { const t = renderTex(f); return f.t === 'sum' || t.startsWith('-') ? paren(t) : t; });
       const coef = n.c === 1 ? [] : [numTex(n.c)];
       return joinFactors([...coef, ...fs], 'tex');
     }
@@ -250,7 +252,7 @@ export function renderText(n) {
     case 'sum': return n.terms.map((t, i) => { const neg = isNegTerm(t); const body = renderText(neg ? absTerm(t) : t); return i === 0 ? `${neg ? '-' : ''}${body}` : ` ${neg ? '-' : '+'} ${body}`; }).join('');
     case 'mul': {
       if (n.c < 0) return `-${renderText(absTerm(n))}`;
-      const fs = n.f.map(f => (f.t === 'sum' || f.t === 'div' ? paren(renderText(f)) : renderText(f)));
+      const fs = n.f.map(f => { const t = renderText(f); return f.t === 'sum' || f.t === 'div' || t.startsWith('-') ? paren(t) : t; });
       return joinFactors([...(n.c === 1 ? [] : [numText(n.c).includes('/') ? paren(numText(n.c)) : numText(n.c)]), ...fs], 'text');
     }
     case 'pow': return `${atomic(n.b) && !(n.b.t === 'num' && n.b.v < 0) && n.b.t !== 'call' ? renderText(n.b) : paren(renderText(n.b))}^${atomic(n.e) && !(n.e.t === 'num' && (n.e.v < 0 || !Number.isInteger(n.e.v))) ? renderText(n.e) : paren(renderText(n.e))}`;
