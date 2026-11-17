@@ -45,7 +45,6 @@ try {
   assert.ok(checkArchive(app('https://app.prilearning.com')).problems.some(p => /--sha/.test(p)), 'an archive checked without the release commit fails'); n++;
   assert.equal(checkArchive(app('https://app.prilearning.com', 'com.prilearning.qa'), { sha: 'a'.repeat(40) }).problems.length, 1, 'a QA bundle id is not the shipping app'); n++;
   assert.equal(checkArchive(app('https://app.prilearning.com'), { sha: 'b'.repeat(40) }).problems.length, 1, 'a build from another commit fails'); n++;
-  assert.ok(checkArchive(app('https://au.prilearning.com', 'com.prilearning.prithagoras').replace?.call ? app('https://au.prilearning.com', 'com.prilearning.prithagoras') : '', { sha: 'a'.repeat(40) }).problems.length === 0, 'the Prithagoras display name is Prithagoras'); n++;
   // One app per edition: each names its own server and bundles its own client.
   const P = 'com.prilearning.prithagoras';
   assert.deepEqual(checkArchive(app('https://au.prilearning.com', P), { sha: 'a'.repeat(40) }).problems, [], 'a correct Prithagoras archive passes'); n++;
