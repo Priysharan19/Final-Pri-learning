@@ -8,7 +8,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 ## Summary
 
-**180 of 196 chapters at standard.**
+**196 of 196 chapters at standard.**
 
 | Band | Chapters | With notes | At standard | Missing sections (count of chapters) | ≥2 diagrams | Interactive | KaTeX issues |
 |---|---|---|---|---|---|---|---|
@@ -25,9 +25,9 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 | NSW Standard Year 12 | 17 | 17 | 17 | — | 17 | 17 | 0 |
 | NSW Advanced Year 11 | 7 | 7 | 7 | — | 7 | 7 | 0 |
 | NSW Advanced Year 12 | 7 | 7 | 7 | — | 7 | 7 | 0 |
-| NSW Extension 1 Year 11 | 5 | 5 | 0 | objective 5, intuition 5 | 2 | 0 | 0 |
-| NSW Extension 1 Year 12 | 6 | 6 | 0 | objective 6, intuition 6 | 4 | 0 | 0 |
-| NSW Extension 2 Year 12 | 5 | 5 | 0 | objective 5, intuition 5 | 1 | 1 | 0 |
+| NSW Extension 1 Year 11 | 5 | 5 | 5 | — | 5 | 4 | 0 |
+| NSW Extension 1 Year 12 | 6 | 6 | 6 | — | 6 | 6 | 0 |
+| NSW Extension 2 Year 12 | 5 | 5 | 5 | — | 5 | 5 | 0 |
 
 **Typesetting.** Priyabhata: CMU Serif + KaTeX; Prithagoras: CMU Serif + KaTeX.
 
@@ -46,6 +46,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 - `ma5-net-p-01` Introduction to networks (Path) — These skills are counting and comparing on one fixed network; there is no quantity whose movement teaches more than the two highlighted networks with their weights.
 - `mst-11-06` Time and location — This topic rests on one fixed rate, $15^\circ$ of longitude per hour, and on offsets that each question states; there is no quantity to vary whose effect a slider would show more clearly than the two number lines.
 - `mst-11-07` Networks, paths and trees — Shortest paths and spanning trees come from step-by-step methods on one fixed network; nothing varies continuously, and the two highlighted diagrams show each result with its total.
+- `me1-11-04` Permutations and combinations — Counting here is exact reasoning about discrete choices. No quantity varies smoothly, so a slider would only replay the tree and Pascal's triangle without showing anything they do not.
 
 ## Every chapter
 
@@ -298,30 +299,30 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `me1-11-01` Further work with functions | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `me1-11-02` Polynomials | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `me1-11-03` Further trigonometry | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `me1-11-04` Permutations and combinations | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 0 | **no** | 0 | ok | **no** |
-| `me1-11-05` The binomial theorem | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
+| `me1-11-01` Further work with functions | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `me1-11-02` Polynomials | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `me1-11-03` Further trigonometry | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `me1-11-04` Permutations and combinations | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | reason | 0 | ok | yes |
+| `me1-11-05` The binomial theorem | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
 
 ### NSW Extension 1 Year 12
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `me1-12-01` Proof by mathematical induction | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 0 | **no** | 0 | ok | **no** |
-| `me1-12-02` Introduction to vectors | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `me1-12-03` Inverse trigonometric functions | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `me1-12-04` Further calculus skills | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `me1-12-05` Further applications of calculus | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
-| `me1-12-06` The binomial distribution and sampling distribution of the mean | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
+| `me1-12-01` Proof by mathematical induction | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `me1-12-02` Introduction to vectors | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `me1-12-03` Inverse trigonometric functions | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `me1-12-04` Further calculus skills | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `me1-12-05` Further applications of calculus | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `me1-12-06` The binomial distribution and sampling distribution of the mean | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
 
 ### NSW Extension 2 Year 12
 
 | Chapter | Notes | Obj | Prereq | Intuition | Formal | Examples | Misconc. | Checkpoint | Practice | Diagrams | Interactive | Figures | KaTeX | Standard |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| `me2-12-01` The nature of proof | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `me2-12-02` Further work with vectors | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `me2-12-03` Introduction to complex numbers | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | **no** | 0 | ok | **no** |
-| `me2-12-04` Further integration | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 1 | yes | 0 | ok | **no** |
-| `me2-12-05` Applications of calculus to mechanics | yes | **no** | yes | **no** | yes | yes | yes | yes | yes | 2 | **no** | 0 | ok | **no** |
+| `me2-12-01` The nature of proof | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `me2-12-02` Further work with vectors | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `me2-12-03` Introduction to complex numbers | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
+| `me2-12-04` Further integration | yes | yes | yes | yes | yes | yes | yes | yes | yes | 2 | yes | 0 | ok | yes |
+| `me2-12-05` Applications of calculus to mechanics | yes | yes | yes | yes | yes | yes | yes | yes | yes | 3 | yes | 0 | ok | yes |
 
