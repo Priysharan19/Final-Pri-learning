@@ -73,6 +73,7 @@ So the split is safe only if no lane-gated job is ever a required context. The p
 | `ink-production-evidence-capture.yml` | everywhere | evidence honesty: production evidence capture |
 | `android-shell.yml` | trains, main, dispatch | Gradle build and the 4-profile emulator matrix (the shell CSP and store policy stay in `ci.yml`) |
 | `app-health-agent.yml` | trains, main, dispatch (and nightly) | mounted-app audit, browser evidence, macOS native shell |
+| `nightly-backup.yml` | trains, main, dispatch (and nightly) | encrypted `pg_dump` of both production databases and the throwaway-Postgres restore test |
 | `kalp-01-design-system.yml` | trains, main, dispatch | design-system browser journey and visual evidence |
 | `kalp-02-information-architecture.yml` | trains, main, dispatch | navigation browser regression |
 | `kalp-03-onboarding-profile.yml` | trains, main, dispatch | onboarding browser journey (the account gate is in the required browser suites) |

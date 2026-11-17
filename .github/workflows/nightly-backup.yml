@@ -1,0 +1,113 @@
+name: Nightly logical backup
+
+# pg_dump of each production database, encrypted with age to the public key in
+# scripts/ops-age-recipient.txt (private key: owner's macOS Keychain, never in the repo),
+# kept 14 days as a workflow artifact. Secrets PRI_BACKUP_DB_URL_IN and
+# PRI_BACKUP_DB_URL_AU are set by the owner; an absent secret skips that
+# edition cleanly. The restore-test job proves the dump -> encrypt -> decrypt ->
+# restore path on a throwaway Postgres before anything is trusted.
+# Restore steps: docs/operations/restore-runbook.md.
+on:
+  schedule:
+    - cron: '17 18 * * *'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/nightly-backup.yml'
+      - 'scripts/ops-*.sh'
+      - 'scripts/ops-age-recipient.txt'
+  pull_request:
+    paths:
+      - '.github/workflows/nightly-backup.yml'
+      - 'scripts/ops-*.sh'
+      - 'scripts/ops-age-recipient.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-backup-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  restore-test:
+    name: restore test (throwaway Postgres)
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: throwaway
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: throwaway
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install age and the PostgreSQL 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release; echo $VERSION_CODENAME)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age postgresql-client-17
+      - name: Backup, decrypt, restore, compare
+        run: scripts/ops-restore-test.sh
+
+  backup:
+    name: backup (${{ matrix.edition }})
+    needs: restore-test
+    if: (github.event_name != 'pull_request' || startsWith(github.head_ref, 'task/train-')) && (github.event_name != 'pull_request' && github.event_name != 'push')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - edition: in
+            secret: PRI_BACKUP_DB_URL_IN
+          - edition: au
+            secret: PRI_BACKUP_DB_URL_AU
+    env:
+      DB_URL: ${{ secrets[matrix.secret] }}
+    steps:
+      - name: Check the secret is present
+        id: gate
+        run: |
+          if [ -z "${DB_URL}" ]; then
+            echo "::notice::${{ matrix.secret }} is not set - skipping the ${{ matrix.edition }} backup"
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: steps.gate.outputs.run == 'true'
+      - name: Install age and the PostgreSQL 17 client
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release; echo $VERSION_CODENAME)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq age postgresql-client-17
+      - name: pg_dump and encrypt
+        if: steps.gate.outputs.run == 'true'
+        run: |
+          mkdir -p out
+          scripts/ops-backup.sh "out/pri-${{ matrix.edition }}-$(date -u +%Y%m%dT%H%M%SZ).dump.age"
+      - name: Upload encrypted backup (14 days)
+        if: steps.gate.outputs.run == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: pri-backup-${{ matrix.edition }}
+          path: out/*.dump.age
+          retention-days: 14
+          if-no-files-found: error
