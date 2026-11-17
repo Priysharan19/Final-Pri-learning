@@ -30,8 +30,8 @@ import { pathToFileURL } from 'node:url';
  * the edition its bundled client must have been built for.
  */
 export const EDITION_APPS = Object.freeze({
-  'com.prilearning.app': Object.freeze({ edition: 'priyabhata', origin: 'https://app.prilearning.com' }),
-  'com.prilearning.prithagoras': Object.freeze({ edition: 'prithagoras', origin: 'https://au.prilearning.com' })
+  'com.prilearning.app': Object.freeze({ edition: 'priyabhata', origin: 'https://app.prilearning.com', displayName: 'Priyabhata', icon: 'AppIcon' }),
+  'com.prilearning.prithagoras': Object.freeze({ edition: 'prithagoras', origin: 'https://au.prilearning.com', displayName: 'Prithagoras', icon: 'AppIconPrithagoras' })
 });
 
 /** The one origin a native archive may name (D5; RELEASE.md §4 "Cloud origin"). */
@@ -115,7 +115,7 @@ function findReleaseJson(app, file = 'release.json') {
 
 export function checkArchive(path, { sha = null } = {}) {
   const { plist, app } = findApp(path);
-  const info = readPlist(plist, ['PRICloudOrigin', 'CFBundleIdentifier', 'CFBundleShortVersionString', 'CFBundleVersion']);
+  const info = readPlist(plist, ['PRICloudOrigin', 'CFBundleIdentifier', 'CFBundleShortVersionString', 'CFBundleVersion', 'CFBundleDisplayName']);
   const problems = [];
   const edition = EDITION_APPS[info.CFBundleIdentifier] || null;
   const origin = originProblem(info.PRICloudOrigin, edition?.origin ?? CANDIDATE_ORIGIN);
@@ -132,6 +132,8 @@ export function checkArchive(path, { sha = null } = {}) {
     if (features) { try { built = JSON.parse(readFileSync(features, 'utf8')).edition || null; } catch { built = null; } }
     if (built !== edition.edition) problems.push(`the bundled client is the ${built || 'unknown'} edition, not ${edition.edition} (${info.CFBundleIdentifier})`);
   }
+  // The icon and name are the edition's: an archive carrying the other edition's would ship its brand.
+  if (edition && app && info.CFBundleDisplayName !== edition.displayName) problems.push(`display name is ${info.CFBundleDisplayName ?? 'missing'}, not ${edition.displayName}`);
   if (app && !sha) problems.push('no --sha given: a release archive is checked against the exact release commit');
   let releaseSha = null;
   const release = findReleaseJson(app);

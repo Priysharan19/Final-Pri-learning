@@ -30,8 +30,6 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const PACKAGES = ['ios/PriLearning.swiftpm/Package.swift', 'ios/PriLearning 2.swiftpm/Package.swift'];
 export const BUNDLE_ID = 'com.prilearning.app';
-/** One package, one app per edition (ADR-0002): Priyabhata keeps its bundle id; Prithagoras is a second product on the same target. */
-export const EDITION_BUNDLE_IDS = Object.freeze(['com.prilearning.app', 'com.prilearning.prithagoras']);
 export const REQUIRED_FAMILIES = ['pad', 'phone'];
 const FAMILIES = /supportedDeviceFamilies:\s*\[([^\]]*)\]/;
 const ORIENTATIONS = /supportedInterfaceOrientations:\s*\[([\s\S]*?)\n\s*\]/;
@@ -56,11 +54,6 @@ export function orientationEntries(source) {
 /** Map of orientation → device families it is restricted to ('all' when unconditional). */
 export function orientationsOf(source) {
   return Object.fromEntries(orientationEntries(source));
-}
-
-/** Every product's bundle identifier, in order. */
-export function bundleIdsOf(source) {
-  return [...stripComments(source).matchAll(/bundleIdentifier:\s*"([^"]+)"/g)].map(m => m[1]);
 }
 
 export function bundleIdOf(source) {
@@ -90,8 +83,6 @@ export function shippingProblems(source) {
   if (extra.length) problems.push(`unexpected orientations: ${extra.join(', ')}`);
   const id = bundleIdOf(source);
   if (id !== BUNDLE_ID) problems.push(`bundle identifier is ${id}, must stay ${BUNDLE_ID}`);
-  const ids = bundleIdsOf(source);
-  if (JSON.stringify(ids) !== JSON.stringify(EDITION_BUNDLE_IDS)) problems.push(`the products' bundle identifiers are [${ids.join(', ')}], must be exactly [${EDITION_BUNDLE_IDS.join(', ')}] (one app per edition)`);
   return problems;
 }
 

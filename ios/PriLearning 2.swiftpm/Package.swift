@@ -43,40 +43,6 @@ let package = Package(
             // build setting. The signed Info.plist is the native transport's
             // only production origin source; an absent/invalid value fails closed.
             additionalInfoPlistContentFilePath: "Info.plist"
-        ),
-        .iOSApplication(
-            name: "Prithagoras",
-            targets: ["AppModule"],
-            bundleIdentifier: "com.prilearning.prithagoras",
-            displayVersion: "1.0",
-            bundleVersion: "2",
-            appIcon: .asset("AppIconPrithagoras"),
-            accentColor: .presetColor(.yellow),
-            // The Prithagoras edition (ADR-0002): the same target, its own bundle id, name, icon
-            // and (build setting PRI_CLOUD_ORIGIN) server. Built with a Prithagoras client bundle.
-            // V1 ships on iPhone and iPad from this one package (owner scope
-            // change #504, docs/release/PRI_V1_RELEASE_SCOPE.md §22). Same
-            // bundle id, same prilearning://app origin, same on-device data.
-            // Guarded by node scripts/apple-shipping-target.mjs --check-v1.
-            supportedDeviceFamilies: [
-                .pad,
-                .phone
-            ],
-            supportedInterfaceOrientations: [
-                // iPhone is portrait-only (CP-01/CP-04 decision); iPad keeps all four.
-                .portrait,
-                .landscapeRight(.when(deviceFamilies: [.pad])),
-                .landscapeLeft(.when(deviceFamilies: [.pad])),
-                .portraitUpsideDown(.when(deviceFamilies: [.pad]))
-            ],
-            capabilities: [
-                .camera(purposeString: "Photograph handwritten maths so Pri can read it and attach it to your attempt. The photo is sent to the Pri server to be read.")
-            ],
-            appCategory: .education,
-            // Xcode/App Store builds supply PRI_CLOUD_ORIGIN as a user-defined
-            // build setting. The signed Info.plist is the native transport's
-            // only production origin source; an absent/invalid value fails closed.
-            additionalInfoPlistContentFilePath: "Info.plist"
         )
     ],
     targets: [

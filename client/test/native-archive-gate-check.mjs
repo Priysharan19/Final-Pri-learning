@@ -35,7 +35,7 @@ try {
   const app = (origin, bundle = 'com.prilearning.app', sha = 'a'.repeat(40), built = bundle === 'com.prilearning.prithagoras' ? 'prithagoras' : 'priyabhata') => {
     const root = join(dir, `${Math.random().toString(36).slice(2)}.xcarchive`, 'Products', 'Applications', 'PriLearning.app');
     mkdirSync(join(root, 'Web'), { recursive: true });
-    writeFileSync(join(root, 'Info.plist'), `<?xml version="1.0"?><plist><dict><key>CFBundleIdentifier</key><string>${bundle}</string><key>CFBundleShortVersionString</key><string>4.0</string><key>CFBundleVersion</key><string>3</string><key>PRICloudOrigin</key>${origin === '' ? '<string></string>' : `<string>${origin}</string>`}</dict></plist>`);
+    writeFileSync(join(root, 'Info.plist'), `<?xml version="1.0"?><plist><dict><key>CFBundleIdentifier</key><string>${bundle}</string><key>CFBundleDisplayName</key><string>${bundle === 'com.prilearning.prithagoras' ? 'Prithagoras' : 'Priyabhata'}</string><key>CFBundleShortVersionString</key><string>4.0</string><key>CFBundleVersion</key><string>3</string><key>PRICloudOrigin</key>${origin === '' ? '<string></string>' : `<string>${origin}</string>`}</dict></plist>`);
     writeFileSync(join(root, 'Web', 'release.json'), JSON.stringify({ releaseSha: sha }));
     writeFileSync(join(root, 'Web', 'features.json'), JSON.stringify({ edition: built }));
     return join(root, '..', '..', '..');
@@ -45,6 +45,7 @@ try {
   assert.ok(checkArchive(app('https://app.prilearning.com')).problems.some(p => /--sha/.test(p)), 'an archive checked without the release commit fails'); n++;
   assert.equal(checkArchive(app('https://app.prilearning.com', 'com.prilearning.qa'), { sha: 'a'.repeat(40) }).problems.length, 1, 'a QA bundle id is not the shipping app'); n++;
   assert.equal(checkArchive(app('https://app.prilearning.com'), { sha: 'b'.repeat(40) }).problems.length, 1, 'a build from another commit fails'); n++;
+  assert.ok(checkArchive(app('https://au.prilearning.com', 'com.prilearning.prithagoras').replace?.call ? app('https://au.prilearning.com', 'com.prilearning.prithagoras') : '', { sha: 'a'.repeat(40) }).problems.length === 0, 'the Prithagoras display name is Prithagoras'); n++;
   // One app per edition: each names its own server and bundles its own client.
   const P = 'com.prilearning.prithagoras';
   assert.deepEqual(checkArchive(app('https://au.prilearning.com', P), { sha: 'a'.repeat(40) }).problems, [], 'a correct Prithagoras archive passes'); n++;
