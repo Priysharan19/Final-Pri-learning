@@ -93,10 +93,24 @@ export function canonicalKey(n) {
 // call (sin θ, sec θ, ln x) treated as an unrelated unknown. A line that agrees
 // with a side by algebra alone — 1·tan³θ, tan³θ + 0, 2·LHS/2, tan²θ·tan θ —
 // used no identity at all, so it is not working towards the other side.
+// The argument of a call is keyed by its VALUES, so θ + 0, 2θ/2 and 1·θ are
+// one argument: algebra inside a function is algebra too.
+const ARG_POINTS = [0.4137, 0.9183, 1.3311, -0.6271];
+function argumentKey(arg) {
+  const names = [...namesOf(arg)];
+  const vals = ARG_POINTS.map((x, i) => {
+    const env = {};
+    names.forEach((n, j) => { env[n] = x + 0.217 * j + 0.0031 * i; });
+    let v;
+    try { v = evaluate(arg, env); } catch { v = NaN; }
+    return Number.isFinite(v) ? v.toPrecision(10) : 'x';
+  });
+  return vals.every(v => v === 'x') ? `w:${canonicalKey(arg)}` : `v:${names.sort().join(',')}:${vals.join('|')}`;
+}
 function atomize(n, table) {
   if (!n || typeof n !== 'object') return n;
   if (n.t === 'call' && !Array.isArray(n.args)) {
-    const key = `${n.fn === 'csc' ? 'cosec' : n.fn}(${canonicalKey(n.arg)})`;
+    const key = `${n.fn === 'csc' ? 'cosec' : n.fn}(${argumentKey(n.arg)})`;
     if (!table.has(key)) table.set(key, `_u${table.size}`);
     return { t: 'var', v: table.get(key) };
   }

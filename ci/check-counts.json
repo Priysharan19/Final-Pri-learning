@@ -36,7 +36,7 @@
       "pins": [
         {"has":"3160000/3160000 self-checks passed across 395 subtopics"},
         {"has":"21000/21000 multipart part-checks passed"},
-        {"has":"STEP JUSTIFY: PASS — 720/720 checks","note":"Annotated working: named rules for valid steps (27 rules, negative and must-not-name cases), identity proofs straight, \"= RHS\" and meet-in-the-middle, receipt marks unchanged by the panel, no praise words."},
+        {"has":"STEP JUSTIFY: PASS — 731/731 checks","note":"Annotated working: named rules for valid steps (27 rules, negative and must-not-name cases), identity proofs straight, \"= RHS\" and meet-in-the-middle, receipt marks unchanged by the panel, no praise words."},
         {"has":"✔ INDIA SUITE PASSED — 2726/2726 checks"},
         {"has":"STUDENT PLOT: PASS — 38/38 checks","note":"v1.1: step-mark rows say the engine's mark and never contradict it."},
         {"has":"INDIA DIFFICULTY TRUTH: PASS — 36964/36964 checks"},

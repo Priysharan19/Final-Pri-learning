@@ -303,11 +303,18 @@ function checkWorkingWithinBudget(q, workingText) {
     }
   } catch { reached = false; }
 
-  // A proof is complete only in the shape of a proof (proofShape.js): this
-  // can withhold credit from lines that all check out, never grant it.
-  if (reached && hasSides(meta)) {
+  // A proof is complete only in the shape of a proof (proofShape.js). For an
+  // item that states its sides the shape decides: a chain of checked lines
+  // that reaches the other side, written out, or two chains that meet at the
+  // same written expression. The last-line test above cannot see a proof
+  // worked from the right-hand side towards a left-hand side, or one that
+  // meets in the middle, when the right-hand side is a constant (… = 1): the
+  // last line still holds the angle. The shape needs every checked line and
+  // a written side, so it never credits what the lines do not show.
+  if (hasSides(meta)) {
     const verdict = proofVerdict(report.lines.filter(l => l.status === 'ok').map(l => normalize(String(l.text))), meta.sides);
     if (!verdict.ok) return { correct: false, feedback: PROOF_SHAPE_NOTE[verdict.reason] || PROOF_SHAPE_NOTE.unread, stepReport: report, validLines: okLines.length, proofShape: verdict.reason };
+    reached = true;
   }
   if (!reached) {
     return { correct: false, feedback: 'Your verified steps do not yet end with the complete result — state every solution or the requested simplified expression on the final line.', stepReport: report, validLines: okLines.length };

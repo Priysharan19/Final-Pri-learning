@@ -310,6 +310,17 @@ ok('the screenshot identity is a CBSE proof', identityProofCatalogue('cbse').som
   deny('RHS + sin θ − sin θ between', [L, 'tan(θ)^3 + sin(θ) - sin(θ)', 'tan(θ)^3']);
   deny('"= 1·RHS = RHS" on one line', [L, '= 1*tan(θ)^3 = tan(θ)^3']);
   deny('tan²θ·tan θ between', [L, 'tan(θ)^2*tan(θ)', 'tan(θ)^3']);
+  // 2c · algebra inside a function's argument is algebra too (re-review 2, finding 1)
+  deny('tan(θ + 0) between', [L, 'tan(θ+0)^3', 'tan(θ)^3']);
+  deny('tan(2θ/2) between', [L, 'tan(2*θ/2)^3', 'tan(θ)^3']);
+  deny('tan(1·θ) between', [L, 'tan(1*θ)^3', 'tan(θ)^3']);
+  deny('sec(θ + 0) in the LHS between', [L, '(sec(θ+0) - cos(θ))/(cosec(θ) - sin(θ))', 'tan(θ)^3']);
+  // KNOWN LIMIT, recorded on #1005 (re-review 2, finding 2): padding a side with
+  // an identity equal to 1 is a line that uses an identity, so the written shape
+  // alone counts it; only a step-justification gate (declined) would refuse it.
+  // Pinned as the behaviour today so a change to it is a decision, not a drift.
+  for (const pad of ['tan(θ)^3*(sin(θ)^2+cos(θ)^2)', 'tan(θ)^3*sec(θ)*cos(θ)', 'tan(θ)^3 + sin(θ)^2 + cos(θ)^2 - 1'])
+    ok(`known limit (recorded): identity padding "${pad}" is credited by the shape alone`, checkWorking(q, [L, pad, 'tan(θ)^3'].join('\n')).correct === true);
   // 3 · circular: the identity asserted, then "worked" towards
   deny('the identity asserted at the top, then the RHS', [`${L} = tan(θ)^3`, 'tan(θ)^3']);
   deny('"LHS = RHS" at the top, then RHS', ['LHS = RHS', 'tan(θ)^3', '= RHS']);
@@ -324,6 +335,16 @@ ok('the screenshot identity is a CBSE proof', identityProofCatalogue('cbse').som
   deny('a different starting expression equal to the LHS', ['sin(θ)^3/cos(θ)^3', '= tan(θ)^3']);
   // and the honest proofs still earn it
   ok('a straight proof is credited', checkWorking(q, lines.join('\n')).correct === true);
+  // A constant right-hand side: worked from the RHS, and met in the middle (re-review 2, finding 3)
+  {
+    const c = identityProof(() => 2.5 / 4, 'cbse');           // sec A(1 − sin A)(sec A + tan A) = 1
+    const cl = c.answer.canonicalWorking.split('\n');
+    const CL = c.answer.stepMeta.sides.lhs;
+    ok('constant RHS: worked from the RHS to the LHS is credited', checkWorking(c, [...cl].reverse().join('\n')).correct === true);
+    ok('constant RHS: meeting in the middle is credited', checkWorking(c, [`LHS = ${CL}`, ...cl.slice(1, 4).map(l => `= ${l}`), 'RHS = 1', `= ${cl[4]}`, `= ${cl[3]}`].join('\n')).correct === true);
+    ok('constant RHS: the forward proof is still credited', checkWorking(c, cl.join('\n')).correct === true);
+    ok('constant RHS: "1 then the LHS" is still refused', checkWorking(c, ['1', CL].join('\n')).correct !== true);
+  }
   ok('a "To prove: LHS = RHS" header does not stop a proof', checkWorking(q, ['To prove: LHS = RHS', ...lines].join('\n')).correct === true);
   ok('a labelled straight proof is credited', checkWorking(q, [`LHS = ${lines[0]}`, ...lines.slice(1).map(l => `= ${l}`), '= RHS'].join('\n')).correct === true);
   ok('meeting in the middle at the same expression is credited',
