@@ -8,9 +8,10 @@
 //   · "Export JSON"  — a DRAFT of the certification record
 //                      (docs/marking/certifications/schema.json). It always
 //                      carries `draftNotSigned: true`, which the schema forbids, so
-//                      tools/verify-examiner-certification.mjs REFUSES it until a human
-//                      removes the marker after signing the printed form. This page can
-//                      therefore never produce a certification.
+//                      tools/verify-examiner-certification.mjs REFUSES it. It also leaves
+//                      independence unconfirmed and signedOriginal/recordedBy empty, so it is
+//                      refused for those too; a certification is a human act done on the printed,
+//                      signed form and recorded by a person, never produced by this page.
 //   · "Print / Save as PDF" — the decision form with the examiner's verdicts, notes
 //                      and BLANK signature lines. Only the examiner signs.
 //
@@ -73,7 +74,7 @@ function renderItem(id, n, p) {
   const rows = sec ? sec.rows.map(r => `<tr><th>${esc(r[0])}</th><td>${renderMath(r[1].replace(/^`|`$/g, ''))}</td><td>${esc(r[2])}</td><td>${esc(r[3])}</td><td>${esc(r[4])}</td><td class="note">${renderMath(r[5])}</td></tr>`).join('') : '';
   return `<article class="item" id="i${n}" data-id="${esc(id)}" data-kind="${esc(kindOf(id))}" tabindex="0">
 <header><span class="n">${n}</span><code>${esc(id)}</code><span class="what">${renderMath(p.what.get(id) || '')}</span></header>
-${sec ? `<p class="q">${renderMath(sec.question)}</p><p class="seed">sample question, seed ${esc(sec.seed)}</p>
+${sec ? `<p class="q">${renderMath(sec.question)}</p><p class="seed">sample question, ${esc(String(sec.seed).replace(/^seed\s+/i, 'seed '))}</p>
 <table class="cases"><thead><tr><th>Case</th><th>Written</th><th>Engine: correct?</th><th>Final answer only</th><th>With method marks</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="q muted">A rule or policy, not a sample question: judge it against the dossier section named above.</p>'}
 <div class="decide"><div class="vb" role="radiogroup" aria-label="Verdict for ${esc(id)}">
 <button type="button" data-v="A" aria-pressed="false">A <small>approved</small></button>
@@ -119,7 +120,7 @@ function say(t){document.getElementById('msg').textContent=t}
 function download(name,text,type){var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:type}));a.download=name;document.body.appendChild(a);a.click();a.remove()}
 document.getElementById('exj').addEventListener('click',function(){var p=problems();if(p.length&&!confirm('Not complete yet: '+p.slice(0,6).join('; ')+(p.length>6?'; …':'')+'.\\n\\nExport an incomplete draft anyway?'))return;
  var map={A:'approved',C:'approved-with-changes',R:'rejected'},dec={};items.forEach(function(el){var id=el.getAttribute('data-id'),s=state.items[id]||{};if(s.v){var d={verdict:map[s.v]};if((s.note||'').trim())d.notes=s.note.trim();dec[id]=d}});
- var w=state.who;var rec={schemaVersion:1,draftNotSigned:true,jurisdiction:D.jurisdiction,syllabusVersions:D.syllabusVersions,dossierDigest:D.digest,commit:(w.commit||'').trim(),examiners:[{name:(w.name||'').trim(),qualification:(w.qualification||'').trim(),affiliation:(w.affiliation||'').trim(),date:(w.date||'').trim(),independent:true,independenceStatement:(w.independence||'').trim(),conflicts:(w.conflicts||'').trim()}],decisions:dec,signedOriginal:'',recordedBy:''};
+ var w=state.who;var rec={schemaVersion:1,draftNotSigned:true,jurisdiction:D.jurisdiction,syllabusVersions:D.syllabusVersions,dossierDigest:D.digest,commit:(w.commit||'').trim(),examiners:[{name:(w.name||'').trim(),qualification:(w.qualification||'').trim(),affiliation:(w.affiliation||'').trim(),date:(w.date||'').trim(),independent:false,independenceStatement:(w.independence||'').trim(),conflicts:(w.conflicts||'').trim()}],decisions:dec,signedOriginal:'',recordedBy:''};
  download('examiner-review-'+D.jurisdiction+'-draft.json',JSON.stringify(rec,null,2),'application/json');say('Draft JSON saved. It carries draftNotSigned:true and is NOT a certification record: it is refused by the verifier until a person signs the printed form and removes that marker.')});
 document.getElementById('pdf').addEventListener('click',function(){var w=state.who;var rows=items.map(function(el,i){var id=el.getAttribute('data-id'),s=state.items[id]||{};return '<tr><td>'+(i+1)+'</td><td><code>'+id.replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</code></td><td>'+(s.v||'')+'</td><td>'+(s.note||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')+'</td></tr>'}).join('');
  var e=function(x){return (x||'').replace(/&/g,'&amp;').replace(/</g,'&lt;')};

@@ -15,6 +15,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { kitFiles } from './examiner-kits.mjs';
+import { verifyRecord } from './verify-examiner-certification.mjs';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
 const read = f => readFileSync(path.join(ROOT, f), 'utf8');
@@ -33,14 +34,23 @@ for (const [id, packet, label] of [['nsw-hsc', 'hsc', 'NSW'], ['cbse', 'cbse', '
   // coverage: every item id is on the page exactly once as a card
   const missing = items.filter(i => !html.includes(i));
   ok(missing.length === 0, `${label} page misses ${missing.length} item(s), e.g. ${missing[0]}`);
-  // nothing pre-filled
+  // nothing pre-filled: no button ships pressed or selected, and the only state is read from the examiner's own browser storage
+  ok(!/aria-pressed="true"/.test(html), `${label} page ships a verdict button already pressed`);
   ok(!/class="[^"]*\b(on|selected|active|chosen)\b[^"]*"[^>]*data-v=/.test(html), `${label} page ships a verdict button already selected`);
-  ok(!/localStorage\.setItem\(['"]pri-examiner-review[^)]*\)[^;]*;[^]{0,0}/.test('') && !/"verdicts"\s*:\s*\{\s*"[^"]/.test(html), `${label} page ships saved verdicts`);
+  ok(/state=JSON\.parse\(localStorage\.getItem\(KEY\)\|\|'\{\}'\)/.test(html) && /if\(!state\.items\)state\.items=\{\}/.test(html), `${label} page seeds its state from something other than empty storage`);
+  ok(!/s\.v\s*=\s*['"][ACR]['"]|s\.v\|\|['"][ACR]['"]|\.v\s*\|\|\s*['"][ACR]/.test(html), `${label} page defaults a verdict`);
   // offline, answer from the packet only
   ok(!/<script[^>]+src=/.test(html) && !/<link[^>]+href=["']https?:/.test(html) && !/@import/.test(html), `${label} page loads something over the network`);
   ok(!/\bfetch\(|XMLHttpRequest|sendBeacon|WebSocket/.test(html), `${label} page makes a network call`);
   ok(!/prereview|pre-review|AI-A|AI-C|AI-R/i.test(html), `${label} page mentions the AI pre-review`);
-  ok(/draftNotSigned:\s*true/.test(html), `${label} page export is not marked draftNotSigned`);
+  const rec = /var rec=\{schemaVersion:1,draftNotSigned:true,[^\n]*?independent:false,[^\n]*?signedOriginal:'',recordedBy:''\}/;
+  ok(rec.test(html), `${label} page does not build its export as an unsigned, independence-unconfirmed draft with empty signedOriginal and recordedBy`);
+  const draft = { schemaVersion: 1, draftNotSigned: true, jurisdiction: id, syllabusVersions: [], dossierDigest: JSON.parse(read(`docs/marking/packets/${packet}/items.json`)).dossierDigest, commit: '', examiners: [{ name: 'Test', qualification: 'x', affiliation: 'y', date: '2026-01-01', independent: false, independenceStatement: '', conflicts: '' }], decisions: Object.fromEntries(items.map(i => [i, { verdict: 'approved' }])), signedOriginal: '', recordedBy: '' };
+  const v1 = verifyRecord(JSON.stringify(draft), { name: 'draft.json' });
+  ok(!v1.enables && v1.refusals.some(r => /draftNotSigned/.test(r)), `${label} draft with the marker is not refused for the marker`);
+  delete draft.draftNotSigned;
+  const v2 = verifyRecord(JSON.stringify(draft), { name: 'draft.json' });
+  ok(!v2.enables && !v2.complete, `${label} an unsigned draft with the marker removed would still enable`);
   ok(/Not yet reviewed by a human examiner/i.test(html), `${label} page does not say it is unreviewed`);
   // the AI pre-review
   const pr = read(`docs/marking/prereview/${id}.md`);
