@@ -275,6 +275,25 @@ ok('the screenshot identity is a CBSE proof', identityProofCatalogue('cbse').som
   }
 }
 
+// ── COPY: facts only, every state has a word and a shape ─────────────────────
+{
+  const { readFileSync } = await import('node:fs');
+  const EN = (await import('../src/i18n/strings.en.js')).default;
+  const HI = (await import('../src/i18n/strings.hi.js')).default;
+  const camel = k => k.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  const awKeys = Object.keys(EN).filter(k => k.startsWith('aw.'));
+  const text = v => (typeof v === 'string' ? v : `${v?.one ?? ''} ${v?.other ?? ''}`);
+  const PRAISE = /\b(excellent|great|creative|brilliant|amazing|awesome|well done|perfect|fantastic|superb)\b/i;
+  for (const k of awKeys) ok(`${k} has no praise word`, !PRAISE.test(text(EN[k])));
+  for (const k of awKeys) ok(`${k} has a Hindi string`, typeof HI[k] === 'string' || (HI[k] && HI[k].one && HI[k].other));
+  for (const id of STEP_RULE_IDS) ok(`rule ${id} has an English and a Hindi name`, typeof EN[`aw.rule.${camel(id)}`] === 'string' && typeof HI[`aw.rule.${camel(id)}`] === 'string');
+  for (const st of ['checked', 'first-error', 'follows', 'not-verified', 'unread']) ok(`state ${st} has a word`, typeof EN[`aw.status.${camel(st)}`] === 'string');
+  const src = readFileSync(new URL('../src/components/AnnotatedWorking.jsx', import.meta.url), 'utf8');
+  const icons = /const STATUS_ICON = \{([^}]+)\}/.exec(src)?.[1] || '';
+  for (const st of ['checked', "'first-error'", 'follows', "'not-verified'", 'unread']) ok(`state ${st} has a shape`, icons.includes(`${st}:`));
+  ok('engine-verified cards never carry an AI label', !/\bAI\b/.test(awKeys.filter(k => !k.startsWith('aw.eval.provenance')).map(k => text(EN[k])).join(' ')));
+}
+
 console.log(`Named ${NAMED.length} steps across ${STEP_RULE_IDS.length} rules; ${WRONG.length} wrong steps; ${NOT.length} must-not-name cases.`);
 console.log('Authored cases only — no real student working has been scored by this engine.');
 if (failures.length) { console.log('\nfailures:'); for (const f of failures) console.log(`  ✖ ${f}`); }

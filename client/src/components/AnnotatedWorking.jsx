@@ -16,14 +16,46 @@ import { useT } from '../i18n/index.js';
 import { buildAnnotatedWorking } from './annotatedWorkingModel.js';
 import './AnnotatedWorking.css';
 
-const STATUS_ICON = { checked: 'check', 'first-error': 'correction', follows: 'arrowRight', 'not-verified': 'uncertain', unread: 'uncertain' };
+const STATUS_ICON = { checked: 'check', 'first-error': 'alert', follows: 'arrowRight', 'not-verified': 'uncertain', unread: 'uncertain' };
+// Every string key written out, so the catalogue checks can see each one used.
+const RULE_KEY = Object.freeze({
+  'reciprocal': 'aw.rule.reciprocal',
+  'quotient': 'aw.rule.quotient',
+  'pythagorean': 'aw.rule.pythagorean',
+  'pythagorean-tan': 'aw.rule.pythagoreanTan',
+  'pythagorean-cot': 'aw.rule.pythagoreanCot',
+  'double-angle-sin': 'aw.rule.doubleAngleSin',
+  'double-angle-cos': 'aw.rule.doubleAngleCos',
+  'double-angle-cos-cos': 'aw.rule.doubleAngleCosCos',
+  'double-angle-cos-sin': 'aw.rule.doubleAngleCosSin',
+  'double-angle-tan': 'aw.rule.doubleAngleTan',
+  'compound-sin': 'aw.rule.compoundSin',
+  'compound-cos': 'aw.rule.compoundCos',
+  'compound-tan': 'aw.rule.compoundTan',
+  'log-product': 'aw.rule.logProduct',
+  'log-quotient': 'aw.rule.logQuotient',
+  'log-power': 'aw.rule.logPower',
+  'common-denominator': 'aw.rule.commonDenominator',
+  'split-fraction': 'aw.rule.splitFraction',
+  'divide-fraction': 'aw.rule.divideFraction',
+  'multiply-fractions': 'aw.rule.multiplyFractions',
+  'cancel-common-factor': 'aw.rule.cancelCommonFactor',
+  'index-product': 'aw.rule.indexProduct',
+  'index-power': 'aw.rule.indexPower',
+  'index-quotient-power': 'aw.rule.indexQuotientPower',
+  'expand': 'aw.rule.expand',
+  'factorise': 'aw.rule.factorise',
+  'difference-of-squares': 'aw.rule.differenceOfSquares',
+});
+const STATUS_KEY = Object.freeze({ checked: 'aw.status.checked', 'first-error': 'aw.status.firstError', 'not-verified': 'aw.status.notVerified', unread: 'aw.status.unread' });
+const SCOPE_KEY = Object.freeze({ numerator: 'aw.scope.numerator', denominator: 'aw.scope.denominator', both: 'aw.scope.both' });
 const listOf = ns => ns.join(', ');
 
 function RuleLine({ rule, t }) {
-  const where = rule.scope === 'numerator' || rule.scope === 'denominator' || rule.scope === 'both' ? t(`aw.scope.${rule.scope}`) : '';
+  const where = SCOPE_KEY[rule.scope] ? t(SCOPE_KEY[rule.scope]) : '';
   return (
     <div className="aw-rule" data-aw-rule={rule.rule}>
-      <b>{t(`aw.rule.${rule.rule}`)}</b>{where ? <> {where}</> : null}
+      <span className="aw-chip">{RULE_KEY[rule.rule] ? t(RULE_KEY[rule.rule]) : rule.rule}</span>{where ? <span className="aw-where"> {where}</span> : null}
       {rule.latex && <div className="aw-tex"><MathText text={`$${rule.latex}$`} /></div>}
     </div>
   );
@@ -76,7 +108,7 @@ export function AnnotatedComments({ model, renderBreakDetail = null }) {
               <span className="aw-num" aria-hidden="true">{card.n}</span>
               <span className="aw-status">
                 <Icon name={STATUS_ICON[card.status]} size={14} />
-                {card.status === 'follows' ? t('aw.status.follows', { n: card.followsFrom }) : t(`aw.status.${card.status}`)}
+                {card.status === 'follows' ? t('aw.status.follows', { n: card.followsFrom }) : t(STATUS_KEY[card.status])}
               </span>
               <span className="aw-line">{t('aw.line', { n: card.n })}</span>
             </div>
@@ -96,8 +128,9 @@ export function AnnotatedEvaluation({ model }) {
     <section className="aw-eval" aria-labelledby="aw-eval-title" data-aw-summary={summary.key}>
       <div className="aw-eval-head">
         <h3 id="aw-eval-title" className="aw-h">{t('aw.eval.title')}</h3>
-        {marks && <b className="aw-marks" data-aw-marks={`${marks.awarded}/${marks.possible}`}>{t('verdict.marksOutOf', { earned: marks.awarded, total: marks.possible })}</b>}
+        {marks && <b className="aw-marks" data-aw-marks={`${marks.awarded}/${marks.possible}`}>{t('aw.eval.marksConfirmed', { earned: marks.awarded, total: marks.possible })}</b>}
       </div>
+      {marks?.receiptId && <p className="aw-receipt">{t('aw.eval.receipt', { id: marks.receiptId })}</p>}
       <p className="aw-provenance">{t(source === 'handwriting' ? 'aw.eval.provenanceInk' : 'aw.eval.provenanceTyped')}</p>
       <p className="aw-summary">{t(summary.key, { ...summary.vars, count: summary.vars.rules ?? summary.vars.checked })}</p>
       {jumps.length > 0 && <p className="aw-jumps">{t('aw.eval.jumps', { list: listOf(jumps), count: jumps.length })}</p>}
@@ -110,8 +143,8 @@ export function AnnotatedEvaluation({ model }) {
               <tr key={i} className={c.lines.length ? 'is-found' : 'is-missing'} data-aw-evidence={c.lines.length ? 'found' : 'missing'}>
                 <td>{c.kind === 'reaches-rhs' ? t('aw.criteria.reachesRhs') : <MathText text={c.text} />}</td>
                 <td>
-                  <Icon name={c.lines.length ? 'check' : 'uncertain'} size={13} />{' '}
-                  {c.lines.length ? t('aw.criteria.found', { list: listOf(c.lines), count: c.lines.length }) : t('aw.criteria.notFound')}
+                  <span className="aw-met"><Icon name={c.lines.length ? 'check' : 'correction'} size={13} /> {t(c.lines.length ? 'aw.criteria.met' : 'aw.criteria.notMet')}</span>
+                  {c.lines.length > 0 && <span className="aw-evlines"> · {t('aw.criteria.found', { list: listOf(c.lines), count: c.lines.length })}</span>}
                 </td>
               </tr>
             ))}

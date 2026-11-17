@@ -38,7 +38,7 @@
     "test:security": "node client/test/security-check.mjs",
     "test:submission": "node client/test/submission-lifecycle-check.mjs && node client/test/marker-deadline-client-check.mjs",
     "test:submission:sync": "node client/test/submission-sync-durability-check.mjs",
-    "test:diagnose": "node client/test/diagnose-check.mjs",
+    "test:diagnose": "node client/test/diagnose-check.mjs && node client/test/step-justify-check.mjs",
     "test:misconceptions": "node client/test/misconception-ontology-check.mjs",
     "test:misconceptions:targeting": "node client/test/misconception-targeting-check.mjs",
     "test:india": "node client/test/india-check.mjs",

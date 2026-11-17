@@ -105,6 +105,6 @@ export function buildAnnotatedWorking({ lines, stepReport, receipt = null, solut
   if (proof) criteria.push({ text: null, kind: 'reaches-rhs', lines: proof.complete ? (proof.meetLines || [cards.length - 1]).map(i => i + 1) : [] });
 
   const marks = receipt && Number.isFinite(Number(receipt.awarded)) && Number(receipt.possible) > 0
-    ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible) } : null;
+    ? { awarded: Number(receipt.awarded), possible: Number(receipt.possible), receiptId: typeof receipt.id === 'string' && receipt.id ? receipt.id.slice(-8) : null } : null;
   return { cards, proof, summary, marks, criteria, jumps, source };
 }

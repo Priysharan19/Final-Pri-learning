@@ -2052,7 +2052,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     const lines = writeMode ? (judged?.lines || inkResult?.lines || []) : String(working || '').split('\n').filter(Boolean);
     return {
       lines, stepReport: res.stepReport, solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed',
-      receipt: shownGrade ? { awarded: shownGrade.awarded, possible: shownGrade.possible } : null
+      receipt: shownGrade ? { awarded: shownGrade.awarded, possible: shownGrade.possible, id: typeof res.submissionId === 'string' ? res.submissionId : null } : null
     };
   }, [resolved, previousAttempt, res, writeMode, judged, inkResult, working, shownGrade]);
   const [awModel, setAwModel] = useState(null);

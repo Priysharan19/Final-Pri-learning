@@ -39,3 +39,20 @@
   .ink-row.aw-row { grid-template-columns: minmax(0, 1fr) minmax(240px, 300px); align-items: start; }
   .ink-row.aw-row .aw-comments { max-height: none; }
 }
+
+/* Verified-page states (verified-page-spec.md): Checked solid accent, First
+   error 2px error, Follows dashed neutral, Not verified dashed, Couldn't read
+   dotted. The accent is the edition's verified signal. */
+.aw-card.is-checked { border-left: 2px solid var(--accent); }
+.aw-card.is-checked .aw-status { color: var(--accent); }
+.aw-card.is-first-error { border: 2px solid var(--correction); }
+.aw-card.is-follows { border-left: 2px dashed var(--ink-3); }
+.aw-card.is-not-verified { border-left: 2px dashed var(--hairline-strong); }
+.aw-card.is-unread { border-left: 2px dotted var(--hairline-strong); }
+.aw-chip { display: inline-block; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--hairline-strong);
+  font-size: 12.5px; color: var(--ink); background: var(--surface); }
+.aw-where { color: var(--ink-3); font-size: 12.5px; }
+.aw-line, .aw-num, .aw-marks, .aw-receipt { font-family: var(--font-mono, ui-monospace, monospace); }
+.aw-receipt { color: var(--ink-3); font-size: 12px; margin: 2px 0; }
+.aw-criteria tr.is-found td:last-child { color: var(--accent); }
+.aw-criteria tr.is-missing td:last-child { color: var(--correction); }
