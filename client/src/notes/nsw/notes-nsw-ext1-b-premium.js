@@ -103,7 +103,7 @@ export default {
       'A differential equation is solved in the context given: constants are found from the conditions, and the answer is interpreted with units.'
     ],
     diagrams: [
-      { title: 'The area between a line and a parabola', spec: { kind: 'function', xmin: -2, xmax: 3, ymin: -1, ymax: 6, curves: [{ expr: 'x+2', label: 'y=x+2' }, { expr: 'x^2', label: 'y=x^2' }], points: [{ x: -1, y: 1, label: '(-1,1)' }, { x: 2, y: 4, label: '(2,4)' }] }, note: 'The curves meet where $x+2=x^2$, at $x=-1$ and $x=2$. Between them the line is above the parabola, and the enclosed area is $\\tfrac92$.' },
+      { title: 'The area between a line and a parabola', spec: { kind: 'function', xmin: -2, xmax: 3, ymin: -1, ymax: 6, curves: [{ expr: 'x+2', label: 'y=x+2' }, { expr: 'x^2', label: 'y=x^2' }], points: [{ x: -1, y: 1 }, { x: 2, y: 4, label: '(2,4)' }] }, note: 'The curves meet where $x+2=x^2$, at $x=-1$ and $x=2$. Between them the line is above the parabola, and the enclosed area is $\\tfrac92$.' },
       { title: 'Tea cooling towards room temperature', spec: { kind: 'function', xmin: 0, xmax: 30, ymin: 0, ymax: 100, curves: [{ expr: '20+70*exp(-ln(2)/5*x)', label: 'T=20+70e^{-kt}' }], asymptotes: [{ y: 20, label: 'T=20' }], points: [{ x: 0, y: 90, label: '(0,90)' }, { x: 5, y: 55, label: '(5,55)' }, { x: 10, y: 37.5, label: '(10,37.5)' }] }, note: 'Every $5$ minutes the gap above $20^\\circ\\text{C}$ halves: $70$, $35$, then $17.5$, giving $90$, $55$, $37.5$.' }
     ],
     working: [

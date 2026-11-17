@@ -130,7 +130,7 @@ export default {
       'The shares are added back to check they make the original total.'
     ],
     diagrams: [
-      { title: 'A constant speed is a straight line', spec: { kind: 'function', xmin: 0, xmax: 5.5, ymin: 0, ymax: 420, curves: [{ expr: '76*x', intercepts: true, label: 'd=76t' }] }, note: 'The gradient, $76$ km/h, is the speed. After $5$ hours the car has gone $380$ km.' }
+      { title: 'A constant speed is a straight line', spec: { kind: 'function', xmin: 0, xmax: 5.5, ymin: 0, ymax: 420, curves: [{ expr: '76*x', label: 'd=76t' }] }, note: 'The gradient, $76$ km/h, is the speed. After $5$ hours the car has gone $380$ km.' }
     ],
     working: [
       '\\begin{aligned}4+5&=9\\ \\text{parts}\\\\450\\div9&=50\\ \\text{per part}\\\\5\\times50&=250\\end{aligned}',

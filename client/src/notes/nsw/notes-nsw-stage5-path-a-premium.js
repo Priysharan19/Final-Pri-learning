@@ -134,7 +134,7 @@ export default {
       'Exact answers are left as surds unless the question asks for a rounded value, and the number of decimal places requested is respected.'
     ],
     diagrams: [
-      { title: 'Two irrational roots', spec: { kind: 'function', xmin: -2, xmax: 4, ymin: -6, ymax: 10, curves: [{ expr: '2*x^2-5*x-1', intercepts: true, label: 'y=2x^2-5x-1' }] }, note: 'Here $\\Delta=33>0$, so the parabola crosses the axis twice, near $x=-0.19$ and $x=2.69$.' }
+      { title: 'Two irrational roots', spec: { kind: 'function', xmin: -2, xmax: 4, ymin: -6, ymax: 10, curves: [{ expr: '2*x^2-5*x-1', label: 'y=2x^2-5x-1' }] }, note: 'Here $\\Delta=33>0$, so the parabola crosses the axis twice, near $x=-0.19$ and $x=2.69$.' }
     ],
     working: [
       '\\begin{aligned}x^2+6x&=-2\\\\(x+3)^2&=7\\\\x&=-3\\pm\\sqrt{7}\\end{aligned}',

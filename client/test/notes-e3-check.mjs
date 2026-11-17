@@ -13,6 +13,7 @@
 import katex from 'katex';
 import { evalNumeric, exprEquivalent } from '../src/engine/expr.js';
 import { validateSpec, packKind, INTERACTIVE_KIND_NAMES } from '../src/diagrams/kinds.js';
+import { functionGraphModel } from '../src/diagrams/geometry.js';
 import { E3_FIELDS } from '../src/notes/e3.js';
 import { IN_CURRICULUM, OLYMPIAD_TOPICS } from '../src/engine/curriculum-in.js';
 import { NSW_NOTES_TOPIC_BY_ID } from '../src/notes/nsw/nswNotesIndex.js';
@@ -163,6 +164,14 @@ if (!only) {
     const sp = d.spec || {}; const w = `${id} diagram ${i + 1}`;
     const exprs = [...(sp.curves || []).map(c => c.expr), sp.expr].filter(e => typeof e === 'string');
     for (const e of exprs) for (const [, f] of e.matchAll(/([A-Za-z_]\w*)\s*\(/g)) ok(FN_OK.has(f), `${w}: ${f}() is not an engine function (in ${e})`);
+    if (sp.kind === 'function') {
+      // Every point and intercept label sits clear of the curves, the axes, the other dots and the other labels, inside the frame.
+      let m = null;
+      try { m = functionGraphModel(sp); } catch (e) { ok(false, `${w}: the function model throws — ${e.message}`); }
+      if (m) for (const pt of [...m.points, ...m.curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean))]) {
+        if (pt.place) ok(pt.place.cost === 0, `${w}: the label at (${pt.x}, ${pt.y}) collides with something (cost ${pt.place.cost}); move the point's frame or drop the label`);
+      }
+    }
     if (sp.kind === 'function') for (const p of sp.points || []) {
       if (p.free) continue;
       const on = (sp.curves || []).some(c => { try { const y = evalNumeric(c.expr, { x: p.x }); return Math.abs(y - p.y) <= 1e-3 * Math.max(1, Math.abs(p.y)); } catch { return false; } });

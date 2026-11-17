@@ -103,8 +103,8 @@ export function FunctionGraph({ title, caption = null, xLabel = 'x', yLabel = 'y
       ))}
       {m.curves.map(c => c.shade && c.shade.path.length > 0 && <path key={`sh${c.id}`} className="dg-shade" d={`${poly(c.shade.path)} Z`} />)}
       {m.curves.map(c => c.segments.map((seg, k) => <path key={`${c.id}${k}`} className={`dg-curve is-${c.tone}`} d={poly(seg)} />))}
-      {!hideIntercepts && m.curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean).map((p, i) => <g key={`ic${c.id}${i}`}><circle className="dg-dot" cx={p.px[0]} cy={p.px[1]} r="4" /><Tex x={p.px[0] + 8} y={p.px[1] - 12} tex={`(${p.x},\\,${p.y})`} w={80} anchor="start" /></g>))}
-      {m.points.map((p, i) => <g key={`pt${i}`}><circle className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" />{p.label && <Tex x={p.px[0] + 8} y={p.px[1] - 12} tex={p.label} w={90} anchor="start" />}</g>)}
+      {!hideIntercepts && m.curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean).map((p, i) => <g key={`ic${c.id}${i}`}><circle className="dg-dot" cx={p.px[0]} cy={p.px[1]} r="4" />{p.place && <Tex x={p.place.x} y={p.place.y} tex={`(${p.x},\\,${p.y})`} w={p.place.w} anchor={p.place.anchor} />}</g>))}
+      {m.points.map((p, i) => <g key={`pt${i}`}><circle className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" />{p.label && <Tex x={p.place.x} y={p.place.y} tex={p.label} w={p.place.w} anchor={p.place.anchor} />}</g>)}
       {m.curves.map(c => c.label && <Tex key={`lb${c.id}`} x={Math.min(m.frame.right - 40, (c.segments.at(-1)?.at(-1)?.[0] ?? m.frame.right) - 4)} y={(c.segments.at(-1)?.at(-1)?.[1] ?? m.frame.top) - 12} tex={c.label} w={110} anchor="end" className="dg-curve-label" />)}
     </Figure>
   );

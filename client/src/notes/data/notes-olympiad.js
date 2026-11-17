@@ -495,7 +495,7 @@ export default {
         spec: {
           kind: 'function', xmin: -4, xmax: 4, ymin: -3, ymax: 5,
           curves: [{ expr: 'x+1', label: 'f(x)=x+1' }, { expr: '1-x', label: 'f(x)=1-x' }],
-          points: [{ x: 0, y: 1, label: '(0,1)' }, { x: -1, y: 0, label: '(-1,0)' }, { x: 1, y: 0, label: '(1,0)' }]
+          points: [{ x: 0, y: 1 }, { x: -1, y: 0, label: '(-1,0)' }, { x: 1, y: 0, label: '(1,0)' }]
         },
         note: 'Both lines pass through $(0, 1)$, because $P(0, 0)$ forced $f(0) = 1$. The case split $f(1) = 0$ or $f(-1) = 0$ is visible too: one line crosses the $x$-axis at $1$, the other at $-1$.'
       },

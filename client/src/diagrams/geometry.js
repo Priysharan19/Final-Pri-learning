@@ -166,6 +166,46 @@ export function curveExpr(curve) {
  * polylines), asymptotes, intercepts and a shaded region under a curve. Every
  * label value is computed here from the same expression that draws the curve.
  */
+/** The width in px a KaTeX label needs (a close upper estimate: commands do not print). */
+export const labelWidth = tex => Math.max(22, Math.ceil(7.2 * String(tex).replace(/\\(left|right|,|;|!|quad)|[{}\\]|tfrac|dfrac|frac/g, '').length) + 6);
+
+/**
+ * Where to put each point's label so it covers no curve, axis, dot or earlier label and stays in the
+ * frame: the first free spot among the eight around the dot (up-right is preferred), else the one that
+ * overlaps least. items: [{ px: [x, y], tex }]; obstacles: polylines ([[x, y], …]); returns
+ * [{ x, y, anchor, w, h, box }], where (x, y) is the Tex anchor point as Diagram.jsx's Tex takes it.
+ */
+export function placeLabels(items, obstacles, frame, h = 20) {
+  const segs = [];
+  for (const line of obstacles) for (let i = 1; i < line.length; i++) segs.push([line[i - 1], line[i]]);
+  const hitsBox = (b, [[x1, y1], [x2, y2]]) => {
+    const n = Math.max(2, Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 3));
+    for (let k = 0; k <= n; k++) { const x = x1 + ((x2 - x1) * k) / n; const y = y1 + ((y2 - y1) * k) / n; if (x >= b.l && x <= b.r && y >= b.t && y <= b.b) return true; }
+    return false;
+  };
+  const placed = [];
+  const dots = items.map(i => i.px);
+  return items.map(it => {
+    const w = labelWidth(it.tex); const [px, py] = it.px;
+    const cands = [['start', 8, -12], ['end', -8, -12], ['start', 8, 14], ['end', -8, 14], ['middle', 0, -18], ['middle', 0, 20], ['start', 10, 0], ['end', -10, 0], ['start', 12, -30], ['end', -12, -30], ['start', 12, 32], ['end', -12, 32], ['middle', 0, -34], ['middle', 0, 36]];
+    let best = null;
+    for (const [anchor, dx, dy] of cands) {
+      const cx = px + dx; const cy = py + dy;
+      const l = anchor === 'start' ? cx : anchor === 'end' ? cx - w : cx - w / 2;
+      const box = { l, r: l + w, t: cy - h / 2, b: cy + h / 2 };
+      let cost = 0;
+      if (box.l < frame.left - 2 || box.r > frame.right + 2 || box.t < frame.top - 2 || box.b > frame.bottom + 2) cost += 100;
+      cost += segs.filter(sg => hitsBox(box, sg)).length * 5;
+      cost += placed.filter(q => !(box.r < q.l || box.l > q.r || box.b < q.t || box.t > q.b)).length * 50;
+      cost += dots.filter(([dx2, dy2]) => dx2 >= box.l - 3 && dx2 <= box.r + 3 && dy2 >= box.t - 3 && dy2 <= box.b + 3 && !(dx2 === px && dy2 === py)).length * 20;
+      if (!best || cost < best.cost) best = { cost, anchor, x: cx, y: cy, w, h, box };
+      if (cost === 0) break;
+    }
+    placed.push(best.box);
+    return { x: r3(best.x, 2), y: r3(best.y, 2), anchor: best.anchor, w: best.w, h, box: best.box, cost: best.cost };
+  });
+}
+
 export function functionGraphModel(spec) {
   const { xmin = -5, xmax = 5, ymin = -5, ymax = 5, width, height } = spec;
   const frame = makeFrame({ xmin, xmax, ymin, ymax, width, height });
@@ -198,6 +238,15 @@ export function functionGraphModel(spec) {
   const points = (spec.points || []).map(p => ({ x: p.x, y: p.y, label: p.label ?? null, px: [frame.sx(p.x), frame.sy(p.y)] }));
   const xt = spec.xTicks || niceTicks(frame.xmin, frame.xmax, 8);
   const yt = spec.yTicks || niceTicks(frame.ymin, frame.ymax, 6);
+  // Labels for every named point and every intercept, placed clear of the curves, the axes and each other.
+  const icepts = curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean));
+  // One label per spot: an intercept sitting on a named point (or on an earlier intercept) is not labelled twice.
+  const seen = new Set(points.filter(p => p.label).map(p => `${p.px[0].toFixed(1)},${p.px[1].toFixed(1)}`));
+  const uniq = icepts.filter(p => { const k = `${p.px[0].toFixed(1)},${p.px[1].toFixed(1)}`; if (seen.has(k)) { p.noLabel = true; return false; } seen.add(k); return true; });
+  const labelled = [...points.filter(p => p.label).map(p => ({ ref: p, tex: p.label })), ...uniq.map(p => ({ ref: p, tex: `(${p.x},\\,${p.y})` }))];
+  const axisLines = [[[frame.left, frame.sy(clamp(0, frame.ymin, frame.ymax))], [frame.right, frame.sy(clamp(0, frame.ymin, frame.ymax))]], [[frame.sx(clamp(0, frame.xmin, frame.xmax)), frame.top], [frame.sx(clamp(0, frame.xmin, frame.xmax)), frame.bottom]]];
+  const spots = placeLabels(labelled.map(l => ({ px: l.ref.px, tex: l.tex })), [...curves.flatMap(c => c.segments), ...axisLines], frame);
+  labelled.forEach((l, i) => { l.ref.place = spots[i]; });
   return {
     frame,
     axes: { x: [[frame.left, frame.sy(clamp(0, frame.ymin, frame.ymax))], [frame.right, frame.sy(clamp(0, frame.ymin, frame.ymax))]], y: [[frame.sx(clamp(0, frame.xmin, frame.xmax)), frame.top], [frame.sx(clamp(0, frame.xmin, frame.xmax)), frame.bottom]] },

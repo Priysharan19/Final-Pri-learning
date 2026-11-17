@@ -22,12 +22,14 @@ import {
   experimentOutcomes, simStart, simAdd, plain, highlightSet, eventTex, eventText, SIM_MAX_TRIALS
 } from './stats.kinds.js';
 
+// Plain words (a category name) are set through KaTeX too, as \text{…}, so every figure label is typeset the same way.
+const texWords = t => (/\$/.test(t) ? t : `$\\text{${String(t).replace(/([\\{}$&#^_%~])/g, '\\$1')}}$`);
 /** A label that may mix words and $…$ maths (MathText), placed like Tex. */
 function Label({ x, y, text, w = 80, h = 20, anchor = 'middle', className = '' }) {
   const left = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
   return (
     <foreignObject x={r3(left)} y={r3(y - h / 2)} width={w} height={h} className={`dg-tex ${className}`} style={{ overflow: 'visible' }}>
-      <div xmlns="http://www.w3.org/1999/xhtml" className={`dg-tex-in is-${anchor}`}><MathText text={text} /></div>
+      <div xmlns="http://www.w3.org/1999/xhtml" className={`dg-tex-in is-${anchor}`}><MathText text={texWords(text)} /></div>
     </foreignObject>
   );
 }
