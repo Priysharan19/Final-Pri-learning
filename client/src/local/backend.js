@@ -3412,7 +3412,7 @@ const routes = {
     // answers, right answers, and right answers with no help. The HSC priorities
     // view (Prithagoras) reads `independentCorrect`; the ratings above stay the
     // adaptive engine's and are not changed by this.
-    const evidence = evidenceByKey(await attemptsInOrder(p.id));
+    const evidence = evidenceByKey(await byIndex('attempts', 'pid', p.id));
     const evidenceOf = id => {
       const e = evidence[id];
       return { attempts: e?.attempts || 0, correct: e?.correct || 0, independentCorrect: e?.independentCorrect || 0 };

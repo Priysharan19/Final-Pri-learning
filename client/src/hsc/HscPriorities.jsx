@@ -23,6 +23,10 @@ const NESA_PAPERS = {
   extension1: 'https://www.nsw.gov.au/education-and-training/nesa/curriculum/hsc-exam-papers/mathematics-extension-1'
 };
 const PRACTISE_NEXT = 3;
+const STYLE_KEY = {
+  mcq: 'hsc.style.mcq', short: 'hsc.style.short', extended: 'hsc.style.extended',
+  proof: 'hsc.style.proof', sketch: 'hsc.style.sketch', explain: 'hsc.style.explain'
+};
 
 const pct = x => Math.round(x * 100);
 
@@ -53,7 +57,7 @@ function Evidence({ row }) {
 }
 
 function styleText(t, p) {
-  return p.styles.map(s => t(`hsc.style.${s.type}`)).join(' · ');
+  return p.styles.filter(s => STYLE_KEY[s.type]).map(s => t(STYLE_KEY[s.type])).join(' · ');
 }
 
 export default function HscPriorities({ user, courses, curriculum }) {
