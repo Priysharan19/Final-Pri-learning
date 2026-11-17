@@ -31,6 +31,7 @@
 //   PRI_EDITION=prithagoras node client/test/tour-teacher-workspace.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -234,12 +235,32 @@ async function main() {
 
     const review = tp.locator('[data-tw-view="review"]');
     if (await review.count()) {
+      // TEST DESK, labelled: the desk's students typed their working, so one
+      // item is marked as handwritten (inputMode 'ink' and a page digest), to
+      // render the handwriting-first layout. No stored page or real handwriting
+      // exists behind it; the original-work slot says so.
+      const inkRow = platform.h.db.prepare('SELECT id,evidence_json FROM teacher_review_items WHERE student_account_id=? ORDER BY question_order LIMIT 1').get(world.S[1].id);
+      if (inkRow) {
+        const ev = JSON.parse(inkRow.evidence_json);
+        const digest = createHash('sha256').update(`synthetic-page-${inkRow.id}`).digest('hex');
+        platform.h.db.prepare('UPDATE teacher_review_items SET evidence_json=? WHERE id=?').run(JSON.stringify({ ...ev, inputMode: 'ink', ink: { digest }, original: null }), inkRow.id);
+      }
       await review.click();
       await tp.locator('[data-review-item]').first().waitFor({ timeout: 30000 });
-      await tp.locator('[data-review-open]').first().click();
+      if (inkRow) {
+        await tp.locator(`[data-review-open="${inkRow.id}"]`).click();
+        await tp.locator('[data-review-original]').waitFor({ timeout: 15000 });
+        await tp.waitForTimeout(400);
+        check('a handwritten item shows the original-work slot, the ink version and "What Pri read"',
+          await tp.locator('[data-deciding-on]').count() === 1 && /What Pri read/.test((await tp.locator('[data-review-detail]').textContent()) || ''));
+        await shot(tp, '04b-review-item-handwritten', tp.locator('[data-review-detail]'));
+        await tp.locator(`[data-review-open="${inkRow.id}"]`).click();
+      }
+      await tp.locator('[data-review-item]').first().waitFor({ timeout: 30000 });
+      await tp.locator('[data-review-open]').last().click();
       await tp.locator('[data-review-detail]').waitFor({ timeout: 15000 });
       await tp.waitForTimeout(400);
-      check('the review item has no suggested mark', !/suggest/i.test((await tp.locator('[data-review-detail]').textContent()) || ''));
+      check('the review item has no suggested mark', !/suggested|recommended/i.test((await tp.locator('[data-review-detail]').textContent()) || ''));
       await shot(tp, '04-review-item', tp.locator('[data-review-detail]'));
       await tp.locator('[data-review-decision="award"]').check();
       await tp.locator('[data-review-save]').click();

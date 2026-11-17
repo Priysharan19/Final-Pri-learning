@@ -1614,6 +1614,12 @@ async function run() {
       await wait(page, 500);
     });
 
+    await step('teacher workspace · review queue', '/teach', async () => {
+      await click(page, '[data-tw-view="review"]');
+      await page.waitForSelector('[data-review-queue]', { timeout: 20000 });
+      await wait(page, 500);
+    });
+
     // ── verdicts ─────────────────────────────────────────────────────────────
 
     section('the walk');

@@ -11,6 +11,7 @@
 //   · PAPERS — set a timed paper the server issues and marks, then read the
 //     results: engine marks and teacher marks always in separate, labelled
 //     columns; Export CSV downloads the server's own file.
+//   · REVIEW — the teacher-mark queue (ReviewQueue.jsx).
 // Nothing here calls a model, and nothing here suggests a mark.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -23,6 +24,7 @@ import { SUBTOPIC_BY_ID } from '../engine/curriculum.js';
 import {
   INDIA_PAPERS, PAPER_MINUTES, isPaperAssignment, misconceptionName, paperLabel, pathwaysForYear, questionLabel
 } from './classroomWords.js';
+import ReviewQueue from './ReviewQueue.jsx';
 
 const errText = (err, fallback) => (err?.code === 'CLOUD_WEB_ONLY' ? tLater('tw.webOnly') : (err?.message || tLater(fallback)));
 
@@ -481,7 +483,8 @@ function Papers({ classId, onUntimed }) {
 
 const VIEWS = [
   { id: 'board', key: 'tw.tab.board', on: () => featureEnabled('syllabusBoard') },
-  { id: 'papers', key: 'tw.tab.papers', on: () => true }
+  { id: 'papers', key: 'tw.tab.papers', on: () => true },
+  { id: 'review', key: 'tw.tab.review', on: () => true }
 ];
 
 export default function TeacherWorkspace({ classId, className, onUntimed }) {
@@ -499,6 +502,7 @@ export default function TeacherWorkspace({ classId, className, onUntimed }) {
       <p className="tw-note">{t('tw.freeNote')}</p>
       {view === 'board' && <ClassBoard classId={classId} />}
       {view === 'papers' && <Papers classId={classId} onUntimed={onUntimed} />}
+      {view === 'review' && <ReviewQueue classId={classId} />}
     </section>
   );
 }
