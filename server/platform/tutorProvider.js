@@ -143,6 +143,8 @@ export const CAPTION_SCHEMA = Object.freeze({
   }
 });
 
+import { SAFETY_RULES } from './tutorSafety.js';
+
 const COMMON = [
   "You are Pri Learning's maths tutor for a school student (NCERT, CBSE, JEE).",
   '',
@@ -214,12 +216,17 @@ const LOCALE_INSTRUCTIONS = {
 
 const STREAM_FORMAT = 'Reply as plain text only: no JSON, no headings, no lists. Write mathematics in $…$ spans exactly as the solution writes it.';
 
-export function systemInstructions(level, locale = 'en', { streaming = false, resolved = false } = {}) {
+export function systemInstructions(level, locale = 'en', options = {}) {
+  // The child-safety rules ride on EVERY level (tutorSafety.js), last so nothing before them can outrank them.
+  return [...basePrompt(level, locale, options), '', ...SAFETY_RULES].join('\n');
+}
+
+function basePrompt(level, locale = 'en', { streaming = false, resolved = false } = {}) {
   if (level === TUTOR_WHY_LEVEL) {
-    return [...WHY_INSTRUCTIONS, '', LOCALE_INSTRUCTIONS[locale] || LOCALE_INSTRUCTIONS.en].join('\n');
+    return [...WHY_INSTRUCTIONS, '', LOCALE_INSTRUCTIONS[locale] || LOCALE_INSTRUCTIONS.en];
   }
   if (level === TUTOR_DIAGNOSE_LEVEL) {
-    return [...DIAGNOSE_COMMON, '', resolved ? DIAGNOSE_RESOLVED : DIAGNOSE_OPEN, LOCALE_INSTRUCTIONS[locale] || LOCALE_INSTRUCTIONS.en].join('\n');
+    return [...DIAGNOSE_COMMON, '', resolved ? DIAGNOSE_RESOLVED : DIAGNOSE_OPEN, LOCALE_INSTRUCTIONS[locale] || LOCALE_INSTRUCTIONS.en];
   }
   const parts = [...COMMON];
   if (streaming) {
@@ -227,7 +234,7 @@ export function systemInstructions(level, locale = 'en', { streaming = false, re
     // not apply; the deterministic guard runs on every sentence regardless.
     parts.splice(parts.indexOf(parts.find(line => line.startsWith('Set "references_step_index"'))), 1, STREAM_FORMAT);
   }
-  return [...parts, '', LEVEL_INSTRUCTIONS[level] || LEVEL_INSTRUCTIONS.nudge, LOCALE_INSTRUCTIONS[locale] || LOCALE_INSTRUCTIONS.en].join('\n');
+  return [...parts, '', LEVEL_INSTRUCTIONS[level] || LEVEL_INSTRUCTIONS.nudge, LOCALE_INSTRUCTIONS[locale] || LOCALE_INSTRUCTIONS.en];
 }
 
 export class TutorProviderError extends Error {

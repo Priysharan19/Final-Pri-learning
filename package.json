@@ -299,7 +299,7 @@
     "test:ink:strip-blind": "node client/test/reading-strip-blind-check.mjs",
     "test:writing-hand": "node client/test/writing-hand-check.mjs",
     "test:palette:form": "node client/test/palette-form-check.mjs",
-    "test:smart": "node client/test/slip-pattern-check.mjs && node client/test/slip-hint-check.mjs && node server/test/tutor-mark-claim-check.mjs && node server/test/slip-pattern-route-check.mjs",
+    "test:smart": "node client/test/slip-pattern-check.mjs && node client/test/slip-hint-check.mjs && node server/test/tutor-mark-claim-check.mjs && node server/test/slip-pattern-route-check.mjs && node server/test/tutor-safety-check.mjs",
     "test:haptics": "node client/test/haptics-boundary-check.mjs",
     "test:feedback": "node client/test/feedback-first-error-sweep-check.mjs && node client/test/answer-tex-check.mjs",
     "test:ink:smooth": "node client/test/ink-smooth-check.mjs"

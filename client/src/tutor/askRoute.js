@@ -87,7 +87,8 @@ export function createTutorAskRoute({
     const text = fromModel ? reply : (reply || authored);
     return {
       message: text,
-      source: fromModel ? 'tutor' : 'deterministic',
+      source: fromModel ? 'tutor' : outcome?.tutor?.source === 'safety' ? 'safety' : 'deterministic',
+      ...(outcome?.tutor?.source === 'safety' ? { distress: true } : {}),
       streamed: !!outcome?.streamed,
       // Why the deterministic text is showing, as a code the UI can name.
       code: fromModel ? null : (outcome?.error?.code || outcome?.tutor?.reason || null),
