@@ -7,11 +7,12 @@ import { cloudAvailable } from '../platform/cloudTransport.js';
 import { cloudAccountLink, verifyCloudSession } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, hasEntitlement } from '../platform/entitlements.js';
 import { nativeBillingStore, PREMIUM_ON_SALE } from '../platform/nativeBilling.js';
-import { useSaleAvailable, sellsPremium } from './useSaleAvailable.js';
+import { useBillingConfig, sellsPremium } from './useSaleAvailable.js';
 import { useStoreKitPurchase } from './useStoreKitPurchase.js';
 import { useGooglePlayPurchase } from './useGooglePlayPurchase.js';
-import { planOffers, aboutPerMonth, yearlySavingPercent } from './pricing.js';
-import { ARRIVAL_KEYS, FREE_ROWS, PREMIUM_ROWS } from './plans.js';
+import { planOffers, aboutPerMonth, yearlySavingPercent, listPriceOf, formatListAmount } from './pricing.js';
+import { ARRIVAL_KEYS, FREE_ROWS, PREMIUM_ROWS, SCHOOL_ROWS, WHY_KEYS } from './plans.js';
+import { edition } from '../platform/edition.js';
 import { EDITION_ID } from '../brand/edition.js';
 
 // The Premium screen (D22: "the compliant paywall ships").
@@ -33,6 +34,14 @@ import { EDITION_ID } from '../brand/edition.js';
 //
 // Premium itself only ever comes from the server's verification of the
 // purchase (useStoreKitPurchase.js, useGooglePlayPurchase.js).
+//
+// It is also the pricing page (packaging proposal, docs/product/
+// packaging-2026-11.md): Free, Premium and School side by side, the reasons to
+// choose Pri that are true in THIS edition (the edition table's DIFFERENTIATORS,
+// each tied to a live capability), the edition's own list price where it has
+// one, and "cancel anytime". On the web, an edition that sells through a web
+// provider sends the student to their account to subscribe or cancel (both
+// live there, side by side); no competitor and no statistic is named.
 const APPLE_MANAGE_URL = 'https://apps.apple.com/account/subscriptions';
 
 function PlanCard({ offer, cadence, featured, busy, disabled, onBuy, t }) {
@@ -62,7 +71,16 @@ export default function Paywall() {
   const store = nativeBillingStore();
   const apple = store === 'app-store';
   const google = store === 'google-play';
-  const saleAvailable = useSaleAvailable();
+  const billing = useBillingConfig();
+  const saleAvailable = billing ? billing.available : null;
+  const commerce = edition().commerce;
+  // The price the web states: the edition's own list price, else the server's
+  // display configuration (PRI_DISPLAY_*); none when neither is known.
+  const listed = listPriceOf(commerce);
+  const shown = billing?.display;
+  const webPrice = listed || (shown?.monthly && shown?.annual && shown.currency
+    ? { monthly: formatListAmount(shown.monthly, shown.currency, 'en-IN'), annual: formatListAmount(shown.annual, shown.currency, 'en-IN'), currency: shown.currency }
+    : null);
   const [link, setLink] = useState(null);
   const [session, setSession] = useState(null);
   const [busy, setBusy] = useState('');
@@ -113,27 +131,49 @@ export default function Paywall() {
 
   return (
     <div className="qpage" data-paywall data-paywall-store={store || 'web'}>
-      <section className="card" aria-labelledby="paywall-title" style={{ maxWidth: 640 }}>
+      <section className="card" aria-labelledby="paywall-title" style={{ maxWidth: 880 }}>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 'var(--space-3)' }}>
           <h1 id="paywall-title" style={{ margin: 0, fontSize: 'var(--text-lg)' }}>{t('paywall.title')}</h1>
           <button type="button" className="btn btn-quiet btn-sm" data-paywall-close onClick={close}>{t('paywall.close')}</button>
         </div>
         {ARRIVAL_KEYS[from] && <p className="muted" data-paywall-context={from}>{t(ARRIVAL_KEYS[from])}</p>}
 
-        <div className="grid cols-2" style={{ gap: 'var(--space-3)', marginTop: 'var(--space-3)' }} data-paywall-compare>
+        <div className="grid cols-3" style={{ gap: 'var(--space-3)', marginTop: 'var(--space-3)' }} data-paywall-compare>
           <div data-paywall-free>
             <h2 className="sc-label" style={{ margin: 0 }}>{t('paywall.freeTitle')}</h2>
+            <p className="muted" style={{ margin: 'var(--space-1) 0 0' }} data-pricing-free-price>{t('pricing.freePrice')}</p>
             <ul style={{ margin: 'var(--space-2) 0 0', paddingLeft: 'var(--space-5)', lineHeight: 1.5 }}>
               {FREE_ROWS.map(r => <li key={r.key}>{t(r.key, r.vars)}</li>)}
             </ul>
           </div>
           <div data-paywall-premium-rows>
             <h2 className="sc-label" style={{ margin: 0 }}>{t('paywall.premiumTitle')}</h2>
+            {webPrice && !apple && !google && sellsPremium(saleAvailable) && (
+              <p style={{ margin: 'var(--space-1) 0 0', fontWeight: 600 }} data-pricing-price>{t('pricing.priceLine', webPrice)}</p>
+            )}
             <ul style={{ margin: 'var(--space-2) 0 0', paddingLeft: 'var(--space-5)', lineHeight: 1.5 }}>
               {PREMIUM_ROWS.filter(r => !(EDITION_ID === 'prithagoras' && r.key === 'paywall.premium.jeeAdvanced')).map(r => <li key={r.key}>{t(r.key, r.vars)}</li>)}
             </ul>
           </div>
+          <div data-pricing-school>
+            <h2 className="sc-label" style={{ margin: 0 }}>{t('pricing.schoolTitle')}</h2>
+            <p className="muted" style={{ margin: 'var(--space-1) 0 0' }}>{t('pricing.schoolPrice')}</p>
+            <ul style={{ margin: 'var(--space-2) 0 0', paddingLeft: 'var(--space-5)', lineHeight: 1.5 }}>
+              {SCHOOL_ROWS.map(r => <li key={r.key}>{t(r.key, r.vars)}</li>)}
+            </ul>
+          </div>
         </div>
+
+        {WHY_KEYS(commerce.differentiators).length > 0 && (
+          <div style={{ marginTop: 'var(--space-4)' }} data-pricing-why>
+            <h2 className="sc-label" style={{ margin: 0 }}>{t('pricing.whyTitle')}</h2>
+            <ul style={{ margin: 'var(--space-2) 0 0', paddingLeft: 'var(--space-5)', lineHeight: 1.5 }}>
+              {WHY_KEYS(commerce.differentiators).map(key => <li key={key} data-pricing-why-item>{t(key)}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {!premium && sellsPremium(saleAvailable) && <p className="muted" style={{ marginTop: 'var(--space-3)' }} data-pricing-cancel>{t('pricing.cancelAnytime')}</p>}
 
         {premium && (
           <p data-paywall-premium style={{ marginTop: 'var(--space-4)' }}>
@@ -171,7 +211,9 @@ export default function Paywall() {
         {/* An edition with no payment provider (plan E5) has nothing to buy
             anywhere: it says so, and names no store, price or plan. */}
         {!premium && !apple && !google && (sellsPremium(saleAvailable)
-          ? <p style={{ marginTop: 'var(--space-4)' }} data-paywall-in-app>{t('paywall.inAppOnly')}</p>
+          ? (billing?.webCheckout
+            ? <p style={{ marginTop: 'var(--space-4)' }} data-paywall-web>{t('pricing.webSubscribe')}{' '}<PageLink to="/settings#cloud-account-title">{t('paywall.openAccount')}</PageLink></p>
+            : <p style={{ marginTop: 'var(--space-4)' }} data-paywall-in-app>{t('paywall.inAppOnly')}</p>)
           : <p style={{ marginTop: 'var(--space-4)' }} data-paywall-not-on-sale>{t('paywall.notOnSale')}</p>
         )}
 

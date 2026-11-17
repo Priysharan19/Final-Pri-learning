@@ -741,6 +741,9 @@ export const cloud = Object.freeze({
   // Cancel/manage contract (server: wp/server-commerce-classes). Web cancels at
   // the end of the paid cycle; Apple subscriptions are managed in the App Store.
   cancelWebBilling: () => cloudRequest('/v1/billing/web/cancel', { method: 'POST', body: {} }),
+  cancelFeedback: reason => cloudRequest('/v1/billing/cancel-feedback', { method: 'POST', body: { reason } }),
+  referral: () => cloudRequest('/v1/referral/'),
+  claimReferral: code => cloudRequest('/v1/referral/claim', { method: 'POST', body: { code } }),
   billingManage: () => cloudRequest('/v1/billing/manage'),
   classes: () => cloudRequest('/v1/classes'),
   classDetails: classId => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}`),

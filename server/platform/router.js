@@ -29,6 +29,7 @@ import { createCurriculumRouter } from './curriculum.js';
 import { createWorkingRouter } from './working.js';
 import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
+import { createReferralRouter } from './referral.js';
 import { requireGuardianConsent } from './guardianConsent.js';
 import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, syncQuota } from './config.js';
@@ -237,6 +238,8 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // and pass straight through (guardianConsent.js requireGuardianConsent).
   router.use('/sync', requireGuardianConsent(db), createSyncRouter(db));
   router.use('/entitlements', createEntitlementRouter(db));
+  // The referral-unlocked 7-day trial (referral.js): a child needs a guardian's approval first.
+  router.use('/referral', requireGuardianConsent(db), createReferralRouter(db));
   router.use('/billing', requireGuardianConsent(db), createBillingRouter(db, {
     verifiers: billingVerifiers,
     checkout: billingCheckout,
