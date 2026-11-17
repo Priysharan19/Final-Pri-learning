@@ -204,7 +204,7 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   else failures.push(`${G} · c10-arithmetic-progressions D2 seed 1009: normal [${normal}] vs slow clock [${slow}]`);
 }
 
-// ── SymPy differential oracle, 2026-11-18 · 71 cases ────────────────────────
+// ── SymPy differential oracle, 2026-11-18 · 75 cases ────────────────────────
 // tools/math-oracle found the checker crediting each wrong answer below
 // (docs/evidence/sympy-oracle-2026-11-18.md, PR #993): a calculator display of an exact
 // value on a question that demands the exact value, and final-answer
@@ -267,6 +267,9 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
     [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x^30/1e90'], [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x^30/10^90'],
     [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x^80/10^300'], [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x^100/10^300'],
     [square, 'x^2+x^30/1e90'],
+    // round 8: the wide probes visit every decade from 10 to 10^6
+    [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x^8/1e40'], [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+x*abs(x)^20/1e130'],
+    [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+sqrt(abs(x))^60/1e90'], [{ answerType: 'expression', answer: { expr: 'x' } }, 'x+exp(x)/1e50'],
     [{ answerType: 'expression', answer: { expr: 'abs(2x + 7)^7' } }, '128x^7 + 3136x^6 + 32928x^5 + 192080x^4 + 672280x^3 + 1411788x^2 + 1647086x + 823543']
   ]) expect(G, `padded-${w.slice(0, 48)}`, q, w, false);
   const thirdExact = { answerType: 'numeric', prompt: 'Find the exact value.', answer: { value: 1 / 3, requireExact: true } };
@@ -337,10 +340,18 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   expect(G, 'noise-floor-1e-15', sq, 'x^2 + 1e-15x', true);
   expect(G, 'beyond-noise-floor-1e-12x-refused', sq, 'x^2 + 1e-12x', false);
   expect(G, 'XFAIL-float-path-1e-10-behind-a-function', generateQuestion('y9-algebra', 3, 21001), 'x^2-169 + 0.0000000001x*cos(0)', true);
+  // Residual class, pinned (round 8): a term below ~1e-9 of the value inside the
+  // probed range (|x| <= 10^6, 1/1024 grid) cannot be resolved by sampling when
+  // a function is involved, or when it is a polynomial that only matters past
+  // 10^6. Main credits all of these too. Each needs a deliberately constructed
+  // coefficient of 1e-9 or smaller; no plausible slip produces one.
+  const lin = { answerType: 'expression', answer: { expr: 'x' } };
+  for (const w of ['x+sin(x)/1e9', 'x+ln(x)/1e10', 'x+(x^2-1e12)^2/1e40']) expect(G, `XFAIL-${w}`, lin, w, true);
+  expect(G, 'XFAIL-sin(x)+x^30/1e90', { answerType: 'expression', answer: { expr: 'sin(x)' } }, 'sin(x)+x^30/1e90', true);
 }
 
 // ── Counts are part of the contract ─────────────────────────────────────────
-const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 71, 'sympy-oracle-2026-11-18-controls': 1091, 'formerly-XFAIL-exact-probe': 5, 'noise-floor-and-XFAIL': 3 };
+const EXPECTED = { 'q1-round2-precision': 92, 'q1-round1-holdouts': 22, 'q1-round1-labels': 11, 'sympy-oracle-2026-11-18': 75, 'sympy-oracle-2026-11-18-controls': 1091, 'formerly-XFAIL-exact-probe': 5, 'noise-floor-and-XFAIL': 7 };
 for (const [g, n] of Object.entries(EXPECTED)) if (groups[g]?.total !== n) failures.push(`${g}: built ${groups[g]?.total} cases, the corpus has ${n}`);
 
 const pass = Object.values(groups).reduce((s, g) => s + g.pass, 0);

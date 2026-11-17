@@ -917,11 +917,14 @@ function agreesAtProbes(astA, astB, names, integers, domain, positiveOnly, seed,
   // 10⁶), exactly or in floats: a term that vanishes on the sampled interval and
   // not beyond it (1000·(x − 4 + |x − 4|)) is seen there (rounds 5 and 6).
   if (wide) {
-    for (let k = 0; k < 6; k++) {
+    for (let k = 0; k < 12; k++) {
       const env = {};
       for (const n of names) {
         if (integers.has(n)) { env[n] = 1 + Math.floor(next() * 8); continue; }
-        const mag = 10 ** (next() * 6), sign = positiveOnly || next() < 0.5 ? 1 : -1;
+        // one probe per sign at every decade from 10 to 10⁶ (jittered inside it),
+        // so the top decades and both signs are always visited (round 8:
+        // x + x^8/1e40 shows at 10⁶ only; 1000(x − 4 + |x − 4|) only for x > 4)
+        const mag = 10 ** (1 + (k >> 1) + next() * 0.9), sign = positiveOnly || (k & 1) === 0 ? 1 : -1;
         env[n] = sign * Math.round(mag * 1024) / 1024;
       }
       // Far out, floats overflow and lose their argument (e^x, sec x at 10⁵): the
