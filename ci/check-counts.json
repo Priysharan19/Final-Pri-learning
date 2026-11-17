@@ -336,6 +336,13 @@
         {"has":"desk-check (sqlite): 141 checks passed"}
       ]
     },
+    "platform/original-work.log": {
+      "job": "platform-contracts",
+      "log": "original-work.log",
+      "pins": [
+        {"has":"original-work-check (sqlite): 66 checks passed"}
+      ]
+    },
     "platform/desk.log#2": {
       "job": "platform-contracts",
       "log": "desk.log",
@@ -457,7 +464,7 @@
       "log": "security-p2.log",
       "pins": [
         {"has":"admin-mfa-class-routes-check: 77/77 checks passed (sqlite)"},
-        {"has":"account-export-completeness-check (sqlite): 82 checks passed","note":"78 → 82 (plan F4a): the Exam Desk's attempts are exported, never their idempotency key or digest."},
+        {"has":"account-export-completeness-check (sqlite): 89 checks passed","note":"78 → 82 (plan F4a): the Exam Desk's attempts are exported, never their idempotency key or digest. 82 → 89 (standard #08): the kept originals are exported with their bytes, digest, line links and reading layer."},
         {"has":"RLS ACCOUNT COVERAGE: PASS — 20/20 checks"},
         {"has":"OTP DELETE ASYMMETRY: PASS — 15/15 checks"}
       ]
@@ -511,7 +518,7 @@
       "pins": [
         {"has":"✓ hot-path-budget-check.mjs"},
         {"has":"✓ region-isolation-check.mjs","note":"plan H2: two regions share nothing; the database binding, on Postgres."},
-        {"has":"PLATFORM ON POSTGRES: PASS — 94/94 suites","note":"59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
+        {"has":"PLATFORM ON POSTGRES: PASS — 95/95 suites","note":"94 → 95 (standard #08): original-work-check on Postgres (RLS, migration 18). 59 → 60 (#618): recognition-rate concurrency now runs on real Postgres too. 61 → 62: a parent who approves by email code is sent the withdrawal credential. 85 → 86 (plan F1): the shared resource library on Postgres. 86 → 87 (plan F4a): the Exam Desk on Postgres (RLS, migration 16). 87 → 88 (plan G3, train editions-3): Prithagoras NSW practice on Postgres. 88 → 89 (plan E5): billing provider per edition on Postgres. 89 → 90 (plan H7): edition-ai-budgets-check on Postgres. 90 → 91 (plan G4): NSW HSC-style papers on Postgres. 92 → 93 (plan F2): saved library resources (resource-bookmark sync) on Postgres."},
         {"has":"✓ nsw-practice-check.mjs"},
         {"has":"✓ nsw-exam-check.mjs"},
         {"has":"✓ billing-edition-check.mjs"},
@@ -520,6 +527,7 @@
         {"has":"✓ resource-bookmark-sync-check.mjs"},
         {"has":"✓ resource-publishing-check.mjs"},
         {"has":"✓ desk-check.mjs"},
+        {"has":"✓ original-work-check.mjs"},
         {"has":"✓ guardian-code-approval-withdraw-check.mjs"},
         {"has":"✓ practice-reveal-submit-race-check.mjs","note":"61 → 66: the reveal/submit race, deletion mid-mark, billing event order, the SQLite -> Postgres cutover rehearsal and guardian-consent coverage. 66 → 67: the question picker passes over content the account has resolved, on Postgres too. 67 → 68 (#689, #690, #691): learning-state identity and monotonic expiry on real Postgres."},
         {"has":"✓ account-deletion-midflight-check.mjs"},

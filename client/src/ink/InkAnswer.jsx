@@ -241,7 +241,13 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       // What the card keeps with the ink so a reload restores the transcript
       // (and the student's corrections) without reading the page again.
       kept: r.lines.length ? { signature: readRef.current, reading: r } : null,
-      strokes
+      strokes,
+      // The student's original page, for keeping with the mark (standard #08):
+      // the strokes they erased or undid (kept as corrections), the page size
+      // the points are in, and which surface captured them.
+      removed: canvasRef.current?.getRemovedStrokes?.() || [],
+      page: canvasRef.current?.getPageSize?.() || null,
+      inkSource: NATIVE_INK ? 'pencilkit' : 'web-pointer'
     });
   }, [onRecognized]);
 

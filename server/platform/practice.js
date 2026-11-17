@@ -53,6 +53,7 @@ import { verifyReadReceipt } from './readReceipt.js';
 import { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } from './editionBanks.js';
 import { courseAllowedForTests } from './indiaBanks.js';
 import { serverEdition } from './edition.js';
+import { OriginalRefused, keepOriginal, originalProof, parseOriginal } from './originalWork.js';
 import { figureHasExternalRef } from './figureRefs.js';
 
 const MAX_AGE = 90 * 24 * 60 * 60 * 1000;
@@ -109,7 +110,9 @@ const DOTPOINT = /^[a-zA-Z0-9._:-]{1,80}$/;
 // which need the same question twice; they are honoured in NODE_ENV=test and
 // nowhere else, and a suite can switch them off to exercise the real contract.
 const fixedSeedsAllowed = env => env.NODE_ENV === 'test' && env.PRI_PRACTICE_SERVER_SEEDS_ONLY !== '1';
-const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms', 'image']);
+// `original`: the student's own strokes or photographed page the answer was
+// read from, kept with the mark (originalWork.js, standard #08).
+const GRADE_FIELDS = new Set(['submissionId', 'answer', 'mode', 'steps', 'transcriptionReceipt', 'ms', 'image', 'original']);
 // One reading per request to /recognize, and per submission that carries its
 // own picture: the two share this bucket, so the one-request Submit cannot be
 // used to read more pictures an hour than the receipt route allows.
@@ -1126,12 +1129,27 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       try { validateImage(body.image); }
       catch (error) { return reject(res, error.status || 400, error.code || 'RECOGNITION_IMAGE_INVALID', error.message || 'Invalid image.'); }
     }
+    // ── The original the answer was read from (standard #08) ─────────────
+    // The student's own strokes or photographed page, checked against its
+    // SHA-256 here, before anything is read or marked, and kept in the same
+    // transaction as the mark. A typed answer has none. It is never sent to
+    // any reader: reading happened before Submit and stays answer-blind.
+    let original = null;
+    if (body.original !== undefined) {
+      if (mode === 'typed') return reject(res, 400, 'PRACTICE_SUBMISSION_INVALID', 'A typed answer has no handwriting to keep.');
+      try { original = parseOriginal(body.original, { mode, picture: withPicture ? body.image : null }); }
+      catch (error) {
+        if (error instanceof OriginalRefused) return reject(res, error.status, error.code, error.message);
+        throw error;
+      }
+    }
     const accountId = req.platformSession.account_id;
-    // The key remembers the request it answered, the picture included (by
-    // digest). A request without a picture hashes exactly as it always did, so
-    // a submission in flight across a deploy still replays.
+    // The key remembers the request it answered, the picture and the original
+    // included (by digest). A request without them hashes exactly as it always
+    // did, so a submission in flight across a deploy still replays.
     const hash = digest({ qid, submissionId, answer: body.answer, mode, steps: body.steps ?? [], transcriptionReceipt: body.transcriptionReceipt || null, ms: body.ms ?? null,
-      ...(withPicture ? { picture: createHash('sha256').update(body.image).digest('hex') } : {}) });
+      ...(withPicture ? { picture: createHash('sha256').update(body.image).digest('hex') } : {}),
+      ...(original ? { original: original.sha256 } : {}) });
     const now = Date.now();
     const idKey = qid + ':' + submissionId;
     const working = Array.isArray(body.steps) ? body.steps.join('\n') : String(body.steps || '');
@@ -1212,7 +1230,10 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const spent = tries >= 1 || (q._repeat !== true && triedKeys.some(key => known.has(key)));
       // The hint rungs served so far, as the server charged them.
       const hintLevel = await hintLevelOf(accountId, qid);
-      return { sealedJson: sealed.response_json, q, priorTry, tries, spent, hintLevel };
+      // The reading receipt this answer stands on, for the original's reading
+      // layer (what was read beside what the student confirmed).
+      const readingProof = token && held.get('practice-recognition') ? JSON.parse(held.get('practice-recognition').response_json) : null;
+      return { sealedJson: sealed.response_json, q, priorTry, tries, spent, hintLevel, readingProof };
     };
     const refuse = outcome => reject(res, outcome.status, outcome.code,
       outcome.code === 'QUESTION_NOT_FOUND' ? 'This question does not belong to this account.'
@@ -1343,7 +1364,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         const state = await gate();
         if (state.status || state.response) return state;
         if (state.sealedJson !== forecast.sealedJson) return { again: true };
-        const { q, priorTry, tries, spent, hintLevel } = state;
+        const { q, priorTry, tries, spent, hintLevel, readingProof } = state;
       // Only after submission may authored misconception feedback be revealed.
       // Never trust a caller-supplied explanation or make the device infer
       // correctness from a withheld canonical answer.
@@ -1482,6 +1503,27 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         // itself: the device showed it already.
         response.reading = { receipt, corrected: reading.corrected, reused: reading.reused };
       }
+      // The original, kept with the mark in this transaction and named in the
+      // reply by its digest: the mark is provably on THIS handwriting. An
+      // entry that is not an attempt (invalid) keeps nothing. A page over the
+      // account's quota is not kept on the server — the reply says so and the
+      // device keeps its copy; the mark is unaffected.
+      let keptOriginal = null;
+      if (original && !invalid) {
+        let read = null;
+        if (reading) read = reading.text;
+        else if (readingProof) {
+          if (readingProof.parentReceipt) {
+            const parent = await db.get("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='practice-recognition' AND key=?", [accountId, readingProof.parentReceipt]);
+            try { read = parent ? JSON.parse(parent.response_json).text ?? null : null; } catch { read = null; }
+          } else read = typeof readingProof.text === 'string' ? readingProof.text : null;
+        }
+        const kept = await keepOriginal(db, { accountId, edition, questionId: qid, submissionId, attemptId, parsed: original, now,
+          reading: { read, confirmed: body.answer, corrected: reading ? reading.corrected : readingProof?.correctedByStudent === true,
+            receipt: response.reading?.receipt || (typeof body.transcriptionReceipt === 'string' ? body.transcriptionReceipt : null) } });
+        if (kept.saved) keptOriginal = kept.row;
+        response.original = kept.saved ? { ...originalProof(kept.row), saved: true } : { sha256: original.sha256, saved: false, reason: kept.reason };
+      } else if (original) response.original = { sha256: original.sha256, saved: false, reason: 'not-an-attempt' };
       records.unshift(['practice-grade', idKey, JSON.stringify(response), hash]);
       if (resolved) records.push(['practice-completion', qid, JSON.stringify({ attemptId, submissionId }), hash]);
       // Only `(?,?,?,?,?,?,?)` groups are joined into the statement; every value is bound.
@@ -1506,6 +1548,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
             marksEarned: response.marksEarned, marksPossible: response.marksPossible,
             ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
             contentId: response.contentId,
+            // The handwriting this mark was given on, by digest (standard #08).
+            ...(keptOriginal ? { original: { id: keptOriginal.id, kind: keptOriginal.kind, sha256: keptOriginal.sha256 } } : {}),
             subtopic: q.subtopic || null, difficulty: Number(q.difficulty) || 2,
             dotpoint: typeof q.dotpoint === 'string' ? q.dotpoint : null,
             ...curriculumOf(q),

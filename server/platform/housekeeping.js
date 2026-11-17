@@ -53,6 +53,8 @@ export async function runHousekeeping(db, now = Date.now(), { beforeErase, child
     tokens: (await db.run(`DELETE FROM account_tokens
       WHERE (expires_at < ? AND purpose != 'guardian-withdraw') OR (consumed_at IS NOT NULL AND consumed_at < ?)`, [now, now - CONSUMED_TOKEN_RETENTION_MS])).changes,
     idempotencyKeys: (await db.run('DELETE FROM idempotency_keys WHERE expires_at < ?', [now])).changes,
+    // The student's original work past the edition's retention (originalWork.js).
+    originals: (await db.run('DELETE FROM attempt_originals WHERE expires_at < ?', [now])).changes,
     rateBuckets: (await db.run('DELETE FROM rate_limits WHERE window_start < ?', [now - RATE_BUCKET_MAX_WINDOW_MS])).changes,
     oidcNonces: await purgeOidcNonces(db, now),
     loginAttempts: await purgeStaleLoginAttempts(db, now),

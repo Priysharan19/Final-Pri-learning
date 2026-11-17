@@ -44,6 +44,10 @@ const InkCanvas = forwardRef(function InkCanvas({
   const widthRef = useRef(0);          // CSS width the committed strokes are expressed in
   const disabledRef = useRef(disabled);
   const redoRef = useRef([]);
+  // Strokes the student erased, undid or cleared, kept as corrections with the
+  // time they went (standard #08: corrections are kept, never overwritten).
+  // { stroke, removedAt } — removedAt in seconds on the pen-event clock.
+  const removedRef = useRef([]);
   const currentRef = useRef(null);     // { points, drawnTo, filter, _cx,_cy,_t,_w }
   const predictedRef = useRef([]);
   const predRectRef = useRef(null);    // what the last frame's prediction painted
@@ -240,11 +244,16 @@ const InkCanvas = forwardRef(function InkCanvas({
         }
         if (Math.abs(f - 1) > 1e-3) {
           const scalePoint = pt => ({ ...pt, x: pt.x * f, y: pt.y * f });
-          const scale = list => list.map(stroke => ({
-            ...stroke, points: (stroke?.points || []).map(scalePoint)
-          }));
+          // The raw pen samples move with the page exactly as the drawn
+          // points do: one uniform change of the page's frame, nothing else.
+          const scaleStroke = stroke => ({
+            ...stroke, points: (stroke?.points || []).map(scalePoint),
+            ...(Array.isArray(stroke?.raw) ? { raw: stroke.raw.map(scalePoint) } : {})
+          });
+          const scale = list => list.map(scaleStroke);
           strokesRef.current = scale(strokesRef.current);
           redoRef.current = scale(redoRef.current);
+          removedRef.current = removedRef.current.map(r => ({ ...r, stroke: scaleStroke(r.stroke) }));
           // The width can change between pen-down and pen-up (a split view
           // dragged, the keyboard, a rotation): the unfinished line moves with
           // the page too, and is painted again from its first point.
@@ -253,7 +262,7 @@ const InkCanvas = forwardRef(function InkCanvas({
           // a point that is off by the scale factor: a one-sample wobble at
           // most, never a lost point, and the filter is converged again by the
           // next sample. Not worth a reset that would drop the smoothing state.
-          if (live) { live.points = live.points.map(scalePoint); live.drawnTo = 0; }
+          if (live) { live.points = live.points.map(scalePoint); live.raw = live.raw.map(scalePoint); live.drawnTo = 0; }
           rescaled = true;
           // A resolved (disabled) answer is never re-read: its marked reading
           // and verdict geometry stay exactly as they were marked.
@@ -349,6 +358,14 @@ const InkCanvas = forwardRef(function InkCanvas({
       return out;
     };
 
+    /** The pen's own sample, before any conditioning: what the student's
+     * original is kept as (client/src/engine/originalInk.js). The 1€ filter
+     * below shapes only what is drawn and what the reader is shown. */
+    const rawFromEvent = (e, pt) => {
+      const { w: _w, ...out } = pointFromEvent(e, pt, 0);
+      return out;
+    };
+
     const mayDraw = (e) => {
       if (e.pointerType === 'pen') { penSeenRef.current = true; return true; }
       if (e.pointerType === 'touch') {
@@ -366,8 +383,12 @@ const InkCanvas = forwardRef(function InkCanvas({
       const pt = local(e);
       const R = 16;
       const before = strokesRef.current.length;
-      strokesRef.current = strokesRef.current.filter(s =>
-        !s.points.some(p => Math.hypot(p.x - pt.x, p.y - pt.y) < R));
+      const at = Math.max(0, Number(now)) / 1000;
+      strokesRef.current = strokesRef.current.filter(s => {
+        const hit = s.points.some(p => Math.hypot(p.x - pt.x, p.y - pt.y) < R);
+        if (hit) removedRef.current.push({ stroke: s, removedAt: at });
+        return !hit;
+      });
       if (strokesRef.current.length !== before) { notify(); redrawBase(); }
     };
 
@@ -401,6 +422,7 @@ const InkCanvas = forwardRef(function InkCanvas({
       const w = widthFor(e, null);
       currentRef.current = {
         points: [pointFromEvent(e, pt, w)],
+        raw: [rawFromEvent(e, raw)],
         drawnTo: 0,
         filter,
         sawRaw: false,
@@ -429,6 +451,9 @@ const InkCanvas = forwardRef(function InkCanvas({
       strokeMoved(e, events);
       for (const ev of events) {
         const raw = local(ev);
+        // Every sample the pen reported is kept, before the filter and before
+        // near-duplicates are dropped from the drawing.
+        cur.raw.push(rawFromEvent(ev, raw));
         const pt = cur.filter(raw.x, raw.y, ev.timeStamp || 0);
         const last = cur.points[cur.points.length - 1];
         if (last && Math.hypot(pt.x - last.x, pt.y - last.y) < 0.9) continue;
@@ -481,10 +506,10 @@ const InkCanvas = forwardRef(function InkCanvas({
       const hwErased = hwEraseRef.current;
       hwEraseRef.current = false;
       if (!hwErased && toolRef.current !== 'eraser' && currentRef.current) {
-        const { points } = currentRef.current;
+        const { points, raw } = currentRef.current;
         currentRef.current = null;
         if (points.length) {
-          strokesRef.current = [...strokesRef.current, { points }];
+          strokesRef.current = [...strokesRef.current, { points, raw }];
           paintStroke(ctxRef.current.base, points, inkRef.current);
           notify();
         }
@@ -524,30 +549,41 @@ const InkCanvas = forwardRef(function InkCanvas({
   useImperativeHandle(ref, () => ({
     undo() {
       if (!strokesRef.current.length) return;
-      redoRef.current.push(strokesRef.current[strokesRef.current.length - 1]);
+      const last = strokesRef.current[strokesRef.current.length - 1];
+      redoRef.current.push(last);
+      removedRef.current.push({ stroke: last, removedAt: performance.now() / 1000 });
       strokesRef.current = strokesRef.current.slice(0, -1);
       notify(); redrawBase(); force(x => x + 1);
     },
     redo() {
       const s = redoRef.current.pop();
       if (!s) return;
+      // Back on the page: no longer a removed stroke.
+      removedRef.current = removedRef.current.filter(r => r.stroke !== s);
       strokesRef.current = [...strokesRef.current, s];
       notify(); redrawBase(); force(x => x + 1);
     },
     clear() {
       if (!strokesRef.current.length) return;
       redoRef.current = [...strokesRef.current].reverse();
+      const at = performance.now() / 1000;
+      for (const stroke of strokesRef.current) removedRef.current.push({ stroke, removedAt: at });
       strokesRef.current = [];
       notify(); redrawBase(); force(x => x + 1);
     },
     getStrokes: () => strokesRef.current,
+    /** The erased/undone/cleared strokes, each with `removedAt` (seconds). */
+    getRemovedStrokes: () => removedRef.current.map(r => ({ ...r.stroke, removedAt: r.removedAt })),
+    /** The page the points are in, CSS px. */
+    getPageSize: () => ({ width: widthRef.current, height }),
     setStrokes(strokes) {
       strokesRef.current = strokes || [];
       redoRef.current = [];
+      removedRef.current = [];
       notify(); redrawBase(); force(x => x + 1);
     },
     isEmpty: () => strokesRef.current.length === 0
-  }), [notify, redrawBase]);
+  }), [notify, redrawBase, height]);
 
   return (
     <div

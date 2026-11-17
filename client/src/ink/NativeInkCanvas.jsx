@@ -94,12 +94,19 @@ const NativeInkCanvas = forwardRef(function NativeInkCanvas({
     redo() { nativeInk.redo(); },
     clear() { nativeInk.clear(); },
     getStrokes: () => strokesRef.current,
+    // PencilKit erases inside the shell; the bridge reports only the page as
+    // it stands, so no removed strokes are known here.
+    getRemovedStrokes: () => [],
+    getPageSize: () => {
+      const r = wrapRef.current?.getBoundingClientRect?.();
+      return { width: r?.width || 0, height: r?.height || height };
+    },
     setStrokes(strokes) {
       strokesRef.current = strokes || [];
       nativeInk.setStrokes(strokesRef.current);
     },
     isEmpty: () => strokesRef.current.length === 0
-  }), []);
+  }), [height]);
 
   return (
     <div

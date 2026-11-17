@@ -159,6 +159,8 @@ export const ENGINE_SUITES = [
   'desk-check.mjs',
   // Resource publishing (plan F3): the schema-16 → 17 upgrade/rollback and the state machine.
   'resource-publishing-check.mjs',
+  // The student's original work (standard #08): kept with the mark under RLS, schema 18.
+  'original-work-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',

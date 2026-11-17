@@ -66,7 +66,9 @@ const ACCOUNT_SCOPED = new Set([
   // 20261113010000_desk_attempts.sql: the Exam Desk's practice attempts.
   'desk_attempts',
   // 20261114000000_resource_publishing.sql: revision history names staff accounts, as content_revisions does.
-  'resource_revisions'
+  'resource_revisions',
+  // 20261118000000_attempt_originals.sql: the student's original work behind each mark.
+  'attempt_originals'
 ]);
 // The ownership predicate of each pri_account_scope policy (default account_id).
 const ACCOUNT_OWNER = new Map([
@@ -275,6 +277,8 @@ export async function postgresSchema(client, schema = 'pri') {
 
 function expectedPostgresType(table, column, sqliteType) {
   if (sqliteType === 'TEXT') return 'text';
+  // The student's original work (attempt_originals.content) is bytes.
+  if (sqliteType === 'BLOB') return 'bytea';
   if (sqliteType === 'INTEGER') return POSTGRES_INTEGER.has(`${table}.${column}`) ? 'integer' : 'bigint';
   return `unmapped SQLite type ${sqliteType}`;
 }

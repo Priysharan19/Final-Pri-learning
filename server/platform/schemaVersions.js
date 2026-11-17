@@ -51,7 +51,12 @@
 //    history and the review state machine) and resource_assets (hosted PDF
 //    records), both global under the fail-closed RLS policy
 //    (supabase/migrations/20261114000000_resource_publishing.sql).
-export const SCHEMA_VERSION = 17;
+// 18: the student's original work (standard #08) — attempt_originals, the
+//    strokes or photographed page each marked answer was read from, kept with
+//    the mark and bound to it by SHA-256; account-owned under RLS, cascades
+//    with the account, expires after the edition's retention
+//    (supabase/migrations/20261118000000_attempt_originals.sql).
+export const SCHEMA_VERSION = 18;
 // Billing 4: billing_payments keeps its row when the account is deleted
 //    (ON DELETE SET NULL, account_id nullable) — the payment ledger is retained
 //    pseudonymously (supabase/migrations/20261003000000, billingSchema.js).

@@ -447,7 +447,7 @@ if (engine === 'postgres') {
   // the resource library's two global tables (resources-check.mjs) and the
   // Exam Desk's account-scoped desk_attempts (desk-check.mjs; pgSchemaParity pins it)
   // and the publishing history's two global tables (resource-publishing-check.mjs).
-  const LATER = ['20261019000000_rls_account_coverage.sql', '20261022000000_parent_report.sql', '20261113000000_resource_library.sql', '20261113010000_desk_attempts.sql', '20261114000000_resource_publishing.sql'];
+  const LATER = ['20261019000000_rls_account_coverage.sql', '20261022000000_parent_report.sql', '20261113000000_resource_library.sql', '20261113010000_desk_attempts.sql', '20261114000000_resource_publishing.sql', '20261118000000_attempt_originals.sql'];
   ok(!!forward && JSON.stringify(all.slice(all.findIndex(m => m.name === FORWARD) + 1).map(m => m.name)) === JSON.stringify(LATER),
     `${FORWARD} runs after every earlier migration; only ${LATER.join(', ')} follow it`);
   const scratch = await scratchDatabase('rls_upgrade', { migrations: all.filter(m => m.name < FORWARD) });

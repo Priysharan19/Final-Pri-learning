@@ -22,6 +22,7 @@ import { isCommonPassword } from './commonPasswords.js';
 import { PHONE_ACCOUNT_EMAIL_DOMAIN, verifyReauthCode } from './otp.js';
 import { maskPhone } from './otpCore.js';
 import { ERASURE_REASONS, scheduleErasure } from './childErasure.js';
+import { originalView } from './originalWork.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -879,6 +880,11 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     // idempotency key or request digests.
     const deskRows = await db.all(`SELECT id,edition,mode,origin,resource_id,paper_json,clock_json,questions_json,state,imported_from_json,created_at,updated_at,finished_at
       FROM desk_attempts WHERE account_id=? ORDER BY created_at, id`, [accountId]);
+    // The student's original work behind each mark (originalWork.js, #08): the
+    // strokes or photographed page itself, its digest, each line's strokes and
+    // the reading layer (what was read, what they confirmed, their edits).
+    const originalRows = await db.all('SELECT * FROM attempt_originals WHERE account_id=? ORDER BY created_at, id', [accountId]);
+    const originals = originalRows.map(row => { try { return originalView(row); } catch { return { ...originalView(row, { withBytes: false }), data: null, corrupt: true }; } });
     // A receipt with no personal data: the format and how many rows each
     // section carried, so a bulk read of an account is visible in the audit
     // trail without copying any of it.
@@ -887,7 +893,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       counts: {
         identities: identities.length, learningEvents: events.length, entities: entities.length, classes: classes.length,
         assignmentSubmissions: submissions.length, assignmentFeedback: feedback.length, telemetry: telemetry.length, issueReports: reports.length,
-        receipts: receipts.length, phones: phones.length
+        receipts: receipts.length, phones: phones.length, originals: originals.length
       }
     }, Date.now());
     res.set('Cache-Control', 'no-store');
@@ -938,7 +944,10 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
           state: row.state, imported: row.imported_from_json ? json(row.imported_from_json, null) : null,
           createdAt: Number(row.created_at), updatedAt: Number(row.updated_at), finishedAt: row.finished_at == null ? null : Number(row.finished_at)
         };
-      })
+      }),
+      // Strokes are pri-ink-v1 bytes (base64; client/src/engine/originalInk.js
+      // documents the format); an image is a data URL.
+      originals
     });
   });
 

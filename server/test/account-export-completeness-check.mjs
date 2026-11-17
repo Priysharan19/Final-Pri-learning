@@ -17,6 +17,9 @@
 import './support/hermetic.mjs';
 import { requestedEngine } from './support/engine.mjs';
 import { checks, registerAccount, startApp } from './support/app-harness.mjs';
+import { createHash } from 'node:crypto';
+import { gzipSync } from 'node:zlib';
+import { encodeInk } from '../../client/src/engine/originalInk.js';
 
 // table.column → the export section that carries it.
 const COVERED = {
@@ -34,7 +37,8 @@ const COVERED = {
   'account_phones.account_id': 'phones',
   'parent_report_links.account_id': 'parentReport',
   'parent_report_sends.account_id': 'parentReport',
-  'desk_attempts.account_id': 'deskAttempts'
+  'desk_attempts.account_id': 'deskAttempts',
+  'attempt_originals.account_id': 'originals'
 };
 // table.column → why it is not in the export.
 const EXCLUDED = {
@@ -132,6 +136,13 @@ try {
       VALUES (?,?,'prithagoras','unmarked','desk','2027-mathematics-advanced-assessment-1',?,?,?,'idle',0,?,?,?,?)`,
     [`00000000-0000-4000-8000-00000000000${tag === 'ALICE' ? 1 : 2}`, id, JSON.stringify({ title: 'Paper', questionCount: 27 }), JSON.stringify({ v: 1, events: [] }),
       JSON.stringify({ 3: { note: `${tag}-DESK-NOTE`, noteRev: 1 } }), `${tag}-DESK-KEY-SECRET`, `${tag}-DESK-DIGEST-SECRET`, now, now]);
+    // The student's original handwriting behind a mark (#08): its bytes and
+    // reading layer are theirs to export.
+    const ink = Buffer.from(encodeInk({ strokes: [{ raw: [{ x: tag.length, y: 2, t: 1, p: 0.5 }, { x: 9, y: 9, t: 1.01, p: 0.6 }] }], width: 300, height: 200 }));
+    await db.run(`INSERT INTO attempt_originals(id,account_id,edition,question_id,submission_id,attempt_id,kind,origin,format,encoding,sha256,byte_length,canonical_bytes,content,lines_json,reading_json,created_at,expires_at)
+      VALUES (?,?,'priyabhata',?,?,?,'strokes','ink','pri-ink-v1','gzip',?,?,?,?,?,?,?,?)`,
+    [`00000000-0000-4000-8000-0000000001${tag === 'ALICE' ? '01' : '02'}`, id, `${tag}-q-done`, `${tag}-sub`, `${tag}-attempt`, createHash('sha256').update(ink).digest('hex'),
+      gzipSync(ink).byteLength, ink.byteLength, gzipSync(ink), JSON.stringify([{ strokes: [0] }]), JSON.stringify({ read: `${tag}-WHAT-PRI-READ`, confirmed: `${tag}-CONFIRMED`, corrected: true, edits: [] }), now, now + 86400000]);
     await receipt('exam-paper', `${tag}-exam-open`, { answer: `${tag}-PAPER-OPEN-SECRET` });
     await receipt('exam-answers', `${tag}-exam-open`, { answers: `${tag}-MY-EXAM-ANSWERS` });
     await receipt('exam-paper', `${tag}-exam-done`, { answer: `${tag}-PAPER-DONE` });
@@ -163,7 +174,7 @@ try {
 
   // Every covered table's seeded row is there.
   for (const marker of ['ALICE-EVENT', 'ALICE-ENTITY', 'ALICE-SUBMISSION', 'ALICE-FEEDBACK', 'ALICE-REPORT', 'ALICE-SURFACE',
-    'ALICE-MY-EXAM-ANSWERS', 'ALICE-PAPER-DONE', 'ALICE-EXAM-RESULT', 'ALICE-ANSWER-DONE', 'ALICE-COMPLETION', 'ALICE-TRANSCRIPT', 'ALICE-DESK-NOTE']) {
+    'ALICE-MY-EXAM-ANSWERS', 'ALICE-PAPER-DONE', 'ALICE-EXAM-RESULT', 'ALICE-ANSWER-DONE', 'ALICE-COMPLETION', 'ALICE-TRANSCRIPT', 'ALICE-DESK-NOTE', 'ALICE-WHAT-PRI-READ', 'ALICE-CONFIRMED']) {
     c.ok(text.includes(marker), `the export carries Alice's ${marker}`);
   }
   c.ok(x.classes.some(row => row.id === 'class-1'), 'the class membership is exported');
@@ -174,6 +185,13 @@ try {
   c.ok(!text.includes('+919876511111'), 'the guardian\'s full number is not in the export');
   c.eq(x.parentReport?.link?.recipient, 'a•••••••••••@example.test', 'the parent report recipient is exported masked');
   c.deq(x.parentReport?.sends?.map(row => row.status), ['sent'], 'each week\'s parent report send is exported');
+
+  // The original itself, byte for byte, under its digest.
+  c.eq(x.originals?.length, 1, 'Alice\'s one kept original is exported');
+  const kept = x.originals[0];
+  c.eq(createHash('sha256').update(Buffer.from(kept.data, 'base64')).digest('hex'), kept.sha256, 'the exported strokes are the kept bytes (their SHA-256 matches)');
+  c.deq(kept.lines, [{ strokes: [0] }], 'with each reading line\'s strokes');
+  c.ok(!('content' in kept) && !('account_id' in kept), 'raw column names are not exported');
 
   const receipts = x.receipts;
   c.ok(Array.isArray(receipts) && receipts.length === 9, 'all nine of Alice\'s idempotency rows are listed');
@@ -204,7 +222,7 @@ try {
   // The audit receipt counts the new sections, still with no personal data.
   const audit = await db.get("SELECT metadata_json FROM audit_log WHERE action='account.export' AND target_id=? ORDER BY id DESC", [A]);
   const counts = JSON.parse(audit.metadata_json).counts;
-  c.deq([counts.receipts, counts.phones], [9, 1], 'the audit receipt counts receipts and phones');
+  c.deq([counts.receipts, counts.phones, counts.originals], [9, 1, 1], 'the audit receipt counts receipts, phones and originals');
 
   console.log(`engine: ${h.engine}`);
   console.log(`account-export-completeness-check (${h.engine}): ${c.count()} checks passed`);

@@ -16,6 +16,7 @@ import { createReportRouter } from './reports.js';
 import { createParentReportRecipientRouter, createParentReportRouter, parentReportEnabled } from './parentReport.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
+import { createOriginalsRouter } from './originalWork.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
 import { createExamRouter } from './exams.js';
 import { createResourceRouter } from './resources.js';
@@ -261,6 +262,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // account later goes through the guarded /practice/issue below.
   router.post('/practice/prepare', ...createPracticePrepareRoute(db));
   router.use('/practice', requireGuardianConsent(db), createPracticeRouter(db));
+  // The student's original work behind each mark (standard #08): read-only;
+  // an original is written only with its mark, by /practice submit.
+  router.use('/originals', requireGuardianConsent(db), createOriginalsRouter(db, { edition }));
   router.use('/habits', requireGuardianConsent(db), createMistakeDnaRouter(db));
   // An examination paper is issued, collected and marked here: the same
   // eligibility as checking one answer (session, verified email, student,
