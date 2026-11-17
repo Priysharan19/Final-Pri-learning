@@ -240,7 +240,7 @@ export default function IndexPage() {
               <b id="home-next-title">{t('inst.resumePrefix')} · <span lang="en"><TermGloss text={recent.subtopicName || ''} /></span></b>
               <small>{resumeMarks ? t('inst.resumeMarks', { earned: resumeMarks.earned, possible: resumeMarks.possible }) : t('inst.resumeSub')}</small>
             </div>
-            <PageLink className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })} data-home-primary-cta>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></PageLink>
+            <PageLink into className="in-btn is-primary" to={practiceHref({ subtopic: recent.subtopic, track })} data-home-primary-cta>{t('inst.resume')} <span className="in-kbd" aria-hidden="true">↵</span></PageLink>
             {resumeMarks && resumeMarks.possible <= 10 && (
               <div className="in-seg10" aria-hidden="true">
                 {Array.from({ length: 10 }, (_, i) => <i key={i} className={i < resumeMarks.earned ? 'd' : i < resumeMarks.possible ? 'x' : undefined} />)}
@@ -343,7 +343,7 @@ export default function IndexPage() {
           )}
           <div>
             <div className="in-plate-acts">
-              <PageLink className="in-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</PageLink>
+              <PageLink into className="in-btn" to={practiceHref({ subtopic: current.row.id, track })} data-instrument-practise>{t('inst.practise')}</PageLink>
             </div>
             {current.evidence.attempts > 0 && current.evidence.accuracy == null && <p className="in-note" style={{ marginTop: 10 }}>{t('inst.accuracyHeld')}</p>}
           </div>

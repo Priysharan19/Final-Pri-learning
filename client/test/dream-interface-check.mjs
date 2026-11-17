@@ -335,7 +335,9 @@ check('no learner-model numbers or game points in the result', () => {
 
 check('formal assessment: no hints, confirmed submission, flags and a spoken timer', () => {
   assert.doesNotMatch(exam, /getHint|hintsAvailable|PriExplain/);
-  assert.match(exam, /role="dialog"[\s\S]*exam\.confirmUnanswered/);
+  // The confirmation is a dialog: inline, or the shell's ConfirmSheet (F4c), which renders role="dialog".
+  assert.match(exam, /(?:role="dialog"|<ConfirmSheet)[\s\S]*exam\.confirmUnanswered/);
+  assert.match(readFileSync(join(ROOT, 'src/examShell/ConfirmSheet.jsx'), 'utf8'), /role="dialog"/);
   assert.match(exam, /setFlagged/);
   // The deadline clock announces the last five minutes and the last minute in words.
   assert.match(exam, /examRoom\.fiveMinutesLeft[\s\S]*examRoom\.oneMinuteLeft/);

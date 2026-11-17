@@ -1,0 +1,6 @@
+/* The shortcut list (ShortcutsSheet): kept apart from examShell.css so the marked room, which imports the sheet but not the desk layout, carries only these rules. */
+.xs-keys { display: grid; gap: 8px; margin: 12px 0; }
+.xs-keys div { display: grid; grid-template-columns: 96px 1fr; gap: 12px; align-items: baseline; }
+.xs-keys dt { display: flex; gap: 4px; }
+.xs-keys dd { margin: 0; }
+.xs-keys kbd { min-width: 24px; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 0 1px var(--in-edge-3); background: var(--in-l2); font: 500 0.8rem var(--in-mono); text-align: center; }

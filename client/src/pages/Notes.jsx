@@ -11,6 +11,7 @@
 // scroll into view, cards unfold and flashcards flip. Every one of those is
 // switched off by prefers-reduced-motion (Notes.css) and the content is fully
 // present without it: the reveal classes only ever hide what is already there.
+import { navigateInto } from '../instrument/viewTransition.js';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
@@ -295,7 +296,7 @@ function ChapterMap({ group, notes }) {
               aria-label={`${t('notes.chapterNumber', { n: i + 1 })}: ${c.name}`}
               onMouseEnter={() => setFocus(c.id)} onMouseLeave={() => setFocus(null)}
               onFocus={() => setFocus(c.id)} onBlur={() => setFocus(null)}
-              onClick={() => nav(chapterNotesLink(c, params))}>
+              onClick={() => navigateInto(nav, chapterNotesLink(c, params))}>
               {i + 1}
             </button>
           ))}
