@@ -678,7 +678,7 @@ function triForms() {
       const [p, q] = distinct(rng, 2, 9 + d, 2), m = ri(rng, 2, 12);
       return {
         payload: numeric('perimeter-ratio', `Triangles $ABC$ and $DEF$ are similar. Their corresponding sides $BC$ and $EF$ are $${p}$ cm and $${q}$ cm. The perimeter of $ABC$ is $${m * p}$ cm. Find the perimeter of $DEF$ in cm.`, m * q, {
-          figure: D.similarTriangles({ small: p, big: q, shown: { small: `BC = ${p} cm`, big: `EF = ${q} cm` } }).svg,
+          figure: D.similarTriangles({ small: p, big: q, names: ['B', 'E'], shown: { small: `BC = ${p} cm`, big: `EF = ${q} cm` } }).svg,
           hints: ['The perimeters of similar triangles are in the same ratio as corresponding sides.', `The ratio is $${p} : ${q}$.`, 'Scale the given perimeter by it.'],
           steps: [{ h: 'Ratio', d: `$\\dfrac{${q}}{${p}}$` }, { h: 'Scale', d: `$${m * p}\\times\\dfrac{${q}}{${p}}$` }],
           traps: [{ value: m * q * q / p, why: 'Perimeters are lengths; they scale by the side ratio, not its square.' }].filter(t => Number.isInteger(t.value) && t.value !== m * q)

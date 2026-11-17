@@ -370,8 +370,10 @@ export function angleTriangle({ A, B, C, shown = {}, exterior = null }) {
   const cv = new Canvas();
   const rad = d => (d * Math.PI) / 180, a = Math.sin(rad(A)), b = Math.sin(rad(B)), c = Math.sin(rad(C));
   const raw = { A: [0, 0], B: [c, 0], C: [b * Math.cos(rad(A)), -b * Math.sin(rad(A))] };
-  const ext = exterior ? 0.45 * c : 0;                          // room to produce side BC beyond C
-  const xs = [...Object.values(raw).map(p => p[0]), raw.C[0] + (raw.C[0] - raw.B[0]) * 0.45 * (exterior ? 1 : 0) + (exterior ? (raw.C[0] > raw.B[0] ? 0.12 : -0.12) * c : 0)], ys = [...Object.values(raw).map(p => p[1]), ...(exterior ? [raw.C[1] - 0.2 * c] : [])];
+  const ext = exterior ? 0.45 * c : 0;
+  const Eraw = exterior ? [raw.C[0] + (raw.C[0] - raw.B[0]) * 0.45, raw.C[1] + (raw.C[1] - raw.B[1]) * 0.45] : null;
+  const margin = exterior ? 0.16 * c : 0;                         // room for the exterior angle's label
+  const xs = [...Object.values(raw).map(p => p[0]), ...(Eraw ? [Eraw[0]] : [])], ys = [...Object.values(raw).map(p => p[1]), ...(Eraw ? [Eraw[1] - margin] : [])];
   const sc = Math.min((W - 2 * PAD) / (Math.max(...xs) - Math.min(...xs)), (H - 2 * PAD) / (Math.max(...ys) - Math.min(...ys)));
   const ox = PAD + ((W - 2 * PAD) - (Math.max(...xs) - Math.min(...xs)) * sc) / 2 - Math.min(...xs) * sc, oy = PAD + ((H - 2 * PAD) - (Math.max(...ys) - Math.min(...ys)) * sc) / 2 - Math.min(...ys) * sc;
   const P = Object.fromEntries(Object.entries(raw).map(([k, p]) => [k, [ox + p[0] * sc, oy + p[1] * sc]]));
@@ -456,7 +458,7 @@ export function circlePoints({ points, chords = [], centre = false, radii = [], 
   for (const i of radii) cv.line(O[0], O[1], pos[i][0], pos[i][1]);
   if (centre) { cv.dot(O[0], O[1]); cv.label(O[0] + 4, O[1] + 16, 'O', { dy: 1 }); }
   points.forEach((p, i) => { const ux = Math.cos((p.deg * Math.PI) / 180), uy = -Math.sin((p.deg * Math.PI) / 180); cv.label(pos[i][0] + ux * 14, pos[i][1] + uy * 14 + 4, p.name, { dx: ux, dy: uy }); });
-  for (const al of angleLabels) { const q = pos[al.at], vx = O[0] - q[0], vy = O[1] - q[1], l = Math.hypot(vx, vy); cv.label(q[0] + (vx / l) * 30, q[1] + (vy / l) * 30 + 4, lab(al.text), { dx: vx / l, dy: vy / l, size: 12, accent: unk(al.text) }); }
+  for (const al of angleLabels) { const q = pos[al.at], vx = O[0] - q[0], vy = O[1] - q[1], l = Math.hypot(vx, vy); cv.label(q[0] + (vx / l) * 30 + (al.dx || 0), q[1] + (vy / l) * 30 + 4 + (al.dy || 0), lab(al.text), { dx: vx / l, dy: vy / l, size: 12, accent: unk(al.text) }); }
   if (centreLabel) { const m = [(pos[centreLabel.between[0]][0] + pos[centreLabel.between[1]][0]) / 2, (pos[centreLabel.between[0]][1] + pos[centreLabel.between[1]][1]) / 2]; cv.label(O[0] + (m[0] - O[0]) * 0.35, O[1] + (m[1] - O[1]) * 0.35 + 4, lab(centreLabel.text), { size: 12, accent: unk(centreLabel.text) }); }
   for (const [k, text] of Object.entries(shown)) { const [x, y] = k.split(',').map(Number); cv.label(x, y, lab(text), { size: 12, accent: unk(text) }); }
   return cv.out('Circle with points on it', { O, R, pos, points });
@@ -469,7 +471,8 @@ export function segmentLine({ points, labels = [] }) {
   const X = p => PAD + (p.at - lo) * sc;
   cv.line(PAD, y, W - PAD, y);
   for (const p of points) { cv.dot(X(p), y); cv.label(X(p), y + 20, p.name, { dy: 1 }); }
-  for (const l of labels) { const a = points.find(p => p.name === l.from), b = points.find(p => p.name === l.to); const xm = (X(a) + X(b)) / 2; cv.line(X(a), y - 14, X(b), y - 14, { stroke: ACCENT }); cv.label(xm, y - 22, lab(l.text), { dy: -1, accent: unk(l.text) }); }
+  const placed = [];
+  for (const l of labels) { const a = points.find(p => p.name === l.from), b = points.find(p => p.name === l.to); const x0 = Math.min(X(a), X(b)), x1 = Math.max(X(a), X(b)), level = placed.filter(q => q.x0 < x1 && x0 < q.x1).length, yy = y - 14 - 22 * level; placed.push({ x0, x1 }); cv.line(x0, yy, x1, yy, { stroke: ACCENT }); cv.label((x0 + x1) / 2, yy - 8, lab(l.text), { dy: -1, accent: unk(l.text) }); }
   return cv.out('Points on a line', { y, X: Object.fromEntries(points.map(p => [p.name, X(p)])), scale: sc });
 }
 
@@ -491,17 +494,17 @@ export function prismFigure({ n, shown = {} }) {
 }
 
 /** Two similar right triangles to ONE scale (legs 3k:4k stay right-angled), the second scaled by q/p. */
-export function similarTriangles({ small, big, shown = {} }) {
+export function similarTriangles({ small, big, shown = {}, names = ['A', 'P'] }) {
   const cv = new Canvas();
-  const legs = [3, 4], total = big * legs[0] + small * legs[0], sc = Math.min((W - 2 * PAD - 20) / (legs[0] * (small + big)), (H - 2 * PAD) / (legs[1] * big));
+  const legs = [3, 4], total = big * legs[0] + small * legs[0], sc = Math.min((W - 2 * PAD - 20) / (legs[0] * (small + big)), (H - 2 * PAD) / (legs[1] * Math.max(small, big)));
   const t = (x, y, k) => [[x, y], [x + legs[0] * k * sc, y], [x, y - legs[1] * k * sc]];
   const base = H - PAD - 8, x1 = PAD, x2 = PAD + legs[0] * small * sc + 20;
   const T1 = t(x1, base, small), T2 = t(x2, base, big);
   cv.poly(T1); cv.poly(T2); cv.rightMark(T1[0][0], T1[0][1], 1, 0, 0, -1, 8); cv.rightMark(T2[0][0], T2[0][1], 1, 0, 0, -1, 8);
   cv.label(T1[0][0] + (legs[0] * small * sc) / 2, base + 16, lab(shown.small), { dy: 1, accent: unk(shown.small) });
   cv.label(T2[0][0] + (legs[0] * big * sc) / 2, base + 16, lab(shown.big), { dy: 1, accent: unk(shown.big) });
-  cv.label(T1[0][0] - 6, base - (legs[1] * small * sc) / 2, 'A', { dx: -1, size: 12, anchor: 'end' });
-  cv.label(T2[0][0] - 6, base - (legs[1] * big * sc) / 2, 'P', { dx: -1, size: 12, anchor: 'end' });
+  cv.label(T1[0][0] - 6, base - (legs[1] * small * sc) / 2, names[0], { dx: -1, size: 12, anchor: 'end' });
+  cv.label(T2[0][0] - 6, base - (legs[1] * big * sc) / 2, names[1], { dx: -1, size: 12, anchor: 'end' });
   void total;
   return cv.out('Two similar triangles', { T1, T2, small, big, scale: sc });
 }
@@ -509,7 +512,7 @@ export function similarTriangles({ small, big, shown = {} }) {
 /** An angle of `total` degrees at O with its bisector dashed; labels for the whole angle and the half. */
 export function angleBisector({ total, shown = {} }) {
   const cv = new Canvas();
-  const r = 130, O = [PAD + 20, H - PAD - 20], a = (total * Math.PI) / 180;
+  const a = (total * Math.PI) / 180, r = 110, O = [PAD + 14 + r * Math.max(0, -Math.cos(a)), H - PAD - 20];
   const P1 = [O[0] + r, O[1]], P2 = [O[0] + r * Math.cos(a), O[1] - r * Math.sin(a)], M = [O[0] + r * Math.cos(a / 2), O[1] - r * Math.sin(a / 2)];
   cv.line(O[0], O[1], P1[0], P1[1]); cv.line(O[0], O[1], P2[0], P2[1]); cv.line(O[0], O[1], M[0], M[1], { dash: true, stroke: ACCENT });
   const ar = 42;

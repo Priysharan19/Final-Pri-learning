@@ -270,7 +270,6 @@ const ANGLES = () => [
   mk('regular-exterior', (rng, d) => {
     const n = [3, 4, 5, 6, 8, 9, 10, 12, 15, 18, 20, 24, 30, 36, 40, 45, 60, 72][ri(rng, 0, 17)];
     return { p: `Each exterior angle of a regular polygon is $${360 / n}^\\circ$. How many sides does it have?`, v: n, h: ['The exterior angles of any polygon add to $360^\\circ$.', 'All exterior angles of a regular polygon are equal.', 'Divide $360^\\circ$ by one exterior angle.'], s: [{ h: 'Divide', d: `$360\\div ${360 / n}$` }],
-      f: n <= 24 ? D.regularPolygon({ n, exteriorLabel: `${360 / n}°` }) : null,
       t: [{ value: 180 / n * 2 - 2 > 0 ? 180 - 360 / n : 0, why: 'That is the interior angle, not the number of sides.' }], c: () => { for (let s = 3; s <= 360; s++) if (360 / s === 360 / n) return s; return NaN; } };
   }),
   mk('third-side-count', (rng, d) => {
@@ -327,7 +326,7 @@ const CIRC9 = () => [
   mk('semicircle', (rng, d) => {
     const a = ri(rng, 20, 70);
     return { p: `$AB$ is a diameter of a circle and $C$ is a point on the circle. If $\\angle CAB = ${a}^\\circ$, find $\\angle CBA$ in degrees.`, v: 90 - a, h: ['The angle in a semicircle is $90^\\circ$.', 'So triangle $ABC$ has a right angle at $C$.', 'The other two angles add to $90^\\circ$.'], s: [{ h: 'Right angle', d: '$\\angle ACB = 90^\\circ$' }],
-      f: D.circlePoints({ points: [{ deg: 180, name: 'A' }, { deg: 0, name: 'B' }, { deg: 2 * a, name: 'C' }], chords: [[0, 1], [0, 2], [1, 2]], centre: true, angleLabels: [{ at: 0, text: `${a}°` }, { at: 1, text: '?' }] }),
+      f: D.circlePoints({ points: [{ deg: 180, name: 'A' }, { deg: 0, name: 'B' }, { deg: 2 * a, name: 'C' }], chords: [[0, 1], [0, 2], [1, 2]], centre: true, angleLabels: [{ at: 0, text: `${a}°`, dy: -12 }, { at: 1, text: '?', dy: -12 }] }),
       t: [{ value: 180 - a, why: 'The triangle has a right angle, so the other two angles add to $90^\\circ$.' }], c: () => 180 - 90 - a };
   }),
   mk('cyclic-quadrilateral', (rng, d) => {

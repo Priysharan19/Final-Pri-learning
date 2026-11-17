@@ -4,7 +4,7 @@
 
 Targets (owner, Nov 2026): at least 10,000 distinct instances and at least 5 structural forms per skill. Instances and forms are the question-capacity tool's synthetic measurement; diagram coverage is the share of 240 sampled questions per skill (60 seeds × 4 difficulties) that carry a figure, diagram, plot or graph. SYNTHETIC: generators run in-process; no student or examiner evidence.
 
-**279 Priyabhata skills measured. 279 meet both targets; 0 are below.** 58 skills carry a generated figure in at least one sampled question.
+**279 Priyabhata skills measured. 279 meet both targets; 0 are below.** 57 skills carry a generated figure in at least one sampled question.
 
 ## Below target
 
@@ -18,6 +18,7 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 - `c11-radian-unit-circle-reasoning`
 - `olymp-geometry`
 - `c7-angle-sum-reasoning`
+- `c7-symmetry`
 - `c11-parabola-jee-reasoning`
 - `c8-quadrilateral-property-reasoning`
 - `c12-vector-direction-reasoning`
@@ -351,7 +352,7 @@ Skills whose questions benefit from a diagram (geometry, mensuration, coordinate
 | `c7-solid-shapes` | 18.7k | 28 | 10% | — |
 | `c7-sss-sas-reasoning` | 29.4k | 10 | 63% | — |
 | `c7-statistical-question-reasoning` | 2.9M | 310 | 0% | — |
-| `c7-symmetry` | 18.9k | 13 | 13% | — |
+| `c7-symmetry` | 18.9k | 13 | 0% | — |
 | `c7-tiling-invariant-reasoning` | 2.2M | 6 | 0% | — |
 | `c7-transversal-reasoning` | 116.0k | 31 | 0% | — |
 | `c7-triangle-angles` | 17.1k | 6 | 63% | — |

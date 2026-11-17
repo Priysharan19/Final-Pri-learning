@@ -22,6 +22,10 @@ function framed(name, fig) {
     for (let j = i + 1; j < labels.length; j++) ok(!overlap(b, labels[j].box), `${name}: labels "${labels[i].text}" and "${labels[j].text}" collide`);
   }
   ok(/^<svg viewBox="0 0 \d+ \d+" role="img" aria-label="[^"]+"/.test(fig.svg), `${name}: the svg is a labelled image`);
+  for (const m of fig.svg.matchAll(/ (?:x|x1|x2|cx)="(-?[\d.]+)"/g)) ok(+m[1] >= -0.5 && +m[1] <= w + 0.5, `${name}: x coordinate ${m[1]} is outside the frame`);
+  for (const m of fig.svg.matchAll(/ (?:y|y1|y2|cy)="(-?[\d.]+)"/g)) ok(+m[1] >= -0.5 && +m[1] <= h + 0.5, `${name}: y coordinate ${m[1]} is outside the frame`);
+  for (const m of fig.svg.matchAll(/points="([^"]+)"/g)) for (const q of m[1].trim().split(/\s+/)) { const [px, py] = q.split(',').map(Number); ok(px >= -0.5 && px <= w + 0.5 && py >= -0.5 && py <= h + 0.5, `${name}: a drawn point (${px}, ${py}) is outside the frame`); }
+  for (const m of fig.svg.matchAll(/ d="([^"]+)"/g)) for (const q of m[1].matchAll(/[ML] (-?[\d.]+) (-?[\d.]+)/g)) ok(+q[1] >= -0.5 && +q[1] <= w + 0.5 && +q[2] >= -0.5 && +q[2] <= h + 0.5, `${name}: a path point (${q[1]}, ${q[2]}) is outside the frame`);
   ok(!/NaN|undefined|Infinity/.test(fig.svg), `${name}: no NaN in the drawing`);
 }
 
@@ -177,7 +181,7 @@ for (let i = 1; i <= 300; i++) {
   const pn = ri(rng, 3, 9), pr = D.prismFigure({ n: pn, shown: { n: `${pn} sides` } });
   ok(pr.geom.bot.length === pn && pr.geom.top.every((t, k) => near(t[0], pr.geom.bot[k][0]) && near(pr.geom.bot[k][1] - t[1], pr.geom.bot[0][1] - pr.geom.top[0][1])), 'prism: the top base is the bottom base lifted straight up');
   framed('prism', pr);
-  const sm = ri(rng, 1, 6), bg = sm + ri(rng, 1, 6), st = D.similarTriangles({ small: sm, big: bg, shown: { small: `${3 * sm} cm`, big: '?' } });
+  const sm = ri(rng, 1, 12), bg = ri(rng, 1, 12), st = D.similarTriangles({ small: sm, big: bg, shown: { small: `${3 * sm} cm`, big: '?' } });
   const [S1, S2] = [st.geom.T1, st.geom.T2];
   ok(Math.abs(dot(S1[0], S1[1], S1[2])) < 1e-6 && Math.abs(dot(S2[0], S2[1], S2[2])) < 1e-6, 'similar triangles: right angles at the base corners');
   ok(near(dist(S2[0], S2[1]) / dist(S1[0], S1[1]), bg / sm) && near(dist(S2[0], S2[2]) / dist(S1[0], S1[2]), bg / sm), 'similar triangles: the second is the first scaled by big / small, on one scale');
@@ -189,7 +193,7 @@ for (let i = 1; i <= 200; i++) {
   const an = (o, p, q) => (Math.acos(dot(o, p, q) / (dist(o, p) * dist(o, q))) * 180) / Math.PI;
   ok(near(an(g.O, g.P1, g.P2), tot, 1e-6) && near(an(g.O, g.P1, g.M), tot / 2, 1e-6) && near(an(g.O, g.M, g.P2), tot / 2, 1e-6), `angle bisector: ${tot}° split into two equal halves`);
   framed('angleBisector', ab2);
-  const ab = ri(rng, 4, 40), pa = ab / 2 + ri(rng, 2, 30), pf = D.perpBisectorFigure({ ab, pa, shown: { ab: `${ab} cm`, pa: `${pa} cm`, pb: '?' } }), q = pf.geom;
+  const ab = ri(rng, 6, 60), pa = ab / 2 + ri(rng, 2, 60), pf = D.perpBisectorFigure({ ab, pa, shown: { ab: `${ab} cm`, pa: `${pa} cm`, pb: '?' } }), q = pf.geom;
   ok(near(dist(q.P, q.A), dist(q.P, q.B)) && near(dist(q.P, q.A) / dist(q.A, q.B), pa / ab) && Math.abs(dot(q.M, q.P, q.B)) < 1e-6 * 1e3, 'perpendicular bisector: P is equidistant from A and B, to scale, and PM is perpendicular to AB');
   framed('perpBisector', pf);
 }
