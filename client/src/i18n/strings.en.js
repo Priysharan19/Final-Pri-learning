@@ -3091,7 +3091,7 @@ export default {
   "hand.title": "Writing hand",
   "hand.right": "Right",
   "hand.left": "Left",
-  "hand.note": "On an iPad in landscape the tool dock sits on the side of the hand that is not writing. Kept on this device only.",
+  "hand.note": "Chooses which side a tool dock sits on, opposite the hand that writes, where a screen has one. Kept on this device only.",
   "inst.chapterN": "Chapter {n}",
   "inst.scopeLabel": "An illustrative plot for {name}",
   "inst.practise": "Practise this chapter",

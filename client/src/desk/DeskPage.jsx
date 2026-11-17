@@ -480,7 +480,7 @@ function Desk({ attemptId }) {
 
   return (
     <div className="dk-page xs-room" data-desk-attempt={attempt.id} data-desk-phase={clock.phase} data-desk-running={clock.running ? 'true' : 'false'}
-      data-hand={readHand()} data-desk-rev={attempt.rev} data-desk-queued={view.intents?.length || 0} data-desk-save={view.problem || saveState} data-desk-estimate={estimate ? 'true' : undefined}>
+      data-hand={hand} data-desk-rev={attempt.rev} data-desk-queued={view.intents?.length || 0} data-desk-save={view.problem || saveState} data-desk-estimate={estimate ? 'true' : undefined}>
       <header className="xs-head">
         {back}
         <PaperHeader title={attempt.resource.title || paper.title} eyebrow={<UnmarkedPlate t={t} />}
