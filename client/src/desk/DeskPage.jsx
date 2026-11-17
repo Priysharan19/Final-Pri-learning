@@ -473,7 +473,7 @@ function Desk({ attemptId }) {
   const elapsed = clock.phase === 'reading' ? clock.elapsedReadingMs : clock.phase === 'working' || finished ? clock.elapsedWorkingMs : 0;
   const clockNote = estimate ? t('desk.estimate') : paused ? t('desk.paused') : over ? t('desk.overNote') : clock.phase === 'ready' ? t('desk.readyNote') : clock.phase === 'idle' ? t('desk.idleNote') : null;
   const saveKey = view.checking && !view.problem ? 'desk.checking'
-    : autosaveWorkState({ saveState, problem: view.problem || null, target: 'account' }).key;
+    : autosaveWorkState({ saveState, problem: view.problem || null, target: 'account', synced: view.synced !== false }).key;
   const link = attempt.resource.listed ? safeExternalUrl(attempt.resource.url) : null;
   const shortcuts = [
     { keys: ['←', '→'], label: t('desk.keyMove') }, { keys: ['D'], label: t('desk.keyDone') }, { keys: ['F'], label: t('desk.keyFlag') },

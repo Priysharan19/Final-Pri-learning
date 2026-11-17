@@ -165,7 +165,7 @@
         {"has":"DESK UI: PASS — 192/192 checks","note":"The exam shell and the Exam Desk as drawn (plan F4b): navigator labels, shortcuts inert while typing, a clock face that computes nothing, autosave order, the save merge, no mark wording in either language."},
         {"has":"DESK CLOCK: PASS — 30/30 checks"},
         {"has":"DESK IMPORT: PASS — 18/18 checks"},
-        {"has":"WORK STATE: PASS — 7/7 checks","note":"Standard #45: one vocabulary for the state of the student's work; every displayed state maps 1:1 and nothing reads as saved, uploaded or marked early."},
+        {"has":"WORK STATE: PASS — 8/8 checks","note":"Standard #45: one vocabulary for the state of the student's work; every displayed state maps 1:1 and nothing reads as saved, uploaded or marked early."},
         {"has":"ETHICAL COMMERCE: PASS — 11/11 checks","note":"Standard #42: no paywall, upsell or price on the guardian-consent, withdrawn, restriction and age-gate screens, in both languages."},
         {"has":"EDITION CLIENT (E2): PASS — 137/137 checks","note":"Plan E2: the app knows its own edition from its build, declares it on every /v1 request, and shows a blocking screen at the other's server. 133 → 136 (plan E4, re-derived by running): the record's identity is checked exactly (its keys, the table's values, frozen). 136 → 137 (Lit Instrument D6): the identity also carries its own cut's working-indicator form."},
         {"has":"SERVER DAILY CAP (CLIENT): PASS — 27/27 checks","note":"The device meets the SERVER's daily practice cap (#537): refused through the real dispatcher, no fallback, a prepared question stays unbound and unmarked, a second device is refused at zero."},

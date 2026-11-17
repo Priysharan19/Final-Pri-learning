@@ -76,6 +76,14 @@ ok('exam room and desk: device save and account save are different states, and a
   }
 });
 
+ok('a failed or running device save is never hidden by a result; a kept (unsynced) desk copy is never "uploaded"', () => {
+  assert.equal(practiceWorkState({ saveState: 'failed', resolved: true, serverAuthoritative: true }).state, 'failed');
+  assert.equal(practiceWorkState({ saveState: 'saving', resolved: true, serverAuthoritative: true }).state, 'saving');
+  assert.equal(practiceWorkState({ saveState: 'saved', resolved: true, serverAuthoritative: true }).state, 'marked');
+  assert.equal(autosaveWorkState({ saveState: 'saved', target: 'account', synced: false }).state, 'waiting-to-upload');
+  assert.equal(autosaveWorkState({ saveState: 'saved', target: 'account', synced: true }).state, 'uploaded');
+});
+
 ok('sync: uploaded only after an acknowledgement and with nothing pending', () => {
   assert.equal(syncWorkState({ pending: 2, acknowledged: true }).state, 'waiting-to-upload');
   assert.equal(syncWorkState({ inFlight: true, acknowledged: true }).state, 'waiting-to-upload');

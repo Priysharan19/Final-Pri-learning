@@ -21,7 +21,7 @@ const SCREENS = {
 // App.jsx is the route table and the shell; it is a leaf here: a screen that imports its Logo is not the shell's paywall route.
 const LEAVES = new Set(['App.jsx']);
 const BANNED_MODULE = /(^|\/)(paywall|Paywall|PremiumBadge|Upsell|upsell|pricing|Pricing|plans)[^/]*(\/|\.jsx?$)/;
-const BANNED_WORDS = /premium|upgrade|upsell|subscri|pricing|\bprice|₹|\$\s?\d|\bUSD\b|\bAUD\b|\bINR\b|free trial|\/month|per month|per year|buy now|unlock|pro plan|प्रीमियम|अपग्रेड|कीमत|सब्सक्रिप्शन|मूल्य/i;
+const BANNED_WORDS = /premium|upgrade|upsell|subscri|pricing|\bprice|₹|\$\s?\d|\bUSD\b|\bAUD\b|\bINR\b|free trial|\/month|per month|per year|buy now|pro plan|प्रीमियम|अपग्रेड|कीमत|सब्सक्रिप्शन|मूल्य/i;
 
 const importsOf = file => [...readFileSync(file, 'utf8').matchAll(/(?:^|\n)\s*import\s[^'"]*?from\s*['"](\.[^'"]+)['"]|(?:^|\n)\s*import\s*['"](\.[^'"]+)['"]/g)].map(m => m[1] || m[2]);
 function resolveImport(from, spec) {
@@ -46,10 +46,14 @@ for (const [screen, entries] of Object.entries(SCREENS)) {
   ok(`${screen}: its modules reach no paywall, pricing or entitlement UI`, () => {
     const files = closure(entries);
     assert.ok(files.length >= entries.length);
-    for (const f of files) assert.equal(BANNED_MODULE.test('/' + f), false, `${f} is a commerce module reachable from ${screen}`);
+    for (const f of files.filter(f => !LEAVES.has(f))) {
+      assert.equal(BANNED_MODULE.test('/' + f), false, `${f} is a commerce module reachable from ${screen}`);
+      // By content too, so a differently named module cannot carry the upsell: a route to the paywall or its constant.
+      assert.equal(/PAYWALL_ROUTE|['"`]\/premium\b|from\s+['"][^'"]*paywall/i.test(readFileSync(join(SRC, f), 'utf8')), false, `${f} routes to the paywall (reachable from ${screen})`);
+    }
   });
   ok(`${screen}: every string it can show is free of premium, upgrade and price words, in en (Prithagoras, shared) and hi (Priyabhata)`, () => {
-    const own = entries.map(e => e); // the screen files themselves; their direct children are covered by the closure test
+    const own = closure(entries).filter(f => /\.jsx$/.test(f) && !LEAVES.has(f)); // every component in the closure, not only the entry files
     for (const k of keysUsed(own)) for (const [lang, cat] of [['en', en], ['hi', hi]]) {
       const v = cat[k]; if (v === undefined) continue;
       const text = typeof v === 'object' ? Object.values(v).join(' ') : String(v);

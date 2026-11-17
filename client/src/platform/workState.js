@@ -63,9 +63,11 @@ export function practiceWorkState(f = {}) {
   const out = (state, reason = null, key = stateKey(state, reason)) => ({ state, reason, key });
   if (f.busy) return out('marking');
   if (f.cloudPending) return out('marking', null, 'workstate.markingMethod');
-  if (f.resolved) return f.serverAuthoritative ? out('marked') : out('offline-readable');   // an attempt recorded by an earlier version is only kept, never "marked" here
+  // A failed or in-progress device save outranks everything below it, a result included: the warning
+  // that work is not safe must never be hidden by a verdict (the card's own order before this module).
   if (f.saveState === 'failed') return out('failed', 'save');
   if (f.saveState === 'saving') return out('saving');
+  if (f.resolved) return f.serverAuthoritative ? out('marked') : out('offline-readable');   // an attempt recorded by an earlier version is only kept, never "marked" here
   const savedOnDevice = f.saveState === 'saved';
   if (f.inkUnread) return out('failed', 'read-failed');   // an unreadable page outranks "saved": the student must act
   if (f.photoWaitingSignIn) return out('waiting-to-upload', null, 'workstate.waitingPhoto');
@@ -86,11 +88,12 @@ export function practiceWorkState(f = {}) {
  * device store, read back) or 'account' (the desk: the server acknowledged). An account save that
  * did not land is kept on the device and waiting, which is not a failure of the work.
  */
-export function autosaveWorkState({ saveState = null, problem = null, checking = false, target = 'device' } = {}) {
+export function autosaveWorkState({ saveState = null, problem = null, checking = false, target = 'device', synced = true } = {}) {
   const r = (state, reason = null, key = stateKey(state, reason)) => ({ state, reason, key });
   if (target === 'account') {
     if (problem === 'signed-out') return r('waiting-to-upload', null, 'workstate.waitingSignedOut');
-    if (problem === 'offline' || problem === 'failed' || saveState === 'unsaved') return r('waiting-to-upload', null, 'workstate.waitingKept');
+    // A copy opened from the device (synced false) has not been acknowledged by the server, whatever the save line last said.
+    if (problem === 'offline' || problem === 'failed' || saveState === 'unsaved' || synced === false) return r('waiting-to-upload', null, 'workstate.waitingKept');
     if (checking) return r('marking');
     if (saveState === 'saving') return r('saving');
     if (saveState === 'saved') return r('uploaded');
