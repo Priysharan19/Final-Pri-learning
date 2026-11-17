@@ -365,9 +365,6 @@ const INDIA_BANK_OF = {
 /** Holds the generators of every bank loaded so far, keyed by subtopic id. */
 export const GENERATORS = {};
 
-// Banks whose Australian skills carry extra structural forms (au-forms.js).
-const AU_OVERLAID = new Set(['streams-standard', 'streams-ext', 'year7', 'year8', 'year9', 'year10', 'year11', 'year12']);
-
 const loaded = new Set();
 const inflight = new Map();
 const JEE_BANK_PREFIX = 'jee-pyq:';
@@ -414,10 +411,8 @@ function loadBank(name) {
   let job = inflight.get(name);
   if (!job) {
     job = loader().then(async bank => {
-      if (AU_OVERLAID.has(name)) {
-        const [{ applyAuForms }, { AU_FORMS }] = await Promise.all([import('./au-forms-apply.js'), import('./au-forms.js')]);
-        bank = applyAuForms(bank, AU_FORMS);
-      }
+      const overlay = await import('./au-forms.js').then(m => m.loadAuForms(name));
+      if (overlay) bank = (await import('./au-forms-apply.js')).applyAuForms(bank, overlay);
       Object.assign(GENERATORS, bank);
       loaded.add(name);
       inflight.delete(name);
