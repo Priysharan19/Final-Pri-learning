@@ -116,7 +116,7 @@ export function barChartModel(params) {
       }
     });
     const showValues = bars.every(b => estWidth(b.tex) - 8 <= (dual ? barW + 6 : slot - 4));
-    const cats = categories.map((c, i) => ({ i, text: texts[i], x: r3(frame.left + slot * (i + 0.5)), y: r3(frame.bottom + 13 + axis.row[i] * 18), shown: axis.shown[i] }));
+    const cats = categories.map((c, i) => ({ i, text: texts[i], x: r3(frame.left + slot * (i + 0.5)), y: r3(frame.bottom + 15 + axis.row[i] * 18), shown: axis.shown[i] }));
     return { kind: 'barChart', horizontal, frame, n, categories, values, dual, vmin, vmax, ticks: ticks.map(v => ({ value: v, px: frame.sy(v) })), base, bars, showValues, cats, axis, slot: r3(slot), theory: !!params.experiment, yLabel: src.yLabel || null, xLabel: src.xLabel || null, dualLabel: src.dual?.label || null, label: src.label || null };
   }
   // Horizontal: categories down the left, values across.

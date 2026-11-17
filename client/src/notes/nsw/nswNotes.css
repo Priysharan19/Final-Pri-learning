@@ -12,7 +12,8 @@
 
 
 /* Ideas */
-.nn-ideas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--nn-s5); }
+.nn-ideas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--nn-s5); }
+.nn-ideas > li { min-width: 0; }
 .nn-idea-t { display: flex; align-items: baseline; gap: var(--nn-s3); margin: 0 0 var(--nn-s1); font-family: var(--nn-read); font-size: 21px; font-weight: 700; }
 .nn-idea-n { font-family: var(--nn-ui); font-size: 13px; font-weight: 600; color: var(--nt-ink-3); font-variant-numeric: tabular-nums; min-width: 1.5em; }
 .nn-ideas .nn-read { margin-left: calc(1.5em + var(--nn-s3)); }
@@ -66,6 +67,12 @@
   .nn-formula { padding: var(--nn-s3) var(--nn-s4); }
   .nn-ideas .nn-read { margin-left: 0; }
   .nn-display .katex { font-size: 1.1em; }
+  /* A formula that cannot break (the glue keeps it with its punctuation, KaTeX does not wrap) scrolls inside its own
+     block at phone width; the page never scrolls sideways. The same pattern as .nn-display and .nt-ink-tex. */
+  .nn-read, .nn-idea-t, .nn-diagram-t, .nn-diagram-note { max-width: 100%; min-width: 0; overflow-x: auto; overflow-y: hidden; padding-block: 3px; }
+  .nn-diagram, .nn-diagram .dg { min-width: 0; max-width: 100%; }
+  /* The glue that keeps a formula with its punctuation may not hold a whole phrase on one line at phone width. */
+  [data-nsw-notes] .mt-glue { white-space: normal; }
 }
 @media print { .nn-more { display: none; } }
 
