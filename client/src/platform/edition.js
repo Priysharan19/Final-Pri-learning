@@ -18,9 +18,9 @@
 // what a server says it is with this build; a difference is a blocking state
 // (components/EditionMismatch.jsx), never something to adapt to.
 // ─────────────────────────────────────────────────────────────────────────────
-import { EDITION_RECORD, EDITION_ID } from './edition-record.js';
+import { EDITION_RECORD, EDITION_LITERAL } from './edition-record.js';
 
-export const EDITION = EDITION_ID;
+export const EDITION = EDITION_LITERAL;
 
 /** The request header this build declares its edition in (the server only ever refuses on it). */
 export const EDITION_HEADER = 'X-Pri-Edition';
