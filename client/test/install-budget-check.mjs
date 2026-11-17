@@ -133,10 +133,22 @@ let PYQ_ARCHIVE_MEASURED = null;
 // The install ceilings, the banned-from-install list, render-from-install and offline
 // coverage are unchanged and still pass.
 
+// Raised again 2026-11-18 (train editions-25, CTO under the same owner decision, "i dont
+// care if the app is 10gb just make it properly end to end", size not a constraint):
+// FIRST_VISIT_RAW 4,350,000 -> 5,000,000 and FIRST_VISIT_GZIP 1,450,000 -> 1,750,000
+// bytes. Train 25 merges thirty-three branches on train 24 (the Priyabhata extra forms
+// and diagrams for Classes 7-12, the Prithagoras capacity overlays, NSW Extension 1/2
+// notes, the teacher workspace, the landing pages, passkeys and Apple sign-in, annotated
+// working and the step-justification engine, the tutor policy): the combined tree,
+// either edition, measured 4,784 kB raw (4,898,816 bytes) and 1,628 kB gzipped
+// (1,667,072 bytes) install plus warm, over the 4,350,000 / 1,450,000 ceilings. The new
+// ceilings leave about 100 kB raw and 80 kB gzipped. The install ceilings, the
+// banned-from-install list, render-from-install and offline coverage are unchanged.
+
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 4_350_000;
-const FIRST_VISIT_GZIP_CEILING = 1_450_000;
+const FIRST_VISIT_RAW_CEILING = 5_000_000;
+const FIRST_VISIT_GZIP_CEILING = 1_750_000;
 
 // Things that must never be in the install again, and what each one costs.
 const BANNED_FROM_INSTALL = [
