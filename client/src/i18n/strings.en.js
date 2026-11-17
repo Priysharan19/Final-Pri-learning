@@ -3676,4 +3676,10 @@ export default {
   "notes.nsw.notFound": "This topic is not in the NSW notes.",
   "notes.nsw.noTopics": "This course has no topics in Year {n}.",
   "login.kickerNsw": "NSW · YEARS 7–12 · HSC",
+  'notes.nsw.sectionDiagram': 'Diagram',
+  'notes.nsw.sectionExaminers': 'What examiners look for',
+  'notes.nsw.sectionTraps': 'Common traps',
+  'notes.nsw.sectionCheck': 'Self-check',
+  'notes.nsw.showAnswer': 'Show the answer',
+  'notes.nsw.hideAnswer': 'Hide the answer',
 };

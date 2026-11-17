@@ -13,7 +13,8 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import '../notes/Notes.css';
-import { Section, Concepts, Formula, Example, Flashcards, useReveal } from '../notes/NotesParts.jsx';
+import { Flashcards, useReveal } from '../notes/NotesParts.jsx';
+import { ChapterSheet } from '../notes/nsw/NswParts.jsx';
 import {
   NSW_NOTES_COURSES, NSW_NOTES_TOPIC_BY_ID, NSW_NOTES_YEARS, loadNswNotesForStage, topicSearchText, topicsFor, yearOfTopic
 } from '../notes/nsw/nswNotesIndex.js';
@@ -204,45 +205,7 @@ function TopicNotes({ topicId }) {
       )}
 
       {notes && (
-        <div className="nt-sheet">
-          <Section id="ideas" title={t('notes.sectionIdeas')}><Concepts concepts={notes.concepts} /></Section>
-          <Section id="definitions" title={t('notes.sectionDefinitions')}>
-            <dl className="nt-defs">
-              {notes.definitions.map((d, i) => (
-                <div key={i} className="nt-reveal" style={{ '--i': i }}>
-                  <dt><MathText text={d.term} /></dt>
-                  <dd><MathText text={d.meaning} /></dd>
-                </div>
-              ))}
-            </dl>
-          </Section>
-          <Section id="formulas" title={t('notes.sectionFormulas')}>
-            <div className="nt-formulas">{notes.formulas.map((f, i) => <Formula key={i} f={f} i={i} />)}</div>
-          </Section>
-          <Section id="points" title={t('notes.sectionPoints')}>
-            <ol className="nt-points">
-              {notes.points.map((p, i) => (
-                <li key={i} className="nt-reveal" style={{ '--i': i }}>
-                  <MathText className="nt-point-front" text={p.front} />
-                  <MathText className="nt-point-back" text={p.back} />
-                </li>
-              ))}
-            </ol>
-          </Section>
-          <Section id="mistakes" title={t('notes.sectionMistakes')}>
-            <ul className="nt-mistakes">
-              {notes.mistakes.map((m, i) => (
-                <li key={i} className="nt-reveal" style={{ '--i': i }}>
-                  <div className="nt-wrong"><span className="nt-tag">{t('notes.mistakeWrong')}</span><MathText text={m.wrong} /></div>
-                  <div className="nt-right"><span className="nt-tag">{t('notes.mistakeRight')}</span><MathText text={m.right} /></div>
-                </li>
-              ))}
-            </ul>
-          </Section>
-          <Section id="examples" title={t('notes.sectionExamples')}>
-            {notes.examples.map((ex, i) => <Example key={topicId + ':' + ex.question} ex={ex} n={i + 1} />)}
-          </Section>
-        </div>
+        <ChapterSheet notes={notes} topicId={topicId} />
       )}
       {cards && notes && <Flashcards chapter={{ name: topic.name }} points={notes.points} onClose={() => setCards(false)} />}
     </article>

@@ -1,0 +1,99 @@
+/* NSW notes: the chapter sheet.
+   Reading text is CMU Serif, maths is KaTeX, interface labels are Instrument Sans.
+   One spacing scale (4 8 12 16 24 32 48), one box (hairline border, 6px radius),
+   no left-border cards, no gradients. Colours are the notes' own tokens, so light
+   and dark follow the theme. Scoped to [data-nsw-notes]; the India notes are untouched. */
+[data-nsw-notes] {
+  --nn-s1: 4px; --nn-s2: 8px; --nn-s3: 12px; --nn-s4: 16px; --nn-s5: 24px; --nn-s6: 32px; --nn-s7: 48px;
+  --nn-read: 'CMU Serif', 'Latin Modern Roman', 'Times New Roman', serif;
+  --nn-ui: var(--in-ui, 'Instrument Sans Variable', system-ui, sans-serif);
+  --nt-serif: var(--nn-read);
+  --nn-box: var(--nt-raised);
+  --nn-line: var(--nt-rule);
+}
+[data-nsw-notes] .nt-title, [data-nsw-notes] .nt-lede { font-family: var(--nn-read); font-weight: 400; }
+[data-nsw-notes] .nt-lede { font-size: 20px; line-height: 1.6; }
+
+.nn-read { font-family: var(--nn-read); font-size: 19px; line-height: 1.65; color: var(--nt-ink); }
+.nn-read .katex { font-size: 1.04em; }
+.nn-section { padding-top: var(--nn-s6); }
+.nn-section + .nn-section { margin-top: var(--nn-s2); }
+.nn-h { font-family: var(--nn-ui); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nt-ink-3); margin: 0 0 var(--nn-s4); padding-bottom: var(--nn-s2); border-bottom: 1px solid var(--nn-line); }
+.nn-label { font-family: var(--nn-ui); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nt-ink-3); margin: 0 0 var(--nn-s2); }
+.nn-tag { display: flex; align-items: center; gap: var(--nn-s1); font-family: var(--nn-ui); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: var(--nn-s1); }
+.nn-ico { flex: none; }
+
+/* Ideas */
+.nn-ideas { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--nn-s5); }
+.nn-idea-t { display: flex; align-items: baseline; gap: var(--nn-s3); margin: 0 0 var(--nn-s1); font-family: var(--nn-read); font-size: 21px; font-weight: 700; }
+.nn-idea-n { font-family: var(--nn-ui); font-size: 13px; font-weight: 600; color: var(--nt-ink-3); font-variant-numeric: tabular-nums; min-width: 1.5em; }
+.nn-ideas .nn-read { margin-left: calc(1.5em + var(--nn-s3)); }
+
+/* Definitions */
+.nn-defs { margin: 0; display: grid; gap: 0; border: 1px solid var(--nn-line); border-radius: var(--nt-r); background: var(--nn-box); }
+.nn-defs > div { display: grid; grid-template-columns: minmax(8em, 11em) 1fr; gap: var(--nn-s4); padding: var(--nn-s3) var(--nn-s4); }
+.nn-defs > div + div { border-top: 1px solid var(--nn-line); }
+.nn-defs dt { font-family: var(--nn-read); font-weight: 700; font-size: 19px; }
+.nn-defs dd { margin: 0; }
+
+/* Formulas: every one boxed the same way */
+.nn-formulas { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--nn-s4); }
+.nn-formula { margin: 0; padding: var(--nn-s4) var(--nn-s5); border: 1px solid var(--nt-rule-strong); border-radius: var(--nt-r); background: var(--nn-box); }
+.nn-formula figcaption { font-family: var(--nn-ui); font-size: 13px; color: var(--nt-ink-3); margin-bottom: var(--nn-s1); }
+.nn-formula-note { margin-top: var(--nn-s2); font-family: var(--nn-read); font-size: 17px; line-height: 1.5; color: var(--nt-ink-2); }
+.nn-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: var(--nn-s1) 0; }
+.nn-display .katex-display { margin: var(--nn-s2) 0; }
+.nn-display .katex { font-size: 1.2em; }
+
+/* Diagrams */
+.nn-diagrams { display: grid; gap: var(--nn-s5); }
+.nn-diagram-t { font-family: var(--nn-ui); font-size: 15px; font-weight: 600; margin: 0 0 var(--nn-s1); }
+.nn-diagram-note { font-family: var(--nn-read); font-size: 17px; line-height: 1.5; color: var(--nt-ink-2); text-align: center; max-width: 560px; margin: var(--nn-s1) auto 0; }
+
+/* What examiners look for */
+.nn-examiners { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--nn-s3); }
+.nn-examiners li { display: grid; grid-template-columns: 18px 1fr; gap: var(--nn-s3); align-items: start; }
+.nn-examiners .nn-ico { margin-top: 0.42em; stroke: var(--nt-good); color: var(--nt-good); }
+
+/* Traps: the wrong line and the right line, labelled; no stripe, no fill wash */
+.nn-traps { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--nn-s4); }
+.nn-traps li { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--nt-rule-strong); border-radius: var(--nt-r); overflow: hidden; background: var(--nn-box); }
+.nn-wrong, .nn-right { padding: var(--nn-s3) var(--nn-s4); }
+.nn-wrong { border-right: 1px solid var(--nn-line); }
+.nn-wrong .nn-tag { color: var(--nt-copper); }
+.nn-right .nn-tag { color: var(--nt-good); }
+.nn-wrong .nn-read, .nn-right .nn-read { font-size: 18px; }
+
+/* Worked examples */
+.nn-example { padding: var(--nn-s4) 0 var(--nn-s5); }
+.nn-example + .nn-example { border-top: 1px solid var(--nn-line); }
+.nn-q { margin-bottom: var(--nn-s3); }
+.nn-steps { margin: 0 0 var(--nn-s3); padding-left: var(--nn-s5); display: grid; gap: var(--nn-s2); }
+.nn-steps li::marker { font-family: var(--nn-ui); font-size: 14px; color: var(--nt-ink-3); }
+.nn-more { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nn-s3); }
+.nn-answer { border: 1px solid var(--nt-rule-strong); border-radius: var(--nt-r); padding: var(--nn-s3) var(--nn-s5) var(--nn-s4); background: var(--nn-box); }
+.nn-checked { margin-left: var(--nn-s2); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--nt-ink-3); }
+.nn-final { font-weight: 700; }
+.nn-working .katex { font-size: 1.15em; }
+
+/* Self-check */
+.nn-check { margin: 0; padding-left: var(--nn-s5); display: grid; gap: var(--nn-s5); }
+.nn-check li::marker { font-family: var(--nn-ui); font-size: 14px; color: var(--nt-ink-3); }
+.nn-check-a { margin-top: var(--nn-s2); padding: var(--nn-s2) var(--nn-s4); border: 1px solid var(--nn-line); border-radius: var(--nt-r); background: var(--nn-box); }
+
+@media (max-width: 640px) {
+  .nn-read { font-size: 18px; }
+  .nn-defs > div { grid-template-columns: 1fr; gap: var(--nn-s1); }
+  .nn-traps li { grid-template-columns: 1fr; }
+  .nn-wrong { border-right: 0; border-bottom: 1px solid var(--nn-line); }
+  .nn-formula { padding: var(--nn-s3) var(--nn-s4); }
+  .nn-ideas .nn-read { margin-left: 0; }
+  .nn-display .katex { font-size: 1.1em; }
+}
+@media print { .nn-more { display: none; } }
+
+/* The chapter sheet is plain paper: no margin rule, no card. */
+[data-nsw-notes] .nt-sheet { border: 0; background: transparent; padding: 0; box-shadow: none; }
+[data-nsw-notes] .nt-sheet::before { content: none; }
+.nn-working .katex-display { text-align: left; }
+.nn-working .katex-display > .katex { text-align: left; }

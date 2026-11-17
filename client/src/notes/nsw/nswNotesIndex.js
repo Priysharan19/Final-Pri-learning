@@ -67,8 +67,21 @@ export function topicsFor(year, course = null) {
 
 // One chunk per band of written notes. A band with no module yet has no
 // entry: its topics show "coming soon".
+/** A topic's base notes plus its premium layer (examiners, diagrams, aligned working, self-check). */
+export function mergePremium(base, premium) {
+  const out = {};
+  for (const [id, n] of Object.entries(base)) {
+    const p = premium?.[id];
+    out[id] = p ? { ...n, examiners: p.examiners, diagrams: p.diagrams || [], check: p.check, examples: n.examples.map((ex, i) => ({ ...ex, working: p.working?.[i] })) } : n;
+  }
+  return out;
+}
+
 const LOADERS = Object.freeze({
-  4: () => import('./notes-nsw-stage4.js')
+  4: async () => {
+    const [base, premium] = await Promise.all([import('./notes-nsw-stage4.js'), import('./notes-nsw-stage4-premium.js')]);
+    return { default: mergePremium(base.default, premium.default) };
+  }
 });
 
 /** The notes of every topic in a stage (an object keyed by topic id), or null when none are written yet. */

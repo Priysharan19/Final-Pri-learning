@@ -1,0 +1,185 @@
+// Pri Learning · NSW Notes — the parts of one chapter, in the order every chapter
+// uses: ideas, definitions, formulas (boxed), diagram, what examiners look for,
+// traps, worked examples, self-check. Presentation only; no curriculum data.
+//
+// All mathematics goes through KaTeX (lib/latex.jsx for running text, DisplayMath
+// below for display and aligned working). Nothing here builds maths from HTML or
+// Unicode super/subscripts. Icons are the app's stroke icons, never emoji or glyph ticks.
+import React, { useMemo, useState } from 'react';
+import katex from 'katex';
+import { MathText } from '../../lib/latex.jsx';
+import Icon from '../../components/Icon.jsx';
+import DiagramFromSpec from '../../diagrams/DiagramFromSpec.jsx';
+import { useT } from '../../i18n/index.js';
+import './nswFonts.css';
+import './nswNotes.css';
+
+const escapeHtml = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/** One display equation (or an aligned block). A render error shows the source in a marked element the build tests fail on. */
+export function DisplayMath({ tex, className = '' }) {
+  const html = useMemo(() => {
+    try { return katex.renderToString(tex, { displayMode: true, throwOnError: true, strict: 'error' }); }
+    catch { return `<span class="katex-error" data-katex-error>${escapeHtml(tex)}</span>`; }
+  }, [tex]);
+  return <div className={`nn-display ${className}`.trim()} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+export function SectionBlock({ id, title, children }) {
+  return (
+    <section className="nn-section" id={id} aria-labelledby={`nn-h-${id}`} data-nn-section={id}>
+      <h2 className="nn-h" id={`nn-h-${id}`}>{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+export function Ideas({ concepts }) {
+  return (
+    <ol className="nn-ideas">
+      {concepts.map((c, i) => (
+        <li key={i}>
+          <h3 className="nn-idea-t"><span className="nn-idea-n" aria-hidden="true">{i + 1}</span><MathText text={c.title} /></h3>
+          <MathText block className="nn-read" text={c.body} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+export function Definitions({ items }) {
+  return (
+    <dl className="nn-defs">
+      {items.map((d, i) => (
+        <div key={i}>
+          <dt><MathText text={d.term} /></dt>
+          <dd><MathText className="nn-read" text={d.meaning} /></dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/** Every formula is boxed the same way: a caption, the equation, an optional note. */
+export function FormulaBox({ f }) {
+  return (
+    <figure className="nn-formula">
+      <figcaption><MathText text={f.label} /></figcaption>
+      <DisplayMath tex={f.tex} />
+      {f.note && <MathText block className="nn-formula-note" text={f.note} />}
+    </figure>
+  );
+}
+
+export function Diagrams({ items }) {
+  return (
+    <div className="nn-diagrams">
+      {items.map((d, i) => (
+        <div key={i} className="nn-diagram">
+          {d.title && <h3 className="nn-diagram-t"><MathText text={d.title} /></h3>}
+          <DiagramFromSpec spec={d.spec} interactive />
+          {d.note && <MathText block className="nn-diagram-note" text={d.note} />}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function Examiners({ items }) {
+  return (
+    <ul className="nn-examiners">
+      {items.map((s, i) => (
+        <li key={i}><Icon name="check" size={18} className="nn-ico" /><MathText className="nn-read" text={s} /></li>
+      ))}
+    </ul>
+  );
+}
+
+export function Traps({ items }) {
+  const t = useT();
+  return (
+    <ul className="nn-traps">
+      {items.map((m, i) => (
+        <li key={i}>
+          <div className="nn-wrong"><span className="nn-tag"><Icon name="close" size={14} className="nn-ico" />{t('notes.mistakeWrong')}</span><MathText className="nn-read" text={m.wrong} /></div>
+          <div className="nn-right"><span className="nn-tag"><Icon name="check" size={14} className="nn-ico" />{t('notes.mistakeRight')}</span><MathText className="nn-read" text={m.right} /></div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** A worked example. The student sees the problem first and asks for the working one step at a time. */
+export function WorkedExample({ ex, n }) {
+  const t = useT();
+  const [shown, setShown] = useState(0);
+  const done = shown >= ex.steps.length;
+  return (
+    <div className="nn-example">
+      <p className="nn-label">{t('notes.exampleNumber', { n })}</p>
+      <MathText block className="nn-read nn-q" text={ex.question} />
+      {ex.diagram && <DiagramFromSpec spec={ex.diagram} interactive />}
+      {/* Once every step has been asked for, the aligned working replaces the list so the solution is written once. */}
+      {!(done && ex.working) && (
+        <ol className="nn-steps">
+          {ex.steps.slice(0, shown).map((s, i) => <li key={i}><MathText className="nn-read" text={s} /></li>)}
+        </ol>
+      )}
+      {!done ? (
+        <div className="nn-more">
+          <button type="button" className="btn btn-secondary" onClick={() => setShown(s => s + 1)}>{t('notes.nextStep')}</button>
+          <button type="button" className="nt-link-btn" onClick={() => setShown(ex.steps.length)}>{t('notes.allSteps')}</button>
+        </div>
+      ) : (
+        <div className="nn-answer">
+          <p className="nn-label">{t('notes.answer')} <span className="nn-checked">{t('notes.engineChecked')}</span></p>
+          {ex.working && <DisplayMath tex={ex.working} className="nn-working" />}
+          <MathText block className="nn-read nn-final" text={ex.answer} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SelfCheck({ items }) {
+  const t = useT();
+  const [open, setOpen] = useState(() => new Set());
+  const toggle = i => setOpen(prev => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; });
+  return (
+    <ol className="nn-check">
+      {items.map((c, i) => {
+        const isOpen = open.has(i);
+        return (
+          <li key={i}>
+            <MathText block className="nn-read nn-q" text={c.question} />
+            <button type="button" className="nt-link-btn" aria-expanded={isOpen} aria-controls={`nn-a-${i}`} onClick={() => toggle(i)}>
+              {isOpen ? t('notes.nsw.hideAnswer') : t('notes.nsw.showAnswer')}
+            </button>
+            <div id={`nn-a-${i}`} hidden={!isOpen} className="nn-check-a"><MathText block className="nn-read" text={c.answer} /></div>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** The body of a chapter, in the order every chapter uses. */
+export function ChapterSheet({ notes, topicId }) {
+  const t = useT();
+  return (
+    <div className="nt-sheet" data-chapter-sheet>
+      <SectionBlock id="ideas" title={t('notes.sectionIdeas')}><Ideas concepts={notes.concepts} /></SectionBlock>
+      <SectionBlock id="definitions" title={t('notes.sectionDefinitions')}><Definitions items={notes.definitions} /></SectionBlock>
+      <SectionBlock id="formulas" title={t('notes.sectionFormulas')}>
+        <div className="nn-formulas">{notes.formulas.map((f, i) => <FormulaBox key={i} f={f} />)}</div>
+      </SectionBlock>
+      {notes.diagrams?.length > 0 && <SectionBlock id="diagram" title={t('notes.nsw.sectionDiagram')}><Diagrams items={notes.diagrams} /></SectionBlock>}
+      {notes.examiners?.length > 0 && <SectionBlock id="examiners" title={t('notes.nsw.sectionExaminers')}><Examiners items={notes.examiners} /></SectionBlock>}
+      <SectionBlock id="mistakes" title={t('notes.nsw.sectionTraps')}><Traps items={notes.mistakes} /></SectionBlock>
+      <SectionBlock id="examples" title={t('notes.sectionExamples')}>
+        {notes.examples.map((ex, i) => <WorkedExample key={topicId + ':' + ex.question} ex={ex} n={i + 1} />)}
+      </SectionBlock>
+      {notes.check?.length > 0 && <SectionBlock id="check" title={t('notes.nsw.sectionCheck')}><SelfCheck items={notes.check} /></SectionBlock>}
+    </div>
+  );
+}

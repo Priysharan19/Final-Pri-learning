@@ -16,13 +16,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import katex from 'katex';
 import { evalNumeric, exprEquivalent } from '../src/engine/expr.js';
-import { NSW_NOTES_TOPICS, NSW_NOTES_TOPIC_BY_ID } from '../src/notes/nsw/nswNotesIndex.js';
-import stage4 from '../src/notes/nsw/notes-nsw-stage4.js';
+import { NSW_NOTES_TOPICS, NSW_NOTES_TOPIC_BY_ID, mergePremium } from '../src/notes/nsw/nswNotesIndex.js';
+import base4 from '../src/notes/nsw/notes-nsw-stage4.js';
+import premium4 from '../src/notes/nsw/notes-nsw-stage4-premium.js';
+import { readFileSync } from 'node:fs';
+
+const stage4 = mergePremium(base4, premium4);
+// The kit's registry names, read from its source (a .jsx file cannot be imported by plain node).
+const kitSource = readFileSync(new URL('../src/diagrams/DiagramFromSpec.jsx', import.meta.url), 'utf8');
+const DIAGRAM_KINDS = [...kitSource.matchAll(/(?:STATIC_KINDS|INTERACTIVE_KINDS) = Object\.freeze\(\{([\s\S]*?)\}\);/g)]
+  .flatMap(m => [...m[1].matchAll(/(\w+):/g)].map(x => x[1]));
+const NO_DIAGRAM = new Set(['ma4-vol-c-01']); // no solid-figure kind in the diagram kit yet
 
 let pass = 0;
 const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 
+ok(DIAGRAM_KINDS.length >= 25, `the kit registry was read (${DIAGRAM_KINDS.length} kinds)`);
 const texRenders = (tex, display) => {
   try { katex.renderToString(tex, { throwOnError: true, displayMode: display, strict: 'ignore' }); return null; } catch (e) { return e.message; }
 };
@@ -92,7 +102,29 @@ for (const [id, n] of all) {
     const why = verifyExample(ex.verify);
     ok(why === null, `${w}: the engine disagrees — ${why}`);
   });
+  // The premium layer: the same section order on every chapter.
+  ok(n.examiners?.length >= 3, `${where}: needs at least 3 things examiners look for`);
+  (n.examiners || []).forEach((e, i) => checkProse(e, `${where} examiners ${i}`));
+  ok(n.check?.length >= 2, `${where}: needs at least 2 self-check questions`);
+  (n.check || []).forEach((c, i) => {
+    checkProse(c.question, `${where} check ${i} question`); checkProse(c.answer, `${where} check ${i} answer`);
+    const why = verifyExample(c.verify); ok(why === null, `${where} check ${i}: the engine disagrees — ${why}`);
+  });
+  n.examples.forEach((ex, i) => {
+    ok(typeof ex.working === 'string' && /\\begin\{aligned\}/.test(ex.working), `${where} example ${i + 1}: needs aligned working`);
+    const err = texRenders(ex.working || '', true); ok(!err, `${where} example ${i + 1} working: KaTeX failed — ${err}`);
+  });
+  if (!NO_DIAGRAM.has(id)) ok(n.diagrams?.length >= 1, `${where}: needs a diagram`);
+  (n.diagrams || []).forEach((d, i) => {
+    ok(DIAGRAM_KINDS.includes(d.spec?.kind), `${where} diagram ${i}: unknown kind ${d.spec?.kind}`);
+    if (d.title) checkProse(d.title, `${where} diagram ${i} title`);
+    if (d.note) checkProse(d.note, `${where} diagram ${i} note`);
+  });
   const text = JSON.stringify(n);
+  // Formatting rules: maths is KaTeX, never Unicode super/subscripts; no emoji or glyph ticks; no filler.
+  ok(!/[\u00B2\u00B3\u00B9\u2070-\u209F]/.test(text), `${where}: a Unicode superscript or subscript (use KaTeX)`);
+  ok(!/[\u2713\u2714\u2715\u2716\u2717\u2718\u2705\u274C\u2728]|\p{Extended_Pictographic}/u.test(text), `${where}: an emoji or glyph tick (use the stroke icons)`);
+  ok(!/let['\u2019]s dive|in this section we|in this chapter we|welcome to|\bsimply\b|\bobviously\b/i.test(text), `${where}: filler phrasing`);
   ok(!INDIA.test(text), `${where}: India curriculum wording found (${(text.match(INDIA) || [])[0]})`);
   ok(!NOT_AU.test(text), `${where}: non-Australian spelling (${(text.match(NOT_AU) || [])[0]})`);
   ok(!/official NESA|NESA (?:publication|material)|syllabus (?:states|says|requires)/i.test(text), `${where}: claims an official NESA source`);

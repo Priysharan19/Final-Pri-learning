@@ -3731,4 +3731,10 @@ export default {
   "notes.nsw.notFound": "यह विषय NSW नोट्स में नहीं है।",
   "notes.nsw.noTopics": "इस पाठ्यक्रम में Year {n} के लिए कोई विषय नहीं है।",
   "login.kickerNsw": "NSW · YEAR 7–12 · HSC (ईयर 7–12)",
+  'notes.nsw.sectionDiagram': 'आरेख',
+  'notes.nsw.sectionExaminers': 'परीक्षक क्या देखते हैं',
+  'notes.nsw.sectionTraps': 'आम गलतियाँ',
+  'notes.nsw.sectionCheck': 'खुद जाँचें',
+  'notes.nsw.showAnswer': 'उत्तर दिखाएँ',
+  'notes.nsw.hideAnswer': 'उत्तर छिपाएँ',
 };

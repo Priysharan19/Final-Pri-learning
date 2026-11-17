@@ -147,7 +147,7 @@ export function Triangle({ a, b, c, C, labels = { sides: true, angles: true }, t
   const sideLabel = (k, p, away) => <Tex key={k} x={p[0] + away[0]} y={p[1] + away[1]} tex={String(m.sides[k])} w={46} h={22} className="dg-side" />;
   const cx = (V.A[0] + V.B[0] + V.C[0]) / 3; const cy = (V.A[1] + V.B[1] + V.C[1]) / 3;
   const away = p => { const dx = p[0] - cx; const dy = p[1] - cy; const n = Math.hypot(dx, dy) || 1; return [(dx / n) * 16, (dy / n) * 16]; };
-  const corner = (k) => { const p = V[k]; const dx = cx - p[0]; const dy = cy - p[1]; const n = Math.hypot(dx, dy) || 1; return [p[0] + (dx / n) * 30, p[1] + (dy / n) * 30]; };
+  const corner = (k) => { const p = V[k]; const dx = cx - p[0]; const dy = cy - p[1]; const n = Math.hypot(dx, dy) || 1; return [p[0] + (dx / n) * 46, p[1] + (dy / n) * 46]; };
   const rightMark = m.right ? (() => { const p = V[m.right]; const others = Object.keys(V).filter(k => k !== m.right).map(k => V[k]); const u = others.map(q => { const dx = q[0] - p[0]; const dy = q[1] - p[1]; const n = Math.hypot(dx, dy) || 1; return [dx / n * 14, dy / n * 14]; }); return `M${p[0] + u[0][0]} ${p[1] + u[0][1]} L${p[0] + u[0][0] + u[1][0]} ${p[1] + u[0][1] + u[1][1]} L${p[0] + u[1][0]} ${p[1] + u[1][1]}`; })() : null;
   const desc = `Triangle ABC with sides a = ${m.sides.a}, b = ${m.sides.b}, c = ${m.sides.c}; angles A = ${m.angles.A}°, B = ${m.angles.B}°, C = ${m.angles.C}°${m.right ? `, a right angle at ${m.right}` : ''}; area ${m.area}.`;
   return (
@@ -156,7 +156,7 @@ export function Triangle({ a, b, c, C, labels = { sides: true, angles: true }, t
       {rightMark && <path className="dg-rightmark" d={rightMark} fill="none" />}
       {labels.sides && <>{sideLabel('a', m.midpoints.a, away(m.midpoints.a))}{sideLabel('b', m.midpoints.b, away(m.midpoints.b))}{sideLabel('c', m.midpoints.c, away(m.midpoints.c))}</>}
       {['A', 'B', 'C'].map(k => <Tex key={k} x={V[k][0] + away(V[k])[0] * 1.4} y={V[k][1] + away(V[k])[1] * 1.4} tex={k} w={24} h={22} className="dg-vertex" />)}
-      {labels.angles && ['A', 'B', 'C'].filter(k => k !== m.right).map(k => <Tex key={`an${k}`} x={corner(k)[0]} y={corner(k)[1]} tex={`${m.angles[k]}^{\\circ}`} w={60} h={20} className="dg-small" />)}
+      {labels.angles && ['A', 'B', 'C'].filter(k => k !== m.right).map(k => <Tex key={`an${k}`} x={corner(k)[0]} y={corner(k)[1]} tex={`${r3(m.angles[k], 1)}^{\\circ}`} w={60} h={20} className="dg-small" />)}
       {showArea && <Tex x={cx} y={cy} tex={`\\text{area}=${m.area}`} w={110} className="dg-small" />}
     </Figure>
   );
