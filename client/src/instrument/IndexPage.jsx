@@ -144,8 +144,8 @@ export default function IndexPage() {
   const name = (user.name || '').split(' ')[0];
   const markOf = id => (marks[id]?.possible ? marks[id] : null);
   // The tick scale reads the dot points the plate already lists, from the same
-  // evidence: a dot point is "secure" once it has the answers the progress floor
-  // calls practised and an accuracy may be stated, "building" with any answer
+  // evidence: a dot point is "practised" once it has the answers the progress floor
+  // calls practised (a count of answers, not a judgement of how well they went), "started" with any answer
   // (its own evidence, or a server-certified answer filed under it), else empty.
   // No new measure: only the existing floors, applied per dot point.
   const dotStates = c => {
@@ -154,29 +154,29 @@ export default function IndexPage() {
     return dps.map((dp, i) => {
       const ev = typeof dp === 'object' && dp ? chapterEvidence(dp, accuracyClaim, PROGRESS_THRESHOLDS.chapterAccuracy) : null;
       const key = typeof dp === 'object' && dp?.id ? String(dp.id) : String(i);
-      if (ev && ev.accuracy != null && ev.attempts >= PROGRESS_THRESHOLDS.chapterPractised) return 'secure';
+      if (ev && ev.accuracy != null && ev.attempts >= PROGRESS_THRESHOLDS.chapterPractised) return 'practised';
       const any = (ev?.attempts || 0) > 0 || Number(seen[key]?.questions) > 0 || Number(seen[String(i)]?.questions) > 0;
-      return any ? 'building' : 'empty';
+      return any ? 'started' : 'empty';
     });
   };
   const chapterTicks = c => {
     const st = dotStates(c);
     const n = st.length;
-    const secure = st.filter(x => x === 'secure').length;
-    const building = st.filter(x => x === 'building').length;
+    const secure = st.filter(x => x === 'practised').length;
+    const building = st.filter(x => x === 'started').length;
     // One tick per topic up to 8; beyond that, 8 ticks in proportion (a tick is
     // secure when most of its share is, building when any of it has started).
     const cells = n <= 8 ? st : Array.from({ length: 8 }, (_, k) => {
       const part = st.slice(Math.floor((k * n) / 8), Math.floor(((k + 1) * n) / 8));
-      const sec = part.filter(x => x === 'secure').length;
-      return sec * 2 > part.length ? 'secure' : part.some(x => x !== 'empty') ? 'building' : 'empty';
+      const sec = part.filter(x => x === 'practised').length;
+      return sec * 2 > part.length ? 'practised' : part.some(x => x !== 'empty') ? 'started' : 'empty';
     });
     return { n, secure, building, cells };
   };
   const chapterSub = (c, ticks) => {
     if (ticks.n) {
-      if (ticks.secure) return t('inst.tickSecure', { s: ticks.secure, n: ticks.n });
-      if (ticks.building) return t('inst.tickBuilding', { b: ticks.building, n: ticks.n });
+      if (ticks.secure) return t('inst.tickPractised', { s: ticks.secure, n: ticks.n });
+      if (ticks.building) return t('inst.tickStarted', { b: ticks.building, n: ticks.n });
       return t('inst.notStarted');
     }
     const m = markOf(c.row.id);
@@ -252,11 +252,14 @@ export default function IndexPage() {
         {phone && current && (
           <>
             <div className="in-next" style={{ '--cc': `var(${current.colour})` }} data-instrument-next={current.row.id}
-              onTouchStart={e => { swipe.current = e.touches[0].clientX; }}
+              onTouchStart={e => { swipe.current = [e.touches[0].clientX, e.touches[0].clientY]; }}
+              onTouchCancel={() => { swipe.current = null; }}
               onTouchEnd={e => {
-                const x0 = swipe.current; swipe.current = null;
-                const dx = x0 == null ? 0 : e.changedTouches[0].clientX - x0;
-                if (Math.abs(dx) > 48) step(dx < 0 ? 1 : -1);
+                const from = swipe.current; swipe.current = null;
+                if (!from) return;
+                const dx = e.changedTouches[0].clientX - from[0];
+                const dy = e.changedTouches[0].clientY - from[1];
+                if (Math.abs(dx) > 48 && Math.abs(dx) > 1.5 * Math.abs(dy)) step(dx < 0 ? 1 : -1);
               }}>
               <ChapterScope figure={current.figure} colourVar={current.colour} label={t('inst.scopeLabel', { name: current.row.name })} tracerHint={t('inst.scopeTracer')} probeHint={t('inst.scopeProbe')} />
               <div className="in-next-label">
@@ -291,7 +294,7 @@ export default function IndexPage() {
                       </span>
                       {ticks.n > 0 && (
                         <span className="in-ticks" role="img" aria-label={t('inst.tickLabel', { count: ticks.n, s: ticks.secure, n: ticks.n, b: ticks.building })}>
-                          {ticks.cells.map((x, k) => <i key={k} className={x === 'empty' ? undefined : x === 'secure' ? 's' : 'b'} />)}
+                          {ticks.cells.map((x, k) => <i key={k} className={x === 'empty' ? undefined : x === 'practised' ? 's' : 'b'} />)}
                         </span>
                       )}
                       <Ring value={c.evidence.mastery} colourVar={c.colour} />
