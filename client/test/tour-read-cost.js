@@ -379,7 +379,7 @@ export const flow = {
         } finally { await page.context().unroute(pattern, damage); }
         await check(`10 · the kept read gone and the receipt not valid: 0 provider calls at Submit, nothing marked, no try used; the transcript and the ink stay and the student is asked to Read again [${EVIDENCE}]`,
           prompted.provider === 1 && prompted.label === 1 && prompted.reason === 'ink.submitReadExpired' && prompted.transcript === right.text &&
-            prompted.readAgain === 1 && prompted.submitDisabled === true && prompted.grades === 0 && prompted.verdict === 0,
+            prompted.readAgain === 1 && prompted.submitDisabled === false && prompted.grades === 0 && prompted.verdict === 0,
           JSON.stringify(prompted));
         await pressRead(page);
         await lines(1);

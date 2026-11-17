@@ -1639,9 +1639,9 @@ async function run() {
       refusals.replay?.held === 1 && /^Checking your earlier answer/.test(refusals.replay.checking || '') && refusals.replay.disabled === 0 &&
         refusals.replay.strokeDuringReplay === true && refusals.read?.button?.tag === 'button',
       JSON.stringify(refusals.replay));
-    ok('handwriting not yet read: a real, named "Read my answer" button, and Submit says why it is unavailable in a status the button is described by',
+    ok('handwriting not yet read: a real, named "Read my answer" button, and Submit says why it is unavailable (or, on stale ink, that it will read the page again) in a status the button is described by',
       refusals.read?.button?.tag === 'button' && /\p{L}/u.test(refusals.read.button.name) && refusals.read.unread?.role === 'status' &&
-        /\p{L}/u.test(refusals.read.unread.text) && refusals.read.unread.describes === true && refusals.read.unread.disabled === true,
+        /\p{L}/u.test(refusals.read.unread.text) && refusals.read.unread.describes === true && refusals.read.unread.disabled === (refusals.read.unread.key !== 'ink.submitReadAgain'),
       JSON.stringify({ button: refusals.read?.button, unread: refusals.read?.unread }));
     ok('activating "Read my answer" from the keyboard does not drop focus to <body>: while the page is read, focus rests on the announced reading status inside the writing surface',
       refusals.read?.during?.button === 0 && refusals.read.during.focus.body === false && refusals.read.during.focus.inInk === true &&
