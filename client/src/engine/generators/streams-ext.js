@@ -2,6 +2,7 @@
 // Pri Learning · Extension 1 & Extension 2 generators (ME / MEX)
 // ─────────────────────────────────────────────────────────────────────────────
 import { ri, rc, rs, nz, gcd, Frac, mcq, poly, sgn, r1, r2, r3, rad } from '../qhelpers.js';
+import { streamsExtNsw } from './streams-ext-nsw.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 const nCr = (n, r) => Math.round(factorial(n) / (factorial(r) * factorial(n - r)));
@@ -204,6 +205,7 @@ function principalTwelfths(fn, t) {
 }
 
 export const streamsExt = {
+  ...streamsExtNsw,
 
   // ── ME-F2 · Polynomials ──────────────────────────────────────────────────
   'me11-poly': (rng, diff) => {

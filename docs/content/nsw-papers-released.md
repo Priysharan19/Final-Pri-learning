@@ -8,7 +8,7 @@ Prithagoras offers timed papers shaped like an HSC examination, each an "Answer-
 - Otherwise a **partial** paper (only the slots that can be filled) is released when at least 75% of the course's Year 12 outcomes (from the G2 model) are covered. It is titled "Practice paper — N of M Year 12 outcomes", never an HSC paper or a trial; its marks and working time are scaled to what it examines; and the Exams page, the paper and the result name every outcome it leaves out.
 - Below that floor the paper is refused.
 
-The pool today: 395 approved forms. Blueprint structures (times, marks, section sizes) follow NESA's published HSC examination specifications for the 2024 syllabuses, first examined in 2027 (`docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md` §5.3). Which outcome each slot is on is Pri's own design: every Year 12 outcome of the examined course has slots. No NESA paper, question, marking guideline or reference sheet is reproduced. The platform has no authored formula sheet yet, so none is shown.
+The pool today: 411 approved forms. Blueprint structures (times, marks, section sizes) follow NESA's published HSC examination specifications for the 2024 syllabuses, first examined in 2027 (`docs/research/NSW_HSC_CURRICULUM_ASSESSMENT_AUTHORITY.md` §5.3). Which outcome each slot is on is Pri's own design: every Year 12 outcome of the examined course has slots. No NESA paper, question, marking guideline or reference sheet is reproduced. The platform has no authored formula sheet yet, so none is shown.
 
 | Paper | State | Year 12 outcomes covered | Sat as | Omitted outcomes |
 | --- | --- | --- | --- | --- |
@@ -101,12 +101,12 @@ Source: Mathematics Extension 1 11–12 Syllabus (2024): HSC examinations — ht
 | ME1-11-03 | Further trigonometry | 11 | 2 | 3 | 4 | yes |
 | ME1-11-04 | Permutations and combinations | 11 | 2 | 3 | 3 | yes |
 | ME1-11-05 | The binomial theorem | 11 | 2 | 2 | 0 | no |
-| ME1-12-02 | Introduction to vectors | 12 | 4 | 10 | 12 | yes |
+| ME1-12-02 | Introduction to vectors | 12 | 4 | 10 | 20 | yes |
 | ME1-12-03 | Inverse trigonometric functions | 12 | 3 | 6 | 4 | yes |
 | ME1-12-04 | Further calculus skills | 12 | 4 | 10 | 0 | no |
 | ME1-12-05 | Further applications of calculus | 12 | 4 | 9 | 3 | yes |
-| ME1-12-06 | The binomial distribution and sampling distribution of the mean | 12 | 4 | 9 | 3 | yes |
-| ME1-12-01 | Proof by mathematical induction | 12 | 2 | 7 | 3 | yes |
+| ME1-12-06 | The binomial distribution and sampling distribution of the mean | 12 | 4 | 9 | 7 | yes |
+| ME1-12-01 | Proof by mathematical induction | 12 | 2 | 7 | 7 | yes |
 
 ## Mathematics Extension 2
 
