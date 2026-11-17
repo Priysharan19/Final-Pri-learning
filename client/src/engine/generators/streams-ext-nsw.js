@@ -48,7 +48,7 @@ export const streamsExtNsw = {
     }
     const a = ri(rng, 1, 4), b = ri(rng, 1, 3), n = ri(rng, 3, 6);
     return {
-      prompt: `Find the sum of all the coefficients in the expansion of $(${a}x + ${b})^{${n}}$.`,
+      prompt: `Find the sum of all the coefficients in the expansion of $(${a === 1 ? '' : a}x + ${b})^{${n}}$.`,
       answerType: 'numeric', answer: { value: (a + b) ** n },
       traps: [{ value: a ** n + b ** n, why: 'Put $x = 1$: the sum of the coefficients is $(a + b)^n$, not $a^n + b^n$.' }].filter(t => t.value !== (a + b) ** n),
       hints: ['Substitute $x = 1$ into the expansion.', `The sum of the coefficients is $(${a} + ${b})^{${n}}$.`, 'Evaluate the power.'],
@@ -58,14 +58,14 @@ export const streamsExtNsw = {
 
   // ── Further calculus skills ────────────────────────────────────────────────
   'me12-further-calc': (rng, diff) => {
-    const a = ri(rng, 1, 6);
+    const a = ri(rng, 1, 12);
     if (diff === 1) {
       return {
         prompt: `Find $\\dfrac{d}{dx}\\left(\\sin^{-1}(${a === 1 ? '' : a}x)\\right)$ at $x = 0$.`,
         answerType: 'numeric', answer: { value: a },
         traps: [{ value: 1, why: 'Use the chain rule: $\\dfrac{d}{dx}\\sin^{-1}(ax) = \\dfrac{a}{\\sqrt{1 - a^2x^2}}$.' }].filter(t => t.value !== a),
         hints: ['$\\dfrac{d}{dx}\\sin^{-1}(ax) = \\dfrac{a}{\\sqrt{1 - a^2x^2}}$.', 'At $x = 0$ the square root is $1$.', 'So the value is $a$.'],
-        steps: [{ h: 'Derivative', d: `$\\dfrac{${a}}{\\sqrt{1 - ${a * a}x^2}}$` }, { h: 'At x = 0', d: `$${a}$` }]
+        steps: [{ h: 'Derivative', d: `$\\dfrac{${a}}{\\sqrt{1 - ${a * a === 1 ? '' : a * a}x^2}}$` }, { h: 'At x = 0', d: `$${a}$` }]
       };
     }
     if (diff === 2) {
@@ -74,13 +74,13 @@ export const streamsExtNsw = {
         answerType: 'numeric', answer: { value: a },
         traps: [{ value: 1, why: 'Use the chain rule: $\\dfrac{d}{dx}\\tan^{-1}(ax) = \\dfrac{a}{1 + a^2x^2}$.' }].filter(t => t.value !== a),
         hints: ['$\\dfrac{d}{dx}\\tan^{-1}(ax) = \\dfrac{a}{1 + a^2x^2}$.', 'At $x = 0$ the denominator is $1$.', 'So the value is $a$.'],
-        steps: [{ h: 'Derivative', d: `$\\dfrac{${a}}{1 + ${a * a}x^2}$` }, { h: 'At x = 0', d: `$${a}$` }]
+        steps: [{ h: 'Derivative', d: `$\\dfrac{${a}}{1 + ${a * a === 1 ? '' : a * a}x^2}$` }, { h: 'At x = 0', d: `$${a}$` }]
       };
     }
     if (diff === 3) {
       const k = 4 * ri(rng, 1, 9);
       return {
-        prompt: `Evaluate $\\displaystyle\\int_0^1 \\dfrac{${k}}{1 + x^2}\\,dx$. Give the answer as $c\\pi$ and enter $c$.`,
+        prompt: `Evaluate $\\displaystyle\\int_0^1 \\dfrac{${k}}{1 + x^2}\\,dx$. The answer is $c\\pi$: type only the number $c$ (not $\\pi$).`,
         answerType: 'numeric', answer: { value: k / 4 },
         traps: [{ value: k, why: '$\\int_0^1 \\dfrac{dx}{1 + x^2} = \\tan^{-1}1 - \\tan^{-1}0 = \\dfrac{\\pi}{4}$, so the factor $\\dfrac14$ matters.' }],
         hints: ['$\\displaystyle\\int \\dfrac{dx}{1 + x^2} = \\tan^{-1}x$.', '$\\tan^{-1}1 = \\dfrac{\\pi}{4}$ and $\\tan^{-1}0 = 0$.', `Multiply by $${k}$.`],
@@ -89,7 +89,7 @@ export const streamsExtNsw = {
     }
     const k = 6 * ri(rng, 1, 9);
     return {
-      prompt: `Evaluate $\\displaystyle\\int_0^{1/2} \\dfrac{${k}}{\\sqrt{1 - x^2}}\\,dx$. Give the answer as $c\\pi$ and enter $c$.`,
+      prompt: `Evaluate $\\displaystyle\\int_0^{1/2} \\dfrac{${k}}{\\sqrt{1 - x^2}}\\,dx$. The answer is $c\\pi$: type only the number $c$ (not $\\pi$).`,
       answerType: 'numeric', answer: { value: k / 6 },
       traps: [{ value: k, why: '$\\int_0^{1/2}\\dfrac{dx}{\\sqrt{1 - x^2}} = \\sin^{-1}\\tfrac12 = \\dfrac{\\pi}{6}$.' }],
       hints: ['$\\displaystyle\\int \\dfrac{dx}{\\sqrt{1 - x^2}} = \\sin^{-1}x$.', '$\\sin^{-1}\\tfrac12 = \\dfrac{\\pi}{6}$.', `Multiply by $${k}$.`],
@@ -110,7 +110,7 @@ export const streamsExtNsw = {
         answerType: 'numeric', answer: { value: t },
         traps: [{ value: -t, why: 'Solve $\\mathbf{a} + t\\mathbf{d} = \\mathbf{p}$ component by component.' }],
         hints: ['Equate one component: $a_1 + t d_1 = p_1$.', `$${A[0]} + t(${u[0]}) = ${P[0]}$.`, 'Check that the other components agree.'],
-        steps: [{ h: 'First component', d: `$${A[0]} + ${u[0]}t = ${P[0]} \\Rightarrow t = ${t}$` }]
+        steps: [{ h: 'First component', d: `$${A[0]} ${u[0] < 0 ? '-' : '+'} ${Math.abs(u[0])}t = ${P[0]} \\Rightarrow t = ${t}$` }]
       };
     }
     if (diff === 2) {
@@ -120,12 +120,13 @@ export const streamsExtNsw = {
         prompt: `A line has vector equation $\\mathbf{r} = ${tex(A)} + t${tex(u)}$. The point $Q(${P[0]}, ${P[1]}, m)$ lies on the line. Find $m$.`,
         answerType: 'numeric', answer: { value: P[2] },
         traps: [{ value: A[2] + u[2], why: 'First find $t$ from the other coordinates, then use it in the third.' }].filter(x => x.value !== P[2]),
-        hints: ['Find $t$ from the $x$-coordinate.', `$${A[0]} + ${u[0]}t = ${P[0]}$ gives $t = ${t}$.`, `Then $m = ${A[2]} + ${t}(${u[2]})$.`],
+        hints: ['Find $t$ from the $x$-coordinate.', `$${A[0]} + (${u[0]})t = ${P[0]}$ gives $t = ${t}$.`, `Then $m = ${A[2]} + ${t}(${u[2]})$.`],
         steps: [{ h: 'Find t', d: `$t = ${t}$` }, { h: 'Third coordinate', d: `$m = ${A[2]} + ${t}(${u[2]}) = ${P[2]}$` }]
       };
     }
     if (diff === 3) {
       let w = v();
+      while (u[1] * w[2] - u[2] * w[1] === 0 && u[2] * w[0] - u[0] * w[2] === 0 && u[0] * w[1] - u[1] * w[0] === 0) w = v();
       const s0 = nz(rng, -3, 3), t0 = nz(rng, -3, 3);
       const X = A.map((c, i) => c + s0 * u[i]);
       const B = X.map((c, i) => c - t0 * w[i]);

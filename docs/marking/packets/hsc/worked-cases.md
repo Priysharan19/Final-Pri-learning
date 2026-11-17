@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `05ddb2bb8ec27997169980a67d2da7e41c303751be669d22f52f9b5c3e88321d` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `0c1d9df14305e5a8a1be81980f9432ed14fe51e65a7b884fa83cb4543b0b4f4c` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -4587,14 +4587,14 @@ Final answer: 6
 
 ## `nsw-final:y11-trig-ident/D2` — seed 1009
 
-> Solve $\\tan\\theta = -1$ for $0^\\circ \\le \\theta \\le 360^\\circ$. Give the smaller of the two solutions, in degrees.
+> Solve $\\sin\\theta = \\tfrac{\\sqrt3}{2}$ for $0^\\circ \\le \\theta \\le 360^\\circ$. Give the smaller of the two solutions, in degrees.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `135` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `135.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `136` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `136` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `60` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `60.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `61` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `61` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-trig-ident/D3` — seed 1009
 
@@ -4609,14 +4609,14 @@ Final answer: 6
 
 ## `nsw-final:y11-trig-ident/D4` — seed 1009
 
-> Solve $\\tan\\theta = -1$ for $0^\\circ \\le \\theta \\le 360^\\circ$. Give the larger of the two solutions, in degrees.
+> Solve $\\sin\\theta = \\tfrac{\\sqrt3}{2}$ for $0^\\circ \\le \\theta \\le 360^\\circ$. Give the larger of the two solutions, in degrees.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `315` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `315.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `316` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `316` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `120` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `120.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `121` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `121` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-explog-more/D1` — seed 1009
 
@@ -4642,14 +4642,14 @@ Final answer: 6
 
 ## `nsw-final:y11-explog-more/D3` — seed 1009
 
-> Evaluate $\\ln\\left(e^{4}\\right) + \\ln 1$.
+> Evaluate $\\ln\\left(e^{7}\\right) + \\ln 1$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-explog-more/D4` — seed 1009
 
@@ -4807,14 +4807,14 @@ Final answer: 6
 
 ## `nsw-final:ms11-managing-exact/D2` — seed 1009
 
-> A monthly budget has income \\$2500 and expenses of \\$600 (rent), \\$400 (food) and \\$300 (transport). How much is left over, in dollars?
+> A monthly budget has income \\$2100 and expenses of \\$700 (rent), \\$500 (food) and \\$300 (transport). How much is left over, in dollars?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1200` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `1200.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `1201` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1201` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `600` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `600.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `601` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `601` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-managing-exact/D3` — seed 1009
 
@@ -4873,14 +4873,14 @@ Final answer: 6
 
 ## `nsw-final:ms11-time-location/D4` — seed 1009
 
-> A flight leaves city A at 1300 local time and flies for 4 hours to city B, which is 7 hours ahead of A. What is the local arrival hour in city B (24-hour clock; 1500 is 15)? Ignore any change of day.
+> A flight leaves city A at 1300 local time and flies for 3 hours to city B, which is 4 hours ahead of A. What is the local arrival hour in city B (24-hour clock; 1500 is 15)? Ignore any change of day.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `0` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `0.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `20` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `20.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `21` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `21` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-measure-more/D1` — seed 1009
 
@@ -4972,29 +4972,29 @@ Final answer: 6
 
 ## `nsw-final:me12-further-calc/D1` — seed 1009
 
-> Find $\\dfrac{d}{dx}\\left(\\sin^{-1}(5x)\\right)$ at $x = 0$.
+> Find $\\dfrac{d}{dx}\\left(\\sin^{-1}(9x)\\right)$ at $x = 0$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `9` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `9.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `10` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `10` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-further-calc/D2` — seed 1009
 
-> Find $\\dfrac{d}{dx}\\left(\\tan^{-1}(5x)\\right)$ at $x = 0$.
+> Find $\\dfrac{d}{dx}\\left(\\tan^{-1}(9x)\\right)$ at $x = 0$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `9` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `9.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-further-calc/D3` — seed 1009
 
-> Evaluate $\\displaystyle\\int_0^1 \\dfrac{24}{1 + x^2}\\,dx$. Give the answer as $c\\pi$ and enter $c$.
+> Evaluate $\\displaystyle\\int_0^1 \\dfrac{24}{1 + x^2}\\,dx$. The answer is $c\\pi$: type only the number $c$ (not $\\pi$).
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -5005,7 +5005,7 @@ Final answer: 6
 
 ## `nsw-final:me12-further-calc/D4` — seed 1009
 
-> Evaluate $\\displaystyle\\int_0^{1/2} \\dfrac{36}{\\sqrt{1 - x^2}}\\,dx$. Give the answer as $c\\pi$ and enter $c$.
+> Evaluate $\\displaystyle\\int_0^{1/2} \\dfrac{36}{\\sqrt{1 - x^2}}\\,dx$. The answer is $c\\pi$: type only the number $c$ (not $\\pi$).
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|

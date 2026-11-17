@@ -17,7 +17,7 @@ export const year11Nsw = {
   // ── Working with functions ─────────────────────────────────────────────────
   'y11-functions-more': (rng, diff) => {
     if (diff === 1) {
-      const a = ri(rng, -9, 9), m = ri(rng, 1, 4);
+      const a = nz(rng, -9, 9), m = ri(rng, 1, 4);
       return {
         prompt: `What is the smallest value of $x$ in the domain of $f(x) = \\sqrt{${m === 1 ? '' : m}x ${sg(-a * m)}}$?`,
         answerType: 'numeric', answer: { value: a },
@@ -116,7 +116,9 @@ export const year11Nsw = {
     const EQ = [
       { tex: '\\sin\\theta = \\tfrac12', sols: [30, 150] }, { tex: '\\cos\\theta = \\tfrac12', sols: [60, 300] },
       { tex: '\\cos\\theta = -\\tfrac12', sols: [120, 240] }, { tex: '\\tan\\theta = 1', sols: [45, 225] },
-      { tex: '\\tan\\theta = -1', sols: [135, 315] }, { tex: '\\sin\\theta = -\\tfrac12', sols: [210, 330] }
+      { tex: '\\tan\\theta = -1', sols: [135, 315] }, { tex: '\\sin\\theta = -\\tfrac12', sols: [210, 330] },
+      { tex: '\\sin\\theta = \\tfrac{\\sqrt3}{2}', sols: [60, 120] }, { tex: '\\cos\\theta = \\tfrac{\\sqrt3}{2}', sols: [30, 330] },
+      { tex: '\\tan\\theta = \\sqrt3', sols: [60, 240] }, { tex: '\\cos\\theta = -\\tfrac{\\sqrt3}{2}', sols: [150, 210] }
     ];
     const e = rc(rng, EQ);
     if (diff === 2 || diff === 4) {
@@ -131,12 +133,12 @@ export const year11Nsw = {
     }
     const val = rc(rng, [-1, 0, 1, 0.5, -0.5, 2]);
     const label = { '-1': '-1', '0': '0', '1': '1', '0.5': '\\tfrac12', '-0.5': '-\\tfrac12', '2': '2' }[String(val)];
-    const exact = Math.abs(val) === 1 ? 1 : (Math.abs(val) < 1 ? 2 : 0);
+    const exact = val === 0 ? 3 : (Math.abs(val) === 1 ? 1 : (Math.abs(val) < 1 ? 2 : 0));
     return {
       prompt: `How many solutions does $\\sin\\theta = ${label}$ have for $0^\\circ \\le \\theta \\le 360^\\circ$?`,
       answerType: 'numeric', answer: { value: exact },
-      traps: [{ value: exact === 1 ? 2 : 1, why: 'A sine value strictly between $-1$ and $1$ is reached twice in a full turn; $\\pm 1$ once; beyond that never.' }],
-      hints: ['Sine takes every value in $[-1, 1]$.', 'Values strictly inside $(-1, 1)$ occur twice in $0^\\circ$–$360^\\circ$.', '$\\pm 1$ occurs once; anything else never.'],
+      traps: [{ value: exact === 1 ? 2 : (exact === 3 ? 2 : 1), why: 'A sine value strictly between $-1$ and $1$ (other than $0$) is reached twice in $0^\\circ$–$360^\\circ$; $\\pm 1$ once; $0$ three times ($0^\\circ$, $180^\\circ$ and $360^\\circ$); beyond $\\pm 1$ never.' }],
+      hints: ['Sine takes every value in $[-1, 1]$.', 'Values strictly inside $(-1, 1)$, other than $0$, occur twice in $0^\\circ$–$360^\\circ$; the end angles $0^\\circ$ and $360^\\circ$ are both included.', '$\\pm 1$ occurs once, $0$ three times; anything else never.'],
       steps: [{ h: 'Count', d: `$\\sin\\theta = ${label}$ has ${exact} solution${exact === 1 ? '' : 's'} in the interval` }]
     };
   },
@@ -164,7 +166,7 @@ export const year11Nsw = {
       };
     }
     if (diff === 3) {
-      const m = ri(rng, 2, 7);
+      const m = ri(rng, 2, 15);
       return {
         prompt: `Evaluate $\\ln\\left(e^{${m}}\\right) + \\ln 1$.`,
         answerType: 'numeric', answer: { value: m },

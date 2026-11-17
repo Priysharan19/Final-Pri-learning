@@ -736,13 +736,13 @@ const raw = {
       return {
         prompt: `An item costs \\$${p} before GST. GST is 10%. What is the price including GST, in dollars?`,
         answerType: 'numeric', answer: { value: p / 10 * 11 },
-        traps: [{ value: p + 10, why: 'GST is 10% of the price, not a flat \\$10.' }].filter(t => t.value !== p * 1.1),
+        traps: [{ value: p + 10, why: 'GST is 10% of the price, not a flat \\$10.' }].filter(t => t.value !== p / 10 * 11),
         hints: ['Price including GST $= 1.1\\times$ price.', `$${p}\\times 1.1$.`, 'Or add 10% of the price.'],
         steps: [{ h: 'Add 10%', d: `$${p} + ${p / 10} = ${p / 10 * 11}$ dollars` }]
       };
     }
     if (diff === 2) {
-      const inc = ri(rng, 12, 30) * 100, e1 = ri(rng, 3, 8) * 100, e2 = ri(rng, 2, 6) * 100, e3 = ri(rng, 1, 5) * 100;
+      const e1 = ri(rng, 3, 8) * 100, e2 = ri(rng, 2, 6) * 100, e3 = ri(rng, 1, 5) * 100, inc = e1 + e2 + e3 + ri(rng, 2, 12) * 100;
       return {
         prompt: `A monthly budget has income \\$${inc} and expenses of \\$${e1} (rent), \\$${e2} (food) and \\$${e3} (transport). How much is left over, in dollars?`,
         answerType: 'numeric', answer: { value: inc - e1 - e2 - e3 },
@@ -775,7 +775,7 @@ const raw = {
   // ── Standard · Year 11 · Time and location ────────────────────────────────
   'ms11-time-location': (rng, diff) => {
     if (diff === 1) {
-      const a = ri(rng, -5, 3), b = a + ri(rng, 1, 9);
+      const a = nz(rng, -5, 3), b = a + ri(rng, 1, 9);
       return {
         prompt: `City A is $${a >= 0 ? '+' : '-'}${Math.abs(a)}$ hours from UTC and city B is $${b >= 0 ? '+' : '-'}${Math.abs(b)}$ hours from UTC. How many hours ahead of city A is city B?`,
         answerType: 'numeric', answer: { value: b - a }, answerSuffix: 'hours',
@@ -795,7 +795,8 @@ const raw = {
       };
     }
     if (diff === 3) {
-      const d = ri(rng, 1, 12), dur = ri(rng, 2, 9);
+      let d = ri(rng, 1, 12), dur = ri(rng, 2, 9);
+      while ((d + 6 + dur) % 24 === 0) { d = ri(rng, 1, 12); dur = ri(rng, 2, 9); }
       return {
         prompt: `A flight leaves at ${String(d + 6).padStart(2, '0')}00 and lasts ${dur} hours. What is the arrival time, in hours on the 24-hour clock (for example, 1500 is 15)? Use the departure city’s time.`,
         answerType: 'numeric', answer: { value: (d + 6 + dur) % 24 },
@@ -804,7 +805,8 @@ const raw = {
         steps: [{ h: 'Add', d: `$${d + 6} + ${dur} = ${d + 6 + dur}$, so the hour is $${(d + 6 + dur) % 24}$` }]
       };
     }
-    const off = ri(rng, 1, 9), h = ri(rng, 8, 15), dur = ri(rng, 2, 6);
+    let off = ri(rng, 1, 9), h = ri(rng, 8, 15), dur = ri(rng, 2, 6);
+    while ((h + dur + off) % 24 === 0) { off = ri(rng, 1, 9); h = ri(rng, 8, 15); dur = ri(rng, 2, 6); }
     return {
       prompt: `A flight leaves city A at ${String(h).padStart(2, '0')}00 local time and flies for ${dur} hours to city B, which is ${off} hours ahead of A. What is the local arrival hour in city B (24-hour clock; 1500 is 15)? Ignore any change of day.`,
       answerType: 'numeric', answer: { value: (h + dur + off) % 24 },
