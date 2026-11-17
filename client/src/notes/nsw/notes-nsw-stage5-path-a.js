@@ -397,7 +397,7 @@ export default {
     ]
   },
 
-  'ma5-geo-p-01': {
+  'ma5-geo-p-02': {
     summary: 'Two figures are congruent when one fits exactly on the other. Four tests prove triangles congruent, and once they are, every pair of corresponding sides and angles is equal. That is how geometric facts are proved.',
     prereqs: ['ma5-geo-c-01', 'ma4-geo-c-01'],
     concepts: [
@@ -445,9 +445,9 @@ export default {
     ]
   },
 
-  'ma5-geo-p-02': {
+  'ma5-geo-p-01': {
     summary: 'Similar figures have the same shape but different sizes. Matching angles and a constant ratio of corresponding sides let you find lengths that cannot be measured directly, and the scale factor links lengths, areas and volumes.',
-    prereqs: ['ma5-geo-p-01', 'ma5-geo-c-01'],
+    prereqs: ['ma5-geo-c-01'],
     concepts: [
       { title: 'Tests for similar triangles', body: 'Two triangles are similar if two pairs of angles are equal (AA), or the three pairs of sides are in the same ratio, or two pairs of sides are in the same ratio with the included angles equal.' },
       { title: 'Scale factor', body: 'If a figure is enlarged by scale factor $k$, every length is multiplied by $k$. Corresponding sides are the ones opposite equal angles.' },
@@ -543,49 +543,49 @@ export default {
   },
 
   'ma5-ind-p-02': {
-    summary: 'In an exponential equation the unknown is in the index. When both sides can be written with the same base the indices must be equal, and the same idea underlies exponential growth and decay.',
+    summary: 'A surd is an irrational root such as $\\sqrt{2}$ that is left unevaluated so the answer stays exact. Surds are simplified by pulling out square factors, combined like algebraic terms, and rationalised so no root remains in a denominator.',
     prereqs: ['ma5-ind-p-01', 'ma5-ind-c-01'],
     concepts: [
-      { title: 'Solve by matching the base', body: 'Write both sides as powers of the same number, then equate the indices. For $9^x=27$, write $3^{2x}=3^3$, so $2x=3$ and $x=\\tfrac{3}{2}$.' },
-      { title: 'Exponential growth and decay', body: 'In $y=ab^x$, $a$ is the starting value and $b$ is the multiplier for each step. If $b>1$ the quantity grows and if $0<b<1$ it decays. The $x$-axis is an asymptote.' },
-      { title: 'Percentages as multipliers', body: 'A rise of $r\\%$ per period has multiplier $1+\\tfrac{r}{100}$ and a fall of $r\\%$ has multiplier $1-\\tfrac{r}{100}$. A $20\\%$ fall means multiplying by $0.8$.' }
+      { title: 'Simplify by taking out square factors', body: 'Write the number under the root as a perfect square times another number, then split the root: $\\sqrt{72}=\\sqrt{36\\times2}=6\\sqrt{2}$. A surd is simplest when the number under the root has no square factor.' },
+      { title: 'Add, subtract, multiply and divide', body: 'Only like surds add or subtract, in the way $3\\sqrt{2}+5\\sqrt{2}=8\\sqrt{2}$. Multiplication and division work on the numbers under the roots: $\\sqrt{a}\\times\\sqrt{b}=\\sqrt{ab}$ and $\\sqrt{a}\\div\\sqrt{b}=\\sqrt{\\tfrac{a}{b}}$.' },
+      { title: 'Rationalise the denominator', body: 'Multiply top and bottom by a suitable surd so the denominator is rational. For $\\tfrac{1}{\\sqrt{3}}$ multiply by $\\tfrac{\\sqrt{3}}{\\sqrt{3}}$. For $\\tfrac{1}{a+\\sqrt{b}}$ use the conjugate $a-\\sqrt{b}$, since $(a+\\sqrt{b})(a-\\sqrt{b})=a^2-b$. A root is the index $\\tfrac{1}{2}$, so $\\sqrt{x}=x^{1/2}$.' }
     ],
     definitions: [
-      { term: 'Exponential function', meaning: 'A function of the form $y=ab^x$ with $a\\ne0$, $b>0$ and $b\\ne1$, in which the variable is in the index.' },
-      { term: 'Growth factor', meaning: 'The number $b$ by which the quantity is multiplied each time $x$ increases by $1$.' }
+      { term: 'Surd', meaning: 'An irrational number written as a root that cannot be simplified to a rational number, such as $\\sqrt{2}$ or $\\sqrt{7}$. The number $\\sqrt{16}=4$ is not a surd.' },
+      { term: 'Conjugate', meaning: 'For $a+\\sqrt{b}$ the conjugate is $a-\\sqrt{b}$. Their product $a^2-b$ is rational.' }
     ],
     formulas: [
-      { label: 'Equal bases', tex: 'a^{x}=a^{y}\\ \\Longrightarrow\\ x=y\\quad(a>0,\\ a\\ne1)' },
-      { label: 'Exponential model', tex: 'y=ab^{x}' }
+      { label: 'Product and quotient', tex: '\\sqrt{a}\\times\\sqrt{b}=\\sqrt{ab},\\qquad \\frac{\\sqrt{a}}{\\sqrt{b}}=\\sqrt{\\frac{a}{b}}\\quad(a,b>0)' },
+      { label: 'Rationalising', tex: '\\frac{1}{\\sqrt{a}}=\\frac{\\sqrt{a}}{a},\\qquad (a+\\sqrt{b})(a-\\sqrt{b})=a^{2}-b' }
     ],
     points: [
-      { front: 'Solve $2^x=64$.', back: '$64=2^6$, so $x=6$.' },
-      { front: 'The $y$-intercept of $y=ab^x$', back: '$a$, because $b^0=1$.' },
-      { front: 'The multiplier for a $5\\%$ increase', back: '$1.05$.' },
-      { front: 'Can $2^x$ ever equal a negative number?', back: 'No. A positive base to any power is positive, so $2^x=-4$ has no solution.' }
+      { front: 'Simplify $\\sqrt{50}$.', back: '$\\sqrt{25\\times2}=5\\sqrt{2}$.' },
+      { front: '$\\sqrt{3}\\times\\sqrt{3}$', back: '$3$. A surd times itself is the number under the root.' },
+      { front: 'Rationalise $\\dfrac{6}{\\sqrt{3}}$.', back: '$\\dfrac{6\\sqrt{3}}{3}=2\\sqrt{3}$.' },
+      { front: 'Write $\\sqrt{5}$ as an index.', back: '$5^{1/2}$, so $\\sqrt{5}\\times\\sqrt{5}=5^{1/2+1/2}=5$.' }
     ],
     mistakes: [
-      { wrong: '$2\\times3^x=6^x$.', right: 'Bases with different values cannot be combined this way. At $x=2$ the left is $18$ and the right is $36$.' },
-      { wrong: 'A $20\\%$ fall each year is modelled by $y=a(0.2)^t$.', right: 'After a $20\\%$ fall $80\\%$ remains, so the multiplier is $0.8$: $y=a(0.8)^t$.' }
+      { wrong: '$\\sqrt{9+16}=\\sqrt{9}+\\sqrt{16}=7$.', right: 'A root does not split over addition. $\\sqrt{9+16}=\\sqrt{25}=5$, not $7$.' },
+      { wrong: '$\\sqrt{2}+\\sqrt{3}=\\sqrt{5}$.', right: 'Unlike surds cannot be combined. Numerically $1.414+1.732\\approx3.146$, but $\\sqrt{5}\\approx2.236$.' }
     ],
     examples: [
       {
-        question: 'Solve $2^{x+1}=32$.',
-        steps: ['Write $32$ as a power of $2$: $32=2^5$.', 'Equate the indices: $x+1=5$.', 'So $x=4$.'],
-        answer: '$x=4$',
-        verify: { kind: 'roots', f: '2^(x+1)-32', answers: ['4'] }
+        question: 'Simplify $\\sqrt{72}$.',
+        steps: ['The largest square factor of $72$ is $36$: $72=36\\times2$.', 'Split the root: $\\sqrt{36}\\times\\sqrt{2}=6\\sqrt{2}$.'],
+        answer: '$6\\sqrt{2}$',
+        verify: { kind: 'equivalent', a: 'sqrt(72)', b: '6*sqrt(2)' }
       },
       {
-        question: 'Solve $9^x=27$.',
-        steps: ['Write both sides with base $3$: $(3^2)^x=3^3$.', 'So $3^{2x}=3^3$ and $2x=3$.', '$x=\\tfrac{3}{2}$.'],
-        answer: '$x=\\tfrac{3}{2}$',
-        verify: { kind: 'roots', f: '9^x-27', answers: ['3/2'] }
+        question: 'Simplify $3\\sqrt{2}+\\sqrt{50}-\\sqrt{8}$.',
+        steps: ['Simplify each surd: $\\sqrt{50}=5\\sqrt{2}$ and $\\sqrt{8}=2\\sqrt{2}$.', 'All three terms are now multiples of $\\sqrt{2}$: $3\\sqrt{2}+5\\sqrt{2}-2\\sqrt{2}$.', 'Combine the coefficients: $(3+5-2)\\sqrt{2}=6\\sqrt{2}$.'],
+        answer: '$6\\sqrt{2}$',
+        verify: { kind: 'equivalent', a: '3*sqrt(2)+sqrt(50)-sqrt(8)', b: '6*sqrt(2)' }
       },
       {
-        question: 'A culture starts with $200$ bacteria and doubles every hour, so $N=200\\times2^t$. When does it reach $3200$?',
-        steps: ['Set $200\\times2^t=3200$.', 'Divide by $200$: $2^t=16$, and $16=2^4$.', 'So $t=4$ hours.'],
-        answer: '$t=4$ hours',
-        verify: { kind: 'roots', f: '200*2^t-3200', answers: ['4'], var: 't' }
+        question: 'Rationalise the denominator of $\\dfrac{4}{3-\\sqrt{5}}$.',
+        steps: ['Multiply top and bottom by the conjugate $3+\\sqrt{5}$.', 'The denominator is $(3-\\sqrt{5})(3+\\sqrt{5})=9-5=4$.', 'So the fraction is $\\dfrac{4(3+\\sqrt{5})}{4}=3+\\sqrt{5}$.'],
+        answer: '$3+\\sqrt{5}$',
+        verify: { kind: 'equivalent', a: '4/(3-sqrt(5))', b: '3+sqrt(5)' }
       }
     ]
   },
@@ -640,7 +640,7 @@ export default {
 
   'ma5-log-p-01': {
     summary: 'A logarithm answers the question: what power of the base gives this number? It is the inverse of an exponential, and its laws turn multiplication into addition. That makes it the tool for solving equations with the unknown in the index.',
-    prereqs: ['ma5-ind-p-02', 'ma5-ind-c-01'],
+    prereqs: ['ma5-ind-p-01', 'ma5-ind-c-01'],
     concepts: [
       { title: 'Logarithms undo powers', body: '$\\log_2 32=5$ means $2^5=32$. The logarithm is the index. It exists only for a positive number and a positive base other than $1$.' },
       { title: 'The logarithm laws', body: 'They mirror the index laws: products become sums, quotients become differences, and a power comes down as a multiplier. $\\log_6 4+\\log_6 9=\\log_6 36=2$.' },

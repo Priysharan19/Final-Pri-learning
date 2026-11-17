@@ -111,7 +111,7 @@ export default {
     concepts: [
       { title: 'Degree and arithmetic', body: 'The degree is the highest power of $x$. Adding two polynomials gives a polynomial of at most the larger degree; multiplying adds the degrees, so a linear times a quadratic is a cubic. Collect like powers after expanding.' },
       { title: 'The remainder theorem', body: 'When $P(x)$ is divided by $x-a$, the remainder is the number $P(a)$. You can find the remainder by substituting, with no long division at all.' },
-      { title: 'The factor theorem', body: 'If $P(a)=0$ then $x-a$ is a factor of $P(x)$, and conversely. To factorise a cubic, test the factors of the constant term until one gives $0$, divide it out, then factorise the quadratic that remains.' }
+      { title: 'The factor theorem', body: 'If $P(a)=0$ then $x-a$ is a factor of $P(x)$, and conversely. To factorise a monic cubic (leading coefficient $1$), test the factors of the constant term until one gives $0$, divide it out, then factorise the quadratic that remains.' }
     ],
     definitions: [
       { term: 'Polynomial', meaning: 'An expression such as $2x^3-x+7$ built from numbers multiplied by whole-number powers of $x$, added or subtracted.' },

@@ -167,7 +167,7 @@ export default {
     ]
   },
 
-  'ma5-geo-p-01': {
+  'ma5-geo-p-02': {
     examiners: [
       'The congruence test is named with the matching vertices written in order, for example $\\triangle ABM\\equiv\\triangle ACM$ (SSS).',
       'Every statement in a proof carries its reason, and the final line says which corresponding parts are equal because the triangles are congruent.',
@@ -187,7 +187,7 @@ export default {
     ]
   },
 
-  'ma5-geo-p-02': {
+  'ma5-geo-p-01': {
     examiners: [
       'The reason for similarity is stated (equal angles, or sides in the same ratio) before any ratio is used.',
       'Corresponding sides are matched by position, and the scale factor is written as a fraction showing which figure is on top.',
@@ -229,21 +229,22 @@ export default {
 
   'ma5-ind-p-02': {
     examiners: [
-      'Both sides are written with the same base, and the line showing this is written down before the indices are equated.',
-      'In a growth or decay model the multiplier is built from the percentage, for example $0.8$ for a $20\\%$ fall.',
-      'The answer is interpreted in the context, with units such as hours, and checked by substituting it back.'
+      'The largest square factor is found and shown, for example $72=36\\times2$, so the surd is fully simplified and not left as $2\\sqrt{18}$.',
+      'Surds are simplified first and only like surds are then added or subtracted. Unlike surds are never merged.',
+      'To rationalise a binomial denominator the conjugate is used on both numerator and denominator, and the difference of squares is shown.'
     ],
     diagrams: [
-      { title: 'Where $2^{x+1}$ reaches $32$', spec: { kind: 'function', xmin: -2, xmax: 6, ymin: 0, ymax: 70, curves: [{ expr: '2^(x+1)', label: 'y=2^{x+1}' }, { expr: '32', label: 'y=32' }], points: [{ x: 4, y: 32, label: '(4,32)' }] }, note: 'The curve $y=2^{x+1}$ meets the line $y=32$ at $x=4$, the solution of $2^{x+1}=32$.' }
+      { title: 'A right triangle with legs 1 and 1', spec: { kind: 'triangle', a: 1, b: 1, C: 90 }, note: 'By Pythagoras the hypotenuse is $\\sqrt{1^2+1^2}=\\sqrt{2}$. No fraction or terminating decimal equals it, so it is left as a surd.' },
+      { title: 'Surds on the number line', spec: { kind: 'numberLine', min: 0, max: 3, points: [{ value: 1.4142, label: '\\sqrt{2}' }, { value: 1.7321, label: '\\sqrt{3}' }, { value: 2.2361, label: '\\sqrt{5}' }] }, note: 'The surds sit between whole numbers: $\\sqrt{2}\\approx1.414$, $\\sqrt{3}\\approx1.732$ and $\\sqrt{5}\\approx2.236$.' }
     ],
     working: [
-      '\\begin{aligned}2^{x+1}&=2^5\\\\x+1&=5\\\\x&=4\\end{aligned}',
-      '\\begin{aligned}3^{2x}&=3^3\\\\2x&=3\\\\x&=\\tfrac{3}{2}\\end{aligned}',
-      '\\begin{aligned}200\\times2^t&=3200\\\\2^t&=16=2^4\\\\t&=4\\end{aligned}'
+      '\\begin{aligned}\\sqrt{72}&=\\sqrt{36\\times2}\\\\&=\\sqrt{36}\\times\\sqrt{2}\\\\&=6\\sqrt{2}\\end{aligned}',
+      '\\begin{aligned}3\\sqrt{2}+\\sqrt{50}-\\sqrt{8}&=3\\sqrt{2}+5\\sqrt{2}-2\\sqrt{2}\\\\&=6\\sqrt{2}\\end{aligned}',
+      '\\begin{aligned}\\frac{4}{3-\\sqrt{5}}&=\\frac{4(3+\\sqrt{5})}{(3-\\sqrt{5})(3+\\sqrt{5})}\\\\&=\\frac{4(3+\\sqrt{5})}{4}\\\\&=3+\\sqrt{5}\\end{aligned}'
     ],
     check: [
-      { question: 'Solve $3^x=81$.', answer: '$x=4$', verify: { kind: 'roots', f: '3^x-81', answers: ['4'] } },
-      { question: 'Solve $5^{x-1}=25$.', answer: '$x=3$', verify: { kind: 'roots', f: '5^(x-1)-25', answers: ['3'] } }
+      { question: 'Simplify $\\sqrt{48}$.', answer: '$4\\sqrt{3}$', verify: { kind: 'equivalent', a: 'sqrt(48)', b: '4*sqrt(3)' } },
+      { question: 'Expand and simplify $(\\sqrt{5}+2)(\\sqrt{5}-2)$.', answer: '$1$', verify: { kind: 'value', expr: '(sqrt(5)+2)*(sqrt(5)-2)', answer: '1' } }
     ]
   },
 
