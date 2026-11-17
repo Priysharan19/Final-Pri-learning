@@ -935,7 +935,12 @@ export const INTERACTIVE = Object.freeze({
   circleExplorer: safe(validateCircleExplorer, p => circleExplorerModel({ theorem: p.theorem, initial: p.initial || {}, radius: p.radius ?? 5 }))
 });
 // interactive kind -> static kind a question (or a print) shows instead
-export const COUNTERPART = Object.freeze({ parallelLinesExplorer: 'parallelLines', triangleExplorer: 'triangle', circleExplorer: 'circleTheorem' });
+// (a function maps the explorer's params to the static spec of its starting picture; see counterpartParams)
+export const COUNTERPART = Object.freeze({
+  parallelLinesExplorer: 'parallelLines',
+  triangleExplorer: p => ({ kind: 'triangle', ...counterpartParams('triangleExplorer', p) }),
+  circleExplorer: p => { const c = counterpartParams('circleExplorer', p); return c ? { kind: 'circleTheorem', ...c } : null; }
+});
 
 // ── Words ────────────────────────────────────────────────────────────────────
 // The pack's words in English (en-AU) and Hindi; plane.jsx reads them through useKitText.
