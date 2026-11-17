@@ -49,19 +49,19 @@ const CORPUS = [
   // fractions
   ['\\frac12', '1 over 2'], ['\\frac{1}{2}', '1 over 2'], ['\\frac{3}{4}', '3 over 4'], ['\\frac{a}{b}', 'a over b'], ['\\frac{x+1}{2}', 'fraction x plus 1 over 2 end fraction'], ['\\frac{1}{x+1}', 'fraction 1 over x plus 1 end fraction'],
   ['\\frac{x^2}{2}', 'fraction x squared over 2 end fraction'], ['\\dfrac{19}{15}', '19 over 15'], ['\\tfrac{7}{10}', '7 over 10'], ['\\frac{64}{3}', '64 over 3'], ['\\frac{1}{2}+\\frac{1}{3}', '1 over 2 plus 1 over 3'],
-  ['\\frac{dy}{dx}', 'fraction d y over d x end fraction'], ['\\frac{\\pi}{2}', 'pi over 2'], ['\\frac{-b}{2a}', 'fraction minus b over 2 a end fraction'], ['\\frac{a}{b}+c', 'a over b plus c'], ['\\frac{3}{4}x', '3 over 4 x'],
-  ['\\frac{\\frac{1}{2}}{3}', 'fraction 1 over 2 over 3 end fraction'], ['\\frac{2}{3}+\\frac{3}{5}=\\frac{19}{15}', '2 over 3 plus 3 over 5 equals 19 over 15'], ['\\frac{p}{100}\\times A', 'p over 100 times A'],
+  ['\\frac{dy}{dx}', 'fraction d y over d x end fraction'], ['\\frac{\\pi}{2}', 'pi over 2'], ['\\frac{-b}{2a}', 'fraction minus b over 2 a end fraction'], ['\\frac{a}{b}+c', 'a over b plus c'], ['\\frac{3}{4}x', 'fraction 3 over 4 end fraction x'],
+  ['\\frac{\\frac{1}{2}}{3}', 'fraction fraction 1 over 2 end fraction over 3 end fraction'], ['\\frac{2}{3}+\\frac{3}{5}=\\frac{19}{15}', '2 over 3 plus 3 over 5 equals 19 over 15'], ['\\frac{p}{100}\\times A', 'p over 100 times A'],
   ['m=\\frac{y_2-y_1}{x_2-x_1}', 'm equals fraction y sub 2 minus y sub 1 over x sub 2 minus x sub 1 end fraction'], ['P(A)=\\frac{n(A)}{n(S)}', 'P open bracket A close bracket equals fraction n open bracket A close bracket over n open bracket S close bracket end fraction'],
   ['z=\\frac{x-\\mu}{\\sigma}', 'z equals fraction x minus mu over sigma end fraction'], ['x=\\frac{c-b}{a}', 'x equals fraction c minus b over a end fraction'], ['\\text{speed}=\\frac{d}{t}', 'speed equals d over t'],
-  ['\\text{change}=\\frac{\\text{new}-\\text{old}}{\\text{old}}\\times100\\%', 'change equals fraction new minus old over old end fraction times 100 percent'], ['V=\\frac{4}{3}\\pi r^3', 'V equals 4 over 3 pi r cubed'],
-  ['S_n=\\frac{n}{2}(a+l)', 'S sub n equals n over 2 open bracket a plus l close bracket'], ['\\frac{h}{2}', 'h over 2'], ['\\frac{b-a}{n}', 'fraction b minus a over n end fraction'],
+  ['\\text{change}=\\frac{\\text{new}-\\text{old}}{\\text{old}}\\times100\\%', 'change equals fraction new minus old over old end fraction times 100 percent'], ['V=\\frac{4}{3}\\pi r^3', 'V equals fraction 4 over 3 end fraction pi r cubed'],
+  ['S_n=\\frac{n}{2}(a+l)', 'S sub n equals fraction n over 2 end fraction open bracket a plus l close bracket'], ['\\frac{h}{2}', 'h over 2'], ['\\frac{b-a}{n}', 'fraction b minus a over n end fraction'],
   ['x=\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}', 'x equals fraction minus b plus or minus square root of b squared minus 4 a c over 2 a end fraction'],
   // roots
   ['\\sqrt{x}', 'square root of x'], ['\\sqrt{2}', 'square root of 2'], ['\\sqrt{x+1}', 'square root of x plus 1'], ['\\sqrt{x+1}+3', 'square root of x plus 1 end root plus 3'], ['\\sqrt[3]{x}', 'cube root of x'],
   ['\\sqrt[4]{16}', '4 th root of 16'], ['\\sqrt{16}=4', 'square root of 16 equals 4'], ['\\sqrt{a^2+b^2}', 'square root of a squared plus b squared'], ['2\\sqrt{3}', '2 square root of 3'],
   ['5\\sqrt{2}+\\sqrt{8}', '5 square root of 2 plus square root of 8'], ['\\sqrt{23.04}=4.8', 'square root of 23 point 0 4 equals 4 point 8'], ['\\sqrt[2]{x}', 'square root of x'],
   // functions
-  ['\\sin x', 'sine x'], ['\\cos\\theta', 'cosine theta'], ['\\tan 45^\\circ', 'tangent 45 degrees'], ['\\sin^2 x', 'sine squared x'], ['\\sin^{-1}x', 'sine to the power minus 1 end power x'], ['\\ln x', 'natural log x'], ['\\log x', 'log x'],
+  ['\\sin x', 'sine x'], ['\\cos\\theta', 'cosine theta'], ['\\tan 45^\\circ', 'tangent 45 degrees'], ['\\sin^2 x', 'sine squared x'], ['\\sin^{-1}x', 'inverse sine x'], ['\\ln x', 'natural log x'], ['\\log x', 'log x'],
   ['\\log_2 8', 'log base 2 of 8'], ['\\log_{10}100', 'log base 10 of 100'], ['\\log_a x=y', 'log base a of x equals y'], ['\\exp(x)', 'exp open bracket x close bracket'], ['\\sin\\left(2x\\right)', 'sine open bracket 2 x close bracket'],
   ['\\sec\\theta', 'secant theta'], ['\\csc\\theta', 'cosecant theta'], ['\\cot\\theta', 'cotangent theta'], ['\\arcsin x', 'inverse sine x'], ['\\arctan x', 'inverse tangent x'], ['\\arccos x', 'inverse cosine x'],
   ['\\sin^2\\theta+\\cos^2\\theta=1', 'sine squared theta plus cosine squared theta equals 1'], ['\\tan\\theta=\\frac{\\sin\\theta}{\\cos\\theta}', 'tangent theta equals fraction sine theta over cosine theta end fraction'],
@@ -71,9 +71,9 @@ const CORPUS = [
   ['\\sum_{i=1}^{n} i', 'sum from i equals 1 to n of i'], ['\\sum_{k=0}^{\\infty} x^k', 'sum from k equals 0 to infinity of x to the power k'], ['\\prod_{i=1}^{n} i', 'product from i equals 1 to n of i'],
   ['\\sum x', 'sum of x'], ['\\bar{x}=\\frac{\\sum x}{n}', 'x bar equals fraction sum of x over n end fraction'], ['\\int x\\,dx', 'integral of x d x'], ['\\int_0^1 x^2\\,dx', 'integral from 0 to 1 of x squared d x'],
   ['\\int_a^b f(x)\\,dx', 'integral from a to b of f open bracket x close bracket d x'], ['\\int_{-1}^{1} x\\,dx', 'integral from minus 1 to 1 of x d x'], ['\\int_1^3 (6x^2-4x+5)\\,dx', 'integral from 1 to 3 of open bracket 6 x squared minus 4 x plus 5 close bracket d x'],
-  ['\\left[x^2\\right]_0^3', 'open square bracket x squared close square bracket evaluated from 0 to 3'], ['\\left.x^2\\right|_0^3', 'x squared evaluated from 0 to 3'], ['\\int e^{2x}\\,dx=\\tfrac12e^{2x}+C', 'integral of e to the power 2 x end power d x equals 1 over 2 e to the power 2 x end power plus C'],
+  ['\\left[x^2\\right]_0^3', 'open square bracket x squared close square bracket evaluated from 0 to 3'], ['\\left.x^2\\right|_0^3', 'x squared evaluated from 0 to 3'], ['\\int e^{2x}\\,dx=\\tfrac12e^{2x}+C', 'integral of e to the power 2 x end power d x equals fraction 1 over 2 end fraction e to the power 2 x end power plus C'],
   ['\\lim_{x\\to0}x', 'limit as x tends to 0 x'], ['\\lim_{n\\to\\infty}\\frac1n', 'limit as n tends to infinity 1 over n'], ['\\int_0^\\infty e^{-x}\\,dx', 'integral from 0 to infinity of e to the power minus x end power d x'],
-  ['\\frac{h}{2}[y_0+2(y_1+y_2)+y_3]', 'h over 2 open square bracket y sub 0 plus 2 open bracket y sub 1 plus y sub 2 close bracket plus y sub 3 close square bracket'],
+  ['\\frac{h}{2}[y_0+2(y_1+y_2)+y_3]', 'fraction h over 2 end fraction open square bracket y sub 0 plus 2 open bracket y sub 1 plus y sub 2 close bracket plus y sub 3 close square bracket'],
   // brackets and absolute value
   ['(x+1)', 'open bracket x plus 1 close bracket'], ['[1,2]', 'open square bracket 1 comma 2 close square bracket'], ['|x|', 'absolute value of x end absolute value'], ['|x-3|<2', 'absolute value of x minus 3 end absolute value is less than 2'],
   ['\\left|x\\right|', 'absolute value of x end absolute value'], ['\\left|x\\right|^2', 'absolute value of x end absolute value squared'], ['\\langle a,b\\rangle', 'open angle bracket a comma b close angle bracket'], ['f(x)', 'f open bracket x close bracket'],
@@ -91,13 +91,20 @@ const CORPUS = [
   ['\\mathbf{r}=\\begin{pmatrix}4\\\\4\\end{pmatrix}', 'vector r equals matrix, 2 rows, 1 column. row 1: 4. row 2: 4. end matrix.'],
   ['\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}', 'matrix, 2 rows, 2 columns. row 1: 1, 2. row 2: 3, 4. end matrix.'], ['\\begin{bmatrix}a&b\\end{bmatrix}', 'matrix, 1 row, 2 columns. row 1: a, b. end matrix.'],
   ['\\begin{aligned}x+1&=3\\\\x&=2\\end{aligned}', 'working, 2 lines. line 1: x plus 1 equals 3. line 2: x equals 2. end working.'], ['\\begin{aligned}4x-7&=21\\\\4x&=28\\\\x&=7\\end{aligned}', 'working, 3 lines. line 1: 4 x minus 7 equals 21. line 2: 4 x equals 28. line 3: x equals 7. end working.'],
-  ['\\begin{aligned}A&=\\tfrac12bh\\end{aligned}', 'working, 1 line. line 1: A equals 1 over 2 b h. end working.'], ['\\boxed{x=2}', 'boxed x equals 2'],
+  ['\\begin{aligned}A&=\\tfrac12bh\\end{aligned}', 'working, 1 line. line 1: A equals fraction 1 over 2 end fraction b h. end working.'], ['\\boxed{x=2}', 'boxed x equals 2'],
   // dots, spacing, layout commands
   ['1,2,\\ldots,n', '1 comma 2 comma dot dot dot comma n'], ['1+2+\\cdots+n', '1 plus 2 plus dot dot dot plus n'], ['a\\,b', 'a b'], ['a\\quad b', 'a b'], ['\\displaystyle x', 'x'], ['a\\;b', 'a b'], ['a\\!b', 'a b'],
   ['\\displaystyle\\frac{a}{b}', 'a over b'], ['\\left(a\\right)', 'open bracket a close bracket'], ['\\Big(a\\Big)', 'open bracket a close bracket'],
+  // review findings: bars, conditions, scope, floors, thousands, limits, mixed numbers
+  ['P(A|B)', 'P open bracket A given B close bracket'], ['|x|+|y|', 'absolute value of x end absolute value plus absolute value of y end absolute value'],
+  ['f(x)=\\begin{cases}x&x>0\\\\-x&x\\le0\\end{cases}', 'f open bracket x close bracket equals cases. line 1: x if x is greater than 0. line 2: minus x if x is less than or equal to 0. end cases.'],
+  ['\\frac{1}{\\frac{2}{3}}', 'fraction 1 over fraction 2 over 3 end fraction end fraction'], ['\\frac{1}{2x}', 'fraction 1 over 2 x end fraction'], ['\\frac{x}{2}^2', 'fraction x over 2 end fraction squared'],
+  ['\\sqrt{x}^2', 'square root of x end root squared'], ['\\sqrt{2}x', 'square root of 2 end root x'], ['\\|v\\|', 'magnitude of v end magnitude'], ['\\lfloor x\\rfloor', 'floor of x end floor'], ['\\lceil x\\rceil', 'ceiling of x end ceiling'],
+  ['1{,}000{,}000', '1000000'], ['x\\to 2^+', 'x tends to 2 from above'], ['x\\to 2^-', 'x tends to 2 from below'], ['[F(x)]_a^b', 'open square bracket F open bracket x close bracket close square bracket evaluated from a to b'],
+  ['2\\frac{1}{2}', '2 and 1 over 2'], ['\\neg p', 'not p'], ['p\\land q', 'p and q'], ['p\\lor q', 'p or q'], ['x>-2', 'x is greater than minus 2'], ['\\sin^{-1}x+\\cos^{-1}x', 'inverse sine x plus inverse cosine x'],
   // formulas from the notes
   ['a(b+c)=ab+ac', 'a open bracket b plus c close bracket equals a b plus a c'], ['ab+ac=a(b+c)', 'a b plus a c equals a open bracket b plus c close bracket'], ['(-a)\\times(-b)=ab', 'open bracket minus a close bracket times open bracket minus b close bracket equals a b'],
-  ['a-(-b)=a+b', 'a minus open bracket minus b close bracket equals a plus b'], ['y=mx+c', 'y equals m x plus c'], ['P=2(l+w)', 'P equals 2 open bracket l plus w close bracket'], ['A=\\tfrac{1}{2}bh', 'A equals 1 over 2 b h'], ['V=lwh', 'V equals l w h'],
+  ['a-(-b)=a+b', 'a minus open bracket minus b close bracket equals a plus b'], ['y=mx+c', 'y equals m x plus c'], ['P=2(l+w)', 'P equals 2 open bracket l plus w close bracket'], ['A=\\tfrac{1}{2}bh', 'A equals fraction 1 over 2 end fraction b h'], ['V=lwh', 'V equals l w h'],
   ['c^2=a^2+b^2', 'c squared equals a squared plus b squared'], ['x^2-2x-3', 'x squared minus 2 x minus 3'], ['x^2-3x', 'x squared minus 3 x'], ['6x^2-4x+5', '6 x squared minus 4 x plus 5'], ['y=(x-1)^2-4', 'y equals open bracket x minus 1 close bracket squared minus 4'],
   ['y=2(x-3)^2-4', 'y equals 2 open bracket x minus 3 close bracket squared minus 4'], ['y=x^2', 'y equals x squared'], ['y=\\frac{1}{x}', 'y equals 1 over x'], ['T_{20}=83', 'T sub 20 equals 83'], ['S_{\\infty}=\\frac{a}{1-r}', 'S sub infinity equals fraction a over 1 minus r end fraction'],
   ['E(X)=\\sum xP(x)', 'E open bracket X close bracket equals sum of x P open bracket x close bracket'], ['\\sigma=\\sqrt{\\frac{\\sum(x-\\bar{x})^2}{n}}', 'sigma equals square root of fraction sum of open bracket x minus x bar close bracket squared over n end fraction'],
@@ -112,10 +119,26 @@ ok(new Set(CORPUS.map(c => c[0])).size === CORPUS.length, 'every corpus expressi
 // en-AU and Hindi
 eq('5\\%', '5 per cent', 'en-AU'); eq('x^2', 'x squared', 'en-AU'); eq('\\frac{64}{3}', '64 over 3', 'en-AU'); eq('15\\%\\text{ of }80', '15 per cent of 80', 'en-AU');
 eq('x^2-2x-3', 'x का वर्ग घटा 2 x घटा 3', 'hi'); eq('\\frac{64}{3}', '64 बटा 3', 'hi'); eq('x=5', 'x बराबर 5', 'hi'); eq('a+b', 'a जमा b', 'hi'); eq('a\\times b', 'a गुणा b', 'hi');
-eq('x^3', 'x का घन', 'hi'); eq('\\sqrt{x}', 'वर्गमूल x', 'hi'); eq('5\\%', '5 प्रतिशत', 'hi'); eq('30^\\circ', '30 डिग्री', 'hi'); eq('\\infty', 'अनंत', 'hi'); eq('3.5', '3 दशमलव 5', 'hi'); eq('x<4', 'x से कम 4', 'hi');
-eq('\\int_1^3 x\\,dx', 'समाकल से 1 तक 3 का x d x', 'hi'); eq('\\sin x', 'साइन x', 'hi'); eq('x^4', 'x की घात 4', 'hi'); eq('\\binom{n}{r}', 'n चुनें r', 'hi');
+eq('x^3', 'x का घन', 'hi'); eq('\\sqrt{x}', 'वर्गमूल x', 'hi'); eq('5\\%', '5 प्रतिशत', 'hi'); eq('30^\\circ', '30 डिग्री', 'hi'); eq('\\infty', 'अनंत', 'hi'); eq('3.5', '3 दशमलव 5', 'hi'); eq('x<4', 'x छोटा है 4', 'hi');
+eq('\\int_1^3 x\\,dx', '1 से 3 तक समाकल का x d x', 'hi'); eq('\\sin x', 'साइन x', 'hi'); eq('x^4', 'x की घात 4', 'hi'); eq('\\binom{n}{r}', 'n चुनें r', 'hi');
 eq('\\begin{pmatrix}4\\\\4\\end{pmatrix}', 'आव्यूह, 2 पंक्तियाँ, 1 स्तंभ. पंक्ति 1: 4. पंक्ति 2: 4. आव्यूह समाप्त.', 'hi');
 
+// Hindi: no English left in the words for sets, brackets, Greek letters and piecewise definitions; a lone minus is "ऋण"
+eq('x\\in A\\cup B', 'x में है A संघ B', 'hi'); eq('\\alpha+\\beta', 'अल्फ़ा जमा बीटा', 'hi'); eq('\\{1,2\\}', 'ब्रेस खुला 1 अल्पविराम 2 ब्रेस बंद', 'hi'); eq('-x', 'ऋण x', 'hi'); eq('x>-2', 'x बड़ा है ऋण 2', 'hi');
+eq('a-b', 'a घटा b', 'hi'); eq('a+(-b)', 'a जमा कोष्ठक खुला ऋण b कोष्ठक बंद', 'hi'); eq('\\mathbb{R}', 'वास्तविक संख्याएँ', 'hi'); eq('\\sin^{-1}x', 'प्रतिलोम साइन x', 'hi'); eq('\\pi', 'पाई', 'hi'); eq('A\\cap B', 'A सर्वनिष्ठ B', 'hi');
+eq('f(x)=\\begin{cases}x&x>0\\\\-x&x\\le0\\end{cases}', 'f कोष्ठक खुला x कोष्ठक बंद बराबर स्थितियाँ. पंक्ति 1: x यदि x बड़ा है 0. पंक्ति 2: ऋण x यदि x छोटा या बराबर है 0. स्थितियाँ समाप्त.', 'hi');
+// no Latin words (apart from the letters of the formula itself) are left in Hindi output for symbols
+for (const tex of ['\\alpha', '\\Delta', '\\cup', '\\cap', '\\in', '\\{', '\\triangle ABC', '\\angle A', '\\prod x', '\\mathbb{Z}', '\\lfloor x\\rfloor', '\\|v\\|', '\\sec x']) {
+  const out = speakMath(tex, 'hi').replace(/\b[A-Za-z]\b/g, '');
+  ok(!/[A-Za-z]{2,}/.test(out), `Hindi: "${tex}" leaves English words in "${out}"`);
+}
+// no LaTeX command name is ever spoken as a word
+for (const [tex] of CORPUS) {
+  for (const l of ['en', 'hi']) {
+    const out = speakMath(tex, l);
+    ok(!/\b(?:lfloor|rfloor|lceil|rceil|neg|Vert|langle|rangle|frac|dfrac|sqrt|mathbf|mathbb|cdot|ldots|infty|leq|geq|neq|pmatrix|bmatrix|aligned)\b/.test(out), `[${l}] a LaTeX command name is spoken in "${out}"`);
+  }
+}
 // locale choice
 ok(speechLocale('hi', 'priyabhata') === 'hi' && speechLocale('hi', 'prithagoras') === 'hi', 'Hindi speech whenever the interface is Hindi');
 ok(speechLocale('en', 'prithagoras') === 'en-AU' && speechLocale('en', 'priyabhata') === 'en', 'English speech is en-AU in the Prithagoras edition and en elsewhere');

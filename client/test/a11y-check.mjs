@@ -281,7 +281,7 @@ function auditPage() {
     const name = (wrap.getAttribute('aria-label') || '').trim();
     if (!name) out.mathFaults.push({ el: el2str(wrap), detail: 'role="math" with no aria-label: nothing is spoken for this formula' });
     else if (!/[\p{L}\p{N}]/u.test(name)) out.mathFaults.push({ el: el2str(wrap), detail: `role="math" is named "${name}": not words` });
-    if (/\\[a-zA-Z]+|[{}^_]/.test(name)) out.mathFaults.push({ el: el2str(wrap), detail: `the spoken name still carries LaTeX: "${name.slice(0, 60)}"` });
+    if (/\\[a-zA-Z]+|[{}^_]|\b(?:lfloor|rfloor|lceil|rceil|neg|Vert|langle|rangle|dfrac|sqrt|mathbf|mathbb|cdot|ldots|infty|leq|geq|neq|pmatrix|bmatrix)\b/.test(name)) out.mathFaults.push({ el: el2str(wrap), detail: `the spoken name still carries LaTeX: "${name.slice(0, 60)}"` });
     if (!k.closest('[aria-hidden="true"]')) out.mathFaults.push({ el: el2str(wrap), detail: 'the formula is exposed to assistive technology as well as named, so it would be announced twice' });
     if (wrap.parentElement && wrap.parentElement.closest('[role="math"]')) out.mathFaults.push({ el: el2str(wrap), detail: 'a role="math" inside another role="math"' });
     for (const inner of wrap.querySelectorAll('[role="math"]')) out.mathFaults.push({ el: el2str(inner), detail: 'a role="math" inside another role="math"' });
