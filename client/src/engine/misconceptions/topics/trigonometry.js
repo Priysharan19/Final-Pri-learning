@@ -411,6 +411,9 @@ const exactTriangleLength = {
       { id: 'trig-ratio-ignored', value: L, say: s(
         `The side is ${n4(L)} × ${fn} ${t}° = ${n4(L)} × ${n4(r)}: the hypotenuse is multiplied by the ratio, not left as it is.`,
         `भुजा ${n4(L)} × ${fn} ${t}° = ${n4(L)} × ${n4(r)} है: कर्ण को अनुपात से गुणा करना है, वैसा ही नहीं छोड़ना।`) },
+      { id: 'trig-ratio-denominator-dropped', value: 2 * L * r, say: s(
+        `${fn} ${t}° is ${n4(r)}, with the 2 in its denominator: ${n4(2 * L * r)} would be the hypotenuse times only the numerator.`,
+        `${fn} ${t}° = ${n4(r)} है, जिसके हर में 2 है: ${n4(2 * L * r)} कर्ण को केवल अंश से गुणा करने पर मिलता।`) },
       { id: 'trig-ratio-inverted', value: L / r, say: s(
         `The side is hypotenuse × ${fn} ${t}°, so multiply, not divide: dividing by ${n4(r)} gives ${n4(L / r)}, which is longer than the hypotenuse.`,
         `भुजा कर्ण × ${fn} ${t}° है, इसलिए गुणा करें, भाग नहीं: ${n4(r)} से भाग देने पर ${n4(L / r)} आता है, जो कर्ण से लंबा है।`) }
@@ -569,10 +572,14 @@ const compoundFraction = {
     const right = fn === 'sin' ? sinF(sg) : cosF(sg);
     const wrongSign = fn === 'sin' ? sinF(-sg) : cosF(-sg);
     const mixed = fn === 'sin' ? cosF(sg) : sinF(sg);
+    const mixed2 = fn === 'sin' ? cosF(-sg) : sinF(-sg);
     return [
       { id: 'compound-sign-flipped', value: wrongSign, say: s(
         `The ${fn} formula's middle sign is ${fn === 'sin' ? (op === '+' ? '+' : '−') : (op === '+' ? '−' : '+')} for ${fn}(A ${op} B): ${fn === 'sin' ? 'sin A cos B ' + op + ' cos A sin B' : 'cos A cos B ' + (op === '+' ? '−' : '+') + ' sin A sin B'}. Here the other sign was used (${n4(wrongSign)}).`,
         `${fn}(A ${op} B) के सूत्र का बीच का चिह्न ${fn === 'sin' ? (op === '+' ? '+' : '−') : (op === '+' ? '−' : '+')} है। यहाँ दूसरा चिह्न लिया गया (${n4(wrongSign)})।`) },
+      { id: 'compound-formula-mixed', value: mixed2, say: s(
+        `${fn}(A ${op} B) uses ${fn === 'sin' ? 'sin A cos B and cos A sin B (one sin and one cos in each product)' : 'cos A cos B and sin A sin B (two cos, then two sin)'}; your ${n4(mixed2)} comes from the other formula, with sin A = ${n4(A.s)}, cos A = ${n4(A.c)}, sin B = ${n4(B.s)}, cos B = ${n4(B.c)}.`,
+        `${fn}(A ${op} B) में ${fn === 'sin' ? 'sin A cos B और cos A sin B (हर गुणनफल में एक sin, एक cos)' : 'cos A cos B और sin A sin B (दो cos, फिर दो sin)'} आते हैं; आपका ${n4(mixed2)} दूसरे सूत्र से आता है, जहाँ sin A = ${n4(A.s)}, cos A = ${n4(A.c)}, sin B = ${n4(B.s)}, cos B = ${n4(B.c)}।`) },
       { id: 'compound-formula-mixed', value: mixed, say: s(
         `${fn}(A ${op} B) uses ${fn === 'sin' ? 'sin A cos B and cos A sin B (one sin and one cos in each product)' : 'cos A cos B and sin A sin B (two cos, then two sin)'}; the other formula was used (your ${n4(mixed)}), with sin A = ${n4(A.s)}, cos A = ${n4(A.c)}, sin B = ${n4(B.s)}, cos B = ${n4(B.c)}.`,
         `${fn}(A ${op} B) में ${fn === 'sin' ? 'sin A cos B और cos A sin B (हर गुणनफल में एक sin, एक cos)' : 'cos A cos B और sin A sin B (दो cos, फिर दो sin)'} आते हैं; दूसरा सूत्र लिया गया (आपका ${n4(mixed)}), जहाँ sin A = ${n4(A.s)}, cos A = ${n4(A.c)}, sin B = ${n4(B.s)}, cos B = ${n4(B.c)}।`) }
@@ -605,43 +612,55 @@ const doubleAngle = {
   id: 'trig-double-angle',
   read(q) {
     const t = String(q.prompt);
-    let m = t.match(/Given \$\\tan\\theta = \\dfrac\{(\d+)\}\{(\d+)\}\$ with \$\\theta\$ acute, use a double-angle formula to find \$\\(sin|cos) 2\\theta\$/);
-    if (m) { const o = num(m[1]), a = num(m[2]), h = Math.hypot(o, a); return { s: o / h, c: a / h, which: m[3] }; }
-    m = t.match(/\$\\theta\$ lies in the \*\*(first|second|third|fourth) quadrant\*\* and \$\\(sin|cos)\\theta = (-?)\\?(?:d?frac)\{(\d+)\}\{(\d+)\}\$\. Find \$\\(sin|cos) 2\\theta\$/);
+    const QUADS = { first: [1, 1], second: [1, -1], third: [-1, -1], fourth: [-1, 1] };
+    let m = t.match(/Given \$\\(sin|cos|tan)\\theta = \\dfrac\{(\d+)\}\{(\d+)\}\$ with \$\\theta\$ acute, use a double-angle formula to find \$\\(sin|cos|tan) 2\\theta\$/);
+    if (m) {
+      const v = num(m[2]) / num(m[3]);
+      let sn, c;
+      if (m[1] === 'tan') { const h = Math.hypot(v, 1); sn = v / h; c = 1 / h; } else if (m[1] === 'sin') { sn = v; c = Math.sqrt(1 - v * v); } else { c = v; sn = Math.sqrt(1 - v * v); }
+      return { s: sn, c, which: m[4] };
+    }
+    m = t.match(/\$\\theta\$ lies in the \*\*(first|second|third|fourth) quadrant\*\* and \$\\(sin|cos)\\theta = (-?)\\(?:d?frac)\{(\d+)\}\{(\d+)\}\$\. Find \$\\(sin|cos|tan) 2\\theta\$/);
     if (m) {
       const v = (m[3] === '-' ? -1 : 1) * num(m[4]) / num(m[5]);
       const other = Math.sqrt(1 - v * v);
-      const quad = m[1];
-      const sinSign = quad === 'first' || quad === 'second' ? 1 : -1;
-      const cosSign = quad === 'first' || quad === 'fourth' ? 1 : -1;
+      const [sinSign, cosSign] = QUADS[m[1]];
       const sv = m[2] === 'sin' ? v : sinSign * other;
       const cv = m[2] === 'cos' ? v : cosSign * other;
-      return { s: sv, c: cv, which: m[6], quad };
+      return { s: sv, c: cv, which: m[6], quad: m[1] };
     }
     return null;
   },
   slips({ s: sn, c, which }) {
-    const sinPos = Math.abs(sn), cosPos = Math.abs(c);
-    const right = which === 'sin' ? 2 * sn * c : c * c - sn * sn;
+    const tn = sn / c;
+    const right = which === 'sin' ? 2 * sn * c : which === 'cos' ? c * c - sn * sn : (2 * tn) / (1 - tn * tn);
     const out = [];
     if (which === 'sin') {
       out.push({ id: 'double-angle-doubled-ratio', value: 2 * sn, say: s(
         `sin 2θ = 2 sin θ cos θ, not 2 sin θ: the cos θ factor was left out (2 × ${n4(sn)} = ${n4(2 * sn)}).`,
         `sin 2θ = 2 sin θ cos θ है, 2 sin θ नहीं: cos θ का गुणक छूट गया (2 × ${n4(sn)} = ${n4(2 * sn)})।`) });
-      out.push({ id: 'double-angle-sign-by-quadrant', value: -right, say: s(
-        `The sign of 2 sin θ cos θ follows the quadrant: sin θ = ${n4(sn)} and cos θ = ${n4(c)}, so check whether their product is positive or negative.`,
-        `2 sin θ cos θ का चिह्न चतुर्थांश से तय होता है: sin θ = ${n4(sn)} और cos θ = ${n4(c)}, इसलिए देखें उनका गुणनफल धनात्मक है या ऋणात्मक।`) });
-    } else {
+    } else if (which === 'cos') {
       out.push({ id: 'double-angle-doubled-ratio', value: 2 * c, say: s(
         `cos 2θ = cos²θ − sin²θ, not 2 cos θ: doubling the angle does not double the ratio (2 × ${n4(c)} = ${n4(2 * c)}).`,
         `cos 2θ = cos²θ − sin²θ है, 2 cos θ नहीं: कोण दुगुना करने से अनुपात दुगुना नहीं होता (2 × ${n4(c)} = ${n4(2 * c)})।`) });
-      out.push({ id: 'double-angle-sign-by-quadrant', value: -right, say: s(
-        `cos²θ − sin²θ = ${n4(c * c)} − ${n4(sn * sn)}: the sign comes from the two squares, not from the quadrant.`,
-        `cos²θ − sin²θ = ${n4(c * c)} − ${n4(sn * sn)}: चिह्न दोनों वर्गों से आता है, चतुर्थांश से नहीं।`) });
       out.push({ id: 'double-angle-sum-of-squares', value: c * c + sn * sn, say: s(
         `cos 2θ = cos²θ MINUS sin²θ; cos²θ + sin²θ is always 1.`,
         `cos 2θ = cos²θ घटा sin²θ है; cos²θ + sin²θ हमेशा 1 होता है।`) });
+    } else {
+      out.push({ id: 'double-angle-doubled-ratio', value: 2 * tn, say: s(
+        `tan 2θ = 2 tan θ ÷ (1 − tan²θ), not 2 tan θ: doubling the angle does not double the ratio (2 × ${n4(tn)} = ${n4(2 * tn)}).`,
+        `tan 2θ = 2 tan θ ÷ (1 − tan²θ) है, 2 tan θ नहीं: कोण दुगुना करने से अनुपात दुगुना नहीं होता (2 × ${n4(tn)} = ${n4(2 * tn)})।`) });
+      out.push({ id: 'double-angle-denominator-sign', value: (2 * tn) / (1 + tn * tn), say: s(
+        `The denominator of tan 2θ is 1 MINUS tan²θ, not 1 plus it.`,
+        `tan 2θ के हर में 1 घटा tan²θ आता है, 1 जमा नहीं।`) });
     }
+    out.push({ id: 'double-angle-sign-by-quadrant', value: -right, say: s(
+      which === 'cos'
+        ? `cos²θ − sin²θ = ${n4(c * c)} − ${n4(sn * sn)}: the sign comes from the two squares, not from the quadrant.`
+        : `The sign of ${which} 2θ follows the quadrant: sin θ = ${n4(sn)} and cos θ = ${n4(c)}, so check the sign of your result.`,
+      which === 'cos'
+        ? `cos²θ − sin²θ = ${n4(c * c)} − ${n4(sn * sn)}: चिह्न दोनों वर्गों से आता है, चतुर्थांश से नहीं।`
+        : `${which} 2θ का चिह्न चतुर्थांश से तय होता है: sin θ = ${n4(sn)} और cos θ = ${n4(c)}, इसलिए अपने उत्तर का चिह्न जाँचें।`) });
     return out;
   }
 };
@@ -750,14 +769,21 @@ const inverseOfRatio = {
     const x = p / r;
     const th = INV[inner](x);
     const vals = { sin: Math.sin(th), cos: Math.cos(th), tan: Math.tan(th) };
+    const right = vals[outer];
     const out = [{ id: 'inverse-trig-ratio-as-given', value: x, say: s(
       `${n4(x)} is the ratio given for ${inner} θ, not ${outer} θ: draw the right triangle with ${inner} θ = ${n4(p)}/${n4(r)} and read the ${outer} from it.`,
       `${n4(x)} ${inner} θ का दिया गया अनुपात है, ${outer} θ का नहीं: ${inner} θ = ${n4(p)}/${n4(r)} वाला समकोण त्रिभुज बनाकर उसमें से ${outer} पढ़ें।`) }];
+    out.push({ id: 'trig-ratio-upside-down', value: 1 / right, say: s(
+      `${outer} θ is a ratio of two sides of the triangle with ${inner} θ = ${n4(p)}/${n4(r)}; yours has the two sides the wrong way up.`,
+      `${outer} θ ${inner} θ = ${n4(p)}/${n4(r)} वाले त्रिभुज की दो भुजाओं का अनुपात है; आपके अनुपात में दोनों भुजाएँ उलटी हैं।`) });
     for (const g of ['sin', 'cos', 'tan']) {
       if (g === outer || g === inner) continue;
       out.push({ id: 'trig-wrong-ratio', value: vals[g], say: s(
         `That is ${g} θ; the question asks for ${outer} θ in the triangle with ${inner} θ = ${n4(p)}/${n4(r)}.`,
         `यह ${g} θ है; प्रश्न ${inner} θ = ${n4(p)}/${n4(r)} वाले त्रिभुज में ${outer} θ माँगता है।`) });
+      out.push({ id: 'trig-ratio-upside-down', value: 1 / vals[g], say: s(
+        `That is the reciprocal of ${g} θ; the question asks for ${outer} θ, with ${inner} θ = ${n4(p)}/${n4(r)}.`,
+        `यह ${g} θ का व्युत्क्रम है; प्रश्न ${inner} θ = ${n4(p)}/${n4(r)} के साथ ${outer} θ माँगता है।`) });
     }
     return out;
   }
@@ -802,6 +828,9 @@ const trigStationary = {
       { id: 'trig-calculus-no-chain', value: Math.PI / 2, say: s(
         `The stationary points are where the derivative ${n4(b)}·cos(${n4(b)}x) = 0, so ${n4(b)}x = π/2, not x = π/2.`,
         `स्थिर बिंदु वहाँ हैं जहाँ अवकलज ${n4(b)}·cos(${n4(b)}x) = 0, इसलिए ${n4(b)}x = π/2, x = π/2 नहीं।`) },
+      { id: 'trig-calculus-next-stationary', value: (3 * Math.PI) / (2 * b), say: s(
+        `That is the NEXT stationary point (the ${n4(b)}x = 3π/2 one): between them the curve passes a maximum and then a minimum, and the question asks for the smallest positive x.`,
+        `यह अगला स्थिर बिंदु है (${n4(b)}x = 3π/2 वाला): उनके बीच वक्र अधिकतम और फिर न्यूनतम से गुज़रता है, और प्रश्न सबसे छोटा धनात्मक x माँगता है।`) },
       { id: 'trig-calculus-zero-not-stationary', value: Math.PI / b, say: s(
         `${n4(Math.PI / b)} is where y = 0, not where the gradient is 0: set ${n4(b)}cos(${n4(b)}x) = 0, giving ${n4(b)}x = π/2.`,
         `${n4(Math.PI / b)} वह है जहाँ y = 0, जहाँ ढाल 0 हो वह नहीं: ${n4(b)}cos(${n4(b)}x) = 0 रखें, ${n4(b)}x = π/2 मिलता है।`) }
@@ -820,11 +849,127 @@ const trigStationary = {
   }
 };
 
+
+// ── The angle of a right triangle from its figure (the other acute angle) ──
+const markedAngle = {
+  id: 'trig-marked-angle',
+  read(q) {
+    if (!/In the right-angled triangle shown, find the marked angle \$\\theta\$, correct to the nearest degree/.test(String(q.prompt))) return null;
+    const right = Number(q?.answer?.value);
+    return Number.isFinite(right) ? { right } : null;
+  },
+  slips({ right }) {
+    return [{ id: 'trig-complement-angle', value: 90 - right, say: s(
+      `${n4(90 - right)}° is the other acute angle of the triangle. Check which corner is marked θ, and which side is opposite it and which is adjacent, before choosing the ratio.`,
+      `${n4(90 - right)}° त्रिभुज का दूसरा न्यून कोण है। देखें θ किस कोने पर चिह्नित है, और उसके सम्मुख और संलग्न कौन सी भुजाएँ हैं, फिर अनुपात चुनें।`) }];
+  }
+};
+
+// ── The sine rule for a side (B a right angle, sin 30° = ½ given) ──
+const sineRuleSideSimple = {
+  id: 'trig-sine-rule-side-simple',
+  read(q) {
+    const m = String(q.prompt).match(/\$A = (\d+)\^\\circ\$, \$B = (\d+)\^\\circ\$ and \$a = (\d+)\$ cm\. Use the sine rule to find \$b\$/);
+    return m ? { A: num(m[1]), B: num(m[2]), a: num(m[3]) } : null;
+  },
+  slips({ A, B, a }) {
+    return [
+      { id: 'sine-rule-inverted', value: (a * SIN(A)) / SIN(B), say: s(
+        `Each side goes over the sine of its OWN opposite angle: b ÷ sin ${B}° = ${n4(a)} ÷ sin ${A}°. You had sin ${A}° and sin ${B}° the wrong way round.`,
+        `हर भुजा अपने सम्मुख कोण की ज्या के साथ आती है: b ÷ sin ${B}° = ${n4(a)} ÷ sin ${A}°। आपने sin ${A}° और sin ${B}° उलटे रखे।`) },
+      { id: 'sine-rule-cosine', value: (a * COS(B)) / COS(A), say: s(
+        `The sine rule uses sines: a ÷ sin A = b ÷ sin B, not cosines.`,
+        `ज्या नियम में ज्या (sin) आती है: a ÷ sin A = b ÷ sin B, कोज्या नहीं।`) }
+    ];
+  }
+};
+
+// ── k × sin/cos/tan θ with θ in another quadrant ──
+const exactTimes = {
+  id: 'trig-exact-times',
+  read(q) {
+    const m = String(q.prompt).match(/Evaluate \$(\d+)\\times \\(sin|cos|tan) (\d+)\^\\circ\$ exactly/);
+    return m ? { k: num(m[1]), fn: m[2], t: num(m[3]) } : null;
+  },
+  slips({ k, fn, t }) {
+    const val = FN[fn](t);
+    const other = { sin: 'cos', cos: 'sin', tan: 'tan' }[fn];
+    const out = [{ id: 'trig-sign-by-quadrant', value: -k * val, say: s(
+      `Use the reference angle for the size, but the sign comes from the quadrant ${t}° lies in (ASTC): check whether ${fn} is positive or negative there.`,
+      `आकार संदर्भ कोण से मिलता है, पर चिह्न उस चतुर्थांश से तय होता है जिसमें ${t}° है (ASTC): देखें वहाँ ${fn} धनात्मक है या ऋणात्मक।`) }];
+    if (other !== fn) out.push({ id: 'trig-exact-value-swapped', value: k * FN[other](t), say: s(
+      `That uses ${other} ${t}°; the question has ${fn} ${t}°. (sin and cos swap at 30° and 60°.)`,
+      `यह ${other} ${t}° लेता है; प्रश्न में ${fn} ${t}° है। (30° और 60° पर sin और cos आपस में बदल जाते हैं।)`) });
+    return out;
+  }
+};
+
+// ── Horizontal tangents of y = a cos x + c x + k ──
+const SURD = { '\\sqrt{3}': Math.sqrt(3), '\\sqrt{2}': Math.SQRT2, '': 1 };
+const horizontalTangents = {
+  id: 'trig-horizontal-tangent',
+  read(q) {
+    const m = String(q.prompt).match(/The curve \$y = (\\sqrt\{[23]\}|\d*)\\cos x ([+-]) (\\sqrt\{[23]\}|\d*)x ([+-]) \d+\$ has horizontal tangents/);
+    if (!m) return null;
+    const aa = m[1] === '' ? 1 : (m[1] in SURD ? SURD[m[1]] : num(m[1]));
+    const cc = (m[2] === '-' ? -1 : 1) * 0 + (m[3] === '' ? 1 : (m[3] in SURD ? SURD[m[3]] : num(m[3])));
+    // y = a cos x + (±c) x + k, with the sign printed before the x term
+    const c = (m[2] === '-' ? -1 : 1) * cc;
+    return { a: aa, c };
+  },
+  slips({ a, c }) {
+    // y′ = −a sin x + c = 0  →  sin x = c/a
+    const solve = r => {
+      if (Math.abs(r) > 1) return [];
+      const x1 = Math.asin(r);
+      const xs = [];
+      for (let k = 0; k < 3; k++) { xs.push(x1 + 2 * Math.PI * k, Math.PI - x1 + 2 * Math.PI * k); }
+      return xs.filter(v => v > 1e-9).sort((u, v) => u - v);
+    };
+    const right = solve(c / a), flipped = solve(-c / a);
+    const out = [];
+    if (right[1] !== undefined) out.push({ id: 'trig-calculus-other-solution', value: right[1], say: s(
+      `That is a genuine solution of y′ = 0, but a larger one: the question asks for the SMALLEST positive x.`,
+      `यह y′ = 0 का एक वास्तविक हल है, पर बड़ा: प्रश्न सबसे छोटा धनात्मक x माँगता है।`) });
+    if (flipped[0] !== undefined) out.push({ id: 'trig-calculus-sign-moved', value: flipped[0], say: s(
+      `Check the sign when the x term crosses to the other side: y′ = −${n4(a)} sin x + (${n4(c)}), so sin x = ${n4(c)} ÷ ${n4(a)}, not −${n4(c)} ÷ ${n4(a)}.`,
+      `x वाला पद दूसरी ओर ले जाते समय चिह्न जाँचें: y′ = −${n4(a)} sin x + (${n4(c)}), इसलिए sin x = ${n4(c)} ÷ ${n4(a)}, −${n4(c)} ÷ ${n4(a)} नहीं।`) });
+    return out;
+  }
+};
+
+// ── A cosine model from its extremes: the value at a given time ──
+const waveFromExtremes = {
+  id: 'trig-wave-from-extremes',
+  read(q) {
+    const m = String(q.prompt).match(/y = A\\cos\(bt\) \+ k\$ with \$b > 0\$\. Its maximum value is \$(\d+)\$ and its minimum value is \$(\d+)\$, its maximum occurs at \$t = 0\$, and its period is \$(\d+)\$\. Find \$y\$ when \$t = (\d+)\$/);
+    return m ? { M: num(m[1]), m: num(m[2]), P: num(m[3]), T: num(m[4]) } : null;
+  },
+  slips({ M, m, P, T }) {
+    const A = (M - m) / 2, k = (M + m) / 2;
+    return [
+      { id: 'wave-still-at-maximum', value: M, say: s(
+        `The maximum is at t = 0; at t = ${n4(T)} the graph is ${n4(T)}/${n4(P)} of the way round one period, so y = ${n4(A)} cos(2π × ${n4(T)}/${n4(P)}) + ${n4(k)}, not still the maximum ${n4(M)}.`,
+        `अधिकतम t = 0 पर है; t = ${n4(T)} पर ग्राफ़ एक आवर्त का ${n4(T)}/${n4(P)} भाग पार कर चुका है, इसलिए y = ${n4(A)} cos(2π × ${n4(T)}/${n4(P)}) + ${n4(k)}, अब भी अधिकतम ${n4(M)} नहीं।`) },
+      { id: 'wave-shift-only', value: k, say: s(
+        `${n4(k)} is the midline k; at t = ${n4(T)} add the cosine part: ${n4(A)} cos(2π × ${n4(T)}/${n4(P)}).`,
+        `${n4(k)} मध्य रेखा k है; t = ${n4(T)} पर कोज्या वाला भाग जोड़ें: ${n4(A)} cos(2π × ${n4(T)}/${n4(P)})।`) },
+      { id: 'wave-forgot-shift', value: A * COS((360 * T) / P), say: s(
+        `${n4(A)} cos(2π × ${n4(T)}/${n4(P)}) leaves out the vertical shift: add the midline k = ${n4(k)} to it.`,
+        `${n4(A)} cos(2π × ${n4(T)}/${n4(P)}) में ऊर्ध्वाधर विस्थापन छूट गया: उसमें मध्य रेखा k = ${n4(k)} जोड़ें।`) },
+      { id: 'wave-wrong-extreme', value: m, say: s(
+        `That is the minimum; at t = ${n4(T)} the graph has not reached the bottom of the cycle: use y = ${n4(A)} cos(2π × ${n4(T)}/${n4(P)}) + ${n4(k)}.`,
+        `यह न्यूनतम है; t = ${n4(T)} पर ग्राफ़ चक्र के सबसे नीचे नहीं पहुँचा है: y = ${n4(A)} cos(2π × ${n4(T)}/${n4(P)}) + ${n4(k)} लें।`) }
+    ];
+  }
+};
+
 export const entries = Object.freeze([
   { id: 'trig-right-triangle', read: readRightTriangle, slips: rightTriangleSlips },
   bearingEast, bearingHiker, pythagoras, cosineRuleSide, areaRule, sineRuleSide, sineRuleAngle, exactSum, trigEquation, pythagoreanIdentity,
   exactAngle, acuteAngleFromRatio, exactTriangleLength, solutionCount, ladderRamp, angleFromSides, waveModel,
-  compoundFraction, compoundExpression, doubleAngle, compoundSpecial, inverseTrig, inverseNested, inverseOfRatio, trigGradient, trigStationary
+  compoundFraction, compoundExpression, doubleAngle, compoundSpecial, inverseTrig, inverseNested, inverseOfRatio, trigGradient, trigStationary,
+  markedAngle, sineRuleSideSimple, exactTimes, horizontalTangents, waveFromExtremes
 ]);
 export default entries;
 
@@ -846,6 +991,7 @@ export const SLIP_IDS = Object.freeze([
   'cosine-rule-order',
   'cosine-rule-plus',
   'cosine-rule-pythagoras',
+  'double-angle-denominator-sign',
   'double-angle-doubled-ratio',
   'double-angle-sign-by-quadrant',
   'double-angle-sum-of-squares',
@@ -869,9 +1015,12 @@ export const SLIP_IDS = Object.freeze([
   'trig-calculator-degrees',
   'trig-calculator-radians',
   'trig-calculus-count-endpoints',
+  'trig-calculus-next-stationary',
   'trig-calculus-no-chain',
   'trig-calculus-one-per-turn',
+  'trig-calculus-other-solution',
   'trig-calculus-sign',
+  'trig-calculus-sign-moved',
   'trig-calculus-value-not-gradient',
   'trig-calculus-zero-not-stationary',
   'trig-complement-angle',
@@ -881,9 +1030,11 @@ export const SLIP_IDS = Object.freeze([
   'trig-exact-value-ratio-as-one',
   'trig-exact-value-swapped',
   'trig-other-solution',
+  'trig-ratio-denominator-dropped',
   'trig-ratio-flipped-angle',
   'trig-ratio-ignored',
   'trig-ratio-inverted',
+  'trig-ratio-upside-down',
   'trig-reference-angle-only',
   'trig-sign-by-quadrant',
   'trig-units-swapped',
@@ -895,6 +1046,7 @@ export const SLIP_IDS = Object.freeze([
   'wave-period-from-b',
   'wave-shift-only',
   'wave-sine-as-one',
+  'wave-still-at-maximum',
   'wave-wrong-extreme'
 ]);
 export const registryCode = id => (/^trig-/.test(id) ? id : `trig-${id}`);

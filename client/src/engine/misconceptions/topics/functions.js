@@ -295,8 +295,8 @@ const inverseDomain = {
 };
 
 // ── Quadratics: discriminant, roots, completing the square ──
-const quad = '(-?\\d*)x\\^2 ([+-]) (\\d+)x ([+-]) (\\d+)';
-const coeffOf = (sign, digits) => (sign === '-' ? -1 : 1) * num(digits);
+const quad = '(-?\\d*)x\\^2 ([+-]) (\\d*)x ([+-]) (\\d+)';
+const coeffOf = (sign, digits) => (sign === '-' ? -1 : 1) * (digits === '' ? 1 : num(digits));
 const aOf = a => (a === '' ? 1 : a === '-' ? -1 : num(a));
 const discriminant = {
   id: 'fn-discriminant',
@@ -460,9 +460,59 @@ const growthModel = {
   }
 };
 
+
+// ── f(x) = x² − k = 0: the positive root ──
+const rootOfSquare = {
+  id: 'fn-root-of-square',
+  read(q) {
+    const m = String(q.prompt).match(/^\$f\(x\) = x\^2 - (\d+)\$\. Find the positive value of \$x\$ for which \$f\(x\) = 0\$\.$/);
+    return m ? { k: num(m[1]) } : null;
+  },
+  slips({ k }) {
+    return [
+      { id: 'fn-square-root-forgotten', value: k, say: s(
+        `x² − ${n4(k)} = 0 gives x² = ${n4(k)}, and then x is the square root of ${n4(k)}: your ${n4(k)} is x², not x.`,
+        `x² − ${n4(k)} = 0 से x² = ${n4(k)} मिलता है, फिर x उसका वर्गमूल है: आपका ${n4(k)} x² है, x नहीं।`) },
+      { id: 'fn-root-halved', value: k / 2, say: s(
+        `To undo the square, take the square root of ${n4(k)}; dividing by 2 only undoes a multiplication by 2.`,
+        `वर्ग को पलटने के लिए ${n4(k)} का वर्गमूल लें; 2 से भाग देना केवल 2 से गुणा को पलटता है।`) },
+      { id: 'fn-root-wrong-branch', value: -Math.sqrt(k), say: s(
+        `x² = ${n4(k)} has two roots, +√${n4(k)} and −√${n4(k)}; the question asks for the positive one.`,
+        `x² = ${n4(k)} के दो मूल हैं, +√${n4(k)} और −√${n4(k)}; प्रश्न धनात्मक वाला माँगता है।`) }
+    ];
+  }
+};
+
+
+// ── f(x) = ax² + bx + c: evaluate at a (negative) input ──
+const evalQuadratic = {
+  id: 'fn-eval-full-quadratic',
+  read(q) {
+    const m = String(q.prompt).match(new RegExp(`^If \\$f\\(x\\) = ${quad}\\$, evaluate \\$f\\((-?\\d+)\\)\\$\\.$`));
+    return m ? { a: aOf(m[1]), b: coeffOf(m[2], m[3]), c: coeffOf(m[4], m[5]), p: num(m[6]) } : null;
+  },
+  slips({ a, b, c, p }) {
+    const out = [
+      { id: 'fn-eval-negative-squared', value: -a * p * p + b * p + c, say: s(
+        `${n4(p)}² is ${n4(p * p)}, positive: squaring a negative number gives a positive one, so the x² term is ${n4(a)} × ${n4(p * p)}.`,
+        `${n4(p)}² = ${n4(p * p)} धनात्मक है: ऋणात्मक संख्या का वर्ग धनात्मक होता है, इसलिए x² वाला पद ${n4(a)} × ${n4(p * p)} है।`) },
+      { id: 'fn-eval-linear-sign', value: a * p * p - b * p + c, say: s(
+        `The x term is ${n4(b)} × (${n4(p)}), with the sign of the input kept: a negative input changes the sign of that term.`,
+        `x वाला पद ${n4(b)} × (${n4(p)}) है, इनपुट का चिह्न रखते हुए: ऋणात्मक इनपुट उस पद का चिह्न बदल देता है।`) },
+      { id: 'fn-eval-constant-sign', value: a * p * p + b * p - c, say: s(
+        `The constant stays ${n4(c)}; it does not change sign when x changes.`,
+        `अचर ${n4(c)} ही रहता है; x बदलने पर इसका चिह्न नहीं बदलता।`) }
+    ];
+    if (a < 0) out.push({ id: 'fn-eval-leading-sign-dropped', value: Math.abs(a) * p * p + b * p + c, say: s(
+      `The x² term keeps its own sign: ${n4(a)} × ${n4(p * p)}, not ${n4(Math.abs(a))} × ${n4(p * p)}.`,
+      `x² वाले पद का अपना चिह्न रहता है: ${n4(a)} × ${n4(p * p)}, ${n4(Math.abs(a))} × ${n4(p * p)} नहीं।`) });
+    return out;
+  }
+};
+
 export const entries = Object.freeze([
   quadEval, solveForInput, composition, oneToOneP, domainRoot, minOfSquare, inverseValue, compositeInverse, inverseDomain,
-  discriminant, rootsSumProduct, equalRoots, completeSquareValue, growthModel
+  discriminant, rootsSumProduct, equalRoots, completeSquareValue, growthModel, rootOfSquare, evalQuadratic
 ]);
 export default entries;
 
@@ -500,6 +550,10 @@ export const SLIP_IDS = Object.freeze([
   'fn-domain-constant-sign',
   'fn-domain-no-divide',
   'fn-eval-bracket-first',
+  'fn-eval-constant-sign',
+  'fn-eval-leading-sign-dropped',
+  'fn-eval-linear-sign',
+  'fn-eval-negative-squared',
   'fn-eval-sign-of-constant',
   'fn-eval-square-skipped',
   'fn-inverse-constant-sign',
@@ -515,6 +569,9 @@ export const SLIP_IDS = Object.freeze([
   'fn-minimum-bracket-sign',
   'fn-minimum-x-for-y',
   'fn-output-as-input',
+  'fn-root-halved',
+  'fn-root-wrong-branch',
+  'fn-square-root-forgotten',
   'fn-vertex-b-as-x',
   'fn-vertex-no-halving',
   'fn-vertex-sign',

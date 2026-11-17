@@ -17,10 +17,13 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
 const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
-const { diagnoseWith, sayIn, LANGS } = await import(`${SRC}engine/misconceptions/slipKit.js`);
-const trig = (await import(`${SRC}engine/misconceptions/topics/trigonometry.js`)).entries;
-let functions = [];
-try { functions = (await import(`${SRC}engine/misconceptions/topics/functions.js`)).entries; } catch { functions = []; }
+const { diagnoseWith, sayIn, LANGS, slipTolerance } = await import(`${SRC}engine/misconceptions/slipKit.js`);
+const trigMod = await import(`${SRC}engine/misconceptions/topics/trigonometry.js`);
+const trig = trigMod.entries;
+const { checkAnswer } = await import(`${SRC}engine/checker.js`);
+const { topicDiagnosisCodes } = await import(`${SRC}engine/misconceptions/topics/index.js`);
+const fnMod = await import(`${SRC}engine/misconceptions/topics/functions.js`);
+const functions = fnMod.entries;
 await loadAllBanks();
 
 const TRIG = ['y9-trig', 'y10-trig', 'y10-trig-any-angle', 'y10-trig-nonright', 'y11-trig-ident', 'y11-trigfunc', 'y11-sine-cosine-rule', 'me11-trigid', 'me11-inversetrig', 'y12-trigcalc', 'y12-trig-model', 'ms12-right-triangle'];
@@ -33,7 +36,7 @@ const ok = (c, t) => { checks++; if (!c) fail(t); };
 
 const shapeOf = p => String(p).replace(/\$[^$]*\$/g, '$').replace(/[-\d.]+/g, '#').slice(0, 90);
 const rows = [];
-let totalTraps = 0, totalNamed = 0;
+let totalTraps = 0, totalNamed = 0, slipChecks = 0, slipNamed = 0, viaChecker = 0, named2 = 0;
 const missed = new Map();
 const leaks = new Map();
 
@@ -47,6 +50,35 @@ for (const [group, topics, entries] of [['trigonometry', TRIG, trig], ['function
         const right = Number(q.answer?.value);
         // B · the right answer is never a slip
         if (Number.isFinite(right)) ok(diagnoseWith(entries, q, right) === null, `${topic}: the right answer ${right} was named a slip for "${String(q.prompt).slice(0, 80)}"`);
+        // F · every id a slip emits is registered (the registry names the slip through its code)
+        for (const entry of entries) { let params = null; try { params = entry.read(q); } catch { params = null; } if (!params) continue; for (const slip of entry.slips(params)) ok((group === 'trigonometry' ? trigMod : fnMod).SLIP_IDS.includes(slip.id), `${slip.id} is emitted but missing from SLIP_IDS`); }
+        // G · through the real checker: a catalogued slip that is not an authored trap is named in the feedback,
+        //     and the verdict is the one the marker gives without the catalogue (never correct for a slip)
+        if (i <= 6) {
+          for (const entry of entries) {
+            let params = null; try { params = entry.read(q); } catch { params = null; }
+            if (!params) continue;
+            for (const slip of entry.slips(params).slice(0, 3)) {
+              if (!Number.isFinite(slip.value) || (Number.isFinite(right) && Math.abs(slip.value - right) <= slipTolerance(q, right))) continue;
+              if ((q.traps || []).some(t => Number.isFinite(Number(t.value)) && Math.abs(Number(t.value) - slip.value) <= slipTolerance(q, slip.value))) continue;
+              const res = checkAnswer(q, String(Number(slip.value.toPrecision(12))));
+              viaChecker++;
+              ok(res.correct === false, `${topic}/${slip.id}: the checker marked a slip correct`);
+              if (typeof res.slipCode === 'string') { named2++; ok(topicDiagnosisCodes().includes(res.slipCode) && typeof res.feedback === 'string' && res.feedback.length > 20, `${topic}/${slip.id}: the checker's slip code or feedback is not the catalogue's`); }
+            }
+          }
+        }
+        // E · every wrong answer a catalogued slip produces is named (the slip itself, or another that gives the same number)
+        for (const entry of entries) {
+          let params = null; try { params = entry.read(q); } catch { params = null; }
+          if (!params) continue;
+          for (const slip of entry.slips(params)) {
+            if (!Number.isFinite(slip.value) || (Number.isFinite(right) && Math.abs(slip.value - right) <= slipTolerance(q, right))) continue;
+            slipChecks++;
+            const hit = diagnoseWith(entries, q, slip.value);
+            if (hit) slipNamed++; else fail(`${topic}: the slip ${slip.id} (${slip.value}) is not named when entered for "${String(q.prompt).slice(0, 70)}"`);
+          }
+        }
         for (const t of q.traps || []) {
           const v = Number(t.value);
           if (!Number.isFinite(v)) continue;
@@ -82,6 +114,8 @@ for (const [group, topics, entries] of [['trigonometry', TRIG, trig], ['function
 }
 
 for (const r of rows) console.log(`${r.group.padEnd(13)} ${r.topic.padEnd(22)} ${String(r.qn).padStart(4)} questions  ${String(r.named).padStart(4)}/${String(r.traps).padStart(4)} designed wrong answers named (${r.traps ? Math.round((100 * r.named) / r.traps) : 100}%)`);
+console.log(`CHECKER ${named2}/${viaChecker} catalogued slips that are not authored traps came back from checkAnswer named (verdict unchanged: never correct)`);
+console.log(`CATALOGUE ${slipNamed}/${slipChecks} wrong answers a catalogued slip produces are named when entered`);
 const pct = totalTraps ? (100 * totalNamed) / totalTraps : 100;
 console.log(`TOTAL ${totalNamed}/${totalTraps} designed wrong answers named with a specific sentence (${pct.toFixed(1)}%)`);
 if (process.argv.includes('--missed')) for (const [k, n] of [...missed].sort((a, b) => b[1] - a[1]).slice(0, 60)) console.log(`  missed ×${n}: ${k}`);
