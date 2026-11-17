@@ -174,6 +174,13 @@ export const ON_DEMAND = [
   // Desk reads a paper through them too.)
   [/(^|\/)(Library|libraryApi)-[^/]*\.(js|css)$/, 'resource library (online-only)'],
 
+  // Annotated working (QuestionCard's lazy AnnotatedWorking chunk, with the
+  // step-justification engine): drawn only for an attempt the server has just
+  // marked, and marking is online-only (ADR-0001 amendment 2026-10-10), so the
+  // chunk is always requested over a live connection and cached from then on.
+  // A chunk that cannot load leaves the plain step report in its place.
+  [/(^|\/)AnnotatedWorking-[^/]*\.(js|css)$/, 'annotated working (shown only after online marking)'],
+
   // The Exam Desk (ADR-0002 §8 plan F4b, PRI_FEATURE_EXAM_DESK): the desk's
   // pages, the shared exam shell they are built on and the desk's pure clock
   // and import reader, in one named chunk behind import() in App.jsx and
