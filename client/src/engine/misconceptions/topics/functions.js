@@ -493,9 +493,9 @@ const evalQuadratic = {
   },
   slips({ a, b, c, p }) {
     const out = [
-      { id: 'fn-eval-negative-squared', value: -a * p * p + b * p + c, say: s(
-        `${n4(p)}² is ${n4(p * p)}, positive: squaring a negative number gives a positive one, so the x² term is ${n4(a)} × ${n4(p * p)}.`,
-        `${n4(p)}² = ${n4(p * p)} धनात्मक है: ऋणात्मक संख्या का वर्ग धनात्मक होता है, इसलिए x² वाला पद ${n4(a)} × ${n4(p * p)} है।`) },
+      ...(p < 0 ? [{ id: 'fn-eval-negative-squared', value: -a * p * p + b * p + c, say: s(
+        `(${n4(p)})² is ${n4(p * p)}, positive: squaring a negative number gives a positive one, so the x² term is ${n4(a)} × ${n4(p * p)}.`,
+        `(${n4(p)})² = ${n4(p * p)} धनात्मक है: ऋणात्मक संख्या का वर्ग धनात्मक होता है, इसलिए x² वाला पद ${n4(a)} × ${n4(p * p)} है।`) }] : []),
       { id: 'fn-eval-linear-sign', value: a * p * p - b * p + c, say: s(
         `The x term is ${n4(b)} × (${n4(p)}), with the sign of the input kept: a negative input changes the sign of that term.`,
         `x वाला पद ${n4(b)} × (${n4(p)}) है, इनपुट का चिह्न रखते हुए: ऋणात्मक इनपुट उस पद का चिह्न बदल देता है।`) },
