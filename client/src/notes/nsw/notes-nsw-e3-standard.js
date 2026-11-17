@@ -67,8 +67,8 @@ export default {
     diagrams: [
       {
         title: 'Change the tank\'s radius and height',
-        spec: { kind: 'solidExplorer', shape: 'cylinder', r: 0.5, h: 1.2 },
-        note: 'Start with $r=0.5$ m and $h=1.2$ m: the volume is $0.3\\pi\\text{ m}^3$, about $942$ L. Double the height and the volume doubles; double the radius and it becomes four times as large, because the radius is squared.'
+        spec: { kind: 'solidExplorer', shape: 'cylinder', r: 1, h: 2 },
+        note: 'A tank with $r=1$ m and $h=2$ m has volume $2\\pi\\text{ m}^3$, about $6283$ L. Set $r=0.5$ and $h=1.5$ to see the volume change, then keep $r=0.5$ and double $h$: the volume doubles. Double the radius instead and it becomes four times as large, because the radius is squared.'
       }
     ]
   },
@@ -181,8 +181,8 @@ export default {
     diagrams: [
       {
         title: 'Change the triangle, watch the ratios',
-        spec: { kind: 'triangleExplorer', mode: 'trigRatios', initial: { a: 20, b: 15 } },
-        note: 'Start with legs $20$ and $15$ and hypotenuse $25$, as in the cable problem: $\\cos\\theta=0.8$ and $\\theta\\approx36.9^\\circ$. A larger triangle with the same angle gives the same $\\sin\\theta$, $\\cos\\theta$ and $\\tan\\theta$; only changing the angle changes them.'
+        spec: { kind: 'triangleExplorer', mode: 'trigRatios', initial: { a: 6, b: 8 } },
+        note: 'Start with legs $6$ and $8$ and hypotenuse $10$, the cable triangle $20,15,25$ at a smaller scale: $\\cos\\theta=0.8$ and $\\theta\\approx36.9^\\circ$. A larger triangle with the same angle gives the same $\\sin\\theta$, $\\cos\\theta$ and $\\tan\\theta$; only changing the angle changes them.'
       },
       {
         title: 'Angle of elevation to the top of a tower',
