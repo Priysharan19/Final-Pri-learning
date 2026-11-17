@@ -258,12 +258,29 @@ export function forecastAreas(board, forecast, courseKey) {
     const lo = Number(r?.low), hi = Number(r?.high);
     return Number.isFinite(lo) && Number.isFinite(hi) && lo >= 0 && hi >= lo && hi <= 1 ? { low: lo * P, high: hi * P } : null;
   };
+  const all = Object.fromEntries(board.groups.flatMap(g => g.nodes).map(n => [n.id, range(n.id)]).filter(([, r]) => r));
+  if (!Object.keys(all).length) return null;
   const areas = board.groups.map(g => ({
     id: g.id, name: g.name, nodeIds: g.nodes.map(n => n.id), marks: null,
-    nodeRanges: Object.fromEntries(g.nodes.map(n => [n.id, range(n.id)]).filter(([, r]) => r))
+    nodeRanges: Object.fromEntries(g.nodes.filter(n => all[n.id]).map(n => [n.id, all[n.id]]))
   }));
-  if (!areas.some(a => Object.keys(a.nodeRanges).length)) return null;
-  return { areas, paperMarks: P, source: 'forecast', disclaimer: String(meta.disclaimer || '') };
+  return { areas, paperMarks: P, ranges: all, source: 'forecast', disclaimer: String(meta.disclaimer || '') };
+}
+
+/**
+ * The marks a SET of outcomes can hold, given each outcome's low–high marks and
+ * that the whole paper is `paper` marks: never below the set's lows or below
+ * what the others' highs leave, never above the set's highs or above what the
+ * others' lows leave. Summing each outcome's high alone would claim more marks
+ * than the paper has.
+ */
+export function setBounds(ids, ranges, paper) {
+  const inSet = new Set(ids);
+  let lo = 0, hi = 0, restLo = 0, restHi = 0;
+  for (const [id, r] of Object.entries(ranges)) {
+    if (inSet.has(id)) { lo += r.low; hi += r.high; } else { restLo += r.low; restHi += r.high; }
+  }
+  return { low: Math.max(lo, paper - restHi, 0), high: Math.min(hi, paper - restLo, paper) };
 }
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
@@ -279,7 +296,7 @@ const PRACTISE_FIRST = {
  * The ranked priorities. Deterministic: ties are broken by area id.
  * @returns {{ items: object[], stake: {low:number, high:number}|null, paperMarks: number|null }}
  */
-export function boardPriorities(board, { areas, paperMarks = null }, { limit = 4, minutesPerQuestion = MINUTES_PER_QUESTION } = {}) {
+export function boardPriorities(board, { areas, paperMarks = null, ranges = null }, { limit = 4, minutesPerQuestion = MINUTES_PER_QUESTION } = {}) {
   const nodeById = new Map(board.groups.flatMap(g => g.nodes).map(n => [n.id, n]));
   const items = areas.map(area => {
     const nodes = area.nodeIds.map(id => nodeById.get(id)).filter(Boolean);
@@ -299,9 +316,11 @@ export function boardPriorities(board, { areas, paperMarks = null }, { limit = 4
         : action === 'retain' ? clamp(t.independent, 3, 6) : 4;
     let stake = null;
     if (area.nodeRanges) {
-      // hsc-forecast: each outcome's own low–high marks, rounded outwards.
-      const sum = (states, k) => nodes.filter(x => states.includes(x.state)).reduce((acc, x) => acc + (area.nodeRanges[x.id]?.[k] || 0), 0);
-      stake = { low: Math.floor(sum(SURE, 'low') + 1e-9), high: Math.ceil(sum([...SURE, 'thin'], 'high') - 1e-9) };
+      // hsc-forecast: the outcomes' low–high marks, bounded by the paper, rounded outwards.
+      const pick = states => nodes.filter(x => states.includes(x.state) && area.nodeRanges[x.id]).map(x => x.id);
+      const all = ranges || area.nodeRanges;
+      const lo = setBounds(pick(SURE), all, paperMarks ?? Infinity).low, hi = setBounds(pick([...SURE, 'thin']), all, paperMarks ?? Infinity).high;
+      stake = { low: Math.floor(lo + 1e-9), high: Math.ceil(hi - 1e-9) };
     } else if (area.marks != null && n) {
       if (area.nodeMarks) {
         // Exact: the marks on the outcomes in each set.
@@ -334,9 +353,15 @@ export function boardPriorities(board, { areas, paperMarks = null }, { limit = 4
     || ACTION_RANK[a.action] - ACTION_RANK[b.action]
     || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const withMarks = items.filter(i => i.stake);
-  const stake = paperMarks != null && withMarks.length
+  let stake = paperMarks != null && withMarks.length
     ? { low: withMarks.reduce((s, i) => s + i.stake.low, 0), high: withMarks.reduce((s, i) => s + i.stake.high, 0) }
     : null;
+  if (stake && ranges) {
+    // The paper total, from the union of the outcomes not shown, bounded the same way.
+    const states = (k) => board.groups.flatMap(g => g.nodes).filter(n => k.includes(n.state) && ranges[n.id]).map(n => n.id);
+    const SURE_ALL = ['not-started', 'seen', 'assisted', 'recheck'];
+    stake = { low: Math.floor(setBounds(states(SURE_ALL), ranges, paperMarks).low + 1e-9), high: Math.ceil(setBounds(states([...SURE_ALL, 'thin']), ranges, paperMarks).high - 1e-9) };
+  }
   return { items: items.filter(i => i.action !== 'extend' || items.every(x => x.action === 'extend')).slice(0, limit), stake, paperMarks };
 }
 

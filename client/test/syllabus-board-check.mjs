@@ -196,6 +196,24 @@ const groups = B.indiaBoardGroups(chapters);
   eq(B.forecastAreas(adv, null, 'advanced'), null, 'no module (#1003 not in this build): the blueprint fallback applies');
   eq(B.forecastAreas(adv, { topicWeightRanges: () => ({ 'MAV-11-01': { low: 0.5, high: 0.2 } }), forecastMeta: () => meta }, 'advanced'), null, 'a malformed range is not used');
   eq(B.FORECAST_COURSE, { advanced: 'advanced', 'extension-1': 'extension1' }, 'board course keys map to hsc-forecast course names');
+  // Bounded by the paper (review of the real #1003 ranges, whose highs sum past 1).
+  const wide = Object.fromEntries(codes.map(c => [c, { low: 0.02, mid: 0.055, high: 0.09 }]));
+  const fw = B.forecastAreas(adv, { topicWeightRanges: () => wide, forecastMeta: () => meta }, 'advanced');
+  const pw = B.boardPriorities(adv, fw, { limit: 99 });
+  eq(pw.stake, { low: 100, high: 100 }, 'nothing shown: exactly the paper\'s 100 marks are at stake, never more');
+  ok(pw.items.every(i => i.stake.high <= 100 && i.stake.low <= i.stake.high), 'no area claims more marks than the paper');
+  eq(B.setBounds(['a'], { a: { low: 10, high: 60 }, b: { low: 50, high: 80 } }, 100), { low: 20, high: 50 }, 'a set holds at least what the others cannot, at most what they leave');
+  // The real module, when hsc-forecast (#1003) is in this tree.
+  if (existsSync(fileURLToPath(new URL('../src/engine/hsc/hscPriorities.js', import.meta.url)))) {
+    const real = await import('../src/engine/hsc/hscPriorities.js');
+    for (const key of ['advanced', 'extension-1']) {
+      const b = B.syllabusBoard(B.nswBoardGroups(NSW_BOARD_COURSES[key]), [], { now: NOW });
+      const ranges = real.topicWeightRanges(B.FORECAST_COURSE[key]);
+      eq(Object.keys(ranges).sort(), B.nodesOf(b.groups).map(n => n.id).sort(), `${key}: hsc-forecast ranges cover exactly the board's outcomes`);
+      const pr = B.boardPriorities(b, B.forecastAreas(b, real, key));
+      eq(pr.stake, { low: real.forecastMeta(B.FORECAST_COURSE[key]).paperMarks, high: real.forecastMeta(B.FORECAST_COURSE[key]).paperMarks }, `${key}: nothing shown puts exactly the paper's marks at stake`);
+    }
+  } else ok(true, 'hsc-forecast (#1003) is not in this tree; its fixture shape is tested above');
   // Area roll-up: shown on your own only when every outcome is.
   eq(B.groupState([{ state: 'retained' }, { state: 'independent' }]), 'independent', 'an area is as strong as its weakest outcome');
   eq(B.groupState([{ state: 'retained' }, { state: 'not-started' }]), 'not-started', 'an untouched outcome keeps the area from reading as shown');
