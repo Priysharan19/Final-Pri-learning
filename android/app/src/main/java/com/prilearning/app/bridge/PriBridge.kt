@@ -111,6 +111,17 @@ class PriBridge(
                 c.forgetSession()
                 Envelope.ok(req.id)
             }
+            // Touch feedback: one of two kinds; the system's own haptics setting governs it.
+            "haptics.fire" -> {
+                val kind = req.payload.optString("kind", "")
+                val constant = when (kind) {
+                    "confirm" -> if (Build.VERSION.SDK_INT >= 30) android.view.HapticFeedbackConstants.CONFIRM else android.view.HapticFeedbackConstants.VIRTUAL_KEY
+                    "selection" -> android.view.HapticFeedbackConstants.CLOCK_TICK
+                    else -> return send(proxy, Envelope.fail(req.id, "BAD_REQUEST", "haptics.fire needs kind confirm or selection."))
+                }
+                webView.performHapticFeedback(constant)
+                Envelope.ok(req.id)
+            }
             "share.file" -> {
                 val f = files ?: return send(proxy, Envelope.fail(req.id, "UNSUPPORTED", "share.file is not supported by this app version."))
                 f.share(req.payload) { r -> answerLater(proxy, fileReply(req.id, r)) }

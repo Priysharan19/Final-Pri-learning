@@ -14,7 +14,7 @@ import { readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { checks, enrolMfa, promoteRole, registerAccount, startApp, verifyMfa } from './support/app-harness.mjs';
+import { checks, promoteRole, registerAccount, startApp, verifyMfa } from './support/app-harness.mjs';
 import { requestedEngine } from './support/engine.mjs';
 import { createLocalStorage, createObjectStorage, presignGetUrl, storageConfigProblems, assetKey } from '../platform/objectStorage.js';
 import { PART_BYTES, pdfProblems, publishingProblems } from '../platform/resourcePublishing.js';
@@ -95,7 +95,7 @@ try {
   c.eq((await call(author, 'POST', `/${R}/drafts`, { body: body() })).data?.error?.code, 'REVISION_OPEN', 'a second open revision is refused');
   c.deq(ids(await library(student)).includes(R), false, 'a draft is not in the library');
 
-  r = await call(author, 'PATCH', `/${R}/revisions/1`, { body: body({ rightsBasis: undefined }) });
+  await call(author, 'PATCH', `/${R}/revisions/1`, { body: body({ rightsBasis: undefined }) });
   r = await call(author, 'POST', `/${R}/revisions/1/submit`);
   c.deq([r.status, r.data?.error?.code], [400, 'RESOURCE_INCOMPLETE'], 'a draft without a rights basis cannot leave draft');
   c.ok((r.data?.error?.problems || []).some(p => /rightsBasis/.test(p)), 'and the problem names it');
@@ -141,7 +141,7 @@ try {
   c.eq(r.data.revision?.state, 'published', 'revision 2 is published');
   r = await call(reviewer, 'GET', `/${R}/revisions`);
   c.deq(r.data.revisions.map(x => [x.revision, x.state]), [[2, 'published'], [1, 'superseded']], 'the history shows both revisions, the first superseded');
-  c.eq(lib = (await library(student)).data.resources.find(x => x.id === R).title, 'Practice paper (second edition)', 'the library serves revision 2');
+  c.eq((await library(student)).data.resources.find(x => x.id === R).title, 'Practice paper (second edition)', 'the library serves revision 2');
 
   // Rollback: a new revision carrying revision 1's reviewed body.
   c.eq((await call(author, 'POST', `/${R}/revisions/1/rollback`)).status, 403, 'rollback is admin only');
