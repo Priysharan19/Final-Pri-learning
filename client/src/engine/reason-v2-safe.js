@@ -101,7 +101,7 @@ function exactDomainComparison(a, b, variable = null) {
 }
 
 
-// ── Rational, absolute-value and square-root equations, by solution set ──────
+// ── Absolute-value equations, by solution set ────────────────────────────────
 // Where the complete real solution set of a line and of the line above can be
 // found exactly (reason-v4 equationSolutionSet), a step is judged on the sets:
 // the same set is valid; a larger set is an IMPLIED step (every solution kept,
@@ -112,10 +112,14 @@ function exactDomainComparison(a, b, variable = null) {
 // the line above undefined (the usual extraneous root). Mirrors the benchmark's
 // SymPy rules. Anything the sets cannot decide falls through unchanged.
 function usesCoveredClass(node, variable = null) {
+  // Absolute value only. Rational equations keep their established policy
+  // (restoring a root a denominator excluded is a break, and a starting
+  // rational line stays unproved), and a starting radical line stays an
+  // abstention (pri-reason-check #7); both are still judged on their LAST line
+  // by the incomplete flag.
   node = unwrap(node);
   if (!node || typeof node !== 'object') return false;
-  if (node.t === 'call' && (node.fn === 'abs' || node.fn === 'sqrt')) return containsVariable(node.arg, variable);
-  if (node.t === 'bin' && node.op === '/' && containsVariable(node.r, variable)) return true;
+  if (node.t === 'call' && node.fn === 'abs') return containsVariable(node.arg, variable);
   return ['l', 'r', 'v', 'arg'].some(k => usesCoveredClass(node[k], variable));
 }
 function wantedSolutions(meta) {

@@ -845,7 +845,7 @@
  "eq-035": {
   "verdicts": [
    "given",
-   "valid"
+   "abstain"
   ],
   "solution": "incorrect",
   "firstBreak": null
@@ -863,8 +863,8 @@
  "eq-037": {
   "verdicts": [
    "given",
-   "valid",
-   "valid"
+   "abstain",
+   "abstain"
   ],
   "solution": "incorrect",
   "firstBreak": null
@@ -872,9 +872,9 @@
  "eq-038": {
   "verdicts": [
    "given",
-   "valid",
-   "valid",
-   "valid"
+   "abstain",
+   "abstain",
+   "abstain"
   ],
   "solution": "incorrect",
   "firstBreak": null
@@ -1119,9 +1119,9 @@
  "eq-064": {
   "verdicts": [
    "given",
-   "valid",
-   "valid",
-   "valid"
+   "abstain",
+   "abstain",
+   "abstain"
   ],
   "solution": "incorrect",
   "firstBreak": null
