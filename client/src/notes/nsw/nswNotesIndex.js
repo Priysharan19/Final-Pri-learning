@@ -93,7 +93,8 @@ const LOADERS = Object.freeze({
     () => Promise.all([import('./notes-nsw-stage4b.js'), import('./notes-nsw-stage4b-premium.js')])
   ]),
   5: bandsLoader(['core-a', 'core-b', 'path-a', 'path-b'].map(b => () => Promise.all([import(`./notes-nsw-stage5-${b}.js`), import(`./notes-nsw-stage5-${b}-premium.js`)]))),
-  'six:ext1': bandsLoader(['a', 'b'].map(b => () => Promise.all([import(`./notes-nsw-ext1-${b}.js`), import(`./notes-nsw-ext1-${b}-premium.js`)])))
+  'six:ext1': bandsLoader(['a', 'b'].map(b => () => Promise.all([import(`./notes-nsw-ext1-${b}.js`), import(`./notes-nsw-ext1-${b}-premium.js`)]))),
+  'six:ext2': bandsLoader([() => Promise.all([import('./notes-nsw-ext2.js'), import('./notes-nsw-ext2-premium.js')])])
 });
 
 /** The notes of every topic in a stage (an object keyed by topic id), or null when none are written yet. */
