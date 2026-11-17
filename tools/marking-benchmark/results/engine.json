@@ -23,26 +23,26 @@
  },
  "ca-004": {
   "verdicts": [
-   "abstain",
-   "abstain"
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-005": {
   "verdicts": [
-   "abstain",
    "valid",
-   "abstain"
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-006": {
   "verdicts": [
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-007": {
@@ -61,9 +61,9 @@
  },
  "ca-009": {
   "verdicts": [
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-010": {
@@ -75,14 +75,14 @@
  },
  "ca-011": {
   "verdicts": [
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-012": {
   "verdicts": [
-   "abstain",
+   "valid",
    "valid"
   ],
   "solution": "correct",
@@ -90,10 +90,10 @@
  },
  "ca-013": {
   "verdicts": [
-   "abstain",
-   "abstain"
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-014": {
@@ -105,33 +105,33 @@
  },
  "ca-015": {
   "verdicts": [
-   "abstain",
-   "abstain"
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-016": {
   "verdicts": [
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-017": {
   "verdicts": [
-   "abstain",
-   "abstain"
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-018": {
   "verdicts": [
    "valid",
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-019": {
@@ -144,9 +144,9 @@
  },
  "ca-020": {
   "verdicts": [
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-021": {
@@ -159,17 +159,17 @@
  "ca-022": {
   "verdicts": [
    "valid",
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-023": {
   "verdicts": [
    "valid",
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "ca-024": {
@@ -202,10 +202,10 @@
  },
  "ca-028": {
   "verdicts": [
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-029": {
   "verdicts": [
@@ -248,11 +248,11 @@
  },
  "ca-034": {
   "verdicts": [
-   "abstain",
+   "invalid",
    "abstain"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-035": {
   "verdicts": [
@@ -270,17 +270,17 @@
  },
  "ca-037": {
   "verdicts": [
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-038": {
   "verdicts": [
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-039": {
   "verdicts": [
@@ -312,39 +312,39 @@
  },
  "ca-043": {
   "verdicts": [
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-044": {
   "verdicts": [
-   "abstain",
+   "invalid",
    "abstain"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-045": {
   "verdicts": [
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-046": {
   "verdicts": [
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-047": {
   "verdicts": [
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-048": {
   "verdicts": [
@@ -399,7 +399,7 @@
  },
  "ca-055": {
   "verdicts": [
-   "abstain",
+   "valid",
    "invalid",
    "abstain"
   ],
@@ -408,7 +408,7 @@
  },
  "ca-056": {
   "verdicts": [
-   "abstain",
+   "valid",
    "invalid"
   ],
   "solution": "incorrect",
@@ -416,15 +416,15 @@
  },
  "ca-057": {
   "verdicts": [
-   "abstain",
-   "abstain"
+   "valid",
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 1
  },
  "ca-058": {
   "verdicts": [
-   "abstain",
+   "valid",
    "invalid"
   ],
   "solution": "incorrect",
@@ -440,11 +440,11 @@
  },
  "ca-060": {
   "verdicts": [
-   "abstain",
+   "invalid",
    "abstain"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-061": {
   "verdicts": [
@@ -473,7 +473,7 @@
  "ca-064": {
   "verdicts": [
    "invalid",
-   "abstain"
+   "valid"
   ],
   "solution": "incorrect",
   "firstBreak": 0
@@ -489,18 +489,18 @@
  "ca-066": {
   "verdicts": [
    "invalid",
-   "abstain"
+   "valid"
   ],
   "solution": "incorrect",
   "firstBreak": 0
  },
  "ca-067": {
   "verdicts": [
-   "abstain",
-   "abstain"
+   "invalid",
+   "valid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 0
  },
  "ca-068": {
   "verdicts": [
@@ -674,12 +674,12 @@
  "eq-017": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
-   "abstain",
-   "abstain"
+   "valid",
+   "valid",
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "eq-018": {
@@ -748,7 +748,7 @@
  "eq-025": {
   "verdicts": [
    "given",
-   "abstain",
+   "valid",
    "invalid"
   ],
   "solution": "incorrect",
@@ -776,19 +776,19 @@
  "eq-028": {
   "verdicts": [
    "given",
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 1
  },
  "eq-029": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
-   "abstain"
+   "valid",
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "eq-030": {
@@ -805,32 +805,32 @@
  "eq-031": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
+   "valid",
+   "invalid",
    "abstain",
    "abstain"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 2
  },
  "eq-032": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
-   "abstain"
+   "valid",
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "eq-033": {
   "verdicts": [
    "given",
-   "abstain",
+   "invalid",
    "abstain"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 1
  },
  "eq-034": {
   "verdicts": [
@@ -949,8 +949,8 @@
  "eq-046": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
+   "valid",
+   "valid",
    "valid"
   ],
   "solution": "correct",
@@ -978,7 +978,7 @@
  "eq-049": {
   "verdicts": [
    "given",
-   "abstain",
+   "valid",
    "valid",
    "valid"
   ],
@@ -988,26 +988,26 @@
  "eq-050": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain"
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "eq-051": {
   "verdicts": [
    "given",
-   "abstain"
+   "invalid"
   ],
-  "solution": "abstain",
-  "firstBreak": null
+  "solution": "incorrect",
+  "firstBreak": 1
  },
  "eq-052": {
   "verdicts": [
    "given",
-   "abstain"
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "eq-053": {
@@ -1050,8 +1050,8 @@
  "eq-057": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
+   "valid",
+   "valid",
    "abstain"
   ],
   "solution": "abstain",
@@ -1060,7 +1060,7 @@
  "eq-058": {
   "verdicts": [
    "given",
-   "abstain",
+   "valid",
    "valid",
    "valid"
   ],
@@ -1079,11 +1079,11 @@
  "eq-060": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
-   "abstain"
+   "valid",
+   "valid",
+   "valid"
   ],
-  "solution": "abstain",
+  "solution": "correct",
   "firstBreak": null
  },
  "eq-061": {
@@ -1098,7 +1098,7 @@
  "eq-062": {
   "verdicts": [
    "given",
-   "abstain",
+   "valid",
    "invalid",
    "invalid"
   ],
@@ -1108,9 +1108,9 @@
  "eq-063": {
   "verdicts": [
    "given",
-   "abstain",
-   "abstain",
-   "abstain",
+   "valid",
+   "valid",
+   "valid",
    "abstain"
   ],
   "solution": "abstain",

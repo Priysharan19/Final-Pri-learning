@@ -162,7 +162,7 @@ function rationalForm(node, variable) {
   return null;
 }
 
-function rationalResidual(eq, variable) {
+export function rationalResidual(eq, variable) {
   if (!eq || eq.t !== 'equation') return null;
   const left = rationalForm(eq.l, variable), right = rationalForm(eq.r, variable);
   if (!left || !right) return null;
