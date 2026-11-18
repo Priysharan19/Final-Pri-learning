@@ -174,6 +174,8 @@ import {
 import { loadBanksFor } from '../../client/src/engine/generators/index.js';
 import { practicePapersAllowed } from './indiaBanks.js';
 import { bankPolicy, sealForEdition } from './editionBanks.js';
+import { editionOffering } from './edition.js';
+import { courseOfferedIn } from '../../client/src/engine/offeringRules.js';
 import { nswExamsOn, nswRelease, nswExamPool, nswExamCatalogue, outcomeNamed } from './nswExamPool.js';
 import { slotsOf, formsForSlot, nswPaperTitle, NSW_EXAM_LABEL, NSW_MARKING_NOTE } from '../../client/src/engine/nswExams.js';
 import { generateMultipart } from '../../client/src/engine/generators/multipart.js';
@@ -760,8 +762,29 @@ const pdfReply = (name, lines, title, extra = {}) => ({
   filename: name, mimeType: 'application/pdf', pdfBase64: buildPdf({ title, lines }).toString('base64'), ...extra
 });
 
+/**
+ * Owner decision, 19 Nov 2026: a paper for a year or course the edition does not offer is refused by name
+ * (the student app hides it; the server enforces). `null` when offered, or when the request names no year yet.
+ */
+const NOT_OFFERED = Object.freeze(refusal(403, 'COURSE_NOT_OFFERED', 'This year or course is not offered yet. Year 11 and Year 12 Mathematics Advanced and Extension 1 are.'));
+function offeringRefusal(body, env) {
+  const off = editionOffering(env);
+  if (!off || !plain(body)) return null;
+  let year, pathway;
+  if (body.kind === 'generated' && plain(body.generated)) ({ year, pathway } = body.generated);
+  else if (body.kind === 'practice-paper' && plain(body.paper)) ({ year, pathway } = body.paper);
+  else if (body.kind === 'nsw' && plain(body.blueprint) && typeof body.blueprint.id === 'string') {
+    const c = /^nsw-hsc-(standard-[12]|advanced|extension-1|extension-2)-/.exec(body.blueprint.id)?.[1];
+    if (!c) return null;
+    year = 12; pathway = c.startsWith('standard') ? 'standard' : c === 'extension-1' ? 'ext1' : c === 'extension-2' ? 'ext2' : 'advanced';
+  } else return null;
+  return courseOfferedIn(off, year, pathway ?? (Number(year) >= 11 ? 'advanced' : null)) ? null : NOT_OFFERED;
+}
+
 function readSpec(body, env = process.env) {
   if (!plain(body) || unknown(body, CREATE_FIELDS).length) return INVALID();
+  const hidden = offeringRefusal(body, env);
+  if (hidden) return hidden;
   // D15: the practice paper is the NSW course's, built from banks outside the
   // India curriculum's covers, so it is refused (indiaBanks.js).
   if (body.kind === 'practice-paper' && !practicePapersAllowed()) {

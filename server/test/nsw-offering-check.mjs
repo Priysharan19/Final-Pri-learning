@@ -69,6 +69,23 @@ try {
     c.eq(p.status, 200, `prepare: ${label} (${id}) is prepared`);
   }
   c.ok(typeof (await issue(YEAR12)).data?.question?.id === 'string', 'and an offered question is the server\'s own');
+
+  // Papers and exams: the same refusal, by name, before anything is composed or counted.
+  const exam = body => h.request('/v1/exams', { method: 'POST', jar: a.jar, body, headers: { 'Idempotency-Key': `off-${Math.random().toString(36).slice(2)}-${Date.now()}` } });
+  const gen = (year, pathway) => ({ kind: 'generated', generated: { year, ...(pathway ? { pathway } : {}), topics: ['y11-functions'], marks: 10, mix: 'standard' } });
+  const paper = (year, pathway) => ({ kind: 'practice-paper', paper: { year, minutes: 30, ...(pathway ? { pathway } : {}) }, slots: [] });
+  for (const [label, body] of [
+    ['generated Year 9', gen(9)], ['generated Year 10', gen(10)], ['generated Year 12 Standard', gen(12, 'standard')], ['generated Year 12 Extension 2', gen(12, 'ext2')],
+    ['practice paper Year 8', paper(8)], ['practice paper Year 12 Standard', paper(12, 'standard')],
+    ['HSC paper Standard 2', { kind: 'nsw', blueprint: { id: 'nsw-hsc-standard-2-2027' } }], ['HSC paper Extension 2', { kind: 'nsw', blueprint: { id: 'nsw-hsc-extension-2-2027' } }]
+  ]) {
+    const r = await exam(body);
+    c.deq([r.status, r.data?.error?.code], [403, 'COURSE_NOT_OFFERED'], `exams: ${label} is refused by name`);
+  }
+  for (const [label, body] of [['generated Year 12 Advanced', gen(12, 'advanced')], ['generated Year 11 Extension 1', gen(11, 'ext1')], ['practice paper Year 12 Advanced', paper(12, 'advanced')], ['HSC paper Advanced', { kind: 'nsw', blueprint: { id: 'nsw-hsc-advanced-2027' } }], ['HSC paper Extension 1', { kind: 'nsw', blueprint: { id: 'nsw-hsc-extension-1-2027' } }]]) {
+    const r = await exam(body);
+    c.ok(r.data?.error?.code !== 'COURSE_NOT_OFFERED', `exams: ${label} is not refused as hidden (${r.status} ${r.data?.error?.code || 'ok'})`);
+  }
 } finally {
   await h.close();
 }

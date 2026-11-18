@@ -3327,6 +3327,7 @@ const routes = {
         throw notOffered();
       }
     }
+    const wasCourse = { year: p.year, pathway: p.pathway ?? null };
     if (body.name !== undefined) p.name = String(body.name).trim().slice(0, 40) || p.name;
     if (body.year !== undefined) p.year = Math.min(12, Math.max(7, Number(body.year) || p.year));
     if (body.pathway !== undefined && p.course === 'nsw') p.pathway = cleanPathway(body.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
@@ -3353,6 +3354,9 @@ const routes = {
       if (p.course === 'nsw') p.pathway = cleanPathway(p.pathway, p.year) || (p.year >= 11 ? 'advanced' : null);
       else p.pathway = null;
     }
+    // The one-time re-choice (components/OfferedCourse.jsx) keeps what the student was on, on the profile (no schema change).
+    if (offering() && p.course === 'nsw' && !p.previousCourse && !courseOffered(wasCourse.year, wasCourse.year >= 11 ? (wasCourse.pathway || 'advanced') : null)
+        && courseOffered(p.year, p.year >= 11 ? (p.pathway || 'advanced') : null)) p.previousCourse = { ...wasCourse, at: Date.now() };
     if (body.avatar !== undefined) p.avatar = String(body.avatar).slice(0, 4);
     if (body.handwriting !== undefined) p.handwriting = !!body.handwriting;
     // Server-side handwriting reading is off unless the student turns it on:

@@ -81,12 +81,21 @@ eq([AU.games, IN.games], [false, true], 'Rapid Fire and Match are hidden in Prit
 const premiumKeys = Object.entries(en).filter(([, v]) => /\bPremium\b/.test(typeof v === 'string' ? v : JSON.stringify(v))).map(([k]) => k);
 ok(premiumKeys.length > 50, 'the shared catalogue names the paid tier "Premium" in many strings');
 eq(premiumKeys.filter(k => /\bPremium\b/.test(JSON.stringify(renameTier(en[k])))), [], 'and a Prithagoras lookup renames every one of them');
-eq(renameTier('Premium removes the daily limit.'), 'HSC Pass removes the daily limit.', 'a sentence');
+eq(renameTier('Premium is on every plan.'), 'HSC Pass is on every plan.', 'a sentence');
 eq(renameTier('part of {brand} Premium.'), 'part of {brand} HSC Pass.', 'a sentence with a slot');
 eq(renameTier({ one: 'Restored {n} item and refreshed Premium.', other: 'Restored {n} items and refreshed Premium.' }), { one: 'Restored {n} item and refreshed HSC Pass.', other: 'Restored {n} items and refreshed HSC Pass.' }, 'counted strings value by value');
 eq(renameTier('Nothing to rename.'), 'Nothing to rename.', 'a string that names no tier is the same string');
 eq(renameTier('Premiumize'), 'Premiumize', 'only the word');
 eq(Object.entries(AU_STRINGS).filter(([, v]) => /\bPremium\b/.test(typeof v === 'string' ? v : JSON.stringify(v))).map(([k]) => k), [], 'and no en-AU override says Premium');
+// Payments are off: no Prithagoras line says the HSC Pass does something today or can be bought today.
+const GATED = /^(paywall\.(disclosure|inAppOnly|authority|notOnSale)|cloud\.|pricing\.|invite\.|trial\.|msg\.ent\.)/;   // shown only where a sale is configured (or are explicit that it is not on sale)
+const resolved = Object.fromEntries(Object.keys(en).map(k => [k, Object.hasOwn(AU_STRINGS, k) ? AU_STRINGS[k] : renameTier(en[k])]));
+const text = v => (typeof v === 'string' ? v : JSON.stringify(v));
+eq(Object.entries(resolved).filter(([, v]) => /\bHSC Pass (removes|adds|includes|shows|builds|names|follows|reads)\b/.test(text(v))).map(([k]) => k), [], 'no line says the HSC Pass does something today (it will, or it is part of it)');
+eq(Object.entries(resolved).filter(([k, v]) => !GATED.test(k) && /\b(buy|purchase|subscribe|upgrade now|get HSC Pass|unlock)\b/i.test(text(v)) && /HSC Pass/.test(text(v))).map(([k]) => k), [], 'and no line outside the sale-gated screens invites a purchase');
+eq(renameTier('Premium removes the daily limit.'), 'HSC Pass will remove the daily limit.', 'the rename puts it in the future tense');
+const backend = read('../src/local/backend.js');
+ok(/const wasCourse = \{ year: p\.year, pathway: p\.pathway \?\? null \};/.test(backend) && /p\.previousCourse = \{ \.\.\.wasCourse, at: Date\.now\(\) \};/.test(backend), 'the one-time re-choice records the previous year and course on the profile first (no schema change)');
 const core = read('../src/i18n/core.js');
 ok(/const au = EDITION_ID === 'prithagoras' && language === 'en';/.test(core) && /if \(au && !overridden && entry !== undefined\) entry = renameTier\(entry\);/.test(core), 'only a Prithagoras English lookup renames; India and Hindi never do');
 ok(/HSC Pass/.test(AU_STRINGS['settings.premiumAdds']) && /HSC Pass/.test(AU_STRINGS['upgrade.jeeAdvanced']), 'the overrides written by hand already say HSC Pass');
