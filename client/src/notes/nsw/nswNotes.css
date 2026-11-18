@@ -57,8 +57,23 @@
 .nn-more { display: flex; flex-wrap: wrap; align-items: center; gap: var(--nn-s3); }
 .nn-answer { border: 1px solid var(--nt-rule-strong); border-radius: var(--nt-r); padding: var(--nn-s3) var(--nn-s5) var(--nn-s4); background: var(--nn-box); }
 .nn-checked { margin-left: var(--nn-s2); font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--nt-ink-3); }
-.nn-final { font-weight: 700; }
-.nn-working .katex { font-size: 1.15em; }
+.nn-final { font-weight: 400; margin: 0; }
+.nn-answer .nn-label + .nn-wk { margin-top: 0; }
+.nn-answer .nn-wk + .nn-label { margin-top: var(--nn-s4); padding-top: var(--nn-s3); border-top: 1px solid var(--nn-line); }
+
+/* Working: the reason in words, then the line, every line on its relation sign in one column. */
+.nn-wk { display: grid; grid-template-columns: max-content minmax(0, 1fr); column-gap: 0.35em; align-items: baseline; max-width: 100%; }
+.nn-wk-say { grid-column: 1 / -1; font-family: var(--nn-read); font-size: 17px; line-height: 1.45; color: var(--nt-ink-2); margin: var(--nn-s3) 0 var(--nn-s1); }
+.nn-wk-say:first-child { margin-top: 0; }
+.nn-wk-l { text-align: right; }
+.nn-wk-r, .nn-wk-line { min-width: 0; overflow-x: auto; overflow-y: hidden; }
+.nn-wk-line { grid-column: 1 / -1; }
+.nn-wk-m.nn-display { overflow: visible; padding: 0; }
+.nn-wk-r .nn-wk-m.nn-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+.nn-wk-m .katex-display { margin: 0; text-align: left; }
+.nn-wk-m .katex-display > .katex { text-align: left; }
+.nn-wk-l .nn-wk-m .katex-display, .nn-wk-l .nn-wk-m .katex-display > .katex { text-align: right; }
+.nn-wk-m .katex { font-size: 1.1em; }
 
 @media (max-width: 640px) {
   .nn-defs > div { grid-template-columns: 1fr; gap: var(--nn-s1); }
@@ -79,5 +94,3 @@
 /* The chapter sheet is plain paper: no margin rule, no card. */
 [data-nsw-notes] .nt-sheet { border: 0; background: transparent; padding: 0; box-shadow: none; }
 [data-nsw-notes] .nt-sheet::before { content: none; }
-.nn-working .katex-display { text-align: left; }
-.nn-working .katex-display > .katex { text-align: left; }

@@ -11,6 +11,7 @@ import { readJSONFile } from '../lib/files.js';
 import { assignmentSections, defaultSectionKey, describeTaskTargets } from '../platform/assignmentTarget.js';
 import { useT } from '../i18n/index.js';
 import Working from '../instrument/Working.jsx';
+import { offeredChapters } from '../engine/curriculumAvailability.js';
 
 export default function Tasks() {
   const { user, toast } = useApp();
@@ -33,11 +34,11 @@ export default function Tasks() {
   const mySubtopics = (() => {
     if (!curriculum) return [];
     if (user.year >= 11 && user.pathway === 'standard') {
-      return curriculum.streams?.find(g => g.key === `standard-${user.year}`)?.subtopics || [];
+      return offeredChapters(curriculum.streams?.find(g => g.key === `standard-${user.year}`)?.subtopics);
     }
     const core = curriculum.years.find(y => y.year === user.year)?.subtopics || [];
     const extra = (curriculum.streams || []).filter(g => g.year === user.year).flatMap(g => g.subtopics);
-    return [...core, ...extra];
+    return offeredChapters([...core, ...extra]);
   })();
 
   async function importPack(e) {

@@ -12,6 +12,7 @@
 // where it can be, and checked by the student against the sample answer where it
 // cannot.
 // ─────────────────────────────────────────────────────────────────────────────
+import { BRAND } from '../brand/edition.js';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
@@ -28,7 +29,7 @@ export function ext1PapersFor(user) {
   return !!user && user.course === 'nsw' && user.pathway === 'ext1' && Number(user.year) >= 11;
 }
 
-const fileName = (title, kind) => `Prithagoras-Ext1-${title.replace(/[^A-Za-z0-9]+/g, '-')}${kind === 'guidelines' ? '-Marking-Guidelines' : ''}.pdf`;
+const fileName = (title, kind) => `${BRAND}-Ext1-${title.replace(/[^A-Za-z0-9]+/g, '-')}${kind === 'guidelines' ? '-Marking-Guidelines' : ''}.pdf`;
 
 export default function Ext1Papers() {
   const t = useT();
@@ -80,7 +81,7 @@ export default function Ext1Papers() {
     <section className="card" style={{ gridColumn: '1 / -1' }} data-ext1-papers aria-labelledby="ext1-papers-title">
       <h2 className="card-title" id="ext1-papers-title">{t('papers.ext1.heading')}</h2>
       <p className="sub" style={{ marginBottom: 14 }} data-ext1-papers-note>{t('papers.ext1.note')}</p>
-      {!list && !failed && <p className="muted" role="status"><Working pending size={24} /><span>{t('papers.ext1.loading')}</span></p>}
+      {!list && !failed && <p className="muted" role="status"><Working pending={list === null} size={24} /><span>{t('papers.ext1.loading')}</span></p>}
       {failed && <p className="muted" data-ext1-papers-unavailable>{t('papers.ext1.unavailable')}</p>}
       {list && list.papers.length > 0 && <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
         {list.papers.map(p => (

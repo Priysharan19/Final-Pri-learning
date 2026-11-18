@@ -48,3 +48,22 @@ export function selectableDifficulties(trackLevels, selection) {
   const real = selection && typeof selection === 'object' && Array.isArray(selection.requestable) ? selection.requestable : null;
   return real ? levels.filter(d => real.includes(d)) : [...levels];
 }
+
+/**
+ * Is a chapter worth offering at all? Owner decision 2026-11-18: a chapter that
+ * has no question at any level is hidden, never listed with a dead end behind
+ * it. `requestable` is the curriculum response's list of levels a question
+ * really exists at for the chapter (the server's issued cells on the
+ * Prithagoras edition, the authored forms on Priyabhata); an empty list means
+ * nothing can be served. A row that carries no list (a stub, an older reply)
+ * is not judged here.
+ */
+export function chapterOffered(topic) {
+  if (!topic || typeof topic !== 'object') return false;
+  return !Array.isArray(topic.requestable) || topic.requestable.length > 0;
+}
+
+/** The chapters of a list that can be practised at some level. */
+export function offeredChapters(rows) {
+  return (Array.isArray(rows) ? rows : []).filter(chapterOffered);
+}

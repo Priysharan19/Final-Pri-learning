@@ -54,7 +54,16 @@ for (const [claim, why] of FALSE_NOW) {
 // #283: Premium is enforced now, so the README must state the free tier the
 // gate enforces rather than the old "Premium buys nothing" gap.
 const { FREE_TIER } = await import(join(ROOT, 'client/src/local/entitlementGate.js'));
-ok(new RegExp(`${FREE_TIER.practicePerDay} practice questions a day`).test(readme) && !/Premium buys nothing/i.test(readme),
+// Owner decision 2026-11-18: the active packaging does not cap free practice, so the README
+// states "no daily limit on practice questions" (it states "N practice questions a day" only
+// if a cap ever returns), and the read allowances it names are the packaging's (5 / 50).
+const { READ_ALLOWANCE } = await import(join(ROOT, 'client/src/engine/practiceAllowance.js'));
+const flat = readme.replace(/\s+/g, ' '); // the README wraps its lines
+const practiceStated = FREE_TIER.practicePerDay === null
+  ? /no daily limit on practice questions/.test(flat)
+  : new RegExp(`${FREE_TIER.practicePerDay} practice questions a day`).test(flat);
+ok(practiceStated && new RegExp(`${READ_ALLOWANCE.free} reads of your writing and ${READ_ALLOWANCE.free} question photos a day`).test(flat)
+  && new RegExp(`raises the reads to ${READ_ALLOWANCE.premium} and the photos to ${READ_ALLOWANCE.premium} a day`).test(flat) && !/Premium buys nothing/i.test(readme),
   'the README states the enforced free-tier cap and no longer says Premium buys nothing');
 
 // The gaps that must stay named while they are still real.

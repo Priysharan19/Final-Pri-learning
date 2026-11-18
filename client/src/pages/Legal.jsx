@@ -45,7 +45,7 @@ import terms from '../../../docs/legal/terms.md?raw';
 import refund from '../../../docs/legal/refund-policy.md?raw';
 import grievance from '../../../docs/legal/grievance.md?raw';
 import review from '../../../docs/legal/review-status.json';
-import { EDITION } from '../platform/edition.js';
+import { EDITION, offeredLanguages, offersLanguage } from '../platform/edition.js';
 
 // The English of each notice, keyed by its own route. There is no `title` here
 // any more: a notice names itself in its first heading, in whichever language
@@ -365,8 +365,8 @@ export default function Legal() {
     <div className="qpage" style={{ maxWidth: 720 }}>
       <h1>{titleOf(source)}</h1>
 
-      {LANGUAGES.length > 1 && <div className="seg-tabs" role="group" aria-label={t('legal.languageLabel')} style={{ marginTop: 0, marginBottom: 18 }}>
-        {LANGUAGES.map(({ id, label }) => (
+      {offeredLanguages(LANGUAGES).length > 1 && <div className="seg-tabs" role="group" aria-label={t('legal.languageLabel')} style={{ marginTop: 0, marginBottom: 18 }}>
+        {LANGUAGES.map(({ id, label }) => offersLanguage(id) && (
           <button
             key={id}
             type="button"

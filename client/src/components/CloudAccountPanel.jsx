@@ -20,6 +20,9 @@ import {
 import GooglePlayBilling from './GooglePlayBilling.jsx';
 import CloudAccountSecurity from './CloudAccountSecurity.jsx';
 import { tLater, useT, useTx } from '../i18n/index.js';
+import { defaultCourse } from '../platform/edition.js';
+import { EDITION_ID } from '../brand/edition.js';
+import { localeOf } from '../lib/locale.js';
 import { priNative } from '../platform/native/index.js';
 import { cloudErrorCopy } from '../platform/cloudErrorCopy.js';
 import { acceptedCheckoutUrl } from '../platform/checkoutHosts.js';
@@ -44,7 +47,7 @@ function price(value, currency) {
   try {
     // Whole amounts print as before (₹199); a price with cents prints them (A$9.99).
     const digits = Number.isInteger(value) ? 0 : 2;
-    return new Intl.NumberFormat('en-IN', {
+    return new Intl.NumberFormat(localeOf(defaultCourse()), {
       style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits
     }).format(value);
   } catch {
@@ -853,6 +856,9 @@ export default function CloudAccountPanel() {
                 {busy === 'cancel-web' ? t('cloud.cancelling') : t('cloud.cancelSubscription')}
               </button>
             )}
+          </div>}
+          {canUseWebBilling && !premium && EDITION_ID === 'prithagoras' && pricing?.monthly && pricing?.annual && <div className="muted" data-paywall-web-disclosure style={{ fontSize: 12, marginTop: 8 }}>
+            {t('paywall.disclosureWeb', { monthly: price(pricing.monthly, pricing.currency), annual: price(pricing.annual, pricing.currency), currency: pricing.currency })}
           </div>}
 
           {canSync && <div style={{ marginTop: 12 }}><TrialNotice /></div>}

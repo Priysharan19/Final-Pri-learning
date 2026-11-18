@@ -239,7 +239,7 @@ export default {
       {
         question: 'Team A scored $10,12,14,16,18$ and Team B scored $13,14,14,14,15$. Both have mean $14$. Compare their standard deviations.',
         steps: ['Team A: squared deviations $16,4,0,4,16$ sum to $40$, so $\\sigma=\\sqrt{40\\div5}=\\sqrt{8}\\approx2.83$.', 'Team B: squared deviations $1,0,0,0,1$ sum to $2$, so $\\sigma=\\sqrt{2\\div5}\\approx0.63$.', 'Team B is far more consistent, although the two teams have the same mean.'],
-        answer: '$\\sigma_A=\\sqrt{8}\\approx2.83$ and $\\sigma_B=\\sqrt{0.4}\\approx0.63$',
+        answer: '$\\sigma_A=\\sqrt{8}\\approx2.83$ and $\\sigma_B=\\sqrt{0.4}\\approx0.63$; Team B has the smaller standard deviation, so it is more consistent',
         verify: { kind: 'values', pairs: [['sqrt((16+4+0+4+16)/5)', '2*sqrt(2)'], ['sqrt((1+0+0+0+1)/5)', 'sqrt(2/5)']] }
       },
       {
@@ -391,7 +391,7 @@ export default {
       {
         question: 'Show that $(3,4)$ lies on the circle $x^2+y^2=25$ and find the other value of $y$ when $x=3$.',
         steps: ['Substitute: $3^2+4^2=9+16=25$, so the point lies on the circle.', 'When $x=3$, $y^2=25-9=16$.', 'So $y=4$ or $y=-4$.'],
-        answer: '$y=4$ or $y=-4$',
+        answer: '$(3,4)$ lies on the circle since $3^2+4^2=25$; $y=4$ or $y=-4$, so the other value of $y$ is $-4$',
         verify: { kind: 'roots', f: 'y^2-16', answers: ['4', '-4'], var: 'y' }
       }
     ]

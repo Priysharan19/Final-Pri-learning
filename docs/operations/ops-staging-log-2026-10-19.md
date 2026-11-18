@@ -4,7 +4,7 @@ Environment: **staging only** (Railway project `profound-spontaneity`, environme
 service `pri-learning-staging`, region `ams`; Supabase `pri-learning-staging`
 `orudxrckgxyyraopyzmn`, `ap-south-1`, Postgres, schema 12 / billing 6). Production was not
 touched. No migration was applied anywhere. Operator: Claude Code session on the owner's
-authority (owner: impriysharan@icloud.com). All times UTC.
+authority (owner: prilearning19@gmail.com). All times UTC.
 
 Evidence class: the real deployed staging host and database. Not production, not a device,
 not a student.

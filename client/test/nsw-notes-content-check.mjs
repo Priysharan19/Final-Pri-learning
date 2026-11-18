@@ -15,6 +15,7 @@
 //      stubbed.
 // ─────────────────────────────────────────────────────────────────────────────
 import katex from 'katex';
+import { workingRows } from '../src/notes/workingRows.js';
 import { evalNumeric, exprEquivalent } from '../src/engine/expr.js';
 import { NSW_NOTES_TOPICS, NSW_NOTES_TOPIC_BY_ID, mergePremium } from '../src/notes/nsw/nswNotesIndex.js';
 import base4 from '../src/notes/nsw/notes-nsw-stage4.js';
@@ -117,8 +118,9 @@ for (const [id, n, mod] of all) {
     const why = verifyExample(c.verify); ok(why === null, `${where} check ${i}: the engine disagrees — ${why}`);
   });
   n.examples.forEach((ex, i) => {
-    ok(typeof ex.working === 'string' && /\\begin\{aligned\}/.test(ex.working), `${where} example ${i + 1}: needs aligned working`);
-    const err = texRenders(ex.working || '', true); ok(!err, `${where} example ${i + 1} working: KaTeX failed — ${err}`);
+    const wRows = workingRows(ex.working);
+    ok(wRows.length >= 1, `${where} example ${i + 1}: needs working`);
+    for (const r of wRows) { const werr = texRenders(`${r.lhs ?? ''}${r.rest}`, true); ok(!werr, `${where} example ${i + 1} working: KaTeX failed — ${werr}`); }
   });
   if (!NO_DIAGRAM.has(id)) ok(n.diagrams?.length >= 1, `${where}: needs a diagram`);
   (n.diagrams || []).forEach((d, i) => {

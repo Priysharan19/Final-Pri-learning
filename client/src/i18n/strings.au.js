@@ -28,7 +28,7 @@ export const AU_STRINGS = Object.freeze({
   'snap.chapterOption': 'Year {grade} · {name}',
   'classroom.classNamePlaceholder': 'Year 10 Mathematics',
   'paywall.from.practice': 'You have used today’s free practice questions. They come back at midnight (Sydney time).',
-  'check.freeCapHint': 'Checking this one would be another of today’s free practice questions, and the free plan includes 20 a day. They come back at midnight (Sydney time), and Premium removes the daily cap.',
+  'check.freeCapHint': 'Checking this one would be another of today’s free practice questions, and you have used the free plan’s daily allowance. They come back at midnight (Sydney time), and Premium removes the daily cap.',
   'legal.unreviewedBody': 'This notice is published so you can read what the app does with your data. No lawyer qualified in Australian law has reviewed it yet. When that review has happened, this banner will go.',
   'explain.kicker': 'Pri Explain · Exam mode',
   'insights.lead': 'Read from your own marked practice. Nothing here is a predicted exam score.',
@@ -55,5 +55,16 @@ export const AU_STRINGS = Object.freeze({
   'exams.indiaHeading': 'Exams',
   'placement.provenance': 'The prerequisite map behind it is Pri’s own teaching judgement (version {version}), not a NESA publication.',
   'pricing.why.syllabus': "Built for the NSW Mathematics syllabuses, including the 2024 Stage 6 syllabuses first examined in the 2027 HSC.",
+  // Sweep of 18 Nov 2026: shared strings a Prithagoras screen draws that still said
+  // class, a Hindi search hint, or an India chooser.
+  'common.class': 'Year',
+  'gloss.filterTopics': 'Filter topics',
+  'login.stepCourseSub': 'Choose the year and course that should drive Practice, Exams and Progress.',
+  'login.courseRequired': 'Choose a year and course to continue.',
+  'login.chooseClassTrack': 'Choose a year or course…',
+  'notes.classLabel': 'Choose a year',
+  'notes.noBookmarks': 'No bookmarked chapters in this year yet.',
+  'inst.noChapters': 'No chapters are set for your year yet.',
+  'cloudError.consentDeclarationRequired': 'Tell us whether the learner is 18 or older, or their year with a parent or guardian’s name and email, then try again.',
   'upgrade.jeeAdvanced': "This part of the course is included with Premium."
 });

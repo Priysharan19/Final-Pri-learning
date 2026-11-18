@@ -2,8 +2,10 @@
 // Pri Learning · Free tier and Premium gate for the local backend.
 //
 // The FREE plan's pre-check lives here, on the device, so the student is told
-// before a request leaves: 20 practice questions per calendar day (the day
-// boundary is the profile's own timezone — Asia/Kolkata for India profiles),
+// before a request leaves: the free daily practice cap when the packaging sets one
+// (none under value-2026-11, owner decision 2026-11-18; 20 under the superseded
+// d19-d20) per calendar day (the day
+// boundary is the profile's own timezone — India Standard Time for India profiles),
 // one exam simulation every 30 days, and basic Pri Explain. The counter is a
 // device-local row and is a courtesy, not the limit: since every creditable
 // question is issued by the server, the SERVER decides the daily cap per
@@ -23,6 +25,7 @@ import { cloudLinkRowId } from '../platform/cloudAccount.js';
 import { ENTITLEMENTS, FREE_EXAM_ALLOWANCE, entitlementDecision, normalizeEntitlementSnapshot } from '../platform/entitlements.js';
 import { FREE_PRACTICE_ALLOWANCE } from '../engine/practiceAllowance.js';
 import { translate } from '../i18n/core.js';
+import { defaultTimezone, localeOf } from '../lib/locale.js';
 
 const DAY = 86_400_000;
 const USAGE_PREFIX = 'pri-free-usage-v1:';
@@ -40,7 +43,7 @@ export const FREE_TIER = Object.freeze({
  * enforcement suite checks every ENTITLEMENTS value has an entry here.
  */
 export const CAPABILITY_ENFORCEMENT = Object.freeze({
-  [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'server · POST /v1/practice/issue, /v1/practice/:id/repeat and /v1/practice/notebook/:attemptId/twin refuse the twenty-first practice question of the account\'s day (server/platform/practiceAllowance.js, from the server\'s own entitlement record, #537, D19); the local backend\'s POST /practice/next and /history/:id/retry pre-check is the device\'s courtesy copy',
+  [ENTITLEMENTS.UNLIMITED_PRACTICE]: 'server · POST /v1/practice/issue, /v1/practice/:id/repeat and /v1/practice/notebook/:attemptId/twin refuse a practice question beyond the free daily cap, where the active packaging sets one (none today: value-2026-11 has free practice uncapped; server/platform/practiceAllowance.js, from the server\'s own entitlement record, #537, D19); the local backend\'s POST /practice/next and /history/:id/retry pre-check is the device\'s courtesy copy',
   [ENTITLEMENTS.PREMIUM_EXAMS]: 'server · POST /v1/exams counts the account\'s own sealed papers, and a finished paper\'s time report is added only when the result is read by a Premium account (server/platform/exams.js withTimeReport); local backend · POST /exams (HSC paper builder and India exam module) pre-checks beyond the free simulation',
   [ENTITLEMENTS.JEE_ADVANCED]: 'server · the track\'s own papers (POST /v1/exams, server/platform/exams.js) and its own question banks, jee-advanced-* and pyq-jee-advanced-* (POST /v1/practice/issue, prepared bind, repeat and notebook twin, server/platform/practiceAllowance.js PREMIUM_PRACTICE_CONTENT, D19); its difficulty 3–4 chapter questions are the free JEE Main items, so the track as a whole is gated by the local backend · every route that can serve jee-advanced content, checked on the RESOLVED track rather than the request shape: POST /practice/next smart practice, POST /practice/next against a task whose targets name the track (a student can set one themselves on the Tasks page), POST /history/:id/retry on a row whose india.track is jee-advanced, and POST /exams in the India exam module',
   // Declared, sold nowhere and gated nowhere: Pri Explain plays in full on every
@@ -64,11 +67,11 @@ function validTimeZone(tz) {
   try { new Intl.DateTimeFormat('en-CA', { timeZone: tz }); return true; } catch { return false; }
 }
 
-/** The calendar a profile lives in. India profiles default to Asia/Kolkata. */
+/** The calendar a profile lives in: its own, else its course's (India: IST; otherwise Sydney). */
 export function profileTimeZone(profile) {
   const tz = String(profile?.timezone || '').trim();
   if (tz && validTimeZone(tz)) return tz;
-  return profile?.course === 'in' ? 'Asia/Kolkata' : 'Australia/Sydney';
+  return defaultTimezone(profile?.course);
 }
 
 export function dayKey(ms, timeZone) {
@@ -136,9 +139,9 @@ function offlineNote(decision) {
     : '';
 }
 
-function whenLabel(ms, timeZone) {
+function whenLabel(ms, timeZone, profile) {
   try {
-    return new Intl.DateTimeFormat('en-IN', { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms));
+    return new Intl.DateTimeFormat(localeOf(profile?.course || 'in'), { timeZone, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(ms));
   } catch { return new Date(ms).toISOString(); }
 }
 
@@ -192,7 +195,7 @@ export async function assertExamAllowed(profile, now = clock()) {
   if (allowance.allowed) return allowance;
   const timeZone = profileTimeZone(profile);
   throw gateError('FREE_CAP_REACHED',
-    `The free plan includes one exam simulation every ${FREE_TIER.examWindowDays} days. Your next free simulation unlocks on ${whenLabel(allowance.nextAt, timeZone)}; Premium includes unlimited simulations.${offlineNote({ reason: allowance.reason })}`,
+    `The free plan includes one exam simulation every ${FREE_TIER.examWindowDays} days. Your next free simulation unlocks on ${whenLabel(allowance.nextAt, timeZone, profile)}; Premium includes unlimited simulations.${offlineNote({ reason: allowance.reason })}`,
     { capability: ENTITLEMENTS.PREMIUM_EXAMS, used: allowance.used, limit: allowance.limit, nextAt: allowance.nextAt, windowDays: allowance.windowDays, timeZone, reason: allowance.reason, refreshRequired: allowance.refreshRequired });
 }
 

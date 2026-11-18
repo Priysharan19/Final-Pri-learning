@@ -17,9 +17,21 @@ export default {
     ],
     diagrams: [],
     working: [
-      '\\begin{aligned}\\sum\\deg(v)&=3+3+2+2+4=14\\\\E&=14\\div2=7\\end{aligned}',
-      '\\begin{aligned}\\text{Tree}&=BC+AC+DE+BD\\\\&=2+3+4+5\\\\&=14\\end{aligned}',
-      '\\begin{aligned}A\\to C\\to E&=3+7=10\\\\A\\to B\\to D\\to E&=4+5+4=13\\\\A\\to C\\to D\\to E&=3+6+4=13\\end{aligned}'
+      [
+        { say: 'Sum of the degrees:', tex: '\\sum\\deg(v)&=3+3+2+2+4=14' },
+        { say: 'Each edge adds $2$ to the degree sum:', tex: 'E&=14\\div2=7' },
+        { say: 'Count the vertices of odd degree (the two of degree $3$):', tex: '\\text{Odd-degree vertices}&=2' }
+      ],
+      [
+        { say: 'Take the edges in increasing order, skipping any that close a cycle ($AB$ is skipped):', tex: '\\text{Tree}&=BC+AC+DE+BD' },
+        { say: 'Substitute the lengths:', tex: '&=2+3+4+5' },
+        { tex: '&=14' }
+      ],
+      [
+        { say: 'Route through $C$:', tex: 'A\\to C\\to E&=3+7=10' },
+        { say: 'Route through $B$ and $D$:', tex: 'A\\to B\\to D\\to E&=4+5+4=13' },
+        { say: 'Route through $C$ and $D$:', tex: 'A\\to C\\to D\\to E&=3+6+4=13' }
+      ]
     ],
     check: [
       { question: 'A network has degrees $4,4,3,3,2,2$. How many edges does it have?', answer: '$9$', verify: { kind: 'value', expr: '(4+4+3+3+2+2)/2', answer: '9' } },
@@ -37,9 +49,26 @@ export default {
       { title: 'The curve $y=5\\times2^x$', spec: { kind: 'function', xmin: -2, xmax: 5, ymin: -20, ymax: 180, curves: [{ expr: '5*2^x', label: 'y=5\\times2^x' }], points: [{ x: 0, y: 5, label: '(0,\\,5)' }, { x: 3, y: 40, label: '(3,\\,40)' }, { x: 5, y: 160, label: '(5,\\,160)' }] }, note: 'The curve cuts the $y$-axis at $5$ and passes through $(3,40)$, which fixes $a=5$. Each step to the right doubles $y$.' }
     ],
     working: [
-      '\\begin{aligned}(5-2)^2+(3+1)^2&=3^2+4^2\\\\&=9+16\\\\&=25=r^2\\end{aligned}',
-      '\\begin{aligned}40&=a\\times2^3\\Rightarrow a=5\\\\y(5)&=5\\times2^5=160\\end{aligned}',
-      '\\begin{aligned}\\frac{12}{x}&=x+1\\\\x^2+x-12&=0\\\\(x+4)(x-3)&=0\\end{aligned}'
+      [
+        { say: 'Substitute $(5,3)$ into the left side:', tex: '(5-2)^2+(3+1)^2&=3^2+4^2' },
+        { tex: '&=9+16' },
+        { say: 'Compare with $r^2=25$:', tex: '&=25=r^2' }
+      ],
+      [
+        { say: 'Substitute $(3,40)$:', tex: '40&=a\\times2^3' },
+        { say: 'Simplify:', tex: '40&=8a' },
+        { say: 'Solve for $a$:', tex: 'a&=5' },
+        { say: 'Substitute $x=5$ into $y=5\\times2^x$:', tex: 'y(5)&=5\\times2^5' },
+        { tex: '&=160' }
+      ],
+      [
+        { say: 'Set the two equations equal:', tex: '\\dfrac{12}{x}&=x+1' },
+        { say: 'Multiply both sides by $x$:', tex: '12&=x^2+x' },
+        { say: 'Rearrange to zero:', tex: 'x^2+x-12&=0' },
+        { say: 'Factorise:', tex: '(x+4)(x-3)&=0' },
+        { say: 'Take the positive root (first quadrant):', tex: 'x&=3' },
+        { say: 'Substitute into $y=x+1$:', tex: 'y&=3+1=4' }
+      ]
     ],
     check: [
       { question: 'Find the radius of the circle $x^2+y^2=81$.', answer: '$9$', verify: { kind: 'value', expr: 'sqrt(81)', answer: '9' } },
@@ -58,9 +87,24 @@ export default {
       { title: 'The roots of $x^3-2x^2-5x+6$', spec: { kind: 'function', xmin: -2.5, xmax: 4, ymin: -12, ymax: 20, curves: [{ expr: 'x^3-2*x^2-5*x+6', intercepts: true, label: 'y=x^3-2x^2-5x+6' }] }, note: 'The curve crosses the $x$-axis at $-2$, $1$ and $3$, matching the factors $(x+2)$, $(x-1)$ and $(x-3)$.' }
     ],
     working: [
-      '\\begin{aligned}P(1)&=1-2-5+6=0\\\\P(x)&=(x-1)(x^2-x-6)\\\\&=(x-1)(x-3)(x+2)\\end{aligned}',
-      '\\begin{aligned}P(-2)&=2(-8)+4+8+3\\\\&=-1\\end{aligned}',
-      '\\begin{aligned}P(2)&=8+4k-6+2=0\\\\4k&=-4\\\\k&=-1\\end{aligned}'
+      [
+        { say: 'Test $x=1$:', tex: 'P(1)&=1-2-5+6=0' },
+        { say: 'So $x-1$ is a factor; divide:', tex: 'P(x)&=(x-1)(x^2-x-6)' },
+        { say: 'Factorise the quadratic:', tex: 'x^2-x-6&=(x-3)(x+2)' },
+        { say: 'Combine:', tex: 'P(x)&=(x-1)(x-3)(x+2)' }
+      ],
+      [
+        { say: 'Remainder theorem: the remainder is $P(-2)$:', tex: 'P(-2)&=2(-8)+4+8+3' },
+        { tex: '&=-16+15' },
+        { tex: '&=-1' }
+      ],
+      [
+        { say: 'Factor theorem:', tex: 'P(2)&=0' },
+        { say: 'Substitute $x=2$:', tex: '8+4k-6+2&=0' },
+        { say: 'Collect like terms:', tex: '4k+4&=0' },
+        { say: 'Solve for $k$:', tex: '4k&=-4' },
+        { say: 'Hence:', tex: 'k&=-1' }
+      ]
     ],
     check: [
       { question: 'Find $P(3)$ when $P(x)=x^3-4x^2+x+6$. Is $x-3$ a factor?', answer: '$P(3)=0$, so yes', verify: { kind: 'value', expr: '3^3-4*3^2+3+6', answer: '0' } },
@@ -79,9 +123,21 @@ export default {
       { title: 'Netball and swimming', spec: { kind: 'venn', sets: 2, labels: ['N', 'S'], counts: { A: 12, AB: 6, B: 10, none: 12 }, universe: 40 }, note: 'There are $18$ netballers ($12+6$) and $6$ of them swim, so $P(\\text{swim}\\mid\\text{netball})=\\tfrac{6}{18}$.' }
     ],
     working: [
-      '\\begin{aligned}P(RR)&=\\tfrac58\\times\\tfrac47=\\tfrac{5}{14}\\\\P(\\text{one each})&=\\tfrac58\\times\\tfrac37+\\tfrac38\\times\\tfrac57\\\\&=\\tfrac{30}{56}=\\tfrac{15}{28}\\end{aligned}',
-      '\\begin{aligned}P(S\\mid N)&=\\frac{n(S\\text{ and }N)}{n(N)}\\\\&=\\tfrac{6}{18}=\\tfrac13\\end{aligned}',
-      '\\begin{aligned}P(A\\text{ and }B)&=0.4\\times0.5=0.2\\\\P(A\\text{ or }B)&=0.4+0.5-0.2=0.7\\end{aligned}'
+      [
+        { say: 'Both red, without replacement:', tex: 'P(RR)&=\\dfrac{5}{8}\\times\\dfrac{4}{7}' },
+        { tex: '&=\\dfrac{20}{56}=\\dfrac{5}{14}' },
+        { say: 'One of each is red then blue, or blue then red:', tex: 'P(\\text{one each})&=\\dfrac{5}{8}\\times\\dfrac{3}{7}+\\dfrac{3}{8}\\times\\dfrac{5}{7}' },
+        { tex: '&=\\dfrac{15}{56}+\\dfrac{15}{56}' },
+        { tex: '&=\\dfrac{30}{56}=\\dfrac{15}{28}' }
+      ],
+      [
+        { say: 'Conditional probability:', tex: 'P(S\\mid N)&=\\dfrac{n(S\\text{ and }N)}{n(N)}' },
+        { say: 'Substitute $6$ and $18$:', tex: '&=\\dfrac{6}{18}=\\dfrac{1}{3}' }
+      ],
+      [
+        { say: 'Independent events multiply:', tex: 'P(A\\text{ and }B)&=0.4\\times0.5=0.2' },
+        { say: 'Addition rule:', tex: 'P(A\\text{ or }B)&=0.4+0.5-0.2=0.7' }
+      ]
     ],
     check: [
       { question: 'Two cards are drawn without replacement from a standard $52$ card pack. Find $P(\\text{both aces})$.', answer: '$\\tfrac{1}{221}$', verify: { kind: 'value', expr: '4/52*3/51', answer: '1/221' } },
@@ -99,9 +155,21 @@ export default {
       { title: 'Inverse variation $y=\\dfrac{24}{x}$', spec: { kind: 'function', xmin: 0, xmax: 12, ymin: 0, ymax: 14, curves: [{ expr: '24/x', label: 'y=24/x' }], points: [{ x: 4, y: 6, label: '(4,\\,6)' }, { x: 8, y: 3, label: '(8,\\,3)' }] }, note: 'Doubling $x$ from $4$ to $8$ halves $y$ from $6$ to $3$. The product $xy=24$ is the same at both points.' }
     ],
     working: [
-      '\\begin{aligned}12&=k\\times2^2\\Rightarrow k=3\\\\y&=3\\times5^2=75\\end{aligned}',
-      '\\begin{aligned}6&=\\frac{k}{4}\\Rightarrow k=24\\\\y&=\\frac{24}{8}=3\\end{aligned}',
-      '\\begin{aligned}6\\times10&=60\\\\15d&=60\\\\d&=4\\end{aligned}'
+      [
+        { say: 'Direct variation, $y=kx^2$; substitute $y=12$, $x=2$:', tex: '12&=k\\times2^2' },
+        { say: 'Solve for $k$:', tex: 'k&=3' },
+        { say: 'Substitute $x=5$ into $y=3x^2$:', tex: 'y&=3\\times5^2=75' }
+      ],
+      [
+        { say: 'Inverse variation, $y=\\dfrac{k}{x}$; substitute $y=6$, $x=4$:', tex: '6&=\\dfrac{k}{4}' },
+        { say: 'Solve for $k$:', tex: 'k&=24' },
+        { say: 'Substitute $x=8$:', tex: 'y&=\\dfrac{24}{8}=3' }
+      ],
+      [
+        { say: 'Workers times days is constant:', tex: '6\\times10&=60' },
+        { say: 'Same total for $15$ workers:', tex: '15d&=60' },
+        { say: 'Divide by $15$:', tex: 'd&=4' }
+      ]
     ],
     check: [
       { question: '$y$ varies directly as $x$ and $y=21$ when $x=7$. Find $y$ when $x=10$.', answer: '$30$', verify: { kind: 'value', expr: '21/7*10', answer: '30' } },
@@ -119,9 +187,20 @@ export default {
       { title: 'A secant and a tangent on $y=x^2$', spec: { kind: 'secantToTangent', expr: 'x^2', x0: 1, h: 2, xmin: -1, xmax: 4, ymin: -1, ymax: 10 }, note: 'The secant from $x=1$ to $x=3$ has gradient $4$, the average rate. The tangent at $x=1$ has gradient $2$, the rate at that point.' }
     ],
     working: [
-      '\\begin{aligned}\\frac{f(3)-f(1)}{3-1}&=\\frac{9-1}{2}\\\\&=4\\end{aligned}',
-      '\\begin{aligned}\\frac{1.1^2-1}{0.1}&=2.1\\\\\\frac{1.01^2-1}{0.01}&=2.01\\\\&\\to2\\end{aligned}',
-      '\\begin{aligned}\\frac{N(3)-N(1)}{3-1}&=\\frac{800-200}{2}\\\\&=300\\ \\text{cells per hour}\\end{aligned}'
+      [
+        { say: 'Average rate of change is the change in $y$ over the change in $x$:', tex: '\\dfrac{f(3)-f(1)}{3-1}&=\\dfrac{9-1}{3-1}' },
+        { say: 'Simplify:', tex: '&=\\dfrac{8}{2}=4' }
+      ],
+      [
+        { say: 'Interval $[1,1.1]$:', tex: '\\dfrac{1.1^2-1}{0.1}&=2.1' },
+        { say: 'Interval $[1,1.01]$:', tex: '\\dfrac{1.01^2-1}{0.01}&=2.01' },
+        { say: 'The averages approach $2$ as the interval shrinks:', tex: '&\\to2' }
+      ],
+      [
+        { say: 'Values at the endpoints, $N(1)=100\\times2^1$ and $N(3)=100\\times2^3$:', tex: 'N(1)&=200,\\quad N(3)=800' },
+        { say: 'Average rate of growth:', tex: '\\dfrac{N(3)-N(1)}{3-1}&=\\dfrac{800-200}{2}' },
+        { tex: '&=300\\text{ cells per hour}' }
+      ]
     ],
     check: [
       { question: 'Find the average rate of change of $y=x^2+1$ from $x=2$ to $x=4$.', answer: '$6$', verify: { kind: 'value', expr: '((4^2+1)-(2^2+1))/(4-2)', answer: '6' } },
@@ -139,9 +218,25 @@ export default {
       { title: 'A triangle with sides $7$, $5$ and $8$', spec: { kind: 'triangle', a: 7, b: 5, c: 8 }, note: 'The angle opposite the side of length $7$ is $60^\\circ$, as the cosine rule gives: $\\cos A=\\tfrac{40}{80}=\\tfrac12$.' }
     ],
     working: [
-      '\\begin{aligned}c^2&=7^2+9^2-2(7)(9)\\cos60^\\circ\\\\&=130-63=67\\\\c&=\\sqrt{67}\\end{aligned}',
-      '\\begin{aligned}\\frac{b}{\\sin45^\\circ}&=\\frac{10}{\\sin30^\\circ}\\\\b&=10\\sqrt2\\end{aligned}',
-      '\\begin{aligned}\\cos A&=\\frac{5^2+8^2-7^2}{2(5)(8)}\\\\&=\\tfrac12\\\\A&=60^\\circ\\end{aligned}'
+      [
+        { say: 'Cosine rule:', tex: 'c^2&=7^2+9^2-2(7)(9)\\cos60^\\circ' },
+        { say: 'Use $\\cos60^\\circ=\\dfrac{1}{2}$:', tex: '&=130-63' },
+        { tex: '&=67' },
+        { say: 'Take the positive square root:', tex: 'c&=\\sqrt{67}' },
+        { say: 'Calculator:', tex: '&\\approx8.19' }
+      ],
+      [
+        { say: 'Sine rule:', tex: '\\dfrac{b}{\\sin45^\\circ}&=\\dfrac{10}{\\sin30^\\circ}' },
+        { say: 'Make $b$ the subject:', tex: 'b&=\\dfrac{10\\sin45^\\circ}{\\sin30^\\circ}' },
+        { say: 'Exact values $\\sin45^\\circ=\\dfrac{\\sqrt2}{2}$, $\\sin30^\\circ=\\dfrac{1}{2}$:', tex: '&=\\dfrac{10\\times\\dfrac{\\sqrt2}{2}}{\\dfrac{1}{2}}' },
+        { tex: '&=10\\sqrt2' },
+        { say: 'Calculator:', tex: '&\\approx14.14' }
+      ],
+      [
+        { say: 'Rearrange the cosine rule for $\\cos A$:', tex: '\\cos A&=\\dfrac{5^2+8^2-7^2}{2(5)(8)}' },
+        { say: 'Simplify:', tex: '&=\\dfrac{40}{80}=\\dfrac{1}{2}' },
+        { say: 'Inverse cosine:', tex: 'A&=\\cos^{-1}\\left(\\dfrac{1}{2}\\right)=60^\\circ' }
+      ]
     ],
     check: [
       { question: 'Find the area of a triangle with sides $8$ and $11$ and an included angle of $30^\\circ$.', answer: '$22$ square units', verify: { kind: 'value', expr: '0.5*8*11*sin(30*pi/180)', answer: '22' } },
@@ -159,9 +254,19 @@ export default {
       { title: 'The point at $150^\\circ$', spec: { kind: 'unitCircleDrag', initial: 150, deg: 150 }, note: 'At $150^\\circ$ the point is $(-\\tfrac{\\sqrt3}{2},\\ \\tfrac12)$: sine is positive, cosine negative, and the reference angle is $30^\\circ$.' }
     ],
     working: [
-      '\\begin{aligned}\\sin150^\\circ&=\\sin30^\\circ=\\tfrac12\\\\\\cos240^\\circ&=-\\cos60^\\circ=-\\tfrac12\\end{aligned}',
-      '\\begin{aligned}\\sin\\theta&=\\tfrac{\\sqrt3}{2}\\\\\\theta&=60^\\circ\\ \\text{or}\\ 180^\\circ-60^\\circ=120^\\circ\\end{aligned}',
-      '\\begin{aligned}\\cos^2\\theta&=1-\\tfrac{9}{25}=\\tfrac{16}{25}\\\\\\cos\\theta&=-\\tfrac45\\\\\\tan\\theta&=-\\tfrac34\\end{aligned}'
+      [
+        { say: 'Second quadrant, reference angle $30^\\circ$; sine is positive:', tex: '\\sin150^\\circ&=\\sin30^\\circ=\\dfrac{1}{2}' },
+        { say: 'Third quadrant, reference angle $60^\\circ$; cosine is negative:', tex: '\\cos240^\\circ&=-\\cos60^\\circ=-\\dfrac{1}{2}' }
+      ],
+      [
+        { say: 'Divide by $2$:', tex: '\\sin\\theta&=\\dfrac{\\sqrt3}{2}' },
+        { say: 'Reference angle $60^\\circ$; sine is positive in quadrants one and two:', tex: '\\theta&=60^\\circ\\text{ or }180^\\circ-60^\\circ=120^\\circ' }
+      ],
+      [
+        { say: 'Pythagorean identity:', tex: '\\cos^2\\theta&=1-\\dfrac{9}{25}=\\dfrac{16}{25}' },
+        { say: 'Obtuse angle, so cosine is negative:', tex: '\\cos\\theta&=-\\dfrac{4}{5}' },
+        { say: 'Divide sine by cosine:', tex: '\\tan\\theta&=\\dfrac{3/5}{-4/5}=-\\dfrac{3}{4}' }
+      ]
     ],
     check: [
       { question: 'Find the exact value of $\\sin210^\\circ$.', answer: '$-\\tfrac12$', verify: { kind: 'value', expr: 'sin(210*pi/180)', answer: '-1/2' } },
@@ -177,9 +282,22 @@ export default {
     ],
     diagrams: [],
     working: [
-      '\\begin{aligned}V&=\\tfrac13\\pi r^2h\\\\&=\\tfrac13\\pi(3)^2(4)\\\\&=12\\pi\\end{aligned}',
-      '\\begin{aligned}V&=\\tfrac13Ah\\\\&=\\tfrac13(36)(5)\\\\&=60\\end{aligned}',
-      '\\begin{aligned}V&=\\pi(2)^2(5)+\\tfrac23\\pi(2)^3\\\\&=20\\pi+\\tfrac{16}{3}\\pi\\\\&=\\tfrac{76}{3}\\pi\\end{aligned}'
+      [
+        { say: 'Volume of a cone:', tex: 'V&=\\dfrac{1}{3}\\pi r^2h' },
+        { say: 'Substitute $r=3$, $h=4$:', tex: '&=\\dfrac{1}{3}\\pi(3)^2(4)' },
+        { tex: '&=12\\pi' }
+      ],
+      [
+        { say: 'Base area:', tex: 'A&=6\\times6=36' },
+        { say: 'Volume of a pyramid:', tex: 'V&=\\dfrac{1}{3}Ah' },
+        { say: 'Substitute $A=36$, $h=5$:', tex: '&=\\dfrac{1}{3}(36)(5)' },
+        { tex: '&=60' }
+      ],
+      [
+        { say: 'Cylinder plus hemisphere:', tex: 'V&=\\pi(2)^2(5)+\\dfrac{2}{3}\\pi(2)^3' },
+        { say: 'Evaluate each part:', tex: '&=20\\pi+\\dfrac{16}{3}\\pi' },
+        { say: 'Add:', tex: '&=\\dfrac{76}{3}\\pi' }
+      ]
     ],
     check: [
       { question: 'Find the exact volume of a sphere of radius $6$.', answer: '$288\\pi$', verify: { kind: 'value', expr: '4/3*pi*6^3', answer: '288*pi' } },

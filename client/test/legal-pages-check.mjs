@@ -368,8 +368,13 @@ ok(!/परीक्षा-परिणाम की भविष्यवाण
 const consentCode = readFileSync(join(ROOT, 'server/platform/guardianConsent.js'), 'utf8');
 ok(/CONSENT_METHOD = 'guardian-email-confirmation'/.test(consentCode),
   'the server records guardian consent as an email confirmation (the fact the notice must state)');
-ok(/it does not ask for your age/i.test(privacy),
-  'the notice says plainly that no age is collected');
+// The sign-up flow asks an age (SignUpFlow.jsx AGES, 11-17 or "18 or older") and the
+// server keeps only the decision it made from it (accounts.age_basis), so the notice
+// says exactly that: it asks, it does not keep, it never asks for a date of birth.
+ok(/it asks your age but does not keep it,\s+and it never asks for your date of birth/i.test(privacy)
+  && /const AGES = \[11, 12, 13, 14, 15, 16, 17\]/.test(readFileSync(join(ROOT, 'client/src/components/SignUpFlow.jsx'), 'utf8'))
+  && !/UPDATE accounts SET age\b/.test(readFileSync(join(ROOT, 'server/platform/otp.js'), 'utf8')),
+  'the notice says the app asks your age and keeps only the child/adult decision (SignUpFlow.jsx, otp.js)');
 ok(/asks for a parent\s+or guardian's name and email address/i.test(privacy),
   'the notice discloses that a guardian name and email are collected for an under-18 account');
 ok(/parent or guardian's name and email address\*\*, only for an account of\s+someone under 18/i.test(privacy),
@@ -424,8 +429,8 @@ ok(/need a Pri Learning account, and a connection, to have answers checked/.test
   'the notice says an account and a connection are needed to be marked');
 ok(/Marking is done online by our server/.test(privacy) && /never sets the mark/.test(privacy),
   'the notice says marking is server-side and the on-device engine never sets the mark');
-ok(/Railway's `ams` region/.test(privacy) && /Supabase in its Mumbai region/.test(privacy),
-  'the notice states where data is stored today and where it is planned to move');
+ok(/Railway[^.]*Amsterdam/.test(privacy) && /Neon[^.]*Singapore/.test(privacy) && !/Supabase|Mumbai/.test(privacy),
+  'the notice states where data is stored (Railway Amsterdam, Neon Singapore) and no longer a planned Supabase Mumbai move');
 ok(!/whole app without an account|servers in India|on your own device\.|so a teacher can set work/i.test(privacy),
   'the notice no longer claims an account-free app, Indian servers, on-device marking or a teacher product');
 // The notice may not claim to "follow" the Act while its own Children section
@@ -541,10 +546,20 @@ const LATIN_IN_HINDI = new Map([
 
 // The owner's facts as filled into the templates (docs/legal/README.md). Each
 // must appear in the English notices too, so this cannot hide prose.
-const OWNER_FACTS = ['Priysharan Tripathi', '5 Juniper Pl, Oakville NSW 2765, Australia'];
+const OWNER_FACTS = ['Priysharan Tripathi', 'ABN 20 192 090 394', 'Priysharan Tripathi trading as Pri Learning, ABN 20 192 090 394'];
 for (const fact of OWNER_FACTS) {
   ok(PAGES.some(([slug]) => readDoc(slug, 'en').replace(/\s+/g, ' ').includes(fact)),
     `owner fact "${fact}" is filled into the English notices as well`);
+}
+
+// Owner decisions of 18 Nov 2026: a short cookies-and-storage section, and the payment and error-reporting processors named.
+{
+  const enPrivacy = readDoc('privacy', 'en'), hiPrivacy = readFileSync(fileFor('privacy', 'hi'), 'utf8');
+  ok(/## Cookies and storage[\s\S]*Sign-in cookies[\s\S]*no advertising or analytics cookies/.test(enPrivacy), 'it names only sign-in cookies and functional storage, and says there is no tracking');
+  ok(/## कुकीज़ और स्टोरेज/.test(hiPrivacy), 'the Hindi notice has the same section');
+  ok(/\*\*Razorpay\*\*[\s\S]{0,400}we never\s+receive or store them/.test(enPrivacy), 'the Indian notice names Razorpay and says card, UPI and netbanking details never reach us');
+  ok(/error-reporting service\*\* \(Sentry/.test(enPrivacy), 'the Indian notice names the error-reporting processor');
+  ok(/रेज़रपे/.test(hiPrivacy) && /त्रुटि-रिपोर्ट सेवा/.test(hiPrivacy), 'the Hindi notice names both too');
 }
 
 for (const [slug] of PAGES) {
@@ -838,6 +853,38 @@ for (const dir of imported) {
     `the image's client build copies ${dir}, which the client imports from outside client/`);
 }
 ok(imported.length > 0, 'the legal page imports its documents from the repository, not a copy');
+
+// Owner privacy (18 Nov 2026): no street or postal address of the owner, and no
+// personal iCloud address, may appear on any published or shipped surface. The
+// business is named by its ABN and the prilearning19@gmail.com mailbox instead.
+{
+  const SURFACES = ['docs/legal', 'docs/release/store', 'site/src', 'site/public', 'client/src', 'server', 'README.md'];
+  const SKIP = new Set(['node_modules', 'dist', '.git']);
+  const TEXT = /\.(md|mjs|js|jsx|json|html|txt|css|svg|xml)$/;
+  const PRIVATE = [
+    ['the owner\'s street', /\bJuniper\s+Pl\b|\bOakville\b/i],
+    ['an Australian street address', /\b\d{1,5}[A-Za-z]?\s+[A-Z][A-Za-z']+(?:\s+[A-Z][A-Za-z']+)?\s+(?:Pl|Place|St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Ln|Lane|Ct|Court|Cres|Crescent|Pde|Parade|Way|Tce|Terrace)\b[.,]?\s+[A-Z][A-Za-z ]+\s+(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\s+\d{4}\b/],
+    ['the owner\'s personal iCloud address', /impriysharan@icloud\.com/i],
+    ['an unfilled contact placeholder', /\{\{\s*CONTACT_EMAIL\s*\}\}/],
+  ];
+  const hits = [];
+  const walk = (rel) => {
+    const abs = join(ROOT, rel);
+    let entries = null;
+    try { entries = readdirSync(abs, { withFileTypes: true }); } catch { /* a file, or not there */ }
+    if (entries) {
+      for (const e of entries) if (!SKIP.has(e.name)) walk(`${rel}/${e.name}`);
+    } else if (TEXT.test(rel)) {
+      let text = null;
+      try { text = readFileSync(abs, 'utf8'); } catch { /* absent */ }
+      if (text !== null) for (const [what, re] of PRIVATE) if (re.test(text)) hits.push(`${rel}: ${what}`);
+    }
+  };
+  for (const rel of SURFACES) walk(rel);
+  ok(hits.length === 0, `no published surface carries the owner's street address or personal iCloud address${hits.length ? ' — ' + hits.slice(0, 6).join('; ') : ''}`);
+  ok(PRIVATE[1][1].test('x 5 Juniper Pl, Oakville NSW 2765') && PRIVATE[1][1].test('12 Smith Street Parramatta NSW 2150')
+    && !PRIVATE[1][1].test('ABN 20 192 090 394'), 'the address pattern catches a street address and leaves the ABN alone');
+}
 
 console.log(failures.length
   ? `LEGAL PAGES: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`

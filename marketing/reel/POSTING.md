@@ -36,7 +36,7 @@ right-side icon rail; the first and last frames are black so the loop is seamles
 > Maths practice for CBSE / NCERT Classes 7 to 12, JEE Main and JEE Advanced. 77 chapters,
 > generated questions with fresh numbers, timed papers. No rank is predicted.
 >
-> Free: 20 questions a day. Premium: ₹199 a month or ₹1,499 a year.
+> Free: practice with no daily limit. Premium: ₹199 a month or ₹1,499 a year.
 >
 > Not endorsed by NCERT, CBSE or the NTA. Coming soon — follow @pri.learning. 🔔
 
@@ -51,7 +51,7 @@ right-side icon rail; the first and last frames are black so the loop is seamles
 
 > Dark cinematic reel: a calculus integral is handwritten on an iPad and marked automatically,
 > followed by a chapter counter, a syllabus map, a chapters-practised card, a race between
-> students, a timed paper, a feature montage, and pricing — free at 20 questions a day, Premium
+> students, a timed paper, a feature montage, and pricing — free with no daily limit on practice, Premium
 > at ₹199 a month — ending on the Pri Learning logo and "Coming soon".
 
 ## Voice-over

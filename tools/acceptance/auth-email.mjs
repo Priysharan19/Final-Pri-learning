@@ -202,10 +202,11 @@ async function requestCode(id, label, recipient, { path = '/v1/account/otp/reque
   messagesTo.set(recipient, (messagesTo.get(recipient) || 0) + fresh.length);
   if (!check(`${id}b`, `${label}: Resend accepted the send and holds the message`, !!codeMessage, `${fresh.length} new message(s) for ${mask(recipient)}, none carrying a code`)) return null;
   check(`${id}c`, `${label}: sent from the configured sender ${EXPECTED_SENDER}`, senderOk(codeMessage.message), 'the From of the stored message is not the expected sender');
-  const subjectTail = purpose === 'guardian-consent' ? ' is the code to approve your child’s Pri Learning account' : ' is your Pri Learning code';
+  const brand = String(codeMessage.message.subject || '').match(/ (Priyabhata|Prithagoras|Pri Learning)( account| code)/)?.[1] || 'Pri Learning'; // the deployment's edition name, as the mail states it
+  const subjectTail = purpose === 'guardian-consent' ? ` is the code to approve your child’s ${brand} account` : ` is your ${brand} code`;
   const bodyMarker = purpose === 'guardian-consent'
-    ? /Your child is setting up Pri Learning and has asked you to approve their account\. Open http:\/\/127\.0\.0\.1:\d+\/guardian\/consent yourself/
-    : /Enter this code in Pri Learning to continue\. It is valid for 10 minutes\. Do not share it with anyone\./;
+    ? /Your child is setting up (?:Pri Learning|Priyabhata|Prithagoras) and has asked you to approve their account\. Open http:\/\/127\.0\.0\.1:\d+\/guardian\/consent yourself/
+    : /Enter this code in (?:Pri Learning|Priyabhata|Prithagoras) to continue\. It is valid for 10 minutes\. Do not share it with anyone\./;
   const text = String(codeMessage.message.text || '');
   const html = String(codeMessage.message.html || '');
   // The accessible 480px OTP template uses a labelled <div> with three

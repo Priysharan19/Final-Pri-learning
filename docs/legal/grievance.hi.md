@@ -14,10 +14,10 @@
 
 ## शिकायत अधिकारी
 
-- Priysharan Tripathi
-- शिकायत अधिकारी, Pri Learning
-- 5 Juniper Pl, Oakville NSW 2765, Australia
-- impriysharan@icloud.com
+- Priysharan Tripathi (Pri Learning के नाम से व्यापार)
+- शिकायत अधिकारी
+- ABN 20 192 090 394
+- prilearning19@gmail.com
 
 भारत का डिजिटल व्यक्तिगत डेटा संरक्षण अधिनियम, 2023 (DPDP Act) हमसे अपेक्षा करता
 है कि आपके डेटा से जुड़े प्रश्नों और शिकायतों के लिए हम एक संपर्क प्रकाशित करें।
@@ -50,6 +50,6 @@
 
 ## सदस्यता
 
-बिलिंग से जुड़े सवालों के लिए impriysharan@icloud.com पर लिखिए; देखिए
+बिलिंग से जुड़े सवालों के लिए prilearning19@gmail.com पर लिखिए; देखिए
 [रिफ़ंड नीति](/refund-policy)। भुगतान ऐप स्टोर या गूगल प्ले ने लिया है, इसलिए
 आप बात उनके सामने भी रख सकते हैं।

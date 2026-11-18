@@ -1,14 +1,15 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · what each plan includes, as the Premium screen states it
 //
-// Owner defaults D19 and D20 (docs/release/V1_DECISIONS_2026-11-01.md), from
-// the same definitions the server enforces, so the screen cannot promise a
-// figure the server does not keep:
-//   Free     — 20 practice questions a day, one timed paper every 30 days,
+// The 'value-2026-11' packaging, owner-approved 2026-11-18 (it replaced owner
+// defaults D19 / D20, docs/release/V1_DECISIONS_2026-11-01.md), from the same
+// definitions the server enforces, so the screen cannot promise a figure the
+// server does not keep:
+//   Free     — practice with no daily limit, one timed paper every 30 days,
 //              5 reads of your writing and 5 question photos a day, and the
 //              mistake notebook;
-//   Premium  — unlimited practice questions and timed papers, the JEE
-//              Advanced track, 25 reads and 25 photos a day; and, on the
+//   Premium  — unlimited timed papers, the JEE Advanced track, 50 reads and
+//              50 photos a day; and, on the
 //              server's own entitlement record, where the time went in each
 //              section of a timed paper (premium-exams), the estimate from
 //              practice and the mistake patterns on Insights
@@ -19,8 +20,8 @@
 // report, "Why this step?") are not listed until they are on.
 // Nothing else is claimed: no accuracy, no outcome, no "complete" (D24).
 //
-// The figures come from the ACTIVE packaging (engine/packaging.js): under the
-// value proposal free practice is not capped, so the free column says so and
+// The figures come from the ACTIVE packaging (engine/packaging.js): free
+// practice is not capped, so the free column says so and
 // Premium stops claiming "unlimited practice questions" as something it adds.
 // ─────────────────────────────────────────────────────────────────────────────
 import { FREE_PRACTICE_ALLOWANCE, READ_ALLOWANCE } from '../engine/practiceAllowance.js';
@@ -53,7 +54,8 @@ export const PREMIUM_ROWS = Object.freeze([
 
 /** Why the student arrived, said first and plainly. Unknown reasons say nothing. */
 export const ARRIVAL_KEYS = Object.freeze({
-  practice: 'paywall.from.practice',
+  // Said only when free practice really has a daily cap; with none, no student arrives for it and no copy says so.
+  ...(practiceCapped ? { practice: 'paywall.from.practice' } : {}),
   exams: 'paywall.from.exams',
   'jee-advanced': 'paywall.from.jeeAdvanced',
   reads: 'paywall.from.reads',

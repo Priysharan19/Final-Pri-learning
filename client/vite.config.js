@@ -722,7 +722,8 @@ export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HAN
 //   SYLLABUS_BOARD — the syllabus board, priorities and paper readiness on the
 //   Progress page (both editions). Off in a production build: the Prithagoras
 //   board names NSW outcome codes and focus areas to students, and whether that
-//   needs NESA permission is an open question (research §5.7).
+//   needs NESA permission is an open question (research §5.7). The owner turned
+//   it on for a Prithagoras build on 18 Nov 2026 (featureStates); it stays off for Priyabhata.
 //   TUTOR_POLICY — the tutor policy's "smallest next step" panel above the hint
 //   ladder (src/engine/tutorPolicy.js, src/components/HelpPlan.jsx). Opt-in
 //   everywhere, the dev server included: turning it on is an owner decision,
@@ -730,7 +731,11 @@ export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HAN
 const OPT_IN_FLAGS = new Set(['PAST_PAPERS', 'TUTOR_POLICY']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
-  const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
+  // Owner decision 18 Nov 2026: the syllabus board is ON in a Prithagoras build (NESA outcome codes beside our own
+  // descriptions; the wording guard in hsc-priorities-check.mjs holds the text). PRI_FEATURE_SYLLABUS_BOARD=0 still
+  // switches it off; a Priyabhata build keeps it off until it is turned on explicitly.
+  const defaultOn = name => name === 'SYLLABUS_BOARD' && resolveEdition(env) === 'prithagoras' && env.PRI_FEATURE_SYLLABUS_BOARD !== '0';
+  const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' || defaultOn(name) : env[`PRI_FEATURE_${name}`] !== '0');
   // The regional edition (client/edition.config.mjs, ADR-0002) this build
   // serves: PRI_EDITION, unset = Priyabhata. An unknown value stops the build.
   return { ...Object.fromEntries([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].map(name => [flagKey(name), on(name)])), instrument: INSTRUMENT_BUILD, skin: INTERFACE_SKIN, edition: resolveEdition(env) };
@@ -787,7 +792,8 @@ export default defineConfig(({ command }) => {
     define: {
       ...featureDefines(command),
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
-      __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
+      __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build'),
+      __PRI_BUILD_SHA__: JSON.stringify(command === 'build' ? String(releaseIdentity.releaseSha || '') : '')
     },
     plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), editionLegalPlugin(featureStates(command).edition), editionBrand(featureStates(command).edition), editionLanguages(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },

@@ -6,14 +6,13 @@
 // "Extension 1 practice papers" section:
 //
 //   · an Extension 1 Year 12 profile on the FREE plan sees the section, the
-//     not-NESA line and a row for each cleared paper: Practice Paper 1 is the
-//     free sample (open, with "Sit this paper in the app" and both PDFs) and
-//     Practice Paper 13 ("70 marks · 2 hours · 20 pages") is locked with the
-//     Premium prompt and no download button;
+//     not-NESA line and thirteen rows (Practice Paper 01-13). Paper 01 is
+//     the free sample and downloads; Paper 02 is locked with the Premium
+//     prompt and no download button;
 //   · every control has an accessible name on Chrome's own tree, and the page
 //     does not scroll sideways at 360 px;
-//   · once the server's own entitlement row says Premium, the row unlocks and
-//     both buttons download the owner's PDFs, byte for byte;
+//   · once the server's own entitlement row says Premium, all thirteen unlock and a
+//     non-sample paper and its guidelines download byte for byte;
 //   · the same student on the Advanced pathway, and on Year 10, sees nothing.
 //
 // WHAT IS REAL: the built Prithagoras client, the platform server and its
@@ -113,16 +112,25 @@ try {
   check('it says the papers are original, not NESA examinations, and marked with the guidelines', (await section.locator('[data-ext1-papers-note]').innerText()).trim() === 'Original practice papers written for Prithagoras. Not NESA examinations. Printed papers are marked by you or your teacher with the marking guidelines.');
   const ids = await page.locator('[data-ext1-paper]').evaluateAll(els => els.map(el => el.getAttribute('data-ext1-paper')));
   check('a row for every paper, in order', JSON.stringify(ids) === JSON.stringify(manifest.papers.map(p => p.id)), JSON.stringify(ids));
-  const first = manifest.papers.find(p => p.id === 'ext1-2027-p13');
-  check('the manifest ships Papers 1 to 7, 10 and 13, and Paper 1 alone is the free sample', manifest.papers.length === 9 && manifest.papers.filter(p => p.sample).map(p => p.id).join() === 'ext1-2027-p01');
-  const firstText = (await page.locator(`[data-ext1-paper="${first.id}"]`).textContent()).replace(/\s+/g, ' ');
-  check('the row says "70 marks · 2 hours · 20 pages"', firstText.includes('70 marks · 2 hours · 20 pages'), firstText);
-  check('on the free plan every paper but the sample is locked: Premium prompt and a link to Premium; the sample has Sit, Paper and Guidelines buttons',
-    await page.locator('[data-ext1-paper][data-locked="yes"]').count() === 8 && await page.locator('[data-ext1-paper][data-locked="no"]').count() === 1
-    && await page.locator('[data-premium-gate="ext1-papers"]').count() === 8 && await page.getByRole('link', { name: en['papers.ext1.seePremium'] }).count() === 8
-    && await page.locator('[data-ext1-papers] button').count() === 3
-    && await page.getByRole('button', { name: 'Sit Practice Paper 1 in the app' }).count() === 1
-    && await page.locator(`[data-ext1-paper="${first.id}"] button`).count() === 0);
+  const sampleP = manifest.papers[0];
+  const lockedP = manifest.papers[1];
+  check('the manifest ships Practice Papers 01-13, Paper 01 the only sample',
+    JSON.stringify(manifest.papers.map(p => p.id)) === JSON.stringify(['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'].map(n => `ext1-2027-p${n}`))
+    && JSON.stringify(manifest.papers.filter(p => p.sample).map(p => p.id)) === JSON.stringify([sampleP.id]));
+  const rowText = async p => (await page.locator(`[data-ext1-paper="${p.id}"]`).textContent()).replace(/\s+/g, ' ');
+  const sampleText = await rowText(sampleP);
+  check('the Paper 01 row says "70 marks · 2 hours · 19 pages"', sampleText.includes('70 marks · 2 hours · 19 pages'), sampleText);
+  check('on the free plan Paper 01 is unlocked with both buttons and the other twelve are locked',
+    await page.locator(`[data-ext1-paper="${sampleP.id}"]`).getAttribute('data-locked') === 'no'
+    && await page.locator('[data-ext1-paper][data-locked="no"]').count() === 1 && await page.locator('[data-ext1-paper][data-locked="yes"]').count() === 12
+    && await page.getByRole('button', { name: 'Download Practice Paper 01, paper (PDF)' }).count() === 1
+    && await page.getByRole('button', { name: 'Download Practice Paper 01, marking guidelines (PDF)' }).count() === 1
+    && await page.locator('[data-ext1-papers] button').count() === 2);
+  check('a locked row (Paper 02) shows the Premium prompt, a link to Premium and no download button',
+    await page.locator(`[data-ext1-paper="${lockedP.id}"] button`).count() === 0
+    && await page.locator('[data-premium-gate="ext1-papers"]').count() >= 1 && await page.getByRole('link', { name: en['papers.ext1.seePremium'] }).count() >= 1);
+  const [freePaper] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.locator(`[data-ext1-download="${sampleP.id}:paper"]`).click()]);
+  check('the free account downloads Paper 01, byte for byte', sha(readFileSync(await freePaper.path())) === sampleP.paper.sha256 && freePaper.suggestedFilename() === 'Prithagoras-Ext1-Practice-Paper-01.pdf', freePaper.suggestedFilename());
   check('ACCESSIBILITY: every control on the page has a name', (await unnamedControls(page)).length === 0, JSON.stringify(await unnamedControls(page)));
 
   // ── 360 px ──────────────────────────────────────────────────────────────────
@@ -140,14 +148,17 @@ try {
     .run(made.accountId, now + 30 * DAY, now);
   await openExams(platform, page);
   await page.waitForSelector('[data-ext1-paper]', { timeout: 30000 });
-  check('with Premium the paper is unlocked and offers the sitting and both downloads', await page.locator('[data-ext1-paper][data-locked="yes"]').count() === 0 && await page.locator('[data-premium-gate="ext1-papers"]').count() === 0
-    && await page.getByRole('button', { name: 'Sit Practice Paper 13 in the app' }).count() === 1
-    && await page.getByRole('button', { name: 'Download Practice Paper 13, paper (PDF)' }).count() === 1
+  const listed = await page.locator('[data-ext1-paper]').evaluateAll(els => els.map(el => [el.getAttribute('data-ext1-paper'), el.getAttribute('data-locked')]));
+  check('with Premium all thirteen papers are listed and unlocked, with no Premium prompt',
+    listed.length === 13 && listed.every(([, l]) => l === 'no') && await page.locator('[data-premium-gate="ext1-papers"]').count() === 0
+    && await page.locator('[data-ext1-papers] button').count() === 26, JSON.stringify(listed));
+  const first = manifest.papers.find(p => p.id === 'ext1-2027-p13');
+  check('Paper 13 offers both buttons with the catalogue\'s names', await page.getByRole('button', { name: 'Download Practice Paper 13, paper (PDF)' }).count() === 1
     && await page.getByRole('button', { name: 'Download Practice Paper 13, marking guidelines (PDF)' }).count() === 1);
   check('the visible button text is the catalogue\'s', (await page.locator(`[data-ext1-download="${first.id}:paper"]`).innerText()) === en['papers.ext1.paper']
     && (await page.locator(`[data-ext1-download="${first.id}:guidelines"]`).innerText()) === en['papers.ext1.guidelines']);
   const [paid] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.locator(`[data-ext1-download="${first.id}:paper"]`).click()]);
-  check('the paper downloads, byte for byte', sha(readFileSync(await paid.path())) === first.paper.sha256 && paid.suggestedFilename() === 'Prithagoras-Ext1-Practice-Paper-13.pdf', paid.suggestedFilename());
+  check('a non-sample paper downloads, byte for byte', sha(readFileSync(await paid.path())) === first.paper.sha256 && paid.suggestedFilename() === 'Prithagoras-Ext1-Practice-Paper-13.pdf', paid.suggestedFilename());
   const [guide] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.locator(`[data-ext1-download="${first.id}:guidelines"]`).click()]);
   check('and its marking guidelines', sha(readFileSync(await guide.path())) === first.guidelines.sha256 && guide.suggestedFilename().endsWith('-Marking-Guidelines.pdf'));
   check('ACCESSIBILITY (Premium): every control on the page has a name', (await unnamedControls(page)).length === 0, JSON.stringify(await unnamedControls(page)));
@@ -171,4 +182,4 @@ if (failures.length) {
   console.error(`EXT1 PAPERS TOUR: FAIL — ${failures.length} failed, ${pass} passed`);
   process.exit(1);
 }
-console.log(`EXT1 PAPERS TOUR: PASS — ${pass}/${pass} checks — a Prithagoras Extension 1 Year 12 student sees the cleared papers (Paper 1 free, the rest locked on the free plan and unlocked on Premium), downloads the owner's PDFs, and other pathways and years see nothing. [SYNTHETIC student and entitlement]`);
+console.log(`EXT1 PAPERS TOUR: PASS — ${pass}/${pass} checks — a Prithagoras Extension 1 Year 12 student sees thirteen practice papers (Paper 01 free, the rest locked on the free plan, all unlocked on Premium), downloads the owner's PDFs, and other pathways and years see nothing. [SYNTHETIC student and entitlement]`);

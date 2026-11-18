@@ -17,17 +17,17 @@ import { edition } from '../platform/edition.js';
 import {
   functionGraphModel, unitCircleModel, triangleModel, regularPolygonModel, circleTheoremModel, numberLineModel, treeModel, vennModel,
   twoWayModel, histogramModel, boxPlotModel, normalCurveModel, vectorModel, sequenceModel, compoundModel, timelineModel,
-  secantTangentModel, riemannModel, networkModel, scatterModel, solidModel, ftex, ftext, r3
+  secantTangentModel, riemannModel, networkModel, scatterModel, solidModel, ftex, ftext, r3, layoutLabels, textW
 } from './geometry.js';
 
 const poly = pts => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x} ${y}`).join(' ');
 
 /** A KaTeX label centred (or anchored) at an SVG point. */
-export function Tex({ x, y, tex, w = 64, h = 26, anchor = 'middle', baseline = 'middle', className = '' }) {
+export function Tex({ x, y, tex, w = 64, h = 26, anchor = 'middle', baseline = 'middle', className = '', ...rest }) {
   const left = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
   const top = baseline === 'top' ? y : baseline === 'bottom' ? y - h : y - h / 2;
   return (
-    <foreignObject x={left} y={top} width={w} height={h} className={`dg-tex ${className}`} style={{ overflow: 'visible' }}>
+    <foreignObject x={left} y={top} width={w} height={h} className={`dg-tex ${className}`} style={{ overflow: 'visible' }} {...rest}>
       <div xmlns="http://www.w3.org/1999/xhtml" className={`dg-tex-in is-${anchor}`}><MathText text={`$${tex}$`} /></div>
     </foreignObject>
   );
@@ -51,6 +51,7 @@ export function Figure({ width, height, title, description, caption = null, chil
 function Axes({ m, grid = true, labels = true, xLabel = null, yLabel = null }) {
   const f = m.frame;
   const x0 = m.axes.x[0][1]; const y0 = m.axes.y[0][0];
+  const an = m.axisNames;
   return (
     <g className="dg-axes">
       {grid && m.xTicks.map(t => <line key={`gx${t.value}`} className="dg-grid" x1={t.px} x2={t.px} y1={f.top} y2={f.bottom} />)}
@@ -59,8 +60,9 @@ function Axes({ m, grid = true, labels = true, xLabel = null, yLabel = null }) {
       <line className="dg-axis" x1={y0} x2={y0} y1={m.axes.y[1][1]} y2={m.axes.y[0][1]} markerEnd="url(#dg-arrow)" />
       {labels && m.xTicks.filter(t => t.value !== 0).map(t => <Tex key={`lx${t.value}`} x={t.px} y={x0 + 14} tex={String(t.value)} w={40} h={20} />)}
       {labels && m.yTicks.filter(t => t.value !== 0).map(t => <Tex key={`ly${t.value}`} x={y0 - 6} y={t.px} tex={String(t.value)} w={40} h={20} anchor="end" />)}
-      {xLabel && <Tex x={f.right} y={x0 - 12} tex={xLabel} w={36} h={20} anchor="end" />}
-      {yLabel && <Tex x={y0 + 8} y={f.top - 2} tex={yLabel} w={36} h={20} anchor="start" />}
+      {labels && m.origin && <Tex x={m.origin.x} y={m.origin.y} tex="0" w={20} h={20} anchor="end" />}
+      {xLabel && an && <Tex data-axis-name="x" className="dg-axis-name" x={an.x.x} y={an.x.y} tex={xLabel} w={an.x.w + 8} h={20} anchor={an.x.anchor} />}
+      {yLabel && an && <Tex data-axis-name="y" className="dg-axis-name" x={an.y.x} y={an.y.y} tex={yLabel} w={an.y.w + 8} h={20} anchor={an.y.anchor} />}
     </g>
   );
 }
@@ -85,27 +87,31 @@ export const currencyTex = symbol => (symbol === '₹' ? '\\text{₹}' : '\\$');
 const useTk = () => useKitText(CORE_TEXT);
 
 // ── Function graphs ──────────────────────────────────────────────────────────
-export function FunctionGraph({ title, caption = null, xLabel = 'x', yLabel = 'y', hideIntercepts = false, ...spec }) {
+export function FunctionGraph({ title, caption = null, hideIntercepts = false, ...spec }) {
   const tk = useTk();
   const m = functionGraphModel(spec);
+  const xLabel = m.names.xTex; const yLabel = m.names.yTex;
+  const V = { xv: m.names.x, yv: m.names.y };
+  const inVars = e => String(e).replace(/\bx\b/g, m.names.x);
   const desc = sentence(
-    tk('function.axes', { xmin: r3(m.frame.xmin, 2), xmax: r3(m.frame.xmax, 2), ymin: r3(m.frame.ymin, 2), ymax: r3(m.frame.ymax, 2) }),
-    m.curves.map(c => sentence(c.label ? tk('function.curveNamed', { name: c.label.replace(/[\\${}]/g, ''), expr: c.expr }) : tk('function.curve', { expr: c.expr }), c.shade ? tk('function.shade', { from: c.shade.from, to: c.shade.to }) : '')).join(' '),
-    m.curves.flatMap(c => [c.yIntercept ? tk('function.yIntercept', { y: c.yIntercept.y }) : '', c.xIntercepts?.length ? tk('function.xIntercepts', { xs: c.xIntercepts.map(i => i.x).join(', ') }) : '']).join(' '),
-    m.asymptotes.map(a => tk(a.axis === 'x' ? 'function.asymptoteVertical' : 'function.asymptoteHorizontal', { value: a.value })).join(' ')
+    tk('function.axes', { ...V, xmin: r3(m.frame.xmin, 2), xmax: r3(m.frame.xmax, 2), ymin: r3(m.frame.ymin, 2), ymax: r3(m.frame.ymax, 2) }),
+    m.curves.map(c => sentence(c.label ? tk('function.curveNamed', { ...V, name: c.label.replace(/[\\${}]/g, ''), expr: inVars(c.expr) }) : tk('function.curve', { ...V, expr: inVars(c.expr) }), c.shade ? tk('function.shade', { ...V, from: c.shade.from, to: c.shade.to }) : '')).join(' '),
+    m.curves.flatMap(c => [c.yIntercept ? tk('function.yIntercept', { ...V, y: c.yIntercept.y }) : '', c.xIntercepts?.length ? tk('function.xIntercepts', { ...V, xs: c.xIntercepts.map(i => i.x).join(', ') }) : '']).join(' '),
+    m.asymptotes.map(a => tk(a.axis === 'x' ? 'function.asymptoteVertical' : 'function.asymptoteHorizontal', { ...V, value: a.value })).join(' '),
+    m.curves.filter(c => c.constant !== undefined).map(c => tk('function.referenceLine', { ...V, value: c.constant })).join(' ')
   );
   return (
     <Figure width={m.frame.width} height={m.frame.height} title={title ?? tk('function.title')} description={desc} caption={caption}>
       <Defs />
       <Axes m={m} xLabel={xLabel} yLabel={yLabel} />
       {m.asymptotes.map((a, i) => (
-        <g key={`as${i}`}><line className="dg-asymptote" x1={a.px[0][0]} y1={a.px[0][1]} x2={a.px[1][0]} y2={a.px[1][1]} />{a.label && <Tex x={a.axis === 'x' ? a.px[0][0] + 4 : a.px[1][0] - 4} y={a.axis === 'x' ? a.px[0][1] + 12 : a.px[0][1] - 12} tex={a.label} w={70} anchor={a.axis === 'x' ? 'start' : 'end'} />}</g>
+        <g key={`as${i}`}><line className="dg-asymptote" x1={a.px[0][0]} y1={a.px[0][1]} x2={a.px[1][0]} y2={a.px[1][1]} />{a.place && <Tex className="dg-ref-label" x={a.place.x} y={a.place.y} tex={a.refLabel} w={a.place.w} anchor={a.place.anchor} />}</g>
       ))}
       {m.curves.map(c => c.shade && c.shade.path.length > 0 && <path key={`sh${c.id}`} className="dg-shade" d={`${poly(c.shade.path)} Z`} />)}
-      {m.curves.map(c => c.segments.map((seg, k) => <path key={`${c.id}${k}`} className={`dg-curve is-${c.tone}`} d={poly(seg)} />))}
+      {m.curves.map(c => <g key={`cv${c.id}`}>{c.segments.map((seg, k) => <path key={`${c.id}${k}`} className={`dg-curve is-${c.tone}`} d={poly(seg)} />)}{c.constant !== undefined && c.place && <Tex className="dg-ref-label" x={c.place.x} y={c.place.y} tex={c.refLabel} w={c.place.w} anchor={c.place.anchor} />}</g>)}
       {!hideIntercepts && m.curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean).map((p, i) => <g key={`ic${c.id}${i}`}><circle className="dg-dot" cx={p.px[0]} cy={p.px[1]} r="4" />{p.place && <Tex x={p.place.x} y={p.place.y} tex={`(${p.x},\\,${p.y})`} w={p.place.w} anchor={p.place.anchor} />}</g>))}
-      {m.points.map((p, i) => <g key={`pt${i}`}><circle className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" />{p.label && <Tex x={p.place.x} y={p.place.y} tex={p.label} w={p.place.w} anchor={p.place.anchor} />}</g>)}
-      {m.curves.map(c => c.label && <Tex key={`lb${c.id}`} x={Math.min(m.frame.right - 40, (c.segments.at(-1)?.at(-1)?.[0] ?? m.frame.right) - 4)} y={(c.segments.at(-1)?.at(-1)?.[1] ?? m.frame.top) - 12} tex={c.label} w={110} anchor="end" className="dg-curve-label" />)}
+      {m.points.map((p, i) => <g key={`pt${i}`}><circle className="dg-dot is-key" cx={p.px[0]} cy={p.px[1]} r="4.5" />{p.label && p.place && <Tex x={p.place.x} y={p.place.y} tex={p.label} w={p.place.w} anchor={p.place.anchor} />}</g>)}
+      {m.curves.map(c => c.label && c.constant === undefined && c.labelPlace && <Tex key={`lb${c.id}`} x={c.labelPlace.x} y={c.labelPlace.y} tex={c.label} w={c.labelPlace.w} anchor={c.labelPlace.anchor} className="dg-curve-label" />)}
     </Figure>
   );
 }
@@ -115,6 +121,18 @@ export function UnitCircle({ deg = 30, showTan = false, title, caption = null, o
   const tk = useTk();
   const m = unitCircleModel({ deg });
   const p = m.point;
+  // The point's coordinates go where no tick number, other label, ray or the circle is: beside the point, else further out or inside.
+  const coordTex = `(${p.cos},\\,${p.sin})`;
+  const box = (x, y, w, anchor = 'middle') => ({ l: anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2, r: anchor === 'start' ? x + w : anchor === 'end' ? x : x + w / 2, t: y - 7, b: y + 7 });
+  const circle = Array.from({ length: 73 }, (_, k) => [m.centre[0] + m.radius * Math.cos((k * Math.PI) / 36), m.centre[1] + m.radius * Math.sin((k * Math.PI) / 36)]);
+  const thetaW = textW(`\\theta=${p.deg}^{\\circ}`);
+  const cands = [];
+  for (const [dy, dx] of [[-16, 10], [16, 10], [-16, -10], [16, -10], [-34, 8], [34, 8], [-34, -8], [34, -8], [0, 14], [0, -14], [-52, 6], [52, 6], [-52, -6], [52, -6]]) cands.push({ anchor: dx > 0 ? 'start' : 'end', x: m.px[0] + dx, y: m.px[1] + dy });
+  const [coord] = layoutLabels([{ w: textW(coordTex), at: m.px, cands }], {
+    fixed: [...m.ticks.map(t => box(t.px[0], t.px[1], textW(`${t.deg}^{\\circ}`))), box(m.centre[0] + 36, m.centre[1] - 8, thetaW, 'start')],
+    lines: [{ pts: circle, weight: 8 }, { pts: [m.centre, m.px], weight: 6 }, { pts: [m.px, m.foot], weight: 6 }, { pts: [m.centre, m.foot], weight: 6 }, { pts: [[m.frame.left, m.centre[1]], [m.frame.right, m.centre[1]]], weight: 4 }, { pts: [[m.centre[0], m.frame.top], [m.centre[0], m.frame.bottom]], weight: 4 }],
+    dots: [m.px], bounds: { left: 0, right: m.frame.width, top: 0, bottom: m.frame.height }
+  });
   const desc = sentence(
     tk('unitCircle.desc', { deg: p.deg, cos: p.cos, sin: p.sin, tan: p.tan !== null ? tk('unitCircle.tan', { tan: p.tan }) : tk('unitCircle.tanUndefined') }),
     p.quadrant ? tk('unitCircle.quadrant', { quadrant: p.quadrant, reference: p.reference }) : tk('unitCircle.onAxis', { reference: p.reference })
@@ -131,7 +149,7 @@ export function UnitCircle({ deg = 30, showTan = false, title, caption = null, o
       <line className="dg-dash is-cos" x1={m.px[0]} y1={m.px[1]} x2={m.foot[0]} y2={m.foot[1]} />
       <line className="dg-dash is-sin" x1={m.centre[0]} y1={m.centre[1]} x2={m.foot[0]} y2={m.foot[1]} />
       <circle className="dg-dot is-key" cx={m.px[0]} cy={m.px[1]} r="5" />
-      <Tex x={p.cos >= 0 ? Math.min(m.px[0] + 10, m.frame.width - 128) : Math.max(m.px[0] - 10, 128)} y={m.px[1] + (p.sin >= 0 ? -16 : 16)} tex={`(${p.cos},\\,${p.sin})`} w={120} anchor={p.cos >= 0 ? 'start' : 'end'} />
+      <Tex x={coord.x} y={coord.y} tex={coordTex} w={coord.w} anchor={coord.anchor} />
       <Tex x={m.centre[0] + 36} y={m.centre[1] - 8} tex={`\\theta=${p.deg}^{\\circ}`} w={90} anchor="start" className="dg-small" />
       {showTan && p.tan !== null && <Tex x={m.frame.left + 8} y={m.frame.top + 12} tex={`\\tan\\theta=${p.tan}`} w={150} anchor="start" />}
       {overlay && overlay(m)}
@@ -418,6 +436,11 @@ export function SecantTangent({ title, caption = null, ...spec }) {
 export function RiemannRectangles({ title, caption = null, ...spec }) {
   const tk = useTk();
   const m = riemannModel(spec); const f = m.frame;
+  // The sum and the area are read in whichever top corner the curve leaves free.
+  const sumTex = [`\\text{${tk('tex.sum')}}=${m.sum}`, `\\text{${tk('tex.area')}}=${m.area}`];
+  const corner = (tex, row) => [{ anchor: 'end', x: f.right - 6, y: f.top + 10 + row * 20 }, { anchor: 'start', x: f.left + 10, y: f.top + 10 + row * 20 }, { anchor: 'end', x: f.right - 6, y: f.bottom - 10 - (1 - row) * 20 }, { anchor: 'start', x: f.left + 10, y: f.bottom - 10 - (1 - row) * 20 }];
+  const spots = layoutLabels(sumTex.map((tex, row) => ({ w: textW(tex), cands: corner(tex, row) })), { lines: m.curve.map(pts => ({ pts, weight: 16 })), bounds: f });
+  const sumArea = sumTex.map((tex, i) => ({ ...spots[i], tex }));
   const desc = tk('riemann.desc', { n: m.n, mode: riemannMode(tk, m.mode), expr: m.expr, a: m.a, b: m.b, width: m.width, sum: m.sum, area: m.area });
   return (
     <Figure width={f.width} height={f.height} title={title ?? tk('riemann.title')} description={desc} caption={caption}>
@@ -426,8 +449,7 @@ export function RiemannRectangles({ title, caption = null, ...spec }) {
         <line className="dg-axis" x1={f.left} x2={f.right} y1={f.sy(0)} y2={f.sy(0)} markerEnd="url(#dg-arrow)" /><line className="dg-axis" x1={f.left} x2={f.left} y1={f.bottom} y2={f.top} markerEnd="url(#dg-arrow)" /></g>
       {m.rects.map((r, i) => <rect key={i} className="dg-bar" x={r.x1} y={r.y} width={Math.max(0, r.x2 - r.x1)} height={Math.max(0, r.base - r.y)} />)}
       {m.curve.map((s, i) => <path key={i} className="dg-curve is-primary" d={poly(s)} fill="none" />)}
-      <Tex x={f.right - 6} y={f.top + 10} tex={`\\text{${tk('tex.sum')}}=${m.sum}`} w={140} anchor="end" className="dg-small" />
-      <Tex x={f.right - 6} y={f.top + 30} tex={`\\text{${tk('tex.area')}}=${m.area}`} w={140} anchor="end" className="dg-small" />
+      {sumArea.map((l, i) => <Tex key={i} x={l.x} y={l.y} tex={l.tex} w={l.w} anchor={l.anchor} className="dg-small" />)}
     </Figure>
   );
 }

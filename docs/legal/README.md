@@ -54,6 +54,18 @@ Indian notices.
 - **Not done**: the static marketing site under `site/` and the store listings are Indian and are not
   changed here.
 
+## Status, 18 November 2026 (owner review of the pages)
+
+- The India (English, Hindi) and Australia privacy notices and terms now describe stored
+  handwriting (2 years, then deleted), the teacher workspace, the invite-a-friend trial, today's
+  free and Premium limits, AI help, the distress message, product measurement and the
+  tutor-policy experiment (off). Australia also carries the NESA line. The pages were checked
+  against the code by `client/test/legal-owner-review-check.mjs` (in `npm run test:legal`),
+  which reads every stated number from the code, and `tools/legal-promises.mjs` holds four of
+  the promises for nomination.
+- The "not reviewed by a lawyer" banner and both switches are unchanged. The plain-English
+  summary for the owner is `owner-review/LEGAL-REVIEW-2026-11-18.md`.
+
 ## Status, 9 November 2026 (D17, with #737)
 
 - The privacy notice (EN + HI), the store disclosures, the public site and
@@ -221,14 +233,14 @@ Engineering cannot complete any line below. The gate that consumes them is
 
 | # | Action (owner / counsel) | Status | Evidence it produces |
 |---|---|---|---|
-| 1 | Decide the legal entity that holds the data and takes the money, and its registered address | Filled 19 Oct 2026 with the owner as an individual at a home address; **operator decision still open** (counsel pack §11 Q1–Q4) | the notices name the operator |
-| 2 | Appoint the grievance officer and a monitored mailbox | Filled 19 Oct 2026 (the owner; personal iCloud address) | `grievance.md` |
+| 1 | Decide the legal entity that holds the data and takes the money, and its registered address | Filled 19 Oct 2026 with the owner as an individual; on 18 Nov 2026 the street address was removed from every published surface and replaced by the ABN (Priysharan Tripathi trading as Pri Learning, ABN 20 192 090 394, a sole trader); **operator decision and the confirmed legal entity name still open** (counsel pack §11 Q1–Q4) | the notices name the operator |
+| 2 | Appoint the grievance officer and a monitored mailbox | Filled 19 Oct 2026 (the owner); the contact address is now prilearning19@gmail.com | `grievance.md` |
 | 3 | Open the customer support mailbox | Same address; a `prilearning.com` mailbox has no MX record yet | `refund-policy.md` |
 | 4 | Choose the jurisdiction whose courts the terms name | New Delhi, 19 Oct 2026 | `terms.md` |
 | 5 | Have the English set reviewed by a lawyer qualified in Indian law; have the Hindi checked against it | **Open.** Record it in `review-status.json` | the banner goes; `legal-pages-check.mjs` enforces the paperwork |
 | 6 | Confirm the notice matches the code's data path at the release SHA | Reconciled by engineering 2 Nov 2026 against `a5778a319`; counsel's confirmation open | `docs/release/app-store-privacy-labels.md` §6, `play-data-safety.md` §6b |
 | 7 | Set the publication date of the filled version | 19 Oct 2026; revised 2 Nov 2026 | `**Last updated**` in all eight documents |
-| 8 | Name processors in the notice if counsel requires it | Named now: Resend, Railway, Supabase (planned), OpenAI, Apple and Google | `privacy.md` "Who else sees your data" |
+| 8 | Name processors in the notice if counsel requires it | Named now: Resend, Railway, Neon, OpenAI, Apple and Google | `privacy.md` "Who else sees your data" |
 
 ## Owner summary and sign-off (Prithagoras)
 

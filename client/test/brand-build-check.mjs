@@ -131,6 +131,9 @@ if (BOTH) {
     //                  streams-standard, year8-10) carry the other hash in their import
     //                  line. Priyabhata's own bundle is byte-identical to before.
     const MAY_DIFFER = {
+      // The syllabus board is on in a Prithagoras build and off in a Priyabhata one (owner decision 18 Nov 2026, featureStates):
+      // the feature chunk holds the build's own flag values.
+      features: 'build flags',
       edition: 'brand', Paywall: 'commerce', CloudAccountPanel: 'commerce', useGooglePlayPurchase: 'commerce', useSaleAvailable: 'commerce', Legal: 'legal', i18n: 'language',
       'i18n-hi': 'language', legalHindi: 'language', languages: 'language', core: 'language',
       backend: 'language', indiaProduct: 'language', 'streams-standard': 'language', year8: 'language', year9: 'language', year10: 'language',

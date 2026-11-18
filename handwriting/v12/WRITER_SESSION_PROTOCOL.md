@@ -14,7 +14,7 @@ from `PHYSICAL_STUDY_PLAN.json`, and every path and command named here exists.
   (`docs/release/device-matrix.md`, "Which server a device build talks to"). Record the build SHA the app's
   diagnostics show; it must equal the candidate.
 - **The account.** One study account per device: a verified adult account the server lets read handwriting.
-  Each prompt is one paid read (61 prompts, about 61 reads); D20 limits Premium to 25 reads a day, so
+  Each prompt is one paid read (61 prompts, about 61 reads); the approved packaging (2026-11-18) limits Premium to 50 reads a day, so
   the account needs a raised allowance for the study, set by the owner, never by editing the app.
 - **The two device slots.** Slot A and slot B are two genuinely different iPad model classes
   (`PHYSICAL_STUDY_PLAN.json` `deviceSlots`). Never record one model as both.

@@ -59,15 +59,15 @@ export default {
     ],
     "mistakes": [
       {
-        "wrong": "$\\sin^{-1}\\left(\\sin \\tfrac{5\\pi}{6}\\right)$ must equal $\\tfrac{5\\pi}{6}$.",
+        "wrong": "$\\sin^{-1}\\left(\\sin\\left(\\tfrac{5\\pi}{6}\\right)\\right)$ must equal $\\tfrac{5\\pi}{6}$.",
         "right": "The principal value is $\\tfrac{\\pi}{6}$, because it lies in the output interval of $\\sin^{-1}$."
       }
     ],
     "examples": [
       {
-        "question": "Find the principal value of $\\sin^{-1}\\left(\\sin \\tfrac{5\\pi}{6}\\right)$.",
+        "question": "Find the principal value of $\\sin^{-1}\\left(\\sin\\left(\\tfrac{5\\pi}{6}\\right)\\right)$.",
         "steps": [
-          "$\\sin \\tfrac{5\\pi}{6} = \\tfrac{1}{2}$.",
+          "$\\sin\\left(\\tfrac{5\\pi}{6}\\right) = \\tfrac{1}{2}$.",
           "The angle $\\tfrac{\\pi}{6}$ is in the principal range of $\\sin^{-1}$ and has sine $\\tfrac{1}{2}$.",
           "Therefore the principal value is $\\tfrac{\\pi}{6}$."
         ],

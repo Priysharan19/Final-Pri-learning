@@ -14,6 +14,7 @@ import { loadGlossary } from '../i18n/glossary.js';
 import { priNative } from '../platform/native/index.js';
 import { errorReportsEnabled, setErrorReportsEnabled } from '../platform/telemetry.js';
 import { INSTRUMENT_UI } from '../platform/features.js';
+import { offersCourse, offeredLanguages } from '../platform/edition.js';
 import Glyph from '../instrument/Glyph.jsx';
 
 // The instrument build draws a glyph beside each section name (s9); the
@@ -140,7 +141,7 @@ function LanguageSection() {
     <div className="card">
       <h2 style={{ marginBottom: 12 }}>{t('lang.label')}</h2>
       <div className="row" role="group" aria-label={t('lang.label')}>
-        {LANGUAGES.map(l => (
+        {offeredLanguages(LANGUAGES).map(l => (
           <button key={l.id} type="button" className={`gen-opt ${chosen === l.id ? 'on' : ''}`}
             style={{ width: 160 }} lang={l.htmlLang} disabled={busy}
             aria-pressed={chosen === l.id} aria-label={t('lang.switchTo', { language: l.english })}
@@ -263,7 +264,8 @@ function CrashReportsCard({ t }) {
   );
 }
 
-const SECTIONS = [
+// One language is no choice to make: an edition that offers only English draws no Language section.
+const SECTIONS_ALL = [
   ['plan', '♛', 'settings.secPlan'],
   ['profile', '☺', 'settings.secProfile'],
   ['security', '⚿', 'settings.secSecurity'],
@@ -274,6 +276,7 @@ const SECTIONS = [
   ['data', '⇅', 'settings.secData'],
   ['help', '?', 'settings.secHelp'],
 ];
+const SECTIONS = offeredLanguages(LANGUAGES).length > 1 ? SECTIONS_ALL : SECTIONS_ALL.filter(([k]) => k !== 'language');
 
 function SecuritySection({ toast }) {
   const { user, setUser } = useApp();
@@ -320,7 +323,7 @@ function SecuritySection({ toast }) {
         <span className="set-k">{t('settings.email')}</span>
         {!editEmail ? (
           <span className="set-v" style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-            {user.email || <span className="muted">{t('settings.emailNotSet')}</span>}
+            {user.email || <span className="muted">{t(user.cloudLinked ? 'settings.emailInAccount' : 'settings.emailNotSet')}</span>}
             <button className="btn btn-quiet btn-sm" aria-label={t('settings.editEmail')}
               onClick={() => { setEmail(user.email || ''); setEditEmail(true); }}><Icon name="pen" size={15} /></button>
           </span>
@@ -521,7 +524,7 @@ export default function Settings() {
             {storageInfo && storageInfo.quota > 0 && (
               <div className="set-row"><span className="set-k">{t('settings.spaceUsed')}</span><span className="set-v">{t('settings.spaceOf', { used: fmtBytes(storageInfo.usage), total: fmtBytes(storageInfo.quota), percent: usagePct })}</span></div>
             )}
-            <div className="set-row"><span className="set-k">{t('settings.accounts')}</span><span className="set-v">{t('settings.accountsValue')}</span></div>
+            <div className="set-row"><span className="set-k">{t('settings.accounts')}</span><span className="set-v" data-accounts-value={user.cloudLinked ? 'linked' : 'local'}>{t(user.cloudLinked ? 'settings.accountsValueLinked' : 'settings.accountsValue')}</span></div>
           </div>
 
           {/* ── Profile ── */}
@@ -565,7 +568,7 @@ export default function Settings() {
                     <div className="field">
                       <label className="label" htmlFor="set-course">{t('settings.syllabus')}</label>
                       <select className="input" id="set-course" value={form.course} onChange={e => setForm(f => ({ ...f, course: e.target.value }))}>
-                        {COURSES.map(([k, label, labelKey]) => <option key={k} value={k}>{labelKey ? t(labelKey) : label}</option>)}
+                        {COURSES.filter(([k]) => offersCourse(k) || k === form.course).map(([k, label, labelKey]) => <option key={k} value={k}>{labelKey ? t(labelKey) : label}</option>)}
                       </select>
                     </div>
                   </div>
@@ -619,9 +622,9 @@ export default function Settings() {
           </div>
 
           {/* ── Language ── */}
-          <div ref={el => secRefs.current.language = el}>
+          {SECTIONS.some(([k]) => k === 'language') && <div ref={el => secRefs.current.language = el}>
             <LanguageSection />
-          </div>
+          </div>}
 
           {/* ── Appearance ── */}
           <div className="card" ref={el => secRefs.current.appearance = el}>

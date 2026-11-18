@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
 import { createHash } from 'node:crypto';
+import { inflateSync } from 'node:zlib';
 import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -32,7 +33,9 @@ const real = loadManifest();
 
 // ── 1 · the manifest matches the files on disk ────────────────────────────────
 c.eq(real.edition, 'prithagoras', 'the manifest is the Prithagoras edition\'s');
-c.deq(real.papers.map(p => p.id), ['01', '02', '03', '04', '05', '06', '07', '10', '13'].map(n => `ext1-2027-p${n}`), 'Practice Papers 1 to 7, 10 and 13 ship (8, 9, 11 and 12 await the author\'s choice of version)');
+const SHIPPED = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'];
+c.deq(real.papers.map(p => p.id), SHIPPED.map(n => `ext1-2027-p${n}`), 'thirteen practice papers ship, in order: 01-13 (08, 09, 11 and 12 are the scope-revised versions, each replaced part re-solved 18 Nov 2026)');
+c.deq(real.papers.map(p => p.title), SHIPPED.map(n => `Practice Paper ${n}`), 'titled "Practice Paper NN"');
 // The structured papers, their diagrams and the conversion report are content too, not PDFs (paperContent.js).
 const named = new Set(['manifest.json', 'conversion-report.json', 'structured', 'figures']);
 for (const p of real.papers) {
@@ -49,26 +52,67 @@ for (const p of real.papers) {
   }
 }
 c.deq(readdirSync(PAPERS_DIR).filter(f => f !== 'approvals.json').sort(), [...named].sort(), 'the directory holds exactly the manifest and the files it names');
-c.deq(real.papers.filter(p => p.sample).map(p => p.id), ['ext1-2027-p01'], 'Practice Paper 1 is the one free sample; every other paper is Premium');
-const real13 = real.papers.find(p => p.id === 'ext1-2027-p13');
-c.deq([real13.hasGuidelines, real13.paper.pages, real13.guidelines.pages], [true, 20, 22], 'Paper 13 has its marking guidelines: 20 and 22 pages');
+c.deq(real.papers.filter(p => p.sample).map(p => p.id), ['ext1-2027-p01'], 'Practice Paper 01 is the only free sample; the other twelve are Premium');
+c.deq(real.papers.map(p => [p.hasGuidelines, p.paper.pages, p.guidelines.pages]), [[true, 19, 14], [true, 18, 12], [true, 17, 11], [true, 18, 11], [true, 18, 11], [true, 17, 12], [true, 17, 11], [true, 18, 12], [true, 14, 10], [true, 16, 9], [true, 15, 10], [true, 15, 9], [true, 20, 22]], 'every paper has its marking guidelines, with the page counts of the rebuilt files');
+
+// Text scan of every shipped PDF, under node with no dependency beyond the standard library (the server jobs install no
+// client packages): the PDFs are pdfTeX output, so every stream is inflated and the strings of its text-showing
+// operators (Tj, TJ) are read, kerning ignored. The brand is spelled right, and no personal contact, street address or
+// old spelling is in any of them (B1 of the review of #1058: the owner's mobile number and personal email were once
+// printed on the last page of twenty-four of them).
+function pdfText(file) {
+  const raw = readFileSync(join(PAPERS_DIR, file)).toString('latin1');
+  const unescape = body => body.replace(/\\([nrtbf()\\]|[0-7]{1,3})/g, (_, e) => ({ n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', '(': '(', ')': ')', '\\': '\\' }[e] ?? String.fromCharCode(parseInt(e, 8))));
+  const pieces = [];
+  for (const m of raw.matchAll(/stream\r?\n/g)) {
+    const start = m.index + m[0].length, end = raw.indexOf('endstream', start);
+    if (end < 0) continue;
+    let text;
+    try { text = inflateSync(Buffer.from(raw.slice(start, end), 'latin1')).toString('latin1'); } catch { continue; }
+    for (const op of text.matchAll(/\[((?:[^\]\\]|\\.)*)\]\s*TJ|\(((?:[^)\\]|\\.)*)\)\s*Tj/g)) {
+      const strings = op[1] !== undefined ? [...op[1].matchAll(/\(((?:[^)\\]|\\.)*)\)/g)].map(x => unescape(x[1])) : [unescape(op[2])];
+      pieces.push(strings.join(''));
+    }
+  }
+  return pieces.join(' ');
+}
+// Spaces inside a word or a number may be kerning, so every pattern tolerates none.
+const SCAN = [
+  ['an iCloud address', /@\s*icloud|icloud\s*\.\s*com/i],
+  ['an Australian mobile number', /(?:\+?61\s*)?\(?0?4\d{2}\)?[\s-]*\d{3}[\s-]*\d{3}(?!\d)/],
+  ['a street address', new RegExp('\\b\\d{1,4}\\s*[A-Z][a-z]+\\s*(?:Pl|Place|St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Ct|Court|Cres|Crescent|Lane|Ln)\\b|Oak' + 'ville|NSW\\s*2\\d{3}\\b')],
+  ['the old spelling', /Pritagoras/i],
+  ['the owner\'s personal name beside a contact', /Priysharan/i]
+];
+const pdfFiles = [...named].filter(f => f.endsWith('.pdf'));
+const brandRows = [];
+const scanHits = [];
+for (const f of pdfFiles) {
+  const text = pdfText(f);
+  brandRows.push([f, /Prithagoras/.test(text), text.length]);
+  for (const [label, re] of SCAN) if (re.test(text)) scanHits.push(`${f}: ${label}`);
+}
+c.eq(brandRows.length, 26, 'the text scan read all twenty-six PDFs');
+c.ok(brandRows.every(r => r[2] > 2000), 'and found real text in each');
+c.deq(brandRows.filter(r => !r[1]).map(r => r[0]), [], 'every shipped PDF contains "Prithagoras"');
+c.deq(scanHits, [], 'no shipped PDF carries an iCloud address, an Australian mobile number, a street address, the owner\'s name or the old spelling');
+// The scan itself is proved on strings that must trip it.
+c.ok(SCAN.every(([, re]) => re.test(['0416 169 219', 'impriysharan' + '@' + 'icloud.com', '5 Juniper' + ' Pl', 'Oakv' + 'ille', 'Prit' + 'agoras', 'Priysh' + 'aran'].join(' '))), 'each pattern catches what it exists to catch');
 c.eq(PAPERS_CAPABILITY, 'premium-exams', 'the capability is the existing premium one');
 
 // ── The fixture: the real files plus two TEST-ONLY entries ────────────────────
-// A free sample and a paper without guidelines, so the mechanisms later papers
-// will use stay proved. Both reuse Paper 13's bytes under other names.
+// A paper without guidelines, so that path stays proved. It reuses a real
+// paper's bytes under another name; every other entry is the real manifest.
 const fixtureDir = mkdtempSync(join(tmpdir(), 'pri-papers-fixture-'));
-const SAMPLE = 'ext1-test-sample';
+const SAMPLE = 'ext1-2027-p01';
 const NO_GUIDE = 'ext1-test-noguide';
-const LOCKED = 'ext1-2027-p13';
-const base = real.papers.find(p => p.id === 'ext1-2027-p13');
-for (const f of [base.paper.file, base.guidelines.file]) copyFileSync(join(PAPERS_DIR, f), join(fixtureDir, f));
-copyFileSync(join(PAPERS_DIR, base.paper.file), join(fixtureDir, `${SAMPLE}.pdf`));
-copyFileSync(join(PAPERS_DIR, base.guidelines.file), join(fixtureDir, `${SAMPLE}-guidelines.pdf`));
+const LOCKED = 'ext1-2027-p02';
+const base = real.papers[0];
+for (const f of named) if (f.endsWith('.pdf')) copyFileSync(join(PAPERS_DIR, f), join(fixtureDir, f));
 copyFileSync(join(PAPERS_DIR, base.paper.file), join(fixtureDir, `${NO_GUIDE}.pdf`));
 const entry = (id, title, extra) => ({ ...base, id, title, sample: false, ...extra,
   paper: { ...base.paper, file: `${id}.pdf` }, guidelines: extra.hasGuidelines === false ? null : { ...base.guidelines, file: `${id}-guidelines.pdf` } });
-const manifest = { ...real, papers: [base, entry(SAMPLE, 'Practice Paper 01', { sample: true, hasGuidelines: true }), entry(NO_GUIDE, 'Practice Paper 99', { hasGuidelines: false })] };
+const manifest = { ...real, papers: [...real.papers, entry(NO_GUIDE, 'Practice Paper 99', { hasGuidelines: false })] };
 writeFileSync(join(fixtureDir, 'manifest.json'), JSON.stringify(manifest));
 
 // ── Over HTTP ─────────────────────────────────────────────────────────────────
@@ -87,7 +131,9 @@ try {
   }
   const get = (h, path, jar, headers = {}) => h.request(path, { jar, headers });
   const bytesOf = async (h, path, jar) => {
-    const response = await fetch(`${h.origin}${path}`, { headers: { Cookie: cookieHeader(jar) } });
+    const target = new URL(path, h.origin); // an id read from the manifest file can only ever name a path on this server
+    if (target.origin !== new URL(h.origin).origin) throw new Error(`not this server: ${path}`);
+    const response = await fetch(target, { headers: { Cookie: cookieHeader(jar) } });
     return { status: response.status, headers: response.headers, bytes: Buffer.from(await response.arrayBuffer()) };
   };
   const free = await student(hAu, 'free@example.test', null);
@@ -110,7 +156,7 @@ try {
   c.deq(list.data.papers.map(p => p.id), manifest.papers.map(p => p.id), 'every paper is listed, in manifest order');
   c.deq(list.data.papers.filter(p => !p.locked).map(p => p.id), [SAMPLE], 'for a free account only the sample is unlocked');
   const row = list.data.papers[0];
-  c.deq([row.title, row.marks, row.workingTime, row.pages, row.hasGuidelines, row.guidelinesPages, row.yearLevel, row.course], ['Practice Paper 13', 70, '2 hours', 20, true, 22, 12, 'nsw-ext1'], 'a row carries title, marks, time, pages');
+  c.deq([row.title, row.marks, row.workingTime, row.pages, row.hasGuidelines, row.guidelinesPages, row.yearLevel, row.course], ['Practice Paper 01', 70, '2 hours', 19, true, 14, 12, 'nsw-ext1'], 'a row carries title, marks, time, pages');
   c.ok(!JSON.stringify(list.data).match(/sha256|\.pdf|server\/content/), 'the list names no file, hash or path');
   c.deq((await get(hAu, '/v1/papers', paid)).data.papers.filter(p => p.locked), [], 'Premium: nothing is locked');
   c.eq((await get(hAu, '/v1/papers', paid)).data.premium, true, 'Premium is reported from the server\'s own row');
@@ -121,14 +167,14 @@ try {
   // 3 · downloads
   const sample = await bytesOf(hAu, `/v1/papers/${SAMPLE}/paper`, free);
   c.eq(sample.status, 200, 'the sample paper is free to a free account');
-  c.eq(sha(sample.bytes), manifest.papers[1].paper.sha256, 'the sample paper arrives byte for byte');
+  c.eq(sha(sample.bytes), real.papers[0].paper.sha256, 'the sample paper arrives byte for byte');
   c.eq(sample.headers.get('content-type'), 'application/pdf', 'application/pdf');
   c.match(sample.headers.get('content-disposition'), /^attachment; filename="[A-Za-z0-9._-]+\.pdf"$/, 'an attachment with a plain file name');
   c.eq(sample.headers.get('cache-control'), 'private, no-store', 'no-store');
   c.eq(sample.headers.get('x-content-type-options'), 'nosniff', 'nosniff');
   c.eq(Number(sample.headers.get('content-length')), sample.bytes.length, 'content-length is the file\'s');
   const sampleGuide = await bytesOf(hAu, `/v1/papers/${SAMPLE}/guidelines`, free);
-  c.deq([sampleGuide.status, sha(sampleGuide.bytes)], [200, manifest.papers[1].guidelines.sha256], 'the sample\'s marking guidelines are free too');
+  c.deq([sampleGuide.status, sha(sampleGuide.bytes)], [200, real.papers[0].guidelines.sha256], 'the sample\'s marking guidelines are free too');
   c.match(sampleGuide.headers.get('content-disposition'), /Marking-Guidelines\.pdf"$/, 'the guidelines file says what it is');
   for (const kind of ['paper', 'guidelines']) {
     const refusal = await get(hAu, `/v1/papers/${LOCKED}/${kind}`, free);
@@ -147,7 +193,8 @@ try {
     for (const p of manifest.papers) {
       for (const [kind, f] of [['paper', p.paper], ['guidelines', p.guidelines]]) {
         if (!f) continue;
-        const got = await bytesOf(hAu, `/v1/papers/${p.id}/${kind}`, jar);
+        const known = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'].map(n => `ext1-2027-p${n}`).concat([NO_GUIDE]).find(x => x === p.id); // a literal from this file, never the manifest's own string
+        const got = await bytesOf(hAu, `/v1/papers/${known}/${kind}`, jar);
         if (got.status !== 200 || sha(got.bytes) !== f.sha256) c.ok(false, `${name}: ${p.id}/${kind} should arrive intact (status ${got.status})`);
       }
     }
