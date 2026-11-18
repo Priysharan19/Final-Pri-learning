@@ -102,7 +102,7 @@ export default function ReadingReview({
                     <button type="button" className="btn btn-ghost btn-sm" data-photo-line-done onClick={() => setOpen(null)}>{t('photo.review.done')}</button>
                   </div>
                 ) : (
-                  <button type="button" className="rr-open" data-photo-line-open disabled={disabled}
+                  <button type="button" className="rr-open" data-photo-line-open data-photo-line-text={prettyLine(line.text)} disabled={disabled}
                     aria-label={t('photo.review.lineLabel', { n: i + 1, text: prettyLine(line.text) })}
                     aria-describedby={note ? `${uid}-note-${i}` : undefined}
                     onClick={() => setOpen(i)}>
@@ -137,6 +137,7 @@ export default function ReadingReview({
             {!disabled && <button type="button" className="btn btn-quiet btn-sm" data-photo-include-all onClick={onIncludeAll}>{t('photo.includeAll')}</button>}
           </p>
         )}
+        {lines.some((l, i) => asksAt(i)) && <p className="rr-quiet" data-photo-reading-doubt>{t('photo.lineCheckNote')}</p>}
         {transcript.undecided && <p className="rr-quiet" role="status" data-photo-undecided>{t('photo.undecided')}</p>}
         {!disabled && <p className="rr-quiet muted">{t('photo.review.hint')}</p>}
         {children}

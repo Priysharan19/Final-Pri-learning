@@ -2898,7 +2898,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   {!isWorking && !resolved && (
                     <div className="rr-final" data-photo-final>
                       {String(answer).trim() && photoAnswerSource === 'proposed' && !answerOpen ? (
-                        <p className="rr-final-line" data-photo-answer-note={photoNote?.status || 'proposed'}>
+                        <p className="rr-final-line" data-photo-answer-note={photoNote?.status || 'proposed'} data-photo-final-value={String(answer).trim()}>
                           <span>{t('photo.finalAnswerIs')}</span>{' '}
                           <b className="rr-final-value">{question.answerPrefix ? <span lang="en"><MathText text={question.answerPrefix} /> </span> : null}<MathText text={`$${texOf(String(answer).trim())}$`} />{question.answerSuffix ? ` ${question.answerSuffix}` : ''}</b>
                           {' '}<button type="button" className="btn btn-quiet btn-sm" data-photo-answer-change onClick={() => setAnswerOpen(true)}>{t('photo.change')}</button>

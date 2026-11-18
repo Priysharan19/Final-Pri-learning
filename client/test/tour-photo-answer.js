@@ -94,11 +94,36 @@ const photoRows = page => page.evaluate(() => new Promise(done => {
   };
 }));
 const webStorageText = page => page.evaluate(() => JSON.stringify(Object.fromEntries(Object.keys(localStorage).map(k => [k, localStorage.getItem(k)]))) + JSON.stringify(Object.fromEntries(Object.keys(sessionStorage).map(k => [k, sessionStorage.getItem(k)]))));
+// Owner request of 18 Nov 2026: after a read the page and the reading are ONE compact view. A line is
+// text until tapped; tapping opens it for changing or removing. These helpers do what a student does.
 const lineState = page => page.evaluate(() => [...document.querySelectorAll('[data-photo-line]')].map(li => ({
-  text: li.querySelector('input')?.value ?? '', out: li.getAttribute('data-excluded') === 'true',
+  text: li.querySelector('[data-photo-line-text]')?.getAttribute('data-photo-line-text') ?? li.querySelector('input')?.value ?? '', out: li.getAttribute('data-excluded') === 'true',
   check: li.getAttribute('data-check') === 'true', edited: li.getAttribute('data-edited') === 'true',
-  note: li.querySelector('.photo-line-note')?.innerText?.trim() || ''
+  note: li.querySelector('.rr-note')?.innerText?.trim() || ''
 })));
+/** Tap a line open (if it is not already), as a student would. */
+const openLine = async (page, i) => {
+  const li = page.locator(`[data-photo-line="${i}"]`);
+  if (await li.locator('[data-photo-correct-transcript]').count() === 0 && await li.locator('[data-photo-line-open]').count()) await li.locator('[data-photo-line-open]').click();
+  return li;
+};
+/** Remove (or put back) one line: open it, press its one button, close it. */
+const toggleLine = async (page, i) => {
+  const li = await openLine(page, i);
+  await li.locator('[data-photo-line-toggle]').first().click();
+  if (await li.locator('[data-photo-line-done]').count()) await li.locator('[data-photo-line-done]').click();
+};
+const correctLine = async (page, i, text) => {
+  const li = await openLine(page, i);
+  await li.locator('[data-photo-correct-transcript]').fill(text);
+  await li.locator('[data-photo-line-done]').click();
+};
+/** What the final answer is: the compact "Final answer:" row, or the field when it is open. */
+const finalValue = async page => {
+  const field = page.locator('[data-final-answer]');
+  if (await field.count() && await field.first().isVisible()) return field.first().inputValue();
+  return (await page.locator('[data-photo-final-value]').first().getAttribute('data-photo-final-value').catch(() => null)) ?? '';
+};
 
 /** The page's own issue request, answered by the real server binding the desk's sealed token. */
 // Installed before the profile exists. Creating and signing in the profile
@@ -215,10 +240,12 @@ export const ownerPageFlow = {
           /doubt about how the page was read, not about your maths/i.test(await page.locator('[data-photo-reading-doubt]').innerText().catch(() => '')),
         JSON.stringify(lines[6]));
       const answerField = page.locator('[data-final-answer]');
-      await check('the answer field holds "6" — the mathematics of the last line, not the sentence "least value ⇒ 6."',
-        await answerField.inputValue() === '6' && await answerField.isEditable() &&
-          await page.locator('[data-photo-answer-note="proposed"]').isVisible() && /taken from line 9/i.test(await page.locator('[data-photo-answer-note]').innerText()),
-        JSON.stringify(await answerField.inputValue()));
+      await check('the final answer is "Final answer: 6" — the mathematics of the last line, not the sentence "least value ⇒ 6." — said once, with where it came from, and the field is not shown until Change',
+        await finalValue(page) === '6' && await answerField.count() === 0 &&
+          await page.locator('[data-photo-answer-note="proposed"]').isVisible() && /from line 9/i.test(await page.locator('[data-photo-answer-note]').innerText()),
+        JSON.stringify(await finalValue(page)));
+      await check('Change opens the final-answer field, editable, holding 6',
+        await (async () => { await page.locator('[data-photo-answer-change]').click(); return await answerField.isEditable() && await finalValue(page) === '6'; })());
       await check('reading marks nothing: no question recognised or graded until Submit is pressed',
         (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/(recognize|submit)/)).length === 0 && await page.locator('.eval-card, .verdict-bad').count() === 0);
       const status = page.locator('.ws-actions .status-line');
@@ -234,16 +261,14 @@ export const ownerPageFlow = {
       await page.locator('[data-photo-include-all]').click();
       lines = await lineState(page);
       await check('"Include them" brings all five back in one action, and the answer is still 6 (not a number from the notes)',
-        lines.every(l => !l.out) && await answerField.inputValue() === '6' && await page.locator('[data-photo-left-out]').count() === 0, JSON.stringify(lines.map(l => l.out)));
-      for (let i = 0; i < 5; i += 1) await page.locator(`[data-photo-line="${i}"] [data-photo-line-toggle]`).click();
+        lines.every(l => !l.out) && await finalValue(page) === '6' && await page.locator('[data-photo-left-out]').count() === 0, JSON.stringify(lines.map(l => l.out)));
+      for (let i = 0; i < 5; i += 1) await toggleLine(page, i);
       lines = await lineState(page);
       await check('each line can be left out again by the student, one tap each',
-        lines.slice(0, 5).every(l => l.out) && lines.slice(5).every(l => !l.out) && await answerField.inputValue() === '6', JSON.stringify(lines.map(l => l.out)));
+        lines.slice(0, 5).every(l => l.out) && lines.slice(5).every(l => !l.out) && await finalValue(page) === '6', JSON.stringify(lines.map(l => l.out)));
 
       // ── the student corrects > to ≥ on one line ────────────────────────────
-      const seventh = page.locator('[data-photo-line="6"] input');
-      await seventh.fill('(x+3)^2 >= 0');
-      await page.locator('[data-final-answer]').focus();
+      await correctLine(page, 6, '(x+3)^2 >= 0');
       lines = await lineState(page);
       await check('line 7 is corrected from > to ≥ by the student: shown as ≥, marked "Corrected by you", no longer asking',
         lines[6].text === '(x+3)² ≥ 0' && lines[6].edited && !lines[6].check && /Corrected by you/.test(lines[6].note) && lines[7].text === '(x+3)² + 6 > 6', JSON.stringify(lines[6]));
@@ -261,7 +286,7 @@ export const ownerPageFlow = {
           await page.locator('[data-photo-restored]').isVisible());
       await check('the corrected line, the five exclusions and the answer 6 are all restored',
         lines.length === 9 && lines[6].text === '(x+3)² ≥ 0' && lines[6].edited && lines.slice(0, 5).every(l => l.out) && lines.slice(5).every(l => !l.out) &&
-          await page.locator('[data-final-answer]').inputValue() === '6', JSON.stringify(lines.map(l => [l.text, l.out, l.edited])));
+          await finalValue(page) === '6', JSON.stringify(lines.map(l => [l.text, l.out, l.edited])));
       await page.waitForTimeout(1500);
       await check('restoring costs no read: the reader was not asked again',
         reader.requests.length === readsBeforeReload, `${reader.requests.length - readsBeforeReload} provider request(s) after the reload`);
@@ -341,10 +366,9 @@ async function webkitGeneric({ page, check, mathText, online, reader, account, p
     reader.requests.length === readsBefore + 2 && lines.length === 9 && lines[6].text === '(x+3)² > 0' && lines[8].text === 'least value ⇒ 6.', JSON.stringify(lines.map(l => l.text)));
   await check('the doubted line says "Check this line" as a doubt about the reading', lines[6].check && /reader was not sure \(≥ or >\)/.test(lines[6].note), JSON.stringify(lines[6]));
   const answerField = page.locator('[data-final-answer]');
-  await check('the answer field holds "6", not the sentence', await answerField.inputValue() === '6', JSON.stringify(await answerField.inputValue()));
-  for (let i = 0; i < 5; i += 1) await page.locator(`[data-photo-line="${i}"] [data-photo-line-toggle]`).click();
-  await page.locator('[data-photo-line="6"] input').fill('(x+3)^2 >= 0');
-  await answerField.focus();
+  await check('the final answer is "6", not the sentence', await finalValue(page) === '6', JSON.stringify(await finalValue(page)));
+  for (let i = 0; i < 5; i += 1) await toggleLine(page, i);
+  await correctLine(page, 6, '(x+3)^2 >= 0');
   lines = await lineState(page);
   await check('lines are left out one tap each, and a line is corrected from > to ≥',
     lines.slice(0, 5).every(l => l.out) && lines.slice(5).every(l => !l.out) && lines[6].text === '(x+3)² ≥ 0' && lines[6].edited, JSON.stringify(lines.map(l => [l.text, l.out])));
@@ -361,7 +385,7 @@ async function webkitGeneric({ page, check, mathText, online, reader, account, p
   await page.waitForTimeout(1200);
   await check('after a reload: the same question and photo, the corrected line, the exclusions and the answer, with no second read',
     await shownId(page) === qid && await mathText('.q-prompt') === prompt && await page.locator('.photo-thumb img').getAttribute('src').catch(() => null) === thumb &&
-      lines.length === 9 && lines[6].text === '(x+3)² ≥ 0' && lines.slice(0, 5).every(l => l.out) && await page.locator('[data-final-answer]').inputValue() === '6' &&
+      lines.length === 9 && lines[6].text === '(x+3)² ≥ 0' && lines.slice(0, 5).every(l => l.out) && await finalValue(page) === '6' &&
       reader.requests.length === readsBeforeReload, JSON.stringify({ lines: lines.map(l => [l.text, l.out]), reads: reader.requests.length - readsBeforeReload }));
   await pressSubmit(page);
   await until(page, async () => (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length > 0, 40000);
