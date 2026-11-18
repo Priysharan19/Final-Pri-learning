@@ -33,6 +33,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:f
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { crc32, deflateSync } from 'node:zlib';
 import { startOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile, switchSyllabus } from './support/verified-onboarding.mjs';
 
@@ -50,6 +51,18 @@ const check = (name, condition, detail = '') => {
   if (condition) pass++; else failures.push(`${name}${detail ? ` — ${detail}` : ''}`);
   console.log(`  ${condition ? '✓' : '✗'} ${name}${condition || !detail ? '' : ` — ${detail}`}`);
 };
+
+/** A real, decodable greyscale PNG with a few dark strokes (so the page's own photo re-encoder and the reader's size guards run). */
+function png(width, height) {
+  const raw = Buffer.alloc((width + 1) * height, 255);
+  for (let y = 0; y < height; y += 1) {
+    raw[y * (width + 1)] = 0;
+    if (y % 40 > 30) for (let x = 20; x < width - 20; x += 1) raw[y * (width + 1) + 1 + x] = 20;
+  }
+  const chunk = (type, data) => { const body = Buffer.concat([Buffer.from(type), data]); const out = Buffer.alloc(body.length + 8); out.writeUInt32BE(data.length, 0); body.copy(out, 4); out.writeUInt32BE(crc32(body), body.length + 4); return out; };
+  const head = Buffer.alloc(13); head.writeUInt32BE(width, 0); head.writeUInt32BE(height, 4); head[8] = 8; head[9] = 0;
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk('IHDR', head), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
 
 function build() {
   const out = mkdtempSync(join(tmpdir(), 'pri-paper-sitting-'));
@@ -173,6 +186,35 @@ try {
   check('keyboard: arrow keys move between Type, Write and Photo', await page.locator('[data-paper-part="q11b-i"] [data-paper-mode="ink"]').getAttribute('aria-selected') === 'true');
   await page.keyboard.press('ArrowLeft');
 
+  // ── Photo and Write on parts Pri can check (the reader is a STAND-IN: it never looks at the picture) ──
+  // A photographed answer is read, the reading is the student's to confirm, and "Keep" stores the original with it. SYNTHETIC reader.
+  platform.reader.text = '4*sqrt(3)+2*pi/3-8';
+  await page.locator('[data-paper-part="q12b-iii"]').scrollIntoViewIfNeeded();
+  await page.locator('[data-paper-part="q12b-iii"] [data-paper-mode="photo"]').click();
+  await page.locator('[data-paper-part="q12b-iii"] [data-paper-photo]').setInputFiles({ name: 'answer.png', mimeType: 'image/png', buffer: png(640, 360) });
+  await page.locator('[data-paper-part="q12b-iii"] [data-paper-reading]').waitFor({ timeout: 30000 });
+  check('PHOTO: the reading of the picture is shown for the student to confirm, in the final-answer box', (await page.locator('[data-paper-part="q12b-iii"] [data-paper-final]').inputValue()) === '4*sqrt(3)+2*pi/3-8');
+  await page.locator('[data-paper-part="q12b-iii"] [data-paper-keep]').click();
+  await page.waitForSelector('[data-paper-part="q12b-iii"] [data-paper-kept="yes"]', { timeout: 30000 });
+  check('PHOTO: "Keep" stores the picture with the confirmed reading', true);
+  platform.reader.text = '1/((2*m-1)*nCr(2*m-2,m-1))';
+  await page.locator('[data-paper-part="q14b-ii"]').scrollIntoViewIfNeeded();
+  await page.locator('[data-paper-part="q14b-ii"] [data-paper-mode="ink"]').click();
+  const canvas = page.locator('[data-paper-part="q14b-ii"] canvas').first();
+  await canvas.waitFor({ timeout: 30000 });
+  const box = await canvas.boundingBox();
+  for (let stroke = 0; stroke < 3; stroke += 1) {
+    await page.mouse.move(box.x + 30, box.y + 40 + stroke * 40);
+    await page.mouse.down();
+    for (let i = 1; i <= 12; i += 1) await page.mouse.move(box.x + 30 + i * 18, box.y + 40 + stroke * 40 + (i % 2) * 9, { steps: 2 });
+    await page.mouse.up();
+  }
+  await page.locator('[data-paper-part="q14b-ii"] [data-paper-reading]').waitFor({ timeout: 45000 });
+  check('WRITE: the strokes are read and the reading is shown to confirm', (await page.locator('[data-paper-part="q14b-ii"] [data-paper-final]').inputValue()) === '1/((2*m-1)*nCr(2*m-2,m-1))');
+  await page.locator('[data-paper-part="q14b-ii"] [data-paper-keep]').click();
+  await page.waitForSelector('[data-paper-part="q14b-ii"] [data-paper-kept="yes"]', { timeout: 30000 });
+  check('WRITE: "Keep" stores the strokes with the confirmed reading', true);
+
   // ── Autosave, then resume ───────────────────────────────────────────────────
   await page.waitForSelector('[data-paper-save="saved"]', { timeout: 15000 });
   check('answers are saved as the student goes', true);
@@ -201,10 +243,13 @@ try {
 
   // ── The result ──────────────────────────────────────────────────────────────
   const totals = (await page.locator('[data-paper-totals]').innerText()).trim();
-  check('the honest totals line', totals === 'Marked by Pri: 9 of 20 marks available to automatic marking; 50 marks are self-checked.', totals);
+  check('the honest totals line', totals === 'Marked by Pri: 11 of 20 marks available to automatic marking; 50 marks are self-checked.', totals);
   check('a wrong option is called wrong and a right one right', await page.locator('[data-paper-part="q1"] [data-paper-verdict="incorrect"]').count() === 1 && await page.locator('[data-paper-part="q2"] [data-paper-verdict="correct"]').count() === 1);
   check('the blank question says no answer', await page.locator('[data-paper-part="q10"] [data-paper-verdict="unanswered"]').count() === 1);
   check('a right final answer is marked right, by Pri, for the 1 mark it carries', (await page.locator('[data-paper-part="q11a-iii"] [data-paper-verdict]').innerText()).includes('Final answer right') && (await page.locator('[data-paper-part="q11a-iii"] .pp-verdict').innerText()).includes('1 of 1 marked by Pri'));
+  check('Photo and Write parts are marked from the confirmed reading: both right', await page.locator('[data-paper-part="q12b-iii"] [data-paper-verdict="correct"]').count() === 1 && await page.locator('[data-paper-part="q14b-ii"] [data-paper-verdict="correct"]').count() === 1);
+  check('written working is read line by line and says so (feedback, never a mark)', await page.locator('[data-paper-part="q11a-iii"] [data-paper-working-lines]').count() === 1);
+  check('a free account is told the plan and the re-test are Premium, and offered Premium', await page.locator('[data-paper-next="premium"]').count() === 1);
   check('a proof is a self-check: no mark claimed', (await page.locator('[data-paper-part="q11b-i"] [data-paper-verdict="self-check"]').innerText()).includes('Check this against the sample answer'));
   check('nothing says a guideline is awaiting approval', !/awaiting|draft|approv/i.test(await page.locator('.pp-page').innerText()));
   await page.locator('[data-paper-part="q11b-i"]').scrollIntoViewIfNeeded();
@@ -214,6 +259,7 @@ try {
   await page.locator('[data-paper-how="q11b-i"] summary').click();
   await page.waitForSelector('[data-paper-how="q11b-i"] .pp-criteria li', { timeout: 15000 });
   check('"How this is marked" lists the three guideline criteria', await page.locator('[data-paper-how="q11b-i"] .pp-criteria li').count() === 3);
+  check('each criterion says who checks it: Pri for the final answer, the student for the rest', await page.locator('[data-paper-how="q11b-i"] [data-paper-criterion="self-check"]').count() === 3);
   check('and shows NO marks beside them (no approval record)', await page.locator('[data-paper-how="q11b-i"] .pp-crit-marks').count() === 0);
   await page.screenshot({ path: join(SHOTS, '06-result-part-390.png') });
   await page.locator('[data-paper-result]').scrollIntoViewIfNeeded();

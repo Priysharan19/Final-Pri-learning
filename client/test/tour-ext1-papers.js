@@ -7,8 +7,9 @@
 //
 //   · an Extension 1 Year 12 profile on the FREE plan sees the section, the
 //     not-NESA line and thirteen rows (Practice Paper 01-13). Paper 01 is
-//     the free sample and downloads; Paper 02 is locked with the Premium
-//     prompt and no download button;
+//     the free sample to SIT in the app; every PDF is free for any signed-in
+//     account (owner decision, 19 Nov 2026), while sitting Paper 02 shows the
+//     Premium prompt;
 //   · every control has an accessible name on Chrome's own tree, and the page
 //     does not scroll sideways at 360 px;
 //   · once the server's own entitlement row says Premium, all thirteen unlock and a
@@ -186,4 +187,4 @@ if (failures.length) {
   console.error(`EXT1 PAPERS TOUR: FAIL — ${failures.length} failed, ${pass} passed`);
   process.exit(1);
 }
-console.log(`EXT1 PAPERS TOUR: PASS — ${pass}/${pass} checks — a Prithagoras Extension 1 Year 12 student sees thirteen practice papers (Paper 01 free, the rest locked on the free plan, all unlocked on Premium), downloads the owner's PDFs, and other pathways and years see nothing. [SYNTHETIC student and entitlement]`);
+console.log(`EXT1 PAPERS TOUR: PASS — ${pass}/${pass} checks — a Prithagoras Extension 1 Year 12 student sees thirteen practice papers (every PDF free; Paper 01 alone can be sat on the free plan, all can on Premium), downloads the owner's PDFs, and other pathways and years see nothing. [SYNTHETIC student and entitlement]`);
