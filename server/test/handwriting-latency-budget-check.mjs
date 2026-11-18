@@ -181,7 +181,7 @@ try {
   eq(inkReadingBlockedKey(user, { outcome: { error: { code: 'HANDWRITING_PROVIDER_5XX' } }, available, online }), 'ink.waitingServiceDown',
     'as does a provider outage');
   eq(inkReadingBlockedKey(user, { available, online: () => false }), 'ink.waitingOffline', 'while offline is its own, saved-and-read-later note');
-  ok(/^Saved\. /.test(en['ink.waitingOffline']) && /When you are back online, press Read my answer\./.test(en['ink.waitingOffline']) && !/will be read/i.test(en['ink.waitingOffline']),
+  ok(/^Saved\. /.test(en['ink.waitingOffline']) && /When you are back online, press Mark my working\./.test(en['ink.waitingOffline']) && !/will be read/i.test(en['ink.waitingOffline']),
     'the offline note begins with the plain promise and says what to press when back online, promising no automatic read');
 }
 

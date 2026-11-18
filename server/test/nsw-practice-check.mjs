@@ -260,7 +260,7 @@ try {
     const s3 = await sealedOf(a.account.id, poly.data.question.id);
     c.deq([s3._curriculum.syllabus, s3._curriculum.labelledSyllabus, s3._curriculum.outcomes[0].code],
       ['nsw-mathematics-extension1-11-12-2024', 'nsw-mathematics-advanced-11-12-2024', 'ME1-11-02'], 'remainder-theorem items labelled Advanced are sealed as Extension 1 content');
-    c.deq([(await issue({ generator: 'y10-compound', difficulty: 1, curriculum: 'nsw' })).data?.error?.code, (await issue({ generator: 'me11-poly', difficulty: 4, curriculum: 'nsw' })).data?.error?.code],
+    c.deq([(await issue({ generator: 'me11-comb', difficulty: 1, curriculum: 'nsw' })).data?.error?.code, (await issue({ generator: 'me11-poly', difficulty: 4, curriculum: 'nsw' })).data?.error?.code],
       ['PRACTICE_BANK_OUTSIDE_CURRICULUM', 'PRACTICE_CONTENT_UNSUPPORTED'], 'a bank the quality gate excluded whole, and a cell it excluded, are refused');
     // Asking a dot point whose only forms are not issued: y8-linear.3 lives at D3 (issued); y8-linear D4 has no dot point.
     c.deq([(await issue({ generator: 'y8-linear', difficulty: 4, curriculum: 'nsw' })).status], [422], 'y8-linear D4 assesses no dot point and is refused');
