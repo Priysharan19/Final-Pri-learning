@@ -368,7 +368,9 @@ export function fullyVerifiedWorking(report) {
   // A tick for matching a worked-solution step (milestones.js) is feedback:
   // no transition was checked, so it never counts as verified working.
   if (report?.source === 'milestones') return false;
-  return lines.every(l => l && l.status === 'ok' && !l.milestone);
+  // A value-chain tick (valueChain.js) says a stated value is true, not that a step was made.
+  if (report?.source === 'value-chain') return false;
+  return lines.every(l => l && l.status === 'ok' && !l.milestone && !l.valueChain);
 }
 
 /**

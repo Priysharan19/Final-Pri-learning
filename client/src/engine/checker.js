@@ -29,6 +29,7 @@ import { assessAreaLine, AREA_STAGE_KINDS } from './reason-area.js';
 import { cleanInput, parseNumericInput, checkAnswer as coreCheckAnswer } from './checker-core.js';
 import { lostMarks, ruleKeyFor } from './lost-marks.js';
 import { expLogSolutionSet, isExpLogLine, domainAt, domainFreeRoot, sameReducedForm } from './reason-explog.js';
+import { stepCheckValueChain } from './valueChain.js';
 
 export { lostMarks, ruleKeyFor };
 
@@ -2189,6 +2190,8 @@ function numericSolutions(meta) {
 function stepCheckWithinBudget(meta, workingText, options = null) {
   meta = numericSolutions(meta);
   if (meta?.kind === 'plan') return stepCheckPlan(meta, workingText);
+  // A function and one number asked of it (valueChain.js): its own verdicts, no equation to solve.
+  if (meta?.kind === 'value-chain') return stepCheckValueChain(meta, workingText);
   const prompt = typeof options?.prompt === 'string' ? options.prompt : '';
   let calculus = null;
   try { calculus = calculusContext(meta, prompt); } catch { calculus = null; }
@@ -3267,6 +3270,8 @@ export function methodMarks(input = {}) {
 }
 function methodMarksWithinBudget({ meta, working, marks, prompt = '', report = null } = {}) {
   if (!meta || working == null || !String(working).trim()) return null;
+  // Value-chain lines are verdict ticks only: no examiner has signed a method rubric for them.
+  if (meta.kind === 'value-chain') return null;
   let rep = report;
   if (!rep) {
     try { rep = stepCheck(meta, String(working), { prompt }); } catch { return null; }
