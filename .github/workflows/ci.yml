@@ -1010,6 +1010,9 @@ jobs:
             # The diagram kit (shared by Notes and questions) at phone width, in light and dark,
             # by keyboard, with reduced motion.
             node client/test/diagram-kit-browser-check.mjs 2>&1 | tee -a browser.log
+            # Every notes diagram, both editions, desktop and 390 px: no overlapping or on-curve labels,
+            # every reference line named (needs Chromium, so here and not in the suites shards).
+            node client/test/notes-diagram-layout-check.mjs 2>&1 | tee -a browser.log
             # Every NSW notes chapter in light and dark: no KaTeX error, one section order, CMU Serif
             # for reading, no stripe, gradient, emoji or overflow at phone width.
             node client/test/nsw-notes-visual-check.mjs 2>&1 | tee -a browser.log
