@@ -62,6 +62,23 @@ on the issued question), and the next attempt is the existing "Redo"/repeat of t
 A question answered BY its working (`answerType: 'working'`) sends its lines as the answer itself, so the floor is applied
 to each of those lines; the answer is unreadable only when no judged line is left.
 
+## Written working is one authoritative attempt (CTO ruling, 19 Nov 2026; implemented)
+
+A line verdict returned on an open try would test a candidate answer (each verdict is a free check), which the marking
+safety suites rightly forbid. So for an answer given as HANDWRITTEN or PHOTOGRAPHED working the first "Mark my working"
+is the one authoritative attempt: the question RESOLVES on that submit, right or wrong, and the student always gets the
+full marked page (per-line states, first-error reason, the mark; the solution on demand), exactly what a resolved
+question shows. There is no second credited try for written working; "Redo" gives the same question again as practice
+with no new credit, as it already does.
+
+The rule is the SERVER's (`server/platform/practice.js`, `writtenWorking = withPicture || mode !== 'typed'`): a request
+that carries a picture, or an ink/photo mode (a reading), is written working, whatever the client says; the body has no
+field that can claim otherwise (unknown fields are refused). `resolved` takes `writtenWorking`, and the working is checked
+on that reply (`evidenceIfWrong`). Typed and multiple-choice answers keep their two tries and the existing replies, which
+carry no per-line verdict, key or solution before resolution. A FINAL_ANSWER_UNREADABLE reply returns before all of this:
+it records nothing and spends nothing. A resolved question refuses a further submit with 409 QUESTION_ALREADY_GRADED.
+Tests: `server/test/reading-floor-http-check.mjs` (section 6 and 6a, 71 checks).
+
 ## Not in this amendment
 
 No threshold was changed. A model never sets a mark.

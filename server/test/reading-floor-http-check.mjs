@@ -241,11 +241,39 @@ try {
     const unitsBefore = await aiUsed(erin.id), calls = provider.bodies.length;
     const first = await submit(erin.jar, qid, 'floor-remark-1', { answer: '4', steps: ['2x = 18', '4'], image: img });
     c.eq(first.data.correct, false, 'a wrong final answer read confidently is the engine\'s to mark wrong');
-    // the student corrects the line through the on-demand editor: their own text, judged as typed, a second submission
+    // CTO ruling 19 Nov 2026: written working is ONE authoritative attempt. The first submit RESOLVES the question and
+    // returns the full marked page (per-line states, first-error reason, mark); a correction is a Redo (a new copy
+    // with no new credit), never a second credited try on the same issued question.
+    c.eq(first.data.resolved, true, 'written working resolves on the first submit, wrong or right');
+    c.eq(first.data.triesLeft, 0, 'there is no second credited try for written working');
+    c.ok(first.data.stepReport && Array.isArray(first.data.stepReport.lines), 'the full marked page (per-line report) comes back');
+    c.deq(await rows(erin.id, qid), { grades: 1, tries: 0, done: 1, recognitions: 2, events: 1 }, 'one attempt, one completion and one learning event (the reading receipt is the read plus the submit)');
     const second = await submit(erin.jar, qid, 'floor-remark-2', { answer: '9', steps: ['2x = 18', '9'], image: img });
-    c.eq(second.data.correct, true, 'the corrected line is judged as typed and the re-mark replaces the verdict');
+    c.eq(second.status, 409, 'a corrected re-submit on the resolved question is refused');
+    c.eq(second.data.error?.code, 'QUESTION_ALREADY_GRADED', 'as already graded: it earns nothing and never overturns the verdict');
+    c.deq(await rows(erin.id, qid), { grades: 1, tries: 0, done: 1, recognitions: 2, events: 1 }, 'and records nothing more');
     c.eq(await aiUsed(erin.id), unitsBefore, 'neither submission buys a read: no reading unit is spent');
     c.eq(provider.bodies.length, calls, 'and the provider is not called again for the same picture');
+  }
+
+  // ══ 6a · The one-attempt rule is the SERVER's, decided from what the request carries ══════════════════════
+  {
+    const p = await person();
+    const qid = await issue(p.jar);
+    const img = picture('2x = 18@0.95;4@0.97', 'f1');
+    await read(p.jar, img);
+    // a wrong ink answer carrying a client claim that it is still open still resolves: nothing the client says buys a try
+    const w = await submit(p.jar, qid, 'floor-one-1', { answer: '4', steps: ['2x = 18', '4'], image: img, resolved: false, triesLeft: 1 });
+    c.eq(w.status, 400, 'a client claim about tries or resolution is refused outright: the body has no such field');
+    const w2 = await submit(p.jar, qid, 'floor-one-2', { answer: '4', steps: ['2x = 18', '4'], image: img });
+    c.eq(w2.data.resolved, true, 'the server alone resolves written working, from the picture it carries');
+    // typed answers keep both tries: a wrong first try is open and says nothing per line, no key, no solution
+    const t = await person();
+    const tq = await issue(t.jar);
+    const wrong = await submit(t.jar, tq, 'floor-typed-1', { answer: '4', steps: ['2x = 18', '4'], mode: 'typed' });
+    c.eq(wrong.data.resolved, false, 'a typed wrong first try is still open');
+    c.eq(wrong.data.triesLeft, 1, 'with one try left');
+    c.ok(!wrong.data.stepReport && !wrong.data.lineStates && !wrong.data.solution, 'and no reply before resolution carries a per-line verdict, key or solution');
   }
 
   // ══ 6b · A question answered BY its working: the lines are the answer, and the floor applies to each of them ═════

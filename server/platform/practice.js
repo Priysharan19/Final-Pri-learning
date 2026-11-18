@@ -1340,6 +1340,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     // The reading of a picture this submission carries (read once, kept across
     // the rounds below).
     let reading = null;
+    const writtenWorking = withPicture || mode !== 'typed';
     for (let round = 0; round < 3; round++) {
       // ── 1. Read ──────────────────────────────────────────────────────────
       // Three independent reads, asked for together rather than one after the
@@ -1429,7 +1430,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // use it (the answer is right, or a wrong answer resolves the question).
       const marked = await timePhase('marker', () => markerPool().run('practice', {
         q: forecast.q, answer: markAnswer, working,
-        evidenceIfWrong: evidenceForced || forecast.spent || ONE_TRY_MODES.includes(forecast.q._practiceMode)
+        evidenceIfWrong: evidenceForced || writtenWorking || forecast.spent || ONE_TRY_MODES.includes(forecast.q._practiceMode)
       }, { key: accountId }));
       // Refused before it ran: nothing marked, nothing spent, same key retries.
       if (!marked.ok && marked.code === MARKING_BUSY) return sendMarkerBusy(res);
@@ -1507,7 +1508,11 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const workingOnly = result.invalid === true && body.answer.trim() === '' && working.trim() !== '';
       const invalid = Boolean(result.invalid && !workingOnly);
       // Invalid input is not a failed mathematical attempt: do not consume a try or close the question.
-      const resolved = !invalid && Boolean(result.correct || spent || ONE_TRY_MODES.includes(q._practiceMode));
+      // CTO ruling 19 Nov 2026 (ADR-0001 amendment): written working (a picture, or an ink/photo reading) is ONE
+      // authoritative attempt: the first Mark my working resolves the question, right or wrong, so the student gets the
+      // full marked page. Decided HERE from what the request carries, never from a client flag. Typed and multiple-choice
+      // answers keep their two tries. An unreadable final answer returned earlier and recorded nothing.
+      const resolved = !invalid && Boolean(result.correct || spent || writtenWorking || ONE_TRY_MODES.includes(q._practiceMode));
       // The working is checked once, and only by the reply that resolves the
       // question — see "What an open question may be told about its working".
       // It was computed in step 2; if this locked read resolves a question the

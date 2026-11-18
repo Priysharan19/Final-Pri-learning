@@ -780,7 +780,7 @@
       "job": "platform-contracts",
       "log": "reading-floor-http.log",
       "pins": [
-        {"has":"READING FLOOR HTTP (sqlite): PASS: 60 checks"}
+        {"has":"READING FLOOR HTTP (sqlite): PASS: 71 checks"}
       ]
     }
   },
