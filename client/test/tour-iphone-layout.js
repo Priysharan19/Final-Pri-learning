@@ -65,8 +65,7 @@ const overflowDetail = page => page.evaluate(() => {
 
 /** Step through questions until `want(page)` holds (the draw is random). */
 async function questionWhere(page, settle, want) {
-  for (let i = 0; i < 30; i++) {
-    if (await page.evaluate(want)) return true;
+  X    if (await page.evaluate(want)) return true;
     const next = page.locator('.ctx-next');
     if (!(await next.count())) return false;
     await next.click({ timeout: 5000 }).catch(() => {});
