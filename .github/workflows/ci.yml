@@ -822,6 +822,7 @@ jobs:
           # package index, so an out-of-date file is fetched again, never used.
           restore-keys: |
             apt-debs-${{ steps.image.outputs.build }}-
+            apt-debs-ubuntu24-
       # Two commands, bounded differently, because a kill is safe for one and
       # not the other. System packages: once, never under `timeout` — GNU
       # timeout signals the whole process group, and a SIGTERM while dpkg is
@@ -847,6 +848,9 @@ jobs:
             sudo cp "$APT_DEBS"/*.deb /var/cache/apt/archives/
             echo "apt: $(ls "$APT_DEBS"/*.deb | wc -l) cached package files offered"
           fi
+          # A stalled mirror connection must fail over, not hang the step: apt
+          # gives each connection 30 s and retries a failed fetch three times.
+          printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "3";\nAcquire::ForceIPv4 "true";\n' | sudo tee /etc/apt/apt.conf.d/99pri-timeouts > /dev/null
           npx playwright install-deps $BROWSERS
           mkdir -p "$APT_DEBS"
           sudo find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -f {} "$APT_DEBS"/ \;
