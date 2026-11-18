@@ -985,11 +985,12 @@ async function run() {
     const topic = await nextQuestion({ mode: 'topic', subtopic: topicId, difficulty: 3 });
     eq('topic mode serves the topic asked for', topic.question.subtopic, topicId);
     eq('topic mode honours the difficulty', topic.question.difficulty, 3);
-    // 99 is clamped to D4. The server issues no D4 for this topic (y10-quadratics:
-    // server/platform/nswBanks.js), so the clamped level is answered with the
-    // levels that exist; a topic whose D4 is issued serves it.
-    eq('an out-of-range difficulty is clamped, and a level the server does not issue is refused by name',
-      await POST('/practice/next', { mode: 'topic', subtopic: topicId, difficulty: 99 }).then(() => 'served', e => `${e.code} D${e.detail?.difficultyRequested}`), 'DIFFICULTY_UNAVAILABLE D4');
+    // 99 is clamped to D4. The server now issues a D4 for y10-quadratics too
+    // (engine/nswIssuedCells.js), so the clamp serves it; a topic with no issued D4
+    // (y9-simint: Year 9 Simple interest, levels 1 and 2) is answered with the
+    // levels that exist, refused by name.
+    eq('an out-of-range difficulty is clamped to a level that is issued, y10-quadratics included', (await nextQuestion({ mode: 'topic', subtopic: topicId, difficulty: 99 })).question.difficulty, 4);
+    eq('a level the server does not issue is refused by name', await POST('/practice/next', { mode: 'topic', subtopic: 'y9-simint', difficulty: 99 }).then(() => 'served', e => `${e.code} D${e.detail?.difficultyRequested}`), 'DIFFICULTY_UNAVAILABLE D4');
     eq('an out-of-range difficulty is clamped to a level that is issued', (await nextQuestion({ mode: 'topic', subtopic: 'y10-simeq', difficulty: 99 })).question.difficulty, 4);
 
     const missable = await answerableQuestion({ mode: 'topic', subtopic: topicId });
