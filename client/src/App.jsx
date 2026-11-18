@@ -93,7 +93,7 @@ function LeaveSignIn({ to }) {
     const id = setTimeout(() => nav(to, { replace: true }), 700);
     return () => clearTimeout(id);
   }, [nav, to]);
-  return <RouteLoading />;
+  return React.createElement(RouteLoading);
 }
 
 /**
@@ -108,7 +108,7 @@ function FirstScreen() {
     api.get('/profiles').then(r => { if (live) setFirst(r?.profiles?.length ? 'device' : 'visitor'); }).catch(() => { if (live) setFirst('visitor'); });
     return () => { live = false; };
   }, []);
-  if (!first) return <RouteLoading />;
+  if (!first) return React.createElement(RouteLoading);
   return first === 'visitor' ? <GuestTry /> : <Login />;
 }
 const PublicInfo = React.lazy(() => import('./landing/PublicInfo.jsx'));

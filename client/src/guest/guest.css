@@ -38,7 +38,10 @@
 .qp-choices { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .qp .qp-choice { display: inline-flex; margin: 0; align-items: center; gap: var(--space-2); min-height: var(--tap); padding: 0 var(--space-3); border: 1px solid var(--control-border); border-radius: 4px; background: var(--surface-raised); font-weight: 400; color: var(--ink); cursor: pointer; }
 .qp .qp-choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
-.qp .qp-choice input { accent-color: var(--accent); }
+.qp .qp-choice { position: relative; }
+.qp .qp-choice:has(input:checked) { font-weight: 600; }
+/* The input covers the whole choice, so the hit area is the choice (44px), and the checked state is the choice's own border and fill. */
+.qp .qp-choice input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
 .qp-start { justify-self: start; min-width: 160px; min-height: var(--tap); }
 
 @media (max-width: 480px) {
