@@ -150,7 +150,9 @@ if (BOTH) {
       // letters. The brand and commerce checks below still apply to every one of them.
       AccountActivationGate: 'edition values', ExamRoom: 'edition values', Exams: 'edition values', History: 'edition values', InkAnswer: 'edition values',
       PaperGenerator: 'edition values', PracticeBase: 'edition values', PractisePhoto: 'edition values', ReportHead: 'edition values',
-      Settings: 'edition values', Tasks: 'edition values', TrialNotice: 'edition values', index: 'edition values'
+      Settings: 'edition values', Tasks: 'edition values', TrialNotice: 'edition values', index: 'edition values',
+      AccountDeleteRequest: 'edition values', GuardianConsent: 'edition values', OfferedCourse: 'edition values', SignUpFlow: 'edition values', Teach: 'edition values',
+      difficultyText: 'edition values', glossary: 'edition values', guest: 'edition values', offering: 'edition values'
     };
     //   core           i18n/core.js (split from i18n/index.js in train 23 so the server
     //                  can translate without React) picks the edition's en-AU overrides
