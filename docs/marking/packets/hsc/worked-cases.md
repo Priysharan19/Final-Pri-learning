@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `38f7a8272869e666900056d34fa7acc15a44278bc50ba97ee950c57d6b219fe0` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `e9d5d8fb160511e5abad5e6c487d350f87d056af7bd33b1bb2e090d7ddabdfa4` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -3053,36 +3053,36 @@ Final answer: -6, 7
 
 ## `nsw-final:y12-financial/D2` — seed 1009
 
-> \\$1,200.00 is deposited at the **start** of each year for 3 years into an account paying $5.5\\%$ p.a. compounded annually. What is the balance at the end of the third year, to the nearest cent?
+> \\$2,000.00 is deposited at the **start** of each year for 3 years into an account paying $6\\%$ p.a. compounded annually. What is the balance at the end of the third year, to the nearest cent?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `100268/25` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `100268/25` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `100293/25` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `100293/25` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `674923/100` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `674923/100` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `675023/100` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `675023/100` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-financial/D3` — seed 1009
 
-> \\$2,000.00 is deposited at the **end** of each year for $13$ years, earning $5\\%$ p.a. compounded annually. Using the annuity formula $FV = a\\dfrac{(1+r)^n - 1}{r}$, find the future value to the nearest dollar.
+> \\$4,200.00 is deposited at the **end** of each year for $15$ years, earning $6\\%$ p.a. compounded annually. Using the annuity formula $FV = a\\dfrac{(1+r)^n - 1}{r}$, find the future value to the nearest dollar.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `35426` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `35426.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `35427` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `35427` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `97759` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `97759.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `97760` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `97760` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-financial/D4` — seed 1009
 
-> A \\$20,000.00 loan charges interest at $12\\%$ p.a. compounded **monthly** (1\\% per month), with repayments of \\$400.00 at the end of each month. Find the balance owing after the **second** repayment, to the nearest cent.
+> A \\$21,100.00 loan charges interest at $12\\%$ p.a. compounded **monthly** (1\\% per month), with repayments of \\$550.00 at the end of each month. Find the balance owing after the **second** repayment, to the nearest cent.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `19598` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `19598.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `19599` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `19599` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `2041861/100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `2041861/100` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `2041961/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2041961/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-stats/D1` — seed 1009
 
@@ -4591,25 +4591,25 @@ Final answer: -3, -2, 2, 4
 
 ## `nsw-final:me11-comb/D1` — seed 1009
 
-> $8$ band members sit around a **circular** table. How many seating arrangements are there, counting rotations of the same order as identical?
+> $10$ band members sit around a **circular** table. How many seating arrangements are there, counting rotations of the same order as identical?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5040` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `5040.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `5041` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `5041` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `362880` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `362880.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `362881` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `362881` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-comb/D2` — seed 1009
 
-> $7$ teammates line up for a photo. $2$ of them are siblings. In how many arrangements are the siblings **not all together**?
+> $8$ teammates line up for a photo. $2$ of them are siblings. In how many arrangements are the siblings **not all together**?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `3600` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `3600.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `3601` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3601` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `30240` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `30240.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `30241` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `30241` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-comb/D3` — seed 1009
 
@@ -4811,47 +4811,47 @@ Final answer: -3, -2, 2, 4
 
 ## `nsw-final:me12-calc/D1` — seed 1009
 
-> Find $\\displaystyle\\int 3\\cos^{3}x\\,\\sin x\\,dx$. (You may omit +C.)
+> Find $\\displaystyle\\int 5\\cos^{4}x\\,\\sin x\\,dx$. (You may omit +C.)
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-3/4*cos(x)^4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `(-3/4*cos(x)^4)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
-| common wrong | `2*(-3/4*cos(x)^4)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2*(-3/4*cos(x)^4)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-1*cos(x)^5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(-1*cos(x)^5)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `2*(-1*cos(x)^5)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2*(-1*cos(x)^5)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-calc/D2` — seed 1009
 
-> Using $u = \\ln x$, evaluate $\\displaystyle\\int_{1}^{e^{3}} \\frac{2(\\ln x)^{2}}{x}\\,dx$.
+> Using $u = \\ln x$, evaluate $\\displaystyle\\int_{1}^{e^{4}} \\frac{9(\\ln x)^{3}}{x}\\,dx$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `18` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| correct | `576` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `19` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `19` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `577` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `577` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-calc/D3` — seed 1009
 
-> The region bounded by the parabola $y = x^2$ (for $x \\ge 0$), the $y$-axis and the line $y = 7$ is rotated about the $y$-axis. Find the **exact** volume of the solid formed.
+> The region enclosed between the parabola $y = x^2$ and the line $y = 7x$ is rotated about the $x$-axis. Find the **exact** volume of the solid formed.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `49pi/2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| correct | `33614pi/15` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `77.96902` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `77.96902` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `7041.099697` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7041.099697` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-calc/D4` — seed 1009
 
-> Find the area of the region in the first quadrant bounded by the curve $y = x^3$ and the line $y = 9x$.
+> Find the area of the region enclosed by the curve $y = \\sqrt{x}$ and the line $y = \\dfrac{x}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `81/4` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
+| correct | `343/6` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `85/4` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `85/4` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| common wrong | `349/6` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `349/6` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-binomial/D1` — seed 1009
 
