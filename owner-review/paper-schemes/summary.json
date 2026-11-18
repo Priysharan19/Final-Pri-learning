@@ -1,0 +1,106 @@
+[
+ {
+  "id": "ext1-2027-p01",
+  "parts": 25,
+  "keyed": 10,
+  "criteria": 60,
+  "yes": 10,
+  "no": 50
+ },
+ {
+  "id": "ext1-2027-p02",
+  "parts": 22,
+  "keyed": 7,
+  "criteria": 60,
+  "yes": 7,
+  "no": 53
+ },
+ {
+  "id": "ext1-2027-p03",
+  "parts": 22,
+  "keyed": 9,
+  "criteria": 60,
+  "yes": 9,
+  "no": 51
+ },
+ {
+  "id": "ext1-2027-p04",
+  "parts": 22,
+  "keyed": 11,
+  "criteria": 60,
+  "yes": 11,
+  "no": 49
+ },
+ {
+  "id": "ext1-2027-p05",
+  "parts": 25,
+  "keyed": 15,
+  "criteria": 60,
+  "yes": 15,
+  "no": 45
+ },
+ {
+  "id": "ext1-2027-p06",
+  "parts": 25,
+  "keyed": 14,
+  "criteria": 60,
+  "yes": 14,
+  "no": 46
+ },
+ {
+  "id": "ext1-2027-p07",
+  "parts": 24,
+  "keyed": 15,
+  "criteria": 60,
+  "yes": 15,
+  "no": 45
+ },
+ {
+  "id": "ext1-2027-p08",
+  "parts": 26,
+  "keyed": 13,
+  "criteria": 60,
+  "yes": 13,
+  "no": 47
+ },
+ {
+  "id": "ext1-2027-p09",
+  "parts": 25,
+  "keyed": 17,
+  "criteria": 60,
+  "yes": 17,
+  "no": 43
+ },
+ {
+  "id": "ext1-2027-p10",
+  "parts": 22,
+  "keyed": 12,
+  "criteria": 60,
+  "yes": 12,
+  "no": 48
+ },
+ {
+  "id": "ext1-2027-p11",
+  "parts": 22,
+  "keyed": 9,
+  "criteria": 60,
+  "yes": 9,
+  "no": 51
+ },
+ {
+  "id": "ext1-2027-p12",
+  "parts": 22,
+  "keyed": 12,
+  "criteria": 60,
+  "yes": 12,
+  "no": 48
+ },
+ {
+  "id": "ext1-2027-p13",
+  "parts": 16,
+  "keyed": 13,
+  "criteria": 60,
+  "yes": 13,
+  "no": 47
+ }
+]
