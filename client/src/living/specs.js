@@ -44,6 +44,16 @@ export function periodInPi(b) {
   return fraction(8n, q(b));
 }
 
+
+// ── Tidy display ────────────────────────────────────────────────────────────
+// The formula is shown the way a person would write it: a multiplier of 1 is not written, a
+// multiplier of −1 is a minus sign, an added 0 is left out, and (x − 0) is x. Display only: every
+// parameter keeps its value and stays draggable in the controls list, and the spoken reading
+// (`tex`) still states every value.
+const T = tex => ({ tex });
+const mult = (id, v) => (v === 1 ? [] : v === -1 ? [T('-')] : [{ p: id }]);
+const add = (id, v, tok = { sp: id }) => (v === 0 ? [] : [tok]);
+
 const pt = (shape, x, y) => ({ shape, x, y });
 const vline = x => ({ shape: 'vline', x });
 const hline = y => ({ shape: 'hline', y });
@@ -57,6 +67,7 @@ export const SPECS = [
     together: [['a', 'b']],
     params: [frange(-3, 3, 0.5, 1, 'a', 'a'), frange(-6, 6, 1, -2, 'b', 'b'), frange(-6, 6, 1, -3, 'c', 'c')],
     formula: [{ tex: 'y =' }, { p: 'a' }, { tex: 'x^2' }, { sp: 'b' }, { tex: 'x' }, { sp: 'c' }],
+    tidy: ({ a, b, c }) => [T('y ='), ...mult('a', a), T('x^2'), ...(b === 0 ? [] : [{ sp: 'b' }, T('x')]), ...add('c', c)],
     tex: ({ a, b, c }) => `y = ${a}x^2 + (${b})x + (${c})`,
     window: { xMin: -6, xMax: 6, yMin: -10, yMax: 10 },
     fn: ({ a, b, c }) => x => a * x * x + b * x + c,
@@ -90,6 +101,7 @@ export const SPECS = [
     together: [['h', 'k']],
     params: [frange(-3, 3, 0.5, 1, 'a', 'a'), frange(-5, 5, 0.5, 2, 'h', 'h'), frange(-6, 6, 0.5, -3, 'k', 'k')],
     formula: [{ tex: 'y =' }, { p: 'a' }, { tex: '(x' }, { sp: 'h', neg: true }, { tex: ')^2' }, { sp: 'k' }],
+    tidy: ({ a, h, k }) => [T('y ='), ...mult('a', a), ...(h === 0 ? [T('x^2')] : [T('(x'), { sp: 'h', neg: true }, T(')^2')]), ...add('k', k)],
     tex: ({ a, h, k }) => `y = ${a}(x - (${h}))^2 + (${k})`,
     window: { xMin: -6, xMax: 6, yMin: -10, yMax: 10 },
     fn: ({ a, h, k }) => x => a * (x - h) * (x - h) + k,
@@ -121,6 +133,7 @@ export const SPECS = [
     together: [],
     params: [frange(-4, 4, 0.5, 1, 'm', 'm'), frange(-6, 6, 1, 2, 'c', 'c')],
     formula: [{ tex: 'y =' }, { p: 'm' }, { tex: 'x' }, { sp: 'c' }],
+    tidy: ({ m, c }) => [T('y ='), ...(m === 0 ? [] : [...mult('m', m), T('x')]), ...(m === 0 ? [{ p: 'c' }] : add('c', c))],
     tex: ({ m, c }) => `y = ${m}x + (${c})`,
     window: { xMin: -8, xMax: 8, equal: true },
     fn: ({ m, c }) => x => m * x + c,
@@ -138,6 +151,7 @@ export const SPECS = [
     together: [],
     params: [frange(-3, 3, 0.5, 2, 'a', 'a'), frange(0.5, 3, 0.5, 1, 'b', 'b'), frange(-3, 3, 0.5, 0, 'c', 'c'), frange(-3, 3, 1, 0, 'd', 'd')],
     formula: [{ tex: 'y =' }, { p: 'a' }, { tex: '\\sin\\big(' }, { p: 'b' }, { tex: '(x' }, { sp: 'c', neg: true }, { tex: ')\\big)' }, { sp: 'd' }],
+    tidy: ({ a, b, c, d }) => [T('y ='), ...mult('a', a), ...(b === 1 && c === 0 ? [T('\\sin(x)')] : b === 1 ? [T('\\sin(x'), { sp: 'c', neg: true }, T(')')] : c === 0 ? [T('\\sin('), { p: 'b' }, T('x)')] : [T('\\sin\\big('), { p: 'b' }, T('(x'), { sp: 'c', neg: true }, T(')\\big)')]), ...add('d', d)],
     tex: ({ a, b, c, d }) => `y = ${a}\\sin(${b}(x - (${c}))) + (${d})`,
     window: { xMin: -7, xMax: 7, yMin: -7, yMax: 7 },
     fn: ({ a, b, c, d }) => x => a * Math.sin(b * (x - c)) + d,

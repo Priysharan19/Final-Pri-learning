@@ -175,7 +175,7 @@ export default function LivingFormula({ spec }) {
       </span>
     );
   };
-  const view = spec.formula.map(renderToken);
+  const view = (spec.tidy ? spec.tidy(values) : spec.formula).map(renderToken);
 
   const spokenFormula = t('living.ui.formula', { tex: speakMath(spec.tex(values), locale) });
   const clip = `${uid}-clip`;

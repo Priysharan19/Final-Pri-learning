@@ -257,6 +257,20 @@ ok(!/\bfetch\s*\(|XMLHttpRequest|sendBeacon|WebSocket|\bapi\.js|outbox|localStor
 ok(!/checker|marker|attempt|hint|mastery|learnerState|recordAnswer/i.test(src.replace(/\/\/.*$/gm, '')), 'living formulas touch no marking, hint, attempt or learner state');
 ok(readdirSync(fileURLToPath(new URL('../src/living/', import.meta.url))).every(f => !/\.(png|jpe?g|woff2?)$/.test(f)), 'no new asset in the living formulas');
 
+// ── tidy display: identity values are not written, every parameter stays a parameter ─────────────
+{
+  const shown = (spec, v) => (spec.tidy ? spec.tidy(v) : spec.formula).map(t => (t.tex ?? (t.p ? `<${t.p}>` : `<${t.sp}${t.neg ? '-' : ''}>`))).join(' ');
+  const sine = SPEC_BY_ID.sine;
+  ok(shown(sine, { a: 3, b: 1, c: 0, d: 0 }) === 'y = <a> \\sin(x)', 'sine with b = 1, c = 0, d = 0 is written 3 sin(x), not 3 sin(1(x - 0)) + 0');
+  ok(!/<b>|<c->|<d>/.test(shown(sine, { a: 3, b: 1, c: 0, d: 0 })), 'identity parameters are not drawn in the formula');
+  ok(/<b>/.test(shown(sine, { a: 3, b: 2, c: 0, d: 0 })) && /<c->/.test(shown(sine, { a: 3, b: 1, c: 1, d: 0 })) && /<d>/.test(shown(sine, { a: 3, b: 1, c: 0, d: 2 })), 'a parameter that is not the identity is drawn, and draggable');
+  ok(shown(sine, { a: -1, b: 1, c: 0, d: 0 }) === 'y = - \\sin(x)', 'a multiplier of -1 is a minus sign');
+  ok(shown(SPEC_BY_ID.quadratic, { a: 1, b: 0, c: 0 }) === 'y = x^2', 'x^2 alone for a = 1, b = 0, c = 0');
+  ok(shown(SPEC_BY_ID.vertex, { a: 2, h: 0, k: 0 }) === 'y = <a> x^2', 'vertex form with h = 0, k = 0');
+  for (const spec of SPECS) ok(spec.params.length >= 1 && spec.params.every(p => valueAt(p, 0) === p.min), `${spec.id}: every parameter stays defined and in the controls`);
+  ok(SPEC_BY_ID.sine.tex({ a: 3, b: 1, c: 0, d: 0 }).includes('(1(x - (0)))'), 'the spoken reading still states every value');
+}
+
 if (failures.length) {
   console.error(`LIVING FORMULAS MATH: FAIL — ${failures.length} of ${pass + failures.length} checks failed`);
   for (const f of failures.filter(Boolean).slice(0, 40)) console.error(`  · ${f}`);
