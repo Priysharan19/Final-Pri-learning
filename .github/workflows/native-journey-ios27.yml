@@ -36,6 +36,8 @@ on:
       - 'client/test/native-ink-check.mjs'
       - 'scripts/native-bridge-selfcheck.mjs'
       - 'scripts/iphone-journey.mjs'
+      - 'scripts/journey-evidence-reader.mjs'
+      - 'scripts/journey-evidence-reader-check.mjs'
       - 'scripts/cloud-fixture-server.mjs'
       - 'scripts/journey-oracle.mjs'
       - 'scripts/synthetic-reader-server.mjs'
@@ -53,6 +55,8 @@ on:
       - 'client/test/native-ink-check.mjs'
       - 'scripts/native-bridge-selfcheck.mjs'
       - 'scripts/iphone-journey.mjs'
+      - 'scripts/journey-evidence-reader.mjs'
+      - 'scripts/journey-evidence-reader-check.mjs'
       - 'scripts/cloud-fixture-server.mjs'
       - 'scripts/journey-oracle.mjs'
       - 'scripts/synthetic-reader-server.mjs'
@@ -105,6 +109,9 @@ jobs:
           cache-dependency-path: |
             client/package-lock.json
             server/package-lock.json
+
+      - name: Journey evidence reader regression checks
+        run: node scripts/journey-evidence-reader-check.mjs
 
       - name: Canonical native source has no stale duplicate
         run: node scripts/check-native-package-sync.mjs

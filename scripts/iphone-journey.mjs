@@ -67,6 +67,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { openServerDesk } from './journey-oracle.mjs';
+import { reportOffset, readJourneyReport, journeyReportSource } from './journey-evidence-reader.mjs';
 import { describeRuntimes, installApp, keepOnlySimulator, pickSimulator, requiredRuntime, selectedSimulatorRuntimeEvidence } from './simulator-fleet.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -176,6 +177,14 @@ const PHASE_MIN_MS = 600_000;
 // nothing for 632 s and failed the journey (run 43860746750).
 const STALL_MS = 180_000;
 const LOG_SHOW_EVERY_MS = 30_000;
+// get_app_container is itself a simctl call. Reuse the verified path across
+// phases of the same install (especially the offline relaunch), but never
+// carry it into a fresh install or another simulator/bundle.
+let reportFileForInstall = null;
+function installJourneyApp(device, app) {
+  reportFileForInstall = null;
+  installApp(device, app);
+}
 function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = null, duringAfterMs = 20_000, duringWhen = null, duringDeadlineMs = 240_000, tick = null, loops = 75 } = {}) {
   const started = localStamp(new Date(Date.now() - 2000));
   // SIMCTL_CHILD_* reaches the app's environment (DEBUG builds read the cloud
@@ -186,23 +195,23 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   // in the app's container (the hosted iOS 27 image shows the app nothing in
   // `log show`). Only what THIS launch appends is read: the size is taken first,
   // so a summary left by an earlier run can never pass this one.
-  let reportFile = null, offset = 0;
-  try {
-    const container = run('xcrun', ['simctl', 'get_app_container', udid, bundleId, 'data'], { timeout: 60_000 }).trim();
-    if (container) { reportFile = join(container, 'Documents', 'PRIJOURNEY.log'); offset = existsSync(reportFile) ? readFileSync(reportFile).length : 0; }
-  } catch { /* no data container yet: the log is the only channel */ }
-  const fromFile = () => {
+  let reportFile = reportFileForInstall?.udid === udid && reportFileForInstall?.bundleId === bundleId
+    ? reportFileForInstall.path : null;
+  if (!reportFile) {
     try {
-      if (!reportFile || !existsSync(reportFile)) return [];
-      const bytes = readFileSync(reportFile);
-      // A file shorter than the offset was replaced (the app rewrites it
-      // whole when it cannot append): read it all. Only lines after this
-      // launch's own "started <phase>" are kept below, so an earlier run's
-      // summary still cannot pass this one.
-      if (bytes.length < offset) offset = 0;
-      return bytes.subarray(offset).toString('utf8').split('\n').filter(l => l.startsWith('PRIJOURNEY'));
-    } catch { return []; }
-  };
+      const container = run('xcrun', ['simctl', 'get_app_container', udid, bundleId, 'data'], { timeout: 60_000, killSignal: 'SIGKILL' }).trim();
+      if (container) {
+        reportFile = join(container, 'Documents', 'PRIJOURNEY.log');
+        reportFileForInstall = { udid, bundleId, path: reportFile };
+      }
+    } catch { /* no data container yet: the log is the only channel */ }
+  }
+  let offset = reportOffset(reportFile);
+  if (reportFile && offset === null) {
+    console.log(`  (${phase}: cannot snapshot the report offset; using unified log)`);
+    reportFile = null;
+    reportFileForInstall = null;
+  }
   console.log(`  (${phase}: launching at ${new Date().toISOString().slice(11, 19)}Z)`);
   launchApp(udid, bundleId, [flag], { env });
   let lines = [];
@@ -212,8 +221,9 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
   // one phase run 75 slow `log show` reads (18 minutes for the offline phase
   // on Train editions-6, run 43435306380), and the job hit its 65-minute
   // limit before the iPad journey finished. The container file is read every
-  // pass (it is cheap); `log show` only when there is no file, or at most
-  // once per LOG_SHOW_EVERY_MS while the file has given nothing.
+  // pass (it is cheap); while it is readable, never block on `log show`,
+  // even before the first complete line. If unavailable, use the bounded
+  // fallback after the startup grace period.
   const deadline = t0 + Math.max(loops * 2_000, PHASE_MIN_MS) + (during ? duringDeadlineMs : 0);
   let lastLogShow = 0;
   let via = 'nothing';
@@ -236,10 +246,14 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // journey with nothing reported. A read that does not come back is not a
     // result — the next pass reads again, and a phase whose summary is never
     // read is reported "not reported" and fails the journey.
-    const filed = fromFile();
+    const filed = readJourneyReport(reportFile, offset);
+    const source = journeyReportSource({
+      path: reportFile, report: filed, launchAgeMs: Date.now() - launchedAt,
+      sinceLogMs: Date.now() - lastLogShow, stallMs: STALL_MS, logIntervalMs: LOG_SHOW_EVERY_MS,
+    });
     let log;
-    if (filed.length) { log = filed.join('\n'); via = 'container file'; }
-    else if (reportFile && Date.now() - lastLogShow < LOG_SHOW_EVERY_MS) continue;
+    if (source === 'file') { offset = filed.offset; log = filed.lines.join('\n'); via = 'container file'; }
+    else if (source === 'wait') continue;
     else try {
       lastLogShow = Date.now();
       via = 'unified log';
@@ -258,7 +272,7 @@ function launchAndRead(udid, bundleId, flag, phase, childEnv = {}, { during = nu
     // and exists (it does once any earlier phase has written): a phase that
     // is merely unreadable (no file, `log show` timing out or throttled) is
     // not a stall, and relaunching it could repeat a non-idempotent step.
-    if (!startedSeen && !relaunched && reportFile && existsSync(reportFile) && Date.now() - launchedAt > STALL_MS) {
+    if (!startedSeen && !relaunched && filed !== null && Date.now() - launchedAt > STALL_MS) {
       relaunched = true;
       console.log(`  (${phase}: no "started" line in ${Math.round((Date.now() - launchedAt) / 1000)} s — launching once more)`);
       const describe = (label, fn) => { try { console.log(`    ${label}: ${String(fn()).trim().split('\n').slice(0, 6).join(' | ').slice(0, 400) || '(none)'}`); } catch (e) { console.log(`    ${label}: unreadable (${String(e?.code || e?.signal || e?.message).slice(0, 50)})`); } };
@@ -297,7 +311,7 @@ if (!app) {
 const bundleId = run('/usr/bin/plutil', ['-extract', 'CFBundleIdentifier', 'raw', '-o', '-', join(app, 'Info.plist')]).trim();
 try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
 try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
-installApp(udid, app);
+installJourneyApp(udid, app);
 
 // --staging: the deployed staging service, the real reader and a real emailed
 // code instead of the local legs (scripts/journey-staging.mjs; SIMULATOR +
@@ -386,7 +400,7 @@ if (WANT_CLOUD) try {
   // A fresh install: nothing on the device has an account yet.
   try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
   try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
-  installApp(udid, app);
+  installJourneyApp(udid, app);
   const show = lines => {
     for (const line of lines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
     if (fixture.PRI_CLOUD_SERVER_LOG && (!lines.length || lines.some(l => l.startsWith('PRIJOURNEY FAIL')))) {
@@ -547,7 +561,7 @@ let offlineRelaunchLines = [];
 
     try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
     try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
-    installApp(udid, app);
+    installJourneyApp(udid, app);
     const childEnv = { PRI_CLOUD_ORIGIN: server.PRI_CLOUD_ORIGIN, PRI_JOURNEY_EMAIL: student, PRI_JOURNEY_ORACLE_DIR: oracleDir };
     markingLines = launchAndRead(udid, bundleId, '--journey-marking', 'marking', childEnv, { tick, loops: 130 });
     for (const line of markingLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
@@ -613,7 +627,7 @@ let offlineRelaunchLines = [];
     // product behaviour, and the marking profile has used much of it.
     try { run('xcrun', ['simctl', 'terminate', udid, bundleId], { timeout: 60_000, killSignal: 'SIGKILL' }); } catch { /* not running */ }
     try { run('xcrun', ['simctl', 'uninstall', udid, bundleId]); } catch { /* not installed */ }
-    installApp(udid, app);
+    installJourneyApp(udid, app);
     const offlineEnv = { ...childEnv, PRI_JOURNEY_NEW_EMAIL: offlineStudent };
     offlineDraftLines = launchAndRead(udid, bundleId, '--journey-offline-draft', 'offlineDraft', offlineEnv, { tick, loops: 120 });
     for (const line of offlineDraftLines) console.log(`  ${line.replace(/^PRIJOURNEY\s*/, '')}`);
