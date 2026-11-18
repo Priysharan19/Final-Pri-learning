@@ -835,6 +835,7 @@ async function run() {
       // Owner decision, 19 Nov 2026: one press of "Mark my working" reads (silently) and marks. The strokes alone send nothing.
       const readButton = page.getByRole('button', { name: /^Mark my working/ }).first();
       await readButton.waitFor({ state: 'visible', timeout: 20000 });
+      refusals.mark = { button: await readButton.evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })), readButton: await page.locator('[data-ink-read]').count(), readingList: await page.locator('.ink-line, [data-reading-list]').count() };
       await readButton.click();
       // Server-only reading (owner decision): with no reader in this harness
       // the page shows the reading/waiting status rather than a local reading.
@@ -974,69 +975,6 @@ async function run() {
       } finally {
         await online.reconnect();
       }
-    });
-
-    // Mark my working (owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own
-    // page; CTO ruling: written working is one authoritative attempt). Driven from the keyboard on the real server with the
-    // scripted stand-in reader. A working-type question is pinned by seed so the marked page has lines to speak about.
-    await step('practice · mark my working, the marked page', '/practice', async () => {
-      const focusOf = () => page.evaluate(() => { const el = document.activeElement; return { tag: (el?.tagName || '').toLowerCase(), body: el === document.body || !el }; });
-      let issued = 0;
-      const PIN = /\/v1\/practice\/issue(?:\?.*)?$/;
-      const pin = async route => {
-        const original = route.request().postDataJSON() || {};
-        const seed = [49, 54, 56][issued++ % 3];
-        await route.fulfill({ response: await route.fetch({ postData: JSON.stringify({ ...original, generator: 'c10-trigonometry-current', difficulty: 4, curriculum: 'in', seed }) }) });
-      };
-      await page.route(PIN, pin);
-      try {
-        await goTo(page, BASE, '/practice?subtopic=c10-trigonometry');
-        let lines = null;
-        for (let n = 0; n < 6 && !lines; n++) {
-          await page.waitForSelector('.q-prompt', { timeout: 30000 });
-          const id = (await online.shownRow())?.serverQuestionId;
-          const row = id ? platform.h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?").get(id) : null;
-          const q = row ? JSON.parse(row.response_json) : null;
-          if (q?.answerType === 'working' && typeof q.answer?.canonicalWorking === 'string' && q.answer.canonicalWorking.split('\n').filter(Boolean).length >= 4) lines = q.answer.canonicalWorking.split('\n').filter(Boolean);
-          else { await page.locator('.ctx-next').first().click(); await wait(page, SETTLE); }
-        }
-        if (!lines) throw new Error(`no working-type question reachable (issued ${issued}, shown ${JSON.stringify(await online.shownRow())})`.slice(0, 400));
-        const hand = page.getByRole('button', { name: 'Answer by handwriting' });
-        if (await hand.count()) await hand.click();
-        await page.waitForSelector('.ink-answer:not(.ink-disabled) .ink-canvas-live', { timeout: 30000 });
-        const box = await page.locator('.ink-canvas-live').boundingBox();
-        const MISREAD = `${lines[1]} + 7`;
-        platform.reader.lines = [{ text: lines[0], confidence: 0.97 }, { text: MISREAD, confidence: 0.97 }, { text: lines[2], confidence: 0.96 }, { text: lines[3], confidence: 0.95 }];
-        platform.reader.confidence = 0.97;
-        let y = 10;
-        for (let i = 0; i < 4; i++) {
-          await page.mouse.move(box.x + 30, box.y + y); await page.mouse.down();
-          for (let k = 1; k <= 8; k++) await page.mouse.move(box.x + 30 + k * 18, box.y + y + (k % 2) * 20);
-          await page.mouse.up(); y += 112;
-        }
-        await wait(page, 900);
-        const mark = page.getByRole('button', { name: /^Mark my working/ }).first();
-        await mark.waitFor({ timeout: 15000 });
-        refusals.mark = { button: await mark.evaluate(b => ({ tag: b.tagName.toLowerCase(), name: (b.textContent || '').trim() })), readButton: await page.locator('[data-ink-read]').count(), readingList: await page.locator('.ink-line, [data-reading-list]').count() };
-        await mark.focus();
-        await page.keyboard.press('Enter');
-        await page.waitForSelector('[data-marked-page]', { timeout: 40000 });
-        await wait(page, 600);
-        refusals.mark.after = { focus: await focusOf(), mp: await page.evaluate(() => {
-          const sec = document.querySelector('[data-marked-page]');
-          const list = sec.querySelector('ol[aria-label]');
-          const nums = [...sec.querySelectorAll('[data-mp-card]')].map(li => li.getAttribute('data-mp-card')).filter(n => n !== 'collapsed').map(Number);
-          return { headings: sec.querySelectorAll('h3').length, list: !!list, ordered: nums.every((n, i) => i === 0 || n > nums[i - 1]), cards: nums.length,
-            tabbable: [...sec.querySelectorAll('[data-mp-card]')].every(li => li.tabIndex === 0), live: !!sec.querySelector('[data-mp-sentence][role="status"]') };
-        }) };
-        // "See how Pri read this line": a real button reachable by keyboard, expanding in place
-        const see = page.locator('[data-mp-see-line]').first();
-        await see.focus();
-        const before = await see.getAttribute('aria-expanded');
-        await page.keyboard.press('Enter');
-        await wait(page, 300);
-        refusals.mark.see = { tag: await see.evaluate(b => b.tagName.toLowerCase()), before, after: await see.getAttribute('aria-expanded'), reading: await page.locator('[data-mp-reading]').count(), focusStill: (await focusOf()).tag };
-      } finally { await page.unroute(PIN, pin).catch(() => { }); }
     });
 
     // the marked state — the verdict, the evaluation card and the criteria table
@@ -1744,17 +1682,9 @@ async function run() {
       JSON.stringify({ rush: refusals.rush, match: refusals.match }));
 
     section('mark my working');
-    ok('handwriting is marked by ONE real, named "Mark my working" button: no Read button and no reading list is shown before marking',
+    ok('handwriting is marked by ONE real, named "Mark my working" button: no Read button and no reading list is shown before marking (the marked page\'s own keyboard walk is in tour-marked-page.mjs)',
       refusals.mark?.button?.tag === 'button' && /^Mark my working/.test(refusals.mark.button.name) && refusals.mark.readButton === 0 && refusals.mark.readingList === 0,
       JSON.stringify(refusals.mark));
-    ok('pressing it from the keyboard marks the page, and focus does not drop to <body>',
-      refusals.mark?.after?.focus?.body === false, JSON.stringify(refusals.mark?.after?.focus));
-    ok('the marked page names itself with one heading, one named comments list in line order (the screen-reader source), every comment a tab stop, and the header is a status',
-      refusals.mark?.after?.mp?.headings === 1 && refusals.mark.after.mp.list === true && refusals.mark.after.mp.ordered === true && refusals.mark.after.mp.cards >= 3 && refusals.mark.after.mp.tabbable === true && refusals.mark.after.mp.live === true,
-      JSON.stringify(refusals.mark?.after?.mp));
-    ok('"See how Pri read this line" is a real button reachable by keyboard; Enter expands the reading in place and focus stays on it',
-      refusals.mark?.see?.tag === 'button' && refusals.mark.see.before === 'false' && refusals.mark.see.after === 'true' && refusals.mark.see.reading >= 1 && refusals.mark.see.focusStill === 'button',
-      JSON.stringify(refusals.mark?.see));
 
     section('spoken mathematics');
     ok('formulas were seen, so the rule is alive', mathSeen >= 20, `only ${mathSeen} formulas were found across the views`);

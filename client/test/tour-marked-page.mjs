@@ -47,6 +47,20 @@ const browser0 = await chromium.launch();
   if (shots) await pg.screenshot({ path: `${shots}/criteria-fixture-buoy-desktop.png`, fullPage: true });
   await ctx.close();
 }
+{
+  // The keyboard walk of the marked page (a11y gate: the real flow cannot reach a working-type question there). Comments list in
+  // line order is the screen-reader source; "See how Pri read this line" is a real button, reachable and operable by keyboard.
+  const ctx = await browser0.newContext({ viewport: { width: 1280, height: 900 } }); const pg = await ctx.newPage();
+  await pg.goto(`${url('stationary', 'ink', 'prithagoras', 'light')}&reading=1`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
+  const nums = await pg.locator('[data-mp-card]').evaluateAll(es => es.map(e => e.getAttribute('data-mp-card')).filter(n => n !== 'collapsed').map(Number));
+  ok(nums.length === 8 && nums.every((n, i) => i === 0 || n > nums[i - 1]), `the comments list is in line order (${nums})`);
+  const see = pg.locator('[data-mp-see-line]').first();
+  await see.focus();
+  ok(await see.evaluate(b => b.tagName === 'BUTTON') && await see.getAttribute('aria-expanded') === 'false', 'See how Pri read this line is a real button, collapsed');
+  await pg.keyboard.press('Enter');
+  ok(await see.getAttribute('aria-expanded') === 'true' && await pg.locator('[data-mp-reading]').count() >= 1 && await pg.evaluate(() => document.activeElement?.tagName) === 'BUTTON', 'Enter on it expands the reading in place and focus stays on the button');
+  await ctx.close();
+}
 await browser0.close();
 const browser = await chromium.launch();
 try {

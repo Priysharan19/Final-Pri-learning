@@ -83,6 +83,6 @@ const FIXTURE = q.get('criteria') === '1' && which === 'buoy' ? {
 
 createRoot(document.getElementById('root')).render(
   <div style={{ padding: '16px', maxWidth: 1100, margin: '0 auto' }} data-gallery-case={`${which}/${source}/${edition}`}>
-    <MarkedPage input={input} texOf={s => exprToLatex(s) || '\\;'} {...props} {...FIXTURE} />
+    <MarkedPage input={input} texOf={s => exprToLatex(s) || '\\;'} {...props} {...FIXTURE} {...(q.get('reading') === '1' ? { reading: { lines: c.lines }, onCorrect: () => {} } : {})} />
   </div>
 );
