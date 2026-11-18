@@ -2,8 +2,8 @@
 
 **Last updated: 18 November 2026**
 
-These terms are an agreement between you and Priysharan Tripathi,
-Pri Learning, ABN 20 192 090 394, about your use of Prithagoras
+These terms are an agreement between you and Priysharan Tripathi
+trading as Pri Learning, ABN 20 192 090 394, about your use of Prithagoras
 (Pri Learning's Australian edition) on the web, on iPhone and iPad, and on
 Android. They have not yet been reviewed by a lawyer; the app says so above
 them.
@@ -30,7 +30,17 @@ estimates progress. It is a practice tool.
 Handwriting and photos are read by an outside service, OpenAI, as the
 [privacy notice](/privacy) describes. The mark is always decided by our own
 marking engine, never by that service, and you can correct what it read before
-the answer counts.
+the answer counts. When a handwritten or photographed practice answer is marked,
+we keep your original handwriting or photo with the mark for 2 years, as the
+privacy notice describes.
+
+Explanations, hints and tutor replies may be written by an AI. They are labelled
+as written by AI and not checked by the maths engine, they can be wrong, and
+they never set a mark.
+
+If you join a class, your teacher can see what the privacy notice lists under
+"Teachers and classes", and nothing else. A teacher's own marks are recorded
+separately from the marking engine's.
 
 **Marking is of the final answer only.** The app does not award the marks an
 examiner gives for working, and it does not mark the way an HSC examiner would.
@@ -47,10 +57,15 @@ has no standing outside it.
 
 ## Subscriptions
 
-The free plan includes a daily allowance of practice questions; the app tells
-you what it is and when it resets. Prithagoras Premium, which removes those
-limits, is sold as a subscription at A$9.99 a month or A$99 a year, in Australian
-dollars. Where GST applies, the price includes it. You pay on a page hosted by
+In this version the free plan includes every difficulty level with step-by-step
+checking, practice questions with no daily limit, up to 5 handwriting reads and 5
+"Practise this" photos a day, and one exam simulation every 30 days. Reads
+are counted over any 24 hours.
+The app tells you what is left. Prithagoras Premium removes the
+exam limit, raises the daily reads to 50 and 50, and unlocks the other features
+listed at the point of purchase. These numbers can change in a later version;
+the app always shows the current ones. Premium is sold as a subscription at
+A$9.99 a month or A$99 a year, in Australian dollars. Where GST applies, the price includes it. You pay on a page hosted by
 Stripe, our payment processor; we do not receive or store your card number. The
 subscription renews each month or year until you cancel it. You can cancel in the
 app, and Premium then stays on until the end of the period you have paid for.
@@ -69,12 +84,11 @@ free trial before and are not already paying for Premium.
 - **Eligibility:** the friend's account must be new (created in the last 7
   days, or approved by a parent or guardian in the last 7 days) and must not
   belong to you. An account made on the same device as
-  yours, or with the same email inbox, does not count. If you are under 18 and
-  your account needs a parent's or guardian's approval, you can share or use an
-  invite only once that approval is in place.
+  yours, or with the same email inbox, does not count. If your account needs a
+  parent's or guardian's approval (it does for a student under 15), you can
+  share or use an invite only once that approval is in place.
 - **One per person:** each person can have one invitation trial, ever, and an
-  account that has already had a free trial bought on our website does not get
-  another. Accounts at the same email inbox count as one person. An invite link
+  account that has already had any free trial from us does not get another. Accounts at the same email inbox count as one person. An invite link
   credits at most 5 friends in any 30 days.
 - **No card, no charge:** the trial needs no card and no payment details. At
   the end of the 7 days your account goes back to the free plan by itself.
@@ -83,7 +97,8 @@ free trial before and are not already paying for Premium.
 - **No cash value:** the trial cannot be exchanged for money, transferred or
   combined with another trial.
 - **Your friend's details:** you share the link yourself. We never ask you for
-  a friend's email address or phone number, and we do not contact them.
+  a friend's email address or phone number, and we do not contact them. The
+  only thing we keep is a record of who invited whom.
 - **Where it applies:** the invitation is offered on the website only. A trial
   you have works wherever you sign in with the same account.
 - We may end or change the invitation offer for the future. A trial that has
@@ -96,9 +111,11 @@ Questions, solutions and explanations are ours. Your work is yours: what you
 write and answer belongs to you, and we claim no ownership of it.
 
 Prithagoras is maths practice organised around the NSW Mathematics syllabuses.
-It does not cover the whole of any syllabus, and it is not endorsed by,
-affiliated with or approved by NESA, the NSW Education Standards Authority, or
-any other examination authority. It is not an official HSC resource.
+It does not cover the whole of any syllabus. Where the syllabus map shows NESA
+outcome codes, the plain-language description beside each code is our own, not
+NESA's. Prithagoras is not affiliated with or endorsed by NESA, the NSW
+Education Standards Authority, or approved by any other examination authority.
+It is not an official HSC resource.
 
 ## Availability
 

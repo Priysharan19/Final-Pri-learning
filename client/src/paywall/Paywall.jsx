@@ -217,6 +217,11 @@ export default function Paywall() {
           : <p style={{ marginTop: 'var(--space-4)' }} data-paywall-not-on-sale>{t('paywall.notOnSale')}</p>
         )}
 
+        {/* Australian Consumer Law: a web subscription states its price, its period, that it renews until cancelled and how to cancel, where the student chooses it. */}
+        {!premium && !apple && !google && sellsPremium(saleAvailable) && billing?.webCheckout && EDITION_ID === 'prithagoras' && webPrice && (
+          <p className="muted" data-paywall-web-disclosure style={{ fontSize: 'var(--text-xs)', lineHeight: 1.5, marginTop: 'var(--space-2)' }}>{t('paywall.disclosureWeb', webPrice)}</p>
+        )}
+
         {(apple || google) && (
           <div className="row" style={{ marginTop: 'var(--space-3)', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             <button type="button" className="btn btn-quiet" data-paywall-restore disabled={!canBuy || !!busyNow} onClick={restore}>

@@ -8,10 +8,14 @@
 // PRI_RESEND_API_KEY, PRI_AUTH_EMAIL_FROM). The raw code exists only in this
 // call; it is never stored or logged.
 // ─────────────────────────────────────────────────────────────────────────────
+import { EDITIONS, resolveEdition } from '../../client/edition.config.mjs';
 import { recordTestMessage, testModeAllowed } from './smsProvider.js';
 import { cleanPublicOrigin, postResendEmail } from './authDelivery.js';
 import { recordAuthEmail } from './metrics.js';
 import { logEvent, safeCode } from './observability.js';
+
+/** The name students know the service by on this deployment: Priyabhata or Prithagoras (client/edition.config.mjs), never the company name alone. */
+export function otpEmailBrand(env = process.env) { return EDITIONS[resolveEdition(env)].brand; }
 
 const trim = (value) => String(value ?? '').trim();
 
@@ -37,18 +41,18 @@ export function otpEmailConsentLink(origin = process.env.PRI_PUBLIC_ORIGIN) {
  * shows without zooming; no image, no tracking pixel, no remote font. Sign-in
  * and deletion codes carry NO link at all — a code is typed, never clicked.
  */
-function codeEmailHtml({ preheader, lead, code, expiry, tail, link = null }) {
+function codeEmailHtml({ preheader, lead, code, expiry, tail, link = null, brand }) {
   const digits = escapeHtml(String(code));
   const spaced = `${digits.slice(0, 3)}&nbsp;${digits.slice(3)}`;
   const linkRow = link
     ? `<tr><td style="padding:0 28px 18px;font:15px/1.5 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#48463f">Their page: <a href="${escapeHtml(link)}" style="color:#0b6e69">${escapeHtml(link)}</a></td></tr>`
     : '';
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>Pri Learning</title></head>`
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>${escapeHtml(brand)}</title></head>`
     + `<body style="margin:0;padding:0;background:#f0ede6">`
     + `<div style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(preheader)}</div>`
     + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f0ede6"><tr><td align="center" style="padding:24px 12px">`
     + `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#fdfcf9;border:1px solid #d9d5cb;border-radius:12px">`
-    + `<tr><td style="padding:24px 28px 6px;font:600 17px/1.3 Georgia,'Times New Roman',serif;color:#1c1b18">Pri Learning</td></tr>`
+    + `<tr><td style="padding:24px 28px 6px;font:600 17px/1.3 Georgia,'Times New Roman',serif;color:#1c1b18">${escapeHtml(brand)}</td></tr>`
     + `<tr><td style="padding:6px 28px 4px;font:16px/1.5 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1c1b18">${escapeHtml(lead)}</td></tr>`
     + `<tr><td align="center" style="padding:18px 28px 10px"><div aria-label="Code ${digits.split('').join(' ')}" style="display:inline-block;padding:14px 22px;border:1px solid #1c1b18;border-radius:10px;font:700 34px/1.1 'SF Mono',Menlo,Consolas,'Courier New',monospace;letter-spacing:6px;color:#1c1b18;background:#ffffff">${spaced}</div></td></tr>`
     + `<tr><td align="center" style="padding:0 28px 18px;font:14px/1.5 -apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#48463f">${escapeHtml(expiry)}</td></tr>`
@@ -57,43 +61,43 @@ function codeEmailHtml({ preheader, lead, code, expiry, tail, link = null }) {
     + `</table></td></tr></table></body></html>`;
 }
 
-export function otpEmailMessage(code, purpose, origin = process.env.PRI_PUBLIC_ORIGIN, { intent = null } = {}) {
+export function otpEmailMessage(code, purpose, origin = process.env.PRI_PUBLIC_ORIGIN, { intent = null, brand = otpEmailBrand() } = {}) {
   // A deletion code must never read like a sign-in code: the public
   // /account/delete-request page can be asked for by anyone who knows the
   // address, so the mail itself has to say what entering the code does.
   if (intent === 'account-delete') {
-    const body = 'Someone asked to DELETE the Pri Learning account for this address. Entering this code on the account deletion page permanently deletes the account and its data. Never share it or read it out to anyone.';
+    const body = 'Someone asked to DELETE the ' + brand + ' account for this address. Entering this code on the account deletion page permanently deletes the account and its data. Never share it or read it out to anyone.';
     const tail = 'If you did not ask for this, ignore this email: your account stays exactly as it is. The code is valid for 10 minutes.';
     return {
-      subject: `${code} is the code to delete your Pri Learning account`,
+      subject: `${code} is the code to delete your ${brand} account`,
       text: `${code}\n\n${body}\n\n${tail}`,
-      html: codeEmailHtml({ preheader: 'This code deletes a Pri Learning account.', lead: body, code, expiry: 'This code works for 10 minutes and only once.', tail: 'If you did not ask for this, ignore this email: your account stays exactly as it is.' })
+      html: codeEmailHtml({ brand, preheader: `This code deletes a ${brand} account.`, lead: body, code, expiry: 'This code works for 10 minutes and only once.', tail: 'If you did not ask for this, ignore this email: your account stays exactly as it is.' })
     };
   }
   if (purpose === 'guardian-consent') {
     const link = otpEmailConsentLink(origin);
-    const where = link || 'the Pri Learning parent page';
-    const body = `Your child is setting up Pri Learning and has asked you to approve their account. Open ${where} yourself, read what you are agreeing to, and enter this code there.`;
+    const where = link || `the ${brand} parent page`;
+    const body = `Your child is setting up ${brand} and has asked you to approve their account. Open ${where} yourself, read what you are agreeing to, and enter this code there.`;
     const tail = 'The code is valid for 10 minutes. If you did not expect this, ignore this email and nothing will sync.';
     return {
-      subject: `${code} is the code to approve your child’s Pri Learning account`,
+      subject: `${code} is the code to approve your child’s ${brand} account`,
       text: `${code}\n\n${body}\n\n${tail}`,
-      html: codeEmailHtml({
-        preheader: 'Your child asked you to approve their Pri Learning account.',
-        lead: 'Your child is setting up Pri Learning and has asked you to approve their account. Open the parent page yourself, read what you are agreeing to, and enter this code there.',
+      html: codeEmailHtml({ brand,
+        preheader: `Your child asked you to approve their ${brand} account.`,
+        lead: `Your child is setting up ${brand} and has asked you to approve their account. Open the parent page yourself, read what you are agreeing to, and enter this code there.`,
         code, expiry: 'This code works for 10 minutes and only once.', link,
         tail: 'If you did not expect this, ignore this email and nothing will sync.'
       })
     };
   }
-  const body = 'Enter this code in Pri Learning to continue. It is valid for 10 minutes. Do not share it with anyone.';
+  const body = `Enter this code in ${brand} to continue. It is valid for 10 minutes. Do not share it with anyone.`;
   const tail = 'If you did not ask for it, you can ignore this email.';
   return {
-    subject: `${code} is your Pri Learning code`,
+    subject: `${code} is your ${brand} code`,
     text: `${code}\n\n${body}\n\n${tail}`,
-    html: codeEmailHtml({
-      preheader: 'Your six-digit Pri Learning code. It works for 10 minutes.',
-      lead: 'Enter this code in Pri Learning to continue.', code,
+    html: codeEmailHtml({ brand,
+      preheader: `Your six-digit ${brand} code. It works for 10 minutes.`,
+      lead: `Enter this code in ${brand} to continue.`, code,
       expiry: 'This code works for 10 minutes and only once. Do not share it with anyone.',
       tail: 'If you did not ask for this code, you can ignore this email. Nobody can sign in without it.'
     })

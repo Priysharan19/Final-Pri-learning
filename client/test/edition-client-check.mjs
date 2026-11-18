@@ -239,8 +239,8 @@ try {
   }
   {
     const source = read('src/platform/cloudTransport.js');
-    ok((source.match(/\[EDITION_HEADER\]: EDITION/g) || []).length === 2, 'the request and the streamed tutor turn both declare the edition');
-    ok((source.match(/editionRefusal\(err, data\);/g) || []).length === 3, 'the native, web and streaming paths all read an edition refusal');
+    ok((source.match(/\[EDITION_HEADER\]: EDITION/g) || []).length === 3, 'the request, the PDF download (practice papers) and the streamed tutor turn all declare the edition');
+    ok((source.match(/editionRefusal\(err, data\);/g) || []).length === 4, 'the native, web, PDF-download and streaming paths all read an edition refusal');
     ok(/if \(data\?\.service !== HEALTH_SERVICE\) return null;\s+serverEditionAsked = true;\s+hearServerEdition\(data\.edition\);/.test(source), 'the boot probe hears the serving server\'s edition, so a web start asks nothing extra');
   }
 } finally {

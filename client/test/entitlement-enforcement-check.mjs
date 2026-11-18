@@ -17,7 +17,26 @@
 //
 // Usage: node client/test/entitlement-enforcement-check.mjs
 
-import { installBrowserEnv, resetStorage, rawRows } from './backend-check.mjs';
+// Owner decision 2026-11-18 (docs/product/packaging-2026-11.md): the ACTIVE
+// packaging (value-2026-11) leaves free practice uncapped, so the device's
+// daily-cap mechanism is dormant by default. This suite exists to prove that
+// mechanism and the Premium lift of it, so it runs in a child process with the
+// superseded d19-d20 packaging (20 a day) switched on by a test-only module
+// hook. The parent first pins what the ACTIVE packaging does on the device.
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+if (!process.env.PRI_TEST_LEGACY_PACKAGING) {
+  const { FREE_TIER: active } = await import('../src/local/entitlementGate.js');
+  const { PACKAGING } = await import('../src/engine/packaging.js');
+  const bad = [];
+  if (PACKAGING.id !== 'value-2026-11') bad.push('active packaging is not value-2026-11');
+  if (JSON.stringify([active.practicePerDay, active.examsPerWindow, active.examWindowDays]) !== '[null,1,30]') bad.push(`active free tier is ${JSON.stringify(active)}, not [null,1,30]`);
+  if (bad.length) { console.error(`ENTITLEMENT ENFORCEMENT: FAIL — ${bad.join('; ')}`); process.exit(1); }
+  const child = spawnSync(process.execPath, ['--import', fileURLToPath(new URL('./support/legacy-packaging.mjs', import.meta.url)), fileURLToPath(import.meta.url)],
+    { stdio: 'inherit', env: { ...process.env, PRI_TEST_LEGACY_PACKAGING: '1' } });
+  process.exit(child.status ?? 1);
+}
+const { installBrowserEnv, resetStorage, rawRows } = await import('./backend-check.mjs');
 
 installBrowserEnv();
 resetStorage();

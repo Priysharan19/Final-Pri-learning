@@ -8,7 +8,7 @@ reviewed by a lawyer; the app says so above it.
 
 ## Who to write to
 
-- Priysharan Tripathi
+- Priysharan Tripathi trading as Pri Learning
 - Prithagoras (Pri Learning's Australian edition)
 - ABN 20 192 090 394
 - prilearning19@gmail.com

@@ -36,6 +36,7 @@
 //
 // Run on its own:  node client/test/tour-ink-reader-permission.js
 // ─────────────────────────────────────────────────────────────────────────────
+import { READER_PERMISSION_VERSION } from '../src/ink/readerPermission.js';
 import { pathToFileURL } from 'node:url';
 import { readLines, turnOnServerReading } from './fakeServerReader.js';
 import { TEMPLATES } from '../src/ink/templates.js';
@@ -205,7 +206,7 @@ export const flow = {
     await check('phone, declined: "Read my answer" is no longer offered', await page.locator('[data-ink-read]').count() === 0);
     const declined = await recordOf();
     await check('phone, declined: the decline is recorded on this device for this profile and this wording',
-      Object.values(declined || {}).some(r => r.choice === 'declined' && r.version === 1), JSON.stringify(declined));
+      Object.values(declined || {}).some(r => r.choice === 'declined' && r.version === READER_PERMISSION_VERSION), JSON.stringify(declined));
 
     // The same question, typed: declining keeps the student on typed answers.
     await page.getByRole('button', { name: EN['verdict.modeTypeLabel'] }).click();

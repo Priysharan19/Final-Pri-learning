@@ -440,17 +440,17 @@ export const CURRICULUM = [
         'Interpret motion graphs',
         'Solve rates-of-change problems'
       ]),
-      S('y12-integral-calc', 'Integral Calculus · Answer-Checked Practice', 'Calculus', AUTHORED_WEIGHT, [
+      S('y12-integral-calc', 'Integral Calculus: Practice', 'Calculus', AUTHORED_WEIGHT, [
         'Find antiderivatives of exponential and trigonometric functions',
         'Evaluate definite integrals of polynomial functions',
         'Find displacement from a velocity function'
       ]),
-      S('y12-random-var', 'Random Variables · Answer-Checked Practice', 'Statistics & Probability', AUTHORED_WEIGHT, [
+      S('y12-random-var', 'Random Variables: Practice', 'Statistics & Probability', AUTHORED_WEIGHT, [
         'Find the expected value of a discrete random variable',
         'Find the variance of a discrete random variable',
         'Use z-scores and the 68–95–99.7 rule for a normal distribution'
       ]),
-      S('y12-fin-exact', 'Financial Mathematics · Answer-Checked Practice', 'Financial Maths', AUTHORED_WEIGHT, [
+      S('y12-fin-exact', 'Financial Mathematics: Practice', 'Financial Maths', AUTHORED_WEIGHT, [
         'Find the value of a compound-interest investment',
         'Track the balance of a reducing-balance loan',
         'Find the future value of an annuity as a geometric series'
@@ -579,7 +579,7 @@ export const STREAM_CURRICULUM = {
         'Use exponential models',
         'Interpret linear graphs of practical situations'
       ]),
-      T('ms12-invest-loans', 'Investment, Loans & Depreciation · Answer-Checked Practice', 'Financial Maths', 8, 'MS-F4', [
+      T('ms12-invest-loans', 'Investment, Loans & Depreciation: Practice', 'Financial Maths', 8, 'MS-F4', [
         'Find the value of a compound-interest investment',
         'Track the balance of a loan with interest and repayments',
         'Find the value of a declining-balance asset'
@@ -609,7 +609,7 @@ export const STREAM_CURRICULUM = {
         'Interpret the gradient of a line of fit',
         'Use a line of fit through two points'
       ]),
-      T('ms12-normal-exact', 'The Normal Distribution · Answer-Checked Practice', 'Statistics & Probability', 8, 'MS-S5', [
+      T('ms12-normal-exact', 'The Normal Distribution: Practice', 'Statistics & Probability', 8, 'MS-S5', [
         'Find a z-score',
         'Use the 68–95–99.7 rule to count values',
         'Find a value from its z-score'
@@ -619,12 +619,12 @@ export const STREAM_CURRICULUM = {
         'Find the value of a simple-interest investment',
         'Find the rate or the time from the interest earned'
       ]),
-      T('ms12-depreciation', 'Depreciation & Loans · Answer-Checked Practice', 'Financial Maths', 8, 'MS-F3', [
+      T('ms12-depreciation', 'Depreciation & Loans: Practice', 'Financial Maths', 8, 'MS-F3', [
         'Find the value of an asset using straight-line depreciation',
         'Find the annual depreciation of an asset',
         'Find the interest paid on a loan repaid in equal instalments'
       ]),
-      T('ms12-right-triangle', 'Right-Angled Triangles · Answer-Checked Practice', 'Trigonometry', 8, 'MS-M3', [
+      T('ms12-right-triangle', 'Right-Angled Triangles: Practice', 'Trigonometry', 8, 'MS-M3', [
         'Use Pythagoras’ theorem to find a side',
         'Use a special-angle ratio to find a side',
         'Find an acute angle from an exact ratio'

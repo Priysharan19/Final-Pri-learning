@@ -16,7 +16,8 @@
 //   · email LINKS (a guardian's consent and withdrawal) come from the server's
 //     undelivered auth-delivery outbox, decrypted at this desk exactly as the
 //     delivery worker would before sending.
-// The free practice cap runs at its shipped default (20) and the paid-call
+// The free practice cap runs at 20 (owner decision 2026-11-18: the shipped default is now uncapped, so the cap is set
+// explicitly for step 13) and the paid-call
 // ceiling at production's 120 an hour / 300 a day, as on staging.
 //
 //   ~/Developer/.pri-fleet/heavy-slot.sh L8 node tools/staging-journey-local.mjs [--profile full] [--out <dir>] [--dist <client dist>]
@@ -101,7 +102,7 @@ export async function runLocalJourney(args) {
   const { otpEmailMessage } = await import('../server/platform/otpEmail.js');
   const { decryptDeliveryToken } = await import('../server/platform/deliveryCrypto.js');
   const { buildAuthActionUrl } = await import('../server/platform/authDelivery.js');
-  const platform = await startOnlinePlatform({ dist: args.dist, env: { PRI_FREE_PRACTICE_PER_DAY: null, PRI_PAID_CALLS_PER_HOUR: '120', PRI_PAID_CALLS_PER_DAY: '300' } });
+  const platform = await startOnlinePlatform({ dist: args.dist, env: { PRI_FREE_PRACTICE_PER_DAY: '20', PRI_PAID_CALLS_PER_HOUR: '120', PRI_PAID_CALLS_PER_DAY: '300' } });
   try {
     const release = JSON.parse(readFileSync(join(args.dist, 'release.json'), 'utf8'));
     return await runJourney({

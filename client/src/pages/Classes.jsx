@@ -6,6 +6,7 @@ import AssignmentInboxPanel from '../components/AssignmentInboxPanel.jsx';
 import Class10NCERTLibrary from '../components/Class10NCERTLibrary.jsx';
 import { readJSONFile } from '../lib/files.js';
 import { useT } from '../i18n/index.js';
+import { offersCourse } from '../platform/edition.js';
 
 export default function Classes() {
   const { user, toast } = useApp();
@@ -49,7 +50,7 @@ export default function Classes() {
 
       <AssignmentInboxPanel />
 
-      {Number(user.year) === 10 && <Class10NCERTLibrary />}
+      {Number(user.year) === 10 && offersCourse('in') && <Class10NCERTLibrary />}
 
       <section style={{ marginTop: 20 }} aria-labelledby="offline-class-packs-title">
         <div className="spread" style={{ marginBottom: 10 }}>
