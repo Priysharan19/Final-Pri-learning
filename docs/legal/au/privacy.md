@@ -157,7 +157,7 @@ are not carried over into your account.
   marking engine on our server, never by the reading service.
 - **Reading happens by itself after a pause.** Once you have agreed to the
   reader, are signed in and are online, the page you are writing is read
-  automatically when your pen has rested for about 1.3 seconds, so you do not
+  automatically when your pen has rested for about 1.6 seconds, so you do not
   have to press Read. It is the same reading with the same rules: only the
   picture is sent, nothing is sent before you have agreed, and nothing is marked
   until you check the reading and confirm it. To turn it off, go to Settings →

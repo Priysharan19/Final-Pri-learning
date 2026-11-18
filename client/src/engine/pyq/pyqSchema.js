@@ -300,6 +300,8 @@ export function pyqPayload(rec) {
     // let in anything the band does not already contain.
     const [lo, hi] = rec.answer.officialRange;
     answer.tol = ((hi - lo) / 2) * (1 + 1e-9) + 1e-12;
+    // Carried on the key so the marker's exact-value and uncalled-for-band rules leave the paper's own published band alone.
+    answer.officialRange = [lo, hi];
   }
   return {
     ...base,

@@ -56,8 +56,8 @@ ok(/keepOriginal\(db, \{ accountId, edition, questionId: qid/.test(read('server/
 ok(/Reading stays ANSWER-BLIND/.test(original), 'reading is answer-blind (originalWork.js)');
 both(/Reading is answer-blind and you confirm it/, 'says reading is answer-blind and the student confirms it');
 both(/Settings\s*→\s*Reading my handwriting/, 'names the Settings section that turns automatic reading off');
-both(/about 1\.3 seconds/, 'states the pause before an automatic read');
-ok(/AUTO_READ_IDLE_MS\s*=\s*1300/.test(read('client/src/ink/InkAnswer.jsx') + read('client/src/lib/autoRead.js') + read('client/src/components/QuestionCard.jsx')), 'the pause is 1300 ms in the client');
+both(/about 1\.6 seconds/, 'states the pause before an automatic read');
+ok(/AUTO_READ_IDLE_MS\s*=\s*1600/.test(read('client/src/ink/InkAnswer.jsx') + read('client/src/lib/autoRead.js') + read('client/src/components/QuestionCard.jsx')), 'the pause is 1600 ms in the client');
 ok(/getItem\(KEY\) !== 'off'/.test(read('client/src/lib/autoRead.js')) && /'autoRead\.title': "Reading my handwriting"/.test(read('client/src/i18n/strings.en.js')) && /<AutoRead \/>/.test(read('client/src/pages/Settings.jsx')), 'automatic reading is on by default and Settings has the section that turns it off');
 
 // ── 2 · The in-app prompt and Settings say the same as the pages ─────────────
@@ -161,7 +161,7 @@ ok(/data-legal-unreviewed="true"/.test(legalPage) && /export const LEGAL_REVIEWE
 for (const text of [IN.privacy, IN.terms, AU.privacy, AU.terms, AU.refund]) ok(!/complian(?:t|ce) with|fully compliant|lawyer[- ]approved|legally reviewed|certified/i.test(text.replace(/not claim to comply|do not claim to comply|nor does it claim|been reviewed by a lawyer|reviewed by a lawyer/gi, '')), 'no page claims compliance or legal review');
 
 // ── 9 · The Hindi pages carry every new promise ─────────────────────────────
-for (const [what, re] of [['2 years and 730 days', /2 वर्ष \(730 दिन\)/], ['40 and 24 MB', /40 एमबी[\s\S]*24 एमबी/], ['1.3 seconds', /1\.3 सेकंड/], ['Tele-MANAS 14416', /14416/], ['fewer than 10', /10 से कम/], ['teachers and classes section', /## शिक्षक और कक्षाएँ/], ['AI label', /एआई ने लिखा, गणित इंजन ने नहीं जाँचा/], ['24 hours', /24 घंटे/], ['four things kept', /चार चीज़ें/]]) ok(re.test(read('docs/legal/privacy.hi.md')), `Hindi privacy: ${what}`);
+for (const [what, re] of [['2 years and 730 days', /2 वर्ष \(730 दिन\)/], ['40 and 24 MB', /40 एमबी[\s\S]*24 एमबी/], ['1.6 seconds', /1\.6 सेकंड/], ['Tele-MANAS 14416', /14416/], ['fewer than 10', /10 से कम/], ['teachers and classes section', /## शिक्षक और कक्षाएँ/], ['AI label', /एआई ने लिखा, गणित इंजन ने नहीं जाँचा/], ['24 hours', /24 घंटे/], ['four things kept', /चार चीज़ें/]]) ok(re.test(read('docs/legal/privacy.hi.md')), `Hindi privacy: ${what}`);
 for (const [what, re] of [['practice uncapped', /अभ्यास-प्रश्न बिना\s+दैनिक सीमा के/], ['5 and 5', /5 पठन तक[\s\S]*5\s+फ़ोटो/], ['every 30 days', /हर 30\s+दिन में एक परीक्षा-अभ्यास/], ['50 and 50', /50 और 50/]]) ok(re.test(IN.termsHi), `Hindi terms: ${what}`);
 
 console.log(failures.length

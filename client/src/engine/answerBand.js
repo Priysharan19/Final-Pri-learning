@@ -12,7 +12,8 @@
 //
 //   · an authored `tol` stays when the question names a precision ("correct to
 //     2 decimal places", "to the nearest dollar"), asks for an estimate or a
-//     rounded value, or declares a published `rounding` rule;
+//     rounded value, or declares a published `rounding` rule or the paper's own
+//     `officialRange` (a past-paper key);
 //   · otherwise, on a key that is itself exact to two decimal places or fewer
 //     (7, 2.4, 661.25), the band is dropped: the key is the answer, and the
 //     marker's own default band (a whole key exact, a decimal key within half a
@@ -40,7 +41,8 @@ export function exactToHundredths(v) {
  */
 export function withoutUncalledForBand(payload) {
   const a = payload?.answer;
-  if (!a || a.tol == null || a.rounding) return payload;
+  // A past-paper key that carries the paper's own published acceptance band (officialRange) keeps it: that band is the examiner's rule, not an authored allowance.
+  if (!a || a.tol == null || a.rounding || a.officialRange) return payload;
   const keys = payload.answerType === 'numeric' && typeof a.value === 'number' ? [a.value]
     : payload.answerType === 'set' && Array.isArray(a.values) && a.values.every(v => typeof v === 'number') ? a.values : null;
   if (!keys) return payload;
