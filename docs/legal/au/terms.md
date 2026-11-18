@@ -3,7 +3,7 @@
 **Last updated: 18 November 2026**
 
 These terms are an agreement between you and Priysharan Tripathi,
-5 Juniper Pl, Oakville NSW 2765, Australia, about your use of Prithagoras
+Pri Learning, ABN 20 192 090 394, about your use of Prithagoras
 (Pri Learning's Australian edition) on the web, on iPhone and iPad, and on
 Android. They have not yet been reviewed by a lawyer; the app says so above
 them.
@@ -18,7 +18,7 @@ If you are under 18, a parent or guardian must agree to these terms for you.
 ## Your account
 
 You are responsible for keeping your password and the sign-in codes sent to your
-email address. Tell us at {{CONTACT_EMAIL}} if you think someone else has used
+email address. Tell us at prilearning19@gmail.com if you think someone else has used
 your account. We may suspend an account that is being used to attack the service
 or to harm other users.
 
@@ -131,4 +131,4 @@ your access if you break these terms.
 These terms are governed by the laws of New South Wales, Australia. You and we
 submit to the non-exclusive jurisdiction of the courts of New South Wales.
 
-Questions: {{CONTACT_EMAIL}}.
+Questions: prilearning19@gmail.com.

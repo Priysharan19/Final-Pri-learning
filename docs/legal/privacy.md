@@ -9,7 +9,7 @@ to give you. It has not yet been reviewed by a lawyer; the app says so above
 this notice, and will stop saying so only when that review has happened.
 
 The person responsible for your data (the "data fiduciary") is
-Priysharan Tripathi, 5 Juniper Pl, Oakville NSW 2765, Australia.
+Priysharan Tripathi, Pri Learning, ABN 20 192 090 394.
 
 ## The short version
 
@@ -260,7 +260,7 @@ You can ask us to:
 - **Withdraw consent**, after which we stop processing and delete.
 - **Nominate** someone to exercise these rights if you cannot.
 
-Write to impriysharan@icloud.com. See [Grievances](/grievance) for how
+Write to prilearning19@gmail.com. See [Grievances](/grievance) for how
 complaints are handled and how to escalate to the Data Protection Board of
 India.
 
@@ -279,4 +279,4 @@ will tell you and the Data Protection Board as the DPDP Act requires.
 If we change this notice we will publish the new version here and, where the
 change is significant, ask again for consent.
 
-Questions: impriysharan@icloud.com.
+Questions: prilearning19@gmail.com.
