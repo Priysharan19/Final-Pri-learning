@@ -243,7 +243,7 @@ export default function MapPage() {
                 <circle className="in-map-ring" cx={node.x} cy={node.y} r={node.r + 6} />
                 {/* The chapter's figure sits on the dot; the name below stays the accessible name. */}
                 <g className={`in-map-glyph${fillOf(node) > 0.6 ? ' is-solid' : ''}`} aria-hidden="true" data-glyph={iconFor(node.row.id, node.strand).key}
-                  transform={`translate(${node.x - node.r * 0.62} ${node.y - node.r * 0.62}) scale(${(node.r * 1.24) / 24})`}>
+                  transform={`matrix(${(node.r * 1.24) / 24} 0 0 ${(node.r * 1.24) / 24} ${node.x - node.r * 0.62} ${node.y - node.r * 0.62})`}>
                   <GlyphPaths glyph={iconFor(node.row.id, node.strand).key} />
                 </g>
                 <text x={node.x} y={node.y + node.r + 22} className="in-map-name" textAnchor="middle" lang="en">

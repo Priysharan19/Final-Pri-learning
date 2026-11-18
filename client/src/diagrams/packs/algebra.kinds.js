@@ -23,7 +23,7 @@
 // text, so the readout and the description cannot state different numbers.
 // ─────────────────────────────────────────────────────────────────────────────
 import { parse, evaluate, variablesOf } from '../../engine/expr.js';
-import { makeFrame, niceTicks, niceStep, sampleSegments, roots as signRoots, r3 } from '../geometry.js';
+import { makeFrame, niceTicks, niceStep, sampleSegments, roots as signRoots, r3, OPERATORS } from '../geometry.js';
 
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -381,10 +381,11 @@ export function turningPoints(f, a, b, poles = [], n = 600) {
 
 // ── Label placement (no two labels on one spot) ──────────────────────────────
 /** Rough width in px of a KaTeX label at the kit's 14 px. */
-export function texWidth(tex) {
+export function texWidth(tex, small = false) {
   const s = String(tex).replace(/\\[td]?frac\{([^}]*)\}\{([^}]*)\}/g, (m, a, b) => (a.length > b.length ? a : b) + ' ')
     .replace(/\\left|\\right|\\,|\\;|\\!/g, '').replace(/\\[a-zA-Z]+/g, 'x').replace(/[{}^_]/g, '');
-  return Math.round(s.length * 7.6 + 10);
+  // `small` labels (a constraint line's equation) are set smaller: about 0.85 of the width.
+  return Math.round((s.length * 7.6 + 13 * (String(tex).match(OPERATORS) || []).length) * (small ? 0.85 : 1) + 10);
 }
 const OFFSETS = [
   ['ne', 8, -14, 'start'], ['nw', -8, -14, 'end'], ['se', 8, 14, 'start'], ['sw', -8, 14, 'end'], ['n', 0, -20, 'middle'], ['s', 0, 20, 'middle'], ['e', 10, 0, 'start'], ['w', -10, 0, 'end'],
@@ -402,7 +403,7 @@ export const overlaps = (A, B, pad = 0) => A[0] - pad < B[0] + B[2] && B[0] - pa
 export function placeLabels(items, { width, height, obstacles = [], ink = [], dots = [] }) {
   const placed = [];
   for (const it of items) {
-    const w = it.w ?? texWidth(it.tex); const h = it.h ?? 20;
+    const w = it.w ?? texWidth(it.tex, it.small); const h = it.h ?? 20;
     let best = null;
     const cands = it.positions ? OFFSETS.filter(o => it.positions.includes(o[0])) : OFFSETS;
     const spots = it.alts || [it.px];

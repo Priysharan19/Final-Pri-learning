@@ -165,6 +165,8 @@ export function curveExpr(curve) {
  * polylines), asymptotes, intercepts and a shaded region under a curve. Every
  * label value is computed here from the same expression that draws the curve.
  */
+// Operators and relations carry a space either side (about 20 px in KaTeX, not 7.2 or 7.4): "y=x+7" measures 65 px.
+export const OPERATORS = /[=+<>≤≥≠±×·]|\\(?:le|ge|leq|geq|ne|neq|pm|times|cdot)(?![A-Za-z])|(?<=[A-Za-z0-9)}])[−-]/g;
 /** The width in px a KaTeX label needs (a close upper estimate: commands do not print). */
 export const labelWidth = tex => Math.max(22, Math.ceil(7.2 * String(tex).replace(/\\(left|right|,|;|!|quad)|[{}\\]|tfrac|dfrac|frac/g, '').length) + 6);
 
@@ -233,8 +235,12 @@ export function graphVariables(spec = {}) {
   return { x, y, xTex: title(x, spec.xUnit, spec.xLabel), yTex: title(y, spec.yUnit, spec.yLabel), xUnit: spec.xUnit || null, yUnit: spec.yUnit || null };
 }
 
-/** A close estimate of a label's drawn width in px (commands print nothing). */
-export const textW = tex => Math.ceil(7.4 * String(tex).replace(/\\(left|right|,|;|!|quad| |text|mathrm|dfrac|tfrac|frac)|[{}\\^_]/g, '').length) + 4;
+/** A close estimate of a label's drawn width in px (commands print nothing; operators carry their spaces). */
+export const textW = tex => {
+  const t = String(tex);
+  const ops = (t.match(OPERATORS) || []).length;
+  return Math.ceil(7.4 * t.replace(/\\(left|right|,|;|!|quad| |text|mathrm|dfrac|tfrac|frac)|[{}\\^_]/g, '').length + 13 * ops) + 4;
+};
 
 /**
  * Put labels where they touch nothing: no other label, tick number, curve, dot or axis. Each item lists its
@@ -252,16 +258,16 @@ export function layoutLabels(items, { fixed = [], lines = [], dots = [], bounds 
   return items.map(it => {
     const w = it.w; const h = it.h || 14; let best = null;
     (it.cands.length ? it.cands : [{ anchor: 'middle', x: 0, y: 0 }]).forEach((c, i) => {
-      const box = boxOf(c, w, h); let cost = i * 0.05;
+      const box = boxOf(c, w, h); const rank = i * 0.05; let cost = rank;
       if (!it.free && (box.l < bounds.left + 1 || box.r > bounds.right - 1 || box.t < bounds.top + 1 || box.b > bounds.bottom - 1)) cost += 100;
       cost += taken.filter(q => meet(box, q, 1)).length * 60;
       const hit = pts.filter(([x, y]) => x >= box.l - 2 && x <= box.r + 2 && y >= box.t - 2 && y <= box.b + 2);
       cost += hit.reduce((n, q) => n + q[2], 0) / 2;
       cost += dots.filter(([x, y]) => x >= box.l - 4 && x <= box.r + 4 && y >= box.t - 4 && y <= box.b + 4 && !(it.at && x === it.at[0] && y === it.at[1])).length * 30;
-      if (!best || cost < best.cost) best = { cost, c, box };
+      if (!best || cost < best.cost) best = { cost, clash: cost - rank, c, box };
     });
     taken.push(best.box);
-    return { x: r3(best.c.x, 2), y: r3(best.c.y, 2), anchor: best.c.anchor, w, h: 20, box: best.box, cost: best.cost };
+    return { x: r3(best.c.x, 2), y: r3(best.c.y, 2), anchor: best.c.anchor, w, h: 20, box: best.box, cost: best.cost, clash: best.clash };
   });
 }
 
@@ -337,8 +343,10 @@ export function functionGraphModel(spec) {
   const items = [];
   const ring = (px, w) => {
     const [x, y] = px; const out = [];
-    for (const [dy, dx] of [[-13, 8], [-13, -8], [13, 8], [13, -8], [0, 12], [0, -12], [-28, 6], [-28, -6], [29, 6], [29, -6], [-44, 4], [-44, -4], [45, 4], [45, -4]]) out.push({ anchor: dx > 0 ? 'start' : 'end', x: x + dx, y: y + dy });
+    for (const [dy, dx] of [[-13, 8], [-13, -8], [13, 8], [13, -8], [0, 12], [0, -12], [-28, 6], [-28, -6], [29, 6], [29, -6], [-44, 4], [-44, -4], [45, 4], [45, -4], [-20, 14], [-20, -14], [20, 14], [20, -14], [-60, 4], [-60, -4], [61, 4], [61, -4], [-34, 18], [-34, -18], [35, 18], [35, -18], [0, 22], [0, -22]]) out.push({ anchor: dx > 0 ? 'start' : 'end', x: x + dx, y: y + dy });
     out.push({ anchor: 'middle', x, y: y - 20 }, { anchor: 'middle', x, y: y + 34 });
+    // A crowded spot (three curves through it): a wider sweep, nearest first, so the label still finds clear paper.
+    for (const dist of [48, 72, 96]) for (const [dy, dx] of [[-1, 1], [-1, -1], [1, 1], [1, -1], [0, 1], [0, -1], [-1, 0], [1, 0]]) out.push({ anchor: dx > 0 ? 'start' : dx < 0 ? 'end' : 'middle', x: x + dx * (dx ? dist * 0.6 : 0), y: y + dy * dist * (dy ? 0.6 : 0) });
     return out;
   };
   for (const p of [...points.filter(q => q.label), ...uniq]) { p.labelTex = p.label ?? `(${p.x},\\,${p.y})`; items.push({ ref: p, w: textW(p.labelTex), at: p.px, cands: ring(p.px, 0), tex: p.labelTex }); }
@@ -354,7 +362,7 @@ export function functionGraphModel(spec) {
   for (const c of curves) {
     if (!c.label || c.constant !== undefined) continue;
     const seg = c.segments.slice().sort((p, q) => q.length - p.length)[0] || [];
-    const w = textW(c.label); const cands = [];
+    const w = textW(c.label); const cands = []; const far = [];
     for (const f of [1, 0.92, 0.84, 0.74, 0.62, 0.5, 0.36, 0.22, 0.08]) {
       if (seg.length < 2) break;
       const k = Math.max(1, Math.min(seg.length - 1, Math.round(f * (seg.length - 1))));
@@ -364,9 +372,11 @@ export function functionGraphModel(spec) {
         if (ny > 0.2 && sgn === 1) { nx = -nx; ny = -ny; }
         const d = Math.abs(nx) * w / 2 + Math.abs(ny) * 7 + 6;
         cands.push({ anchor: 'middle', x: x2 + nx * d, y: y2 + ny * d });
+        far.push({ anchor: 'middle', x: x2 + nx * d * 1.7, y: y2 + ny * d * 1.7 }, { anchor: 'middle', x: x2 + nx * d * 2.6, y: y2 + ny * d * 2.6 });
       }
     }
-    c.labelPlace = null; items.push({ ref: c, w, cands, tex: c.label, key: 'curve' });
+    // Nearest spots first; further out from the stroke only when every near one is taken.
+    c.labelPlace = null; items.push({ ref: c, w, cands: [...cands, ...far], tex: c.label, key: 'curve' });
   }
   const spots = layoutLabels(items, { fixed, lines, dots, bounds });
   items.forEach((it, i) => { if (it.key === 'ref') it.ref.place = spots[i]; else if (it.key === 'curve') it.ref.labelPlace = spots[i]; else it.ref.place = spots[i]; });
