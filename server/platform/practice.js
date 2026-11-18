@@ -10,6 +10,7 @@
 // unapproved production Postgres DDL. Old clients are not authorised to treat
 // their offline grades as server grades. The client transport integration is
 // a separate mandatory release gate.
+import { interpretAfterStepCheck } from './lineInterpreter/overlay.js';
 import { createHash, randomInt, randomUUID } from 'node:crypto';
 import { asyncRouter, asyncHandler } from './asyncRouter.js';
 import { asStore } from './store.js';
@@ -1476,6 +1477,9 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const counted = resolved && finalAnswerOnly ? { stepReport: evidence.stepReport || null, partial: null } : evidence;
       const { stepReport, partial } = resolved ? counted : { stepReport: null, partial: null };
       const notRead = resolved && workingNotRead && working.trim() !== '';
+      // After the engine's step check, never before it, and rules only (the model arm is unreachable here).
+      const lineInterpretation = resolved && !invalid && !notRead
+        ? await interpretAfterStepCheck({ question: q, working, stepReport, env }) : null;
       // A question answered BY its working (the answer is the lines) has a
       // marker's verdict that is itself a verdict on the lines.
       const answeredByWorking = q.answerType === 'working' || Boolean(result.stepReport);
@@ -1550,7 +1554,8 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
         ...(q._repeat === true ? { repeat: true } : {}), ...(q._repeatEvidence ? { repeatEvidence: q._repeatEvidence } : {}),
         // An entry that is not an attempt costs nothing, so it may not return
         // line-by-line verdicts either: they would be a free answer oracle.
-        stepReport: invalid ? null : stepReport, partial: invalid ? null : partial, ...(resolved ? {
+        stepReport: invalid ? null : stepReport, partial: invalid ? null : partial,
+        ...(resolved && !invalid && lineInterpretation ? { lineInterpretation } : {}), ...(resolved ? {
           solution: solutionFor(q),
           // Supplemental aggregate marking: no per-step allocations are invented.
           ...(!invalid ? { markRows: finalAnswerRows(q, markRowsFor(q, {
