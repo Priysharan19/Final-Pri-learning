@@ -74,7 +74,7 @@ export function CardBody({ card, model, t, renderBreakDetail }) {
     return (
       <>
         <p>{card.n > 1 ? t('aw.body.firstError', { n: card.n - 1 }) : t('aw.body.firstErrorStart')}</p>
-        {card.diagnosis?.title && <p className="aw-diag"><b>{card.diagnosis.title}</b>{card.diagnosis.message ? <> — {card.diagnosis.message}</> : null}</p>}
+        {card.diagnosis?.title && <p className="aw-diag"><b>{card.diagnosis.title}</b>{card.diagnosis.message ? <>: {card.diagnosis.message}</> : null}</p>}
         {!card.diagnosis && card.note && <p className="aw-diag">{card.note}</p>}
         {card.diagnosis?.fix && <p className="aw-fix">{card.diagnosis.fix}</p>}
         {renderBreakDetail && card.previousText ? renderBreakDetail(card.previousText, card.text) : null}

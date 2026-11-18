@@ -12,11 +12,11 @@
 // A state is always an icon and a word as well as a colour.
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { MathText } from '../lib/latex.jsx';
 import Icon from './Icon.jsx';
 import { useT } from '../i18n/index.js';
 import { buildAnnotatedWorking } from './annotatedWorkingModel.js';
 import { CardBody } from './AnnotatedWorking.jsx';
+import { Typeset } from './ReadingReview.jsx';
 import { strokePath } from './originalWorkModel.js';
 import { STATE, alignCards, boxesFromInk, boxesFromPhoto, buildMarkedPage, commentItems, listOf } from './markedPageModel.js';
 import './MarkedPage.css';
@@ -46,7 +46,8 @@ function Sheet({ source, geometry, page, active, setActive, t }) {
         <img className="mp-img" src={source.src} alt={t('mp.pageAlt.photo')} />
       ) : (
         <svg className="mp-ink" role="img" aria-label={t('mp.pageAlt.ink')}
-          viewBox={view ? `${view.x} ${view.y} ${view.w} ${view.h}` : '0 0 1 1'} preserveAspectRatio="xMidYMin meet">
+          viewBox={view ? `${view.x} ${view.y} ${view.w} ${view.h}` : '0 0 1 1'} preserveAspectRatio="xMinYMin meet"
+          style={view ? { aspectRatio: `${view.w} / ${view.h}` } : undefined}>
           {(source.strokes || []).map((s, i) => <path key={i} className="mp-stroke" d={strokePath(pointsOf(s).map(xy))} />)}
         </svg>
       )}
@@ -137,7 +138,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
                   <b>{status === 'follows' ? t('aw.status.follows', { n: card.followsFrom }) : t(st.word)}</b>
                 </p>
                 {(status === 'first-error' || status === 'follows') && card.text && (
-                  <p className="mp-expr" data-mp-expr><MathText text={`$${texOf(card.text)}$`} /></p>
+                  <p className="mp-expr" data-mp-expr><Typeset text={card.text} texOf={texOf} /></p>
                 )}
                 <div className="mp-text"><CardBody card={card} model={model} t={t} /></div>
               </li>
