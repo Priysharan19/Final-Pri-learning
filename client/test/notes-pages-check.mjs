@@ -69,7 +69,10 @@ for (const c of CASES.filter(x => x.nsw)) {
 // Graph transformations (MAV-11-03) is taught by an issued subtopic (y11-transform: Year 11 Advanced, every difficulty), so
 // its practice link is that subtopic's. The fallback to plain /practice is exercised by a topic no issued subtopic reaches.
 ok(CASES.find(c => c.id === 'mav-11-03').exactPractice === true && CASES.find(c => c.id === 'mav-11-03').practice === '/practice?subtopic=y11-transform', 'mav-11-03 (Graph transformations) links to its issued subtopic y11-transform');
-ok(CASES.find(c => c.id === 'ma5-fin-c-02').exactPractice === false, 'ma5-fin-c-02 has no issued practice subtopic, so it exercises the fallback');
+// Compound interest (MA5-FIN-C-02) is now reached by an issued subtopic (y10-compound, every difficulty), so no real topic is left
+// to take the fallback; the fallback itself is still asserted on a topic that carries no outcomes.
+ok(CASES.find(c => c.id === 'ma5-fin-c-02').practice === '/practice?subtopic=y10-compound', 'ma5-fin-c-02 (Compound interest) links to its issued subtopic y10-compound');
+ok(nswPracticeSubtopic({ id: 'no-outcomes', outcomes: [] }) === null && nswPracticeSubtopic(null) === null, 'a topic no issued subtopic reaches has no practice subtopic, so the page falls back to plain /practice');
 
 function expectedSections(c) {
   const n = c.notes;

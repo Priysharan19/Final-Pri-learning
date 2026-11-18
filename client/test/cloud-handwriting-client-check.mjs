@@ -654,9 +654,9 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
   const hi = (await import('../src/i18n/strings.hi.js')).default;
   // Reading is asked for now, so the sentence no longer promises it will
   // happen by itself: saved, and what to press once back online.
-  ok(en['ink.waitingOffline'].startsWith('Saved. ') && /When you are back online, press Read my answer\./.test(en['ink.waitingOffline']) && !/will be read/.test(en['ink.waitingOffline']),
-    'offline, the student is told plainly: saved, and to press Read my answer when back online');
-  ok(hi['ink.waitingOffline'].startsWith('सहेज लिया गया। ') && /मेरा उत्तर पढ़ें/.test(hi['ink.waitingOffline']), 'in Hindi too');
+  ok(en['ink.waitingOffline'].startsWith('Saved. ') && /When you are back online, press Mark my working\./.test(en['ink.waitingOffline']) && !/will be read/.test(en['ink.waitingOffline']),
+    'offline, the student is told plainly: saved, and to press Mark my working when back online');
+  ok(hi['ink.waitingOffline'].startsWith('सहेज लिया गया। ') && /मेरा काम जाँचें/.test(hi['ink.waitingOffline']), 'in Hindi too');
   for (const key of ['ink.waitingOffline', 'ink.waitingOfflinePlain', 'ink.waitingSignIn', 'ink.waitingVerifyEmail', 'ink.waitingServiceDown', 'ink.waitingServiceDownPlain']) {
     ok(!/will be read|it will be read|tried again shortly|read once you have/i.test(en[key]) && !/पढ़ा जाएगा|फिर कोशिश होगी/.test(hi[key]), `${key} promises no automatic read or retry`);
   }
