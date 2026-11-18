@@ -665,7 +665,6 @@ export default {
   'verdict.inkFailedStuck': 'The recogniser is kept in a file of its own and this device couldn’t read it just now. Nothing you have done is lost — reload the app, or answer by typing.',
   'verdict.inkFailedRetry': 'The recogniser is kept in a file of its own and this device couldn’t read it just now. Nothing you have done is lost — try again, or answer by typing.',
   'verdict.reloadApp': 'Reload {brand}',
-  'verdict.typeInstead': 'Type the answer instead',
   'verdict.warmingUp': 'Warming up the handwriting engine…',
   'verdict.whereItBreaks': 'Where it breaks',
   'verdict.possibly': 'Possibly',
