@@ -66,5 +66,7 @@ export const AU_STRINGS = Object.freeze({
   'notes.noBookmarks': 'No bookmarked chapters in this year yet.',
   'inst.noChapters': 'No chapters are set for your year yet.',
   'cloudError.consentDeclarationRequired': 'Tell us whether the learner is 18 or older, or their year with a parent or guardian’s name and email, then try again.',
-  'upgrade.jeeAdvanced': "This part of the course is included with Premium."
+  'upgrade.jeeAdvanced': "This part of the course is included with Premium.",
+  'picker.year': 'Year',
+  'picker.course': 'Course'
 });

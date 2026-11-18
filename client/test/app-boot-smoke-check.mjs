@@ -53,8 +53,10 @@ for (const edition of (process.env.PRI_EDITIONS || 'priyabhata,prithagoras').spl
     page.on('console', m => { if (m.type() === 'error' && JS_FAULT.test(m.text())) faults.push(`console: ${m.text().slice(0, 200)}`); });
 
     await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
-    await page.waitForSelector('[data-signin-card="page"], .crash-card', { timeout: 30000 });
+    // A visitor's first screen is the question picker (ADR-0003); the sign-in card is one click away.
+    await page.waitForSelector('[data-guest-try], [data-signin-card="page"], .crash-card', { timeout: 30000 });
     check(await page.locator('.crash-card').count() === 0, `${edition}: first load is not the crash screen`);
+    check(await page.locator('[data-guest-try] [data-question-picker]').count() === 1, `${edition}: a device with no profile opens on the question picker`);
     check(faults.length === 0, `${edition}: first load raises no JavaScript error ${faults.join(' | ')}`);
 
     await createVerifiedProfile(page, platform, { name: 'Smoke Student', year: 10, course: 'in' });

@@ -166,6 +166,11 @@ export async function createVerifiedProfile(page, platform, {
     await page.getByTestId('picker-create-account').click();
   }
   const card = page.locator('[data-signin-card="page"]');
+  // A visitor's first screen is the question picker (ADR-0003); the sign-in
+  // card is one click away, as for a person who chooses it.
+  // (The boot screen is an .auth-wrap too: wait for the card or the first screen itself.)
+  await page.locator('[data-signin-card="page"], [data-guest-try]').first().waitFor({ timeout: 30000 });
+  if (await page.locator('[data-guest-try]').count()) await page.getByTestId('guest-sign-in').click();
   await card.waitFor({ timeout: 30000 });
   // The sign-in language is the device's choice before a profile exists; the
   // profile the card makes is given that language (Login.jsx finishAccount).

@@ -16,6 +16,9 @@ import { featureEnabled } from '../platform/features.js';
 import { useHomeDecision, usePlacement, actionCopy, PlacementCard, GoalCard } from '../pages/Home.jsx';
 import { chapterEvidence, colourFor, figureFor, practiceTrack, scopeFor } from './chapters.js';
 import HomeAside, { NextMeta } from '../home/HomeVerified.jsx';
+import QuestionPicker from '../guest/QuestionPicker.jsx';
+import { EDITION } from '../platform/edition.js';
+import '../guest/guest.css';
 
 // The v1.1 home: the student's syllabus as a thumb-indexed book. The list and
 // the coloured tabs choose a chapter; its plate shows what the evidence says
@@ -369,6 +372,19 @@ export default function IndexPage() {
           queue (dot points due, from the server's own evidence), the study
           plan, photo practice and the exact-topic generator. The due figure is
           the shell's, from GET /reviews. */}
+      {/* The one question picker, as the quick start (ADR-0003): the same
+          control a visitor meets first, listing only what has questions. The
+          type of answer is the practice page's own choice, so it is not asked
+          here. */}
+      {user.role !== 'teacher' && (
+        <section className="in-quick qp-home" aria-labelledby="in-quick-title" data-instrument-quickstart>
+          <h2 id="in-quick-title">{t('picker.homeTitle')}</h2>
+          <p className="in-note">{t('picker.homeHint')}</p>
+          <QuestionPicker edition={EDITION} defaultYear={user.year} forms={[]} idPrefix="hq"
+            onStart={choice => nav(practiceHref({ subtopic: choice.chapter, difficulty: choice.difficulty, track: EDITION === 'priyabhata' ? choice.course : null }))} />
+        </section>
+      )}
+
       <section className="in-also" aria-labelledby="in-also-title" data-instrument-also>
         <h2 id="in-also-title">{t('inst.alsoTitle')}</h2>
         <ul className="in-also-list">
