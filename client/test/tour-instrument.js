@@ -263,7 +263,7 @@ export const flow = {
       const pairs = [];
       for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) if (hit(rects[i], rects[j])) pairs.push(`${rects[i].id}×${rects[j].id}`);
       const card = c ? { l: c.left, t: c.top, r: c.right, b: c.bottom } : null;
-      return { n: rects.length, pairs, covered: card ? rects.filter(r => hit(r, card)).map(r => r.id) : [], floating: !!c && getComputedStyle(document.querySelector('[data-map-card]')).position === 'absolute' };
+      return { n: rects.length, pairs, covered: card ? rects.filter(r => hit(r, card)).map(r => r.id) : [], floating: !!c && !!document.querySelector('.in-map-graph-wrap.is-floating') && getComputedStyle(document.querySelector('[data-map-card]')).position === 'sticky' };
     });
     await page.setViewportSize({ width: 1240, height: 900 });
     await page.waitForTimeout(400);
@@ -274,8 +274,9 @@ export const flow = {
     const geo = await mapGeo();
     await check('the map draws every chapter as a positioned node', geo.n === chapters, `${geo.n} nodes`);
     await check('no two map nodes or labels overlap', geo.pairs.length === 0, geo.pairs.slice(0, 6).join(', '));
-    await check('the card floats over the map at desktop width and covers no node', geo.floating && geo.covered.length === 0, JSON.stringify(geo.covered));
-    await check('the map links are straight lines', (await page.locator('.in-map-edge').evaluateAll(es => es.every(e => / L /.test(e.getAttribute('d')) && !/Q/.test(e.getAttribute('d'))))));
+    await check('the card sits in a column beside the map at desktop width (sticky, not over the drawing) and covers no node', geo.floating && geo.covered.length === 0, JSON.stringify(geo.covered));
+    // Links are routed (map-layout-check proves they clear every box): straight runs with softly rounded corners, never free curves.
+    await check('the map links are routed runs with rounded corners, never free-form curves', (await page.locator('.in-map-edge').evaluateAll(es => es.length > 0 && es.every(e => /^M[-\d. ]+(?: ?[LQ][-\d. ]+)+$/.test(e.getAttribute('d')) && !/[CSA]/.test(e.getAttribute('d'))))));
     writeFileSync(join(outDir, 'map-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     await page.locator('[data-map-practise]').click();
     await page.waitForURL(u => u.pathname === '/practice', { timeout: 10000 });
