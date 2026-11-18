@@ -1,0 +1,250 @@
+{
+ "ext1-2027-p01": {
+  "id": "ext1-2027-p01",
+  "notes": [],
+  "gaps": [
+   "q11a-i: a find/calculate part with no key yet (self-check until one is written and verified)"
+  ],
+  "manual": [],
+  "counts": {
+   "totalMarks": 70,
+   "mcq": 10,
+   "section2Leaves": 25,
+   "autoMarks": 20,
+   "selfCheckMarks": 50,
+   "keyedSection2Parts": 10
+  },
+  "katex": []
+ },
+ "ext1-2027-p02": {
+  "id": "ext1-2027-p02",
+  "notes": [],
+  "gaps": [
+   "q11a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14b-i: a find/calculate part with no key yet (self-check until one is written and verified)"
+  ],
+  "manual": [],
+  "counts": {
+   "totalMarks": 70,
+   "mcq": 10,
+   "section2Leaves": 22,
+   "autoMarks": 10,
+   "selfCheckMarks": 60,
+   "keyedSection2Parts": 0
+  },
+  "katex": []
+ },
+ "ext1-2027-p03": {
+  "id": "ext1-2027-p03",
+  "notes": [],
+  "gaps": [
+   "q11a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11d: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11e: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14b-ii: a find/calculate part with no key yet (self-check until one is written and verified)"
+  ],
+  "manual": [],
+  "counts": {
+   "totalMarks": 70,
+   "mcq": 10,
+   "section2Leaves": 22,
+   "autoMarks": 10,
+   "selfCheckMarks": 60,
+   "keyedSection2Parts": 0
+  },
+  "katex": []
+ },
+ "ext1-2027-p04": {
+  "id": "ext1-2027-p04",
+  "notes": [],
+  "gaps": [
+   "q11a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11d: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14b-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14b-iii: a find/calculate part with no key yet (self-check until one is written and verified)"
+  ],
+  "manual": [],
+  "counts": {
+   "totalMarks": 70,
+   "mcq": 10,
+   "section2Leaves": 22,
+   "autoMarks": 10,
+   "selfCheckMarks": 60,
+   "keyedSection2Parts": 0
+  },
+  "katex": []
+ },
+ "ext1-2027-p05": {
+  "id": "ext1-2027-p05",
+  "notes": [],
+  "gaps": [
+   "q11a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11d: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11e: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-iv: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14b-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14b-ii: a find/calculate part with no key yet (self-check until one is written and verified)"
+  ],
+  "manual": [],
+  "counts": {
+   "totalMarks": 70,
+   "mcq": 10,
+   "section2Leaves": 25,
+   "autoMarks": 10,
+   "selfCheckMarks": 60,
+   "keyedSection2Parts": 0
+  },
+  "katex": []
+ },
+ "ext1-2027-p06": {
+  "id": "ext1-2027-p06",
+  "notes": [],
+  "gaps": [
+   "q11a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11c: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11d: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11e: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-iv: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14b-iii: a find/calculate part with no key yet (self-check until one is written and verified)"
+  ],
+  "manual": [],
+  "counts": {
+   "totalMarks": 70,
+   "mcq": 10,
+   "section2Leaves": 25,
+   "autoMarks": 10,
+   "selfCheckMarks": 60,
+   "keyedSection2Parts": 0
+  },
+  "katex": []
+ },
+ "ext1-2027-p07": {
+  "id": "ext1-2027-p07",
+  "notes": [],
+  "gaps": [
+   "q11a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11d: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11e: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-iv: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-iv: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14b-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14b-iii: a find/calculate part with no key yet (self-check until one is written and verified)"
+  ],
+  "manual": [],
+  "counts": {
+   "totalMarks": 70,
+   "mcq": 10,
+   "section2Leaves": 24,
+   "autoMarks": 10,
+   "selfCheckMarks": 60,
+   "keyedSection2Parts": 0
+  },
+  "katex": []
+ },
+ "ext1-2027-p10": {
+  "id": "ext1-2027-p10",
+  "notes": [],
+  "gaps": [
+   "q11a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11c: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q11d: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-iv: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13a-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q13b-iii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14a: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14b: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14c-i: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14c-ii: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q14c-iii: a find/calculate part with no key yet (self-check until one is written and verified)"
+  ],
+  "manual": [],
+  "counts": {
+   "totalMarks": 70,
+   "mcq": 10,
+   "section2Leaves": 22,
+   "autoMarks": 10,
+   "selfCheckMarks": 60,
+   "keyedSection2Parts": 0
+  },
+  "katex": []
+ },
+ "ext1-2027-p13": {
+  "id": "ext1-2027-p13",
+  "notes": [
+   "paper: Q7: options are the lettered graphs inside the figure"
+  ],
+  "gaps": [
+   "q11d: a find/calculate part with no key yet (self-check until one is written and verified)",
+   "q12c-ii: a find/calculate part with no key yet (self-check until one is written and verified)"
+  ],
+  "manual": [],
+  "counts": {
+   "totalMarks": 70,
+   "mcq": 10,
+   "section2Leaves": 16,
+   "autoMarks": 22,
+   "selfCheckMarks": 48,
+   "keyedSection2Parts": 12
+  },
+  "katex": []
+ }
+}

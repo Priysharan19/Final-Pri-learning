@@ -1,0 +1,2320 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p10",
+ "paperNumber": 10,
+ "title": "Practice Paper 10",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "0c0b95dcf918e97c8c9fc6b397da08726382cf90ebbc70462ec928027f16fb95"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the value of $\\displaystyle\\int_0^{\\tfrac{\\pi}{4}} \\cos^{2} 3x\\,dx$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{12} + \\dfrac{\\pi}{8}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{6} + \\dfrac{\\pi}{4}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$- \\dfrac{1}{12} + \\dfrac{\\pi}{8}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$- \\dfrac{1}{6} + \\dfrac{\\pi}{8}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\cos^{2} 3x = \\tfrac12\\left(1 + \\cos 6x\\right)$, so the integral is $\\left[\\dfrac{x}{2} + \\dfrac{\\sin 6x}{12}\\right]_0^{\\dfrac{\\pi}{4}} = - \\dfrac{1}{12} + \\dfrac{\\pi}{8}$."
+        }
+       ],
+       "classification": {
+        "content": "Integrals of sin squared and cos squared",
+        "outcomes": [
+         "ME1-12-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many subsets of $\\{1, 2, 3, \\ldots, 14\\}$ have exactly 5 elements, no two of which are consecutive integers?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "252"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "126"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "462"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "210"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Write the chosen numbers as $a_1 < a_2 < \\cdots < a_{5}$ and let $b_i = a_i - (i - 1)$. The condition $a_{i+1} \\ge a_i + 2$ becomes $b_{i+1} > b_i$, and the $b_i$ are any 5 different numbers from $1$ to $10$. So there are $\\dbinom{10}{5} = 252$ subsets."
+        }
+       ],
+       "classification": {
+        "content": "Combinations; choosing with gaps",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $\\underset{\\sim}{a} = -\\underset{\\sim}{i} - 4\\underset{\\sim}{j}$ and $\\underset{\\sim}{b} = 4\\underset{\\sim}{i} + 3\\underset{\\sim}{j}$. What is the projection of $\\underset{\\sim}{a}$ onto $\\underset{\\sim}{b}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{64}{17}\\underset{\\sim}{i} - \\dfrac{48}{17}\\underset{\\sim}{j}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{64}{25}\\underset{\\sim}{i} - \\dfrac{48}{25}\\underset{\\sim}{j}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{64}{5}\\underset{\\sim}{i} - \\dfrac{48}{5}\\underset{\\sim}{j}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{16}{25}\\underset{\\sim}{i} + \\dfrac{64}{25}\\underset{\\sim}{j}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\mathrm{proj}_{\\underset{\\sim}{b}}\\underset{\\sim}{a} = \\dfrac{\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b}}{\\underset{\\sim}{b}\\cdot\\underset{\\sim}{b}}\\underset{\\sim}{b} = \\dfrac{-16}{25}\\underset{\\sim}{b} = -\\dfrac{64}{25}\\underset{\\sim}{i} - \\dfrac{48}{25}\\underset{\\sim}{j}$."
+        }
+       ],
+       "classification": {
+        "content": "Projection of vectors",
+        "outcomes": [
+         "ME1-12-01"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The graph of $y = f(x)$ is shown."
+      },
+      {
+       "k": "fig",
+       "name": "figpfunctionsreciprocalabsolutegraphscaddijacbase"
+      },
+      {
+       "k": "p",
+       "t": "Which graph shows $y = f(|x|)$?"
+      }
+     ],
+     "figures": [
+      "figpfunctionsreciprocalabsolutegraphscaddijacbase"
+     ],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figpfunctionsreciprocalabsolutegraphscaddijacwra"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figpfunctionsreciprocalabsolutegraphscaddijacwrb"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figpfunctionsreciprocalabsolutegraphscaddijacwrc"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figpfunctionsreciprocalabsolutegraphscaddijacopt"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "For $x \\ge 0$ the graph of $y = f(|x|)$ is the same as that of $y = f(x)$, and the part for $x < 0$ is its reflection in the $y$-axis. Only graph D has this form."
+        }
+       ],
+       "classification": {
+        "content": "Graphs of y = f(|x|) and related functions",
+        "outcomes": [
+         "ME1-11-01"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "When the polynomial $P(x)$ is divided by $x - 1$ the remainder is $-6$, and when it is divided by $x - 3$ the remainder is $-7$."
+      },
+      {
+       "k": "p",
+       "t": "What is the remainder when $P(x)$ is divided by $(x - 1)(x - 3)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{2}x - \\dfrac{11}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{1}{2}x - \\dfrac{13}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{1}{2}x - \\dfrac{11}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{13}{2}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The remainder has the form $mx + c$, and $P(x) = (x - 1)(x - 3)Q(x) + mx + c$. Then $P(1) = -6$ and $P(3) = -7$ give $m + c = -6$ and $3m + c = -7$, so $m = - \\dfrac{1}{2}$ and $c = - \\dfrac{11}{2}$."
+        }
+       ],
+       "classification": {
+        "content": "Remainder theorem; division by a quadratic",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Which differential equation could have the slope field shown?"
+      },
+      {
+       "k": "fig",
+       "name": "figpdifferentialequationsslopefieldmatchfbbafddcslope"
+      }
+     ],
+     "figures": [
+      "figpdifferentialequationsslopefieldmatchfbbafddcslope"
+     ],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = -xy$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = \\dfrac{x}{y + 3}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = xy$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = y^2 - x$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "At $(0, -2)$ the slope in the field is about $4$, which matches $\\dfrac{dy}{dx} = y^2 - x$ (the other equations give $0, 0, 0$ there)."
+        }
+       ],
+       "classification": {
+        "content": "Slope fields",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the least number of whole numbers needed to guarantee that at least three of them leave the same remainder when divided by 9?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$18$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$27$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$28$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$19$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "There are 9 possible remainders. With $2 \\times 9 = 18$ objects it is possible to have exactly 2 in each, so no three share. With one more, by the pigeonhole principle some remainders must contain at least 3. So the answer is $19$."
+        }
+       ],
+       "classification": {
+        "content": "Pigeonhole principle",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The tangent to the curve $y = 3x^{4}$ at the point where $x = 2$ meets the $x$-axis at $P$."
+      },
+      {
+       "k": "p",
+       "t": "What is the $x$-coordinate of $P$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{3}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{5}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{2}{3}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "At $x = 2$ the gradient is $3 \\times 4 \\times 2^{3}$ and $y = 3 \\times 2^{4}$. The tangent meets $y = 0$ where $x = 2 - \\dfrac{y}{y'} = 2 - \\dfrac{2}{4} = \\dfrac{3}{2}$."
+        }
+       ],
+       "classification": {
+        "content": "Tangents; derivatives of powers and exponentials",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The polynomial $P(x) = 2 x^{3} + 2 x^{2} + 6 x - 9$ has zeros $\\alpha$, $\\beta$ and $\\gamma$. What is the value of $\\dfrac{1}{\\alpha} + \\dfrac{1}{\\beta} + \\dfrac{1}{\\gamma}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{2}{3}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$- \\dfrac{2}{3}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{3}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$- \\dfrac{2}{9}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\dfrac{1}{\\alpha} + \\dfrac{1}{\\beta} + \\dfrac{1}{\\gamma} = \\dfrac{\\alpha\\beta + \\beta\\gamma + \\gamma\\alpha}{\\alpha\\beta\\gamma} = \\dfrac{3}{\\dfrac{9}{2}} = \\dfrac{2}{3}$."
+        }
+       ],
+       "classification": {
+        "content": "Sums and products of roots",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The polynomial $x^3 - 27x + c$, where $c > 0$, has a repeated zero."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $c$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$27$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$54$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$81$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$108$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "A repeated zero is a zero of the derivative $3x^2 - 27$, so it is $x = \\pm 3$. If it is $3$: $27 - 81 + c = 0$, so $c = 54$. If it is $-3$, $c = -54 < 0$."
+        }
+       ],
+       "classification": {
+        "content": "Multiple zeros of polynomials",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 16,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find the term independent of $x$ in the expansion of $\\left(3 x + \\dfrac{2}{x}\\right)^{6}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct term"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the value of $k$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the general term"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The general term is $\\dbinom{6}{k}\\left(3 x\\right)^{6 - k}\\left(\\dfrac{2}{x}\\right)^{k}$, in which the power of $x$ is $(6 - k) - k$. This is zero when $k = 3$, so the term is $\\dbinom{6}{3} \\times 3^{3} \\times 2^{3} = 4320$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial expansion; term independent of x",
+        "outcomes": [
+         "ME1-11-05"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $f(x) = (x - 4)^2 + 4$ for $x \\ge 4$, and let $f^{-1}$ be its inverse function."
+        },
+        {
+         "k": "p",
+         "t": "Find the coordinates of the points where the graphs of $y = f(x)$ and $y = f^{-1}(x)$ meet."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides both points with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Explains why the graphs meet only on $y = x$, or solves $f(x) = x$ correctly"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Sets up a correct equation"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$f$ is increasing for $x \\ge 4$. If $f(a) = b$ and $f^{-1}(a) = b$ then $f(b) = a$; if $a < b$ then $f(a) < f(b)$, that is, $b < a$, which is impossible, and similarly $a > b$ is impossible. So the graphs meet only on the line $y = x$, where $f(x) = x$: $x^2 - 9 x + 20 = 0$, so $(x - 4)(x - 5) = 0$. Both values satisfy $x \\ge 4$, so the points are $(4, 4)$ and $(5, 5)$."
+        }
+       ],
+       "classification": {
+        "content": "Inverse functions; intersections with the inverse",
+        "outcomes": [
+         "ME1-11-01"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The points $A$, $B$ and $C$ are $(4, 2)$, $(2, 4)$ and $(1, 7)$."
+        },
+        {
+         "k": "p",
+         "t": "Use vectors to find the coordinates of the point $P$ on the line $AB$ that is closest to $C$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct coordinates"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the projection of $\\overrightarrow{AC}$ onto $\\overrightarrow{AB}$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $\\overrightarrow{AB}$ and $\\overrightarrow{AC}$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\overrightarrow{AB} = -2\\underset{\\sim}{i} + 2\\underset{\\sim}{j}$ and $\\overrightarrow{AC} = -3\\underset{\\sim}{i} + 5\\underset{\\sim}{j}$. The closest point is the foot of the perpendicular from $C$, $\\overrightarrow{AP} = \\dfrac{\\overrightarrow{AC}\\cdot\\overrightarrow{AB}}{\\left|\\overrightarrow{AB}\\right|^2}\\overrightarrow{AB} = 2\\overrightarrow{AB}$. So $P$ is $(0, 6)$."
+        }
+       ],
+       "classification": {
+        "content": "Vector projections; closest point on a line",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A ball is projected from a point $O$ on horizontal ground with speed $30$ m s$^{-1}$ at an angle $\\theta$ to the horizontal. It passes through the point that is 60 m horizontally from $O$ and $5$ m above the ground. Take $g = 10$ m s$^{-2}$, and assume the ball's position at time $t$ is $Vt\\cos\\theta\\,\\underset{\\sim}{i} + \\left(Vt\\sin\\theta - 5t^2\\right)\\underset{\\sim}{j}$."
+        },
+        {
+         "k": "p",
+         "t": "Find the two possible values of $\\tan\\theta$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides both values"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Solves the quadratic with a minor error"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains a correct quadratic equation in $\\tan\\theta$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the time to reach the point"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "At horizontal distance $60$, $t = \\dfrac{60}{30\\cos\\theta}$, so the height is $60\\tan\\theta - 20\\sec^2\\theta = 60\\tan\\theta - 20\\left(1 + \\tan^2\\theta\\right)$. Setting this equal to $5$ with $T = \\tan\\theta$: $\\ 20T^2 - 60T + 25 = 0$. Its solutions are $T = \\dfrac{1}{2}$ and $T = \\dfrac{5}{2}$."
+        }
+       ],
+       "classification": {
+        "content": "Projectile motion; angles of projection through a given point",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Prove by mathematical induction that $10^{n+1} - 9n - 10$ is divisible by $81$ for all integers $n \\ge 1$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct proof"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case and makes substantial progress with the inductive step"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "When $n = 1$ the expression is $81$, which is divisible by $81$. Assume that the expression for $n = k$ equals $81M$ for an integer $M$. Then for $n = k + 1$: $10^{k+2} - 9(k + 1) - 10 = 10\\left(10^{k+1} - 9k - 10\\right) + 81k + 81 = 810M + 81k + 81$, which is divisible by $81$. So the result holds for $n = k + 1$, and hence for all $n \\ge 1$ by mathematical induction."
+        }
+       ],
+       "classification": {
+        "content": "Proof by induction; divisibility",
+        "outcomes": [
+         "ME1-12-01"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find the least value of $\\sin^2 x + 8\\sin x\\cos x - 4\\cos^2 x$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the expression in the form $A + R\\cos(2x - \\alpha)$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Uses double-angle results to rewrite the expression"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Using $\\sin^2 x = \\tfrac12(1 - \\cos 2x)$, $\\cos^2 x = \\tfrac12(1 + \\cos 2x)$ and $\\sin x\\cos x = \\tfrac12\\sin 2x$, the expression is $-\\dfrac{3}{2} - \\dfrac{5}{2}\\cos 2x + 4\\sin 2x$. Now $-\\dfrac{5}{2}\\cos 2x + 4\\sin 2x = \\dfrac{\\sqrt{89}}{2}\\cos(2x - \\alpha)$ for a suitable angle $\\alpha$, and $\\cos(2x - \\alpha)$ takes every value from $-1$ to $1$. So the least value is $- \\dfrac{\\sqrt{89}}{2} - \\dfrac{3}{2}$."
+        }
+       ],
+       "classification": {
+        "content": "Double-angle results; auxiliary angle; extreme values",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The random variable $X$ has a binomial distribution with mean $\\dfrac{15}{4}$. It is given that $P(X = 3) = P(X = 4)$."
+        },
+        {
+         "k": "p",
+         "t": "Find the number of trials $n$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value of $n$"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains an equation in $n$ alone"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $p$ in terms of $n$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the two probabilities correctly"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Equating $\\dbinom{n}{3}p^{3}(1 - p)^{n - 3}$ and $\\dbinom{n}{4}p^{4}(1 - p)^{n - 4}$ gives $(n - 3)p = 4(1 - p)$, so $p = \\dfrac{4}{n + 1}$. Then $np = \\dfrac{4n}{n + 1} = \\dfrac{15}{4}$, which gives $n = 15$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial probabilities and mean",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "There are $m$ points on a line $L_1$ and $n$ points on a parallel line $L_2$. Every point on $L_1$ is joined to every point on $L_2$ by a straight segment, and no three segments pass through the same point between the lines. The diagram shows the case $m = 6$, $n = 7$."
+        },
+        {
+         "k": "fig",
+         "name": "figpcombinatoricssegmentsbetweenlinesbceddfccsegments"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Explain why the number of points between the lines where two segments cross is $\\dbinom{m}{2}\\dbinom{n}{2}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct explanation"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that two segments cross exactly when their endpoints are in opposite orders"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Choose two points $A_1, A_2$ on $L_1$ and two points $B_1, B_2$ on $L_2$. Of the two ways to join them in pairs, exactly one pair of segments crosses between the lines. Every crossing comes from exactly one such choice, and there are $\\dbinom{m}{2}\\dbinom{n}{2}$ choices."
+          }
+         ],
+         "classification": {
+          "content": "Combinations; counting crossings; probability",
+          "outcomes": [
+           "ME1-12-06",
+           "11-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "proof-explain",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Two of the segments in the diagram are chosen at random. Find the probability that they cross between the lines."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct probability"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Counts the pairs of segments"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "There are $42$ segments, so $\\dbinom{42}{2} = 861$ pairs, and $\\dbinom{6}{2}\\dbinom{7}{2} = 315$ of them cross. The probability is $\\dfrac{315}{861} = \\dfrac{15}{41}$."
+          }
+         ],
+         "classification": {
+          "content": "Combinations; counting crossings; probability",
+          "outcomes": [
+           "ME1-12-06",
+           "11-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that when $m = n$, the probability that two segments chosen at random cross is $\\dfrac{n - 1}{2(n + 1)}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the probability using binomial coefficients"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\dbinom{n}{2}^2}{\\dbinom{n^2}{2}} = \\dfrac{n^2(n - 1)^2/4}{n^2(n^2 - 1)/2} = \\dfrac{(n - 1)^2}{2(n - 1)(n + 1)} = \\dfrac{n - 1}{2(n + 1)}$."
+          }
+         ],
+         "classification": {
+          "content": "Combinations; counting crossings; probability",
+          "outcomes": [
+           "ME1-12-06",
+           "11-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the least value of $n$ for which this probability exceeds $\\dfrac{2}{5}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Solves the inequality"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{n - 1}{2(n + 1)} > \\dfrac{2}{5} \\iff 5(n - 1) > 4(n + 1) \\iff n > 9$, so the least value is $n = 10$."
+          }
+         ],
+         "classification": {
+          "content": "Combinations; counting crossings; probability",
+          "outcomes": [
+           "ME1-12-06",
+           "11-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpcombinatoricssegmentsbetweenlinesbceddfccsegments"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 14,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Two straight cushions on a billiard table meet at the origin $O$. One lies along the positive $x$-axis and the other along the line $\\ell$ through $O$ in the direction of the unit vector $\\hat{\\underset{\\sim}{u}} = \\dfrac{1}{5}\\left(4\\underset{\\sim}{i} + 3\\underset{\\sim}{j}\\right)$, making an angle $\\alpha$ with the $x$-axis. When the ball strikes a cushion, the component of its velocity along the cushion is unchanged and the component perpendicular to the cushion is reversed. A ball is struck from $A(4, 1)$ with velocity $\\underset{\\sim}{v} = 2\\underset{\\sim}{j}$. It rebounds from $\\ell$ at $P$ and then from the $x$-axis at $Q$."
+        },
+        {
+         "k": "fig",
+         "name": "figpvectorsbilliardreflectionbidegffebilliard"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the velocity of a ball with velocity $\\underset{\\sim}{w}$ just after it rebounds from $\\ell$ is $\\ 2\\left(\\underset{\\sim}{w}\\cdot\\hat{\\underset{\\sim}{u}}\\right)\\hat{\\underset{\\sim}{u}} - \\underset{\\sim}{w}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Resolves $\\underset{\\sim}{w}$ into components along and perpendicular to $\\hat{\\underset{\\sim}{u}}$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Write $\\underset{\\sim}{w} = \\left(\\underset{\\sim}{w}\\cdot\\hat{\\underset{\\sim}{u}}\\right)\\hat{\\underset{\\sim}{u}} + \\underset{\\sim}{n}$, where $\\underset{\\sim}{n} = \\underset{\\sim}{w} - \\left(\\underset{\\sim}{w}\\cdot\\hat{\\underset{\\sim}{u}}\\right)\\hat{\\underset{\\sim}{u}}$ is perpendicular to the cushion. After the rebound the velocity is $\\left(\\underset{\\sim}{w}\\cdot\\hat{\\underset{\\sim}{u}}\\right)\\hat{\\underset{\\sim}{u}} - \\underset{\\sim}{n} = 2\\left(\\underset{\\sim}{w}\\cdot\\hat{\\underset{\\sim}{u}}\\right)\\hat{\\underset{\\sim}{u}} - \\underset{\\sim}{w}$."
+          }
+         ],
+         "classification": {
+          "content": "Vectors; projections; reflection at a boundary; scalar product",
+          "outcomes": [
+           "ME1-12-01",
+           "12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the coordinates of $P$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct coordinates"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the position of the ball at time $t$ and uses the equation of $\\ell$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The ball is at $(4,\\ 1 + 2t)$ at time $t$ and $\\ell$ is $4y = 3x$. So $4(1 + 2t) = 3(4)$, giving $t = 1$ and $P = \\left(4, 3\\right)$."
+          }
+         ],
+         "classification": {
+          "content": "Vectors; projections; reflection at a boundary; scalar product",
+          "outcomes": [
+           "ME1-12-01",
+           "12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Let $\\underset{\\sim}{v}'$ be the velocity after the rebound at $Q$. Show that $\\ \\underset{\\sim}{v}\\cdot\\underset{\\sim}{v}' = |\\underset{\\sim}{v}|^2\\cos 2\\alpha\\$ for every velocity $\\underset{\\sim}{v}$ for which the ball meets $\\ell$ and then the $x$-axis, and hence find the angle between $\\underset{\\sim}{v}$ and $\\underset{\\sim}{v}'$ as an exact expression in inverse trigonometric form."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof and the correct angle"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Proves the dot product result"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $\\underset{\\sim}{v}'$ in terms of the components of $\\underset{\\sim}{v}$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $\\hat{\\underset{\\sim}{u}} = \\cos\\alpha\\,\\underset{\\sim}{i} + \\sin\\alpha\\,\\underset{\\sim}{j}$ and $\\underset{\\sim}{v} = a\\underset{\\sim}{i} + b\\underset{\\sim}{j}$. After the first rebound the velocity is $2(a\\cos\\alpha + b\\sin\\alpha)(\\cos\\alpha\\,\\underset{\\sim}{i} + \\sin\\alpha\\,\\underset{\\sim}{j}) - (a\\underset{\\sim}{i} + b\\underset{\\sim}{j})$, and the rebound at the $x$-axis reverses the $\\underset{\\sim}{j}$ component, so"
+          },
+          {
+           "k": "math",
+           "t": "\\underset{\\sim}{v}' = \\left[2(a\\cos\\alpha + b\\sin\\alpha)\\cos\\alpha - a\\right]\\underset{\\sim}{i} - \\left[2(a\\cos\\alpha + b\\sin\\alpha)\\sin\\alpha - b\\right]\\underset{\\sim}{j}."
+          },
+          {
+           "k": "p",
+           "t": "Then"
+          },
+          {
+           "k": "math",
+           "t": "\\underset{\\sim}{v}\\cdot\\underset{\\sim}{v}' = 2(a\\cos\\alpha + b\\sin\\alpha)(a\\cos\\alpha - b\\sin\\alpha) - a^2 + b^2"
+          },
+          {
+           "k": "math",
+           "t": "= a^2(2\\cos^2\\alpha - 1) + b^2(1 - 2\\sin^2\\alpha) = |\\underset{\\sim}{v}|^2\\cos 2\\alpha."
+          },
+          {
+           "k": "p",
+           "t": "Since $|\\underset{\\sim}{v}'| = |\\underset{\\sim}{v}|$, the angle $\\phi$ between them has $\\cos\\phi = \\cos 2\\alpha = \\cos^2\\alpha - \\sin^2\\alpha = \\dfrac{7}{25}$, so $\\phi = \\cos^{-1}\\left(\\dfrac{7}{25}\\right)$, whatever the starting velocity."
+          }
+         ],
+         "classification": {
+          "content": "Vectors; projections; reflection at a boundary; scalar product",
+          "outcomes": [
+           "ME1-12-01",
+           "12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpvectorsbilliardreflectionbidegffebilliard"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A dose of $350$ mg of a drug is swallowed at time $t = 0$ hours. Let $G$ mg be the amount in the gut and $B$ mg the amount in the bloodstream at time $t$. The drug moves from the gut to the blood, so that $\\dfrac{dG}{dt} = -\\dfrac{1}{5}G$, and the body removes it from the blood, so that $\\ \\dfrac{dB}{dt} = \\dfrac{1}{5}G - \\dfrac{1}{5}B$. Initially $G = 350$ and $B = 0$."
+        },
+        {
+         "k": "fig",
+         "name": "figpdifferentialequationsdrugabsorptionaahcdigfdrug"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find $G$ as a function of $t$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct function"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{G}\\dfrac{dG}{dt} = -\\dfrac{1}{5}$, so $\\ln G = -\\dfrac{1}{5}t + C$, and $G = 350$ at $t = 0$ gives $G = 350e^{-\\tfrac{1}{5}t}$."
+          }
+         ],
+         "classification": {
+          "content": "Differential equations; rates; maxima and points of inflection",
+          "outcomes": [
+           "ME1-12-05",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "By considering $\\dfrac{d}{dt}\\left(Be^{\\tfrac{1}{5}t}\\right)$, show that $B = 70\\,t\\,e^{-\\tfrac{1}{5}t}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Integrates to find $Be^{kt}$ (or equivalent) with the constant determined"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses the product rule with the differential equation to simplify the derivative"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{d}{dt}\\left(Be^{\\tfrac{1}{5}t}\\right) = e^{\\tfrac{1}{5}t}\\left(\\dfrac{dB}{dt} + \\dfrac{1}{5}B\\right) = e^{\\tfrac{1}{5}t}\\times \\dfrac{1}{5}G = 70$, a constant. So $Be^{\\tfrac{1}{5}t} = 70t + C$, and $B = 0$ at $t = 0$ gives $C = 0$, so $B = 70\\,t\\,e^{-\\tfrac{1}{5}t}$."
+          }
+         ],
+         "classification": {
+          "content": "Differential equations; rates; maxima and points of inflection",
+          "outcomes": [
+           "ME1-12-05",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the greatest amount of the drug in the bloodstream, and the time at which it occurs."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct amount and time"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the time when $\\dfrac{dB}{dt} = 0$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates $B$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dB}{dt} = 70e^{-\\tfrac{1}{5}t}\\left(1 - \\dfrac{1}{5}t\\right) = 0$ when $t = 5$, a maximum since $\\dfrac{dB}{dt}$ changes from positive to negative there. The greatest amount is $B = \\dfrac{350}{e}$ mg, at $t = 5$ hours."
+          }
+         ],
+         "classification": {
+          "content": "Differential equations; rates; maxima and points of inflection",
+          "outcomes": [
+           "ME1-12-05",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpdifferentialequationsdrugabsorptionaahcdigfdrug"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The polynomial $P(x) = x^{3} + 4 x^{2} - 6 x + 3$ has zeros $\\alpha$, $\\beta$ and $\\gamma$. Find a polynomial with integer coefficients whose zeros are $\\alpha + 2$, $\\beta + 2$ and $\\gamma + 2$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct polynomial"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Makes a correct substitution into $P$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Expresses $\\alpha$ in terms of a new zero, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "If $u = \\alpha + 2$ then $\\alpha = u - 2$, so the new zeros satisfy $P(x - 2) = 0$: $x^{3} - 2 x^{2} - 10 x + 23 = 0$. So a suitable polynomial is $x^{3} - 2 x^{2} - 10 x + 23$ (any non-zero integer multiple is also correct)."
+        }
+       ],
+       "classification": {
+        "content": "Polynomials; zeros of related polynomials",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Use the substitution $t = \\tan\\dfrac{\\theta}{2}$ to solve $7\\cos\\theta - \\sin\\theta = 5$ for $0 \\le \\theta \\le 2\\pi$. Give your answers in exact form."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct solutions"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Solves the quadratic in $t$"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains the correct quadratic in $t$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correctly substitutes the t-formulae"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "With $\\cos\\theta = \\dfrac{1 - t^2}{1 + t^2}$ and $\\sin\\theta = \\dfrac{2t}{1 + t^2}$ the equation becomes $12 t^{2} + 2 t - 2 = 0$, that is, $2 \\left(2 t + 1\\right) \\left(3 t - 1\\right) = 0$, so $t = - \\dfrac{1}{2}$ or $t = \\dfrac{1}{3}$. Checking $\\theta = \\pi$ (where $t$ is undefined): $7\\cos\\pi = -7 \\ne 5$, so it is not a solution. Since $0 \\le \\dfrac{\\theta}{2} \\le \\pi$, the solutions are $\\theta = 2\\tan^{-1}\\left(\\dfrac{1}{3}\\right)$ and $\\theta = 2\\pi - 2\\tan^{-1}\\left(\\dfrac{1}{2}\\right)$."
+        }
+       ],
+       "classification": {
+        "content": "The t-formulae; solving trigonometric equations",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q14c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The diagram shows the curve $y = 2\\tan^{-1}\\left(\\dfrac{x}{4}\\right)$ for $0 \\le x \\le 4$. The region $S$ lies between the curve, the $x$-axis and the line $x = 4$. The region $T$ lies between the curve, the $y$-axis and the line $y = \\dfrac{\\pi}{2}$."
+        },
+        {
+         "k": "fig",
+         "name": "figpinversetrigregionvolumesadfedgceregion"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14c-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the exact area of $S$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct area"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the area between the curve and the $y$-axis using the inverse function"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The curve can be written $x = 4\\tan\\left(\\dfrac{y}{2}\\right)$. The area of $T$ is"
+          },
+          {
+           "k": "math",
+           "t": "\\int_0^{\\tfrac{\\pi}{2}} 4\\tan\\left(\\dfrac{y}{2}\\right)dy = \\left[-8\\ln\\left|\\cos\\dfrac{y}{2}\\right|\\right]_0^{\\tfrac{\\pi}{2}} = 8\\ln\\sqrt2,"
+          },
+          {
+           "k": "p",
+           "t": "and $S$ and $T$ together make a rectangle of area $2 \\pi$, so the area of $S$ is $2 \\pi - 4\\ln 2$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse trigonometric functions; areas and volumes of revolution",
+          "outcomes": [
+           "ME1-12-03",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14c-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The region $T$ is rotated about the $y$-axis. Find the exact volume of the solid formed."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct volume"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Simplifies the integrand to a form that can be integrated"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes a correct integral for the volume"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$V = \\pi\\displaystyle\\int_0^{\\tfrac{\\pi}{2}} 16\\tan^2\\left(\\dfrac{y}{2}\\right)dy = 16\\pi\\displaystyle\\int_0^{\\tfrac{\\pi}{2}}\\left(\\sec^2\\dfrac{y}{2} - 1\\right)dy = 16\\pi\\left[2\\tan\\dfrac{y}{2} - y\\right]_0^{\\tfrac{\\pi}{2}} = - 8 \\pi^{2} + 32 \\pi$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse trigonometric functions; areas and volumes of revolution",
+          "outcomes": [
+           "ME1-12-03",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14c-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The region $S$ is rotated about the $y$-axis. Find the exact volume of the solid formed."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct volume"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that $S$ and $T$ together form a cylinder when rotated"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the volume of the cylinder of radius $4$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Rotating $S$ and $T$ together gives a cylinder of radius $4$ and height $\\dfrac{\\pi}{2}$, with volume $8 \\pi^{2}$. So the volume from $S$ is $8 \\pi^{2} - \\left(32 \\pi - 8 \\pi^{2}\\right) = 16 \\pi^{2} - 32 \\pi$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse trigonometric functions; areas and volumes of revolution",
+          "outcomes": [
+           "ME1-12-03",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpinversetrigregionvolumesadfedgceregion"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figpfunctionsreciprocalabsolutegraphscaddijacbase",
+  "figpfunctionsreciprocalabsolutegraphscaddijacwra",
+  "figpfunctionsreciprocalabsolutegraphscaddijacwrb",
+  "figpfunctionsreciprocalabsolutegraphscaddijacwrc",
+  "figpfunctionsreciprocalabsolutegraphscaddijacopt",
+  "figpdifferentialequationsslopefieldmatchfbbafddcslope",
+  "figpcombinatoricssegmentsbetweenlinesbceddfccsegments",
+  "figpvectorsbilliardreflectionbidegffebilliard",
+  "figpdifferentialequationsdrugabsorptionaahcdigfdrug",
+  "figpinversetrigregionvolumesadfedgceregion"
+ ]
+}

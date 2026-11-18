@@ -1,0 +1,2526 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p03",
+ "paperNumber": 3,
+ "title": "Practice Paper 3",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "81f29cb213040937208bdcdd280a5d90f2ec60e63ebff3a2cab6e74c05a792b6"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "For which values of the real number $k$ does the equation $x^3 - 3x + k = 0$ have exactly two different real solutions?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-2 < k < 2$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$k < -2$ or $k > 2$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$k = -2$ or $k = 2$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$k = 2$ only"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "A cubic has exactly two different real zeros only when one of them is a double zero, which is also a zero of the derivative $3x^2 - 3$. So the double zero is $x = 1$ or $x = -1$, giving $k = 2$ or $k = -2$. (Then $x^3 - 3x \\pm 2 = (x \\mp 1)^2(x \\pm 2)$.)"
+        }
+       ],
+       "classification": {
+        "content": "Multiple zeros of polynomials; stationary points",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The diagram shows 9 dots in a square array, and one triangle whose vertices are three of the dots."
+      },
+      {
+       "k": "fig",
+       "name": "figninedots"
+      },
+      {
+       "k": "p",
+       "t": "How many triangles have all three vertices at dots of the array?"
+      }
+     ],
+     "figures": [
+      "figninedots"
+     ],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "72"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "76"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "80"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "84"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Three dots can be chosen in $\\binom{9}{3} = 84$ ways. They fail to form a triangle when they lie on a line: 3 rows, 3 columns and 2 diagonals. So the number of triangles is $84 - 8 = 76$."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The function $y(x)$ satisfies $\\dfrac{dy}{dx} = y(2 - y)$ and $y(0) = 3$."
+      },
+      {
+       "k": "p",
+       "t": "Which of the following could be the graph of $y$ for $x \\ge 0$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figdeA"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figdeB"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figdeC"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figdeD"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$y = 2$ is a constant solution and solution curves cannot cross, so $y > 2$ for all $x$. Then $\\dfrac{dy}{dx} = y(2 - y) < 0$, so $y$ decreases towards 2. Also $\\dfrac{d^2y}{dx^2} = (2 - 2y)\\dfrac{dy}{dx} > 0$, since both factors are negative, so the graph is concave up throughout. Only graph A has these properties (graph B changes concavity)."
+        }
+       ],
+       "classification": {
+        "content": "Differential equations; behaviour of solutions; concavity",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The vectors $\\underset{\\sim}{a}$, $\\underset{\\sim}{b}$ and $\\underset{\\sim}{c}$ are unit vectors such that $\\underset{\\sim}{a} + 2\\,\\underset{\\sim}{b} + 2\\,\\underset{\\sim}{c} = \\underset{\\sim}{0}$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $\\underset{\\sim}{b}\\cdot\\underset{\\sim}{c}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac18$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac14$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac12$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac78$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$2\\left(\\underset{\\sim}{b} + \\underset{\\sim}{c}\\right) = -\\underset{\\sim}{a}$, so $4\\left|\\underset{\\sim}{b} + \\underset{\\sim}{c}\\right|^2 = 1$. Hence $4\\left(1 + 2\\,\\underset{\\sim}{b}\\cdot\\underset{\\sim}{c} + 1\\right) = 1$, which gives $\\underset{\\sim}{b}\\cdot\\underset{\\sim}{c} = -\\dfrac78$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; scalar product",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A fair die is rolled $n$ times, and $\\hat{p}$ is the proportion of the rolls that show a six. The standard deviation of $\\hat{p}$ is $\\dfrac{1}{60}$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $n$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "300"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "500"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "600"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "3000"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The standard deviation of $\\hat{p}$ is $\\sqrt{\\dfrac{p(1 - p)}{n}}$ with $p = \\dfrac16$. So $\\dfrac{5}{36n} = \\dfrac{1}{3600}$, which gives $n = 500$."
+        }
+       ],
+       "classification": {
+        "content": "Sample proportions; binomial distribution",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $f(x) = \\sin^{-1}x + \\sin^{-1}\\!\\left(\\sqrt{1 - x^2}\\right)$ for $0 < x < 1$."
+      },
+      {
+       "k": "p",
+       "t": "What is $f'(x)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{2}{\\sqrt{1 - x^2}}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{\\sqrt{1 - x^2}}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$0$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{1}{\\sqrt{1 - x^2}}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "For $0 < x < 1$ let $\\theta = \\cos^{-1}x$, an acute angle with $\\sin\\theta = \\sqrt{1 - x^2}$. So $\\sin^{-1}\\!\\left(\\sqrt{1 - x^2}\\right) = \\cos^{-1}x$ and $f(x) = \\sin^{-1}x + \\cos^{-1}x = \\dfrac{\\pi}{2}$, a constant. Hence $f'(x) = 0$."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; differentiation",
+        "outcomes": [
+         "ME1-12-03",
+         "12-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many solutions does the equation $\\sin x + \\sin 2x + \\sin 3x = 0$ have for $0 \\le x \\le 2\\pi$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "5"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "6"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "7"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "8"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\sin x + \\sin 3x = 2\\sin 2x\\cos x$, so the equation is $\\sin 2x\\,(2\\cos x + 1) = 0$. Then $\\sin 2x = 0$ gives $x = 0, \\frac{\\pi}{2}, \\pi, \\frac{3\\pi}{2}, 2\\pi$, and $\\cos x = -\\frac12$ gives $x = \\frac{2\\pi}{3}, \\frac{4\\pi}{3}$: 7 solutions."
+        }
+       ],
+       "classification": {
+        "content": "Trigonometric equations; sums to products",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the value of $\\displaystyle\\int_{\\frac12}^{2} \\frac{\\ln x}{1 + x^2}\\,dx$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$0$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\ln 2$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\pi}{2}\\ln 2$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\pi}{4}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $I$ be the integral and substitute $x = \\dfrac1u$, so $dx = -\\dfrac{du}{u^2}$, $\\ln x = -\\ln u$ and $\\dfrac{1}{1 + x^2} = \\dfrac{u^2}{u^2 + 1}$. The limits $\\frac12$ and $2$ are exchanged, and $I = \\displaystyle\\int_{\\frac12}^{2}\\frac{-\\ln u}{1 + u^2}\\,du = -I$. Hence $I = 0$."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution; symmetry",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A ball is projected from a point $O$ on horizontal ground. It passes through the point $A$ after 1 second and through the point $B$ after 3 seconds, where $A$ and $B$ are at the same height $h$ metres above the ground. Take $g = 10$ m s$^{-2}$."
+      },
+      {
+       "k": "fig",
+       "name": "figsame"
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $h$?"
+      }
+     ],
+     "figures": [
+      "figsame"
+     ],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "10"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "15"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "20"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "45"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The height at time $t$ is $y = ut - 5t^2$, where $u$ is the initial vertical component of velocity. The times at which $y = h$ are the solutions of $5t^2 - ut + h = 0$, and their product is $\\dfrac{h}{5} = 1 \\times 3$. So $h = 15$."
+        }
+       ],
+       "classification": {
+        "content": "Projectile motion; quadratic equations",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many of the integers from 1 to 1000 are divisible by none of 2, 3 and 5?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "266"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "268"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "270"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "300"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The numbers divisible by 2, 3, 5 are $500$, $333$, $200$; by 6, 10, 15 are $166$, $100$, $66$; by 30 are $33$. So the number divisible by at least one of 2, 3, 5 is $500 + 333 + 200 - 166 - 100 - 66 + 33 = 734$, and the answer is $1000 - 734 = 266$."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The polynomial $P(x)$ satisfies $P(x) - P'(x) = x^n$ for all real $x$, where $n$ is a positive integer."
+        },
+        {
+         "k": "p",
+         "t": "Find $P(0)$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $P(x)$, or makes substantial progress by differentiating repeatedly"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Shows that $P(x)$ has degree $n$, or differentiates the equation"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$P'(x)$ has lower degree than $P(x)$, so $P(x)$ has degree $n$. Differentiating $P(x) = x^n + P'(x)$ repeatedly,"
+        },
+        {
+         "k": "math",
+         "t": "P'(x) = nx^{n-1} + P''(x), \\qquad P''(x) = n(n - 1)x^{n-2} + P'''(x), \\qquad \\ldots"
+        },
+        {
+         "k": "p",
+         "t": "and the $(n + 1)$th derivative of $P$ is zero. Substituting each line into the one before,"
+        },
+        {
+         "k": "math",
+         "t": "P(x) = x^n + nx^{n-1} + n(n - 1)x^{n-2} + \\cdots + n(n - 1)\\cdots 2\\,x + n!."
+        },
+        {
+         "k": "p",
+         "t": "Hence $P(0) = n!$."
+        }
+       ],
+       "classification": {
+        "content": "Polynomials; differentiation",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Solve $\\sin^{-1}x + \\sin^{-1}2x = \\dfrac{\\pi}{3}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct solution with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains a correct equation for $x$ free of inverse functions, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Takes the sine of a suitable expression, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $\\alpha = \\sin^{-1}x$. Then $\\sin^{-1}2x = \\dfrac{\\pi}{3} - \\alpha$, so"
+        },
+        {
+         "k": "math",
+         "t": "2x = \\sin\\left(\\frac{\\pi}{3} - \\alpha\\right) = \\frac{\\sqrt3}{2}\\cos\\alpha - \\frac12\\sin\\alpha = \\frac{\\sqrt3}{2}\\sqrt{1 - x^2} - \\frac{x}{2}."
+        },
+        {
+         "k": "p",
+         "t": "Hence $5x = \\sqrt3\\sqrt{1 - x^2}$, so $x > 0$ and $25x^2 = 3 - 3x^2$, giving $x = \\sqrt{\\dfrac{3}{28}} = \\dfrac{\\sqrt{21}}{14}$."
+        },
+        {
+         "k": "p",
+         "t": "Check: with this $x$, both $\\alpha$ and $\\dfrac{\\pi}{3} - \\alpha$ are acute (as $0 < x < 2x < \\frac{\\sqrt3}{2}$), so $\\sin^{-1}2x = \\dfrac{\\pi}{3} - \\alpha$ and the equation holds."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; trigonometric equations",
+        "outcomes": [
+         "ME1-12-03",
+         "11-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Prove by mathematical induction that $7^n(3n + 1) - 1$ is divisible by 9 for all integers $n \\ge 1$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct proof"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case and makes substantial progress with the inductive step"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "When $n = 1$, $7 \\times 4 - 1 = 27$, which is divisible by 9."
+        },
+        {
+         "k": "p",
+         "t": "Assume that $7^k(3k + 1) - 1 = 9M$ for some integer $M$. Then"
+        },
+        {
+         "k": "math",
+         "t": "7^{k+1}(3k + 4) - 1 = 7 \\times 7^k(3k + 1) + 21 \\times 7^k - 1 = 7(9M + 1) + 21 \\times 7^k - 1 = 63M + 3\\left(7^{k+1} + 2\\right)."
+        },
+        {
+         "k": "p",
+         "t": "Now $7^{k+1} - 1 = (7 - 1)\\left(7^k + 7^{k-1} + \\cdots + 1\\right)$ is divisible by 3, so $7^{k+1} + 2 = \\left(7^{k+1} - 1\\right) + 3$ is divisible by 3, and $3\\left(7^{k+1} + 2\\right)$ is divisible by 9. Hence the expression for $n = k + 1$ is divisible by 9, and the result follows by mathematical induction."
+        }
+       ],
+       "classification": {
+        "content": "Proof by mathematical induction (divisibility)",
+        "outcomes": [
+         "ME1-12-01"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Each of the $n$ people invited to a meeting attends with probability $p$, independently of the others. Every two people who attend shake hands once."
+        },
+        {
+         "k": "p",
+         "t": "Find, in simplest form, the expected number of handshakes."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct expected value with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the expected value as a sum and uses an identity for the binomial coefficients, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes a correct expression for the expected value as a sum, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $X$ be the number of people who attend, which has a binomial distribution, and let $q = 1 - p$. The number of handshakes is $\\dbinom{X}{2}$, with expected value $\\displaystyle\\sum_{k=2}^{n}\\binom{k}{2}\\binom{n}{k}p^kq^{\\,n-k}$. Now"
+        },
+        {
+         "k": "math",
+         "t": "\\binom{k}{2}\\binom{n}{k} = \\frac{n!}{2\\,(k - 2)!\\,(n - k)!} = \\binom{n}{2}\\binom{n - 2}{k - 2},"
+        },
+        {
+         "k": "p",
+         "t": "so the expected value is $\\dbinom{n}{2}p^2\\displaystyle\\sum_{k=2}^{n}\\binom{n - 2}{k - 2}p^{k-2}q^{\\,n-k} = \\binom{n}{2}p^2(p + q)^{n-2} = \\frac{n(n - 1)p^2}{2}$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial distribution; expected value; binomial coefficients",
+        "outcomes": [
+         "ME1-12-06",
+         "11-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The function $y(x)$ satisfies $\\dfrac{dy}{dx} = \\dfrac{1 + y^2}{1 + x^2}$ and $y(0) = 1$."
+        },
+        {
+         "k": "p",
+         "t": "Find $y$ as a function of $x$, in a form that does not involve trigonometric functions, for $x < 1$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct function"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains $\\tan^{-1}y = \\tan^{-1}x + \\dfrac{\\pi}{4}$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Separates the variables, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\displaystyle\\int\\frac{dy}{1 + y^2} = \\int\\frac{dx}{1 + x^2}$, so $\\tan^{-1}y = \\tan^{-1}x + C$, and $y(0) = 1$ gives $C = \\dfrac{\\pi}{4}$. Hence"
+        },
+        {
+         "k": "math",
+         "t": "y = \\tan\\left(\\tan^{-1}x + \\frac{\\pi}{4}\\right) = \\frac{x + 1}{1 - x}."
+        }
+       ],
+       "classification": {
+        "content": "Differential equations; inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-05",
+         "12-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "In the triangle $ABC$, the altitude from $A$ and the altitude from $B$ meet at $H$."
+        },
+        {
+         "k": "fig",
+         "name": "figalt"
+        },
+        {
+         "k": "p",
+         "t": "Use vectors to prove that $CH$ is perpendicular to $AB$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct proof"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes both perpendicularity conditions as scalar products and attempts to combine them"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes one perpendicularity condition as a scalar product, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Take $H$ as the origin, and let $\\underset{\\sim}{a}, \\underset{\\sim}{b}, \\underset{\\sim}{c}$ be the position vectors of $A, B, C$. Since $AH \\perp BC$ and $BH \\perp CA$,"
+        },
+        {
+         "k": "math",
+         "t": "\\underset{\\sim}{a}\\cdot\\left(\\underset{\\sim}{c} - \\underset{\\sim}{b}\\right) = 0 \\qquad\\text{and}\\qquad \\underset{\\sim}{b}\\cdot\\left(\\underset{\\sim}{a} - \\underset{\\sim}{c}\\right) = 0."
+        },
+        {
+         "k": "p",
+         "t": "Adding, $\\ \\underset{\\sim}{a}\\cdot\\underset{\\sim}{c} - \\underset{\\sim}{b}\\cdot\\underset{\\sim}{c} = 0$, that is, $\\underset{\\sim}{c}\\cdot\\left(\\underset{\\sim}{a} - \\underset{\\sim}{b}\\right) = 0$. Hence $\\overrightarrow{HC}\\cdot\\overrightarrow{BA} = 0$, so $CH \\perp AB$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; scalar product; geometric proof",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [
+        "figalt"
+       ],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The region bounded by the curve $y = \\sin^{-1}x$, the $x$-axis and the line $x = 1$ is rotated about the line $x = 1$."
+        },
+        {
+         "k": "fig",
+         "name": "figasin"
+        },
+        {
+         "k": "p",
+         "t": "Find the exact volume of the solid formed."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact volume"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Evaluates the integral with a minor error"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes a correct integral for the volume"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Recognises that the radius at height $y$ is $1 - \\sin y$, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "At height $y$, where $0 \\le y \\le \\dfrac{\\pi}{2}$, the region extends from $x = \\sin y$ to $x = 1$, so the cross-section of the solid is a disc of radius $1 - \\sin y$. The volume is"
+        },
+        {
+         "k": "math",
+         "t": "\\pi\\int_0^{\\frac{\\pi}{2}}(1 - \\sin y)^2\\,dy = \\pi\\int_0^{\\frac{\\pi}{2}}\\left(1 - 2\\sin y + \\frac{1 - \\cos 2y}{2}\\right)dy = \\pi\\left[\\frac{3y}{2} + 2\\cos y - \\frac{\\sin 2y}{4}\\right]_0^{\\frac{\\pi}{2}} = \\pi\\left(\\frac{3\\pi}{4} - 2\\right)."
+        }
+       ],
+       "classification": {
+        "content": "Volumes of solids of revolution; inverse functions",
+        "outcomes": [
+         "ME1-12-05",
+         "12-04"
+        ]
+       },
+       "figures": [
+        "figasin"
+       ],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "In a large population, a proportion $p$ of people support a proposal. A random sample of $n$ people is taken, $X$ of them support the proposal, and $\\hat{p} = \\dfrac{X}{n}$. Assume that $X$ has a binomial distribution, so that $E\\bigl((X - np)^2\\bigr) = np(1 - p)$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that, for every positive number $\\varepsilon$, $\\ P\\bigl(|\\hat{p} - p| \\ge \\varepsilon\\bigr) \\le \\dfrac{p(1 - p)}{n\\varepsilon^2}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Bounds the expected value below by the terms in which $X$ is far from $np$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $E\\bigl((X - np)^2\\bigr)$ as a sum, or rewrites the event in terms of $X$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The event $|\\hat{p} - p| \\ge \\varepsilon$ is the event $|X - np| \\ge n\\varepsilon$. Now"
+          },
+          {
+           "k": "math",
+           "t": "np(1 - p) = \\sum_{k=0}^{n}(k - np)^2P(X = k)."
+          },
+          {
+           "k": "p",
+           "t": "Every term is non-negative, so the sum is at least the sum of the terms with $|k - np| \\ge n\\varepsilon$, and in each of those terms $(k - np)^2 \\ge n^2\\varepsilon^2$. Hence"
+          },
+          {
+           "k": "math",
+           "t": "np(1 - p) \\ge n^2\\varepsilon^2\\,P\\bigl(|X - np| \\ge n\\varepsilon\\bigr), \\qquad\\text{so}\\qquad P\\bigl(|\\hat{p} - p| \\ge \\varepsilon\\bigr) \\le \\frac{p(1 - p)}{n\\varepsilon^2}."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; sample proportions; normal approximation; inequalities",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Deduce that if $n \\ge 2000$ then, whatever the value of $p$, the probability that $\\hat{p}$ is within $0.05$ of $p$ is at least $0.95$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct deduction"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $p(1 - p) \\le \\dfrac14$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$p(1 - p) = \\dfrac14 - \\left(p - \\dfrac12\\right)^2 \\le \\dfrac14$. By part (i) with $\\varepsilon = 0.05$ and $n \\ge 2000$,"
+          },
+          {
+           "k": "math",
+           "t": "P\\bigl(|\\hat{p} - p| \\ge 0.05\\bigr) \\le \\frac{1}{4 \\times 2000 \\times 0.0025} = 0.05,"
+          },
+          {
+           "k": "p",
+           "t": "so $P\\bigl(|\\hat{p} - p| < 0.05\\bigr) \\ge 0.95$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; sample proportions; normal approximation; inequalities",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "For large $n$, $\\hat{p}$ is approximately normally distributed with mean $p$ and standard deviation $\\sqrt{\\dfrac{p(1 - p)}{n}}$, and a normal random variable lies within $1.96$ standard deviations of its mean with probability $0.95$."
+          },
+          {
+           "k": "p",
+           "t": "Find the least value of $n$ which, according to this approximation, makes the probability in part (ii) at least $0.95$ whatever the value of $p$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct least value with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains a correct inequality for $n$ in the case $p = \\frac12$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the condition $1.96\\sqrt{\\dfrac{p(1 - p)}{n}} \\le 0.05$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The probability that $\\hat{p}$ is within $0.05$ of $p$ is at least $0.95$ when $0.05$ is at least $1.96$ standard deviations, that is,"
+          },
+          {
+           "k": "math",
+           "t": "1.96\\sqrt{\\frac{p(1 - p)}{n}} \\le 0.05, \\qquad n \\ge \\left(\\frac{1.96}{0.05}\\right)^2p(1 - p)."
+          },
+          {
+           "k": "p",
+           "t": "This must hold for every $p$, and the right-hand side is greatest when $p = \\dfrac12$, so $n \\ge 1536.64 \\times \\dfrac14 = 384.16$. The least value is $n = 385$. (The bound of part (ii) is safe but far from the least sample size.)"
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; sample proportions; normal approximation; inequalities",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A curve in the first quadrant has negative gradient at every point. The tangent to the curve at each point $P(x, y)$ meets the $x$-axis at $A$ and the $y$-axis at $B$."
+        },
+        {
+         "k": "fig",
+         "name": "figtanax"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $P$ is the midpoint of $AB$ for every point $P$ on the curve. Show that $\\dfrac{dy}{dx} = -\\dfrac{y}{x}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the coordinates of $A$ or $B$ in terms of $x$, $y$ and the gradient, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $m = \\dfrac{dy}{dx}$ at $P(x, y)$. The tangent $Y - y = m(X - x)$ meets the $x$-axis at $A\\left(x - \\dfrac{y}{m}, 0\\right)$ and the $y$-axis at $B(0, y - mx)$. If $P$ is the midpoint of $AB$ then $2y = y - mx$, so $m = -\\dfrac{y}{x}$. (Then also $x - \\dfrac{y}{m} = 2x$.)"
+          }
+         ],
+         "classification": {
+          "content": "Differential equations from geometric conditions; tangents; areas",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the equations of all such curves, and show that for each of them the area of the triangle $OAB$ is the same for every position of $P$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct curves and a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the curves, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Separates the variables, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\displaystyle\\int\\frac{dy}{y} = -\\int\\frac{dx}{x}$, so $\\ln y = -\\ln x + C$ and $xy = c$, where $c$ is a positive constant."
+          },
+          {
+           "k": "p",
+           "t": "By part (i), $A = (2x, 0)$ and $B = (0, 2y)$, so the area of triangle $OAB$ is $\\dfrac12 \\times 2x \\times 2y = 2xy = 2c$, which is the same for every position of $P$."
+          }
+         ],
+         "classification": {
+          "content": "Differential equations from geometric conditions; tangents; areas",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose instead that, for every point $P$ on the curve, $P$ divides the interval $AB$ so that $AP : PB = 1 : 2$. Find the equations of all such curves."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct curves"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains the correct differential equation, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Expresses the condition in terms of the coordinates of $A$, $B$ and $P$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "With $A$ and $B$ as in part (i), $P = A + \\dfrac13\\overrightarrow{AB}$, so its $y$-coordinate is $y = \\dfrac13(y - mx)$. Hence $m = -\\dfrac{2y}{x}$, that is,"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{dy}{dx} = -\\frac{2y}{x}, \\qquad \\int\\frac{dy}{y} = -2\\int\\frac{dx}{x}, \\qquad \\ln y = -2\\ln x + C."
+          },
+          {
+           "k": "p",
+           "t": "The curves are $y = \\dfrac{c}{x^2}$, where $c$ is a positive constant. (Check: then $x - \\dfrac{y}{m} = \\dfrac{3x}{2}$, and the $x$-coordinate of $A + \\frac13\\overrightarrow{AB}$ is $\\dfrac23 \\times \\dfrac{3x}{2} = x$.)"
+          }
+         ],
+         "classification": {
+          "content": "Differential equations from geometric conditions; tangents; areas",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figtanax"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The point $A$ lies on the curve $y = x^3 + px$, where $p$ is a constant, and the $x$-coordinate of $A$ is $a$, where $a > 0$. The tangent to the curve at $A$ meets the curve again at $B$, and the tangent at $B$ meets the curve again at $C$."
+        },
+        {
+         "k": "fig",
+         "name": "figtang"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the $x$-coordinates of $B$ and $C$ in terms of $a$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides both $x$-coordinates with justification"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the $x$-coordinate of $B$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let the tangent at $A$ be $y = mx + c$. Then $x^3 + px - mx - c$ is a monic cubic with a double zero at $x = a$, so it equals $(x - a)^2(x - b)$, where $b$ is the $x$-coordinate of $B$. The coefficient of $x^2$ is zero, so $2a + b = 0$ and $b = -2a$. The same argument at $B$ shows that the $x$-coordinate of $C$ is $-2b = 4a$."
+          }
+         ],
+         "classification": {
+          "content": "Tangents to polynomial curves; multiple zeros; areas",
+          "outcomes": [
+           "ME1-11-02",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the area of the region enclosed by the curve and the interval $AB$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct area"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes a correct integral for the area in terms of $a$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the difference between the curve and the tangent as $(x - a)^2(x + 2a)$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "For $-2a \\le x \\le a$ the curve is above the tangent by $(x - a)^2(x + 2a) \\ge 0$. With $u = x - a$, the area is"
+          },
+          {
+           "k": "math",
+           "t": "\\int_{-2a}^{a}(x - a)^2(x + 2a)\\,dx = \\int_{-3a}^{0}u^2(u + 3a)\\,du = \\left[\\frac{u^4}{4} + au^3\\right]_{-3a}^{0} = 27a^4 - \\frac{81a^4}{4} = \\frac{27a^4}{4}."
+          }
+         ],
+         "classification": {
+          "content": "Tangents to polynomial curves; multiple zeros; areas",
+          "outcomes": [
+           "ME1-11-02",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the region enclosed by the curve and the interval $BC$ has 16 times the area of the region in part (ii), whatever the values of $a$ and $p$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Applies the result of part (ii) at $B$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The curve is unchanged by a half-turn about the origin, which sends the point with $x$-coordinate $-2a$ to the point with $x$-coordinate $2a > 0$ and preserves areas. So the argument of parts (i) and (ii), applied with $2a$ in place of $a$, shows that the region enclosed by the curve and $BC$ has area $\\dfrac{27(2a)^4}{4} = 16 \\times \\dfrac{27a^4}{4}$. This does not depend on $p$."
+          }
+         ],
+         "classification": {
+          "content": "Tangents to polynomial curves; multiple zeros; areas",
+          "outcomes": [
+           "ME1-11-02",
+           "12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figtang"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A ball is projected from a point $O$ on horizontal ground with speed $V$ at an angle $\\theta$ to the horizontal, where $0 < \\theta < \\dfrac{\\pi}{2}$. At time $t$ after projection its position vector relative to $O$ is"
+        },
+        {
+         "k": "math",
+         "t": "\\underset{\\sim}{r} = Vt\\cos\\theta\\,\\underset{\\sim}{i} + \\left(Vt\\sin\\theta - \\tfrac12gt^2\\right)\\underset{\\sim}{j},"
+        },
+        {
+         "k": "p",
+         "t": "where $g$ is the acceleration due to gravity, and its velocity is $\\underset{\\sim}{v}$. **(Do NOT prove this.)**"
+        },
+        {
+         "k": "fig",
+         "name": "figaway"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\dfrac{d}{dt}\\left(\\left|\\underset{\\sim}{r}\\right|^2\\right) = 2\\,\\underset{\\sim}{r}\\cdot\\underset{\\sim}{v}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $\\underset{\\sim}{r} = x\\,\\underset{\\sim}{i} + y\\,\\underset{\\sim}{j}$, so $\\underset{\\sim}{v} = \\dot{x}\\,\\underset{\\sim}{i} + \\dot{y}\\,\\underset{\\sim}{j}$. Then $\\dfrac{d}{dt}\\left(x^2 + y^2\\right) = 2x\\dot{x} + 2y\\dot{y} = 2\\,\\underset{\\sim}{r}\\cdot\\underset{\\sim}{v}$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; scalar product; quadratic inequalities",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find all values of $\\sin\\theta$ for which the distance of the ball from $O$ increases throughout the flight."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct set of values with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains a correct quadratic in $t$ and considers its discriminant, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $\\underset{\\sim}{r}\\cdot\\underset{\\sim}{v}$ in terms of $t$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\underset{\\sim}{v} = V\\cos\\theta\\,\\underset{\\sim}{i} + (V\\sin\\theta - gt)\\,\\underset{\\sim}{j}$, so"
+          },
+          {
+           "k": "math",
+           "t": "\\underset{\\sim}{r}\\cdot\\underset{\\sim}{v} = V^2t\\cos^2\\theta + \\left(Vt\\sin\\theta - \\tfrac12gt^2\\right)(V\\sin\\theta - gt) = t\\left[V^2 - \\tfrac32Vg\\sin\\theta\\,t + \\tfrac12g^2t^2\\right]."
+          },
+          {
+           "k": "p",
+           "t": "By part (i), the distance increases throughout the flight when the quadratic $q(t) = \\tfrac12g^2t^2 - \\tfrac32Vg\\sin\\theta\\,t + V^2$ is never negative during the flight. Its discriminant is $\\tfrac94V^2g^2\\sin^2\\theta - 2g^2V^2 = \\tfrac14V^2g^2\\left(9\\sin^2\\theta - 8\\right)$."
+          },
+          {
+           "k": "p",
+           "t": "If $\\sin\\theta \\le \\dfrac{2\\sqrt2}{3}$ the discriminant is not positive, so $q(t) \\ge 0$ for all $t$ and the distance increases throughout."
+          },
+          {
+           "k": "p",
+           "t": "If $\\sin\\theta > \\dfrac{2\\sqrt2}{3}$ then $q$ is negative between its two zeros, which lie within the flight (see part (iii)), so the distance decreases for a time. Hence the condition is $0 < \\sin\\theta \\le \\dfrac{2\\sqrt2}{3}$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; scalar product; quadratic inequalities",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-iii",
+         "label": "(iii)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $\\sin\\theta > \\dfrac{2\\sqrt2}{3}$. Find the length of time for which the ball is getting closer to $O$, and show that the ball is in flight throughout this time."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct length of time and a correct demonstration"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct length of time, or equivalent merit"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the zeros of the quadratic, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that the ball approaches $O$ while the quadratic is negative"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The zeros of $q(t)$ are $t = \\dfrac{V}{2g}\\left[3\\sin\\theta \\pm \\sqrt{9\\sin^2\\theta - 8}\\right]$, and the ball approaches $O$ between them, for a time"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{V}{g}\\sqrt{9\\sin^2\\theta - 8}."
+          },
+          {
+           "k": "p",
+           "t": "Both zeros are positive. The ball lands at time $T = \\dfrac{2V\\sin\\theta}{g}$, and the larger zero is less than $T$ when"
+          },
+          {
+           "k": "math",
+           "t": "3\\sin\\theta + \\sqrt{9\\sin^2\\theta - 8} < 4\\sin\\theta, \\quad\\text{that is,}\\quad 9\\sin^2\\theta - 8 < \\sin^2\\theta, \\quad\\text{that is,}\\quad \\sin^2\\theta < 1,"
+          },
+          {
+           "k": "p",
+           "t": "which is true. So the ball is in flight throughout this time."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; scalar product; quadratic inequalities",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figaway"
+       ]
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A laboratory tests blood samples for a virus. Each person has the virus with probability $p$, independently of everyone else, where $0 < p < 1$, and $q = 1 - p$."
+        },
+        {
+         "k": "p",
+         "t": "Instead of testing every sample separately, the laboratory mixes the samples of $k$ people, where $k \\ge 2$, and tests the mixture. If the mixture does not contain the virus, one test has cleared all $k$ people. If the mixture contains the virus, each of the $k$ samples is then tested separately, so that $k + 1$ tests are used."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the expected number of tests used per person is $1 + \\dfrac1k - q^k$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the probability that the mixture does not contain the virus, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The mixture does not contain the virus when none of the $k$ people has it, which has probability $q^k$. So the expected number of tests for the group is"
+          },
+          {
+           "k": "math",
+           "t": "1 \\times q^k + (k + 1)\\left(1 - q^k\\right) = k + 1 - kq^k,"
+          },
+          {
+           "k": "p",
+           "t": "and the expected number per person is $1 + \\dfrac1k - q^k$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial probability; expected value; optimisation and inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Mixing is *worthwhile* if the expected number of tests per person is less than 1."
+          },
+          {
+           "k": "p",
+           "t": "Find all values of $p$ for which mixing is worthwhile for at least one value of $k$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct set of values with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that the condition is easiest to satisfy when $k = 3$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains the condition $q^k > \\dfrac1k$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Mixing with groups of $k$ is worthwhile when $q^k > \\dfrac1k$, that is, when $k\\ln q > -\\ln k$, that is, when"
+          },
+          {
+           "k": "math",
+           "t": "-\\ln q < \\frac{\\ln k}{k}."
+          },
+          {
+           "k": "p",
+           "t": "So mixing is worthwhile for some $k$ when $-\\ln q$ is less than the greatest value of $\\dfrac{\\ln k}{k}$ for integers $k \\ge 2$."
+          },
+          {
+           "k": "p",
+           "t": "Let $h(x) = \\dfrac{\\ln x}{x}$ for $x > 0$. Then $h'(x) = \\dfrac{1 - \\ln x}{x^2}$, which is positive for $x < e$ and negative for $x > e$. Since $2 < e < 3$, the greatest value for integers $k \\ge 2$ is $h(2)$ or $h(3)$. Now $3\\ln 2 = \\ln 8 < \\ln 9 = 2\\ln 3$, so $h(2) < h(3)$, and the greatest value is $\\dfrac{\\ln 3}{3}$."
+          },
+          {
+           "k": "p",
+           "t": "The condition is $-\\ln q < \\dfrac{\\ln 3}{3}$, that is, $q > 3^{-\\frac13}$. Hence mixing is worthwhile for at least one $k$ exactly when"
+          },
+          {
+           "k": "math",
+           "t": "0 < p < 1 - \\frac{1}{\\sqrt[3]{3}} \\quad (\\approx 0.307)."
+          }
+         ],
+         "classification": {
+          "content": "Binomial probability; expected value; optimisation and inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $p = \\dfrac{1}{m^2}$, where $m$ is an integer with $m \\ge 2$. Show that mixing in groups of $m$ uses fewer than $2\\sqrt{p}$ tests per person, on average."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Reduces the claim to an inequality such as $\\left(1 - \\frac{1}{m^2}\\right)^m > 1 - \\frac1m$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (i) with $k = m$, the expected number of tests per person is $\\dfrac1m + 1 - \\left(1 - \\dfrac{1}{m^2}\\right)^m$, and $2\\sqrt{p} = \\dfrac2m$. So it is enough to show that $\\left(1 - \\dfrac{1}{m^2}\\right)^m > 1 - \\dfrac1m$."
+          },
+          {
+           "k": "p",
+           "t": "Let $g(x) = (1 - x)^m - 1 + mx$ for $0 \\le x \\le 1$. Then $g(0) = 0$ and $g'(x) = m\\left[1 - (1 - x)^{m-1}\\right] > 0$ for $0 < x < 1$, since $m \\ge 2$. So $g(x) > 0$ for $0 < x \\le 1$. With $x = \\dfrac{1}{m^2}$,"
+          },
+          {
+           "k": "math",
+           "t": "\\left(1 - \\frac{1}{m^2}\\right)^m > 1 - \\frac{m}{m^2} = 1 - \\frac1m,"
+          },
+          {
+           "k": "p",
+           "t": "which is the required inequality. (For example, when one person in 10 000 has the virus, groups of 100 use fewer than one fiftieth of the tests.)"
+          }
+         ],
+         "classification": {
+          "content": "Binomial probability; expected value; optimisation and inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figninedots",
+  "figdeA",
+  "figdeB",
+  "figdeC",
+  "figdeD",
+  "figsame",
+  "figalt",
+  "figasin",
+  "figtanax",
+  "figtang",
+  "figaway"
+ ]
+}

@@ -1,0 +1,2642 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p06",
+ "paperNumber": 6,
+ "title": "Practice Paper 6",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "8be227a8b813e10d0c812eb002beefe926906c387d667bb67e24a61635099070"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $k$ be a constant with $0 < k < 1$."
+      },
+      {
+       "k": "p",
+       "t": "How many solutions does the equation $\\tan^{-1}x = kx$ have?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "1"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "2"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "3"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "5"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$x = 0$ is a solution. The curve $y = \\tan^{-1}x$ has gradient $\\dfrac{1}{1 + x^2}$, which is 1 at the origin and decreases towards 0 as $x$ increases, so for small $x > 0$ the curve is above the line $y = kx$. But the curve stays below $\\dfrac{\\pi}{2}$ while the line increases without bound, so they cross once for $x > 0$, and only once because the curve is concave down there. Both functions are odd, so there is one matching solution for $x < 0$. There are 3 solutions."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; graphs and gradients",
+        "outcomes": [
+         "ME1-12-03",
+         "12-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A board that is 2 squares high and 6 squares wide is to be covered completely by 6 dominoes. Each domino covers exactly 2 squares and may be placed horizontally or vertically."
+      },
+      {
+       "k": "fig",
+       "name": "figdomino"
+      },
+      {
+       "k": "p",
+       "t": "In how many ways can the board be covered?"
+      }
+     ],
+     "figures": [
+      "figdomino"
+     ],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "8"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "13"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "21"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "32"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $c_n$ be the number of ways for a board $n$ squares wide. The left-hand column is covered either by one vertical domino (leaving a board of width $n - 1$) or by two horizontal dominoes (leaving a board of width $n - 2$). So $c_n = c_{n-1} + c_{n-2}$ with $c_1 = 1$, $c_2 = 2$, giving $3, 5, 8, 13$. So $c_6 = 13$."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The polynomial $P(x)$ has degree 4. It is given that $P(1) = P(2) = P(3) = P(4) = 5$ and $P(0) = 29$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $P(5)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$5$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$24$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$53$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$29$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$P(x) - 5$ has degree 4 and zeros 1, 2, 3 and 4, so $P(x) = a(x - 1)(x - 2)(x - 3)(x - 4) + 5$. Then $P(0) = 24a + 5 = 29$ gives $a = 1$, and $P(5) = 4 \\times 3 \\times 2 \\times 1 + 5 = 29$."
+        }
+       ],
+       "classification": {
+        "content": "Polynomials; the factor theorem",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Which of the following vectors makes equal angles with the vectors $\\underset{\\sim}{i}$ and $3\\underset{\\sim}{i} + 4\\underset{\\sim}{j}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$2\\underset{\\sim}{i} + \\underset{\\sim}{j}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\underset{\\sim}{i} + 2\\underset{\\sim}{j}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$4\\underset{\\sim}{i} + 4\\underset{\\sim}{j}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\underset{\\sim}{i} - 2\\underset{\\sim}{j}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The unit vectors in the two directions are $\\underset{\\sim}{i}$ and $\\dfrac35\\underset{\\sim}{i} + \\dfrac45\\underset{\\sim}{j}$. Their sum, $\\dfrac85\\underset{\\sim}{i} + \\dfrac45\\underset{\\sim}{j}$, bisects the angle between them, and it is parallel to $2\\underset{\\sim}{i} + \\underset{\\sim}{j}$. (Check: the cosine of each angle is $\\dfrac{2}{\\sqrt5}$.)"
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; scalar product",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A spherical snowball melts so that its volume decreases at a rate proportional to its surface area. After 1 hour its volume is one eighth of its original volume."
+      },
+      {
+       "k": "p",
+       "t": "How much longer does the snowball take to melt completely?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac17$ of an hour"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "1 hour"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "2 hours"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It never melts completely."
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\dfrac{dV}{dt} = 4\\pi r^2\\dfrac{dr}{dt}$ and this equals $-c \\times 4\\pi r^2$ for a constant $c > 0$, so $\\dfrac{dr}{dt} = -c$: the radius decreases at a constant rate. In the first hour the radius halves (the volume is one eighth), so the remaining half of the radius takes 1 more hour."
+        }
+       ],
+       "classification": {
+        "content": "Related rates of change; modelling",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many four-digit numbers have their digits in strictly increasing order from left to right?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "3024"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "210"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "84"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "126"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The digit 0 cannot be used, since it would have to come first. Each choice of 4 different digits from 1 to 9 gives exactly one such number, so there are $\\dbinom{9}{4} = 126$."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques; combinations",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the range of the function $f(x) = \\sin x + \\sin\\left(x + \\dfrac{2\\pi}{3}\\right)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-1 \\le y \\le 1$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\sqrt3 \\le y \\le \\sqrt3$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-2 \\le y \\le 2$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac32 \\le y \\le \\dfrac32$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\sin x + \\sin\\left(x + \\dfrac{2\\pi}{3}\\right) = 2\\sin\\left(x + \\dfrac{\\pi}{3}\\right)\\cos\\dfrac{\\pi}{3} = \\sin\\left(x + \\dfrac{\\pi}{3}\\right)$, which takes all values from $-1$ to $1$."
+        }
+       ],
+       "classification": {
+        "content": "Trigonometric identities; sums to products",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The random variable $X$ has a binomial distribution with $n = 100$ and $p = \\dfrac13$."
+      },
+      {
+       "k": "p",
+       "t": "Which statement about the most likely value of $X$ is correct?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It is 32 only."
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It is 34 only."
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It is 33 only."
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "Both 33 and 34 are equally the most likely."
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\dfrac{P(X = k + 1)}{P(X = k)} = \\dfrac{100 - k}{k + 1} \\times \\dfrac12$, which is greater than 1 exactly when $100 - k > 2k + 2$, that is, $k < 32\\tfrac23$, and it is never equal to 1. So the probabilities increase up to $k = 33$ and then decrease: the most likely value is 33 only."
+        }
+       ],
+       "classification": {
+        "content": "Binomial distribution",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A square has one diagonal along the $x$-axis, from $x = 0$ to $x = 2$. A vertical line moves across the square. When the line is $x = t$, the area of the part of the square to the left of the line is $A$."
+      },
+      {
+       "k": "fig",
+       "name": "figsweep"
+      },
+      {
+       "k": "p",
+       "t": "Which graph shows $A$ against $t$ for $0 \\le t \\le 2$?"
+      }
+     ],
+     "figures": [
+      "figsweep"
+     ],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figswA"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figswB"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figswC"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figswD"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The rate $\\dfrac{dA}{dt}$ is the length of the part of the line inside the square: $2t$ for $0 \\le t \\le 1$ and $2(2 - t)$ for $1 \\le t \\le 2$. So the gradient of the graph increases from 0 until $t = 1$ and then decreases back to 0: the graph is concave up and then concave down, with $A = 1$ at $t = 1$ and $A = 2$ at $t = 2$. (In fact $A = t^2$ and then $A = 2 - (2 - t)^2$.) That is graph C."
+        }
+       ],
+       "classification": {
+        "content": "Rates of change; graphs of functions",
+        "outcomes": [
+         "ME1-12-05",
+         "11-01"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The function $y(x)$ satisfies $\\dfrac{dy}{dx} = y^2 - y$ and $y(0) = \\dfrac12$."
+      },
+      {
+       "k": "p",
+       "t": "What happens to $y$ as $x \\to \\infty$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$y \\to \\dfrac12$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$y \\to 0$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$y \\to 1$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$y \\to \\infty$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The constant functions $y = 0$ and $y = 1$ are solutions. While $0 < y < 1$, $\\dfrac{dy}{dx} = y(y - 1) < 0$, so $y$ decreases from $\\dfrac12$. It cannot cross the solution $y = 0$, and its rate of decrease is small only near $y = 0$, so $y \\to 0$."
+        }
+       ],
+       "classification": {
+        "content": "Differential equations; behaviour of solutions",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The polynomial $x^3 - x - 1$ has zeros $\\alpha$, $\\beta$ and $\\gamma$."
+        },
+        {
+         "k": "p",
+         "t": "Find the value of $\\ \\dfrac{1 + \\alpha}{1 - \\alpha} + \\dfrac{1 + \\beta}{1 - \\beta} + \\dfrac{1 + \\gamma}{1 - \\gamma}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains a polynomial whose zeros are the three required numbers, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Expresses $x$ in terms of $y = \\dfrac{1 + x}{1 - x}$, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $y = \\dfrac{1 + x}{1 - x}$, so that $x = \\dfrac{y - 1}{y + 1}$. If $x$ is a zero of $x^3 - x - 1$ then"
+        },
+        {
+         "k": "math",
+         "t": "(y - 1)^3 - (y - 1)(y + 1)^2 - (y + 1)^3 = 0."
+        },
+        {
+         "k": "p",
+         "t": "Expanding, $\\left(y^3 - 3y^2 + 3y - 1\\right) - \\left(y^3 + y^2 - y - 1\\right) - \\left(y^3 + 3y^2 + 3y + 1\\right) = 0$, that is,"
+        },
+        {
+         "k": "math",
+         "t": "y^3 + 7y^2 - y + 1 = 0."
+        },
+        {
+         "k": "p",
+         "t": "The three required numbers are the zeros of this cubic, so their sum is $-7$."
+        }
+       ],
+       "classification": {
+        "content": "Zeros and coefficients of polynomials",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A sequence is defined by $a_1 = 1$ and $a_{n+1} = a_n + \\dfrac{1}{a_n}$ for $n \\ge 1$."
+        },
+        {
+         "k": "p",
+         "t": "Prove by mathematical induction that $a_n \\ge \\sqrt{2n - 1}$ for all integers $n \\ge 1$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct proof"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case and makes substantial progress with the inductive step"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "When $n = 1$: $a_1 = 1 = \\sqrt{2 - 1}$."
+        },
+        {
+         "k": "p",
+         "t": "Assume that $a_k \\ge \\sqrt{2k - 1}$, so that $a_k^2 \\ge 2k - 1$ and $a_k > 0$. Then"
+        },
+        {
+         "k": "math",
+         "t": "a_{k+1}^2 = a_k^2 + 2 + \\frac{1}{a_k^2} > a_k^2 + 2 \\ge 2k + 1 = 2(k + 1) - 1."
+        },
+        {
+         "k": "p",
+         "t": "Since $a_{k+1} > 0$, $\\ a_{k+1} \\ge \\sqrt{2(k + 1) - 1}$. Hence the result holds for all integers $n \\ge 1$ by mathematical induction."
+        }
+       ],
+       "classification": {
+        "content": "Proof by mathematical induction (inequalities)",
+        "outcomes": [
+         "ME1-12-01"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Use the substitution $x = \\sin^2\\theta$ to find the exact value of $\\displaystyle\\int_0^{\\frac12}\\sqrt{\\frac{x}{1 - x}}\\;dx$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Transforms the integral correctly, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $dx$ in terms of $d\\theta$, or the new limits"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$dx = 2\\sin\\theta\\cos\\theta\\,d\\theta$. When $x = 0$, $\\theta = 0$, and when $x = \\dfrac12$, $\\theta = \\dfrac{\\pi}{4}$. For these values $\\sqrt{\\dfrac{x}{1 - x}} = \\dfrac{\\sin\\theta}{\\cos\\theta}$, so the integral is"
+        },
+        {
+         "k": "math",
+         "t": "\\int_0^{\\frac{\\pi}{4}}\\frac{\\sin\\theta}{\\cos\\theta} \\times 2\\sin\\theta\\cos\\theta\\,d\\theta = \\int_0^{\\frac{\\pi}{4}}(1 - \\cos 2\\theta)\\,d\\theta = \\left[\\theta - \\frac12\\sin 2\\theta\\right]_0^{\\frac{\\pi}{4}} = \\frac{\\pi}{4} - \\frac12."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution; trigonometric integrals",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Five people each toss a fair coin. If exactly one person's coin shows a different face from all of the others, that person is the *odd one out*. If there is no odd one out, all five people toss again."
+        },
+        {
+         "k": "p",
+         "t": "Find the probability that an odd one out is found in the first three rounds of tosses."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct probability"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the probability that there is no odd one out in one round and attempts to use three rounds"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Counts the outcomes of one round that give an odd one out, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "In one round there are $2^5 = 32$ equally likely outcomes. There is an odd one out when exactly one coin shows heads or exactly one shows tails: $5 + 5 = 10$ outcomes. So the probability of an odd one out in a round is $\\dfrac{5}{16}$."
+        },
+        {
+         "k": "p",
+         "t": "The probability of no odd one out in three rounds is $\\left(\\dfrac{11}{16}\\right)^3 = \\dfrac{1331}{4096}$, so the required probability is $\\dfrac{2765}{4096}$."
+        }
+       ],
+       "classification": {
+        "content": "Probability; counting",
+        "outcomes": [
+         "ME1-11-04",
+         "12-06"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $f(x) = \\tan^{-1}x + \\tan^{-1}\\!\\left(\\dfrac{1 - x}{1 + x}\\right)$ for $x \\ne -1$."
+        },
+        {
+         "k": "p",
+         "t": "Find all the values that $f(x)$ takes."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides both values with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Shows that $f'(x) = 0$ and finds one of the values"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Differentiates $f(x)$ with some success, or evaluates $f$ at a suitable point"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The derivative of $\\dfrac{1 - x}{1 + x}$ is $\\dfrac{-2}{(1 + x)^2}$, so"
+        },
+        {
+         "k": "math",
+         "t": "f'(x) = \\frac{1}{1 + x^2} + \\frac{1}{1 + \\left(\\frac{1 - x}{1 + x}\\right)^2} \\times \\frac{-2}{(1 + x)^2} = \\frac{1}{1 + x^2} - \\frac{2}{(1 + x)^2 + (1 - x)^2} = 0."
+        },
+        {
+         "k": "p",
+         "t": "So $f$ is constant on each of the intervals $x > -1$ and $x < -1$."
+        },
+        {
+         "k": "p",
+         "t": "For $x > -1$: $f(x) = f(0) = \\tan^{-1}1 = \\dfrac{\\pi}{4}$."
+        },
+        {
+         "k": "p",
+         "t": "For $x < -1$: as $x \\to -\\infty$, $\\ \\tan^{-1}x \\to -\\dfrac{\\pi}{2}$ and $\\dfrac{1 - x}{1 + x} \\to -1$, so $f(x) = -\\dfrac{\\pi}{2} - \\dfrac{\\pi}{4} = -\\dfrac{3\\pi}{4}$."
+        },
+        {
+         "k": "p",
+         "t": "The values are $\\dfrac{\\pi}{4}$ and $-\\dfrac{3\\pi}{4}$."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; differentiation",
+        "outcomes": [
+         "ME1-12-03",
+         "12-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "In the triangle $ABC$, $AB = 7$, $AC = 9$ and $BC = 8$. The point $M$ is the midpoint of $BC$."
+        },
+        {
+         "k": "fig",
+         "name": "figmedian"
+        },
+        {
+         "k": "p",
+         "t": "Use vectors to find the length of $AM$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct length with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $\\overrightarrow{AB}\\cdot\\overrightarrow{AC}$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes $\\overrightarrow{AM}$ and $\\overrightarrow{BC}$ in terms of two base vectors"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $\\underset{\\sim}{b} = \\overrightarrow{AB}$ and $\\underset{\\sim}{c} = \\overrightarrow{AC}$. Then $\\overrightarrow{BC} = \\underset{\\sim}{c} - \\underset{\\sim}{b}$ and $\\overrightarrow{AM} = \\dfrac12\\left(\\underset{\\sim}{b} + \\underset{\\sim}{c}\\right)$."
+        },
+        {
+         "k": "p",
+         "t": "From $\\left|\\underset{\\sim}{c} - \\underset{\\sim}{b}\\right|^2 = 64$: $\\ 81 + 49 - 2\\,\\underset{\\sim}{b}\\cdot\\underset{\\sim}{c} = 64$, so $\\underset{\\sim}{b}\\cdot\\underset{\\sim}{c} = 33$."
+        },
+        {
+         "k": "p",
+         "t": "Then $\\left|\\underset{\\sim}{b} + \\underset{\\sim}{c}\\right|^2 = 49 + 81 + 66 = 196$, so $AM = \\dfrac12 \\times 14 = 7$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; scalar product",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [
+        "figmedian"
+       ],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The diagram shows some of the parabolas $y = cx^2$, where $c$ is a non-zero constant, together with a curve through the point $(2, 1)$. At every point where the curve meets one of the parabolas, the curve and the parabola cross at right angles."
+        },
+        {
+         "k": "fig",
+         "name": "figortho"
+        },
+        {
+         "k": "p",
+         "t": "Find the equation of the curve."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct equation"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Solves the differential equation with a minor error"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains the differential equation of the curve"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the gradient of the parabola through $(x, y)$ in terms of $x$ and $y$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The parabola through a point $(x, y)$ with $x \\ne 0$ has $c = \\dfrac{y}{x^2}$, so its gradient there is $2cx = \\dfrac{2y}{x}$. The curve is perpendicular to it, so on the curve"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{dy}{dx} = -\\frac{x}{2y}."
+        },
+        {
+         "k": "p",
+         "t": "Separating the variables, $\\displaystyle\\int 2y\\,dy = -\\int x\\,dx$, so $y^2 = -\\dfrac{x^2}{2} + C$. At $(2, 1)$: $1 = -2 + C$, so $C = 3$."
+        },
+        {
+         "k": "p",
+         "t": "The curve is $x^2 + 2y^2 = 6$."
+        }
+       ],
+       "classification": {
+        "content": "Differential equations; perpendicular gradients",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       },
+       "figures": [
+        "figortho"
+       ],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A player starts a game with 1 unit of money. In each round the player stakes a fixed fraction $f$ of the money they hold at that time, where $0 < f \\le 1$. With probability $p$ the player wins the round and receives the stake back together with an equal amount. Otherwise the stake is lost. The rounds are independent, and $\\dfrac12 < p < 1$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the expected amount of money held after $n$ rounds is"
+          },
+          {
+           "k": "math",
+           "t": "\\bigl(1 + (2p - 1)f\\bigr)^n."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the amount held after $k$ wins in $n$ rounds, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "After $k$ wins and $n - k$ losses the player holds $(1 + f)^k(1 - f)^{n-k}$, and the number of wins is binomial. So the expected amount is"
+          },
+          {
+           "k": "math",
+           "t": "\\sum_{k=0}^{n}\\binom{n}{k}p^k(1 - p)^{n-k}(1 + f)^k(1 - f)^{n-k} = \\bigl(p(1 + f) + (1 - p)(1 - f)\\bigr)^n = \\bigl(1 + (2p - 1)f\\bigr)^n"
+          },
+          {
+           "k": "p",
+           "t": "by the binomial theorem."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; the binomial theorem; optimisation",
+          "outcomes": [
+           "ME1-12-06",
+           "11-04",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $f = 1$. Find the probability that the player still holds some money after $n$ rounds."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct probability"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The player loses everything at the first loss, so the player must win all $n$ rounds: the probability is $p^n$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; the binomial theorem; optimisation",
+          "outcomes": [
+           "ME1-12-06",
+           "11-04",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that the player wins exactly $pn$ of the $n$ rounds. Find the value of $f$ for which the player then holds the greatest amount of money."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains a correct equation for the stationary point, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the amount held, or its logarithm, as a function of $f$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The amount held is $(1 + f)^{pn}(1 - f)^{(1-p)n}$, which is greatest when"
+          },
+          {
+           "k": "math",
+           "t": "g(f) = p\\ln(1 + f) + (1 - p)\\ln(1 - f), \\qquad 0 < f < 1,"
+          },
+          {
+           "k": "p",
+           "t": "is greatest. (When $f = 1$ the amount is 0.) Now"
+          },
+          {
+           "k": "math",
+           "t": "g'(f) = \\frac{p}{1 + f} - \\frac{1 - p}{1 - f} = \\frac{(2p - 1) - f}{(1 + f)(1 - f)},"
+          },
+          {
+           "k": "p",
+           "t": "which is positive for $f < 2p - 1$ and negative for $f > 2p - 1$. So the amount is greatest when $f = 2p - 1$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; the binomial theorem; optimisation",
+          "outcomes": [
+           "ME1-12-06",
+           "11-04",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $p = \\dfrac35$ and $f = \\dfrac12$, and that the player wins exactly $pn$ of the $n$ rounds. Show that the player finishes with less than 1 unit of money."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the amount held in terms of $n$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The amount held is"
+          },
+          {
+           "k": "math",
+           "t": "\\left(\\frac32\\right)^{\\frac{3n}{5}}\\left(\\frac12\\right)^{\\frac{2n}{5}} = \\left[\\left(\\frac32\\right)^3\\left(\\frac12\\right)^2\\right]^{\\frac{n}{5}} = \\left(\\frac{27}{32}\\right)^{\\frac{n}{5}} < 1."
+          },
+          {
+           "k": "p",
+           "t": "(By part (i) the expected amount, $(1.1)^n$, grows without bound: the average is carried by rare runs of many wins.)"
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; the binomial theorem; optimisation",
+          "outcomes": [
+           "ME1-12-06",
+           "11-04",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The amount $A$ of a medicine in a patient's blood satisfies $\\dfrac{dA}{dt} = -kA$ between doses, where $k$ is a positive constant. A dose of size $D$ is given at each of the times $t = 0, T, 2T, 3T, \\ldots$, and each dose raises $A$ at once by $D$. There is no medicine in the blood before the first dose. Let $r = e^{-kT}$."
+        },
+        {
+         "k": "fig",
+         "name": "figdose"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the amount just after the $n$th dose is $\\dfrac{D\\left(1 - r^n\\right)}{1 - r}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that an amount is multiplied by $r$ between doses, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Between doses $A = A_0e^{-kt}$, so over one interval of length $T$ an amount is multiplied by $e^{-kT} = r$. Just after the $n$th dose, the doses given have been decaying for $0, T, 2T, \\ldots, (n - 1)T$, so the amount is"
+          },
+          {
+           "k": "math",
+           "t": "D + Dr + Dr^2 + \\cdots + Dr^{n-1} = \\frac{D\\left(1 - r^n\\right)}{1 - r}."
+          }
+         ],
+         "classification": {
+          "content": "Exponential decay; geometric series; limits; inequalities",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the limit, as $n \\to \\infty$, of the amount just before the $n$th dose."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct limit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Since $0 < r < 1$, the amount just after a dose approaches $\\dfrac{D}{1 - r}$, so the amount just before a dose approaches $\\dfrac{D}{1 - r} - D = \\dfrac{Dr}{1 - r}$."
+          }
+         ],
+         "classification": {
+          "content": "Exponential decay; geometric series; limits; inequalities",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The first dose is now replaced by a dose of size $D_1$, and every later dose still has size $D$. Find $D_1$, in terms of $D$ and $r$, so that the amount just after every dose is the same."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains an equation for $D_1$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Just after the first dose the amount is $D_1$, and just after the second it is $D_1r + D$. These are equal when $D_1(1 - r) = D$, that is,"
+          },
+          {
+           "k": "math",
+           "t": "D_1 = \\frac{D}{1 - r}."
+          },
+          {
+           "k": "p",
+           "t": "The same calculation then gives the amount $D_1$ after every later dose."
+          }
+         ],
+         "classification": {
+          "content": "Exponential decay; geometric series; limits; inequalities",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iv",
+         "label": "(iv)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Return to doses that all have size $D$. Find, in terms of $k$, the values of $T$ for which, in the long run, the amount stays between $2D$ and $5D$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct values of $T$"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the values of $r$ that are required"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains one correct inequality for $r$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "In the long run the amount varies between $\\dfrac{Dr}{1 - r}$ (just before a dose) and $\\dfrac{D}{1 - r}$ (just after). So"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{r}{1 - r} \\ge 2 \\quad\\text{and}\\quad \\frac{1}{1 - r} \\le 5, \\qquad\\text{that is,}\\qquad \\frac23 \\le r \\le \\frac45."
+          },
+          {
+           "k": "p",
+           "t": "Since $r = e^{-kT}$, $\\ T = \\dfrac1k\\ln\\dfrac1r$, so $\\dfrac1k\\ln\\dfrac54 \\le T \\le \\dfrac1k\\ln\\dfrac32$."
+          }
+         ],
+         "classification": {
+          "content": "Exponential decay; geometric series; limits; inequalities",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figdose"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A lamp $L$ is at the top of a vertical post of height $H$. A ball is released from rest at a point that is level with the lamp and at a horizontal distance $d$ from it, where $d < H$. The ball falls vertically with acceleration $g$. Its shadow $S$ moves along the horizontal ground, and at time $t$ after the ball is released, $S$ is at a distance $s$ from the foot of the post."
+        },
+        {
+         "k": "fig",
+         "name": "figlamp"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $s = \\dfrac{2dH}{gt^2}$ while the ball is falling."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the distance fallen, or uses similar triangles"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "At time $t$ the ball has fallen a distance $\\dfrac12gt^2$ below the level of the lamp. The triangle formed by the lamp, the ball and the point from which the ball was released is similar to the triangle formed by the lamp, $S$ and the foot of the post, so"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{s}{H} = \\frac{d}{\\frac12gt^2}, \\qquad\\text{that is,}\\qquad s = \\frac{2dH}{gt^2}."
+          }
+         ],
+         "classification": {
+          "content": "Motion under gravity; similar triangles; related rates",
+          "outcomes": [
+           "ME1-12-02",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the speed of the shadow at the instant when the ball reaches the ground."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct speed"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates $s$, or finds the time at which the ball reaches the ground"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{ds}{dt} = -\\dfrac{4dH}{gt^3}$. The ball reaches the ground when $\\dfrac12gt^2 = H$, that is, $t = \\sqrt{\\dfrac{2H}{g}}$. Then the speed of the shadow is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{4dH}{g} \\times \\frac{g}{2H}\\sqrt{\\frac{g}{2H}} = 2d\\sqrt{\\frac{g}{2H}} = d\\sqrt{\\frac{2g}{H}}."
+          }
+         ],
+         "classification": {
+          "content": "Motion under gravity; similar triangles; related rates",
+          "outcomes": [
+           "ME1-12-02",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the distance of the shadow from the foot of the post at the instant when the shadow and the ball have the same speed."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct distance"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $t^2$ or $t^4$ at the required instant"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Equates the speed of the shadow and the speed of the ball"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The ball has speed $gt$. The speeds are equal when $\\dfrac{4dH}{gt^3} = gt$, that is, $t^4 = \\dfrac{4dH}{g^2}$ and $t^2 = \\dfrac{2\\sqrt{dH}}{g}$. (This is before the ball lands, since $\\sqrt{dH} < H$.) Then"
+          },
+          {
+           "k": "math",
+           "t": "s = \\frac{2dH}{g} \\times \\frac{g}{2\\sqrt{dH}} = \\sqrt{dH}."
+          }
+         ],
+         "classification": {
+          "content": "Motion under gravity; similar triangles; related rates",
+          "outcomes": [
+           "ME1-12-02",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figlamp"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The diagram shows a curved mirror in the $xy$-plane that is symmetrical about the $y$-axis. Rays of light travelling in the direction of $-\\underset{\\sim}{j}$ strike the mirror, and every reflected ray passes through the origin $O$."
+        },
+        {
+         "k": "p",
+         "t": "At the point $P(x, y)$ of the mirror, where $x > 0$, the tangent makes an angle $\\psi$ with the positive $x$-axis, and $\\underset{\\sim}{t} = \\cos\\psi\\,\\underset{\\sim}{i} + \\sin\\psi\\,\\underset{\\sim}{j}$ is a unit vector along the tangent. A ray travelling in the direction of a unit vector $\\underset{\\sim}{d}$ is reflected at $P$ into the direction of the vector $\\underset{\\sim}{r}$ that has the same component as $\\underset{\\sim}{d}$ along the tangent and the opposite component perpendicular to the tangent."
+        },
+        {
+         "k": "fig",
+         "name": "figdish"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\underset{\\sim}{r} = 2\\left(\\underset{\\sim}{d}\\cdot\\underset{\\sim}{t}\\right)\\underset{\\sim}{t} - \\underset{\\sim}{d}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the projection of $\\underset{\\sim}{d}$ onto the tangent, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The projection of $\\underset{\\sim}{d}$ onto the tangent is $\\left(\\underset{\\sim}{d}\\cdot\\underset{\\sim}{t}\\right)\\underset{\\sim}{t}$, so $\\underset{\\sim}{d} = \\left(\\underset{\\sim}{d}\\cdot\\underset{\\sim}{t}\\right)\\underset{\\sim}{t} + \\underset{\\sim}{n}$, where $\\underset{\\sim}{n} = \\underset{\\sim}{d} - \\left(\\underset{\\sim}{d}\\cdot\\underset{\\sim}{t}\\right)\\underset{\\sim}{t}$ is perpendicular to the tangent. Reversing the perpendicular part,"
+          },
+          {
+           "k": "math",
+           "t": "\\underset{\\sim}{r} = \\left(\\underset{\\sim}{d}\\cdot\\underset{\\sim}{t}\\right)\\underset{\\sim}{t} - \\underset{\\sim}{n} = 2\\left(\\underset{\\sim}{d}\\cdot\\underset{\\sim}{t}\\right)\\underset{\\sim}{t} - \\underset{\\sim}{d}."
+          }
+         ],
+         "classification": {
+          "content": "Vectors and projections; double-angle results; gradients",
+          "outcomes": [
+           "ME1-12-02",
+           "11-03",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find $\\underset{\\sim}{r}$ in terms of $\\psi$ when $\\underset{\\sim}{d} = -\\underset{\\sim}{j}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct vector"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\underset{\\sim}{d}\\cdot\\underset{\\sim}{t} = -\\sin\\psi$, so $\\underset{\\sim}{r} = -2\\sin\\psi\\left(\\cos\\psi\\,\\underset{\\sim}{i} + \\sin\\psi\\,\\underset{\\sim}{j}\\right) + \\underset{\\sim}{j} = -\\sin 2\\psi\\,\\underset{\\sim}{i} + \\cos 2\\psi\\,\\underset{\\sim}{j}$."
+          }
+         ],
+         "classification": {
+          "content": "Vectors and projections; double-angle results; gradients",
+          "outcomes": [
+           "ME1-12-02",
+           "11-03",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Let $m = \\dfrac{dy}{dx}$ at $P$. Show that $\\dfrac{y}{x} = \\dfrac{m^2 - 1}{2m}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses the fact that $\\underset{\\sim}{r}$ is parallel to $\\overrightarrow{PO}$, or writes $\\tan 2\\psi$ in terms of $m$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The reflected ray passes through $O$, so $\\underset{\\sim}{r}$ is parallel to $\\overrightarrow{PO} = -x\\,\\underset{\\sim}{i} - y\\,\\underset{\\sim}{j}$. Comparing the ratios of the components,"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{y}{x} = \\frac{\\cos 2\\psi}{-\\sin 2\\psi} = -\\frac{1 - \\tan^2\\psi}{2\\tan\\psi} = \\frac{m^2 - 1}{2m},"
+          },
+          {
+           "k": "p",
+           "t": "since $m = \\tan\\psi$."
+          }
+         ],
+         "classification": {
+          "content": "Vectors and projections; double-angle results; gradients",
+          "outcomes": [
+           "ME1-12-02",
+           "11-03",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "It can be shown that the curves $y = \\dfrac{x^2 - c^2}{2c}$, where $c > 0$, satisfy the equation in part (iii). (Do NOT prove this.)"
+          },
+          {
+           "k": "p",
+           "t": "A dish with a cross-section of this shape is 2.4 m wide at its rim and 0.4 m deep. Find the height of the point $O$ above the lowest point of the dish."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct height"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains an equation for $c$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The lowest point is $\\left(0, -\\dfrac{c}{2}\\right)$. At the rim $x = 1.2$, and the height above the lowest point is $\\dfrac{x^2}{2c} = \\dfrac{1.44}{2c}$. So $\\dfrac{1.44}{2c} = 0.4$, giving $c = 1.8$."
+          },
+          {
+           "k": "p",
+           "t": "The point $O$ is $\\dfrac{c}{2} = 0.9$ m above the lowest point of the dish."
+          }
+         ],
+         "classification": {
+          "content": "Vectors and projections; double-angle results; gradients",
+          "outcomes": [
+           "ME1-12-02",
+           "11-03",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figdish"
+       ]
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "An ant walks along the edges of a triangle $ABC$, starting at $A$. Each second it walks from the vertex it is at to one of the other two vertices, each with probability $\\dfrac12$, independently of its earlier moves. Let $p_n$ be the probability that the ant is at $A$ after $n$ seconds, so that $p_0 = 1$."
+        },
+        {
+         "k": "p",
+         "t": "A wheel is divided into $n$ sectors numbered $1$ to $n$, where $n \\ge 3$. Each sector is to be painted red, green or blue so that sectors with a common edge have different colours."
+        },
+        {
+         "k": "fig",
+         "name": "figant"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Explain why $p_{n+1} = \\dfrac12\\left(1 - p_n\\right)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct explanation"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that the ant must be away from $A$ after $n$ seconds, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The ant is at $A$ after $n + 1$ seconds only if it is at $B$ or $C$ after $n$ seconds, which has probability $1 - p_n$, and then walks to $A$ rather than to the other vertex, which has probability $\\dfrac12$. So $p_{n+1} = \\dfrac12\\left(1 - p_n\\right)$."
+          }
+         ],
+         "classification": {
+          "content": "Probability; proof by mathematical induction; counting",
+          "outcomes": [
+           "ME1-12-06",
+           "12-01",
+           "11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "proof-explain",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Prove by mathematical induction that $p_n = \\dfrac13 + \\dfrac23\\left(-\\dfrac12\\right)^n$ for all integers $n \\ge 0$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Verifies the base case and makes substantial progress with the inductive step"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Verifies the base case, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "When $n = 0$: $\\dfrac13 + \\dfrac23 = 1 = p_0$."
+          },
+          {
+           "k": "p",
+           "t": "Assume that $p_k = \\dfrac13 + \\dfrac23\\left(-\\dfrac12\\right)^k$. Then by part (i)"
+          },
+          {
+           "k": "math",
+           "t": "p_{k+1} = \\frac12\\left(1 - \\frac13 - \\frac23\\left(-\\frac12\\right)^k\\right) = \\frac13 - \\frac13\\left(-\\frac12\\right)^k = \\frac13 + \\frac23\\left(-\\frac12\\right)^{k+1}."
+          },
+          {
+           "k": "p",
+           "t": "So the result holds for $n = k + 1$, and hence for all integers $n \\ge 0$ by mathematical induction."
+          }
+         ],
+         "classification": {
+          "content": "Probability; proof by mathematical induction; counting",
+          "outcomes": [
+           "ME1-12-06",
+           "12-01",
+           "11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "By considering the ant's walk, find the number of ways in which the wheel can be painted."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct number with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Matches paintings with walks that return to their starting vertex and counts the walks of $n$ steps"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Relates the colours of consecutive sectors to the steps of a walk, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Name the vertices of the triangle red, green and blue. Read the colours of sectors $1, 2, \\ldots, n$ in order and then return to sector 1. Since neighbouring sectors have different colours, this is a walk of $n$ steps on the triangle that starts at the colour of sector 1 and returns to it, and every such walk gives a painting."
+          },
+          {
+           "k": "p",
+           "t": "From a given vertex there are $2^n$ walks of $n$ steps, all equally likely for the ant, so $2^np_n$ of them return to the starting vertex. There are 3 choices for the colour of sector 1, so the number of paintings is"
+          },
+          {
+           "k": "math",
+           "t": "3 \\times 2^n\\left(\\frac13 + \\frac23\\left(-\\frac12\\right)^n\\right) = 2^n + 2(-1)^n."
+          },
+          {
+           "k": "p",
+           "t": "(For example, $n = 3$ gives $6$ and $n = 4$ gives $18$.)"
+          }
+         ],
+         "classification": {
+          "content": "Probability; proof by mathematical induction; counting",
+          "outcomes": [
+           "ME1-12-06",
+           "12-01",
+           "11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figant"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figdomino",
+  "figsweep",
+  "figswA",
+  "figswB",
+  "figswC",
+  "figswD",
+  "figmedian",
+  "figortho",
+  "figdose",
+  "figlamp",
+  "figdish",
+  "figant"
+ ]
+}

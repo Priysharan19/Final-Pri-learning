@@ -37,6 +37,8 @@ import { rateLimit, requireRole, requireSession, requireVerifiedEmail } from './
 import { serverEdition } from './edition.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { EDITION_IDS } from '../../client/edition.config.mjs';
+import { mountPaperAttempts } from './paperAttempts.js';
+import { loadApprovals, loadStructuredPapers } from './paperContent.js';
 
 export const PAPERS_CAPABILITY = 'premium-exams';
 export const PAPERS_EDITION = 'prithagoras';
@@ -52,12 +54,15 @@ export function loadManifest(dir = PAPERS_DIR) {
 const notAvailable = res => res.status(404).json({ error: { code: 'PAPERS_NOT_AVAILABLE', message: 'No practice papers are offered here.' } });
 const notFound = res => res.status(404).json({ error: { code: 'PAPER_NOT_FOUND', message: 'No such practice paper.' } });
 
-export function createPapersRouter(rawDb, { edition = serverEdition(process.env), dir = PAPERS_DIR, now: clock = () => Date.now() } = {}) {
+export function createPapersRouter(rawDb, { edition = serverEdition(process.env), dir = PAPERS_DIR, now: clock = () => Date.now(), transcribe, env = process.env, approvals = null } = {}) {
   const db = asStore(rawDb);
   if (!EDITION_IDS.includes(edition)) throw new Error(`practice papers: unknown edition ${JSON.stringify(edition)}`);
   const offered = edition === PAPERS_EDITION;
   const manifest = offered ? loadManifest(dir) : { papers: [] };
   const byId = new Map(manifest.papers.map(p => [p.id, p]));
+  // The structured papers to sit in the app (paperContent.js): loaded now, so one the server cannot read exactly is never offered.
+  const docs = offered ? loadStructuredPapers(dir) : new Map();
+  const approvalList = approvals ?? (offered ? loadApprovals(dir) : []);
   const router = asyncRouter();
   router.use(requireSession(db), requireVerifiedEmail, requireRole('student'));
 
@@ -65,6 +70,9 @@ export function createPapersRouter(rawDb, { edition = serverEdition(process.env)
     const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
     return serverEntitlementCapabilities(snapshot, clock()).includes(PAPERS_CAPABILITY);
   };
+
+  // Sitting a paper in the app (paperAttempts.js). Mounted before /:id/:kind so 'attempts' is never read as a paper id.
+  mountPaperAttempts(router, db, { offered, byId, docs, dir, capability: PAPERS_CAPABILITY, isPremium, now: clock, env, transcribe, approvals: approvalList });
 
   router.get('/', rateLimit(db, 'papers-list', { limit: 600, windowMs: 3600000 }), async (req, res) => {
     res.set('Cache-Control', 'private, no-store');
@@ -77,7 +85,7 @@ export function createPapersRouter(rawDb, { edition = serverEdition(process.env)
       papers: manifest.papers.map(p => ({
         id: p.id, title: p.title, course: p.course, yearLevel: p.yearLevel, marks: p.marks, workingTime: p.workingTime,
         pages: p.paper.pages, hasGuidelines: p.hasGuidelines === true, guidelinesPages: p.guidelines?.pages ?? null,
-        sample: p.sample === true, locked: !(premium || p.sample === true)
+        sample: p.sample === true, locked: !(premium || p.sample === true), inApp: docs.has(p.id)
       }))
     });
   });

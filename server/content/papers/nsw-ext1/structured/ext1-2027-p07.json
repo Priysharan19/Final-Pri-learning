@@ -1,0 +1,2556 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p07",
+ "paperNumber": 7,
+ "title": "Practice Paper 7",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "71e8b5efbd02e6e1e75c343fd9510aed0532d9df53a0e84a7fe4c9edcffcb732"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A committee of 4 people is to be chosen from 5 married couples so that no couple is on the committee together."
+      },
+      {
+       "k": "p",
+       "t": "In how many ways can the committee be chosen?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "210"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "120"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "160"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "80"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Choose which 4 of the 5 couples are represented, in $\\dbinom54 = 5$ ways, and then choose one person from each of those couples, in $2^4 = 16$ ways. So there are $5 \\times 16 = 80$ committees."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques; combinations",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $P(x) = \\left(x^2 - 1\\right)^3$."
+      },
+      {
+       "k": "p",
+       "t": "How many different real zeros does $P'(x)$ have?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "2"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "3"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "5"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "6"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$P(x) = (x - 1)^3(x + 1)^3$ has zeros of multiplicity 3 at $x = \\pm1$, so $P'(x)$ has zeros of multiplicity 2 there. In fact $P'(x) = 6x\\left(x^2 - 1\\right)^2$, with different zeros $-1$, $0$ and $1$."
+        }
+       ],
+       "classification": {
+        "content": "Polynomials; multiple zeros",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The unit vectors $\\underset{\\sim}{a}$ and $\\underset{\\sim}{b}$ satisfy $\\left|\\underset{\\sim}{a} + \\underset{\\sim}{b}\\right| = \\sqrt3\\,\\left|\\underset{\\sim}{a} - \\underset{\\sim}{b}\\right|$."
+      },
+      {
+       "k": "p",
+       "t": "What is the angle between $\\underset{\\sim}{a}$ and $\\underset{\\sim}{b}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$30^\\circ$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$45^\\circ$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$60^\\circ$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$120^\\circ$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $c = \\underset{\\sim}{a}\\cdot\\underset{\\sim}{b}$. Squaring, $2 + 2c = 3(2 - 2c)$, so $c = \\dfrac12$ and the angle is $60^\\circ$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; scalar product",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the domain of the function $f(x) = \\sin^{-1}\\left(x^2 - 3\\right)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-2 \\le x \\le -\\sqrt2\\$ or $\\ \\sqrt2 \\le x \\le 2$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-2 \\le x \\le 2$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\sqrt2 \\le x \\le 2$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\sqrt2 \\le x \\le \\sqrt2$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$-1 \\le x^2 - 3 \\le 1$ gives $2 \\le x^2 \\le 4$, that is, $\\sqrt2 \\le x \\le 2$ or $-2 \\le x \\le -\\sqrt2$."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; domain",
+        "outcomes": [
+         "ME1-12-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Which graph shows $y = \\sin^{-1}\\!\\left(\\dfrac{2x}{1 + x^2}\\right)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figasA"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figasB"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figasC"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figasD"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $x = \\tan\\theta$ with $-\\dfrac{\\pi}{2} < \\theta < \\dfrac{\\pi}{2}$. Then $\\dfrac{2x}{1 + x^2} = \\sin 2\\theta$. For $-1 \\le x \\le 1$, $2\\theta$ lies between $-\\dfrac{\\pi}{2}$ and $\\dfrac{\\pi}{2}$, so $y = 2\\theta = 2\\tan^{-1}x$. For $x > 1$, $2\\theta$ lies between $\\dfrac{\\pi}{2}$ and $\\pi$, so $y = \\pi - 2\\tan^{-1}x$, which decreases from $\\dfrac{\\pi}{2}$ towards 0. The graph therefore has sharp corners at $x = \\pm1$ and approaches the $x$-axis: graph C."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; graphs; double-angle results",
+        "outcomes": [
+         "ME1-12-03",
+         "11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "For $a > 1$, the region bounded by the curve $y = \\dfrac1x$, the $x$-axis and the lines $x = 1$ and $x = a$ is rotated about the $x$-axis to form a solid of volume $V$."
+      },
+      {
+       "k": "p",
+       "t": "What happens to $V$ as $a \\to \\infty$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$V \\to \\pi$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$V \\to \\dfrac{\\pi}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$V \\to 2\\pi$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$V$ increases without bound."
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$V = \\pi\\displaystyle\\int_1^a\\frac{1}{x^2}\\,dx = \\pi\\left(1 - \\frac1a\\right) \\to \\pi$."
+        }
+       ],
+       "classification": {
+        "content": "Volumes of solids of revolution",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Three of the six vertices of a regular hexagon are chosen at random."
+      },
+      {
+       "k": "p",
+       "t": "What is the probability that they are the vertices of a right-angled triangle?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{3}{10}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac25$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac35$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac12$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The vertices lie on a circle, so the triangle is right-angled exactly when one side is a diameter. There are 3 diameters and, for each, 4 choices for the third vertex: 12 triangles out of $\\dbinom63 = 20$. The probability is $\\dfrac35$."
+        }
+       ],
+       "classification": {
+        "content": "Probability; counting",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A function $y(x)$ is continuous and satisfies $\\dfrac{dy}{dx} = 1 + y^2$ at every point of the interval $a < x < b$."
+      },
+      {
+       "k": "p",
+       "t": "Which statement gives the least upper bound for the length $b - a$ of the interval?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It cannot be greater than $\\dfrac{\\pi}{2}$."
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It cannot be greater than $\\pi$."
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It cannot be greater than $2\\pi$."
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It can be as large as we like."
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\displaystyle\\int\\frac{dy}{1 + y^2} = \\int dx$ gives $\\tan^{-1}y = x + C$, so $y = \\tan(x + C)$, and $x + C = \\tan^{-1}y$ must stay strictly between $-\\dfrac{\\pi}{2}$ and $\\dfrac{\\pi}{2}$. So the interval has length at most $\\pi$ (and $y = \\tan x$ on $-\\dfrac{\\pi}{2} < x < \\dfrac{\\pi}{2}$ shows that $\\pi$ is possible). So $\\pi$ is the least upper bound. Option C is also a true bound, but it is not the least."
+        }
+       ],
+       "classification": {
+        "content": "Differential equations; inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A projectile is fired from horizontal ground at an angle $\\theta$ to the horizontal. It reaches a greatest height $H$ and lands at a distance $R$ from its starting point."
+      },
+      {
+       "k": "p",
+       "t": "Which of the following is equal to $\\tan\\theta$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{H}{R}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{2H}{R}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{R}{4H}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{4H}{R}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$H = \\dfrac{V^2\\sin^2\\theta}{2g}$ and $R = \\dfrac{2V^2\\sin\\theta\\cos\\theta}{g}$, so $\\dfrac{H}{R} = \\dfrac{\\tan\\theta}{4}$ and $\\tan\\theta = \\dfrac{4H}{R}$."
+        }
+       ],
+       "classification": {
+        "content": "Projectile motion",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Some of the integers from 1 to 20 are chosen."
+      },
+      {
+       "k": "p",
+       "t": "What is the smallest number of integers that must be chosen to be certain that one of the chosen integers is a multiple of another?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "10"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "11"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "12"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "15"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Write each integer as a power of 2 times an odd number. There are 10 odd numbers from 1 to 19, so among 11 chosen integers two have the same odd part, and then the smaller divides the larger. Ten are not enough: none of $11, 12, \\ldots, 20$ is a multiple of another. So the answer is 11."
+        }
+       ],
+       "classification": {
+        "content": "The pigeonhole principle",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The polynomial $x^4 - 4x^3 + ax^2 + bx + 1$ is the square of a quadratic polynomial."
+        },
+        {
+         "k": "p",
+         "t": "Find the two possible pairs of values of $a$ and $b$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides both pairs of values"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds one correct pair, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the polynomial as the square of a suitable quadratic and compares coefficients"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The quadratic can be taken as $x^2 + px + c$. Then"
+        },
+        {
+         "k": "math",
+         "t": "\\left(x^2 + px + c\\right)^2 = x^4 + 2px^3 + \\left(p^2 + 2c\\right)x^2 + 2pcx + c^2."
+        },
+        {
+         "k": "p",
+         "t": "So $2p = -4$, giving $p = -2$, and $c^2 = 1$, giving $c = \\pm1$. Then $a = 4 + 2c$ and $b = -4c$."
+        },
+        {
+         "k": "p",
+         "t": "If $c = 1$: $a = 6$, $b = -4$. If $c = -1$: $a = 2$, $b = 4$."
+        }
+       ],
+       "classification": {
+        "content": "Polynomials; equating coefficients",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Solve $\\ \\tan x + \\tan 2x = \\tan 3x\\$ for $0 < x < \\pi$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides both solutions and no others"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Reduces the equation to $\\tan x\\tan 2x\\tan 3x = 0$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Uses the expansion of $\\tan(x + 2x)$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Where all three tangents are defined, $\\tan 3x = \\dfrac{\\tan x + \\tan 2x}{1 - \\tan x\\tan 2x}$, so $\\tan x + \\tan 2x = \\tan 3x\\left(1 - \\tan x\\tan 2x\\right)$. The equation becomes"
+        },
+        {
+         "k": "math",
+         "t": "\\tan 3x\\left(1 - \\tan x\\tan 2x\\right) = \\tan 3x, \\qquad\\text{that is,}\\qquad \\tan x\\,\\tan 2x\\,\\tan 3x = 0."
+        },
+        {
+         "k": "p",
+         "t": "For $0 < x < \\pi$: $\\tan x \\ne 0$; $\\ \\tan 2x = 0$ only at $x = \\dfrac{\\pi}{2}$, where $\\tan x$ is not defined; and $\\tan 3x = 0$ at $x = \\dfrac{\\pi}{3}$ and $x = \\dfrac{2\\pi}{3}$, where the other tangents are defined."
+        },
+        {
+         "k": "p",
+         "t": "The solutions are $x = \\dfrac{\\pi}{3}$ and $x = \\dfrac{2\\pi}{3}$."
+        }
+       ],
+       "classification": {
+        "content": "Trigonometric identities and equations",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Prove by mathematical induction that, for all integers $n \\ge 1$,"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{d^n}{dx^n}\\left(x^2e^x\\right) = \\left(x^2 + 2nx + n(n - 1)\\right)e^x."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct proof"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case and makes substantial progress with the inductive step"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "When $n = 1$: $\\dfrac{d}{dx}\\left(x^2e^x\\right) = \\left(x^2 + 2x\\right)e^x$, which agrees with the formula."
+        },
+        {
+         "k": "p",
+         "t": "Assume the result for $n = k$. Differentiating once more,"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{d^{k+1}}{dx^{k+1}}\\left(x^2e^x\\right) = \\left(2x + 2k\\right)e^x + \\left(x^2 + 2kx + k(k - 1)\\right)e^x = \\left(x^2 + 2(k + 1)x + (k + 1)k\\right)e^x,"
+        },
+        {
+         "k": "p",
+         "t": "which is the result for $n = k + 1$. Hence the result holds for all integers $n \\ge 1$ by mathematical induction."
+        }
+       ],
+       "classification": {
+        "content": "Proof by mathematical induction; differentiation",
+        "outcomes": [
+         "ME1-12-01",
+         "12-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Two players, $A$ and $B$, take turns to throw a ball at a target, with $A$ throwing first. The first player to hit the target wins. On each throw $A$ hits the target with probability $p$ and $B$ hits it with probability $\\dfrac12$, independently of all other throws."
+        },
+        {
+         "k": "p",
+         "t": "Find the value of $p$ for which each player has the same probability of winning."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the probability that $A$ wins in terms of $p$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the probability that $A$ wins on the second or a later turn, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$A$ wins on his $k$th throw if the first $k - 1$ throws of each player miss and then $A$ hits. Each such pair of misses has probability $\\dfrac{1 - p}{2}$, so"
+        },
+        {
+         "k": "math",
+         "t": "P(A\\text{ wins}) = p + p\\left(\\frac{1 - p}{2}\\right) + p\\left(\\frac{1 - p}{2}\\right)^2 + \\cdots = \\frac{p}{1 - \\frac{1 - p}{2}} = \\frac{2p}{1 + p}."
+        },
+        {
+         "k": "p",
+         "t": "This is $\\dfrac12$ when $4p = 1 + p$, that is, $p = \\dfrac13$."
+        }
+       ],
+       "classification": {
+        "content": "Probability; geometric series",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Use the substitution $u = \\tan x$ to find the exact value of $\\displaystyle\\int_0^{\\frac{\\pi}{4}}\\frac{dx}{1 + \\sin^2 x}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Transforms the integral correctly, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $dx$ in terms of $du$, or writes $\\sin^2 x$ in terms of $u$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$du = \\sec^2x\\,dx = \\left(1 + u^2\\right)dx$ and $\\sin^2x = \\dfrac{u^2}{1 + u^2}$, so $1 + \\sin^2 x = \\dfrac{1 + 2u^2}{1 + u^2}$. The limits become 0 and 1, and"
+        },
+        {
+         "k": "math",
+         "t": "\\int_0^{\\frac{\\pi}{4}}\\frac{dx}{1 + \\sin^2x} = \\int_0^1\\frac{du}{1 + 2u^2} = \\left[\\frac{1}{\\sqrt2}\\tan^{-1}\\left(\\sqrt2\\,u\\right)\\right]_0^1 = \\frac{1}{\\sqrt2}\\tan^{-1}\\sqrt2."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution; inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-04",
+         "12-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A laser at the point $A(1, 2)$ sends a beam in the direction of the vector $3\\underset{\\sim}{i} + 4\\underset{\\sim}{j}$, as shown."
+        },
+        {
+         "k": "fig",
+         "name": "figlaser"
+        },
+        {
+         "k": "p",
+         "t": "Use a vector projection to find the shortest distance from the point $B(8, 6)$ to the beam."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct distance"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the length of the projection of $\\overrightarrow{AB}$ onto the beam"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $\\overrightarrow{AB}$ and a scalar product with the direction of the beam"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\overrightarrow{AB} = 7\\underset{\\sim}{i} + 4\\underset{\\sim}{j}$, and a unit vector along the beam is $\\underset{\\sim}{u} = \\dfrac15\\left(3\\underset{\\sim}{i} + 4\\underset{\\sim}{j}\\right)$. The length of the projection of $\\overrightarrow{AB}$ onto the beam is"
+        },
+        {
+         "k": "math",
+         "t": "\\overrightarrow{AB}\\cdot\\underset{\\sim}{u} = \\frac{21 + 16}{5} = \\frac{37}{5},"
+        },
+        {
+         "k": "p",
+         "t": "which is positive, so the foot of the perpendicular from $B$ is on the beam. By Pythagoras' theorem the distance is"
+        },
+        {
+         "k": "math",
+         "t": "\\sqrt{65 - \\frac{1369}{25}} = \\sqrt{\\frac{256}{25}} = \\frac{16}{5}."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; projections",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [
+        "figlaser"
+       ],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A cylindrical hole is drilled through the centre of a solid sphere of radius $a$. The solid that remains has height $2h$, and it is formed by rotating the shaded region about the $x$-axis, as shown."
+        },
+        {
+         "k": "fig",
+         "name": "fignapkin"
+        },
+        {
+         "k": "p",
+         "t": "Find the volume of the solid in terms of $h$ only."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct volume in terms of $h$ only"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Evaluates the integral with a minor error"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes a correct integral for the volume"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the radius of the hole in terms of $a$ and $h$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The circle is $x^2 + y^2 = a^2$. At $x = \\pm h$ it meets the hole, so the radius of the hole is $\\sqrt{a^2 - h^2}$. The volume is"
+        },
+        {
+         "k": "math",
+         "t": "\\pi\\int_{-h}^{h}\\left[\\left(a^2 - x^2\\right) - \\left(a^2 - h^2\\right)\\right]dx = \\pi\\int_{-h}^{h}\\left(h^2 - x^2\\right)dx = \\pi\\left[h^2x - \\frac{x^3}{3}\\right]_{-h}^{h} = \\frac{4\\pi h^3}{3}."
+        },
+        {
+         "k": "p",
+         "t": "(The volume does not depend on the radius of the sphere.)"
+        }
+       ],
+       "classification": {
+        "content": "Volumes of solids of revolution",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       },
+       "figures": [
+        "fignapkin"
+       ],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A coin is known to be either fair, or biased so that it shows heads with probability 0.6. To decide which, the coin is tossed $n$ times and the proportion $\\hat{p}$ of heads is recorded. The coin is declared biased if $\\hat{p} > c$ and fair otherwise."
+        },
+        {
+         "k": "p",
+         "t": "Assume that $\\hat{p}$ is approximately normally distributed, so that it is more than 2 standard deviations above its mean with probability about 0.025, and more than 2 standard deviations below its mean with probability about 0.025."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the standard deviation of $\\hat{p}$ in terms of $n$ when the coin is fair."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct standard deviation"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\sqrt{\\dfrac{0.5 \\times 0.5}{n}} = \\dfrac{1}{2\\sqrt{n}}$."
+          }
+         ],
+         "classification": {
+          "content": "Sample proportions; normal approximation",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find $c$ in terms of $n$ so that a fair coin is declared biased with probability about 0.025."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value of $c$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that $c$ is 2 standard deviations above 0.5"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$c$ must be 2 standard deviations above the mean 0.5, so $c = \\dfrac12 + \\dfrac{1}{\\sqrt{n}}$."
+          }
+         ],
+         "classification": {
+          "content": "Sample proportions; normal approximation",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "With this value of $c$, find the value of $n$ for which a biased coin is declared fair with probability about 0.025."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value of $n$"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains a correct equation for $n$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the standard deviation of $\\hat{p}$ for the biased coin"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "For the biased coin $\\hat{p}$ has mean 0.6 and standard deviation $\\sqrt{\\dfrac{0.6 \\times 0.4}{n}}$, so $c$ must be 2 standard deviations below 0.6:"
+          },
+          {
+           "k": "math",
+           "t": "\\frac12 + \\frac{1}{\\sqrt{n}} = \\frac35 - \\frac{2\\sqrt{0.24}}{\\sqrt{n}}, \\qquad\\text{so}\\qquad \\sqrt{n} = 10\\left(1 + 2\\sqrt{0.24}\\right) \\approx 19.80."
+          },
+          {
+           "k": "p",
+           "t": "Hence $n \\approx 392$."
+          }
+         ],
+         "classification": {
+          "content": "Sample proportions; normal approximation",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "For that value of $n$, find the smallest number of heads for which the coin is declared biased."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct number of heads"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $c$, or $cn$, for $n = 392$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$c = \\dfrac12 + \\dfrac{1}{\\sqrt{392}} \\approx 0.5505$, and $0.5505 \\times 392 \\approx 215.8$. The coin is declared biased when the number of heads is more than this, so the smallest number is 216."
+          }
+         ],
+         "classification": {
+          "content": "Sample proportions; normal approximation",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Cars of length $L$ travel along one lane of a road, all at the same constant speed $v$. Each driver leaves a gap in front of the car equal to"
+        },
+        {
+         "k": "math",
+         "t": "Tv + \\frac{v^2}{2a},"
+        },
+        {
+         "k": "p",
+         "t": "where $T$ and $a$ are positive constants. (The first term is the distance travelled during the driver's reaction time and the second is the braking distance.) Let $F$ be the number of cars that pass a fixed point of the road per unit time."
+        },
+        {
+         "k": "fig",
+         "name": "figcars"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $F = \\dfrac{v}{L + Tv + \\dfrac{v^2}{2a}}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the length of road taken up by each car and its gap"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Each car, with the gap in front of it, takes up a length $L + Tv + \\dfrac{v^2}{2a}$ of road. In one unit of time a length $v$ of this line of cars passes the fixed point, so the number of cars that pass is"
+          },
+          {
+           "k": "math",
+           "t": "F = \\frac{v}{L + Tv + \\dfrac{v^2}{2a}}."
+          }
+         ],
+         "classification": {
+          "content": "Modelling; optimisation using calculus",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the speed $v$ for which $F$ is greatest."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct speed with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the stationary point without justifying that it gives the greatest value"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates $F$, or $\\dfrac1F$, with respect to $v$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac1F = \\dfrac{L}{v} + T + \\dfrac{v}{2a}$, and $F$ is greatest when this is least. Now"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{d}{dv}\\left(\\frac{L}{v} + T + \\frac{v}{2a}\\right) = -\\frac{L}{v^2} + \\frac{1}{2a},"
+          },
+          {
+           "k": "p",
+           "t": "which is negative for $v < \\sqrt{2aL}$ and positive for $v > \\sqrt{2aL}$. So $F$ is greatest when $v = \\sqrt{2aL}$. (At this speed the braking distance is equal to the length of a car.)"
+          }
+         ],
+         "classification": {
+          "content": "Modelling; optimisation using calculus",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the greatest value of $F$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct greatest value"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Substitutes the speed from part (ii) into $F$ or $\\dfrac1F$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "When $v = \\sqrt{2aL}$: $\\ \\dfrac{L}{v} = \\dfrac{v}{2a} = \\sqrt{\\dfrac{L}{2a}}$, so $\\dfrac1F = T + 2\\sqrt{\\dfrac{L}{2a}} = T + \\sqrt{\\dfrac{2L}{a}}$. The greatest value is"
+          },
+          {
+           "k": "math",
+           "t": "F = \\frac{1}{T + \\sqrt{\\dfrac{2L}{a}}}."
+          }
+         ],
+         "classification": {
+          "content": "Modelling; optimisation using calculus",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figcars"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The cross-section of a bowl is the parabola $y = x^2$. A ball of radius $r$ rests in the bowl, and its cross-section is a circle with centre $C(0, c)$ that touches the parabola and has no point below it. So $r$ is the least distance from $C$ to the points of the parabola."
+        },
+        {
+         "k": "fig",
+         "name": "figbowl"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Let $u = x^2$. Show that the square of the distance from $C$ to the point $\\left(x, x^2\\right)$ is $u + (u - c)^2$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The square of the distance is $(x - 0)^2 + \\left(x^2 - c\\right)^2 = u + (u - c)^2$."
+          }
+         ],
+         "classification": {
+          "content": "Distance between points; optimisation on a restricted domain",
+          "outcomes": [
+           "ME1-12-05",
+           "11-01"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $r \\le \\dfrac12$. Show that the ball touches the bowl at its lowest point $O$ only."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $r \\le \\dfrac12$ forces $c \\le \\dfrac12$, using the least value $c - \\dfrac14$ when $c > \\dfrac12$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates $D(u) = u + (u - c)^2$ with respect to $u$, or completes the square"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $D(u) = u + (u - c)^2$ for $u \\ge 0$, so that $r^2$ is the least value of $D$. Then $D'(u) = 1 + 2(u - c)$. If $c > \\dfrac12$, the least value of $D$ is $D\\left(c - \\tfrac12\\right) = c - \\dfrac14$, so $r^2 = c - \\dfrac14 > \\dfrac14$, that is $r > \\dfrac12$. Hence if $r \\le \\dfrac12$ then $c \\le \\dfrac12$."
+          },
+          {
+           "k": "p",
+           "t": "Now for $u > 0$ we have $D'(u) = (1 - 2c) + 2u > 0$, so $D$ is strictly increasing for $u \\ge 0$. Its least value $D(0) = c^2$ occurs at $u = 0$ only. So the circle touches the parabola at $O$ only, and $r = c$."
+          }
+         ],
+         "classification": {
+          "content": "Distance between points; optimisation on a restricted domain",
+          "outcomes": [
+           "ME1-12-05",
+           "11-01"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $r > \\dfrac12$. Find $c$ in terms of $r$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct expression for $c$"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the least value of the squared distance in terms of $c$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates the squared distance with respect to $u$, or completes the square"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $D(u) = u + (u - c)^2$ for $u \\ge 0$. Then $D'(u) = 1 + 2(u - c)$, which is negative for $u < c - \\dfrac12$ and positive for $u > c - \\dfrac12$. When $c > \\dfrac12$ the least value is"
+          },
+          {
+           "k": "math",
+           "t": "D\\left(c - \\tfrac12\\right) = c - \\tfrac12 + \\tfrac14 = c - \\tfrac14,"
+          },
+          {
+           "k": "p",
+           "t": "and this must be $r^2$. So $c = r^2 + \\dfrac14$. (This gives $c > \\dfrac12$ exactly when $r > \\dfrac12$, and the ball then touches the bowl where $u = r^2 - \\dfrac14 > 0$, not at $O$.)"
+          }
+         ],
+         "classification": {
+          "content": "Distance between points; optimisation on a restricted domain",
+          "outcomes": [
+           "ME1-12-05",
+           "11-01"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-iv",
+         "label": "(iv)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "For $r > \\dfrac12$, find the height of the lowest point of the ball above $O$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct height"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$c - r = r^2 - r + \\dfrac14 = \\left(r - \\dfrac12\\right)^2$."
+          }
+         ],
+         "classification": {
+          "content": "Distance between points; optimisation on a restricted domain",
+          "outcomes": [
+           "ME1-12-05",
+           "11-01"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figbowl"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A fire hose at a point $O$ on horizontal ground sends out water with speed $V$ at an angle $\\theta$ to the horizontal, towards a vertical wall at a distance $d$ from $O$, where $V^2 > gd$. At time $t$ after leaving the hose, water is at the point with position vector"
+        },
+        {
+         "k": "math",
+         "t": "Vt\\cos\\theta\\;\\underset{\\sim}{i} + \\left(Vt\\sin\\theta - \\tfrac12gt^2\\right)\\underset{\\sim}{j}"
+        },
+        {
+         "k": "p",
+         "t": "relative to $O$. (Do NOT prove this.)"
+        },
+        {
+         "k": "fig",
+         "name": "fighose"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the water strikes the wall at the height $\\ d\\tan\\theta - \\dfrac{gd^2}{2V^2}\\left(1 + \\tan^2\\theta\\right)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the time at which the water reaches the wall"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The water reaches the wall when $Vt\\cos\\theta = d$, that is, $t = \\dfrac{d}{V\\cos\\theta}$. Its height is then"
+          },
+          {
+           "k": "math",
+           "t": "d\\tan\\theta - \\frac{gd^2}{2V^2\\cos^2\\theta} = d\\tan\\theta - \\frac{gd^2}{2V^2}\\left(1 + \\tan^2\\theta\\right)."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; optimisation; scalar product",
+          "outcomes": [
+           "ME1-12-02",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the greatest height on the wall that the water can reach."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct greatest height"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the value of $\\tan\\theta$ that gives the greatest height"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Treats the height as a quadratic in $\\tan\\theta$, or differentiates it"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The height is a quadratic in $T = \\tan\\theta$ with negative leading coefficient:"
+          },
+          {
+           "k": "math",
+           "t": "-\\frac{gd^2}{2V^2}T^2 + dT - \\frac{gd^2}{2V^2}."
+          },
+          {
+           "k": "p",
+           "t": "It is greatest when $T = \\dfrac{V^2}{gd}$, and the greatest height is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{V^2}{g} - \\frac{gd^2}{2V^2} \\times \\frac{V^4}{g^2d^2} - \\frac{gd^2}{2V^2} = \\frac{V^2}{2g} - \\frac{gd^2}{2V^2},"
+          },
+          {
+           "k": "p",
+           "t": "which is positive since $V^2 > gd$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; optimisation; scalar product",
+          "outcomes": [
+           "ME1-12-02",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that water reaching this greatest height strikes the wall while moving at right angles to the direction in which it left the hose."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the scalar product of the two velocities in terms of $\\theta$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the velocity of the water as it strikes the wall"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The velocity at time $t$ is $V\\cos\\theta\\,\\underset{\\sim}{i} + (V\\sin\\theta - gt)\\,\\underset{\\sim}{j}$, and the initial velocity is $V\\cos\\theta\\,\\underset{\\sim}{i} + V\\sin\\theta\\,\\underset{\\sim}{j}$. Their scalar product is"
+          },
+          {
+           "k": "math",
+           "t": "V^2\\cos^2\\theta + V^2\\sin^2\\theta - gtV\\sin\\theta = V^2 - gtV\\sin\\theta."
+          },
+          {
+           "k": "p",
+           "t": "At the wall $t = \\dfrac{d}{V\\cos\\theta}$, so the scalar product is $V^2 - gd\\tan\\theta$. For the greatest height $\\tan\\theta = \\dfrac{V^2}{gd}$, and the scalar product is $V^2 - V^2 = 0$. So the two velocities are perpendicular."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; optimisation; scalar product",
+          "outcomes": [
+           "ME1-12-02",
+           "12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "fighose"
+       ]
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "In an election, candidates $A$ and $B$ each receive $n$ votes. The $2n$ votes are counted one at a time in a random order, with every order of the votes for $A$ and for $B$ equally likely. A count is recorded as a path from $O$ to $(n, n)$: each vote for $A$ is a step of 1 unit to the right and each vote for $B$ is a step of 1 unit up."
+        },
+        {
+         "k": "p",
+         "t": "A path is *bad* if at some stage of the count $B$ is ahead of $A$, that is, if the path has a point on the line $y = x + 1$. The diagram shows a bad path for $n = 5$ that first reaches the line at $T$. The dotted steps are the reflection in the line of the part of the path from $O$ to $T$."
+        },
+        {
+         "k": "fig",
+         "name": "figballot"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Write down the total number of paths from $O$ to $(n, n)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct number"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "A path is a choice of which $n$ of the $2n$ steps are to the right: $\\dbinom{2n}{n}$."
+          }
+         ],
+         "classification": {
+          "content": "Counting techniques; probability",
+          "outcomes": [
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "By reflecting the first part of each bad path as in the diagram, show that the number of bad paths is $\\dbinom{2n}{n + 1}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Counts the paths from $(-1, 1)$ to $(n, n)$, or explains why the reflection matches bad paths with such paths"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that the reflected path starts at $(-1, 1)$ and ends at $(n, n)$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Reflection in the line $y = x + 1$ sends $O$ to $(-1, 1)$, turns steps to the right into steps up and steps up into steps to the right, and leaves $T$ fixed. So each bad path gives a path of unit steps (right or up) from $(-1, 1)$ to $(n, n)$."
+          },
+          {
+           "k": "p",
+           "t": "Conversely, every path from $(-1, 1)$ to $(n, n)$ starts above the line and ends below it, so it meets the line; reflecting the part before its first point on the line gives back a bad path. So the bad paths are matched one to one with the paths from $(-1, 1)$ to $(n, n)$."
+          },
+          {
+           "k": "p",
+           "t": "Such a path has $n + 1$ steps to the right and $n - 1$ steps up, so there are $\\dbinom{2n}{n + 1}$ of them."
+          }
+         ],
+         "classification": {
+          "content": "Counting techniques; probability",
+          "outcomes": [
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the probability that $B$ is never ahead of $A$ at any stage of the count."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct probability in simplest form"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the ratio of the two binomial coefficients, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the probability in terms of the numbers in parts (i) and (ii)"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The probability is $1 - \\dbinom{2n}{n + 1}\\Big/\\dbinom{2n}{n}$. Now"
+          },
+          {
+           "k": "math",
+           "t": "\\binom{2n}{n + 1}\\Big/\\binom{2n}{n} = \\frac{n!\\,n!}{(n + 1)!\\,(n - 1)!} = \\frac{n}{n + 1},"
+          },
+          {
+           "k": "p",
+           "t": "so the probability is $1 - \\dfrac{n}{n + 1} = \\dfrac{1}{n + 1}$."
+          }
+         ],
+         "classification": {
+          "content": "Counting techniques; probability",
+          "outcomes": [
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figballot"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figasA",
+  "figasB",
+  "figasC",
+  "figasD",
+  "figlaser",
+  "fignapkin",
+  "figcars",
+  "figbowl",
+  "fighose",
+  "figballot"
+ ]
+}

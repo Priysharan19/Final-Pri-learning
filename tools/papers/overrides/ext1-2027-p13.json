@@ -1,0 +1,87 @@
+{
+  "keys": {
+    "q11a": {
+      "answerType": "value",
+      "key": { "type": "numeric", "value": 24, "display": "24" },
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q11a: Newton from 400 random starts on the four stated equations finds one positive solution set (0.3225, 1.7458, 4.5366, 9.3951), product 24 (Laguerre L4 roots). Engine: 24, 24.0, 48/2, x=24 accepted; 12, 25, 24.5 rejected."
+    },
+    "q11b": {
+      "answerType": "value",
+      "key": { "type": "numeric", "value": 5.759586531581287, "angle": "rad", "display": "\\dfrac{11\\pi}{6}" },
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q11b: solved (a,b,c) from the three given solutions (a=0.6660, b=0.8124, c=-1/16, the only real triple giving four roots) and located all roots in [0,2pi): pi/12, pi/3, 3pi/4, 11pi/6. Engine (angle rad): 11pi/6, 11π/6, 5.76, 330° accepted; pi/6, 7pi/6, 5pi/3, bare 330 rejected."
+    },
+    "q12b": {
+      "answerType": "expression",
+      "key": { "type": "expression", "expr": "((1-2*p*(1-p))^3+2*(p*(1-p))^3)^2+6*(p*(1-p))^3*(1-p*(1-p))*(1-2*p*(1-p))^2", "display": "\\big((1-2r)^{3}+2r^{3}\\big)^{2}+6r^{3}(1-r)(1-2r)^{2},\\ r=p(1-p)" },
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q12b: all 4096 on/off states enumerated with exact Q(sqrt3) vector sums; 172 balanced states; the probability polynomial equals the key and its expansion exactly (p=1/2 gives 43/1024). Engine: key form, the r-expanded form 1-12r+60r^2-...+12r^6 and the degree-12 polynomial in p accepted; 1-12r+60r^2, ...12r^7 and 43/1024 rejected."
+    },
+    "q12c-i": {
+      "answerType": "expression",
+      "key": { "type": "expression", "expr": "2-1/2^51", "display": "2-\\dfrac{1}{2^{51}}" },
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q12c-i: brute force over all 2^n riffle strings for n<=16 gives E=2-2^(1-n) exactly; position-by-position count validated against it gives E(52)=2-1/2^51. Engine: 2-1/2^51, (2^52-1)/2^51, 2-2^(-51), 2-1/(2^51) accepted; 2, 2-1/2^50, 2-1/2^52 rejected. Decimals within ~1e-14 of 2 are also accepted (engine tolerance). Expression type used because the numeric type would accept a bare 2 (double precision cannot separate 2 and 2-2^-51) and rejects power forms."
+    },
+    "q13a-i": {
+      "answerType": "expression",
+      "key": { "type": "expression", "expr": "pi*sqrt(10-2*sqrt(17))", "anyOf": ["4.16", "4.160", "4.1604", "4.16043", "4.160433"], "display": "\\pi\\sqrt{10-2\\sqrt{17}}" },
+      "answerSuffix": "cm^3/s",
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q13a-i: from the four stated facts, the inflow rate pi*sqrt(E-w) over the whole filling range has minimum 4.160433; ODE with pump 0.98*key sinks, 1.02*key never sinks. Engine: pi*sqrt(10-2*sqrt(17)), π√(10−2√17), sqrt(pi^2*(10-2*sqrt(17))), 4.16, 4.160433 accepted; 4.1, 4.2, pi*sqrt(10+2*sqrt(17)) rejected. A unit typed inside an expression is not stripped, so the unit is shown by answerSuffix only."
+    },
+    "q13a-ii": {
+      "answerType": "expression",
+      "key": { "type": "expression", "expr": "8*(53*sqrt(2)-32)/15", "anyOf": ["(424*sqrt(2)-256)/15"], "display": "\\dfrac{8\\,(53\\sqrt{2}-32)}{15}" },
+      "answerSuffix": "s",
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q13a-ii: quadrature of dt=8(10-w)dw/sqrt(E-w), w from 5 to 6 with E from V(E)=V(w)+V(4), gives 22.908436696412 s = 8(53sqrt2-32)/15 to 15 digits. Engine (exact answer asked, so decimals deliberately rejected): 8(53sqrt2-32)/15, (424sqrt2-256)/15, 424/15*sqrt(2)-256/15 accepted; 8(53sqrt2+32)/15 and decimals rejected."
+    },
+    "q13b-i": {
+      "answerType": "value",
+      "key": { "type": "numeric", "value": 300, "display": "300" },
+      "answerSuffix": "m",
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q13b-i: RK4 simulation of the drone/truck motion (truck 15, drone 25 m/s, 300 s): greatest distance 300.0000 m (least 75.0000 m). Engine: 300, 300 m, 3000/10 accepted; 299, 75, 150, 300 cm rejected."
+    },
+    "q13b-ii": {
+      "answerType": "value",
+      "key": { "type": "numeric", "value": 80, "display": "80" },
+      "answerSuffix": "m",
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q13b-ii: RK4 simulation with both speeds 25 m/s and event detection: the next road crossing is at t=6.4 s, 80.000 m from S (towards the truck's start). Engine: 80, 80 m accepted; 40, 81, 120, 160, 80 s rejected."
+    },
+    "q14a-i": {
+      "answerType": "expression",
+      "key": { "type": "expression", "expr": "R*acos(-(3+8*sqrt(6))/25)", "anyOf": ["R*(pi-acos((3+8*sqrt(6))/25))", "R*(2*pi-acos(-3/5)-acos(1/5))"], "display": "R\\cos^{-1}\\!\\Big(-\\dfrac{3+8\\sqrt{6}}{25}\\Big)" },
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q14a-i: unit vectors from the Gram matrix; the whole constraint curve cos(ADB)=sqrt10/4 sampled on the sphere and c.d minimised: cos(COD)=-0.90383672 = -(3+8sqrt6)/25, distance 2.699449R. Engine: the R-containing expression works; R*acos(..), R*arccos(..), R*(pi-arccos(..)) accepted; wrong cosines and the guideline's own common error R*(pi-acos(3/5)-acos(1/5)) rejected. Not accepted: cos^-1(...) notation and a decimal coefficient such as 2.699R (the engine cannot take them here)."
+    },
+    "q14a-ii": {
+      "answerType": "expression",
+      "key": { "type": "expression", "expr": "R*(sqrt(5/3)-1)", "anyOf": ["(sqrt(15)-3)*R/3"], "display": "R\\Big(\\sqrt{\\dfrac{5}{3}}-1\\Big)=\\dfrac{(\\sqrt{15}-3)R}{3}" },
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q14a-ii: minimised |P| subject to P.X>=R^2 for the three cities over the sphere: |P|/R=1.290994449, h=0.290994449R = R(sqrt(5/3)-1). Engine: R*(sqrt(5/3)-1), (sqrt(15)-3)R/3, R*sqrt(5/3)-R, R/sqrt(3/5)-R accepted; R/4 (the AB-midpoint error), R*(sqrt(3/5)-1), R*(sqrt(5/3)+1) rejected. Decimal 0.291R is not accepted."
+    },
+    "q14b-i": {
+      "answerType": "expression",
+      "key": { "type": "expression", "expr": "3*N/(2*(N-1)*(N-2))*cot(pi/N)", "anyOf": ["3*N*cos(pi/N)/(2*(N-1)*(N-2)*sin(pi/N))", "3*N/(2*(N-1)*(N-2)*tan(pi/N))"], "display": "\\dfrac{3N}{2(N-1)(N-2)}\\cot\\dfrac{\\pi}{N}" },
+      "answerSuffix": "km^2",
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q14b-i: mean triangle area over all C(N,3) triangles of the regular N-gon, N=3..14 at 30 digits, equals the key to 1e-30. Engine: cot, cos/sin and 1/tan forms accepted; tan(pi/N), 3N/((N-1)(N-2)) (factor 2 missing), cot(2pi/N) rejected."
+    },
+    "q14b-ii": {
+      "answerType": "expression",
+      "key": { "type": "expression", "expr": "(5*N+3)/(N+3)", "display": "\\dfrac{5N+3}{N+3}" },
+      "autoMarks": 1,
+      "keyChecks": "p13.py Q14b-ii: exact geometry (centre-in-hull via triangle test) over all k-subsets for N=3,5,...,13 and over all N! orders for N=5,7 gives 3, 7/2, 19/5, 4, 29/7, 17/4 = (5N+3)/(N+3). Engine: (5N+3)/(N+3), 5-12/(N+3) accepted; (5N+3)/(N+2), (5N+4)/(N+3) rejected."
+    }
+  },
+  "_omitted": {
+    "q11c": "A proof by induction (the closed form S_n = 4^n (n!)^2/(2n+1)! is verified for n=1..12 in p13.py but the answer is the proof).",
+    "q11d": "The answer is a pair of open intervals 4/3<|c|<4sqrt(2)/3; verified by exact root counting in p13.py but it is not a single value or expression.",
+    "q12a": "Two values of p in terms of m (m/(2m+1) and (m+1)/(2m+1)) with a justification; a multi-valued set depending on a parameter.",
+    "q12c-ii": "Key 26235/2^104 (about 1.3e-27): the engine cannot separate it from 0 (numeric accepts a bare 0 and rejects every exact power form as an unevaluated operation; expression accepts 0, 26235/2^103 and 26236/2^104 as equal), so a bare answer cannot be auto-marked."
+  }
+}
