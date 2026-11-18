@@ -43,6 +43,10 @@ export const INK_ANSWER_PROPS = Object.freeze([
   // comment (1, 2, 3 …), drawn beside the ink after marking. Only integers
   // derived from the line order of the step report; nothing about the
   // question or its answer, and it never reaches the reader request.
+  // Reviewed 2026-11-19 (one press Mark my working): a presentation boolean. When false the card
+  // shows no reading line, list or chips (the reading is not shown before marking). It is read only
+  // by the render; it carries nothing about the question or its answer and never reaches the reader request.
+  'showReading',
   'lineMarkers',
   // Reviewed 2026-10-10: a boolean, `saveState === 'saved'` on the card (the
   // IndexedDB readback of the student's own strokes). It only chooses whether
