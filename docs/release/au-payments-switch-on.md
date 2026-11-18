@@ -7,11 +7,12 @@ Status, 19 November 2026: DRAFT checklist. Nothing here is switched on. Australi
 Built, with tests, and not connected to checkout:
 
 - The offer arithmetic: `client/src/engine/hscPass.js`, `client/test/hsc-pass-check.mjs`. HSC Pass monthly A$9.99; HSC Pass to the exams A$69, one payment, no renewal, ending the day after the last HSC Mathematics exam of its exam year; the price steps down by whole months below six months to a A$19 floor; the exact price and end date are stated before purchase.
+- The pass in the entitlement lifecycle: `server/platform/hscPassGrant.js` (`grantHscPass`, `revokeHscPass`), tested by `server/test/hsc-pass-grant-check.mjs`. It is a dated grant of Premium on the existing support-grant mechanism (no schema change): idempotent per payment reference, ends at the configured end instant (the last paid millisecond is the end minus one), never renews, never shortens a longer source, and a full refund removes it at once. The purchase day is the Sydney date (`passOfferAt`). Nothing calls it yet.
 - The product rules for the papers: PDFs free for any signed-in account; sitting Paper 01 free; sitting the other twelve, the practice plan and the unseen re-test need `premium-exams`, decided by the server's own entitlement row (`paperAttempts.js`).
 
 NOT built, and needed before the switch (each is a change to a security or commerce surface and needs its own reviewed change):
 
-1. A one-off purchase in the entitlement lifecycle: a dated grant of `premium-exams` and the Premium read allowance until `endsOn`, written only from a verified Stripe event, never from the client; refunds per the refund policy ending the grant; expiry on the date with no renewal.
+1. The Stripe side of the one-off purchase: a payment-mode Checkout session whose price the SERVER chooses (`passOfferAt`), a webhook branch that, on a verified `checkout.session.completed` (mode payment, paid), calls `grantHscPass`, and, on a verified full `charge.refunded` of that payment, calls `revokeHscPass`. The grant and the refund rule are built; the session and the webhook branch are not, and they need a place to record the payment-to-account binding (billing_payments requires a subscription id today, so a payment-only row needs a reviewed schema change).
 2. Paywall copy that names the tier "HSC Pass", lists the two ways to buy, and shows the exact price and end date before purchase (copy in `strings.en.js`; tests in `paywall-honesty-check.mjs` and `value-packaging-check.mjs`).
 3. Terms and refund text for a non-renewing pass in `docs/legal/au/` and its checks (`packaging-check` holds the three prices equal); Priyabhata (India) unchanged.
 4. The Australian terms and refund policy reviewed by counsel (see `docs/legal/au/SUMMARY-FOR-OWNER.md`).
