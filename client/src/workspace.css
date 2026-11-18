@@ -252,3 +252,69 @@
 
 /* The panel is a quiet "needs a look" surface, not a dashed warning box. */
 .ws-confirm.ws-check { border: 1px solid var(--uncertain-line); }
+
+/* ── Photo answer: one calm flow (owner request, 18 Nov 2026) ──────────────
+   Quiet instrument on paper: existing tokens, hairlines, no gradients. */
+.photo-answer { margin-bottom: 14px; }
+.editor-shell.is-dropping { outline: 2px dashed var(--accent); outline-offset: -4px; background: var(--accent-soft); }
+.pf-empty { display: grid; justify-items: center; gap: 12px; text-align: center; padding: 28px 16px; border: 1.5px dashed var(--hairline-strong); border-radius: 6px; background: var(--paper); }
+.pf-empty.is-dragging { border-color: var(--accent); background: var(--accent-soft); }
+.pf-lead { margin: 0; font-size: var(--text-md); color: var(--ink); max-width: 36ch; }
+.pf-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pf-hint { margin: 0; font-size: 13px; }
+.pf-busy { display: flex; align-items: center; gap: 10px; padding: 28px 16px; border: 1px solid var(--hairline); border-radius: 6px; background: var(--paper); color: var(--ink-2); }
+.pf-spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--hairline-strong); border-top-color: var(--accent); animation: pf-turn 0.9s linear infinite; }
+@keyframes pf-turn { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .pf-spin { animation: none; } }
+.pf-failed { display: grid; gap: 12px; padding: 18px 16px; border: 1px solid var(--hairline-strong); border-left: 3px solid var(--uncertain-line, var(--hairline-strong)); border-radius: 6px; background: var(--paper); }
+.pf-reason { margin: 0; color: var(--ink); font-size: var(--text-base); }
+.pf-failed .pf-actions { justify-content: flex-start; }
+.pf-attached { display: grid; gap: 12px; align-items: start; }
+.pf-preview { display: grid; gap: 8px; justify-items: start; }
+.pf-page.photo-thumb { position: relative; display: block; width: min(100%, 420px); height: auto; max-height: 340px; padding: 0; cursor: zoom-in; background: var(--paper); border: 1px solid var(--hairline-strong); border-radius: 4px; overflow: hidden; }
+.pf-page.photo-thumb:disabled { cursor: default; min-height: 120px; }
+.pf-page.photo-thumb img { display: block; width: 100%; height: auto; max-height: 340px; object-fit: contain; }
+.pf-page-pdf { display: grid; place-items: center; min-height: 120px; font: 600 15px var(--font-mono); color: var(--ink-3); }
+.pf-page-zoom { position: absolute; right: 6px; bottom: 6px; padding: 2px 8px; border-radius: 3px; font-size: 12px; background: var(--surface); color: var(--ink-2); border: 1px solid var(--hairline-strong); }
+.pf-tools { display: flex; flex-wrap: wrap; gap: 4px 8px; }
+.pf-status { min-width: 0; }
+.pf-how { margin-top: 6px; font-size: 12.5px; color: var(--ink-3); }
+.pf-how summary { cursor: pointer; width: fit-content; }
+.pf-how p { margin: 6px 0 0; max-width: 60ch; }
+.pf-dropping { margin: 8px 0 0; font-size: 13px; color: var(--accent); }
+.pf-lightbox { position: fixed; inset: 0; z-index: 90; display: grid; place-items: center; padding: 16px; }
+.pf-lightbox-scrim { position: absolute; inset: 0; border: 0; background: color-mix(in srgb, var(--ink) 55%, transparent); cursor: zoom-out; }
+.pf-lightbox-body { position: relative; display: grid; gap: 10px; justify-items: center; max-width: min(96vw, 1100px); max-height: 94vh; padding: 12px; background: var(--surface); border: 1px solid var(--hairline-strong); border-radius: 6px; }
+.pf-lightbox-body img { display: block; max-width: 100%; max-height: calc(94vh - 90px); object-fit: contain; }
+@media (min-width: 900px) { .pf-attached { grid-template-columns: minmax(260px, 420px) minmax(0, 1fr); } }
+
+/* After a read: the page, and what Pri read, once. */
+.reading-review { display: grid; gap: 14px; margin-top: 4px; }
+.rr-page .pf-page.photo-thumb { max-height: 380px; }
+.rr-read { min-width: 0; }
+.rr-count { margin: 4px 0 6px; font-size: 13.5px; color: var(--ink); font-weight: 600; }
+.rr-lines { list-style: none; margin: 6px 0 0; padding: 0; display: grid; }
+.rr-line { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; align-items: baseline; gap: 2px 8px; padding: 2px 0; border-top: 1px solid var(--hairline); }
+.rr-line:first-child { border-top: 0; }
+.rr-n { font: 500 11px var(--font-mono); color: var(--ink-3); text-align: right; font-variant-numeric: tabular-nums; }
+.rr-open { text-align: left; background: none; border: 0; padding: 6px 4px; min-height: 36px; color: var(--ink); font: inherit; cursor: pointer; border-radius: 3px; }
+.rr-open:hover:not(:disabled) { background: var(--surface-2); }
+.rr-words { font-family: var(--font); font-size: var(--text-base); font-style: normal; color: var(--ink-2); }
+.rr-maths { font-size: var(--text-base); }
+.rr-edit { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.rr-input { flex: 1 1 200px; min-width: 0; }
+.rr-note { grid-column: 2 / -1; font-size: 12.5px; color: var(--ink-2); }
+.rr-note.is-doubt { color: var(--ink); font-weight: 600; }
+.rr-line.is-check { border-left: 2px solid var(--uncertain-line, var(--ink-3)); padding-left: 6px; background: var(--surface-2); }
+.rr-line.is-out .rr-text { text-decoration: line-through; color: var(--ink-3); }
+.rr-ask { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 6px; }
+.rr-mark { grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; font-size: 12.5px; color: var(--ink-2); }
+.rr-line.pm-break { box-shadow: inset 2px 0 0 var(--correction); }
+.rr-quiet { margin: 8px 0 0; font-size: 12.5px; color: var(--ink-3); }
+.rr-final { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--hairline); }
+.rr-final-line, .rr-final-why { margin: 0; font-size: var(--text-base); }
+.rr-final-value { font-weight: 600; }
+.rr-from { font-size: 12.5px; }
+@media (min-width: 900px) { .reading-review { grid-template-columns: minmax(240px, 400px) minmax(0, 1fr); align-items: start; } }
+@media (max-width: 520px) { .rr-line { grid-template-columns: 22px minmax(0, 1fr); } .pf-page.photo-thumb { width: 100%; } }
+.tutor-launch-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

@@ -2989,7 +2989,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     {inkProposal.status === 'proposed'
                       ? t('ink.answerProposed', { answer: inkProposal.answer, n: (inkProposal.line ?? inkResult.lines.length - 1) + 1 })
                       : inkProposal.status === 'ambiguous' ? t('ink.answerAmbiguous', { candidates: inkProposal.candidates.join(', ') })
-                        : t('ink.answerNone')}
+                        : inkProposal.missing ? t('photo.answerMissing', { v: inkProposal.missing })
+                          : t('ink.answerNone')}
                   </p>
                 </div>
               )}
@@ -3152,6 +3153,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               onClick={() => setShowTutor(v => !v)}>
               {t('tutor.help')}
             </button>
+            {/* Help and "What went wrong?" are one row of quiet actions. */}
+            {showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry }) && MistakeDiagnosis && (() => {
+              const key = String(attempt?.submissionId || judged?.revision || question.id);
+              return (
+                <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${diagnoseFor === key ? 'on' : ''}`}
+                  aria-expanded={diagnoseFor === key} data-tutor-diagnose
+                  onClick={() => setDiagnoseFor(diagnoseFor === key ? null : key)}>
+                  {t('tutor.diagnose.button')}
+                </button>
+              );
+            })()}
             {tutorUsed > 0 && <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>{t('tutor.helpUsed', { count: tutorUsed, n: tutorUsed })}</span>}
           </div>
         )}
@@ -3191,13 +3203,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           const open = diagnoseFor === attemptKey;
           return (
             <>
-              <div className="tutor-launch-row no-print">
-                <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${open ? 'on' : ''}`}
-                  aria-expanded={open} data-tutor-diagnose
-                  onClick={() => setDiagnoseFor(open ? null : attemptKey)}>
-                  {t('tutor.diagnose.button')}
-                </button>
-              </div>
+              {!(!resolved && tutorEnabled && !diagnostic) && (
+                <div className="tutor-launch-row no-print">
+                  <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${open ? 'on' : ''}`}
+                    aria-expanded={open} data-tutor-diagnose
+                    onClick={() => setDiagnoseFor(open ? null : attemptKey)}>
+                    {t('tutor.diagnose.button')}
+                  </button>
+                </div>
+              )}
               {open && (
                 <TutorBoundary fallback={t('tutor.unavailable')}>
                   <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.diagnose.asking')}</div>}>
@@ -3268,8 +3282,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                    result is kept, said as the earlier attempt's, and nothing
                    on the page now is described as checked. */
                 <>
-                  <div className="verdict-title">{t(state.res?.invalid ? 'verdict.previousAttemptUnread' : 'verdict.previousAttemptWrong')}</div>
-                  <div className="verdict-body" data-new-work-unchecked>{t('verdict.newWorkNotChecked')}</div>
+                  {/* One sentence, placed with the result (owner, 18 Nov 2026). */}
+                  <div className="verdict-body" data-new-work-unchecked>{t(state.res?.invalid ? 'verdict.previousAttemptUnreadOne' : 'verdict.previousAttemptOne')}</div>
                 </>
               ) : (
                 <>
@@ -3286,7 +3300,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   </div>
                 </>
               )}
-              {attemptViaInk && !checkRefused && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
+              {attemptViaInk && !checkRefused && !previousAttempt && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
               {!previousAttempt && state.res?.authoritative !== true && state.res?.partial &&
                 <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
               {!previousAttempt && state.res?.authoritative !== true && state.res?.partial && <LostMarks lost={state.res.partial.lost} t={t} />}
