@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `bc9139453270fc5d708f346cce1a867f269c4efe2298ae3759dc05c10d774216` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `c765504ba5a6b9a7386f84ad8d0b6e6f6e67e548da1ec3ce208f2cbec6bc2399` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -421,7 +421,7 @@ Final answer: 23
 
 ## `nsw-final:y7-data/D1` — seed 1009
 
-> Here are five quiz scores: $13,\\ 14,\\ 17,\\ 13,\\ 14$. Find the **range**.
+> Here are five quiz scores: $15,\\ 14,\\ 17,\\ 13,\\ 14$. Find the **range**.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
