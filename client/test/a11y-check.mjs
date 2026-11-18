@@ -832,9 +832,8 @@ async function run() {
       };
       await draw([[70, 50], [70, 105], [120, 105]]);
       await draw([[150, 50], [150, 105]]);
-      // Read on request (#440): the strokes alone send nothing. The control
-      // that asks for the read must be there, then the student presses it.
-      const readButton = page.locator('[data-ink-read]').first();
+      // Owner decision, 19 Nov 2026: one press of "Mark my working" reads (silently) and marks. The strokes alone send nothing.
+      const readButton = page.getByRole('button', { name: /^Mark my working/ }).first();
       await readButton.waitFor({ state: 'visible', timeout: 20000 });
       await readButton.click();
       // Server-only reading (owner decision): with no reader in this harness
@@ -998,8 +997,8 @@ async function run() {
         let lines = null;
         for (let n = 0; n < 6 && !lines; n++) {
           await page.waitForSelector('.q-prompt', { timeout: 30000 });
-          const id = await page.locator('.qpage[data-question-id]').getAttribute('data-question-id');
-          const row = platform.h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?").get(id);
+          const id = (await online.shownRow())?.serverQuestionId;
+          const row = id ? platform.h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?").get(id) : null;
           const q = row ? JSON.parse(row.response_json) : null;
           if (q?.answerType === 'working' && typeof q.answer?.canonicalWorking === 'string' && q.answer.canonicalWorking.split('\n').filter(Boolean).length >= 4) lines = q.answer.canonicalWorking.split('\n').filter(Boolean);
           else { await page.locator('.ctx-next').first().click(); await wait(page, SETTLE); }
