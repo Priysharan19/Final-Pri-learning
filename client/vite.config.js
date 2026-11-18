@@ -764,6 +764,9 @@ export function featureDefines(command, env = process.env) {
     // Which notes page this build carries: a literal, so the other edition's page and its whole notes data are
     // dead code and are not emitted (App.jsx; client/test/nsw-notes-no-india-check.mjs).
     __PRI_NOTES_PAGE__: JSON.stringify(states.edition === 'prithagoras' ? 'nsw' : 'india'),
+    // Rapid Fire and Match (owner decision, 19 Nov 2026: hidden in Prithagoras): a literal, so a build without them
+    // holds neither page, nor their chunks, in the install (App.jsx).
+    __PRI_GAMES__: JSON.stringify(editionOf(states.edition).games !== false),
     // Plan E5: false in a build of an edition with no payment provider, so its
     // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).
     __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0),

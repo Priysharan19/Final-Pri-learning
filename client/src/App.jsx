@@ -40,8 +40,12 @@ const ProgressPage = React.lazy(() => import('./pages/Progress.jsx'));
 const Exams = React.lazy(() => import('./pages/Exams.jsx'));
 const PaperGenerator = React.lazy(() => import('./pages/PaperGenerator.jsx'));
 const ExamRoom = React.lazy(() => import('./pages/ExamRoom.jsx'));
-const Rush = React.lazy(() => import('./pages/Rush.jsx'));
-const Match = React.lazy(() => import('./pages/Match.jsx'));
+// Rapid Fire and Match are a literal in a build (vite.config.js __PRI_GAMES__): Prithagoras hides them (owner decision, 19 Nov 2026), and its
+// build then emits neither page. A Node suite or the dev server, with no literal, has them.
+/* global __PRI_GAMES__ */
+const GAMES_BUILD = typeof __PRI_GAMES__ === 'boolean' ? __PRI_GAMES__ : true;
+const Rush = GAMES_BUILD ? React.lazy(() => import('./pages/Rush.jsx')) : null;
+const Match = GAMES_BUILD ? React.lazy(() => import('./pages/Match.jsx')) : null;
 const Tasks = React.lazy(() => import('./pages/Tasks.jsx'));
 const Teach = React.lazy(() => import('./pages/Teach.jsx'));
 const History = React.lazy(() => import('./pages/History.jsx'));
@@ -217,7 +221,7 @@ const STUDENT_NAV = [
     ...(PARENT_REPORT_ON ? [{ to: '/parent-report', key: 'nav.parentReport', ico: I.progress }] : [])
   ] },
   // Rapid Fire and Match: not offered in Prithagoras (owner decision, 19 Nov 2026).
-  ...(gamesOffered() ? [{ label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] }] : []),
+  ...(GAMES_BUILD && gamesOffered() ? [{ label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] }] : []),
   { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
 ];
 
@@ -767,8 +771,8 @@ export default function App() {
                     {DESK_ON && <Route path="/desk/import" element={studentOnly(<DeskImport />)} />}
                     {DESK_ON && <Route path="/desk/:attemptId" element={studentOnly(<DeskPage />)} />}
                     {/* Owner decision, 19 Nov 2026: Rapid Fire and Match are hidden in Prithagoras; their URLs go Home. */}
-                    <Route path="/rush" element={gamesOffered() ? studentOnly(<Rush />) : <Navigate to="/" replace />} />
-                    <Route path="/match" element={gamesOffered() ? studentOnly(<Match />) : <Navigate to="/" replace />} />
+                    <Route path="/rush" element={GAMES_BUILD && gamesOffered() ? studentOnly(<Rush />) : <Navigate to="/" replace />} />
+                    <Route path="/match" element={GAMES_BUILD && gamesOffered() ? studentOnly(<Match />) : <Navigate to="/" replace />} />
                     <Route path="/review" element={studentOnly(<History />)} />
                     <Route path="/history" element={<Navigate to="/review" replace />} />
                     <Route path="/favorites" element={<Navigate to="/review?filter=bookmarked" replace />} />
