@@ -82,15 +82,17 @@ accountable" (APP 8.1 and s 16C) or rely on consent (APP 8.2(b))?
 
 ## 3. Children and students [children]
 
-The app does not ask for an age. A cloud account is a child's unless the person says they are 18 or
-older, and a child's needs a parent or guardian's name and email; the guardian confirms by link or code.
-The confirmation proves control of an inbox, not that the person is an adult or a guardian.
+The app asks an age at sign-up (11 to 17, or 18 or older) and keeps only the decision it makes from it,
+not the age. In Prithagoras a student who is under 15, or who gives no age, is a child's account: it needs
+a parent or guardian's name and email, and the guardian confirms by link or code. A student of 15 or older
+needs no guardian. The confirmation proves control of an inbox, not that the person is an adult or a
+guardian.
 
 **Current text** · `docs/legal/au/privacy.md`
 
-> When you create a cloud account it
-> asks whether you are 18 or older, and unless you say you are, the account is
-> treated as a child's.
+> A student under 15 needs a
+> parent or guardian to confirm the account. A student who is 15 or older does
+> not, and nor does an adult.
 
 **Current text** · `docs/legal/au/privacy.md`
 
@@ -98,13 +100,13 @@ The confirmation proves control of an inbox, not that the person is an adult or 
 > who can read that email inbox followed the link or entered the code. It does not
 > show that they are an adult, or that they are your parent or guardian.
 
-**Lives in** · `client/src/components/CloudAccountPanel.jsx` · `isAdult`
+**Lives in** · `server/platform/guardianConsent.js` · `AU_GUARDIAN_AGE = 15`
 **Lives in** · `server/platform/childErasure.js` · `UNCONSENTED_CHILD_RETENTION_MS`
 **Lives in** · `server/platform/guardianConsent.js` · `consentState`
 
 **For counsel:** the OAIC's guidance on capacity to consent (including a presumption for those aged 15
-and over) against this approach, which treats every account not declared adult as a child's; whether
-that is adequate, or too strict to be practicable, for 15 to 17 year olds; whether an email
+and over) against this approach, which sets the line at 15 on the age a student states and treats a
+missing age as a child; whether 15 is the right line, and whether relying on a stated age is adequate; whether an email
 confirmation is acceptable under the Act for a minor's account; the 30-day closure and 7-day erasure
 rule for an unconfirmed account; the guardian's erasure route.
 

@@ -154,7 +154,7 @@ for (const [label, re] of [
   ['who is responsible, with an address', /Oakville NSW 2765, Australia/], ['what is collected', /What we collect/], ['why', /Why we use it/],
   ['overseas disclosure under APP 8, with the recipients', /Sending information overseas[\s\S]*OpenAI[\s\S]*Resend/], ['APP 12 and 13: access and correction', /APP 12 and APP 13/],
   ['a complaint to us then the OAIC', /write to us first[\s\S]{0,300}Office of the Australian\s+Information Commissioner \(OAIC\)/],
-  ['children: under 18 treated as a child; a parent or guardian confirms', /unless you say you are, the account is\s+treated as a child's/],
+  ['children: under 15 needs a parent or guardian to confirm; 15 and over does not', /A student under 15 needs a\s+parent or guardian to confirm the account\. A student who is 15 or older does\s+not, and nor does an adult/],
   ['the Children\'s Online Privacy Code, pending and not claimed', /Children.s Online Privacy Code[\s\S]{0,500}not treated any such Code as being in force[\s\S]{0,80}do not claim\s+to comply/],
   ['how long it is kept', /How long we keep it/], ['security and the data-breach promise', /data breach[\s\S]{0,120}tell you/], ['a way to delete', /\/account\/delete-request/]
 ]) ok(re.test(privacy), `the privacy notice has ${label}`);
@@ -162,7 +162,7 @@ ok(!/we (?:comply|are compliant) with the (?:Children|Privacy)/i.test(privacy), 
 ok(/aim to handle your information in line with the APPs/.test(privacy), 'it says we AIM to follow the APPs (whether the Act applies to us is open), not that we are bound or compliant');
 for (const [label, re] of [
   ['Australian Consumer Law guarantees that cannot be excluded', /guarantees that cannot be excluded under the Australian\s+Consumer Law/], ['New South Wales law', /governed by the laws of New South Wales/],
-  ['NSW courts', /courts of New South Wales/], ['final answer only', /Marking is of the final answer only/], ['not NESA-approved, not an official HSC resource', /not endorsed by,\s+affiliated with or approved by NESA[\s\S]{0,200}not an official HSC resource/],
+  ['NSW courts', /courts of New South Wales/], ['final answer only', /Marking is of the final answer only/], ['not affiliated with or endorsed by NESA, not an official HSC resource', /Prithagoras is not affiliated with or endorsed by NESA[\s\S]{0,200}not an official HSC resource/],
   ['no prediction of an HSC mark, band or ATAR', /not a prediction of an HSC mark, band or ATAR/], ['the Premium price in AUD', /A\$9\.99 a month or A\$99 a year/], ['Stripe as the processor', /Stripe, our payment processor/], ['cancelling at the end of the paid period', /You can cancel in the app,\s+and Premium then stays on until the end of the period/], ['no whole-syllabus claim', /does not cover the whole of any syllabus/]
 ]) ok(re.test(terms), `the terms have ${label}`);
 ok(!/exclusive jurisdiction/.test(terms.replace(/non-exclusive/g, '')), 'the terms do not impose an exclusive jurisdiction on a consumer');
@@ -186,7 +186,7 @@ ok(/FULL refund of the CURRENT period/.test(stripeCode), 'a full refund of the c
 ok(/^const CHECKOUT_HOST = 'checkout\.stripe\.com';$/m.test(stripeCode) && /customer_email: account\.email/.test(stripeCode), 'payment is taken on Stripe\'s hosted page and the account email is the only identifier sent (stripe.js)');
 ok(!/card_number|cardNumber|pan\b/i.test(stripeCode), 'no card number is handled in the Stripe code');
 ok(/stays on\s+until the end of the period/.test(terms) && /A\$9\.99 a month or A\$99 a year/.test(terms) && /Stripe, our payment processor/.test(terms), 'the terms state the price, the processor and the cancellation rule');
-ok(/never receive or store a card number/.test(privacy) && /\*\*Stripe\*\* is our payment processor/.test(privacy) && /Three things are kept after deletion/.test(privacy), 'the privacy notice names Stripe, says no card number is held, and lists the payment record kept after deletion');
+ok(/never receive or store a card number/.test(privacy) && /\*\*Stripe\*\* is our payment processor/.test(privacy) && /Four things are kept after deletion/.test(privacy), 'the privacy notice names Stripe, says no card number is held, and lists the payment record kept after deletion');
 ok(/ON DELETE SET NULL/.test(read('server/platform/billingSchema.js')), 'a payment record outlives the account without its link (billingSchema.js)');
 ok(!/not on sale/.test(all), 'no notice still says Premium is not on sale');
 const marking = read('server/platform/editionMarking.js');
@@ -204,7 +204,7 @@ ok(/bcrypt/i.test(read('server/platform/security.js') + read('server/platform/ac
 ok(/PRI_AUTH_EMAIL_PROVIDER=resend/.test(read('.env.production.example')) && /Resend/.test(privacy), 'email goes through Resend (.env.production.example)');
 ok(/OpenAI/.test(read('client/src/i18n/strings.en.js').match(/'readerPermission\.leadInk':[^\n]*/)?.[0] || '') && /naming OpenAI/.test(privacy), 'the one-time permission prompt names OpenAI, as the notice says');
 ok(/export const READER_PERMISSION_VERSION\s*=/.test(read('client/src/ink/readerPermission.js')), 'and its versioned record exists (readerPermission.js)');
-ok(/isAdult: false/.test(read('client/src/components/CloudAccountPanel.jsx')) && /!form\.isAdult && \(!form\.guardianName\.trim\(\) \|\| !form\.guardianEmail\.trim\(/.test(read('client/src/components/CloudAccountPanel.jsx')) && /18 or older/.test(privacy), 'an account is a child\'s unless the person says they are 18 or older, and a child\'s needs a guardian\'s name and email (CloudAccountPanel.jsx)');
+ok(/export const AU_GUARDIAN_AGE = 15;/.test(read('server/platform/guardianConsent.js')) && /return !\(Number\.isInteger\(years\) && years >= AU_GUARDIAN_AGE && years <= 120\)/.test(read('server/platform/guardianConsent.js')) && /under 15 needs a\s+parent or guardian/.test(privacy) && !/under 18/.test(privacy), 'in Australia an account is a child\'s (needs a guardian) only when the stated age is under 15 or missing, and the notice says 15, not 18 (guardianConsent.js AU_GUARDIAN_AGE)');
 ok(/'\/account\/delete-request'/.test(read('client/src/main.jsx')) && existsSync(join(ROOT, 'client/src/pages/AccountDeleteRequest.jsx')), 'the delete-request page the notice links to exists (main.jsx, AccountDeleteRequest.jsx)');
 ok(/48 hours/.test(contact) && /48 hours/.test(privacy), 'the 48-hour acknowledgement is stated the same way on both pages');
 
