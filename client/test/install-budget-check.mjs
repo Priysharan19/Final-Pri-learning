@@ -145,9 +145,18 @@ let PYQ_ARCHIVE_MEASURED = null;
 // ceilings leave about 100 kB raw and 80 kB gzipped. The install ceilings, the
 // banned-from-install list, render-from-install and offline coverage are unchanged.
 
+// Raised again 2026-11-19 (NSW content gaps, CTO under the same owner decision, size not a
+// constraint): FIRST_VISIT_RAW 5,000,000 -> 5,200,000 bytes; the gzip ceilings are unchanged. Measured
+// with real builds: origin/main (3d10618c1) is 4,841 kB raw / 1,647 kB gzipped install plus warm
+// (42 kB under the old ceiling); this branch is 4,960 kB raw, 119 kB above main. That is the cost of the
+// new Advanced and Extension 1 question forms (au-forms-gaps-*-nsw.js, about 2,700 lines). They are
+// dynamic imports split by course, so a Year 12 Advanced session loads only the year-12 forms and an
+// Extension 1 session only the stream forms; the warm pass still precaches every chunk, which is what
+// this ceiling counts. The new ceiling leaves about 118 kB.
+
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 5_000_000;
+const FIRST_VISIT_RAW_CEILING = 5_200_000;
 const FIRST_VISIT_GZIP_CEILING = 1_750_000;
 
 // Things that must never be in the install again, and what each one costs.
