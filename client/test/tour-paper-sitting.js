@@ -193,7 +193,7 @@ try {
   await page.locator('[data-paper-submit]').click();
   await page.waitForSelector('[data-paper-confirm-empty]', { timeout: 10000 });
   const emptyText = await page.locator('[data-paper-confirm-empty]').innerText();
-  check('Submit all says how many parts are empty and names them', /You have not answered \d+ parts/.test(emptyText) && emptyText.includes('Q10') && emptyText.includes('Q11a(i)'), emptyText.slice(0, 120));
+  check('Submit all says how many parts are empty and names them', /You have not answered \d+ parts/.test(emptyText) && emptyText.includes('Q10') && emptyText.includes('Q11(a)(i)'), emptyText.slice(0, 120));
   await page.screenshot({ path: join(SHOTS, '05-submit-confirm-390.png') });
   check('the student can keep working instead', await page.getByRole('button', { name: en['paper.confirm.keepWorking'] }).count() === 1);
   await page.locator('[data-paper-confirm-submit]').click();
@@ -221,7 +221,8 @@ try {
 
   // ── Layout and names ────────────────────────────────────────────────────────
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
-  check('at 390 px the page does not scroll sideways', overflow <= 0, `overflow ${overflow}px`);
+  const wide = overflow > 0 ? await page.evaluate(() => [...document.querySelectorAll('.pp-page *')].filter(el => el.getBoundingClientRect().right > window.innerWidth + 1).slice(0, 5).map(el => `${el.tagName.toLowerCase()}.${String(el.className).slice(0, 40)}`)) : [];
+  check('at 390 px the page does not scroll sideways', overflow <= 0, `overflow ${overflow}px ${JSON.stringify(wide)}`);
   check('ACCESSIBILITY: every control has a name', (await unnamedControls(page)).length === 0, JSON.stringify(await unnamedControls(page)));
   await page.setViewportSize({ width: 1180, height: 820 });
   await page.waitForTimeout(300);

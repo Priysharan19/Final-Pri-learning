@@ -39,7 +39,8 @@ export function PaperChoice({ part, attemptId, value, onChange, disabled }) {
       <legend className="sr-only">{t('paper.choose', { n: part.id.replace(/^q/, '') })}</legend>
       {part.options.map(o => (
         <label key={o.label} className={`pp-opt${value?.text === o.label ? ' is-on' : ''}`}>
-          <input type="radio" name={name} value={o.label} checked={value?.text === o.label} onChange={() => onChange({ mode: 'typed', text: o.label })} />
+          <input type="radio" name={name} value={o.label} checked={value?.text === o.label} onChange={() => onChange({ mode: 'typed', text: o.label })}
+            aria-label={o.blocks.some(b => b.k === 'fig') ? t('paper.option', { letter: o.label }) : undefined} />
           <span className="pp-opt-key" aria-hidden="true">{o.label}</span>
           <span className="pp-opt-body">{o.blocks.length ? <Blocks blocks={o.blocks} attemptId={attemptId} inline /> : <span className="sr-only">{t('paper.option', { letter: o.label })}</span>}</span>
         </label>
