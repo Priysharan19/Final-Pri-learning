@@ -37,7 +37,7 @@ const MARGIN = 4;         // clearance kept between a link and any box
 const CORNER = 6;         // radius of a link's corners
 const HEAD_BOX = { w: 210, h: 34 };   // a strand's heading, top left of its lane
 
-export const radiusFor = mastery => 9 + (Math.max(0, Math.min(100, mastery)) / 100) * 15;
+export const radiusFor = mastery => 13 + (Math.max(0, Math.min(100, mastery)) / 100) * 13;   // room for the chapter's glyph at every level
 
 /** A chapter name in at most two lines of LABEL_MAX characters. */
 export function wrapLabel(name, max = LABEL_MAX) {

@@ -12,6 +12,8 @@ import { chapterEvidence, colourFor, practiceTrack, scopeFor } from './chapters.
 import { layered, layersOf, MAP_W } from './mapLayout.js';
 import TermGloss from '../components/TermGloss.jsx';
 import Working from './Working.jsx';
+import { iconFor } from './chapterIcons.js';
+import { Glyph, GlyphPaths } from './chapterGlyph.jsx';
 // map.css is part of the boot stylesheet (main.jsx), so a first visit offline
 // needs no stylesheet fetched for this tab (#658).
 
@@ -239,6 +241,11 @@ export default function MapPage() {
               <g key={node.row.id} className={`in-map-node${nodeState(node)}${current?.row.id === node.row.id ? ' is-current' : ''}${isRecommended(node) ? ' is-next' : ''}`} style={{ '--cc': `var(${node.colour})` }} data-map-node={node.row.id}>
                 <circle className="in-map-dot" cx={node.x} cy={node.y} r={node.r} style={{ fillOpacity: fillOf(node) }} />
                 <circle className="in-map-ring" cx={node.x} cy={node.y} r={node.r + 6} />
+                {/* The chapter's figure sits on the dot; the name below stays the accessible name. */}
+                <g className={`in-map-glyph${fillOf(node) > 0.6 ? ' is-solid' : ''}`} aria-hidden="true" data-glyph={iconFor(node.row.id, node.strand).key}
+                  transform={`translate(${node.x - node.r * 0.62} ${node.y - node.r * 0.62}) scale(${(node.r * 1.24) / 24})`}>
+                  <GlyphPaths glyph={iconFor(node.row.id, node.strand).key} />
+                </g>
                 <text x={node.x} y={node.y + node.r + 22} className="in-map-name" textAnchor="middle" lang="en">
                   {node.lines.map((ln, k) => <tspan key={k} x={node.x} dy={k ? 16 : 0}>{ln}</tspan>)}
                 </text>
@@ -261,7 +268,7 @@ export default function MapPage() {
                         onMouseEnter={() => setHover(node.row.id)}>
                         {/* On a phone this is the map: the name, how far along it is, and what it builds on. */}
                         <span className="in-map-hit-name" aria-hidden="true">
-                          <i className="in-map-hit-dot" style={{ '--cc': `var(${node.colour})`, '--f': fillOf(node) }} />
+                          <span className="in-map-hit-dot" style={{ '--cc': `var(${node.colour})`, '--f': fillOf(node) }}><Glyph id={node.row.id} strand={node.strand} /></span>
                           <span lang="en">{node.row.name}</span>
                           <em>{metaOf(node)}</em>
                           {preNames(node).length > 0 && <small lang="en">{t('inst.mapBuildsOn', { names: preNames(node).join(', ') })}</small>}

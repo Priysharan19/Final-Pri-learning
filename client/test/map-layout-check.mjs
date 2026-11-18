@@ -6,6 +6,8 @@ import { NSW_PREREQ_EDGES, nswPrerequisitesOf } from '../src/engine/prerequisite
 import { layered, layersOf, linkFaults, overlaps } from '../src/instrument/mapLayout.js';
 import { scopeForYear, PATHWAYS } from '../src/engine/curriculum.js';
 import { IN_CHAPTERS, IN_TRACKS } from '../src/engine/curriculum-in-base.js';
+import { GLYPHS, iconFor } from '../src/instrument/chapterIcons.js';
+import { readFileSync } from 'node:fs';
 import { prerequisitesOf, mapStrandOf } from '../src/engine/prerequisites.js';
 
 let pass = 0;
@@ -68,7 +70,7 @@ for (const grade of [7, 8, 9, 10, 11, 12]) {
   if (own.length) courses.push([`India class ${grade}`, own.map((c, i) => ({ id: c.id, name: c.name, mastery: (i * 13) % 100, strand: mapStrandOf(c.id) || 'algebra' })), id => prerequisitesOf(id).map(p => p.id)]);
 }
 for (const [id, track] of Object.entries(IN_TRACKS)) {
-  const own = track.scopeFor(12);
+  const own = track.scopeFor(12).map(cid => IN_CHAPTERS.find(c => c.id === cid)).filter(Boolean);
   if (own.length) courses.push([`India ${id}`, own.map((c, i) => ({ id: c.id, name: c.name, mastery: (i * 13) % 100, strand: mapStrandOf(c.id) || 'algebra' })), id2 => prerequisitesOf(id2).map(p => p.id)]);
 }
 check('the course list covers both editions', () => {
@@ -92,6 +94,29 @@ check('the link checker can fail: a link drawn through a label is caught', () =>
   assert.ok(linkFaults(bad).length > 0);
 });
 
+// Glyphs: every chapter of every course resolves to a drawn glyph, by its id.
+const seen = new Map();
+for (const [, chapters] of courses) for (const c of chapters) seen.set(c.id, c.strand);
+check('every chapter of every course of both editions has a glyph named by its id', () => {
+  assert.ok(seen.size > 200, `${seen.size} chapters`);
+  const bad = [];
+  for (const [id, strand] of seen) { const g = iconFor(id, strand); if (g.via !== 'id' || !GLYPHS[g.key]?.length) bad.push(`${id} → ${g.key} (${g.via})`); }
+  assert.deepEqual(bad, []);
+});
+check('a chapter no rule names still gets its strand glyph, never none', () => {
+  assert.equal(iconFor('zz-new-chapter', 'Calculus').via, 'strand');
+  assert.ok(GLYPHS[iconFor('zz-new-chapter', '').key]);
+});
+check('every glyph is one line family: plain path data, decorative, no colour of its own', () => {
+  for (const [key, paths] of Object.entries(GLYPHS)) assert.ok(paths.length >= 1 && paths.every(d => /^[MmLlHhVvCcSsQqTtAaZz0-9 .,\-]+$/.test(d)), key);
+  // The two places a glyph is drawn: both aria-hidden, neither carries a name, colour or text of its own.
+  const glyph = readFileSync(new URL('../src/instrument/chapterGlyph.jsx', import.meta.url), 'utf8');
+  const page = readFileSync(new URL('../src/instrument/MapPage.jsx', import.meta.url), 'utf8');
+  assert.match(glyph, /<svg[^>]*aria-hidden="true"[^>]*focusable="false"/);
+  assert.match(page, /<g className=\{`in-map-glyph[\s\S]{0,120}aria-hidden="true"/);
+  assert.doesNotMatch(glyph, /aria-label|role=|<title|<text|fill="#|stroke="#/);
+  assert.match(page, /aria-label=\{`\$\{node\.row\.name\} ·/);   // the node button is still named by the chapter
+});
 check('the three answer-checked sets are named for what they are, and not "Exact Results"', () => {
   const names = new Map(rows.map(r => [r.id, r.name]));
   for (const id of ['y12-integral-calc', 'y12-random-var', 'y12-fin-exact']) assert.match(names.get(id), / · Answer-Checked Practice$/);

@@ -30,6 +30,9 @@
 .in-map-foundation circle { fill: var(--in-l4); stroke: var(--in-edge-3); stroke-width: 1; }
 .in-map-pulse { fill: var(--cc); filter: drop-shadow(0 0 4px var(--cc)); }
 .in-map-dot { fill: var(--cc); }
+.in-map-glyph { color: var(--in-tx); pointer-events: none; }
+.in-map-glyph path { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+html[data-theme="dark"] .in-map-glyph.is-solid { color: var(--in-base); }
 .in-map-ring { fill: none; stroke: var(--cc); stroke-opacity: 0.55; stroke-width: 1; transform-box: fill-box; transform-origin: center; }
 .in-map-node.is-on .in-map-ring { stroke-opacity: 1; stroke-width: 2; animation: in-map-breathe 2.1s ease-in-out infinite alternate; }
 @keyframes in-map-breathe { from { transform: scale(0.95); } to { transform: scale(1.05); } }
@@ -49,11 +52,12 @@
 .in-map-hit:focus-visible { outline: 2px solid var(--in-tx); outline-offset: 0; }
 .in-map-hit-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .in-map-hit-dot { display: none; }
+.in-map-hit-dot svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 /* Narrow screens: the drawing would crowd the 44px targets, so the map becomes
    a list of the same buttons, each with its colour, fill and how secure it is. */
 @media (max-width: 640px) {
   .in-map-graph { padding: 0; }
-  .in-map-graph svg, .in-map-legend { display: none; }
+  .in-map-graph > svg, .in-map-legend { display: none; }
   .in-map-layers { position: static; display: grid; gap: 18px; pointer-events: auto; }
   .in-map-layer { display: block; }
   .in-map-layer-h { position: static; width: auto; height: auto; clip: auto; white-space: normal; margin: 0 0 4px; padding: 0 10px; font: 500 11px var(--in-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--in-tx-3); }
@@ -62,8 +66,8 @@
   .in-map-hit { width: 100%; height: auto; min-height: 44px; border-radius: 4px; text-align: left; padding: 8px 10px; color: var(--in-tx); }
   .in-map-hit[aria-current="true"] { background: var(--in-l3); box-shadow: inset 0 1px 0 var(--in-hi); }
   .in-map-hit-name { position: static; width: auto; height: auto; clip: auto; display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 2px 10px; font: 500 14px var(--in-ui); white-space: normal; }
-  .in-map-hit-dot { display: inline-block; flex: none; align-self: center; width: 10px; height: 10px; border-radius: 50%; box-shadow: 0 0 0 1px var(--cc);
-    background: color-mix(in srgb, var(--cc) calc(var(--f) * 100%), transparent); }
+  .in-map-hit-dot { display: inline-flex; flex: none; align-self: center; grid-row: 1 / span 3; width: 28px; height: 28px; padding: 5px; border-radius: 50%; color: var(--in-tx); box-shadow: 0 0 0 1px var(--cc);
+    background: color-mix(in srgb, var(--cc) calc(var(--f) * 60%), transparent); }
   .in-map-hit-name em { grid-column: 2; font: 400 12px var(--in-ui); font-style: normal; color: var(--in-tx-2); }
   .in-map-hit-name small { grid-column: 2; font: 400 12px var(--in-ui); color: var(--in-tx-3); }
 }
