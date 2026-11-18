@@ -507,7 +507,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
    * from there; nothing of the shell is reached with an unlinked, stale or
    * unconfirmed profile.
    */
-  const finishAccount = async ({ account, name, year, track, pathway }) => {
+  const finishAccount = async ({ account, name, year, track, pathway, restoredProfile = null }) => {
     if (!account?.id) throw new Error(t('signup.genericError'));
 
     // Creating the local profile and linking the cloud account are two requests.
@@ -524,6 +524,13 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
         ...(SIGNUP_COURSE === 'in' ? { indiaTrack: track || 'cbse' } : { pathway: pathway || 'advanced' })
       });
       pid = r.user.id;
+      if (restoredProfile) {
+        // The account already holds this student's profile. The row made here
+        // is only a vessel for it: the stored settings go in, and the marker
+        // tells the first sync that the stored profile outranks this row.
+        const { applyStoredProfile } = await import('../platform/accountProfileRestore.js');
+        await applyStoredProfile(pid, restoredProfile);
+      }
       accountProfileRef.current = { accountId: account.id, pid };
     }
 

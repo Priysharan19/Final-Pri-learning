@@ -141,6 +141,7 @@ jobs:
           # Cloud sync end to end: restore on a fresh device, automatic
           # triggers, and 409 entity-conflict recovery.
           node client/test/cloud-restore-fidelity-check.mjs
+          node client/test/returning-signin-restore-check.mjs
           node client/test/auto-sync-scheduler-check.mjs
           node client/test/sync-conflict-recovery-check.mjs
           node client/test/cloud-session-refresh-check.mjs
