@@ -65,7 +65,10 @@ const overflowDetail = page => page.evaluate(() => {
 
 /** Step through questions until `want(page)` holds (the draw is random). */
 async function questionWhere(page, settle, want) {
-  X    if (await page.evaluate(want)) return true;
+  // The draw is random and a multiple-choice question is roughly one in ten here; 30 draws missed one often enough to
+  // fail CI on unrelated changes (three runs of PR 1064), so the search is wider. What is asserted afterwards is unchanged.
+  for (let i = 0; i < 90; i++) {
+    if (await page.evaluate(want)) return true;
     const next = page.locator('.ctx-next');
     if (!(await next.count())) return false;
     await next.click({ timeout: 5000 }).catch(() => {});
