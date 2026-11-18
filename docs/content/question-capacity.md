@@ -6,7 +6,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 
 ## Prithagoras
 
-131 skills measured; **111** meet both targets; **20** are below at least one.
+133 skills measured; **111** meet both targets; **22** are below at least one.
 
 | Skill (generator) | Cells | Distinct instances | Structural forms (proxy) | Tagged forms | Below target |
 | --- | --- | --- | --- | --- | --- |
@@ -16,10 +16,12 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `me11-binomial` | 4 | 127 | 2 | — | instances + forms |
 | `me12-trigeq` | 4 | 408 | 34 | — | instances |
 | `ms11-time-location` | 4 | 511 | 3 | — | instances + forms |
-| `y12-financial` | 3 | 638 | 2 | — | instances + forms |
+| `me12-calc` | 4 | 1.5k | 22 | — | instances |
 | `y11-functions-more` | 4 | 1.7k | 8 | — | instances |
 | `ms12-annuity` | 4 | 1.8k | 2 | — | instances + forms |
 | `ms11-managing-exact` | 4 | 1.8k | 1 | — | instances + forms |
+| `y12-financial` | 4 | 2.0k | 15 | — | instances |
+| `me11-comb` | 4 | 2.3k | 82 | — | instances |
 | `y10-compound` | 4 | 2.8k | 1 | — | instances + forms |
 | `ms11-earning-exact` | 4 | 3.0k | 1 | — | instances + forms |
 | `ms11-energy` | 4 | 5.1k | 1 | — | instances + forms |
@@ -28,17 +30,16 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms11-measure-more` | 4 | 8.5k | 1 | — | instances + forms |
 | `ms11-earning` | 4 | 9.4k | 26 | — | instances |
 | `y9-algebra` | 4 | 10.4k | 54 | — | — |
-| `me12-induction` | 3 | 10.6k | 34 | — | — |
 | `y9-nonlinear-a` | 4 | 10.6k | 26 | — | — |
+| `me12-induction` | 4 | 10.7k | 34 | — | — |
 | `me12-projectile-forms` | 4 | 10.9k | 48 | 5: context, direct, multi-step, representation, reverse | — |
 | `y10-indices-neg` | 4 | 11.1k | 15 | — | — |
 | `mex-proof` | 4 | 11.2k | 30 | — | — |
 | `y11-probability` | 4 | 11.3k | 84 | — | — |
 | `y9-probability` | 4 | 11.5k | 99 | — | — |
-| `y11-trigfunc` | 3 | 11.6k | 210 | — | — |
-| `y12-appdiff` | 3 | 11.8k | 150 | — | — |
 | `mex-mechanics` | 4 | 12.1k | 30 | — | — |
 | `y8-circles` | 4 | 12.3k | 16 | — | — |
+| `y11-trigfunc` | 4 | 12.3k | 210 | — | — |
 | `me11-trigid` | 4 | 12.5k | 84 | — | — |
 | `y12-integration` | 4 | 12.7k | 65 | — | — |
 | `y11-functions` | 4 | 12.8k | 51 | — | — |
@@ -46,19 +47,19 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms12-rates` | 4 | 12.9k | 34 | — | — |
 | `y10-quadratics` | 4 | 14.5k | 52 | — | — |
 | `y9-surface-solids` | 4 | 15.1k | 12 | — | — |
-| `y8-equations` | 3 | 15.4k | 26 | — | — |
+| `y8-equations` | 3 | 15.5k | 26 | — | — |
 | `y10-simeq` | 4 | 15.8k | 6 | — | — |
 | `y8-indices` | 4 | 16.7k | 40 | — | — |
+| `y12-appdiff` | 4 | 16.8k | 150 | — | — |
 | `y10-surds` | 4 | 16.9k | 12 | — | — |
-| `y11-quadfunc` | 3 | 17.2k | 78 | — | — |
 | `y10-logarithms` | 4 | 17.4k | 34 | — | — |
 | `y9-indices-sci` | 4 | 17.5k | 16 | — | — |
 | `mex-integration` | 4 | 17.6k | 141 | — | — |
 | `y11-transform` | 4 | 19.9k | 4 | — | forms |
 | `y7-fractions` | 4 | 20.0k | 265 | — | — |
+| `y11-quadfunc` | 4 | 20.4k | 86 | — | — |
 | `ms12-right-triangle` | 4 | 20.9k | 32 | — | — |
 | `me11-inversetrig` | 4 | 22.7k | 495 | — | — |
-| `y7-algebra` | 3 | 22.8k | 92 | — | — |
 | `mex-complex` | 4 | 23.0k | 28 | — | — |
 | `y9-volume-solids` | 4 | 23.6k | 15 | — | — |
 | `ms12-invest-loans` | 4 | 24.3k | 16 | — | — |
@@ -67,7 +68,6 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `mex-demoivre` | 4 | 24.9k | 72 | — | — |
 | `y9-trig` | 4 | 25.4k | 27 | — | — |
 | `y12-stats` | 4 | 25.8k | 18 | — | — |
-| `y9-simint` | 2 | 25.9k | 149 | — | — |
 | `y11-polynomials` | 4 | 25.9k | 96 | — | — |
 | `y7-decimals-perc` | 4 | 26.9k | 260 | — | — |
 | `y12-integral-calc` | 4 | 27.4k | 50 | 6: context, direct, mcq, missing-parameter, multi-step, reverse | — |
@@ -77,6 +77,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y12-motion` | 4 | 29.9k | 138 | — | — |
 | `y7-integers` | 4 | 30.2k | 10 | — | — |
 | `y10-probability` | 4 | 30.5k | 28 | — | — |
+| `y7-algebra` | 4 | 31.6k | 92 | — | — |
 | `y12-diff` | 4 | 31.7k | 72 | — | — |
 | `y8-geo-figures` | 4 | 31.8k | 27 | — | — |
 | `me12-projectile` | 4 | 32.0k | 11 | — | — |
@@ -101,11 +102,12 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `ms11-measure` | 4 | 43.2k | 32 | — | — |
 | `y12-fin-exact` | 4 | 43.6k | 8 | 5: context, direct, missing-parameter, multi-step, reverse | — |
 | `y12-random-var` | 4 | 44.1k | 9 | 5: context, direct, missing-parameter, multi-step, reverse | — |
-| `me11-functions` | 3 | 44.2k | 95 | — | — |
 | `ms12-algebraic` | 4 | 44.4k | 17 | — | — |
 | `y9-surface-area` | 4 | 45.0k | 11 | — | — |
+| `me11-functions` | 4 | 45.1k | 94 | — | — |
 | `y12-trigcalc` | 4 | 45.3k | 200 | — | — |
 | `y10-stats` | 4 | 53.9k | 15 | — | — |
+| `y9-simint` | 4 | 54.0k | 149 | — | — |
 | `ms12-networks` | 4 | 54.3k | 1318 | — | — |
 | `ms12-simple-interest` | 4 | 54.8k | 16 | — | — |
 | `y10-polynomials` | 4 | 57.1k | 290 | — | — |
@@ -127,8 +129,8 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y10-trig-nonright` | 4 | 123.9k | 13 | — | — |
 | `y11-lines` | 4 | 141.0k | 225 | — | — |
 | `y7-ratio` | 4 | 142.1k | 1009 | — | — |
-| `me11-poly` | 3 | 153.3k | 558 | — | — |
 | `ms11-formulas` | 4 | 155.3k | 18 | — | — |
+| `me11-poly` | 4 | 161.1k | 558 | — | — |
 | `mex-vectors` | 4 | 227.2k | 50 | — | — |
 | `me12-vectors-forms` | 4 | 250.8k | 6 | 5: context, direct, missing-parameter, multi-step, representation | — |
 | `y9-data-inquiry` | 4 | 256.8k | 273 | — | — |
@@ -430,5 +432,5 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 
 ## Not measured
 
-2 generators are in the registry but neither issued by the Prithagoras ledger nor part of the India curriculum, so they are not served to a student and are left out: `me11-comb`, `me12-calc`.
+0 generators are in the registry but neither issued by the Prithagoras ledger nor part of the India curriculum, so they are not served to a student and are left out: .
 

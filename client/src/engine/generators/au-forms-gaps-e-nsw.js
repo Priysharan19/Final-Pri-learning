@@ -171,7 +171,7 @@ const appdiff = [
     return {
       dotpoint: 1,
       prompt: `The tangent to $y = ${poly(f)}$ at the point where $x = ${x0}$ crosses the $x$-axis at $A$. Find the $x$-coordinate of $A$.`,
-      answerType: 'numeric', answer: { value: val }, answerPrefix: 'x =',
+      answerType: 'numeric', answer: { value: val },
       traps: [
         { value: cInt, why: 'That is where the tangent meets the $y$-axis. For the $x$-axis, put $y = 0$ in the tangent equation.' },
         { value: -y0 / m, why: `Solving $0 - ${y0} = ${m}(x - ${x0})$ gives $x - ${x0} = ${-y0 / m}$; add back $${x0}$.` }

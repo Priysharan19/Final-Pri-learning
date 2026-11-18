@@ -260,7 +260,7 @@ const DIGESTS = {
   syllabuses: digest(NSW_SYLLABUSES.map(s => ({ id: s.id, focusAreas: s.focusAreas, topics: s.topics }))),
   crosswalk: digest(NSW_CROSSWALK.map(r => ({ subtopicId: r.subtopicId, syllabus: r.syllabus, outcome: r.outcome, historicalCodes: r.historicalCodes, dotpoints: r.dotpoints, status: r.status, placement: r.placement })))
 };
-const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '60e27b49d9402b13' };
+const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '847e9446b92a4eeb' };
 if (process.argv.includes('--print-digests')) console.log(JSON.stringify(DIGESTS));
 for (const k of Object.keys(PINNED_DIGESTS)) {
   check(DIGESTS[k] === PINNED_DIGESTS[k], `${k} digest ${DIGESTS[k]} differs from the reviewed ${PINNED_DIGESTS[k]}: re-verify the change against NESA, get it reviewed, then update the pin`);

@@ -90,15 +90,15 @@ try {
   // 69 chapter cells were held back when this was written (> 30); fixing the tolerance and wording defects behind
   // the quality-gate exclusions issued most of them, so the bar is the count that remains plus a margin, not a
   // lower aim: the suite still asks for every one of them and needs real ones to ask for.
-  ok(`there are unissued cells to keep out (${unissued.length})`, unissued.length >= 15);
-  for (const [id, d] of [['y9-simint', 3], ['y9-simint', 4], ['y11-trigfunc', 4], ['me11-poly', 4], ['me11-comb', 1]]) ok(`${id} D${d} is not issued`, !nswCell(id, d) && !nswCellIssued(id, d));
+  ok(`there are unissued cells to keep out (${unissued.length})`, unissued.length >= 2);
+  for (const [id, d] of [['y8-equations', 1], ['y8-linear', 4]]) ok(`${id} D${d} is not issued`, !nswCell(id, d) && !nswCellIssued(id, d));
 
   // ── The cell a request may name (pure) ─────────────────────────────────────
   ok('a request never names an unissued cell', allNsw.every(id => LEVELS.every(d => { const c = nswOfferedCell({ generator: id, difficulty: d }); return c === null ? nswIssuedLevels(id).length === 0 : nswCell(id, c.difficulty); })));
   ok('with a dot point either', allNsw.every(id => dotpointsFor(id).every(dp => LEVELS.every(d => { const c = nswOfferedCell({ generator: id, difficulty: d, dotpoint: dp.id, dotpointForms: dp.forms }); return c === null || (nswCell(id, c.difficulty) && (c.dotpoint === null || dp.forms.includes(c.difficulty))); }))));
-  same('an issued cell is left as asked', nswOfferedCell({ generator: 'y11-trigfunc', difficulty: 2 }), { difficulty: 2, dotpoint: null, moved: false });
-  same('an unissued level moves to the nearest issued one', nswOfferedCell({ generator: 'y11-trigfunc', difficulty: 4 }), { difficulty: 3, dotpoint: null, moved: true });
-  same('a generator the server issues nothing from has no cell', nswOfferedCell({ generator: 'me11-comb', difficulty: 2 }), null);
+  same('an issued cell is left as asked', nswOfferedCell({ generator: 'y8-linear', difficulty: 2 }), { difficulty: 2, dotpoint: null, moved: false });
+  same('an unissued level moves to the nearest issued one', nswOfferedCell({ generator: 'y8-linear', difficulty: 4 }), { difficulty: 3, dotpoint: null, moved: true });
+  same('a generator the server issues nothing from has no cell', nswOfferedCell({ generator: 'y8-not-a-chapter', difficulty: 2 }), null);
   for (const [year, pathway] of [[7], [8], [9], [10], [11, 'standard'], [11, 'advanced'], [11, 'ext1'], [12, 'standard'], [12, 'advanced'], [12, 'ext1'], [12, 'ext2']]) {
     for (let i = 0; i < 60; i++) {
       const pick = pickNext({ ratings: {}, reviewsDue: [], year, pathway, rand: (i + 0.5) / 60, recent: [], offered: id => nswIssuedLevels(id).length > 0 });
@@ -181,14 +181,20 @@ try {
   }
   ok(`every offered cell was asked for (${offeredCells}) and they are all the server's cells`, offeredCells === Object.values(ledger).reduce((n, l) => n + l.length, 0), `${offeredCells}`);
   ok(`every one was issued and marked correct on its stored answer (${marked})`, marked === offeredCells);
-  ok(`every unissued cell in scope was asked for and refused (${unissuedAsked})`, unissuedAsked >= 15);
+  ok(`every unissued cell in scope was asked for and refused (${unissuedAsked})`, unissuedAsked >= 2);
 
   // An unlevelled request on a topic whose aimed level is not issued is moved, not drafted.
   const y11 = (await POST('/profiles', { name: 'Moved', year: 11, course: 'nsw', pathway: 'ext1' })).user;
   await POST('/profiles/select', { id: y11.id });
   await authority.link(y11.id);
-  const noTopic = await refusal(() => POST('/practice/next', { mode: 'topic', subtopic: 'me11-comb' }));
-  same('a topic the server issues nothing from is refused even with no level named', noTopic?.code, 'PRACTICE_NOT_OFFERED');
+  // Every NSW chapter now serves a question at some level, so there may be no chapter the server
+  // issues nothing from; when one exists again (a chapter whose cells are all held back) it must be
+  // refused even with no level named. Until then the rule has nothing to refuse and says so.
+  const emptyTopic = allNsw.find(id => nswIssuedLevels(id).length === 0);
+  if (emptyTopic) {
+    const noTopic = await refusal(() => POST('/practice/next', { mode: 'topic', subtopic: emptyTopic }));
+    same('a topic the server issues nothing from is refused even with no level named', noTopic?.code, 'PRACTICE_NOT_OFFERED');
+  } else ok('no NSW chapter is without an issued level, so there is none to refuse', true);
 } catch (err) {
   failures.push(`the suite stopped: ${err.stack || err.message}`);
 } finally {

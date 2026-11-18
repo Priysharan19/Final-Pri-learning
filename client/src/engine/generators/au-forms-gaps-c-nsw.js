@@ -65,7 +65,7 @@ const forms = {
     }),
     // (3) exponential of a quadratic
     V([1], rng => {
-      const k = rc(rng, [-3, -2, -1, 1, 2, 3, 4]), m = ri(rng, 1, 9);
+      const k = rc(rng, [1, 2, 3, 4]), m = ri(rng, 1, 9);
       const e = `${k === 1 ? '' : k === -1 ? '-' : k}x^2`;
       const eIn = `${k === 1 ? '' : k === -1 ? '-' : `${k}*`}x^2`;
       const f = new Frac(m, 2 * k);
@@ -88,13 +88,13 @@ const forms = {
       const key = `${f.str()}*${A}(x)^${n + 1}`;
       const wrongSign = `${new Frac(useSin ? -m : m, n + 1).str()}*${A}(x)^${n + 1}`;
       return expr(
-        `Find $\\displaystyle\\int ${co(m)}\\${A}^{${n}}x\\,\\${B}x\\,dx$. (You may omit +C.)`, key, `e.g. 2*${A}(x)^${n + 1}/${n + 1}`,
-        [{ expr: `${m}*${A}(x)^${n + 1}`, why: `After substituting $u = \\${A}x$ the integral is $\\int u^{${n}}\\,du = \\dfrac{u^{${n + 1}}}{${n + 1}}$. The division by the new power is missing.` },
+        `Find $\\displaystyle\\int ${co(m)}\\${A}^{${n}}x\\,\\${B} x\\,dx$. (You may omit +C.)`, key, `e.g. 2*${A}(x)^${n + 1}/${n + 1}`,
+        [{ expr: `${m}*${A}(x)^${n + 1}`, why: `After substituting $u = \\${A} x$ the integral is $\\int u^{${n}}\\,du = \\dfrac{u^{${n + 1}}}{${n + 1}}$. The division by the new power is missing.` },
          useSin ? { expr: `${new Frac(m, n).str()}*sin(x)^${n}`, why: 'Integrating raises the power by 1 and divides by the new power; do not lower it.' }
                 : { expr: wrongSign, why: `With $u = \\cos x$, $du = -\\sin x\\,dx$, so the sign is negative. $\\dfrac{d}{dx}\\cos x = -\\sin x$.` }],
-        [`Choose $u = \\${A}x$ so that the other factor is its derivative${useSin ? '' : ', apart from a sign'}.`, `$du = ${useSin ? '' : '-'}\\${B}x\\,dx$, so the integral becomes $${useSin ? '' : '-'}${co(m)}\\int u^{${n}}\\,du$.`, `Integrate in $u$ and replace $u$ with $\\${A}x$.`],
-        [{ h: 'Substitute', d: `$u = \\${A}x$, $du = ${useSin ? '' : '-'}\\${B}x\\,dx$` },
-         { h: 'Rewrite', d: `$\\int ${co(m)}\\${A}^{${n}}x\\,\\${B}x\\,dx = ${useSin ? '' : '-'}${co(m)}\\int u^{${n}}du$` },
+        [`Choose $u = \\${A} x$ so that the other factor is its derivative${useSin ? '' : ', apart from a sign'}.`, `$du = ${useSin ? '' : '-'}\\${B} x\\,dx$, so the integral becomes $${useSin ? '' : '-'}${co(m)}\\int u^{${n}}\\,du$.`, `Integrate in $u$ and replace $u$ with $\\${A} x$.`],
+        [{ h: 'Substitute', d: `$u = \\${A} x$, $du = ${useSin ? '' : '-'}\\${B} x\\,dx$` },
+         { h: 'Rewrite', d: `$\\int ${co(m)}\\${A}^{${n}}x\\,\\${B} x\\,dx = ${useSin ? '' : '-'}${co(m)}\\int u^{${n}}du$` },
          { h: 'Integrate and substitute back', d: `$${f.latex()}\\,\\${A}^{${n + 1}}x + C$` }]
       );
     }),
@@ -145,10 +145,10 @@ const forms = {
       const val = (sinType ? pw(o.u) : new Frac(1).sub(pw(o.u))).mul(new Frac(m, n + 1));
       const uLo = sinType ? '0' : '1', uHi = o.u.str();
       return exact(
-        `Evaluate $\\displaystyle\\int_0^{${o.t}} ${co(m)}\\${A}^{${n}}x\\,\\${B}x\\,dx$ using $u = \\${A}x$. Give the exact value.`, val,
+        `Evaluate $\\displaystyle\\int_0^{${o.t}} ${co(m)}\\${A}^{${n}}x\\,\\${B} x\\,dx$ using $u = \\${A} x$. Give the exact value.`, val,
         [{ value: m * (sinType ? pw(o.u).value : 1 - pw(o.u).value), why: 'Dividing by the new power, $n + 1$, is part of integrating $u^n$.' },
          { value: sinType ? (m * (Math.PI / (o.t.includes('6') ? 6 : 2)) ** (n + 1)) / (n + 1) : -val.value, why: sinType ? 'Substitute the new limits in $u$, not the old limits in $x$.' : 'With $u = \\cos x$, $du = -\\sin x\\,dx$. Keep track of the sign and swap the limits, which run from 1 down to the new value.' }],
-        [`When $x = 0$, $u = ${uLo}$; at the upper limit $u = ${uHi}$.`, `$du = ${sinType ? '' : '-'}\\${B}x\\,dx$, so the integral is $${co(m)}\\int u^{${n}}\\,du$ over the new limits${sinType ? '' : ' (the sign is absorbed by swapping the limits)'}.`, `Integrate $u^{${n}}$ to $\\dfrac{u^{${n + 1}}}{${n + 1}}$ and substitute the limits.`],
+        [`When $x = 0$, $u = ${uLo}$; at the upper limit $u = ${uHi}$.`, `$du = ${sinType ? '' : '-'}\\${B} x\\,dx$, so the integral is $${co(m)}\\int u^{${n}}\\,du$ over the new limits${sinType ? '' : ' (the sign is absorbed by swapping the limits)'}.`, `Integrate $u^{${n}}$ to $\\dfrac{u^{${n + 1}}}{${n + 1}}$ and substitute the limits.`],
         [{ h: 'New limits', d: `$x = 0 \\to u = ${uLo}$; upper limit gives $u = ${uHi}$` },
          { h: 'Rewrite', d: sinType ? `$${co(m)}\\int_{0}^{${uHi}} u^{${n}}du$` : `$${co(m)}\\int_{${uHi}}^{1} u^{${n}}du$` },
          { h: 'Integrate and evaluate', d: sinType ? `$${co(m)}\\left[\\dfrac{u^{${n + 1}}}{${n + 1}}\\right]_0^{${uHi}} = ${val.latex()}$` : `$${co(m)}\\left[\\dfrac{u^{${n + 1}}}{${n + 1}}\\right]_{${uHi}}^{1} = ${val.latex()}$` }],
