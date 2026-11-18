@@ -203,7 +203,10 @@ kept **on the device only**, per local profile and per wording version (`pri-rea
 in local storage); there is no server record of it. A change to what the student agrees to must
 bump `READER_PERMISSION_VERSION`, which asks every student again. The setting itself is still on by
 default for a signed-in account, and stays off for a child until a guardian confirms. The wording is
-a draft pending your answer; the Hindi is a draft pending a native-speaker review (D11).
+a draft pending your answer; the Hindi is a draft pending a native-speaker review (D11). On 18 November
+2026 the prompt's "keep" sentence changed, because Pri now keeps the original handwriting or photo of a
+marked practice answer for 2 years (`attempt_originals`); the version went from 1 to 2, so every student
+is asked again.
 
 **Not covered by the prompt:** the optional "check my working" feature (its own setting, which
 sends the working lines and the question text and calls the provider "an outside AI service"), and
@@ -233,7 +236,7 @@ OpenAI.
 
 **Current text** · `client/src/i18n/strings.en.js` · `readerPermission.keep`
 
-> Pri does not keep the picture. OpenAI is asked not to store it, but says it may keep it for up to 30 days to check for misuse, and does not use it to train its models by default.
+> Pri does not keep the picture it sends for reading. When you then submit the answer to be marked, Pri keeps your original handwriting or photo with the mark for 2 years, so you can look back at it. OpenAI is asked not to store it, but says it may keep it for up to 30 days to check for misuse, and does not use it to train its models by default.
 
 **Current text** · `client/src/i18n/strings.en.js` · `readerPermission.marks`
 
@@ -262,7 +265,7 @@ OpenAI.
 
 **Current text** · `client/src/i18n/strings.en.js` · `settings.cloudHandwritingCopy`
 
-> Handwriting and photos are read only by this server reader; the on-device reader is not accurate enough to mark from. It is on by default for a signed-in account, and you can turn it off here — but then handwriting and photos are not read at all, and you type your answers instead. While it is on, a picture drawn from your strokes or your photo is sent through Pri’s server to an outside AI reading service to be read. It is a picture of your writing only — never the question, never the answer, never your name. Pri keeps no copy; the reading service is asked not to store it, but may hold it for a limited time under its own safety-monitoring rules. The reading only proposes what you wrote: Pri’s own marker decides the mark.
+> Handwriting and photos are read only by this server reader; the on-device reader is not accurate enough to mark from. It is on by default for a signed-in account, and you can turn it off here — but then handwriting and photos are not read at all, and you type your answers instead. While it is on, a picture drawn from your strokes or your photo is sent through Pri’s server to an outside AI reading service to be read. It is a picture of your writing only — never the question, never the answer, never your name. Pri does not keep that picture just for reading; when you then submit the answer to be marked, Pri keeps your original handwriting or photo with the mark for 2 years, as the privacy notice describes. The reading service is asked not to store it, but may hold it for a limited time under its own safety-monitoring rules. The reading only proposes what you wrote: Pri’s own marker decides the mark.
 
 **Current text** · `docs/legal/privacy.md`
 
@@ -270,7 +273,7 @@ OpenAI.
 > otherwise altered — so whatever is in the frame is sent, which can include the
 > printed question, a name written on the page, or anything else on the paper.
 
-**Lives in** · `client/src/ink/readerPermission.js` · `export const READER_PERMISSION_VERSION = 1;`
+**Lives in** · `client/src/ink/readerPermission.js` · `export const READER_PERMISSION_VERSION = 2;`
 **Lives in** · `client/src/ink/readerPermission.js` · `pri-reader-permission-v1`
 **Lives in** · `client/src/ink/ReaderPermission.jsx` · `role="dialog" aria-modal="true"`
 **Lives in** · `client/src/i18n/strings.hi.js` · `'readerPermission.leadInk'`

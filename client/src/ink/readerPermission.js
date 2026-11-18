@@ -23,7 +23,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Bump when the prompt's wording changes what the student is agreeing to. */
-export const READER_PERMISSION_VERSION = 1;
+export const READER_PERMISSION_VERSION = 2;
 
 export const READER_PERMISSION_STORAGE_KEY = 'pri-reader-permission-v1';
 
