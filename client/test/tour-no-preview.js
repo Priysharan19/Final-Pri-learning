@@ -215,14 +215,11 @@ export const flow = {
     await writePage(box, picked2);
     await page.waitForTimeout(3200);
     await markWorking(page);
-    // A wrong first try says only that it was not right (the working is checked once the question is finished): the student marks again.
-    await page.waitForSelector('.verdict-bad, [data-marked-page]', { timeout: 30000 });
-    if (!await page.locator('[data-marked-page]').count()) {
-      await check('a wrong first try is "Not quite" and shows no per-line verdict and no reading (the question is still open)',
-        await page.locator('.verdict-bad').count() === 1 && await page.locator('[data-mp-reading], [data-mp-card]').count() === 0);
-      await markWorking(page);
-      await page.waitForSelector('[data-marked-page]', { timeout: 30000 });
-    }
+    // CTO ruling 19 Nov 2026: written working is ONE authoritative attempt. A wrong first Mark my working still resolves the
+    // question and shows the full marked page at once; there is no open "Not quite, try again" for a written page.
+    await page.waitForSelector('[data-marked-page]', { timeout: 30000 });
+    await check('a wrong written page resolves on the first press: the full marked page is shown, with no "one more go"',
+      (await gradeCalls()).at(-1)?.json?.resolved === true && await page.locator('.verdict-bad').count() === 0 && !/one more go/i.test(await page.locator('body').innerText()));
     const g4 = (await gradeCalls()).at(-1);
     await check('the confident misread was judged as read: line 2 is the first error on the page',
       await page.locator('[data-mp-card="2"][data-mp-status="first-error"]').count() === 1, JSON.stringify((g4?.json?.stepReport?.lines || []).map(l => [l.text, l.status])));
