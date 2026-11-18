@@ -82,7 +82,9 @@ export const flow = {
         await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 30000 }).catch(() => {});
         await page.waitForTimeout(600);
       };
-      const gradesOf = id => online.practiceCalls(new RegExp(`^/v1/practice/${id}/submit$`));
+      // Submit is ONE request (#506): the reading travels with it. A Submit the server refuses (read again) is a request, not an attempt, so
+      // only a 200 is counted as marked.
+      const gradesOf = async id => (await online.practiceCalls(new RegExp(`^/v1/practice/${id}/submit$`))).filter(c => c.status === 200);
       const receiptsOf = id => online.practiceCalls(new RegExp(`^/v1/practice/${id}/recognize$`));
 
       // ── 1 · one line, right first time ─────────────────────────────────────
@@ -100,9 +102,9 @@ export const flow = {
         const receipt = (await receiptsOf(right.serverQuestionId)).at(-1);
         costs.oneLine = reader.requests.length - start;
         await check(`1 · one-line answer, right first time: 1 provider call from first stroke to verdict (0 while writing and pausing; the Submit receipt is reused) [${EVIDENCE}]`,
-          afterPause === 0 && costs.oneLine === 1 && (await readCalls()).length === pageStart + 2 && receipt?.json?.reused === true &&
+          afterPause === 0 && costs.oneLine === 1 && (await readCalls()).length === pageStart + 1 && grade?.json?.reading?.reused === true &&
             grade?.json?.correct === true && grade.json.resolved === true,
-          `provider calls ${costs.oneLine} (after the pause ${afterPause}); page read requests ${(await readCalls()).length - pageStart}; receipt reused ${receipt?.json?.reused}; correct ${grade?.json?.correct}`);
+          `provider calls ${costs.oneLine} (after the pause ${afterPause}); page read requests ${(await readCalls()).length - pageStart}; receipt reused ${grade?.json?.reading?.reused}; correct ${grade?.json?.correct}`);
       }
 
       // ── 2 · four lines of working, written with pauses, read once ──────────
