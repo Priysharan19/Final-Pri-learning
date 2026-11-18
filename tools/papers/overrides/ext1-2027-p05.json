@@ -1,0 +1,176 @@
+{
+  "keys": {
+    "q11a": {
+      "answerType": "value",
+      "key": {
+        "type": "set",
+        "values": [
+          -1.2765694770084508,
+          1.2765694770084508
+        ],
+        "display": "k=\\pm\\dfrac{2\\sqrt{33}}{9}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: resultant of P(x) and P(x+1) in x gives the real k values; each k checked to have two zeros differing by 1"
+    },
+    "q11b": {
+      "answerType": "value",
+      "key": {
+        "type": "set",
+        "values": [
+          0.17453292519943295,
+          0.8726646259971648,
+          2.2689280275926285,
+          2.96705972839036
+        ],
+        "display": "\\dfrac{\\pi}{18},\\ \\dfrac{5\\pi}{18},\\ \\dfrac{13\\pi}{18},\\ \\dfrac{17\\pi}{18}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: sign-change scan of sin x sin(pi/3-x) sin(pi/3+x) - 1/8 on (0,pi), four roots refined to 1e-12"
+    },
+    "q11d": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 6713280,
+        "display": "6\\,713\\,280"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: brute force over all 9,979,200 distinct arrangements of PRITHAGORAS, inclusion-exclusion and a placement count agree on 6,713,280"
+    },
+    "q11e": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 0.7853981633974483,
+        "display": "\\dfrac{\\pi}{4}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: mpmath quadrature of the stated integral agrees with pi/4 to 1e-20"
+    },
+    "q12b": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "3*pi/8",
+        "display": "\\dfrac{3\\pi}{8}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: Green's theorem area of x=cos^3 t, y=sin^3 t by quadrature agrees with 3pi/8 to 1e-20"
+    },
+    "q12c-i": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "(1-p)^n+n*p*(1-p)^(n-1)",
+        "display": "(1-p)^{n}+np(1-p)^{n-1}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: exact binomial P(at most one defective), n=3..8, two values of p"
+    },
+    "q12c-iii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "1/(n-1)",
+        "display": "p=\\dfrac{1}{n-1}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: golden-section search of -A'(p) with A from the binomial sum, n=3..10"
+    },
+    "q13a-i": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "sqrt(a^2+b^2-2*a*b*cos(theta))",
+        "display": "d=\\sqrt{a^{2}+b^{2}-2ab\\cos\\theta}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: distance between M=(a,0) and H=(b cos t, b sin t) at four (a,b,theta)"
+    },
+    "q13a-iii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "b/a",
+        "display": "\\cos\\theta=\\dfrac{b}{a}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: golden-section maximisation of d'(theta) from coordinates, five (a>b)"
+    },
+    "q13a-iv": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "b*omega",
+        "display": "b\\omega"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: maximum of d'(theta) (omega=1) over a fine grid equals b for five (a>b)"
+    },
+    "q13b-ii": {
+      "answerType": "expression",
+      "key": {
+        "type": "equation",
+        "lhs": "U*sin(alpha)",
+        "rhs": "W*sin(beta)",
+        "display": "U\\sin\\alpha=W\\sin\\beta"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: 30 random parameter sets; imposing the condition gives PQ=0 at a positive time, violating it leaves the minimum separation positive"
+    },
+    "q13b-iii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "d*abs(W*sin(beta)-U*sin(alpha))/sqrt((U*cos(alpha)+W*cos(beta))^2+(W*sin(beta)-U*sin(alpha))^2)",
+        "display": "\\dfrac{d\\,|W\\sin\\beta-U\\sin\\alpha|}{\\sqrt{(U\\cos\\alpha+W\\cos\\beta)^{2}+(W\\sin\\beta-U\\sin\\alpha)^{2}}}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: golden-section minimisation of |PQ(t)| from the position vectors, 12 random parameter sets"
+    },
+    "q14a-i": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "Q^2/k^2",
+        "display": "H=\\dfrac{Q^{2}}{k^{2}}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: root of Q-k sqrt(h)=0 and long RK4 integration of the tank equation settle at Q^2/k^2, three parameter sets"
+    },
+    "q14a-iii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "A*Q*(2*ln(2)-1)/k^2",
+        "display": "\\dfrac{AQ}{k^{2}}\\,(2\\ln 2-1)"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: time to reach H/4 by quadrature of A dh/(Q-k sqrt h) and by RK4 simulation, three parameter sets"
+    },
+    "q14b-i": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "n*(1-p)^n",
+        "display": "n(1-p)^{n}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: exact enumeration of all 2^n bust patterns, n=1..7, two values of p"
+    },
+    "q14b-ii": {
+      "answerType": "value",
+      "key": {
+        "type": "set",
+        "values": [
+          5,
+          6
+        ],
+        "display": "n=5\\ \\text{and}\\ n=6"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p05.py: exact fractions n(5/6)^n for n=1..399 peak at n=5 and n=6"
+    }
+  }
+}

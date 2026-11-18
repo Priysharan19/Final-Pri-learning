@@ -36,6 +36,7 @@ import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 const ProgressPage = React.lazy(() => import('./pages/Progress.jsx'));
 const Exams = React.lazy(() => import('./pages/Exams.jsx'));
 const PaperGenerator = React.lazy(() => import('./pages/PaperGenerator.jsx'));
+const PaperSitting = React.lazy(() => import('./paper/PaperSitting.jsx'));
 const ExamRoom = React.lazy(() => import('./pages/ExamRoom.jsx'));
 const Rush = React.lazy(() => import('./pages/Rush.jsx'));
 const Match = React.lazy(() => import('./pages/Match.jsx'));
@@ -756,6 +757,7 @@ export default function App() {
                     <Route path="/exams" element={studentOnly(<Exams />)} />
                     <Route path="/paper-generator" element={studentOnly(<PaperGenerator />)} />
                     <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
+                    <Route path="/papers/sit/:attemptId" element={studentOnly(<PaperSitting />)} />
                     <Route path="/notes" element={studentOnly(<Notes />)} />
                     <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
                     {LIBRARY_ON && <Route path="/library" element={studentOnly(<Library />)} />}

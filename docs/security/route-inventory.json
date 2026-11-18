@@ -2856,6 +2856,282 @@
       "bodyLimit": "no-body"
     },
     {
+      "method": "POST",
+      "path": "/v1/papers/:id/attempts",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "issues (or resumes) a sitting of one structured paper or one question of it; the paper must be in the manifest, and a manifest entry flagged sample (Paper 1) is free while every other paper needs premium-exams from the server's own entitlement_snapshots row, else 402 PREMIUM_REQUIRED; the body names only timer, fresh and question, never a plan; the paper is returned as issued (stems, parts, options, figure names): no key, marking criterion or sample answer; at most 24 open sittings; written in the account's transaction under its lock. Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE",
+      "rateLimits": [
+        {
+          "key": "paper-attempt-issue",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/papers/attempts",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; this account's own sittings (id, paper, state, totals), never another account's and never any paper content; Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store",
+      "rateLimits": [
+        {
+          "key": "paper-attempt-list",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/papers/attempts/:attemptId",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; the paper as issued plus the account's saved answers (and its result once submitted): never a key, criterion or sample answer",
+      "rateLimits": [
+        {
+          "key": "paper-attempt-read",
+          "limit": 1200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/papers/attempts/:attemptId/answers",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "autosave of typed answers and the timer choice; the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; part ids must be parts of this sitting, text at most 12000 characters, unknown fields refused; a submitted sitting is 409 PAPER_ATTEMPT_SUBMITTED; the snapshot is replaced inside the account's transaction under its lock and never written after the result",
+      "rateLimits": [
+        {
+          "key": "paper-autosave",
+          "limit": 3000,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/papers/attempts/:attemptId/parts/:partId/original",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "keeps one handwritten or photographed part: the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; the picture must be one the account already had read (a kept read is bound, never bought: RECOGNITION_READ_EXPIRED otherwise) and the original is checked against its SHA-256 and stored in attempt_originals in the same transaction as the saved answer, after a live-session and locked guardian-consent recheck; insert-once, quota-bounded; the reader never receives the strokes",
+      "rateLimits": [
+        {
+          "key": "paper-original",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/papers/attempts/:attemptId/submit",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Submit all: the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; the deterministic engine marks every part that has a key from the answers the sitting itself holds (a model never sets a mark); parts with no key are self-check and earn nothing; criterion marks are not awarded; the result is written once under the account's lock after a live-session and locked guardian-consent recheck and a re-read of the answers that were marked; a repeat is given the stored result",
+      "rateLimits": [
+        {
+          "key": "paper-submit",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/papers/attempts/:attemptId/parts/:partId/solution",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; refused before the sitting is submitted (409 PAPER_NOT_SUBMITTED); a sample paper is free and every other paper's guideline needs premium-exams from the server's own entitlement row, else 402; returns the sample answer, the guideline text as How this is marked (marks only for an approved scheme digest) and the key",
+      "rateLimits": [
+        {
+          "key": "paper-solution",
+          "limit": 1200,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/papers/attempts/:attemptId/plan",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; refused before the sitting is submitted (409 PAPER_NOT_SUBMITTED); needs premium-exams from the server's own entitlement row, else 402 PREMIUM_REQUIRED (the PDFs are free, the workflow is not: owner decision 19 Nov 2026); What to practise next: computed deterministically from the stored result (only engine-marked parts, grouped by syllabus outcome, biggest loss first, mapped to practice subtopics); no key, criterion, sample answer or paper text; no predicted mark",
+      "rateLimits": [
+        {
+          "key": "paper-plan",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/papers/attempts/:attemptId/retest",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "issues an unseen re-test: the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; refused before the sitting is submitted (409 PAPER_NOT_SUBMITTED); needs premium-exams from the server's own entitlement row, else 402 PREMIUM_REQUIRED (the PDFs are free, the workflow is not: owner decision 19 Nov 2026); the body is empty; the re-test is a sitting row of this account holding only the chosen part references (paper id, part id, outcome) from papers the account has never sat, built from the server's own structured papers; never the same questions; asking again resumes it; a re-test of a re-test is 409; nothing is sent to a model",
+      "rateLimits": [
+        {
+          "key": "paper-retest",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/papers/attempts/:attemptId/comparison",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; refused before the sitting is submitted (409 PAPER_NOT_SUBMITTED); needs premium-exams from the server's own entitlement row, else 402 PREMIUM_REQUIRED (the PDFs are free, the workflow is not: owner decision 19 Nov 2026); the sitting must be a re-test; compares the engine-marked marks per outcome of the first sitting and the re-test, in plain words; no claim of learning, no predicted mark",
+      "rateLimits": [
+        {
+          "key": "paper-comparison",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/papers/attempts/:attemptId/figures/:name",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; streams one diagram (image/svg+xml, nosniff, locked-down CSP); :name must be in the paper's own figure list and the opened file name comes from the content, never the request",
+      "rateLimits": [
+        {
+          "key": "paper-figure",
+          "limit": 3000,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/papers/exam-style/:subtopic",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the multi-part Section II questions of the structured papers whose parts the guideline mapping grid ties to the named Extension 1 subtopic (Paper, Question, marks, matching part ids: no paper content, key or criterion); locked is decided from the server's own entitlement row (sample free, else premium-exams); an unknown subtopic is an empty list; Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "paper-exam-style",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
       "method": "GET",
       "path": "/v1/papers/",
       "auth": "session",
@@ -2865,7 +3141,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "read-only; the owner-written Extension 1 practice-paper manifest (server/content/papers/nsw-ext1/manifest.json), the same for every account except `premium` and `locked`, which come from the server's own entitlement_snapshots row (capability premium-exams); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; nothing written",
+      "ownership": "read-only; the owner-written Extension 1 practice-paper manifest (server/content/papers/nsw-ext1/manifest.json), the same for every account except `premium` and `sitLocked` (whether the account may sit the paper in the app), which come from the server's own entitlement_snapshots row (capability premium-exams); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; nothing written",
       "rateLimits": [
         {
           "key": "papers-list",
@@ -2888,7 +3164,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "read-only; streams one manifest PDF as an attachment (application/pdf, no-store). :id and :kind are looked up in the manifest and the opened file name comes from the manifest, never the request (no path traversal; unknown id, unknown kind and a paper with no guidelines are 404 PAPER_NOT_FOUND). A manifest entry flagged `sample` is free to every signed-in account (none today); every other file, Practice Paper 13 included, needs premium-exams from the server's own entitlement_snapshots row, else 402 PREMIUM_REQUIRED; no header or body is consulted. Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE",
+      "ownership": "read-only; streams one manifest PDF as an attachment (application/pdf, no-store). :id and :kind are looked up in the manifest and the opened file name comes from the manifest, never the request (no path traversal; unknown id, unknown kind and a paper with no guidelines are 404 PAPER_NOT_FOUND). Every paper and guidelines PDF is FREE to any signed-in verified student (owner decision, 19 Nov 2026: give the papers away, sell the workflow); sign-in is kept so downloads can be counted and no entitlement is consulted; no header or body is consulted. Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE",
       "rateLimits": [
         {
           "key": "papers-download",

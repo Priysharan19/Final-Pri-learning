@@ -1,0 +1,2717 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p05",
+ "paperNumber": 5,
+ "title": "Practice Paper 5",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "f66ef5dfcc789aff6703344faee9f955ad20b62f102b2e038d4f1a04f5684277"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many different real zeros does the polynomial $(x - 1)(x - 2)(x - 3)(x - 4) + 1$ have?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "0"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "2"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "3"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "4"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$(x - 1)(x - 4) = x^2 - 5x + 4$ and $(x - 2)(x - 3) = x^2 - 5x + 6$. With $u = x^2 - 5x + 5$ the polynomial is $(u - 1)(u + 1) + 1 = u^2 = \\left(x^2 - 5x + 5\\right)^2$. So its zeros are the two different zeros of $x^2 - 5x + 5$, each a double zero."
+        }
+       ],
+       "classification": {
+        "content": "Polynomials; multiple zeros",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The vectors $\\underset{\\sim}{a}$ and $\\underset{\\sim}{b}$ are not parallel, with $\\left|\\underset{\\sim}{a}\\right| = 3$ and $\\left|\\underset{\\sim}{b}\\right| = 2$. The vectors $\\underset{\\sim}{a} + k\\,\\underset{\\sim}{b}$ and $\\underset{\\sim}{a} - k\\,\\underset{\\sim}{b}$ are perpendicular, where $k > 0$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $k$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac32$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac23$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac94$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\sqrt6}{2}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\left(\\underset{\\sim}{a} + k\\,\\underset{\\sim}{b}\\right)\\cdot\\left(\\underset{\\sim}{a} - k\\,\\underset{\\sim}{b}\\right) = \\left|\\underset{\\sim}{a}\\right|^2 - k^2\\left|\\underset{\\sim}{b}\\right|^2 = 9 - 4k^2 = 0$, so $k = \\dfrac32$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; scalar product",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The random variable $X$ has a binomial distribution with parameters $n$ and $p$, where $0 < p < 1$. It is given that $P(X = 0) = P(X = 1)$."
+      },
+      {
+       "k": "p",
+       "t": "What is the mean of $X$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$p$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$1$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n(1 - p)$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$1 - p$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$(1 - p)^n = np(1 - p)^{n-1}$ gives $1 - p = np$. The mean is $np = 1 - p$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial distribution; mean",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $f(x) = x^3 + x$, and let $g$ be the inverse function of $f$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $g'(10)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{301}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$13$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{13}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{10}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$f(2) = 10$, so $g(10) = 2$, and $g'(10) = \\dfrac{1}{f'(2)} = \\dfrac{1}{3 \\times 4 + 1} = \\dfrac{1}{13}$."
+        }
+       ],
+       "classification": {
+        "content": "Derivatives of inverse functions",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The diagram shows an equilateral triangle divided into 9 small equilateral triangles."
+      },
+      {
+       "k": "fig",
+       "name": "figtrigrid"
+      },
+      {
+       "k": "p",
+       "t": "How many triangles of all sizes are there in the diagram?"
+      }
+     ],
+     "figures": [
+      "figtrigrid"
+     ],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "9"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "10"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "13"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "16"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "There are 9 triangles of side 1, 3 of side 2 (one at each corner) and 1 of side 3. So there are 13."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $t = \\tan\\dfrac{x}{2}$, where $-\\dfrac{\\pi}{2} < x < \\dfrac{\\pi}{2}$."
+      },
+      {
+       "k": "p",
+       "t": "Which expression is equal to $\\dfrac{1 + \\sin x}{1 - \\sin x}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\left(\\dfrac{1 + t}{1 - t}\\right)^2$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1 + t}{1 - t}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1 + t^2}{1 - t^2}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\left(\\dfrac{1 + t^2}{1 - t^2}\\right)^2$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\sin x = \\dfrac{2t}{1 + t^2}$, so $\\dfrac{1 + \\sin x}{1 - \\sin x} = \\dfrac{1 + t^2 + 2t}{1 + t^2 - 2t} = \\left(\\dfrac{1 + t}{1 - t}\\right)^2$."
+        }
+       ],
+       "classification": {
+        "content": "The $t$-formulae",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A Ferris wheel of radius 1 turns at a constant rate, taking time $T$ for each revolution. A passenger $P$ boards at the lowest point $B$ of the wheel when $t = 0$. Let $d$ be the distance from $P$ to $B$ at time $t$."
+      },
+      {
+       "k": "fig",
+       "name": "figwheel"
+      },
+      {
+       "k": "p",
+       "t": "Which graph shows $d$ against $t$?"
+      }
+     ],
+     "figures": [
+      "figwheel"
+     ],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ7OptA"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ7OptB"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ7OptC"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ7OptD"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "After the wheel has turned through an angle $\\phi = \\dfrac{2\\pi t}{T}$, the chord $BP$ subtends $\\phi$ at the centre, so $d = 2\\left|\\sin\\dfrac{\\phi}{2}\\right|$. This is 0 at $t = 0, T, 2T, \\ldots$, where the graph has a sharp point (the gradient changes sign abruptly), and it has a smooth maximum of 2 halfway between. That is graph B. (Graph A is the height of $P$ above $B$, which is $1 - \\cos\\phi$.)"
+        }
+       ],
+       "classification": {
+        "content": "Trigonometric functions; half-angle results; graphs",
+        "outcomes": [
+         "ME1-11-03",
+         "ME1-11-01"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The diagram shows the slope field of a differential equation."
+      },
+      {
+       "k": "fig",
+       "name": "figfield"
+      },
+      {
+       "k": "p",
+       "t": "Which of the following could be the differential equation?"
+      }
+     ],
+     "figures": [
+      "figfield"
+     ],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = x^2 - y$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = y - x^2$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = x - y^2$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = y^2 - x$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The gradients are zero along the parabola $y = x^2$ (for example at $(0, 0)$, $(1, 1)$ and $(2, 4)$), positive above it (for example at $(0, 1)$) and negative below it (for example at $(2, 0)$). Only $\\dfrac{dy}{dx} = y - x^2$ has these properties: option A has the opposite signs, and in options C and D the gradients are zero along a parabola with the $x$-axis as its axis."
+        }
+       ],
+       "classification": {
+        "content": "Slope fields",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A ball is projected from a point $O$ on horizontal ground at an angle of $45^\\circ$ to the horizontal. The greatest height that it reaches is $H$."
+      },
+      {
+       "k": "fig",
+       "name": "figfortyfive"
+      },
+      {
+       "k": "p",
+       "t": "How far from $O$ does the ball land?"
+      }
+     ],
+     "figures": [
+      "figfortyfive"
+     ],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$2H$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$2\\sqrt2\\,H$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$8H$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$4H$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "With speed $V$: $\\ H = \\dfrac{V^2\\sin^2 45^\\circ}{2g} = \\dfrac{V^2}{4g}$ and the range is $\\dfrac{V^2\\sin 90^\\circ}{g} = \\dfrac{V^2}{g} = 4H$."
+        }
+       ],
+       "classification": {
+        "content": "Projectile motion",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Some of the integers from 1 to 30 are chosen."
+      },
+      {
+       "k": "p",
+       "t": "What is the smallest number of integers that must be chosen to be certain that two of the chosen integers have a sum of 31?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "14"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "15"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "16"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "17"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The integers form the 15 pairs $\\{1, 30\\}, \\{2, 29\\}, \\ldots, \\{15, 16\\}$, each with sum 31. Choosing $1, 2, \\ldots, 15$ shows that 15 integers are not enough. If 16 are chosen, two are in the same pair. So the answer is 16."
+        }
+       ],
+       "classification": {
+        "content": "The pigeonhole principle",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Two of the zeros of the polynomial $x^3 - 3x + k$ differ by 1."
+        },
+        {
+         "k": "p",
+         "t": "Find the two possible values of $k$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides both values with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains and solves an equation for one of the zeros, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the zeros as $\\alpha$, $\\alpha + 1$ and $-2\\alpha - 1$, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let the zeros be $\\alpha$, $\\alpha + 1$ and $\\gamma$. Their sum is 0, so $\\gamma = -2\\alpha - 1$. The sum of the products of pairs is $-3$:"
+        },
+        {
+         "k": "math",
+         "t": "\\alpha(\\alpha + 1) + (2\\alpha + 1)(-2\\alpha - 1) = -3, \\qquad\\text{so}\\qquad 3\\alpha^2 + 3\\alpha - 2 = 0."
+        },
+        {
+         "k": "p",
+         "t": "The product of the zeros is $-k$, so $k = \\alpha(\\alpha + 1)(2\\alpha + 1)$. Since $\\alpha(\\alpha + 1) = \\dfrac23$ and $2\\alpha + 1 = \\pm\\dfrac{\\sqrt{33}}{3}$ (from $\\alpha = \\dfrac{-3 \\pm \\sqrt{33}}{6}$),"
+        },
+        {
+         "k": "math",
+         "t": "k = \\pm\\frac{2\\sqrt{33}}{9}."
+        }
+       ],
+       "classification": {
+        "content": "Zeros and coefficients of polynomials",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "set",
+        "values": [
+         -1.2765694770084508,
+         1.2765694770084508
+        ],
+        "display": "k=\\pm\\dfrac{2\\sqrt{33}}{9}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p05.py: resultant of P(x) and P(x+1) in x gives the real k values; each k checked to have two zeros differing by 1"
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Solve $\\ \\sin x\\,\\sin\\left(\\dfrac{\\pi}{3} - x\\right)\\sin\\left(\\dfrac{\\pi}{3} + x\\right) = \\dfrac18\\$ for $0 < x < \\pi$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides all four solutions with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Reduces the equation to $\\sin 3x = \\frac12$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Simplifies the product of two of the factors, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\sin\\left(\\dfrac{\\pi}{3} - x\\right)\\sin\\left(\\dfrac{\\pi}{3} + x\\right) = \\dfrac34\\cos^2 x - \\dfrac14\\sin^2 x = \\dfrac34 - \\sin^2 x$. So the left-hand side is"
+        },
+        {
+         "k": "math",
+         "t": "\\frac14\\left(3\\sin x - 4\\sin^3 x\\right) = \\frac14\\sin 3x."
+        },
+        {
+         "k": "p",
+         "t": "The equation is $\\sin 3x = \\dfrac12$ with $0 < 3x < 3\\pi$, so $3x = \\dfrac{\\pi}{6}, \\dfrac{5\\pi}{6}, \\dfrac{13\\pi}{6}, \\dfrac{17\\pi}{6}$, and"
+        },
+        {
+         "k": "math",
+         "t": "x = \\frac{\\pi}{18},\\ \\frac{5\\pi}{18},\\ \\frac{13\\pi}{18},\\ \\frac{17\\pi}{18}."
+        }
+       ],
+       "classification": {
+        "content": "Trigonometric identities and equations",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "set",
+        "values": [
+         0.17453292519943295,
+         0.8726646259971648,
+         2.2689280275926285,
+         2.96705972839036
+        ],
+        "display": "\\dfrac{\\pi}{18},\\ \\dfrac{5\\pi}{18},\\ \\dfrac{13\\pi}{18},\\ \\dfrac{17\\pi}{18}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p05.py: sign-change scan of sin x sin(pi/3-x) sin(pi/3+x) - 1/8 on (0,pi), four roots refined to 1e-12"
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Prove by mathematical induction that $(3n)!$ is divisible by $6^n$ for all integers $n \\ge 1$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct proof"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case and makes substantial progress with the inductive step"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "When $n = 1$, $3! = 6$, which is divisible by $6^1$."
+        },
+        {
+         "k": "p",
+         "t": "Assume that $(3k)! = 6^kM$ for some integer $M$. Then"
+        },
+        {
+         "k": "math",
+         "t": "(3k + 3)! = (3k)! \\times (3k + 1)(3k + 2)(3k + 3) = 6^kM \\times (3k + 1)(3k + 2)(3k + 3)."
+        },
+        {
+         "k": "p",
+         "t": "Of the three consecutive integers $3k + 1$, $3k + 2$, $3k + 3$, at least one is even and the last is divisible by 3, so their product is divisible by 6. Hence $(3k + 3)!$ is divisible by $6^{k+1}$, and the result follows by mathematical induction."
+        }
+       ],
+       "classification": {
+        "content": "Proof by mathematical induction (divisibility)",
+        "outcomes": [
+         "ME1-12-01"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The letters of the word PRITHAGORAS are arranged in a row."
+        },
+        {
+         "k": "p",
+         "t": "In how many of the arrangements are the two letters A not next to each other and the two letters R not next to each other?"
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct number with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Counts the arrangements with the A's together or with the R's together and attempts to combine"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the total number of arrangements, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "There are 11 letters, with two A's and two R's, so there are $\\dfrac{11!}{2!\\,2!} = 9\\,979\\,200$ arrangements."
+        },
+        {
+         "k": "p",
+         "t": "The A's are together in $\\dfrac{10!}{2!} = 1\\,814\\,400$ arrangements (treat AA as one letter), and the R's are together in the same number. Both pairs are together in $9! = 362\\,880$ arrangements."
+        },
+        {
+         "k": "p",
+         "t": "So the number with at least one pair together is $1\\,814\\,400 + 1\\,814\\,400 - 362\\,880 = 3\\,265\\,920$, and the required number is $9\\,979\\,200 - 3\\,265\\,920 = 6\\,713\\,280$."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques; arrangements with repetition",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 6713280,
+        "display": "6\\,713\\,280"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p05.py: brute force over all 9,979,200 distinct arrangements of PRITHAGORAS, inclusion-exclusion and a placement count agree on 6,713,280"
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Use the substitution $u = x - \\dfrac1x$ to find the exact value of"
+        },
+        {
+         "k": "math",
+         "t": "\\int_1^{\\,\\frac12\\left(1 + \\sqrt5\\right)}\\frac{x^2 + 1}{x^4 - x^2 + 1}\\,dx."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Transforms the integral correctly, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $du$ in terms of $dx$, or the new limits"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$du = \\left(1 + \\dfrac{1}{x^2}\\right)dx$ and $u^2 = x^2 - 2 + \\dfrac{1}{x^2}$. Dividing the numerator and the denominator by $x^2$,"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{x^2 + 1}{x^4 - x^2 + 1}\\,dx = \\frac{1 + \\frac{1}{x^2}}{x^2 - 1 + \\frac{1}{x^2}}\\,dx = \\frac{du}{u^2 + 1}."
+        },
+        {
+         "k": "p",
+         "t": "When $x = 1$, $u = 0$. When $x = \\dfrac{1 + \\sqrt5}{2}$, $\\ \\dfrac1x = \\dfrac{\\sqrt5 - 1}{2}$, so $u = 1$. Hence the integral is $\\Bigl[\\tan^{-1}u\\Bigr]_0^1 = \\dfrac{\\pi}{4}$."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution; inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-04",
+         "ME1-12-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 0.7853981633974483,
+        "display": "\\dfrac{\\pi}{4}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p05.py: mpmath quadrature of the stated integral agrees with pi/4 to 1e-20"
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "In the triangle $ABC$, the point $D$ lies on $BC$ with $BD : DC = 2 : 1$, and $E$ is the midpoint of $AD$. The line $BE$ meets $AC$ at $F$."
+        },
+        {
+         "k": "fig",
+         "name": "figcev"
+        },
+        {
+         "k": "p",
+         "t": "Use vectors to find the ratio $AF : FC$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct ratio with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes a general point of $BE$ and uses the fact that $F$ lies on $AC$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $\\overrightarrow{AD}$ or $\\overrightarrow{AE}$ in terms of two base vectors"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $\\underset{\\sim}{b} = \\overrightarrow{AB}$ and $\\underset{\\sim}{c} = \\overrightarrow{AC}$. Then $\\overrightarrow{AD} = \\dfrac13\\underset{\\sim}{b} + \\dfrac23\\underset{\\sim}{c}$ and $\\overrightarrow{AE} = \\dfrac16\\underset{\\sim}{b} + \\dfrac13\\underset{\\sim}{c}$."
+        },
+        {
+         "k": "p",
+         "t": "A point of the line $BE$ has position vector $\\underset{\\sim}{b} + s\\left(\\overrightarrow{AE} - \\underset{\\sim}{b}\\right) = \\left(1 - \\dfrac{5s}{6}\\right)\\underset{\\sim}{b} + \\dfrac{s}{3}\\,\\underset{\\sim}{c}$ relative to $A$. At $F$, which is on $AC$, the coefficient of $\\underset{\\sim}{b}$ is zero, so $s = \\dfrac65$ and $\\overrightarrow{AF} = \\dfrac25\\underset{\\sim}{c}$."
+        },
+        {
+         "k": "p",
+         "t": "Hence $AF : FC = 2 : 3$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; ratios",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [
+        "figcev"
+       ],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The curve with parametric equations $x = \\cos^3 t$, $y = \\sin^3 t$, for $0 \\le t \\le 2\\pi$, is shown."
+        },
+        {
+         "k": "fig",
+         "name": "figastroid"
+        },
+        {
+         "k": "p",
+         "t": "Find the exact area of the region enclosed by the curve."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact area"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Evaluates the trigonometric integral with a minor error"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the area as a correct integral in $t$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Uses symmetry and writes the area as an integral of $y$ with respect to $x$, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "By symmetry the area is $4\\displaystyle\\int_0^1 y\\,dx$, taken over the part of the curve in the first quadrant. With $x = \\cos^3 t$, $dx = -3\\cos^2 t\\sin t\\,dt$, and $x$ goes from 0 to 1 as $t$ goes from $\\dfrac{\\pi}{2}$ to 0. So the area is"
+        },
+        {
+         "k": "math",
+         "t": "4\\int_{\\frac{\\pi}{2}}^{0}\\sin^3 t\\left(-3\\cos^2 t\\sin t\\right)dt = 12\\int_0^{\\frac{\\pi}{2}}\\sin^4 t\\cos^2 t\\,dt."
+        },
+        {
+         "k": "p",
+         "t": "Now $\\sin^4 t\\cos^2 t = \\dfrac14\\sin^2 2t \\times \\dfrac{1 - \\cos 2t}{2} = \\dfrac{1}{16}(1 - \\cos 4t) - \\dfrac18\\sin^2 2t\\cos 2t$, and"
+        },
+        {
+         "k": "math",
+         "t": "\\int_0^{\\frac{\\pi}{2}}\\left[\\frac{1}{16}(1 - \\cos 4t) - \\frac18\\sin^2 2t\\cos 2t\\right]dt = \\left[\\frac{t}{16} - \\frac{\\sin 4t}{64} - \\frac{\\sin^3 2t}{48}\\right]_0^{\\frac{\\pi}{2}} = \\frac{\\pi}{32}."
+        },
+        {
+         "k": "p",
+         "t": "Hence the area is $12 \\times \\dfrac{\\pi}{32} = \\dfrac{3\\pi}{8}$."
+        }
+       ],
+       "classification": {
+        "content": "Parametric form; areas; trigonometric integrals",
+        "outcomes": [
+         "ME1-11-01",
+         "ME1-12-04"
+        ]
+       },
+       "figures": [
+        "figastroid"
+       ],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "3*pi/8",
+        "display": "\\dfrac{3\\pi}{8}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p05.py: Green's theorem area of x=cos^3 t, y=sin^3 t by quadrature agrees with 3pi/8 to 1e-20"
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A factory tests a large batch of items by taking a random sample of $n$ items, where $n \\ge 3$. Each item in the sample is defective with probability $p$, independently of the others. The batch is accepted if the sample contains at most one defective item. Let $A(p)$ be the probability that the batch is accepted. The diagram shows the graph of $A(p)$ for one value of $n$."
+        },
+        {
+         "k": "fig",
+         "name": "figoc"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Write down an expression for $A(p)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct expression"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The number of defective items in the sample has a binomial distribution, so"
+          },
+          {
+           "k": "math",
+           "t": "A(p) = (1 - p)^n + np(1 - p)^{n-1}."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; differentiation; optimisation; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "(1-p)^n+n*p*(1-p)^(n-1)",
+          "display": "(1-p)^{n}+np(1-p)^{n-1}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: exact binomial P(at most one defective), n=3..8, two values of p"
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $A'(p) = -n(n - 1)p(1 - p)^{n-2}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates $A(p)$ correctly without simplifying"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "math",
+           "t": "\\begin{aligned}\nA'(p) &= -n(1 - p)^{n-1} + n(1 - p)^{n-1} - n(n - 1)p(1 - p)^{n-2}\\\\\n&= -n(n - 1)p(1 - p)^{n-2}.\n\\end{aligned}"
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; differentiation; optimisation; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the value of $p$ at which $A(p)$ is decreasing most rapidly."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates $p(1 - p)^{n-2}$ or equivalent"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$A(p)$ decreases most rapidly where $B(p) = p(1 - p)^{n-2}$ is greatest. Now"
+          },
+          {
+           "k": "math",
+           "t": "B'(p) = (1 - p)^{n-2} - (n - 2)p(1 - p)^{n-3} = (1 - p)^{n-3}\\bigl(1 - (n - 1)p\\bigr),"
+          },
+          {
+           "k": "p",
+           "t": "which is positive for $p < \\dfrac{1}{n - 1}$ and negative for $\\dfrac{1}{n - 1} < p < 1$. So the value is $p = \\dfrac{1}{n - 1}$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; differentiation; optimisation; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "1/(n-1)",
+          "display": "p=\\dfrac{1}{n-1}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: golden-section search of -A'(p) with A from the binomial sum, n=3..10"
+        },
+        {
+         "id": "q12c-iv",
+         "label": "(iv)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $A(p) \\ge 1 - \\dbinom{n}{2}p^2$ for $0 \\le p \\le 1$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that the derivative of a suitable difference is non-negative, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Considers a suitable difference and differentiates it"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $g(p) = A(p) - 1 + \\dfrac{n(n - 1)}{2}p^2$. Then $g(0) = 1 - 1 = 0$ and, by part (ii),"
+          },
+          {
+           "k": "math",
+           "t": "g'(p) = -n(n - 1)p(1 - p)^{n-2} + n(n - 1)p = n(n - 1)p\\left[1 - (1 - p)^{n-2}\\right] \\ge 0"
+          },
+          {
+           "k": "p",
+           "t": "for $0 \\le p \\le 1$. So $g$ does not decrease, and $g(p) \\ge g(0) = 0$. Hence $A(p) \\ge 1 - \\dbinom{n}{2}p^2$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; differentiation; optimisation; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figoc"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The minute hand $OM$ of a clock has length $a$ and the hour hand $OH$ has length $b$, where $a > b$. The angle $\\theta$ between the hands increases at a constant rate $\\omega$ as it goes from $0$ to $\\pi$. Let $d$ be the distance between the tips $M$ and $H$ of the hands."
+        },
+        {
+         "k": "fig",
+         "name": "figclock"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Write down $d$ in terms of $a$, $b$ and $\\theta$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct expression"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By the cosine rule, $d = \\sqrt{a^2 + b^2 - 2ab\\cos\\theta}$."
+          }
+         ],
+         "classification": {
+          "content": "Cosine rule; rates of change; optimisation",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "sqrt(a^2+b^2-2*a*b*cos(theta))",
+          "display": "d=\\sqrt{a^{2}+b^{2}-2ab\\cos\\theta}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: distance between M=(a,0) and H=(b cos t, b sin t) at four (a,b,theta)"
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\dfrac{dd}{dt} = \\dfrac{ab\\,\\omega\\sin\\theta}{d}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates $d^2$ or $d$ with respect to $\\theta$ or $t$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Differentiating $d^2 = a^2 + b^2 - 2ab\\cos\\theta$ with respect to $t$,"
+          },
+          {
+           "k": "math",
+           "t": "2d\\,\\frac{dd}{dt} = 2ab\\sin\\theta\\,\\frac{d\\theta}{dt} = 2ab\\,\\omega\\sin\\theta, \\qquad\\text{so}\\qquad \\frac{dd}{dt} = \\frac{ab\\,\\omega\\sin\\theta}{d}."
+          }
+         ],
+         "classification": {
+          "content": "Cosine rule; rates of change; optimisation",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the value of $\\cos\\theta$ at the instant when $d$ is increasing most rapidly."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains a correct equation for the stationary point, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Considers the derivative of $\\dfrac{\\sin\\theta}{d}$ or of its square"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The rate is greatest when $\\dfrac{\\sin^2\\theta}{d^2}$ is greatest. Let $c = \\cos\\theta$ and $h(c) = \\dfrac{1 - c^2}{a^2 + b^2 - 2abc}$ for $-1 \\le c \\le 1$. Then"
+          },
+          {
+           "k": "math",
+           "t": "h'(c) = \\frac{-2c\\left(a^2 + b^2 - 2abc\\right) + 2ab\\left(1 - c^2\\right)}{\\left(a^2 + b^2 - 2abc\\right)^2} = \\frac{2(ac - b)(bc - a)}{\\left(a^2 + b^2 - 2abc\\right)^2}."
+          },
+          {
+           "k": "p",
+           "t": "Since $bc - a < 0$, $h'(c)$ is positive for $c < \\dfrac{b}{a}$ and negative for $c > \\dfrac{b}{a}$. So $d$ is increasing most rapidly when $\\cos\\theta = \\dfrac{b}{a}$."
+          }
+         ],
+         "classification": {
+          "content": "Cosine rule; rates of change; optimisation",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "b/a",
+          "display": "\\cos\\theta=\\dfrac{b}{a}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: golden-section maximisation of d'(theta) from coordinates, five (a>b)"
+        },
+        {
+         "id": "q13a-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the greatest rate at which $d$ increases."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct greatest rate"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $d$ or $\\sin\\theta$ at the instant in part (iii)"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "When $\\cos\\theta = \\dfrac{b}{a}$: $\\ d^2 = a^2 + b^2 - 2b^2 = a^2 - b^2$ and $\\sin\\theta = \\dfrac{\\sqrt{a^2 - b^2}}{a}$. By part (ii) the rate is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{ab\\,\\omega}{\\sqrt{a^2 - b^2}} \\times \\frac{\\sqrt{a^2 - b^2}}{a} = b\\,\\omega."
+          },
+          {
+           "k": "p",
+           "t": "(At this instant $OH^2 + HM^2 = OM^2$, so $HM$ is perpendicular to the hour hand.)"
+          }
+         ],
+         "classification": {
+          "content": "Cosine rule; rates of change; optimisation",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "b*omega",
+          "display": "b\\omega"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: maximum of d'(theta) (omega=1) over a fine grid equals b for five (a>b)"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figclock"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Two points $A$ and $B$ are a distance $d$ apart on horizontal ground. At the same instant, a ball $P$ is thrown from $A$ with speed $U$ at an angle $\\alpha$ to the horizontal, and a ball $Q$ is thrown from $B$ with speed $W$ at an angle $\\beta$ to the horizontal, towards each other in the same vertical plane, as shown. Take $A$ as the origin, with $\\underset{\\sim}{i}$ in the direction of $\\overrightarrow{AB}$ and $\\underset{\\sim}{j}$ vertically upwards. Each ball has acceleration $-g\\,\\underset{\\sim}{j}$."
+        },
+        {
+         "k": "fig",
+         "name": "figtwo"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that, while both balls are in flight,"
+          },
+          {
+           "k": "math",
+           "t": "\\overrightarrow{PQ} = \\bigl(d - (U\\cos\\alpha + W\\cos\\beta)t\\bigr)\\underset{\\sim}{i} + (W\\sin\\beta - U\\sin\\alpha)t\\,\\underset{\\sim}{j}."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the position vector of one ball at time $t$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Integrating the acceleration twice, with the given initial velocities and positions,"
+          },
+          {
+           "k": "math",
+           "t": "\\begin{aligned}\n\\overrightarrow{AP} &= Ut\\cos\\alpha\\,\\underset{\\sim}{i} + \\left(Ut\\sin\\alpha - \\tfrac12gt^2\\right)\\underset{\\sim}{j},\\\\\n\\overrightarrow{AQ} &= (d - Wt\\cos\\beta)\\,\\underset{\\sim}{i} + \\left(Wt\\sin\\beta - \\tfrac12gt^2\\right)\\underset{\\sim}{j}.\n\\end{aligned}"
+          },
+          {
+           "k": "p",
+           "t": "Subtracting, the terms in $g$ cancel, and $\\overrightarrow{PQ} = \\bigl(d - (U\\cos\\alpha + W\\cos\\beta)t\\bigr)\\underset{\\sim}{i} + (W\\sin\\beta - U\\sin\\alpha)t\\,\\underset{\\sim}{j}$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion in vector form; relative position; distance from a point to a line",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the condition on $U$, $W$, $\\alpha$ and $\\beta$ for the balls to collide, given that they stay in flight long enough."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct condition with justification"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Sets $\\overrightarrow{PQ} = \\underset{\\sim}{0}$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The balls collide when $\\overrightarrow{PQ} = \\underset{\\sim}{0}$ for some $t > 0$. The $\\underset{\\sim}{j}$ component is zero for $t > 0$ only if $U\\sin\\alpha = W\\sin\\beta$, and then the $\\underset{\\sim}{i}$ component is zero when $t = \\dfrac{d}{U\\cos\\alpha + W\\cos\\beta}$. So the condition is"
+          },
+          {
+           "k": "math",
+           "t": "U\\sin\\alpha = W\\sin\\beta."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion in vector form; relative position; distance from a point to a line",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "equation",
+          "lhs": "U*sin(alpha)",
+          "rhs": "W*sin(beta)",
+          "display": "U\\sin\\alpha=W\\sin\\beta"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: 30 random parameter sets; imposing the condition gives PQ=0 at a positive time, violating it leaves the minimum separation positive"
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $U\\sin\\alpha \\ne W\\sin\\beta$. Find the least distance between the balls, given that they stay in flight long enough."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct least distance"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the time at which the distance is least, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $PQ^2$ as a quadratic in $t$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $m = U\\cos\\alpha + W\\cos\\beta$ and $n = W\\sin\\beta - U\\sin\\alpha$. Then"
+          },
+          {
+           "k": "math",
+           "t": "PQ^2 = (d - mt)^2 + n^2t^2 = \\left(m^2 + n^2\\right)t^2 - 2dmt + d^2,"
+          },
+          {
+           "k": "p",
+           "t": "a quadratic in $t$ that is least when $t = \\dfrac{dm}{m^2 + n^2}$, with least value $d^2 - \\dfrac{d^2m^2}{m^2 + n^2} = \\dfrac{d^2n^2}{m^2 + n^2}$. The least distance is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{d\\,\\left|W\\sin\\beta - U\\sin\\alpha\\right|}{\\sqrt{(U\\cos\\alpha + W\\cos\\beta)^2 + (W\\sin\\beta - U\\sin\\alpha)^2}}."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion in vector form; relative position; distance from a point to a line",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "d*abs(W*sin(beta)-U*sin(alpha))/sqrt((U*cos(alpha)+W*cos(beta))^2+(W*sin(beta)-U*sin(alpha))^2)",
+          "display": "\\dfrac{d\\,|W\\sin\\beta-U\\sin\\alpha|}{\\sqrt{(U\\cos\\alpha+W\\cos\\beta)^{2}+(W\\sin\\beta-U\\sin\\alpha)^{2}}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: golden-section minimisation of |PQ(t)| from the position vectors, 12 random parameter sets"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figtwo"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Water flows into an empty tank at a constant rate $Q$, and at the same time it flows out through a hole in the side at the base at the rate $k\\sqrt{h}$, where $h$ is the depth of the water and $k$ is a positive constant. The tank has vertical sides, and the area of the water surface is $A$."
+        },
+        {
+         "k": "fig",
+         "name": "figtank"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the depth $H$ at which the depth would stop changing."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct depth"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The volume of water is $Ah$, so $A\\dfrac{dh}{dt} = Q - k\\sqrt{h}$. This is zero when $\\sqrt{h} = \\dfrac{Q}{k}$, so $H = \\dfrac{Q^2}{k^2}$."
+          }
+         ],
+         "classification": {
+          "content": "Modelling with differential equations; integration by substitution",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "Q^2/k^2",
+          "display": "H=\\dfrac{Q^{2}}{k^{2}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: root of Q-k sqrt(h)=0 and long RK4 integration of the tank equation settle at Q^2/k^2, three parameter sets"
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Use the substitution $u = \\sqrt{h}$ to show that the time taken for the depth to increase from 0 to $h$, where $h < H$, is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{2A}{k^2}\\left[Q\\ln\\!\\left(\\frac{Q}{Q - k\\sqrt{h}}\\right) - k\\sqrt{h}\\right]."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Evaluates the integral with a minor error"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Transforms the integral correctly using the substitution"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the time as an integral with respect to $h$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Since $\\dfrac{dt}{dh} = \\dfrac{A}{Q - k\\sqrt{h}}$, the time is $\\displaystyle\\int_0^h\\frac{A}{Q - k\\sqrt{x}}\\,dx$. With $u = \\sqrt{x}$, $dx = 2u\\,du$:"
+          },
+          {
+           "k": "math",
+           "t": "t = 2A\\int_0^{\\sqrt{h}}\\frac{u}{Q - ku}\\,du = \\frac{2A}{k}\\int_0^{\\sqrt{h}}\\left(-1 + \\frac{Q}{Q - ku}\\right)du = \\frac{2A}{k}\\left[-u - \\frac{Q}{k}\\ln(Q - ku)\\right]_0^{\\sqrt{h}}."
+          },
+          {
+           "k": "p",
+           "t": "Hence $t = \\dfrac{2A}{k}\\left[-\\sqrt{h} + \\dfrac{Q}{k}\\ln\\dfrac{Q}{Q - k\\sqrt{h}}\\right] = \\dfrac{2A}{k^2}\\left[Q\\ln\\!\\left(\\dfrac{Q}{Q - k\\sqrt{h}}\\right) - k\\sqrt{h}\\right]$."
+          }
+         ],
+         "classification": {
+          "content": "Modelling with differential equations; integration by substitution",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-iii",
+         "label": "(iii)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the time taken for the depth to reach $\\dfrac{H}{4}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct time"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "When $h = \\dfrac{H}{4}$, $k\\sqrt{h} = \\dfrac{Q}{2}$, so the time is $\\dfrac{2A}{k^2}\\left[Q\\ln 2 - \\dfrac{Q}{2}\\right] = \\dfrac{AQ}{k^2}(2\\ln 2 - 1)$."
+          }
+         ],
+         "classification": {
+          "content": "Modelling with differential equations; integration by substitution",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "A*Q*(2*ln(2)-1)/k^2",
+          "display": "\\dfrac{AQ}{k^{2}}\\,(2\\ln 2-1)"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: time to reach H/4 by quadrature of A dh/(Q-k sqrt h) and by RK4 simulation, three parameter sets"
+        },
+        {
+         "id": "q14a-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Explain why the depth never reaches $H$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct explanation"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Considers the time in part (ii) as $h$ approaches $H$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "As $h$ approaches $H$ from below, $Q - k\\sqrt{h}$ approaches 0 through positive values, so $\\ln\\!\\left(\\dfrac{Q}{Q - k\\sqrt{h}}\\right)$ increases without bound while $k\\sqrt{h}$ approaches $Q$. So the time taken to reach depth $h$ increases without bound: every depth less than $H$ is reached at some finite time, but there is no finite time at which the depth is $H$."
+          }
+         ],
+         "classification": {
+          "content": "Modelling with differential equations; integration by substitution",
+          "outcomes": [
+           "ME1-12-05",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "proof-explain",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figtank"
+       ]
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "In a game, a player decides on a positive integer $n$ and then rolls a die up to $n$ times. Each roll is a *bust* with probability $p$, independently of the other rolls, where $0 < p < 1$. If any roll is a bust, the player stops and scores 0. Otherwise the player scores $n$ points."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Write down the expected score in terms of $n$ and $p$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct expected score"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The player scores $n$ with probability $(1 - p)^n$ and 0 otherwise, so the expected score is $n(1 - p)^n$."
+          }
+         ],
+         "classification": {
+          "content": "Probability; expected value; optimisation over integers; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "n*(1-p)^n",
+          "display": "n(1-p)^{n}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: exact enumeration of all 2^n bust patterns, n=1..7, two values of p"
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $p = \\dfrac16$. Find all the values of $n$ for which the expected score is greatest."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides both values with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds where the ratio of consecutive expected scores is greater than, equal to or less than 1 with a minor error"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Considers the ratio or difference of consecutive expected scores"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $E_n = n\\left(\\dfrac56\\right)^n$. Then $\\dfrac{E_{n+1}}{E_n} = \\dfrac{5(n + 1)}{6n}$, which is greater than 1 when $n < 5$, equal to 1 when $n = 5$ and less than 1 when $n > 5$. So"
+          },
+          {
+           "k": "math",
+           "t": "E_1 < E_2 < E_3 < E_4 < E_5 = E_6 > E_7 > E_8 > \\cdots,"
+          },
+          {
+           "k": "p",
+           "t": "and the expected score is greatest when $n = 5$ and when $n = 6$."
+          }
+         ],
+         "classification": {
+          "content": "Probability; expected value; optimisation over integers; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "set",
+          "values": [
+           5,
+           6
+          ],
+          "display": "n=5\\ \\text{and}\\ n=6"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p05.py: exact fractions n(5/6)^n for n=1..399 peak at n=5 and n=6"
+        },
+        {
+         "id": "q14b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that, whatever the values of $n$ and $p$, the expected score is less than $\\dfrac{1}{ep}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the greatest value of $x(1 - p)^x$ for real $x > 0$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Considers $x(1 - p)^x$ as a function of a real variable $x$ and differentiates it"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $q = 1 - p$ and $\\lambda = -\\ln q > 0$, and let $f(x) = xq^x = xe^{-\\lambda x}$ for real $x > 0$. Then $f'(x) = e^{-\\lambda x}(1 - \\lambda x)$, which is positive for $x < \\dfrac{1}{\\lambda}$ and negative for $x > \\dfrac{1}{\\lambda}$. So for every positive integer $n$,"
+          },
+          {
+           "k": "math",
+           "t": "n(1 - p)^n = f(n) \\le f\\!\\left(\\frac{1}{\\lambda}\\right) = \\frac{1}{e\\lambda}."
+          },
+          {
+           "k": "p",
+           "t": "Next, let $g(p) = -\\ln(1 - p) - p$ for $0 \\le p < 1$. Then $g(0) = 0$ and $g'(p) = \\dfrac{1}{1 - p} - 1 > 0$ for $0 < p < 1$, so $g(p) > 0$, that is, $\\lambda > p$. Hence the expected score is at most $\\dfrac{1}{e\\lambda} < \\dfrac{1}{ep}$."
+          }
+         ],
+         "classification": {
+          "content": "Probability; expected value; optimisation over integers; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figtrigrid",
+  "figwheel",
+  "figQ7OptA",
+  "figQ7OptB",
+  "figQ7OptC",
+  "figQ7OptD",
+  "figfield",
+  "figfortyfive",
+  "figcev",
+  "figastroid",
+  "figoc",
+  "figclock",
+  "figtwo",
+  "figtank"
+ ]
+}

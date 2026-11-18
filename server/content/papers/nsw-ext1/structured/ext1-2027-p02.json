@@ -1,0 +1,2579 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p02",
+ "paperNumber": 2,
+ "title": "Practice Paper 2",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "244dc8042335b29909e9ad4badbeaa04fc3d83b56677dbc72508421b8b2ca271"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The polynomial $x^3 - ax^2 + bx - a$, where $a$ and $b$ are real numbers, has three positive zeros $\\alpha$, $\\beta$ and $\\gamma$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $\\tan^{-1}\\alpha + \\tan^{-1}\\beta + \\tan^{-1}\\gamma$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\pi}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\pi$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{3\\pi}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "It depends on the values of $a$ and $b$."
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $A, B, C$ be the three inverse tangents, each between 0 and $\\frac{\\pi}{2}$. Expanding $\\tan(A + B + C)$ gives $\\dfrac{(\\alpha + \\beta + \\gamma) - \\alpha\\beta\\gamma}{1 - (\\alpha\\beta + \\beta\\gamma + \\gamma\\alpha)} = \\dfrac{a - a}{1 - b} = 0$. (Here $b \\ne 1$: if $b = 1$ then $\\alpha\\beta < 1$ and $\\gamma = \\dfrac{\\alpha + \\beta}{\\alpha\\beta - 1} < 0$.) So $A + B + C$ is a multiple of $\\pi$ lying between 0 and $\\frac{3\\pi}{2}$, and it equals $\\pi$."
+        }
+       ],
+       "classification": {
+        "content": "Sums and products of zeros; compound angles; inverse trigonometric functions",
+        "outcomes": [
+         "ME1-11-02",
+         "ME1-12-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The diagram shows 16 dots in a square array, and one square whose vertices are four of the dots."
+      },
+      {
+       "k": "fig",
+       "name": "figdots"
+      },
+      {
+       "k": "p",
+       "t": "How many squares have all four vertices at dots of the array?"
+      }
+     ],
+     "figures": [
+      "figdots"
+     ],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "14"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "18"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "20"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "24"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Every such square fits exactly inside one square with horizontal and vertical sides (its bounding square), of side $s = 1$, 2 or 3. A bounding square of side $s$ contains $s$ such squares (its own, and $s - 1$ tilted ones with a vertex on each side). There are $9$, $4$ and $1$ bounding squares of sides 1, 2 and 3, so the number is $9 \\times 1 + 4 \\times 2 + 1 \\times 3 = 20$."
+        }
+       ],
+       "classification": {
+        "content": "Counting techniques",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Which of the following is the graph of $y = \\cos\\left(3\\cos^{-1}x\\right)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptA"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptB"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptC"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptD"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $\\theta = \\cos^{-1}x$. Then $\\cos 3\\theta = \\cos 2\\theta\\cos\\theta - \\sin 2\\theta\\sin\\theta = 4\\cos^3\\theta - 3\\cos\\theta$, so $y = 4x^3 - 3x$ for $-1 \\le x \\le 1$. This passes through $(-1, -1)$ and $(1, 1)$, with a maximum of 1 at $x = -\\frac12$ and a minimum of $-1$ at $x = \\frac12$. (Graph B is $y = \\sin\\left(3\\sin^{-1}x\\right)$ and graph C is $y = \\cos\\left(2\\cos^{-1}x\\right)$.)"
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; compound angles",
+        "outcomes": [
+         "ME1-12-03",
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "In the triangle $OAB$, the point $P$ is such that $\\overrightarrow{OP} = \\dfrac13\\overrightarrow{OA} + \\dfrac12\\overrightarrow{OB}$."
+      },
+      {
+       "k": "fig",
+       "name": "figtri"
+      },
+      {
+       "k": "p",
+       "t": "What fraction of the area of triangle $OAB$ is the area of the shaded triangle $PAB$?"
+      }
+     ],
+     "figures": [
+      "figtri"
+     ],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac56$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac12$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac13$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac16$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Produce $OP$ to meet $AB$ at $Q$. Then $\\overrightarrow{OQ} = \\lambda\\overrightarrow{OP} = \\frac{\\lambda}{3}\\overrightarrow{OA} + \\frac{\\lambda}{2}\\overrightarrow{OB}$, and $Q$ lies on $AB$ when $\\frac{\\lambda}{3} + \\frac{\\lambda}{2} = 1$, so $\\lambda = \\frac65$ and $OP = \\frac56OQ$. Triangles $PAB$ and $OAB$ have the same base $AB$ and heights in the ratio $PQ : OQ = 1 : 6$. So the fraction is $\\dfrac16$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; ratios",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The random variable $X$ has a binomial distribution with $n = 14$ and probability of success $p$. The greatest value of $P(X = k)$ occurs for exactly two values of $k$, namely $k = 4$ and $k = 5$."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $p$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{9}{28}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac13$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{5}{14}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{4}{11}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\dfrac{P(X = 5)}{P(X = 4)} = \\dfrac{\\binom{14}{5}}{\\binom{14}{4}} \\times \\dfrac{p}{1 - p} = \\dfrac{10}{5} \\times \\dfrac{p}{1 - p} = 1$, so $2p = 1 - p$ and $p = \\dfrac13$. (Then the ratio $\\frac{15 - k}{2k}$ of consecutive probabilities is greater than 1 for $k < 5$ and less than 1 for $k > 5$.)"
+        }
+       ],
+       "classification": {
+        "content": "Binomial distribution; binomial coefficients",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Consider the solution of the differential equation $\\dfrac{dy}{dx} = x + y$ that satisfies $y = c$ when $x = 0$."
+      },
+      {
+       "k": "p",
+       "t": "For which values of $c$ does the solution curve have a stationary point?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "All real $c$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$c < -1$ only"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$c > -1$ only"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "No values of $c$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The line $y = -x - 1$ is a solution curve (gradient $-1 = x + y$), and solution curves cannot cross. A stationary point must lie on the line $y = -x$, which is above $y = -x - 1$. Above the solution line, $\\dfrac{d}{dx}(x + y) = 1 + (x + y) > 0$, so $x + y$ increases from negative values (as $x \\to -\\infty$ the curve approaches the line) through 0: there is a stationary point when $c > -1$. Below the line $x + y < -1$ always, so there is none when $c \\le -1$. (Explicitly $y = (c + 1)e^x - x - 1$.)"
+        }
+       ],
+       "classification": {
+        "content": "Differential equations; solution curves",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many solutions does the equation $\\cos x\\cos 2x\\cos 4x = \\dfrac18$ have for $0 < x < \\pi$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "3"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "4"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "6"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "7"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Multiplying by $8\\sin x \\ne 0$ and using $\\sin 2\\theta = 2\\sin\\theta\\cos\\theta$ three times, the equation is $\\sin 8x = \\sin x$. So $8x = x + 2k\\pi$, giving $x = \\frac{2\\pi}{7}, \\frac{4\\pi}{7}, \\frac{6\\pi}{7}$, or $8x = \\pi - x + 2k\\pi$, giving $x = \\frac{\\pi}{9}, \\frac{3\\pi}{9}, \\frac{5\\pi}{9}, \\frac{7\\pi}{9}$. There are 7 solutions."
+        }
+       ],
+       "classification": {
+        "content": "Trigonometric equations; double angles",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the value of $\\displaystyle\\int_0^{\\pi} \\frac{x\\sin x}{1 + \\cos^2 x}\\,dx$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\pi^2}{4}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\pi^2}{8}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\pi^2}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{\\pi}{4}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $I$ be the integral. The substitution $x = \\pi - u$ gives $I = \\displaystyle\\int_0^\\pi\\frac{(\\pi - u)\\sin u}{1 + \\cos^2 u}\\,du$, so $2I = \\pi\\displaystyle\\int_0^\\pi\\frac{\\sin u}{1 + \\cos^2 u}\\,du = \\pi\\Bigl[-\\tan^{-1}(\\cos u)\\Bigr]_0^\\pi = \\pi \\times \\frac{\\pi}{2}$. Hence $I = \\dfrac{\\pi^2}{4}$."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution; inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-04",
+         "ME1-12-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The diagram shows the curve with parametric equations $x = t^2$, $y = t^3$. The tangent to the curve at the point $P$, where $t = 2$, meets the curve again at the point $Q$."
+      },
+      {
+       "k": "fig",
+       "name": "figcusp"
+      },
+      {
+       "k": "p",
+       "t": "What are the coordinates of $Q$?"
+      }
+     ],
+     "figures": [
+      "figcusp"
+     ],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$(1,\\ 1)$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\left(\\dfrac49,\\ -\\dfrac{8}{27}\\right)$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\left(\\dfrac14,\\ -\\dfrac18\\right)$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$(1,\\ -1)$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\dfrac{dy}{dx} = \\dfrac{3t^2}{2t} = 3$ at $t = 2$, so the tangent is $y - 8 = 3(x - 4)$. At a point of the curve on this line, $t^3 - 8 = 3\\left(t^2 - 4\\right)$, that is, $t^3 - 3t^2 + 4 = (t - 2)^2(t + 1) = 0$. So $Q$ has $t = -1$, and $Q = (1, -1)$."
+        }
+       ],
+       "classification": {
+        "content": "Parametric form; tangents; polynomial equations",
+        "outcomes": [
+         "ME1-11-01",
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the smallest number of integers that must be chosen to be certain that, among the chosen integers, there are two whose sum or difference is divisible by 10?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "5"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "6"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "7"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "11"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Sort integers by last digit into the six classes $\\{0\\}$, $\\{5\\}$, $\\{1, 9\\}$, $\\{2, 8\\}$, $\\{3, 7\\}$, $\\{4, 6\\}$. Two integers in the same class have a sum or a difference divisible by 10. Among 7 integers two are in the same class, while $0, 1, 2, 3, 4, 5$ shows that 6 integers are not enough. So the answer is 7."
+        }
+       ],
+       "classification": {
+        "content": "The pigeonhole principle",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find all real values of $k$ for which the polynomial $x^4 - 21x^3 + kx^2 - 21x + 1$ has four distinct real zeros."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct set of values with justification"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains correct conditions on both zeros of the quadratic in $u$ with a minor error or omission"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains the quadratic in $u = x + \\frac1x$ and the condition $u^2 > 4$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains the quadratic in $u = x + \\frac1x$, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$x = 0$ is not a zero. Dividing the equation by $x^2$ and writing $u = x + \\dfrac1x$, so that $x^2 + \\dfrac{1}{x^2} = u^2 - 2$,"
+        },
+        {
+         "k": "math",
+         "t": "u^2 - 21u + (k - 2) = 0."
+        },
+        {
+         "k": "p",
+         "t": "For a given real $u$, the equation $x + \\dfrac1x = u$ is $x^2 - ux + 1 = 0$, which has two distinct real solutions exactly when $u^2 > 4$, and different values of $u$ give different values of $x$. So the polynomial has four distinct real zeros exactly when the quadratic has two distinct real zeros $u_1 > u_2$, both with $|u| > 2$."
+        },
+        {
+         "k": "p",
+         "t": "The zeros are real and distinct when $D = 441 - 4(k - 2) = 449 - 4k > 0$. Then $u_1 = \\dfrac{21 + \\sqrt{D}}{2} > 2$, and $u_2 = \\dfrac{21 - \\sqrt{D}}{2}$."
+        },
+        {
+         "k": "p",
+         "t": "$u_2 > 2$ when $\\sqrt{D} < 17$, that is, $449 - 4k < 289$, so $k > 40$."
+        },
+        {
+         "k": "p",
+         "t": "$u_2 < -2$ when $\\sqrt{D} > 25$, that is, $449 - 4k > 625$, so $k < -44$."
+        },
+        {
+         "k": "p",
+         "t": "Hence the polynomial has four distinct real zeros when $k < -44$ or $40 < k < \\dfrac{449}{4}$."
+        }
+       ],
+       "classification": {
+        "content": "Polynomial equations reducible to quadratics",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "interval",
+        "region": "k < -44 or 40 < k < 449/4",
+        "variable": "k",
+        "display": "k < -44 \\ \\text{or}\\ 40 < k < \\dfrac{449}{4}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p02.py: exact distinct-real-root count of the quartic over a k grid with bisection of the transitions gives boundaries -44, 40, 112.25"
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find the value of $k$ for which the polynomial $x^4 - 21x^3 + kx^2 - 21x + 1$ has four distinct positive zeros that form a geometric progression."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Shows that the zeros are $c^{-3}, c^{-1}, c, c^3$ and relates the two values of $u$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Observes that the reciprocal of a zero is a zero, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $P(x)$ be the polynomial. Dividing $P(x) = 0$ by $x^2$ and writing $u = x + \\dfrac1x$ gives $u^2 - 21u + (k - 2) = 0$."
+        },
+        {
+         "k": "p",
+         "t": "If $x$ is a zero then so is $\\dfrac1x$, since $x^4P\\left(\\dfrac1x\\right) = P(x)$. Let the zeros, in increasing order, be $a, ar, ar^2, ar^3$ with $r > 1$. Taking reciprocals reverses the order, so $a \\times ar^3 = 1$ and $ar \\times ar^2 = 1$. With $c = \\sqrt{r}$, the zeros are $c^{-3}, c^{-1}, c, c^3$."
+        },
+        {
+         "k": "p",
+         "t": "The corresponding values of $u$ are $v = c + \\dfrac1c$ and $c^3 + \\dfrac{1}{c^3} = v^3 - 3v$. Their sum is 21, so"
+        },
+        {
+         "k": "math",
+         "t": "v^3 - 2v - 21 = 0, \\qquad (v - 3)\\left(v^2 + 3v + 7\\right) = 0, \\qquad v = 3."
+        },
+        {
+         "k": "p",
+         "t": "The two values of $u$ are 3 and 18, and their product is $k - 2$, so $k = 56$. (Then $c = \\frac{3 + \\sqrt5}{2}$ and the zeros are distinct and positive.)"
+        }
+       ],
+       "classification": {
+        "content": "Zeros and coefficients; geometric progressions",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 56,
+        "display": "56"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p02.py: numeric roots of the quartic scanned over k; the only k with four positive roots in geometric progression is 56"
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $n$ be a positive integer, and let $I = \\displaystyle\\int_0^1\\frac{1 - (1 - x)^n}{x}\\,dx$."
+        },
+        {
+         "k": "p",
+         "t": "By evaluating $I$ in two ways, one of which uses the substitution $u = 1 - x$, show that"
+        },
+        {
+         "k": "math",
+         "t": "\\binom{n}{1} - \\frac12\\binom{n}{2} + \\frac13\\binom{n}{3} - \\cdots + \\frac{(-1)^{n+1}}{n}\\binom{n}{n} \\;=\\; 1 + \\frac12 + \\frac13 + \\cdots + \\frac1n."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct demonstration"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Evaluates the integral in one of the two ways, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Expands $1 - (1 - x)^n$, or makes the substitution $u = 1 - x$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "By the binomial theorem, $1 - (1 - x)^n = \\dbinom{n}{1}x - \\dbinom{n}{2}x^2 + \\cdots + (-1)^{n+1}\\dbinom{n}{n}x^n$. Dividing by $x$ and integrating term by term from 0 to 1, the integral equals the left-hand side."
+        },
+        {
+         "k": "p",
+         "t": "The substitution $u = 1 - x$ turns the integral into $\\displaystyle\\int_0^1\\frac{1 - u^n}{1 - u}\\,du = \\int_0^1\\left(1 + u + u^2 + \\cdots + u^{n-1}\\right)du = 1 + \\frac12 + \\cdots + \\frac1n$, which is the right-hand side."
+        }
+       ],
+       "classification": {
+        "content": "Binomial theorem; integration by substitution",
+        "outcomes": [
+         "ME1-11-04",
+         "ME1-12-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Ten different positive integers, each less than 100, are chosen."
+        },
+        {
+         "k": "p",
+         "t": "Show that it is always possible to find two groups of the chosen integers, with no integer in both groups, such that the sum of the integers in one group equals the sum of the integers in the other group."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct proof"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Shows that two different groups have the same sum, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Counts the non-empty groups or bounds the possible sums, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The ten integers have $2^{10} - 1 = 1023$ non-empty groups (subsets). The sum of the integers in a group is at least 1 and at most $90 + 91 + \\cdots + 99 = 945$, so there are fewer than 1023 possible sums. By the pigeonhole principle, two different groups $G$ and $H$ have the same sum."
+        },
+        {
+         "k": "p",
+         "t": "Remove from both groups every integer that belongs to both. The same amount is removed from each sum, so the two new groups still have equal sums, and now no integer is in both. Neither new group is empty: if one were empty its sum would be 0, so the other would be empty too, and then $G$ and $H$ would have been the same group."
+        }
+       ],
+       "classification": {
+        "content": "The pigeonhole principle",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 2,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A box contains $n$ tickets numbered $1, 2, \\ldots, n$. A ticket is drawn at random and replaced, and this is done $k$ times. Let $M$ be the largest number drawn."
+        },
+        {
+         "k": "p",
+         "t": "Show that $E(M) = n - \\dfrac{1^k + 2^k + \\cdots + (n - 1)^k}{n^k}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct demonstration"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $P(M \\le j)$ or $P(M = j)$, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$M \\le j$ exactly when all $k$ numbers drawn are at most $j$, so $P(M \\le j) = \\dfrac{j^k}{n^k}$ and $P(M = j) = \\dfrac{j^k - (j - 1)^k}{n^k}$. Hence"
+        },
+        {
+         "k": "math",
+         "t": "n^kE(M) = \\sum_{j=1}^{n}j\\left[j^k - (j - 1)^k\\right] = \\sum_{j=1}^{n}j \\times j^k - \\sum_{j=0}^{n-1}(j + 1)j^k = n \\times n^k - \\sum_{j=1}^{n-1}j^k,"
+        },
+        {
+         "k": "p",
+         "t": "since the terms $j \\times j^k$ cancel for $1 \\le j \\le n - 1$. Dividing by $n^k$ gives the result."
+        }
+       ],
+       "classification": {
+        "content": "Probability; expected value; sums",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The diagram shows a quadrilateral $ABCD$."
+        },
+        {
+         "k": "fig",
+         "name": "figquad"
+        },
+        {
+         "k": "p",
+         "t": "Use vectors to prove that the diagonals $AC$ and $BD$ are perpendicular if and only if"
+        },
+        {
+         "k": "math",
+         "t": "AB^2 + CD^2 = BC^2 + DA^2."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct proof of both directions"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Expands the squared lengths as scalar products and makes substantial progress, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the lengths in terms of position vectors, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $\\underset{\\sim}{a}, \\underset{\\sim}{b}, \\underset{\\sim}{c}, \\underset{\\sim}{d}$ be the position vectors of $A, B, C, D$. Then"
+        },
+        {
+         "k": "math",
+         "t": "\\begin{aligned}\nAB^2 + CD^2 - BC^2 - DA^2 &= \\left|\\underset{\\sim}{b} - \\underset{\\sim}{a}\\right|^2 + \\left|\\underset{\\sim}{d} - \\underset{\\sim}{c}\\right|^2 - \\left|\\underset{\\sim}{c} - \\underset{\\sim}{b}\\right|^2 - \\left|\\underset{\\sim}{a} - \\underset{\\sim}{d}\\right|^2\\\\\n&= -2\\,\\underset{\\sim}{a}\\cdot\\underset{\\sim}{b} - 2\\,\\underset{\\sim}{c}\\cdot\\underset{\\sim}{d} + 2\\,\\underset{\\sim}{b}\\cdot\\underset{\\sim}{c} + 2\\,\\underset{\\sim}{a}\\cdot\\underset{\\sim}{d}\\\\\n&= 2\\left(\\underset{\\sim}{c} - \\underset{\\sim}{a}\\right)\\cdot\\left(\\underset{\\sim}{b} - \\underset{\\sim}{d}\\right) = 2\\,\\overrightarrow{AC}\\cdot\\overrightarrow{DB},\n\\end{aligned}"
+        },
+        {
+         "k": "p",
+         "t": "since the squared terms cancel. So $AB^2 + CD^2 = BC^2 + DA^2$ if and only if $\\overrightarrow{AC}\\cdot\\overrightarrow{DB} = 0$, that is, if and only if $AC \\perp BD$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors in two dimensions; scalar product; geometric proof",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [
+        "figquad"
+       ],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Use the substitution $x = \\dfrac{1 - u}{1 + u}$ to find the exact value of $\\displaystyle\\int_0^1\\frac{\\tan^{-1}x}{1 + x}\\,dx$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact value"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains an equation for the integral in terms of itself, or equivalent merit"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Transforms both $\\dfrac{dx}{1 + x}$ and $\\tan^{-1}x$ correctly"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Transforms $\\dfrac{dx}{1 + x}$ or $\\tan^{-1}x$ correctly, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $I$ be the integral. With $x = \\dfrac{1 - u}{1 + u}$: $\\ 1 + x = \\dfrac{2}{1 + u}$ and $dx = \\dfrac{-2}{(1 + u)^2}\\,du$, so $\\dfrac{dx}{1 + x} = -\\dfrac{du}{1 + u}$. Also, for $0 \\le u \\le 1$, $\\tan\\left(\\dfrac{\\pi}{4} - \\tan^{-1}u\\right) = \\dfrac{1 - u}{1 + u}$, so $\\tan^{-1}x = \\dfrac{\\pi}{4} - \\tan^{-1}u$. When $x = 0$, $u = 1$, and when $x = 1$, $u = 0$. Hence"
+        },
+        {
+         "k": "math",
+         "t": "I = \\int_0^1\\frac{\\frac{\\pi}{4} - \\tan^{-1}u}{1 + u}\\,du = \\frac{\\pi}{4}\\ln 2 - I, \\qquad\\text{so}\\qquad I = \\frac{\\pi}{8}\\ln 2."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution; inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-04",
+         "ME1-12-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "pi*ln(2)/8",
+        "display": "\\dfrac{\\pi}{8}\\ln 2"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p02.py: mpmath quadrature of atan(x)/(1+x) on [0,1] agrees with pi ln2/8 to 1e-20"
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "In this part, an expression such as $\\dfrac{\\sin m\\theta}{\\sin\\theta}$ is given its limiting value at any value of $\\theta$ where $\\sin\\theta = 0$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Prove by mathematical induction that, for all integers $n \\ge 1$,"
+          },
+          {
+           "k": "math",
+           "t": "\\sin\\theta + \\sin 3\\theta + \\sin 5\\theta + \\cdots + \\sin(2n - 1)\\theta = \\frac{\\sin^2 n\\theta}{\\sin\\theta}."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Verifies the base case and makes substantial progress with the inductive step"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Verifies the base case, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "For $n = 1$ both sides equal $\\sin\\theta$. Assume the result for $n = k$. Then"
+          },
+          {
+           "k": "math",
+           "t": "\\sin\\theta + \\cdots + \\sin(2k - 1)\\theta + \\sin(2k + 1)\\theta = \\frac{\\sin^2 k\\theta + \\sin(2k + 1)\\theta\\,\\sin\\theta}{\\sin\\theta}."
+          },
+          {
+           "k": "p",
+           "t": "Now $\\sin(2k + 1)\\theta\\,\\sin\\theta = \\frac12\\bigl[\\cos 2k\\theta - \\cos(2k + 2)\\theta\\bigr] = \\frac12\\bigl[\\left(1 - 2\\sin^2 k\\theta\\right) - \\left(1 - 2\\sin^2(k + 1)\\theta\\right)\\bigr] = \\sin^2(k + 1)\\theta - \\sin^2 k\\theta$."
+          },
+          {
+           "k": "p",
+           "t": "So the sum is $\\dfrac{\\sin^2(k + 1)\\theta}{\\sin\\theta}$, which is the result for $n = k + 1$. By mathematical induction the result is true for all integers $n \\ge 1$."
+          }
+         ],
+         "classification": {
+          "content": "Proof by mathematical induction; trigonometric identities; definite integrals",
+          "outcomes": [
+           "ME1-12-01",
+           "ME1-11-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\displaystyle\\int_0^{\\pi}\\frac{\\sin(2k - 1)\\theta}{\\sin\\theta}\\,d\\theta = \\pi$ for every integer $k \\ge 1$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that consecutive integrals are equal, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Evaluates the integral for $k = 1$ and considers the difference of consecutive integrands, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $I_k$ be the integral. Then $I_1 = \\displaystyle\\int_0^\\pi 1\\,d\\theta = \\pi$. Since $\\sin(2k + 1)\\theta - \\sin(2k - 1)\\theta = 2\\cos 2k\\theta\\,\\sin\\theta$,"
+          },
+          {
+           "k": "math",
+           "t": "I_{k+1} - I_k = \\int_0^\\pi 2\\cos 2k\\theta\\,d\\theta = \\left[\\frac{\\sin 2k\\theta}{k}\\right]_0^\\pi = 0."
+          },
+          {
+           "k": "p",
+           "t": "Hence $I_{k+1} = I_k$ for all $k \\ge 1$, and so $I_k = \\pi$ for every $k \\ge 1$."
+          }
+         ],
+         "classification": {
+          "content": "Proof by mathematical induction; trigonometric identities; definite integrals",
+          "outcomes": [
+           "ME1-12-01",
+           "ME1-11-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Hence find the value of $\\displaystyle\\int_0^{\\pi}\\left(\\frac{\\sin n\\theta}{\\sin\\theta}\\right)^2 d\\theta$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Divides the identity of part (i) by $\\sin\\theta$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Dividing the identity of part (i) by $\\sin\\theta$, $\\ \\left(\\dfrac{\\sin n\\theta}{\\sin\\theta}\\right)^2 = \\displaystyle\\sum_{k=1}^{n}\\frac{\\sin(2k - 1)\\theta}{\\sin\\theta}$. Integrating from 0 to $\\pi$ and using part (ii), the value is $n\\pi$."
+          }
+         ],
+         "classification": {
+          "content": "Proof by mathematical induction; trigonometric identities; definite integrals",
+          "outcomes": [
+           "ME1-12-01",
+           "ME1-11-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "n*pi",
+          "display": "n\\pi"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p02.py: quadrature of (sin n t / sin t)^2 over [0,pi] for n=1..8 equals n*pi"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Two circles of radius 1 have centres $C_1$ and $C_2$ that are a distance $d$ apart, where $0 < d < 2$. The shaded region common to the two circles has area $A$, and the common chord of the circles has length $L$."
+        },
+        {
+         "k": "fig",
+         "name": "figlens"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find $A$ in terms of $d$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct area"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the area of one segment in terms of an angle and relates the angle to $d$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the angle subtended by the common chord at a centre, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let the common chord subtend an angle $2\\alpha$ at each centre. The chord is the perpendicular bisector of $C_1C_2$, so $\\cos\\alpha = \\dfrac{d}{2}$. The region consists of two equal segments, each of area $\\frac12(2\\alpha) - \\frac12\\sin 2\\alpha = \\alpha - \\sin\\alpha\\cos\\alpha$. Hence"
+          },
+          {
+           "k": "math",
+           "t": "A = 2\\alpha - 2\\sin\\alpha\\cos\\alpha = 2\\cos^{-1}\\frac{d}{2} - \\frac{d}{2}\\sqrt{4 - d^2},"
+          },
+          {
+           "k": "p",
+           "t": "since $\\sin\\alpha = \\sqrt{1 - \\dfrac{d^2}{4}} = \\dfrac12\\sqrt{4 - d^2}$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse trigonometric functions; areas of sectors; differentiation",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "2*acos(d/2)-(d/2)*sqrt(4-d^2)",
+          "display": "2\\cos^{-1}\\dfrac{d}{2}-\\dfrac{d}{2}\\sqrt{4-d^{2}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p02.py: numeric overlap area of two unit circles (vertical-chord quadrature) matches at 7 values of d to 1e-12"
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\dfrac{dA}{dd} = -L$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates $A$ correctly, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $L$ in terms of $d$, or attempts to differentiate $A$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$L = 2\\sin\\alpha = \\sqrt{4 - d^2}$. Differentiating the result of part (i),"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{dA}{dd} = \\frac{-2 \\times \\frac12}{\\sqrt{1 - \\frac{d^2}{4}}} - \\frac12\\sqrt{4 - d^2} + \\frac{d}{2} \\times \\frac{d}{\\sqrt{4 - d^2}} = \\frac{-4 - \\left(4 - d^2\\right) + d^2}{2\\sqrt{4 - d^2}} = \\frac{d^2 - 4}{\\sqrt{4 - d^2}} = -\\sqrt{4 - d^2}."
+          },
+          {
+           "k": "p",
+           "t": "Hence $\\dfrac{dA}{dd} = -L$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse trigonometric functions; areas of sectors; differentiation",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Use part (ii) to find the mean value $\\dfrac12\\displaystyle\\int_0^2 L\\,dd$ of the length of the common chord, without finding a primitive of $L$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value using part (ii)"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the integral as a change in $A$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (ii), $\\displaystyle\\int_0^2 L\\,dd$ is the total decrease in $A$ as $d$ increases from 0 to 2. When $d = 0$ the circles coincide and $A = \\pi$; when $d = 2$ the circles touch and $A = 0$. (The formula of part (i) gives these values as $d \\to 0$ and $d \\to 2$.) So the integral is $\\pi$ and the mean value is $\\dfrac{\\pi}{2}$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse trigonometric functions; areas of sectors; differentiation",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 1.5707963267948966,
+          "display": "\\dfrac{\\pi}{2}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p02.py: chord length from solving the circle equations, mean value by quadrature = pi/2"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figlens"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A string is wound around a fixed circular post of radius 1 with centre $O$. The free end $P$ of the string starts at the point $(1, 0)$ on the post, and the string is unwound and kept taut, so that at time $t \\ge 0$ the position vector of $P$ is"
+        },
+        {
+         "k": "math",
+         "t": "\\underset{\\sim}{r} = (\\cos t + t\\sin t)\\,\\underset{\\sim}{i} + (\\sin t - t\\cos t)\\,\\underset{\\sim}{j}."
+        },
+        {
+         "k": "p",
+         "t": "At time $t$ the string leaves the post at the point $Q$ whose position vector is $\\ \\cos t\\,\\underset{\\sim}{i} \\,+\\, \\sin t\\,\\underset{\\sim}{j}$."
+        },
+        {
+         "k": "fig",
+         "name": "figinv"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the velocity vector of $P$, and show that the speed of $P$ at time $t$ is $t$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the velocity and the speed"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\underset{\\sim}{v} = (-\\sin t + \\sin t + t\\cos t)\\,\\underset{\\sim}{i} + (\\cos t - \\cos t + t\\sin t)\\,\\underset{\\sim}{j} = t\\cos t\\,\\underset{\\sim}{i} + t\\sin t\\,\\underset{\\sim}{j}$, so $\\left|\\underset{\\sim}{v}\\right| = t$."
+          }
+         ],
+         "classification": {
+          "content": "Motion in vector form; scalar product; rates of change",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that, for $t > 0$, the straight part $QP$ of the string is a tangent to the post, has length $t$, and is perpendicular to the direction in which $P$ is moving."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration of all three facts"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Establishes two of the three facts, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $\\overrightarrow{QP}$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\overrightarrow{QP} = \\underset{\\sim}{r} - \\overrightarrow{OQ} = t\\sin t\\,\\underset{\\sim}{i} - t\\cos t\\,\\underset{\\sim}{j}$, which has length $t$."
+          },
+          {
+           "k": "p",
+           "t": "$\\overrightarrow{QP}\\cdot\\overrightarrow{OQ} = t\\sin t\\cos t - t\\cos t\\sin t = 0$, so $QP$ is perpendicular to the radius $OQ$ at the point $Q$ of the circle. Hence $QP$ is a tangent to the post."
+          },
+          {
+           "k": "p",
+           "t": "$\\overrightarrow{QP}\\cdot\\underset{\\sim}{v} = t^2\\sin t\\cos t - t^2\\cos t\\sin t = 0$, so $QP$ is perpendicular to the velocity of $P$."
+          }
+         ],
+         "classification": {
+          "content": "Motion in vector form; scalar product; rates of change",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Let $\\alpha$ be the angle between $\\overrightarrow{OP}$ and the velocity of $P$, for $t > 0$. Find $\\cos\\alpha$ in terms of $t$, and hence find the time at which $\\alpha = \\dfrac{\\pi}{3}$ and the rate at which the distance $OP$ is increasing at that time."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides $\\cos\\alpha$, the time and the rate"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $\\cos\\alpha$ and the time, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $\\underset{\\sim}{r}\\cdot\\underset{\\sim}{v}$ or the length of $\\underset{\\sim}{r}$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\underset{\\sim}{r}\\cdot\\underset{\\sim}{v} = t\\cos t(\\cos t + t\\sin t) + t\\sin t(\\sin t - t\\cos t) = t$, and $\\left|\\underset{\\sim}{r}\\right|^2 = (\\cos t + t\\sin t)^2 + (\\sin t - t\\cos t)^2 = 1 + t^2$. Hence"
+          },
+          {
+           "k": "math",
+           "t": "\\cos\\alpha = \\frac{\\underset{\\sim}{r}\\cdot\\underset{\\sim}{v}}{\\left|\\underset{\\sim}{r}\\right|\\left|\\underset{\\sim}{v}\\right|} = \\frac{t}{t\\sqrt{1 + t^2}} = \\frac{1}{\\sqrt{1 + t^2}}."
+          },
+          {
+           "k": "p",
+           "t": "$\\alpha = \\dfrac{\\pi}{3}$ when $\\sqrt{1 + t^2} = 2$, that is, when $t = \\sqrt3$."
+          },
+          {
+           "k": "p",
+           "t": "Since $OP = \\sqrt{1 + t^2}$, $\\ \\dfrac{d}{dt}(OP) = \\dfrac{t}{\\sqrt{1 + t^2}}$, which equals $\\dfrac{\\sqrt3}{2}$ when $t = \\sqrt3$. (This is the component $\\left|\\underset{\\sim}{v}\\right|\\cos\\alpha$ of the velocity in the direction of $OP$.)"
+          }
+         ],
+         "classification": {
+          "content": "Motion in vector form; scalar product; rates of change",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figinv"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Two thin vertical walls, each of height $h$, stand a distance $d$ apart on horizontal ground. A ball is projected from a point $O$ on the ground, at a distance $a$ from the nearer wall, in a vertical plane perpendicular to the walls. It just clears both walls. The ball is projected with speed $V$ at an angle $\\theta$ to the horizontal, and at time $t$ its position vector relative to $O$ is"
+        },
+        {
+         "k": "math",
+         "t": "Vt\\cos\\theta\\,\\underset{\\sim}{i} + \\left(Vt\\sin\\theta - \\tfrac12gt^2\\right)\\underset{\\sim}{j},"
+        },
+        {
+         "k": "p",
+         "t": "where $g$ is the acceleration due to gravity. **(Do NOT prove this.)**"
+        },
+        {
+         "k": "fig",
+         "name": "figwalls"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the ball lands at a distance $a$ beyond the farther wall."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains the equation of the path and a quadratic equation for the points at height $h$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Eliminating $t$, the path is $y = x\\tan\\theta - \\dfrac{gx^2}{2V^2\\cos^2\\theta} = x\\tan\\theta\\left(1 - \\dfrac{x}{R}\\right)$, where $R = \\dfrac{2V^2\\sin\\theta\\cos\\theta}{g}$ is the distance from $O$ at which the ball lands."
+          },
+          {
+           "k": "p",
+           "t": "The ball is at height $h$ when $x^2 - Rx + \\dfrac{hR}{\\tan\\theta} = 0$, and the solutions are $x = a$ and $x = a + d$. Their sum is $R$, so $R = 2a + d$, and the ball lands at a distance $R - (a + d) = a$ beyond the farther wall."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; quadratic equations; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find $V^2$ in terms of $a$, $d$, $h$ and $g$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct expression for $V^2$"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $\\tan\\theta$ in terms of $a$, $d$ and $h$ and relates $V^2$ to $R$ and $\\tan\\theta$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $\\tan\\theta$ in terms of $a$, $d$ and $h$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The product of the solutions of the quadratic in part (i) is $a(a + d) = \\dfrac{hR}{\\tan\\theta}$, so $\\tan\\theta = \\dfrac{hR}{a(a + d)}$."
+          },
+          {
+           "k": "p",
+           "t": "Also $V^2 = \\dfrac{gR}{2\\sin\\theta\\cos\\theta} = \\dfrac{gR\\left(1 + \\tan^2\\theta\\right)}{2\\tan\\theta} = \\dfrac{g}{2}\\left[\\dfrac{R}{\\tan\\theta} + R\\tan\\theta\\right]$. Substituting, with $R = 2a + d$,"
+          },
+          {
+           "k": "math",
+           "t": "V^2 = \\frac{g}{2}\\left[\\frac{a(a + d)}{h} + \\frac{h(2a + d)^2}{a(a + d)}\\right]."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; quadratic equations; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "g/2*(a*(a+d)/h+h*(2*a+d)^2/(a*(a+d)))",
+          "display": "\\dfrac{g}{2}\\left[\\dfrac{a(a+d)}{h}+\\dfrac{h(2a+d)^{2}}{a(a+d)}\\right]"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p02.py: 25 random exact rational (a,d,h,g); solving the two clearance conditions for tan(theta) and V^2 equals the key exactly"
+        },
+        {
+         "id": "q14a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The point $O$ may be chosen anywhere on the ground. Find the least speed with which the ball can be projected so that it clears both walls, and the corresponding value of $a$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct least speed and the correct value of $a$"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the least value of $V^2$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Expresses $V^2$ in terms of a single variable such as $a(a + d)$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $w = a(a + d)$, which takes every positive value as $a$ varies. Then $(2a + d)^2 = 4w + d^2$ and"
+          },
+          {
+           "k": "math",
+           "t": "V^2 = \\frac{g}{2}\\left[\\frac{w}{h} + 4h + \\frac{hd^2}{w}\\right], \\qquad \\frac{d}{dw}\\left(V^2\\right) = \\frac{g}{2}\\left[\\frac1h - \\frac{hd^2}{w^2}\\right],"
+          },
+          {
+           "k": "p",
+           "t": "which is negative for $w < hd$ and positive for $w > hd$. So $V^2$ is least when $w = hd$, and then $V^2 = \\dfrac{g}{2}\\left[d + 4h + d\\right] = g(d + 2h)$."
+          },
+          {
+           "k": "p",
+           "t": "The least speed is $\\sqrt{g(d + 2h)}$. It occurs when $a^2 + ad - hd = 0$, that is, $a = \\dfrac{-d + \\sqrt{d^2 + 4hd}}{2}$."
+          },
+          {
+           "k": "p",
+           "t": "(A ball that only just clears both walls passes through their tops, and a ball that clears them by more needs a greater speed, so it is enough to consider these paths.)"
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; quadratic equations; optimisation",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figwalls"
+       ]
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A sample contains $N$ radioactive atoms, where $N \\ge 2$. Each atom decays at a random moment, independently of the others, and the probability that a given atom has not decayed by time $t$ is $e^{-\\lambda t}$, where $\\lambda$ is a positive constant. Let $X$ be the number of atoms that have not decayed by time $t$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Write down $E(X)$ and $P(X = 0)$ in terms of $N$, $\\lambda$ and $t$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides both expressions"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$X$ has a binomial distribution with $N$ trials and probability of success $e^{-\\lambda t}$. So $E(X) = Ne^{-\\lambda t}$ and $P(X = 0) = \\left(1 - e^{-\\lambda t}\\right)^N$."
+          }
+         ],
+         "classification": {
+          "content": "Exponential decay; binomial distribution; optimisation; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the probability that every atom has decayed is increasing most rapidly at the instant when $E(X) = 1$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds where the derivative of $P(X = 0)$ is stationary, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Differentiates $P(X = 0)$ with respect to $t$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $F(t) = P(X = 0) = \\left(1 - e^{-\\lambda t}\\right)^N$. Then $F'(t) = N\\lambda e^{-\\lambda t}\\left(1 - e^{-\\lambda t}\\right)^{N-1}$."
+          },
+          {
+           "k": "p",
+           "t": "Let $u = e^{-\\lambda t}$, which decreases from 1 towards 0 as $t$ increases. Then $F'(t) = \\lambda N\\,G(u)$, where $G(u) = u(1 - u)^{N-1}$, and"
+          },
+          {
+           "k": "math",
+           "t": "G'(u) = (1 - u)^{N-1} - (N - 1)u(1 - u)^{N-2} = (1 - u)^{N-2}(1 - Nu),"
+          },
+          {
+           "k": "p",
+           "t": "which is positive for $0 < u < \\dfrac1N$ and negative for $\\dfrac1N < u < 1$. So $G(u)$, and therefore $F'(t)$, is greatest when $u = \\dfrac1N$, and then $E(X) = Nu = 1$."
+          },
+          {
+           "k": "p",
+           "t": "(Note that $F'(t) = \\lambda\\,P(X = 1)$: the sample finishes decaying at the moment when the last remaining atom decays.)"
+          }
+         ],
+         "classification": {
+          "content": "Exponential decay; binomial distribution; optimisation; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that, at the instant in part (ii), $\\ P(X = 0) < \\dfrac1e < P(X = 1)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct proof of both inequalities"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Proves one inequality, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $P(X = 0)$ and $P(X = 1)$ at that instant, or shows that $\\ln(1 + x) < x$ for $x \\ne 0$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "At that instant $e^{-\\lambda t} = \\dfrac1N$, so $P(X = 0) = \\left(1 - \\dfrac1N\\right)^N$ and $P(X = 1) = N \\times \\dfrac1N\\left(1 - \\dfrac1N\\right)^{N-1} = \\left(1 - \\dfrac1N\\right)^{N-1}$."
+          },
+          {
+           "k": "p",
+           "t": "Let $g(x) = x - \\ln(1 + x)$ for $x > -1$. Then $g(0) = 0$ and $g'(x) = \\dfrac{x}{1 + x}$, which is negative for $-1 < x < 0$ and positive for $x > 0$. So $\\ln(1 + x) < x$ for all $x > -1$ with $x \\ne 0$."
+          },
+          {
+           "k": "p",
+           "t": "With $x = -\\dfrac1N$: $\\ N\\ln\\left(1 - \\dfrac1N\\right) < -1$, so $P(X = 0) < \\dfrac1e$."
+          },
+          {
+           "k": "p",
+           "t": "With $x = \\dfrac{1}{N - 1}$: $\\ \\ln\\dfrac{N}{N - 1} < \\dfrac{1}{N - 1}$, so $(N - 1)\\ln\\left(1 - \\dfrac1N\\right) > -1$ and $P(X = 1) > \\dfrac1e$."
+          }
+         ],
+         "classification": {
+          "content": "Exponential decay; binomial distribution; optimisation; inequalities using calculus",
+          "outcomes": [
+           "ME1-12-06",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figdots",
+  "figQ3OptA",
+  "figQ3OptB",
+  "figQ3OptC",
+  "figQ3OptD",
+  "figtri",
+  "figcusp",
+  "figquad",
+  "figlens",
+  "figinv",
+  "figwalls"
+ ]
+}

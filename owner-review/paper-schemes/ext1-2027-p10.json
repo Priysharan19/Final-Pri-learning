@@ -1,0 +1,714 @@
+{
+ "status": "DRAFT for the author's review: not approved. Nothing in this file is switched on.",
+ "paper": "ext1-2027-p10",
+ "schemeDigest": "0c0b95dcf918e97c8c9fc6b397da08726382cf90ebbc70462ec928027f16fb95",
+ "source": "the criteria exactly as written in the author's marking guidelines; marks per criterion are his, not guessed",
+ "sectionII": {
+  "parts": 22,
+  "criteria": 60,
+  "engineCanAward": 12,
+  "engineCannot": 48
+ },
+ "parts": [
+  {
+   "id": "q11a",
+   "question": 11,
+   "marks": 3,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct term",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (numeric). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Finds the value of $k$",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Writes the general term",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "05e1561605712317765f326cf7437013c0bbe2b816aa39c0736d6b65b5eaf99d"
+  },
+  {
+   "id": "q11b",
+   "question": 11,
+   "marks": 3,
+   "answerType": "open",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides both points with justification",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c2",
+     "text": "Explains why the graphs meet only on $y = x$, or solves $f(x) = x$ correctly",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c3",
+     "text": "Sets up a correct equation",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    }
+   ],
+   "digest": "ef2391318189291008e79e7c6aaffbe5474668798a96eb944ed71af1e8abf81e"
+  },
+  {
+   "id": "q11c",
+   "question": 11,
+   "marks": 3,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct coordinates",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (point). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Finds the projection of $\\overrightarrow{AC}$ onto $\\overrightarrow{AB}$",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Finds $\\overrightarrow{AB}$ and $\\overrightarrow{AC}$",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "f80547f95db9f08f9f16e2aa8f5ded46a9edeeafd35d98cc7b866f8ab5218c5f"
+  },
+  {
+   "id": "q11d",
+   "question": 11,
+   "marks": 4,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides both values",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (set). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Solves the quadratic with a minor error",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Obtains a correct quadratic equation in $\\tan\\theta$",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Finds the time to reach the point",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "20b2ec30c0951e5e7772bcaa91f796f2c715eb38e3e21fa43cd277c454231bb1"
+  },
+  {
+   "id": "q11e",
+   "question": 11,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct proof",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Verifies the base case and makes substantial progress with the inductive step",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Verifies the base case",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "cacb92978b29341bf9be9b67e20cf45e752cc9ca9de3559663f73c414387a35f"
+  },
+  {
+   "id": "q12a",
+   "question": 12,
+   "marks": 3,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct value",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Writes the expression in the form $A + R\\cos(2x - \\alpha)$, or equivalent merit",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Uses double-angle results to rewrite the expression",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "a45a973dba5d1b874515026bba7839c7864c53e0a4bef11a3056e6aa54e2b463"
+  },
+  {
+   "id": "q12b",
+   "question": 12,
+   "marks": 4,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct value of $n$",
+     "marks": 4,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (numeric). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Obtains an equation in $n$ alone",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Finds $p$ in terms of $n$",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c4",
+     "text": "Writes the two probabilities correctly",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "46f0143b8d71b9d4b2ce757bd30a11306813944966ee4894c4c9acf6b9d6388a"
+  },
+  {
+   "id": "q12c-i",
+   "question": 12,
+   "marks": 2,
+   "answerType": "proof-explain",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct explanation",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "an explanation: words are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Recognises that two segments cross exactly when their endpoints are in opposite orders",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "an explanation: words are not machine-judged."
+    }
+   ],
+   "digest": "e2bc90a64a7cacd2478a2cc75350e2ac36199b6ff5c68320b1c93beb22d5605f"
+  },
+  {
+   "id": "q12c-ii",
+   "question": 12,
+   "marks": 2,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct probability",
+     "marks": 2,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (exact). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Counts the pairs of segments",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "1c3cd0df318382b4edf9d1a0ab0b007cf301224731f1bafc2b8eb35cf807a99c"
+  },
+  {
+   "id": "q12c-iii",
+   "question": 12,
+   "marks": 2,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct demonstration",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Writes the probability using binomial coefficients",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "0ecc92eda7af731381358729dead4efbea3e0558e460073bd205c31a0744c060"
+  },
+  {
+   "id": "q12c-iv",
+   "question": 12,
+   "marks": 2,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct value",
+     "marks": 2,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (numeric). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Solves the inequality",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "34d995979ca601e2aa319c3f554c2c1f7d9733ecc21ce7bc05e50fcd392e7105"
+  },
+  {
+   "id": "q13a-i",
+   "question": 13,
+   "marks": 2,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct demonstration",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Resolves $\\underset{\\sim}{w}$ into components along and perpendicular to $\\hat{\\underset{\\sim}{u}}$",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "711e5814583f8d7062c2f7939f2a7fcf7b9ee11fc4a5422c9d38962f9b7f43f4"
+  },
+  {
+   "id": "q13a-ii",
+   "question": 13,
+   "marks": 2,
+   "answerType": "value",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct coordinates",
+     "marks": 2,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (point). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Writes the position of the ball at time $t$ and uses the equation of $\\ell$",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "3e72158db09b94cad80080b0cd2baa7d4dd581ae502fc3339aa1f9f30b1e1d11"
+  },
+  {
+   "id": "q13a-iii",
+   "question": 13,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct proof and the correct angle",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Proves the dot product result",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Writes $\\underset{\\sim}{v}'$ in terms of the components of $\\underset{\\sim}{v}$",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "9bdef64df458a9b844456a964c73e8d1a7811bcd9af3bdfe03cbc0be90712a04"
+  },
+  {
+   "id": "q13b-i",
+   "question": 13,
+   "marks": 1,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct function",
+     "marks": 1,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    }
+   ],
+   "digest": "b0458b2d7e478d7a32247abadbe73db1022aebbc34077822c934aab26bde6c0e"
+  },
+  {
+   "id": "q13b-ii",
+   "question": 13,
+   "marks": 3,
+   "answerType": "show-that",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct demonstration",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c2",
+     "text": "Integrates to find $Be^{kt}$ (or equivalent) with the constant determined",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    },
+    {
+     "key": "c3",
+     "text": "Uses the product rule with the differential equation to simplify the derivative",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a \"show that\" or proof: no final answer exists to check, and the steps are not machine-judged."
+    }
+   ],
+   "digest": "23507b7101bb2a81434bc3ea9a0638dadacf1901f18d2414d2e69136103b5585"
+  },
+  {
+   "id": "q13b-iii",
+   "question": 13,
+   "marks": 3,
+   "answerType": "open",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct amount and time",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c2",
+     "text": "Finds the time when $\\dfrac{dB}{dt} = 0$",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c3",
+     "text": "Differentiates $B$",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    }
+   ],
+   "digest": "fd943a29ac0b718abeb365f0e1420fd675cde1b029fe02407d1c2a1fef80ed2b"
+  },
+  {
+   "id": "q14a",
+   "question": 14,
+   "marks": 3,
+   "answerType": "open",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides a correct polynomial",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c2",
+     "text": "Makes a correct substitution into $P$",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c3",
+     "text": "Expresses $\\alpha$ in terms of a new zero, or equivalent merit",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    }
+   ],
+   "digest": "63418498091f1fd2b8b128b0908063e21d45854d9241509a9f5bc6d95a4ca886"
+  },
+  {
+   "id": "q14b",
+   "question": 14,
+   "marks": 4,
+   "answerType": "open",
+   "keyed": false,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct solutions",
+     "marks": 4,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c2",
+     "text": "Solves the quadratic in $t$",
+     "marks": 3,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c3",
+     "text": "Obtains the correct quadratic in $t$",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    },
+    {
+     "key": "c4",
+     "text": "Correctly substitutes the t-formulae",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+    }
+   ],
+   "digest": "709d6cca8515dcde5cc2ef0acd902b2346b606190efcc83d6801aac5a43b1057"
+  },
+  {
+   "id": "q14c-i",
+   "question": 14,
+   "marks": 2,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct area",
+     "marks": 2,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Finds the area between the curve and the $y$-axis using the inverse function",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "9b68d02ed1a753393426c20323bb698278262207d998bc65b83c602a089fea04"
+  },
+  {
+   "id": "q14c-ii",
+   "question": 14,
+   "marks": 3,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct volume",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Simplifies the integrand to a form that can be integrated",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Writes a correct integral for the volume",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "6625386891cc545931511c1cbd4cef4fbf2ed5614353d058a0957cc156b39d40"
+  },
+  {
+   "id": "q14c-iii",
+   "question": 14,
+   "marks": 3,
+   "answerType": "expression",
+   "keyed": true,
+   "criteria": [
+    {
+     "key": "c1",
+     "text": "Provides the correct volume",
+     "marks": 3,
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (expression). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
+    },
+    {
+     "key": "c2",
+     "text": "Recognises that $S$ and $T$ together form a cylinder when rotated",
+     "marks": 2,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    },
+    {
+     "key": "c3",
+     "text": "Finds the volume of the cylinder of radius $4$",
+     "marks": 1,
+     "engine": "no",
+     "decidedBy": "student, against the sample answer",
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
+    }
+   ],
+   "digest": "d3071bba5360f938d39093c0acebc3272d4513e317902b0736a9559d9a21a00d"
+  }
+ ]
+}
