@@ -3,7 +3,9 @@
 Status: **decided by the owner; implemented** in two passes on `task/train-editions-28`. Pass 1 (server): the rule
 (`server/platform/readingFloor.js`, `server/test/reading-floor-check.mjs`) is wired into `POST /v1/practice/:id/submit`
 and tested over HTTP (`server/test/reading-floor-http-check.mjs`). Pass 2 (client): the confirm step is removed and the
-marked page is the only result.
+marked page is the only result. Pass 3 (CTO ruling): written working is one authoritative attempt, enforced by the server
+(below). **Fully implemented**: the server rule, the one-press client, the rewritten tours and accessibility walk, and the marked
+page's compact rows, truthful mark line and display-only photo clean-up are all on this branch; nothing is pushed or merged.
 
 ## Decision
 
