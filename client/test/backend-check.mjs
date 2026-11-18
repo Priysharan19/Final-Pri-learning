@@ -985,11 +985,11 @@ async function run() {
     const topic = await nextQuestion({ mode: 'topic', subtopic: topicId, difficulty: 3 });
     eq('topic mode serves the topic asked for', topic.question.subtopic, topicId);
     eq('topic mode honours the difficulty', topic.question.difficulty, 3);
-    // 99 is clamped to D4. The server issues no D4 for this topic (y10-quadratics:
-    // server/platform/nswBanks.js), so the clamped level is answered with the
-    // levels that exist; a topic whose D4 is issued serves it.
-    eq('an out-of-range difficulty is clamped, and a level the server does not issue is refused by name',
-      await POST('/practice/next', { mode: 'topic', subtopic: topicId, difficulty: 99 }).then(() => 'served', e => `${e.code} D${e.detail?.difficultyRequested}`), 'DIFFICULTY_UNAVAILABLE D4');
+    // 99 is clamped to D4. The tolerance fixes (engine/answerBand.js) issued y10-quadratics D4, so the clamped
+    // level is now served; the refusal of a level the server does not issue by name is held by nsw-offer-check
+    // (y8-equations D1, y8-linear D4, both refused with no draft).
+    eq('an out-of-range difficulty is clamped to D4, which this topic now issues',
+      await POST('/practice/next', { mode: 'topic', subtopic: topicId, difficulty: 99 }).then(r => `served D${r.question.difficulty}`, e => `${e.code} D${e.detail?.difficultyRequested}`), 'served D4');
     eq('an out-of-range difficulty is clamped to a level that is issued', (await nextQuestion({ mode: 'topic', subtopic: 'y10-simeq', difficulty: 99 })).question.difficulty, 4);
 
     const missable = await answerableQuestion({ mode: 'topic', subtopic: topicId });
