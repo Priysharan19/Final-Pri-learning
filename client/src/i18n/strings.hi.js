@@ -3449,7 +3449,7 @@ export default {
   'ink.readMyAnswer': "मेरा उत्तर पढ़ें",
   'ink.readAgain': "दोबारा पढ़ें",
   'ink.readNow': "अभी पढ़ें",
-  'ink.footerAuto': "आप रुकते हैं तो Pri आपकी लिखावट पढ़ता है। पढ़ने को जाँचें, फिर जमा करें।",
+  'ink.footerAuto': "आप रुकते हैं तो Pri आपकी लिखावट पढ़ता है।",
   'ink.readMyAnswerHint': "आपकी लिखावट एक बार पढ़ी जाती है, जब आप कहें।",
   'ink.readAgainHint': "पढ़े जाने के बाद आपकी लिखावट बदल गई है।",
   'ink.readingStale': "आपकी पहले की लिखावट से — दोबारा पढ़वाएँ",

@@ -3396,7 +3396,7 @@ export default {
   'ink.readMyAnswer': "Read my answer",
   'ink.readAgain': "Read again",
   'ink.readNow': "Read now",
-  'ink.footerAuto': "Pri reads your writing when you pause. Check the reading, then submit.",
+  'ink.footerAuto': "Pri reads your writing when you pause.",
   'ink.readMyAnswerHint': "Your writing is read once, when you ask.",
   'ink.readAgainHint': "Your writing has changed since it was read.",
   'ink.readingStale': "From your earlier writing — read again",
