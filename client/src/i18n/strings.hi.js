@@ -1030,7 +1030,7 @@ export default {
   'offer.notYet.body': 'Pri का यह हिस्सा अभी उपलब्ध नहीं है।',
   'offer.notYet.home': 'होम पर जाएँ',
   'check.serverFaultTitle': 'Pri के सर्वर में समस्या आई।',
-  'check.serverFaultHint': 'आपका काम सुरक्षित है। फिर कोशिश करें।',
+  'check.serverFaultHint': 'आपका काम बना रहेगा। फिर कोशिश करें।',
   'verdict.rungLabelFree': '{n}/4 संकेत खोलें, {rung}। शॉर्टकट: H',
   'verdict.rungLabel': '4 में से संकेत {n} खोलें, {rung} — इस प्रश्न के {percent}% अंक बचते हैं। शॉर्टकट: H',
   'verdict.rungSolutionTitle': 'पूरा हल — प्रश्न यहीं समाप्त, कोई अंक नहीं',

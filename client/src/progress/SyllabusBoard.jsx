@@ -58,23 +58,17 @@ const TREND_WORD = { up: 'board.ready.trendUp', down: 'board.ready.trendDown', l
 
 /** The NSW courses a student is on, the one to show first first. */
 export function nswCoursesFor(user) {
-  const all = allNswCoursesFor(user);
+  const y = Number(user?.year);
+  const pw = user?.pathway;
+  const all = y <= 8 ? ['k10-stage4'] : y <= 10 ? ['k10-stage5']
+    : pw === 'standard' ? ['standard-2', 'standard-1'] : pw === 'ext1' ? ['extension-1', 'advanced']
+      : pw === 'ext2' ? ['extension-2', 'extension-1'] : ['advanced'];
   // Owner decision, 19 Nov 2026: only the courses the edition offers are shown (Prithagoras: Advanced and
   // Extension 1). A student still on a hidden course sees Advanced until they choose (components/OfferedCourse.jsx).
   if (!offering()) return all;
-  const shown = all.filter(c => !c.startsWith('k10') && pathwayOffered(BOARD_COURSE_PATHWAY[c]));
+  const pathwayOf = { 'standard-1': 'standard', 'standard-2': 'standard', advanced: 'advanced', 'extension-1': 'ext1', 'extension-2': 'ext2' };
+  const shown = all.filter(c => !c.startsWith('k10') && pathwayOffered(pathwayOf[c]));
   return shown.length ? shown : ['advanced'];
-}
-const BOARD_COURSE_PATHWAY = { 'standard-1': 'standard', 'standard-2': 'standard', advanced: 'advanced', 'extension-1': 'ext1', 'extension-2': 'ext2' };
-function allNswCoursesFor(user) {
-  const y = Number(user?.year);
-  if (y <= 8) return ['k10-stage4'];
-  if (y <= 10) return ['k10-stage5'];
-  const pw = user?.pathway;
-  if (pw === 'standard') return ['standard-2', 'standard-1'];
-  if (pw === 'ext1') return ['extension-1', 'advanced'];
-  if (pw === 'ext2') return ['extension-2', 'extension-1'];
-  return ['advanced'];
 }
 
 /** A topic's sentence: how many points are shown on their own, then only the states it holds. */

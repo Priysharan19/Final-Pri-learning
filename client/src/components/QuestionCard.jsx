@@ -2217,6 +2217,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       + (res.solution?.answerText ? t('verdict.speechExpected', { answer: res.solution.answerText }) : '');
   }, [state.phase, state.res, resolved, res, verdictGood, shownGrade?.awarded, shownGrade?.possible, previousAttempt, markedLineFix, t]);
 
+  // Walk-through fix, 19 Nov 2026 (Prithagoras): a "Not quite", offline or server-fault card, and its Try again button,
+  // come into view above the sticky action bar rather than beneath it (workspace.css keeps the bar's height clear).
+  useEffect(() => {
+    if (!walkthroughFixes() || (state.phase !== 'retry' && !resolved)) return undefined;
+    const id = requestAnimationFrame(() => document.querySelector('.qpage.ws .verdict')?.scrollIntoView({ block: 'nearest' }));
+    return () => cancelAnimationFrame(id);
+  }, [state.phase, state.res, resolved]);
+
   const answerLines = isMcq ? [] : writeMode
     ? (inkResult?.lines || [])
     : isWorking ? working.split('\n').filter(Boolean)
@@ -2559,7 +2567,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         </div>
         {/* A practice question's marks are the server's alone to state, so the
             card promises no credit figure for it. */}
-        {!HINTS_FREE && helpUsed > 0 && !resolved && diagnostic && (
+        {helpUsed > 0 && !resolved && diagnostic && !HINTS_FREE && (
           <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
         )}
 

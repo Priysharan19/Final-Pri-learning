@@ -281,7 +281,7 @@ export default function Teach() {
   }
 
   // Only the chapters the server issues a question for (owner decision 2026-11-18).
-  const allSubtopics = CURRICULUM.flatMap(y => y.subtopics.filter(s => nswIssuedLevels(s.id).length > 0 && subtopicOffered(s.id)).map(s => ({ ...s, year: y.year })));
+  const allSubtopics = CURRICULUM.flatMap(y => y.subtopics.filter(s => nswIssuedLevels(s.id).length > 0).filter(s => subtopicOffered(s.id)).map(s => ({ ...s, year: y.year })));
   const indiaClass = analytics ? analytics.syllabus !== 'nsw' : true;
   const sheetStudent = sheet?.kind === 'student' ? analytics?.students.find(s => s.id === sheet.id) : null;
 
