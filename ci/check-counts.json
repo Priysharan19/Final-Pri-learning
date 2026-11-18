@@ -335,7 +335,7 @@
       "job": "platform-contracts",
       "log": "papers.log",
       "pins": [
-        {"has":"PRACTICE PAPERS: PASS — 219/219 checks"}
+        {"has":"PRACTICE PAPERS: PASS — 220/220 checks"}
       ]
     },
     "platform/resources.log": {

@@ -48,6 +48,8 @@ const FORBIDDING = {
 };
 eq('every forbidden context is exercised', Object.keys(FORBIDDING).sort(), [...FORBIDDEN_UPGRADE_CONTEXTS].sort());
 for (const moment of UPGRADE_MOMENTS) {
+  // The practice-cap moment has no copy, and no arrival, while the active packaging does not cap free practice.
+  if (moment === 'practice-cap' && !MOMENT_KEYS[moment]) { ok('practice-cap: no copy while free practice is uncapped', !MOMENT_ARRIVAL[moment] && !ARRIVAL_KEYS.practice); continue; }
   eq(`${moment}: offered at a value moment in a neutral context`, upgradeOffer(moment, NEUTRAL), { show: true, reason: null });
   for (const [context, cases] of Object.entries(FORBIDDING)) {
     const refused = cases.every(extra => { const o = upgradeOffer(moment, { ...NEUTRAL, ...extra }); return o.show === false && o.reason === context; });

@@ -35,7 +35,7 @@
 // so this suite only has to prove it is reachable, rendered by the same reader,
 // and loaded on demand rather than carried by every install.
 // ─────────────────────────────────────────────────────────────────────────────
-import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseAst } from 'vite';

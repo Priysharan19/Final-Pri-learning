@@ -54,7 +54,8 @@ export const PREMIUM_ROWS = Object.freeze([
 
 /** Why the student arrived, said first and plainly. Unknown reasons say nothing. */
 export const ARRIVAL_KEYS = Object.freeze({
-  practice: 'paywall.from.practice',
+  // Said only when free practice really has a daily cap; with none, no student arrives for it and no copy says so.
+  ...(practiceCapped ? { practice: 'paywall.from.practice' } : {}),
   exams: 'paywall.from.exams',
   'jee-advanced': 'paywall.from.jeeAdvanced',
   reads: 'paywall.from.reads',

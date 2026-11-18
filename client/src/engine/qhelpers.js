@@ -4,6 +4,12 @@
 // assembly used by every question generator.
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { EDITION } from '../platform/edition.js';
+
+// The edition this code runs for: the build's own record (a Vite build replaces it with that edition's), and, in Node
+// (the server and the suites, where the record is always the default), the process's PRI_EDITION. Unset is Priyabhata.
+const RUNS_FOR = EDITION !== 'priyabhata' ? EDITION : String(globalThis.process?.env?.PRI_EDITION ?? '').trim();
+
 /** Deterministic RNG (mulberry32) so a seed reproduces a question exactly. */
 export function makeRng(seed) {
   let a = seed >>> 0;
@@ -174,12 +180,15 @@ export function mcq(rng, correct, distractors) {
 /** Degrees → radians. */
 export const rad = d => d * Math.PI / 180;
 
-// The names in NSW question text (every consumer is a Prithagoras generator; the
-// India generators carry their own list, IN_NAMES). Owner decision 2026-11-18:
-// nothing Indian is visible in the Australian syllabus, so the four Indian
-// names that were here (Dev, Priya, Uma, Vik) are replaced in place, which
-// keeps every other name at the same position for the same seed.
-export const NAMES = ['Aria', 'Blake', 'Chen', 'Dean', 'Elif', 'Finn', 'Grace', 'Hana', 'Ivy', 'Jonah', 'Kiri', 'Leo', 'Mia', 'Noah', 'Ollie', 'Piper', 'Quinn', 'Ruby', 'Sam', 'Tara', 'Una', 'Vera', 'Willa', 'Xavier', 'Yusuf', 'Zoe'];
+// The names in question text. The banks are SHARED by both editions (Priyabhata's chapters reuse y7-y12 generators,
+// 100 of them), so the pool is chosen by the build's edition, not swapped for everyone: a Prithagoras build draws from
+// NSW_NAMES, which has no Indian name (owner decision 2026-11-18: nothing Indian is visible in the Australian
+// syllabus); a Priyabhata build draws from INDIA_SHARED_NAMES, byte-for-byte the list it always had, so its seeded
+// questions are unchanged. The two lists differ in four positions only (Dev, Priya, Uma, Vik), so every other name
+// is the same for the same seed in both. (client/test/au-no-india-surface-check.mjs holds both halves.)
+export const INDIA_SHARED_NAMES = ['Aria', 'Blake', 'Chen', 'Dev', 'Elif', 'Finn', 'Grace', 'Hana', 'Ivy', 'Jonah', 'Kiri', 'Leo', 'Mia', 'Noah', 'Ollie', 'Priya', 'Quinn', 'Ruby', 'Sam', 'Tara', 'Uma', 'Vik', 'Willa', 'Xavier', 'Yusuf', 'Zoe'];
+export const NSW_NAMES = ['Aria', 'Blake', 'Chen', 'Dean', 'Elif', 'Finn', 'Grace', 'Hana', 'Ivy', 'Jonah', 'Kiri', 'Leo', 'Mia', 'Noah', 'Ollie', 'Piper', 'Quinn', 'Ruby', 'Sam', 'Tara', 'Una', 'Vera', 'Willa', 'Xavier', 'Yusuf', 'Zoe'];
+export const NAMES = RUNS_FOR === 'prithagoras' ? NSW_NAMES : INDIA_SHARED_NAMES;
 export const ITEMS = [
   { name: 'a skateboard', price: [80, 320] },
   { name: 'a pair of sneakers', price: [60, 240] },

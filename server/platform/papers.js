@@ -16,8 +16,8 @@
 //     active subscription or active trial) for every paper and every
 //     marking guideline, EXCEPT
 //   · a paper whose manifest entry says `sample: true` (paper and marking
-//     guidelines) is free for every signed-in account. None is, today: Practice
-//     Paper 13 is Premium;
+//     guidelines) is free for every signed-in account. Practice Paper 01 is the
+//     only free sample; Papers 02 to 13 (twelve of them) are Premium;
 //   · a free account still READS the list (titles, marks, pages).
 // Nothing the device sends (a header, a body, a query) is consulted.
 //

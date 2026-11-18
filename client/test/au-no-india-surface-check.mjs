@@ -108,10 +108,17 @@ check('no resolved Australian string carries Hindi, Hinglish, Devanagari, NEET, 
   const leaks = Object.keys(au).filter(k => BAN2.test(text(au[k])) && !ALLOW2.some(([re]) => re.test(k)));
   assert.deepEqual(leaks, [], `override these in strings.au.js, or give them a reasoned allowance: ${leaks.join(', ')}`);
 });
-check('NSW question text names no Indian person (the shared name pool)', () => {
-  const pool = read('engine/qhelpers.js').match(/export const NAMES = \[([^\]]*)\]/)[1];
-  for (const name of ['Priya', 'Dev', 'Uma', 'Vik', 'Ravi', 'Rahul', 'Amit', 'Anita', 'Arjun']) assert.ok(!new RegExp(`'${name}'`).test(pool), `${name} is in the NSW name pool`);
+check('the name pool is chosen by edition: NSW_NAMES has no Indian name, INDIA_SHARED_NAMES is the list Priyabhata always had, and they differ only where those four names sit', () => {
+  const src = read('engine/qhelpers.js');
+  const list = name => [...src.match(new RegExp(`export const ${name} = \\[([^\\]]*)\\]`))[1].matchAll(/'([^']+)'/g)].map(m => m[1]);
+  const nsw = list('NSW_NAMES'), india = list('INDIA_SHARED_NAMES');
+  for (const name of ['Priya', 'Dev', 'Uma', 'Vik', 'Ravi', 'Rahul', 'Amit', 'Anita', 'Arjun']) assert.ok(!nsw.includes(name), `${name} is in the NSW name pool`);
+  assert.equal(india.join(), 'Aria,Blake,Chen,Dev,Elif,Finn,Grace,Hana,Ivy,Jonah,Kiri,Leo,Mia,Noah,Ollie,Priya,Quinn,Ruby,Sam,Tara,Uma,Vik,Willa,Xavier,Yusuf,Zoe', 'the Indian edition\'s shared pool is unchanged');
+  assert.deepEqual(nsw.map((n, i) => (n === india[i] ? null : i)).filter(i => i !== null), [3, 15, 20, 21], 'only the four Indian names are replaced, in place');
+  assert.match(src, /export const NAMES = RUNS_FOR === 'prithagoras' \? NSW_NAMES : INDIA_SHARED_NAMES;/);
 });
+// The issued-question scan below is for the Prithagoras build: in Node the name pool follows PRI_EDITION, read when the generators load.
+process.env.PRI_EDITION = 'prithagoras';
 {
   const { installBrowserEnv } = await import('./backend-check.mjs');
   installBrowserEnv();
