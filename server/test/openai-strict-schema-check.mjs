@@ -18,7 +18,7 @@ import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { TRANSCRIPTION_SCHEMA, normalizeResult } from '../platform/handwritingProvider.js';
-import { HELP_SCHEMA, CAPTION_SCHEMA } from '../platform/tutorProvider.js';
+import { HELP_SCHEMA, CAPTION_SCHEMA, DIAGNOSIS_SCHEMA } from '../platform/tutorProvider.js';
 import { WORKING_SCHEMA } from '../platform/workingProvider.js';
 
 export function strictSchemaViolations(schema, path = '$') {
@@ -64,6 +64,7 @@ const SCHEMAS = {
   pri_handwriting_transcription: TRANSCRIPTION_SCHEMA,
   pri_tutor_help: HELP_SCHEMA,
   pri_tutor_captions: CAPTION_SCHEMA,
+  pri_tutor_diagnosis: DIAGNOSIS_SCHEMA,
   pri_working_check: WORKING_SCHEMA
 };
 for (const [name, schema] of Object.entries(SCHEMAS)) {

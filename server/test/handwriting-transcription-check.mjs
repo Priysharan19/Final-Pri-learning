@@ -153,7 +153,14 @@ ok(!clean.needsConfirmation && clean.confidence >= 0.9, 'a confident single line
   eq([legacy.lines[0].uncertain, legacy.lines[0].doubt, legacy.lines[0].gapBefore, legacy.needsConfirmation], [true, null, false, true],
     'a line missing its required `uncertain` flag is a doubt to confirm, never "no doubt"');
   const line = TRANSCRIPTION_SCHEMA.properties.lines.items;
-  eq([...line.required].sort(), ['confidence', 'doubt', 'gap_before', 'latex', 'segments', 'text', 'uncertain'], 'the strict schema requires every per-line field');
+  eq([...line.required].sort(), ['box', 'confidence', 'doubt', 'gap_before', 'latex', 'segments', 'text', 'uncertain'], 'the strict schema requires every per-line field');
+  {
+    // The line box is layout only: four fractions inside the picture or null; anything else is dropped.
+    const { normalizeBox } = await import('../platform/handwritingProvider.js');
+    eq(normalizeBox({ x: 0.1, y: 0.2, w: 0.5, h: 0.1 }), { x: 0.1, y: 0.2, w: 0.5, h: 0.1 }, 'a box inside the picture is kept');
+    eq([normalizeBox(null), normalizeBox({ x: 0.9, y: 0.2, w: 0.5, h: 0.1 }), normalizeBox({ x: 'a', y: 0, w: 1, h: 1 }), normalizeBox({ x: -0.1, y: 0, w: 0.2, h: 0.1 }), normalizeBox({ x: 0, y: 0, w: 0, h: 0.1 })], [null, null, null, null, null], 'a missing, out-of-picture, non-numeric, negative or empty box is null');
+    ok(line.properties.box.anyOf.some(a => a.type === 'null'), 'the schema allows null where the reader is not sure');
+  }
   ok(line.additionalProperties === false && line.properties.uncertain.type === 'boolean' && line.properties.doubt.maxLength === 120 && line.properties.gap_before.type === 'boolean', 'and nothing beyond them');
   ok(/bar under it/.test(SYSTEM_INSTRUCTIONS) && /x and n/.test(SYSTEM_INSTRUCTIONS) && /do not settle it silently/.test(SYSTEM_INSTRUCTIONS), 'the instruction reads relation and look-alike symbols from their strokes and reports a doubt');
   ok(/Never choose a symbol because it would make the mathematics true/.test(SYSTEM_INSTRUCTIONS) && /You do not know the question/.test(SYSTEM_INSTRUCTIONS), 'and never decides a symbol by what would be mathematically right');
@@ -844,7 +851,7 @@ try {
     eq(Object.keys(json?.transcription || {}).sort(),
       ['confidence', 'confidenceFloor', 'engine', 'escalated', 'fallbackAttempted', 'fallbackFailureCode', 'latencyMs', 'lines', 'needsConfirmation', 'providerNeedsConfirmation', 'text'],
       'the route answers with the closed transcription shape, whatever extra the model returned');
-    eq(Object.keys(json?.transcription?.lines?.[0] || {}).sort(), ['confidence', 'doubt', 'gapBefore', 'latex', 'segments', 'text', 'uncertain'],
+    eq(Object.keys(json?.transcription?.lines?.[0] || {}).sort(), ['box', 'confidence', 'doubt', 'gapBefore', 'latex', 'segments', 'text', 'uncertain'],
       'and every line is the closed line shape');
     eq(Object.keys(json || {}).sort(), ['receipt', 'reused', 'transcription'], 'nothing beside the transcription, the receipt and the reuse flag');
     const wireReply = JSON.stringify(json);

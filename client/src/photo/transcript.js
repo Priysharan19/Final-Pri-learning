@@ -223,6 +223,14 @@ export function cleanSegments(raw) {
   return out.length ? out : null;
 }
 
+/** A line's rectangle on the photo as fractions of its width and height, or null. Layout only. */
+export function cleanBox(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const [x, y, w, h] = [raw.x, raw.y, raw.w, raw.h].map(Number);
+  if (![x, y, w, h].every(Number.isFinite) || x < 0 || y < 0 || w <= 0 || h <= 0 || x + w > 1.001 || y + h > 1.001) return null;
+  return { x, y, w: Math.min(w, 1 - x), h: Math.min(h, 1 - y) };
+}
+
 /** The pieces to set a line in: the reader's, when they still restate the line as shown; else null. */
 export function segmentsFor(line) {
   const segs = cleanSegments(line?.segments);
@@ -243,7 +251,8 @@ export function buildTranscript(transcription, question = {}) {
       uncertain: line?.uncertain === true,
       doubt: typeof line?.doubt === 'string' && line.doubt.trim() ? line.doubt.trim().slice(0, 120) : null,
       gapBefore: line?.gapBefore === true,
-      segments: cleanSegments(line?.segments)
+      segments: cleanSegments(line?.segments),
+      box: cleanBox(line?.box)
     }))
     .filter(line => line.text)
     .slice(0, MAX_LINES);
@@ -260,6 +269,7 @@ export function buildTranscript(transcription, question = {}) {
       doubt: line.doubt || (letter ? `${letter.question} or ${letter.read}` : null),
       gapBefore: line.gapBefore,
       ...(line.segments ? { segments: line.segments } : {}),
+      ...(line.box ? { box: line.box } : {}),
       excluded: !!out,
       why: out ? out.why : null,
       edited: false
@@ -306,6 +316,7 @@ export function reviveTranscript(value) {
     doubt: typeof l?.doubt === 'string' ? l.doubt.slice(0, 120) : null,
     gapBefore: l?.gapBefore === true,
     ...(cleanSegments(l?.segments) ? { segments: cleanSegments(l.segments) } : {}),
+    ...(cleanBox(l?.box) ? { box: cleanBox(l.box) } : {}),
     excluded: l?.excluded === true,
     why: ['before-question', 'after-break', 'student'].includes(l?.why) ? l.why : null,
     edited: l?.edited === true,

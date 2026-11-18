@@ -117,7 +117,7 @@ export const TRANSCRIPTION_SCHEMA = Object.freeze({
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['text', 'segments', 'latex', 'confidence', 'uncertain', 'doubt', 'gap_before'],
+        required: ['text', 'segments', 'latex', 'confidence', 'uncertain', 'doubt', 'gap_before', 'box'],
         properties: {
           text: { type: 'string', maxLength: MAX_LINE_TEXT_CHARS },
           // The same line, in order, split into the English words the student
@@ -147,7 +147,26 @@ export const TRANSCRIPTION_SCHEMA = Object.freeze({
           // A clearly larger vertical gap above this line than between the
           // other lines: layout only, so a page holding more than one piece
           // of work can be shown to the student in its pieces.
-          gap_before: { type: 'boolean' }
+          gap_before: { type: 'boolean' },
+          // Where this line sits on the picture, as fractions (0 to 1) of the picture's width and
+          // height, so the marked page can draw its outline on the student's own page. Layout
+          // only: null when the reader is not sure. Never read for marking.
+          box: {
+            anyOf: [
+              { type: 'null' },
+              {
+                type: 'object',
+                additionalProperties: false,
+                required: ['x', 'y', 'w', 'h'],
+                properties: {
+                  x: { type: 'number', minimum: 0, maximum: 1 },
+                  y: { type: 'number', minimum: 0, maximum: 1 },
+                  w: { type: 'number', minimum: 0, maximum: 1 },
+                  h: { type: 'number', minimum: 0, maximum: 1 }
+                }
+              }
+            ]
+          }
         }
       }
     },
@@ -163,6 +182,7 @@ export const SYSTEM_INSTRUCTIONS = [
   'Transcribe every line the student wrote, in order, one entry per written line.',
   'Write `text` as plain linear mathematics a parser can read: use <= >= != for the relations, / for division, ^ for powers, and ordinary commas between listed values. Keep a space between a word and the mathematics beside it. Write ordinary English words as words.',
   'Also give `segments`: the same line in reading order as alternating pieces. A piece of kind "text" is English the student wrote as words (Let, or, and, so, hence, since, when, where, then, if, at, for, max, min, value, area, cost, Sub, into, and similar). A piece of kind "math" is everything else: symbols, numbers, variables, operators, brackets, function names such as sin cos tan log ln lim, the marks ∴ ∵ => and units written with a number. A word is never put inside a math piece, so "x = 0 or x = -3" is math "x = 0", text "or", math "x = -3". Segments only restate `text`; they add no mark and change no symbol.',
+  'Also give `box`: the rectangle that holds this line on the picture, as fractions between 0 and 1 of the picture width and height (x and y are the top left corner, w and h the size). Layout only. Use null when you are not sure where the line is.',
   'Write `latex` as a faithful display-only transcription of the same line; when the line has nothing display-worthy, set `latex` to an empty string.',
   '`confidence` is how certain you are that the transcription matches the marks on the page, not whether the mathematics is correct.',
   'Notation. A small stroke raised beside a letter or bracket (y, f, g, x) is a prime: write y′ and f′(x), and two strokes f′′(x) or y′′, using ′ (U+2032) and never a superscript 1, the digit 1 or ^1. A raised digit or letter after a variable is a power: x^2, e^x, 2^(x+1). π is a horizontal bar with two short legs under it (never n, and never "n" plus a letter); θ is a closed oval with a bar across it; ∫ is a tall S; a tick-and-overbar is a square root.',
@@ -499,6 +519,20 @@ export function normalizeLeadConnective(text) {
 // the line is shown from `text` as before. A bad segment never fails a read
 // and never changes what is marked.
 const stripSpace = value => value.normalize('NFC').replace(/\s+/gu, '');
+/**
+ * A line's rectangle as fractions of the picture, or null. Anything that is not four finite numbers
+ * inside the picture with a visible size is dropped, so a client never draws outside the page.
+ * Layout only: it never reaches marking.
+ */
+export function normalizeBox(raw) {
+  if (!raw || typeof raw !== 'object') return null;
+  const [x, y, w, h] = [raw.x, raw.y, raw.w, raw.h].map(Number);
+  if (![x, y, w, h].every(Number.isFinite)) return null;
+  if (x < 0 || y < 0 || w < 0.01 || h < 0.005 || x + w > 1.001 || y + h > 1.001) return null;
+  const r = v => Math.round(Math.min(1, v) * 1000) / 1000;
+  return { x: r(x), y: r(y), w: r(Math.min(w, 1 - x)), h: r(Math.min(h, 1 - y)) };
+}
+
 export function normalizeSegments(raw, text) {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_LINE_SEGMENTS) return null;
   const out = [];
@@ -534,7 +568,8 @@ function normalizeLines(raw) {
         doubt: uncertain && typeof line.doubt === 'string' && line.doubt.trim()
           ? firstCodePoints(line.doubt.replace(/[\u0000-\u001f\u007f]/g, ' ').trim(), MAX_LINE_DOUBT_CHARS)
           : null,
-        gapBefore: line.gap_before === true
+        gapBefore: line.gap_before === true,
+        box: normalizeBox(line.box)
       };
     })
     .filter(line => line.text.length > 0);
