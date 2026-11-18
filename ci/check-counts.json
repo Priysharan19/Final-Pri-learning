@@ -758,7 +758,7 @@
       "job": "browser",
       "log": "browser-prithagoras.log",
       "pins": [
-        {"has":"ACCESSIBILITY SUITE PASSED — 49/49 checks across 14 groups","note":"Plan E6: the accessibility walk on a Prithagoras build and server, an NSW Year 10 student; India-only steps (placement, the JEE room, generated papers refused by D15, the India chapter table) are listed as not applicable."},
+        {"has":"ACCESSIBILITY SUITE PASSED — 52/52 checks across 15 groups","note":"Paper sitting page walked (52 from a real run, 19 Nov 2026; was 49). Plan E6: the accessibility walk on a Prithagoras build and server, an NSW Year 10 student; India-only steps (placement, the JEE room, generated papers refused by D15, the India chapter table) are listed as not applicable."},
         {"has":"ACCESSIBILITY SUITE PASSED — 52/52 checks across 15 groups"},
         {"has":"not applicable on prithagoras (India-only): 7"},
         {"has":"E2E SUITE PASSED — 36/36 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server (36: one more check, no phone channel, parent reached by email)."},
