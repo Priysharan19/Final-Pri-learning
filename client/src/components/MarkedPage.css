@@ -39,3 +39,11 @@
 .mp-text p { margin: var(--space-1) 0; }
 .mp-expr { margin: var(--space-1) 0; overflow-x: auto; overflow-y: hidden; }
 .mp-card .aw-fix, .mp-card .aw-more { color: var(--ink-3); }
+
+.mp-criteria { display: grid; gap: var(--space-2); }
+.mp-table { width: 100%; border-collapse: collapse; font-size: 13.5px; color: var(--ink-2); border: 1px solid var(--hairline-strong); }
+.mp-table caption { text-align: left; padding: 0 0 var(--space-2); font-weight: 600; color: var(--ink); }
+.mp-table th, .mp-table td { text-align: left; vertical-align: top; padding: var(--space-2) var(--space-3); border-top: 1px solid var(--hairline); }
+.mp-table td svg { vertical-align: -2px; margin-right: var(--space-1); }
+.mp-why { display: block; color: var(--ink-3); font-size: 12.5px; }
+.mp-label { margin: 0; color: var(--ink-3); font-size: 12.5px; }

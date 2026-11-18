@@ -32,6 +32,22 @@ const EXPECT = {
   stationary: { statuses: ['checked', 'checked', 'condition', 'checked', 'checked', 'checked', 'checked', 'first-error'], sentence: /^6 of 8 lines checked\. First error on line 8\.$/, mark: '0/3', collapsed: null, firstError: 8 },
   mixed: { statuses: ['checked', 'unread', 'checked', 'not-verified', 'checked', 'checked'], sentence: null, mark: '0/3', collapsed: '2,4', firstError: null }
 };
+const browser0 = await chromium.launch();
+{
+  // The criteria table: absent for every real (unapproved) type; a fixture approval shows it, summing to the server mark.
+  const ctx = await browser0.newContext({ viewport: { width: 1280, height: 900 } }); const pg = await ctx.newPage();
+  await pg.goto(`${url('buoy', 'ink', 'prithagoras', 'light')}`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
+  ok(await pg.locator('[data-mp-criteria]').count() === 0, 'an unapproved type shows no criteria table, empty or greyed');
+  await pg.goto(`${url('buoy', 'ink', 'prithagoras', 'light')}&criteria=1`, { waitUntil: 'networkidle' }); await pg.waitForSelector('[data-marked-page]');
+  const rows = await pg.locator('[data-mp-criterion]').evaluateAll(es => es.map(e => [e.getAttribute('data-mp-criterion'), e.getAttribute('data-awarded')]));
+  ok(JSON.stringify(rows) === JSON.stringify([['max', 'yes'], ['value', 'yes']]), `a fixture-approved type shows its criteria ${JSON.stringify(rows)}`);
+  const label = await pg.locator('[data-mp-approval-label]').innerText();
+  ok(/approved by the author \(Priysharan Tripathi, tutor\)\. Not an official NESA guideline\./.test(label) && !/examiner-certified/i.test(label), `the label names the author and disclaims NESA: ${label}`);
+  ok(/2 of 2 marks/.test(await pg.locator('.mp-table tfoot').innerText()) && await pg.locator('[data-mp-mark]').getAttribute('data-mp-mark') === '2/2', 'the table total equals the server mark');
+  if (shots) await pg.screenshot({ path: `${shots}/criteria-fixture-buoy-desktop.png`, fullPage: true });
+  await ctx.close();
+}
+await browser0.close();
 const browser = await chromium.launch();
 try {
   for (const edition of ['prithagoras', 'priyabhata']) for (const theme of ['light', 'dark']) for (const [size, viewport] of [['desktop', { width: 1280, height: 900 }], ['phone', { width: 390, height: 844 }]]) {

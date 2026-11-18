@@ -73,8 +73,16 @@ const props = source === 'ink'
   ? { source: { kind: 'ink', strokes: inkPage(c.lines) } }
   : (() => { const p = photoPage(c.lines); return { source: { kind: 'photo', src: p.src, lines: c.lines.map((text, i) => ({ text, box: p.boxes[i] })) } }; })();
 
+// A FIXTURE approval, test only: the real build has no approved type. ?criteria=1 shows the table it would draw.
+const FIXTURE = q.get('criteria') === '1' && which === 'buoy' ? {
+  approved: [{ typeId: 'fixture-buoy', digest: 'c'.repeat(64), approvedBy: 'Fixture Author', date: '2026-11-19' }],
+  criteria: { typeId: 'fixture-buoy', digest: 'c'.repeat(64), items: [
+    { key: 'max', text: 'States the maximum as 22 + 5', marks: 1, awarded: true, lines: [2], reason: 'Line 2 states it.' },
+    { key: 'value', text: 'Gives the value 27', marks: 1, awarded: true, lines: [3], reason: 'Line 3 gives it.' }] }
+} : {};
+
 createRoot(document.getElementById('root')).render(
   <div style={{ padding: '16px', maxWidth: 1100, margin: '0 auto' }} data-gallery-case={`${which}/${source}/${edition}`}>
-    <MarkedPage input={input} texOf={s => exprToLatex(s) || '\;'} {...props} />
+    <MarkedPage input={input} texOf={s => exprToLatex(s) || '\\;'} {...props} {...FIXTURE} />
   </div>
 );

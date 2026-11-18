@@ -2903,7 +2903,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               )}
               {photoPageOn && (
                 <React.Suspense fallback={null}>
-                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} />
+                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} criteria={res?.methodCriteria} />
                 </React.Suspense>
               )}
               {mode === 'photo' && photoOCR.phase === 'done' && photoLines && !photoPageOn && (
@@ -2979,7 +2979,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <>
           {inkPageOn && (
             <React.Suspense fallback={null}>
-              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} />
+              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} criteria={res?.methodCriteria} />
             </React.Suspense>
           )}
           <div className={`ink-row${awModel && !inkPageOn ? ' aw-row' : ''}`} hidden={inkPageOn || undefined}>

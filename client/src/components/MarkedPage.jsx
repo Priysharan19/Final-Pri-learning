@@ -19,6 +19,7 @@ import { CardBody } from './AnnotatedWorking.jsx';
 import { Typeset } from './ReadingReview.jsx';
 import { strokePath } from './originalWorkModel.js';
 import { STATE, alignCards, boxesFromInk, boxesFromPhoto, buildMarkedPage, commentItems, listOf } from './markedPageModel.js';
+import { criteriaView } from './criteriaTableModel.js';
 import './MarkedPage.css';
 
 const pointsOf = s => (Array.isArray(s) ? s : Array.isArray(s?.points) ? s.points : []);
@@ -66,7 +67,7 @@ function Sheet({ source, geometry, page, active, setActive, t }) {
  * source: { kind: 'ink', strokes } or { kind: 'photo', src, lines } where `lines` are the judged
  * lines in order (each may carry the reader's normalised `box`). The geometry is worked out here.
  */
-export default function MarkedPage({ input, source, texOf = s => s, markReady = true }) {
+export default function MarkedPage({ input, source, texOf = s => s, markReady = true, criteria = null, approved }) {
   const t = useT();
   const uid = useId();
   const model = useMemo(() => { try { return input ? buildAnnotatedWorking(input) : null; } catch { return null; } }, [input]);
@@ -79,6 +80,8 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
   }, [source, input]);
   const page = useMemo(() => buildMarkedPage({ model, boxes: geometry?.boxes || null, markReady }), [model, geometry, markReady]);
   const items = useMemo(() => commentItems(page), [page]);
+  // Only for a question type the author has approved, for its current scheme; otherwise nothing is drawn.
+  const table = useMemo(() => (page && model ? criteriaView({ criteria, mark: page.header.mark, cards: model.cards, ...(approved ? { approved } : {}) }) : null), [criteria, page, model, approved]);
   const [active, setActive] = useState(null);
   const sheetRef = useRef(null);
   const colRef = useRef(null);
@@ -146,6 +149,28 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
           })}
         </ol>
       </div>
+      {table && (
+        <div className="mp-criteria" data-mp-criteria={table.typeId}>
+          <table className="mp-table">
+            <caption>{t('mp.criteria.caption')}</caption>
+            <thead><tr><th scope="col">{t('mp.criteria.criterion')}</th><th scope="col">{t('mp.criteria.result')}</th></tr></thead>
+            <tbody>
+              {table.rows.map(r => (
+                <tr key={r.key} data-mp-criterion={r.key} data-awarded={r.awarded ? 'yes' : 'no'}>
+                  <td><span>{r.text}</span>{r.reason ? <span className="mp-why">{r.reason}</span> : null}</td>
+                  <td>
+                    <Icon name={r.awarded ? 'check' : 'uncertain'} size={14} />
+                    <span>{r.awarded ? t('mp.criteria.awarded', { marks: r.marks }) : t('mp.criteria.notAwarded', { marks: r.marks })}</span>
+                    {r.lines.length > 0 && <span className="mp-why">{t('mp.criteria.onLines', { count: r.lines.length, list: listOf(r.lines) })}</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot><tr><th scope="row">{t('mp.criteria.total')}</th><td>{t('mp.mark', { earned: table.earned, possible: table.possible })}</td></tr></tfoot>
+          </table>
+          <p className="mp-label" data-mp-approval-label>{t('mp.criteria.label')}</p>
+        </div>
+      )}
     </section>
   );
 }
