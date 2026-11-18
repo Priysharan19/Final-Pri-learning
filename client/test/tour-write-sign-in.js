@@ -40,6 +40,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { handwrite, pressRead } from './fakeServerReader.js';
+import { directFormsOnly } from '../src/engine/generators/index.js';
 
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 14;
@@ -703,7 +704,11 @@ export const typedReloadFlow = {
   online: true,
   name: 'Type · typed answer and working survive a reload, then the same question is server-marked',
 
-  async run({ page, base, check, goto, createProfile, mathText, settle, online }) {
+  // This flow names one question (by seed, or by needing typed working). The
+  // in-process server draws the skill's direct form for it; every other form
+  // is marked by the sweeps over all issued questions.
+  async run(env) { const was = directFormsOnly(true); try { return await this.runDirect(env); } finally { directFormsOnly(was); } },
+  async runDirect({ page, base, check, goto, createProfile, mathText, settle, online }) {
     // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
     await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     const WORKING = '2 + 2 = 4\n3 + 3 = 6';
