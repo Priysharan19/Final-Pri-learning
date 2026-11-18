@@ -3965,7 +3965,7 @@ export default {
   'paper.next.compareTitle': 'Your re-test, topic by topic',
   'paper.next.compareLine': 'first sitting {b} of {ba}; re-test {a} of {aa}.',
   'paper.next.fallbackNote': '{n} topics had no unseen paper part that stands alone, so they are not in the re-test. Practise them in the chapter instead.',
-  'paper.next.compareNote': 'These are marks Pri could check, on two different sets of questions. They are not a measure of learning and not a predicted mark.',
+  'paper.next.compareNote': 'These are marks Pri could check, on two different sets of questions. They do not measure how much you have learned, and they say nothing about any exam result.',
   'paper.res.title': 'Your result',
   'paper.totals': {
     one: 'Marked by Pri: {awarded} of {available} mark available to automatic marking; {selfChecked} marks are self-checked.',
