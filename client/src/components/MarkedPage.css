@@ -76,3 +76,8 @@
   .mp-tag { font-size: 10px; line-height: 14px; padding: 0 2px; gap: 0; }
   .mp-tag svg { display: none; }
 }
+/* With the on-demand reading offered, the row keeps its one line at rest; opening a reading lets it grow in place. */
+.mp-card.mp-row.has-read { height: auto; flex-wrap: wrap; overflow: visible; }
+.mp-row.has-read .mp-read { display: contents; }
+.mp-row.has-read .mp-read > button { margin-left: auto; padding: 0; min-height: 0; }
+.mp-row.has-read .mp-read > div { flex: 1 0 100%; padding-bottom: var(--space-2); white-space: normal; }

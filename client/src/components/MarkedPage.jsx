@@ -225,11 +225,12 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
             if (status === 'checked' || status === 'condition') {
               const why = whyOf(card, t);
               return (
-                <li key={it.id} className={`mp-card mp-row is-${status}${active === n ? ' is-active' : ''}`} data-mp-card={n} data-mp-status={status} tabIndex={0} style={pos} {...on(n)}>
+                <li key={it.id} className={`mp-card mp-row is-${status}${reading ? ' has-read' : ''}${active === n ? ' is-active' : ''}`} data-mp-card={n} data-mp-status={status} tabIndex={0} style={pos} {...on(n)}>
                   <Icon name={st.icon} size={14} />
                   <span className="mp-row-n">{t('mp.line', { n })}</span>
                   {why && <span className="mp-row-why" data-mp-why>{why}</span>}
                   <span className="sr-only">{t(st.word)}</span>
+                  {reading && readingOfLine(n)}
                 </li>
               );
             }
