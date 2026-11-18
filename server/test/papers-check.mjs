@@ -19,7 +19,6 @@
 import './support/hermetic.mjs';
 import { createHash } from 'node:crypto';
 import { inflateSync } from 'node:zlib';
-import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -131,7 +130,9 @@ try {
   }
   const get = (h, path, jar, headers = {}) => h.request(path, { jar, headers });
   const bytesOf = async (h, path, jar) => {
-    const response = await fetch(`${h.origin}${path}`, { headers: { Cookie: cookieHeader(jar) } });
+    const target = new URL(path, h.origin); // an id read from the manifest file can only ever name a path on this server
+    if (target.origin !== new URL(h.origin).origin) throw new Error(`not this server: ${path}`);
+    const response = await fetch(target, { headers: { Cookie: cookieHeader(jar) } });
     return { status: response.status, headers: response.headers, bytes: Buffer.from(await response.arrayBuffer()) };
   };
   const free = await student(hAu, 'free@example.test', null);

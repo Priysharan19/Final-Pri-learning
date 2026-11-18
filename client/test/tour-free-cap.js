@@ -253,7 +253,7 @@ export const capAtCheck = {
     const verdict = await visibleText(page, '.verdict');
     await check('Submit is refused as the free cap, in the card: what ran out, that nothing was checked, and the way through',
       shown.refusal.join() === 'free-cap' && /Today.s free questions are used up/.test(verdict) && /has not been checked/.test(verdict) &&
-        /free plan includes 20 a day/.test(verdict) && /midnight/.test(verdict) && await page.locator('.verdict').getByRole('link', { name: 'See Premium' }).count() === 1,
+        /free plan.s daily allowance/.test(verdict) && /midnight/.test(verdict) && await page.locator('.verdict').getByRole('link', { name: 'See Premium' }).count() === 1,
       `${JSON.stringify(shown)} ${JSON.stringify(verdict.slice(0, 240))}`);
     await check('and with NO verdict, marks, XP or solution', nothingMarked(shown), JSON.stringify(shown));
     await check('the refusal is in the card on the same question, without leaving the page',

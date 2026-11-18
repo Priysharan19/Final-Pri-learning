@@ -124,7 +124,7 @@ ok(/cancel_at_period_end: true/.test(stripe) && /FULL refund of the CURRENT peri
 ok(/Written by AI · not checked by the maths engine/.test(en) && existsSync(join(ROOT, 'client/src/tutor/AiLabel.jsx')), 'AI explanations carry the AI label (strings.en.js, AiLabel.jsx)');
 both(/labelled as written by AI and not checked by the maths engine/, 'says AI text is labelled');
 const provider = read('server/platform/tutorProvider.js');
-ok(/api\.openai\.com/.test(provider) && /TUTOR_CACHE_TTL_MS = 24 \* 60 \* 60 \* 1000/.test(read('server/platform/tutor.js')), 'the tutor calls OpenAI and caches a reply for 24 hours (tutorProvider.js, tutor.js)');
+ok(/https:\/\/api\.openai\.com\//.test(provider) && /TUTOR_CACHE_TTL_MS = 24 \* 60 \* 60 \* 1000/.test(read('server/platform/tutor.js')), 'the tutor calls OpenAI and caches a reply for 24 hours (tutorProvider.js, tutor.js)');
 both(/up to 24 hours/, 'states the 24-hour cache');
 const safety = read('server/platform/tutorSafety.js');
 ok(/name: 'Tele-MANAS', number: '14416'/.test(safety) && /name: 'Kids Helpline', number: '1800 55 1800'/.test(safety), 'the support lines are Tele-MANAS 14416 and Kids Helpline 1800 55 1800 (tutorSafety.js)');
