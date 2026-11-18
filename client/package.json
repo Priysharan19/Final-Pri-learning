@@ -17,6 +17,7 @@
     "@react-three/fiber": "8.18.0",
     "jsxgraph": "1.14.3",
     "katex": "^0.18.9",
+    "libheif-js": "1.23.5",
     "mathlive": "0.111.4",
     "motion": "14.14.0",
     "pdfjs-dist": "^6.3.289",
