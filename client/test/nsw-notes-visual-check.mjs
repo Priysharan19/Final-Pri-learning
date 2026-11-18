@@ -55,6 +55,9 @@ const present = n => ({
 const server = await createServer({
   root: CLIENT, configFile: fileURLToPath(new URL('../vite.config.js', import.meta.url)), logLevel: 'error',
   server: { host: '127.0.0.1', port: 0, strictPort: false, hmr: false, watch: null, proxy: undefined },
+  // Its own dependency cache: the walks that ran before it in the same job leave one optimised for other entries, and a dev server
+  // that finds it stale re-optimises mid-run ("Pre-transform error: the file does not exist … deps/react-dom") and never draws the chapter.
+  cacheDir: fileURLToPath(new URL('../node_modules/.vite-nsw-notes-visual', import.meta.url)),
   optimizeDeps: { entries: ['test/support/nsw-notes-gallery.html'] }
 });
 await server.listen();
