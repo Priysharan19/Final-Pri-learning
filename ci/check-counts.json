@@ -37,6 +37,7 @@
         {"has":"3296000/3296000 self-checks passed across 412 subtopics"},
         {"has":"21000/21000 multipart part-checks passed"},
         {"has":"✔ INDIA SUITE PASSED — 2726/2726 checks"},
+        {"re":"LINE INTERPRETER: PASS — ([0-9]+)/\\1 checks — verbatim guard","note":"The line interpreter (dark, PRI_FEATURE_LINE_INTERPRETER): a lying interpreter never ticks a wrong line and the request carries no answer. The count follows the number of generator families, so it is matched as N/N."},
         {"has":"MISTAKE VIEW: PASS — 308/308 checks","note":"306 → 308: piecewise (abs/floor/ceil) lines are never read as a chain of equals. 303 → 306: final review — an equation true only on a half-line (|x − 10| = 10 − x) is never read as a chain of equals. 299 → 303: second review — a line undefined near the origin is never read as an identity; a tiny value reads ≈ 0. See why it's wrong: the first break as two graphs, feedback only; null whenever it cannot be shown honestly. 267 → 299: the independent review's cases (identities, substitution lines, chains of equals, rounded roots, the real Step Check path) became regression checks."},
         {"has":"STUDENT PLOT: PASS — 38/38 checks","note":"v1.1: step-mark rows say the engine's mark and never contradict it."},
         {"has":"INDIA DIFFICULTY TRUTH: PASS — 36964/36964 checks"},
