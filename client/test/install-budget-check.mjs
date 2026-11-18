@@ -168,7 +168,11 @@ const INSTALL_GZIP_CEILING = 1_000_000;
 // its own tree (Prithagoras 4,934 kB). This branch adds the NSW content-gap forms on top; the merged tree measured with a real build is
 // 5,047 kB raw / 1,719 kB gzipped install plus warm. FIRST_VISIT_RAW 5,100,000 -> 5,250,000 (about 80 kB headroom) and
 // FIRST_VISIT_GZIP 1,750,000 -> 1,850,000 (about 87 kB headroom); the higher of the two branches' measured needs is kept.
-const FIRST_VISIT_RAW_CEILING = 5_250_000;
+// Raised 2026-11-19 (train editions-28 after merging main's focus pack, the CTO under the same owner decision, size not a constraint):
+// FIRST_VISIT_RAW 5,250,000 -> 5,400,000 bytes; gzip unchanged. Measured on the merged tree: 5,158 kB raw install plus warm, over 5,127 kB.
+// A re-baseline for the combined branch, not a weaker gate: the install ceilings, the banned-from-install list, render-from-install and
+// offline coverage are unchanged. Headroom is about 115 kB.
+const FIRST_VISIT_RAW_CEILING = 5_400_000;
 const FIRST_VISIT_GZIP_CEILING = 1_850_000;
 
 // Things that must never be in the install again, and what each one costs.

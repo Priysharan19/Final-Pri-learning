@@ -226,22 +226,6 @@
 .ws-read-by { margin-left: 8px; font-size: 12.5px; color: var(--ink-3); }
 
 
-/* ── Check what Pri read (verified page, step 1) ─ recognised maths set in Computer
-   Modern (KaTeX's own face) under each line; an uncertain line is a static dashed
-   outline with its question in words. The only looping motion is the pulse, and it
-   exists only when motion is allowed; under reduced motion the outline and the
-   words carry it. */
-.ws-confirm-count { margin-left: auto; font: 500 12px var(--in-mono, monospace); font-variant-numeric: tabular-nums; color: var(--in-tx-2, inherit); }
-.ws-confirm-blind { margin: 2px 0 6px; font-size: 12.5px; }
-.ws-confirm-line { display: grid; grid-template-columns: 22px 1fr; gap: 4px 8px; align-items: baseline; }
-.ws-confirm-n { font: 500 11px var(--in-mono, monospace); color: var(--in-tx-3, inherit); }
-.ws-cm .katex { font-size: 1.15em; }
-.ws-confirm-line.is-unsure { outline: 1.5px dashed var(--in-slip, currentColor); outline-offset: 2px; box-shadow: none; }
-.ws-confirm-ask { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.ws-confirm-ask .btn { min-height: 44px; }
-.ws-confirm-acts .btn { min-height: 44px; }
-@keyframes ws-unsure-pulse { 0%, 100% { outline-color: var(--in-slip, currentColor); } 50% { outline-color: color-mix(in srgb, var(--in-slip, currentColor) 35%, transparent); } }
-@media (prefers-reduced-motion: no-preference) { .ws-confirm-line.is-unsure { animation: ws-unsure-pulse 1.4s ease-in-out infinite; } }
 
 /* ── Walk-through fixes, 19 Nov 2026 (Prithagoras: [data-edition] is on <html>) ───────────────────────────
    1. The sticky action bar sits over the foot of the page. Anything the page scrolls to (a "Not quite" card, the
