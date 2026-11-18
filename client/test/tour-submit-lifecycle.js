@@ -239,6 +239,12 @@ export const flow = {
     // no reading is on screen, and the page was NOT read (or paid for) again: the count of reader requests is the same after the
     // reload as before it. (Before it, a slow runner can rest the pen long enough for more than one automatic read of the same page.)
     await page.waitForTimeout(3500);
+    // The kept page is unsealed from IndexedDB after the reload: on a loaded runner that can take longer than the settle above, so wait
+    // (bounded) for Mark my working to come back enabled. The check below still requires it to be enabled and not to have caused a read.
+    await page.waitForFunction(() => {
+      const b = [...document.querySelectorAll('.ws-actions .btn-primary')].find(x => /^Mark my working/.test(x.textContent || ''));
+      return !!b && !b.disabled;
+    }, null, { timeout: 20000 }).catch(() => null);
     const hidden = await readingIsNotShown(page, []);
     const markBtn = page.getByRole('button', { name: /^Mark my working/ });
     await check('its handwriting is back on the page, ready to mark, with no reading shown, and was NOT read again (no new reader request)',
