@@ -30,6 +30,9 @@ import { translate } from '../i18n/core.js';
 const SHA = /^[0-9a-f]{40}$/;
 const GUARD_KEY = 'pri.freshBuild.reloaded.v1';
 const RECHECK_MS = 60_000;
+// The boot check waits for the page's own load to finish and then a quiet moment, so a reload can never cut
+// off the shell's own scripts and fonts in flight.
+const SETTLE_MS = 2500;
 const SHELL_PATHS = ['/index.html', '/'];
 // Anything a person does to a page that may leave something unsaved in it.
 const TOUCH_EVENTS = ['keydown', 'input', 'paste', 'pointerdown', 'touchstart'];
@@ -50,14 +53,22 @@ export function freshnessAction({ ownSha, liveSha, touched, alreadyReloadedFor }
   return 'reload';
 }
 
-async function dropStaleShell(win) {
+/**
+ * Replace the cached shell with the live one BEFORE reloading: the new shell is fetched first, and only a
+ * successful answer is written over the old entry. A connection that drops here leaves the old shell in
+ * place (the reload then still opens offline), never an empty cache. Returns whether the shell was replaced.
+ */
+async function replaceStaleShell(win) {
   try {
+    const fresh = await win.fetch('/', { cache: 'reload', credentials: 'same-origin', headers: { Accept: 'text/html' } });
+    if (!fresh?.ok || !/html/i.test(fresh.headers?.get?.('content-type') || '')) return false;
     const names = (await win.caches.keys()).filter(n => n.startsWith('pri-'));
     await Promise.all(names.map(async n => {
       const cache = await win.caches.open(n);
-      await Promise.all(SHELL_PATHS.map(p => cache.delete(p)));
+      await Promise.all(SHELL_PATHS.map(p => cache.put(p, fresh.clone())));
     }));
-  } catch { /* no cache API, or unreadable: the reload then asks the worker as before */ }
+    return true;
+  } catch { return false; /* offline, or no cache API: the old shell stays and the worker is asked as before */ }
 }
 
 async function askWorkerToUpdate(win) {
@@ -98,7 +109,7 @@ function showNotice(win, onReload) {
  * `read` and `ownSha` are injectable; by default they are the live manifest and
  * the SHA baked into this bundle.
  */
-export function watchFreshBuild(win = window, { read = readReleaseIdentityManifest, ownSha = ownBuildSha(), now = () => Date.now(), immediate = true } = {}) {
+export function watchFreshBuild(win = window, { read = readReleaseIdentityManifest, ownSha = ownBuildSha(), now = () => Date.now(), immediate = true, settleMs = SETTLE_MS } = {}) {
   let touched = false;
   let last = 0;
   let busy = false;
@@ -110,7 +121,7 @@ export function watchFreshBuild(win = window, { read = readReleaseIdentityManife
     // the reload happened, so the notice is the only safe outcome.
     if (!writeGuard(win, liveSha)) return false;
     await askWorkerToUpdate(win);
-    await dropStaleShell(win);
+    await replaceStaleShell(win);
     win.location.reload();
     return true;
   }
@@ -130,7 +141,7 @@ export function watchFreshBuild(win = window, { read = readReleaseIdentityManife
         showNotice(win, () => { void (async () => {
           writeGuard(win, liveSha);
           await askWorkerToUpdate(win);
-          await dropStaleShell(win);
+          await replaceStaleShell(win);
           win.location.reload();
         })(); });
         return 'notice';
@@ -146,7 +157,11 @@ export function watchFreshBuild(win = window, { read = readReleaseIdentityManife
   const onVisible = () => { if (win.document?.visibilityState === 'visible') void check(); };
   win.document?.addEventListener('visibilitychange', onVisible);
   win.addEventListener('online', onVisible);
-  if (immediate) void check();
+  if (immediate) {
+    const go = () => { setTimeout(() => { void check(); }, settleMs); };
+    if (win.document?.readyState && win.document.readyState !== 'complete') win.addEventListener('load', go, { once: true });
+    else go();
+  }
 
   return {
     check: () => { last = 0; return check(); },

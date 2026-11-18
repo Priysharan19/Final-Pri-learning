@@ -33,7 +33,8 @@ const en = {
   'function.yIntercept': 'It crosses the {yv}-axis at {y}.',
   'function.xIntercepts': 'It crosses the {xv}-axis at {xv} = {xs}.',
   'function.asymptoteVertical': 'Vertical asymptote {xv} = {value}.',
-  'function.asymptoteHorizontal': 'Horizontal line {yv} = {value}.',
+  'function.asymptoteHorizontal': 'Horizontal asymptote {yv} = {value}.',
+  'function.referenceLine': 'Horizontal line {yv} = {value}.',
 
   'unitCircle.title': 'The unit circle',
   'unitCircle.desc': 'A point on the unit circle at {deg} degrees: cosine {cos}, sine {sin}{tan}.',
@@ -222,7 +223,8 @@ const hi = {
   'function.yIntercept': 'यह {yv}-अक्ष को {y} पर काटता है।',
   'function.xIntercepts': 'यह {xv}-अक्ष को {xv} = {xs} पर काटता है।',
   'function.asymptoteVertical': 'ऊर्ध्वाधर अनंतस्पर्शी {xv} = {value}।',
-  'function.asymptoteHorizontal': 'क्षैतिज रेखा {yv} = {value}।',
+  'function.asymptoteHorizontal': 'क्षैतिज अनंतस्पर्शी {yv} = {value}।',
+  'function.referenceLine': 'क्षैतिज रेखा {yv} = {value}।',
 
   'unitCircle.title': 'इकाई वृत्त',
   'unitCircle.desc': 'इकाई वृत्त पर {deg} अंश के कोण पर एक बिंदु: cos का मान {cos}, sin का मान {sin}{tan}।',

@@ -46,7 +46,7 @@ import { priNative } from '../platform/native/index.js';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
 import { readOnboardingAuthority } from './onboardingAuthority.js';
 import { parentFeaturesOffered, defaultCourse } from '../platform/edition.js';
-import { readStoredAccountProfile } from '../platform/accountProfileRestore.js';
+import { planStoredProfile } from '../platform/accountProfileRestore.js';
 import { EDITION_ID } from '../brand/edition.js';
 
 export { isNetworkFailure, signInErrorCopy };
@@ -146,6 +146,9 @@ export default function SignUpFlow({
   const [pathway, setPathway] = useState('advanced');
   // The stored profile of a returning account (see signedIn); null otherwise.
   const restored = useRef(null);
+  // Whether the account's stored profile has been asked for in this sign-in (a guardian-pending child cannot be asked yet).
+  const storedAsked = useRef(false);
+  const [readRetry, setReadRetry] = useState(null);
   const available = cloudAvailable();
 
   const needsParent = !!consent?.required && consent.state !== 'given';
@@ -334,7 +337,24 @@ export default function SignUpFlow({
     } finally { verifying.current = false; }
   }
 
+  function applyStored(stored) {
+    restored.current = stored;
+    if (stored.name && !name.trim()) setName(stored.name);
+    setYear(stored.year);
+    if (stored.pathway) setPathway(stored.pathway);
+    if (stored.indiaTrack) setTrack(stored.indiaTrack);
+  }
+
+  async function retryStoredRead() {
+    const again = readRetry;
+    if (!again) return;
+    setReadRetry(null); setError('');
+    await signedIn(again);
+  }
+
   async function signedIn(result) {
+    // Nothing of an earlier sign-in survives into this one: a different account must never inherit its profile.
+    restored.current = null; storedAsked.current = false; setReadRetry(null);
     setAccount(result.account);
     const state = result.guardianConsent || null;
     setConsent(state);
@@ -347,18 +367,16 @@ export default function SignUpFlow({
     // blank one. The class is asked only when the server truly holds none.
     // Inside a page the profile exists, so nothing more is asked at all.
     // A child whose guardian has not approved yet cannot sync (the server refuses the pull), so nothing
-    // is stored to read: the class is asked, then the parent step, exactly as before.
+    // is stored to read yet: the class is asked, then the parent step. Once the guardian has approved,
+    // finish() asks for the stored profile before the device makes one of its own.
     if (!inline && year === null && parent) { go('class'); return; }
     if (!inline && year === null) {
-      let stored = null;
-      try { stored = await readStoredAccountProfile(result.account?.id); }
-      catch (err) { fail(err); return; }
-      if (stored && stored.course === defaultCourse()) {
-        restored.current = stored;
-        if (stored.name && !name.trim()) setName(stored.name);
-        setYear(stored.year);
-        if (stored.pathway) setPathway(stored.pathway);
-        if (stored.indiaTrack) setTrack(stored.indiaTrack);
+      const plan = await planStoredProfile(result.account?.id, { course: defaultCourse() });
+      // "Could not ask" is never "has none": the card stays signed in and offers to ask again.
+      if (plan.status === 'failed') { setReadRetry(result); fail(plan.error); return; }
+      storedAsked.current = true;
+      if (plan.status === 'restore') {
+        applyStored(plan.stored);
       } else { go('class'); return; }
     }
     if (parent) { go('parent'); return; }
@@ -508,6 +526,13 @@ export default function SignUpFlow({
           if (step !== 'parent' && step !== 'parent-wait') go('parent');
           setError(tLater('signup.parentStillWaiting'));
           return;
+        }
+        // A guardian-pending child could not be asked for a stored profile at sign-in; the approval is in, so ask once now.
+        if (!inline && !storedAsked.current && !restored.current) {
+          const plan = await planStoredProfile(signedInAccount.id, { course: defaultCourse() });
+          if (plan.status === 'failed') { fail(plan.error); return; }
+          storedAsked.current = true;
+          if (plan.status === 'restore') applyStored(plan.stored);
         }
         const stored = restored.current;
         if (stored) {
@@ -837,6 +862,7 @@ export default function SignUpFlow({
         {body}
         {notice && <p className="signup-hint signup-notice-line" role="status" data-testid="signup-notice">{notice}</p>}
         {error && <div className="error-box signup-error" role="alert" id={errorId} data-testid="signup-error">{error}</div>}
+        {error && readRetry && <button type="button" className="btn btn-secondary" data-testid="signup-retry-read" onClick={() => { void retryStoredRead(); }}>{t('common.tryAgain')}</button>}
         {busy === 'finish' && <p className="signup-hint" role="status">{t(inline ? 'signup.signingIn' : 'signup.settingUp')}</p>}
       </div>
     </div>

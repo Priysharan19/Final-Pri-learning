@@ -98,7 +98,7 @@ export function FunctionGraph({ title, caption = null, hideIntercepts = false, .
     m.curves.map(c => sentence(c.label ? tk('function.curveNamed', { ...V, name: c.label.replace(/[\\${}]/g, ''), expr: inVars(c.expr) }) : tk('function.curve', { ...V, expr: inVars(c.expr) }), c.shade ? tk('function.shade', { ...V, from: c.shade.from, to: c.shade.to }) : '')).join(' '),
     m.curves.flatMap(c => [c.yIntercept ? tk('function.yIntercept', { ...V, y: c.yIntercept.y }) : '', c.xIntercepts?.length ? tk('function.xIntercepts', { ...V, xs: c.xIntercepts.map(i => i.x).join(', ') }) : '']).join(' '),
     m.asymptotes.map(a => tk(a.axis === 'x' ? 'function.asymptoteVertical' : 'function.asymptoteHorizontal', { ...V, value: a.value })).join(' '),
-    m.curves.filter(c => c.constant !== undefined).map(c => tk('function.asymptoteHorizontal', { ...V, value: c.constant })).join(' ')
+    m.curves.filter(c => c.constant !== undefined).map(c => tk('function.referenceLine', { ...V, value: c.constant })).join(' ')
   );
   return (
     <Figure width={m.frame.width} height={m.frame.height} title={title ?? tk('function.title')} description={desc} caption={caption}>

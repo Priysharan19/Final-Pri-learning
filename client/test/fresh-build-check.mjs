@@ -31,9 +31,11 @@ function fakeWin({ storage = true } = {}) {
     addEventListener(t, f) { this.listeners[t] = f; } });
   const body = el('body');
   const doc = { body, visibilityState: 'visible', createElement: el, getElementById: (id) => body.children.find(c => c.id === id) || null, addEventListener() {}, removeEventListener() {} };
+  const replaced = [];
   const cachesState = { 'pri-old': new Set(['/index.html', '/', '/assets/x.js']), 'pri-new': new Set(['/index.html', '/']) };
   const win = {
-    document: doc, reloads: 0, updates: 0, added,
+    document: doc, reloads: 0, updates: 0, added, fetches: 0, fetchOk: true,
+    fetch: async () => { win.fetches++; if (!win.fetchOk) throw new Error('offline'); return { ok: true, headers: { get: () => 'text/html' }, clone() { return this; } }; },
     addEventListener(t, f) { (handlers[t] = handlers[t] || []).push(f); },
     removeEventListener() {},
     fire(t) { (handlers[t] || []).forEach(f => f({})); },
@@ -42,9 +44,9 @@ function fakeWin({ storage = true } = {}) {
     navigator: { serviceWorker: { getRegistration: async () => ({ update: async () => { win.updates++; } }) } },
     caches: {
       keys: async () => Object.keys(cachesState),
-      open: async (n) => ({ delete: async (p) => cachesState[n].delete(p) })
+      open: async (n) => ({ delete: async (p) => cachesState[n].delete(p), put: async (p) => { cachesState[n].add(p); replaced.push(`${n}${p}`); } })
     },
-    cachesState, store
+    cachesState, store, replaced
   };
   return win;
 }
@@ -55,13 +57,13 @@ const run = async (win, sha, own = A) => {
   return { w, r };
 };
 
-// stale + untouched → reloads once, drops the stale shell, asks the worker to update
+// stale + untouched → reloads once, replaces the stale shell, asks the worker to update
 {
   const win = fakeWin();
   const { r } = await run(win, B);
   ok(r === 'reload' && win.reloads === 1, 'untouched stale page reloads once');
   ok(win.updates >= 1, 'worker asked to update');
-  ok(!win.cachesState['pri-old'].has('/index.html') && !win.cachesState['pri-new'].has('/') && win.cachesState['pri-old'].has('/assets/x.js'), 'only the shell is dropped from the caches');
+  ok(win.fetches === 1 && win.replaced.length === 4 && win.cachesState['pri-old'].has('/index.html') && win.cachesState['pri-old'].has('/assets/x.js'), 'the live shell is fetched first and replaces the cached one; nothing else is touched');
   ok(win.store.get('pri.freshBuild.reloaded.v1') === B, 'reload recorded for the live build');
   // The reloaded page is still on the old shell (worker answered stale again): no second reload.
   const again = await run(win, B);
@@ -87,7 +89,7 @@ for (const type of ['keydown', 'input', 'pointerdown', 'touchstart', 'paste']) {
   const btn = win.document.getElementById('pri-update-notice').children[1];
   btn.listeners.click();
   await new Promise(r => setTimeout(r, 10));
-  ok(win.reloads === 1 && !win.cachesState['pri-old'].has('/index.html'), 'choosing the notice reloads once and drops the stale shell');
+  ok(win.reloads === 1 && win.replaced.length === 4, 'choosing the notice reloads once after replacing the stale shell');
 }
 
 // current build, unreadable manifest, dev build, and no storage
@@ -104,10 +106,36 @@ for (const type of ['keydown', 'input', 'pointerdown', 'touchstart', 'paste']) {
   ok(r === 'notice' && noStore.reloads === 0, 'no sessionStorage: cannot prove a single reload, so notice only');
 }
 
+// N2: the new shell cannot be fetched (the connection drops): the cached shell is left exactly as it was
+{
+  const win = fakeWin(); win.fetchOk = false;
+  const { r } = await run(win, B);
+  ok(r === 'reload' && win.replaced.length === 0 && win.cachesState['pri-old'].has('/index.html') && win.cachesState['pri-new'].has('/'), 'fetch of the new shell failed: nothing deleted, shell still cached');
+}
+
+// the boot check never fires while the page is still loading, and waits a quiet moment after it
+{
+  const win = fakeWin(); win.document.readyState = 'loading';
+  watchFreshBuild(win, { read: live(B), ownSha: A, settleMs: 0 });
+  await new Promise(r => setTimeout(r, 30));
+  ok(win.reloads === 0, 'still loading: no check, no reload');
+  win.fire('load');
+  await new Promise(r => setTimeout(r, 30));
+  ok(win.reloads === 1, 'after load the boot check runs');
+  const w2 = fakeWin();
+  watchFreshBuild(w2, { read: live(B), ownSha: A });
+  await new Promise(r => setTimeout(r, 30));
+  ok(w2.reloads === 0, 'default settle delay: not within the first 30 ms');
+  // placeholders are never a reason to act
+  for (const bad of ['', 'development-unknown', 'a'.repeat(39), 'A'.repeat(40)]) {
+    ok(freshnessAction({ ownSha: A, liveSha: bad, touched: false }) === 'none' && freshnessAction({ ownSha: bad, liveSha: B, touched: false }) === 'none', `placeholder SHA "${bad}" never acts`);
+  }
+}
+
 // started with the default (immediate) check: the boot check itself reloads an untouched stale page
 {
   const win = fakeWin();
-  watchFreshBuild(win, { read: live(B), ownSha: A });
+  watchFreshBuild(win, { read: live(B), ownSha: A, settleMs: 0 });
   await new Promise(r => setTimeout(r, 20));
   ok(win.reloads === 1, 'the boot check on an untouched stale page reloads');
 }

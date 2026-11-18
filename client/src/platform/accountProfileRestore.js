@@ -66,3 +66,17 @@ export async function applyStoredProfile(pid, stored) {
   await put('profiles', next);
   return next;
 }
+
+/**
+ * What sign-in does about the stored profile, as one decision the card and the tests share.
+ *   { status: 'restore', stored }  the account holds a profile for this edition: build the device from it
+ *   { status: 'none' }             the server was asked and truly holds none (or one for another course): ask the class
+ *   { status: 'failed', error }    the server could not be asked: say so and offer "Try again", never "none"
+ */
+export async function planStoredProfile(accountId, { course, read = readStoredAccountProfile } = {}) {
+  let stored;
+  try { stored = await read(accountId); }
+  catch (error) { return { status: 'failed', error }; }
+  if (stored && stored.course === course) return { status: 'restore', stored };
+  return { status: 'none' };
+}

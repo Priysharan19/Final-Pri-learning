@@ -221,6 +221,16 @@ try {
   await server.close();
 }
 
+// A real asymptote is announced as one, a constant reference line as a line (S3, accessibility wording).
+{
+  const { CORE_TEXT } = await import('../src/diagrams/coreText.js');
+  ok(/asymptote/i.test(CORE_TEXT.en['function.asymptoteHorizontal']) && !/asymptote/i.test(CORE_TEXT.en['function.referenceLine']), 'en: horizontal asymptote keeps its name; reference line is a line');
+  ok(/अनंतस्पर्शी/.test(CORE_TEXT.hi['function.asymptoteHorizontal']) && !/अनंतस्पर्शी/.test(CORE_TEXT.hi['function.referenceLine']), 'hi: horizontal asymptote keeps its name; reference line is a line');
+  for (const l of ['en', 'hi']) ok(['{yv}', '{value}'].every(slot => CORE_TEXT[l]['function.referenceLine'].includes(slot)), `${l}: referenceLine has its slots`);
+  const dg = (await import('node:fs')).readFileSync(fileURLToPath(new URL('../src/diagrams/Diagram.jsx', import.meta.url)), 'utf8');
+  ok(/m\.asymptotes\.map\(a => tk\(a\.axis === 'x' \? 'function\.asymptoteVertical' : 'function\.asymptoteHorizontal'/.test(dg) && /constant !== undefined\)\.map\(c => tk\('function\.referenceLine'/.test(dg), 'Diagram.jsx uses asymptote text for asymptotes and referenceLine for constant lines');
+}
+
 if (failures.length) {
   console.error(`DIAGRAM KIT I18N: FAIL — ${failures.length} of ${pass + failures.length} checks failed`);
   for (const f of failures.slice(0, 60)) console.error(`  · ${f}`);

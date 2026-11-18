@@ -124,11 +124,36 @@ eq('a stored year outside 7-12 is not usable', usableStoredProfile({ year: 3 }),
 
 // ── 5 · The card reads before it asks ────────────────────────────────────────
 const flow = readFileSync(fileURLToPath(new URL('../src/components/SignUpFlow.jsx', import.meta.url)), 'utf8');
-ok('signedIn reads the stored profile before asking the class',
-  /if \(!inline && year === null\) \{\s*let stored = null;\s*try \{ stored = await readStoredAccountProfile\(/.test(flow));
-ok('a read failure stops at the error and never falls through to the class',
-  /catch \(err\) \{ fail\(err\); return; \}\s*if \(stored && stored\.course === defaultCourse\(\)\)/.test(flow));
+ok('signedIn plans the stored profile before asking the class',
+  /if \(!inline && year === null\) \{\s*const plan = await planStoredProfile\(/.test(flow));
+ok('a failed read keeps the sign-in and offers Try again; it never falls through to the class',
+  /if \(plan\.status === 'failed'\) \{ setReadRetry\(result\); fail\(plan\.error\); return; \}\s*storedAsked\.current = true;/.test(flow)
+  && /data-testid="signup-retry-read"/.test(flow) && /await signedIn\(again\)/.test(flow));
 ok('the stored profile is handed to the device profile maker', /restoredProfile: stored/.test(flow));
+ok('N1: every sign-in starts with no restored profile, no earlier read and no retry',
+  /async function signedIn\(result\) \{[^}]*restored\.current = null; storedAsked\.current = false; setReadRetry\(null\);/.test(flow));
+ok('S1: a guardian-pending child is asked for the stored profile once the approval is in, before the device makes its own',
+  /if \(!inline && year === null && parent\) \{ go\('class'\); return; \}/.test(flow)
+  && /if \(!inline && !storedAsked\.current && !restored\.current\) \{\s*const plan = await planStoredProfile\(signedInAccount\.id[\s\S]{0,260}applyStored\(plan\.stored\);[\s\S]{0,200}const stored = restored\.current;/.test(flow));
+
+// ── 6 · The decision the card takes, run ─────────────────────────────────────
+const { planStoredProfile } = await import('../src/platform/accountProfileRestore.js');
+const body = { name: 'Gia', year: 11, course: 'nsw', pathway: 'ext1' };
+const usable = usableStoredProfile(body);
+let asked = 0;
+eq('a stored profile for this edition is restored', (await planStoredProfile('a', { course: 'nsw', read: async () => { asked++; return usable; } })).status, 'restore');
+eq('one for another edition is not adopted: the class is asked', (await planStoredProfile('a', { course: 'in', read: async () => usable })).status, 'none');
+eq('truly none is none', (await planStoredProfile('a', { course: 'nsw', read: async () => null })).status, 'none');
+const failed = await planStoredProfile('a', { course: 'nsw', read: async () => { throw new Error('offline'); } });
+eq('S2: a read that throws is failed, never none', failed.status, 'failed');
+ok('S2: and carries the error for the card to show', failed.error?.message === 'offline');
+// S1 simulated: the first (pre-approval) ask is skipped, the post-approval ask restores
+let calls = 0; const readOnce = async () => { calls++; return usable; };
+const afterApproval = await planStoredProfile('child', { course: 'nsw', read: readOnce });
+ok('S1: asked once after approval, restores', afterApproval.status === 'restore' && calls === 1);
+// N1 simulated: a second sign-in as another account yields that account's own plan, nothing carried
+const other = await planStoredProfile('b', { course: 'nsw', read: async () => null });
+ok('N1: a different account never inherits the first one\'s profile', other.status === 'none');
 
 if (failures.length) { console.error(failures.map(f => `FAIL ${f}`).join('\n')); process.exit(1); }
 console.log(`returning-signin-restore-check: ${pass}/${pass} checks passed`);
