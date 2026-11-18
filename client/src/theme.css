@@ -2401,7 +2401,10 @@ html { background-color: var(--page); }
   .ws-actions { position: static; }
   .ws-actions-btns { flex-wrap: wrap; }
   .ws-actions .btn-primary, .ws-actions-btns .btn { min-width: 0; flex: 1 1 100%; }
-  .ws-context .q-prompt { overflow-x: auto; overflow-y: hidden; padding: 4px 0; }
+  .ws-context .q-prompt { overflow-x: auto; overflow-y: hidden; padding: 10px 0; }
+  /* The marks table of a marked card fits a 200%-zoomed phone: words wrap, the marks column gives up its fixed width. */
+  .criteria-table th, .criteria-table td { overflow-wrap: anywhere; padding-left: 8px; padding-right: 8px; }
+  .criteria-table td.cm { width: auto; }
   /* A tag beside a heading (the chapter shells, assignment cards) wraps its
      words instead of holding the row at its one-line width. */
   .spread > .tag { white-space: normal; overflow-wrap: anywhere; min-width: 0; }
