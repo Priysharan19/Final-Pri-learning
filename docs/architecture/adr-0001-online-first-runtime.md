@@ -93,6 +93,7 @@ The server-side OpenAI providers already exist (`server/platform/handwritingProv
    - Known limits, not hidden: an open paper is resumed on the device that started it; a second
      device sees a paper once it is finished (its result and marked detail are read back from the
      account).
+   - **Amended once, narrowly, by ADR-0003 (2026-11-18):** a signed-out browser visitor may have up to five typed or multiple-choice questions a day issued and marked by the server under an anonymous sealed token. Everything above still holds for every account.
    - `.pri-os/fleet.json` keeps the principle key `deterministic_marking_fallback` (the fleet
      validator pins the key name). From this amendment it means: the deterministic engine, not a
      model, decides every mark — on the server.
