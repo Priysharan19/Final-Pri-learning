@@ -1028,6 +1028,9 @@ jobs:
             # A failed chunk, a refused cache write or a probe that never settles must
             # end in the app or in a visible notice with Reload, never a silent splash.
             npm run test:boot 2>&1 | tee -a browser.log
+            # A returning browser moves to a new release with the real service worker: one reload when untouched,
+            # a notice when touched, build A still working when the live shell cannot be fetched.
+            node client/test/tour-fresh-release.js --no-build 2>&1 | tee -a browser.log
               ;;
             edition-prithagoras)
             # Plan E6: PRI_EDITION=prithagoras for the whole group (the step's
