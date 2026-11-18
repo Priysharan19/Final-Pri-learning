@@ -287,7 +287,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
   // Where the student was going when the card stopped them (a deep link
   // opened signed out). Read once, at mount: signing in returns them there.
   const location = useLocation();
-  const intended = useRef(location.pathname && location.pathname !== '/' ? `${location.pathname}${location.search || ''}${location.hash || ''}` : '/practice');
+  const intended = useRef(location.pathname && location.pathname !== '/' && location.pathname !== '/signin' ? `${location.pathname}${location.search || ''}${location.hash || ''}` : '/practice');
   const t = useT();
   // Resolved per render, not at module load, so a development override of the
   // flag (features.js) is honoured; a production build compiles it to a constant.

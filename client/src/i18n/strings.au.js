@@ -150,4 +150,6 @@ export const AU_STRINGS = Object.freeze({
   'msg.ent.extraAi': 'Additional AI usage is reserved for {brand} HSC Pass.',
   'msg.ent.generic': 'This feature is part of {brand} HSC Pass.',
   'msg.ent.genericShort': 'This is part of {brand} HSC Pass.',
+  'picker.year': 'Year',
+  'picker.course': 'Course'
 });

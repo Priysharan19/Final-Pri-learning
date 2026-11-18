@@ -193,7 +193,7 @@ export const flow = {
       adultCtx.on('request', captureRequest);
       const adult = await adultCtx.newPage();
       const adultEmail = freshEmail('adult');
-      await adult.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+      await adult.goto(`${base}/signin`, { waitUntil: 'domcontentloaded' });
       await adult.locator(`${CARD} #signup-destination`).waitFor({ timeout: 30000 });
       resetOtpLimits(await onlinePlatform());
       await adult.locator('#signup-destination').fill(adultEmail);
@@ -210,7 +210,7 @@ export const flow = {
       await adult.getByTestId('signup-class-next').click();
       await adult.waitForSelector('.shell', { timeout: 60000 });
       await check('18+ goes straight in: no parent step, no waiting screen',
-        await adult.locator('[data-signup-step="parent"], [data-signup-step="parent-wait"], [data-testid="activation-guardian"]').count() === 0 && new URL(adult.url()).pathname === '/practice');
+        await adult.locator('[data-signup-step="parent"], [data-signup-step="parent-wait"], [data-testid="activation-guardian"]').count() === 0 && new URL(adult.url()).pathname === '/practice', adult.url());
       const adultAccount = h.db.prepare('SELECT id, age_basis FROM accounts WHERE email=?').get(adultEmail);
       await check('the server holds the adult age authority and NO guardian row',
         adultAccount?.age_basis === 'adult' && h.db.prepare('SELECT COUNT(*) AS n FROM guardian_consents WHERE account_id=?').get(adultAccount.id).n === 0, JSON.stringify(adultAccount));

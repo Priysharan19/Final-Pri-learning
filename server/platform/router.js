@@ -37,6 +37,7 @@ import { requireGuardianConsent } from './guardianConsent.js';
 import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, syncQuota } from './config.js';
 import { csrfGuard, originGuard } from './security.js';
+import { createGuestTrialRouter } from './guestTrial.js';
 import { housekeepingStatus } from './housekeeping.js';
 import { operatorHealthDetail } from './operatorHealth.js';
 import { cachedServerReleaseIdentity, releaseShaForLogs } from './releaseIdentity.js';
@@ -76,7 +77,7 @@ const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
 // and no cookie. Its token can only stop parent reports (parentReport.js).
 const ONE_CLICK_UNSUBSCRIBE = /^\/parent-report\/unsubscribe\/one-click$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {}, desk = {}, papers = {}, publicCatalogue: publicOverride = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {}, desk = {}, papers = {}, publicCatalogue: publicOverride = {}, guest = {} } = {}) {
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
@@ -209,6 +210,10 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
     if (req.method === 'POST' && (SERVER_WEBHOOK.test(req.path) || PROVIDER_CALLBACK.test(req.path) || ONE_CLICK_UNSUBSCRIBE.test(req.path))) return next();
     return originGuard(req, res, next);
   });
+  // The guest trial (ADR-0003) is mounted BEFORE the session CSRF guard on
+  // purpose: it has no session. It carries its own CSRF check (guestTrial.js),
+  // and a stale sign-in cookie on the device must not make it 403.
+  router.use('/guest', createGuestTrialRouter(db, guest));
   router.use(csrfGuard);
 
   // The child/privacy architecture — a modified client can persist only aggregate
