@@ -69,7 +69,7 @@ export function boxesFromInk(strokes, readLines) {
 export function boxesFromPhoto(lines) {
   const list = Array.isArray(lines) ? lines : [];
   if (!list.length) return null;
-  const boxes = list.map(l => (validBox(l?.box) ? { x: clamp01(l.box.x), y: clamp01(l.box.y), w: Math.min(1, l.box.w), h: Math.min(1, l.box.h) } : null));
+  const boxes = list.map(l => (validBox(l?.box) ? { x: clamp01(l.box.x), y: clamp01(l.box.y), w: Math.min(1 - clamp01(l.box.x), l.box.w), h: Math.min(1 - clamp01(l.box.y), l.box.h) } : null));
   if (boxes.some(b => !b)) return null;
   for (let i = 1; i < boxes.length; i += 1) if (boxes[i].y + boxes[i].h / 2 < boxes[i - 1].y + boxes[i - 1].h / 2) return null;
   return { view: null, boxes };
