@@ -46,6 +46,7 @@ export function leavesOf(paper) {
 }
 
 const answered = a => !!a && ((a.text || '').trim() !== '' || (a.working || '').trim() !== '');
+const critWord = (t, status) => (status === 'verified' ? t('paper.crit.verified') : status === 'not-verified' ? t('paper.crit.notVerified') : status === 'not-attempted' ? t('paper.crit.notAttempted') : t('paper.crit.selfCheck'));
 const marksWord = (t, n) => t(n === 1 ? 'paper.mark.one' : 'paper.mark.other', { n });
 
 // ── The sample answer and how it is marked, fetched when asked for ────────────
@@ -76,7 +77,7 @@ function HowMarked({ part, solutions, ask, row }) {
       <summary>{t('paper.res.howMarked')}</summary>
       {s && typeof s === 'object'
         ? <ul className="pp-criteria">{s.howMarked.map((c, i) => <li key={i} data-paper-criterion={row?.criteria?.[i]?.status || undefined}>{c.marks != null && <strong className="pp-crit-marks">{marksWord(t, c.marks)}</strong>}<Blocks blocks={c.text} inline />
-          {row?.criteria?.[i] && <span className="muted pp-crit-status"> · {t(`paper.crit.${row.criteria[i].status}`)}</span>}</li>)}</ul>
+          {row?.criteria?.[i] && <span className="muted pp-crit-status"> · {critWord(t, row.criteria[i].status)}</span>}</li>)}</ul>
         : <p className="muted" role="status">{s === 'failed' ? t('paper.res.sampleFailed') : t('paper.res.loadingSample')}</p>}
     </details>
   );

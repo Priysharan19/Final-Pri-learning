@@ -10,6 +10,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
+import { BRAND } from '../brand/edition.js';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { ext1PapersFor } from '../pages/Ext1Papers.jsx';
@@ -41,7 +42,7 @@ export default function ExamStyleQuestions({ chapter }) {
   return (
     <section className="card" aria-labelledby="exam-style-h" data-exam-style={chapter} style={{ marginBottom: 16 }}>
       <h2 className="card-title" id="exam-style-h" style={{ textTransform: 'none', letterSpacing: 0 }}>{t('paper.examStyle.heading')}</h2>
-      <p className="sub" style={{ marginBottom: 12 }}>{t('paper.examStyle.note')}</p>
+      <p className="sub" style={{ marginBottom: 12 }}>{t('paper.examStyle.note', { brand: BRAND })}</p>
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
         {items.map(item => {
           const key = `${item.paperId}:${item.question}`;

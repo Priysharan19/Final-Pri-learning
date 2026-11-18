@@ -2955,6 +2955,75 @@
     },
     {
       "method": "GET",
+      "path": "/v1/papers/attempts/:attemptId/plan",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; refused before the sitting is submitted (409 PAPER_NOT_SUBMITTED); needs premium-exams from the server's own entitlement row, else 402 PREMIUM_REQUIRED (the PDFs are free, the workflow is not: owner decision 19 Nov 2026); What to practise next: computed deterministically from the stored result (only engine-marked parts, grouped by syllabus outcome, biggest loss first, mapped to practice subtopics); no key, criterion, sample answer or paper text; no predicted mark",
+      "rateLimits": [
+        {
+          "key": "paper-plan",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/papers/attempts/:attemptId/retest",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "issues an unseen re-test: the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; refused before the sitting is submitted (409 PAPER_NOT_SUBMITTED); needs premium-exams from the server's own entitlement row, else 402 PREMIUM_REQUIRED (the PDFs are free, the workflow is not: owner decision 19 Nov 2026); the body is empty; the re-test is a sitting row of this account holding only the chosen part references (paper id, part id, outcome) from papers the account has never sat, built from the server's own structured papers; never the same questions; asking again resumes it; a re-test of a re-test is 409; nothing is sent to a model",
+      "rateLimits": [
+        {
+          "key": "paper-retest",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/papers/attempts/:attemptId/comparison",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; the sitting is one of this account's own rows (paper-sitting, keyed by an unguessable id; another account's id is 404 PAPER_ATTEMPT_NOT_FOUND); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; refused before the sitting is submitted (409 PAPER_NOT_SUBMITTED); needs premium-exams from the server's own entitlement row, else 402 PREMIUM_REQUIRED (the PDFs are free, the workflow is not: owner decision 19 Nov 2026); the sitting must be a re-test; compares the engine-marked marks per outcome of the first sitting and the re-test, in plain words; no claim of learning, no predicted mark",
+      "rateLimits": [
+        {
+          "key": "paper-comparison",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
       "path": "/v1/papers/attempts/:attemptId/figures/:name",
       "auth": "session",
       "roles": [
@@ -3009,7 +3078,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "read-only; the owner-written Extension 1 practice-paper manifest (server/content/papers/nsw-ext1/manifest.json), the same for every account except `premium` and `locked`, which come from the server's own entitlement_snapshots row (capability premium-exams); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; nothing written",
+      "ownership": "read-only; the owner-written Extension 1 practice-paper manifest (server/content/papers/nsw-ext1/manifest.json), the same for every account except `premium` and `sitLocked` (whether the account may sit the paper in the app), which come from the server's own entitlement_snapshots row (capability premium-exams); Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE; no-store; nothing written",
       "rateLimits": [
         {
           "key": "papers-list",
@@ -3032,7 +3101,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "read-only; streams one manifest PDF as an attachment (application/pdf, no-store). :id and :kind are looked up in the manifest and the opened file name comes from the manifest, never the request (no path traversal; unknown id, unknown kind and a paper with no guidelines are 404 PAPER_NOT_FOUND). A manifest entry flagged `sample` is free to every signed-in account (none today); every other file, Practice Paper 13 included, needs premium-exams from the server's own entitlement_snapshots row, else 402 PREMIUM_REQUIRED; no header or body is consulted. Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE",
+      "ownership": "read-only; streams one manifest PDF as an attachment (application/pdf, no-store). :id and :kind are looked up in the manifest and the opened file name comes from the manifest, never the request (no path traversal; unknown id, unknown kind and a paper with no guidelines are 404 PAPER_NOT_FOUND). Every paper and guidelines PDF is FREE to any signed-in verified student (owner decision, 19 Nov 2026: give the papers away, sell the workflow); sign-in is kept so downloads can be counted and no entitlement is consulted; no header or body is consulted. Prithagoras server only, otherwise 404 PAPERS_NOT_AVAILABLE",
       "rateLimits": [
         {
           "key": "papers-download",

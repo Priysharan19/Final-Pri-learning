@@ -77,8 +77,11 @@ for (const f of FORBIDDEN_SURFACES) ok(`${f} never links to Premium`, !PREMIUM_L
   const linking = walk(join(root, 'src')).map(p => p.slice(root.length)).filter(p => PREMIUM_LINK.test(readFileSync(join(root, p), 'utf8')) && !p.startsWith('src/paywall/')).sort();
   eq('only value-moment surfaces link to Premium (add a new one here only with a moment)', linking, [
     'src/App.jsx', 'src/components/ErrorNotebook.jsx', 'src/components/FreeCapNotice.jsx', 'src/components/QuestionCard.jsx',
-    'src/components/SectionTime.jsx', 'src/insights/Insights.jsx', 'src/pages/Ext1Papers.jsx', 'src/pages/Today.jsx'
+    'src/components/SectionTime.jsx', 'src/insights/Insights.jsx', 'src/pages/Ext1Papers.jsx', 'src/pages/Today.jsx',
+    'src/paper/ExamStyleQuestions.jsx', 'src/paper/PaperNext.jsx'
   ]);
+  // The two paper surfaces are value moments too: ExamStyleQuestions links once beside an exam-style question the student could not open (Premium), and PaperNext
+  // is the moment right after a student has submitted a sitting, where the plan and the unseen re-test (the paid workflow, 19 Nov 2026) are offered.
   // Ext1Papers.jsx: the moment is a student asking for a Premium-only practice paper (it states the paper is part of Premium, then links once).
 }
 {
