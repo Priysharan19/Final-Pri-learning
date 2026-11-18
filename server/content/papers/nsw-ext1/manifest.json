@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "edition": "prithagoras",
+  "course": "nsw-ext1",
+  "papers": [
+    {
+      "id": "ext1-2027-p13",
+      "title": "Practice Paper 13",
+      "course": "nsw-ext1",
+      "yearLevel": 12,
+      "marks": 70,
+      "workingTime": "2 hours",
+      "sample": false,
+      "hasGuidelines": true,
+      "paper": {
+        "file": "ext1-2027-p13.pdf",
+        "sha256": "ac8123c9028f48ac48b957642adc3d45279d9a104f5a1c4b37d3570889f8a7bc",
+        "bytes": 172596,
+        "pages": 20
+      },
+      "guidelines": {
+        "file": "ext1-2027-p13-guidelines.pdf",
+        "sha256": "7220cfe232b5f15b5b377d7ba68bcb8b21d1e87acde29dfea57a86c22a2a3ad4",
+        "bytes": 190141,
+        "pages": 22
+      }
+    }
+  ]
+}
