@@ -169,7 +169,7 @@ person is an adult or the child's parent, and both the code and the notice say s
 **Lives in** · `server/platform/guardianConsent.js` · `CONSENT_NOTICE_VERSION = '2026-10-22'`
 **Lives in** · `server/platform/guardianConsent.js` · `ACCEPTED_CONSENT_NOTICE_VERSIONS`
 **Lives in** · `server/platform/router.js` · `requireGuardianConsent`
-**Lives in** · `server/platform/otpEmail.js` · `is the code to approve your child’s Pri Learning account`
+**Lives in** · `server/platform/otpEmail.js` · `is the code to approve your child’s ${brand} account`
 **Lives in** · `client/src/components/SignUpFlow.jsx` · `channels`
 
 **For counsel:**

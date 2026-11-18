@@ -165,7 +165,7 @@ ok('every arrival reason has copy in both languages', Object.values(ARRIVAL_KEYS
     /if \(!enabled \|\| !PREMIUM_ON_SALE\) \{\s*setPricing\(null\);\s*setWebCheckout\(false\);\s*return \(\) => \{ live = false; \};\s*\}\s*cloud\.billingConfig\(\)/.test(panel) &&
     panel.includes('const canUseWebBilling = canSync && webCheckout && !nativeShell;'));
   ok('and says Premium is not on sale where it is not (the edition sells nothing, or the server says it is not on sale)', /\{!sellsPremium\(saleAvailable\) && !premium && <div[^>]*data-premium-not-on-sale>\s*\{t\('paywall\.notOnSale'\)\}/.test(panel));
-  ok('every web price and checkout button in the panel is behind that', (panel.match(/price\(pricing\.(monthly|annual), pricing\.currency\)/g) || []).length === 2 &&
+  ok('every web price and checkout button in the panel is behind that (two buttons and the two prices of the auto-renewal disclosure, itself behind canUseWebBilling)', (panel.match(/price\(pricing\.(monthly|annual), pricing\.currency\)/g) || []).length === 4 &&
     panel.indexOf('{canUseWebBilling && <div') < panel.indexOf('price(pricing.monthly') && (panel.match(/startWebCheckout\('/g) || []).length === 2 && /async function startWebCheckout\(cadence\) \{\s*if \(!canUseWebBilling\) return;/.test(panel));
   for (const [lang, cat] of [['en', en], ['hi', hi]]) {
     ok(`the not-on-sale sentence (${lang}) promises no date, price or store`, typeof cat['paywall.notOnSale'] === 'string' && !/\d|₹|\$|soon|App Store|Google Play|Razorpay/i.test(cat['paywall.notOnSale']), cat['paywall.notOnSale']);
