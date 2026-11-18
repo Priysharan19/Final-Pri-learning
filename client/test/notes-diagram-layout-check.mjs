@@ -75,7 +75,6 @@ function measure() {
         if (hit(labels[i].box, labels[j].box)) v.push(`OVERLAP "${labels[i].text}" x "${labels[j].text}"`);
       }
       const paths = [...svg.querySelectorAll('path.dg-curve')];
-      const ctm = svg.getScreenCTM();
       const flat = [];
       for (const p of paths) {
         const len = p.getTotalLength(); const pts = [];

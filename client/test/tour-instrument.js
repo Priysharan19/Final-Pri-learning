@@ -276,7 +276,7 @@ export const flow = {
     await check('no two map nodes or labels overlap', geo.pairs.length === 0, geo.pairs.slice(0, 6).join(', '));
     await check('the card sits in a column beside the map at desktop width (sticky, not over the drawing) and covers no node', geo.floating && geo.covered.length === 0, JSON.stringify(geo.covered));
     // Links are routed (map-layout-check proves they clear every box): straight runs with softly rounded corners, never free curves.
-    await check('the map links are routed runs with rounded corners, never free-form curves', (await page.locator('.in-map-edge').evaluateAll(es => es.length > 0 && es.every(e => /^M[-\d. ]+(?: ?[LQ][-\d. ]+)+$/.test(e.getAttribute('d')) && !/[CSA]/.test(e.getAttribute('d'))))));
+    await check('the map links are routed runs with rounded corners, never free-form curves', (await page.locator('.in-map-edge').evaluateAll(es => es.length > 0 && es.every(e => /^M[-\d. ]+(?:[LQ][-\d. ]+)+$/.test(e.getAttribute('d')) && !/[CSA]/.test(e.getAttribute('d'))))));
     writeFileSync(join(outDir, 'map-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     await page.locator('[data-map-practise]').click();
     await page.waitForURL(u => u.pathname === '/practice', { timeout: 10000 });
