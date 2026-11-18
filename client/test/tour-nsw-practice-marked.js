@@ -50,17 +50,36 @@ function build() {
 let dist = null;
 let platform = null;
 let browser = null;
+// A hang is a failure that names where it stopped, never a silent 20-minute
+// shard timeout (two CI runs of 18 Nov 2026 stopped after the first check with
+// no output). The stage is updated as the tour moves on.
+let stage = 'build';
+const STALL_MS = 240000;
+const stall = setTimeout(() => {
+  console.log(`NSW PRACTICE MARKED TOUR: FAIL — the tour stalled for ${STALL_MS / 1000}s at stage "${stage}" (${pass} checks had passed)`);
+  process.exit(1);
+}, STALL_MS);
+stall.unref();
 try {
   dist = build();
   const features = JSON.parse(readFileSync(join(dist, 'features.json'), 'utf8'));
   check('the build under test is the Prithagoras build', features.edition === EDITION, JSON.stringify(features.edition));
+  stage = 'start the platform server';
   platform = await startOnlinePlatform({ dist, env: { PRI_EDITION: EDITION } });
+  stage = 'launch the browser';
   browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1180, height: 820 } });
   const page = await ctx.newPage();
   const online = platform.session(ctx, page);
   const issueBodies = [];
   const issueRequests = [];
+  // An issue request the browser itself cancelled (the onboarding pre-fetch cut
+  // off by the navigation to /practice) never reached a server verdict: it has
+  // no response to await, and awaiting one waits for ever.
+  const cancelled = new Set();
+  page.on('requestfailed', request => {
+    if (/abort|cancel/i.test(request.failure()?.errorText || '')) cancelled.add(request);
+  });
   page.on('request', request => {
     if (request.method() === 'POST' && new URL(request.url()).pathname === '/v1/practice/issue') {
       issueRequests.push(request);
@@ -68,15 +87,19 @@ try {
     }
   });
 
+  stage = 'open the app';
   await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
+  stage = 'create the verified profile';
   await createVerifiedProfile(page, platform, { name: 'NSW Practice Student', year: 10, fromPicker: await page.getByTestId('picker-create-account').count() > 0 });
+  stage = 'switch the syllabus';
   await switchSyllabus(page, platform, { course: 'nsw', year: 10 });
   // Since E3 a Prithagoras sign-up is an NSW profile from the start, so EVERY
   // issue request this page makes names NSW and the server issues every one.
   // (Counting only from the switch missed the run where the first question was
   // issued before it and resumed after: no new request, an empty list.)
 
+  stage = 'open practice and find an issued typed question';
   await page.goto(`${platform.origin}/practice?subtopic=${CHAPTER}`, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
   const answerBox = page.locator('.editor-body input.answer-input');
@@ -102,10 +125,16 @@ try {
   // Prithagoras begins with an NSW profile. Capture *all* its issue
   // requests, including the one pre-fetched during onboarding, and await
   // completed replies rather than racing an async page.on('response') handler.
-  const nswReplies = await Promise.all(issueRequests.map(async request => {
-    const response = await request.response();
+  stage = 'await the issue replies';
+  const within = (promise, label) => Promise.race([promise,
+    new Promise(resolve => setTimeout(() => resolve({ timedOut: label }), 30000).unref())]);
+  const answered = issueRequests.filter(request => !cancelled.has(request));
+  const nswReplies = await Promise.all(answered.map(async request => {
+    const response = await within(request.response(), 'response');
+    if (response?.timedOut) return { status: null, code: 'NO_RESPONSE_IN_30S' };
     if (!response) return { status: null, code: 'NO_RESPONSE' };
-    const failure = await response.finished();
+    const failure = await within(response.finished(), 'finished');
+    if (failure?.timedOut) return { status: null, code: 'RESPONSE_NOT_FINISHED_IN_30S' };
     let body = null;
     try { body = await response.json(); } catch { /* status remains authoritative */ }
     return { status: failure ? null : response.status(),
@@ -114,6 +143,7 @@ try {
     };
   }));
   check(`the server issued what the NSW profile asked for (${CHAPTER})`, nswReplies.length > 0 && nswReplies.every(r => r.status === 201), JSON.stringify(nswReplies));
+  stage = 'read the shown question and submit';
   const shown = await online.shownRow();
   check('practice shows a question the server issued, not a draft', shown?.checkState === 'issued', JSON.stringify(shown));
   check('no "cannot be marked" draft notice is on the card', !/cannot be marked/i.test(await page.locator('.qpage').innerText()));
@@ -137,6 +167,7 @@ try {
 } catch (err) {
   failures.push(`the tour stopped: ${String(err.stack || err.message).split('\n').slice(0, 4).join(' | ')}`);
 } finally {
+  clearTimeout(stall);
   await browser?.close().catch(() => {});
   await platform?.close?.().catch?.(() => {});
   if (dist) rmSync(dist, { recursive: true, force: true });
