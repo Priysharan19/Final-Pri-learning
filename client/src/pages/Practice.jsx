@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { useT } from '../i18n/index.js';
 import { NCERT_CLASS8_3_13_IDS } from '../engine/ncert/class8-chapters-3-13-syllabus.js';
 import { NCERT_CLASS9_SYLLABUS } from '../engine/ncert/class9-syllabus.js';
-import { NotOffered } from '../components/OfferedCourse.jsx';
+import { NotOffered } from '../components/NotOffered.jsx';
 import { subtopicOffered } from '../engine/offering.js';
 
 // Practice is one of the heaviest product surfaces: handwriting, the maths

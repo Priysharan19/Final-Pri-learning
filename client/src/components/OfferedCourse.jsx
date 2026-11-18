@@ -13,7 +13,6 @@
 import React, { useState } from 'react';
 import { api } from '../api.js';
 import { useT } from '../i18n/index.js';
-import PageLink from './PageLink.jsx';
 import { courseOffered, offering, defaultOffering } from '../platform/edition.js';
 
 const COURSE_NAMES = { advanced: 'Advanced', ext1: 'Extension 1' };
@@ -21,6 +20,8 @@ const COURSE_NAMES = { advanced: 'Advanced', ext1: 'Extension 1' };
 /** Whether a signed-in student's own year or course is one this edition no longer offers. */
 export const needsCoursePick = user => !!user && user.role !== 'teacher' && (user.course || 'nsw') === 'nsw'
   && !!offering() && !courseOffered(user.year, user.year >= 11 ? (user.pathway || 'advanced') : null);
+
+export { NotOffered } from './NotOffered.jsx';
 
 export function CoursePrompt({ user, setUser }) {
   const t = useT();
@@ -55,16 +56,5 @@ export function CoursePrompt({ user, setUser }) {
         <button type="button" className="btn btn-primary" style={{ marginTop: 16 }} disabled={busy} onClick={save} data-testid="course-pick-save">{t('offer.pick.save')}</button>
       </div>
     </>
-  );
-}
-
-export function NotOffered() {
-  const t = useT();
-  return (
-    <div className="card" role="status" data-not-offered style={{ maxWidth: 560, margin: '48px auto' }}>
-      <h1 style={{ fontSize: 22, marginBottom: 8 }}>{t('offer.notYet.title')}</h1>
-      <p className="muted">{t('offer.notYet.body')}</p>
-      <p style={{ marginTop: 16 }}><PageLink to="/" className="btn btn-primary">{t('offer.notYet.home')}</PageLink></p>
-    </div>
   );
 }

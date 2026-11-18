@@ -13,7 +13,7 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import '../notes/Notes.css';
-import { NotOffered } from '../components/OfferedCourse.jsx';
+import { NotOffered } from '../components/NotOffered.jsx';
 import { offeredYears, pathwayOffered, yearOffered, defaultOffering } from '../platform/edition.js';
 import { Flashcards, NextPractice, useReveal } from '../notes/NotesParts.jsx';
 import { ChapterSheet } from '../notes/nsw/NswParts.jsx';
