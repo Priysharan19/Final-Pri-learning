@@ -146,13 +146,12 @@ try {
   // onboarding pre-fetch, superseded when the profile's course settled) never
   // gets a response. It is superseded, not a wrong reply, when a later issue
   // request was answered. Every request that DID get a response is still held
-  // to 201 for the asked chapter, and at least one must have succeeded.
+  // to 201, and at least one answered request must be for the asked chapter
+  // (the onboarding pre-fetch legitimately asks for the profile's first chapter).
   const responded = nswReplies.filter(r => r.status !== null || !/^NO_RESPONSE/.test(String(r.code)));
   const superseded = nswReplies.length - responded.length;
   if (superseded) console.log(`  note: ${superseded} issue request(s) never answered and superseded by a later one`);
   check(`the server issued what the NSW profile asked for (${CHAPTER})`,
-    // The onboarding pre-fetch asks for the profile's default chapter first; that cell is issued now (the tolerance fixes issued
-    // y10-probability), so it answers 201 too. Every answered request must be a 201, and the chapter the profile asked for must be one.
     responded.length > 0 && responded.every(r => r.status === 201) && responded.some(r => r.generator === CHAPTER), JSON.stringify(nswReplies));
   stage = 'read the shown question and submit';
   const shown = await online.shownRow();
