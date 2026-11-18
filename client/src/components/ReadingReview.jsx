@@ -17,7 +17,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useId, useState } from 'react';
 import { MathText } from '../lib/latex.jsx';
-import { defaultExclusions, prettyLine } from '../photo/transcript.js';
+import { defaultExclusions, prettyLine, segmentsFor } from '../photo/transcript.js';
 import { splitWordsAndMaths } from '../photo/typeset.js';
 import { PhotoPreview } from './PhotoFrame.jsx';
 
@@ -29,8 +29,11 @@ const MARK_GLYPH = { ok: '✓', ecf: '✓', break: '✗', also: '✗' };
 const MARK_KEY = { break: 'verdict.mistakeIsHere', also: 'verdict.alsoWrong', ecf: 'verdict.carriedForward' };
 
 /** One line, set the way it reads: words upright, maths typeset. */
-function Typeset({ text, texOf }) {
-  const runs = splitWordsAndMaths(prettyLine(text));
+export function Typeset({ text, texOf, segments = null }) {
+  // The reader's own split (words versus maths) when it still restates the line; else the heuristic split.
+  const runs = segments
+    ? segments.map(p => ({ kind: p.kind === 'text' ? 'words' : 'maths', text: p.kind === 'text' ? p.value : prettyLine(p.value) }))
+    : splitWordsAndMaths(prettyLine(text));
   return (
     <span className="rr-text">
       {runs.map((run, i) => (run.kind === 'words'
@@ -106,7 +109,7 @@ export default function ReadingReview({
                     aria-label={t('photo.review.lineLabel', { n: i + 1, text: prettyLine(line.text) })}
                     aria-describedby={note ? `${uid}-note-${i}` : undefined}
                     onClick={() => setOpen(i)}>
-                    <Typeset text={line.text} texOf={texOf} />
+                    <Typeset text={line.text} texOf={texOf} segments={segmentsFor(line)} />
                   </button>
                 )}
                 {line.excluded && !editing && !disabled && (

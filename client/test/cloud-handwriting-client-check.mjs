@@ -513,7 +513,7 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
     // marked auto (so they never ask for permission and never retry on failure).
     const timed = [...src.matchAll(/readRef2\.current\?\.\(([^)]*)\)/g)].map(m => m[1].trim());
     ok(timed.length >= 3 && timed.every(a => a === '{ auto: true }' || a === '{ auto: true, ask }'), 'every timer-driven read is an auto read (the idle pause alone may also carry ask, the once-per-card consent prompt): the idle pause, the live step coach and coming back online');
-    ok(/export const AUTO_READ_IDLE_MS = 1300;/.test(src) && /export const AUTO_READ_MAX = 12;/.test(src), 'the idle pause and the per-visit cap are named constants');
+    ok(/export const AUTO_READ_IDLE_MS = 1600;/.test(src) && /export const AUTO_READ_MAX = 12;/.test(src), 'the idle pause and the per-visit cap are named constants');
     ok(/readerPermission\(userRef\.current\) === READER_PERMISSION\.ACCEPTED/.test(src) && /if \(\(auto && opts\?\.ask !== true\) \|\| askingRef\.current\) return;/.test(src), 'an automatic read needs the student\'s yes: only the idle pause may open the prompt (once), nothing is sent before accept');
     ok(/abortRef\.current\?\.abort\?\.\(\)/.test(src) && /flyingRef\.current !== pageSig/.test(src), 'a read still out for an older page is cancelled when the page changes');
   }

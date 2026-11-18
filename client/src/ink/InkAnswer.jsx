@@ -30,6 +30,8 @@ import InkCanvas from './InkCanvas.jsx';
 import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
+import { Typeset } from '../components/ReadingReview.jsx';
+import { segmentsFor } from '../photo/transcript.js';
 import { ACCOUNT_BLOCKED_KEYS, inkReaderUiState, readerBlock, readerPaused, readinessIdentity, resumeReaderNow, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
 import { retryClock, retryWhen } from './readerFailure.js';
 import { useInRouterContext } from 'react-router-dom';
@@ -111,7 +113,7 @@ const MAX_PAGES = 4;
 /** The pen rests this long on a new line before the line above is read (liveRead). */
 export const LIVE_READ_REST_MS = 1500;
 /** The pen rests this long before the page is read on its own (autoRead). */
-export const AUTO_READ_IDLE_MS = 1300;
+export const AUTO_READ_IDLE_MS = 1600;
 /** Automatic reads of one page in one visit to a question; the server caps it too. */
 export const AUTO_READ_MAX = 12;
 
@@ -350,7 +352,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     setStatus({ kind: 'reading' });
     const pressedAt = typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
     const sincePress = () => (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now()) - pressedAt;
-    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true }).finally(landed).then(outcome => {
+    readWithCloud(strokes, { user: who, signal: controller?.signal, freshReadiness: true, superseded: auto }).finally(landed).then(outcome => {
       // The page was submitted or left while the server was reading it (§09:
       // a late reading never rewrites the reading a mark was given for).
       if (seq !== readSeqRef.current || disabledRef.current) return;
@@ -876,7 +878,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 if (st === 'read') return <span className="sr-only" data-read-state="read">{t('inst.readStateSr', { n: li + 1, state: t(READ_STATE_KEY.read) })}</span>;
                 return <span className="in-rstate" data-read-state={st}><i aria-hidden="true" />{t(READ_STATE_KEY[st])}<span className="sr-only"> {t('inst.readStateSr', { n: li + 1, state: t(READ_STATE_KEY[st]) })}</span></span>;
               })()}
-              <span className="ink-line-math"><MathText text={`$${exprToLatex(line.text) || '\\;'}$`} /></span>
+              <span className="ink-line-math">{(() => { const segs = line.corrected === true ? null : segmentsFor(line); return segs ? <Typeset text={line.text} texOf={x => exprToLatex(x) || '\\;'} segments={segs} /> : <MathText text={`$${exprToLatex(line.text) || '\\;'}$`} />; })()}</span>
               {lineVerdicts && lineVerdicts[li] && ['break', 'wrong'].includes(lineVerdicts[li].status) && lineVerdicts[li].note && (
                 <span className="sc-note" style={{ fontSize: 12.5 }}>— {lineVerdicts[li].note}</span>
               )}
