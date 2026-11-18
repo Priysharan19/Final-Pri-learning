@@ -35,7 +35,7 @@ function fakeWin({ storage = true } = {}) {
   const cachesState = { 'pri-old': new Set(['/index.html', '/', '/assets/x.js']), 'pri-new': new Set(['/index.html', '/']) };
   const win = {
     document: doc, reloads: 0, updates: 0, added, fetches: 0, fetchOk: true,
-    fetch: async () => { win.fetches++; if (!win.fetchOk) throw new Error('offline'); return { ok: true, headers: { get: () => 'text/html' }, clone() { return this; } }; },
+    fetchShell: async () => { win.fetches++; if (!win.fetchOk) return null; return { clone() { return this; } }; },
     addEventListener(t, f) { (handlers[t] = handlers[t] || []).push(f); },
     removeEventListener() {},
     fire(t) { (handlers[t] || []).forEach(f => f({})); },
@@ -52,7 +52,7 @@ function fakeWin({ storage = true } = {}) {
 }
 const live = (sha) => async () => ({ releaseSha: sha });
 const run = async (win, sha, own = A) => {
-  const w = watchFreshBuild(win, { read: live(sha), ownSha: own, immediate: false });
+  const w = watchFreshBuild(win, { read: live(sha), ownSha: own, immediate: false, fetchShell: win.fetchShell });
   const r = await w.check();
   return { w, r };
 };
@@ -74,7 +74,7 @@ const run = async (win, sha, own = A) => {
 // stale + the student typed → notice only, nothing reloaded, work untouched
 for (const type of ['keydown', 'input', 'pointerdown', 'touchstart', 'paste']) {
   const win = fakeWin();
-  const w = watchFreshBuild(win, { read: live(B), ownSha: A, immediate: false });
+  const w = watchFreshBuild(win, { read: live(B), ownSha: A, immediate: false, fetchShell: win.fetchShell });
   win.fire(type);
   const r = await w.check();
   ok(r === 'notice' && win.reloads === 0, `${type} before the check: notice, no reload`);
@@ -83,7 +83,7 @@ for (const type of ['keydown', 'input', 'pointerdown', 'touchstart', 'paste']) {
 {
   // The notice's own button reloads, once, after dropping the shell.
   const win = fakeWin();
-  const w = watchFreshBuild(win, { read: live(B), ownSha: A, immediate: false });
+  const w = watchFreshBuild(win, { read: live(B), ownSha: A, immediate: false, fetchShell: win.fetchShell });
   win.fire('keydown');
   await w.check();
   const btn = win.document.getElementById('pri-update-notice').children[1];
@@ -116,7 +116,7 @@ for (const type of ['keydown', 'input', 'pointerdown', 'touchstart', 'paste']) {
 // the boot check never fires while the page is still loading, and waits a quiet moment after it
 {
   const win = fakeWin(); win.document.readyState = 'loading';
-  watchFreshBuild(win, { read: live(B), ownSha: A, settleMs: 0 });
+  watchFreshBuild(win, { read: live(B), ownSha: A, settleMs: 0, fetchShell: win.fetchShell });
   await new Promise(r => setTimeout(r, 30));
   ok(win.reloads === 0, 'still loading: no check, no reload');
   win.fire('load');
@@ -135,7 +135,7 @@ for (const type of ['keydown', 'input', 'pointerdown', 'touchstart', 'paste']) {
 // started with the default (immediate) check: the boot check itself reloads an untouched stale page
 {
   const win = fakeWin();
-  watchFreshBuild(win, { read: live(B), ownSha: A, settleMs: 0 });
+  watchFreshBuild(win, { read: live(B), ownSha: A, settleMs: 0, fetchShell: win.fetchShell });
   await new Promise(r => setTimeout(r, 20));
   ok(win.reloads === 1, 'the boot check on an untouched stale page reloads');
 }

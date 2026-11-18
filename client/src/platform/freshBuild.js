@@ -24,7 +24,7 @@
 // is asked to look for its own update.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { readReleaseIdentityManifest } from './cloudTransport.js';
+import { readReleaseIdentityManifest, readLiveShell } from './cloudTransport.js';
 import { translate } from '../i18n/core.js';
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -58,10 +58,10 @@ export function freshnessAction({ ownSha, liveSha, touched, alreadyReloadedFor }
  * successful answer is written over the old entry. A connection that drops here leaves the old shell in
  * place (the reload then still opens offline), never an empty cache. Returns whether the shell was replaced.
  */
-async function replaceStaleShell(win) {
+async function replaceStaleShell(win, fetchShell = readLiveShell) {
   try {
-    const fresh = await win.fetch('/', { cache: 'reload', credentials: 'same-origin', headers: { Accept: 'text/html' } });
-    if (!fresh?.ok || !/html/i.test(fresh.headers?.get?.('content-type') || '')) return false;
+    const fresh = await fetchShell();
+    if (!fresh) return false;
     const names = (await win.caches.keys()).filter(n => n.startsWith('pri-'));
     await Promise.all(names.map(async n => {
       const cache = await win.caches.open(n);
@@ -109,7 +109,7 @@ function showNotice(win, onReload) {
  * `read` and `ownSha` are injectable; by default they are the live manifest and
  * the SHA baked into this bundle.
  */
-export function watchFreshBuild(win = window, { read = readReleaseIdentityManifest, ownSha = ownBuildSha(), now = () => Date.now(), immediate = true, settleMs = SETTLE_MS } = {}) {
+export function watchFreshBuild(win = window, { read = readReleaseIdentityManifest, ownSha = ownBuildSha(), now = () => Date.now(), immediate = true, settleMs = SETTLE_MS, fetchShell = readLiveShell } = {}) {
   let touched = false;
   let last = 0;
   let busy = false;
@@ -121,7 +121,7 @@ export function watchFreshBuild(win = window, { read = readReleaseIdentityManife
     // the reload happened, so the notice is the only safe outcome.
     if (!writeGuard(win, liveSha)) return false;
     await askWorkerToUpdate(win);
-    await replaceStaleShell(win);
+    await replaceStaleShell(win, fetchShell);
     win.location.reload();
     return true;
   }
@@ -141,7 +141,7 @@ export function watchFreshBuild(win = window, { read = readReleaseIdentityManife
         showNotice(win, () => { void (async () => {
           writeGuard(win, liveSha);
           await askWorkerToUpdate(win);
-          await replaceStaleShell(win);
+          await replaceStaleShell(win, fetchShell);
           win.location.reload();
         })(); });
         return 'notice';

@@ -40,6 +40,28 @@ function envOrigin() {
   return String(injected || vite || metaOrigin() || '').trim();
 }
 
+/**
+ * The live app shell (the page at "/"), read from the network and never from a cache, as a Response; or null when it
+ * cannot be read as HTML. Used only to refresh the offline shell before a release reload (platform/freshBuild.js).
+ */
+export async function readLiveShell({ timeoutMs = 8000 } = {}) {
+  const loc = globalThis.location;
+  if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), Math.max(500, Math.min(20_000, Number(timeoutMs) || 8000)));
+  try {
+    const response = await fetch(`${loc.origin}/`, {
+      method: 'GET', headers: { Accept: 'text/html' }, credentials: 'same-origin', cache: 'reload', redirect: 'error', signal: controller.signal
+    });
+    if (!response.ok || !/html/i.test(response.headers.get('content-type') || '')) return null;
+    return response;
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function readReleaseIdentityManifest({ timeoutMs = 1500 } = {}) {
   const loc = globalThis.location;
   if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
