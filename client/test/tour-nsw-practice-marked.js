@@ -151,7 +151,9 @@ try {
   const superseded = nswReplies.length - responded.length;
   if (superseded) console.log(`  note: ${superseded} issue request(s) never answered and superseded by a later one`);
   check(`the server issued what the NSW profile asked for (${CHAPTER})`,
-    responded.length > 0 && responded.every(r => r.status === 201 && r.generator === CHAPTER), JSON.stringify(nswReplies));
+    // The onboarding pre-fetch asks for the profile's default chapter first; that cell is issued now (the tolerance fixes issued
+    // y10-probability), so it answers 201 too. Every answered request must be a 201, and the chapter the profile asked for must be one.
+    responded.length > 0 && responded.every(r => r.status === 201) && responded.some(r => r.generator === CHAPTER), JSON.stringify(nswReplies));
   stage = 'read the shown question and submit';
   const shown = await online.shownRow();
   check('practice shows a question the server issued, not a draft', shown?.checkState === 'issued', JSON.stringify(shown));
