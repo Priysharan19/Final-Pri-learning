@@ -80,7 +80,7 @@ function exactAt(fn, ang) {
 }
 const exactNum = (rng, prompt, v, hints, steps, extra = {}) => ({
   prompt, answerType: 'numeric', answer: { value: valOf(v), requireExact: true, canonicalInput: typedOf(v) },
-  inputHint: 'e.g. -sqrt(3)/4', traps: [], hints, steps, dotpoint: 1, ...extra
+  inputHint: 'e.g. -sqrt(3)/4', traps: [], hints, steps, ...extra
 });
 
 const trig = [
@@ -141,7 +141,7 @@ const trig = [
     const vt = `${sv < 0 ? '-' : ''}${texOf([c, r, d])}`;
     return {
       prompt: `Solve $${lhs} = 0$ for $${dom[0]}° \\le \\theta \\le ${dom[1]}°$. Give all solutions in degrees.`,
-      answerType: 'set', answer: { values: sols, tol: 0.01 }, answerSuffix: '°', inputHint: 'e.g. 30, 150', dotpoint: 2,
+      answerType: 'set', answer: { values: sols, tol: 0.01 }, answerSuffix: '°', inputHint: 'e.g. 30, 150',
       traps: [{ value: sols[0] + ref, why: `Make $\\${fn}(\\theta)$ the subject first, then use the reference angle and the quadrants where $\\${fn}$ has that sign.` }].filter(t => !sols.includes(t.value)),
       hints: [`Rearrange to get $\\${fn}(\\theta)$ on its own.`, `Recognise the exact value and its reference angle ${ref}°.`, `Use ASTC to place the angle in the correct quadrants, then sweep the whole interval.`],
       steps: [{ h: 'Make the ratio the subject', d: `$\\${fn}(\\theta) = ${vt}$` }, { h: 'Reference angle', d: `$\\${fn}(${ref}°) = ${texOf([c, r, d])}$, so the reference angle is $${ref}°$` }, { h: 'Solutions on the interval', d: `$\\theta = ${sols.join('°, ')}°$` }]
@@ -166,7 +166,7 @@ const trig = [
     rej(sols.length !== 4);
     return {
       prompt: `Solve $\\${fn}^2(\\theta) = ${rhs}$ for $${dom[0]}° \\le \\theta \\le ${dom[1]}°$. Give all solutions in degrees.`,
-      answerType: 'set', answer: { values: sols, tol: 0.01 }, answerSuffix: '°', inputHint: 'e.g. 30, 150, 210, 330', dotpoint: 2,
+      answerType: 'set', answer: { values: sols, tol: 0.01 }, answerSuffix: '°', inputHint: 'e.g. 30, 150, 210, 330',
       traps: [],
       hints: [`Take the square root of both sides: remember the $\\pm$.`, `Both $\\${fn}(\\theta) = +$ and $\\${fn}(\\theta) = -$ the same exact value occur.`, `The reference angle is ${ref}°; use ASTC for both signs.`],
       steps: [{ h: 'Take square roots', d: `$\\${fn}(\\theta) = \\pm ${texOf([c, r, d])}$` }, { h: 'Reference angle', d: `$${ref}°$` }, { h: 'All four solutions', d: `$\\theta = ${sols.join('°, ')}°$` }]

@@ -87,7 +87,7 @@ function sweep(id, diff, check) {
   for (let seed = 1; seed <= SEEDS; seed++) {
     let q;
     try { q = generateQuestion(id, diff, seed * 7919 + 13); } catch (e) { fail(cell, seed, `generator threw ${e.message}`); continue; }
-    if (q.dotpointSource !== 'payload') { foreign++; continue; }   // a pre-existing form of the cell, not ours
+    if (id !== 'y11-trigfunc' && q.dotpointSource !== 'payload') { foreign++; continue; }   // a pre-existing form of the cell, not ours (trig D4 is wholly ours and declares both dot points on the cell)
     n++;
     seen.set(skeleton(q.prompt), (seen.get(skeleton(q.prompt)) || 0) + 1);
     try { check(cell, seed, q); } catch (e) { fail(cell, seed, `check threw ${e.message}`, q); }
@@ -179,7 +179,7 @@ sweep('y8-linear', 4, (cell, seed, q) => {
 // ═════════════ y11-trigfunc D4
 sweep('y11-trigfunc', 4, (cell, seed, q) => {
   const p = q.prompt;
-  if (q.dotpointSource !== 'payload' || !['y11-trigfunc.2', 'y11-trigfunc.3'].includes(q.dotpoint)) fail(cell, seed, `dot point ${q.dotpoint}/${q.dotpointSource}, want ordinal 1 or 2`, q);
+  if (q.dotpoints.join() !== 'y11-trigfunc.2,y11-trigfunc.3') fail(cell, seed, `dot points ${q.dotpoints}, want the cell's ordinals 1 and 2`, q);
   const deg = Math.PI / 180;
   const rd = x => x * deg;
   if (q.answerType === 'numeric') {

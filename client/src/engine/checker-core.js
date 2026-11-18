@@ -1146,7 +1146,7 @@ function checkAnswerWithinBudget(question, rawInput) {
         // A question that asks for the EXACT value is not a rounding question: an authored
         // absolute tol (0.001 on 1/480, half the size of the key) must never decide it. The
         // band is the default one, relative to the key (a whole key is exact).
-        if (named == null && ans.tol != null && !ans.rounding && asksForExactValue(question)) tolUsed = Math.min(tolUsed, numericBand(target));
+        if (named == null && ans.tol != null && !ans.rounding && !question.pyq && asksForExactValue(question)) tolUsed = Math.min(tolUsed, numericBand(target));
         // A declared JEE rounding rule (engine/tolerance.js) is read only when the
         // reviewed key itself declares it; nothing is inferred.
         let ok = ans.rounding ? acceptsNumeric(value, target, { rounding: ans.rounding, tol: ans.tol }) : numsClose(value, target, tolUsed);

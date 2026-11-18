@@ -49,7 +49,7 @@ function numeric(prompt, value, { prefix, suffix, traps = [], hints, steps, dotp
   const seen = new Set([value]);
   const tr = [];
   for (const t of traps) { if (!fin(t.value) || seen.has(t.value)) continue; seen.add(t.value); tr.push(t); }
-  const q = { dotpoint, prompt, answerType: 'numeric', answer: { value }, traps: tr, hints, steps };
+  const q = { prompt, answerType: 'numeric', answer: { value }, traps: tr, hints, steps };
   if (prefix) q.answerPrefix = prefix;
   if (suffix) q.answerSuffix = suffix;
   if (hint) q.inputHint = hint;
@@ -71,7 +71,6 @@ const appdiff = [
     const flipped = line(fr(1, m), x0, y0);
     rej(key.expr === tangent.expr || key.expr === flipped.expr || key.c[0] === 0);
     return {
-      dotpoint: 1,
       prompt: `Find the equation of the **normal** to the curve $y = ${poly(f)}$ at the point where $x = ${x0}$. Give your answer in the form $y = mx + c$.`,
       answerType: 'expression', answer: { expr: key.expr },
       inputHint: 'e.g. y = -x/2 + 3   (type -x/2 + 3)',
@@ -101,7 +100,6 @@ const appdiff = [
     rej(f[1] === 0);
     const lo = Math.min(s1, s2), hi = Math.max(s1, s2);
     return {
-      dotpoint: 1,
       prompt: `The tangent to the curve $y = ${poly(f)}$ has gradient $${g}$ at two points. Find the $x$-coordinates of both points.`,
       answerType: 'set', answer: { values: [lo, hi] },
       inputHint: 'e.g. x = -1, 2',
@@ -142,7 +140,6 @@ const appdiff = [
       { text: `Local ${kind} at ${pt(other, yOther)}`, why: `That is the other stationary point; the question asks about $x = ${at}$.` }
     ]);
     return {
-      dotpoint: 0,
       prompt: `The curve $y = ${poly(f)}$ has a stationary point at $x = ${at}$. Which statement describes it?`,
       answerType: 'mcq', answer: { correctIndex: m.correctIndex, optionTraps: m.optionTraps }, mcqOptions: m.options,
       hints: ['You need the $y$-coordinate from the curve, and the sign of the second derivative to classify the point.',
@@ -168,7 +165,6 @@ const appdiff = [
     rej(val === 0 || val === x0);
     const cInt = y0 - m * x0;
     return {
-      dotpoint: 1,
       prompt: `The tangent to $y = ${poly(f)}$ at the point where $x = ${x0}$ crosses the $x$-axis at $A$. Find the $x$-coordinate of $A$.`,
       answerType: 'numeric', answer: { value: val },
       traps: [
@@ -199,7 +195,6 @@ const appdiff = [
     rej(val <= 0);
     const model = poly(e, 't');
     return {
-      dotpoint: 2,
       prompt: ctx.head(model),
       answerType: 'numeric', answer: { value: val }, answerSuffix: ctx.unit,
       traps: [
@@ -226,7 +221,6 @@ const appdiff = [
     rej(f[1] === 0 || f[2] === 0);
     const wide = rng() < 0.5;
     return {
-      dotpoint: 0,
       prompt: wide
         ? `The curve $y = ${poly(f)}$ is increasing for $x < a$ and for $x > b$, where $a < b$. Find $b$.`
         : `The curve $y = ${poly(f)}$ is decreasing for $a < x < b$. Find the value of $b - a$.`,

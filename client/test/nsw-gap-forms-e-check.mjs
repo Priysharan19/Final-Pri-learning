@@ -73,7 +73,7 @@ function sweep(id, diff, classify, check, wantForms) {
   for (let seed = 1; seed <= SEEDS; seed++) {
     let q;
     try { q = generateQuestion(id, diff, seed * 7919 + 13); } catch (e) { fail(cell, seed, `generator threw ${e.message}`); continue; }
-    if (q.dotpointSource !== 'payload') { foreign++; continue; }
+    if (id === 'y12-appdiff' ? !appClass(q.prompt) : q.dotpointSource !== 'payload') { foreign++; continue; }
     n++;
     dps.add(q.dotpoint);
     let form;
@@ -120,8 +120,8 @@ const appClass = p => {
 };
 sweep('y12-appdiff', 3, appClass, (cell, seed, q, form) => {
   const p = q.prompt;
-  const dpWant = { 'stationary-nature-mcq': 'y12-appdiff.1', 'increasing-interval': 'y12-appdiff.1', 'model-max': 'y12-appdiff.3', 'model-min': 'y12-appdiff.3' };
-  if (q.dotpoint !== (dpWant[form] || 'y12-appdiff.2')) fail(cell, seed, `dot point ${q.dotpoint} unexpected for ${form}`, q);
+  // The D3 cell declares all three dot points in the registry (the pool seals one outcome set per cell), so no form carries its own.
+  if (q.dotpoints.length !== 3) fail(cell, seed, `dot points ${q.dotpoints} unexpected for ${form}`, q);
   let finals = [];
   if (form === 'normal') {
     const f = polyIn(p, /y = ([^$]+)\$ at the point/);

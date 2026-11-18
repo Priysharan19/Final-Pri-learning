@@ -952,7 +952,7 @@ export const DOTPOINT_FORMS = Object.freeze({
   'y11-probability': [[1], [0, 1], [2], [0]],
   // ── Year 12 Advanced ──────────────────────────────────────────────────────
   'y12-diff': [[2], [0], [1], [2]],
-  'y12-appdiff': [[0], [0], [1], [2]],
+  'y12-appdiff': [[0], [0], [0, 1, 2], [2]],
   'y12-integration': [[0], [1], [2], [2]],
   'y12-trigcalc': [[0], [1], [0], [2]],
   'y12-explogcalc': [[0], [1], [2], [2]],

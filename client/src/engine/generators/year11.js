@@ -669,7 +669,7 @@ export const year11 = {
       const turns = turn / 360;
       return {
         prompt: `Find the **exact value** of $\\${fn}(${ang}°)$.`,
-        answerType: 'numeric', answer: { value: signed, requireExact: true, canonicalInput: sign === 1 ? typed : `-${typed}` }, dotpoint: 1,
+        answerType: 'numeric', answer: { value: signed, requireExact: true, canonicalInput: sign === 1 ? typed : `-${typed}` },
         inputHint: 'e.g. -sqrt(3)/2',
         traps: [{ value: -signed, why: `Find the quadrant of the coterminal angle ${principal}° (ASTC) before choosing the sign.`, tol: 0.001 }],
         hints: [
