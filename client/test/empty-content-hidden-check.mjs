@@ -120,7 +120,7 @@ try {
   await POST('/profiles/select', { id: y12.id });
   const cur = await GET('/curriculum');
   const ids = scopeFor(cur, y12).subtopics.map(s => s.id);
-  ok('Year 12 Financial Maths & Annuities (y12-financial) is listed now that D2-D4 are issued', ids.includes('y12-financial'));
+  ok('Year 12 Financial Maths & Annuities (y12-financial) is listed: D1 now has authored annuity forms, so the chapter serves a question at every level', ids.includes('y12-financial'));
   ok('Year 12 Financial Mathematics: Practice (y12-fin-exact) is listed', ids.includes('y12-fin-exact'));
   ok('the three renamed chapters read ": Practice"', ['y12-integral-calc', 'y12-random-var', 'y12-fin-exact'].every(id => /: Practice$/.test(scopeFor(cur, y12).subtopics.find(s => s.id === id)?.name || '')));
 } catch (err) {
@@ -138,8 +138,7 @@ try {
   ok('the instrument scope (Index, Map, command bar, report head, History) is filtered in one place', /offeredChapters\(scope\.chapters\)/.test(src('instrument/chapters.js')) && /offeredChapters\(scope\.subtopics\)/.test(src('instrument/chapters.js')));
 }
 
-// Every chapter that still has no issued level is hidden: these two (Extension 1 Combinatorics and Further Calculus) are the ones left.
-ok('the NSW chapters that still have no issued level are hidden', hidden.length >= 2 && hidden.some(h => /me11-comb/.test(h)) && hidden.some(h => /me12-calc/.test(h)), `${hidden.length}: ${hidden.join(' | ')}`);
+ok('no NSW chapter is hidden: every chapter now serves a question at some level (the rule that hides an empty one is held by the checks above)', hidden.length === 0, `${hidden.length}`);
 if (process.env.LIST_HIDDEN) console.log(`HIDDEN CHAPTERS (${hidden.length})\n  ${hidden.join('\n  ')}\nHIDDEN LEVELS (${hiddenLevels.length})\n  ${hiddenLevels.join('\n  ')}`);
 
 const total = pass + failures.length;

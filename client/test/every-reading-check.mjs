@@ -35,6 +35,23 @@ ok(!status(I.meta, I.prompt, ['∫14e^(2x)dx', '1/6']).includes('break'), 'a lin
 ok(!status(D.meta, D.prompt, ['dy/dx = 15(3x + 5)^4']).includes('break'), 'a true derivative claim is never crossed');
 ok(status(D.meta, D.prompt, ['y = (3x + 5)^5', 'dy/dx = 15(3x + 5)^4 + C'])[1] === 'break', 'derivative: an added + C is a slip');
 
+
+// ── Unknown letters: a definition or a side formula is never crossed; a claim about the chain with a free letter is ──────────
+const SIDE = [
+  ['A = πr²', ['y = (3x + 5)^5', 'A = πr²']],
+  ['A = pi*r^2', ['y = (3x + 5)^5', 'A = pi*r^2']],
+  ['let u = 2x + 1', ['y = (3x + 5)^5', 'let u = 2x + 1']],
+  ['u = 2x + 1', ['y = (3x + 5)^5', 'u = 2x + 1']],
+  ['V = ∫ 3x² dx', ['y = (3x + 5)^5', 'V = ∫ 3x² dx']],
+  ['let u = 2x + 1 (integral question)', ['∫14e^(2x)dx', 'let u = 2x + 1']],
+  ['V = ∫ 3x² dx (integral question)', ['∫14e^(2x)dx', 'V = ∫ 3x² dx']]
+];
+for (const [name, lines] of SIDE) ok(!status(lines[0].startsWith('∫') ? I.meta : D.meta, lines[0].startsWith('∫') ? I.prompt : D.prompt, lines).includes('break'), `a definition or side formula is never crossed: ${name}`);
+ok(status(D.meta, D.prompt, ['y = (3x + 5)^5', "y′ = 6v"])[1] === 'break', "a claim on an established quantity with a free letter, y′ = 6v in an x question, is crossed");
+ok(status(D.meta, D.prompt, ['y = (3x + 5)^5', "dy/dx = 6v"])[1] === 'break', 'dy/dx = 6v in an x question is crossed');
+ok(status(D.meta, D.prompt, ['y = (3x + 5)^5', '= 1 + v^2'])[1] === 'break', 'a bare "= …" continuation holding a free letter is crossed (it cannot hold identically)');
+ok(status(D.meta, D.prompt, ['y = (3x + 5)^5', 'w = 3'])[1] !== 'break', 'a line whose left side is a new letter is a definition: abstain');
+
 // A wrong line is never ticked, whichever reading is tried.
 for (const wrong of ['= 5(3x + 5)^4', '= 3x + 5', '= 20(3x + 5)^4']) ok(status(D.meta, D.prompt, ['y = (3x + 5)^5', wrong])[1] !== 'ok', `derivative: ${wrong} is never ticked`);
 for (const wrong of ['= 14e^(2x)', '= 7e^(2x) * 4', '= 28e^(2x)']) ok(status(I.meta, I.prompt, ['∫14e^(2x)dx', wrong])[1] !== 'ok', `integral: ${wrong} is never ticked`);

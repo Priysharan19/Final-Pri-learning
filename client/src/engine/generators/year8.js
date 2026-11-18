@@ -326,18 +326,21 @@ export const year8 = {
   // ── Equations with brackets & both sides ─────────────────────────────────
   'y8-equations': (rng, diff) => {
     if (diff === 1) {
-      const x = ri(rng, -7, 12), a = rc(rng, [2, 3, 4, 5, 6]), b = nz(rng, -12, 12);
-      const c = a * x + b;
+      // One bracket, one multiplier, whole-number answer: the first rung of
+      // "solve equations involving brackets". The two-step drill ax + b = c
+      // that used to sit here assessed no bracket skill.
+      const x = ri(rng, -7, 12), a = rc(rng, [2, 3, 4, 5, 6]), b = nz(rng, -9, 9);
+      const c = a * (x + b);
       return {
-        prompt: `Solve $${a}x ${sgn(b)} = ${c}$.`,
-        answerType: 'numeric', answer: { value: x }, answerPrefix: 'x =',
+        prompt: `Solve $${a}(x ${sgn(b)}) = ${c}$.`,
+        answerType: 'numeric', answer: { value: x }, answerPrefix: 'x =', dotpoint: 0,
         stepcheck: { kind: 'equation', variable: 'x', solutions: [x] },
-        traps: [{ value: (c + b) / a, why: `Undo the ${sgn(b)} with its opposite first.` }],
-        hints: ['Undo addition/subtraction first, then the multiplication.', `$${a}x = ${c - b}$.`, `Divide by ${a}.`],
+        traps: [{ value: (c - b) / a, why: `The ${a} multiplies the whole bracket, so ${b >= 0 ? 'subtracting' : 'adding'} ${Math.abs(b)} alone leaves the bracket unmultiplied.` }],
+        hints: [`Divide both sides by ${a} to free the bracket, or expand it first.`, `The bracket equals ${c / a}.`, `Undo the ${sgn(b)} inside the bracket.`],
         steps: [
-          { h: `${b >= 0 ? 'Subtract' : 'Add'} ${Math.abs(b)}`, d: `$${a}x = ${c - b}$` },
-          { h: `Divide by ${a}`, d: `$x = ${x}$` },
-          { h: 'Check', d: `$${a}(${x}) ${sgn(b)} = ${c}$ ✓` }
+          { h: `Divide both sides by ${a}`, d: `$x ${sgn(b)} = ${c / a}$` },
+          { h: `${b >= 0 ? 'Subtract' : 'Add'} ${Math.abs(b)}`, d: `$x = ${x}$` },
+          { h: 'Check', d: `$${a}(${x} ${sgn(b)}) = ${c}$ ✓` }
         ]
       };
     }
@@ -466,6 +469,24 @@ export const year8 = {
         hints: ['Compare with $y = mx + c$.', 'm multiplies x; c stands alone.', `Here $m = ${m}$ and $c = ${c}$.`],
         steps: [
           { h: 'Match to y = mx + c', d: `$m = ${m}$ (slope), $c = ${c}$ (crossing point on the y-axis)` }
+        ]
+      };
+    }
+    if (diff === 4) {
+      // The equation of the line through two points: gradient, then intercept.
+      const m = nz(rng, -4, 4), c = nz(rng, -8, 8);
+      const x1 = ri(rng, -3, 2), dx = ri(rng, 1, 3), x2 = x1 + dx;
+      const y1 = m * x1 + c, y2 = m * x2 + c;
+      return {
+        prompt: `Find the equation of the line through $(${x1}, ${y1})$ and $(${x2}, ${y2})$. Give it in the form $y = mx + c$.`,
+        answerType: 'expression', answer: { expr: `${term(m)} ${sgn(c)}` }, answerPrefix: 'y =', dotpoint: 1,
+        inputHint: 'e.g. 2x - 3',
+        traps: [],
+        hints: ['First the gradient: rise ÷ run between the two points.', `The run is ${dx}.`, 'Put one point and the gradient into $y = mx + c$ and solve for $c$.'],
+        steps: [
+          { h: 'Gradient', d: `$m = \\dfrac{${y2} - (${y1})}{${x2} - (${x1})} = ${m}$` },
+          { h: 'Find c', d: `$${y1} = ${m}(${x1}) + c$, so $c = ${c}$` },
+          { h: 'Equation', d: `$y = ${term(m)} ${sgn(c)}$` }
         ]
       };
     }

@@ -640,8 +640,14 @@ export function lineProvenFalse(line, ctx, previousTexts = []) {
     if (/\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|exp|sqrt)\s+[^(\s]/i.test(String(line))) return false;
     // A line that names a function or its derivative (f(x) = …, f'(x) = …, g′ = …) is a definition of the method, not a claim.
     if (ctx.relation === 'antiderivative' && /^\s*(?:∴\s*)?[a-zA-Z]\s*(?:['′]\s*)?(?:\(\s*[a-z]\s*\))?\s*=/.test(String(line)) && !/^\s*[Fy]\s*(\(\s*[a-z]\s*\))?\s*=/.test(String(line))) return false;
-    const segs = segmentsOf(line).filter(t => t !== '' && !LABEL.test(t));
+    const allSegs = segmentsOf(line).filter(t => t !== '');
+    const segs = allSegs.filter(t => !LABEL.test(t));
     if (!segs.length) return false;
+    // A letter the question does not use is allowed only as a claim about something the chain has fixed: after a label (y′ =, dy/dx =)
+    // or as a bare "= …" continuation. A new letter on the left of an equals sign (A = πr², V = ∫…, u = 2x + 1, let u = …) is a definition.
+    const claim = allSegs.length > segs.length || /^\s*=/.test(String(line));
+    const fresh = segs.some(t => { const a = tryParse(t.replace(/^let\s+/i, '')); return a && [...variablesOf(a)].some(l => l !== ctx.variable && l !== 'e'); });
+    if ((fresh && !claim) || /^\s*let\b/i.test(String(line))) return false;
     const read = segs.map(t => readSegment(t, ctx));
     if (read.some(r => !r)) return false;
     if (ctx.relation === 'antiderivative') {

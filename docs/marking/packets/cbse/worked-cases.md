@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `e57a9f23e49f2d76310717767c7728c5e9827bd0f57bb3cb94bcfc9dc07f0b3b` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `fea8df9cdcfcbfed329f27acfa6dc9838899cfe6e3cd4425b9114bb965be8bec` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -1043,6 +1043,46 @@ Final answer: 37
 ```
 </details>
 
+## `cbse-bank:me11-functions/D2` — seed 16847
+
+> The function $f(x) = (x - 3)^2 - 3$, $x \\ge 3$, has an inverse. The graphs of $y = f(x)$ and $y = f^{-1}(x)$ meet at exactly one point. Find the $x$-coordinate of that point.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `6` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `6.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `7` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 7
+```
+</details>
+
+## `cbse-bank:me11-poly/D4` — seed 1009
+
+> Find all real solutions of $2x^4 - 40x^2 + 128 = 0$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-4, -2, 2, 4` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `-3, -2, 2, 4` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-3, -2, 2, 4` | no | 0/4 | 0/4 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: -3, -2, 2, 4
+```
+</details>
+
 ## `cbse-bank:ms11-formulas/D2` — seed 32685
 
 > Using $C = 54n + 60$, find the number of hours $n$ for which the charge is \\$438.00.
@@ -1405,60 +1445,60 @@ Final answer: 18
 
 ## `cbse-bank:y8-equations/D1` — seed 1009
 
-> Solve $5x - 2 = 28$.
+> I think of a number $x$, add 4, then multiply the result by 4. I get 48. This gives the equation $4(x + 4) = 48$. Solve it to find my number.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `6.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `7` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `7` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `8` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `8.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `9` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 7
+Final answer: 9
 ```
 </details>
 
 ## `cbse-bank:y8-equations/D2` — seed 1009
 
-> Solve $3(x - 1) - 1 = 11$.
+> Solve $3(x - 1) + 4 = 13$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 6
+Final answer: 5
 ```
 </details>
 
-## `cbse-bank:y8-equations/D3` — seed 1009
+## `cbse-bank:y8-equations/D3` — seed 8928
 
-> Solve $6x - 2 = 2x + 18$.
+> Solve $6x + 8 = 3x + 2$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `-2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `-2.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `-1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-1` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 6
+Final answer: -1
 ```
 </details>

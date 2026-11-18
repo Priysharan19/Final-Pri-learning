@@ -145,14 +145,15 @@ let PYQ_ARCHIVE_MEASURED = null;
 // ceilings leave about 100 kB raw and 80 kB gzipped. The install ceilings, the
 // banned-from-install list, render-from-install and offline coverage are unchanged.
 
-// Raised again 2026-11-18 (train editions-28, CTO under the same owner decision, size not a
-// constraint): FIRST_VISIT_RAW 5,000,000 -> 5,150,000 bytes only. Train 28 merges the photo
-// answer branch (HEIC decoding, PDF and drag-drop intake, the one-view reading), the line
-// interpreter, living formulas and the marked page. The combined tree, built with
-// PRI_EDITION=prithagoras, measured 4,927 kB raw (about 5,045,000 bytes) install plus warm, over
-// the 5,000,000 ceiling; the gzip ceiling was not exceeded and is unchanged, as are the install
-// ceilings, the banned-from-install list, render-from-install and offline coverage. The new
-// ceiling leaves about 100 kB.
+// Raised again 2026-11-19 (NSW content gaps, CTO under the same owner decision, size not a
+// constraint): FIRST_VISIT_RAW 5,000,000 -> 5,200,000 bytes; the gzip ceilings are unchanged. Measured
+// with real builds: origin/main (3d10618c1) is 4,841 kB raw / 1,647 kB gzipped install plus warm
+// (42 kB under the old ceiling); this branch is 4,960 kB raw, 119 kB above main. That is the cost of the
+// new Advanced and Extension 1 question forms (au-forms-gaps-*-nsw.js, about 2,700 lines). They are
+// dynamic imports split by course, so a Year 12 Advanced session loads only the year-12 forms and an
+// Extension 1 session only the stream forms; the warm pass still precaches every chunk, which is what
+// this ceiling counts. The new ceiling leaves about 118 kB. Re-measured after merging main's guest mode and Paper 05
+// fix (2026-11-19): 4,989 kB raw / 1,699 kB gzipped install plus warm, so about 89 kB remain under 5,200,000.
 
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
@@ -163,10 +164,10 @@ const INSTALL_GZIP_CEILING = 1_000_000;
 // panel and the new answer forms in the checker (checker-core: exact rationals, equations, subscripted names), their Hindi and English strings
 // (about 40 more catalogue entries each), and the HSC Pass arithmetic. The papers UI is already a lazy chunk (App.jsx React.lazy) and the
 // structured papers are server content, so there was no larger saving to take; the new ceiling leaves about 48 kB. Other ceilings unchanged.
-// Raised once more 2026-11-19 (train editions-28 after merging main's guest trial, papers and exam-style questions; the CTO under the same
-// owner decision, size not a constraint): FIRST_VISIT_RAW 5,150,000 -> 5,250,000 and FIRST_VISIT_GZIP 1,750,000 -> 1,850,000 bytes. Measured on the
-// merged tree: 5,031 kB raw and 1,713 kB gzipped install plus warm, over 5,029 / 1,709 kB. A re-baseline for the combined branch, not a weaker
-// gate: the install ceilings, the banned-from-install list, render-from-install and offline coverage are unchanged. Headroom is about 95 kB.
+// Merged with main's papers-in-app re-baseline (2026-11-19, PR 1064, same owner decision): main set the raw ceiling to 5,100,000 for
+// its own tree (Prithagoras 4,934 kB). This branch adds the NSW content-gap forms on top; the merged tree measured with a real build is
+// 5,047 kB raw / 1,719 kB gzipped install plus warm. FIRST_VISIT_RAW 5,100,000 -> 5,250,000 (about 80 kB headroom) and
+// FIRST_VISIT_GZIP 1,750,000 -> 1,850,000 (about 87 kB headroom); the higher of the two branches' measured needs is kept.
 const FIRST_VISIT_RAW_CEILING = 5_250_000;
 const FIRST_VISIT_GZIP_CEILING = 1_850_000;
 

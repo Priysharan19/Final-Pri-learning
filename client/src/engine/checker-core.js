@@ -241,7 +241,7 @@ export function namedDecimalPlaces(question) {
 }
 // "evaluate … exactly", "find the exact gradient": the answer is a value, not a rounded one.
 // Maths inside $…$ is not the sentence ("P(\\text{exactly } 1)" asks for a probability).
-const EXACT_ASK = /\bexact\b(?!\s+(?:change|same))|\bexactly\b(?!\s+(?:\d|one|two|three|four|five|when|the same|equal|half|as many|divisible))/i;
+const EXACT_ASK = /\bexact\b(?!\s+(?:change|same))|\bexactly\b(?!\s+(?:\d|once|twice|thrice|one|two|three|four|five|when|the same|equal|half|as many|divisible))/i;
 export function asksForExactValue(question) {
   return EXACT_ASK.test(String(question?.prompt ?? '').replace(/\$[^$]*\$/g, ' '));
 }
@@ -1234,7 +1234,7 @@ function checkAnswerWithinBudget(question, rawInput) {
         // A question that asks for the EXACT value is not a rounding question: an authored
         // absolute tol (0.001 on 1/480, half the size of the key) must never decide it. The
         // band is the default one, relative to the key (a whole key is exact).
-        if (named == null && ans.tol != null && !ans.rounding && !ans.officialRange && asksForExactValue(question)) tolUsed = Math.min(tolUsed, numericBand(target));
+        if (named == null && ans.tol != null && !ans.rounding && !question.pyq && asksForExactValue(question)) tolUsed = Math.min(tolUsed, numericBand(target));
         // A declared JEE rounding rule (engine/tolerance.js) is read only when the
         // reviewed key itself declares it; nothing is inferred.
         let ok = ans.rounding ? acceptsNumeric(value, target, { rounding: ans.rounding, tol: ans.tol }) : numsClose(value, target, tolUsed);
@@ -1668,8 +1668,13 @@ function stepCheckWithinBudget(meta, workingText) {
               const R = evaluate(ast.r, env);
               return Number.isFinite(L) && Number.isFinite(R) && Math.abs(L - R) <= Math.max(1e-6, Math.abs(R) * 1e-6);
             });
-            status = holds ? 'ok' : 'break';
-            if (!holds) note = `This is the line where it goes wrong — the true solution no longer satisfies this equation. Compare it carefully with the line above.`;
+            // A root the question's domain removes is part of correct working ("x = -4, rejected"): a bare
+            // claim x = r for a listed `rejected` root is a true statement about the equation, so it is not a slip.
+            const isRejected = !holds && Array.isArray(meta.rejected) && ast.l?.t === 'var' && ast.l.v === meta.variable
+              && meta.rejected.some(r => { try { return numsClose(evaluate(ast.r, {}), r); } catch { return false; } });
+            status = holds || isRejected ? 'ok' : 'break';
+            if (isRejected) note = 'This root solves the equation but lies outside the domain: say so, and keep the root that is allowed.';
+            if (!holds && !isRejected) note = `This is the line where it goes wrong — the true solution no longer satisfies this equation. Compare it carefully with the line above.`;
           }
         } else {
           // a bare value — treat as a claimed solution

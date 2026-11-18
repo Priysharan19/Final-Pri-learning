@@ -985,12 +985,11 @@ async function run() {
     const topic = await nextQuestion({ mode: 'topic', subtopic: topicId, difficulty: 3 });
     eq('topic mode serves the topic asked for', topic.question.subtopic, topicId);
     eq('topic mode honours the difficulty', topic.question.difficulty, 3);
-    // 99 is clamped to D4. The server now issues a D4 for y10-quadratics too
-    // (engine/nswIssuedCells.js), so the clamp serves it; a topic with no issued D4
-    // (y9-simint: Year 9 Simple interest, levels 1 and 2) is answered with the
-    // levels that exist, refused by name.
-    eq('an out-of-range difficulty is clamped to a level that is issued, y10-quadratics included', (await nextQuestion({ mode: 'topic', subtopic: topicId, difficulty: 99 })).question.difficulty, 4);
-    eq('a level the server does not issue is refused by name', await POST('/practice/next', { mode: 'topic', subtopic: 'y9-simint', difficulty: 99 }).then(() => 'served', e => `${e.code} D${e.detail?.difficultyRequested}`), 'DIFFICULTY_UNAVAILABLE D4');
+    // 99 is clamped to D4. The tolerance fixes (engine/answerBand.js) issued y10-quadratics D4, so the clamped
+    // level is now served; the refusal of a level the server does not issue by name is held by nsw-offer-check
+    // (y8-equations D1, y8-linear D4, both refused with no draft).
+    eq('an out-of-range difficulty is clamped to D4, which this topic now issues',
+      await POST('/practice/next', { mode: 'topic', subtopic: topicId, difficulty: 99 }).then(r => `served D${r.question.difficulty}`, e => `${e.code} D${e.detail?.difficultyRequested}`), 'served D4');
     eq('an out-of-range difficulty is clamped to a level that is issued', (await nextQuestion({ mode: 'topic', subtopic: 'y10-simeq', difficulty: 99 })).question.difficulty, 4);
 
     const missable = await answerableQuestion({ mode: 'topic', subtopic: topicId });
@@ -1754,7 +1753,11 @@ async function run() {
     // the build and on the server unless each turns it on; then forwarded to the
     // server's own issued question, charging nothing on the device.
     {
-      const hpQ = await answerableQuestion({ mode: 'topic', subtopic: topicId, difficulty: 3 });
+      // A chapter this suite has not practised before. The plan's first choice depends on the student's history in the chapter
+      // ("faded" support after earlier attempts), and the draw of earlier questions in topicId is the server's own, not seedable from
+      // the device: on topicId the history, and so the plan, differed from run to run. A fresh chapter has no history, so the
+      // plan for its first help request is fixed: the smallest hint rung, a nudge, charged.
+      const hpQ = await answerableQuestion({ mode: 'topic', subtopic: 'y10-surds', difficulty: 2 });
       const priorOverrides = globalThis.__PRI_FEATURE_OVERRIDES__;
       await rejects('the help plan is dark unless the build turns it on', POST(`/practice/${hpQ.question.id}/help-plan`, { helpRequested: true }), { status: 404 });
       globalThis.__PRI_FEATURE_OVERRIDES__ = { ...(priorOverrides || {}), tutorPolicy: true };

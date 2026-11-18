@@ -148,11 +148,10 @@ try {
     ['a request naming the India course', { generator: 'y7-integers', difficulty: 1, curriculum: 'in' }, 400, 'PRACTICE_GENERATOR_INVALID'],
     ['an India bank under the India course', { generator: 'c10-arithmetic-progressions', difficulty: 2, curriculum: 'in' }, 400, 'PRACTICE_GENERATOR_INVALID'],
     ['a request naming no course', { generator: 'y7-integers', difficulty: 1 }, 400, 'PRACTICE_GENERATOR_INVALID'],
-    ['a partial bank (pigeonhole is in no current syllabus)', { generator: 'me11-comb', difficulty: 1, curriculum: 'nsw' }, 422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM'],
-    ['a partial bank', { generator: 'me12-calc', difficulty: 2, curriculum: 'nsw' }, 422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM'],
     ['a cell whose form assesses no dot point', { generator: 'y8-equations', difficulty: 1, curriculum: 'nsw' }, 422, 'PRACTICE_CONTENT_UNSUPPORTED'],
-    ['a cell the quality gate excluded', { generator: 'y9-simint', difficulty: 3, curriculum: 'nsw' }, 422, 'PRACTICE_CONTENT_UNSUPPORTED'],
-    ['a cell whose every form is a proof', { generator: 'me12-induction', difficulty: 4, curriculum: 'nsw' }, 422, 'PRACTICE_CONTENT_UNSUPPORTED'],
+    ['a second cell whose form assesses no dot point', { generator: 'y8-linear', difficulty: 4, curriculum: 'nsw' }, 422, 'PRACTICE_CONTENT_UNSUPPORTED'],
+    // (No crosswalk row is partial and no cell is held by the quality gate any more: me11-comb and me12-calc are mapped, the key-format
+    // exclusions were repaired at their source, and me12-induction D4 issues checkable numbers; the refusals above are the ones left.)
     ['an unknown generator', { generator: 'y7-nonexistent', difficulty: 1, curriculum: 'nsw' }, 422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM']
   ]) {
     const r = await issue(body);
@@ -161,7 +160,7 @@ try {
     const p = await h.request('/v1/practice/prepare', { method: 'POST', body: curriculum === undefined ? rest : body });
     c.deq([p.status, p.data?.error?.code], [status, code], `prepare: ${label} is refused`);
   }
-  c.ok(!nswCell('y8-equations', 1) && !nswCell('y9-simint', 3) && nswCell('y9-simint', 1), 'the refused cells are the ledger\'s, and their bank\'s other cells are issued');
+  c.ok(!nswCell('y8-equations', 1) && !nswCell('y8-linear', 4) && nswCell('y8-equations', 2) && nswCell('y8-linear', 3), 'the refused cells are the ledger\'s, and their bank\'s other cells are issued');
   c.match((await issue({ generator: 'c10-arithmetic-progressions', difficulty: 2, curriculum: 'nsw' })).data.error.message, /NSW curriculum/, 'the refusal names the NSW curriculum');
   c.eq(await escrowCount(a.account.id), start, 'no refusal escrowed a question');
 
@@ -260,8 +259,8 @@ try {
     const s3 = await sealedOf(a.account.id, poly.data.question.id);
     c.deq([s3._curriculum.syllabus, s3._curriculum.labelledSyllabus, s3._curriculum.outcomes[0].code],
       ['nsw-mathematics-extension1-11-12-2024', 'nsw-mathematics-advanced-11-12-2024', 'ME1-11-02'], 'remainder-theorem items labelled Advanced are sealed as Extension 1 content');
-    c.deq([(await issue({ generator: 'me11-comb', difficulty: 1, curriculum: 'nsw' })).data?.error?.code, (await issue({ generator: 'me11-poly', difficulty: 4, curriculum: 'nsw' })).data?.error?.code],
-      ['PRACTICE_BANK_OUTSIDE_CURRICULUM', 'PRACTICE_CONTENT_UNSUPPORTED'], 'a bank the quality gate excluded whole, and a cell it excluded, are refused');
+    // (The quality gate holds no bank or cell back any more, so there is no excluded-by-the-gate refusal left to assert; the
+    // cells still refused are those with no dot point behind them, below.)
     // Asking a dot point whose only forms are not issued: y8-linear.3 lives at D3 (issued); y8-linear D4 has no dot point.
     c.deq([(await issue({ generator: 'y8-linear', difficulty: 4, curriculum: 'nsw' })).status], [422], 'y8-linear D4 assesses no dot point and is refused');
   }

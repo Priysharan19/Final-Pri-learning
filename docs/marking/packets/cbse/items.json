@@ -5,7 +5,7 @@
     "cbse-mathematics-2026-27"
   ],
   "dossier": "docs/marking/order14-examiner-certification-dossier.md",
-  "dossierDigest": "e57a9f23e49f2d76310717767c7728c5e9827bd0f57bb3cb94bcfc9dc07f0b3b",
+  "dossierDigest": "fea8df9cdcfcbfed329f27acfa6dc9838899cfe6e3cd4425b9114bb965be8bec",
   "minExaminers": 1,
   "items": [
     "cbse-policy:ap-ecf",
@@ -47,6 +47,8 @@
     "cbse-bank:c12-applications-integrals/D2",
     "cbse-bank:c12-applications-integrals/D3",
     "cbse-bank:c12-applications-integrals/D4",
+    "cbse-bank:me11-functions/D2",
+    "cbse-bank:me11-poly/D4",
     "cbse-bank:ms11-formulas/D2",
     "cbse-bank:y10-quadratics/D1",
     "cbse-bank:y10-quadratics/D2",

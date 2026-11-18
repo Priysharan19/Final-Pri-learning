@@ -1912,7 +1912,10 @@ function stepMetaFor(q) {
     }
   }
   if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
-    return { kind: 'equation', variable: 'x', solutions: a.values };
+    {
+      const asked = String(q.prompt || '').match(/\b(?:values?|solutions?|roots?)\s+of\s+\$([A-Za-z])\$/i);
+      return { kind: 'equation', variable: asked ? asked[1] : 'x', solutions: a.values };
+    }
   }
   return null;
 }

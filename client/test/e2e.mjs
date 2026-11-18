@@ -209,6 +209,10 @@ const readMathIn = (el) => {
 
 function helpers(page, base, flowId) {
   let shotN = 0;
+  // The page's console, kept so a failing check leaves it beside its screenshot (CI uploads both).
+  const consoleLines = [];
+  page.on('console', m => { consoleLines.push(`${new Date().toISOString()} ${m.type()} ${m.text().slice(0, 400)}`); if (consoleLines.length > 400) consoleLines.shift(); });
+  page.on('pageerror', e => consoleLines.push(`${new Date().toISOString()} pageerror ${String(e?.message || e).slice(0, 400)}`));
 
   const shot = async (label) => {
     const name = `${flowId}-${String(++shotN).padStart(2, '0')}-${label}.png`;
@@ -223,6 +227,7 @@ function helpers(page, base, flowId) {
   const check = async (name, condition, detail = '') => {
     if (condition) return ok(name, true);
     const path = await shot(`FAIL-${name.replace(/[^a-z0-9]+/gi, '-').slice(0, 48)}`);
+    try { if (path) await writeFile(path.replace(/\.png$/, '.console.log'), consoleLines.join('\n') + '\n'); } catch { /* the screenshot is the evidence that matters */ }
     return ok(name, false, `${detail}${path ? `\n      screenshot: ${path}` : ''}`);
   };
 

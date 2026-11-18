@@ -53,17 +53,17 @@
         {"has":"BOARD SCHEME CONTRACT: PASS — 147/147 checks — Board value points carried in whole-mark groups, never above the Board; only lines the deterministic step check verifies earn, matched to points one-to-one and in order; no model verdict sets a mark; 1 Section B–E archive records, every scheme line engine-verified.","note":"Board-scheme marks contract (L5, R4): CBSE Section B–E value points, awarded only by the deterministic engine."},
         {"has":"DISTINCT QUESTIONS: Class 7 ≥ 3.02×10^8, Class 8 ≥ 5.24×10^8, Class 9 ≥ 1.45×10^8, Class 10 ≥ 1.63×10^8, Class 11 ≥ 2.62×10^8, Class 12 ≥ 3.60×10^8 — 6/6 classes at the 10^8 target","note":"Train 25 integration, re-derived by running tools/distinct-questions.mjs on the merged tree: 5/6 → 6/6 classes at the target. Before (main) → after (this train): Class 7 2.98 → 3.02, Class 8 4.17 → 5.24, Class 9 2.43 → 1.45, Class 10 1.46 → 1.63, Class 11 4.01 → 2.62, Class 12 3.83 → 3.60 (×10^8, lower bounds). Class 9 and 11 FELL because of form draw weighting: the estimator measures the effective size under each generator's own sampling (collision estimate), and the train draws a form in proportion to the questions it can serve, with one weight per skill across the difficulties (ea5d33ef5), so draws concentrate on the larger forms and repeat more within a cell; that lowers the effective size of those classes' cells although more forms exist. Class 7, 8 and 10 rose for the opposite reason (extra forms that were rarely drawn before). Every class stays above the 10^8 target, and Class 9 is the thinnest."},
         {"has":"CLASS X ALGEBRA FORMS: PASS — 5 generators, 29 forms, 6225 items re-derived from the prompt by a second route","note":"Class X Algebra additional forms (L5): 5 generators × D1–D3 take 355 → 360 subtopics, 576 → 591 declared pairs and 2678 → 2708 India checks; every answer re-derived from its prompt by a second route."},
-        {"has":"INDIA HARDEST FORMS: PASS — 652116/652116 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points"},
+        {"has":"INDIA HARDEST FORMS: PASS — 653477/653477 checks — 142 hardest-level forms (D3 CBSE Class VII/VIII/X/XI/XII, D4 JEE Class 11/12) for 142 dot points"},
         {"has":"PROMPT VARIABLE CONSISTENCY: PASS — 247204 prompts, 566 claim prompts, 3326 stated solutions, 0 inconsistent"},
         {"has":"59400 questions from 594 declared (generator, difficulty) pairs × 100 draws — 59400 marked correct by their own marker, 59400 well formed"},
-        {"has":"QUESTION VARIANTS: PASS — 594 generated seeds (0 cells skipped: seed not credited by its own key), 4752 variants verified by the marker and distinct by content hash, 2376/2376 bands filled, 985/1188 same-band variants keep the seed","note":"Question variants (L5): every live India cell and every official CBSE record yields variants at each band, each credited by the deterministic marker on its own key and distinct by content hash. 576 → 594 seeds (Train 14: re-derived by running all 4 shards on main 0c655e4cf + #837 + #839)."},
+        {"has":"QUESTION VARIANTS: PASS — 594 generated seeds (0 cells skipped: seed not credited by its own key), 4752 variants verified by the marker and distinct by content hash, 2376/2376 bands filled, 986/1188 same-band variants keep the seed","note":"Question variants (L5): every live India cell and every official CBSE record yields variants at each band, each credited by the deterministic marker on its own key and distinct by content hash. 576 → 594 seeds (Train 14: re-derived by running all 4 shards on main 0c655e4cf + #837 + #839)."},
         {"has":"shape; 95 official CBSE records → 366 Pri variants on their chapter (14 bands with no serving generator).","note":"28/110 → 80/310 records/variants (Train 15: #840, #845, #842 records, re-derived by running all 4 shards). 80/310 → 81/314 (#846: 65/2/1 Q24, re-derived by running all 4 shards on Train 15 + #846)."},
         {"has":"258/258 dot points have a generator behind them; 0 do not"},
         {"has":"NCERT ANSWER FORMS: PASS — 481/481 checks","note":"L1 policies (V1 decisions D12–D14): 478 → 481 forms (D13 flips seven pre-D13 pins to refusals and adds three)."},
-        {"has":"ADVERSARIAL CORPUS: PASS — 11701/11701 checks","note":"11819 → 11701 (Train 28, re-derived by running): families whose derived step check is off (y10-nonlinear, mex-vectors, y9-indices-sci, y11-explog, c11-straight-lines, y12-integration) are answer only, so their step-check cases no longer run. #723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count. 219 → 1397: the SymPy differential oracle cases (2026-11-18) incl. every bypass from the eight #992 reviews (75), 1091 right-answer controls for the final-answer probe, 5 cases once XFAIL now refused by the exact probe, and 3 noise-floor/XFAIL policy pins; re-derived by running the suite."},
+        {"has":"ADVERSARIAL CORPUS: PASS — 12203/12203 checks","note":"#723 (Step 14): the suites the forms gate imports, and the authenticated step14 suites, each pinned by count. 219 → 1397: the SymPy differential oracle cases (2026-11-18) incl. every bypass from the eight #992 reviews (75), 1091 right-answer controls for the final-answer probe, 5 cases once XFAIL now refused by the exact probe, and 3 noise-floor/XFAIL policy pins; re-derived by running the suite."},
         {"has":"EXACT BOUNDS: PASS — 107/107 checks"},
-        {"has":"STEP14 REVIEW FIXES: PASS — 45995/45995 checks","note":"39533 → 39547 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
-        {"has":"REVIEW FOLLOW-UPS: PASS — 439/439 checks"},
+        {"has":"STEP14 REVIEW FIXES: PASS — 46111/46111 checks","note":"39533 → 39547 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
+        {"has":"REVIEW FOLLOW-UPS: PASS — 427/427 checks"},
         {"has":"#680 SOURCED CASES: PASS — 91/91 cases"},
         {"has":"STEP14_DECIMAL_SUMMARY 7/7 engine=sqlite"},
         {"has":"Q1_PERSIST_SUMMARY badFullCredit=0/4 integrityControls=4/4 engine=sqlite"},
@@ -74,9 +74,9 @@
         {"has":"STEP COACH: PASS — 49/49 checks","note":"F1 live step coach (#826): no guess oracle, premium-only, off by default, capped."},
         {"has":"INTERIM MARKING POLICY (D13, D14): PASS — 12655/12655 checks","note":"10855 (Train 6, re-derived by a full local shard run on the merged tree; CI's run of 4136aac56 reported the same). 10855 → 10820 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree): the D13 sweep runs over generated questions, and #812's widened Class 9 generators change that sample (sweep 10481 → 10446); every check is still run and passes, none removed."},
         {"has":"INDIA BANKS (D15): PASS — 173/173 checks","note":"124 (Train 5, re-derived by running india-banks-check): #745 pinned 122 on its base; merged onto main 631019053 the same suite reports 124."},
-        {"has":"NSW BANK QUALITY: PASS — 131 generators, 512 cells issued","note":"Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render."},
+        {"has":"NSW BANK QUALITY: PASS — 133 generators, 530 cells issued","note":"Plan G3: the NSW bank quality gate — every issued cell's stored answer accepted, wrong answers refused, options distinct, prompts render."},
         {"has":"NSW EXAM BLUEPRINTS (G4): PASS — 546 checks","note":"Plan G4: NSW HSC-style blueprints held to NESA's specification, the release check, and the exam-path false-positive sweep."},
-        {"has":"FALSE-POSITIVE SWEEP: PASS — 0 of 490115 wrong answers marked correct across 21600 questions","note":"133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit. 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree). 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree). 419741/18696 → 422759/19248 (Train 15: #838 widening + CBSE X/XII Section A (#840, #845) + JEE Main 2026 S2 (#842), re-derived by running all 4 shards on the merged tree). 422759/19248 → 422837/19248 (#846: CBSE XII 65/2/1 Q24, the first Section B record, restacked on Train 15)."},
+        {"has":"FALSE-POSITIVE SWEEP: PASS — 0 of 490897 wrong answers marked correct across 21600 questions","note":"133426 → 405961 probes (m-finish-10-marking): #667's list probes, #670's percent-sign and label probes and the key carrying a % the question never asked for, over 18072 questions. A count of value perturbations only — it is not evidence of zero false credit. 406804/18072 → 409709/18312 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree). 409709/18312 → 419741/18696, 31792/11932 → 32824/12349 (Train 13: #800 + #784, re-derived on the merged tree). 419741/18696 → 422759/19248 (Train 15: #838 widening + CBSE X/XII Section A (#840, #845) + JEE Main 2026 S2 (#842), re-derived by running all 4 shards on the merged tree). 422759/19248 → 422837/19248 (#846: CBSE XII 65/2/1 Q24, the first Section B record, restacked on Train 15)."},
         {"has":"CORRECT-ANSWER SWEEP: PASS — 0 of 34485 right answers over 14462 India questions (594 generator×difficulty cells × 30 seeds)","note":"The opposite direction: every right answer to every India question (the key, the box's unit in every spelling, ₹/Rs on an amount, the printed answer, the photo path's \"Ans:\" line) is credited, or refused only by D13."},
         {"has":"EQUIVALENCE CLASSES: PASS — 672/672 checks across 9 classes","note":"Train 13 (#800 + #784 + the L1 marking types), re-derived by running all 4 shards on the merged tree: 355 → 363 subtopics, 576 → 594 pairs."},
         {"has":"WORKING RUBRICS: PASS — 8737/8737 checks across 13 family levels"},
@@ -139,7 +139,7 @@
         {"has":"PAGE LINK HISTORY: PASS — 39/39 checks"},
         {"has":"MISCONCEPTION TARGETING: PASS — 41/41 checks"},
         {"has":"LOST MARKS: PASS — 170/170 checks","note":"Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy."},
-        {"has":"TOLERANCE POLICY: PASS — 228/228 checks","note":"221 → 228: exact-value demands refuse a calculator display (SymPy differential oracle, 2026-11-18), re-derived by running the suite."},
+        {"has":"TOLERANCE POLICY: PASS — 235/235 checks","note":"221 → 228: exact-value demands refuse a calculator display (SymPy differential oracle, 2026-11-18), re-derived by running the suite."},
         {"has":"PRECISION BAND: PASS — 2360 draws state a precision","note":"Issue #518: a prompt that states a precision keys a tol or rounding. 2143 → 2360: the nearest-unit wording (degree, cent, dollar) and the three-decimal prompts now state a precision, re-derived by running the suite."},
         {"re":"numeric-tolerance-sweep: [0-9]+ numeric questions from [0-9]+ generators .* 0 loose cell\\(s\\) in 0 generator\\(s\\); 0 cell\\(s\\) with a rounded key and no stated precision; [0-9]+ key\\(s\\) not accepted as typed; 0 failure\\(s\\)","note":"Walk-through F02: no numeric key, over every generator and difficulty, accepts a value one unit (or 2%) off it, an exact question accepts nothing 0.1% off, and a rounded key states its precision."},
         {"has":"NOTES CONTENT CHECK PASSED — 77/77 chapters","note":"Chapter notes: every curriculum chapter, every worked answer engine-verified."},
@@ -408,7 +408,7 @@
       "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
-        {"has":"NSW PRACTICE (G3): PASS — 166/166 checks"}
+        {"has":"NSW PRACTICE (G3): PASS — 159/159 checks"}
       ]
     },
     "platform/practice-http.log#6": {
@@ -422,7 +422,7 @@
       "job": "platform-contracts",
       "log": "practice-http.log",
       "pins": [
-        {"has":"PAPER GENERATOR: PASS — 69/69 checks"}
+        {"has":"PAPER GENERATOR: PASS — 70/70 checks"}
       ]
     },
     "platform/practice-http.log#5": {
@@ -485,7 +485,7 @@
       "log": "guest-trial.log",
       "pins": [
         {"has":"✓ guest-trial-check.mjs (103 checks)","note":"ADR-0003, the guest trial over real HTTP (re-derived by running)."},
-        {"has":"✓ guest-menu-issuable-check.mjs (3907 checks)","note":"Everything the guest picker lists, in both editions, is a request the edition's server issues (3907, re-derived by running on the marking-release tree; 3704 before its issued cells grew; it follows the number of listed chapter-and-level cells)."}
+        {"has":"✓ guest-menu-issuable-check.mjs (3981 checks)","note":"Everything the guest picker lists, in both editions, is a request the edition's server issues (3981, re-derived by running; it follows the number of listed chapter-and-level cells)."}
       ]
     },
     "platform/secret-shapes.log": {

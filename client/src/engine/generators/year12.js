@@ -213,7 +213,9 @@ export const year12 = {
       };
     }
     if (diff === 3) {
-      const a = 1, b = nz(rng, -5, 5), c = nz(rng, -6, 6), x0 = nz(rng, -3, 3);
+      const a = 1, b = nz(rng, -5, 5), c = nz(rng, -6, 6);
+      let x0 = nz(rng, -3, 3);
+      if (2 * x0 + b === 0) x0 += 1; // a horizontal tangent would key a zero-gradient term ("0x + c"); this form asks for y = mx + c with m non-zero
       const y0 = x0 * x0 + b * x0 + c;
       const mGrad = 2 * x0 + b;
       const cc = y0 - mGrad * x0;
@@ -738,24 +740,37 @@ export const year12 = {
   // ── Financial maths & annuities ──────────────────────────────────────────
   'y12-financial': (rng, diff) => {
     if (diff === 1) {
-      const P = ri(rng, 4, 20) * 1000;
-      const rr = rc(rng, [4, 5, 6]);
-      const n = ri(rng, 5, 15);
-      const A = P * (1 + rr / 100) ** n;
+      // Dot point 1 (future value of regular deposits), one term of the annuity's geometric series:
+      // what does the first end-of-year deposit grow to by the end of year n?
+      let a, rr, n, g;
+      for (let i = 0; i < 200; i++) {
+        a = rc(rng, [100, 200, 250, 400, 500, 800, 1000, 1500]);
+        rr = rc(rng, [2, 3, 4, 5, 6, 8]);
+        n = ri(rng, 3, 6);
+        g = 1 + rr / 100;
+        const c = a * g ** (n - 1) * 100;
+        if (Math.abs((c - Math.floor(c)) - 0.5) > 0.05) break;   // keep clear of a rounding boundary
+      }
+      const val = r2(a * g ** (n - 1));
       return {
-        prompt: `${moneyPlain(P)} is invested at $${rr}\\%$ p.a., compounding annually, for $${n}$ years. Find the future value, to the nearest dollar.`,
-        answerType: 'numeric', answer: { value: Math.round(A), tol: 1.01 }, answerPrefix: '$',
-        traps: [{ value: Math.round(P * (1 + rr * n / 100)), why: 'That’s simple growth — compound growth uses the multiplier $(1+r)^n$.', tol: 1.01 }],
-        hints: ['$FV = P(1 + r)^n$.', `$FV = ${P}(${1 + rr / 100})^{${n}}$.`, `$(${1 + rr / 100})^{${n}} \\approx ${r3((1 + rr / 100) ** n)}$.`],
+        dotpoint: 0,
+        prompt: `${moneyPlain(a)} is deposited into an account at the **end** of each year for $${n}$ years. The account pays $${rr}\\%$ p.a. interest, compounded annually. The first deposit is made at the end of year 1 and earns interest until the end of year $${n}$. What is the value of this first deposit at the end of year $${n}$, to the nearest cent?`,
+        answerType: 'numeric', answer: { value: val, tol: 0.006 }, answerPrefix: '$',
+        traps: [
+          { value: r2(a * g ** n), why: `The first deposit is made at the end of year 1, so it earns interest for ${n - 1} years, not ${n}.`, tol: 0.006 },
+          { value: r2(a * (1 + rr * (n - 1) / 100)), why: 'Interest is compounded: multiply by $(1 + r)$ once for each year, not add simple interest.', tol: 0.006 }
+        ],
+        hints: ['Each year the balance of this deposit is multiplied by $1 + r$.', `The deposit is made at the end of year 1, so it grows for ${n - 1} years.`, `Evaluate $${a}(${g})^{${n - 1}}$.`],
         steps: [
-          { h: 'Formula', d: `$FV = P(1+r)^n = ${P}(${1 + rr / 100})^{${n}}$` },
-          { h: 'Evaluate', d: `$\\approx ${moneyPlain(Math.round(A))}$` }
+          { h: 'Years of growth', d: `Deposited at the end of year 1, so it earns interest for $${n} - 1 = ${n - 1}$ years` },
+          { h: 'Growth formula', d: `$${a}(1 + ${rr / 100})^{${n - 1}} = ${a}(${g})^{${n - 1}}$` },
+          { h: 'Evaluate', d: `$\\approx ${val}$ → ${moneyPlain(val)}` }
         ]
       };
     }
     if (diff === 2) {
-      const dep = rc(rng, [250, 400, 500, 600, 750, 1000, 1200, 1500, 2000, 2500, 3000]);
-      const rr = rc(rng, [3, 4, 4.5, 5, 5.5, 6, 7, 8, 9, 10]);
+      const dep = ri(rng, 5, 60) * 50;
+      const rr = rc(rng, [3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]);
       const g = 1 + rr / 100;
       const total = dep * (g ** 3 + g ** 2 + g);
       return {
@@ -774,9 +789,9 @@ export const year12 = {
       };
     }
     if (diff === 3) {
-      const a = rc(rng, [1000, 1500, 2000, 3000]);
-      const rr = rc(rng, [4, 5, 6, 7]);
-      const n = ri(rng, 8, 20);
+      const a = ri(rng, 10, 60) * 100;
+      const rr = rc(rng, [4, 5, 6, 7, 8, 9]);
+      const n = ri(rng, 8, 24);
       const g = 1 + rr / 100;
       const FV = a * (g ** n - 1) / (rr / 100);
       return {
@@ -791,10 +806,10 @@ export const year12 = {
         ]
       };
     }
-    const L = rc(rng, [8000, 10000, 12000, 15000, 18000, 20000, 25000, 30000]);
+    const L = ri(rng, 60, 300) * 100;
     const rr = rc(rng, [6, 9, 12, 15, 18]);
     const rMonthly = rr / 1200;
-    const M = rc(rng, [250, 300, 350, 400, 450, 500, 600, 750]);
+    const M = ri(rng, 8, 40) * 25;
     const b1 = L * (1 + rMonthly) - M;
     const b2 = b1 * (1 + rMonthly) - M;
     return {

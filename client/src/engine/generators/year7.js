@@ -417,7 +417,9 @@ export const year7 = {
       };
     }
     if (diff === 2) {
-      const a = ri(rng, 3, 8), b = nz(rng, -6, 6), c = nz(rng, -5, -1), d = nz(rng, -6, 9);
+      const a = ri(rng, 3, 8), b = nz(rng, -6, 6), d = nz(rng, -6, 9);
+      let c = nz(rng, -5, -1);
+      if (a + c === 0) c -= 1; // the x terms must not cancel: the answer keeps an x term
       const xc = a + c, k = b + d;
       return {
         prompt: `Simplify $${a}x ${sgn(b)} ${c < 0 ? '-' : '+'} ${Math.abs(c)}x ${sgn(d)}$ by collecting like terms.`,

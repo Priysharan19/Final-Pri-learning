@@ -1488,6 +1488,14 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
               note = assessed.note;
               lineDiagnosis = assessed.diagnosis || null;
               impliedStep = assessed.implied === true;
+              // A root the question's domain removes is part of correct working ("x = -4, rejected"): a bare claim x = r for a
+              // listed `rejected` root is a true statement about the equation, not a slip (checker-core.js holds the same rule).
+              if (status === 'break' && Array.isArray(meta.rejected) && ast.l?.t === 'var' && ast.l.v === meta.variable
+                  && meta.rejected.some(r => { try { return numsClose(evaluate(ast.r, {}), r); } catch { return false; } })) {
+                status = 'ok';
+                note = 'This root solves the equation but lies outside the domain: say so, and keep the root that is allowed.';
+                lineDiagnosis = null;
+              }
               // A true identity that is not a trivial 0 = 0 (a factorisation, an
               // expansion: `x^2 - 1 = (x - 1)(x + 1)`) is a TRUE line. It does not carry the
               // equation forward, so it is not credited, but it is never crossed.
@@ -1564,7 +1572,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
         const squashed = proseClean.replace(/\s+/g, '');
         const onlyIntegralAux = /∫/.test(proseClean) && !/[→]|d\/d[a-z]\s*[(\[a-z0-9]|\b[uvw]\b|\bd[uvw]\b/i.test(proseClean);
         const provenFalse = assessed && assessed.status === 'break' && !SIDE_DEFINITION.test(squashed)
-          && (!AUXILIARY_CALCULUS.test(proseClean) || onlyIntegralAux)
+          && (!AUXILIARY_CALCULUS.test(proseClean) || onlyIntegralAux || /^\s*=/.test(String(line).trim()) || DERIVATIVE_CLAIM.test(squashed))
           && lineProvenFalse(line, calculus, out.map(l => String(l.text)));
         if (assessed && assessed.status === 'break' && !provenFalse && (SIDE_DEFINITION.test(squashed) || AUXILIARY_CALCULUS.test(proseClean) || !DERIVATIVE_CLAIM.test(squashed)
             || calculus?.relation === 'antiderivative')) {   // a derivative claim inside an integral question is about a side function
@@ -1582,7 +1590,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           const judged = judgeExpressionLine(cleaned, meta, {
             reference: expressionReference(meta, prompt, out, { lineAbove: /^\s*=/.test(bareExpressionLine(cleaned)) }),
             promptSpans: [...String(prompt || '').matchAll(/\$([^$]+)\$/g)].map(m => { try { return plainTex(m[1]); } catch { return ''; } }).filter(t => t && !/[=<>≤≥,]/.test(t) && parseExpr(t)),
-            knownLetters: prompt ? new Set((`${prompt} ${meta.canonical || ''} ${meta.source || ''} ${out.map(l => l.text).join(' ')}`.replace(/\\[a-zA-Z]+/g, ' ').match(/[A-Za-z]/g) || [])) : null
+            knownLetters: prompt ? new Set((`${[...String(prompt).matchAll(/\$([^$]+)\$/g)].map(m => m[1]).join(' ')} ${meta.canonical || ''} ${meta.source || ''} ${out.map(l => l.text).join(' ')}`.replace(/\\[a-zA-Z]+/g, ' ').match(/[A-Za-z]/g) || [])) : null
           });
           status = judged.status;
           if (judged.note) note = judged.note;

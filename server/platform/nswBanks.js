@@ -50,20 +50,13 @@ export const NSW_COURSE = 'nsw';
  * no longer fails is visible.
  */
 export const NSW_QUALITY_EXCLUSIONS = Object.freeze({
-  'y9-simint|3': 'a right answer is marked wrong: the box reads "% p.a." and the marker refuses "6% p.a." (it accepts "6" and "6%"), spending a try',
-  'y9-simint|4': 'a right answer is marked wrong on the rate form: the box reads "% p.a." and the marker refuses "12% p.a.", spending a try',
-  'y11-quadfunc|1': 'the answer as the server prints it, "Δ = 97", cannot be read by the marker (the box is prefixed "Δ =")',
-  'me11-functions|2': 'the answer in the form the question asks for, "x ≥ -1", cannot be read by the marker (the box is prefixed "x ≥")',
-  // (The cells that were listed here for a tolerance wider than the question asks (an exact
-  // key one hundredth off, a rounded key with no stated precision, a list of solutions one
-  // hundredth off) were fixed at the source: engine/answerBand.js drops a band the question
-  // does not ask for, the marker bounds a list by the precision it names, and the
-  // three-decimal keys now say "correct to 3 decimal places".)
-  // A right answer refused: the key keeps a zero-coefficient term.
-  'y7-algebra|2': 'when the expression simplifies to a constant the key is "0x + 9" and the right answer "9" is marked wrong, spending a try',
-  'y12-appdiff|3': 'for a horizontal tangent the key is "0x + -10" and the right answer "-10" is marked wrong, spending a try',
-  'me11-poly|4': 'the answer shown after resolution is a raw float ("1.3333333333333333, 3" for 4/3, 3) on a question asked over the rationals',
-  'me12-induction|4': 'every form is a proof answered by its working: there is no final answer to mark while marking is final answer only (plan G6)'
+  // (Every cell recorded here earlier was repaired at its source, not patched over: key formats
+  // that the marker could not read (a "% p.a." box, a "Δ =" or "x ≥" prefix, a zero-coefficient
+  // key term) now key a plain number or expression; a set of rational solutions prints as
+  // fractions (practice.js setValueText); me12-induction D4 now issues the checkable numbers
+  // inside an induction (least starting value, the closing constant, the shared divisor), and a
+  // written proof stays unissued because it has no final answer to mark. A tolerance wider than
+  // the question asks for was fixed in engine/answerBand.js. The gate re-sweeps any new entry.)
 });
 
 const currentCode = code => Object.hasOwn(NSW_OUTCOME_BY_CODE, code);

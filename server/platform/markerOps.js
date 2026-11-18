@@ -56,7 +56,10 @@ export function stepMetaFor(q) {
     }
   }
   if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
-    return { kind: 'equation', variable: 'x', solutions: a.values };
+    // The letter the question asks for ("Find all values of $k$ ..."), not a guessed x: working in another letter is a side
+    // calculation, never a claim about this answer.
+    const asked = String(q.prompt || '').match(/\b(?:values?|solutions?|roots?)\s+of\s+\$([A-Za-z])\$/i);
+    return { kind: 'equation', variable: asked ? asked[1] : 'x', solutions: a.values };
   }
   return null;
 }

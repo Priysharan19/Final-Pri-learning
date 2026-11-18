@@ -208,6 +208,20 @@ export const flow = {
     const ledger = online.ledger();
     await check('and the server completed that question exactly once', ledger.completions === 1, JSON.stringify(ledger));
 
+    // PRI_TOUR_SLOW_IDB=<ms> delays every IndexedDB success by that long, so the restore of the kept page lands late (a slow disk).
+    if (process.env.PRI_TOUR_SLOW_IDB) {
+      await page.context().addInitScript(ms => {
+        const wrap = fn => function (...a) { const self = this; setTimeout(() => fn.apply(self, a), ms); };
+        const d = Object.getOwnPropertyDescriptor(IDBRequest.prototype, 'onsuccess');
+        Object.defineProperty(IDBRequest.prototype, 'onsuccess', { configurable: true, get: d.get, set(fn) { d.set.call(this, typeof fn === 'function' ? wrap(fn) : fn); } });
+        const add = EventTarget.prototype.addEventListener;
+        IDBRequest.prototype.addEventListener = function (t, fn, o) { return add.call(this, t, t === 'success' && typeof fn === 'function' ? wrap(fn) : fn, o); };
+      }, Number(process.env.PRI_TOUR_SLOW_IDB));
+    }
+    // A slow phone is a slow CI runner: PRI_TOUR_CPU_THROTTLE=6 runs this flow with the page's CPU 6x slower (Chromium only).
+    if (process.env.PRI_TOUR_CPU_THROTTLE) {
+      try { const cdp = await page.context().newCDPSession(page); await cdp.send('Emulation.setCPUThrottlingRate', { rate: Number(process.env.PRI_TOUR_CPU_THROTTLE) }); } catch { /* not Chromium */ }
+    }
     // ── 4 · handwriting survives a reload ────────────────────────────────────
     await page.getByRole('button', { name: 'Answer by handwriting' }).click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });

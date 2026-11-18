@@ -41,8 +41,7 @@ export function exactToHundredths(v) {
  */
 export function withoutUncalledForBand(payload) {
   const a = payload?.answer;
-  // A past-paper key that carries the paper's own published acceptance band (officialRange) keeps it: that band is the examiner's rule, not an authored allowance.
-  if (!a || a.tol == null || a.rounding || a.officialRange) return payload;
+  if (!a || a.tol == null || a.rounding || payload.pyq) return payload;   // a previous-year question carries the exam's published band: that is the rule, not an authored allowance
   const keys = payload.answerType === 'numeric' && typeof a.value === 'number' ? [a.value]
     : payload.answerType === 'set' && Array.isArray(a.values) && a.values.every(v => typeof v === 'number') ? a.values : null;
   if (!keys) return payload;
