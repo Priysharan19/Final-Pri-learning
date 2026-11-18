@@ -843,12 +843,9 @@ async function run() {
       // Any ONE of them rendered: a hidden .ink-status sits earlier in the
       // document than the visible in-card sign-in, so they are not waited for
       // as one selector list.
-      await page.waitForFunction(() => [...document.querySelectorAll('.ink-preview, .ink-status, [data-ink-account-recovery]')]
-        .some(el => el.getClientRects().length > 0), null, { timeout: 20000 })
-        .catch(async err => { throw new Error(`${String(err.message).split('\n')[0]} · on screen: ${JSON.stringify(await page.evaluate(() => ({
-          recovery: !!document.querySelector('[data-ink-account-recovery]'), status: document.querySelector('.ink-status')?.textContent || null,
-          notice: !!document.querySelector('[data-check-needs-account]'), foot: (document.querySelector('.ws-actions')?.innerText || '').replace(/\s+/g, ' ').slice(0, 120),
-          canvas: !!document.querySelector('.ink-canvas-live') })))}`.slice(0, 600)); });
+      // Nothing is read or marked signed out: the page keeps the ink and says so in the footer; any status or the in-card sign-in is audited if it shows.
+      await page.waitForFunction(() => [...document.querySelectorAll('.ink-preview, .ink-status, [data-ink-account-recovery], .ws-actions')]
+        .some(el => el.getClientRects().length > 0), null, { timeout: 20000 });
       await wait(page, 600);
     });
 
@@ -1003,7 +1000,7 @@ async function run() {
           if (q?.answerType === 'working' && typeof q.answer?.canonicalWorking === 'string' && q.answer.canonicalWorking.split('\n').filter(Boolean).length >= 4) lines = q.answer.canonicalWorking.split('\n').filter(Boolean);
           else { await page.locator('.ctx-next').first().click(); await wait(page, SETTLE); }
         }
-        if (!lines) throw new Error('no working-type question reachable');
+        if (!lines) throw new Error(`no working-type question reachable (issued ${issued}, shown ${JSON.stringify(await online.shownRow())})`.slice(0, 400));
         const hand = page.getByRole('button', { name: 'Answer by handwriting' });
         if (await hand.count()) await hand.click();
         await page.waitForSelector('.ink-answer:not(.ink-disabled) .ink-canvas-live', { timeout: 30000 });
