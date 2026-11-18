@@ -146,8 +146,8 @@ device can open a profile that has no password.
   answer, and the AI never decides a mark.
 - **Your original handwriting and photos, kept with each marked practice
   answer.** When you submit a handwritten or photographed practice answer to be
-  marked, our server keeps your original with the mark, so that you can look back
-  at exactly what was marked. For handwriting that is your pen strokes as your
+  marked, our server keeps your original with the mark, so that there is a record of
+  exactly what was marked. For handwriting that is your pen strokes as your
   device recorded them (where the pen was, when, how hard it pressed, how it was
   tilted, and the strokes you erased). For a photo it is the photo or scanned
   page as you sent it. We also keep a fingerprint of it (a SHA-256 value), which
