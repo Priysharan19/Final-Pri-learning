@@ -226,6 +226,21 @@ function safeQuestion(id, q) {
 
 // Release only after the server has committed a final resolution. This must
 // never be present on an unresolved or newly issued public question.
+/**
+ * One solution of a 'set' key as the student reads it. A rational solution
+ * keyed as a float (4/3 -> 1.3333333333333333) is shown as the fraction the
+ * question asks for; anything that is not within 1e-9 of a fraction with a
+ * denominator of at most 12 is left as authored.
+ */
+function setValueText(v) {
+  if (typeof v !== 'number' || !Number.isFinite(v) || Number.isInteger(v)) return String(v);
+  for (let d = 2; d <= 12; d++) {
+    const n = Math.round(v * d);
+    if (Math.abs(v - n / d) < 1e-9) return `${n}/${d}`;
+  }
+  return String(v);
+}
+
 function answerTextFor(q) {
   const a = q.answer || {};
   switch (q.answerType) {
@@ -236,7 +251,7 @@ function answerTextFor(q) {
       if (a.surdForm) return (a.surdForm.k === 1 ? '' : a.surdForm.k) + '√' + a.surdForm.r;
       return (q.answerPrefix ? q.answerPrefix + ' ' : '') + a.value + (q.answerSuffix ? ' ' + q.answerSuffix : '');
     case 'expression': return a.expr || '';
-    case 'set': return Array.isArray(a.values) ? a.values.join(', ') : '';
+    case 'set': return Array.isArray(a.values) ? a.values.map(setValueText).join(', ') : '';
     case 'point': return '(' + a.x + ', ' + a.y + ')';
     case 'ratio': return a.a + ' : ' + a.b;
     case 'working': return a.canonicalWorking || '';

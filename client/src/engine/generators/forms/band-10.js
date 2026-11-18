@@ -2,6 +2,7 @@
 // skill carries its own list of forms; π is 22/7 wherever a circle appears.
 import { ri, numeric, choice, span, person, place, r6, terminates } from './kit.js';
 import * as D from './diagrams.js';
+import { br } from '../../qhelpers.js';
 
 const R = d => span(d, 20, 15);
 const gcd = (x, y) => (y ? gcd(y, x % y) : x);
@@ -102,6 +103,30 @@ function mensForms() {
         check: () => r6((th / 360) * (22 / 7) * r * r)
       };
     } },
+    { form: 'arc-length', make(rng, d) {
+      const k = ri(rng, 1, R(d)), r = 7 * k, th = [45, 90, 180, 270][ri(rng, 0, 3)];
+      return {
+        payload: numeric('arc-length', `An arc of a circle of radius $${r}$ cm subtends an angle of $${th}^\\circ$ at the centre. Using $\\pi = \\dfrac{22}{7}$, find the length of the arc in centimetres.`, (th * 44 * k) / 360, {
+          figure: D.sectorFigure({ r, theta: th, shown: { r: `${r} cm`, theta: `${th}°` } }).svg,
+          hints: ['An arc is the fraction $\\dfrac{\\theta}{360}$ of the whole circumference.', 'The circumference is $2\\pi r$.', 'Multiply the fraction by the circumference.'],
+          steps: [{ h: 'Fraction', d: `$\\dfrac{${th}}{360}$` }, { h: 'Length', d: `$\\dfrac{${th}}{360}\\times 2\\times\\dfrac{22}{7}\\times ${r}$` }],
+          traps: [{ value: r6((th / 360) * (22 / 7) * r * r), why: 'That is the area of the sector. A length uses the circumference $2\\pi r$, not $\\pi r^2$.' }, { value: r6((th * 22 * r) / (360 * 7)), why: 'The circumference is $2\\pi r$; the factor of $2$ is part of it.' }]
+        }),
+        check: () => r6((th / 360) * 2 * (22 / 7) * r)
+      };
+    } },
+    { form: 'sector-perimeter', make(rng, d) {
+      const k = ri(rng, 1, R(d)), r = 7 * k, th = [45, 90, 180, 270][ri(rng, 0, 3)], arc = (th * 44 * k) / 360;
+      return {
+        payload: numeric('sector-perimeter', `A sector of angle $${th}^\\circ$ is cut from a circular plate of radius $${r}$ cm. Using $\\pi = \\dfrac{22}{7}$, find the perimeter of the sector in centimetres.`, arc + 2 * r, {
+          figure: D.sectorFigure({ r, theta: th, shown: { r: `${r} cm`, theta: `${th}°` } }).svg,
+          hints: ['The perimeter is the curved arc plus the two straight radii.', `The arc is $\\dfrac{${th}}{360}$ of the circumference $2\\pi r$.`, 'Add $2r$ for the two radii.'],
+          steps: [{ h: 'Arc', d: `$\\dfrac{${th}}{360}\\times 2\\times\\dfrac{22}{7}\\times ${r} = ${arc}$` }, { h: 'Add the two radii', d: `$${arc} + 2(${r})$` }],
+          traps: [{ value: arc, why: 'That is only the arc. The perimeter also includes the two straight sides, each of length $r$.' }]
+        }),
+        check: () => r6((th / 360) * 2 * (22 / 7) * r + 2 * r)
+      };
+    } },
     { form: 'cylinder-volume', make(rng, d) {
       const k = ri(rng, 1, R(d)), r = 7 * k, h = ri(rng, 2, 30 + 10 * d);
       return {
@@ -124,6 +149,29 @@ function mensForms() {
           traps: [{ value: 22 * 7 * k * k * h, why: 'A cone is one third of the cylinder with the same base and height.' }]
         }),
         check: () => r6(((22 / 7) * r * r * h) / 3)
+      };
+    } },
+    { form: 'cylinder-curved-area', make(rng, d) {
+      const k = ri(rng, 1, R(d)), r = 7 * k, h = ri(rng, 2, 30 + 10 * d);
+      return {
+        payload: numeric('cylinder-curved-area', `A cylindrical drum has radius $${r}$ cm and height $${h}$ cm. Taking $\\pi = \\dfrac{22}{7}$, find its curved surface area in square centimetres.`, 44 * k * h, {
+          figure: D.solidFigure({ kind: 'cylinder', r, h, shown: { r: `${r} cm`, h: `${h} cm` } }).svg,
+          hints: ['The curved surface area of a cylinder is $2\\pi r h$.', 'Since $r$ is a multiple of $7$, the $7$ in the denominator cancels.', 'Multiply the remaining factors.'],
+          steps: [{ h: 'Formula', d: '$\\text{CSA} = 2\\pi r h$' }, { h: 'Substitute', d: `$2\\times\\dfrac{22}{7}\\times ${r}\\times ${h}$` }],
+          traps: [{ value: 22 * 7 * k * k * h, why: 'That is the volume $\\pi r^2 h$. The curved surface area is $2\\pi r h$.' }]
+        }),
+        check: () => r6(2 * (22 / 7) * r * h)
+      };
+    } },
+    { form: 'sphere-surface-area', make(rng, d) {
+      const k = ri(rng, 1, 6 + d), r = 7 * k;
+      return {
+        payload: numeric('sphere-surface-area', `A solid metal sphere has radius $${r}$ cm. Taking $\\pi = \\dfrac{22}{7}$, find its total surface area in square centimetres.`, 616 * k * k, {
+          hints: ['The surface area of a sphere is $4\\pi r^2$.', 'Since $r$ is a multiple of $7$, one factor of $7$ cancels the denominator.', 'Square the radius carefully.'],
+          steps: [{ h: 'Formula', d: '$A = 4\\pi r^2$' }, { h: 'Substitute', d: `$4\\times\\dfrac{22}{7}\\times ${r}^2$` }],
+          traps: [{ value: 308 * k * k, why: 'That is a hemisphere\'s curved surface $2\\pi r^2$. A whole sphere has $4\\pi r^2$.' }]
+        }),
+        check: () => r6(4 * (22 / 7) * r * r)
       };
     } },
     { form: 'hemisphere-volume', make(rng, d) {
@@ -500,7 +548,7 @@ function quadForms() {
           { text: 'No real roots', why: `The discriminant is $${D}$, not negative.` }
         ].filter(o => o.text !== correct), {
           hints: ['Compute the discriminant $b^2 - 4ac$.', 'Positive means two distinct real roots; zero means equal; negative means none.', 'Compare.'],
-          steps: [{ h: 'Discriminant', d: `$${b}^2 - 4(${a})(${c}) = ${D}$` }, { h: 'Sign', d: 'decides the nature of the roots' }]
+          steps: [{ h: 'Discriminant', d: `$${br(b)}^2 - 4(${a})(${c}) = ${D}$` }, { h: 'Sign', d: 'decides the nature of the roots' }]
         }),
         check: () => { const disc = b * b - 4 * a * c; const exp = disc > 0 ? 'Two distinct real roots' : disc === 0 ? 'Two equal real roots' : 'No real roots'; return exp === correct; }
       };
@@ -791,11 +839,16 @@ function trigForms() {
 
 // Some Applications of Trigonometry takes only the heights-and-distances form that draws its figure; the
 // table and identity expressions are the Trigonometry chapter's (the practice figure tour, tour-v3, relies on it).
-const AP = retrying(apForms()), MENS = retrying(mensForms()), CIRC = retrying(circleForms()), COORD = retrying(coordForms()), LIN = retrying(linearForms()), POLY = retrying(polyForms()), PROB = retrying(probForms()), QUAD = retrying(quadForms()), REAL = retrying(realForms()), STAT = retrying(statForms()), TRI = retrying(triForms()), TRIG = retrying(trigForms()), TRIG_APPLIED = retrying(trigForms().filter(f => ['ratio-from-3-4-5', 'ladder', 'kite-string', 'cliff-depression'].includes(f.form)));
+const AP = retrying(apForms()), MENS_ALL = retrying(mensForms()), CIRC = retrying(circleForms()), COORD = retrying(coordForms()), LIN = retrying(linearForms()), POLY = retrying(polyForms()), PROB = retrying(probForms()), QUAD = retrying(quadForms()), REAL = retrying(realForms()), STAT = retrying(statForms()), TRI = retrying(triForms()), TRIG = retrying(trigForms()), TRIG_APPLIED = retrying(trigForms().filter(f => ['ratio-from-3-4-5', 'ladder', 'kite-string', 'cliff-depression'].includes(f.form)));
+// Areas Related to Circles serves the plane-figure forms (ring path, sector); Surface Areas and Volumes serves the
+// solids (cylinder, cone, hemisphere). They were one list, so "Areas Related to Circles" asked for the volume of a
+// conical heap of grain and "Surface Areas and Volumes" for the area of a concentric-circle path.
+const PLANE_FORMS = new Set(['ring-area', 'sector-area', 'arc-length', 'sector-perimeter']);
+const MENS_PLANE = MENS_ALL.filter(f => PLANE_FORMS.has(f.form)), MENS_SOLID = MENS_ALL.filter(f => !PLANE_FORMS.has(f.form));
 
 export const BAND_10 = {
   'c10-ap-inverse-competency': AP, 'c10-ap-sum-reasoning': AP, 'c10-arithmetic-progressions': AP,
-  'c10-areas-circles': MENS, 'c10-surface-volume-combo': MENS, 'c10-surface-area-combo': MENS, 'c10-volume-combination-reasoning': MENS, 'c10-sector-reasoning': MENS,
+  'c10-areas-circles': MENS_PLANE, 'c10-sector-reasoning': MENS_PLANE, 'c10-surface-volume-combo': MENS_SOLID, 'c10-surface-area-combo': MENS_SOLID, 'c10-volume-combination-reasoning': MENS_SOLID,
   'c10-circles': CIRC, 'c10-tangent-length-reasoning': CIRC,
   'c10-irrationality-proofs': REAL, 'c10-real-numbers': REAL,
   'c10-coordinate-geometry': COORD, 'c10-distance-reasoning': COORD, 'c10-section-reasoning': COORD,

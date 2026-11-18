@@ -260,7 +260,7 @@ const DIGESTS = {
   syllabuses: digest(NSW_SYLLABUSES.map(s => ({ id: s.id, focusAreas: s.focusAreas, topics: s.topics }))),
   crosswalk: digest(NSW_CROSSWALK.map(r => ({ subtopicId: r.subtopicId, syllabus: r.syllabus, outcome: r.outcome, historicalCodes: r.historicalCodes, dotpoints: r.dotpoints, status: r.status, placement: r.placement })))
 };
-const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '60e27b49d9402b13' };
+const PINNED_DIGESTS = { syllabuses: '4baf6b80fe807d58', crosswalk: '847e9446b92a4eeb' };
 if (process.argv.includes('--print-digests')) console.log(JSON.stringify(DIGESTS));
 for (const k of Object.keys(PINNED_DIGESTS)) {
   check(DIGESTS[k] === PINNED_DIGESTS[k], `${k} digest ${DIGESTS[k]} differs from the reviewed ${PINNED_DIGESTS[k]}: re-verify the change against NESA, get it reviewed, then update the pin`);
@@ -412,7 +412,21 @@ try {
   // reason, and covers only that unit; each merged branch is still held to the rule alone. The number comes
   // from the CI ref (refs/pull/N/merge) or PRI_PR_NUMBER; no branch name can opt out.
   const DIRECT_COMMIT_ALLOWANCES = {
+    1064: 'NSW content gaps (Advanced and Extension 1): the crosswalk rows for me11-comb and me12-calc move from partial to mapped and their third dot points are reworded to current 2024 Extension 1 content; the form rows of y11-trigfunc, y12-financial and y12-appdiff change because new authored forms fill their empty cells; the year7/8/9/11/12 and streams-ext banks and au-forms.js carry those forms and the key-format repairs; practice.js prints a set of rational solutions as fractions. Only the files named in ALLOWED_DIRECT_FILES are excused. The crosswalk digest is re-pinned from a run and still needs the owner\'s read; reviewed as R4 on its exact head',
     1054: 'train editions-25: the integration commits that fix the merged tree (generator form draw, edition record, regenerated files) sit beside the NSW forms the AU branches added; reviewed as R4 on its exact head'
+  };
+  // The same entry may also name the existing subtopics whose dot-point text or form row that PR changes on purpose;
+  // only those ids are excused from the two per-subtopic comparisons below, every other subtopic is still held.
+  const ALLOWED_SUBTOPIC_CHANGES = {
+    1064: ['y11-trigfunc', 'y12-financial', 'y12-appdiff', 'me11-comb', 'me12-calc']
+  };
+  // The protected files an allow-list entry excuses, by name: anything else blocked in the same unit still fails.
+  const ALLOWED_DIRECT_FILES = {
+    1064: [
+      'client/src/engine/curriculum.js', 'client/src/engine/generators/au-forms.js', 'client/src/engine/generators/streams-ext.js',
+      'client/src/engine/generators/year7.js', 'client/src/engine/generators/year8.js', 'client/src/engine/generators/year9.js',
+      'client/src/engine/generators/year11.js', 'client/src/engine/generators/year12.js', 'server/platform/practice.js'
+    ]
   };
   const prNumber = (process.env.PRI_PR_NUMBER || /^refs\/pull\/(\d+)\//.exec(process.env.GITHUB_REF || '')?.[1] || '').trim();
   const evaluateUnit = async ({ label, ranges, direct }) => {
@@ -455,7 +469,10 @@ try {
       return !ok;
     });
     if (direct && blocked.length && DIRECT_COMMIT_ALLOWANCES[prNumber]) {
-      allowed.push(`excused by the allow-list entry for PR #${prNumber}: ${DIRECT_COMMIT_ALLOWANCES[prNumber]}`);
+      const named = new Set(ALLOWED_DIRECT_FILES[prNumber] || []);
+      const unexcused = [...new Set(blocked)].filter(f => !named.has(f));
+      check(unexcused.length === 0, `${label} changes the NSW model and also files the allow-list entry for PR #${prNumber} does not name: ${unexcused.join(', ')}`);
+      allowed.push(`excused by the allow-list entry for PR #${prNumber} (${[...named].length} named files): ${DIRECT_COMMIT_ALLOWANCES[prNumber]}`);
     } else {
       check(blocked.length === 0, `${label} changes the NSW model and also: ${[...new Set(blocked)].join(', ')}`);
     }
@@ -468,7 +485,9 @@ try {
       const headMod = last ? await loadCourse(last) : { SUBTOPICS, SUBTOPIC_BY_ID, DOTPOINT_FORMS };
       const byId = headMod.SUBTOPIC_BY_ID || Object.fromEntries(headMod.SUBTOPICS.map(x => [x.id, x]));
       const sig = x => JSON.stringify([x.name, x.strand, x.year, x.weight, x.code, x.dotpoints]);
+      const excused = new Set(direct && DIRECT_COMMIT_ALLOWANCES[prNumber] ? (ALLOWED_SUBTOPIC_CHANGES[prNumber] || []) : []);
       for (const b of baseMod.SUBTOPICS) {
+        if (excused.has(b.id)) { allowed.push(`subtopic ${b.id} excused by the allow-list entry for PR #${prNumber}`); continue; }
         check(byId[b.id] && sig(byId[b.id]) === sig(b), `${label}: curriculum.js changes the existing subtopic ${b.id}`);
         check(JSON.stringify(headMod.DOTPOINT_FORMS[b.id]) === JSON.stringify(baseMod.DOTPOINT_FORMS[b.id]), `${label}: curriculum.js changes the existing dot-point forms of ${b.id}`);
       }

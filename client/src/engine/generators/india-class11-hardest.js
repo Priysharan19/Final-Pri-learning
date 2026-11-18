@@ -37,7 +37,7 @@
 //
 // Asked for any rung other than D3, each generator returns its D3 form.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, gcd, makeRng, term } from '../qhelpers.js';
+import { ri, rc, nz, gcd, makeRng, term, br } from '../qhelpers.js';
 import { IN_NAMES, IN_CITIES } from './india-native-helpers.js';
 import { traps, numericAnswer, pick, texNum } from './india-class7-hardest-kit.js';
 
@@ -402,7 +402,7 @@ function complexModulus(rng) {
       ],
       steps: [
         { h: 'Conjugate', d: `Multiply by $\\dfrac{${cTex(c, -d)}}{${cTex(c, -d)}}$` },
-        { h: 'Denominator', d: `$${c}^2 + ${Math.abs(d)}^2 = ${D}$` },
+        { h: 'Denominator', d: `$${br(c)}^2 + ${Math.abs(d)}^2 = ${D}$` },
         { h: 'Numerator', d: `$(${cTex(a, b)})(${cTex(c, -d)}) = ${cTex(a * c + b * d, b * c - a * d)}$` },
         { h: 'Answer', d: `$${part === 're' ? 'p' : 'q'} = ${ratText(N, D)}$` }
       ]

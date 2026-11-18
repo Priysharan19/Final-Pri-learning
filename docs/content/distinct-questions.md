@@ -110,34 +110,34 @@ Cells whose estimate is under 10^4: the first to widen (more forms, wider ranges
 |---|---|---|---|---|
 | `c10-linear-graphs` | 1 | 2000 | 192 | 192 |
 | `c10-trig-applications-current` | 3 | 2000 | 383 | 385 |
+| `c10-areas-circles` | 1 | 2000 | 447 | 464 |
 | `c10-trig-applications-current` | 4 | 2000 | 651 | 680 |
-| `c10-areas-circles` | 1 | 2000 | 1000 | 1381 |
-| `c10-surface-volume-combo` | 1 | 2000 | 1000 | 1392 |
+| `c10-areas-circles` | 2 | 2000 | 824 | 1051 |
+| `c10-areas-circles` | 3 | 2000 | 1055 | 1719 |
 | `c10-trig-applications-current` | 1 | 2000 | 1140 | 1749 |
 | `c10-trig-applications-current` | 2 | 2000 | 1152 | 1756 |
+| `c10-surface-volume-combo` | 1 | 2000 | 1116 | 1767 |
 | `c10-zero-coefficient-forms` | 3 | 2000 | 944 | 2482 |
+| `c10-sector-reasoning` | 3 | 2000 | 1163 | 2526 |
 | `c10-triangles-current` | 1 | 2000 | 1176 | 2578 |
-| `c10-surface-area-combo` | 1 | 2000 | 1360 | 2748 |
-| `c10-areas-circles` | 2 | 2000 | 1308 | 3096 |
-| `c10-surface-volume-combo` | 2 | 2000 | 1313 | 3101 |
+| `c10-surface-area-combo` | 1 | 2000 | 1420 | 2826 |
 | `c10-ap-daily-life-reasoning` | 3 | 2000 | 1323 | 3445 |
 | `c10-linear-graphs` | 4 | 2000 | 1503 | 3698 |
 | `c10-triangles-current` | 3 | 2000 | 1391 | 3774 |
+| `c10-surface-volume-combo` | 2 | 2000 | 1395 | 3969 |
 | `c10-linear-graphs` | 2 | 2000 | 1568 | 4039 |
 | `c10-zero-coefficient-forms` | 2 | 2000 | 1558 | 4043 |
-| `c10-surface-area-combo` | 2 | 2000 | 1515 | 4097 |
 | `c10-zero-coefficient-forms` | 1 | 2000 | 1549 | 4339 |
 | `c10-triangles-current` | 2 | 2000 | 1593 | 4360 |
 | `c10-bpt-reasoning` | 3 | 2000 | 1520 | 4384 |
 | `c10-triangles-current` | 4 | 2000 | 1479 | 4916 |
-| `c10-volume-combination-reasoning` | 3 | 2000 | 1631 | 5260 |
-| `c10-areas-circles` | 3 | 2000 | 1458 | 5376 |
+| `c10-surface-area-combo` | 2 | 2000 | 1612 | 4991 |
 | `c10-ap-sum-forms` | 1 | 2000 | 1287 | 5809 |
-| `c10-sector-reasoning` | 3 | 2000 | 1603 | 6141 |
 | `c10-polynomial-zeroes` | 1 | 2000 | 1429 | 6194 |
 | `c10-ap-term-forms` | 3 | 2000 | 1639 | 6229 |
-| `c10-surface-area-combo` | 3 | 2000 | 1772 | 8205 |
+| `c10-volume-combination-reasoning` | 3 | 2000 | 1668 | 6349 |
 | `c10-probability-classical` | 3 | 2000 | 1650 | 8876 |
+| `c10-surface-area-combo` | 3 | 2000 | 1798 | 9697 |
 
 ### Class 11
 

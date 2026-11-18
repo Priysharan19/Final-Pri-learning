@@ -2108,7 +2108,9 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
   // covers and lacks. 404 unless this is a Prithagoras server with the switch on.
   router.get('/nsw', rateLimit(db, 'exam-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     if (bankPolicy().curriculum !== 'nsw' || !nswExamsOn(env)) return reject(res, 404, 'EXAM_KIND_UNAVAILABLE', 'These papers are not available here.');
-    return res.status(200).json(nswExamCatalogue(nswExamPool(), env));
+    // Owner decision, 19 Nov 2026: only the papers of an offered course are listed (the server enforces what the app hides).
+    const catalogue = nswExamCatalogue(nswExamPool(), env);
+    return res.status(200).json({ ...catalogue, papers: catalogue.papers.filter(paper => !offeringRefusal({ kind: 'nsw', blueprint: { id: paper.id } }, env)) });
   });
 
   router.post('/', rateLimit(db, 'exam-create', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res) => {

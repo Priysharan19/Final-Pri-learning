@@ -17,6 +17,7 @@ process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = 'b8'.repeat(32);
 process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
 process.env.PRI_EDITION = 'prithagoras';
+process.env.PRI_NSW_EXAMS = 'on';   // the HSC catalogue route is behind this switch
 delete process.env.PRI_OFFERING;
 delete process.env.PRI_PUBLIC_ORIGIN;
 
@@ -70,6 +71,12 @@ try {
   }
   c.ok(typeof (await issue(YEAR12)).data?.question?.id === 'string', 'and an offered question is the server\'s own');
 
+  // The HSC blueprint catalogue lists only offered courses (GET /v1/exams/nsw; 404 where the exam switch is off).
+  const cat = await h.request('/v1/exams/nsw', { jar: a.jar });
+  if (cat.status === 200) {
+    const ids = cat.data.papers.map(paper => paper.id).sort();
+    c.deq(ids, ['nsw-hsc-advanced-2027', 'nsw-hsc-extension-1-2027'], 'the HSC catalogue lists Advanced and Extension 1 only (no Standard 1 or 2, no Extension 2)');
+  } else c.eq(cat.status, 404, 'the HSC catalogue is off here, as before');
   // Papers and exams: the same refusal, by name, before anything is composed or counted.
   const exam = body => h.request('/v1/exams', { method: 'POST', jar: a.jar, body, headers: { 'Idempotency-Key': `off-${Math.random().toString(36).slice(2)}-${Date.now()}` } });
   const gen = (year, pathway) => ({ kind: 'generated', generated: { year, ...(pathway ? { pathway } : {}), topics: ['y11-functions'], marks: 10, mix: 'standard' } });
