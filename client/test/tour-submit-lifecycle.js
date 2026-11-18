@@ -243,7 +243,7 @@ export const flow = {
     const markBtn = page.getByRole('button', { name: /^Mark my working/ });
     await check('its handwriting is back on the page, ready to mark, with no reading shown, and was NOT read again (no new reader request)',
       readsBefore >= 1 && await markBtn.count() === 1 && await markBtn.isEnabled() && hidden.structure.length === 0 && online.reader.requests.length === readerCallsBeforeReload,
-      `reads before ${readsBefore}; reader requests +${online.reader.requests.length - readerCallsBeforeReload}; ${JSON.stringify(hidden)}`);
+      `reads before ${readsBefore}; reader requests +${online.reader.requests.length - readerCallsBeforeReload}; ${JSON.stringify(hidden)}; Mark buttons ${await markBtn.count()}, enabled ${await markBtn.first().isEnabled().catch(() => 'n/a')}; actions: ${JSON.stringify(await page.locator('.ws-actions').innerText().catch(() => '?'))}`);
   }
 };
 
