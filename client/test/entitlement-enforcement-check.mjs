@@ -127,7 +127,10 @@ for (const capability of Object.values(ENTITLEMENTS)) {
     // session's own account by the route: the allowance is consumed there, and
     // a read served from a kept reading costs none.
     /recognitionOpsFor\(db\)\.read\(\{\s*db, accountId: req\.platformSession\.account_id,/.test(src('server/platform/handwriting.js')) &&
-    /consumeAiAllowance\(db, \{ accountId, kind: 'handwriting'/.test(src('server/platform/recognitionOps.js')) &&
+    // One unit per ANSWER since 2026-11-18: recognitionOps charges through chargeForRead,
+    // which spends the same server-side `handwriting` allowance (aiAllowance.js).
+    /chargeForRead\(db, \{ accountId, answerKey, env \}\)/.test(src('server/platform/recognitionOps.js')) &&
+    /consumeAiAllowance\(db, \{ accountId, kind: 'handwriting'/.test(src('server/platform/aiAllowance.js')) &&
     !/accountId: req\.body/.test(src('server/platform/handwriting.js')) &&
     /consumeAiAllowance\(db, \{ accountId: req\.platformSession\.account_id, kind: 'working'/.test(src('server/platform/working.js')));
   // D19: JEE Advanced "which the server enforces" — the track's own papers and

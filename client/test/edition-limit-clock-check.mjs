@@ -28,7 +28,7 @@ process.env.TZ = 'UTC';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const src = path => readFileSync(join(ROOT, path), 'utf8');
 const { limitClock, capResetClock, timezoneOf } = await import('../src/lib/locale.js');
-const { retryClock } = await import('../src/ink/readerFailure.js');
+const { retryClock, retryWhen } = await import('../src/ink/readerFailure.js');
 const gate = await import('../src/local/entitlementGate.js');
 const { practiceDay } = await import('../../server/platform/practiceAllowance.js');
 
@@ -64,6 +64,20 @@ ok('which reads as midnight, not the device\'s 1 pm', /^12:00\s?am$/i.test(retry
 same('an NSW student with no zone set reads it in en-AU on the device\'s own clock (a rolling window)', retryClock(sydneyMidnight, 'en', NSW), new Intl.DateTimeFormat('en-AU', { hour: 'numeric', minute: '2-digit' }).format(new Date(sydneyMidnight)));
 ok('a Perth student reads the same instant on the Perth clock', /^9:00\s?pm$/i.test(retryClock(sydneyMidnight, 'en', { course: 'nsw', timezone: 'Australia/Perth' })), retryClock(sydneyMidnight, 'en', { course: 'nsw', timezone: 'Australia/Perth' }));
 same('nothing to say is still nothing', [retryClock(null, 'en', NSW), retryClock(0, 'en', NSW), retryClock('soon', 'en', NSW)], ['', '', '']);
+
+// retryWhen (owner, 18 Nov 2026: "renews at about 7:50 pm" read one minute after 7:50 pm): a limit that lifts on
+// another calendar day says "tomorrow"; within the hour it says how long.
+{
+  const base = new Date('2026-11-18T07:00:00.000Z').getTime();           // a fixed instant
+  const SYD = { course: 'nsw', timezone: 'Australia/Sydney' };
+  const syd = ms => new Date(ms).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' });
+  const pm = base + 24 * 3600_000 - 60_000;                              // 23 h 59 min later: the next Sydney day
+  ok('a window that renews on the next day says "tomorrow at about"', /^tomorrow at about \d{1,2}:\d{2}\s?[ap]m$/i.test(retryWhen(pm, 'en', SYD, base)), retryWhen(pm, 'en', SYD, base) + ' | ' + syd(base) + ' -> ' + syd(pm));
+  ok('one that renews later the same day says "today at about"', /^today at about /.test(retryWhen(base + 3 * 3600_000, 'en', SYD, new Date('2026-11-17T22:00:00Z').getTime())));
+  same('within the hour it says how long', retryWhen(base + 40 * 60_000, 'en', SYD, base), 'in about 40 minutes');
+  same('and nothing when there is no time', retryWhen(null, 'en', SYD, base), '');
+  ok('in Hindi it says कल (tomorrow) with the time', /^कल लगभग .* बजे$/.test(retryWhen(pm, 'hi', null, base)) || /^आज लगभग .* बजे$/.test(retryWhen(pm, 'hi', null, base)), retryWhen(pm, 'hi', null, base));
+}
 {
   let sampled = 0;
   let differ = null;

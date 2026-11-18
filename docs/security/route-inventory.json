@@ -1895,7 +1895,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "stateless; image only (answer-blind); counts against the deployment paid-call ceiling",
+      "ownership": "stateless; image plus a server-derived bare symbol list from the public stem (answer-blind, ADR-0001 §6); counts against the deployment paid-call ceiling",
       "rateLimits": [
         {
           "key": "handwriting-transcribe",

@@ -24,9 +24,9 @@
 //     floor, and a digest of the prompt and the response schema.
 //
 // The question id and the input mode (ink/photo) are deliberately NOT part of
-// the identity. The reader is answer-blind and question-blind: it is sent the
-// picture and nothing else, so the same picture reads the same whichever
-// question it is for. That is what lets the transcript shown by /transcribe be
+// the identity. The reader is answer-blind: it is sent the picture and, at most,
+// a bare symbol list from the public stem (a function of the question, never of
+// the picture), so the same picture reads the same whichever question it is for. That is what lets the transcript shown by /transcribe be
 // the transcript /recognize binds into a receipt — one paid call, not two.
 // Nothing about authority moves here: /recognize still re-checks ownership,
 // completion, the live session and guardian consent itself, and still mints
@@ -64,7 +64,7 @@
 import { createHash, createHmac, randomBytes } from 'node:crypto';
 import { practiceContentKey } from './deliveryCrypto.js';
 import { asStore } from './store.js';
-import { consumeAiAllowance, refundAiAllowance, refuseAiAllowance } from './aiAllowance.js';
+import { chargeForRead, refundRead, refuseAiAllowance } from './aiAllowance.js';
 import { refundPaidCall, refusePaidCall, reservePaidCall, spendCeilingMissing } from './spendCeiling.js';
 import { recordProviderUsage, recordRecognitionRead } from './metrics.js';
 import { logEvent } from './observability.js';
@@ -198,7 +198,7 @@ export function createRecognitionOps({
 } = {}) {
   const settings = { ttlMs, maxTranscriptBytes, now };
   const inFlight = new Map();  // operation id → Promise<outcome>   (this process only)
-  const counters = { providerReads: 0, storedHits: 0, inFlightHits: 0, stored: 0, notStored: 0, unpaidMisses: 0 };
+  const counters = { cancelled: 0, providerReads: 0, storedHits: 0, inFlightHits: 0, stored: 0, notStored: 0, unpaidMisses: 0 };
 
   function operationId(accountId, image, env) {
     const match = DATA_URL.exec(String(image || ''));
@@ -207,7 +207,7 @@ export function createRecognitionOps({
     const config = providerConfig(env);
     return createHmac('sha256', key || serverKey()).update(JSON.stringify([
       'recognition-op', String(accountId), match[1], imageDigest,
-      config.endpoint, config.primaryModel, config.fallbackModel, config.reasoningEffort,
+      config.endpoint, config.primaryModel, config.fallbackModel, config.reasoningEffort, config.imageDetail,
       config.confidenceFloor, READER_CONTRACT_DIGEST
     ])).digest('hex');
   }
@@ -244,15 +244,19 @@ export function createRecognitionOps({
   }
 
   /** The one paid path: allowance, ceiling, provider, refunds. */
-  async function paidRead({ db, accountId, image, env, transcribe, requestId }) {
-    const allowance = await timePhase('limit', () => consumeAiAllowance(db, { accountId, kind: 'handwriting', env }));
-    if (!allowance.allowed) return { refusal: { kind: 'allowance', verdict: allowance } };
+  async function paidRead({ db, accountId, image, env, transcribe, requestId, signal = null, symbols = [], answerKey = null }) {
+    // The unit is one ANSWER (owner decision 18 Nov 2026): with a server-issued
+    // `answerKey` only the first paid read of that answer in the day spends a
+    // unit and re-reads are free up to a server-enforced cap; with none it is one
+    // unit per read. The deployment ceiling below still counts every provider call.
+    const allowance = await timePhase('limit', () => chargeForRead(db, { accountId, answerKey, env }));
+    if (!allowance.allowed) return { refusal: { kind: allowance.cap ? 'answer-cap' : 'allowance', verdict: allowance } };
 
     // Counted before anything is sent, so a request can never spend past the
     // ceiling; each fallback escalation is a second unit, counted the same way.
     const first = await timePhase('limit', () => reservePaidCall(db, { env }));
     if (first.verdict) {
-      await refundAiAllowance(db, allowance);
+      await refundRead(db, allowance);
       return { refusal: { kind: 'paid', verdict: first.verdict } };
     }
     const reservations = [first];
@@ -264,6 +268,9 @@ export function createRecognitionOps({
       const result = await timePhase('provider', () => transcribe(image, {
         env,
         fetchImpl: meter.fetchWithUsage,
+        signal,
+        // The public-stem vocabulary hint, or [] (handwritingProvider.js rule 2).
+        ...(symbols.length ? { symbols } : {}),
         authorizeFallback: async () => {
           const next = await reservePaidCall(db, { env });
           if (!next.verdict) reservations.push(next);
@@ -277,7 +284,7 @@ export function createRecognitionOps({
       await meter.settled();
       reportUsage({ requestId, calls, paidUnits: reservations.length, ms: Date.now() - started });
       if (NEVER_SENT.test(String(error?.code || ''))) {
-        await refundAiAllowance(db, allowance);
+        await refundRead(db, allowance);
         for (const reservation of reservations) await refundPaidCall(db, reservation);
       }
       // The ceiling refused the fallback model: a refusal, not a provider fault.
@@ -295,8 +302,11 @@ export function createRecognitionOps({
    *   { missing: true }                         `paid: false` and nothing kept.
    * Rejects with the provider's error; nothing is kept from a failure.
    */
-  async function read({ db, accountId, image, env = process.env, transcribe, requestId = null, paid = true, fresh = false }) {
+  async function read({ db, accountId, image, env = process.env, transcribe, requestId = null, paid = true, fresh = false, signal = null, symbols = [], answerKey = null }) {
     db = asStore(db);
+    // The hint is deliberately NOT part of the identity: it is a function of
+    // the question, never of the picture, and Submit looks a kept read up by
+    // picture alone (paid: false). One picture is one paid read.
     const id = operationId(accountId, image, env);
     // `paid: false` — the caller is not the student asking for a read (it is
     // Submit, binding a transcript they were already shown). It may join a
@@ -309,11 +319,11 @@ export function createRecognitionOps({
     // server reading at all, so it is refused by the same guard as ever and is
     // never answered from a kept read.
     if (!id || spendCeilingMissing(env).length) {
-      return paidOutcome(await paidRead({ db, accountId, image, env, transcribe, requestId }));
+      return paidOutcome(await paidRead({ db, accountId, image, env, transcribe, requestId, signal, symbols, answerKey }));
     }
 
     const running = inFlight.get(id);
-    if (running) return joined(await running);
+    if (running) { watch(running, signal); return joined(await running.promise); }
 
     // `fresh: true` — the student explicitly asked for this picture to be read
     // AGAIN (an exam page whose earlier reading was uncertain). A kept read is
@@ -328,10 +338,15 @@ export function createRecognitionOps({
     // The lookup above awaited: another request for the same picture may have
     // started its read meanwhile. Join it rather than start a second one.
     const startedMeanwhile = inFlight.get(id);
-    if (startedMeanwhile) return joined(await startedMeanwhile);
+    if (startedMeanwhile) { watch(startedMeanwhile, signal); return joined(await startedMeanwhile.promise); }
     if (paid === false) { counters.unpaidMisses += 1; return { missing: true }; }
 
-    const flight = paidRead({ db, accountId, image, env, transcribe, requestId })
+    // Everyone waiting on this read shares one provider call. It is cancelled
+    // only when EVERY waiter has gone and each of them could be cancelled (a
+    // caller that passes no signal can never cancel it), so one student's
+    // abandoned request never takes another's read away.
+    const entry = { controller: new AbortController(), waiters: 0, uncancellable: false, promise: null };
+    const flight = paidRead({ db, accountId, image, env, transcribe, requestId, signal: entry.controller.signal, symbols, answerKey })
       .then(async outcome => {
         if (outcome.refusal) return outcome;
         const result = freezeDeep(JSON.parse(JSON.stringify(outcome.result ?? null)));
@@ -341,8 +356,27 @@ export function createRecognitionOps({
         return { ...outcome, result };
       })
       .finally(() => { inFlight.delete(id); });
-    inFlight.set(id, flight);
+    entry.promise = flight;
+    inFlight.set(id, entry);
+    watch(entry, signal);
     return paidOutcome(await flight);
+  }
+
+  function watch(entry, signal) {
+    if (!signal) { entry.uncancellable = true; return; }
+    entry.waiters += 1;
+    let gone = false;
+    const leave = () => {
+      if (gone) return;
+      gone = true;
+      entry.waiters -= 1;
+      if (entry.waiters <= 0 && !entry.uncancellable) { counters.cancelled += 1; entry.controller.abort(); }
+    };
+    if (signal.aborted) leave();
+    else {
+      signal.addEventListener('abort', leave, { once: true });
+      entry.promise?.finally(() => signal.removeEventListener('abort', leave)).catch(() => {});
+    }
   }
 
   function joined(shared) {
@@ -408,6 +442,15 @@ export function recognitionOpsFor(db) {
 
 /** Answer a refusal from read() in the shape each guard already uses. */
 export function sendRecognitionRefusal(res, refusal) {
+  if (refusal.kind === 'answer-cap') {
+    const resetAt = Number(refusal.verdict?.resetAt) || null;
+    if (resetAt) res.set('Retry-After', String(Math.max(1, Math.ceil((resetAt - Date.now()) / 1000))));
+    return res.status(429).json({ error: {
+      code: 'RATE_LIMITED',
+      message: 'This answer has been read as many times as one answer allows today. Submit the reading you have, or type your answer.',
+      retryable: false, resetAt, window: 'day'
+    } });
+  }
   return refusal.kind === 'allowance'
     ? refuseAiAllowance(res, refusal.verdict)
     : refusePaidCall(res, refusal.verdict);

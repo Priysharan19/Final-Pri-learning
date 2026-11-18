@@ -1343,7 +1343,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // ── 1b. Read the picture, when the submission carries one ───────────
       // After the replay above, so recovering a committed reply never reads
       // (or is rate limited or charged) again. Answer-blind: the reader is
-      // handed the picture alone (recognitionOps → handwritingProvider).
+      // handed the picture, and at most a bare stem-symbol list (recognitionOps → handwritingProvider).
       if (withPicture && !reading) {
         const verdict = await timePhase('limit', () => consumeRateLimit(db, `practice-recognize:${sha256(accountId).slice(0, 24)}`, RECOGNIZE_LIMIT));
         if (!verdict.allowed) {

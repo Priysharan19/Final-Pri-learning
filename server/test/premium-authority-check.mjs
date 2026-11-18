@@ -22,7 +22,7 @@ import { ensureBillingSchema } from '../platform/billingSchema.js';
 import { createHandwritingRouter } from '../platform/handwriting.js';
 import { createWorkingRouter } from '../platform/working.js';
 import { createQuestionPhotoRouter } from '../platform/questionPhoto.js';
-import { consumeAiAllowance, aiAllowance, aiAllowanceConfigProblems, AI_ALLOWANCE_DEFAULTS } from '../platform/aiAllowance.js';
+import { consumeAiAllowance, aiAllowance, aiAllowanceConfigProblems, AI_ALLOWANCE_DEFAULTS, ANSWER_READ_CAP, renewsIn } from '../platform/aiAllowance.js';
 import { serverEntitlementCapabilities } from '../platform/entitlements.js';
 import { sha256 } from '../platform/security.js';
 import { pngDataUrl } from './support/test-image.mjs';
@@ -36,7 +36,7 @@ const env = {
   PRI_PAID_CALLS_PER_HOUR: '100000', PRI_PAID_CALLS_PER_DAY: '1000000',
   PRI_AI_DAILY_FREE: '5', PRI_AI_DAILY_PREMIUM: '12'
 };
-const EXPECTED_CHECKS = 52; // every check is unconditional
+const EXPECTED_CHECKS = 60; // every check is unconditional
 
 // ── configuration (owner default D20: 5 free / 25 Premium a day, per kind) ──
 const D20 = { free: 5, premium: 25 };
@@ -80,6 +80,7 @@ const accounts = {
   grace: ['premium', 'grace', T - DAY, T + DAY], graceOver: ['premium', 'grace', T - 2 * DAY, T - DAY], expired: ['premium', 'active', T - DAY, null],
   revoked: ['premium', 'revoked', T + 30 * DAY, null], grant: ['premium', 'active', T + 30 * DAY, null], other: ['free', 'free', null, null],
   upgrader: ['free', 'free', null, null], capped: ['free', 'free', null, null],
+  ans1: ['free', 'free', null, null], ans2: ['free', 'free', null, null], ans3: ['free', 'free', null, null], ans4: ['free', 'free', null, null],
 };
 for (const [id, [plan, status, end, grace]] of Object.entries(accounts)) {
   db.prepare('INSERT INTO accounts(id,email,name,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?)').run(id, `${id}@example.test`, id, 'student', T, T, T);
@@ -178,8 +179,8 @@ try {
   const freeInk = await d20('d20free', '/d20/handwriting/transcribe', ink);
   ok(freeInk.n === 5 && readCalls - before20 === 5 && freeInk.r.status === 429 && freeInk.r.data.error.limit === 5 && freeInk.r.data.error.kind === 'handwriting',
     `D20: a free account gets exactly 5 reads of its writing a day (${freeInk.n}, ${readCalls - before20} provider calls)`);
-  ok(/5 readings of your writing/.test(freeInk.r.data.error.message) && /type your answer/.test(freeInk.r.data.error.message) && /Premium includes 25 a day/.test(freeInk.r.data.error.message) && !/on-device/i.test(freeInk.r.data.error.message),
-    'the refusal names the count, the typed alternative and Premium\'s figure, and promises no on-device reader (D16)');
+  ok(/5 handwritten answers/.test(freeInk.r.data.error.message) && /renew in about (23|24) hours/.test(freeInk.r.data.error.message) && /type your answer/.test(freeInk.r.data.error.message) && /Premium includes 25 a day/.test(freeInk.r.data.error.message) && !/on-device/i.test(freeInk.r.data.error.message),
+    'the refusal names the count in answers, when it renews (a duration, never a bare clock time), the typed alternative and Premium\'s figure, and promises no on-device reader (D16)');
   const freePhoto = await d20('d20free', '/d20/question-photo/identify', photo);
   ok(freePhoto.n === 5 && photoCalls === 5 && freePhoto.r.status === 429 && freePhoto.r.data.error.kind === 'question-photo',
     `D20: photos are their own kind — 5 more for the same free account after its reads ran out (${freePhoto.n})`);
@@ -187,6 +188,37 @@ try {
   const premiumPhoto = await d20('d20premium', '/d20/question-photo/identify', photo);
   ok(premiumInk.n === 25 && premiumPhoto.n === 25 && premiumInk.r.data.error.plan === 'premium' && !/Premium includes/.test(premiumInk.r.data.error.message),
     `D20: Premium gets exactly 25 of each kind (${premiumInk.n} reads, ${premiumPhoto.n} photos)`);
+  // 10 · The unit is one ANSWER (owner decision 18 Nov 2026), keyed on a server-issued question id.
+  const qid = k => `00000000-0000-4000-8000-0000000000${String(k).padStart(2, '0')}`;
+  const issue = (acct, id) => db.prepare("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)")
+    .run(acct, 'practice-question', id, JSON.stringify({ prompt: 'Solve $x + 1 = 2$.' }), null, Date.now(), Date.now() + DAY);
+  const answerCount = (acct, id) => db.prepare('SELECT count FROM rate_limits WHERE bucket=?').get(`hw-answer:${sha256(`${acct}:${id}`).slice(0, 32)}`)?.count ?? 0;
+  const readFor = (acct, id, path = '/handwriting/transcribe') => post(path, acct, { image: freshPicture(), questionId: id });
+  issue('ans1', qid(1)); issue('ans1', qid(2));
+  const calls10 = readCalls;
+  let eight = 0;
+  for (let i = 0; i < 8; i++) if ((await readFor('ans1', qid(1))).status === 200) eight += 1;
+  ok(eight === 8 && readCalls - calls10 === 8 && used('ans1') === 1, `eight reads of ONE answer are eight provider calls but spend ONE unit (${eight} reads, ${used('ans1')} unit)`);
+  ok((await readFor('ans1', qid(2))).status === 200 && used('ans1') === 2, 'a second answer spends a second unit');
+  let more = 0;
+  for (let i = 0; i < ANSWER_READ_CAP - 8; i++) if ((await readFor('ans1', qid(1))).status === 200) more += 1;
+  const capped = await readFor('ans1', qid(1));
+  ok(more === ANSWER_READ_CAP - 8 && capped.status === 429 && capped.data?.error?.code === 'RATE_LIMITED' && /Submit the reading you have, or type/.test(capped.data.error.message) && used('ans1') === 2,
+    `the per-answer cap (${ANSWER_READ_CAP}) is enforced by the server and the refused read spends nothing`);
+  ok(answerCount('ans1', qid(1)) === ANSWER_READ_CAP, 'and the server, not the device, holds the count');
+  // forged, rotated or foreign ids mint no free reads
+  let rotated = 0;
+  for (let i = 0; i < 5; i++) if ((await readFor('ans2', `1111111${i}-2222-4333-8444-555555555555`)).status === 200) rotated += 1;
+  const sixth = await readFor('ans2', '99999999-2222-4333-8444-555555555555');
+  ok(rotated === 5 && used('ans2') === 5 && sixth.status === 429 && sixth.data?.error?.code === 'AI_ALLOWANCE_EXHAUSTED', 'ids the server never issued fall back to one unit per read: rotating them mints no free reads');
+  for (let i = 0; i < 3; i++) await readFor('ans3', qid(1));
+  ok(used('ans3') === 3, 'a question issued to another account is not this account\'s answer: one unit per read');
+  // refund path: a read the ceiling refuses costs neither the unit nor the answer count
+  issue('ans4', qid(4));
+  const refused = await readFor('ans4', qid(4), '/handwriting-full/transcribe');
+  ok(refused.status === 503 && used('ans4') === 0 && answerCount('ans4', qid(4)) === 0, 'a read refused by the deployment ceiling is refunded: no unit, and the answer is still unspent');
+  const hour = 3_600_000;
+  ok(renewsIn(Date.now() + 23 * hour - 60_000) === 'in about 23 hours' && renewsIn(Date.now() + 40 * 60_000) === 'in about 40 minutes' && renewsIn(Date.now() + hour * 24) === 'in about 24 hours', 'the refusal says how long until renewal ("in about 23 hours"), never a bare clock time');
 } finally {
   await new Promise(resolve => server.close(resolve));
 }

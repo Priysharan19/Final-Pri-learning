@@ -31,7 +31,7 @@ import NativeInkCanvas from './NativeInkCanvas.jsx';
 import { nativeInkAvailable } from './native.js';
 import { exprToLatex } from './inkLatex.js';
 import { ACCOUNT_BLOCKED_KEYS, inkReaderUiState, readerBlock, readerPaused, readinessIdentity, resumeReaderNow, readWithCloud, recordLocalHandwritingDiagnostics, toReading } from './cloudReader.js';
-import { retryClock } from './readerFailure.js';
+import { retryClock, retryWhen } from './readerFailure.js';
 import { useInRouterContext } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { useApp } from '../App.jsx';
@@ -614,11 +614,11 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
     : shownStatus?.kind === 'empty'
       ? t('ink.serverEmpty')
       : shownStatus?.kind === 'allowance'
-        ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language, user) })
+        ? t(shownStatus.key || 'ink.waitingAllowance', { time: retryClock(shownStatus.block?.retryAt, language, user), when: retryWhen(shownStatus.block?.retryAt, language, user) })
         : shownStatus?.kind === 'waiting' && autoReadRef.current && shownStatus.block?.kind === 'offline'
           ? t('ink.autoOffline')
         : shownStatus?.kind === 'waiting'
-          ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language, user) })
+          ? t(draftSaved ? shownStatus.key : (WAITING_WITHOUT_SAVE_CLAIM[shownStatus.key] || shownStatus.key), { time: retryClock(shownStatus.block?.retryAt, language, user), when: retryWhen(shownStatus.block?.retryAt, language, user) })
           : checkingEarlier
             // An earlier submission of this question is being checked again
             // (after the app was closed mid-check). The page stays writable;
