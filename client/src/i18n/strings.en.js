@@ -2581,6 +2581,8 @@ export default {
   'boot.notStartedBody': 'The app loaded but did not open. Reloading keeps every profile and everything saved on this device.',
   'boot.slowTitle': 'Still loading {brand}',
   'boot.slowBody': 'This is taking longer than it should. You can keep waiting, or reload.',
+  'update.available': 'Update available — reload to get the latest version.',
+  'update.reload': 'Reload',
   'charts.notEnoughHistory': 'Not enough history yet — keep practising and your trend will appear here.',
   'charts.dayTip': { one: '{n} question · {correct} correct', other: '{n} questions · {correct} correct' },
   'charts.noPractice': 'No practice',

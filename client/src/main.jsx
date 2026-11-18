@@ -28,6 +28,7 @@ import EditionMismatch from './components/EditionMismatch.jsx';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
+import { watchFreshBuild } from './platform/freshBuild.js';
 import { priNative } from './platform/native/index.js';
 import { captureInvite } from './platform/referral.js';
 import { installFormFactorAttributes } from './platform/formFactor.js';
@@ -218,4 +219,7 @@ if ('serviceWorker' in navigator && import.meta.env.PROD && !priNative.bundledAs
   // build is asked for once the page is rendered and the thread is idle, so it
   // never competes with the load a student is watching.
   scheduleOfflineWarm(window);
+  // A returning browser is moved onto the live build: once, before the
+  // student has touched anything, or by a notice they choose to follow.
+  watchFreshBuild(window);
 }
