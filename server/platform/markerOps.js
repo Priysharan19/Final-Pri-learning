@@ -14,7 +14,8 @@
 // This file imports the engine only (client/src/engine, which the production
 // image ships — see Dockerfile and production-runtime-image-check.mjs). It
 // must never import a server module: the worker has no store and no secrets.
-import { checkAnswer, stepCheck, methodMarks } from '../../client/src/engine/checker.js';
+import { checkAnswer, stepCheck, methodMarks, plainTex } from '../../client/src/engine/checker.js';
+import { parse, normalize, evaluate, variablesOf } from '../../client/src/engine/expr.js';
 import { markObjective, markMultiCorrect } from '../../client/src/engine/indiaExams.js';
 import { markMatrixMatch } from '../../client/src/engine/matrixMatch.js';
 import { markGraphSketch, readFeatureSet, sketchMethodCredit } from '../../client/src/engine/graphFeatures.js';
@@ -37,7 +38,7 @@ export function stepMetaFor(q) {
   if (q.answerType === 'numeric' && a.value !== undefined) {
     const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
     // The letter as the question writes it: an angle $A$ is not the side $a$.
-    if (m) return { kind: 'equation', variable: m[1], solutions: [a.value] };
+    if (m) return derivedEquation(q, m[1], [a.value]);
     // Some authored Class 8 algebra forms print only `$6m+15=7m+29$`
     // and omit answerPrefix. Derive the variable ONLY from that entire,
     // single-variable, plain algebraic equation. Other numeric prompts
@@ -54,9 +55,37 @@ export function stepMetaFor(q) {
     }
   }
   if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
-    return { kind: 'equation', variable: 'x', solutions: a.values };
+    return derivedEquation(q, 'x', a.values);
   }
   return null;
+}
+
+/**
+ * An equation meta derived from the ANSWER (an `x =` prefix, a set of values) is true to the
+ * question only when the prompt really states an equation in that one letter that the answer
+ * solves. Otherwise ("what is the axis of symmetry", "solve 4cos²θ = 3") the question's lines are
+ * not equation steps, and holding them to the answer's solution set crossed true working
+ * (x = 3, the factor roots). Such a meta judges only the line that states the answer.
+ */
+function derivedEquation(q, variable, solutions) {
+  const meta = { kind: 'equation', variable, solutions };
+  const spans = [...String(q.prompt || '').matchAll(/\$([^$]+)\$/g)].map(m => m[1]);
+  for (const span of spans) {
+    try {
+      const plain = plainTex(span);
+      if (plain.split('=').length !== 2 || /[<>≤≥]/.test(plain)) continue;
+      const ast = parse(normalize(plain));
+      if (ast.t !== 'equation') continue;
+      const letters = [...variablesOf(ast)].filter(v => v !== 'e');
+      if (letters.length !== 1 || letters[0] !== variable) continue;
+      const holds = solutions.every(v => {
+        const l = evaluate(ast.l, { [variable]: Number(v) }), r = evaluate(ast.r, { [variable]: Number(v) });
+        return Number.isFinite(l) && Number.isFinite(r) && Math.abs(l - r) <= 1e-6 * Math.max(1, Math.abs(l), Math.abs(r));
+      });
+      if (holds) return meta;
+    } catch { /* this span is not an equation */ }
+  }
+  return { ...meta, answerOnly: true };
 }
 
 // An issued question and every committed grade must use the SAME server-owned

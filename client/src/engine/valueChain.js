@@ -212,6 +212,9 @@ export function stepCheckValueChain(meta, workingText) {
     const nums = asts.map(a => (freeVars(a).length ? null : evaluate(a, {})));
     if (nums.some(v => v === null || !Number.isFinite(v))) return note(line, GENERIC_NOTE);
     if (nums.every(v => close(v, truth))) { prev = { value: truth }; out.push({ text: line, status: 'ok', valueChain: { rule: label.type, quantity: label.key || null } }); return; }
+    // A decimal that is the true value to the places written is a rounded true value: not provably wrong.
+    const roundedOf = (text, v) => { const m = String(text).trim().match(/^-?\d*\.(\d+)$/); return !!m && Math.abs(v - truth) <= 10 ** -m[1].length; };
+    if (rest.every((v, k) => close(nums[k], truth) || roundedOf(v, nums[k]))) return note(line, 'Not verified: this agrees with the true value only to the decimals written, so it is not ticked as exact.');
     // A trigonometric value without π might be in degrees: that is not provably wrong.
     const maybeDegrees = rest.some((v, k) => !close(nums[k], truth) && TRIG.test(v) && !/pi|π/i.test(v));
     if (maybeDegrees) return note(line, 'Not verified: Pri cannot tell whether the angle is in radians or degrees.');
