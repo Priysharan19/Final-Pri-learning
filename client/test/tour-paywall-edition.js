@@ -39,7 +39,8 @@ const EDITION = 'prithagoras';
 const en = (await import('../src/i18n/strings.en.js')).default;
 // owner decision, 19 Nov 2026: the Prithagoras screen names the paid tier "HSC Pass" (its en-AU overrides), so what it shows is read from them.
 const { AU_STRINGS } = await import('../src/i18n/strings.au.js');
-const au = { ...en, ...AU_STRINGS };
+const { renameTier } = await import('../src/i18n/tierName.js');
+const au = { ...Object.fromEntries(Object.entries(en).map(([k, v]) => [k, renameTier(v)])), ...AU_STRINGS };
 // A currency amount in any form the app could print one.
 const AMOUNT = /[₹$]\s?\d|\b(?:INR|AUD|Rs\.?)\s?\d/;
 

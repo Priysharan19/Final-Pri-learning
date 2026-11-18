@@ -37,7 +37,8 @@ const EDITION = 'prithagoras';
 const en0 = (await import('../src/i18n/strings.en.js')).default;
 // owner decision, 19 Nov 2026: the Prithagoras screen names the paid tier "HSC Pass" (its en-AU overrides), so the text it shows is read from them.
 const { AU_STRINGS } = await import('../src/i18n/strings.au.js');
-const en = { ...en0, ...AU_STRINGS };
+const { renameTier } = await import('../src/i18n/tierName.js');
+const en = { ...Object.fromEntries(Object.entries(en0).map(([k, v]) => [k, renameTier(v)])), ...AU_STRINGS };
 const manifest = JSON.parse(readFileSync(join(PAPERS, 'manifest.json'), 'utf8'));
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const DAY = 86_400_000;
