@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
 import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -32,7 +33,9 @@ const real = loadManifest();
 
 // ── 1 · the manifest matches the files on disk ────────────────────────────────
 c.eq(real.edition, 'prithagoras', 'the manifest is the Prithagoras edition\'s');
-c.deq(real.papers.map(p => p.id), ['ext1-2027-p13'], 'today only Practice Paper 13 ships');
+const SHIPPED = ['01', '02', '03', '04', '05', '06', '07', '10', '13'];
+c.deq(real.papers.map(p => p.id), SHIPPED.map(n => `ext1-2027-p${n}`), 'nine practice papers ship, in order: 01-07, 10 and 13');
+c.deq(real.papers.map(p => p.title), SHIPPED.map(n => `Practice Paper ${n}`), 'titled "Practice Paper NN"');
 const named = new Set(['manifest.json']);
 for (const p of real.papers) {
   c.deq([p.course, p.yearLevel, p.marks, p.workingTime], ['nsw-ext1', 12, 70, '2 hours'], `${p.id}: course, year level, marks and working time`);
@@ -48,25 +51,32 @@ for (const p of real.papers) {
   }
 }
 c.deq(readdirSync(PAPERS_DIR).sort(), [...named].sort(), 'the directory holds exactly the manifest and the files it names');
-c.deq(real.papers.filter(p => p.sample).map(p => p.id), [], 'no real paper is a free sample yet: Paper 13 is Premium');
-c.deq([real.papers[0].hasGuidelines, real.papers[0].paper.pages, real.papers[0].guidelines.pages], [true, 20, 22], 'Paper 13 has its marking guidelines: 20 and 22 pages');
+c.deq(real.papers.filter(p => p.sample).map(p => p.id), ['ext1-2027-p01'], 'Practice Paper 01 is the only free sample; the other eight are Premium');
+c.deq(real.papers.map(p => [p.hasGuidelines, p.paper.pages, p.guidelines.pages]), [[true, 19, 14], [true, 18, 12], [true, 17, 11], [true, 18, 11], [true, 18, 12], [true, 17, 12], [true, 17, 11], [true, 16, 9], [true, 20, 22]], 'every paper has its marking guidelines, with the page counts of the rebuilt files');
+
+// Branding: every shipped PDF says Prithagoras and none says the old spelling.
+// PyMuPDF reads the text; the check is skipped loudly if python3 or pymupdf is absent.
+const brandScan = spawnSync('python3', ['-I', '-c', 'import sys,pymupdf\nfor f in sys.argv[1:]:\n    t="".join(p.get_text() for p in pymupdf.open(f))\n    print(f, "Prithagoras" in t, "Pritagoras" in t)', ...[...named].filter(f => f.endsWith('.pdf')).map(f => join(PAPERS_DIR, f))], { encoding: 'utf8' });
+if (brandScan.status !== 0) throw new Error(`the PDF brand scan could not run (python3 with pymupdf is required): ${brandScan.stderr}`);
+const brandRows = brandScan.stdout.trim().split('\n').map(l => l.split(' '));
+c.eq(brandRows.length, 18, 'the brand scan read all eighteen PDFs');
+c.deq(brandRows.filter(r => r[r.length - 2] !== 'True').map(r => r[0]), [], 'every shipped PDF contains "Prithagoras"');
+c.deq(brandRows.filter(r => r[r.length - 1] !== 'False').map(r => r[0]), [], 'no shipped PDF contains "Pritagoras"');
 c.eq(PAPERS_CAPABILITY, 'premium-exams', 'the capability is the existing premium one');
 
 // ── The fixture: the real files plus two TEST-ONLY entries ────────────────────
-// A free sample and a paper without guidelines, so the mechanisms later papers
-// will use stay proved. Both reuse Paper 13's bytes under other names.
+// A paper without guidelines, so that path stays proved. It reuses a real
+// paper's bytes under another name; every other entry is the real manifest.
 const fixtureDir = mkdtempSync(join(tmpdir(), 'pri-papers-fixture-'));
-const SAMPLE = 'ext1-test-sample';
+const SAMPLE = 'ext1-2027-p01';
 const NO_GUIDE = 'ext1-test-noguide';
-const LOCKED = 'ext1-2027-p13';
+const LOCKED = 'ext1-2027-p02';
 const base = real.papers[0];
-for (const f of [base.paper.file, base.guidelines.file]) copyFileSync(join(PAPERS_DIR, f), join(fixtureDir, f));
-copyFileSync(join(PAPERS_DIR, base.paper.file), join(fixtureDir, `${SAMPLE}.pdf`));
-copyFileSync(join(PAPERS_DIR, base.guidelines.file), join(fixtureDir, `${SAMPLE}-guidelines.pdf`));
+for (const f of named) if (f.endsWith('.pdf')) copyFileSync(join(PAPERS_DIR, f), join(fixtureDir, f));
 copyFileSync(join(PAPERS_DIR, base.paper.file), join(fixtureDir, `${NO_GUIDE}.pdf`));
 const entry = (id, title, extra) => ({ ...base, id, title, sample: false, ...extra,
   paper: { ...base.paper, file: `${id}.pdf` }, guidelines: extra.hasGuidelines === false ? null : { ...base.guidelines, file: `${id}-guidelines.pdf` } });
-const manifest = { ...real, papers: [base, entry(SAMPLE, 'Practice Paper 01', { sample: true, hasGuidelines: true }), entry(NO_GUIDE, 'Practice Paper 99', { hasGuidelines: false })] };
+const manifest = { ...real, papers: [...real.papers, entry(NO_GUIDE, 'Practice Paper 99', { hasGuidelines: false })] };
 writeFileSync(join(fixtureDir, 'manifest.json'), JSON.stringify(manifest));
 
 // ── Over HTTP ─────────────────────────────────────────────────────────────────
@@ -108,7 +118,7 @@ try {
   c.deq(list.data.papers.map(p => p.id), manifest.papers.map(p => p.id), 'every paper is listed, in manifest order');
   c.deq(list.data.papers.filter(p => !p.locked).map(p => p.id), [SAMPLE], 'for a free account only the sample is unlocked');
   const row = list.data.papers[0];
-  c.deq([row.title, row.marks, row.workingTime, row.pages, row.hasGuidelines, row.guidelinesPages, row.yearLevel, row.course], ['Practice Paper 13', 70, '2 hours', 20, true, 22, 12, 'nsw-ext1'], 'a row carries title, marks, time, pages');
+  c.deq([row.title, row.marks, row.workingTime, row.pages, row.hasGuidelines, row.guidelinesPages, row.yearLevel, row.course], ['Practice Paper 01', 70, '2 hours', 19, true, 14, 12, 'nsw-ext1'], 'a row carries title, marks, time, pages');
   c.ok(!JSON.stringify(list.data).match(/sha256|\.pdf|server\/content/), 'the list names no file, hash or path');
   c.deq((await get(hAu, '/v1/papers', paid)).data.papers.filter(p => p.locked), [], 'Premium: nothing is locked');
   c.eq((await get(hAu, '/v1/papers', paid)).data.premium, true, 'Premium is reported from the server\'s own row');
@@ -119,14 +129,14 @@ try {
   // 3 · downloads
   const sample = await bytesOf(hAu, `/v1/papers/${SAMPLE}/paper`, free);
   c.eq(sample.status, 200, 'the sample paper is free to a free account');
-  c.eq(sha(sample.bytes), manifest.papers[1].paper.sha256, 'the sample paper arrives byte for byte');
+  c.eq(sha(sample.bytes), real.papers[0].paper.sha256, 'the sample paper arrives byte for byte');
   c.eq(sample.headers.get('content-type'), 'application/pdf', 'application/pdf');
   c.match(sample.headers.get('content-disposition'), /^attachment; filename="[A-Za-z0-9._-]+\.pdf"$/, 'an attachment with a plain file name');
   c.eq(sample.headers.get('cache-control'), 'private, no-store', 'no-store');
   c.eq(sample.headers.get('x-content-type-options'), 'nosniff', 'nosniff');
   c.eq(Number(sample.headers.get('content-length')), sample.bytes.length, 'content-length is the file\'s');
   const sampleGuide = await bytesOf(hAu, `/v1/papers/${SAMPLE}/guidelines`, free);
-  c.deq([sampleGuide.status, sha(sampleGuide.bytes)], [200, manifest.papers[1].guidelines.sha256], 'the sample\'s marking guidelines are free too');
+  c.deq([sampleGuide.status, sha(sampleGuide.bytes)], [200, real.papers[0].guidelines.sha256], 'the sample\'s marking guidelines are free too');
   c.match(sampleGuide.headers.get('content-disposition'), /Marking-Guidelines\.pdf"$/, 'the guidelines file says what it is');
   for (const kind of ['paper', 'guidelines']) {
     const refusal = await get(hAu, `/v1/papers/${LOCKED}/${kind}`, free);
