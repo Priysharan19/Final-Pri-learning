@@ -33,11 +33,12 @@ commit you to, in plain English, so you can read them with the right questions i
   the periods stated. Each of these is enforced by code and checked by a test.
 - Keeping the prices in the notices equal to the prices set in Stripe (they are not in the code), and keeping the cancel button working: the notice promises both.
 
-## Three blanks you must fill before this is live
+## The three blanks are filled
 
-The notices leave three facts as `{{PLACEHOLDERS}}`, because the code cannot show them. Until they are filled,
-the page shows "Template". Please confirm the real answers: where the Australian **server** runs, where the
-**database** is held (the brief said Neon, Sydney; the repository's plan says Supabase, Sydney), the and the **contact email**. Stripe is now named in the notices (the code sells through Stripe only).
+The server (Railway, Singapore), the database (Neon on AWS, Sydney) and the contact email
+(prilearning19@gmail.com) were supplied by the owner and verified from the live infrastructure on
+2026-11-18. The notices state them plainly, with no adequacy or compliance claim. Stripe is named in the
+notices (the code sells through Stripe only).
 
 ## The five points most worth a lawyer's look
 

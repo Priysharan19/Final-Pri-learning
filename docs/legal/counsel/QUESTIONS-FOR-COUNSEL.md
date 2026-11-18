@@ -59,7 +59,7 @@ number or address that has not been given to it.
 > - Priysharan Tripathi
 > - Grievance officer, Pri Learning
 > - 5 Juniper Pl, Oakville NSW 2765, Australia
-> - impriysharan@icloud.com
+> - prilearning19@gmail.com
 
 **Lives in** · `docs/legal/privacy.hi.md` · `Priysharan Tripathi`
 **Lives in** · `docs/release/store/app-store-listing.md` · `{{OWNER_LEGAL_NAME}}`

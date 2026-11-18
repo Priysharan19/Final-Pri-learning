@@ -42,13 +42,11 @@ learning is sent anywhere — and nothing is marked.
 
 ## Where your data is stored
 
-- **Our server** runs on Railway, a hosting provider. On 4 October 2026 the
-  production service and its database volume were in Railway's `ams` region
-  (Amsterdam, the Netherlands). Until the planned move described next, your
-  account data is stored there, not in India.
-- **Our database is planned to move** to Supabase in its Mumbai region
-  (`ap-south-1`). This notice will be updated when that move has happened; until
-  then, do not read it as saying your data is stored in India.
+- **Our server** runs on Railway, a hosting provider, in its Amsterdam region
+  (EU West, the Netherlands).
+- **Our database**, which holds your account and learning records, is held on
+  Neon (running on AWS), in its Singapore region (`ap-southeast-1`). Your account
+  data is stored there, not in India.
 - **OpenAI** reads handwriting, photos and (if you turn it on) your working
   outside India.
 - **Our email delivery provider and the app stores** process what they need in
@@ -264,8 +262,7 @@ Only the services needed to run the parts you use:
 - **Apple and Google**, if you subscribe through the App Store or Google Play.
   We never see or store your card details; the store tells us only whether a
   subscription is active, which plan, and until when.
-- **Our hosting and database providers** (Railway; Supabase after the planned
-  move), which store and process it for us — see "Where your data is stored".
+- **Our hosting and database providers** (Railway and Neon), which store and process it for us — see "Where your data is stored".
 - **A handwriting reader** (OpenAI), while the handwriting-reading setting is
   on and you have agreed to send it, and only the image of your writing or the
   photo described above.
@@ -385,7 +382,7 @@ You can ask us to:
 - **Withdraw consent**, after which we stop processing and delete.
 - **Nominate** someone to exercise these rights if you cannot.
 
-Write to impriysharan@icloud.com. See [Grievances](/grievance) for how
+Write to prilearning19@gmail.com. See [Grievances](/grievance) for how
 complaints are handled and how to escalate to the Data Protection Board of
 India.
 
@@ -404,4 +401,4 @@ will tell you and the Data Protection Board as the DPDP Act requires.
 If we change this notice we will publish the new version here and, where the
 change is significant, ask again for consent.
 
-Questions: impriysharan@icloud.com.
+Questions: prilearning19@gmail.com.

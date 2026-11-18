@@ -11,7 +11,7 @@ reviewed by a lawyer; the app says so above it.
 - Priysharan Tripathi
 - Prithagoras (Pri Learning's Australian edition)
 - 5 Juniper Pl, Oakville NSW 2765, Australia
-- {{CONTACT_EMAIL}}
+- prilearning19@gmail.com
 
 ## What to include
 

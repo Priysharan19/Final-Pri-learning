@@ -27,17 +27,17 @@ no longer the text in the file it names, or if a location below no longer exists
    refuses the flag without those fields or if a notice is edited after the review date. Nothing in the
    code or any agent sets it.
 
-## Facts the notices leave open (the placeholders)
+## Facts the notices now state (filled 2026-11-18, formerly placeholders)
 
-The Australian notices say only what the code and the repository show. Three facts are not in either, so
-they are left as placeholders, and a notice with one unfilled shows as a template:
+The Australian notices say only what the code and the repository show. Three facts were not in either, so
+they were placeholders; the owner supplied them, verified from the live infrastructure on 2026-11-18, and they are now stated plainly:
 
 | Placeholder | What it must say | What engineering was told, and what the repository shows |
 | --- | --- | --- |
-| `{{AU_HOSTING_PROVIDER_AND_REGION}}` | Where the Australian server runs | Told: Railway, Singapore. The repository records no Australian service (`docs/operations/region-isolation-verification.md`: "The Prithagoras (Australia) deployment does not exist yet") |
-| `{{AU_DATABASE_PROVIDER_AND_REGION}}` | Where the Australian database is held | Told: Neon Postgres, Sydney. The repository's plan names Supabase, Sydney (`ap-southeast-2`) |
+| Hosting (was `AU_HOSTING_PROVIDER_AND_REGION`) | Where the Australian server runs | Railway, Singapore (`asia-southeast1`). Not recorded in the repository (`docs/operations/region-isolation-verification.md`: "The Prithagoras (Australia) deployment does not exist yet") |
+| Database (was `AU_DATABASE_PROVIDER_AND_REGION`) | Where the Australian database is held | Neon (AWS), Sydney (`ap-southeast-2`). The repository's older plan named Supabase, Sydney; the live infrastructure is Neon |
 | Payment processor (no longer a placeholder) | Who takes payment | Stripe: `client/edition.config.mjs` lists `stripe` for Prithagoras, in AUD, and `server/platform/stripe.js` hosts Checkout on Stripe. The prices (A$9.99 a month, A$99 a year) are set in Stripe and `PRI_DISPLAY_*`, not in code: the owner must keep the notices and Stripe in step |
-| `{{CONTACT_EMAIL}}` | The contact address | The address the Indian notices use; an agent session was prevented from writing it into a new file |
+| Contact email (was `CONTACT_EMAIL`) | The contact address | `prilearning19@gmail.com`, owner-supplied, now used in both editions' notices |
 
 Counsel should be told which of these are real at the date they review. The notices must not name a
 provider or a region that is not the deployment.

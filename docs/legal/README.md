@@ -240,7 +240,7 @@ Engineering cannot complete any line below. The gate that consumes them is
 | 5 | Have the English set reviewed by a lawyer qualified in Indian law; have the Hindi checked against it | **Open.** Record it in `review-status.json` | the banner goes; `legal-pages-check.mjs` enforces the paperwork |
 | 6 | Confirm the notice matches the code's data path at the release SHA | Reconciled by engineering 2 Nov 2026 against `a5778a319`; counsel's confirmation open | `docs/release/app-store-privacy-labels.md` §6, `play-data-safety.md` §6b |
 | 7 | Set the publication date of the filled version | 19 Oct 2026; revised 2 Nov 2026 | `**Last updated**` in all eight documents |
-| 8 | Name processors in the notice if counsel requires it | Named now: Resend, Railway, Supabase (planned), OpenAI, Apple and Google | `privacy.md` "Who else sees your data" |
+| 8 | Name processors in the notice if counsel requires it | Named now: Resend, Railway, Neon, OpenAI, Apple and Google | `privacy.md` "Who else sees your data" |
 
 ## Owner summary and sign-off (Prithagoras)
 

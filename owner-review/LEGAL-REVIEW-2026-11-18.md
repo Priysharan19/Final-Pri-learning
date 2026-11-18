@@ -32,16 +32,17 @@ review and does not remove the banner. Nothing here says the pages comply with a
      I raised `READER_PERMISSION_VERSION` from 1 to 2. **Every student is asked for permission
      again.** The CTO should know this before release.
 2. **The plans on the pages are the plan you approved** (the code now ships it). See "Plans" below.
-3. **Hosting facts I could not fill.** The code does not say where the servers and databases are.
-   - Australia: the pages still have two blanks, `{{AU_HOSTING_PROVIDER_AND_REGION}}` and
-     `{{AU_DATABASE_PROVIDER_AND_REGION}}`, plus `{{CONTACT_EMAIL}}`. The page shows a "Template"
-     banner until you fill them. The only repository evidence is the backup guide
-     (`docs/operations/restore-runbook.md`): "Neon Sydney" for Australia and "Neon Singapore" for
-     India. It names no Railway region. Please confirm the real answers.
-   - India: the privacy page still says the server was in Railway's Amsterdam region on 4 October
-     2026 and that a move to Supabase in Mumbai is planned. The backup guide suggests the
-     database is now Neon in Singapore. **That section may be out of date.** I did not change it
-     because I cannot prove either way from the code.
+3. **Hosting facts are now filled (no longer open).** Supplied by you and verified from the live
+   infrastructure on 18 November 2026; the pages state them plainly, with no compliance or adequacy
+   claim, and the "not reviewed by a lawyer" banner stays.
+   - Contact email, both editions: `prilearning19@gmail.com`.
+   - Australia (Prithagoras, au.prilearning.com): server on Railway, Singapore (`asia-southeast1`);
+     database on Neon (AWS), Sydney (`ap-southeast-2`). The three Australian placeholders are gone.
+   - India (Priyabhata, app.prilearning.com): server on Railway, Amsterdam (EU West); database on
+     Neon (AWS), Singapore (`ap-southeast-1`), not Supabase Mumbai. The "planned move to Supabase in
+     Mumbai" wording is removed (English and Hindi).
+   - Handwriting reading is processed by OpenAI (United States) with `store:false`, as the pages
+     already say.
 4. **Store listings were not changed.** `docs/release/app-store-privacy-labels.md` and
    `docs/release/play-data-safety.md` still need the stored-handwriting facts before an app goes
    to a store. I did not touch them.
@@ -181,8 +182,7 @@ NESA paragraph.
 
 ## Australia: refund policy and contact
 
-Unchanged. The refund policy already matched `stripe.js` and the prices. The contact page still
-needs `{{CONTACT_EMAIL}}` from you.
+Unchanged. The refund policy already matched `stripe.js` and the prices. The contact page now carries the contact email.
 
 ## Questions only a lawyer can answer
 

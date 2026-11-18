@@ -50,9 +50,9 @@ learning is sent anywhere, and nothing is marked.
 
 ## Where your information is stored
 
-- **Our server** runs on {{AU_HOSTING_PROVIDER_AND_REGION}}.
+- **Our server** runs on Railway, a hosting provider, in its Singapore region (`asia-southeast1`).
 - **Our database**, which holds your account and learning records, is
-  {{AU_DATABASE_PROVIDER_AND_REGION}}.
+  held on Neon (running on AWS), in its Sydney region (`ap-southeast-2`).
 - **OpenAI** reads handwriting, photos and (if you turn it on) your working,
   **our email delivery provider** sends our messages, and **Stripe** takes
   payment if you buy Premium. Each processes what it is sent in its own locations, which we do not control. See "Sending information
@@ -429,7 +429,7 @@ You can ask us to (these requests follow the access and correction principles, A
   under "How long we keep it".
 - **Withdraw consent**, after which we stop processing and delete.
 
-Write to {{CONTACT_EMAIL}}. We aim to acknowledge your message within 48 hours and
+Write to prilearning19@gmail.com. We aim to acknowledge your message within 48 hours and
 answer within 30 days. If we cannot give you access to something, or cannot
 correct it, we will tell you why.
 
@@ -456,4 +456,4 @@ OAIC where the Privacy Act requires it.
 If we change this notice we will publish the new version here and, where the
 change is significant, ask again for consent.
 
-Questions: {{CONTACT_EMAIL}}.
+Questions: prilearning19@gmail.com.

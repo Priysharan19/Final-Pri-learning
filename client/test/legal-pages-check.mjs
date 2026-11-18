@@ -429,8 +429,8 @@ ok(/need a Pri Learning account, and a connection, to have answers checked/.test
   'the notice says an account and a connection are needed to be marked');
 ok(/Marking is done online by our server/.test(privacy) && /never sets the mark/.test(privacy),
   'the notice says marking is server-side and the on-device engine never sets the mark');
-ok(/Railway's `ams` region/.test(privacy) && /Supabase in its Mumbai region/.test(privacy),
-  'the notice states where data is stored today and where it is planned to move');
+ok(/Railway[^.]*Amsterdam/.test(privacy) && /Neon[^.]*Singapore/.test(privacy) && !/Supabase|Mumbai/.test(privacy),
+  'the notice states where data is stored (Railway Amsterdam, Neon Singapore) and no longer a planned Supabase Mumbai move');
 ok(!/whole app without an account|servers in India|on your own device\.|so a teacher can set work/i.test(privacy),
   'the notice no longer claims an account-free app, Indian servers, on-device marking or a teacher product');
 // The notice may not claim to "follow" the Act while its own Children section

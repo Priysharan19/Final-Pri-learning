@@ -209,10 +209,12 @@ ok(/'\/account\/delete-request'/.test(read('client/src/main.jsx')) && existsSync
 ok(/48 hours/.test(contact) && /48 hours/.test(privacy), 'the 48-hour acknowledgement is stated the same way on both pages');
 
 // ── 5 · Placeholders, and the review switch ─────────────────────────────────
-const DECLARED = new Set(['AU_HOSTING_PROVIDER_AND_REGION', 'AU_DATABASE_PROVIDER_AND_REGION', 'CONTACT_EMAIL']);
+// The three formerly-declared placeholders were filled 2026-11-18 (owner-supplied, verified from the live infrastructure).
+const DECLARED = new Set();
 const found = new Set((all.match(/\{\{[A-Z_]+\}\}/g) || []).map(p => p.slice(2, -2)));
 for (const name of found) ok(DECLARED.has(name), `placeholder {{${name}}} is one of the declared four`);
-for (const name of DECLARED) ok(found.has(name), `declared placeholder {{${name}}} is used`);
+ok(found.size === 0, 'no placeholder is left in the Australian notices');
+ok(/Railway[^.]*Singapore/.test(privacy) && /Neon[^.]*Sydney/.test(privacy) && /prilearning19@gmail\.com/.test(privacy + contact), 'the Australian notice states its hosting (Railway, Singapore), its database (Neon, Sydney) and the contact email');
 const statusPath = join(ROOT, 'docs/legal/au/review-status.json');
 ok(existsSync(statusPath), 'docs/legal/au/review-status.json exists');
 const status = JSON.parse(readFileSync(statusPath, 'utf8'));
@@ -266,8 +268,8 @@ ok(Array.from(AU.map(d => d.text)).every(t => /been\s+reviewed by a\s+lawyer; th
   ok(quotes >= 10 && places >= 6, `the sheet quotes ${quotes} passages and names ${places} places`);
   for (const topic of ['operator', 'overseas', 'children', 'code', 'rights', 'terms', 'refunds']) ok(new RegExp(`\\[${topic}\\]`).test(sheet), `the sheet has a section for [${topic}]`);
   ok(/reviewed: false/.test(sheet) && status.reviewed === false, 'the sheet states the review switch as it is');
-  for (const name of DECLARED) ok(sheet.includes(`{{${name}}}`), `the sheet explains {{${name}}}`);
-  ok(/provider, Neon|Neon Postgres, Sydney/.test(sheet) === true && /Stripe/.test(sheet), 'the sheet records what engineering was told about the providers, labelled as not in the repository');
+  for (const what of ['Railway, Singapore', 'Neon (AWS), Sydney', 'prilearning19@gmail.com']) ok(sheet.includes(what), `the sheet records the filled fact: ${what}`);
+  ok(/Neon \(AWS\), Sydney/.test(sheet) && /Stripe/.test(sheet), 'the sheet records the providers: the owner-supplied, live-verified facts and what the repository shows');
 }
 
 console.log(`${scanned ? scanned.trim() + ' ' : ''}placeholders left in the Australian notices: ${[...found].sort().join(', ') || 'none'}`);

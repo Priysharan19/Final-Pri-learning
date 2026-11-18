@@ -11,7 +11,7 @@ lawyer; the app says so above it.
 - Priysharan Tripathi
 - Grievance officer, Pri Learning
 - 5 Juniper Pl, Oakville NSW 2765, Australia
-- impriysharan@icloud.com
+- prilearning19@gmail.com
 
 India's Digital Personal Data Protection Act 2023 requires us to publish a
 contact for your questions and complaints about your data. This is it.
@@ -43,6 +43,6 @@ have raised it with us first, which is what this page is for.
 
 ## Subscriptions
 
-For billing questions write to impriysharan@icloud.com; see the
+For billing questions write to prilearning19@gmail.com; see the
 [refund policy](/refund-policy). The App Store or Google Play took your payment,
 so you may also raise it with them.
