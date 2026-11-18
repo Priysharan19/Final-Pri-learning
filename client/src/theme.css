@@ -1662,6 +1662,10 @@ h3 { font-size: 16.5px; line-height: 1.3; }
   margin: 0;
   max-width: var(--measure);
   text-wrap: pretty;
+  /* A formula wider than the column (a long inline expression on a phone) scrolls inside the prompt;
+     it never widens the page. Room above and below keeps a raised exponent from being cut. */
+  overflow-x: auto;
+  padding-block: 6px;
 }
 @supports (text-wrap: balance) { .ws-split .q-prompt, .ws-single .q-prompt { text-wrap: balance; } }
 .q-prompt .katex-display { margin: 0.7em 0; overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
