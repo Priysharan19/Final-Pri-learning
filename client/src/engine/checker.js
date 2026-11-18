@@ -849,12 +849,17 @@ function judgeExpressionLine(cleaned, meta, { reference = null } = {}) {
       && (continued || [...variablesOf(parseExpr(tail))].every(v => allowed.has(v)))) {
     return { status: 'break', note: 'This line is no longer equivalent to the expression you started with — the slip is here.' };
   }
-  // The question authors its own expression and the answer is that expression in another form
-  // (`source`): the working is a chain of equal expressions, so a bare line that is not equal to it
-  // is the slip. (Without an authored source a bare line may be a true partial result.)
-  if (parts.length === 1 && typeof meta.source === 'string' && parseExpr(meta.source) && parseExpr(tail) && same(meta.source, meta.canonical)
-      && [...variablesOf(parseExpr(tail))].every(v => [...variablesOf(parseExpr(meta.canonical))].includes(v))) {
-    return { status: 'break', note: 'This line is no longer equivalent to the expression you started with — the slip is here.' };
+  // A bare line in the answer's own letters that is not the answer: the working is a chain of one
+  // expression, so this is the slip. (A line in other letters, or with no letter, is a side
+  // calculation and is only ever a note.)
+  if (parts.length === 1) {
+    const ast = parseExpr(tail), canon = parseExpr(meta.canonical);
+    const letters = ast ? [...variablesOf(ast)].filter(v => v !== 'e') : [];
+    const canonLetters = canon ? new Set([...variablesOf(canon)]) : new Set();
+    // (a numeric answer: every bare numeric line of the chain is that same number)
+    if (ast && (letters.length || !canonLetters.size) && letters.every(v => canonLetters.has(v))) {
+      return { status: 'break', note: 'This line is no longer equivalent to the expression you started with — the slip is here.' };
+    }
   }
   return unread;
 }
