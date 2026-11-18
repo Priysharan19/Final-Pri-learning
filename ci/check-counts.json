@@ -771,7 +771,7 @@
       "job": "platform-contracts",
       "log": "original-work.log",
       "pins": [
-        {"has":"original-work-check (sqlite): 70 checks passed"}
+        {"has":"original-work-check (sqlite): 75 checks passed"}
       ]
     }
   },
