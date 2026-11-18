@@ -41,19 +41,28 @@ function envOrigin() {
 }
 
 /**
- * The live app shell (the page at "/"), read from the network and never from a cache, as a Response; or null when it
- * cannot be read as HTML. Used only to refresh the offline shell before a release reload (platform/freshBuild.js).
+ * The live app shell, read from the network as a Response; or null when it cannot be read as HTML.
+ *
+ * The service worker answers every same-origin GET from its precache first, and "/" is precached, so a plain
+ * request for "/" (even with cache: 'reload') would be answered with the very shell being replaced. The request
+ * therefore carries a search string naming the live build ("/?shell=<sha>"): it never matches a precache key, and
+ * the worker does not keep a response for a path that is not a build asset (public/sw.js CACHEABLE). Used only to
+ * refresh the offline shell before a release reload (platform/freshBuild.js).
  */
-export async function readLiveShell({ timeoutMs = 8000 } = {}) {
+export function liveShellUrl(origin, liveSha) {
+  return `${origin}/?shell=${encodeURIComponent(String(liveSha || '').toLowerCase())}`;
+}
+
+export async function readLiveShell(liveSha, { timeoutMs = 8000 } = {}) {
   const loc = globalThis.location;
   if (!loc || !/^https?:$/.test(String(loc.protocol || '')) || typeof fetch !== 'function') return null;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(new DOMException('Timed out', 'TimeoutError')), Math.max(500, Math.min(20_000, Number(timeoutMs) || 8000)));
   try {
-    const response = await fetch(`${loc.origin}/`, {
+    const response = await fetch(liveShellUrl(loc.origin, liveSha), {
       method: 'GET', headers: { Accept: 'text/html' }, credentials: 'same-origin', cache: 'reload', redirect: 'error', signal: controller.signal
     });
-    if (!response.ok || !/html/i.test(response.headers.get('content-type') || '')) return null;
+    if (response.status !== 200 || !/html/i.test(response.headers.get('content-type') || '')) return null;
     return response;
   } catch {
     return null;
