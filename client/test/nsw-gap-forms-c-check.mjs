@@ -127,6 +127,58 @@ sample('me11-poly', 4, (q, id) => {
   });
 });
 
+
+// ── me11-poly D4: the direct a+b form and the cubic solved over the rationals ─
+const polyOf = text => {            // "6x^3 - 7x^2 + x + 5" -> [c0, c1, c2, c3]
+  const co = [0, 0, 0, 0];
+  const clean = text.replace(/\s+/g, '').replace(/^\+/, '');
+  for (const m of clean.matchAll(/([+-]?)(\d*)(x(?:\^(\d))?)?/g)) {
+    if (!m[0]) continue;
+    const sign = m[1] === '-' ? -1 : 1;
+    if (m[3]) co[m[4] ? Number(m[4]) : 1] += sign * (m[2] === '' ? 1 : Number(m[2]));
+    else if (m[2] !== '') co[0] += sign * Number(m[2]);
+  }
+  return co;
+};
+const evalP = (co, x) => co.reduce((s, c, i) => s + c * x ** i, 0);
+sample('me11-poly', 4, (q, id) => {
+  let m;
+  if ((m = q.prompt.match(/^\$P\(x\) = (\d?)x\^3 \+ ax\^2 \+ bx ([+-]) (\d+)\$ has \$\(x ([+-]) (\d+)\)\$ and \$\(x ([+-]) (\d+)\)\$ as factors/))) {
+    bump('poly-ab');
+    const lead = m[1] === '' ? 1 : Number(m[1]), C = (m[2] === '-' ? -1 : 1) * Number(m[3]);
+    const r1 = -(m[4] === '-' ? -1 : 1) * Number(m[5]) * -1, r2 = -(m[6] === '-' ? -1 : 1) * Number(m[7]) * -1;
+    // (x - r) factor: the prompt prints (x + k) for root -k, (x - k) for root k
+    const root = (sgn, k) => (sgn === '-' ? k : -k);
+    const ra = root(m[4], Number(m[5])), rb = root(m[6], Number(m[7]));
+    // P(ra)=P(rb)=0 : lead*r^3 + a r^2 + b r + C = 0 -> solve the 2x2 by Cramer
+    const eq = r => [r * r, r, -(lead * r ** 3 + C)];
+    const [a1, b1, c1] = eq(ra), [a2, b2, c2] = eq(rb);
+    const det = a1 * b2 - a2 * b1;
+    const a = (c1 * b2 - c2 * b1) / det, b = (a1 * c2 - a2 * c1) / det;
+    if (Math.abs(a + b - q.answer.value) > 1e-9) fail(id, `a + b ${q.answer.value} != ${a + b}`);
+    return;
+  }
+  if ((m = q.prompt.match(/^Solve \$(.+?) = 0\$ over the rationals/))) {
+    bump('poly-rational');
+    const co = polyOf(m[1]);
+    const vals = q.answer.values;
+    for (const v of vals) if (Math.abs(evalP(co, v)) > 1e-7 * Math.max(1, ...co.map(Math.abs))) fail(id, `${v} is not a root of ${m[1]}`);
+    // every real root found by sign scan with bisection must be in the key (and be rational with denominator <= 3)
+    const roots = [];
+    let prev = evalP(co, -50), px = -50;
+    for (let x = -49.99; x <= 50; x += 0.01) {
+      const cur = evalP(co, x);
+      if (prev === 0) roots.push(px); else if (prev * cur < 0) { let lo = px, hi = x; for (let i = 0; i < 80; i++) { const mid = (lo + hi) / 2; if (evalP(co, lo) * evalP(co, mid) <= 0) hi = mid; else lo = mid; } roots.push((lo + hi) / 2); }
+      prev = cur; px = x;
+    }
+    const distinct = [...new Set(roots.map(r => Math.round(r * 1e6) / 1e6))];
+    const keyed = vals.map(v => Math.round(v * 1e6) / 1e6);
+    for (const r of distinct) if (!keyed.some(k => Math.abs(k - r) < 1e-4)) fail(id, `real root ${r} of ${m[1]} is missing from the key`);
+    const dP = co.map((c, i) => c * i).slice(1);
+    for (const k of vals) if (!distinct.some(r => Math.abs(r - k) < 1e-4) && Math.abs(dP.reduce((t, c, i) => t + c * k ** i, 0)) > 1e-6) fail(id, `key value ${k} is neither a sign-change root nor a repeated root of ${m[1]}`);
+  }
+});
+
 // ── me11-functions D2: domain of the inverse of a sqrt function ─────────────
 sample('me11-functions', 2, (q, id) => {
   const m = q.prompt.match(/f\(x\) = (\d+)\\sqrt\{x (?:- (-?\d+)|\+ (\d+))\} ([+-]) (\d+)\$ has domain/);
@@ -154,6 +206,6 @@ sample('y12-appdiff', 3, (q, id) => {
 });
 
 console.log(JSON.stringify(stats));
-for (const k of ['ind-n0', 'ind-k', 'ind-c', 'ind-sum', 'ind-gcd', 'ind-mcq', 'comb-base', 'poly-set', 'fn-inv-domain', 'y7-expr', 'appdiff-expr']) if (!stats[k]) fails.push(`no ${k} question was sampled`);
+for (const k of ['poly-ab', 'poly-rational', 'ind-n0', 'ind-k', 'ind-c', 'ind-sum', 'ind-gcd', 'ind-mcq', 'comb-base', 'poly-set', 'fn-inv-domain', 'y7-expr', 'appdiff-expr']) if (!stats[k]) fails.push(`no ${k} question was sampled`);
 console.log(fails.length ? `NSW GAP FORMS C: FAIL\n  ${fails.join('\n  ')}` : 'NSW GAP FORMS C: PASS — every key rebuilt independently. [SYNTHETIC]');
 process.exit(fails.length ? 1 : 0);

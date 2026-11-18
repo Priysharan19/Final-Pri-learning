@@ -10,7 +10,7 @@
 // a set of integers. All forms are original. SYNTHETIC: no student or examiner
 // evidence.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, poly, term, sgn } from '../qhelpers.js';
+import { ri, rc, nz, gcd, poly, term, sgn } from '../qhelpers.js';
 
 const REJ = Symbol('reject');
 const rej = cond => { if (cond) throw REJ; };
@@ -18,7 +18,7 @@ const rej = cond => { if (cond) throw REJ; };
 /** The key as text, for the hint check below. */
 const keyTexts = q => {
   const a = q.answer || {};
-  if (Array.isArray(a.values)) return a.values.map(String);
+  if (Array.isArray(a.values)) return [a.values.join(", ")];   // naming one root of several is not the whole answer
   if (a.expr !== undefined) return [String(a.expr)];
   return a.value !== undefined ? [String(a.canonicalInput ?? a.value)] : [];
 };
@@ -64,6 +64,90 @@ function numQ(prompt, key, { prefix, suffix, traps = [], hints, steps, dotpoint,
 // Cell D4 exercises dot point 2 (solve polynomial equations); forms carry their own
 // honest dot point (0 factor/remainder theorem, 1 roots and coefficients, 2 solving).
 const polyForms = [
+  // The equations solved over the rationals (rational root theorem; fractional roots, a repeated root): the forms that
+  // used to be the direct form of this cell (dot point 2).
+  V([4], rng => {
+    // Solving over the rationals: the rational root theorem narrows the search,
+    // and the factors that come out need not have leading coefficient 1.
+    const branch = ri(rng, 0, 2);
+    if (branch === 0) {
+      const p = rc(rng, [2, 3]);
+      let q = nz(rng, -7, 7);
+      for (let guard = 0; gcd(Math.abs(q), p) !== 1 && guard < 40; guard++) q = nz(rng, -7, 7);
+      if (gcd(Math.abs(q), p) !== 1) rej(true);
+      const r = nz(rng, -5, 5);
+      let s = nz(rng, -5, 5);
+      if (s === r) s = r === 5 ? -1 : r + 1;
+      const c3 = p, c2 = -(p * (r + s) + q), c1 = p * r * s + q * (r + s), c0 = -q * r * s;
+      return {
+        prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals.`,
+        answerType: 'set', answer: { values: [q / p, r, s] },
+        inputHint: 'e.g. x = 3/2, -1, 4',
+        traps: [
+          { value: q, why: `A factor $(${p}x ${sgn(-q)})$ is zero at $x = \\dfrac{${q}}{${p}}$, not at $x = ${q}$ — divide by the leading $${p}$.` },
+          { value: c0, why: 'The rational root theorem says a root is $\\pm\\dfrac{\\text{factor of the constant}}{\\text{factor of the leading coefficient}}$ — the constant term itself is rarely a root.' }
+        ],
+        hints: [`By the rational root theorem any rational root is $\\pm\\dfrac{p}{q}$ with $p \\mid ${Math.abs(c0)}$ and $q \\mid ${p}$.`,
+          `Testing the integer candidates finds $x = ${r}$, so $(x ${sgn(-r)})$ is a factor.`,
+          `Dividing out leaves $(${p}x ${sgn(-q)})(x ${sgn(-s)})$, and one root is a fraction.`],
+        steps: [
+          { h: 'Candidate rational roots', d: `$\\pm\\dfrac{\\text{factors of } ${Math.abs(c0)}}{\\text{factors of } ${p}}$` },
+          { h: 'Factorise fully', d: `$${poly([c3, c2, c1, c0])} = (${p}x ${sgn(-q)})(x ${sgn(-r)})(x ${sgn(-s)})$` },
+          { h: 'Null factor law', d: `$x = \\dfrac{${q}}{${p}}$, $\\ x = ${r}$, $\\ x = ${s}$` }
+        ]
+      };
+    }
+    if (branch === 1) {
+      const p = rc(rng, [2, 3]), r = rc(rng, [2, 3]);
+      let q = nz(rng, -5, 5), s = nz(rng, -5, 5);
+      for (let guard = 0; (gcd(Math.abs(q), p) !== 1 || gcd(Math.abs(s), r) !== 1 || q * r === s * p) && guard < 60; guard++) {
+        q = nz(rng, -5, 5); s = nz(rng, -5, 5);
+      }
+      if (gcd(Math.abs(q), p) !== 1 || gcd(Math.abs(s), r) !== 1 || q * r === s * p) rej(true);
+      const t = nz(rng, -4, 4);
+      const c3 = p * r, c2 = -(p * s + q * r + p * r * t), c1 = q * s + (p * s + q * r) * t, c0 = -q * s * t;
+      return {
+        prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals.`,
+        answerType: 'set', answer: { values: [q / p, s / r, t] },
+        inputHint: 'e.g. x = 1/2, -2/3, 4',
+        traps: [
+          { value: q * s, why: 'Two of the three roots here are fractions — the leading coefficient does not divide out neatly into integer roots.' },
+          { value: t, why: `$x = ${t}$ is only **one** of the three solutions; the question asks for all of them.` }
+        ],
+        hints: [`The leading coefficient is $${c3} = ${p} \\times ${r}$, so denominators of $${p}$ and $${r}$ are both possible.`,
+          `The integer root is $x = ${t}$; divide $(x ${sgn(-t)})$ out first.`,
+          `What is left factorises as $(${p}x ${sgn(-q)})(${r}x ${sgn(-s)})$.`],
+        steps: [
+          { h: 'Find the integer root', d: `$P(${t}) = 0$, so $(x ${sgn(-t)})$ is a factor` },
+          { h: 'Factorise the quadratic left behind', d: `$(${p}x ${sgn(-q)})(${r}x ${sgn(-s)})$` },
+          { h: 'Null factor law', d: `$x = \\dfrac{${q}}{${p}}$, $\\ x = \\dfrac{${s}}{${r}}$, $\\ x = ${t}$` }
+        ]
+      };
+    }
+    const p = rc(rng, [2, 3]);
+    let q = nz(rng, -6, 6);
+    for (let guard = 0; gcd(Math.abs(q), p) !== 1 && guard < 40; guard++) q = nz(rng, -6, 6);
+    if (gcd(Math.abs(q), p) !== 1) rej(true);
+    const t = nz(rng, -5, 5);
+    const c3 = p * p, c2 = -(2 * p * q + p * p * t), c1 = q * q + 2 * p * q * t, c0 = -q * q * t;
+    return {
+      prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals, listing each **distinct** solution once.`,
+      answerType: 'set', answer: { values: [q / p, t] },
+      inputHint: 'e.g. x = 3/2, -4',
+      traps: [
+        { value: q, why: `$(${p}x ${sgn(-q)})^2 = 0$ gives $x = \\dfrac{${q}}{${p}}$ — the leading $${p}$ still has to be divided out.` },
+        { value: c0, why: 'The constant term is not a root here. Use the rational root theorem to narrow the candidates first.' }
+      ],
+      hints: [`The cubic has a **repeated** rational factor.`,
+        `$x = ${t}$ is one root; dividing $(x ${sgn(-t)})$ out leaves a perfect square.`,
+        `That square is $(${p}x ${sgn(-q)})^2$.`],
+      steps: [
+        { h: 'Factorise', d: `$${poly([c3, c2, c1, c0])} = (${p}x ${sgn(-q)})^2(x ${sgn(-t)})$` },
+        { h: 'Null factor law', d: `$(${p}x ${sgn(-q)})^2 = 0 \\Rightarrow x = \\dfrac{${q}}{${p}}$ (twice); $\\ x = ${t}$` },
+        { h: 'Distinct solutions', d: `$x = \\dfrac{${q}}{${p}}$ or $x = ${t}$` }
+      ]
+    };
+  }),
   // Two factors given, two unknown coefficients (dot point 0).
   V([4], rng => {
     const m = rc(rng, [1, 1, 2, 3]);

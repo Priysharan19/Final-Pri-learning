@@ -841,7 +841,7 @@ function counterexample(A, B, meta) {
         if (!Number.isFinite(L) || !Number.isFinite(R)) continue;
         if (Math.abs(L - R) > Math.max(1e-6, Math.abs(R) * 1e-6)) {
           return build('counterexample', {
-            text: `Put ${variable} = ${fmtNum(sol)} — the answer to the original — into this line and it reads ${fmtNum(L)} = ${fmtNum(R)}, which is false.`
+            text: `Put a solution of the original equation in for ${variable} (try it yourself) and this line reads ${fmtNum(L)} = ${fmtNum(R)}, which is false: a correct step keeps every solution.`
           }, 'medium');
         }
       }

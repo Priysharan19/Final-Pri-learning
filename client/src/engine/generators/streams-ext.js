@@ -258,84 +258,26 @@ export const streamsExt = {
         ]
       };
     }
-    // Solving over the rationals: the rational root theorem narrows the search,
-    // and the factors that come out need not have leading coefficient 1.
-    const branch = ri(rng, 0, 2);
-    if (branch === 0) {
-      const p = rc(rng, [2, 3]);
-      let q = nz(rng, -7, 7);
-      for (let guard = 0; gcd(Math.abs(q), p) !== 1 && guard < 40; guard++) q = nz(rng, -7, 7);
-      if (gcd(Math.abs(q), p) !== 1) return streamsExt['me11-poly'](rng, diff);
-      const r = nz(rng, -5, 5);
-      let s = nz(rng, -5, 5);
-      if (s === r) s = r === 5 ? -1 : r + 1;
-      const c3 = p, c2 = -(p * (r + s) + q), c1 = p * r * s + q * (r + s), c0 = -q * r * s;
-      return {
-        prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals.`,
-        answerType: 'set', answer: { values: [q / p, r, s] },
-        inputHint: 'e.g. x = 3/2, -1, 4',
-        traps: [
-          { value: q, why: `A factor $(${p}x ${sgn(-q)})$ is zero at $x = \\dfrac{${q}}{${p}}$, not at $x = ${q}$ — divide by the leading $${p}$.` },
-          { value: c0, why: 'The rational root theorem says a root is $\\pm\\dfrac{\\text{factor of the constant}}{\\text{factor of the leading coefficient}}$ — the constant term itself is rarely a root.' }
-        ],
-        hints: [`By the rational root theorem any rational root is $\\pm\\dfrac{p}{q}$ with $p \\mid ${Math.abs(c0)}$ and $q \\mid ${p}$.`,
-          `Testing the integer candidates finds $x = ${r}$, so $(x ${sgn(-r)})$ is a factor.`,
-          `Dividing out leaves $(${p}x ${sgn(-q)})(x ${sgn(-s)})$, and one root is a fraction.`],
-        steps: [
-          { h: 'Candidate rational roots', d: `$\\pm\\dfrac{\\text{factors of } ${Math.abs(c0)}}{\\text{factors of } ${p}}$` },
-          { h: 'Factorise fully', d: `$${poly([c3, c2, c1, c0])} = (${p}x ${sgn(-q)})(x ${sgn(-r)})(x ${sgn(-s)})$` },
-          { h: 'Null factor law', d: `$x = \\dfrac{${q}}{${p}}$, $\\ x = ${r}$, $\\ x = ${s}$` }
-        ]
-      };
-    }
-    if (branch === 1) {
-      const p = rc(rng, [2, 3]), r = rc(rng, [2, 3]);
-      let q = nz(rng, -5, 5), s = nz(rng, -5, 5);
-      for (let guard = 0; (gcd(Math.abs(q), p) !== 1 || gcd(Math.abs(s), r) !== 1 || q * r === s * p) && guard < 60; guard++) {
-        q = nz(rng, -5, 5); s = nz(rng, -5, 5);
-      }
-      if (gcd(Math.abs(q), p) !== 1 || gcd(Math.abs(s), r) !== 1 || q * r === s * p) return streamsExt['me11-poly'](rng, diff);
-      const t = nz(rng, -4, 4);
-      const c3 = p * r, c2 = -(p * s + q * r + p * r * t), c1 = q * s + (p * s + q * r) * t, c0 = -q * s * t;
-      return {
-        prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals.`,
-        answerType: 'set', answer: { values: [q / p, s / r, t] },
-        inputHint: 'e.g. x = 1/2, -2/3, 4',
-        traps: [
-          { value: q * s, why: 'Two of the three roots here are fractions — the leading coefficient does not divide out neatly into integer roots.' },
-          { value: t, why: `$x = ${t}$ is only **one** of the three solutions; the question asks for all of them.` }
-        ],
-        hints: [`The leading coefficient is $${c3} = ${p} \\times ${r}$, so denominators of $${p}$ and $${r}$ are both possible.`,
-          `The integer root is $x = ${t}$; divide $(x ${sgn(-t)})$ out first.`,
-          `What is left factorises as $(${p}x ${sgn(-q)})(${r}x ${sgn(-s)})$.`],
-        steps: [
-          { h: 'Find the integer root', d: `$P(${t}) = 0$, so $(x ${sgn(-t)})$ is a factor` },
-          { h: 'Factorise the quadratic left behind', d: `$(${p}x ${sgn(-q)})(${r}x ${sgn(-s)})$` },
-          { h: 'Null factor law', d: `$x = \\dfrac{${q}}{${p}}$, $\\ x = \\dfrac{${s}}{${r}}$, $\\ x = ${t}$` }
-        ]
-      };
-    }
-    const p = rc(rng, [2, 3]);
-    let q = nz(rng, -6, 6);
-    for (let guard = 0; gcd(Math.abs(q), p) !== 1 && guard < 40; guard++) q = nz(rng, -6, 6);
-    if (gcd(Math.abs(q), p) !== 1) return streamsExt['me11-poly'](rng, diff);
-    const t = nz(rng, -5, 5);
-    const c3 = p * p, c2 = -(2 * p * q + p * p * t), c1 = q * q + 2 * p * q * t, c0 = -q * q * t;
+    // D4 (direct form): the factor theorem used twice to find two unknown coefficients. The equations solved over the
+    // rationals are overlay forms (au-forms-gaps-f-nsw.js).
+    const r1_ = nz(rng, -4, 4);
+    let r2_ = nz(rng, -4, 4);
+    if (r2_ === r1_) r2_ = r1_ === 4 ? -4 : r1_ + 1;
+    const s_ = nz(rng, -4, 4), m_ = rc(rng, [1, 2, 3]);
+    const A_ = -m_ * (r1_ + r2_ + s_), B_ = m_ * (r1_ * r2_ + r1_ * s_ + r2_ * s_), C_ = -m_ * r1_ * r2_ * s_;
+    const key_ = A_ + B_;
     return {
-      prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals, listing each **distinct** solution once.`,
-      answerType: 'set', answer: { values: [q / p, t] },
-      inputHint: 'e.g. x = 3/2, -4',
-      traps: [
-        { value: q, why: `$(${p}x ${sgn(-q)})^2 = 0$ gives $x = \\dfrac{${q}}{${p}}$ — the leading $${p}$ still has to be divided out.` },
-        { value: c0, why: 'The constant term is not a root here. Use the rational root theorem to narrow the candidates first.' }
-      ],
-      hints: [`The cubic has a **repeated** rational factor.`,
-        `$x = ${t}$ is one root; dividing $(x ${sgn(-t)})$ out leaves a perfect square.`,
-        `That square is $(${p}x ${sgn(-q)})^2$.`],
+      prompt: `$P(x) = ${m_ === 1 ? '' : m_}x^3 + ax^2 + bx ${sgn(C_)}$ has $(x ${sgn(-r1_)})$ and $(x ${sgn(-r2_)})$ as factors. Find the value of $a + b$.`,
+      answerType: 'numeric', answer: { value: key_ }, answerPrefix: 'a + b =',
+      traps: [{ value: A_, why: 'That is $a$ alone. The question asks for $a + b$.' }, { value: B_, why: 'That is $b$ alone. The question asks for $a + b$.' }].filter(t => t.value !== key_),
+      hints: ['A factor $(x - r)$ means $P(r) = 0$.',
+        `Write $P(${r1_}) = 0$ and $P(${r2_}) = 0$: two equations in $a$ and $b$.`,
+        'Solve the pair, then add the two values.'],
       steps: [
-        { h: 'Factorise', d: `$${poly([c3, c2, c1, c0])} = (${p}x ${sgn(-q)})^2(x ${sgn(-t)})$` },
-        { h: 'Null factor law', d: `$(${p}x ${sgn(-q)})^2 = 0 \\Rightarrow x = \\dfrac{${q}}{${p}}$ (twice); $\\ x = ${t}$` },
-        { h: 'Distinct solutions', d: `$x = \\dfrac{${q}}{${p}}$ or $x = ${t}$` }
+        { h: 'First factor', d: `$P(${r1_}) = 0$ gives an equation in $a$ and $b$` },
+        { h: 'Second factor', d: `$P(${r2_}) = 0$ gives a second equation` },
+        { h: 'Solve together', d: `$a = ${A_}$ and $b = ${B_}$` },
+        { h: 'Add', d: `$a + b = ${key_}$` }
       ]
     };
   },
