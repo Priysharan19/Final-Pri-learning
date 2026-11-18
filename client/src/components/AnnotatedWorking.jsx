@@ -61,7 +61,7 @@ function RuleLine({ rule, t }) {
   );
 }
 
-function CardBody({ card, model, t, renderBreakDetail }) {
+export function CardBody({ card, model, t, renderBreakDetail }) {
   if (card.status === 'unread') return <p>{t('aw.body.unread')}</p>;
   if (card.valueChain === 'given') return <p>{t('aw.body.given')}</p>;
   if (card.valueChain === 'verified') return <p>{t('aw.body.valueVerified')}</p>;

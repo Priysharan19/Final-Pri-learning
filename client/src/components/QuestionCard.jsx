@@ -158,6 +158,7 @@ const MistakeGraph = React.lazy(() => import('./MistakeGraph.jsx').catch(() => (
 // Annotated working: each checked line's named rule, numbered against the ink,
 // and the evaluation built from the receipt. Engine-only, feedback only, and
 // its own chunk; a chunk that cannot load shows the plain step report instead.
+const MarkedPage = React.lazy(() => import('./MarkedPage.jsx').catch(() => ({ default: () => null })));
 const AnnotatedWorkingPart = React.lazy(() => import('./AnnotatedWorking.jsx').catch(() => ({ default: () => null })));
 
 class TutorBoundary extends React.Component {
@@ -2245,6 +2246,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   }, [resolved, previousAttempt, res, writeMode, judged, inkResult, working, shownGrade, markedCount]);
   const [awModel, setAwModel] = useState(null);
   useEffect(() => { if (!awInput) setAwModel(null); }, [awInput]);
+  // The marked page: the student's own page with each judged line outlined and one comment per
+  // line beside it. Only for a marked result with a step report of at least two lines; any other
+  // result keeps the views it had.
+  const markedOn = !!awInput && resolved && !res?.revealed && !res?.invalid;
+  const photoPageOn = markedOn && mode === 'photo' && !!photo && !!photoLines?.lines?.length;
+  const inkPageOn = markedOn && writeMode;
+  const photoPageLines = photoPageOn ? photoLines.lines.filter(l => !l.excluded && String(l.text).trim()) : null;
   const instrumentScore = INSTRUMENT && !!shownGrade && Number.isFinite(Number(shownGrade.awarded))
     && Number(shownGrade.possible) > 0 && Number(shownGrade.awarded) >= 0 && Number(shownGrade.awarded) <= Number(shownGrade.possible);
 
@@ -2893,7 +2901,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   {drop.dragging && photoOCR.phase !== 'idle' && <p className="pf-dropping" role="status">{t('photo.dropActive')}</p>}
                 </div>
               )}
-              {mode === 'photo' && photoOCR.phase === 'done' && photoLines && (
+              {photoPageOn && (
+                <React.Suspense fallback={null}>
+                  <MarkedPage input={awInput} source={{ kind: 'photo', src: photo, lines: photoPageLines }} texOf={texOf} />
+                </React.Suspense>
+              )}
+              {mode === 'photo' && photoOCR.phase === 'done' && photoLines && !photoPageOn && (
                 <ReadingReview t={t} photo={photo} transcript={photoLines} disabled={resolved || busy} marks={photoMarks} texOf={texOf}
                   toConfirm={toConfirm} firstToCheck={firstToCheck} confirmFocusRef={confirmFocusRef}
                   onEdit={(i, text) => changePhotoLines(editLine(photoLines, i, text))}
@@ -2963,7 +2976,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             </div>
           </div>
         ) : (
-          <div className={`ink-row${awModel ? ' aw-row' : ''}`}>
+          <>
+          {inkPageOn && (
+            <React.Suspense fallback={null}>
+              <MarkedPage input={awInput} source={{ kind: 'ink', strokes: latestInk.current || restoredInk || [] }} texOf={texOf} />
+            </React.Suspense>
+          )}
+          <div className={`ink-row${awModel && !inkPageOn ? ' aw-row' : ''}`} hidden={inkPageOn || undefined}>
             {/* data-marked starts the reading sweep (theme.css): it appears only
                 when the deterministic engine has actually marked this page. */}
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
@@ -3071,12 +3090,13 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </div>
               )}
             </div>
-            {awInput && writeMode && awModel && (
+            {awInput && writeMode && awModel && !inkPageOn && (
               <React.Suspense fallback={null}>
                 <AnnotatedWorkingPart part="comments" input={awInput} />
               </React.Suspense>
             )}
           </div>
+          </>
         )}
 
         {/* A reading in doubt asks about the smallest useful region — one
