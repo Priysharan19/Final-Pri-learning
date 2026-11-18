@@ -9,6 +9,7 @@
 // Nothing here marks anything: printed papers are marked by the student or
 // their teacher with the marking guidelines.
 // ─────────────────────────────────────────────────────────────────────────────
+import { BRAND } from '../brand/edition.js';
 import React, { useEffect, useState } from 'react';
 import PageLink from '../components/PageLink.jsx';
 import Working from '../instrument/Working.jsx';
@@ -23,7 +24,7 @@ export function ext1PapersFor(user) {
   return !!user && user.course === 'nsw' && user.pathway === 'ext1' && Number(user.year) >= 11;
 }
 
-const fileName = (title, kind) => `Prithagoras-Ext1-${title.replace(/[^A-Za-z0-9]+/g, '-')}${kind === 'guidelines' ? '-Marking-Guidelines' : ''}.pdf`;
+const fileName = (title, kind) => `${BRAND}-Ext1-${title.replace(/[^A-Za-z0-9]+/g, '-')}${kind === 'guidelines' ? '-Marking-Guidelines' : ''}.pdf`;
 
 export default function Ext1Papers() {
   const t = useT();
