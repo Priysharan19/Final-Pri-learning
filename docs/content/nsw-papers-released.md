@@ -79,7 +79,7 @@ Source: Mathematics Advanced 11–12 Syllabus (2024): HSC examinations — https
 | MAV-12-03 | Sequences and series | 12 | 4 | 8 | 4 | yes |
 | MAV-12-04 | Differential calculus | 12 | 5 | 11 | 7 | yes |
 | MAV-12-05 | Integral calculus | 12 | 5 | 13 | 9 | yes |
-| MAV-12-06 | Applications of calculus | 12 | 5 | 15 | 13 | yes |
+| MAV-12-06 | Applications of calculus | 12 | 5 | 15 | 14 | yes |
 | MAV-12-07 | Random variables | 12 | 4 | 8 | 8 | yes |
 | MAV-12-02 | Further graph transformations and modelling | 12 | 3 | 9 | 4 | yes |
 | MAV-12-08 | Financial mathematics | 12 | 3 | 8 | 8 | yes |

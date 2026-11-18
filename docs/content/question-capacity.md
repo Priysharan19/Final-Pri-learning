@@ -130,7 +130,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y11-lines` | 4 | 141.0k | 225 | — | — |
 | `y7-ratio` | 4 | 142.1k | 1009 | — | — |
 | `ms11-formulas` | 4 | 155.3k | 18 | — | — |
-| `me11-poly` | 4 | 160.8k | 558 | — | — |
+| `me11-poly` | 4 | 160.9k | 558 | — | — |
 | `mex-vectors` | 4 | 227.2k | 50 | — | — |
 | `me12-vectors-forms` | 4 | 250.8k | 6 | 5: context, direct, missing-parameter, multi-step, representation | — |
 | `y9-data-inquiry` | 4 | 256.8k | 273 | — | — |
