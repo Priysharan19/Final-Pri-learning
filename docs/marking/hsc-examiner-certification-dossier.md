@@ -39,7 +39,7 @@ It hashes (a) the marking source below — the import tree of `server/platform/m
 | `client/src/engine/curriculum-nsw/legacyGenerators.js` | `c3c2db777863c5fe7bee9693e16e38eaf56de59c5ea04824b52ebb9fb4affe55` |
 | `client/src/engine/curriculum-nsw/stage6-2017.js` | `b0634636b45f0a74d6d835e517b5c8d7736f0edacbf4305138bb20916187a70d` |
 | `client/src/engine/curriculum-nsw/standard-2024.js` | `f3d56c04910a53d9ee4834a1937171aed6af4b9e6579045849e03ca1036fa0df` |
-| `client/src/engine/curriculum.js` | `62f7bc6ec3b6c50dede37f04b82dc839c75ac77b61a8b2cef51733c6dc50f01e` |
+| `client/src/engine/curriculum.js` | `913bfb9616fdbaab4475e5c3bcc2239869c29326369b231cee417adef0c3510f` |
 | `client/src/engine/diagnose.js` | `66754a047db247c8a95ffa87bdedb2d5ef401fea972e102bc43b00130f727280` |
 | `client/src/engine/exact.js` | `564986734049c7c7c969d202546ba1847cb2ef90c5a301e9195158b33726f570` |
 | `client/src/engine/expr.js` | `1157e9d361d63e6e93f3305b4e1046062dedd3b062268fc9add97d4242aa36f6` |
@@ -126,7 +126,7 @@ It hashes (a) the marking source below — the import tree of `server/platform/m
 | `client/src/engine/proofShape.js` | `f85d848a0959501d8cef41088eefa4e54a65656ea8dfe0f7dba5b20562a16eeb` |
 | `client/src/engine/proofSteps.js` | `c82c30cb454b1889d83a146662d6dc53944a3a09545b72f833d49ce068025ea2` |
 | `client/src/engine/pyq/pyqIndex.js` | `bc9942b2d97018c2913f162d046500d35af17e419248f8a7ba332111c0e76930` |
-| `client/src/engine/qhelpers.js` | `32b0491142893b12859f57ac3d602322426c04df99f2489c431040c26a39c180` |
+| `client/src/engine/qhelpers.js` | `1d0f2a630a3ad76313b59fb2709b7c3d18ce241250b16f557e2f870da363df18` |
 | `client/src/engine/reason-area.js` | `679a502ac26463e72d3a822bfaf37ad294e115069ac074b061bb5efc2fa66acd` |
 | `client/src/engine/reason-chain.js` | `3a65f3414aedcce099cb83371fa418eb4dc09f43395f1d83fa409aac16a93f9b` |
 | `client/src/engine/reason-explog.js` | `4a75b51ca71935319ced9663d27260f46b1858272dd00599fb85f80f1d8a7165` |

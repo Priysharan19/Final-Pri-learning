@@ -72,7 +72,7 @@ It hashes (a) the marking source files below — the full import tree of `server
 | `client/src/engine/misconceptions/topics/trigonometry.js` | `3def59c29adbf0c2289c959efff9c2fcadcd3ba6536ea46849535d3a2600bc45` |
 | `client/src/engine/proofShape.js` | `f85d848a0959501d8cef41088eefa4e54a65656ea8dfe0f7dba5b20562a16eeb` |
 | `client/src/engine/proofSteps.js` | `c82c30cb454b1889d83a146662d6dc53944a3a09545b72f833d49ce068025ea2` |
-| `client/src/engine/qhelpers.js` | `32b0491142893b12859f57ac3d602322426c04df99f2489c431040c26a39c180` |
+| `client/src/engine/qhelpers.js` | `1d0f2a630a3ad76313b59fb2709b7c3d18ce241250b16f557e2f870da363df18` |
 | `client/src/engine/reason-area.js` | `679a502ac26463e72d3a822bfaf37ad294e115069ac074b061bb5efc2fa66acd` |
 | `client/src/engine/reason-chain.js` | `3a65f3414aedcce099cb83371fa418eb4dc09f43395f1d83fa409aac16a93f9b` |
 | `client/src/engine/reason-explog.js` | `4a75b51ca71935319ced9663d27260f46b1858272dd00599fb85f80f1d8a7165` |

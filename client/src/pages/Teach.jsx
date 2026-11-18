@@ -12,6 +12,7 @@ import { downloadJSON, readJSONFile, readTextFile, dateStamp, printPage } from '
 import { parseRoster } from '../lib/csv.js';
 import { MathText } from '../lib/latex.jsx';
 import { CURRICULUM } from '../engine/curriculum.js';
+import { nswIssuedLevels } from '../engine/nswOffer.js';
 import { offersCourse } from '../platform/edition.js';
 import { assignmentSections, describeTaskTargets, sectionKeyForChapter } from '../platform/assignmentTarget.js';
 import ClassroomPanel from '../components/ClassroomPanel.jsx';
@@ -278,7 +279,8 @@ export default function Teach() {
     } catch (err) { setMsg(`⚠️ ${err.message}`); }
   }
 
-  const allSubtopics = CURRICULUM.flatMap(y => y.subtopics.map(s => ({ ...s, year: y.year })));
+  // Only the chapters the server issues a question for (owner decision 2026-11-18).
+  const allSubtopics = CURRICULUM.flatMap(y => y.subtopics.filter(s => nswIssuedLevels(s.id).length > 0).map(s => ({ ...s, year: y.year })));
   const indiaClass = analytics ? analytics.syllabus !== 'nsw' : true;
   const sheetStudent = sheet?.kind === 'student' ? analytics?.students.find(s => s.id === sheet.id) : null;
 
