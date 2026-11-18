@@ -58,11 +58,11 @@ has no standing outside it.
 ## Subscriptions
 
 In this version the free plan includes every difficulty level with step-by-step
-checking, up to 20 practice questions a day, up to 5 handwriting reads and 5
-"Practise this" photos a day, and one exam simulation every 30 days. Practice
-questions are counted by the Sydney calendar day, and reads over any 24 hours.
-The app tells you what is left. Prithagoras Premium removes the practice and
-exam limits, raises the daily reads to 25 and 25, and unlocks the other features
+checking, practice questions with no daily limit, up to 5 handwriting reads and 5
+"Practise this" photos a day, and one exam simulation every 30 days. Reads
+are counted over any 24 hours.
+The app tells you what is left. Prithagoras Premium removes the
+exam limit, raises the daily reads to 50 and 50, and unlocks the other features
 listed at the point of purchase. These numbers can change in a later version;
 the app always shows the current ones. Premium is sold as a subscription at
 A$9.99 a month or A$99 a year, in Australian dollars. Where GST applies, the price includes it. You pay on a page hosted by

@@ -31,7 +31,7 @@ review and does not remove the banner. Nothing here says the pages comply with a
      device". I changed those texts too (English and Hindi). Because the prompt's meaning changed,
      I raised `READER_PERMISSION_VERSION` from 1 to 2. **Every student is asked for permission
      again.** The CTO should know this before release.
-2. **The plans on the pages are today's code, not the plan you approved.** See "Plans" below.
+2. **The plans on the pages are the plan you approved** (the code now ships it). See "Plans" below.
 3. **Hosting facts I could not fill.** The code does not say where the servers and databases are.
    - Australia: the pages still have two blanks, `{{AU_HOSTING_PROVIDER_AND_REGION}}` and
      `{{AU_DATABASE_PROVIDER_AND_REGION}}`, plus `{{CONTACT_EMAIL}}`. The page shows a "Template"
@@ -61,34 +61,36 @@ review and does not remove the banner. Nothing here says the pages comply with a
 
 ## Plans: what you approved against what the code does
 
-You approved the new plan on 18 November 2026. The code still ships the older packaging
-(`ACTIVE_PACKAGING_ID = 'd19-d20'` in `client/src/engine/packaging.js`). The switch lands in
-the next release. **The pages describe the code.** A test fails when the packaging changes, so the
-pages cannot go stale without someone noticing.
+You approved the new plan on 18 November 2026, and the code now ships it
+(`ACTIVE_PACKAGING_ID = 'value-2026-11'` in `client/src/engine/packaging.js`). **The pages
+describe the code.** A test (`client/test/legal-owner-review-check.mjs`) reads every plan number
+from `packaging.js`, so the pages cannot go stale without someone noticing.
 
-| | You approved | Code today | On the pages |
+| | You approved | Code | On the pages |
 |---|---|---|---|
-| Free: practice questions | unlimited | 20 a day | 20 a day |
+| Free: practice questions | no daily limit | no daily limit | no daily limit |
 | Free: every difficulty, step checking | yes | yes | yes |
 | Free: handwriting reads | 5 a day | 5 a day | 5 a day |
 | Free: "Practise this" photos | 5 a day | 5 a day | 5 a day |
-| Free: exam simulations | 1 a week | 1 every 30 days | 1 every 30 days |
-| Premium: reads and photos | 100 and 100 a day | 25 and 25 a day | 25 and 25 a day |
-| Premium: simulations | unlimited | no limit | no limit ("removes the practice and exam limits") |
+| Free: exam simulations | 1 every 30 days | 1 every 30 days | 1 every 30 days |
+| Premium: reads and photos | 50 and 50 a day | 50 and 50 a day | 50 and 50 a day |
+| Premium: simulations | no limit | no limit | no limit ("removes the exam limit") |
 | Premium price, Australia | A$9.99 / A$99 | A$9.99 / A$99 (`client/edition.config.mjs`) | A$9.99 / A$99 |
 
+Stored handwriting: the original of a marked practice answer is kept for 2 years (730 days), then
+deleted automatically (`ORIGINAL_RETENTION_MS` in `server/platform/originalWork.js`). A teacher
+sees handed-in work only, never practice handwriting or work that was not handed in.
+
 For the CTO:
-- The second packaging in the file, `value-2026-11`, is not the plan you approved. It has free
-  reads at **10** (you approved 5) and the exam window at **30 days** (you approved 1 a week).
-  Fix it before the switch.
-- Until the switch, the pages must not say "unlimited". When it lands, change the numbers in
-  `docs/legal/terms.md`, its Hindi, and `docs/legal/au/terms.md`.
+- The pages no longer state a daily practice number or a calendar-day rule for practice, because
+  practice has no daily limit. The Hindi terms were updated in step.
 - India prices are not in the code. The store shows its own rupee price, and the India terms say
   so. I did not state a rupee price.
 - Cancel, renew and refund rules are as coded in `server/platform/stripe.js` (Australia): cancel
   at the end of the paid period, deleting the account cancels at once, a full refund of the
   current period ends Premium at once. The Australian refund page already said this and did not
   need a change. The India refund page (store purchases) did not need a change either.
+- These pages have still not been reviewed by a lawyer; the "not reviewed by a lawyer" banner stays.
 
 ## India: privacy notice (English and Hindi)
 
@@ -127,13 +129,13 @@ guardian email confirmation).
 ## India: terms (English and Hindi)
 
 **What changed:** the "what the app is" section (stored original, AI labelled, teachers, teacher
-marks kept separate); the subscription section (today's free plan and what Premium changes); the
+marks kept separate); the subscription section (the approved free plan and what Premium changes); the
 invitation trial (any earlier free trial blocks a second; only who invited whom is kept).
 
 | Promise on the page | Code file that keeps it |
 |---|---|
-| Free plan numbers (20 a day, 5 and 5, 1 every 30 days); Premium 25 and 25 | `client/src/engine/packaging.js`, `server/platform/aiAllowance.js`, `server/platform/practiceAllowance.js`, `server/platform/exams.js` |
-| Reads are counted over 24 hours; practice by the Indian calendar day | `aiAllowance.js` (`AI_WINDOW_MS`), `client/src/engine/practiceAllowance.js` |
+| Free plan numbers (practice no daily limit, 5 and 5, 1 every 30 days); Premium 50 and 50 | `client/src/engine/packaging.js`, `server/platform/aiAllowance.js`, `server/platform/practiceAllowance.js`, `server/platform/exams.js` |
+| Reads are counted over 24 hours | `aiAllowance.js` (`AI_WINDOW_MS`), `client/src/engine/practiceAllowance.js` |
 | Every difficulty and step checking are free | `packaging.js` (`PLAN_PROMISES`) |
 | Trial: 7 days, new account (under 7 days old), at most 5 friends per 30 days | `server/platform/referral.js` (`REFERRAL`) |
 | One trial per person, no card, no charge, ends by itself, no cash value | `referral.js` (`billing_trial_claims`, a dated grant) |

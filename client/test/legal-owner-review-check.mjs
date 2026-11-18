@@ -102,16 +102,18 @@ ok(/\(it does for a student under 15\)/.test(AU.terms) && /If you are under 18 a
 
 // ── 5 · The plans, with every number read from packaging.js ─────────────────
 const p = PACKAGING;
-ok(ACTIVE_PACKAGING_ID === 'd19-d20', `the pages describe the ACTIVE packaging (${ACTIVE_PACKAGING_ID}); when the packaging changes this check fails and the pages must be rewritten (packaging.js)`);
+ok(ACTIVE_PACKAGING_ID === 'value-2026-11', `the pages describe the ACTIVE packaging (${ACTIVE_PACKAGING_ID}); when the packaging changes this check fails and the pages must be rewritten (packaging.js)`);
+const practiceSentence = n => n === null ? 'practice questions with no daily limit' : `up to ${n} practice questions a day`;
 for (const [label, terms] of [['India', IN.terms], ['Australia', AU.terms]]) {
-  ok(terms.includes(`up to ${p.free.practicePerDay} practice questions a day`), `${label} terms: free practice is ${p.free.practicePerDay} a day`);
+  ok(terms.includes(practiceSentence(p.free.practicePerDay)), `${label} terms: free practice is ${p.free.practicePerDay === null ? 'uncapped' : p.free.practicePerDay + ' a day'}`);
   ok(terms.includes(`up to ${p.free.readsPerDay} handwriting reads and ${p.free.readsPerDay} "Practise this" photos a day`), `${label} terms: free reads and photos are ${p.free.readsPerDay} a day each`);
   ok(terms.includes(`one exam simulation every ${p.free.examWindowDays} days`) && p.free.examsPerWindow === 1, `${label} terms: one exam simulation every ${p.free.examWindowDays} days`);
   ok(terms.includes(`raises the daily reads to ${p.premium.readsPerDay} and ${p.premium.readsPerDay}`), `${label} terms: Premium reads are ${p.premium.readsPerDay} and ${p.premium.readsPerDay}`);
+  ok(p.free.practicePerDay !== null || (/removes the exam limit/.test(terms) && !/practice (?:and exam )?limits/.test(terms)), `${label} terms: with practice uncapped, Premium removes only the exam limit`);
   ok(/every difficulty level with step-by-step checking/.test(terms) && PLAN_PROMISES.difficulties === 'all' && PLAN_PROMISES.stepChecked === 'every-plan', `${label} terms: every difficulty and step checking are free (packaging.js PLAN_PROMISES)`);
 }
-ok(PRACTICE_DAY_TIME_ZONES.priyabhata === 'Asia/Kolkata' && /Indian calendar day/.test(IN.terms) && PRACTICE_DAY_TIME_ZONES.prithagoras === 'Australia/Sydney' && /Sydney calendar day/.test(AU.terms), 'practice is counted by each edition\'s own calendar day (practiceAllowance.js)');
-ok(/AI_WINDOW_MS = 24 \* 60 \* 60 \* 1000/.test(read('server/platform/aiAllowance.js')) && /reads over any 24 hours/.test(IN.terms) && /reads over any 24 hours/.test(AU.terms), 'reads are counted over a rolling 24 hours (aiAllowance.js)');
+ok(PRACTICE_DAY_TIME_ZONES.priyabhata === 'Asia/Kolkata' && PRACTICE_DAY_TIME_ZONES.prithagoras === 'Australia/Sydney' && (p.free.practicePerDay === null ? !/calendar day/.test(IN.terms + AU.terms) : /Indian calendar day/.test(IN.terms) && /Sydney calendar day/.test(AU.terms)), 'practice is counted by each edition\'s own calendar day (practiceAllowance.js)');
+ok(/AI_WINDOW_MS = 24 \* 60 \* 60 \* 1000/.test(read('server/platform/aiAllowance.js')) && /[Rr]eads are counted over any 24 hours/.test(IN.terms) && /[Rr]eads are counted over any 24 hours/.test(AU.terms), 'reads are counted over a rolling 24 hours (aiAllowance.js)');
 const edition = read('client/edition.config.mjs');
 ok(/listPrice: Object\.freeze\(\{ monthly: 9\.99, annual: 99 \}\)/.test(edition) && /A\$9\.99 a month or A\$99 a year/.test(AU.terms) && /A\$9\.99 a month\*\* or \*\*A\$99 a year/.test(AU.refund), 'the Australian prices are those of edition.config.mjs');
 ok(/providers: Object\.freeze\(\['razorpay', 'apple', 'google'\]\)/.test(edition) && /listPrice: null/.test(edition) && /price, the billing period and what is included are shown by the store before you pay/.test(IN.terms), 'India shows the store\'s own INR price; no price is coded or stated');
@@ -160,7 +162,7 @@ for (const text of [IN.privacy, IN.terms, AU.privacy, AU.terms, AU.refund]) ok(!
 
 // ── 9 · The Hindi pages carry every new promise ─────────────────────────────
 for (const [what, re] of [['2 years and 730 days', /2 वर्ष \(730 दिन\)/], ['40 and 24 MB', /40 एमबी[\s\S]*24 एमबी/], ['1.3 seconds', /1\.3 सेकंड/], ['Tele-MANAS 14416', /14416/], ['fewer than 10', /10 से कम/], ['teachers and classes section', /## शिक्षक और कक्षाएँ/], ['AI label', /एआई ने लिखा, गणित इंजन ने नहीं जाँचा/], ['24 hours', /24 घंटे/], ['four things kept', /चार चीज़ें/]]) ok(re.test(read('docs/legal/privacy.hi.md')), `Hindi privacy: ${what}`);
-for (const [what, re] of [['20 questions a day', /20\s+प्रश्न तक/], ['5 and 5', /5 पठन तक[\s\S]*5\s+फ़ोटो/], ['every 30 days', /हर 30\s+दिन में एक परीक्षा-अभ्यास/], ['25 and 25', /25 और 25/]]) ok(re.test(IN.termsHi), `Hindi terms: ${what}`);
+for (const [what, re] of [['practice uncapped', /अभ्यास-प्रश्न बिना\s+दैनिक सीमा के/], ['5 and 5', /5 पठन तक[\s\S]*5\s+फ़ोटो/], ['every 30 days', /हर 30\s+दिन में एक परीक्षा-अभ्यास/], ['50 and 50', /50 और 50/]]) ok(re.test(IN.termsHi), `Hindi terms: ${what}`);
 
 console.log(failures.length
   ? `LEGAL OWNER REVIEW: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.slice(0, 60).join('\n  · ')}`
