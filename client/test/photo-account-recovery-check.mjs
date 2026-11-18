@@ -31,7 +31,7 @@ has(photo, /photoOCR\.blockedKey !== 'verdict\.photoReadingSignIn'/, 'Only an au
 has(photo, /!cloudReadingEnabled\(user\)/, 'A locally stored profile is not assumed to be authorised');
 has(photo, /await readOnePage\(dataURL\)/, 'Photo recovery uses real existing cloud reader');
 has(photo, /photoReadGeneration\.current/, 'Late recognition responses are generation guarded');
-has(readFileSync(new URL('../src/components/PhotoLines.jsx', import.meta.url), 'utf8'), /data-photo-correct-transcript/, 'Recognition transcript is human editable');
+has(readFileSync(new URL('../src/components/ReadingReview.jsx', import.meta.url), 'utf8'), /data-photo-correct-transcript/, 'Recognition transcript is human editable');
 // The transcript is edited line by line (PhotoLines.jsx). A corrected line
 // reaches the working that is submitted, and the answer field holds the
 // proposal from the kept lines — never the last line copied in as a sentence.

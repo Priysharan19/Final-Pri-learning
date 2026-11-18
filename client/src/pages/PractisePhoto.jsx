@@ -18,6 +18,7 @@ import { cloudAvailable } from '../platform/cloudTransport.js';
 const PhotoAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
 import { chapterChoices, identifyQuestionPhoto, practiseHrefFor } from '../lib/questionPhoto.js';
 import { createPhotoRequestGate } from './photoPractiseRequest.js';
+import { intakeImageFile, intakeMessageKey, PHOTO_ACCEPT } from '../ink/photoIntake.js';
 
 const STATE_KEY = {
   offline: 'snap.offline',
@@ -35,29 +36,6 @@ const STATE_KEY = {
   declined: 'snap.declined',
   'not-permitted': 'snap.notPermitted'
 };
-
-function readFile(file, signal) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    let settled = false;
-    const finish = (value, failed = false) => {
-      if (settled) return;
-      settled = true;
-      signal?.removeEventListener?.('abort', abort);
-      if (failed) reject(value); else resolve(value);
-    };
-    const abort = () => {
-      try { if (reader.readyState === FileReader.LOADING) reader.abort(); } catch { /* best effort */ }
-      finish(new Error('Photo reading was cancelled.'), true);
-    };
-    reader.onload = () => finish(String(reader.result || ''));
-    reader.onerror = () => finish(reader.error || new Error('Photo cannot be read.'), true);
-    reader.onabort = () => finish(new Error('Photo reading was cancelled.'), true);
-    if (signal?.aborted) { abort(); return; }
-    signal?.addEventListener?.('abort', abort, { once: true });
-    try { reader.readAsDataURL(file); } catch (error) { finish(error, true); }
-  });
-}
 
 export default function PractisePhoto() {
   const t = useT();
@@ -97,15 +75,19 @@ export default function PractisePhoto() {
     setAccountRecoveryOpen(false); // photo replacement ends previous auth-error pane.
     let stage = 'decoding';
     try {
-      const dataUrl = await readFile(file, signal);
+      // The one photo door: JPEG, PNG, WebP, AVIF and HEIC (converted on the device).
+      const { dataUrl } = await intakeImageFile(file);
+      if (signal?.aborted) return;
       if (!gate.current(epoch)) return;
       stage = 'identifying';
       const read = await identifyQuestionPhoto(dataUrl, { signal, user });
       if (!gate.current(epoch)) return;
       setReading({ accountId, result: read });
       setChapterId(read.candidates?.[0]?.chapterId || '');
-    } catch {
-      if (gate.current(epoch)) {
+    } catch (error) {
+      if (gate.current(epoch) && error?.name === 'PhotoIntakeError') {
+        setReading({ accountId, result: { state: 'bad-photo', intakeKey: intakeMessageKey(error), questionText: '', candidates: [] } });
+      } else if (gate.current(epoch)) {
         // No unhandled FileReader/proxy/provider exception may strand the spinner
         // or leave an old chapter available to practise.
         setReading({ accountId, result: { state: stage === 'decoding' ? 'bad-photo' : 'provider-down', questionText: '', candidates: [] } });
@@ -125,7 +107,7 @@ export default function PractisePhoto() {
       <p className="sub">{t('snap.lead')}</p>
       <p className="muted">{t('snap.howMarked')}</p>
 
-      <input ref={inputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+      <input ref={inputRef} type="file" accept={PHOTO_ACCEPT} capture="environment" style={{ display: 'none' }}
         onChange={onFile} data-photo-practise-input aria-hidden="true" tabIndex={-1} />
       <div className="row" style={{ gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
         <button className="btn btn-primary" disabled={busy} onClick={() => inputRef.current?.click()} data-photo-practise-pick>
@@ -137,7 +119,7 @@ export default function PractisePhoto() {
 
       {result && result.state !== 'ok' && (
         <div className="error-box" role="alert" style={{ marginTop: 12 }} data-photo-practise-state={result.state}>
-          {t(STATE_KEY[result.state] || 'snap.providerDown')}
+          {t(result.intakeKey || STATE_KEY[result.state] || 'snap.providerDown')}
         </div>
       )}
 

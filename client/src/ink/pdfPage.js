@@ -144,23 +144,17 @@ export async function renderPdfPages(dataUrl, {
         const base = page.getViewport({ scale: 1 });
         const scale = Math.min(3, Math.max(0.5, renderWidth / Math.max(1, base.width)));
         const viewport = page.getViewport({ scale });
-        // A page that would overflow the canvas is drawn smaller, not refused.
-        let dims = safeCanvasDimensions(viewport, maxCanvasSide, maxCanvasPixels);
-        let drawn = viewport;
-        if (!dims) {
-          const fit = Math.min(maxCanvasSide / Math.max(1, viewport.width), maxCanvasSide / Math.max(1, viewport.height),
-            Math.sqrt(maxCanvasPixels / Math.max(1, viewport.width * viewport.height))) * 0.98;
-          drawn = page.getViewport({ scale: scale * fit });
-          dims = safeCanvasDimensions(drawn, maxCanvasSide, maxCanvasPixels);
-          if (!dims) { failure = failure || 'unreadable'; break; }
-        }
+        // A page that would overflow the canvas (a pathological MediaBox) is refused
+        // before any allocation, as before; an ordinary phone scan is A4 and never gets here.
+        const dims = safeCanvasDimensions(viewport, maxCanvasSide, maxCanvasPixels);
+        if (!dims) { failure = failure || 'unreadable'; break; }
         const canvas = createCanvas(dims.width, dims.height);
         if (!canvas) break;
         const ctx = canvas.getContext('2d');
         if (!ctx) break;
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        renderTask = page.render({ canvasContext: ctx, viewport: drawn });
+        renderTask = page.render({ canvasContext: ctx, viewport });
         await withTimeout(renderTask.promise, operationTimeoutMs, () => renderTask.cancel?.());
         let out = null;
         for (const quality of [0.85, 0.72, 0.6, 0.48]) {

@@ -67,7 +67,7 @@ export function PhotoPreview({ t, src, canRotate, canChange, busy, onRotate, onR
     <div className="pf-preview">
       <button type="button" className="pf-page photo-thumb" data-photo-thumb disabled={!src}
         aria-label={t('photo.view')} onClick={() => src && setOpen(true)}>
-        {src ? <img src={src} alt={t('history.paperWorking')} /> : <span className="pf-page-pdf" aria-hidden="true">PDF</span>}
+        {src ? <img src={src} alt={t('history.paperWorking')} /> : <span className="pf-page-pdf" aria-hidden="true">{t('photo.pdfBadge')}</span>}
         {src && <span className="pf-page-zoom" aria-hidden="true">{t('photo.enlarge')}</span>}
       </button>
       {canChange && (
@@ -106,7 +106,8 @@ export async function rotateDataUrl(dataUrl) {
   const cv = document.createElement('canvas');
   cv.width = img.naturalHeight; cv.height = img.naturalWidth;
   const ctx = cv.getContext('2d');
-  ctx.translate(cv.width, 0); ctx.rotate(Math.PI / 2);
+  // A quarter turn clockwise: (x, y) -> (height - y, x).
+  ctx.setTransform(0, 1, -1, 0, img.naturalHeight, 0);
   ctx.drawImage(img, 0, 0);
   return cv.toDataURL('image/jpeg', 0.88);
 }
