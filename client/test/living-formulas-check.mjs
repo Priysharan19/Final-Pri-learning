@@ -108,7 +108,9 @@ try {
         ok(a11y.svg && a11y.math, `${where}: graph is a labelled image, formula a named group with its spoken reading`);
         ok(!a11y.slotsFocusable, `${where}: numbers in the formula are not extra tab stops`);
         ok(a11y.targets, `${where}: sliders and Reset are 44 px tall`);
-        ok(a11y.slots >= a11y.ranges && /=/.test(a11y.readout) && a11y.caption === 'The dashed grey line is the original.', `${where}: readout "${a11y.readout}" and caption`);
+        // A parameter at its identity value (a 1 or a 0) is not written in the formula, so there are at most as many
+        // numbers in the formula as sliders, and every parameter is still a slider.
+        ok(a11y.slots >= 1 && a11y.slots <= a11y.ranges && /=/.test(a11y.readout) && a11y.caption === 'The dashed grey line is the original.', `${where}: readout "${a11y.readout}" and caption`);
         ok(a11y.resetDisabled, `${where}: Reset is disabled at the starting values`);
 
         // REACTIVE + KEYBOARD

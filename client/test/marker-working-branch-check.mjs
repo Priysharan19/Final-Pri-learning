@@ -99,7 +99,8 @@ const rootDroppedWithoutFactorising = stepCheck(quadratic, [
 // which nothing else is credited. It is still not the complete answer.
 ok(rootDroppedWithoutFactorising.firstBreak === -1 && rootDroppedWithoutFactorising.lines[1].status === 'ok',
   'one root named with no factorisation above is true of that root, not a mistake');
-ok(/2 solutions, and the other is still to find/.test(rootDroppedWithoutFactorising.lines[1].note || ''), '…and the line says a root is still to find');
+// Owner decision 7 (18 Nov 2026): a true line that leaves a root out is INCOMPLETE and names the missing root.
+ok(rootDroppedWithoutFactorising.lines[1].state === 'incomplete' && /x = −6 is also a solution/.test(rootDroppedWithoutFactorising.lines[1].note || ''), '…and the line says a root is still to find, by name');
 ok(checkWorking({ answerType: 'working', answer: { stepMeta: quadratic } }, 'x^2 + 9x + 18 = 0\nx = -3').correct === false,
   '…and as an answer given by its working it is still not correct: a root is missing');
 ok(stepCheck(quadratic, 'x^2 + 9x + 18 = 0\nx = -4').firstBreak === 1, 'a value that is not a root is still the mistake');

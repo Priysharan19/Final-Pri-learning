@@ -160,7 +160,7 @@ export default function MarkedPage({ input, source, texOf = s => s, markReady = 
                   <td><span>{r.text}</span>{r.reason ? <span className="mp-why">{r.reason}</span> : null}</td>
                   <td>
                     <Icon name={r.awarded ? 'check' : 'uncertain'} size={14} />
-                    <span>{r.awarded ? t('mp.criteria.awarded', { marks: r.marks }) : t('mp.criteria.notAwarded', { marks: r.marks })}</span>
+                    <span>{r.awarded ? t('mp.criteria.awarded', { marks: r.marks, count: r.marks }) : t('mp.criteria.notAwarded', { marks: r.marks, count: r.marks })}</span>
                     {r.lines.length > 0 && <span className="mp-why">{t('mp.criteria.onLines', { count: r.lines.length, list: listOf(r.lines) })}</span>}
                   </td>
                 </tr>

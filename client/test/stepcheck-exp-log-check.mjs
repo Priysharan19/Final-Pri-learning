@@ -233,7 +233,7 @@ breaksAt('a far negative root after 2^(−x) = 1/4', eqMeta([2]), ['2^(-x)=1/4',
   ok(`the same with a prompt, got ${JSON.stringify(s)}`, s.every(v => v === 'ok'));
   const rep = report(eqMeta([0, Math.log(3)]), ['e^x=3', 'x=ln(3)']);
   ok(`one root of two named alone: true, still to find, no break, got ${JSON.stringify(rep.lines.map(l => l.status))}`,
-    rep.firstBreak === -1 && rep.lines.every(l => l.status === 'ok' && /still to find/.test(l.note || '')));
+    rep.firstBreak === -1 && rep.lines.every(l => l.status === 'ok' && l.state === 'incomplete' && /still to find|also a solution/.test(l.note || '')));   // owner decision 7: incomplete, never a break
   s = statuses(eqMeta([0, 2]), ['2^x=4', '2^x=1']);
   ok(`2^x = 4 then 2^x = 1 for roots 0 and 2: both branches, got ${JSON.stringify(s)}`, s.every(v => v === 'ok'));
   s = statuses(eqMeta([1, 2]), ['e^2 x = 1e^2']);

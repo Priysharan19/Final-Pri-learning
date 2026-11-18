@@ -100,6 +100,13 @@ export default function LivingFormula({ spec }) {
   useLayoutEffect(() => {
     const box = formulaRef.current;
     const el = showTip && box ? box.querySelector(`[data-param="${active}"]`) : null;
+    if (showTip && box && !el) {
+      // A parameter at its identity value is not written in the formula (3 sin(x)); its note is then
+      // set under the whole formula, so the slider that names it still has a note to point at.
+      const h = Math.round(box.getBoundingClientRect().height + 8);
+      setPop(p => (p && p.left === 120 && p.top === h ? p : { left: 120, top: h }));
+      return;
+    }
     if (!el) { setPop(null); return; }
     const b = box.getBoundingClientRect(), r = el.getBoundingClientRect();
     const left = Math.round(Math.min(Math.max(r.left - b.left + r.width / 2, 120), Math.max(120, b.width - 120)));
