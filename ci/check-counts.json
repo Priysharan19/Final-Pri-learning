@@ -734,8 +734,8 @@
       "job": "suites-contracts",
       "log": "edition-suites.log",
       "pins": [
-        {"has":"EDITION SUITES COVERAGE: PASS — 36 listed, 3 exempt, 21 importers accounted for","note":"34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
-        {"has":"EDITION SUITES (prithagoras): PASS — 36/36 suites"}
+        {"has":"EDITION SUITES COVERAGE: PASS — 40 listed, 3 exempt, 25 importers accounted for","note":"34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
+        {"has":"EDITION SUITES (prithagoras): PASS — 40/40 suites"}
       ]
     },
     "build/install-budget-prithagoras.log": {
