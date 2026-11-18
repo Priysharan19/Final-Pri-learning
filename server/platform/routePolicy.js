@@ -92,7 +92,8 @@ export function derivePolicy(method, chain) {
       if (window === null) policy.mfa = policy.mfa || true;
       else if (policy.mfa === false || policy.mfa === true || policy.mfa.stepUpMs > window) policy.mfa = { stepUpMs: window };
     }
-    if (tag.csrf && MUTATION.has(method)) policy.csrf = true;
+    // `csrf: 'guest'` is the guest trial's own token check (guestTrial.js): reported apart from the session double-submit, never as it.
+    if (tag.csrf && MUTATION.has(method)) policy.csrf = tag.csrf === 'guest' ? 'guest' : true;
     // rateLimit() keys on the session account when one was established before
     // it, otherwise on req.ip — so its position decides who shares a bucket.
     if (tag.rateLimit) policy.rateLimits.push({ ...tag.rateLimit, identity: policy.session ? 'account' : 'ip' });

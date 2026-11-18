@@ -18,6 +18,7 @@ import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark, EditionByline } from './components/BrandMark.jsx';
 import { BRAND } from './brand/edition.js';
+import { guestTrialAvailable } from './guest/guestTrial.js';
 import { parentFeaturesOffered } from './platform/edition.js';
 import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 
@@ -77,6 +78,39 @@ const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
 // signed-out web routes, each its own chunk: a student who opens the app never
 // downloads them.
 const Landing = React.lazy(() => import('./landing/Landing.jsx'));
+// The first screen for a visitor with no account (ADR-0003): the question picker and up to five server-marked questions.
+const GuestTry = React.lazy(() => import('./guest/GuestTry.jsx'));
+
+/**
+ * `/signin` for someone who is signed in. The sign-in page opens the student's
+ * first question itself the moment the account is confirmed (Login.jsx); this
+ * route only has to stay out of its way for that instant, then take anyone who
+ * is still here (a bookmark, the back button) to their landing page.
+ */
+function LeaveSignIn({ to }) {
+  const nav = useNavigate();
+  useEffect(() => {
+    const id = setTimeout(() => nav(to, { replace: true }), 700);
+    return () => clearTimeout(id);
+  }, [nav, to]);
+  return React.createElement(RouteLoading);
+}
+
+/**
+ * What `/` is before anyone is signed in. A device that already holds a saved
+ * profile opens on its sign-in picker, exactly as before; a device that holds
+ * none is a visitor's, and meets the question picker first.
+ */
+function FirstScreen() {
+  const [first, setFirst] = useState(null);
+  useEffect(() => {
+    let live = true;
+    api.get('/profiles').then(r => { if (live) setFirst(r?.profiles?.length ? 'device' : 'visitor'); }).catch(() => { if (live) setFirst('visitor'); });
+    return () => { live = false; };
+  }, []);
+  if (!first) return React.createElement(RouteLoading);
+  return first === 'visitor' ? <GuestTry /> : <Login />;
+}
 const PublicInfo = React.lazy(() => import('./landing/PublicInfo.jsx'));
 // The Prithagoras edition has its own NSW notes page, built from the NSW curriculum
 // model; it never loads or shows the India notes (client/test/nsw-notes-no-india-check.mjs).
@@ -578,6 +612,11 @@ export default function App() {
             <Route path="/welcome/marking" element={<PublicInfo page="marking" />} />
             <Route path="/welcome/syllabus" element={<PublicInfo page="syllabus" />} />
             <Route path="/welcome/teachers" element={<PublicInfo page="teachers" />} />
+            {/* The first screen is the question picker (ADR-0003). The sign-in
+                page is one click away ("Sign in") and stays the page for every
+                other address; a native shell keeps it as the first screen. */}
+            {guestTrialAvailable() && <Route path="/" element={<FirstScreen />} />}
+            <Route path="/signin" element={<Login />} />
             <Route path="*" element={<Login />} />
           </Routes>
         </React.Suspense>
@@ -709,6 +748,7 @@ export default function App() {
                     {PARENT_REPORT_ON && <Route path="/parent-report" element={studentOnly(<ParentReport />)} />}
                     {PLACEMENT_ON && <Route path="/placement" element={studentOnly(<Placement />)} />}
                     <Route path="/map" element={studentOnly(<MapPage />)} />
+                    <Route path="/signin" element={<LeaveSignIn to={roleLanding} />} />
                     <Route path="/stats" element={<Navigate to="/progress" replace />} />
                     <Route path="/badges" element={<Navigate to="/progress" replace />} />
                     <Route path="/tasks" element={studentOnly(<Tasks />, '/teach#teacher-assignments')} />

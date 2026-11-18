@@ -18,9 +18,9 @@ Marking is done online by our server: it issues each question, and its marking
 engine — a fixed set of mathematical rules, not an AI model — decides the mark
 for a signed-in account. A copy of that engine runs on your device only to show
 your notation as you write and to display results recorded by earlier versions
-of the app; it never sets the mark for a new answer. Signed out or offline,
-nothing is checked or marked: the work you type or write is kept on your device
-until it can be checked.
+of the app; it never sets the mark for a new answer. Offline, nothing is checked or
+marked, and signed out the only checking is the short trial described below:
+the work you type or write is kept on your device until it can be checked.
 
 **Your handwriting and photos are read online.** When you write an answer by
 hand or attach a photo, a picture of it is sent to our server, which passes it
@@ -37,8 +37,9 @@ automatically. You can get it in your data export. Only you, and your class
 teacher for work you hand in, can ever be allowed to open it. The app has no
 screen that shows it yet. See "Your original handwriting and photos" below.
 
-Without an account you can open the app and look around, but nothing about your
-learning is sent anywhere — and nothing is marked.
+Without an account you can open the app, look around, and try up to five
+questions a day (see "Trying a few questions without an account"). Nothing
+about your learning is stored, and nothing else is marked.
 
 ## Where your data is stored
 
@@ -64,6 +65,24 @@ learning is sent anywhere — and nothing is marked.
 If you set a password on a profile, this data is encrypted at rest on the
 device. A profile without a password is not encrypted. Whoever can unlock the
 device can open a profile that has no password.
+
+## Trying a few questions without an account
+
+On the first screen you can try up to five questions a day without signing up.
+You choose a chapter and answer by typing or by picking an option. Our server
+checks the answer, using the same fixed rules as for an account, and tells you
+the result. To do this the server gives your browser a small anonymous token: a
+random number and two times, nothing about you. It is kept in a cookie that
+expires after one day. We do not ask for your name, age, email or any other
+detail, we create no account, and we keep no record of your answers or marks.
+The only thing the server keeps is a count, under a scrambled code that cannot
+be traced to you, so that the limit of five can be enforced; the count is
+deleted within a day of its window ending. The scrambled code of your network
+address is used the same way, to stop one connection from asking for more than
+a few devices' worth of questions. Handwriting, photos and hints beyond the first
+are not part of the trial, so nothing is sent to OpenAI. If you sign up
+afterwards, the normal age and guardian steps apply, and the questions you tried
+are not carried over into your account.
 
 ## What we receive if you create a cloud account
 

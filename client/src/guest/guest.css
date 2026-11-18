@@ -1,0 +1,56 @@
+/* Pri Learning · the guest screen and the question picker (ADR-0003).
+   Existing tokens only; flat surfaces, hairlines, no motion of its own. */
+.auth-wrap.gt { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; place-items: initial; padding: 0; overflow: visible; background: var(--page); color: var(--ink); }
+.auth-wrap.gt > * { margin-block: 0; }
+.gt-bar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-4) var(--space-4); max-width: 720px; width: 100%; margin: 0 auto; box-sizing: border-box; }
+.gt-main { flex: 1; width: 100%; max-width: 720px; margin: 0 auto; padding: var(--space-4); box-sizing: border-box; }
+.gt-panel { background: var(--surface); border: 1px solid var(--hairline); border-radius: 4px; padding: var(--space-6); }
+.gt-panel h1 { margin: 0 0 var(--space-3); font-family: var(--font-display); font-size: var(--text-lg); font-weight: 600; line-height: 1.25; }
+.gt-panel h1:focus { outline: none; }
+.gt-lede, .gt-quiet, .gt-left { margin: 0 0 var(--space-4); color: var(--ink-2); font-size: var(--text-base); }
+.gt-left { margin: var(--space-4) 0 0; font-size: var(--text-sm); color: var(--ink-3); }
+.gt-problem { margin: 0 0 var(--space-4); padding: var(--space-3); border: 1px solid var(--hairline-strong); border-radius: 4px; color: var(--ink); }
+.gt-prompt { margin: var(--space-4) 0; font-size: var(--text-math); line-height: 1.55; }
+.gt-answer { margin: 0; }
+.gt-typed label, .qp .qp-field > label, .qp legend, .gt-options legend { display: block; margin: 0 0 var(--space-2); font-size: var(--text-sm); font-weight: 600; color: var(--ink-2); }
+.gt-typed-row { display: flex; align-items: center; gap: var(--space-2); }
+.gt-typed-row .input { flex: 1; min-width: 0; }
+.gt-options, .qp-set { margin: 0; padding: 0; border: 0; min-width: 0; }
+.gt-option { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; box-sizing: border-box; margin: 0 0 var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--control-border); border-radius: 4px; background: var(--surface-raised); font-weight: 400; color: var(--ink); cursor: pointer; }
+.gt-option.on { border-color: var(--accent); background: var(--accent-soft); }
+.gt-option input { flex: none; accent-color: var(--accent); }
+.gt-option:focus-within, .qp-choice:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+.gt-key { flex: none; width: 1.4em; font-weight: 600; color: var(--ink-3); }
+.gt-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
+.gt-hint { margin: var(--space-4) 0 0; padding: var(--space-3); border: 1px solid var(--hairline); border-radius: 4px; color: var(--ink-2); }
+.gt-verdict { margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--hairline); }
+.gt-verdict p { margin: 0 0 var(--space-2); }
+.gt-verdict-line { font-weight: 600; font-size: var(--text-md); }
+.gt-foot { padding: var(--space-4); max-width: 720px; width: 100%; margin: 0 auto; box-sizing: border-box; font-size: var(--text-sm); color: var(--ink-3); }
+.gt-langs { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); }
+.gt-foot a { color: var(--ink-2); }
+
+.qp { display: grid; gap: var(--space-4); }
+.qp-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+.qp-field { min-width: 0; }
+.qp select.input { width: 100%; min-height: 44px; box-sizing: border-box; }
+.qp-note { margin: var(--space-2) 0 0; color: var(--ink-3); font-size: var(--text-sm); }
+.qp-choices { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.qp .qp-choice { display: inline-flex; margin: 0; align-items: center; gap: var(--space-2); min-height: 44px; box-sizing: border-box; padding: 0 var(--space-3); border: 1px solid var(--control-border); border-radius: 4px; background: var(--surface-raised); font-weight: 400; color: var(--ink); cursor: pointer; }
+.qp .qp-choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.qp .qp-choice { position: relative; }
+.qp .qp-choice:has(input:checked) { font-weight: 600; }
+/* The input covers the whole choice, so the hit area is the choice (44px), and the checked state is the choice's own border and fill. */
+.qp .qp-choice input { position: absolute; inset: -1px; width: calc(100% + 2px); height: calc(100% + 2px); margin: 0; appearance: none; -webkit-appearance: none; background: transparent; border: 0; border-radius: inherit; cursor: pointer; }
+.qp-start { justify-self: start; min-width: 160px; min-height: 44px; box-sizing: border-box; }
+
+@media (max-width: 480px) {
+  .gt-panel { padding: var(--space-4); }
+  .qp-row { grid-template-columns: 1fr; }
+  .qp-start { justify-self: stretch; }
+}
+
+/* The quick start on the signed-in Index. */
+.qp-home { margin: var(--space-8) 0; }
+.qp-home h2 { margin: 0 0 var(--space-2); font-size: var(--text-md); font-weight: 600; }
+.qp-home .in-note { margin: 0 0 var(--space-4); }

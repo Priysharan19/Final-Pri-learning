@@ -10,7 +10,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const INVENTORY_PATH = join(root, 'docs', 'security', 'route-inventory.json');
 const AUTH_KINDS = new Set(['none', 'session', 'credentials', 'bearer-token', 'oidc-token', 'provider-signature', 'operator-token']);
 const ROLES = new Set(['student', 'teacher', 'support', 'admin']);
-const CSRF = new Set(['not-applicable', 'double-submit-when-session-cookie']);
+const CSRF = new Set(['not-applicable', 'double-submit-when-session-cookie', 'guest-token-hmac']);
 const ORIGIN = new Set(['not-applicable', 'enforced', 'exempt-provider-webhook', 'exempt-provider-callback', 'exempt-one-click-unsubscribe']);
 const MUTATION = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -64,7 +64,7 @@ export function compareInventory(mounted, inventory) {
     // IP: every account behind one school NAT shares it, and one account can
     // spread across addresses. Only anonymous routes may be IP-keyed.
     if (entry.auth === 'session' && p.rateLimits.some(limit => limit.identity !== 'account')) problems.push(`${k}: rate limit runs before requireSession, so it is keyed by IP instead of by account`);
-    const csrf = p.csrf ? 'double-submit-when-session-cookie' : 'not-applicable';
+    const csrf = p.csrf === 'guest' ? 'guest-token-hmac' : p.csrf ? 'double-submit-when-session-cookie' : 'not-applicable';
     if (entry.csrf !== csrf) problems.push(`${k}: inventory csrf=${entry.csrf} but mounted ${csrf}`);
   }
   for (const k of listed.keys()) if (!seen.has(k)) problems.push(`STALE INVENTORY ENTRY ${k}: no such route is mounted`);

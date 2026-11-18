@@ -43,6 +43,9 @@ async function registerUnverifiedAdult(platform, label) {
 /** On a fresh device: the landing card → "Sign in with password" → the class step → Continue. */
 async function signInWithPasswordToClass(page, base, email) {
   await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+  // A fresh device opens on the visitor's question picker (ADR-0003); signing in is its "Sign in" button.
+  await page.waitForSelector('[data-guest-try], .signup-flow', { timeout: 30000 });
+  if (await page.locator('[data-guest-try]').count()) await page.getByTestId('guest-sign-in').click();
   const card = page.locator(CARD);
   await card.locator('#signup-destination').waitFor({ timeout: 30000 });
   await page.getByTestId('signup-use-password').click();
