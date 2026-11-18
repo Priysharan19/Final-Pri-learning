@@ -15,6 +15,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { SPECS, SPEC_BY_ID, discriminantSign, periodInPi, valueAt, stopsOf } from '../src/living/specs.js';
 import { fmt, piText, featureVars, isRounded } from '../src/living/format.js';
+import { TITLE, NOTE, FEATURE, MARK } from '../src/living/keys.js';
 import EN from '../src/i18n/strings.en.js';
 import HI from '../src/i18n/strings.hi.js';
 
@@ -207,6 +208,12 @@ function h(v) { return v.h; }
 }
 
 // ── spec shape, strings, honesty ──
+for (const spec of SPECS) {
+  ok(TITLE[spec.id] === `living.${spec.id}.title`, `${spec.id}: key table title`);
+  for (const p of spec.params) ok(NOTE[spec.id]?.[p.id] === `living.${spec.id}.p.${p.id}`, `${spec.id}.${p.id}: key table note`);
+}
+for (const k of kinds) ok(FEATURE[k] === `living.feat.${k}`, `feature ${k}: key table`);
+ok(Object.values(MARK).every(k => Object.hasOwn(EN, k)), 'marker legend keys exist');
 const KEYS = new Set(Object.keys(EN));
 ok(SPECS.length >= 8, `at least eight living formulas (${SPECS.length})`);
 for (const spec of SPECS) {

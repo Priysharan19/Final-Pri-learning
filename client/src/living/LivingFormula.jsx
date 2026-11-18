@@ -12,6 +12,7 @@ import { useT } from '../i18n/index.js';
 import { curvePaths, projector, ticksFor } from '../engine/plot.js';
 import { defaultsOf, indexOf, stopsOf, valueAt } from './specs.js';
 import { featureVars, fmtParam, isRounded } from './format.js';
+import { FEATURE, MARK, NOTE, TITLE } from './keys.js';
 import './living.css';
 
 const BOX = { width: 320, height: 240, pad: { left: 34, right: 10, top: 10, bottom: 22 } };
@@ -72,8 +73,8 @@ export default function LivingFormula({ spec }) {
   const base = useMemo(() => curveOf(spec, defaultsOf(spec), win, project), [spec, win, project]);
   const now = useMemo(() => curveOf(spec, values, win, project), [spec, values, win, project]);
   const features = useMemo(() => spec.features(values), [spec, values]);
-  const title = t(`living.${spec.id}.title`);
-  const sentences = features.map(f => t(`living.feat.${f.kind}`, featureVars(f.kind, f.facts)));
+  const title = t(TITLE[spec.id]);
+  const sentences = features.map(f => t(FEATURE[f.kind], featureVars(f.kind, f.facts)));
   const paramById = useMemo(() => Object.fromEntries(spec.params.map(p => [p.id, p])), [spec]);
   const symbolOf = id => paramById[id].symbol;
   // The symbols lit now: the one hovered, focused or dragged, and while dragging the ones that act with it.
@@ -194,7 +195,7 @@ export default function LivingFormula({ spec }) {
             <div className="lf-formula" role="math" aria-label={spokenFormula}>{view}</div>
             {showTip && pop && (
               <div className="lf-pop" role="tooltip" id={tipId} style={{ left: pop.left, top: pop.top }}>
-                <p className="lf-pop-what"><span className="lf-sym">{symbolOf(active)}</span> {t(`living.${spec.id}.p.${active}`)}</p>
+                <p className="lf-pop-what"><span className="lf-sym">{symbolOf(active)}</span> {t(NOTE[spec.id][active])}</p>
                 <p className="lf-pop-now">{t('living.ui.popValue', { symbol: symbolOf(active), value: fmtParam(values[active]) })}</p>
               </div>
             )}
@@ -202,11 +203,11 @@ export default function LivingFormula({ spec }) {
           <ul className="lf-params">
             {spec.params.map(p => (
               <li key={p.id} className={`lf-param${lit.includes(p.id) ? ' is-active' : ''}`}>
-                <label htmlFor={`${uid}-${p.id}`} className="lf-note"><span className="lf-sym">{p.symbol}</span> {t(`living.${spec.id}.p.${p.id}`)}</label>
+                <label htmlFor={`${uid}-${p.id}`} className="lf-note"><span className="lf-sym">{p.symbol}</span> {t(NOTE[spec.id][p.id])}</label>
                 <div className="lf-ctl">
                   <input id={`${uid}-${p.id}`} type="range" min={p.min} max={p.max} step={p.step} value={values[p.id]}
                     aria-describedby={showTip && active === p.id && pop ? tipId : undefined}
-                    aria-valuetext={t('living.ui.valueText', { symbol: p.symbol, value: fmtParam(values[p.id]) })}
+                    aria-valuetext={`${p.symbol} = ${fmtParam(values[p.id])}`}
                     onChange={e => set(p.id, Number(e.target.value))}
                     onFocus={() => setActive(p.id)} onBlur={() => { if (!drag.current) setActive(a => (a === p.id ? null : a)); }}
                     onPointerEnter={() => !dragging && setActive(p.id)} onPointerLeave={() => !dragging && setActive(a => (a === p.id ? null : a))} />
@@ -260,7 +261,7 @@ export default function LivingFormula({ spec }) {
           ))}
         </ul>
         {features.some(f => Object.values(f.facts).some(isRounded)) && <p className="lf-legend">{t('living.ui.rounded')}</p>}
-        {shapes.length > 0 && <p className="lf-legend">{shapes.map(s => t(`living.ui.mark${s[0].toUpperCase()}${s.slice(1)}`)).join(' · ')}</p>}
+        {shapes.length > 0 && <p className="lf-legend">{shapes.map(s => t(MARK[s])).join(' · ')}</p>}
       </div>
       <p className="lf-status" role="status" aria-live="polite">{status}</p>
     </figure>
