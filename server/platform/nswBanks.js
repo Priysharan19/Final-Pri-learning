@@ -54,45 +54,11 @@ export const NSW_QUALITY_EXCLUSIONS = Object.freeze({
   'y9-simint|4': 'a right answer is marked wrong on the rate form: the box reads "% p.a." and the marker refuses "12% p.a.", spending a try',
   'y11-quadfunc|1': 'the answer as the server prints it, "Δ = 97", cannot be read by the marker (the box is prefixed "Δ =")',
   'me11-functions|2': 'the answer in the form the question asks for, "x ≥ -1", cannot be read by the marker (the box is prefixed "x ≥")',
-  // A tolerance wider than the precision the question asks for: an answer one
-  // unit off in the named place is marked correct. Whether a cent or a dollar
-  // of rounding drift is acceptable is an examiner's ruling (plan G6), not a
-  // default; until then these are not issued.
-  'y10-compound': 'every level asks for the nearest cent or dollar and accepts an answer one cent or dollar off (e.g. 7900.80 for 7900.79)',
-  'ms12-loans': 'every level asks for the nearest cent and accepts an answer one cent off (e.g. 397.26 for 397.25)',
-  'ms12-annuity': 'every level asks for the nearest cent and accepts an answer one cent off (e.g. 8206.51 for 8206.50)',
-  'y12-financial|2': 'asks for the nearest cent and accepts an answer one cent off (e.g. 5061.93 for 5061.92)',
-  'y12-financial|3': 'asks for the nearest dollar and accepts an answer one dollar off (e.g. 37380 for 37379)',
-  'y12-financial|4': 'asks for the nearest cent and accepts an answer one cent off (e.g. 24248.13 for 24248.12)',
-  'ms11-energy': 'money and energy answers accept a cent or a hundredth off (e.g. 2.25 for 2.24; D4 a dollar off at the nearest dollar)',
-  'ms11-earning': 'pay and tax answers accept a cent off an exact amount (e.g. 661.26 for 661.25); D4 accepts anything within 50 cents',
-  // An exact key, no precision named, and a hundredth (or a unit in the key's
-  // own last place) off is still marked correct.
-  'y8-volume|4': 'accepts 17.39 for the key 17.391',
-  'y8-rates|3': 'accepts 111.61 for the exact key 111.6',
-  'y8-probability|4': 'accepts 107.01 for the exact key 107',
-  'y10-similarity|3': 'accepts 1450.01 for the exact key 1450',
-  'y12-integration|2': 'accepts 3.668 for the key 3.667, with no precision named',
-  'y12-integration|3': 'accepts 443.668 for the key 443.667, with no precision named',
-  'y12-integration|4': 'accepts 0.168 for the key 0.167, with no precision named',
-  'y12-series|3': 'accepts 13122.01 for the exact key 13122',
-  'y12-stats|1': 'accepts 1.71 for the exact key 1.7',
-  'y12-stats|3': 'accepts -0.49 for the exact z-score -0.5',
-  'y12-stats|4': 'accepts 68.01 for the exact key 68',
-  'ms11-measure|4': 'accepts 2092.6 for the exact key 2092.5',
-  'ms11-data|4': 'accepts 17.51 for the exact key 17.5',
-  'ms11-relfreq|2': 'accepts 0.146 for the exact key 0.145',
-  'ms12-normal|1': 'accepts -2.49 for the exact z-score -2.5',
-  'ms12-normal|2': 'accepts 2.36 for the exact key 2.35',
-  'ms12-bivariate|2': 'accepts 70.01 for the exact key 70',
-  'ms12-bivariate|3': 'accepts 11.01 for the exact key 11',
-  'ms12-bivariate|4': 'accepts -5.99 for the exact key -6',
-  'me12-binomial|2': 'accepts 4.81 for the exact key 4.8',
-  // A list of solutions with a tolerance: one solution a hundredth (or a unit
-  // at the named precision) off is still marked correct.
-  'y10-quadratics|4': 'asks for 2 decimal places and accepts a root one hundredth off (e.g. 1.78, -2.27 for 1.77, -2.27)',
-  'y11-trigfunc|3': 'accepts an exact angle a hundredth of a degree off (e.g. 45.01 for 45)',
-  'me12-trigeq': 'every level accepts an exact angle a hundredth of a degree off (e.g. 60.01, 120 for 60, 120)',
+  // (The cells that were listed here for a tolerance wider than the question asks (an exact
+  // key one hundredth off, a rounded key with no stated precision, a list of solutions one
+  // hundredth off) were fixed at the source: engine/answerBand.js drops a band the question
+  // does not ask for, the marker bounds a list by the precision it names, and the
+  // three-decimal keys now say "correct to 3 decimal places".)
   // A right answer refused: the key keeps a zero-coefficient term.
   'y7-algebra|2': 'when the expression simplifies to a constant the key is "0x + 9" and the right answer "9" is marked wrong, spending a try',
   'y12-appdiff|3': 'for a horizontal tangent the key is "0x + -10" and the right answer "-10" is marked wrong, spending a try',

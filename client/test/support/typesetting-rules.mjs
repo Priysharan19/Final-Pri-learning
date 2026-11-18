@@ -28,6 +28,14 @@ export const TYPESET_RULES = Object.freeze([
   ['+0 term', /[-+]\s*0(?![\d.])(?=\s*(?:[=)\]},;|]|$|\\le|\\ge|\\ne|\\right|<|>|[-+]))/]
 ]);
 
+// A negative number that is raised to a power must be bracketed: "(-6)^2", never "-6^2",
+// which reads as -(6^2) = -36 (a worked solution printed "-6^2 - 4(5)(6) = -84"). A leading
+// minus is unary when nothing that can be subtracted from stands before it (the start, a
+// relation, a bracket, a comma, a plus, \times, \cdot, \pm). A subtraction ("5 - 6^2") is not
+// flagged. Applied to what a student reads after answering (hints, worked steps, trap
+// explanations) and to prompts; not to an option, where "$-3^{3}$" may stand for -(3^3).
+export const NEGATIVE_BASE = /(?<=(?:^|[=(\[{,+:|]|\\times|\\cdot|\\pm)\s*)[-−]\s*\d+(?:\.\d+)?\^\{?\d/;
+
 // A served question is Pri's own. A textbook exercise, example or Try These
 // number on a prompt reproduces the textbook (audit item 6, Nov 2026).
 export const TEXTBOOK_NUMBERING = /\bNCERT\s+(?:Exercise|Example|Try These)\b|\bExercise\s+\d+\.\d+\s*Q\s*\d+/i;
@@ -65,7 +73,7 @@ function hasVariable(side) {
   return /[a-zA-Z]/.test(bare);
 }
 
-/** Typesetting defects in the $…$ maths of one hint or worked step: [{ rule, math }]. */
+/** Typesetting defects in the $…$ maths of one hint, worked step or trap explanation: [{ rule, math }]. */
 export function workedStepHits(text) {
   const out = [];
   for (const math of mathSpans(text)) {
@@ -76,9 +84,15 @@ export function workedStepHits(text) {
     // Split at every relation (split drops each one, however many there are),
     // then test each side as if a relation followed it: "x + 0 = 5" gives the
     // side "x + 0", read as "x + 0 =".
+    if (NEGATIVE_BASE.test(math)) out.push({ rule: 'unbracketed negative base', math });
     const sides = math.split(RELATION);
     if (sides.some(side => hasVariable(side) && ZERO_TERM.test(`${side} =`)))
       out.push({ rule: '+0 term', math });
   }
   return out;
+}
+
+/** The same negative-base defect in one string (a prompt, a hint, a step, a trap explanation). */
+export function negativeBaseHits(text) {
+  return mathSpans(text).filter(math => NEGATIVE_BASE.test(math)).map(math => ({ rule: 'unbracketed negative base', math }));
 }

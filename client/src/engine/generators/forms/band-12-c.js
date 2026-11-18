@@ -1,5 +1,6 @@
 // Extra forms · Class 12 and Olympiad, part C. See forms/kit.js.
 import { ri, numeric, choice, span, person, place, simpson, numDeriv, r6, C, terminates } from './kit.js';
+import { br } from '../../qhelpers.js';
 
 const R = d => span(d, 30, 20);
 const lin = (a, b) => `${a === 1 ? '' : a}x ${b < 0 ? `- ${-b}` : `+ ${b}`}`;
@@ -60,7 +61,7 @@ const polys = [
     return {
       payload: numeric('sum-of-squares', `The roots of $x^2 ${s === 0 ? '' : (-s < 0 ? `- ${s}` : `+ ${-s}`) + 'x '}${p < 0 ? `- ${-p}` : `+ ${p}`} = 0$ are $\\alpha$ and $\\beta$. Find $\\alpha^2 + \\beta^2$, without solving the equation.`, r1 * r1 + r2 * r2, {
         hints: ['Vieta: the sum of the roots is $-b/a$ and the product is $c/a$.', '$\\alpha^2 + \\beta^2 = (\\alpha + \\beta)^2 - 2\\alpha\\beta$.', 'Substitute the sum and product.'],
-        steps: [{ h: 'Vieta', d: `$\\alpha + \\beta = ${s}$, $\\alpha\\beta = ${p}$` }, { h: 'Identity', d: '$\\alpha^2 + \\beta^2 = (\\alpha+\\beta)^2 - 2\\alpha\\beta$' }, { h: 'Evaluate', d: `$${s}^2 - 2(${p})$` }],
+        steps: [{ h: 'Vieta', d: `$\\alpha + \\beta = ${s}$, $\\alpha\\beta = ${p}$` }, { h: 'Identity', d: '$\\alpha^2 + \\beta^2 = (\\alpha+\\beta)^2 - 2\\alpha\\beta$' }, { h: 'Evaluate', d: `$${br(s)}^2 - 2(${p})$` }],
         traps: [{ value: s * s, why: 'Squaring the sum also contains the cross term $2\\alpha\\beta$, which must come off.' }]
       }),
       check: () => { const q = x => x * x - s * x + p; if (q(r1) !== 0 || q(r2) !== 0) return NaN; return r1 * r1 + r2 * r2; }

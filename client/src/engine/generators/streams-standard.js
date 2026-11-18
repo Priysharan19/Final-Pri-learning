@@ -650,7 +650,7 @@ export const streamsStandard = {
     if (diff === 2) {
       const made = ri(rng, 20, 95), total = rc(rng, [80, 100, 120, 125, 150, 160, 200, 250]);
       return {
-        prompt: `A basketballer made $${made}$ of her last $${total}$ free throws. Using relative frequency, estimate $P(\\text{make})$ as a decimal.`,
+        prompt: `A basketballer made $${made}$ of her last $${total}$ free throws. Using relative frequency, estimate $P(\\text{make})$ as a decimal, correct to 3 decimal places.`,
         answerType: 'numeric', answer: { value: r3(made / total), tol: 0.002 },
         traps: [{ value: made, why: 'Relative frequency = count ÷ total trials.' }],
         hints: ['Relative frequency = successes ÷ trials.', `$${made} \\div ${total}$.`, 'Give it as a decimal.'],
@@ -934,8 +934,8 @@ export const streamsStandard = {
       const x = mu + z * sd;
       return {
         prompt: `Scores are normally distributed with mean $${mu}$ and standard deviation $${sd}$. Find the $z$-score of a result of $${x}$.`,
-        answerType: 'numeric', answer: { value: z, tol: 0.011 }, answerPrefix: 'z =',
-        traps: [{ value: x - mu, why: `Divide the deviation by σ = ${sd}.`, tol: 0.011 }],
+        answerType: 'numeric', answer: { value: z }, answerPrefix: 'z =',
+        traps: [{ value: x - mu, why: `Divide the deviation by σ = ${sd}.` }],
         hints: ['$z = \\frac{x - \\mu}{\\sigma}$.', `$\\frac{${x} - ${mu}}{${sd}}$.`, `= ${z}.`],
         steps: [{ h: 'Standardise', d: `$z = \\dfrac{${x} - ${mu}}{${sd}} = ${z}$` }]
       };
@@ -959,8 +959,8 @@ export const streamsStandard = {
       ]);
       return {
         prompt: `Heights are normal with mean $${mu}$ and sd $${sd}$. Using the 68–95–99.7 rule, what **percentage** lies between $${pick.lo}$ and $${pick.hi}$?`,
-        answerType: 'numeric', answer: { value: pick.pct, tol: 0.11 }, answerSuffix: '%',
-        traps: [{ value: pick.pct === 68 ? 95 : 68, why: '±1σ ↔ 68%, ±2σ ↔ 95% — check how many σ each bound is from the mean.', tol: 0.11 }].filter(t => Math.abs(t.value - pick.pct) > 1),
+        answerType: 'numeric', answer: { value: pick.pct }, answerSuffix: '%',
+        traps: [{ value: pick.pct === 68 ? 95 : 68, why: '±1σ ↔ 68%, ±2σ ↔ 95% — check how many σ each bound is from the mean.' }].filter(t => Math.abs(t.value - pick.pct) > 1),
         hints: ['Convert the bounds to numbers of σ from the mean.', `${pick.lo} is ${(pick.lo - mu) / sd}σ; ${pick.hi} is ${(pick.hi - mu) / sd}σ.`, 'Use symmetry of the bell curve.'],
         steps: [
           { h: 'Bounds in σ', d: `$${(pick.lo - mu) / sd}\\sigma$ to $${(pick.hi - mu) / sd}\\sigma$` },
@@ -1103,8 +1103,8 @@ export const streamsStandard = {
     const answer = r1(observed - predicted);
     return {
       prompt: `The least-squares line for plant growth is $h = ${a} + ${b}w$. A plant measured at week $${x0}$ was actually $${observed}$ cm tall. Find the **residual** for that data point.`,
-      answerType: 'numeric', answer: { value: answer, tol: 0.06 }, answerSuffix: 'cm',
-      traps: [{ value: -answer, why: 'Residual = observed − predicted, in that order — the sign tells you whether the point sits above or below the line.', tol: 0.06 }],
+      answerType: 'numeric', answer: { value: answer }, answerSuffix: 'cm',
+      traps: [{ value: -answer, why: 'Residual = observed − predicted, in that order — the sign tells you whether the point sits above or below the line.' }],
       hints: ['Residual = observed value − predicted value.', `Predicted: $${a} + ${b}(${x0}) = ${r1(predicted)}$ cm.`, `$${observed} - ${r1(predicted)}$.`],
       steps: [
         { h: 'Predict from the line', d: `$h = ${a} + ${b}(${x0}) = ${r1(predicted)}$ cm` },

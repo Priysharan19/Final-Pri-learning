@@ -2,7 +2,7 @@
 // Pri Learning · Year 10 generators
 // ─────────────────────────────────────────────────────────────────────────────
 import { year10Nsw } from './year10-nsw.js';
-import { ri, rc, nz, distinct, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, rad, surdSimp, surdLatex } from '../qhelpers.js';
+import { ri, rc, nz, distinct, gcd, Frac, mcq, term, sgn, moneyPlain, r1, r2, r3, rad, surdSimp, surdLatex, br } from '../qhelpers.js';
 import { figRightTriangle, figBearing, figParabola } from '../figures.js';
 
 // ── Curves and scatterplots ──────────────────────────────────────────────────
@@ -149,7 +149,7 @@ export const year10 = {
       inputHint: 'e.g. x = 0.61 or x = -3.61',
       stepcheck: { kind: 'equation', variable: 'x', solutions: [x1, x2] },
       traps: [{ value: r2((-bb + sq) / 2), why: `Don't forget to divide by $2a = ${2 * a}$ — the whole of $-b \\pm \\sqrt{\\Delta}$ sits over it.`, tol: 0.011 }],
-      hints: ['$x = \\dfrac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$.', `Here $a = ${a}$, $b = ${bb}$, $c = ${cc}$; find the discriminant first.`, `$\\Delta = ${bb}^2 - 4(${a})(${cc}) = ${disc}$; $\\sqrt{\\Delta} \\approx ${r3(sq)}$.`],
+      hints: ['$x = \\dfrac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}$.', `Here $a = ${a}$, $b = ${bb}$, $c = ${cc}$; find the discriminant first.`, `$\\Delta = ${br(bb)}^2 - 4(${a})(${cc}) = ${disc}$; $\\sqrt{\\Delta} \\approx ${r3(sq)}$.`],
       steps: [
         { h: 'Identify a, b, c', d: `$a = ${a},\\ b = ${bb},\\ c = ${cc}$` },
         { h: 'Discriminant', d: `$\\Delta = b^2 - 4ac = ${bb * bb} - ${4 * a * cc} = ${disc}$` },

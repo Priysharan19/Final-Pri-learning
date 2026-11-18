@@ -251,10 +251,10 @@ const integralForms = [
   {
     make: (rng, diff) => {
       const CTX = [
-        { what: 'water flows into a tank', rate: 'litres per minute', unit: 'litres', t: 'minutes', after: 'the tap is opened' },
-        { what: 'a conveyor belt delivers parcels to a depot', rate: 'parcels per hour', unit: 'parcels', t: 'hours', after: 'the shift begins' },
-        { what: 'a council pump removes floodwater from a car park', rate: 'kilolitres per hour', unit: 'kilolitres', t: 'hours', after: 'pumping begins' },
-        { what: 'visitors enter a surf carnival', rate: 'people per hour', unit: 'people', t: 'hours', after: 'the gates open' }
+        { what: 'water flows into a tank', rate: 'litres per minute', unit: 'litres', t: 'minutes', after: 'the tap is opened', verb: 'flow into the tank' },
+        { what: 'a conveyor belt delivers parcels to a depot', rate: 'parcels per hour', unit: 'parcels', t: 'hours', after: 'the shift begins', verb: 'are delivered' },
+        { what: 'a council pump removes floodwater from a car park', rate: 'kilolitres per hour', unit: 'kilolitres', t: 'hours', after: 'pumping begins', verb: 'are removed' },
+        { what: 'visitors enter a surf carnival', rate: 'people per hour', unit: 'people', t: 'hours', after: 'the gates open', verb: 'enter the carnival' }
       ];
       const x = rc(rng, CTX);
       for (let i = 0; i < 4000; i++) {
@@ -266,7 +266,7 @@ const integralForms = [
         if (!Number.isInteger(total)) continue;
         const win = p === 0 ? `in the first $${q}$ ${x.t}` : `between $t = ${p}$ and $t = ${q}$`;
         return num(
-          `${cap(x.what)} at a rate of $R(t) = ${rate}$ ${x.rate}, where $t$ is the number of ${x.t} after ${x.after}. How many ${x.unit} arrive ${win}?`,
+          `${cap(x.what)} at a rate of $R(t) = ${rate}$ ${x.rate}, where $t$ is the number of ${x.t} after ${x.after}. How many ${x.unit} ${x.verb} ${win}?`,
           total,
           {
             formTag: 'context', suffix: x.unit,

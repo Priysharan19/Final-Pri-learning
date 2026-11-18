@@ -99,5 +99,87 @@ for (const id of Object.keys(GENERATORS)) {
 for (const c of conflicts) fail(c);
 ok(generated >= Object.keys(GENERATORS).length * 4 * SEEDS * 0.9, `only ${generated} questions generated`);
 
+// ── 3 · a "mode" / "modal class" question has exactly one mode ──────────────
+// "A grouped frequency table reads 30–40: 13 … 60–70: 13. Find the mode." gave two
+// modal classes by the same formula (700/19 and 65.5) while the key named one, so
+// a student who chose the other class was marked wrong with an equally right answer.
+// Every prompt that asks for a mode (or modal class) is read back into its data —
+// a listed set of values, a frequency table, a grouped table, a dot plot or a
+// histogram — and the highest frequency must belong to one value only, across the
+// same seed range as above, in both editions' generators.
+const MODE_ASK = /\bmod(?:e|al class)\b/i;
+const num = t => Number(String(t).replace(/[^\d.\-]/g, ''));
+function dataOf(q) {
+  const p = String(q.prompt);
+  // an unknown frequency x is filled with the key, so the modal class that results is the one checked
+  const xKey = q.answer && typeof q.answer.value === 'number' ? q.answer.value : null;
+  const grouped = [...p.matchAll(/\$[\d.]+\$[–-]\$[\d.]+\$:\s*\$(\d+|x)\$/g)].map(m => (m[1] === 'x' ? xKey : Number(m[1])));
+  if (grouped.length >= 3 && grouped.every(v => Number.isFinite(v))) return { kind: 'grouped table', freqs: grouped };
+  const row = p.match(/Frequency\}?\s*((?:&\s*\d+\s*)+)/);
+  if (row) return { kind: 'frequency table', freqs: [...row[1].matchAll(/\d+/g)].map(m => Number(m[0])) };
+  const fig = String(q.figure ?? '');
+  const dots = [...fig.matchAll(/<circle cx="([\d.]+)"/g)].map(m => m[1]);
+  if (dots.length) { const c = new Map(); for (const x of dots) c.set(x, (c.get(x) || 0) + 1); return { kind: 'dot plot', freqs: [...c.values()] }; }
+  const bars = [...fig.matchAll(/<rect x="[\d.]+" y="[\d.]+" width="[\d.]+" height="([\d.]+)"/g)].map(m => Number(m[1]));
+  if (bars.length >= 3) return { kind: 'histogram', freqs: bars };
+  const list = p.split(/Find|What/)[0].match(/(?:\$?-?\d+(?:\.\d+)?\$?(?:,\\ |,\s*)){2,}\$?-?\d+(?:\.\d+)?\$?/);
+  if (list) { const c = new Map(); for (const m of list[0].matchAll(/-?\d+(?:\.\d+)?/g)) c.set(m[0], (c.get(m[0]) || 0) + 1); return { kind: 'listed values', freqs: [...c.values()] }; }
+  return null;
+}
+const modeKinds = {};
+const modeIds = new Set();
+const modeBad = [];
+for (const id of Object.keys(GENERATORS)) {
+  for (let d = 1; d <= 4; d++) {
+    for (let s = 1; s <= SEEDS; s++) {
+      let q;
+      try { q = generateQuestion(id, d, s * 7919 + d); } catch { continue; }
+      if (!MODE_ASK.test(String(q.prompt))) continue;
+      const data = dataOf(q);
+      if (!data) continue;
+      modeKinds[data.kind] = (modeKinds[data.kind] || 0) + 1;
+      modeIds.add(id);
+      const top = Math.max(...data.freqs);
+      if (data.freqs.filter(f => Math.abs(f - top) < 1e-9).length !== 1) modeBad.push(`${id} d${d} seed ${s * 7919 + d}: ${data.kind} ${JSON.stringify(data.freqs)} has more than one mode, key ${JSON.stringify(q.answer)}`);
+    }
+  }
+}
+for (const c of modeBad.slice(0, 40)) fail(c);
+if (modeBad.length > 40) fail(`... and ${modeBad.length - 40} more questions with two modes`);
+ok(Object.keys(modeKinds).length >= 5, `mode sweep read only these data forms: ${JSON.stringify(modeKinds)}; it must see grouped tables, frequency tables, dot plots, histograms and listed values`);
+ok(modeIds.size >= 5, `mode sweep reached only ${modeIds.size} generators`);
+
+// ── 4 · the question's verb agrees with the story ────────────────────────────
+// "A council pump removes floodwater from a car park ... How many kilolitres arrive between t = 1 and
+// t = 6?" asked for an arrival of something the story takes away. A prompt whose story removes
+// something (removes, drains, pumps out, leaks, loses) must not ask how much arrives, enters or is
+// delivered, and the reverse: a story that adds or delivers must not ask how much is removed.
+const TAKES = /\b(?:removes?|drains?|pumps?\s+out|empties|leaks?|loses)\b/i;
+const GIVES = /\b(?:arrives?|enters?|flows?\s+into|delivers?|fills?|adds?)\b/i;
+const verbBad = [];
+let verbChecked = 0;
+for (const id of Object.keys(GENERATORS)) {
+  for (let d = 1; d <= 4; d++) {
+    for (let s = 1; s <= Math.min(SEEDS, 120); s++) {
+      let q;
+      try { q = generateQuestion(id, d, s * 7919 + d); } catch { continue; }
+      const text = String(q.prompt).replace(/\$[^$]*\$/g, ' ');
+      const sentences = text.split(/(?<=[.?!])\s+/);
+      const ask = sentences.filter(x => /\bhow (?:many|much)\b/i.test(x)).join(' ');
+      const story = sentences.filter(x => !/\bhow (?:many|much)\b/i.test(x)).join(' ');
+      if (!ask || !story) continue;
+      verbChecked++;
+      if ((TAKES.test(story) && /\b(?:arrives?|arrive|enters?|flows? into|(?:are |is )?delivered)\b/i.test(ask) && !GIVES.test(story))
+        || (GIVES.test(story) && !TAKES.test(story) && /\b(?:(?:are |is )?removed|drains?)\b/i.test(ask))) {
+        verbBad.push(`${id} d${d} seed ${s * 7919 + d}: ${norm(q.prompt).slice(0, 200)}`);
+      }
+    }
+  }
+}
+for (const c of verbBad.slice(0, 20)) fail(`verb disagrees with the story: ${c}`);
+ok(verbChecked >= 10000, `verb sweep read only ${verbChecked} story-and-question prompts`);
+
+console.log(`prompt-answer-parameters: ${verbChecked} story-and-question prompts read for removes/arrive mismatches, ${verbBad.length} found;`);
+console.log(`prompt-answer-parameters: mode questions ${JSON.stringify(modeKinds)} over ${modeIds.size} generators, ${modeBad.length} with two modes;`);
 console.log(`prompt-answer-parameters: ${energy} energy questions over ${rates.size} printed rates; ${generated} questions from ${Object.keys(GENERATORS).length} generators; ${failures} failure(s)`);
 if (failures) process.exit(1);

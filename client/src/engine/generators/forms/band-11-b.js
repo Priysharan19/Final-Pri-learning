@@ -1,5 +1,6 @@
 // Extra forms · Class 11 and JEE, part B. See forms/kit.js.
 import { ri, numeric, span, person, place, r6, C, terminates } from './kit.js';
+import { br } from '../../qhelpers.js';
 
 const R = d => span(d, 20, 15);
 const gcd = (x, y) => (y ? gcd(y, x % y) : x);
@@ -356,7 +357,7 @@ const cQuad = [
     return {
       payload: numeric('root-product', `The roots of a monic quadratic are $${a} + ${b}i$ and $${a} - ${b}i$. Find the product of its roots.`, a * a + b * b, {
         hints: ['The roots are a conjugate pair.', 'A product of conjugates is the sum of two squares.', 'This is the constant term of the monic quadratic.'],
-        steps: [{ h: 'Product', d: `$(${a} + ${b}i)(${a} - ${b}i)$` }, { h: 'Expand', d: `$${a}^2 + ${b}^2$` }],
+        steps: [{ h: 'Product', d: `$(${a} + ${b}i)(${a} - ${b}i)$` }, { h: 'Expand', d: `$${br(a)}^2 + ${b}^2$` }],
         traps: [{ value: a * a - b * b, why: '$i^2 = -1$ makes $-b^2i^2 = +b^2$.' }].filter(t => t.value !== a * a + b * b)
       }),
       check: () => a * a - b * -b

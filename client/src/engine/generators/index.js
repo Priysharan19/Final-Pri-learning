@@ -13,6 +13,7 @@ import { hasJeePyqGenerator, loadJeePyqGenerator } from './jee-pyq-runtime.js';
 import { hasPyqGenerator } from '../pyq/pyqIndex.js';
 import { stampContent } from '../contentIdentity.js';
 import { withSafeInputHints } from '../inputHint.js';
+import { withoutUncalledForBand } from '../answerBand.js';
 
 // ── Banks ────────────────────────────────────────────────────────────────────
 
@@ -722,7 +723,7 @@ export function generateQuestion(subtopicId, difficulty, seed, dotpointId, pick 
   // is its own form: no extra form is drawn for it.)
   const extra = !pick && !directOnly && Object.hasOwn(EXTRA_FORMS, subtopicId) ? EXTRA_FORMS[subtopicId] : null;
   const formPick = extra ? pickForm(subtopicId, gen, extra, makeRng((s ^ 0x2f6b9c1d) >>> 0)()) : 0;
-  const payload = withoutKeyTraps(pick ? pick(rng) : formPick === 0 ? gen(rng, d) : extra[formPick - 1].make(rng, d).payload);
+  const payload = withoutUncalledForBand(withoutKeyTraps(pick ? pick(rng) : formPick === 0 ? gen(rng, d) : extra[formPick - 1].make(rng, d).payload));
   const q = { seed: s, subtopic: subtopicId, difficulty: pick ? payload.difficulty : d, ...payload };
   const { list, source, perQuestion } = dotpointsOf(gen, subtopicId, q.difficulty, payload);
   q.dotpoints = list.map(dp => dp.id);
