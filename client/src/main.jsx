@@ -123,10 +123,10 @@ if (LAN_DEV) {
   })();
 }
 
-const root = // The names in question text follow the build's edition (engine/qhelpers.js).
+// The names in question text follow the build's edition (engine/qhelpers.js).
 selectNamePool(EDITION);
 
-createRoot(document.getElementById('root'));
+const root = createRoot(document.getElementById('root'));
 if (GUARDIAN_MODE || DELETE_REQUEST_MODE || ACCOUNT_ACTION_MODE || PARENT_EMAIL_MODE) bootPhase('render');
 if (PARENT_EMAIL_MODE) {
   const ParentReportEmailAction = React.lazy(() => import('./parent/ParentReportEmailAction.jsx'));
