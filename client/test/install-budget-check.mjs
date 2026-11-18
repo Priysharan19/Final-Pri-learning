@@ -152,7 +152,8 @@ let PYQ_ARCHIVE_MEASURED = null;
 // new Advanced and Extension 1 question forms (au-forms-gaps-*-nsw.js, about 2,700 lines). They are
 // dynamic imports split by course, so a Year 12 Advanced session loads only the year-12 forms and an
 // Extension 1 session only the stream forms; the warm pass still precaches every chunk, which is what
-// this ceiling counts. The new ceiling leaves about 118 kB.
+// this ceiling counts. The new ceiling leaves about 118 kB. Re-measured after merging main's guest mode and Paper 05
+// fix (2026-11-19): 4,989 kB raw / 1,699 kB gzipped install plus warm, so about 89 kB remain under 5,200,000.
 
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
