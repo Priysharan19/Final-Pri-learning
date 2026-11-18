@@ -192,7 +192,8 @@ try {
   await page.locator('[data-paper-part="q12b-iii"]').scrollIntoViewIfNeeded();
   await page.locator('[data-paper-part="q12b-iii"] [data-paper-mode="photo"]').click();
   await page.locator('[data-paper-part="q12b-iii"] [data-paper-photo]').setInputFiles({ name: 'answer.png', mimeType: 'image/png', buffer: png(640, 360) });
-  await page.waitForTimeout(6000); console.log('DEBUG photo:', (await page.locator('[data-paper-part="q12b-iii"] .pp-photo').innerText()).replace(/\s+/g, ' '), JSON.stringify(platform.reader.requests.length), JSON.stringify(platform.reader.refused));
+  // the student's own yes, asked once before anything is read (D17)
+  await page.locator('[data-reader-permission="accept"]').click({ timeout: 15000 }).catch(() => {});
   await page.locator('[data-paper-part="q12b-iii"] [data-paper-reading]').waitFor({ timeout: 30000 });
   check('PHOTO: the reading of the picture is shown for the student to confirm, in the final-answer box', (await page.locator('[data-paper-part="q12b-iii"] [data-paper-final]').inputValue()) === '4*sqrt(3)+2*pi/3-8');
   await page.locator('[data-paper-part="q12b-iii"] [data-paper-keep]').click();
@@ -210,6 +211,7 @@ try {
     for (let i = 1; i <= 12; i += 1) await page.mouse.move(box.x + 30 + i * 18, box.y + 40 + stroke * 40 + (i % 2) * 9, { steps: 2 });
     await page.mouse.up();
   }
+  await page.locator('[data-reader-permission="accept"]').click({ timeout: 8000 }).catch(() => {});
   await page.locator('[data-paper-part="q14b-ii"] [data-paper-reading]').waitFor({ timeout: 45000 });
   check('WRITE: the strokes are read and the reading is shown to confirm', (await page.locator('[data-paper-part="q14b-ii"] [data-paper-final]').inputValue()) === '1/((2*m-1)*nCr(2*m-2,m-1))');
   await page.locator('[data-paper-part="q14b-ii"] [data-paper-keep]').click();
