@@ -1,0 +1,257 @@
+// Pri Learning · the guest trial, in a real browser, in both editions (ADR-0003).
+//
+// For each edition this builds the client, serves it from the real platform
+// server and drives a visitor with no account through:
+//   · the first screen is the question picker, "Sign in" top right;
+//   · only chapters and levels with questions are listed; the last choice is
+//     remembered across a reload;
+//   · choosing "Write by hand" is the calm sign-up prompt and spends nothing;
+//   · typed and multiple-choice answers are marked by the SERVER (the right
+//     answer is read at the test's desk from the sealed ticket the server sent,
+//     never from the page); a wrong one is marked wrong and the answer shown
+//     only afterwards;
+//   · after five questions the sign-up prompt, with no countdown and with the
+//     sentence that tried questions are not carried over;
+//   · no account, session or handwriting request exists at any point, and no
+//     answer key is in any reply before its verdict;
+//   · at 390px nothing overflows; "Sign in" reaches the sign-in page.
+// Screenshots go to PRI_GUEST_SHOTS (default: the OS temp folder).
+//
+// Usage: node client/test/tour-guest-trial.js [priyabhata|prithagoras]
+import { chromium } from '@playwright/test';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { startOnlinePlatform } from './support/online-session.mjs';
+
+const CLIENT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const SHOTS = process.env.PRI_GUEST_SHOTS || join(tmpdir(), 'pri-guest-shots');
+mkdirSync(SHOTS, { recursive: true });
+const editions = process.argv[2] ? [process.argv[2]] : ['priyabhata', 'prithagoras'];
+
+let pass = 0;
+const failures = [];
+const check = (name, condition, detail = '') => {
+  if (condition) pass++; else failures.push(`${name}${detail ? ` - ${detail}` : ''}`);
+  console.log(`  ${condition ? '✓' : '✗'} ${name}${condition || !detail ? '' : ` - ${detail}`}`);
+};
+
+function build(edition) {
+  const out = mkdtempSync(join(tmpdir(), `pri-guest-${edition}-`));
+  const vite = join(CLIENT, 'node_modules', 'vite', 'bin', 'vite.js');
+  const result = spawnSync(process.execPath, [vite, 'build', '--outDir', out, '--emptyOutDir', '--logLevel', 'error'],
+    { cwd: CLIENT, encoding: 'utf8', env: { ...process.env, PRI_EDITION: edition } });
+  if (result.status !== 0 || !existsSync(join(out, 'index.html'))) throw new Error(`the ${edition} build failed:\n${result.stdout || ''}${result.stderr || ''}`);
+  return out;
+}
+
+const stall = setTimeout(() => { console.log('GUEST TRIAL TOUR: FAIL - stalled'); process.exit(1); }, 420000);
+stall.unref();
+
+// The server modules run in this process, so the test's desk can read what the
+// server sealed: that is the oracle, exactly as online-session.mjs's answerOf.
+const { decryptDeliveryToken } = await import('../../server/platform/deliveryCrypto.js');
+const { generateQuestion, loadAllBanks } = await import('../../server/../client/src/engine/generators/index.js');
+const { answerTextFor } = await import('../../server/platform/practice.js');
+await loadAllBanks();
+const keyOf = sealed => {
+  const t = JSON.parse(decryptDeliveryToken(sealed, 'guest-question-v1'));
+  const q = generateQuestion(t.g, t.d, t.s, undefined, null);
+  return { text: answerTextFor(q), mcq: q.answerType === 'mcq', index: q.answer?.correctIndex };
+};
+
+for (const edition of editions) {
+  console.log(`\n== ${edition}`);
+  const dist = build(edition);
+  const platform = await startOnlinePlatform({ dist, env: { PRI_EDITION: edition } });
+  const browser = await chromium.launch();
+  try {
+    const ctx = await browser.newContext({ viewport: { width: 1180, height: 820 } });
+    const page = await ctx.newPage();
+    const requests = [];
+    const issued = [];
+    page.on('request', r => { const u = new URL(r.url()); if (u.pathname.startsWith('/v1/')) requests.push(`${r.method()} ${u.pathname}`); });
+    page.on('response', async r => {
+      const u = new URL(r.url());
+      if (u.pathname === '/v1/guest/question' && r.status() === 201) {
+        try { const body = await r.json(); issued.push({ body, text: JSON.stringify(body) }); } catch { /* read below */ }
+      }
+    });
+    const accounts = () => platform.h.db.prepare('SELECT COUNT(*) AS n FROM accounts').get().n;
+    const accountsBefore = accounts();
+
+    await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
+    await page.locator('[data-guest-try]').waitFor({ timeout: 30000 });
+    check(`${edition}: the first screen is the question picker`, await page.locator('[data-question-picker]').isVisible() && await page.getByRole('heading', { level: 1 }).count() === 1);
+    check(`${edition}: "Sign in" is top right, one click`, await page.getByTestId('guest-sign-in').isVisible());
+    const bar = await page.locator('.gt-bar').boundingBox();
+    const signBox = await page.getByTestId('guest-sign-in').boundingBox();
+    check(`${edition}: and it sits at the right of the top bar`, signBox.x + signBox.width > bar.x + bar.width - 80 && signBox.y < 120);
+    await page.waitForFunction(() => /left today/.test(document.querySelector('[data-guest-left]')?.textContent || ''));
+    check(`${edition}: five left today, said once, no countdown`, /5 questions left today/.test(await page.locator('[data-guest-left]').innerText()));
+    const copy = (await page.locator('body').innerText());
+    check(`${edition}: the copy has no em dash, no emoji, no urgency`, !/—/.test(copy) && !/\p{Extended_Pictographic}/u.test(copy) && !/hurry|last chance|only \d+ left|expires in/i.test(copy));
+    await page.screenshot({ path: join(SHOTS, `${edition}-01-first-screen-desktop.png`) });
+
+    // ── only what has questions is listed; the picker is labelled ──
+    const labels = await page.locator('[data-question-picker] label, [data-question-picker] legend').allInnerTexts();
+    check(`${edition}: every control has a label (${labels.length})`, labels.length >= 6, labels.join(' | '));
+    const yearOptions = await page.locator('[data-picker-year] option').count();
+    check(`${edition}: six years or classes`, yearOptions === 6, String(yearOptions));
+    if (edition === 'prithagoras') {
+      const first = await page.evaluate(() => ({ year: document.querySelector('[data-picker-year]').value, course: document.querySelector('[data-picker-course]').selectedOptions[0].textContent, courses: [...document.querySelectorAll('[data-picker-course] option')].map(o => o.textContent) }));
+      check('prithagoras: a new visitor starts at Year 12 Mathematics Advanced, Extension 1 one choice away', first.year === '12' && first.course === 'Advanced' && first.courses.includes('Extension 1'), JSON.stringify(first));
+    }
+    const levelCount = await page.locator('[data-picker-level]').count();
+    check(`${edition}: levels offered are only the chapter's own (${levelCount})`, levelCount >= 1 && levelCount <= 4);
+    const wording = await page.locator('label[for="gt-year"]').innerText();
+    check(`${edition}: ${edition === 'priyabhata' ? 'Class' : 'Year'} is this edition's word, never the other's`, wording === (edition === 'priyabhata' ? 'Class' : 'Year'), wording);
+    const pageText = await page.locator('body').innerText();
+    check(`${edition}: nothing of the other edition is named`, edition === 'priyabhata' ? !/NSW|Year 1\d|HSC/.test(pageText) : !/CBSE|NCERT|JEE|Class \d/.test(pageText));
+
+    // ── a remembered choice survives a reload ──
+    const topics = await page.locator('[data-picker-topic] option').evaluateAll(os => os.map(o => ({ v: o.value, t: o.textContent })));
+    const chosen = topics[Math.min(2, topics.length - 1)];
+    await page.locator('[data-picker-topic]').selectOption(chosen.v);
+    const levelNow = await page.locator('[data-picker-level]').last().getAttribute('data-picker-level');
+    await page.locator('[data-picker-level]').last().check();
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('[data-guest-try]').waitFor();
+    check(`${edition}: the last topic is remembered`, await page.locator('[data-picker-topic]').inputValue() === chosen.v);
+    check(`${edition}: and the last level`, await page.locator(`[data-picker-level="${levelNow}"]`).isChecked());
+
+    // ── keyboard: the picker is reachable and Start is operable without a mouse ──
+    await page.locator('[data-picker-year]').focus();
+    await page.keyboard.press('Tab');
+    // A single course is a disabled select (nothing to choose), so Tab goes on to the topic.
+    const afterTab = await page.evaluate(() => document.activeElement?.matches('[data-picker-course], [data-picker-topic]'));
+    check(`${edition}: Tab moves on from the year to the next control that has a choice`, afterTab);
+
+    // ── Hindi where the edition has it (Priyabhata); none in Prithagoras ──
+    if (edition === 'priyabhata') {
+      await page.locator('.gt-langs button[lang="hi"]').click();
+      await page.waitForFunction(() => /आज़माएँ/.test(document.querySelector('h1')?.textContent || ''), null, { timeout: 15000 }).catch(() => {});
+      const hiH1 = await page.locator('h1').innerText(), hiStart = await page.locator('[data-picker-start]').innerText();
+      check(`${edition}: the first screen reads in Hindi`, /एक प्रश्न आज़माएँ/.test(hiH1) && /शुरू करें/.test(hiStart), `${hiH1} | ${hiStart}`);
+      check(`${edition}: and says plainly that questions stay in English`, await page.locator('[data-lang-note]').count() === 1);
+      await page.screenshot({ path: join(SHOTS, `${edition}-02b-hindi.png`) });
+      await page.locator('.gt-langs button[lang="en"]').click();
+    } else check(`${edition}: no language switch is drawn`, await page.locator('.gt-langs').count() === 0);
+
+    // ── handwriting is a sign-up prompt and costs nothing ──
+    await page.locator('[data-picker-form="written"]').check();
+    await page.locator('[data-picker-start]').click();
+    await page.locator('[data-guest-signup="written"]').waitFor({ timeout: 10000 });
+    check(`${edition}: "Write by hand" is the calm sign-up prompt`, /Handwriting and photo checking need an account/.test(await page.locator('[data-guest-signup]').innerText()));
+    check(`${edition}: and it says tried questions are not carried over`, /not carried over/.test(await page.locator('[data-guest-signup]').innerText()));
+    check(`${edition}: the heading took focus`, await page.evaluate(() => document.activeElement?.id === 'gt-signup-title'));
+    check(`${edition}: no question was issued for it`, issued.length === 0);
+    await page.screenshot({ path: join(SHOTS, `${edition}-02-written-prompt.png`) });
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.locator('[data-guest-try]').waitFor();
+    await page.locator('[data-picker-form="typed"]').check();
+
+    // ── five questions, marked by the server ──
+    let verdicts = [];
+    for (let i = 0; i < 5; i++) {
+      await page.locator(i === 0 ? '[data-picker-start]' : '[data-guest-next]').click();
+      await page.locator('[data-guest-question], [data-guest-problem]').first().waitFor({ timeout: 30000 });
+      if (await page.locator('[data-guest-problem]').count() && !await page.locator('[data-guest-question]').count()) {
+        // This chapter has no typed question at this level: the picker says so plainly; take a multiple-choice one.
+        check(`${edition}: a missing kind is said plainly`, /no question of that kind/.test(await page.locator('[data-guest-problem]').innerText()));
+        await page.locator('[data-picker-form="choice"]').check();
+        await page.locator('[data-picker-start]').click();
+        await page.locator('[data-guest-question]').waitFor({ timeout: 30000 });
+      }
+      const ticket = issued.at(-1);
+      const key = keyOf(ticket.body.sealed);
+      const reply = ticket.text;
+      check(`${edition} q${i + 1}: no answer key in the issued reply`, !/"(answer|steps|solution|seed|correctIndex)"\s*:/.test(reply) && !reply.includes(JSON.stringify(key.text)));
+      if (i === 0) {
+        await page.screenshot({ path: join(SHOTS, `${edition}-03-question.png`) });
+        await page.setViewportSize({ width: 390, height: 844 });
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+        check(`${edition}: 390px question: no sideways scroll`, overflow <= 0, String(overflow));
+        await page.screenshot({ path: join(SHOTS, `${edition}-04-question-390.png`) });
+        await page.setViewportSize({ width: 1180, height: 820 });
+      }
+      const wrongOnPurpose = i === 1;
+      if (key.mcq) {
+        const pick = wrongOnPurpose ? (key.index + 1) % 4 : key.index;
+        await page.locator('.gt-option').nth(pick).click();
+      } else {
+        await page.locator('#gt-answer').fill(wrongOnPurpose ? '987654' : key.text);
+      }
+      // The server's real think time (2 s): a person has read the question by then.
+      await page.waitForTimeout(2100);
+      await page.locator('[data-guest-check]').click();
+      await page.locator('[data-guest-verdict]').waitFor({ timeout: 30000 });
+      const v = await page.locator('[data-guest-verdict]').getAttribute('data-guest-verdict');
+      verdicts.push(v);
+      check(`${edition} q${i + 1}: the server marks it ${wrongOnPurpose ? 'wrong' : 'right'}`, v === (wrongOnPurpose ? 'wrong' : 'correct'), v);
+      check(`${edition} q${i + 1}: the answer is shown only now`, /The answer is/.test(await page.locator('[data-guest-verdict]').innerText()));
+      if (i === 1) await page.screenshot({ path: join(SHOTS, `${edition}-05-verdict.png`) });
+    }
+    check(`${edition}: after the fifth, the button leads to sign-up`, /Create an account/.test(await page.locator('[data-guest-next]').innerText()));
+    await page.locator('[data-guest-next]').click();
+    await page.locator('[data-guest-signup="limit"]').waitFor();
+    const prompt = await page.locator('[data-guest-signup]').innerText();
+    check(`${edition}: the sign-up prompt after five is calm and states what is not carried over`, /5 free questions/.test(prompt) && /not carried over/.test(prompt) && !/—/.test(prompt) && !/hurry|last chance|expires|timer/i.test(prompt));
+    await page.screenshot({ path: join(SHOTS, `${edition}-06-signup-after-five.png`) });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: join(SHOTS, `${edition}-07-signup-390.png`) });
+    check(`${edition}: 390px sign-up prompt: no sideways scroll`, await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
+    await page.setViewportSize({ width: 1180, height: 820 });
+
+    // a sixth, asked directly by this very page's cookie, is refused by the server
+    const sixth = await page.evaluate(async () => {
+      const start = await (await fetch('/v1/guest/session', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}' })).json();
+      return { remaining: start.remaining };
+    });
+    check(`${edition}: the server agrees: none left`, sixth.remaining === 0, JSON.stringify(sixth));
+
+    // ── nothing it should not have touched ──
+    check(`${edition}: no account, session or handwriting request, and no account row`, accounts() === accountsBefore
+      && !requests.some(r => /\/v1\/(account|sync|handwriting|questions|billing|exams|practice)\b/.test(r)), requests.filter(r => !/guest/.test(r)).join(', '));
+    const cookies = (await ctx.cookies()).map(c => c.name);
+    check(`${edition}: only the guest cookie exists (no session, no CSRF pair)`, cookies.every(n => n === 'pri_guest'), cookies.join(','));
+    const guestCookie = (await ctx.cookies()).find(c => c.name === 'pri_guest');
+    check(`${edition}: the guest cookie is HttpOnly and SameSite=Strict`, guestCookie?.httpOnly === true && guestCookie?.sameSite === 'Strict');
+
+    // ── Sign in reaches the sign-in page ──
+    await page.getByTestId('guest-sign-in').click();
+    await page.locator('[data-signin-card="page"]').waitFor({ timeout: 30000 });
+    check(`${edition}: "Sign in" reaches the sign-in page`, new URL(page.url()).pathname === '/signin' && await page.locator('.hero-title').isVisible());
+    await page.screenshot({ path: join(SHOTS, `${edition}-08-sign-in-page.png`) });
+
+    // ── the same picker is the signed-in Home's quick start ──
+    const { createVerifiedProfile } = await import('./support/verified-onboarding.mjs');
+    await createVerifiedProfile(page, platform, { name: 'Guest Then Student', year: 9 });
+    const quick = page.locator('[data-instrument-quickstart]');
+    await quick.waitFor({ timeout: 30000 });
+    check(`${edition}: signed-in Home has the picker as its quick start`, await quick.locator('[data-question-picker]').isVisible());
+    check(`${edition}: it offers no answer type (the practice page lets a student type or write)`, await quick.locator('[data-picker-form]').count() === 0);
+    check(`${edition}: and no guest copy, count or sign-in button`, await page.locator('[data-guest-try], [data-guest-left]').count() === 0);
+    await quick.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: join(SHOTS, `${edition}-09-home-quick-start.png`) });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await quick.scrollIntoViewIfNeeded();
+    check(`${edition}: 390px Home: no sideways scroll`, await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth));
+    await page.screenshot({ path: join(SHOTS, `${edition}-10-home-quick-start-390.png`) });
+    await page.setViewportSize({ width: 1180, height: 820 });
+    const wantChapter = await quick.locator('[data-picker-topic]').inputValue();
+    await quick.locator('[data-picker-start]').click();
+    await page.waitForURL(/\/practice\?/, { timeout: 30000 });
+    const dest = new URL(page.url());
+    check(`${edition}: Start opens Practice on the chosen chapter and level`, dest.searchParams.get('subtopic') === wantChapter && /^[1-4]$/.test(dest.searchParams.get('difficulty') || ''), page.url());
+    check(`${edition}: ${edition === 'priyabhata' ? 'with its track' : 'with no India track'}`, edition === 'priyabhata' ? dest.searchParams.get('track') === 'cbse' : !dest.searchParams.has('track'), page.url());
+  } finally {
+    await browser.close();
+    await platform.close?.();
+  }
+}
+clearTimeout(stall);
+console.log(failures.length ? `GUEST TRIAL TOUR: FAIL - ${failures.length} of ${pass + failures.length}\n${failures.join('\n')}` : `GUEST TRIAL TOUR: PASS - ${pass} checks (${editions.join(', ')})`);
+process.exit(failures.length ? 1 : 0);

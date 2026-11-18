@@ -50,7 +50,9 @@ export async function startApp({
   // { edition, now } for the Exam Desk (desk.js).
   desk,
   // { dir } for the practice papers (papers.js).
-  papers
+  papers,
+  // Tuning for the guest trial's limits (guestTrial.js).
+  guest
 } = {}) {
   let testStore = null;
   if (!db && engine) {
@@ -58,7 +60,7 @@ export async function startApp({
     db = testStore.store;
   }
   if (!db) db = createPlatformDb(':memory:');
-  const app = await createServerApp(db, { production, dist, legacy, requestLog: typeof log === 'function', log: log || undefined, parentReport, resources, desk, papers });
+  const app = await createServerApp(db, { production, dist, legacy, requestLog: typeof log === 'function', log: log || undefined, parentReport, resources, desk, papers, guest });
   const server = await new Promise((resolve, reject) => {
     const listener = app.listen(0, '127.0.0.1', () => resolve(listener));
     listener.once('error', reject);
