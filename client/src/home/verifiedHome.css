@@ -32,6 +32,12 @@ a.vp-side:focus-visible { outline: 2px solid var(--in-tx); outline-offset: 2px; 
   .vp-home { grid-template-columns: minmax(0, 1fr); padding: 16px 0 18px; gap: 14px; }
   .vp-aside { padding-top: 0; }
 }
+/* iPad portrait (761–980 px): the Index has no side padding of its own here
+   (the spine carries the gutter), so the Next card kept none and the greeting
+   ran into the screen edge. Same 16px gutter as the spine below it. */
+@media (min-width: 761px) and (max-width: 980px) {
+  .vp-home { padding: 16px 16px 18px; }
+}
 @media (max-width: 760px) {
   .vp-home { order: 1; border-bottom: 0; padding: 6px 0 4px; }
   .vp-next .in-resume { margin-top: 14px; padding: 18px; grid-template-columns: 1fr; }
