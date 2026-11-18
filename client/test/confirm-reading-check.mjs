@@ -27,14 +27,15 @@ const card = readFileSync(new URL('../src/components/QuestionCard.jsx', import.m
 ok(/needsConfirmation\(\{ writeMode: writeMode \|\| photoInUse, resolved, reading: readingId, stale: writeMode \? inkStale : false, vouched \}\)/.test(card), 'the card gates on the pure rule with the current reading and the vouched one');
 ok(/if \(needsCheck && vouchedNow !== readingId\) return;/.test(card), 'every submit path still stops on an unconfirmed reading');
 ok(/needsCheck\s*\n?\s*\? \{ label: t\('verdict.confirmAndSubmit'\), run: acceptReading, disabled: busy \|\| !canSubmit \|\| toConfirm > 0 \}/.test(card), 'the primary is the combined Confirm and mark, disabled until nothing is left to confirm');
-ok(/data-confirm-count/.test(card) && /verdict\.confirmCount/.test(card) && /verdict\.confirmWhich/.test(card) && /verdict\.confirmBlind/.test(card), 'the panel counts what is left to confirm, asks which was written, and says Pri reads without seeing the answer');
+ok(/data-confirm-count/.test(card) && /verdict\.confirmCheckOne/.test(card) && /verdict\.confirmCheckMany/.test(card) && /verdict\.confirmWhich/.test(card) && /verdict\.confirmBlind/.test(card), 'the panel counts what is left to confirm, asks which was written, and says Pri reads without seeing the answer');
 ok(/if \(toConfirm > 0\) return;/.test(card), 'accepting is refused while any line is unresolved');
 ok(/confirmed: viaInk \? confirmedRef\.current : null/.test(card), 'the confirmed revision is kept with the submission record');
 ok(/ink = \{ strokes: compactInkStrokes\(inkResult\.strokes\), recognized: inkResult\.text/.test(card), 'the original strokes still travel with the confirmed reading');
 ok(/needsCheck && doubt \? \(doubt\.weakest\?\.id/.test(card), 'the focused symbol is read only when there is a doubt');
 ok(/setVouched\(null\); setAckedDoubt\(null\); confirmedRef\.current = null;/.test(card) && /photoKey, question\.id\]\);/.test(card) && /setAckedDoubt\(null\)/.test(card), 'a confirmation and any doubt acknowledgement are dropped when the transcript, the ink or the photo reading changes');
 const css = readFileSync(new URL('../src/workspace.css', import.meta.url), 'utf8');
-ok(/@media \(prefers-reduced-motion: no-preference\) \{ \.ws-confirm-line\.is-unsure \{ animation/.test(css) && /\.ws-confirm-line\.is-unsure \{ outline: 1\.5px dashed/.test(css), 'the pulse exists only when motion is allowed; the static dashed outline and the words always carry the state');
+// Owner follow-up 18 Nov 2026: no pulsing dashed red box; a quiet left rule and a plain sentence carry the state (static, so motion preferences do not matter).
+ok(!/animation: ws-unsure-pulse/.test(css) && /\.ws-confirm-line\.is-unsure \{ outline: 0; box-shadow: none; border-left: 2px solid/.test(css), 'the line to check is marked by a quiet static rule and its words, not a pulsing dashed box');
 // Photo/PDF: confirming an unchanged line resolves it, and indices are the transcript's own (an excluded line before it does not shift them).
 const { confirmLine, editLine, linesToCheck, reviveTranscript } = await import('../src/photo/transcript.js');
 const tr = { lines: [{ text: 'a', read: 'a', check: false, excluded: true, why: 'student', edited: false }, { text: 'x+1', read: 'x+1', check: true, excluded: false, edited: false }, { text: 'y', read: 'y', check: true, excluded: false, edited: false }], undecided: false, anchor: null };

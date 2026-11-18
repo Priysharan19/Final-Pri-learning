@@ -598,6 +598,9 @@ export const sessionEndedPhotoFlow = {
       reader.requests.length === readsBefore && await transcript.count() === 0 && await readPhoto.isVisible().catch(() => false),
       `${reader.requests.length - readsBefore} provider requests; transcript ${await transcript.count()}`);
     await readPhoto.click().catch(() => {});
+    // Owner, 18 Nov 2026: a read line is text until tapped; tapping opens it for editing.
+    await page.locator('[data-photo-line="0"] [data-photo-line-open]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await page.locator('[data-photo-line="0"] [data-photo-line-open]').click().catch(() => {});
     await transcript.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     await check(`then on the student's request: same question, the SAME photo, read once with an editable transcript [${EVIDENCE}]`,
       await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid && await mathText('.q-prompt') === prompt &&

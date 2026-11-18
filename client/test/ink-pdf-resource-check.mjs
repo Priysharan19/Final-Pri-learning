@@ -14,7 +14,8 @@ let loads = 0;
 const oversized = 'data:application/pdf;base64,' + 'A'.repeat(Math.ceil((MAX_PDF_INPUT_BYTES + 4) * 4 / 3));
 const oversizedResult = await renderPdfPages(oversized, { loadRenderer: async () => { loads += 1; throw new Error('must not load'); } });
 assert.equal(loads, 0, 'oversized PDF must be rejected before pdf.js is loaded');
-assert.equal(oversizedResult.reason, 'unreadable');
+// Owner, 18 Nov 2026 ("why can it not read a pdf"): the refusal names its real reason.
+assert.equal(oversizedResult.reason, 'too-large');
 assert.equal(dataUrlToBytes(oversized), null, 'oversized PDF must be rejected before decoded allocation');
 
 let canvases = 0;
@@ -43,7 +44,7 @@ const parseHang = await renderPdfPages(PDF, {
   loadRenderer: async () => ({ GlobalWorkerOptions: {}, getDocument: () => ({ promise: new Promise(() => {}), destroy: async () => { parseDestroyed = true; } }) }),
   createCanvas: canvas
 });
-assert.equal(parseHang.reason, 'unreadable');
+assert.equal(parseHang.reason, 'timeout'); // named, not guessed (owner, 18 Nov 2026)
 assert.equal(parseDestroyed, true, 'parse timeout must destroy loading task');
 
 let renderCancelled = false;
@@ -66,7 +67,7 @@ const renderHang = await renderPdfPages(PDF, {
   }),
   createCanvas: canvas
 });
-assert.equal(renderHang.reason, 'unreadable');
+assert.equal(renderHang.reason, 'timeout');
 assert.equal(renderCancelled, true, 'render timeout must cancel active render');
 assert.equal(docDestroyed, true, 'render timeout must destroy parsed document');
 

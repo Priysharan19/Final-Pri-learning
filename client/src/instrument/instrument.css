@@ -1020,7 +1020,8 @@ html.ui-instrument .pg-head .pg-title { margin: 0; font: 500 21px/1.2 var(--in-u
 .in-read-cf { flex: none; width: 34px; height: 3px; border-radius: 2px; background: var(--in-l4); overflow: hidden; }
 .in-read-cf i { display: block; height: 100%; background: var(--in-tx-2); }
 .in-read.is-unc .in-read-cf i { background: var(--in-unc); }
-.in-read-tg { font: 500 10.5px var(--in-mono); }
+.in-read-tg { font: 500 11px var(--in-body, inherit); }
+.in-read-ok { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--in-good, currentColor); opacity: .7; }
 .in-read-tg.is-g { color: var(--in-good); }
 .in-read-tg.is-s { color: var(--in-slip); }
 .in-read-tg.is-u { color: var(--in-unc); }

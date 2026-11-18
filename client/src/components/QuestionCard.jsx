@@ -4,6 +4,8 @@
 // photo), an evaluation card with reasoning, worked solution, final answer and
 // a marks criteria table. All marking logic is the verified v3 engine.
 // ─────────────────────────────────────────────────────────────────────────────
+import { doubtfulSpan } from '../ink/readingShape.js';
+import { autoReadEnabled } from '../lib/autoRead.js';
 import { confidenceFloorOf, isLowConfidence } from '../ink/readingCorrection.js';
 import { needsConfirmation, confirmedRevision } from '../ink/confirmGate.js';
 import { relationChoices, swapRelation } from '../ink/relationSwap.js';
@@ -25,13 +27,16 @@ import { READER_PERMISSION, readerPermission } from '../ink/readerPermission.js'
 import { cloudReadingEnabled, forgetCloudReads, setReadingQuestion, INK_READER_STATE, noteReaderRefusal, readerBlock, readPhotoWithCloud, resumeReaderNow, takeCloudReadingNotice } from '../ink/cloudReader.js';
 import { retryClock, retryWhen } from '../ink/readerFailure.js';
 import { preparePhoto } from '../ink/photoRaster.js';
-import { buildTranscript, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
+import { buildTranscript, confirmLine, editLine, includeAll, includedLines, reviveTranscript, setLineExcluded, unreadablePage, workingOf } from '../photo/transcript.js';
 import { proposeFinalAnswer, readsAsWritten } from '../photo/finalAnswer.js';
 import { clearPhotoDraft, confirmPhotoDraftSaved, readPhotoDraft, savePhotoDraft } from '../local/photoDrafts.js';
-import PhotoLines from './PhotoLines.jsx';
 import { lineMarks } from './workingEvidence.js';
 import { onCloudSessionChange } from '../platform/cloudSession.js';
-import { renderPdfPages } from '../ink/pdfPage.js';
+import { renderPdfPages, MAX_PDF_INPUT_BYTES } from '../ink/pdfPage.js';
+import { intakeImageFile, intakeMessageKey, isPdfFile, claimsHeic, PHOTO_OR_PDF_ACCEPT } from '../ink/photoIntake.js';
+import useFileDrop from '../lib/useFileDrop.js';
+import { PhotoEmpty, PhotoBusy, PhotoPreview, PhotoFailure, rotateDataUrl } from './PhotoFrame.jsx';
+import ReadingReview from './ReadingReview.jsx';
 import PriPlot from './PriPlot.jsx';
 import { canRetryPhotoReading, readerRefusalAtSubmit, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
@@ -260,21 +265,18 @@ function loadLatex() {
 const CONFIRM_CONF = 0.55;
 const CONFIRM_MARGIN = 0.15;
 
-function readsAsMaths(text) {
-  // Spaces out first: the layout pass puts them around fractions, and a gap
-  // between two operators would otherwise hide the pair from the last test.
-  const t = String(text || '').replace(/\s+/g, '');
-  if (!t) return true;
-  if (t.includes('?')) return false;
-  let depth = 0;
-  for (const ch of t) {
-    if (ch === '(') depth++;
-    else if (ch === ')' && --depth < 0) return false;
+// Well-formedness is readingShape.js, shared with the reading chips and list.
+// The line index matters: working continues from the line above ("= 27").
+/** The first line (not yet confirmed by hand) that cannot be finished maths, with the part to look at. */
+function shapeDoubtOf(ink) {
+  const lines = ink?.lines || [];
+  for (let i = 0; i < lines.length; i++) {
+    if (ink?.lineMeta?.[i]?.corrected === true) continue;
+    const text = typeof lines[i] === 'string' ? lines[i] : String(lines[i]?.text ?? '');
+    const span = doubtfulSpan(text, { continuation: i > 0 });
+    if (span) return { line: i, span };
   }
-  if (depth !== 0) return false;
-  if (/[+\-*/=<>^.]$/.test(t)) return false;
-  if (/^[+*/=<>^]/.test(t) || /^\.(?!\d)/.test(t)) return false;
-  return !/[+\-*/=<>^]{2,}/.test(t.replace(/<=|>=|!=|=-|\(-/g, 'A'));
+  return null;
 }
 
 /** What is doubtful about this reading, or null when it can be trusted. */
@@ -282,7 +284,8 @@ function doubtOf(ink) {
   const lines = ink?.lines || [];
   if (!lines.length) return null;
   const weakest = ink.weakest || null;
-  if (!lines.every(readsAsMaths)) return { why: 'shape', weakest };
+  const shape = shapeDoubtOf(ink);
+  if (shape) return { why: 'shape', weakest, line: shape.line, span: shape.span };
   // The server reader's own flag: a line under its confidence floor. The
   // student corrects it in the reading panel ("I wrote…") or stands behind
   // it; it is never marked from silently.
@@ -398,6 +401,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // multi-page transcript is not evidence that the server saw every page.
   const [pdfPageCount, setPdfPageCount] = useState(0);
   const [photoOCR, setPhotoOCR] = useState({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+  // 'opening' | 'converting' while a chosen file is being turned into a photo (a HEIC takes a moment).
+  const [photoIntake, setPhotoIntake] = useState(null);
+  // The final-answer field is shown only when it is needed; "Change" opens it.
+  const [answerOpen, setAnswerOpen] = useState(false);
   // The lines read from the photo (photo/transcript.js): the reader's text,
   // the student's edits, and which lines are part of this answer.
   const [photoLines, setPhotoLines] = useState(null);
@@ -730,13 +737,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       pendingPdf.current = null;
       setPhotoOCR({
         phase: 'failed', text: '', confidence: 0, engine: null,
+        // The real reason, never a guess: too large, too many pages, locked,
+        // damaged, too slow, or the PDF reader could not be loaded.
         error: result.reason === 'renderer-unavailable'
           ? pdfReaderNeedsOnlineDownload(language)
-          : tLater('verdict.pdfUnopenable')
+          : tLater(PDF_REASON_KEY[result.reason] || 'verdict.pdfUnopenable')
       });
       return;
     }
     setPhoto(pages[0].dataUrl);
+    // Pages beyond the ones read are never quietly dropped: say so, and the
+    // grading guard (photoEligibleForGrading) holds the receipt back.
+    if ((result.totalPages || 0) > pages.length) setPdfUnread({ unread: result.totalPages - pages.length, total: result.totalPages });
     if (pages.length === 1) { decodePhoto(pages[0].dataUrl); return; }
     if (!cloudReadingEnabled(user)) {
       const block = readerBlock(user);
@@ -805,6 +817,31 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
   }, [user, decodePhoto, decodePdf]);
 
+  // One way in for every file: the picker, a drop on the card, a paste. The
+  // same validation and the same messages whichever door it came through.
+  // Invalidating the previous reading is synchronous: a FileReader or a HEIC
+  // conversion may finish much later, and until then an old phase='done' would
+  // otherwise leave the previous transcript submittable against the new bytes.
+  const takeFile = useCallback((file) => {
+    if (!file) return;
+    const generation = ++photoReadGeneration.current;
+    const live = () => mountedRef.current && generation === photoReadGeneration.current;
+    pendingPdf.current = null;
+    setPhoto(null);
+    setPdfUnread(null);
+    setPdfPageCount(0);
+    setPhotoSignInOpen(false);
+    setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false); setPhotoAttested(null); setHeldPdf(false);
+    setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+    setPhotoIntake(null);
+    attachPhoto(file,
+      data => { if (live()) setPhoto(data); },
+      data => { if (live()) { setPhotoIntake(null); holdAttachment(data, 'photo'); } },
+      data => { if (live()) { setPhotoIntake(null); holdAttachment(data, 'pdf'); } },
+      message => { if (live()) { setPhotoIntake(null); setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }); } },
+      kind => { if (live()) setPhotoIntake(kind); });
+  }, [holdAttachment]);
+
   // Paste a photo straight in. On a laptop this is how a student moves a shot
   // from their phone: AirDrop or a screenshot, then ⌘V.
   useEffect(() => {
@@ -815,36 +852,18 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       const file = item.getAsFile();
       if (!file) return;
       event.preventDefault();
-      // Invalidate the previous recognised attachment as soon as the student
-      // pastes another image. Waiting for FileReader would leave the old
-      // transcript marked as submittable while new bytes were still loading.
-      const generation = ++photoReadGeneration.current;
-      const live = () => mountedRef.current && generation === photoReadGeneration.current;
-      pendingPdf.current = null;
-      setPhoto(null);
-      setPdfUnread(null);
-      setPdfPageCount(0);
-      setPhotoSignInOpen(false);
-      setPhotoOCR({ phase: 'reading', text: '', confidence: 0, error: '', engine: null });
-      const reader = new FileReader();
-      const fail = () => {
-        if (live()) setPhotoOCR({ phase: 'failed', text: '', confidence: 0,
-          error: tLater('verdict.imageUnopenable'), engine: null });
-      };
-      reader.onload = () => {
-        if (!live()) return;
-        const dataURL = String(reader.result || '');
-        if (!dataURL.startsWith('data:image/')) { fail(); return; }
-        setPhoto(dataURL);
-        holdAttachment(dataURL, 'photo');
-      };
-      reader.onerror = fail;
-      reader.onabort = fail;
-      reader.readAsDataURL(file);
+      takeFile(file);
     };
     window.addEventListener('paste', onPaste);
     return () => window.removeEventListener('paste', onPaste);
-  }, [mode, resolved, holdAttachment]);
+  }, [mode, resolved, takeFile]);
+
+  // Drop a photo, a HEIC or a PDF anywhere on the card while in Photo mode.
+  const [dropNote, setDropNote] = useState(null);
+  const drop = useFileDrop({
+    enabled: mode === 'photo' && !resolved && !isMcq,
+    onFile: (file, { extra }) => { setDropNote(extra > 0 ? 'photo.dropOnlyOne' : null); takeFile(file); }
+  });
 
   // ── A photographed page, kept where a reload cannot reach it ───────────────
   // The picture, the lines as read and as corrected, which lines are part of
@@ -1070,6 +1089,39 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     void clearPhotoDraft(question.id);
   };
   const photoInUse = mode === 'photo' && !!photo && !!photoLines && photoOCR.phase === 'done';
+  // One file input serves both ways in; "Take a photo" asks the phone for its
+  // camera first (capture), "Choose" never does (iOS would hide the library).
+  const chooseFile = (camera) => {
+    const input = photoInputRef.current;
+    if (!input) return;
+    if (camera) input.setAttribute('capture', 'environment'); else input.removeAttribute('capture');
+    input.click();
+  };
+  // A quarter turn for a page photographed sideways. Offered before a reading
+  // exists; a rotated page is a new page, so it is held, not read, until asked.
+  const rotatePhoto = async () => {
+    if (!photo || pendingPdf.current) return;
+    try {
+      const turned = await rotateDataUrl(photo);
+      photoReadGeneration.current += 1;
+      setPhotoSignInOpen(false);
+      setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false); setPhotoAttested(null);
+      setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
+      setPhoto(turned);
+      holdAttachment(turned, 'photo');
+    } catch { /* the page stays as it was */ }
+  };
+  // The state of the photo frame, for the page's own styling and the tours.
+  const photoFrameState = photoIntake ? 'busy'
+    : !photo && !heldPdf && photoOCR.phase === 'idle' ? 'empty'
+      : photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable' ? 'failed'
+        : photoOCR.phase === 'reading' ? 'reading'
+          : photoOCR.phase === 'done' ? 'read' : 'attached';
+  // The final-answer field appears only when it is needed: nothing in the
+  // working states the answer, two candidates, the student already typed, or
+  // they pressed Change.
+  const photoFieldShown = mode !== 'photo' || (photoOCR.phase === 'done' && !!photoLines
+    && (answerOpen || photoAnswerSource === 'student' || !String(answer).trim()));
 
   useEffect(() => {
     if (!resolved) return;
@@ -1292,12 +1344,29 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // What still needs the student: the lines the reader was unsure of, until each
   // is confirmed as written, changed to what they wrote, or (photo) left out.
   const [ackedDoubt, setAckedDoubt] = useState(null);
+  // A line is to be checked when the reader was unsure of it or when it does not
+  // come out as finished maths (the same test the chips use).
+  const shapeLine = i => {
+    if (inkResult?.lineMeta?.[i]?.corrected === true) return null;
+    const l = (inkResult?.lines || [])[i];
+    return doubtfulSpan(typeof l === 'string' ? l : String(l?.text ?? ''), { continuation: i > 0 });
+  };
   const unsureLines = writeMode
-    ? (inkResult?.lines || []).map((l, i) => (isLowConfidence(inkResult?.lineMeta?.[i] || { conf: 0 }, confidenceFloorOf(inkResult)) ? i : -1)).filter(i => i >= 0)
+    ? (inkResult?.lines || []).map((l, i) => (isLowConfidence(inkResult?.lineMeta?.[i] || { conf: 0 }, confidenceFloorOf(inkResult)) || shapeLine(i) ? i : -1)).filter(i => i >= 0)
     : photoInUse ? (photoLines.lines || []).map((l, i) => (l.check && !l.edited && !l.confirmed && !l.excluded ? i : -1)).filter(i => i >= 0) : [];
   const ackKey = `${readingId}|${inkResult?.text ?? ''}|${inkSignature ?? ''}`;
   const doubtOnly = writeMode && !!doubt && unsureLines.length === 0 && ackedDoubt !== ackKey;
   const toConfirm = unsureLines.length + (doubtOnly ? 1 : 0);
+  const firstToCheck = unsureLines.length ? unsureLines[0] : -1;
+  // Focus goes to the first line to check when a reading arrives that needs one.
+  const confirmFocusRef = useRef(null);
+  const focusedFor = useRef(null);
+  useEffect(() => {
+    const key = needsCheck && firstToCheck >= 0 ? `${readingId}|${firstToCheck}` : null;
+    if (!key || focusedFor.current === key) return;
+    focusedFor.current = key;
+    try { confirmFocusRef.current?.focus?.({ preventScroll: false }); } catch { /* focus is best-effort */ }
+  });
   // The page as it stands now. Submit records it; a graded result is shown as
   // a result of what is on screen only while this has not changed since.
   const photoIdentity = useMemo(() => photoFingerprint(photo), [photo]);
@@ -1321,7 +1390,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     if (!doubt) return '';
     const nice = s => ({ pi: 'π', theta: 'θ', sqrt: '√', percent: '%' })[s] || s;
     if (doubt.why === 'shape') {
-      return t('verdict.checkShape');
+      return t('verdict.checkShapeLine', { n: (doubt.line ?? 0) + 1, span: doubt.span?.text || '' });
     }
     // Name a runner-up only when it is genuinely close and genuinely different:
     // offering "1 or l?" on a number is a question with no useful answer.
@@ -2282,12 +2351,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     (writeMode && inkHasStrokes && !inkReadable && inkReaderState?.kind !== INK_READER_STATE.READING && !inkAccountBlocked && !inkBlockKey && inkReaderState?.kind !== INK_READER_STATE.READ_FAILED)
     || (mode === 'photo' && !!photo && photoOCR.phase === 'idle'));
   // Why Submit is not available, said beside it — never a dead button.
+  const autoReadOn = !resolved && autoReadEnabled();
+  const touchDevice = (() => { try { return !!globalThis.matchMedia?.('(pointer: coarse)')?.matches; } catch { return false; } })();
   const submitReasonKey = resolved || isMcq || busy ? null
     : writeMode && inkHasStrokes && rereadAsked && inkReadable ? 'ink.submitReadAgainDone'
     : writeMode && inkHasStrokes && inkStale && inkReadExpired ? 'ink.submitReadExpired'
     : mode === 'photo' && photoInUse && photoReadExpired ? 'photo.readExpired'
     : writeMode && inkHasStrokes && inkStale ? 'ink.submitReadAgain'
-      : writeMode && inkHasStrokes && !inkReadable && awaitingReading ? 'ink.submitReadFirst'
+      // Reading is automatic (owner decision 18 Nov 2026): no "read it first" order.
+      : writeMode && inkHasStrokes && !inkReadable && awaitingReading && !autoReadOn ? 'ink.submitReadFirst'
         : writeMode && !isWorking && inkReadable && inkProposal && !String(inkAnswer).trim() ? 'verdict.submitNeedsAnswer'
           : mode === 'photo' && !isWorking && photoInUse && !String(answer).trim() ? 'verdict.submitNeedsAnswer'
             : null;
@@ -2674,9 +2746,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             })}
           </div>
         ) : mode !== 'write' ? (
-          <div className={`editor-shell ${resolved ? 'ink-disabled' : ''}`}>
+          <div className={`editor-shell ${resolved ? 'ink-disabled' : ''}${drop.dragging ? ' is-dropping' : ''}`} data-photo-drop={mode === 'photo' ? (drop.dragging ? 'active' : 'ready') : undefined} {...drop.bind}>
             {/* Tools for writing an answer: gone once there is nothing left to write. */}
-            {!resolved && (
+            {!resolved && mode !== 'photo' && (
               <div className="editor-toolbar">
                 <button className={`editor-tool ${showSyms ? 'on' : ''}`} title={t('verdict.symbolPalette')} aria-label={t('verdict.symbolPalette')} aria-pressed={showSyms} onClick={() => setShowSyms(s => !s)}>Σ</button>
                 <span className="editor-hint">{t(isWorking ? 'verdict.editorHintWorking' : 'verdict.editorHintType')}</span>
@@ -2684,7 +2756,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {question.answerSuffix && <span className="answer-suffix">{t('verdict.answerIn', { unit: question.answerSuffix })}</span>}
               </div>
             )}
-            {showSyms && !resolved && (
+            {showSyms && !resolved && mode !== 'photo' && (
               <div className="sym-palette">
                 {SYMBOLS.map(([sym, nameKey]) => (
                   <button key={sym} className="sym-key" aria-label={t('verdict.insertSymbol', { name: t(nameKey) })} onClick={() => insertSym(sym)}>{sym}</button>
@@ -2693,50 +2765,40 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             )}
             <div className="editor-body">
               {mode === 'photo' && (
-                <div style={{ marginBottom: 14 }}>
-                  {/* No `capture` attribute: on iOS it forces the camera open and removes
-                      the photo-library option, which is the wrong way round. A student
-                      photographs their exercise book first and picks the shot afterwards. */}
-                  <input ref={photoInputRef} type="file" accept="image/*,application/pdf" style={{ display: 'none' }}
+                <div className="photo-answer" data-photo-answer data-photo-state={photoFrameState}>
+                  {/* No `capture` attribute on the main input: on iOS it forces the camera open and removes
+                      the photo-library option, which is the wrong way round. "Take a photo" is its own input. */}
+                  <input ref={photoInputRef} type="file" accept={PHOTO_OR_PDF_ACCEPT} style={{ display: 'none' }} data-photo-file
                     onChange={e => {
                       // Cancelled file pickers keep the previously read image.
-                      if (!e.target.files?.length) return;
-                      // Invalidate the old OCR synchronously. An Image or PDF
-                      // FileReader may finish much later, and until then an old
-                      // phase='done' would otherwise enable stale submission.
-                      const generation = ++photoReadGeneration.current;
-                      const live = () => mountedRef.current && generation === photoReadGeneration.current;
-                      pendingPdf.current = null;
-                      setPhoto(null);
-                      setPdfUnread(null);
-                      setPdfPageCount(0);
-                      setPhotoSignInOpen(false);
-                      setPhotoLines(null); setPhotoNote(null); setPhotoAnswerSource(null); setPhotoRestored(false); setPhotoAttested(null); setHeldPdf(false);
-                      setPhotoOCR({ phase: 'idle', text: '', confidence: 0, error: '', engine: null });
-                      attachPhoto(e,
-                        data => { if (live()) setPhoto(data); },
-                        data => { if (live()) holdAttachment(data, 'photo'); },
-                        data => { if (live()) holdAttachment(data, 'pdf'); },
-                        message => { if (live()) setPhotoOCR({ phase: 'failed', text: '', confidence: 0, engine: null, error: message }); });
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file) return;
+                      setDropNote(null); setAnswerOpen(false);
+                      takeFile(file);
                     }} />
-                  {!photo && !heldPdf && photoOCR.phase === 'idle'
-                    ? <button className="btn btn-ghost photo-pick" onClick={() => photoInputRef.current?.click()}>
-                        <Icon name="photo" size={18} />
-                        <span className="photo-pick-text">
-                          <span className="photo-pick-title">{t('verdict.photographWorking')}</span>
-                          <span className="photo-pick-help">{photoSupportedFormats(language)}</span>
-                        </span>
-                      </button>
-                    : (
-                      <div className="photo-attach">
-                        {/* A PDF sets no thumbnail until its pages render, and the whole
-                            status block used to live inside the photo branch — so every
-                            PDF failure message was unreachable and the screen simply did
-                            not move. */}
-                        {photo
-                          ? <div className="photo-thumb"><img src={photo} alt={t('history.paperWorking')} /><button aria-label={t('verdict.removePhoto')} data-photo-remove onClick={dropPhoto}>✕</button></div>
-                          : <div className="photo-thumb" style={{ display: 'grid', placeItems: 'center', fontSize: 22 }}><span aria-hidden="true">▤</span><button aria-label={t('verdict.removeAttachment')} onClick={dropPhoto}>✕</button></div>}
-                        <div style={{ flex: 1 }} role="status" aria-live="polite">
+
+                  {photoIntake
+                    ? <PhotoBusy t={t} kind={photoIntake} />
+                    : !photo && !heldPdf && photoOCR.phase === 'idle'
+                      ? <PhotoEmpty t={t} touch={touchDevice} dragging={drop.dragging}
+                          onChoose={() => chooseFile(false)} onCapture={() => chooseFile(true)} />
+                      : !photo && !heldPdf && !pendingPdf.current && photoOCR.phase === 'failed'
+                        ? <PhotoFailure t={t} reasonAttr={photoOCR.unreadable ? 'unreadable' : 'failed'}
+                            onChooseAnother={() => chooseFile(false)} onType={() => flipMode('type')}>{photoOCR.error}</PhotoFailure>
+                        : (
+                          <div className={`photo-attach pf-attached${photoOCR.phase === 'done' && photoLines ? ' is-read' : ''}`}>
+                            {/* A PDF sets no preview until its pages render, and the whole
+                                status block used to live inside the photo branch — so every
+                                PDF failure message was unreachable and the screen simply did
+                                not move. After a reading, the page is shown by the reading itself. */}
+                            {!(photoOCR.phase === 'done' && photoLines) && (
+                              <PhotoPreview t={t} src={photo} busy={photoOCR.phase === 'reading'} canChange={!resolved}
+                                canRotate={!!photo && !pendingPdf.current && !heldPdf && photoOCR.phase !== 'reading' && photoOCR.phase !== 'done'}
+                                removeLabel={t(photo ? 'verdict.removePhoto' : 'verdict.removeAttachment')}
+                                onRotate={rotatePhoto} onReplace={() => chooseFile(false)} onRemove={dropPhoto} />
+                            )}
+                            <div className="pf-status" role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
                             <span className="muted"><Working pending={photoOCR.phase === 'reading'} label={t('verdict.readingWork')} /></span>
                           )}
@@ -2751,12 +2813,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                   </button>
                                 </div>
                               )}
-                              {/* What actually read it. Saying "on-device" over a photo that
-                                  was uploaded is the one thing this screen must never do. */}
-                              <div style={{ fontSize: 12.5, marginBottom: 6 }}>
-                                <b>{String(photoOCR.engine || '').startsWith('cloud') ? t('verdict.readOnServer') : t('verdict.decodedOnDevice')}</b>
-                                {photoOCR.confidence ? t('verdict.ocrConfidence', { percent: Math.round(photoOCR.confidence * 100) }) : ''}
-                              </div>
                               {photoRestored && <div className="muted" data-photo-restored style={{ fontSize: 12.5 }}>{t('photo.restored')}</div>}
                               {pdfUnread && <div className="verdict-body" style={{ marginTop: 6 }}>{t('verdict.pdfPagesUnread', pdfUnread)}</div>}
                               {pdfPageCount > 1 && (
@@ -2764,9 +2820,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                                   {pdfReceiptWarning(language, pdfPageCount)}
                                 </div>
                               )}
-                              {cloudNotice && String(photoOCR.engine || '').startsWith('cloud') && (
-                                <div className="muted" style={{ marginTop: 6, fontSize: 12 }}>{t('verdict.photoReadOnServerNotice')}</div>
-                              )}
+                              {/* The one place the reading's provenance is said, quietly. */}
+                              <details className="pf-how" data-photo-how>
+                                <summary>{t('photo.how.title')}</summary>
+                                <p>{String(photoOCR.engine || '').startsWith('cloud') ? t('photo.how.server') : t('verdict.decodedOnDevice')} {t('verdict.photoReadOnServerNotice')}</p>
+                              </details>
                             </>
                           )}
                            {(photoOCR.phase === 'failed' || photoOCR.phase === 'unavailable') && (
@@ -2795,8 +2853,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               </div>
                             )}
                           {(photoOCR.phase === 'failed' || (photoOCR.phase === 'unavailable' && photoOCR.blockedKey !== 'verdict.photoReadingSignIn')) && !resolved && (
-                            <div style={{ marginTop: 8 }}>
-                              <button type="button" className="btn btn-quiet btn-sm" data-type-instead onClick={() => flipMode('type')}>{t('verdict.typeInstead')}</button>
+                            <div className="pf-actions" style={{ marginTop: 10 }}>
+                              <button type="button" className="btn btn-primary btn-sm" data-photo-choose-another onClick={() => chooseFile(false)}>{t('photo.chooseAnother')}</button>
+                              <button type="button" className="btn btn-ghost btn-sm" data-type-instead onClick={() => flipMode('type')}>{t('verdict.typeInstead')}</button>
                             </div>
                           )}
                           {photoOCR.phase === 'unavailable' && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
@@ -2828,26 +2887,41 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             </div>
                           ) : <span className="muted">{photoAwaitingOnlineReader(language)}</span>)}
                         </div>
-                      </div>
-                    )}
+                          </div>
+                        )}
+                  {dropNote && <p className="pf-hint muted" role="status">{t(dropNote)}</p>}
+                  {drop.dragging && photoOCR.phase !== 'idle' && <p className="pf-dropping" role="status">{t('photo.dropActive')}</p>}
                 </div>
               )}
               {mode === 'photo' && photoOCR.phase === 'done' && photoLines && (
-                <>
-                  <PhotoLines transcript={photoLines} disabled={resolved || busy} marks={photoMarks}
-                    onEdit={(i, text) => changePhotoLines(editLine(photoLines, i, text))}
-                    onExclude={(i, out) => changePhotoLines(setLineExcluded(photoLines, i, out))}
-                    onIncludeAll={() => changePhotoLines(includeAll(photoLines))} />
-                  {/* Where the answer in the field came from — or why the field
-                      is empty. Nothing is marked until Submit is pressed. */}
-                  {!isWorking && !resolved && photoNote && photoNote.status !== 'not-applicable' && (
-                    <p className="photo-lines-note" role="status" data-photo-answer-note={photoNote.status} style={{ marginTop: 10 }}>
-                      {photoNote.status === 'proposed' ? t('photo.answerProposed', { n: photoLineNumber(photoLines, photoNote.line) })
-                        : photoNote.status === 'ambiguous' ? t('photo.answerAmbiguous', { candidates: photoNote.candidates.join(', ') })
-                          : t('photo.answerNone')}
-                    </p>
+                <ReadingReview t={t} photo={photo} transcript={photoLines} disabled={resolved || busy} marks={photoMarks} texOf={texOf}
+                  toConfirm={toConfirm} firstToCheck={firstToCheck} confirmFocusRef={confirmFocusRef}
+                  onEdit={(i, text) => changePhotoLines(editLine(photoLines, i, text))}
+                  onExclude={(i, out) => changePhotoLines(setLineExcluded(photoLines, i, out))}
+                  onKeep={i => changePhotoLines(confirmLine(photoLines, i))}
+                  onIncludeAll={() => changePhotoLines(includeAll(photoLines))}
+                  onReplace={() => chooseFile(false)} onRemove={dropPhoto}>
+                  {/* The final answer: taken from the working when a line states the asked
+                      quantity, said where it came from, and asked for only when nothing does. */}
+                  {!isWorking && !resolved && (
+                    <div className="rr-final" data-photo-final>
+                      {String(answer).trim() && photoAnswerSource === 'proposed' && !answerOpen ? (
+                        <p className="rr-final-line" data-photo-answer-note={photoNote?.status || 'proposed'} data-photo-final-value={String(answer).trim()}>
+                          <span>{t('photo.finalAnswerIs')}</span>{' '}
+                          <b className="rr-final-value">{question.answerPrefix ? <span lang="en"><MathText text={question.answerPrefix} /> </span> : null}<MathText text={`$${texOf(String(answer).trim())}$`} />{question.answerSuffix ? ` ${question.answerSuffix}` : ''}</b>
+                          {' '}<button type="button" className="btn btn-quiet btn-sm" data-photo-answer-change onClick={() => setAnswerOpen(true)}>{t('photo.change')}</button>
+                          {photoNote?.status === 'proposed' && <span className="rr-from muted"> {t('photo.answerFromLine', { n: photoLineNumber(photoLines, photoNote.line) })}</span>}
+                        </p>
+                      ) : photoNote && photoNote.status !== 'not-applicable' && photoNote.status !== 'proposed' ? (
+                        <p className="rr-final-why" role="status" data-photo-answer-note={photoNote.status}>
+                          {photoNote.status === 'ambiguous' ? t('photo.answerAmbiguous', { candidates: photoNote.candidates.join(', ') })
+                            : photoNote.missing ? t('photo.answerMissing', { v: photoNote.missing })
+                              : t('photo.answerNone')}
+                        </p>
+                      ) : null}
+                    </div>
                   )}
-                </>
+                </ReadingReview>
               )}
               {photoSignInOpen && photoOCR.blockedKey === 'verdict.photoReadingSignIn' && (
                 /* The same two ways in as the handwriting sign-in: the account
@@ -2868,7 +2942,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   onChange={e => editWorking(e.target.value)}
                   rows={6}
                 />
-              ) : (
+              ) : (mode === 'photo' && !photoFieldShown) ? null : (
                 <TypedAnswerFields
                   question={question} totalMarks={totalMarks} inputRef={inputRef}
                   answer={answer} working={working} onAnswer={photoInUse ? editPhotoAnswer : editAnswer} onWorking={editWorking} onSubmit={submit}
@@ -2923,7 +2997,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     {inkProposal.status === 'proposed'
                       ? t('ink.answerProposed', { answer: inkProposal.answer, n: (inkProposal.line ?? inkResult.lines.length - 1) + 1 })
                       : inkProposal.status === 'ambiguous' ? t('ink.answerAmbiguous', { candidates: inkProposal.candidates.join(', ') })
-                        : t('ink.answerNone')}
+                        : inkProposal.missing ? t('photo.answerMissing', { v: inkProposal.missing })
+                          : t('ink.answerNone')}
                   </p>
                 </div>
               )}
@@ -3006,24 +3081,31 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
         {/* A reading in doubt asks about the smallest useful region — one
             symbol — instead of asking for the whole solution again. */}
-        {needsCheck && (
+        {needsCheck && !photoInUse && toConfirm > 0 && (
           <div className="ws-check ws-confirm" role="group" aria-label={t('verdict.confirmTitle')} data-confirm-reading data-to-confirm={toConfirm}>
             <div className="ws-check-title"><Icon name={toConfirm ? 'uncertain' : 'check'} />{t('verdict.confirmTitle')}
-              <span className="ws-confirm-count" role="status" aria-live="polite" data-confirm-count>{toConfirm ? t('verdict.confirmCount', { n: toConfirm }) : t('verdict.confirmDone')}</span>
+              <span className="ws-confirm-count" role="status" aria-live="polite" data-confirm-count>{toConfirm ? (toConfirm === 1 && firstToCheck >= 0 ? t('verdict.confirmCheckOne', { n: firstToCheck + 1 }) : t('verdict.confirmCheckMany', { count: toConfirm })) : t('verdict.confirmDone')}</span>
             </div>
             <p className="ws-confirm-blind muted">{t('verdict.confirmBlind')}</p>
             <div className="ws-confirm-lines">
-              {(writeMode ? (inkResult?.lines || []).map((l, idx) => ({ l, idx })) : (photoLines?.lines || []).map((l, idx) => ({ l, idx })).filter(r => !r.l.excluded)).map(({ l, idx: i }, shown) => {
-                const unsure = writeMode ? isLowConfidence(inkResult?.lineMeta?.[i] || { conf: 0 }, confidenceFloorOf(inkResult)) : !!(l.check && !l.edited && !l.confirmed);
+              {/* The reading itself is the list above the panel; this panel names only what needs a look. */}
+              {(writeMode ? (inkResult?.lines || []).map((l, idx) => ({ l, idx })).filter(r => unsureLines.includes(r.idx)) : (photoLines?.lines || []).map((l, idx) => ({ l, idx })).filter(r => !r.l.excluded)).map(({ l, idx: i }, shown) => {
+                const unsure = writeMode ? unsureLines.includes(i) : !!(l.check && !l.edited && !l.confirmed);
+                const spanOf = writeMode && unsure ? shapeLine(i) : null;
                 const text = String(typeof l === 'string' ? l : l?.text ?? '');
                 const swaps = writeMode && unsure ? relationChoices({ ...(inkResult?.lineMeta?.[i] || {}), text }) : null;
                 return (
-                  <div key={i} className={`ws-confirm-line${unsure ? ' is-unsure' : ''}`} data-confirm-line={i} data-unsure={unsure ? 'true' : undefined}>
-                    <span className="ws-confirm-n" aria-hidden="true">{shown + 1}</span>
+                  <div key={i} className={`ws-confirm-line${unsure ? ' is-unsure' : ''}`} data-confirm-line={i} data-unsure={unsure ? 'true' : undefined}
+                    tabIndex={unsure && i === firstToCheck ? -1 : undefined} ref={unsure && i === firstToCheck ? confirmFocusRef : undefined}>
+                    <span className="ws-confirm-n" aria-hidden="true">{writeMode ? i + 1 : shown + 1}</span>
                     <span className="ws-confirm-math ws-cm"><MathText text={`$${texOf(text)}$`} /></span>
                     {unsure && (
-                      <div className="ws-confirm-ask" role="group" aria-label={t('verdict.confirmWhich', { n: i + 1 })}>
-                        <span className="ws-confirm-unsure">{t('verdict.confirmWhich', { n: i + 1 })}</span>
+                      <div className="ws-confirm-ask" role="group" aria-label={spanOf ? t('verdict.checkShapeLine', { n: i + 1, span: spanOf.text }) : t('verdict.confirmWhich', { n: i + 1 })}>
+                        {spanOf
+                          ? <span className="ws-confirm-unsure" data-confirm-shape={i}>{t('verdict.confirmCheckLead', { n: i + 1 })}{' '}
+                              <button type="button" className="ws-confirm-span" data-confirm-span={i} aria-label={t('verdict.confirmSpanAria', { n: i + 1, span: spanOf.text })}
+                                onClick={() => inkControlRef.current?.edit?.(i)}><MathText text={`$${texOf(spanOf.text)}$`} /></button></span>
+                          : <span className="ws-confirm-unsure">{t('verdict.confirmWhich', { n: i + 1 })}</span>}
                         <button type="button" className="btn btn-quiet btn-sm" data-confirm-keep={i}
                           onClick={() => (writeMode ? inkControlRef.current?.correct?.(i, text) : changePhotoLines(editLine(photoLines, i, text)))}>{t('verdict.confirmThatsIt')}</button>
                         {swaps && swaps.options.map(sign => (
@@ -3079,6 +3161,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
               onClick={() => setShowTutor(v => !v)}>
               {t('tutor.help')}
             </button>
+            {/* Help and "What went wrong?" are one row of quiet actions. */}
+            {showDiagnoseButton({ tutorEnabled, diagnostic, resolved, res: state.res, gradedRetry }) && MistakeDiagnosis && (() => {
+              const key = String(attempt?.submissionId || judged?.revision || question.id);
+              return (
+                <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${diagnoseFor === key ? 'on' : ''}`}
+                  aria-expanded={diagnoseFor === key} data-tutor-diagnose
+                  onClick={() => setDiagnoseFor(diagnoseFor === key ? null : key)}>
+                  {t('tutor.diagnose.button')}
+                </button>
+              );
+            })()}
             {tutorUsed > 0 && <span className="muted" style={{ marginLeft: 8, fontSize: 13 }}>{t('tutor.helpUsed', { count: tutorUsed, n: tutorUsed })}</span>}
           </div>
         )}
@@ -3118,13 +3211,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           const open = diagnoseFor === attemptKey;
           return (
             <>
-              <div className="tutor-launch-row no-print">
-                <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${open ? 'on' : ''}`}
-                  aria-expanded={open} data-tutor-diagnose
-                  onClick={() => setDiagnoseFor(open ? null : attemptKey)}>
-                  {t('tutor.diagnose.button')}
-                </button>
-              </div>
+              {!(!resolved && tutorEnabled && !diagnostic) && (
+                <div className="tutor-launch-row no-print">
+                  <button type="button" className={`btn btn-ghost btn-sm tutor-launch ${open ? 'on' : ''}`}
+                    aria-expanded={open} data-tutor-diagnose
+                    onClick={() => setDiagnoseFor(open ? null : attemptKey)}>
+                    {t('tutor.diagnose.button')}
+                  </button>
+                </div>
+              )}
               {open && (
                 <TutorBoundary fallback={t('tutor.unavailable')}>
                   <React.Suspense fallback={<div className="hintbox" role="status"><Working pending />{t('tutor.diagnose.asking')}</div>}>
@@ -3195,8 +3290,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                    result is kept, said as the earlier attempt's, and nothing
                    on the page now is described as checked. */
                 <>
-                  <div className="verdict-title">{t(state.res?.invalid ? 'verdict.previousAttemptUnread' : 'verdict.previousAttemptWrong')}</div>
-                  <div className="verdict-body" data-new-work-unchecked>{t('verdict.newWorkNotChecked')}</div>
+                  {/* One sentence, placed with the result (owner, 18 Nov 2026). */}
+                  <div className="verdict-body" data-new-work-unchecked>{t(state.res?.invalid ? 'verdict.previousAttemptUnreadOne' : 'verdict.previousAttemptOne')}</div>
                 </>
               ) : (
                 <>
@@ -3213,7 +3308,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   </div>
                 </>
               )}
-              {attemptViaInk && !checkRefused && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
+              {attemptViaInk && !checkRefused && !previousAttempt && <div className="eval-provenance" data-provenance="handwriting" style={{ padding: '6px 0 0', border: 0 }}>{t('verdict.readByAiMarkedByEngine')}</div>}
               {!previousAttempt && state.res?.authoritative !== true && state.res?.partial &&
                 <div className="muted" style={{ marginTop: 6, fontSize: 13.5 }}>{state.res.partial.note}</div>}
               {!previousAttempt && state.res?.authoritative !== true && state.res?.partial && <LostMarks lost={state.res.partial.lost} t={t} />}
@@ -3471,15 +3566,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           <span className="status-line" data-state={statusState} data-work-state={workState} data-work-vocab={vocab.state || undefined} role="status" aria-live="polite">
             {statusState !== 'idle' && <span className="status-mark" aria-hidden="true"><Working pending={statusState === 'working'} />{statusState !== 'working' && <span className="dot" />}</span>}
             {writeMode && shownAnswerLine && !inkStale && !cloudPending && !(resolved && !judgedShown) && saveState !== 'failed' && saveState !== 'saving'
-              ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(shownAnswerLine)}$`} /></span>
+              ? <span className="ws-answer-preview muted">{t('verdict.yourAnswerIs')} <MathText text={`$${texOf(String(shownAnswerLine).replace(/^\s*[=≈]\s*/, ''))}$`} /></span>
               : statusText}
             {/* Handwriting is read only by the server reader (#316); say so where the work is submitted. */}
             {writeMode && !isMcq && (
-              <span className="ws-read-by">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : t('verdict.inkReadByServerPending')}</span>
+              <span className="ws-read-by">{String(inkResult?.engine || '').startsWith('cloud') ? t('verdict.inkReadByServer') : autoReadOn ? t('ink.footerAuto') : t('verdict.inkReadByServerPending')}</span>
             )}
           </span>
-          {INSTRUMENT && writeMode && !resolved && (
-            <span className="in-wbar-note" aria-hidden="true">{t('inst.wbarNote', { key: CHECK_KEY_GLYPH })}</span>
+          {INSTRUMENT && writeMode && !resolved && touchDevice && (
+            <span className="in-wbar-note" aria-hidden="true">{t('inst.wbarNote')}</span>
           )}
           {/* "Check this line so far": the server's Step Check of the lines read,
               naming a step of the method — never a value, never a mark. Help,
@@ -3726,14 +3821,19 @@ function photoLineNumber(transcript, keptIndex) {
   return (kept[keptIndex]?.i ?? kept.at(-1)?.i ?? 0) + 1;
 }
 
-function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {
-  const f = e.target.files?.[0];
+const PDF_REASON_KEY = {
+  'too-large': 'verdict.pdfTooLarge', locked: 'verdict.pdfLocked', corrupt: 'verdict.pdfCorrupt', timeout: 'verdict.pdfTimeout'
+};
+
+async function attachPhoto(f, setPhoto, onReady, onPdf, onFailed, onWorking) {
   if (!f) return;
   const failed = key => onFailed?.(translate(key));
   // A scanner app hands back a PDF, not a photo. FileReader can reject or
   // abort even after the picker succeeded (device eviction, file permissions).
   // Never strand the student indefinitely in the "Reading…" state.
-  if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name || '')) {
+  if (isPdfFile(f)) {
+    if (f.size > MAX_PDF_INPUT_BYTES) { failed('verdict.pdfTooLarge'); return; }
+    onWorking?.('opening');
     const reader = new FileReader();
     reader.onload = () => {
       const data = String(reader.result || '');
@@ -3742,39 +3842,18 @@ function attachPhoto(e, setPhoto, onReady, onPdf, onFailed) {
     };
     reader.onerror = reader.onabort = () => failed('verdict.pdfUnopenable');
     try { reader.readAsDataURL(f); } catch { failed('verdict.pdfUnopenable'); }
-    e.target.value = '';
     return;
   }
-  const img = new Image();
-  let url;
-  try { url = URL.createObjectURL(f); }
-  catch { failed('verdict.imageUnopenable'); e.target.value = ''; return; }
-  const release = () => URL.revokeObjectURL(url);
-  img.onload = () => {
-    try {
-      const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
-      const cv = document.createElement('canvas');
-      cv.width = Math.round(img.width * scale); cv.height = Math.round(img.height * scale);
-      const context = cv.getContext('2d');
-      if (!context) throw new Error('Canvas unavailable');
-      context.drawImage(img, 0, 0, cv.width, cv.height);
-      const dataURL = cv.toDataURL('image/jpeg', 0.88);
-      if (!dataURL.startsWith('data:image/')) throw new Error('Image encoding failed');
-      setPhoto(dataURL);
-      onReady?.(dataURL);
-    } catch {
-      failed('verdict.imageUnopenable');
-    } finally {
-      release();
-    }
-  };
-  img.onerror = () => {
-    release();
-    // A HEIC from an iPhone opened on Android may land here.
-    failed('verdict.imageUnopenable');
-  };
-  try { img.src = url; }
-  catch { release(); failed('verdict.imageUnopenable'); }
-  e.target.value = '';
+  // Every other file goes through the one photo door (ink/photoIntake.js):
+  // JPEG, PNG, WebP, AVIF and HEIC/HEIF (converted on the device where the
+  // browser cannot open it), EXIF orientation applied, scaled to the upload size.
+  onWorking?.(claimsHeic(f) ? 'converting' : 'opening');
+  try {
+    const out = await intakeImageFile(f);
+    setPhoto(out.dataUrl);
+    onReady?.(out.dataUrl);
+  } catch (error) {
+    failed(intakeMessageKey(error));
+  }
 }
 

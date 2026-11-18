@@ -512,9 +512,9 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
     // The new policy: the only things a timer may send are idle-pause reads, each
     // marked auto (so they never ask for permission and never retry on failure).
     const timed = [...src.matchAll(/readRef2\.current\?\.\(([^)]*)\)/g)].map(m => m[1].trim());
-    ok(timed.length >= 3 && timed.every(a => a === '{ auto: true }'), 'every timer-driven read is an auto read: the idle pause, the live step coach and coming back online');
+    ok(timed.length >= 3 && timed.every(a => a === '{ auto: true }' || a === '{ auto: true, ask }'), 'every timer-driven read is an auto read (the idle pause alone may also carry ask, the once-per-card consent prompt): the idle pause, the live step coach and coming back online');
     ok(/export const AUTO_READ_IDLE_MS = 1300;/.test(src) && /export const AUTO_READ_MAX = 12;/.test(src), 'the idle pause and the per-visit cap are named constants');
-    ok(/readerPermission\(userRef\.current\) === READER_PERMISSION\.ACCEPTED/.test(src) && /if \(auto \|\| askingRef\.current\) return;/.test(src), 'an automatic read needs the student\'s earlier yes and never opens the prompt');
+    ok(/readerPermission\(userRef\.current\) === READER_PERMISSION\.ACCEPTED/.test(src) && /if \(\(auto && opts\?\.ask !== true\) \|\| askingRef\.current\) return;/.test(src), 'an automatic read needs the student\'s yes: only the idle pause may open the prompt (once), nothing is sent before accept');
     ok(/abortRef\.current\?\.abort\?\.\(\)/.test(src) && /flyingRef\.current !== pageSig/.test(src), 'a read still out for an older page is cancelled when the page changes');
   }
   {
@@ -522,7 +522,8 @@ ok(!shouldSupersede(null, local), 'no reading, no change');
     const callers = [...src.matchAll(/(?<![A-Za-z])readNow\(\)|onClick=\{readNow\}/g)].length;
     // Three explicit callers: Read my answer, Try again, and the Submit control
     // (#942, owner-approved) that reads changed writing before anything is sent.
-    eq([sends, callers], [1, 3], 'one place sends a read, reached only from Read my answer, Try again and the Submit control');
+    // (owner decision 18 Nov 2026: a fourth, quiet "Read now"/"Read again" text action when reading is automatic.)
+    eq([sends, callers], [1, 4], 'one place sends a read, reached only from Read my answer, the quiet Read again, Try again and the Submit control');
     ok((src.match(/read: \(\) => readNow\(\)/g) || []).length === 1, 'the Submit control is the only caller besides the two buttons');
   }
   ok(/readinessIdentity\(user\)/.test(src) && /if \(changed\) setStatus\(/.test(src) && !/fresh: changed/.test(src),
