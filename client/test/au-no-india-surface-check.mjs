@@ -40,8 +40,9 @@ check('Settings offers only the edition\'s syllabuses, and no Language section f
 });
 check('every language picker draws only the edition\'s languages', () => {
   for (const f of ['pages/SettingsLegacy.jsx', 'pages/GuardianConsent.jsx', 'pages/AccountDeleteRequest.jsx', 'pages/Legal.jsx']) {
-    assert.match(read(f), /offeredLanguages\(LANGUAGES\)/, f);
-    assert.ok(!/\{LANGUAGES\.map/.test(code(f)), `${f} maps the whole language table`);
+    const src = code(f);
+    assert.ok(/offeredLanguages\(LANGUAGES\)/.test(src) || /LANGUAGES\.map\(\(\{ id, label \}\) => offersLanguage\(id\) &&/.test(src), `${f} must draw only the edition's languages`);
+    assert.ok(!/\{LANGUAGES\.map\((?!\(\{ id, label \}\) => offersLanguage)/.test(src), `${f} maps the whole language table`);
   }
 });
 check('the India syllabus button and the NCERT library are India-edition only', () => {
