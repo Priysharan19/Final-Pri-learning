@@ -805,7 +805,7 @@ export const streamsExt = {
   'me11-comb': (rng, diff) => {
     const GROUP = ['friends', 'cousins', 'teammates', 'band members', 'debaters', 'cyclists', 'chess players', 'volunteers'];
     if (diff === 1) {
-      const n = ri(rng, 5, 10);
+      const n = ri(rng, 5, 13);
       const kind = ri(rng, 1, 4);
       const who = rc(rng, GROUP);
       if (kind === 1) {
@@ -884,7 +884,7 @@ export const streamsExt = {
           ]
         };
       }
-      const n = ri(rng, 5, 9);
+      const n = ri(rng, 5, 12);
       const blockSize = ri(rng, 2, 3);
       const together = rc(rng, [true, false]);
       const val = together
@@ -1494,11 +1494,11 @@ export const streamsExt = {
         ]
       };
     }
-    // Areas involving inverse functions: reflecting in y = x turns an area
-    // measured from the y-axis into one measured from the x-axis, and the
-    // bounding rectangle is what links the two.
-    const branch = ri(rng, 0, 2);
-    if (branch === 0) {
+    // Area between a curve, the y-axis and a horizontal line, by subtracting the
+    // area under the curve from the bounding rectangle.
+    // The inverse-function identity and the ln x area (integration by parts) were not confirmed to be in
+    // the Extension 1 (2024) content, so the base D4 asks only for areas by integrating in x.
+    {
       const n = ri(rng, 2, 5), a = ri(rng, 1, 5);
       const area = new Frac(n * Math.pow(a, n + 1), n + 1);
       return {
@@ -1519,46 +1519,6 @@ export const streamsExt = {
         ]
       };
     }
-    if (branch === 1) {
-      const pI = ri(rng, 2, 8), qI = ri(rng, 2, 12);
-      const A = ri(rng, 1, pI * qI - 1);
-      return {
-        prompt: `$f$ is an increasing function with $f(0) = 0$ and $f(${pI}) = ${qI}$, and $\\displaystyle\\int_0^{${pI}} f(x)\\,dx = ${A}$. Find $\\displaystyle\\int_0^{${qI}} f^{-1}(y)\\,dy$.`,
-        answerType: 'numeric', answer: { value: pI * qI - A },
-        traps: [
-          { value: A, why: `The two integrals are equal only when the curve happens to be symmetric in $y = x$. In general they fill the rectangle between them.` },
-          { value: pI * qI, why: `$${pI} \\times ${qI} = ${pI * qI}$ is the whole rectangle. The area under $f$ still has to be taken off it.` }
-        ].filter(t => t.value !== pI * qI - A),
-        hints: ['Reflecting the graph in $y = x$ turns $f$ into $f^{-1}$ and swaps the two axes.',
-          `Together the two regions exactly fill the rectangle $0 \\le x \\le ${pI}$, $0 \\le y \\le ${qI}$.`,
-          `So $\\displaystyle\\int_0^{${pI}} f + \\int_0^{${qI}} f^{-1} = ${pI} \\times ${qI}$.`],
-        steps: [
-          { h: 'The rectangle identity', d: `$\\displaystyle\\int_0^{a} f(x)\\,dx + \\int_0^{f(a)} f^{-1}(y)\\,dy = a\\,f(a)$` },
-          { h: 'Substitute', d: `$${A} + \\displaystyle\\int_0^{${qI}} f^{-1}(y)\\,dy = ${pI} \\times ${qI} = ${pI * qI}$` },
-          { h: 'Rearrange', d: `$\\displaystyle\\int_0^{${qI}} f^{-1}(y)\\,dy = ${pI * qI} - ${A} = ${pI * qI - A}$` }
-        ]
-      };
-    }
-    const k = ri(rng, 2, 9);
-    const val = k * Math.log(k) - k + 1;
-    return {
-      prompt: `The curve $y = \\ln x$ is the reflection of $y = e^{x}$ in the line $y = x$. Find the exact area of the region bounded by $y = \\ln x$, the $x$-axis and the line $x = ${k}$.`,
-      answerType: 'numeric', answer: { value: val, requireExact: true, canonicalInput: `${k}ln(${k}) - ${k - 1}`, tol: 0.0005 },
-      inputHint: `e.g. ${k}ln(${k}) - ${k - 1}`,
-      traps: [
-        { value: k * Math.log(k), why: `That is $x\\ln x$ evaluated at $x = ${k}$. The antiderivative is $x\\ln x - x$, and the value at the lower limit $x = 1$ has to be subtracted as well.`, tol: 0.0005 },
-        { value: Math.log(k), why: `$\\ln ${k}$ is the **height** of the region at its right-hand edge, not its area.`, tol: 0.0005 }
-      ],
-      hints: [`$y = \\ln x$ meets the $x$-axis at $x = 1$, so the region runs from $x = 1$ to $x = ${k}$.`,
-        `Reflect: the same area sits between $y = e^{x}$, the $y$-axis and $y = \\ln ${k}$ — or integrate by parts directly.`,
-        `$\\displaystyle\\int \\ln x\\,dx = x\\ln x - x$.`],
-      steps: [
-        { h: 'Where the region starts', d: `$\\ln x = 0$ at $x = 1$` },
-        { h: 'Antiderivative', d: `$\\displaystyle\\int \\ln x\\,dx = x\\ln x - x$` },
-        { h: 'Evaluate', d: `$\\left[x\\ln x - x\\right]_{1}^{${k}} = (${k}\\ln ${k} - ${k}) - (0 - 1)$` },
-        { h: 'Exact area', d: `$${k}\\ln ${k} - ${k - 1}$` }
-      ]
-    };
   },
   // ── ME-S1 · Binomial distribution ────────────────────────────────────────
   'me12-binomial': (rng, diff) => {

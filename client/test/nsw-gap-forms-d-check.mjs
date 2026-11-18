@@ -76,12 +76,6 @@ const VOL = [
   ['washer-sqrt-line', /curve \$y = \\sqrt\{(\d+)x\}\$ and the line \$y = x\$ enclose a region\. The region is rotated about the \$x\$-axis/,
     m => { const R = x => Math.sqrt(Number(m[1]) * x), r = x => x, z = zeros(x => R(x) - r(x), 0, 30); return simpson(x => R(x) ** 2 - r(x) ** 2, Math.min(...z), Math.max(...z), 40000); }],
   // rotation about the y-axis, done by cylindrical SHELLS (2*pi*x*height), a different decomposition from the discs in y
-  ['y-axis-parabola', /parabola \$y = x\^2\$ \(for \$x \\ge 0\$\), the \$y\$-axis and the line \$y = (\d+)\$ is rotated about the \$y\$-axis/,
-    m => { const h = Number(m[1]), xr = Math.sqrt(h); return simpson(x => 2 * x * (h - x * x), 0, xr) ; }],
-  ['y-axis-sqrt', /curve \$y = \\sqrt\{x\}\$, the \$y\$-axis and the line \$y = (\d+)\$ is rotated about the \$y\$-axis/,
-    m => { const h = Number(m[1]); return simpson(x => 2 * x * (h - Math.sqrt(x)), 0, h * h, 40000); }],
-  ['y-axis-x=y2+1', /curve \$x = y\^2 \+ 1\$, the \$y\$-axis and the lines \$y = 0\$ and \$y = (\d+)\$ is rotated about the \$y\$-axis/,
-    m => { const c = Number(m[1]); return simpson(x => 2 * x * c, 0, 1) + simpson(x => 2 * x * (c - Math.sqrt(x - 1)), 1, c * c + 1, 40000); }],
   ['cubic-region', /curve \$y = x\(x - (\d+)\)\$ and the \$x\$-axis is rotated about the \$x\$-axis/,
     m => { const f = toFn(`x(x-${m[1]})`); const z = zeros(f, -1, 20); return simpson(x => f(x) ** 2, Math.min(...z), Math.max(...z)); }]
 ];
@@ -90,12 +84,8 @@ const AREA = [
     m => areaBetween(x => x * x, toFn(m[1]), -20, 20)],
   ['two-parabolas', /parabolas \$y = (.+)\$ and \$y = (.+)\$\.$/,
     m => areaBetween(toFn(m[1]), toFn(m[2]), -20, 20)],
-  ['x=y^2', /curve \$x = y\^2\$, the \$y\$-axis and the line \$y = (\d+)\$\.$/,
-    m => { const h = Number(m[1]); return simpson(x => h - Math.sqrt(x), 0, h * h, 40000); }],   // vertical columns: from the curve y = sqrt(x) up to y = h
   ['x^2+k-yaxis', /curve \$y = x\^2 \+ (\d+)\$ \(for \$x \\ge 0\$\), the \$y\$-axis and the line \$y = (\d+)\$\.$/,
     m => { const k = Number(m[1]), h = Number(m[2]); const z = zeros(x => x * x + k - h, 0, 20); return simpson(x => h - (x * x + k), 0, Math.max(...z)); }],
-  ['x=y(a-y)', /curve \$x = y\((\d+) - y\)\$ and the \$y\$-axis\.$/,
-    m => { const a = Number(m[1]); return simpson(y => Math.abs(y * (a - y)), 0, a); }],
   ['cubic-line', /curve \$y = x\^3\$ and the line \$y = (\d+)x\$\.$/,
     m => areaBetween(x => x ** 3, x => Number(m[1]) * x, 0, 30)],
   ['sqrt-line', /curve \$y = \\sqrt\{x\}\$ and the line \$y = \\dfrac\{x\}\{(\d+)\}\$\.$/,

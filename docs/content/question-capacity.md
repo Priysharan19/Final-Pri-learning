@@ -6,7 +6,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 
 ## Prithagoras
 
-133 skills measured; **111** meet both targets; **22** are below at least one.
+133 skills measured; **112** meet both targets; **21** are below at least one.
 
 | Skill (generator) | Cells | Distinct instances | Structural forms (proxy) | Tagged forms | Below target |
 | --- | --- | --- | --- | --- | --- |
@@ -16,14 +16,13 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `me11-binomial` | 4 | 127 | 2 | — | instances + forms |
 | `me12-trigeq` | 4 | 408 | 34 | — | instances |
 | `ms11-time-location` | 4 | 511 | 3 | — | instances + forms |
-| `me12-calc` | 4 | 1.5k | 22 | — | instances |
 | `y11-functions-more` | 4 | 1.7k | 8 | — | instances |
 | `ms12-annuity` | 4 | 1.8k | 2 | — | instances + forms |
 | `ms11-managing-exact` | 4 | 1.8k | 1 | — | instances + forms |
-| `y12-financial` | 4 | 2.0k | 15 | — | instances |
-| `me11-comb` | 4 | 2.3k | 82 | — | instances |
+| `me11-comb` | 4 | 2.4k | 82 | — | instances |
 | `y10-compound` | 4 | 2.8k | 1 | — | instances + forms |
 | `ms11-earning-exact` | 4 | 3.0k | 1 | — | instances + forms |
+| `me12-calc` | 4 | 4.8k | 18 | — | instances |
 | `ms11-energy` | 4 | 5.1k | 1 | — | instances + forms |
 | `ms12-loans` | 4 | 6.0k | 2 | — | instances + forms |
 | `ms11-linear` | 4 | 7.2k | 2 | — | instances + forms |
@@ -103,9 +102,10 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y12-fin-exact` | 4 | 43.6k | 8 | 5: context, direct, missing-parameter, multi-step, reverse | — |
 | `y12-random-var` | 4 | 44.1k | 9 | 5: context, direct, missing-parameter, multi-step, reverse | — |
 | `ms12-algebraic` | 4 | 44.4k | 17 | — | — |
+| `me11-functions` | 4 | 44.9k | 94 | — | — |
 | `y9-surface-area` | 4 | 45.0k | 11 | — | — |
-| `me11-functions` | 4 | 45.1k | 94 | — | — |
 | `y12-trigcalc` | 4 | 45.3k | 200 | — | — |
+| `y12-financial` | 4 | 45.9k | 15 | — | — |
 | `y10-stats` | 4 | 53.9k | 15 | — | — |
 | `y9-simint` | 4 | 54.0k | 149 | — | — |
 | `ms12-networks` | 4 | 54.3k | 1318 | — | — |
@@ -130,7 +130,7 @@ A skill is one generator; its instances are summed over its cells (difficulties)
 | `y11-lines` | 4 | 141.0k | 225 | — | — |
 | `y7-ratio` | 4 | 142.1k | 1009 | — | — |
 | `ms11-formulas` | 4 | 155.3k | 18 | — | — |
-| `me11-poly` | 4 | 161.1k | 558 | — | — |
+| `me11-poly` | 4 | 160.8k | 558 | — | — |
 | `mex-vectors` | 4 | 227.2k | 50 | — | — |
 | `me12-vectors-forms` | 4 | 250.8k | 6 | 5: context, direct, missing-parameter, multi-step, representation | — |
 | `y9-data-inquiry` | 4 | 256.8k | 273 | — | — |

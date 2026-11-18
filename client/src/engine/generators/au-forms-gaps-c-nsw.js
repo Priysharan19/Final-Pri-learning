@@ -34,7 +34,7 @@ const forms = {
     // ───────────── D1: indefinite integrals ─────────────
     // (1) linear shift u = x + k, integrand x(x+k)^n
     V([1], rng => {
-      const k = rc(rng, [-4, -3, -2, -1, 1, 2, 3, 4, 5]), n = ri(rng, 2, 4);
+      const k = rc(rng, [-9, -8, -7, -6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6, 7, 8, 9]), n = ri(rng, 2, 6);
       const inner = lin(k);
       const key = `(${inner})^${n + 2}/${n + 2} ${k < 0 ? '+' : '-'} ${Math.abs(k)}*(${inner})^${n + 1}/${n + 1}`;
       return expr(
@@ -50,7 +50,7 @@ const forms = {
     }),
     // (2) x/(x^2 + c) -> logarithm, substitution not given
     V([1], rng => {
-      const m = rc(rng, [1, 3, 4, 5, 6, 7, 8, 9, 10]), c = ri(rng, 1, 9);
+      const m = rc(rng, [1, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]), c = ri(rng, 1, 19);
       const f = new Frac(m, 2);
       const key = `${f.str()}*ln(x^2 + ${c})`;
       return expr(
@@ -65,7 +65,7 @@ const forms = {
     }),
     // (3) exponential of a quadratic
     V([1], rng => {
-      const k = rc(rng, [1, 2, 3, 4]), m = ri(rng, 1, 9);
+      const k = rc(rng, [1, 2, 3, 4, 5, 6, 7, 8, 9]), m = ri(rng, 1, 19);
       const e = `${k === 1 ? '' : k === -1 ? '-' : k}x^2`;
       const eIn = `${k === 1 ? '' : k === -1 ? '-' : `${k}*`}x^2`;
       const f = new Frac(m, 2 * k);
@@ -82,7 +82,7 @@ const forms = {
     }),
     // (4) powers of sine / cosine times the other
     V([1], rng => {
-      const useSin = rng() < 0.5, m = ri(rng, 1, 6), n = ri(rng, 2, 5);
+      const useSin = rng() < 0.5, m = ri(rng, 1, 12), n = ri(rng, 2, 7);
       const f = new Frac(useSin ? m : -m, n + 1);
       const A = useSin ? 'sin' : 'cos', B = useSin ? 'cos' : 'sin';
       const key = `${f.str()}*${A}(x)^${n + 1}`;
@@ -100,7 +100,7 @@ const forms = {
     }),
     // (5) u = sqrt(x) + c, integrand (sqrt(x)+c)^n / sqrt(x)
     V([1], rng => {
-      const m = ri(rng, 1, 4), c = ri(rng, 1, 5), n = ri(rng, 2, 4);
+      const m = ri(rng, 1, 9), c = ri(rng, 1, 9), n = ri(rng, 2, 6);
       const key = `${2 * m}*(sqrt(x) + ${c})^${n + 1}/${n + 1}`;
       return expr(
         `For $x > 0$, use the substitution $u = \\sqrt{x} + ${c}$ to find $\\displaystyle\\int \\frac{${co(m)}(\\sqrt{x} + ${c})^{${n}}}{\\sqrt{x}}\\,dx$. (You may omit +C.)`, key, `e.g. 4*(sqrt(x) + ${c})^${n + 1}/${n + 1}`,
@@ -116,7 +116,7 @@ const forms = {
     // ───────────── D2: definite integrals, limits changed ─────────────
     // (1) linear shift: x(x+k)^n
     V([2], rng => {
-      const k = rc(rng, [-3, -2, -1, 1, 2, 3, 4]), n = ri(rng, 2, 3), p = ri(rng, 0, 1), q = p + ri(rng, 1, 3);
+      const k = rc(rng, [-6, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 6]), n = ri(rng, 2, 4), p = ri(rng, 0, 2), q = p + ri(rng, 1, 4);
       const inner = lin(k), lo = p + k, hi = q + k;
       const G = u => new Frac((n + 1) * u ** (n + 2) - k * (n + 2) * u ** (n + 1), (n + 1) * (n + 2));
       const val = G(hi).sub(G(lo));
@@ -135,7 +135,7 @@ const forms = {
     }),
     // (2) trigonometric: sin^n x cos x or cos^n x sin x
     V([2], rng => {
-      const sinType = rng() < 0.5, n = ri(rng, 2, 4), m = ri(rng, 1, 4);
+      const sinType = rng() < 0.5, n = ri(rng, 2, 6), m = ri(rng, 1, 9);
       const opts = sinType
         ? [{ t: '\\frac{\\pi}{2}', u: new Frac(1) }, { t: '\\frac{\\pi}{6}', u: new Frac(1, 2) }]
         : [{ t: '\\frac{\\pi}{2}', u: new Frac(1) }, { t: '\\frac{\\pi}{3}', u: new Frac(1, 2) }];
@@ -157,7 +157,7 @@ const forms = {
     }),
     // (3) negative power: x/(x^2+c)^n
     V([2], rng => {
-      const n = rc(rng, [2, 3]), c = ri(rng, 1, 4), b = ri(rng, 1, 3), m = ri(rng, 1, 4);
+      const n = rc(rng, [2, 3]), c = ri(rng, 1, 9), b = ri(rng, 1, 5), m = ri(rng, 1, 9);
       const hi = b * b + c, q = n - 1;
       const val = new Frac(m * (hi ** q - c ** q), 2 * q * c ** q * hi ** q);
       const noHalf = val.mul(new Frac(2));
@@ -175,7 +175,7 @@ const forms = {
     }),
     // (4) logarithm substitution u = ln x
     V([2], rng => {
-      const k = ri(rng, 2, 4), n = ri(rng, 2, 3), m = ri(rng, 1, 4);
+      const k = ri(rng, 2, 5), n = ri(rng, 2, 5), m = ri(rng, 1, 19);
       const val = new Frac(m * k ** (n + 1), n + 1);
       const eK = Math.exp(k);
       return exact(
@@ -190,7 +190,7 @@ const forms = {
     }),
     // (5) u = sqrt(x) + c with limits that are perfect squares
     V([2], rng => {
-      const m = ri(rng, 1, 3), c = ri(rng, 1, 4), n = ri(rng, 2, 3), p = ri(rng, 1, 2), q = p + ri(rng, 1, 2);
+      const m = ri(rng, 1, 9), c = ri(rng, 1, 9), n = ri(rng, 2, 4), p = ri(rng, 1, 3), q = p + ri(rng, 1, 3);
       const val = new Frac(2 * m * ((q + c) ** (n + 1) - (p + c) ** (n + 1)), n + 1);
       const wrongLim = new Frac(2 * m * ((q * q) ** (n + 1) - (p * p) ** (n + 1)), n + 1);
       const noTwo = val.mul(new Frac(1, 2));

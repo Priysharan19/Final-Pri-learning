@@ -32,22 +32,10 @@ const esc = f => f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const sorted = a => [...a].sort((x, y) => x - y);
 const sameSet = (a, b) => a.length === b.length && sorted(a).every((v, i) => Math.abs(v - sorted(b)[i]) < 1e-9);
 
-/** Hint text that restates the final answer ("= key", "is key"). A hint that merely names the variable x
- *  (a vertex or endpoint taken from the prompt) is only a leak when the answer itself is an x-value. */
-function leaks(hints, finals, answerIsX) {
-  const bad = [];
-  for (const f of new Set(finals)) {
-    const re = new RegExp(`(\\S*?)\\s*(?:=|\\\\Rightarrow|\\bis\\b|\\bequals\\b)\\s*\\$?\\s*${esc(f)}(?![\\d.\\\\A-Za-z])`, 'g');
-    for (const h of hints || []) {
-      for (const m of String(h).replace(/\s+/g, ' ').matchAll(re)) {
-        if (/(^|\$)x$/.test(m[1]) && !answerIsX) continue;
-        if (/[)^]/.test(m[1]) || /^-?\d+$/.test(m[1])) continue;   // "f(x) = 1", "(x - 2)^2 = 1": restating the question's own equation
-        bad.push(`"${f}" in: ${h}`);
-      }
-    }
-  }
-  return bad;
-}
+import { hintLeaks, hintLeakSelfTest } from './support/hint-leak.mjs';
+const selfErrors = hintLeakSelfTest();
+if (selfErrors.length) { console.error(`hint-leak self-test FAILED: ${selfErrors.join(' | ')}`); process.exit(1); }
+const leaks = (hints, finals, answerIsX, prompt) => hintLeaks(hints, finals, prompt, { answerIsX });
 
 function printedKey(q) { try { return String(answerTextFor(q)); } catch { return ''; } }
 function bareKey(q) {
@@ -74,7 +62,7 @@ function commonChecks(cell, seed, q, finals, answerIsX = /^x\s*=/.test(q.answerP
     if (tv.correct) fail(cell, seed, `marker accepts trap ${text}`, q);
     if (!t.why || t.why.length < 15) fail(cell, seed, 'trap without a why', q);
   }
-  for (const b of leaks(q.hints, finals, answerIsX)) fail(cell, seed, `hint leaks the answer: ${b}`, q);
+  for (const b of leaks(q.hints, finals, answerIsX, q.prompt)) fail(cell, seed, `hint leaks the answer: ${b}`, q);
 }
 
 const cells = {};

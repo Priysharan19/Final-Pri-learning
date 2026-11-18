@@ -1578,8 +1578,13 @@ function stepCheckWithinBudget(meta, workingText) {
               const R = evaluate(ast.r, env);
               return Number.isFinite(L) && Number.isFinite(R) && Math.abs(L - R) <= Math.max(1e-6, Math.abs(R) * 1e-6);
             });
-            status = holds ? 'ok' : 'break';
-            if (!holds) note = `This is the line where it goes wrong — the true solution no longer satisfies this equation. Compare it carefully with the line above.`;
+            // A root the question's domain removes is part of correct working ("x = -4, rejected"): a bare
+            // claim x = r for a listed `rejected` root is a true statement about the equation, so it is not a slip.
+            const isRejected = !holds && Array.isArray(meta.rejected) && ast.l?.t === 'var' && ast.l.v === meta.variable
+              && meta.rejected.some(r => { try { return numsClose(evaluate(ast.r, {}), r); } catch { return false; } });
+            status = holds || isRejected ? 'ok' : 'break';
+            if (isRejected) note = 'This root solves the equation but lies outside the domain: say so, and keep the root that is allowed.';
+            if (!holds && !isRejected) note = `This is the line where it goes wrong — the true solution no longer satisfies this equation. Compare it carefully with the line above.`;
           }
         } else {
           // a bare value — treat as a claimed solution

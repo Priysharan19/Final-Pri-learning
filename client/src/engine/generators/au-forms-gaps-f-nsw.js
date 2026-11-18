@@ -15,9 +15,19 @@ import { ri, rc, nz, poly, term, sgn } from '../qhelpers.js';
 const REJ = Symbol('reject');
 const rej = cond => { if (cond) throw REJ; };
 /** Re-draw (same rng, so still deterministic) until a variant accepts its numbers. */
+/** The key as text, for the hint check below. */
+const keyTexts = q => {
+  const a = q.answer || {};
+  if (Array.isArray(a.values)) return a.values.map(String);
+  if (a.expr !== undefined) return [String(a.expr)];
+  return a.value !== undefined ? [String(a.canonicalInput ?? a.value)] : [];
+};
+/** A hint that writes "= key", "is key", "gives key" or "answer key" states the final answer, even when the same
+ *  number only turns up by coincidence in an intermediate line: such a draw is not used. */
+const hintStatesKey = q => keyTexts(q).some(k => (q.hints || []).some(h => new RegExp(`(?:=|\\bis\\b|\\bequals\\b|\\bgives\\b|\\banswer\\b|\\bresult\\b)\\s*\\$?\\s*${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\d|\\.\\d|[\\\\A-Za-z])`).test(String(h).replace(/\s+/g, ' '))));
 const R = fn => (rng, diff) => {
   for (let i = 0; i < 300; i++) {
-    try { return fn(rng, diff); } catch (e) { if (e !== REJ) throw e; }
+    try { const q = fn(rng, diff); if (hintStatesKey(q)) continue; return q; } catch (e) { if (e !== REJ) throw e; }
   }
   throw new Error('gaps-f variant: no acceptable draw');
 };
@@ -450,7 +460,7 @@ const funcForms = [
       t2,
       {
         dotpoint: 1, prefix: 'x =',
-        stepcheck: { kind: 'equation', variable: 'x', solutions: [t1, t2] },
+        stepcheck: { kind: 'equation', variable: 'x', solutions: [t2], rejected: [t1] },
         traps: [
           { value: t1, why: `$x = ${t1}$ solves $f(x) = x$ for the unrestricted parabola, but it is less than $${h}$, so it is not in the domain of $f$.` },
           { value: h, why: `$${h}$ is the vertex's $x$-coordinate, the start of the domain. It is not where the graph meets the line $y = x$.` }

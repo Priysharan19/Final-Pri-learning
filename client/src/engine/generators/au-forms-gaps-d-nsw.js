@@ -63,6 +63,8 @@ function build({ prompt, key, typed, trapDefs, hints, steps, dotpoint, tol }) {
     seen.push(t.value);
     traps.push({ value: t.value, why: t.why, tol: 0.002 * Math.max(1, Math.abs(t.value)) });
   }
+  // A draw whose key coincides with a number a hint has to quote (a limit, an intersection) is not used.
+  for (const h of hints || []) if (new RegExp(`(?<![\\d.])${String(typed).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\d.])`).test(String(h))) rej(true);
   const answer = tol != null
     ? { value: key, requireExact: true, canonicalInput: typed, tol }
     : { value: key, requireExact: true, canonicalInput: typed };
@@ -83,7 +85,7 @@ const dropPi = f => ({ value: fval(f), why: NOPI });
 const volumes = [
   // y = sqrt(ax + b) about the x-axis
   V([3], rng => {
-    const a = ri(rng, 1, 5), b = ri(rng, 1, 6), c = ri(rng, 1, 5);
+    const a = ri(rng, 1, 9), b = ri(rng, 1, 9), c = ri(rng, 1, 9);
     const f = frac(a * c * c + 2 * b * c, 2);
     const g = `${co(a)}x + ${b}`;
     return VOL(`The region bounded by the curve $y = \\sqrt{${g}}$, the $x$-axis, the $y$-axis and the line $x = ${c}$ is rotated about the $x$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex, val }) => ({
@@ -100,10 +102,9 @@ const volumes = [
       ]
     }));
   }),
-
   // y = x^2, 0 <= x <= c, about the x-axis
   V([3], rng => {
-    const c = ri(rng, 1, 4);
+    const c = ri(rng, 1, 9);
     const f = frac(c ** 5, 5);
     return VOL(`The region bounded by the parabola $y = x^2$, the $x$-axis and the line $x = ${c}$ is rotated about the $x$-axis through one revolution. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
       trapDefs: [
@@ -119,10 +120,9 @@ const volumes = [
       ]
     }));
   }),
-
   // y = 1/x between x = m and x = c about the x-axis
   V([3], rng => {
-    const m = ri(rng, 1, 3), c = ri(rng, m + 1, m + 4);
+    const m = ri(rng, 1, 5), c = ri(rng, m + 1, m + 8);
     const f = frac(c - m, m * c);
     return VOL(`The region bounded by the curve $y = \\dfrac{1}{x}$, the $x$-axis and the lines $x = ${m}$ and $x = ${c}$ is rotated about the $x$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
       trapDefs: [
@@ -138,10 +138,9 @@ const volumes = [
       ]
     }));
   }),
-
   // washer: parabola y = x^2 and line y = kx about the x-axis
   V([3], rng => {
-    const k = ri(rng, 2, 5);
+    const k = ri(rng, 2, 9);
     const f = frac(2 * k ** 5, 15);
     return VOL(`The region enclosed between the parabola $y = x^2$ and the line $y = ${k}x$ is rotated about the $x$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
       trapDefs: [
@@ -158,10 +157,9 @@ const volumes = [
       ]
     }));
   }),
-
   // washer: y = sqrt(ax) and line y = x about the x-axis
   V([3], rng => {
-    const a = ri(rng, 2, 6);
+    const a = ri(rng, 2, 12);
     const f = frac(a ** 3, 6);
     return VOL(`The curve $y = \\sqrt{${a}x}$ and the line $y = x$ enclose a region. The region is rotated about the $x$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
       trapDefs: [
@@ -178,67 +176,9 @@ const volumes = [
       ]
     }));
   }),
-
-  // rotation about the y-axis: y = x^2 (x >= 0) up to y = h
-  V([3], rng => {
-    const h = ri(rng, 2, 9);
-    const f = frac(h * h, 2);
-    return VOL(`The region bounded by the parabola $y = x^2$ (for $x \\ge 0$), the $y$-axis and the line $y = ${h}$ is rotated about the $y$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
-      trapDefs: [
-        dropPi(f),
-        { value: Math.PI * h ** 3 / 3, why: 'About the $y$-axis the radius is $x$, so the integrand is $x^2 = y$. It is not $y^2$.' }
-      ],
-      hints: ['Rotating about the $y$-axis means integrating with respect to $y$: $V = \\pi\\int x^2\\,dy$.', `From $y = x^2$, $x^2 = y$, and $y$ runs from $0$ to $${h}$.`, `Evaluate $\\pi\\int_0^{${h}} y\\,dy = \\pi\\left[\\tfrac{y^2}{2}\\right]_0^{${h}}$.`],
-      steps: [
-        { h: 'Volume formula', d: `$V = \\pi\\displaystyle\\int_0^{${h}} x^2\\,dy$` },
-        { h: 'Write $x^2$ in terms of $y$', d: `$x^2 = y$` },
-        { h: 'Integrate', d: `$V = \\pi\\left[\\dfrac{y^2}{2}\\right]_0^{${h}}$` },
-        { h: 'Evaluate', d: `$V = ${tex}$` }
-      ]
-    }));
-  }),
-
-  // rotation about the y-axis: y = sqrt(x) up to y = h
-  V([3], rng => {
-    const h = ri(rng, 1, 4);
-    const f = frac(h ** 5, 5);
-    return VOL(`The region bounded by the curve $y = \\sqrt{x}$, the $y$-axis and the line $y = ${h}$ is rotated about the $y$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
-      trapDefs: [
-        dropPi(f),
-        { value: Math.PI * h * h / 2, why: 'From $y = \\sqrt{x}$ we get $x = y^2$, so $x^2 = y^4$. Using $x^2 = y$ would be solving for $x$ incorrectly.' }
-      ],
-      hints: ['Rotating about the $y$-axis, the radius of each disc is $x$, so $V = \\pi\\int x^2\\,dy$.', `Make $x$ the subject: $y = \\sqrt{x}$ gives $x = y^2$, so $x^2 = y^4$.`, `Evaluate $\\pi\\int_0^{${h}} y^4\\,dy$.`],
-      steps: [
-        { h: 'Volume formula', d: `$V = \\pi\\displaystyle\\int_0^{${h}} x^2\\,dy$` },
-        { h: 'Make $x$ the subject', d: `$x = y^2$, so $x^2 = y^4$` },
-        { h: 'Integrate', d: `$V = \\pi\\left[\\dfrac{y^5}{5}\\right]_0^{${h}}$` },
-        { h: 'Evaluate', d: `$V = ${tex}$` }
-      ]
-    }));
-  }),
-
-  // rotation about the y-axis: x = y^2 + 1 between y = 0 and y = c
-  V([3], rng => {
-    const c = ri(rng, 1, 4);
-    const f = frac(3 * c ** 5 + 10 * c ** 3 + 15 * c, 15);
-    return VOL(`The region bounded by the curve $x = y^2 + 1$, the $y$-axis and the lines $y = 0$ and $y = ${c}$ is rotated about the $y$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
-      trapDefs: [
-        dropPi(f),
-        { value: Math.PI * (c ** 5 / 5 + c), why: 'Square the whole expression: $(y^2 + 1)^2 = y^4 + 2y^2 + 1$. The middle term is not zero.' }
-      ],
-      hints: ['About the $y$-axis, $V = \\pi\\int x^2\\,dy$ with $x = y^2 + 1$.', 'Expand $(y^2 + 1)^2 = y^4 + 2y^2 + 1$ before integrating.', `Integrate $y^4 + 2y^2 + 1$ from $0$ to $${c}$.`],
-      steps: [
-        { h: 'Volume formula', d: `$V = \\pi\\displaystyle\\int_0^{${c}} x^2\\,dy$` },
-        { h: 'Square the function', d: `$x^2 = (y^2 + 1)^2 = y^4 + 2y^2 + 1$` },
-        { h: 'Integrate', d: `$V = \\pi\\left[\\dfrac{y^5}{5} + \\dfrac{2y^3}{3} + y\\right]_0^{${c}}$` },
-        { h: 'Evaluate', d: `$V = ${tex}$` }
-      ]
-    }));
-  }),
-
   // region between y = x(x - a) and the x-axis about the x-axis
   V([3], rng => {
-    const a = ri(rng, 1, 5);
+    const a = ri(rng, 1, 9);
     const f = frac(a ** 5, 30);
     return VOL(`The region enclosed between the curve $y = x(x - ${a})$ and the $x$-axis is rotated about the $x$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
       trapDefs: [
@@ -259,7 +199,7 @@ const volumes = [
 const areas = [
   // parabola and a line through two integer-x points
   V([4], rng => {
-    const p = ri(rng, -3, 2), q = ri(rng, p + 1, 3);
+    const p = ri(rng, -6, 4), q = ri(rng, p + 1, 6);
     const s = p + q, t = -p * q;
     const f = frac((q - p) ** 3, 6);
     return AREA(`Find the area of the region enclosed by the parabola $y = x^2$ and the line $y = ${lin(s, t)}$.`, f, ({ tex }) => ({
@@ -276,10 +216,9 @@ const areas = [
       ]
     }));
   }),
-
   // two parabolas, symmetric about the y-axis
   V([4], rng => {
-    const m = ri(rng, 1, 3), n = ri(rng, 1, 3), r = ri(rng, 1, 3);
+    const m = ri(rng, 1, 5), n = ri(rng, 1, 5), r = ri(rng, 1, 5);
     const c = (m + n) * r * r;
     const f = frac(4 * (m + n) * r ** 3, 3);
     return AREA(`Find the area enclosed between the parabolas $y = ${co(m)}x^2$ and $y = ${c} - ${co(n)}x^2$.`, f, ({ tex }) => ({
@@ -296,29 +235,9 @@ const areas = [
       ]
     }));
   }),
-
-  // x = y^2, the y-axis and y = h: integrate with respect to y
-  V([4], rng => {
-    const h = ri(rng, 2, 6);
-    const f = frac(h ** 3, 3);
-    return AREA(`Find the area of the region bounded by the curve $x = y^2$, the $y$-axis and the line $y = ${h}$.`, f, ({ tex }) => ({
-      trapDefs: [
-        { value: 2 * h ** 3 / 3, why: `That is the area between the curve and the line $x = ${h * h}$ — the rest of the rectangle. The region asked for lies between the $y$-axis and the curve.` },
-        { value: h ** 3, why: 'Integrate $x = y^2$ with respect to $y$; do not multiply the width and height of the bounding rectangle.' }
-      ],
-      hints: ['Each horizontal strip runs from the $y$-axis ($x = 0$) to the curve, so the width is $x = y^2$.', `The strips stack from $y = 0$ to $y = ${h}$, so $A = \\int_0^{${h}} x\\,dy$.`, `Integrate $y^2$ and substitute the limits.`],
-      steps: [
-        { h: 'Choose the variable', d: `The region is described from the $y$-axis, so integrate with respect to $y$` },
-        { h: 'Set up the area', d: `$A = \\displaystyle\\int_0^{${h}} y^2\\,dy$` },
-        { h: 'Integrate', d: `$A = \\left[\\dfrac{y^3}{3}\\right]_0^{${h}}$` },
-        { h: 'Evaluate', d: `$A = ${tex}$` }
-      ]
-    }));
-  }),
-
   // y = x^2 + k, the y-axis and y = h (x >= 0), with h - k a perfect square
   V([4], rng => {
-    const k = ri(rng, 1, 5), s = ri(rng, 1, 4), h = k + s * s;
+    const k = ri(rng, 1, 9), s = ri(rng, 1, 7), h = k + s * s;
     const f = frac(2 * s ** 3, 3);
     return AREA(`Find the area of the region bounded by the curve $y = x^2 + ${k}$ (for $x \\ge 0$), the $y$-axis and the line $y = ${h}$.`, f, ({ tex }) => ({
       trapDefs: [
@@ -334,29 +253,9 @@ const areas = [
       ]
     }));
   }),
-
-  // x = y(a - y) and the y-axis
-  V([4], rng => {
-    const a = ri(rng, 2, 7);
-    const f = frac(a ** 3, 6);
-    return AREA(`Find the area of the region enclosed by the curve $x = y(${a} - y)$ and the $y$-axis.`, f, ({ tex }) => ({
-      trapDefs: [
-        { value: a ** 3 / 2, why: 'The width of each horizontal strip is $x = ay - y^2$. Dropping the $-y^2$ term overstates the area.' },
-        { value: a ** 3 / 4, why: `This is the area of the bounding rectangle $\\left(${a} \\times \\tfrac{${a * a}}{4}\\right)$, which is larger than the region.` }
-      ],
-      hints: [`The curve meets the $y$-axis ($x = 0$) where $y = 0$ and $y = ${a}$.`, `Between these values $x = ${a}y - y^2$ is positive, so $A = \\int_0^{${a}} (${a}y - y^2)\\,dy$.`, 'Integrate term by term and substitute the limits.'],
-      steps: [
-        { h: 'Where the curve meets the $y$-axis', d: `$y(${a} - y) = 0 \\Rightarrow y = 0$ or $y = ${a}$` },
-        { h: 'Set up the area', d: `$A = \\displaystyle\\int_0^{${a}} \\left(${a}y - y^2\\right)dy$` },
-        { h: 'Integrate', d: `$A = \\left[\\dfrac{${a}y^2}{2} - \\dfrac{y^3}{3}\\right]_0^{${a}}$` },
-        { h: 'Evaluate', d: `$A = ${tex}$` }
-      ]
-    }));
-  }),
-
   // cubic y = x^3 and the line y = mx in the first quadrant
   V([4], rng => {
-    const r = ri(rng, 2, 4), m = r * r;
+    const r = ri(rng, 2, 8), m = r * r;
     const f = frac(r ** 4, 4);
     return AREA(`Find the area of the region in the first quadrant bounded by the curve $y = x^3$ and the line $y = ${m}x$.`, f, ({ tex }) => ({
       trapDefs: [
@@ -372,10 +271,9 @@ const areas = [
       ]
     }));
   }),
-
   // y = sqrt(x) and y = x/k
   V([4], rng => {
-    const k = ri(rng, 2, 5);
+    const k = ri(rng, 2, 9);
     const f = frac(k ** 3, 6);
     return AREA(`Find the area of the region enclosed by the curve $y = \\sqrt{x}$ and the line $y = \\dfrac{x}{${k}}$.`, f, ({ tex }) => ({
       trapDefs: [
@@ -391,10 +289,9 @@ const areas = [
       ]
     }));
   }),
-
   // sign change: y = x(x - a) from x = 0 to x = u
   V([4], rng => {
-    const a = ri(rng, 1, 4), u = a * ri(rng, 2, 3);
+    const a = ri(rng, 1, 7), u = a * ri(rng, 2, 5);
     const Fu = frac(2 * u ** 3 - 3 * a * u * u, 6);   // F(u) = u^3/3 - a u^2/2
     const area = frac(2 * u ** 3 - 3 * a * u * u + 2 * a ** 3, 6);   // F(u) + a^3/3
     return AREA(`Find the total area between the curve $y = x(x - ${a})$ and the $x$-axis, from $x = 0$ to $x = ${u}$.`, area, ({ tex }) => ({
@@ -411,10 +308,9 @@ const areas = [
       ]
     }));
   }),
-
   // sign change: y = x^3 - m x with m = a^2, enclosed between the curve and the x-axis (two lobes)
   V([4], rng => {
-    const a = ri(rng, 2, 4), m = a * a;
+    const a = ri(rng, 2, 8), m = a * a;
     const f = frac(a ** 4, 2);
     return AREA(`Find the total area enclosed between the curve $y = x^3 - ${m}x$ and the $x$-axis.`, f, ({ tex }) => ({
       trapDefs: [
@@ -431,5 +327,101 @@ const areas = [
     }));
   })
 ];
+
+// Held back from issue: rotation about the y-axis and integrating with respect to y were not
+// confirmed to be inside the Extension 1 (2024) content for areas and volumes, so none of these is served.
+const deferred = [
+  // rotation about the y-axis: y = x^2 (x >= 0) up to y = h
+  V([3], rng => {
+    const h = ri(rng, 2, 16);
+    const f = frac(h * h, 2);
+    return VOL(`The region bounded by the parabola $y = x^2$ (for $x \\ge 0$), the $y$-axis and the line $y = ${h}$ is rotated about the $y$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
+      trapDefs: [
+        dropPi(f),
+        { value: Math.PI * h ** 3 / 3, why: 'About the $y$-axis the radius is $x$, so the integrand is $x^2 = y$. It is not $y^2$.' }
+      ],
+      hints: ['Rotating about the $y$-axis means integrating with respect to $y$: $V = \\pi\\int x^2\\,dy$.', `From $y = x^2$, $x^2 = y$, and $y$ runs from $0$ to $${h}$.`, `Evaluate $\\pi\\int_0^{${h}} y\\,dy = \\pi\\left[\\tfrac{y^2}{2}\\right]_0^{${h}}$.`],
+      steps: [
+        { h: 'Volume formula', d: `$V = \\pi\\displaystyle\\int_0^{${h}} x^2\\,dy$` },
+        { h: 'Write $x^2$ in terms of $y$', d: `$x^2 = y$` },
+        { h: 'Integrate', d: `$V = \\pi\\left[\\dfrac{y^2}{2}\\right]_0^{${h}}$` },
+        { h: 'Evaluate', d: `$V = ${tex}$` }
+      ]
+    }));
+  }),
+  // rotation about the y-axis: y = sqrt(x) up to y = h
+  V([3], rng => {
+    const h = ri(rng, 1, 8);
+    const f = frac(h ** 5, 5);
+    return VOL(`The region bounded by the curve $y = \\sqrt{x}$, the $y$-axis and the line $y = ${h}$ is rotated about the $y$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
+      trapDefs: [
+        dropPi(f),
+        { value: Math.PI * h * h / 2, why: 'From $y = \\sqrt{x}$ we get $x = y^2$, so $x^2 = y^4$. Using $x^2 = y$ would be solving for $x$ incorrectly.' }
+      ],
+      hints: ['Rotating about the $y$-axis, the radius of each disc is $x$, so $V = \\pi\\int x^2\\,dy$.', `Make $x$ the subject: $y = \\sqrt{x}$ gives $x = y^2$, so $x^2 = y^4$.`, `Evaluate $\\pi\\int_0^{${h}} y^4\\,dy$.`],
+      steps: [
+        { h: 'Volume formula', d: `$V = \\pi\\displaystyle\\int_0^{${h}} x^2\\,dy$` },
+        { h: 'Make $x$ the subject', d: `$x = y^2$, so $x^2 = y^4$` },
+        { h: 'Integrate', d: `$V = \\pi\\left[\\dfrac{y^5}{5}\\right]_0^{${h}}$` },
+        { h: 'Evaluate', d: `$V = ${tex}$` }
+      ]
+    }));
+  }),
+  // rotation about the y-axis: x = y^2 + 1 between y = 0 and y = c
+  V([3], rng => {
+    const c = ri(rng, 1, 8);
+    const f = frac(3 * c ** 5 + 10 * c ** 3 + 15 * c, 15);
+    return VOL(`The region bounded by the curve $x = y^2 + 1$, the $y$-axis and the lines $y = 0$ and $y = ${c}$ is rotated about the $y$-axis. Find the **exact** volume of the solid formed.`, f, ({ tex }) => ({
+      trapDefs: [
+        dropPi(f),
+        { value: Math.PI * (c ** 5 / 5 + c), why: 'Square the whole expression: $(y^2 + 1)^2 = y^4 + 2y^2 + 1$. The middle term is not zero.' }
+      ],
+      hints: ['About the $y$-axis, $V = \\pi\\int x^2\\,dy$ with $x = y^2 + 1$.', 'Expand $(y^2 + 1)^2 = y^4 + 2y^2 + 1$ before integrating.', `Integrate $y^4 + 2y^2 + 1$ from $0$ to $${c}$.`],
+      steps: [
+        { h: 'Volume formula', d: `$V = \\pi\\displaystyle\\int_0^{${c}} x^2\\,dy$` },
+        { h: 'Square the function', d: `$x^2 = (y^2 + 1)^2 = y^4 + 2y^2 + 1$` },
+        { h: 'Integrate', d: `$V = \\pi\\left[\\dfrac{y^5}{5} + \\dfrac{2y^3}{3} + y\\right]_0^{${c}}$` },
+        { h: 'Evaluate', d: `$V = ${tex}$` }
+      ]
+    }));
+  }),
+  // x = y^2, the y-axis and y = h: integrate with respect to y
+  V([4], rng => {
+    const h = ri(rng, 2, 12);
+    const f = frac(h ** 3, 3);
+    return AREA(`Find the area of the region bounded by the curve $x = y^2$, the $y$-axis and the line $y = ${h}$.`, f, ({ tex }) => ({
+      trapDefs: [
+        { value: 2 * h ** 3 / 3, why: `That is the area between the curve and the line $x = ${h * h}$ — the rest of the rectangle. The region asked for lies between the $y$-axis and the curve.` },
+        { value: h ** 3, why: 'Integrate $x = y^2$ with respect to $y$; do not multiply the width and height of the bounding rectangle.' }
+      ],
+      hints: ['Each horizontal strip runs from the $y$-axis ($x = 0$) to the curve, so the width is $x = y^2$.', `The strips stack from $y = 0$ to $y = ${h}$, so $A = \\int_0^{${h}} x\\,dy$.`, `Integrate $y^2$ and substitute the limits.`],
+      steps: [
+        { h: 'Choose the variable', d: `The region is described from the $y$-axis, so integrate with respect to $y$` },
+        { h: 'Set up the area', d: `$A = \\displaystyle\\int_0^{${h}} y^2\\,dy$` },
+        { h: 'Integrate', d: `$A = \\left[\\dfrac{y^3}{3}\\right]_0^{${h}}$` },
+        { h: 'Evaluate', d: `$A = ${tex}$` }
+      ]
+    }));
+  }),
+  // x = y(a - y) and the y-axis
+  V([4], rng => {
+    const a = ri(rng, 2, 13);
+    const f = frac(a ** 3, 6);
+    return AREA(`Find the area of the region enclosed by the curve $x = y(${a} - y)$ and the $y$-axis.`, f, ({ tex }) => ({
+      trapDefs: [
+        { value: a ** 3 / 2, why: 'The width of each horizontal strip is $x = ay - y^2$. Dropping the $-y^2$ term overstates the area.' },
+        { value: a ** 3 / 4, why: `This is the area of the bounding rectangle $\\left(${a} \\times \\tfrac{${a * a}}{4}\\right)$, which is larger than the region.` }
+      ],
+      hints: [`The curve meets the $y$-axis ($x = 0$) where $y = 0$ and $y = ${a}$.`, `Between these values $x = ${a}y - y^2$ is positive, so $A = \\int_0^{${a}} (${a}y - y^2)\\,dy$.`, 'Integrate term by term and substitute the limits.'],
+      steps: [
+        { h: 'Where the curve meets the $y$-axis', d: `$y(${a} - y) = 0 \\Rightarrow y = 0$ or $y = ${a}$` },
+        { h: 'Set up the area', d: `$A = \\displaystyle\\int_0^{${a}} \\left(${a}y - y^2\\right)dy$` },
+        { h: 'Integrate', d: `$A = \\left[\\dfrac{${a}y^2}{2} - \\dfrac{y^3}{3}\\right]_0^{${a}}$` },
+        { h: 'Evaluate', d: `$A = ${tex}$` }
+      ]
+    }));
+  })
+];
+void deferred;
 
 export const forms = { 'me12-calc': [...volumes, ...areas] };

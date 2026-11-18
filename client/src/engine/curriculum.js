@@ -692,7 +692,7 @@ export const STREAM_CURRICULUM = {
       T('me12-calc', 'Further Calculus', 'Calculus', 12, 'ME-C2/C3', [
         'Integration by substitution',
         'Volumes of solids of revolution',
-        'Areas between curves, including regions measured from the y-axis'
+        'Areas between curves and lines'
       ]),
       T('me12-binomial', 'The Binomial Distribution', 'Statistics & Probability', 10, 'ME-S1', [
         'Binomial probabilities for n trials',
