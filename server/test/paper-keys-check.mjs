@@ -87,4 +87,9 @@ const circle = { answerType: 'equation', answer: { lhs: 'x^2+y^2', rhs: '25' } }
 c.deq(['x^2+y^2=25', '25=x^2+y^2', '2x^2+2y^2=50', 'x^2+y^2-25=0'].map(g => ok(circle, g)), [true, true, true, true], 'an equation: any equivalent arrangement or multiple');
 c.deq(['x^2+y^2=26', 'y=3', 'x^2+y^2', 'x^2-y^2=25'].map(g => ok(circle, g)), [false, false, false, false], 'a different equation, a non-equation and a sign slip are refused');
 
+// ── Given objects for a line-by-line checker ─────────────────────────────────
+let withGivens = 0;
+for (const doc of docs.values()) for (const leaf of leafParts(doc)) { const q = engineQuestion(doc, leaf); if (q?.givens?.length) withGivens += 1; }
+c.ok(withGivens >= 20, `${withGivens} keyed parts carry the function definitions and equations their question gives`);
+
 console.log(`PAPER KEYS: PASS — ${c.count()}/${c.count()} checks [${keyed} keyed Section II parts, 13 papers]`);

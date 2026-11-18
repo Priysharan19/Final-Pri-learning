@@ -154,11 +154,14 @@ try {
   c.eq(list.headers.get('cache-control'), 'private, no-store', 'the list is not cached');
   c.deq([list.data.available, list.data.premium, list.data.capability], [true, false, 'premium-exams'], 'a free account is told it is not Premium');
   c.deq(list.data.papers.map(p => p.id), manifest.papers.map(p => p.id), 'every paper is listed, in manifest order');
-  c.deq(list.data.papers.filter(p => !p.locked).map(p => p.id), [SAMPLE], 'for a free account only the sample is unlocked');
+  // OWNER DECISION 19 Nov 2026 ("give original papers away; sell the supported diagnosis and correction workflow"): a PDF is free for any signed-in
+  // account. What is Premium is SITTING a paper in the app (the sample, Paper 01, excepted), so the list says which papers a free account may sit.
+  c.deq(list.data.papers.filter(p => !p.sitLocked).map(p => p.id), [SAMPLE], 'for a free account only the sample may be sat in the app');
+  c.ok(list.data.papers.every(p => p.locked === undefined), 'no paper is "locked" any more: every PDF is free');
   const row = list.data.papers[0];
   c.deq([row.title, row.marks, row.workingTime, row.pages, row.hasGuidelines, row.guidelinesPages, row.yearLevel, row.course], ['Practice Paper 01', 70, '2 hours', 19, true, 14, 12, 'nsw-ext1'], 'a row carries title, marks, time, pages');
   c.ok(!JSON.stringify(list.data).match(/sha256|\.pdf|server\/content/), 'the list names no file, hash or path');
-  c.deq((await get(hAu, '/v1/papers', paid)).data.papers.filter(p => p.locked), [], 'Premium: nothing is locked');
+  c.deq((await get(hAu, '/v1/papers', paid)).data.papers.filter(p => p.sitLocked), [], 'Premium: nothing is locked from sitting');
   c.eq((await get(hAu, '/v1/papers', paid)).data.premium, true, 'Premium is reported from the server\'s own row');
   c.eq((await get(hAu, '/v1/papers', freeRow)).data.premium, false, 'a free-plan row is not Premium');
   c.eq((await get(hAu, '/v1/papers', free, { 'x-pri-plan': 'premium', 'x-pri-capabilities': 'premium-exams' })).data.premium, false, 'a Premium claim in a header changes nothing');
@@ -176,19 +179,22 @@ try {
   const sampleGuide = await bytesOf(hAu, `/v1/papers/${SAMPLE}/guidelines`, free);
   c.deq([sampleGuide.status, sha(sampleGuide.bytes)], [200, real.papers[0].guidelines.sha256], 'the sample\'s marking guidelines are free too');
   c.match(sampleGuide.headers.get('content-disposition'), /Marking-Guidelines\.pdf"$/, 'the guidelines file says what it is');
-  for (const kind of ['paper', 'guidelines']) {
-    const refusal = await get(hAu, `/v1/papers/${LOCKED}/${kind}`, free);
-    c.deq([refusal.status, refusal.data?.error?.code, refusal.data?.error?.capability, refusal.data?.error?.plan, refusal.data?.error?.retryable], [402, 'PREMIUM_REQUIRED', 'premium-exams', 'free', false],
-      `a free account is refused ${LOCKED}/${kind}: the existing Premium-required shape`);
-    c.eq(refusal.headers.get('content-type')?.startsWith('application/json'), true, 'the refusal is JSON, never a PDF');
-    c.eq(refusal.headers.get('cache-control'), 'private, no-store', 'the refusal is not cached');
+  // Every PDF, paper and guidelines, downloads for a FREE account, a free-plan row, an expired or revoked state and a false claim alike: the server
+  // consults no entitlement for a PDF (decision of 19 Nov 2026). Sign-in is the only gate, kept so downloads can be counted.
+  for (const [name, jar, headers] of [['a free account', free], ['a free-plan row', freeRow], ['an expired period', expired], ['a revoked state', revoked], ['a header claim', free, { 'x-pri-plan': 'free' }]]) {
+    for (const p of manifest.papers) {
+      for (const [kind, f] of [['paper', p.paper], ['guidelines', p.guidelines]]) {
+        if (!f) continue;
+        const known = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'].map(n => `ext1-2027-p${n}`).concat([NO_GUIDE]).find(x => x === p.id);
+        const got = await bytesOf(hAu, `/v1/papers/${known}/${kind}`, jar);
+        if (got.status !== 200 || sha(got.bytes) !== f.sha256) c.ok(false, `${name}: ${p.id}/${kind} should arrive intact (status ${got.status})`);
+      }
+    }
+    c.ok(true, `${name}: every paper and guidelines PDF is free and arrives byte for byte`);
+    void headers;
   }
-  c.eq((await get(hAu, `/v1/papers/${LOCKED}/paper`, freeRow)).status, 402, 'a free-plan row is refused');
-  c.eq((await get(hAu, `/v1/papers/${LOCKED}/paper`, free, { 'x-pri-plan': 'premium', 'x-pri-capabilities': 'premium-exams' })).status, 402, 'a Premium claim in a header changes nothing');
-  c.eq((await get(hAu, `/v1/papers/${LOCKED}/paper?plan=premium`, free)).status, 402, 'a query claim changes nothing');
-  for (const [name, jar] of [['an expired period', expired], ['a revoked state', revoked]]) {
-    c.eq((await get(hAu, `/v1/papers/${LOCKED}/paper`, jar)).status, 402, `${name} is Free`);
-  }
+  const unauth = await get(hAu, `/v1/papers/${LOCKED}/paper`);
+  c.eq(unauth.status, 401, 'signed out: a PDF is still refused (sign-in is kept so downloads can be counted)');
   for (const [name, jar] of [['an active subscription', paid], ['an active trial', trial], ['a grace period', grace]]) {
     for (const p of manifest.papers) {
       for (const [kind, f] of [['paper', p.paper], ['guidelines', p.guidelines]]) {

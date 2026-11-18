@@ -57,7 +57,6 @@ export default function Ext1Papers() {
       await saveBinaryFile(bytes, fileName(paper.title, kind), 'application/pdf');
       setMessage({ key: 'papers.ext1.saved', vars: { title: paper.title } });
     } catch (err) {
-      if (err?.code === 'PREMIUM_REQUIRED') setList(l => (l ? { ...l, papers: l.papers.map(p => (p.id === paper.id ? { ...p, locked: true } : p)) } : l));
       setMessage({ key: err?.code === 'CLOUD_WEB_ONLY' ? 'papers.ext1.webOnly' : 'papers.ext1.failed' });
     } finally { setBusy(''); }
   }
@@ -72,7 +71,7 @@ export default function Ext1Papers() {
       const r = await startSitting(paper.id);
       nav(`/papers/sit/${r.attempt.id}`);
     } catch (err) {
-      if (err?.code === 'PREMIUM_REQUIRED') setList(l => (l ? { ...l, papers: l.papers.map(p => (p.id === paper.id ? { ...p, locked: true } : p)) } : l));
+      if (err?.code === 'PREMIUM_REQUIRED') setList(l => (l ? { ...l, papers: l.papers.map(p => (p.id === paper.id ? { ...p, sitLocked: true } : p)) } : l));
       setMessage({ key: 'papers.ext1.sitFailed' });
     } finally { setBusy(''); }
   }
@@ -85,29 +84,28 @@ export default function Ext1Papers() {
       {failed && <p className="muted" data-ext1-papers-unavailable>{t('papers.ext1.unavailable')}</p>}
       {list && list.papers.length > 0 && <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
         {list.papers.map(p => (
-          <li key={p.id} className="stat-tile" data-ext1-paper={p.id} data-locked={p.locked ? 'yes' : 'no'}>
+          <li key={p.id} className="stat-tile" data-ext1-paper={p.id} data-sit-locked={p.sitLocked ? 'yes' : 'no'}>
             <div className="sc-label">{p.title}{p.sample ? ` · ${t('papers.ext1.sample')}` : ''}</div>
             <div className="muted">{t('papers.ext1.meta', { marks: p.marks, time: p.workingTime, pages: p.pages })}</div>
-            {p.locked
-              ? <p className="muted" style={{ marginTop: 8 }} data-premium-gate="ext1-papers">
-                {t('papers.ext1.locked')} <PageLink to="/premium" state={{ from: 'exams' }}>{t('papers.ext1.seePremium')}</PageLink>
-              </p>
-              : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                {p.inApp && <button type="button" className="btn btn-primary btn-sm" disabled={busy !== ''} aria-label={t('papers.ext1.sitLabel', { title: p.title })}
-                  onClick={() => sit(p)} data-ext1-sit={p.id}>
-                  {busy === `${p.id}:sit` ? t('papers.ext1.sitting') : t('papers.ext1.sit')}
-                </button>}
-                <button type="button" className={`btn ${p.inApp ? 'btn-ghost' : 'btn-primary'} btn-sm`} disabled={busy !== ''} aria-label={t('papers.ext1.paperLabel', { title: p.title })}
-                  onClick={() => download(p, 'paper')} data-ext1-download={`${p.id}:paper`}>
-                  {busy === `${p.id}:paper` ? t('papers.ext1.saving') : t('papers.ext1.paper')}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+              {p.inApp && !p.sitLocked && <button type="button" className="btn btn-primary btn-sm" disabled={busy !== ''} aria-label={t('papers.ext1.sitLabel', { title: p.title })}
+                onClick={() => sit(p)} data-ext1-sit={p.id}>
+                {busy === `${p.id}:sit` ? t('papers.ext1.sitting') : t('papers.ext1.sit')}
+              </button>}
+              <button type="button" className={`btn ${p.inApp && !p.sitLocked ? 'btn-ghost' : 'btn-primary'} btn-sm`} disabled={busy !== ''} aria-label={t('papers.ext1.paperLabel', { title: p.title })}
+                onClick={() => download(p, 'paper')} data-ext1-download={`${p.id}:paper`}>
+                {busy === `${p.id}:paper` ? t('papers.ext1.saving') : t('papers.ext1.paper')}
+              </button>
+              {p.hasGuidelines
+                ? <button type="button" className="btn btn-ghost btn-sm" disabled={busy !== ''} aria-label={t('papers.ext1.guidelinesLabel', { title: p.title })}
+                  onClick={() => download(p, 'guidelines')} data-ext1-download={`${p.id}:guidelines`}>
+                  {busy === `${p.id}:guidelines` ? t('papers.ext1.saving') : t('papers.ext1.guidelines')}
                 </button>
-                {p.hasGuidelines
-                  ? <button type="button" className="btn btn-ghost btn-sm" disabled={busy !== ''} aria-label={t('papers.ext1.guidelinesLabel', { title: p.title })}
-                    onClick={() => download(p, 'guidelines')} data-ext1-download={`${p.id}:guidelines`}>
-                    {busy === `${p.id}:guidelines` ? t('papers.ext1.saving') : t('papers.ext1.guidelines')}
-                  </button>
-                  : <span className="muted" data-ext1-no-guidelines>{t('papers.ext1.noGuidelines')}</span>}
-              </div>}
+                : <span className="muted" data-ext1-no-guidelines>{t('papers.ext1.noGuidelines')}</span>}
+            </div>
+            {p.inApp && p.sitLocked && <p className="muted" style={{ marginTop: 8 }} data-premium-gate="ext1-papers">
+              {t('papers.ext1.sitLocked')} <PageLink to="/premium" state={{ from: 'exams' }}>{t('papers.ext1.seePremium')}</PageLink>
+            </p>}
           </li>
         ))}
       </ul>}

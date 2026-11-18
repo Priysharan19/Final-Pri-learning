@@ -109,7 +109,7 @@
         "content": "Sums and products of zeros; compound angles; inverse trigonometric functions",
         "outcomes": [
          "ME1-11-02",
-         "12-03"
+         "ME1-12-03"
         ]
        }
       }
@@ -296,7 +296,7 @@
         "content": "Inverse trigonometric functions; compound angles",
         "outcomes": [
          "ME1-12-03",
-         "11-03"
+         "ME1-11-03"
         ]
        }
       }
@@ -755,7 +755,7 @@
         "content": "Integration by substitution; inverse trigonometric functions",
         "outcomes": [
          "ME1-12-04",
-         "12-03"
+         "ME1-12-03"
         ]
        }
       }
@@ -854,7 +854,7 @@
         "content": "Parametric form; tangents; polynomial equations",
         "outcomes": [
          "ME1-11-01",
-         "11-02"
+         "ME1-11-02"
         ]
        }
       }
@@ -1197,7 +1197,7 @@
         "content": "Binomial theorem; integration by substitution",
         "outcomes": [
          "ME1-11-04",
-         "12-04"
+         "ME1-12-04"
         ]
        },
        "figures": [],
@@ -1477,7 +1477,7 @@
         "content": "Integration by substitution; inverse trigonometric functions",
         "outcomes": [
          "ME1-12-04",
-         "12-03"
+         "ME1-12-03"
         ]
        },
        "figures": [],
@@ -1566,8 +1566,8 @@
           "content": "Proof by mathematical induction; trigonometric identities; definite integrals",
           "outcomes": [
            "ME1-12-01",
-           "11-03",
-           "12-04"
+           "ME1-11-03",
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1632,8 +1632,8 @@
           "content": "Proof by mathematical induction; trigonometric identities; definite integrals",
           "outcomes": [
            "ME1-12-01",
-           "11-03",
-           "12-04"
+           "ME1-11-03",
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1681,8 +1681,8 @@
           "content": "Proof by mathematical induction; trigonometric identities; definite integrals",
           "outcomes": [
            "ME1-12-01",
-           "11-03",
-           "12-04"
+           "ME1-11-03",
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1782,7 +1782,7 @@
           "content": "Inverse trigonometric functions; areas of sectors; differentiation",
           "outcomes": [
            "ME1-12-03",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1852,7 +1852,7 @@
           "content": "Inverse trigonometric functions; areas of sectors; differentiation",
           "outcomes": [
            "ME1-12-03",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1900,7 +1900,7 @@
           "content": "Inverse trigonometric functions; areas of sectors; differentiation",
           "outcomes": [
            "ME1-12-03",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1975,7 +1975,7 @@
           "content": "Motion in vector form; scalar product; rates of change",
           "outcomes": [
            "ME1-12-02",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2040,7 +2040,7 @@
           "content": "Motion in vector form; scalar product; rates of change",
           "outcomes": [
            "ME1-12-02",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2109,7 +2109,7 @@
           "content": "Motion in vector form; scalar product; rates of change",
           "outcomes": [
            "ME1-12-02",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2201,7 +2201,7 @@
           "content": "Projectile motion; quadratic equations; optimisation",
           "outcomes": [
            "ME1-12-02",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2266,7 +2266,7 @@
           "content": "Projectile motion; quadratic equations; optimisation",
           "outcomes": [
            "ME1-12-02",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2344,7 +2344,7 @@
           "content": "Projectile motion; quadratic equations; optimisation",
           "outcomes": [
            "ME1-12-02",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2402,7 +2402,7 @@
           "content": "Exponential decay; binomial distribution; optimisation; inequalities using calculus",
           "outcomes": [
            "ME1-12-06",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2475,7 +2475,7 @@
           "content": "Exponential decay; binomial distribution; optimisation; inequalities using calculus",
           "outcomes": [
            "ME1-12-06",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2544,7 +2544,7 @@
           "content": "Exponential decay; binomial distribution; optimisation; inequalities using calculus",
           "outcomes": [
            "ME1-12-06",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],

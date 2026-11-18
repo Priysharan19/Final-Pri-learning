@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Pri Learning · sitting an exam paper in the app (server/platform/paperAttempts.js)
 //
-//   1 · the structured papers: all nine cleared papers load, add to 70 marks,
+//   1 · the structured papers: all thirteen papers load, add to 70 marks,
 //       carry a key for every multiple-choice question, and each keyed part
 //       is accepted by the real engine in its own form and rejects a wrong one;
 //   2 · who may sit one: signed out 401; the free sample (Paper 1) for a free
@@ -69,7 +69,7 @@ const P01 = 'ext1-2027-p01';
 const P13 = 'ext1-2027-p13';
 
 // ── 1 · the content itself ────────────────────────────────────────────────────
-c.deq([...docs.keys()], ['01', '02', '03', '04', '05', '06', '07', '10', '13'].map(n => `ext1-2027-p${n}`), 'the nine cleared papers load (08, 09, 11 and 12 are not shipped)');
+c.deq([...docs.keys()], ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'].map(n => `ext1-2027-p${n}`), 'all thirteen papers load');
 for (const doc of docs.values()) {
   const leaves = leafParts(doc);
   c.eq(leaves.reduce((a, l) => a + l.part.marks, 0), 70, `${doc.id}: 70 marks`);
@@ -114,7 +114,10 @@ for (const doc of docs.values()) for (const leaf of leafParts(doc)) {
   secrets.push(blocksText(p.sampleAnswer).slice(0, 80));
   if (p.markerNote) secrets.push(blocksText(p.markerNote).slice(0, 60));
 }
-const secretList = [...new Set(secrets.map(s => s.trim()).filter(s => s.length >= 12))];
+// A SHORT key spelling (a formula such as \dfrac{\pi}{2}) can also be the printed text of some option or prompt in a paper that is public by
+// design; that is not a leak of the key. Longer strings (criteria, sample answers, notes, long keys) are never exempt.
+const publicBlob = [...docs.values()].map(d => JSON.stringify(publicPaper(d))).join('\n');
+const secretList = [...new Set(secrets.map(s => s.trim()).filter(s => s.length >= 12 && !(s.length < 24 && publicBlob.includes(JSON.stringify(s).slice(1, -1)))))];
 const leaks = reply => secretList.filter(s => JSON.stringify(reply).includes(JSON.stringify(s).slice(1, -1)));
 c.ok(secretList.length > 400, `the scan holds ${secretList.length} secret strings from every paper`);
 const sample = JSON.stringify(publicPaper(docs.get(P13)));
@@ -272,7 +275,7 @@ try {
   const subB = await post(hAu, paid, `/v1/papers/attempts/${B.id}/submit`, { submissionId: 'paper-submit-0013' });
   const RB = subB.data.attempt.result;
   c.deq(['q11a', 'q11b', 'q12b', 'q14b-ii', 'q13b-i'].map(id => RB.parts[id].verdict), ['correct', 'correct', 'correct', 'correct', 'incorrect'], 'Paper 13: the keys mark an exact value, an angle in degrees, an expression in an equivalent form, and reject a wrong value');
-  c.deq([RB.totals.total, RB.totals.autoAvailable, RB.totals.selfChecked, RB.totals.autoAwarded], [70, 22, 48, 4], 'Paper 13 totals: 10 multiple choice + 12 final answers available, 4 earned');
+  c.deq([RB.totals.total, RB.totals.autoAvailable, RB.totals.selfChecked, RB.totals.autoAwarded], [70, 23, 47, 4], 'Paper 13 totals: 10 multiple choice + 13 final answers available (q12c-ii is keyed exactly since 19 Nov 2026), 4 earned');
   c.eq((await get(hAu, paid, `/v1/papers/attempts/${B.id}/parts/q11a/solution`)).status, 200, 'the guideline is Premium: a Premium account has it');
 
   // ── 5 · handwritten parts keep the original, and are marked from the confirmed reading ──

@@ -26,6 +26,9 @@ export function keepPart(id, partId, body) {
 }
 export function submitSitting(id, body) { need(ID.test(id), 'sitting id'); return cloudRequest(`/v1/papers/attempts/${id}/submit`, { method: 'POST', body, timeoutMs: 60_000 }); }
 export function loadSolution(id, partId) { need(ID.test(id) && PART.test(partId), 'part'); return cloudRequest(`/v1/papers/attempts/${id}/parts/${partId}/solution`); }
+export function loadPlan(id) { need(ID.test(id), 'sitting id'); return cloudRequest(`/v1/papers/attempts/${id}/plan`); }
+export function startRetest(id) { need(ID.test(id), 'sitting id'); return cloudRequest(`/v1/papers/attempts/${id}/retest`, { method: 'POST', body: {} }); }
+export function loadComparison(id) { need(ID.test(id), 'sitting id'); return cloudRequest(`/v1/papers/attempts/${id}/comparison`); }
 export function listSittings() { return cloudRequest('/v1/papers/attempts'); }
 export function examStyleFor(subtopic) {
   need(/^[a-z0-9-]{3,40}$/.test(subtopic), 'subtopic');

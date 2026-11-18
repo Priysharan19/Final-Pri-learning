@@ -120,15 +120,19 @@ try {
   const rowText = async p => (await page.locator(`[data-ext1-paper="${p.id}"]`).textContent()).replace(/\s+/g, ' ');
   const sampleText = await rowText(sampleP);
   check('the Paper 01 row says "70 marks · 2 hours · 19 pages"', sampleText.includes('70 marks · 2 hours · 19 pages'), sampleText);
-  check('on the free plan Paper 01 is unlocked with both buttons and the other twelve are locked',
-    await page.locator(`[data-ext1-paper="${sampleP.id}"]`).getAttribute('data-locked') === 'no'
-    && await page.locator('[data-ext1-paper][data-locked="no"]').count() === 1 && await page.locator('[data-ext1-paper][data-locked="yes"]').count() === 12
+  // OWNER DECISION 19 Nov 2026: every PDF is free; only SITTING a paper in the app (Paper 01 excepted) is Premium.
+  check('on the free plan every paper offers both PDFs; Paper 01 alone can be sat; the other twelve show the Premium prompt for the sitting',
+    await page.locator(`[data-ext1-paper="${sampleP.id}"]`).getAttribute('data-sit-locked') === 'no'
+    && await page.locator('[data-ext1-paper][data-sit-locked="no"]').count() === 1 && await page.locator('[data-ext1-paper][data-sit-locked="yes"]').count() === 12
     && await page.getByRole('button', { name: 'Download Practice Paper 01, paper (PDF)' }).count() === 1
     && await page.getByRole('button', { name: 'Download Practice Paper 01, marking guidelines (PDF)' }).count() === 1
-    && await page.locator('[data-ext1-papers] button').count() === 2);
-  check('a locked row (Paper 02) shows the Premium prompt, a link to Premium and no download button',
-    await page.locator(`[data-ext1-paper="${lockedP.id}"] button`).count() === 0
-    && await page.locator('[data-premium-gate="ext1-papers"]').count() >= 1 && await page.getByRole('link', { name: en['papers.ext1.seePremium'] }).count() >= 1);
+    && await page.getByRole('button', { name: /^Sit Practice Paper \d+ in the app$/ }).count() === 1
+    && await page.locator('[data-ext1-papers] button').count() === 27);
+  check('a sitting-locked row (Paper 02) still has both PDF buttons, plus the Premium prompt and a link to Premium',
+    await page.locator(`[data-ext1-paper="${lockedP.id}"] button`).count() === 2
+    && await page.locator('[data-premium-gate="ext1-papers"]').count() === 12 && await page.getByRole('link', { name: en['papers.ext1.seePremium'] }).count() >= 1);
+  const [lockedDl] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.locator(`[data-ext1-download="${lockedP.id}:paper"]`).click()]);
+  check('a free account downloads Paper 02 too, byte for byte', sha(readFileSync(await lockedDl.path())) === lockedP.paper.sha256, lockedDl.suggestedFilename());
   const [freePaper] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.locator(`[data-ext1-download="${sampleP.id}:paper"]`).click()]);
   check('the free account downloads Paper 01, byte for byte', sha(readFileSync(await freePaper.path())) === sampleP.paper.sha256 && freePaper.suggestedFilename() === 'Prithagoras-Ext1-Practice-Paper-01.pdf', freePaper.suggestedFilename());
   check('ACCESSIBILITY: every control on the page has a name', (await unnamedControls(page)).length === 0, JSON.stringify(await unnamedControls(page)));
@@ -148,17 +152,17 @@ try {
     .run(made.accountId, now + 30 * DAY, now);
   await openExams(platform, page);
   await page.waitForSelector('[data-ext1-paper]', { timeout: 30000 });
-  const listed = await page.locator('[data-ext1-paper]').evaluateAll(els => els.map(el => [el.getAttribute('data-ext1-paper'), el.getAttribute('data-locked')]));
-  check('with Premium all thirteen papers are listed and unlocked, with no Premium prompt',
+  const listed = await page.locator('[data-ext1-paper]').evaluateAll(els => els.map(el => [el.getAttribute('data-ext1-paper'), el.getAttribute('data-sit-locked')]));
+  check('with Premium all thirteen papers are listed, can be sat in the app and downloaded, with no Premium prompt',
     listed.length === 13 && listed.every(([, l]) => l === 'no') && await page.locator('[data-premium-gate="ext1-papers"]').count() === 0
-    && await page.locator('[data-ext1-papers] button').count() === 26, JSON.stringify(listed));
+    && await page.locator('[data-ext1-papers] button').count() === 39, JSON.stringify(listed));
   const first = manifest.papers.find(p => p.id === 'ext1-2027-p13');
   check('Paper 13 offers both buttons with the catalogue\'s names', await page.getByRole('button', { name: 'Download Practice Paper 13, paper (PDF)' }).count() === 1
     && await page.getByRole('button', { name: 'Download Practice Paper 13, marking guidelines (PDF)' }).count() === 1);
   check('the visible button text is the catalogue\'s', (await page.locator(`[data-ext1-download="${first.id}:paper"]`).innerText()) === en['papers.ext1.paper']
     && (await page.locator(`[data-ext1-download="${first.id}:guidelines"]`).innerText()) === en['papers.ext1.guidelines']);
   const [paid] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.locator(`[data-ext1-download="${first.id}:paper"]`).click()]);
-  check('a non-sample paper downloads, byte for byte', sha(readFileSync(await paid.path())) === first.paper.sha256 && paid.suggestedFilename() === 'Prithagoras-Ext1-Practice-Paper-13.pdf', paid.suggestedFilename());
+  check('Paper 13 downloads, byte for byte', sha(readFileSync(await paid.path())) === first.paper.sha256 && paid.suggestedFilename() === 'Prithagoras-Ext1-Practice-Paper-13.pdf', paid.suggestedFilename());
   const [guide] = await Promise.all([page.waitForEvent('download', { timeout: 30000 }), page.locator(`[data-ext1-download="${first.id}:guidelines"]`).click()]);
   check('and its marking guidelines', sha(readFileSync(await guide.path())) === first.guidelines.sha256 && guide.suggestedFilename().endsWith('-Marking-Guidelines.pdf'));
   check('ACCESSIBILITY (Premium): every control on the page has a name', (await unnamedControls(page)).length === 0, JSON.stringify(await unnamedControls(page)));

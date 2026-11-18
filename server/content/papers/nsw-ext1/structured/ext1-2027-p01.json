@@ -291,7 +291,7 @@
         "content": "Graphs of inverse trigonometric functions; complementary angles",
         "outcomes": [
          "ME1-12-03",
-         "11-03"
+         "ME1-11-03"
         ]
        }
       }
@@ -668,7 +668,7 @@
         "content": "Inverse trigonometric functions; graphical solution of equations",
         "outcomes": [
          "ME1-12-03",
-         "11-01"
+         "ME1-11-01"
         ]
        }
       }
@@ -757,7 +757,7 @@
         "content": "Integration by substitution; symmetry of inverse trigonometric functions",
         "outcomes": [
          "ME1-12-04",
-         "12-03"
+         "ME1-12-03"
         ]
        }
       }
@@ -856,7 +856,7 @@
         "content": "Parametric form; areas; integration by substitution",
         "outcomes": [
          "ME1-11-01",
-         "12-04"
+         "ME1-12-04"
         ]
        }
       }
@@ -1050,7 +1050,7 @@
           "content": "Zeros and coefficients of polynomials; stationary points; cosine rule",
           "outcomes": [
            "ME1-11-02",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -1106,7 +1106,7 @@
           "content": "Zeros and coefficients of polynomials; stationary points; cosine rule",
           "outcomes": [
            "ME1-11-02",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -1180,7 +1180,7 @@
           "content": "Zeros and coefficients of polynomials; stationary points; cosine rule",
           "outcomes": [
            "ME1-11-02",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -1274,7 +1274,7 @@
           "content": "Proof by mathematical induction; counting techniques; probability",
           "outcomes": [
            "ME1-12-01",
-           "11-04"
+           "ME1-11-04"
           ]
          },
          "figures": [],
@@ -1326,7 +1326,7 @@
           "content": "Proof by mathematical induction; counting techniques; probability",
           "outcomes": [
            "ME1-12-01",
-           "11-04"
+           "ME1-11-04"
           ]
          },
          "figures": [],
@@ -1382,7 +1382,7 @@
           "content": "Proof by mathematical induction; counting techniques; probability",
           "outcomes": [
            "ME1-12-01",
-           "11-04"
+           "ME1-11-04"
           ]
          },
          "figures": [],
@@ -1486,8 +1486,8 @@
           "content": "Binomial distribution; expected value; binomial coefficients; inequalities using calculus",
           "outcomes": [
            "ME1-12-06",
-           "11-04",
-           "12-05"
+           "ME1-11-04",
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -1526,8 +1526,8 @@
           "content": "Binomial distribution; expected value; binomial coefficients; inequalities using calculus",
           "outcomes": [
            "ME1-12-06",
-           "11-04",
-           "12-05"
+           "ME1-11-04",
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -1604,8 +1604,8 @@
           "content": "Binomial distribution; expected value; binomial coefficients; inequalities using calculus",
           "outcomes": [
            "ME1-12-06",
-           "11-04",
-           "12-05"
+           "ME1-11-04",
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -1699,7 +1699,7 @@
           "content": "Inverse trigonometric functions; circle geometry; differentiation",
           "outcomes": [
            "ME1-12-03",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1764,7 +1764,7 @@
           "content": "Inverse trigonometric functions; circle geometry; differentiation",
           "outcomes": [
            "ME1-12-03",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1837,7 +1837,7 @@
           "content": "Inverse trigonometric functions; circle geometry; differentiation",
           "outcomes": [
            "ME1-12-03",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1948,7 +1948,7 @@
           "content": "Modelling with differential equations; inverse trigonometric functions; limits",
           "outcomes": [
            "ME1-12-05",
-           "12-03"
+           "ME1-12-03"
           ]
          },
          "figures": [],
@@ -2019,7 +2019,7 @@
           "content": "Modelling with differential equations; inverse trigonometric functions; limits",
           "outcomes": [
            "ME1-12-05",
-           "12-03"
+           "ME1-12-03"
           ]
          },
          "figures": [],
@@ -2075,7 +2075,7 @@
           "content": "Modelling with differential equations; inverse trigonometric functions; limits",
           "outcomes": [
            "ME1-12-05",
-           "12-03"
+           "ME1-12-03"
           ]
          },
          "figures": [],
@@ -2150,7 +2150,7 @@
           "content": "Volumes of solids of revolution; related rates of change; differential equations",
           "outcomes": [
            "ME1-12-05",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -2202,7 +2202,7 @@
           "content": "Volumes of solids of revolution; related rates of change; differential equations",
           "outcomes": [
            "ME1-12-05",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -2284,7 +2284,7 @@
           "content": "Volumes of solids of revolution; related rates of change; differential equations",
           "outcomes": [
            "ME1-12-05",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -2367,8 +2367,8 @@
           "content": "Projectile motion; trigonometric identities; rates of change; quadratic inequalities",
           "outcomes": [
            "ME1-12-02",
-           "11-03",
-           "12-05"
+           "ME1-11-03",
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2424,8 +2424,8 @@
           "content": "Projectile motion; trigonometric identities; rates of change; quadratic inequalities",
           "outcomes": [
            "ME1-12-02",
-           "11-03",
-           "12-05"
+           "ME1-11-03",
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2477,8 +2477,8 @@
           "content": "Projectile motion; trigonometric identities; rates of change; quadratic inequalities",
           "outcomes": [
            "ME1-12-02",
-           "11-03",
-           "12-05"
+           "ME1-11-03",
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2548,8 +2548,8 @@
           "content": "Projectile motion; trigonometric identities; rates of change; quadratic inequalities",
           "outcomes": [
            "ME1-12-02",
-           "11-03",
-           "12-05"
+           "ME1-11-03",
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2646,8 +2646,8 @@
           "content": "Binomial distribution; binomial coefficients; calculus and inequalities",
           "outcomes": [
            "ME1-12-06",
-           "11-04",
-           "12-05"
+           "ME1-11-04",
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2686,8 +2686,8 @@
           "content": "Binomial distribution; binomial coefficients; calculus and inequalities",
           "outcomes": [
            "ME1-12-06",
-           "11-04",
-           "12-05"
+           "ME1-11-04",
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2757,8 +2757,8 @@
           "content": "Binomial distribution; binomial coefficients; calculus and inequalities",
           "outcomes": [
            "ME1-12-06",
-           "11-04",
-           "12-05"
+           "ME1-11-04",
+           "ME1-12-05"
           ]
          },
          "figures": [],

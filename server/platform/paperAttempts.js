@@ -59,15 +59,11 @@ import { markerPool, markerCooldownUntil, recordMarkerKills, MARKING_BUSY, BUSY_
 import { parseOriginal, keepOriginal, OriginalRefused, originalProof } from './originalWork.js';
 import { recognitionOpsFor, sendRecognitionRefusal } from './recognitionOps.js';
 import { transcribeHandwriting, validateImage, HandwritingProviderError } from './handwritingProvider.js';
+import { SUBTOPIC_OUTCOMES, RETEST_ID, buildPlan, buildRetest, compare, retestDoc } from './paperPlan.js';
 import { engineQuestion, howMarked, publicPaper, schemeApproved, scopedLeaves, statedTime } from './paperContent.js';
 
 const DAY = 24 * 60 * 60 * 1000;
-// Practice subtopic (client/src/engine/curriculum.js, Extension 1) → the syllabus outcomes the guideline's mapping grid names.
-export const SUBTOPIC_OUTCOMES = Object.freeze({
-  'me11-functions': ['ME1-11-01'], 'me11-poly': ['ME1-11-02'], 'me11-trigid': ['ME1-11-03'], 'me12-trigeq': ['ME1-11-03'],
-  'me11-comb': ['ME1-11-04'], 'me11-binomial': ['ME1-11-05'], 'me12-induction': ['ME1-12-01'], 'me12-vectors': ['ME1-12-02'],
-  'me11-inversetrig': ['ME1-12-03'], 'me12-calc': ['ME1-12-04'], 'me11-rates': ['ME1-12-05'], 'me12-binomial': ['ME1-12-06']
-});
+export { SUBTOPIC_OUTCOMES };
 const leafPartsOf = question => { const out = []; const walk = ps => ps.forEach(p => (p.parts ? walk(p.parts) : out.push(p))); walk(question.parts); return out; };
 const KEEP = 400 * DAY;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -117,8 +113,8 @@ export function mountPaperAttempts(router, db, ctx) {
     const accountId = req.platformSession.account_id;
     const now = clock();
     const sit = await readRow(db, accountId, 'paper-sitting', id, now);
-    const doc = sit && docs.get(sit.paperId);
-    if (!sit || !doc) { refuse(res, 404, 'PAPER_ATTEMPT_NOT_FOUND', 'No such sitting.'); return null; }
+    const doc = sit && (sit.retest ? retestDoc(docs, sit.retest) : docs.get(sit.paperId));
+    if (!sit || !doc || (sit.retest && !doc.sections[0].questions.length)) { refuse(res, 404, 'PAPER_ATTEMPT_NOT_FOUND', 'No such sitting.'); return null; }
     const result = await readRow(db, accountId, 'paper-result', id, now);
     if (result && !allowSubmitted) { refuse(res, 409, 'PAPER_ATTEMPT_SUBMITTED', 'This sitting has been submitted.'); return null; }
     const saved = (await readRow(db, accountId, 'paper-answers', id, now)) || { answers: {}, savedAt: null, ms: 0 };
@@ -346,6 +342,33 @@ export function mountPaperAttempts(router, db, ctx) {
     }
     if (kills) await recordMarkerKills(db, s.accountId, kills);
 
+    // ── Feedback on the working, never a mark ────────────────────────────────
+    // A part's written working is read line by line by the same deterministic Step Check the teacher's review uses
+    // (markerOps 'review': feedback only, no key, no mark). Where the engine cannot read a line it says "unsure": silence is never a tick.
+    // The criteria of the author's guideline are the structure of the feedback: the engine can verify ONE thing from a keyed part,
+    // the final answer, and says so on the criterion that carries the full marks; every other criterion is the student's to check.
+    // No criterion mark is awarded or shown here; those appear only for an author-approved scheme (none today).
+    for (const { part, question, section } of leaves) {
+      const row = parts[part.id];
+      const a = s.saved.answers[part.id];
+      const lines = typeof a?.working === 'string' ? a.working.split(/\r?\n/).map(l => l.trim()).filter(Boolean).slice(0, 40) : [];
+      if (lines.length && part.key && part.key.type !== 'mcq') {
+        const q = engineQuestion(s.doc, { part, question, section });
+        const out = await pool.run('review', { q, lines }, { key: s.accountId });
+        if (out.ok && out.value?.evidence) {
+          const ev = out.value.evidence;
+          row.working = { lines: ev.lines, firstBreak: ev.firstBreak, verified: ev.verifiedLines, read: ev.lines.some(x => x !== 'unsure') };
+        } else row.working = { lines: lines.map(() => 'unsure'), firstBreak: -1, verified: 0, read: false };
+      }
+      const crits = part.criteria || [];
+      const top = Math.max(0, ...crits.map(c => c.marks));
+      const topAt = crits.findIndex(c => c.marks === top);
+      row.criteria = crits.map((c, i) => {
+        if (part.key && i === topAt) return { engine: 'final-answer', status: row.verdict === 'correct' ? 'verified' : row.verdict === 'unanswered' ? 'not-attempted' : 'not-verified' };
+        return { engine: 'none', status: 'self-check' };
+      });
+    }
+
     const totals = totalsOf(s.doc, leaves, parts);
     const submittedAt = clock();
     const approved = schemeApproved(s.doc, approvalsNow());
@@ -368,6 +391,70 @@ export function mountPaperAttempts(router, db, ctx) {
     }
     s.result = committed.result;
     return res.json({ attempt: view(s), replay: !!committed.replay });
+  });
+
+  // ── What to practise next, and the unseen re-test (Premium) ────────────────
+  // The paid workflow: a plan computed from this sitting's result alone (paperPlan.js), and a re-test of the same outcomes from papers the
+  // account has never sat. Both need the same entitlement as sitting any paper but Paper 01; the server decides from its own row.
+  async function sittingPapers(accountId, now) {
+    const rows = await db.all("SELECT response_json FROM idempotency_keys WHERE account_id=? AND scope='paper-sitting' AND expires_at>?", [accountId, now]);
+    const sat = new Set();
+    for (const r of rows) {
+      const sit = JSON.parse(r.response_json);
+      if (sit.retest) for (const p of sit.retest.parts) sat.add(p.paperId); else sat.add(sit.paperId);
+    }
+    return sat;
+  }
+  const planGate = async (req, res) => {
+    const s = await sitting(req, res);
+    if (!s) return null;
+    if (!s.result) { refuse(res, 409, 'PAPER_NOT_SUBMITTED', 'The plan is made from a submitted sitting.'); return null; }
+    if (!(await ctx.isPremium(s.accountId))) { premiumRefusal(res, capability); return null; }
+    return s;
+  };
+  router.get('/attempts/:attemptId/plan', rateLimit(db, 'paper-plan', { limit: 600, windowMs: 3600000 }), async (req, res) => {
+    const s = await planGate(req, res);
+    if (!s) return undefined;
+    const plan = buildPlan(s.doc, s.result);
+    const sat = await sittingPapers(s.accountId, s.now);
+    const retest = buildRetest(docs, plan.items, sat);
+    return res.json({ attemptId: s.id, ...plan, retest: { parts: retest.parts.length, marks: retest.marks, fallbacks: retest.fallbacks },
+      limits: 'Only parts the engine marks are counted. This is a list of topics to practise, not a prediction of any mark.' });
+  });
+  router.post('/attempts/:attemptId/retest', rateLimit(db, 'paper-retest', { limit: 60, windowMs: 3600000 }), async (req, res) => {
+    const s = await planGate(req, res);
+    if (!s) return undefined;
+    if (s.sit.retest) return refuse(res, 409, 'PAPER_RETEST_OF_RETEST', 'Make a re-test from a paper sitting.');
+    const plan = buildPlan(s.doc, s.result);
+    const sat = await sittingPapers(s.accountId, s.now);
+    const built = buildRetest(docs, plan.items, sat);
+    if (!built.parts.length) return refuse(res, 409, 'PAPER_RETEST_EMPTY', 'No unseen paper part covers these topics on its own. Use the practice plan.', { fallbacks: built.fallbacks });
+    const out = await db.transaction(async () => {
+      const rows = await db.all("SELECT key,response_json FROM idempotency_keys WHERE account_id=? AND scope='paper-sitting' AND expires_at>?", [s.accountId, s.now]);
+      const same = rows.map(r => ({ id: r.key, ...JSON.parse(r.response_json) })).find(x => x.retest?.of === s.id);
+      if (same) return { id: same.id, resumed: true };
+      if (rows.length >= 200) return { full: true };
+      const id = randomUUID();
+      const sit = { paperId: RETEST_ID, scope: null, issuedAt: s.now, timer: 'off', retest: { of: s.id, parts: built.parts, fallbacks: built.fallbacks } };
+      await db.run(UPSERT, [s.accountId, 'paper-sitting', id, JSON.stringify(sit), digest(sit), s.now, s.now + KEEP]);
+      return { id, resumed: false };
+    }, { accountScope: s.accountId, lock: `paper-attempt:${s.accountId}` });
+    if (out.full) return refuse(res, 409, 'PAPER_ATTEMPTS_OPEN_LIMIT', 'Too many sittings are kept.');
+    req.params.attemptId = out.id;
+    const r = await sitting(req, res);
+    if (!r) return undefined;
+    return res.status(out.resumed ? 200 : 201).json({ attempt: view(r), resumed: out.resumed, fallbacks: built.fallbacks });
+  });
+  router.get('/attempts/:attemptId/comparison', rateLimit(db, 'paper-comparison', { limit: 600, windowMs: 3600000 }), async (req, res) => {
+    const s = await planGate(req, res);
+    if (!s) return undefined;
+    if (!s.sit.retest) return refuse(res, 409, 'PAPER_NOT_A_RETEST', 'This is not a re-test.');
+    const first = await readRow(db, s.accountId, 'paper-sitting', s.sit.retest.of, s.now);
+    const firstResult = await readRow(db, s.accountId, 'paper-result', s.sit.retest.of, s.now);
+    const firstDoc = first && docs.get(first.paperId);
+    if (!firstDoc || !firstResult) return refuse(res, 404, 'PAPER_ATTEMPT_NOT_FOUND', 'The first sitting is no longer kept.');
+    return res.json({ attemptId: s.id, firstAttemptId: s.sit.retest.of, outcomes: compare(firstDoc, firstResult, s.sit.retest, s.doc, s.result),
+      fallbacks: s.sit.retest.fallbacks || [], note: 'Marks the engine decided, per topic, on two different sets of questions. It is not a measure of learning and not a predicted mark.' });
   });
 
   // ── After submitting: how it is marked, the sample answer ──────────────────

@@ -9,17 +9,19 @@
 // the server reads and never serves as static files — described by
 // manifest.json (id, title, marks, pages, sha256 of each file).
 //
-// WHO MAY DOWNLOAD IS THE SERVER'S DECISION, from its own entitlement row:
-//   · signed-in verified student (guardian consent for a child), as every
-//     student-facing router;
-//   · Premium (capability 'premium-exams', serverEntitlementCapabilities: an
-//     active subscription or active trial) for every paper and every
-//     marking guideline, EXCEPT
-//   · a paper whose manifest entry says `sample: true` (paper and marking
-//     guidelines) is free for every signed-in account. Practice Paper 01 is the
-//     only free sample; Papers 02 to 13 (twelve of them) are Premium;
-//   · a free account still READS the list (titles, marks, pages).
-// Nothing the device sends (a header, a body, a query) is consulted.
+// WHO MAY DOWNLOAD. OWNER DECISION, 19 November 2026: "give original papers
+// away; sell the supported diagnosis and correction workflow". Every paper PDF
+// and every marking-guidelines PDF is FREE for any signed-in verified student
+// (guardian consent for a child), as every student-facing router. Sign-in is
+// kept so downloads can be counted; there is no entitlement check on a PDF.
+//
+// WHAT STAYS PREMIUM is the workflow, in paperAttempts.js: a manifest entry
+// with `sample: true` is the one paper (Practice Paper 01) that anyone may SIT
+// in the app, the taste; sitting any other paper, the practice plan made from a
+// sitting and the re-test need Premium (capability 'premium-exams',
+// serverEntitlementCapabilities), decided by the server's own entitlement row.
+// `sample` therefore gates the SITTING only, never a download. Nothing the
+// device sends (a header, a body, a query) is consulted.
 //
 // EDITION. Only a Prithagoras server offers these papers; any other edition
 // answers 404 PAPERS_NOT_AVAILABLE to both routes.
@@ -85,7 +87,7 @@ export function createPapersRouter(rawDb, { edition = serverEdition(process.env)
       papers: manifest.papers.map(p => ({
         id: p.id, title: p.title, course: p.course, yearLevel: p.yearLevel, marks: p.marks, workingTime: p.workingTime,
         pages: p.paper.pages, hasGuidelines: p.hasGuidelines === true, guidelinesPages: p.guidelines?.pages ?? null,
-        sample: p.sample === true, locked: !(premium || p.sample === true), inApp: docs.has(p.id)
+        sample: p.sample === true, sitLocked: !(premium || p.sample === true), inApp: docs.has(p.id)
       }))
     });
   });
@@ -98,15 +100,6 @@ export function createPapersRouter(rawDb, { edition = serverEdition(process.env)
     const entry = byId.get(id);
     const file = entry && kind ? entry[kind === 'paper' ? 'paper' : 'guidelines'] : null;
     if (!file) return notFound(res);
-    if (entry.sample !== true && !(await isPremium(req.platformSession.account_id))) {
-      return res.status(402).json({
-        error: {
-          code: 'PREMIUM_REQUIRED',
-          message: 'The Extension 1 practice papers are part of Pri Learning Premium. Practice papers marked as a sample are free.',
-          capability: PAPERS_CAPABILITY, plan: 'free', retryable: false
-        }
-      });
-    }
     const downloadName = `Prithagoras-Ext1-${entry.title.replace(/[^A-Za-z0-9]+/g, '-')}${kind === 'guidelines' ? '-Marking-Guidelines' : ''}.pdf`;
     res.set({
       'Content-Type': 'application/pdf',

@@ -147,8 +147,31 @@ export function promptFor(doc, leaf) {
   return text(chain.concat(find(leaf.question.parts, []) || []).flat());
 }
 
+/**
+ * The given objects of a part (public: they are in the question): every maths span of the stem and the prompts above the part that
+ * defines a function (f(x) = ...) or states an equation. Attached to the engine question as `givens`, so a line-by-line checker can read what the
+ * question gave. The line checker on main derives its meta from the key; the richer interpreter (train-editions-28, lineInterpreter/givens.js)
+ * reads the same spans from `prompt`; both are served by this one data, and neither is a new marker.
+ */
+export function givensOf(prompt) {
+  const out = [];
+  const seen = new Set();
+  for (const m of String(prompt || '').matchAll(/(?<!\\)\$((?:\\\$|[^$])+?)(?<!\\)\$/g)) {
+    const tex = m[1].trim();
+    if (!tex.includes('=') || seen.has(tex) || tex.length > 200) continue;
+    seen.add(tex);
+    out.push({ kind: /^[a-zA-Z]\s*(\([a-z]\))?\s*=/.test(tex) && /\([a-z]\)\s*=/.test(tex) ? 'function' : 'equation', tex });
+  }
+  return out;
+}
+
 /** The engine question for a keyed part (the key never leaves the server). null when the part has no key. */
 export function engineQuestion(doc, leaf) {
+  const q = engineQuestionCore(doc, leaf);
+  return q ? { ...q, givens: givensOf(q.prompt) } : null;
+}
+
+function engineQuestionCore(doc, leaf) {
   const { part } = leaf;
   const key = part.key;
   if (!key) return null;

@@ -27,6 +27,7 @@ import Blocks from './PaperBlocks.jsx';
 import PaperAnswer, { PaperChoice } from './PaperAnswer.jsx';
 import PaperTimer from './PaperTimer.jsx';
 import { answerToTex } from '../engine/answerTex.js';
+import PaperNext from './PaperNext.jsx';
 import { failureKey, loadSitting, loadSolution, saveAnswers, submitSitting } from './paperApi.js';
 import './paper.css';
 
@@ -66,7 +67,7 @@ function Solution({ attemptId, part, solutions, ask }) {
   );
 }
 
-function HowMarked({ part, solutions, ask }) {
+function HowMarked({ part, solutions, ask, row }) {
   const t = useT();
   const s = solutions[part.id];
   const [open, setOpen] = useState(false);
@@ -74,7 +75,8 @@ function HowMarked({ part, solutions, ask }) {
     <details className="pp-how" open={open} onToggle={e => { setOpen(e.currentTarget.open); if (e.currentTarget.open) ask(part.id); }} data-paper-how={part.id}>
       <summary>{t('paper.res.howMarked')}</summary>
       {s && typeof s === 'object'
-        ? <ul className="pp-criteria">{s.howMarked.map((c, i) => <li key={i}>{c.marks != null && <strong className="pp-crit-marks">{marksWord(t, c.marks)}</strong>}<Blocks blocks={c.text} inline /></li>)}</ul>
+        ? <ul className="pp-criteria">{s.howMarked.map((c, i) => <li key={i} data-paper-criterion={row?.criteria?.[i]?.status || undefined}>{c.marks != null && <strong className="pp-crit-marks">{marksWord(t, c.marks)}</strong>}<Blocks blocks={c.text} inline />
+          {row?.criteria?.[i] && <span className="muted pp-crit-status"> · {t(`paper.crit.${row.criteria[i].status}`)}</span>}</li>)}</ul>
         : <p className="muted" role="status">{s === 'failed' ? t('paper.res.sampleFailed') : t('paper.res.loadingSample')}</p>}
     </details>
   );
@@ -96,6 +98,9 @@ function Verdict({ part, row, answer }) {
       {row.checks === 'pri' && part.marks > row.autoMarks && <p className="muted">{t('paper.res.restSelf', { n: part.marks - row.autoMarks })}</p>}
       {row.checks === 'self' && <p className="muted">{t('paper.res.selfMarks', { n: part.marks })}</p>}
       {row.feedback && row.verdict !== 'correct' && <p className="muted">{row.feedback}</p>}
+      {row.working && <p className="muted" data-paper-working-lines={row.working.read ? 'read' : 'unread'}>
+        {row.working.read ? t('paper.res.workingRead', { verified: row.working.verified, n: row.working.lines.length }) : t('paper.res.workingUnread')}
+        {row.working.firstBreak >= 0 && ` ${t('paper.res.workingBreak', { line: row.working.firstBreak + 1 })}`}</p>}
       {answer?.text && part.answerType !== 'mcq' && (
         <p className="pp-yours"><span className="muted">{t('paper.res.yours')} </span>{answer.mode === 'typed' && part.checks === 'pri' ? <MathText text={answerToTex(answer.text)} /> : <span className="pp-yours-text">{answer.text}</span>}</p>
       )}
@@ -273,6 +278,7 @@ export default function PaperSitting() {
           <p className="pp-totals" data-paper-totals>{t('paper.totals', { count: totals.autoAvailable, awarded: totals.autoAwarded, available: totals.autoAvailable, selfChecked: totals.selfChecked })}</p>
           <p className="muted">{t('paper.res.totalsNote', { total: totals.total })}</p>
           {totals.emptyParts > 0 && <p className="muted">{t('paper.res.emptyParts', { n: totals.emptyParts })}</p>}
+          <PaperNext attemptId={attemptId} paperId={attempt.paperId} />
         </section>
       )}
 
@@ -344,7 +350,7 @@ function Parts({ parts, depth, attemptId, answers, change, register, disabled, r
                       <Verdict part={part} row={result.parts[part.id]} answer={answers[part.id]} />
                       <div className="pp-after-row">
                         <Solution attemptId={attemptId} part={part} solutions={solutions} ask={ask} />
-                        <HowMarked part={part} solutions={solutions} ask={ask} />
+                        <HowMarked part={part} solutions={solutions} ask={ask} row={result.parts[part.id]} />
                       </div>
                     </>
                   )}

@@ -1052,7 +1052,7 @@
         "content": "Functions and calculus: area",
         "outcomes": [
          "ME1-12-03",
-         "12-04; MA-C3"
+         "ME1-12-04"
         ]
        },
        "figures": [],
@@ -1459,7 +1459,7 @@
           "content": "Inverse tangent; maximising an angle; circle tangent to the $x$-axis",
           "outcomes": [
            "ME1-12-03",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1516,7 +1516,7 @@
           "content": "Inverse tangent; maximising an angle; circle tangent to the $x$-axis",
           "outcomes": [
            "ME1-12-03",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -1564,7 +1564,7 @@
           "content": "Inverse tangent; maximising an angle; circle tangent to the $x$-axis",
           "outcomes": [
            "ME1-12-03",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -2033,7 +2033,7 @@
           "content": "Multiple zeros of polynomials; derivatives; inequalities",
           "outcomes": [
            "ME1-11-02",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -2081,7 +2081,7 @@
           "content": "Multiple zeros of polynomials; derivatives; inequalities",
           "outcomes": [
            "ME1-11-02",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -2134,7 +2134,7 @@
           "content": "Multiple zeros of polynomials; derivatives; inequalities",
           "outcomes": [
            "ME1-11-02",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],

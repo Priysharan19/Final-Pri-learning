@@ -285,10 +285,20 @@ export function parseGuidelines(tex) {
   const mapping = {};
   if (mappingAt >= 0) {
     for (const row of s.slice(mappingAt).matchAll(/(?:^|\\hline)\s*(\d{1,2}(?:\s*\([a-z]\))?(?:\s*\([ivx]+\))?)\s*&\s*(\d+)\s*&([^&]*)&([^&]*)&([^&\\]*)\\\\/g)) {
-      mapping[idOfHeading(row[1])] = { marks: Number(row[2]), content: inlineStrip(row[3]), outcomes: inlineStrip(row[4]).split(/,\s*/).filter(Boolean), band: inlineStrip(row[5]) };
+      mapping[idOfHeading(row[1])] = { marks: Number(row[2]), content: inlineStrip(row[3]), outcomes: normalizeOutcomes(inlineStrip(row[4])), band: inlineStrip(row[5]) };
     }
   }
   return { keys, reasoning, entries, mapping, notes: [...notes] };
+}
+/** Syllabus outcomes as the mapping grid writes them: "ME1-11-01, 11-03" and "ME1-12-04; MA-C3" become ["ME1-11-01","ME1-11-03"] and ["ME1-12-04"]. */
+export function normalizeOutcomes(text) {
+  const out = [];
+  for (const raw of String(text).split(/[;,]\s*/)) {
+    const t = raw.trim().replace(/\s+/g, '');
+    const code = /^\d{2}-\d{2}$/.test(t) ? `ME1-${t}` : t;
+    if (/^ME1-\d{2}-\d{2}$/.test(code) && !out.includes(code)) out.push(code);
+  }
+  return out;
 }
 const inlineStrip = t => toBlocks(t).map(b => b.t || '').join(' ').trim();
 

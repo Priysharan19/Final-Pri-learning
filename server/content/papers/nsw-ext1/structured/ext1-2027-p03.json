@@ -571,7 +571,7 @@
         "content": "Inverse trigonometric functions; differentiation",
         "outcomes": [
          "ME1-12-03",
-         "12-04"
+         "ME1-12-04"
         ]
        }
       }
@@ -1097,7 +1097,7 @@
         "content": "Inverse trigonometric functions; trigonometric equations",
         "outcomes": [
          "ME1-12-03",
-         "11-03"
+         "ME1-11-03"
         ]
        },
        "figures": [],
@@ -1239,7 +1239,7 @@
         "content": "Binomial distribution; expected value; binomial coefficients",
         "outcomes": [
          "ME1-12-06",
-         "11-04"
+         "ME1-11-04"
         ]
        },
        "figures": [],
@@ -1309,7 +1309,7 @@
         "content": "Differential equations; inverse trigonometric functions",
         "outcomes": [
          "ME1-12-05",
-         "12-03"
+         "ME1-12-03"
         ]
        },
        "figures": [],
@@ -1475,7 +1475,7 @@
         "content": "Volumes of solids of revolution; inverse functions",
         "outcomes": [
          "ME1-12-05",
-         "12-04"
+         "ME1-12-04"
         ]
        },
        "figures": [
@@ -1964,7 +1964,7 @@
           "content": "Tangents to polynomial curves; multiple zeros; areas",
           "outcomes": [
            "ME1-11-02",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -2025,7 +2025,7 @@
           "content": "Tangents to polynomial curves; multiple zeros; areas",
           "outcomes": [
            "ME1-11-02",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -2078,7 +2078,7 @@
           "content": "Tangents to polynomial curves; multiple zeros; areas",
           "outcomes": [
            "ME1-11-02",
-           "12-04"
+           "ME1-12-04"
           ]
          },
          "figures": [],
@@ -2393,7 +2393,7 @@
           "content": "Binomial probability; expected value; optimisation and inequalities using calculus",
           "outcomes": [
            "ME1-12-06",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2474,7 +2474,7 @@
           "content": "Binomial probability; expected value; optimisation and inequalities using calculus",
           "outcomes": [
            "ME1-12-06",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
@@ -2540,7 +2540,7 @@
           "content": "Binomial probability; expected value; optimisation and inequalities using calculus",
           "outcomes": [
            "ME1-12-06",
-           "12-05"
+           "ME1-12-05"
           ]
          },
          "figures": [],
