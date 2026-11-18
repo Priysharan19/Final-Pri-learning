@@ -431,7 +431,7 @@ try {
     //   · in curriculum.js: only subtopic entries, dot-point form rows, comments, the authored-weight
     //     constant and an extended CODES table (shapes above); no other line may be added or removed.
     const untracked = new Set(untrackedIn(PROTECTED));
-    const existsBefore = file => ranges.every(([from]) => !!git(['ls-tree', from.replace(/\^$/, '^'), '--', file]));
+    const existsBefore = file => ranges.every(([from]) => !!git(['ls-tree', from, '--', file]));
     const diffLines = file => diff(['-U0'], [file]).split('\n').filter(l => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
     const allowed = [];
     const blocked = changed.split('\n').filter(Boolean).filter(file => {

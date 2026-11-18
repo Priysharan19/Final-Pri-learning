@@ -10,8 +10,6 @@ export function makeAdvancedVisual(kind,p){
  const V=(a,b)=>({kind:'value',expr:String(a),answer:String(b)});
  const P=arr=>({kind:'values',pairs:arr.map(([a,b])=>[String(a),String(b)])});
  const pt=(id,xy)=>({id,x:xy[0],y:xy[1],label:id});
- const gcd=(a,b)=>b?gcd(b,a%b):Math.abs(a);
- const fraction=(a,b)=>{const d=gcd(a,b);return `${a/d}/${b/d}`};
  const done=(q,steps,answer,verify,figure)=>{if(!figure.description||steps.length<3)throw Error('incomplete diagram question');return{question:(p.context?p.context+': ':'')+q,steps,answer:String(answer),verify,figure}};
  if(kind==='venn'){
   const {a,b,ab,out=0,mode='union'}=p; if([a,b,ab,out].some(x=>!Number.isInteger(x)||x<0))throw Error('invalid set');
