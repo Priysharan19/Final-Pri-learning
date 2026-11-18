@@ -192,6 +192,7 @@ try {
   await page.locator('[data-paper-part="q12b-iii"]').scrollIntoViewIfNeeded();
   await page.locator('[data-paper-part="q12b-iii"] [data-paper-mode="photo"]').click();
   await page.locator('[data-paper-part="q12b-iii"] [data-paper-photo]').setInputFiles({ name: 'answer.png', mimeType: 'image/png', buffer: png(640, 360) });
+  await page.waitForTimeout(6000); console.log('DEBUG photo:', (await page.locator('[data-paper-part="q12b-iii"] .pp-photo').innerText()).replace(/\s+/g, ' '), JSON.stringify(platform.reader.requests.length), JSON.stringify(platform.reader.refused));
   await page.locator('[data-paper-part="q12b-iii"] [data-paper-reading]').waitFor({ timeout: 30000 });
   check('PHOTO: the reading of the picture is shown for the student to confirm, in the final-answer box', (await page.locator('[data-paper-part="q12b-iii"] [data-paper-final]').inputValue()) === '4*sqrt(3)+2*pi/3-8');
   await page.locator('[data-paper-part="q12b-iii"] [data-paper-keep]').click();
