@@ -23,7 +23,7 @@ const BANNED = [/Asia\/Kolkata/, /en-IN/, /\+91/, /हिन्दी/];
 const FILES = [
   'pages/SettingsLegacy.jsx', 'pages/GuardianConsent.jsx', 'pages/AccountDeleteRequest.jsx', 'pages/Legal.jsx',
   'pages/Classes.jsx', 'insights/Insights.jsx', 'parent/ParentReport.jsx', 'plan/usePlan.js',
-  'local/entitlementGate.js', 'components/CloudAccountPanel.jsx', 'components/SignUpFlow.jsx', 'components/AccountActivationGate.jsx'
+  'local/entitlementGate.js', 'pages/Ext1Papers.jsx', 'components/CloudAccountPanel.jsx', 'components/SignUpFlow.jsx', 'components/AccountActivationGate.jsx'
 ];
 
 for (const f of FILES) {
@@ -54,6 +54,17 @@ check('the phone channel and its calling code come from the edition; the guardia
   assert.match(read('pages/GuardianConsent.jsx'), /\{smsOffered\(\) && <div className="signup-segment signup-channel"/);
   for (const f of ['components/SignUpFlow.jsx', 'components/AccountActivationGate.jsx']) assert.match(read(f), /result\.channels\.sms === true && smsOffered\(\)/, f);
   assert.match(read('platform/edition.js'), /smsOffered = \(\) => EDITION_RECORD\.region === 'IN'/);
+});
+
+check('the Extension 1 papers section on the Exams page is NSW-only and says nothing of Class, India or CBSE', () => {
+  assert.match(code('pages/Ext1Papers.jsx'), /user\.course === 'nsw' && user\.pathway === 'ext1'/);
+  assert.match(code('pages/Exams.jsx'), /ext1PapersFor\(user\) && <Ext1Papers \/>/);
+  const en = read('i18n/strings.en.js');
+  const keys = [...en.matchAll(/^\s*'(papers\.ext1\.[^']+)':\s*(['"])(.*?)\2,?\s*$/gm)];
+  assert.ok(keys.length >= 15, 'the papers.ext1.* strings are found');
+  for (const [, key, , text] of keys) assert.ok(!/\bClass\b|India|CBSE|NCERT|JEE|₹|Rs\./i.test(text), `${key} carries India or Class wording: ${text}`);
+  const manifest = readFileSync(fileURLToPath(new URL('../../server/content/papers/nsw-ext1/manifest.json', here)), 'utf8');
+  assert.ok(!/\bClass\b|India|CBSE|NCERT/.test(manifest), 'the paper manifest titles carry no India or Class wording');
 });
 
 if (failures.length) { console.error(failures.join('\n')); console.error(`AU NO INDIA SURFACE: FAIL ${failures.length}`); process.exit(1); }
