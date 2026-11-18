@@ -314,9 +314,9 @@ function extraSolutionDiagnosis(variable, root) {
 function droppedConstraintDiagnosis() {
   return {
     code: 'constraint-dropped',
-    title: 'The equation lost its constraint',
-    message: 'This line is true for every value, so it no longer carries the restriction from the equation above.',
-    fix: 'A valid step must preserve the same solution set; do not replace the equation by an identity such as 0 = 0.',
+    title: 'This line is true for every value',
+    message: 'This line is true for every value of the letter, so it can no longer tell you which values solve the equation.',
+    fix: 'Keep an equation that is true only for the answers, such as 3x = 15, rather than one that is always true, such as 0 = 0.',
     confidence: 'high'
   };
 }
