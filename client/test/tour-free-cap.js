@@ -5,7 +5,7 @@
 // the free plan is decided there, per account: a modified client, a cleared
 // device or a second device changes nothing. These journeys drive the shipped
 // client in a browser against the real platform server with the cap at its
-// SHIPPED DEFAULT of twenty (every other browser suite runs with it raised by
+// deployment cap of twenty (owner decision 2026-11-18: no longer the shipped default; every other browser suite runs with it raised by
 // configuration so a skipping flow is never read as a fault):
 //
 //   1. A student's other device has used nineteen of today's questions (the
@@ -277,9 +277,12 @@ export const capAtCheck = {
 export const flows = [capScreen, capAtCheck];
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
-  // Boot the platform before the runner does, with the cap at its shipped
-  // default: these journeys are about the twenty, so the twenty it is.
-  await onlinePlatform({ env: { PRI_FREE_PRACTICE_PER_DAY: null } });
+  // Boot the platform before the runner does, with the cap at twenty: these
+  // journeys are about the twenty. Owner decision 2026-11-18: the active
+  // packaging (value-2026-11) no longer caps free practice, so the twenty is now
+  // the deployment's own cap (PRI_FREE_PRACTICE_PER_DAY=20, the superseded d19-d20
+  // figure) rather than the shipped default (null). Same cap, same assertions.
+  await onlinePlatform({ env: { PRI_FREE_PRACTICE_PER_DAY: '20' } });
   const { runFlows } = await import('./e2e.mjs');
   process.exit(await runFlows(flows) ? 1 : 0);
 }

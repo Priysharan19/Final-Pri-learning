@@ -65,8 +65,13 @@ function premium(db, id, now = NOW) {
 }
 
 // ── 1 · which packaging is enforced ────────────────────────────────────────
-c.eq(ACTIVE_PACKAGING_ID, 'd19-d20', 'the owner\'s current packaging (D19 / D20) stays active until the proposal is approved');
-c.eq(PACKAGINGS['value-2026-11'].status, 'proposed', 'the value packaging is a proposal');
+// Owner decision 2026-11-18: value-2026-11 is approved with Free 5 and Premium 50 reads a
+// day (the proposal said 10 and 100); d19-d20 is superseded but stays defined.
+c.eq(ACTIVE_PACKAGING_ID, 'value-2026-11', 'the owner approved the value packaging on 2026-11-18 and it is the active one');
+c.eq(PACKAGINGS['value-2026-11'].status, 'current', 'the value packaging is the current one');
+c.eq(PACKAGINGS['d19-d20'].status, 'superseded', 'D19 / D20 is superseded, and still defined');
+c.deq([PACKAGING.free.practicePerDay, PACKAGING.free.readsPerDay, PACKAGING.premium.readsPerDay, PACKAGING.free.examsPerWindow, PACKAGING.free.examWindowDays], [null, 5, 50, 1, 30],
+  'the approved numbers: Free uncapped practice, 5 reads and 5 photos a day, one exam per 30 days; Premium 50 and 50');
 c.deq([FREE_PRACTICE_ALLOWANCE.perDay, READ_ALLOWANCE.free, READ_ALLOWANCE.premium, FREE_EXAM_ALLOWANCE.examsPerWindow, FREE_EXAM_ALLOWANCE.examWindowDays],
   [PACKAGING.free.practicePerDay, PACKAGING.free.readsPerDay, PACKAGING.premium.readsPerDay, PACKAGING.free.examsPerWindow, PACKAGING.free.examWindowDays],
   'every enforced allowance is read from the active packaging, in one place');
