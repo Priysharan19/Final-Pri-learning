@@ -1,0 +1,2478 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p09",
+ "paperNumber": 9,
+ "title": "Practice Paper 9",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "9b07c684abc14f7a25c5254d7fc7294f27ae1dbdacfefb0e3e29f71296269107"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the range of the function $y = 3\\sin^{-1}\\!\\left(\\dfrac{x}{4}\\right) + 9$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$9 \\le y \\le 3\\pi + 9$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{3\\pi}{2} + 9 \\le y \\le \\dfrac{3\\pi}{2} + 9$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-3\\pi + 9 \\le y \\le 3\\pi + 9$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{\\pi}{2} + 9 \\le y \\le \\dfrac{\\pi}{2} + 9$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\sin^{-1}$ takes every value from $-\\dfrac{\\pi}{2}$ to $\\dfrac{\\pi}{2}$, so $3\\sin^{-1}\\left(\\dfrac{x}{4}\\right)$ takes every value from $-\\dfrac{3\\pi}{2}$ to $\\dfrac{3\\pi}{2}$. Add 9."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; range",
+        "outcomes": [
+         "ME1-12-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Which graph shows the curve with parametric equations $x = \\cos 3t$, $y = \\sin 4t$ for $0 \\le t \\le 2\\pi$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ2OptA"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ2OptB"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ2OptC"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ2OptD"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The curve meets the line $x = 1$ where $\\cos 3t = 1$, and the line $y = 1$ where $\\sin 4t = 1$. Working out the points gives 3 points on $x = 1$ and 4 points on $y = 1$, which matches only graph B."
+        }
+       ],
+       "classification": {
+        "content": "Parametric equations; sketching curves",
+        "outcomes": [
+         "ME1-11-01"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many subsets of $\\{1, 2, 3, \\ldots, 11\\}$ have exactly 4 elements, no two of which are consecutive integers?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "35"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "126"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "70"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "56"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Write the chosen numbers as $a_1 < a_2 < \\cdots < a_{4}$ and let $b_i = a_i - (i - 1)$. The condition $a_{i+1} \\ge a_i + 2$ becomes $b_{i+1} > b_i$, and the $b_i$ are any 4 different numbers from $1$ to $8$. So there are $\\dbinom{8}{4} = 70$ subsets."
+        }
+       ],
+       "classification": {
+        "content": "Combinations; choosing with gaps",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The polynomial $x^4 - 864x + c$ has a repeated zero."
+      },
+      {
+       "k": "p",
+       "t": "What is the value of $c$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$3888$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$1296$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$5184$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$2592$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "A repeated zero is a zero of the derivative $4x^3 - 864$, whose only real zero is $x = 6$. Then $1296 - 5184 + c = 0$, so $c = 3888$."
+        }
+       ],
+       "classification": {
+        "content": "Multiple zeros of polynomials",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "How many solutions does the equation $\\sin 4x = \\sin x$ have for $0 \\le x \\le 2\\pi$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "8"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "10"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "9"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "6"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\sin A = \\sin B$ exactly when $A = B + 2k\\pi$ or $A = \\pi - B + 2k\\pi$. So $x = \\dfrac{2k\\pi}{3}$, giving 4 values in $[0, 2\\pi]$, or $x = \\dfrac{(2k + 1)\\pi}{5}$, giving 5 values. No value is counted twice. There are 9 solutions."
+        }
+       ],
+       "classification": {
+        "content": "Trigonometric equations; general solutions",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The random variable $X$ has a binomial distribution with mean $4$ and variance $\\dfrac{16}{5}$."
+      },
+      {
+       "k": "p",
+       "t": "Which of the following gives the parameters of the distribution?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n = 5$, $p = \\dfrac{4}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n = 40$, $p = \\dfrac{1}{10}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n = 20$, $p = \\dfrac{1}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n = 21$, $p = \\dfrac{1}{5}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$np = 4$ and $np(1 - p) = \\dfrac{16}{5}$, so $1 - p = \\dfrac{\\dfrac{16}{5}}{4}$, giving $p = \\dfrac{1}{5}$ and $n = 4 \\div \\dfrac{1}{5} = 20$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial distribution; mean and variance",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Let $\\underset{\\sim}{a} = 2\\underset{\\sim}{i} - 5\\underset{\\sim}{j}$ and $\\underset{\\sim}{b} = -\\underset{\\sim}{i} - 5\\underset{\\sim}{j}$."
+      },
+      {
+       "k": "p",
+       "t": "For which value of $t$ is $\\underset{\\sim}{a} + t\\,\\underset{\\sim}{b}$ perpendicular to $\\underset{\\sim}{a} - \\underset{\\sim}{b}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-2$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$- \\dfrac{3}{13}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{29}{26}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$2$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\left(\\underset{\\sim}{a} + t\\,\\underset{\\sim}{b}\\right)\\cdot\\left(\\underset{\\sim}{a} - \\underset{\\sim}{b}\\right) = \\underset{\\sim}{a}\\cdot(\\underset{\\sim}{a} - \\underset{\\sim}{b}) + t\\,\\underset{\\sim}{b}\\cdot(\\underset{\\sim}{a} - \\underset{\\sim}{b}) = 6 - 3 t = 0$, so $t = 2$."
+        }
+       ],
+       "classification": {
+        "content": "Vectors; scalar product and perpendicularity",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A fish population $P$ satisfies $\\dfrac{dP}{dt} = \\dfrac{1}{5}\\,P\\left(1 - \\dfrac{P}{800}\\right) - h$, where $h \\ge 0$ is the constant rate at which fish are caught."
+      },
+      {
+       "k": "p",
+       "t": "What is the greatest value of $h$ for which there is a population size that stays constant?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$40$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$80$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$160$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$200$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "A constant population needs $\\dfrac{dP}{dt} = 0$, that is, $h = \\dfrac{1}{5}\\,P\\left(1 - \\dfrac{P}{800}\\right)$. The right-hand side is a quadratic in $P$ with greatest value at $P = 400$, where it equals $40$. So $h$ can be at most $40$."
+        }
+       ],
+       "classification": {
+        "content": "Logistic models with harvesting; equilibrium solutions",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Two particles are projected at the same instant from the same point, with the same speed, at angles of $30^\\circ$ and $65^\\circ$ to the horizontal. While both are in flight, the line joining them makes a constant acute angle with the horizontal."
+      },
+      {
+       "k": "p",
+       "t": "What is this angle?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$47.5^\\circ$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$17.5^\\circ$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$72.5^\\circ$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$42.5^\\circ$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The positions differ by $Vt(\\cos\\beta - \\cos\\alpha)\\underset{\\sim}{i} + Vt(\\sin\\beta - \\sin\\alpha)\\underset{\\sim}{j}$ (the $\\tfrac12gt^2$ terms cancel). This is a multiple of $-\\sin\\tfrac{\\alpha + \\beta}{2}\\,\\underset{\\sim}{i} + \\cos\\tfrac{\\alpha + \\beta}{2}\\,\\underset{\\sim}{j}$, which is perpendicular to the direction at angle $\\tfrac{\\alpha + \\beta}{2} = 47.5^\\circ$. So the line makes an angle of $90^\\circ - 47.5^\\circ = 42.5^\\circ$ with the horizontal."
+        }
+       ],
+       "classification": {
+        "content": "Projectile motion in vector form; relative position",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The tangent to the curve $y = e^{6x}$ at the point where $x = 3$ meets the $x$-axis at $P$."
+      },
+      {
+       "k": "p",
+       "t": "What is the $x$-coordinate of $P$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{19}{6}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-3$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{17}{6}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "At $x = 3$, $y = e^{18}$ and $y' = 6e^{18}$, so the tangent meets $y = 0$ where $x = 3 - \\dfrac{1}{6} = \\dfrac{17}{6}$."
+        }
+       ],
+       "classification": {
+        "content": "Tangents; derivatives of powers and exponentials",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find $y$ as a function of $x$, given that $\\dfrac{dy}{dx} = \\left(1 + y^2\\right)\\cos x$ and $y(0) = 0$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct function"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Integrates both sides correctly"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Separates the variables"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\displaystyle\\int\\frac{dy}{1 + y^2} = \\int\\cos x\\,dx$ gives $\\tan^{-1}y = \\sin x + C$. At $x = 0$, $C = \\tan^{-1}0$. Hence $y = \\tan(\\sin x)$."
+        }
+       ],
+       "classification": {
+        "content": "Separable differential equations",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       },
+       "figures": [],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "tan(sin(x))",
+        "display": "y=\\tan(\\sin x)"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p09.py: RK4 integration of dy/dx=(1+y^2)cos x, y(0)=0 vs tan(sin x) at 8 points in [-3,3], max err < 1e-9"
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Prove by mathematical induction that $8^{n+1} - 7n - 8$ is divisible by $49$ for all integers $n \\ge 1$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct proof"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case and makes substantial progress with the inductive step"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Verifies the base case"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "When $n = 1$ the expression is $49$, which is divisible by $49$. Assume that the expression for $n = k$ equals $49M$ for an integer $M$. Then for $n = k + 1$: $8^{k+2} - 7(k + 1) - 8 = 8\\left(8^{k+1} - 7k - 8\\right) + 49k + 49 = 392M + 49k + 49$, which is divisible by $49$. So the result holds for $n = k + 1$, and hence for all $n \\ge 1$ by mathematical induction."
+        }
+       ],
+       "classification": {
+        "content": "Proof by induction; divisibility",
+        "outcomes": [
+         "ME1-12-01"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $f(x) = (x + 3)^2 - 3$ for $x \\ge -3$, and let $f^{-1}$ be its inverse function."
+        },
+        {
+         "k": "p",
+         "t": "Find the coordinates of the points where the graphs of $y = f(x)$ and $y = f^{-1}(x)$ meet."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides both points with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Explains why the graphs meet only on $y = x$, or solves $f(x) = x$ correctly"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Sets up a correct equation"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$f$ is increasing for $x \\ge -3$. If $f(a) = b$ and $f^{-1}(a) = b$ then $f(b) = a$; if $a < b$ then $f(a) < f(b)$, that is, $b < a$, which is impossible, and similarly $a > b$ is impossible. So the graphs meet only on the line $y = x$, where $f(x) = x$: $x^2 + 5 x + 6 = 0$, so $(x + 3)(x + 2) = 0$. Both values satisfy $x \\ge -3$, so the points are $(-3, -3)$ and $(-2, -2)$."
+        }
+       ],
+       "classification": {
+        "content": "Inverse functions; intersections with the inverse",
+        "outcomes": [
+         "ME1-11-01"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find the least value of $3\\sin^2 x - 4\\sin x\\cos x - \\cos^2 x$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the expression in the form $A + R\\cos(2x - \\alpha)$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Uses double-angle results to rewrite the expression"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Using $\\sin^2 x = \\tfrac12(1 - \\cos 2x)$, $\\cos^2 x = \\tfrac12(1 + \\cos 2x)$ and $\\sin x\\cos x = \\tfrac12\\sin 2x$, the expression is $1 -2\\cos 2x - 2\\sin 2x$. Now $-2\\cos 2x - 2\\sin 2x = 2 \\sqrt{2}\\cos(2x - \\alpha)$ for a suitable angle $\\alpha$, and $\\cos(2x - \\alpha)$ takes every value from $-1$ to $1$. So the least value is $1 - 2 \\sqrt{2}$."
+        }
+       ],
+       "classification": {
+        "content": "Double-angle results; auxiliary angle; extreme values",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "1-2*sqrt(2)",
+        "display": "1-2\\sqrt2"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p09.py: fine-grid then golden-section minimum of 3sin^2x-4sinx cosx-cos^2x over [0,2pi]: -1.828427125"
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Use the substitution $u = x^2 + 4$ to find the exact value of $\\displaystyle\\int_{0}^{3}\\frac{x^3}{\\sqrt{x^2 + 4}}\\,dx$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct exact value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains a correct primitive in terms of $u$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Transforms the integral and the limits correctly"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Changing the variable and the limits, the integral becomes"
+        },
+        {
+         "k": "math",
+         "t": "\\frac12\\int_{4}^{13}\\frac{u - 4}{\\sqrt{u}}\\,du = \\left[\\frac13u^{\\frac32} - 4u^{\\frac12}\\right]_{4}^{13} = \\dfrac{\\sqrt{13}}{3} + \\dfrac{16}{3}."
+        }
+       ],
+       "classification": {
+        "content": "Integration by substitution",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "(16+sqrt(13))/3",
+        "display": "\\dfrac{16+\\sqrt{13}}{3}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p09.py: mpmath quadrature of the original integral to 30 digits"
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The points $A$, $B$ and $C$ are $(-4, 0)$, $(-3, -2)$ and $(4, 5)$."
+        },
+        {
+         "k": "p",
+         "t": "Use vectors to find the coordinates of the point $P$ on the line $AB$ that is closest to $C$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct coordinates"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the projection of $\\overrightarrow{AC}$ onto $\\overrightarrow{AB}$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $\\overrightarrow{AB}$ and $\\overrightarrow{AC}$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\overrightarrow{AB} = \\underset{\\sim}{i} - 2\\underset{\\sim}{j}$ and $\\overrightarrow{AC} = 8\\underset{\\sim}{i} + 5\\underset{\\sim}{j}$. The closest point is the foot of the perpendicular from $C$, $\\overrightarrow{AP} = \\dfrac{\\overrightarrow{AC}\\cdot\\overrightarrow{AB}}{\\left|\\overrightarrow{AB}\\right|^2}\\overrightarrow{AB} = \\dfrac{-2}{5}\\overrightarrow{AB}$. So $P$ is $(- \\dfrac{22}{5}, \\dfrac{4}{5})$."
+        }
+       ],
+       "classification": {
+        "content": "Vector projections; closest point on a line",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "point",
+        "x": -4.4,
+        "y": 0.8,
+        "display": "\\left(-\\dfrac{22}{5},\\ \\dfrac45\\right)"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p09.py: minimisation of |A+t(B-A)-C|^2 over t (SymPy exact)"
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The random variable $X$ has a binomial distribution with mean $\\dfrac{11}{4}$. It is given that $P(X = 2) = P(X = 3)$."
+        },
+        {
+         "k": "p",
+         "t": "Find the number of trials $n$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value of $n$"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains an equation in $n$ alone"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $p$ in terms of $n$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the two probabilities correctly"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Equating $\\dbinom{n}{2}p^{2}(1 - p)^{n - 2}$ and $\\dbinom{n}{3}p^{3}(1 - p)^{n - 3}$ gives $(n - 2)p = 3(1 - p)$, so $p = \\dfrac{3}{n + 1}$. Then $np = \\dfrac{3n}{n + 1} = \\dfrac{11}{4}$, which gives $n = 11$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial probabilities and mean",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 11,
+        "display": "11"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p09.py: exact Fractions: for n=3..200 with p=11/(4n), P(X=2)=P(X=3) holds only for n=11"
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A ball is thrown from a point $O$ at the top of a vertical cliff of height $5$ m above flat ground, with speed $20$ m s$^{-1}$ at an angle $\\theta$ above the horizontal, where $0 \\le \\theta < \\dfrac{\\pi}{2}$. Take $g = 10$ m s$^{-2}$. Its position relative to $O$ at time $t$ is $20t\\cos\\theta\\,\\underset{\\sim}{i} + \\left(20t\\sin\\theta - 5t^2\\right)\\underset{\\sim}{j}$. It lands at a horizontal distance $R$ from the foot of the cliff."
+        },
+        {
+         "k": "fig",
+         "name": "figpprojectilestowergreatestrangehjbbdcedtower"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $\\ -5 = R\\tan\\theta - \\dfrac{1}{80}R^2\\left(1 + \\tan^2\\theta\\right)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the time of flight in terms of $R$ and $\\theta$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The ball lands when $20t\\cos\\theta = R$, that is, $t = \\dfrac{R}{20\\cos\\theta}$, and then its height relative to $O$ is $-5$: $\\ -5 = R\\tan\\theta - \\dfrac{5R^2}{400\\cos^2\\theta} = R\\tan\\theta - \\dfrac{1}{80}R^2\\left(1 + \\tan^2\\theta\\right)$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; greatest range from a height; quadratics",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "By considering this as a quadratic equation in $\\tan\\theta$, find the greatest possible value of $R$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct greatest value"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses the condition that the discriminant is non-negative"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the equation as a quadratic in $\\tan\\theta$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "With $T = \\tan\\theta$: $\\ \\dfrac{1}{80}R^2T^2 - RT + \\dfrac{1}{80}R^2 - 5 = 0$. A real value of $T$ exists exactly when the discriminant is non-negative: $R^2 - 4 \\times \\dfrac{1}{80}R^2\\left(\\dfrac{1}{80}R^2 - 5\\right) \\ge 0$, that is, $1 - 4 \\times \\dfrac{1}{80}\\left(\\dfrac{1}{80}R^2 - 5\\right) \\ge 0$, so $R^2 \\le 2000$. The greatest value is $R = 20 \\sqrt{5}$ m."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; greatest range from a height; quadratics",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 44.721359549995796,
+          "display": "20\\sqrt5"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: landing range from y(t)=-5 maximised over theta in [0,pi/2) (golden section): 44.72135955"
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the value of $\\tan\\theta$ that gives this greatest value."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses the repeated root $T = -\\dfrac{b}{2a}$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that the quadratic has a repeated root"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "For the greatest $R$ the quadratic has a repeated root $T = \\dfrac{R}{2 \\times \\dfrac{1}{80}R^2} = \\dfrac{1}{2 \\times \\dfrac{1}{80} R} = \\dfrac{2 \\sqrt{5}}{5}$."
+          }
+         ],
+         "classification": {
+          "content": "Projectile motion; greatest range from a height; quadratics",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 0.894427190999916,
+          "display": "\\dfrac{2\\sqrt5}{5}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: tan of the maximising theta from the same golden-section search: 0.894427191"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpprojectilestowergreatestrangehjbbdcedtower"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "For $k \\ge 1$ let $T_k = \\tan^{-1}\\left(\\dfrac{2}{4 + k(k - 1)}\\right)$, and let $S_n = T_1 + T_2 + \\cdots + T_n$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $T_k = \\tan^{-1}\\dfrac{k}{2} - \\tan^{-1}\\dfrac{(k - 1)}{2}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses the expansion of $\\tan(\\alpha - \\beta)$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $\\alpha = \\tan^{-1}(\\dfrac{1}{2}k)$ and $\\beta = \\tan^{-1}(\\dfrac{1}{2}(k - 1))$, so $0 \\le \\beta < \\alpha < \\dfrac{\\pi}{2}$. Then $\\tan(\\alpha - \\beta) = \\dfrac{\\dfrac{1}{2}k - \\dfrac{1}{2}(k - 1)}{1 + \\dfrac{1}{4}k(k - 1)} = \\dfrac{2}{4 + k(k - 1)}$ (multiplying the numerator and denominator by $4$), and $0 < \\alpha - \\beta < \\dfrac{\\pi}{2}$, so $\\alpha - \\beta = T_k$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; compound angles; telescoping sums",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find $S_n$ in terms of $n$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct sum"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the sum using part (i) and notes the cancellation"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (i) the sum telescopes: $S_n = \\tan^{-1}(\\dfrac{1}{2}n) - \\tan^{-1}0 = \\tan^{-1}(\\dfrac{1}{2}n)$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; compound angles; telescoping sums",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "atan(n/2)",
+          "display": "S_n=\\tan^{-1}\\!\\left(\\dfrac n2\\right)"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: direct summation of T_k in mpmath at 30 digits for n=1..40"
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the limit of $S_n$ as $n \\to \\infty$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct limit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "As $n \\to \\infty$, $\\dfrac{1}{2}n \\to \\infty$, so $S_n \\to \\dfrac{\\pi}{2}$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; compound angles; telescoping sums",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "pi/2",
+          "display": "\\dfrac{\\pi}{2}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: mpmath nsum (Richardson) of the series T_k, k>=1, to 30 digits"
+        },
+        {
+         "id": "q13a-iv",
+         "label": "(iv)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the smallest $n$ for which $S_n > \\dfrac{\\pi}{2} - \\dfrac{1}{100}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value of $n$"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains $n > \\dfrac{1}{\\dfrac{1}{2}\\tan \\dfrac{1}{100}}$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the condition in terms of $\\tan$ or $\\cot$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\tan^{-1}(\\dfrac{1}{2}n) > \\dfrac{\\pi}{2} - \\dfrac{1}{100}$ exactly when $\\dfrac{1}{2}n > \\tan\\left(\\dfrac{\\pi}{2} - \\dfrac{1}{100}\\right) = \\dfrac{1}{\\tan \\dfrac{1}{100}} \\approx 99.997$, since $\\tan$ is increasing on $\\left(0, \\dfrac{\\pi}{2}\\right)$. So $n > 199.993$, and the smallest $n$ is $200$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; compound angles; telescoping sums",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 200,
+          "display": "200"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: direct partial sums at 40 digits: first n with S_n > pi/2-1/100"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A sequence is defined by its first term $a_1$ and the rule $a_{n+1} = 2a_n^2 - 1$ for $n \\ge 1$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $a_1 = \\cos\\theta$. Find $a_2$, $a_3$ and $a_4$ in the form $\\cos(\\ldots)$, and write down a formula for $a_n$ in terms of $n$ and $\\theta$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct formula with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $a_2$, $a_3$ and $a_4$ correctly"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds $a_2$ using a double-angle result"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$a_2 = 2\\cos^2\\theta - 1 = \\cos 2\\theta$, so $a_3 = 2\\cos^2 2\\theta - 1 = \\cos 4\\theta$ and $a_4 = 2\\cos^2 4\\theta - 1 = \\cos 8\\theta$. Each term doubles the angle, so $a_n = \\cos\\left(2^{n-1}\\theta\\right)$."
+          }
+         ],
+         "classification": {
+          "content": "Double-angle results; polynomial equations; recurrences",
+          "outcomes": [
+           "ME1-11-02",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose that $a_1 = \\cos\\dfrac{\\pi}{64}$. Find the smallest $n$ for which $a_n = 1$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value with justification"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (i) with $\\theta = \\dfrac{\\pi}{64}$, $a_n = \\cos\\dfrac{2^{n-1}\\pi}{64} = 1$ exactly when $\\dfrac{2^{n-1}}{64}$ is an even integer, that is, $2^{n-1} \\ge 128$. The smallest $n$ is $8$."
+          }
+         ],
+         "classification": {
+          "content": "Double-angle results; polynomial equations; recurrences",
+          "outcomes": [
+           "ME1-11-02",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 8,
+          "display": "8"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: iterating a_{n+1}=2a_n^2-1 from cos(pi/64) at 120 digits: first n with a_n=1 (to 1e-100)"
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find all values of $a_1$ for which $a_3 = a_1$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides all the values with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the equation as a polynomial equation in $a_1$ and factorises it, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $a_3$ in terms of $a_1$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $a = a_1$. Then $a_2 = 2a^2 - 1$ and $a_3 = 2\\left(2a^2 - 1\\right)^2 - 1 = 8a^4 - 8a^2 + 1$. So $a_3 = a$ when $8a^4 - 8a^2 - a + 1 = 0$. Since $a = 1$ is a zero, this factorises as"
+          },
+          {
+           "k": "math",
+           "t": "(a - 1)(2a + 1)\\left(4a^2 + 2a - 1\\right) = 0."
+          },
+          {
+           "k": "p",
+           "t": "Hence $a_1 = 1$, $\\ a_1 = -\\dfrac12$, or $a_1 = \\dfrac{-1 \\pm \\sqrt5}{4}$."
+          }
+         ],
+         "classification": {
+          "content": "Double-angle results; polynomial equations; recurrences",
+          "outcomes": [
+           "ME1-11-02",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "set",
+          "values": [
+           1,
+           -0.5,
+           0.30901699437494745,
+           -0.8090169943749475
+          ],
+          "display": "a_1=1,\\ -\\dfrac12,\\ \\dfrac{-1\\pm\\sqrt5}{4}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: real roots of a_3(a)-a=0 with a_3 from two applications of the recurrence (SymPy exact)"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A small plane has 12 seats. Each person who buys a ticket turns up for the flight with probability $\\dfrac{47}{50}$, independently of the others. Each ticket costs $250, and the airline pays $$C$ in compensation to each passenger who turns up but cannot be given a seat."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The airline sells 13 tickets. Write down the probability that more passengers turn up than there are seats."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct probability"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "All 13 must turn up: probability $\\left(\\dfrac{47}{50}\\right)^{13}$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; expected values; decision making",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "(47/50)^13",
+          "anyOf": [
+           "0.4474",
+           "0.44737"
+          ],
+          "display": "\\left(\\dfrac{47}{50}\\right)^{13}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: exact binomial P(X>12) for 13 tickets"
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that selling 13 tickets rather than 12 increases the airline's expected income exactly when $C \\times \\left(\\dfrac{47}{50}\\right)^{13} < 250$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the expected compensation when 13 tickets are sold"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Selling one more ticket brings in $250 more. With 13 tickets at most one passenger is turned away, which happens with probability $\\left(\\dfrac{47}{50}\\right)^{13}$, so the expected compensation is $C \\times \\left(\\dfrac{47}{50}\\right)^{13}$ (with 12 tickets it is 0). So the expected income increases exactly when $C \\times \\left(\\dfrac{47}{50}\\right)^{13} < 250$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; expected values; decision making",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The airline sells 14 tickets. Show that the expected number of passengers who cannot be given a seat is $\\left(\\dfrac{47}{50}\\right)^{13}\\left(14 - 12 \\times \\dfrac{47}{50}\\right)$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the probabilities that 13 and 14 passengers turn up"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that 1 or 2 passengers may be turned away"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "One passenger is turned away if exactly 13 turn up, with probability $14 \\times \\left(\\dfrac{47}{50}\\right)^{13}(1 - \\dfrac{47}{50})$, and two are turned away if all 14 turn up, with probability $\\left(\\dfrac{47}{50}\\right)^{14}$. So the expected number is $14 \\left(\\dfrac{47}{50}\\right)^{13}(1 - \\dfrac{47}{50}) + 2 \\times \\left(\\dfrac{47}{50}\\right)^{14} = \\left(\\dfrac{47}{50}\\right)^{13}\\left(14 - 14 \\dfrac{47}{50} + 2 \\times \\dfrac{47}{50}\\right) = \\left(\\dfrac{47}{50}\\right)^{13}\\left(14 - 12 \\times \\dfrac{47}{50}\\right)$."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; expected values; decision making",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14a-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the greatest whole number of dollars $C$ for which selling 14 tickets gives a greater expected income than selling 13."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains the inequality $C\\left(E_2 - E_1\\right) < 250$ with the expected numbers $E_1$, $E_2$ turned away"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The extra ticket brings $250, and the expected compensation rises by"
+          },
+          {
+           "k": "math",
+           "t": "C\\left(\\left(\\dfrac{47}{50}\\right)^{13}(14 - 12 \\times \\dfrac{47}{50}) - \\left(\\dfrac{47}{50}\\right)^{13}\\right) = C \\times \\left(\\dfrac{47}{50}\\right)^{13}\\left(13 - 12 \\times \\dfrac{47}{50}\\right) \\approx 0.7695\\,C."
+          },
+          {
+           "k": "p",
+           "t": "So we need $0.7695\\,C < 250$, that is, $C < 324.90$. The greatest whole number of dollars is 324."
+          }
+         ],
+         "classification": {
+          "content": "Binomial distribution; expected values; decision making",
+          "outcomes": [
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 324,
+          "display": "324"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: exact Fractions: expected income for 13 and 14 tickets from the full binomial distributions; largest integer C with income14>income13"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A vase is formed by rotating the curve $x = 2y$, for $0 \\le y \\le 4$, about the $y$-axis (units in decimetres). Water is poured into the empty vase at a constant rate of $6$ dm$^3$ per second. Let $h$ be the depth of the water at time $t$ seconds."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that the volume of water when the depth is $h$ is $\\dfrac{4 \\pi h^{3}}{3}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the volume as an integral with respect to $y$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$V = \\pi\\displaystyle\\int_0^h x^2\\,dy = \\pi\\int_0^h 4 y^{2}\\,dy = \\dfrac{4 \\pi h^{3}}{3}$."
+          }
+         ],
+         "classification": {
+          "content": "Volumes of solids of revolution; related rates",
+          "outcomes": [
+           "ME1-12-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the rate at which the depth is increasing when $h = 2$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct rate"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses $\\dfrac{dV}{dt} = \\dfrac{dV}{dh}\\,\\dfrac{dh}{dt}$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dV}{dh} = 4 \\pi h^{2}$ and $\\dfrac{dV}{dt} = 6$, so $\\dfrac{dh}{dt} = \\dfrac{6}{4 \\pi h^{2}}$. At $h = 2$ this is $\\dfrac{3}{8 \\pi}$ dm per second."
+          }
+         ],
+         "classification": {
+          "content": "Volumes of solids of revolution; related rates",
+          "outcomes": [
+           "ME1-12-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 0.1193662073189215,
+          "display": "\\dfrac{3}{8\\pi}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: V(h) by mpmath quadrature, dV/dh by differentiation, dh/dt=6/(dV/dh) at h=2"
+        },
+        {
+         "id": "q14b-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the time taken to fill the vase to a depth of $2$ dm."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct time"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the volume at depth $2$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The volume at depth $2$ is $\\dfrac{32 \\pi}{3}$, and water enters at $6$ dm$^3$ per second, so the time is $\\dfrac{16 \\pi}{9}$ seconds."
+          }
+         ],
+         "classification": {
+          "content": "Volumes of solids of revolution; related rates",
+          "outcomes": [
+           "ME1-12-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "16*pi/9",
+          "display": "\\dfrac{16\\pi}{9}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: V(2) by quadrature divided by 6 dm^3/s"
+        },
+        {
+         "id": "q14b-iv",
+         "label": "(iv)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the depth at the instant when the depth is increasing at $\\dfrac{1}{\\pi}$ dm per second."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct depth"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dh}{dt} = \\dfrac{6}{4 \\pi h^{2}} = \\dfrac1{\\pi}$ gives $h^2 = \\dfrac{3}{2}$, so $h = \\dfrac{\\sqrt{6}}{2}$ dm."
+          }
+         ],
+         "classification": {
+          "content": "Volumes of solids of revolution; related rates",
+          "outcomes": [
+           "ME1-12-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 1.224744871391589,
+          "display": "\\dfrac{\\sqrt6}{2}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p09.py: root-find of 6/(dV/dh)=1/pi using the quadrature V(h)"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figQ2OptA",
+  "figQ2OptB",
+  "figQ2OptC",
+  "figQ2OptD",
+  "figpprojectilestowergreatestrangehjbbdcedtower"
+ ]
+}

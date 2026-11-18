@@ -1,0 +1,2356 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p12",
+ "paperNumber": 12,
+ "title": "Practice Paper 12",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "ccb93a0bcb1d8fabc68783d05988cd82443eaacb378e2648b26ed4e8e7cfad2e"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Using the substitution $t = \\tan\\dfrac{\\theta}{2}$, the equation $4\\cos\\theta + 3\\sin\\theta = 3$ can be written as which quadratic equation in $t$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$7 t^{2} - 6 t - 1 = 0$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$t^{2} - 6 t + 7 = 0$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$7 t^{2} + 6 t - 1 = 0$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$7 t^{2} - 3 t - 1 = 0$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "With $\\cos\\theta = \\dfrac{1 - t^2}{1 + t^2}$ and $\\sin\\theta = \\dfrac{2t}{1 + t^2}$: $4(1 - t^2) + 3(2t) = 3(1 + t^2)$, which rearranges to $7 t^{2} - 6 t - 1 = 0$."
+        }
+       ],
+       "classification": {
+        "content": "The t-formulae",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Two particles are projected at the same instant from the same point, with the same speed, at angles of $50^\\circ$ and $75^\\circ$ to the horizontal. While both are in flight, the line joining them makes a constant acute angle with the horizontal."
+      },
+      {
+       "k": "p",
+       "t": "What is this angle?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$62.5^\\circ$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$12.5^\\circ$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$27.5^\\circ$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$77.5^\\circ$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The positions differ by $Vt(\\cos\\beta - \\cos\\alpha)\\underset{\\sim}{i} + Vt(\\sin\\beta - \\sin\\alpha)\\underset{\\sim}{j}$ (the $\\tfrac12gt^2$ terms cancel). This is a multiple of $-\\sin\\tfrac{\\alpha + \\beta}{2}\\,\\underset{\\sim}{i} + \\cos\\tfrac{\\alpha + \\beta}{2}\\,\\underset{\\sim}{j}$, which is perpendicular to the direction at angle $\\tfrac{\\alpha + \\beta}{2} = 62.5^\\circ$. So the line makes an angle of $90^\\circ - 62.5^\\circ = 27.5^\\circ$ with the horizontal."
+        }
+       ],
+       "classification": {
+        "content": "Projectile motion in vector form; relative position",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The graph of $y = f(x)$ is shown."
+      },
+      {
+       "k": "fig",
+       "name": "figpfunctionsreciprocalabsolutegraphsehfehccbbase"
+      },
+      {
+       "k": "p",
+       "t": "Which graph shows $y = f(|x|)$?"
+      }
+     ],
+     "figures": [
+      "figpfunctionsreciprocalabsolutegraphsehfehccbbase"
+     ],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptA"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptB"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptC"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "fig",
+           "name": "figQ3OptD"
+          }
+         ]
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "For $x \\ge 0$ the graph of $y = f(|x|)$ is the same as that of $y = f(x)$, and the part for $x < 0$ is its reflection in the $y$-axis. Only graph B has this form."
+        }
+       ],
+       "classification": {
+        "content": "Graphs of y = f(|x|) and related functions",
+        "outcomes": [
+         "ME1-11-01"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the range of the function $y = 4\\cos^{-1}(5x) - 5$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-5 \\le y \\le 4\\pi - 5$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-2\\pi - 5 \\le y \\le 2\\pi - 5$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-5 \\le y \\le 2\\pi - 5$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-4\\pi - 5 \\le y \\le 4\\pi - 5$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\cos^{-1}$ takes every value from $0$ to $\\pi$ on its domain, so $4\\cos^{-1}(5x)$ takes every value from $0$ to $4\\pi$. Subtract 5."
+        }
+       ],
+       "classification": {
+        "content": "Inverse trigonometric functions; range",
+        "outcomes": [
+         "ME1-12-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the value of $\\dfrac{d}{dx}\\,\\tan^{-1}{\\left(\\dfrac{3 x}{4} \\right)}$ at $x = \\dfrac{8}{3}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{3}{20}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$- \\dfrac{3}{20}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{60}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\dfrac{d}{dx}\\,\\tan^{-1}{\\left(\\dfrac{3 x}{4} \\right)} = \\dfrac{12}{9 x^{2} + 16}$, which equals $\\dfrac{3}{20}$ at $x = \\dfrac{8}{3}$."
+        }
+       ],
+       "classification": {
+        "content": "Derivatives of inverse trigonometric functions",
+        "outcomes": [
+         "ME1-12-03"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "When the polynomial $P(x)$ is divided by $x + 3$ the remainder is $0$, and when it is divided by $x - 2$ the remainder is $-1$."
+      },
+      {
+       "k": "p",
+       "t": "What is the remainder when $P(x)$ is divided by $(x + 3)(x - 2)$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{5}x - \\dfrac{3}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{1}{5}x - \\dfrac{3}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{1}{5}x - \\dfrac{8}{5}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$-\\dfrac{1}{2}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The remainder has the form $mx + c$, and $P(x) = (x + 3)(x - 2)Q(x) + mx + c$. Then $P(-3) = 0$ and $P(2) = -1$ give $-3m + c = 0$ and $2m + c = -1$, so $m = - \\dfrac{1}{5}$ and $c = - \\dfrac{3}{5}$."
+        }
+       ],
+       "classification": {
+        "content": "Remainder theorem; division by a quadratic",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Which differential equation could have the slope field shown?"
+      },
+      {
+       "k": "fig",
+       "name": "figpdifferentialequationsslopefieldmatchfhafffdfslope"
+      }
+     ],
+     "figures": [
+      "figpdifferentialequationsslopefieldmatchfhafffdfslope"
+     ],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = x + y$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = 1 + y^2$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = \\dfrac{x}{y + 3}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{dy}{dx} = -xy$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "At $(2, 2)$ the slope in the field is about $-4$, which matches $\\dfrac{dy}{dx} = -xy$ (the other equations give $4, 5, \\dfrac{2}{5}$ there)."
+        }
+       ],
+       "classification": {
+        "content": "Slope fields",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A statement $S(n)$ about positive integers $n$ is such that $S(2)$ is true, and whenever $S(k)$ is true, $S(k + 3)$ is also true."
+      },
+      {
+       "k": "p",
+       "t": "For which positive integers $n$ must $S(n)$ be true?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "all positive integers $n$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "exactly those $n$ that leave remainder 2 on division by 3"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "all $n \\ge 2$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "only $n = 2$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Starting from $S(2)$ and adding 3 any number of times reaches exactly the integers with the same remainders on division by 3 as the starting values, that is, remainder 2. Nothing in the information forces $S(n)$ for any other $n$."
+        }
+       ],
+       "classification": {
+        "content": "Mathematical induction; what a step proves",
+        "outcomes": [
+         "ME1-12-01"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The tangent to the curve $y = 7x^{8}$ at the point where $x = 2$ meets the $x$-axis at $P$."
+      },
+      {
+       "k": "p",
+       "t": "What is the $x$-coordinate of $P$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{4}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{9}{4}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{7}{4}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{2}{7}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "At $x = 2$ the gradient is $7 \\times 8 \\times 2^{7}$ and $y = 7 \\times 2^{8}$. The tangent meets $y = 0$ where $x = 2 - \\dfrac{y}{y'} = 2 - \\dfrac{2}{8} = \\dfrac{7}{4}$."
+        }
+       ],
+       "classification": {
+        "content": "Tangents; derivatives of powers and exponentials",
+        "outcomes": [
+         "ME1-12-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "Which expression is equal to $\\displaystyle\\sum_{k=0}^{n}k\\dbinom{n}{k}3^{k}$ for every positive integer $n$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n\\cdot 4^{n-1}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$3n\\cdot 4^{n}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$n\\cdot 3^{n}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$3n\\cdot 4^{n-1}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Differentiate $(1 + x)^n = \\sum_k \\dbinom{n}{k}x^k$: $n(1 + x)^{n-1} = \\sum_k k\\dbinom{n}{k}x^{k-1}$. Multiply by $x$ and put $x = 3$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial theorem; sums of binomial coefficients",
+        "outcomes": [
+         "ME1-11-05"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 16,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find all values of $k$ for which the polynomial $x^{3} + 6x^{2} + k$ has three different real zeros."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct values with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds both turning values in terms of $k$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the turning points"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $P(x) = x^{3} + 6x^{2} + k$. Then $P'(x) = 3x^2 + 12 x = 3(x + 4)x$, so $P$ has a local maximum at $x = -4$ and a local minimum at $x = 0$, with $P(-4) = k + 32$ and $P(0) = k$. A cubic with positive leading coefficient has three different real zeros exactly when its local maximum value is positive and its local minimum value is negative: $P(-4) > 0$ and $P(0) < 0$. Hence $-32 < k < 0$."
+        }
+       ],
+       "classification": {
+        "content": "Polynomials; number of real zeros using turning points",
+        "outcomes": [
+         "ME1-11-02",
+         "ME1-12-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "interval",
+        "region": "k > -32 and k < 0",
+        "variable": "k",
+        "display": "-32<k<0"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p12.py: exact distinct-real-root count of x^3+6x^2+k on a rational grid k in [-60,30] and at k=-32,0 and 1e-6 either side: three roots iff -32<k<0"
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $f(x) = \\ln{\\left(x^{2} + 4 \\right)}$. The function $f$ is now restricted to the domain $x \\ge 0$, where it has an inverse function $f^{-1}$. Find the domain of $f^{-1}$ and the gradient of the graph of $y = f^{-1}(x)$ at the point where $x = \\ln{\\left(8 \\right)}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct domain and gradient"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the domain of the inverse"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Uses $\\dfrac{d}{dx}f^{-1}(x) = \\dfrac{1}{f'(f^{-1}(x))}$"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "On $x \\ge 0$, $f$ is increasing, with range $y \\ge \\ln{\\left(4 \\right)}$, which is the domain of $f^{-1}$. $f(2) = \\ln{\\left(8 \\right)}$, so the point $\\left(\\ln{\\left(8 \\right)}, 2\\right)$ is on $y = f^{-1}(x)$, and its gradient there is $\\dfrac{1}{f'(2)} = \\dfrac{1}{\\dfrac{1}{2}} = 2$."
+        }
+       ],
+       "classification": {
+        "content": "Functions and calculus: inverse",
+        "outcomes": [
+         "ME1-12-03",
+         "ME1-12-04"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $f(x) = (x + 4)^2 - 4$ for $x \\ge -4$, and let $f^{-1}$ be its inverse function."
+        },
+        {
+         "k": "p",
+         "t": "Find the coordinates of the points where the graphs of $y = f(x)$ and $y = f^{-1}(x)$ meet."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides both points with justification"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Explains why the graphs meet only on $y = x$, or solves $f(x) = x$ correctly"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Sets up a correct equation"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$f$ is increasing for $x \\ge -4$. If $f(a) = b$ and $f^{-1}(a) = b$ then $f(b) = a$; if $a < b$ then $f(a) < f(b)$, that is, $b < a$, which is impossible, and similarly $a > b$ is impossible. So the graphs meet only on the line $y = x$, where $f(x) = x$: $x^2 + 7 x + 12 = 0$, so $(x + 4)(x + 3) = 0$. Both values satisfy $x \\ge -4$, so the points are $(-4, -4)$ and $(-3, -3)$."
+        }
+       ],
+       "classification": {
+        "content": "Inverse functions; intersections with the inverse",
+        "outcomes": [
+         "ME1-11-01"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A ball is projected from a point $O$ on horizontal ground with speed $30$ m s$^{-1}$ at an angle $\\theta$ to the horizontal. It passes through the point that is 30 m horizontally from $O$ and $35$ m above the ground. Take $g = 10$ m s$^{-2}$, and assume the ball's position at time $t$ is $Vt\\cos\\theta\\,\\underset{\\sim}{i} + \\left(Vt\\sin\\theta - 5t^2\\right)\\underset{\\sim}{j}$."
+        },
+        {
+         "k": "p",
+         "t": "Find the two possible values of $\\tan\\theta$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides both values"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Solves the quadratic with a minor error"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains a correct quadratic equation in $\\tan\\theta$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the time to reach the point"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "At horizontal distance $30$, $t = \\dfrac{30}{30\\cos\\theta}$, so the height is $30\\tan\\theta - 5\\sec^2\\theta = 30\\tan\\theta - 5\\left(1 + \\tan^2\\theta\\right)$. Setting this equal to $35$ with $T = \\tan\\theta$: $\\ 5T^2 - 30T + 40 = 0$. Its solutions are $T = 2$ and $T = 4$."
+        }
+       ],
+       "classification": {
+        "content": "Projectile motion; angles of projection through a given point",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "set",
+        "values": [
+         2,
+         4
+        ],
+        "display": "\\tan\\theta=2,\\ 4"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p12.py: sign-change scan over theta of (height at 30 m)-35 using the stated position vector, bisected: tan = 2, 4"
+      },
+      {
+       "id": "q11e",
+       "label": "(e)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find the greatest value of $2\\sin^2 x + 12\\sin x\\cos x - 2\\cos^2 x$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the expression in the form $A + R\\cos(2x - \\alpha)$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Uses double-angle results to rewrite the expression"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Using $\\sin^2 x = \\tfrac12(1 - \\cos 2x)$, $\\cos^2 x = \\tfrac12(1 + \\cos 2x)$ and $\\sin x\\cos x = \\tfrac12\\sin 2x$, the expression is $-2\\cos 2x + 6\\sin 2x$. Now $-2\\cos 2x + 6\\sin 2x = 2 \\sqrt{10}\\cos(2x - \\alpha)$ for a suitable angle $\\alpha$, and $\\cos(2x - \\alpha)$ takes every value from $-1$ to $1$. So the greatest value is $2 \\sqrt{10}$."
+        }
+       ],
+       "classification": {
+        "content": "Double-angle results; auxiliary angle; extreme values",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "2*sqrt(10)",
+        "display": "2\\sqrt{10}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p12.py: grid + golden-section maximum of the original expression over [0,2pi]: 6.324555320"
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find $y$ as a function of $x$, given that $\\dfrac{dy}{dx} = e^{x - y}$ and $y(0) = 1$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct function"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Integrates both sides correctly"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Separates the variables"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\displaystyle\\int e^y\\,dy = \\int e^x\\,dx$ gives $e^y = e^x + C$. At $x = 0$: $e^{1} = 1 + C$. Hence $y = \\ln\\left(e^x + e^{1} - 1\\right)$."
+        }
+       ],
+       "classification": {
+        "content": "Separable differential equations",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       },
+       "figures": [],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "ln(e^x+e-1)",
+        "display": "y=\\ln\\!\\left(e^{x}+e-1\\right)"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p12.py: RK4 of dy/dx=e^(x-y), y(0)=1 vs the key at 8 points in [-3,3]"
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Use the substitution $t = \\tan\\dfrac{\\theta}{2}$ to solve $\\cos\\theta + 13\\sin\\theta = 7$ for $0 \\le \\theta \\le 2\\pi$. Give your answers in exact form."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct solutions"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Solves the quadratic in $t$"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains the correct quadratic in $t$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correctly substitutes the t-formulae"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "With $\\cos\\theta = \\dfrac{1 - t^2}{1 + t^2}$ and $\\sin\\theta = \\dfrac{2t}{1 + t^2}$ the equation becomes $8 t^{2} - 26 t + 6 = 0$, that is, $2 \\left(t - 3\\right) \\left(4 t - 1\\right) = 0$, so $t = \\dfrac{1}{4}$ or $t = 3$. Checking $\\theta = \\pi$ (where $t$ is undefined): $\\cos\\pi = -1 \\ne 7$, so it is not a solution. Since $0 \\le \\dfrac{\\theta}{2} \\le \\pi$, the solutions are $\\theta = 2\\tan^{-1}\\left(\\dfrac{1}{4}\\right)$ and $\\theta = 2\\tan^{-1} 3$."
+        }
+       ],
+       "classification": {
+        "content": "The t-formulae; solving trigonometric equations",
+        "outcomes": [
+         "ME1-11-03"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "$OABC$ is a parallelogram with $\\overrightarrow{OA} = \\underset{\\sim}{a}$ and $\\overrightarrow{OC} = \\underset{\\sim}{c}$. The point $P$ lies on $AB$ with $AP : PB = 2 : 5$, and $OP$ meets the diagonal $AC$ at $X$."
+        },
+        {
+         "k": "fig",
+         "name": "figpvectorsparallelogramratiosbdhbiaccpgram"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Express $\\overrightarrow{OP}$ in terms of $\\underset{\\sim}{a}$ and $\\underset{\\sim}{c}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct expression"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses $\\overrightarrow{AB} = \\underset{\\sim}{c}$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\overrightarrow{AB} = \\overrightarrow{OC} = \\underset{\\sim}{c}$, so $\\overrightarrow{OP} = \\underset{\\sim}{a} + \\dfrac{2}{7}\\underset{\\sim}{c}$."
+          }
+         ],
+         "classification": {
+          "content": "Vectors; ratios in a parallelogram",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "a+2*c/7",
+          "display": "\\overrightarrow{OP}=\\underset{\\sim}{a}+\\dfrac27\\underset{\\sim}{c}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p12.py: 6 random parallelograms: P on AB with AP:PB=2:5 located by division, equals a+2c/7 to 1e-12 componentwise"
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the ratio $OX : XP$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct ratio"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Equates two expressions for $\\overrightarrow{OX}$ and compares coefficients"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $\\overrightarrow{OX}$ in two ways"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\overrightarrow{OX} = s\\left(\\underset{\\sim}{a} + \\dfrac{2}{7}\\underset{\\sim}{c}\\right)$ for some $s$, and also $\\overrightarrow{OX} = \\underset{\\sim}{a} + \\mu(\\underset{\\sim}{c} - \\underset{\\sim}{a})$. Since $\\underset{\\sim}{a}$ and $\\underset{\\sim}{c}$ are not parallel, $s = 1 - \\mu$ and $\\dfrac{2}{7}s = \\mu$, so $s = \\dfrac{7}{9}$. Hence $OX : XP = \\dfrac{7}{9} : \\dfrac{2}{9} = 7 : 2$."
+          }
+         ],
+         "classification": {
+          "content": "Vectors; ratios in a parallelogram",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q12c-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The point $M$ is the midpoint of $BC$, and $AM$ meets $OB$ at $Y$. Find the ratio $OY : YB$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct ratio"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Equates two expressions for $\\overrightarrow{OY}$ and compares coefficients"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes $\\overrightarrow{OM} = \\underset{\\sim}{c} + \\tfrac12\\underset{\\sim}{a}$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\overrightarrow{OM} = \\underset{\\sim}{c} + \\tfrac12\\underset{\\sim}{a}$. A point of $AM$ is $\\underset{\\sim}{a} + v\\left(\\underset{\\sim}{c} - \\tfrac12\\underset{\\sim}{a}\\right)$ and a point of $OB$ is $w(\\underset{\\sim}{a} + \\underset{\\sim}{c})$. Comparing coefficients, $v = w$ and $1 - \\tfrac12v = w$, so $w = \\tfrac23$. Hence $OY : YB = 2 : 1$."
+          }
+         ],
+         "classification": {
+          "content": "Vectors; ratios in a parallelogram",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpvectorsparallelogramratiosbdhbiaccpgram"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 14,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "$n$ circles are drawn in the plane so that every two circles meet at exactly two points and no three circles pass through the same point. Let $R_n$ be the number of regions into which the circles divide the plane, so $R_1 = 2$. The diagram shows three such circles."
+        },
+        {
+         "k": "fig",
+         "name": "figpinductionregionsbeccddffregions"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Explain why $R_{k+1} = R_k + 2k$ for $k \\ge 1$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct explanation"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Counts the intersection points on the new circle"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "The new circle meets each of the $k$ earlier circles at exactly two points, all different, so it has $2k$ points on it, which cut it into $2k$ arcs. Each arc splits one existing region into two, so $2k$ new regions are made and $R_{k+1} = R_k + 2k$."
+          }
+         ],
+         "classification": {
+          "content": "Recurrence relations; summing an arithmetic series; counting regions",
+          "outcomes": [
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "proof-explain",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Use part (i) to show that $R_n = n^2 - n + 2$ for all integers $n \\ge 1$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Adds the relations for $k = 1, 2, \\ldots, n - 1$ and sums $2k$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the relation $R_{k+1} - R_k = 2k$ for several consecutive values of $k$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (i), $R_{k+1} - R_k = 2k$ for $k = 1, 2, \\ldots, n - 1$. Adding these $n - 1$ equations, all the terms $R_2, \\ldots, R_{n-1}$ cancel and"
+          },
+          {
+           "k": "math",
+           "t": "R_n - R_1 = 2(1 + 2 + \\cdots + (n - 1)) = 2 \\times \\frac{(n - 1)n}{2} = n^2 - n,"
+          },
+          {
+           "k": "p",
+           "t": "using the sum of an arithmetic series. Since $R_1 = 2$, $R_n = n^2 - n + 2$. (For $n = 1$ the sum is empty and the formula gives $R_1 = 2$.)"
+          }
+         ],
+         "classification": {
+          "content": "Recurrence relations; summing an arithmetic series; counting regions",
+          "outcomes": [
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13a-iii",
+         "label": "(iii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the least number of circles needed to divide the plane into more than $1000$ regions."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct number"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes a correct inequality"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "We need $n^2 - n + 2 > 1000$. $R_{32} = 994$ and $R_{33} = 1058$, and $R_n$ increases with $n$, so the least number is $33$."
+          }
+         ],
+         "classification": {
+          "content": "Recurrence relations; summing an arithmetic series; counting regions",
+          "outcomes": [
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 33,
+          "display": "33"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p12.py: Euler-formula region count from real intersection geometry for n=1..8 random circles (matches n^2-n+2), then least n with count>1000"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpinductionregionsbeccddffregions"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "For $k \\ge 1$ let $T_k = \\tan^{-1}\\left(\\dfrac{3}{9 + k(k - 1)}\\right)$, and let $S_n = T_1 + T_2 + \\cdots + T_n$."
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Show that $T_k = \\tan^{-1}\\dfrac{k}{3} - \\tan^{-1}\\dfrac{(k - 1)}{3}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides a correct demonstration"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses the expansion of $\\tan(\\alpha - \\beta)$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $\\alpha = \\tan^{-1}(\\dfrac{1}{3}k)$ and $\\beta = \\tan^{-1}(\\dfrac{1}{3}(k - 1))$, so $0 \\le \\beta < \\alpha < \\dfrac{\\pi}{2}$. Then $\\tan(\\alpha - \\beta) = \\dfrac{\\dfrac{1}{3}k - \\dfrac{1}{3}(k - 1)}{1 + \\dfrac{1}{9}k(k - 1)} = \\dfrac{3}{9 + k(k - 1)}$ (multiplying the numerator and denominator by $9$), and $0 < \\alpha - \\beta < \\dfrac{\\pi}{2}$, so $\\alpha - \\beta = T_k$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; compound angles; telescoping sums",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "show-that",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find $S_n$ in terms of $n$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct sum"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the sum using part (i) and notes the cancellation"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "By part (i) the sum telescopes: $S_n = \\tan^{-1}(\\dfrac{1}{3}n) - \\tan^{-1}0 = \\tan^{-1}(\\dfrac{1}{3}n)$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; compound angles; telescoping sums",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "atan(n/3)",
+          "display": "S_n=\\tan^{-1}\\!\\left(\\dfrac n3\\right)"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p12.py: direct summation of T_k at 30 digits for n=1..40"
+        },
+        {
+         "id": "q13b-iii",
+         "label": "(iii)",
+         "marks": 1,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the limit of $S_n$ as $n \\to \\infty$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct limit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "As $n \\to \\infty$, $\\dfrac{1}{3}n \\to \\infty$, so $S_n \\to \\dfrac{\\pi}{2}$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; compound angles; telescoping sums",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "pi/2",
+          "display": "\\dfrac{\\pi}{2}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p12.py: mpmath nsum of the series to 30 digits"
+        },
+        {
+         "id": "q13b-iv",
+         "label": "(iv)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the smallest $n$ for which $S_n > \\dfrac{\\pi}{2} - \\dfrac{1}{20}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct value of $n$"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Writes the condition in terms of $\\tan$ or $\\cot$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$\\tan^{-1}(\\dfrac{1}{3}n) > \\dfrac{\\pi}{2} - \\dfrac{1}{20}$ exactly when $\\dfrac{1}{3}n > \\tan\\left(\\dfrac{\\pi}{2} - \\dfrac{1}{20}\\right) = \\dfrac{1}{\\tan \\dfrac{1}{20}} \\approx 19.983$, since $\\tan$ is increasing on $\\left(0, \\dfrac{\\pi}{2}\\right)$. So $n > 59.950$, and the smallest $n$ is $60$."
+          }
+         ],
+         "classification": {
+          "content": "Inverse tangent; compound angles; telescoping sums",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 60,
+          "display": "60"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p12.py: direct partial sums at 40 digits: first n with S_n>pi/2-1/20"
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": []
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Find the term independent of $x$ in the expansion of $\\left(3 x^{3} + \\dfrac{1}{x}\\right)^{12}$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct term"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the value of $k$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the general term"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The general term is $\\dbinom{12}{k}\\left(3 x^{3}\\right)^{12 - k}\\left(\\dfrac{1}{x}\\right)^{k}$, in which the power of $x$ is $3(12 - k) - k$. This is zero when $k = 9$, so the term is $\\dbinom{12}{9} \\times 3^{3} = 5940$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial expansion; term independent of x",
+        "outcomes": [
+         "ME1-11-05"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 5940,
+        "display": "5940"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p12.py: SymPy expansion of (3x^3+1/x)^12, coefficient of x^0"
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The random variable $X$ has a binomial distribution with mean $\\dfrac{18}{5}$. It is given that $P(X = 3) = P(X = 4)$."
+        },
+        {
+         "k": "p",
+         "t": "Find the number of trials $n$."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct value of $n$"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains an equation in $n$ alone"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds $p$ in terms of $n$"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Writes the two probabilities correctly"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Equating $\\dbinom{n}{3}p^{3}(1 - p)^{n - 3}$ and $\\dbinom{n}{4}p^{4}(1 - p)^{n - 4}$ gives $(n - 3)p = 4(1 - p)$, so $p = \\dfrac{4}{n + 1}$. Then $np = \\dfrac{4n}{n + 1} = \\dfrac{18}{5}$, which gives $n = 9$."
+        }
+       ],
+       "classification": {
+        "content": "Binomial probabilities and mean",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 9,
+        "display": "9"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p12.py: exact Fractions: p=18/(5n); P(X=3)=P(X=4) only for n=9 over n=4..300"
+      },
+      {
+       "id": "q14c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $f(x) = \\dfrac{8}{x^{2} + 9}$. The diagram shows the graph of $y = f(x)$."
+        },
+        {
+         "k": "fig",
+         "name": "figpcalculusfunctionstudyeabiiciistudy"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14c-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the coordinates of the stationary point of $y = f(x)$ and determine its nature."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct points and their nature"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the stationary points"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Solves $f'(x) = 0$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$f'(x) = - \\dfrac{16 x}{\\left(x^{2} + 9\\right)^{2}} = 0$ when $x = 0$. Using $f''(x) = \\dfrac{48 \\left(x^{2} - 3\\right)}{\\left(x^{2} + 9\\right)^{3}}$: $f''\\left(0\\right) < 0$, so there is a local maximum at $\\left(0, \\dfrac{8}{9}\\right)$."
+          }
+         ],
+         "classification": {
+          "content": "Functions and calculus: stationary, inflection, inverse",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        },
+        {
+         "id": "q14c-ii",
+         "label": "(ii)",
+         "marks": 2,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Find the $x$-coordinates of the points of inflection."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct values with justification"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Solves $f''(x) = 0$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "$f''(x) = \\dfrac{48 \\left(x^{2} - 3\\right)}{\\left(x^{2} + 9\\right)^{3}}$, which is zero and changes sign at $x = - \\sqrt{3}, \\sqrt{3}$."
+          }
+         ],
+         "classification": {
+          "content": "Functions and calculus: stationary, inflection, inverse",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "set",
+          "values": [
+           1.7320508075688772,
+           -1.7320508075688772
+          ],
+          "display": "x=\\pm\\sqrt3"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p12.py: sign changes of f'' (SymPy exact) for f=8/(x^2+9)"
+        },
+        {
+         "id": "q14c-iii",
+         "label": "(iii)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The function $f$ is now restricted to the domain $x \\ge 0$, where it has an inverse function $f^{-1}$. Find the domain of $f^{-1}$ and the gradient of the graph of $y = f^{-1}(x)$ at the point where $x = \\dfrac{4}{5}$."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct domain and gradient"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the domain of the inverse"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses $\\dfrac{d}{dx}f^{-1}(x) = \\dfrac{1}{f'(f^{-1}(x))}$"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "On $x \\ge 0$, $f$ is decreasing, with range $0 < y \\le \\dfrac{8}{9}$, which is the domain of $f^{-1}$. $f(1) = \\dfrac{4}{5}$, so the point $\\left(\\dfrac{4}{5}, 1\\right)$ is on $y = f^{-1}(x)$, and its gradient there is $\\dfrac{1}{f'(1)} = \\dfrac{1}{- \\dfrac{4}{25}} = - \\dfrac{25}{4}$."
+          }
+         ],
+         "classification": {
+          "content": "Functions and calculus: stationary, inflection, inverse",
+          "outcomes": [
+           "ME1-12-03",
+           "ME1-12-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "open",
+         "key": null,
+         "autoMarks": 0
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figpcalculusfunctionstudyeabiiciistudy"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figpfunctionsreciprocalabsolutegraphsehfehccbbase",
+  "figQ3OptA",
+  "figQ3OptB",
+  "figQ3OptC",
+  "figQ3OptD",
+  "figpdifferentialequationsslopefieldmatchfhafffdfslope",
+  "figpvectorsparallelogramratiosbdhbiaccpgram",
+  "figpinductionregionsbeccddffregions",
+  "figpcalculusfunctionstudyeabiiciistudy"
+ ]
+}

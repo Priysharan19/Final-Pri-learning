@@ -1,0 +1,3488 @@
+{
+ "format": "pri-paper-v1",
+ "id": "ext1-2027-p13",
+ "paperNumber": 13,
+ "title": "Practice Paper 13",
+ "course": "nsw-ext1",
+ "edition": "prithagoras",
+ "year": 2027,
+ "totalMarks": 70,
+ "readingTime": "10 minutes",
+ "workingTime": "2 hours",
+ "markingScheme": {
+  "status": "draft",
+  "note": "The marking guideline as written by the author. Not approved for criterion marks.",
+  "digest": "e64d328a215d5ca433569f7492836d453667ca71c225febe4bfcee244209166c"
+ },
+ "sections": [
+  {
+   "id": "I",
+   "title": "Section I",
+   "marks": 10,
+   "minutes": 15,
+   "instructions": "Attempt Questions 1 to 10. Allow about 15 minutes for this section.",
+   "questions": [
+    {
+     "id": "q1",
+     "number": 1,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A pack of ten cards is numbered 1 to 10 from the top. The pack is cut into an upper pile and a lower pile, each containing at least one card. The two piles are then riffled together to form a single pack: the piles may be interleaved in any way, but the cards of each pile stay in the same order as before."
+      },
+      {
+       "k": "p",
+       "t": "For how many of the possible final orders of the pack is at least one card in its original position?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q1",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$502$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$757$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$758$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$768$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Suppose the upper pile has $k$ cards. A riffle is fixed by the set $S$ of $k$ places in the final pack that receive the cards $1, 2, \\ldots, k$ (in that order); the other places receive $k+1, \\ldots, 10$ in order. Counting over $k = 1, \\ldots, 9$ gives $2^{10} - 2$ choices of $S$. The original order arises once for every $k$ (when $S = \\{1, \\ldots, k\\}$), that is 9 times, and every other order arises once only, because the single place where a card is followed by a smaller card shows where the cut was. So there are $2^{10} - 2 - 8 = 1014$ possible orders."
+        },
+        {
+         "k": "p",
+         "t": "A card of the upper pile can never move up, and a card of the lower pile can never move down. If any card of the upper pile is in its original place then so is every card above it, and in particular card 1; similarly, if any card of the lower pile is in its original place then so is card 10. So no card is in its original place exactly when place 1 holds a card of the lower pile and place 10 holds a card of the upper pile, that is, when $1 \\notin S$ and $10 \\in S$. The places 2 to 9 are then free, giving $2^{8} = 256$ orders (none is the original order, so none is counted twice). The answer is $1014 - 256 = 758$."
+        },
+        {
+         "k": "p",
+         "t": "(A subtracts $2^{9}$, using only one of the two conditions. B leaves out the original order. D takes $2^{10}$ for the number of orders.)"
+        }
+       ],
+       "classification": {
+        "content": "Permutations and combinations",
+        "outcomes": [
+         "ME1-11-04"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q2",
+     "number": 2,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A straight line of gradient 2 crosses the graph of $y = P(x)$, where $P(x)$ is a polynomial of degree 4, at four distinct points $A$, $B$, $C$ and $D$, as shown."
+      },
+      {
+       "k": "fig",
+       "name": "figGsline"
+      },
+      {
+       "k": "p",
+       "t": "The gradients of the tangents to the graph of $y = P(x)$ at $A$, $B$ and $C$ are $-34$, $10$ and $-7$ respectively."
+      },
+      {
+       "k": "p",
+       "t": "What is the gradient of the tangent to the graph of $y = P(x)$ at $D$?"
+      }
+     ],
+     "figures": [
+      "figGsline"
+     ],
+     "parts": [
+      {
+       "id": "q2",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$37$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$39$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$72$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$74$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let the line be $y = 2x + c$ and let $Q(x) = P(x) - 2x - c = k(x-a)(x-b)(x-c')(x-d)$, where $a, b, c', d$ are the $x$-coordinates of $A, B, C, D$. Then $Q'(x) = P'(x) - 2$, so $Q'$ takes the values $-36$, $8$, $-9$ at $a$, $b$, $c'$, and we need $Q'(d)$."
+        },
+        {
+         "k": "p",
+         "t": "Consider"
+        },
+        {
+         "k": "math",
+         "t": "R(x) = \\frac{Q(x)}{(x-a)\\,Q'(a)} + \\frac{Q(x)}{(x-b)\\,Q'(b)} + \\frac{Q(x)}{(x-c')\\,Q'(c')} + \\frac{Q(x)}{(x-d)\\,Q'(d)} - 1 ."
+        },
+        {
+         "k": "p",
+         "t": "Each fraction is a polynomial of degree 3. At $x = a$ the first is $\\dfrac{k(a-b)(a-c')(a-d)}{Q'(a)} = 1$ and the others are 0, so $R(a) = 0$; in the same way $R(b) = R(c') = R(d) = 0$. A polynomial of degree at most 3 with four zeroes is the zero polynomial, so its coefficient of $x^{3}$ is zero:"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{1}{Q'(a)} + \\frac{1}{Q'(b)} + \\frac{1}{Q'(c')} + \\frac{1}{Q'(d)} = 0 ."
+        },
+        {
+         "k": "p",
+         "t": "Hence $\\dfrac{1}{Q'(d)} = \\dfrac{1}{36} - \\dfrac{1}{8} + \\dfrac{1}{9} = \\dfrac{1}{72}$, so $Q'(d) = 72$ and $P'(d) = 74$. (For example $P(x) = x(x-2)(x-3)(x-6) + 2x$.)"
+        },
+        {
+         "k": "p",
+         "t": "(C forgets to add the gradient of the line. A and B assume that the gradients, measured from the line, add to zero.)"
+        }
+       ],
+       "classification": {
+        "content": "Polynomials: zeroes, coefficients and derivatives",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q3",
+     "number": 3,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The diagram shows parts of four solution curves $C_{1}$, $C_{2}$, $C_{3}$ and $C_{4}$ of a differential equation of the form $\\dfrac{\\mathrm{d} y}{\\mathrm{d} x} = f(x)\\,g(y)$, where $f(x)$ and $g(y)$ are positive for all $x$ and $y$."
+      },
+      {
+       "k": "fig",
+       "name": "figGsweb"
+      },
+      {
+       "k": "p",
+       "t": "$C_{1}$ passes through $(0, 1)$ and $(1, 2)$, $C_{2}$ through $(0, 2)$ and $(1, 5)$, $C_{3}$ through $(0, 5)$ and $(1, 10)$, and $C_{4}$ through $(1, 1)$ and $(3, 2)$. The gradients of the curves at $(1, 2)$, $(1, 5)$, $(1, 10)$ and $(3, 2)$ are $2$, $4$, $6$ and $\\frac{1}{2}$ respectively."
+      },
+      {
+       "k": "p",
+       "t": "What is the gradient of $C_{1}$ at the point where $x = 3$?"
+      }
+     ],
+     "figures": [
+      "figGsweb"
+     ],
+     "parts": [
+      {
+       "id": "q3",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{1}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$1$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{3}{2}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$4$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $F$ and $G$ be functions with $F'(x) = f(x)$ and $G'(y) = \\dfrac{1}{g(y)}$; both are increasing. Along a solution curve $\\dfrac{\\mathrm{d}}{\\mathrm{d} x}\\big(G(y) - F(x)\\big) = \\dfrac{1}{g(y)}\\,f(x)g(y) - f(x) = 0$, so $G(y) - F(x)$ is constant on each curve."
+        },
+        {
+         "k": "p",
+         "t": "From $C_{1}$: $G(2) - G(1) = F(1) - F(0)$. From $C_{2}$: $G(5) - G(2) = F(1) - F(0)$. From $C_{4}$: $G(2) - G(1) = F(3) - F(1)$. So $F(3) - F(1) = G(5) - G(2)$, which says that the solution curve through $(1, 2)$, namely $C_{1}$, passes through $(3, 5)$ (and through no other point of $x = 3$, as $G$ is increasing). The curve $C_{3}$ is not needed for this."
+        },
+        {
+         "k": "p",
+         "t": "The given gradients are $f(1)g(2) = 2$, $f(1)g(5) = 4$, $f(1)g(10) = 6$ and $f(3)g(2) = \\frac12$. So the gradient of $C_{1}$ at $(3, 5)$ is"
+        },
+        {
+         "k": "math",
+         "t": "f(3)g(5) = \\frac{f(1)g(5)\\times f(3)g(2)}{f(1)g(2)} = \\frac{4\\times\\frac12}{2} = 1 ."
+        },
+        {
+         "k": "p",
+         "t": "(A is the gradient at $(3, 2)$ and C is the gradient at $(3, 10)$, which is $6\\times\\frac12\\div2$: these come from taking $C_{1}$ to reach the height 2 or the height 10 at $x = 3$. D keeps the gradient that the field has at $(1, 5)$.)"
+        }
+       ],
+       "classification": {
+        "content": "Differential equations: separable equations and solution curves",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q4",
+     "number": 4,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The real numbers $\\theta$ and $\\phi$ satisfy $0 \\le \\theta \\le \\dfrac{\\pi}{2}$ and $0 \\le \\phi \\le \\dfrac{\\pi}{2}$."
+      },
+      {
+       "k": "p",
+       "t": "What is the least possible value of"
+      },
+      {
+       "k": "math",
+       "t": "(5\\cos\\theta + 3\\cos\\phi - 4)^{2} + (5\\sin\\theta + 3\\sin\\phi - 4)^{2}\\,?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q4",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$0$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$66 - 16\\sqrt{17}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$42 - 10\\sqrt{17}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$2$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $\\mathbf{u} = 5\\cos\\theta\\,\\mathbf{i} + 5\\sin\\theta\\,\\mathbf{j}$, $\\mathbf{w} = 3\\cos\\phi\\,\\mathbf{i} + 3\\sin\\phi\\,\\mathbf{j}$ and let $T$ be the point $(4, 4)$. The expression is the square of the distance from $T$ to the point $S$ with position vector $\\mathbf{s} = \\mathbf{u} + \\mathbf{w}$, where $\\mathbf{u}$ and $\\mathbf{w}$ have lengths 5 and 3 and directions in the first quadrant."
+        },
+        {
+         "k": "p",
+         "t": "Since $|\\mathbf{s}|^{2} = 34 + 30\\cos(\\theta - \\phi)$ and $|\\theta - \\phi| \\le \\frac{\\pi}{2}$, we have $|\\mathbf{s}| \\ge \\sqrt{34} > 4\\sqrt2 = OT$, so $S$ can never be at $T$: the least value is not 0. (Nor is $S$ free to be anywhere at distance $\\sqrt{34}$ from $O$: that distance occurs only at $(5, 3)$ and $(3, 5)$, so B is wrong.)"
+        },
+        {
+         "k": "p",
+         "t": "Suppose the least distance occurred with both angles strictly inside their ranges. Turning $\\mathbf{u}$ slightly either way would not bring $S$ closer to $T$, so $TS$ is along $\\mathbf{u}$; likewise $TS$ is along $\\mathbf{w}$. Then $\\mathbf{u}$ and $\\mathbf{w}$ are parallel, and as both point into the first quadrant $\\mathbf{s} = 8\\times$ (a unit vector), at distance at least $8 - 4\\sqrt2 > 2$ from $T$. This is not the least distance (the corner $\\theta = 0$, $\\phi = \\frac{\\pi}{2}$ gives $S = (5, 3)$, at distance $\\sqrt2$), so at the minimum one of the angles is at an end of its range, and $S$ lies on one of four arcs:"
+        },
+        {
+         "k": "list",
+         "ordered": false,
+         "items": [
+          "$\\phi = \\frac{\\pi}{2}$: $S$ is on the circle with centre $(0, 3)$ and radius 5. $T$ is at distance $\\sqrt{16 + 1} = \\sqrt{17}$ from this centre, so the nearest point of the circle is at distance $5 - \\sqrt{17}$, in the direction $4\\mathbf{i} + \\mathbf{j}$ from the centre; this is $\\tan\\theta = \\frac14$, inside the range.",
+          "$\\theta = 0$: $S$ is on the circle with centre $(5, 0)$ and radius 3. The nearest point of this circle to $T$ is in the direction $-\\mathbf{i} + 4\\mathbf{j}$ from the centre, which is outside the range of $\\phi$, so on this arc the nearest point is the end $(5, 3)$, at distance $\\sqrt2$.",
+          "$\\phi = 0$ and $\\theta = \\frac{\\pi}{2}$ are the mirror images of these in the line $y = x$."
+         ]
+        },
+        {
+         "k": "p",
+         "t": "As $5 - \\sqrt{17} \\approx 0.88 < \\sqrt2$, the least value is $(5 - \\sqrt{17})^{2} = 42 - 10\\sqrt{17}$."
+        },
+        {
+         "k": "p",
+         "t": "(A is the answer when the angles are unrestricted, since then $S$ can be anywhere between 2 and 8 units from $O$. B is $(\\sqrt{34} - 4\\sqrt2)^{2}$. D is the value at the corner $S = (5, 3)$.)"
+        }
+       ],
+       "classification": {
+        "content": "Further trigonometry; vectors in two dimensions",
+        "outcomes": [
+         "ME1-11-03",
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q5",
+     "number": 5,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A machine has 100 components. Each component works with probability $p$, where $0 < p < 1$, independently of the others, and the machine works if at least 40 of its components work."
+      },
+      {
+       "k": "p",
+       "t": "Let $R(p)$ be the probability that the machine works."
+      },
+      {
+       "k": "p",
+       "t": "For what value of $p$ is $R(p)$ increasing most rapidly?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q5",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{13}{33}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{79}{200}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{40}{101}$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$\\dfrac{2}{5}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $q = 1 - p$. Then $R(p) = \\displaystyle\\sum_{k=40}^{100}\\binom{100}{k}p^{k}q^{100-k}$, and it is not practical to differentiate the 61 terms (or the 40 terms of $1 - R$) one by one. In general"
+        },
+        {
+         "k": "math",
+         "t": "R'(p) = \\sum_{k=40}^{100}\\binom{100}{k}\\Big(kp^{k-1}q^{100-k} - (100-k)p^{k}q^{99-k}\\Big),"
+        },
+        {
+         "k": "p",
+         "t": "and since $k\\dbinom{100}{k} = 100\\dbinom{99}{k-1}$ and $(100-k)\\dbinom{100}{k} = 100\\dbinom{99}{k}$,"
+        },
+        {
+         "k": "math",
+         "t": "R'(p) = 100\\sum_{k=40}^{100}\\left(\\binom{99}{k-1}p^{k-1}q^{100-k} - \\binom{99}{k}p^{k}q^{99-k}\\right)."
+        },
+        {
+         "k": "p",
+         "t": "Each negative term cancels the next positive term, and the last negative term is zero, so only the first term is left:"
+        },
+        {
+         "k": "math",
+         "t": "R'(p) = 100\\binom{99}{39}p^{39}(1-p)^{60}."
+        },
+        {
+         "k": "p",
+         "t": "(This is 100 times the probability that exactly 39 of the other 99 components work, which is the probability that one given component decides whether the machine works.)"
+        },
+        {
+         "k": "p",
+         "t": "$R(p)$ increases most rapidly when $R'(p)$ is greatest. $\\dfrac{\\mathrm{d}}{\\mathrm{d} p}\\,p^{39}(1-p)^{60} = p^{38}(1-p)^{59}(39 - 99p)$, which changes from positive to negative at $p = \\frac{39}{99} = \\frac{13}{33}$."
+        },
+        {
+         "k": "p",
+         "t": "(D is the proportion of components needed. B and C are $\\frac{2k-1}{2n}$ and $\\frac{k}{n+1}$ with $k = 40$, $n = 100$. At all four options $R'(p)$ is within 1% of its greatest value, so the options cannot be separated numerically.)"
+        }
+       ],
+       "classification": {
+        "content": "The binomial distribution; rates of change",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q6",
+     "number": 6,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "What is the value of"
+      },
+      {
+       "k": "math",
+       "t": "\\binom{20}{0}\\binom{50}{22} - \\binom{20}{1}\\binom{49}{22} + \\binom{20}{2}\\binom{48}{22} - \\cdots + \\binom{20}{20}\\binom{30}{22},"
+      },
+      {
+       "k": "p",
+       "t": "in which the term containing $\\dbinom{20}{k}$ is $(-1)^{k}\\dbinom{20}{k}\\dbinom{50-k}{22}$?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q6",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$0$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$1$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$378$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$435$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "D"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$\\dbinom{50-k}{22}$ is the coefficient of $x^{22}$ in $(1+x)^{50-k}$. So the sum is the coefficient of $x^{22}$ in"
+        },
+        {
+         "k": "math",
+         "t": "\\sum_{k=0}^{20}(-1)^{k}\\binom{20}{k}(1+x)^{50-k} = (1+x)^{30}\\sum_{k=0}^{20}\\binom{20}{k}(1+x)^{20-k}(-1)^{k} = (1+x)^{30}\\big((1+x) - 1\\big)^{20} = x^{20}(1+x)^{30},"
+        },
+        {
+         "k": "p",
+         "t": "by the binomial theorem. The coefficient of $x^{22}$ in $x^{20}(1+x)^{30}$ is the coefficient of $x^{2}$ in $(1+x)^{30}$, which is $\\dbinom{30}{2} = 435$."
+        },
+        {
+         "k": "p",
+         "t": "(A assumes that the alternating terms cancel. B is what the sum would be with 20 in place of 22. C is $\\binom{28}{2}$.)"
+        }
+       ],
+       "classification": {
+        "content": "The binomial theorem",
+        "outcomes": [
+         "ME1-11-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q7",
+     "number": 7,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "The function $y = F(x)$ satisfies $\\dfrac{\\mathrm{d} y}{\\mathrm{d} x} = (x - 1)\\cos y$ for all real $x$, and $F(0) = 0$."
+      },
+      {
+       "k": "p",
+       "t": "Which graph represents $y = F(x)$?"
+      },
+      {
+       "k": "fig",
+       "name": "figGsgraphs"
+      }
+     ],
+     "figures": [
+      "figGsgraphs"
+     ],
+     "parts": [
+      {
+       "id": "q7",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": []
+        },
+        {
+         "label": "B",
+         "blocks": []
+        },
+        {
+         "label": "C",
+         "blocks": []
+        },
+        {
+         "label": "D",
+         "blocks": []
+        }
+       ],
+       "figureOptions": true,
+       "key": {
+        "type": "mcq",
+        "answer": "A"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The equation cannot be solved with the integrals of this course, so the graph must be found from the equation itself. All four graphs pass through $O$ with gradient $(0-1)\\cos 0 = -1$ and have a stationary point on $x = 1$."
+        },
+        {
+         "k": "p",
+         "t": "*Symmetry.* Let $G(x) = F(2 - x)$. Then $G'(x) = -F'(2-x) = -(2 - x - 1)\\cos F(2-x) = (x-1)\\cos G(x)$, so $G$ satisfies the same equation, and $G(1) = F(1)$. The solution through a given point is unique, so $G = F$: the graph is symmetric about $x = 1$. This rules out B."
+        },
+        {
+         "k": "p",
+         "t": "*Bound.* The constant function $y = \\frac{\\pi}{2}$ is a solution, and solution curves cannot cross, so $F(x) < \\frac{\\pi}{2} \\approx 1.57$ for all $x$ (equivalently, the gradient would have to be zero wherever the graph reached this height). This rules out C, which rises steeply through that height. (For $x > 1$ the graph rises, since $\\cos y > 0$ while $-\\frac{\\pi}{2} < y < \\frac{\\pi}{2}$, and it levels off below $y = \\frac{\\pi}{2}$.)"
+        },
+        {
+         "k": "p",
+         "t": "*Concavity.* Differentiating, $\\dfrac{\\mathrm{d}^{2}y}{\\mathrm{d} x^{2}} = \\cos y - (x-1)\\sin y\\,\\dfrac{\\mathrm{d} y}{\\mathrm{d} x} = \\cos y\\,\\big(1 - (x-1)^{2}\\sin y\\big)$. Where $y \\le 0$ this is positive, so the graph is concave up wherever it is on or below the $x$-axis; any point of inflection has $\\sin y = \\dfrac{1}{(x-1)^{2}} > 0$, so it lies above the $x$-axis (and outside $0 \\le x \\le 2$). This rules out D, which is concave down as it crosses the axis."
+        },
+        {
+         "k": "p",
+         "t": "(Each of B, C, D fails exactly one of the three tests and agrees with A in the other two. The solution is in fact $y = 2\\tan^{-1}\\!\\Big(\\tanh\\dfrac{(x-1)^{2} - 1}{4}\\Big)$, with points of inflection at height about $0.51$.)"
+        }
+       ],
+       "classification": {
+        "content": "Differential equations: graphs of solutions",
+        "outcomes": [
+         "ME1-12-05"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q8",
+     "number": 8,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A rectangular block measuring 1 m by 2 m by 3 m hangs from a crane above level ground. The sun is directly overhead, so that its rays are vertical, and the block can be turned into any position."
+      },
+      {
+       "k": "fig",
+       "name": "figGsblock"
+      },
+      {
+       "k": "p",
+       "t": "What is the greatest possible area, in square metres, of the shadow of the block on the ground?"
+      }
+     ],
+     "figures": [
+      "figGsblock"
+     ],
+     "parts": [
+      {
+       "id": "q8",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$3\\sqrt{5}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$7$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$9$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$11$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "B"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $\\mathbf{a}$, $\\mathbf{b}$, $\\mathbf{c}$ be unit vectors along the edges of lengths 1, 2, 3, and let the vertical unit vector be $\\mathbf{n} = p\\mathbf{a} + q\\mathbf{b} + r\\mathbf{c}$, so that $p = \\mathbf{n}\\cdot\\mathbf{a}$, $q = \\mathbf{n}\\cdot\\mathbf{b}$, $r = \\mathbf{n}\\cdot\\mathbf{c}$ and $p^{2} + q^{2} + r^{2} = 1$."
+        },
+        {
+         "k": "p",
+         "t": "The shadow of a vector $\\mathbf{u}$ is $\\mathbf{u}' = \\mathbf{u} - (\\mathbf{u}\\cdot\\mathbf{n})\\mathbf{n}$ (its projection onto the vertical is removed). Take the face with edges $\\mathbf{u} = \\mathbf{a}$ and $\\mathbf{v} = 2\\mathbf{b}$. Then $|\\mathbf{u}'|^{2} = 1 - p^{2}$, $|\\mathbf{v}'|^{2} = 4 - 4q^{2}$ and $\\mathbf{u}'\\cdot\\mathbf{v}' = -2pq$, so the shadow of this face is a parallelogram of area"
+        },
+        {
+         "k": "math",
+         "t": "\\sqrt{|\\mathbf{u}'|^{2}|\\mathbf{v}'|^{2} - (\\mathbf{u}'\\cdot\\mathbf{v}')^{2}} = \\sqrt{4(1-p^{2})(1-q^{2}) - 4p^{2}q^{2}} = 2\\sqrt{1 - p^{2} - q^{2}} = 2|r| ."
+        },
+        {
+         "k": "p",
+         "t": "In the same way the faces of areas 3 and 6 have shadows of areas $3|q|$ and $6|p|$. Seen from above, three faces meeting at a vertex are visible and their shadows fill the shadow of the block without overlapping. So the area of the shadow is"
+        },
+        {
+         "k": "math",
+         "t": "6|p| + 3|q| + 2|r| = (6\\mathbf{i} + 3\\mathbf{j} + 2\\mathbf{k})\\cdot(|p|\\mathbf{i} + |q|\\mathbf{j} + |r|\\mathbf{k}) \\le \\sqrt{36 + 9 + 4}\\times 1 = 7,"
+        },
+        {
+         "k": "p",
+         "t": "since a scalar product is at most the product of the lengths. There is equality when $(p, q, r) = \\left(\\frac67, \\frac37, \\frac27\\right)$, so the greatest area is 7 m$^{2}$."
+        },
+        {
+         "k": "p",
+         "t": "(A is the best that can be done by tilting the block about one of its edges. C adds two whole faces and D adds three whole faces, which would need $|p| = |q| = 1$.)"
+        }
+       ],
+       "classification": {
+        "content": "Vectors in three dimensions: projections",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q9",
+     "number": 9,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "A warehouse on level ground has vertical walls of heights 12 m and 18 m, which are 8 m apart, and a flat sloping roof that joins the tops of the walls. The diagram shows a vertical cross-section."
+      },
+      {
+       "k": "fig",
+       "name": "figGsroof"
+      },
+      {
+       "k": "p",
+       "t": "A ball is thrown from a point on the ground, in the plane of the cross-section, and passes over the warehouse to land on the other side. The point and the direction of projection may be chosen freely. Take $g = 10$ m s$^{-2}$ and ignore air resistance."
+      },
+      {
+       "k": "p",
+       "t": "What is the least possible speed of projection, in metres per second?"
+      }
+     ],
+     "figures": [
+      "figGsroof"
+     ],
+     "parts": [
+      {
+       "id": "q9",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$6\\sqrt{10}$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$2\\sqrt{95}$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$20$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$2\\sqrt{110}$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Take the origin at the foot of the 12 m wall. Suppose the ball crosses the line of this wall at height $y_{0} \\ge 12$ with speed $v$ at an angle $\\phi$ to the horizontal, and let $T = \\tan\\phi$. At the other wall its height is $y_{0} + 8T - \\dfrac{320(1+T^{2})}{v^{2}}$, and this is at least 18 for some $T$ exactly when the quadratic $320T^{2} - 8v^{2}T + 320 + (18 - y_{0})v^{2}$ has a real zero: $v^{4} - 20(18 - y_{0})v^{2} - 6400 \\ge 0$, that is"
+        },
+        {
+         "k": "math",
+         "t": "v^{2} \\ge 10\\Big((18 - y_{0}) + \\sqrt{(18 - y_{0})^{2} + 64}\\Big)."
+        },
+        {
+         "k": "p",
+         "t": "Let $V$ be the speed of projection, with components $\\dot{x} = a$ and $\\dot{y} = b$ at the start. At time $t$, $\\dot{x} = a$, $\\dot{y} = b - gt$ and $y = bt - \\frac12gt^{2}$, so $\\dot{x}^{2} + \\dot{y}^{2} = a^{2} + b^{2} - 2g\\left(bt - \\frac12gt^{2}\\right) = V^{2} - 2gy$. Hence $v^{2} = V^{2} - 20y_{0}$. So"
+        },
+        {
+         "k": "math",
+         "t": "V^{2} \\ge 180 + 10y_{0} + 10\\sqrt{(18 - y_{0})^{2} + 64},"
+        },
+        {
+         "k": "p",
+         "t": "and the right-hand side increases with $y_{0}$ (its derivative is $10 - \\dfrac{10(18 - y_{0})}{\\sqrt{(18-y_{0})^{2} + 64}} > 0$). The least value is at $y_{0} = 12$: $V^{2} = 180 + 120 + 100 = 400$, so $V = 20$. The path then just touches the tops of both walls, and it lies above the roof between them. Throwing from the other side gives the same paths reversed. (In general $V^{2} = g(h_{1} + h_{2} + d)$, where $d$ is the length of the roof.)"
+        },
+        {
+         "k": "p",
+         "t": "(A only reaches the height of the higher wall. B uses the distance between the walls in place of the length of the roof. D treats the roof as level at 18 m.)"
+        }
+       ],
+       "classification": {
+        "content": "Projectile motion",
+        "outcomes": [
+         "ME1-12-02"
+        ]
+       }
+      }
+     ]
+    },
+    {
+     "id": "q10",
+     "number": 10,
+     "marks": 1,
+     "stem": [
+      {
+       "k": "p",
+       "t": "In a model of an investment, at the end of each year the value of the investment is doubled with probability $\\frac{3}{5}$, left unchanged with probability $\\frac{1}{5}$ or halved with probability $\\frac{1}{5}$, independently of all other years."
+      },
+      {
+       "k": "p",
+       "t": "Which of the following is closest to the least number of years after which there is a probability of at least $97.5\\%$ that the investment is worth at least $2^{24}$ times its initial value?"
+      }
+     ],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q10",
+       "label": "",
+       "marks": 1,
+       "prompt": [],
+       "answerType": "mcq",
+       "options": [
+        {
+         "label": "A",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$36$"
+          }
+         ]
+        },
+        {
+         "label": "B",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$60$"
+          }
+         ]
+        },
+        {
+         "label": "C",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$100$"
+          }
+         ]
+        },
+        {
+         "label": "D",
+         "blocks": [
+          {
+           "k": "p",
+           "t": "$128$"
+          }
+         ]
+        }
+       ],
+       "figureOptions": false,
+       "key": {
+        "type": "mcq",
+        "answer": "C"
+       },
+       "autoMarks": 1,
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Correct option."
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "After $n$ years the value is $2^{S}$ times the initial value, where $S = X_{1} + \\cdots + X_{n}$ and each $X_{i}$ is $1$, $0$ or $-1$ with probabilities $\\frac35$, $\\frac15$, $\\frac15$. The event is $S \\ge 24$."
+        },
+        {
+         "k": "p",
+         "t": "Each $X_{i}$ has mean $\\frac35 - \\frac15 = \\frac25$ and variance $\\frac35 + \\frac15 - \\left(\\frac25\\right)^{2} = \\frac{16}{25}$, so standard deviation $\\frac45$. By the central limit theorem the sample mean $\\bar{X} = \\frac{S}{n}$ is approximately normal with mean $\\frac25$ and standard deviation $\\dfrac{4}{5\\sqrt{n}}$. About $95\\%$ of a normal distribution lies within 2 standard deviations of the mean, so $97.5\\%$ lies above the value 2 standard deviations below the mean. The probability of $\\bar{X} \\ge \\frac{24}{n}$ is therefore $97.5\\%$ when"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{24}{n} = \\frac25 - \\frac{8}{5\\sqrt n}, \\quad\\text{that is}\\quad n - 4\\sqrt{n} - 60 = 0, \\quad (\\sqrt n - 10)(\\sqrt n + 6) = 0,"
+        },
+        {
+         "k": "p",
+         "t": "so $n = 100$, and the probability is greater for larger $n$. (An exact calculation gives 99 years, with probabilities $54\\%$ at 60 years and $97.8\\%$ at 100 years.)"
+        },
+        {
+         "k": "p",
+         "t": "(B ignores the spread: $\\frac25 n = 24$. A takes 2 standard deviations above the mean instead of below, $\\sqrt n = 6$. D uses 3 standard deviations: $n - 6\\sqrt n - 60 = 0$ gives $n \\approx 128$.)"
+        }
+       ],
+       "classification": {
+        "content": "Sampling distribution of the mean and the central limit theorem",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "II",
+   "title": "Section II",
+   "marks": 60,
+   "minutes": 105,
+   "instructions": "Attempt Questions 11 to 14. Allow about 1 hour and 45 minutes for this section. Show relevant mathematical reasoning and/or calculations.",
+   "questions": [
+    {
+     "id": "q11",
+     "number": 11,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q11a",
+       "label": "(a)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Four distinct positive real numbers have the following property: for each of the four numbers $x$,"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{1}{x} + \\frac{2}{x - p} + \\frac{2}{x - q} + \\frac{2}{x - r} = 1,"
+        },
+        {
+         "k": "p",
+         "t": "where $p$, $q$ and $r$ are the other three numbers."
+        },
+        {
+         "k": "p",
+         "t": "Find the product of the four numbers."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct product with complete reasoning"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Establishes the identity $xP''(x) + (1-x)P'(x) + 4P(x) = 0$ for the monic quartic $P(x)$ whose zeroes are the four numbers, or finds the sum, the sum of the squares and the sum of the cubes of the four numbers, or equivalent merit"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Shows that $xP''(x) + (1-x)P'(x)$ is zero at each of the four numbers, or finds both the sum of the four numbers and the sum of their reciprocals, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Introduces the polynomial whose zeroes are the four numbers and relates $\\dfrac{1}{x-p} + \\dfrac{1}{x-q} + \\dfrac{1}{x-r}$ to its derivatives, or adds the four equations after multiplying each by a power of its number so that the terms cancel in pairs, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let the numbers be $x_{1}, x_{2}, x_{3}, x_{4}$ and let $P(x) = (x-x_{1})(x-x_{2})(x-x_{3})(x-x_{4})$."
+        },
+        {
+         "k": "p",
+         "t": "Fix one of the numbers, say $x_{1}$, and write $P(x) = (x - x_{1})G(x)$, where $G(x) = (x-x_{2})(x-x_{3})(x-x_{4})$. Then"
+        },
+        {
+         "k": "math",
+         "t": "P'(x) = G(x) + (x-x_{1})G'(x), \\qquad P''(x) = 2G'(x) + (x-x_{1})G''(x),"
+        },
+        {
+         "k": "p",
+         "t": "so $P'(x_{1}) = G(x_{1}) \\ne 0$ and $P''(x_{1}) = 2G'(x_{1})$. By the product rule,"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{G'(x_{1})}{G(x_{1})} = \\frac{1}{x_{1}-x_{2}} + \\frac{1}{x_{1}-x_{3}} + \\frac{1}{x_{1}-x_{4}}, \\qquad\\text{so}\\qquad \\frac{P''(x_{1})}{P'(x_{1})} = \\frac{2}{x_{1}-x_{2}} + \\frac{2}{x_{1}-x_{3}} + \\frac{2}{x_{1}-x_{4}} ."
+        },
+        {
+         "k": "p",
+         "t": "The given property is therefore $\\dfrac{1}{x_{1}} + \\dfrac{P''(x_{1})}{P'(x_{1})} = 1$, that is, $x_{1}P''(x_{1}) + (1 - x_{1})P'(x_{1}) = 0$. The same holds for $x_{2}$, $x_{3}$ and $x_{4}$."
+        },
+        {
+         "k": "p",
+         "t": "Now $Q(x) = xP''(x) + (1-x)P'(x)$ is a polynomial of degree 4 with leading term $-4x^{4}$, and it has the four distinct zeroes $x_{1}, x_{2}, x_{3}, x_{4}$. By the factor theorem $Q(x) = -4P(x)$, so"
+        },
+        {
+         "k": "math",
+         "t": "xP''(x) + (1-x)P'(x) + 4P(x) = 0 \\quad\\text{for all } x ."
+        },
+        {
+         "k": "p",
+         "t": "Write $P(x) = x^{4} + ax^{3} + bx^{2} + cx + d$. Equating coefficients:"
+        },
+        {
+         "k": "math",
+         "t": "\\begin{aligned}\nx^{3}:&\\quad 12 + 4 - 3a + 4a = 0, & a &= -16,\\\\\nx^{2}:&\\quad 6a + 3a - 2b + 4b = 0, & b &= 72,\\\\\nx^{1}:&\\quad 2b + 2b - c + 4c = 0, & c &= -96,\\\\\nx^{0}:&\\quad c + 4d = 0, & d &= 24 .\n\\end{aligned}"
+        },
+        {
+         "k": "p",
+         "t": "The product of the four numbers is the product of the zeroes of $P(x)$, which is $d = 24$."
+        },
+        {
+         "k": "p",
+         "t": "(The numbers are the zeroes of $x^{4} - 16x^{3} + 72x^{2} - 96x + 24$, approximately $0.32$, $1.75$, $4.54$ and $9.40$.)"
+        },
+        {
+         "k": "p",
+         "t": "**Alternative.** Multiply the equation for the number $x$ by $x^{m}$ and add the four equations. Since\n$\\dfrac{u^{m}}{u-v} + \\dfrac{v^{m}}{v-u} = \\dfrac{u^{m}-v^{m}}{u-v}$, the cases $m = 0, 1, 2, 3$ give in turn the sum of the reciprocals ($= 4$), the sum ($= 16$), the sum of the squares ($= 112$) and the sum of the cubes ($= 928$). The sums of the products in pairs and in threes are then $72$ and $96$, and the product is $96 \\div 4 = 24$."
+        }
+       ],
+       "markerNote": [
+        {
+         "k": "p",
+         "t": "Only the product rule, the factor theorem (a polynomial of degree 4 with four known zeroes is a constant multiple of the product of its factors) and the product of the zeroes of a quartic are used. Answers of 24 with no supporting reasoning earn at most 1 mark."
+        }
+       ],
+       "commonErrors": [
+        {
+         "k": "p",
+         "t": "Assuming the numbers are symmetric in some way or guessing values; finding only the sum $16$; differentiating $P$ but not seeing that $Q(x)$ and $P(x)$ have the same four zeroes and the same degree."
+        }
+       ],
+       "classification": {
+        "content": "Polynomials: multiple zeroes, sums and products of zeroes",
+        "outcomes": [
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 24,
+        "display": "24"
+       },
+       "autoMarks": 1,
+       "keyChecks": "p13.py Q11a: Newton from 400 random starts on the four stated equations finds one positive solution set (0.3225, 1.7458, 4.5366, 9.3951), product 24 (Laguerre L4 roots). Engine: 24, 24.0, 48/2, x=24 accepted; 12, 25, 24.5 rejected."
+      },
+      {
+       "id": "q11b",
+       "label": "(b)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "For certain real numbers $a$, $b$ and $c$, the equation"
+        },
+        {
+         "k": "math",
+         "t": "(\\sin x - a)(\\cos x - b) = c"
+        },
+        {
+         "k": "p",
+         "t": "has exactly four solutions in the interval $0 \\le x < 2\\pi$. Three of these solutions are $\\dfrac{\\pi}{12}$, $\\dfrac{\\pi}{3}$ and $\\dfrac{3\\pi}{4}$."
+        },
+        {
+         "k": "p",
+         "t": "Find the fourth solution."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct fourth solution with complete reasoning"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Shows that the four solutions add to an odd multiple of $\\pi$, or equivalent merit"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains the quartic equation in $t = \\tan\\dfrac{x}{2}$ and a relation between its coefficients that does not involve $a$, $b$ or $c$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Rewrites the equation as a polynomial equation in $\\tan\\dfrac{x}{2}$, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $t = \\tan\\dfrac{x}{2}$. From the double angle results, $\\sin x = 2\\sin\\dfrac{x}{2}\\cos\\dfrac{x}{2} = \\dfrac{2t}{1+t^{2}}$ and $\\cos x = \\cos^{2}\\dfrac{x}{2} - \\sin^{2}\\dfrac{x}{2} = \\dfrac{1-t^{2}}{1+t^{2}}$."
+        },
+        {
+         "k": "p",
+         "t": "The equation is $\\sin x\\cos x - b\\sin x - a\\cos x + m = 0$, where $m = ab - c$. Multiplying by $(1+t^{2})^{2}$,"
+        },
+        {
+         "k": "math",
+         "t": "2t(1-t^{2}) - 2bt(1+t^{2}) - a(1-t^{2})(1+t^{2}) + m(1+t^{2})^{2} = 0,"
+        },
+        {
+         "k": "math",
+         "t": "(a+m)t^{4} - (2+2b)t^{3} + 2m\\,t^{2} + (2-2b)t + (m-a) = 0. \\qquad (*)"
+        },
+        {
+         "k": "p",
+         "t": "If $a + m = 0$ then $x = \\pi$ satisfies the original equation and $(*)$ is a cubic whose three zeroes $t_{1}, t_{2}, t_{3}$ satisfy $t_{1}+t_{2}+t_{3} = t_{1}t_{2}t_{3}$; but for $x = \\frac{\\pi}{12}, \\frac{\\pi}{3}, \\frac{3\\pi}{4}$ the values of $t$ are $\\tan\\frac{\\pi}{24}$, $\\tan\\frac{\\pi}{6}$, $\\tan\\frac{3\\pi}{8}$, and $\\tan\\!\\big(\\frac{\\pi}{24}+\\frac{\\pi}{6}+\\frac{3\\pi}{8}\\big) = \\tan\\frac{7\\pi}{12} \\ne 0$, so this does not happen. Hence $(*)$ is a quartic and its zeroes are $t_{i} = \\tan\\theta_{i}$, where $\\theta_{i} = \\dfrac{x_{i}}{2}$ and $x_{1}, x_{2}, x_{3}, x_{4}$ are the four solutions."
+        },
+        {
+         "k": "p",
+         "t": "Let $s_{2}$ be the sum of the products of the $t_{i}$ in pairs and $s_{4} = t_{1}t_{2}t_{3}t_{4}$. Then"
+        },
+        {
+         "k": "math",
+         "t": "1 - s_{2} + s_{4} = 1 - \\frac{2m}{a+m} + \\frac{m-a}{a+m} = 0,"
+        },
+        {
+         "k": "p",
+         "t": "whatever the values of $a$, $b$ and $c$."
+        },
+        {
+         "k": "p",
+         "t": "Now $\\cos(A+B) = \\cos A\\cos B\\,(1 - \\tan A\\tan B)$ and $\\sin(A+B) = \\cos A\\cos B\\,(\\tan A + \\tan B)$, so"
+        },
+        {
+         "k": "math",
+         "t": "\\begin{aligned}\n\\cos(\\theta_{1}+\\theta_{2}+\\theta_{3}+\\theta_{4}) &= \\cos\\theta_{1}\\cos\\theta_{2}\\cos\\theta_{3}\\cos\\theta_{4}\\big[(1-t_{1}t_{2})(1-t_{3}t_{4}) - (t_{1}+t_{2})(t_{3}+t_{4})\\big]\\\\\n&= \\cos\\theta_{1}\\cos\\theta_{2}\\cos\\theta_{3}\\cos\\theta_{4}\\,(1 - s_{2} + s_{4}) = 0 .\n\\end{aligned}"
+        },
+        {
+         "k": "p",
+         "t": "So $\\theta_{1}+\\theta_{2}+\\theta_{3}+\\theta_{4}$ is an odd multiple of $\\dfrac{\\pi}{2}$, and $x_{1}+x_{2}+x_{3}+x_{4}$ is an odd multiple of $\\pi$."
+        },
+        {
+         "k": "p",
+         "t": "Since $\\dfrac{\\pi}{12} + \\dfrac{\\pi}{3} + \\dfrac{3\\pi}{4} = \\dfrac{7\\pi}{6}$, the fourth solution is $\\pi - \\dfrac{7\\pi}{6} + 2k\\pi$ for some integer $k$. The only such value in $0 \\le x < 2\\pi$ is"
+        },
+        {
+         "k": "math",
+         "t": "x = \\frac{11\\pi}{6} ."
+        },
+        {
+         "k": "p",
+         "t": "(Here $a = 0.6660\\ldots$, $b = 0.8124\\ldots$ and $c = -\\frac{1}{16}$; these values are not needed.)"
+        }
+       ],
+       "markerNote": [
+        {
+         "k": "p",
+         "t": "The results for $\\sin x$ and $\\cos x$ in terms of $t$ are not on the Reference Sheet and must be derived as above, as must the expression for $\\cos(\\theta_{1}+\\theta_{2}+\\theta_{3}+\\theta_{4})$, which uses only the compound angle results. The whole argument uses Extension 1 content only: double and compound angles and the sums and products of the zeroes of a quartic. A response that reaches the same relation another way (for example by showing that $\\tan(\\theta_{1}+\\theta_{2})$ and $\\tan(\\theta_{3}+\\theta_{4})$ are reciprocals) is marked on its merits."
+        }
+       ],
+       "commonErrors": [
+        {
+         "k": "p",
+         "t": "Trying to find $a$, $b$ and $c$ first, which leads to heavy surd working and still leaves a quartic to solve; quoting a sum of solutions without justification; giving $-\\dfrac{\\pi}{6}$, which is outside the interval."
+        }
+       ],
+       "classification": {
+        "content": "Further trigonometric identities and equations; polynomials",
+        "outcomes": [
+         "ME1-11-03",
+         "ME1-11-02"
+        ]
+       },
+       "figures": [],
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 5.759586531581287,
+        "angle": "rad",
+        "display": "\\dfrac{11\\pi}{6}"
+       },
+       "autoMarks": 1,
+       "keyChecks": "p13.py Q11b: solved (a,b,c) from the three given solutions (a=0.6660, b=0.8124, c=-1/16, the only real triple giving four roots) and located all roots in [0,2pi): pi/12, pi/3, 3pi/4, 11pi/6. Engine (angle rad): 11pi/6, 11π/6, 5.76, 330° accepted; pi/6, 7pi/6, 5pi/3, bare 330 rejected."
+      },
+      {
+       "id": "q11c",
+       "label": "(c)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "For each integer $n \\ge 1$, let"
+        },
+        {
+         "k": "math",
+         "t": "S_{n} = \\sum_{k=0}^{n} \\frac{(-1)^{k}}{2k+1}\\binom{n}{k}."
+        },
+        {
+         "k": "p",
+         "t": "Find $S_{n}$ as a single fraction in terms of $n$, and prove your result by mathematical induction."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct formula and a complete proof by induction"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Proves that $(2n+3)S_{n+1} = (2n+2)S_{n}$, or equivalent merit"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "States the correct formula, verifies the initial case and makes progress relating $S_{n+1}$ to $S_{n}$ by means of a binomial identity, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Obtains the correct formula from evaluated cases, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "$S_{1} = 1 - \\dfrac13 = \\dfrac23$, $S_{2} = 1 - \\dfrac23 + \\dfrac15 = \\dfrac{8}{15} = \\dfrac{2\\times4}{3\\times5}$, $S_{3} = 1 - 1 + \\dfrac35 - \\dfrac17 = \\dfrac{16}{35} = \\dfrac{2\\times4\\times6}{3\\times5\\times7}$."
+        },
+        {
+         "k": "p",
+         "t": "This suggests"
+        },
+        {
+         "k": "math",
+         "t": "S_{n} = \\frac{2\\times4\\times\\cdots\\times 2n}{3\\times5\\times\\cdots\\times(2n+1)} = \\frac{4^{n}(n!)^{2}}{(2n+1)!} ."
+        },
+        {
+         "k": "p",
+         "t": "*Initial case.* For $n = 1$, $\\dfrac{4\\,(1!)^{2}}{3!} = \\dfrac{2}{3} = S_{1}$, so the result is true for $n = 1$."
+        },
+        {
+         "k": "p",
+         "t": "*Inductive step.* Assume that $S_{n} = \\dfrac{4^{n}(n!)^{2}}{(2n+1)!}$ for some integer $n \\ge 1$. Since $\\dfrac{2n+3}{2k+1} = 1 + \\dfrac{2(n+1-k)}{2k+1}$,"
+        },
+        {
+         "k": "math",
+         "t": "(2n+3)S_{n+1} = \\sum_{k=0}^{n+1}(-1)^{k}\\binom{n+1}{k} + 2\\sum_{k=0}^{n+1}\\frac{(-1)^{k}}{2k+1}(n+1-k)\\binom{n+1}{k} ."
+        },
+        {
+         "k": "p",
+         "t": "The first sum is $(1-1)^{n+1} = 0$ by the binomial theorem. In the second sum the term with $k = n+1$ is zero, and for $0 \\le k \\le n$,"
+        },
+        {
+         "k": "math",
+         "t": "(n+1-k)\\binom{n+1}{k} = \\frac{(n+1)!}{k!\\,(n-k)!} = (n+1)\\binom{n}{k} ."
+        },
+        {
+         "k": "p",
+         "t": "Hence $(2n+3)S_{n+1} = 2(n+1)\\displaystyle\\sum_{k=0}^{n}\\frac{(-1)^{k}}{2k+1}\\binom{n}{k} = (2n+2)S_{n}$, and by the assumption"
+        },
+        {
+         "k": "math",
+         "t": "S_{n+1} = \\frac{2n+2}{2n+3}\\cdot\\frac{4^{n}(n!)^{2}}{(2n+1)!} = \\frac{(2n+2)^{2}\\,4^{n}(n!)^{2}}{(2n+3)(2n+2)(2n+1)!} = \\frac{4^{n+1}\\big((n+1)!\\big)^{2}}{(2n+3)!},"
+        },
+        {
+         "k": "p",
+         "t": "which is the result for $n+1$. Hence, by mathematical induction, $S_{n} = \\dfrac{4^{n}(n!)^{2}}{(2n+1)!}$ for all integers $n \\ge 1$."
+        }
+       ],
+       "markerNote": [
+        {
+         "k": "p",
+         "t": "The statement proved is a result about the sum $S_{n}$, and the step uses only the binomial theorem with $x = -1$ and the definition of $\\binom{n}{k}$ in factorials. No integral or recurrence quoted from elsewhere is needed or accepted in place of the inductive step. A response that uses Pascal's identity together with $k\\binom{n+1}{k} = (n+1)\\binom{n}{k-1}$ to reach $(2n+3)S_{n+1} = (2n+2)S_{n}$ is equally valid."
+        },
+        {
+         "k": "p",
+         "t": "(Equivalent forms such as $\\dfrac{4^{n}}{(2n+1)\\binom{2n}{n}}$ are accepted.)"
+        }
+       ],
+       "commonErrors": [
+        {
+         "k": "p",
+         "t": "Treating $S_{n+1}$ as $S_{n}$ plus one extra term (every term changes with $n$); a formula that fits only $n = 1$ and $n = 2$; using Pascal's identity alone, which produces a second sum with denominators $2k+3$ and does not close."
+        }
+       ],
+       "classification": {
+        "content": "Proof by mathematical induction; the binomial theorem",
+        "outcomes": [
+         "ME1-12-01",
+         "ME1-11-05"
+        ]
+       },
+       "figures": [],
+       "answerType": "show-that",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q11d",
+       "label": "(d)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "Let $f(x) = c - \\dfrac{x^{3}}{3}$, where $c$ is a real number, and let $f^{-1}$ be the inverse function of $f$."
+        },
+        {
+         "k": "p",
+         "t": "Find all values of $c$ for which the graphs of $y = f(x)$ and $y = f^{-1}(x)$ meet at exactly five points."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct set of values of $c$, with a complete count that deals with the end values"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Shows that the meeting points not on $y = x$ correspond to the solutions of $c = 2s - \\dfrac{s^{3}}{3}$ with $-2 < s < 2$, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Shows that there is exactly one meeting point on $y = x$ and that any other meeting point $(p, q)$ satisfies $p^{2} + pq + q^{2} = 3$, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "The point $(p, q)$ lies on both graphs exactly when $q = f(p)$ and $p = f(q)$:"
+        },
+        {
+         "k": "math",
+         "t": "q = c - \\frac{p^{3}}{3} \\quad (1), \\qquad\\qquad p = c - \\frac{q^{3}}{3} \\quad (2)."
+        },
+        {
+         "k": "p",
+         "t": "Subtracting, $q - p = \\dfrac{q^{3} - p^{3}}{3} = \\dfrac{(q - p)(q^{2} + pq + p^{2})}{3}$, so $p = q$ or $p^{2} + pq + q^{2} = 3$."
+        },
+        {
+         "k": "p",
+         "t": "*Points on $y = x$.* If $p = q$ then $p + \\dfrac{p^{3}}{3} = c$. Since $x + \\dfrac{x^{3}}{3}$ is increasing and takes every real value once, there is exactly one such point for every $c$."
+        },
+        {
+         "k": "p",
+         "t": "*Points not on $y = x$.* These occur in pairs $(p, q)$ and $(q, p)$ with $p \\ne q$ and $p^{2} + pq + q^{2} = 3$. Let $s = p + q$. Then $pq = s^{2} - 3$, so $p$ and $q$ are the solutions of $z^{2} - sz + (s^{2} - 3) = 0$. They are real and different exactly when $s^{2} - 4(s^{2} - 3) > 0$, that is, when $-2 < s < 2$."
+        },
+        {
+         "k": "p",
+         "t": "Adding (1) and (2), and using $p^{3} + q^{3} = s^{3} - 3pqs = 9s - 2s^{3}$,"
+        },
+        {
+         "k": "math",
+         "t": "s = 2c - \\frac{9s - 2s^{3}}{3}, \\qquad\\text{that is}\\qquad c = 2s - \\frac{s^{3}}{3} ."
+        },
+        {
+         "k": "p",
+         "t": "Conversely, if $-2 < s < 2$ and $c = 2s - \\dfrac{s^{3}}{3}$, the two solutions $p \\ne q$ of the quadratic satisfy both the sum and the difference of (1) and (2), and so satisfy (1) and (2). Different values of $s$ give different pairs. Let $h(s) = 2s - \\dfrac{s^{3}}{3}$ and let $N$ be the number of solutions of $h(s) = c$ with $-2 < s < 2$. Then"
+        },
+        {
+         "k": "math",
+         "t": "\\text{number of meeting points} = 1 + 2N ."
+        },
+        {
+         "k": "p",
+         "t": "Five meeting points are needed, so $N = 2$."
+        },
+        {
+         "k": "p",
+         "t": "Now $h'(s) = 2 - s^{2}$, which is zero at $s = \\pm\\sqrt2$, and"
+        },
+        {
+         "k": "math",
+         "t": "h(-2) = -\\frac43, \\qquad h(-\\sqrt2) = -\\frac{4\\sqrt2}{3}, \\qquad h(\\sqrt2) = \\frac{4\\sqrt2}{3}, \\qquad h(2) = \\frac43 ."
+        },
+        {
+         "k": "p",
+         "t": "So on $-2 < s < 2$ the function $h$ decreases from $-\\frac43$ to $-\\frac{4\\sqrt2}{3}$, then increases to $\\frac{4\\sqrt2}{3}$, then decreases to $\\frac43$, and the values $\\mp\\frac43$ at the ends $s = \\mp2$ are not attained there."
+        },
+        {
+         "k": "p",
+         "t": "For $c \\ge 0$: the increasing section takes the value $c$ once if $c \\le \\frac{4\\sqrt2}{3}$; the last decreasing section ($\\sqrt2 < s < 2$) takes the value $c$ once if $\\frac43 < c < \\frac{4\\sqrt2}{3}$ and not otherwise; the first section takes only negative values. So $N = 2$ exactly when $\\frac43 < c < \\frac{4\\sqrt2}{3}$ (at $c = \\frac{4\\sqrt2}{3}$ the two solutions coincide at $s = \\sqrt2$, and at $c = \\frac43$ the second solution would be $s = 2$, which is excluded; in both cases $N = 1$). Since $h$ is odd, the same holds for $-c$."
+        },
+        {
+         "k": "p",
+         "t": "The graphs meet at exactly five points when"
+        },
+        {
+         "k": "math",
+         "t": "\\frac43 < c < \\frac{4\\sqrt2}{3} \\qquad\\text{or}\\qquad -\\frac{4\\sqrt2}{3} < c < -\\frac43 ."
+        },
+        {
+         "k": "p",
+         "t": "(There are three meeting points when $|c| \\le \\frac43$ or $|c| = \\frac{4\\sqrt2}{3}$, and one when $|c| > \\frac{4\\sqrt2}{3}$.)"
+        }
+       ],
+       "markerNote": [
+        {
+         "k": "p",
+         "t": "The graph of a decreasing function can meet the graph of its inverse at points that are not on $y = x$. A response that considers only points on $y = x$ finds one meeting point for every $c$ and earns no more than 1 mark, and only if it shows there is exactly one such point. Equivalent reductions are acceptable, for example eliminating $q$ to study $f(f(x)) = x$, provided the count is justified. The end values must be excluded with a reason for full marks."
+        }
+       ],
+       "commonErrors": [
+        {
+         "k": "p",
+         "t": "Concluding that there are no such values of $c$ because ``a function meets its inverse only on $y = x$''; forgetting that each value of $s$ gives two points; allowing $s = \\pm2$ (where $p = q$) and so including $c = \\pm\\frac43$; including $c = \\pm\\frac{4\\sqrt2}{3}$, where the two pairs coincide; giving only the positive interval."
+        }
+       ],
+       "classification": {
+        "content": "Inverse functions; graphs and stationary points",
+        "outcomes": [
+         "ME1-11-01",
+         "ME1-12-05"
+        ]
+       },
+       "figures": [],
+       "answerType": "open",
+       "key": null,
+       "autoMarks": 0
+      }
+     ]
+    },
+    {
+     "id": "q12",
+     "number": 12,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q12a",
+       "label": "(a)",
+       "marks": 4,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "In a game, the house chooses a real number $p$ with $0 \\le p \\le 1$ and tells the player what it is. A coin for which the probability of a head on each toss is $p$ is then tossed $2m$ times, where $m$ is a positive integer. Before the first toss the player names a number, and the player wins if the number of heads obtained is exactly the number named."
+        },
+        {
+         "k": "p",
+         "t": "The player always names a number that gives the greatest possible probability of winning for the value of $p$ announced. The house chooses $p$ so that the player's probability of winning is as small as possible."
+        },
+        {
+         "k": "p",
+         "t": "Find, in terms of $m$, every value of $p$ for which the player's probability of winning is as small as possible. Justify your answer."
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides the correct values of $p$ with full justification"
+          }
+         ],
+         "marks": 4
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Reduces the problem to comparing the values of the winning probability at the points $p = \\frac{k}{2m+1}$ and obtains a correct comparison of neighbouring values, or equivalent merit"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Shows that the least winning probability occurs at a value of $p$ where two numbers of heads are equally likely, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds the values of $p$ for which $k$ heads is a most likely result, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $n = 2m$ and $f_k(p) = \\dbinom{n}{k}p^{k}(1-p)^{n-k}$ for $k = 0, 1, \\dots, n$. The player names a most likely number of heads, so the player wins with probability $W(p)$, the greatest of $f_0(p), \\dots, f_n(p)$. Since $W(0) = W(1) = 1$, take $0 < p < 1$."
+        },
+        {
+         "k": "p",
+         "t": "*The best number to name.* For $0 \\le k \\le n-1$,"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{f_{k+1}(p)}{f_k(p)} = \\frac{(n-k)\\,p}{(k+1)(1-p)} \\ge 1 \\iff p \\ge \\frac{k+1}{n+1}."
+        },
+        {
+         "k": "p",
+         "t": "Write $p_k = \\dfrac{k}{n+1}$. For $p_k \\le p \\le p_{k+1}$ the terms increase up to $f_k$ and then decrease, so $W(p) = f_k(p)$ on this interval, and $f_k = f_{k+1}$ at $p = p_{k+1}$."
+        },
+        {
+         "k": "p",
+         "t": "*Where $W$ can be least.* $f_k'(p) = \\dbinom{n}{k}p^{k-1}(1-p)^{n-k-1}(k - np)$, so $f_k$ increases for $p < \\frac{k}{n}$ and decreases for $p > \\frac{k}{n}$, and $p_k \\le \\frac{k}{n} \\le p_{k+1}$. So on each interval $W$ rises and then falls, and its least value on the interval occurs only at an end. Hence the least value of $W$ is the least of the numbers"
+        },
+        {
+         "k": "math",
+         "t": "g_k = f_k(p_{k+1}) = \\binom{n}{k}\\frac{(k+1)^{k}(n-k)^{n-k}}{(n+1)^{n}}, \\qquad k = 0, 1, \\dots, n-1."
+        },
+        {
+         "k": "p",
+         "t": "*Comparing these values.* For $1 \\le k \\le n-1$,"
+        },
+        {
+         "k": "math",
+         "t": "\\frac{g_k}{g_{k-1}} = \\frac{n-k+1}{k}\\cdot\\frac{(k+1)^{k}(n-k)^{n-k}}{k^{k-1}(n-k+1)^{n-k+1}} = \\frac{\\left(1+\\frac1k\\right)^{k}}{\\left(1+\\frac{1}{n-k}\\right)^{n-k}} = \\frac{a_k}{a_{n-k}}, \\quad\\text{where } a_j = \\Big(1+\\frac1j\\Big)^{j}."
+        },
+        {
+         "k": "p",
+         "t": "The sequence $a_j$ is increasing; this is not assumed but proved here. By the binomial theorem,"
+        },
+        {
+         "k": "math",
+         "t": "a_j = \\sum_{i=0}^{j}\\binom{j}{i}\\frac{1}{j^{i}} = \\sum_{i=0}^{j}\\frac{1}{i!}\\Big(1-\\frac1j\\Big)\\Big(1-\\frac2j\\Big)\\cdots\\Big(1-\\frac{i-1}{j}\\Big)."
+        },
+        {
+         "k": "p",
+         "t": "When $j$ is replaced by $j+1$ every term stays the same or increases and one more positive term is added, so $a_1 < a_2 < a_3 < \\cdots$. (Alternatively, for $x > 0$ let $h(x) = x\\ln\\!\\big(1+\\frac1x\\big)$. Then $h'(x) = \\ln\\!\\big(1+\\frac1x\\big) - \\frac{1}{x+1}$ and $h''(x) = -\\frac{1}{x(x+1)^{2}} < 0$, so $h'$ is decreasing; as $h'(x) \\to 0$ when $x \\to \\infty$, $h'(x) > 0$, so $h$ and hence $a_j = e^{h(j)}$ increase.) Markers: a full-mark response must justify that $a_j$ increases, by either argument or an equivalent one; it may not simply be quoted."
+        },
+        {
+         "k": "p",
+         "t": "Hence $g_k < g_{k-1}$ when $k < n-k$, $g_k = g_{k-1}$ when $k = m$, and $g_k > g_{k-1}$ when $k > m$. The least values are $g_{m-1} = g_m$, at $p = p_m$ and $p = p_{m+1}$. The house can choose"
+        },
+        {
+         "k": "math",
+         "t": "p = \\frac{m}{2m+1} \\qquad\\text{or}\\qquad p = \\frac{m+1}{2m+1}."
+        },
+        {
+         "k": "p",
+         "t": "(The choice $p = \\frac12$ is not best: there $W$ has a local maximum.)"
+        }
+       ],
+       "commonErrors": [
+        {
+         "k": "p",
+         "t": "answering $p = \\frac12$ by symmetry; finding the most likely number of heads but not noticing that $W$ is least where the best number changes; comparing the values $g_k$ only for particular $m$."
+        }
+       ],
+       "classification": {
+        "content": "The binomial distribution; calculus",
+        "outcomes": [
+         "ME1-12-06"
+        ]
+       },
+       "figures": [],
+       "answerType": "proof-explain",
+       "key": null,
+       "autoMarks": 0
+      },
+      {
+       "id": "q12b",
+       "label": "(b)",
+       "marks": 3,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A circular raft has six large water jets and six small water jets around its rim. The 12 jets are equally spaced and are alternately large and small. When it is on, a large jet pushes the raft with a force of magnitude $\\sqrt{3}$ and a small jet pushes the raft with a force of magnitude 1. Each force is directed from the jet towards the centre of the raft, as shown in the diagram, where all 12 jets are on."
+        },
+        {
+         "k": "fig",
+         "name": "figGbjets"
+        },
+        {
+         "k": "p",
+         "t": "Each jet is now switched on or left off at random: independently of the others, each jet is on with probability $p$, where $0 < p < 1$."
+        },
+        {
+         "k": "p",
+         "t": "Find, with justification, an expression in terms of $p$ for the probability that the sum of the forces of the jets on the raft is the zero vector. (If no jet is on, the sum is the zero vector.)"
+        }
+       ],
+       "criteria": [
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Provides a correct expression for the probability with justification that every case has been included"
+          }
+         ],
+         "marks": 3
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Finds, with the probability of each, all possible resultants of one family of jets that could be balanced by the other family, or equivalent merit"
+          }
+         ],
+         "marks": 2
+        },
+        {
+         "text": [
+          {
+           "k": "p",
+           "t": "Separates the small jets from the large jets and compares the possible magnitudes of their two resultants, or combines opposite jets and expresses a resultant in terms of two non-parallel vectors, or equivalent merit"
+          }
+         ],
+         "marks": 1
+        }
+       ],
+       "sampleAnswer": [
+        {
+         "k": "p",
+         "t": "Let $\\mathbf{u}_k$ be the unit vector at angle $30k^\\circ$ to the positive $x$-axis, and number the jets so that jet $k$ pushes in the direction of $\\mathbf{u}_k$, with the large jets at $k = 0, 2, \\dots, 10$. Then $\\mathbf{u}_{k+6} = -\\mathbf{u}_k$. For $k = 0, \\dots, 5$ let $d_k = 1$ if jet $k$ is on and jet $k+6$ is off, $d_k = -1$ if jet $k+6$ is on and jet $k$ is off, and $d_k = 0$ if both are on or both are off. Writing $r = p(1-p)$, the $d_k$ are independent and"
+        },
+        {
+         "k": "math",
+         "t": "P(d_k = 1) = P(d_k = -1) = r, \\qquad P(d_k = 0) = p^{2} + (1-p)^{2} = 1 - 2r."
+        },
+        {
+         "k": "p",
+         "t": "Let $\\mathbf{S}$ be the sum of the forces of the small jets and $\\mathbf{L}$ that of the large jets. We need $\\mathbf{L} = -\\mathbf{S}$, so in particular $|\\mathbf{L}| = |\\mathbf{S}|$."
+        },
+        {
+         "k": "p",
+         "t": "*Small jets.* From components, $\\mathbf{u}_3 = \\mathbf{u}_1 + \\mathbf{u}_5$ and $\\mathbf{u}_1\\cdot\\mathbf{u}_5 = \\cos 120^\\circ = -\\frac12$. So"
+        },
+        {
+         "k": "math",
+         "t": "\\mathbf{S} = d_1\\mathbf{u}_1 + d_3\\mathbf{u}_3 + d_5\\mathbf{u}_5 = a\\,\\mathbf{u}_1 + b\\,\\mathbf{u}_5, \\quad a = d_1 + d_3,\\ b = d_3 + d_5, \\qquad |\\mathbf{S}|^{2} = a^{2} + b^{2} - ab."
+        },
+        {
+         "k": "p",
+         "t": "*Large jets.* Similarly $\\mathbf{u}_2 = \\mathbf{u}_0 + \\mathbf{u}_4$ and $\\mathbf{u}_0\\cdot\\mathbf{u}_4 = -\\frac12$, so"
+        },
+        {
+         "k": "math",
+         "t": "\\mathbf{L} = \\sqrt3\\,(c\\,\\mathbf{u}_0 + e\\,\\mathbf{u}_4), \\quad c = d_0 + d_2,\\ e = d_2 + d_4, \\qquad |\\mathbf{L}|^{2} = 3\\,(c^{2} + e^{2} - ce)."
+        },
+        {
+         "k": "p",
+         "t": "So $|\\mathbf{S}|^{2} = a^{2} + b^{2} - ab$ must be a multiple of 3, where $a$ and $b$ are integers from $-2$ to $2$. Checking the pairs $(a, b)$: the value is $0$ for $(0,0)$; $3$ for $\\pm(1,-1)$, $\\pm(2,1)$, $\\pm(1,2)$; $12$ for $\\pm(2,-2)$, which cannot occur as it needs $d_3 = 1$ and $d_3 = -1$; and $1$, $4$ or $7$ otherwise. Hence $|\\mathbf{S}|^{2} = |\\mathbf{L}|^{2}$ is $0$ or $3$."
+        },
+        {
+         "k": "p",
+         "t": "*Case 1: $\\mathbf{S} = \\mathbf{L} = \\mathbf{0}$.* As $\\mathbf{u}_1$ and $\\mathbf{u}_5$ are not parallel, $a = b = 0$, so $(d_1, d_3, d_5) = (t, -t, t)$ with $t = 0$, probability $(1-2r)^{3}$, or $t = \\pm1$, probability $r^{3}$ each. So $P(\\mathbf{S} = \\mathbf{0}) = (1-2r)^{3} + 2r^{3}$, and in the same way $P(\\mathbf{L} = \\mathbf{0}) = (1-2r)^{3} + 2r^{3}$. The two families are independent, so this case has probability $\\big((1-2r)^{3} + 2r^{3}\\big)^{2}$."
+        },
+        {
+         "k": "p",
+         "t": "*Case 2: $|\\mathbf{S}| = |\\mathbf{L}| = \\sqrt3$.*\nFor the small jets, $(a,b) = (1,-1)$ needs $d_1 + d_3 = 1$ and $d_3 + d_5 = -1$, and the only possibility is $(d_1,d_3,d_5) = (1, 0, -1)$; $(a, b) = (2,1)$ needs $(1,1,0)$; $(a,b) = (1,2)$ needs $(0,1,1)$; and similarly for their negatives. Each has exactly one $d_k = 0$ and so has probability $r^{2}(1-2r)$. So each of the six vectors"
+        },
+        {
+         "k": "math",
+         "t": "\\mathbf{S} = \\pm(\\mathbf{u}_1 - \\mathbf{u}_5) = \\pm\\sqrt3\\,\\mathbf{u}_0, \\qquad \\pm(2\\mathbf{u}_1 + \\mathbf{u}_5) = \\pm\\sqrt3\\,\\mathbf{u}_2, \\qquad \\pm(\\mathbf{u}_1 + 2\\mathbf{u}_5) = \\pm\\sqrt3\\,\\mathbf{u}_4"
+        },
+        {
+         "k": "p",
+         "t": "is the value of $\\mathbf{S}$ with probability $r^{2}(1-2r)$."
+        },
+        {
+         "k": "p",
+         "t": "For the large jets, $c^{2} + e^{2} - ce = 1$ gives $(c, e) = \\pm(1,0)$, $\\pm(0,1)$, $\\pm(1,1)$, that is, $\\mathbf{L} = \\pm\\sqrt3\\,\\mathbf{u}_0$, $\\pm\\sqrt3\\,\\mathbf{u}_4$, $\\pm\\sqrt3\\,\\mathbf{u}_2$: the same six vectors. For $(c,e) = (1,0)$: $(d_0,d_2,d_4) = (1,0,0)$, probability $r(1-2r)^{2}$, or $(0,1,-1)$, probability $r^{2}(1-2r)$. For $(c, e) = (1,1)$: $(0,1,0)$ or $(1,0,1)$, with the same two probabilities. By symmetry each of the six vectors is the value of $\\mathbf{L}$ with probability $r(1-2r)^{2} + r^{2}(1-2r) = r(1-r)(1-2r)$."
+        },
+        {
+         "k": "p",
+         "t": "Each of the six values of $\\mathbf{S}$ is balanced by exactly one value of $\\mathbf{L}$, so this case has probability $6\\times r^{2}(1-2r)\\times r(1-r)(1-2r)$."
+        },
+        {
+         "k": "p",
+         "t": "Hence the probability that the sum of the forces is zero is"
+        },
+        {
+         "k": "math",
+         "t": "\\big((1-2r)^{3} + 2r^{3}\\big)^{2} + 6r^{3}(1-r)(1-2r)^{2}, \\qquad\\text{where } r = p(1-p),"
+        },
+        {
+         "k": "p",
+         "t": "which is $1 - 12r + 60r^{2} - 150r^{3} + 186r^{4} - 96r^{5} + 12r^{6}$. Any correct equivalent expression in $p$ is accepted. (Check: $p = \\frac12$ gives $r = \\frac14$ and probability $\\frac{100 + 72}{4096} = \\frac{43}{1024}$.)"
+        }
+       ],
+       "commonErrors": [
+        {
+         "k": "p",
+         "t": "including only opposite pairs, giving $(1-2r)^{6}$; treating the small and the large jets separately and stopping at $\\big((1-2r)^{3}+2r^{3}\\big)^{2}$; missing one of the two ways in which the large jets give a resultant of magnitude $\\sqrt3$; treating states with different numbers of jets on as equally likely; giving no reason why other resultants cannot balance."
+        }
+       ],
+       "classification": {
+        "content": "Probability; vectors in two dimensions",
+        "outcomes": [
+         "ME1-11-04",
+         "ME1-12-02"
+        ]
+       },
+       "figures": [
+        "figGbjets"
+       ],
+       "answerType": "expression",
+       "key": {
+        "type": "expression",
+        "expr": "((1-2*p*(1-p))^3+2*(p*(1-p))^3)^2+6*(p*(1-p))^3*(1-p*(1-p))*(1-2*p*(1-p))^2",
+        "display": "\\big((1-2r)^{3}+2r^{3}\\big)^{2}+6r^{3}(1-r)(1-2r)^{2},\\ r=p(1-p)"
+       },
+       "autoMarks": 1,
+       "keyChecks": "p13.py Q12b: all 4096 on/off states enumerated with exact Q(sqrt3) vector sums; 172 balanced states; the probability polynomial equals the key and its expansion exactly (p=1/2 gives 43/1024). Engine: key form, the r-expanded form 1-12r+60r^2-...+12r^6 and the degree-12 polynomial in p accepted; 1-12r+60r^2, ...12r^7 and 43/1024 rejected."
+      },
+      {
+       "id": "q12c",
+       "label": "(c)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A deck of 52 cards is numbered 1 to 52 from the top. In a *riffle shuffle*, the deck is first cut into a top packet and a bottom packet. The number of cards in the top packet is a random variable with the binomial distribution $B\\!\\left(52, \\frac{1}{2}\\right)$, so either packet may be empty. The two packets are then merged into a single deck in such a way that the cards from each packet stay in the same order, relative to one another, as they were in that packet. Given the two packets, every merged deck that can be formed in this way is equally likely."
+        },
+        {
+         "k": "p",
+         "t": "The diagram shows one possible riffle shuffle of a deck of only six cards."
+        },
+        {
+         "k": "fig",
+         "name": "figGbriffle"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q12c-i",
+         "label": "(i)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The deck of 52 cards is given one riffle shuffle."
+          },
+          {
+           "k": "p",
+           "t": "Find, in exact form, the expected number of cards that are in the same position in the deck after the shuffle as they were before it."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct expected value in exact form"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the probability distribution of the number of cards that stay in position, or equivalent merit"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Identifies exactly which cards stay in position in a given shuffle, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that every combination of a cut and a merge has probability $\\frac{1}{2^{52}}$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "If the top packet has $k$ cards there are $\\dbinom{52}{k}$ ways to merge (choose the positions of the top packet cards), so each cut and merge has probability $\\dbinom{52}{k}\\dfrac{1}{2^{52}}\\times\\dfrac{1}{\\binom{52}{k}} = \\dfrac{1}{2^{52}}$."
+          },
+          {
+           "k": "p",
+           "t": "Record a shuffle as a string of 52 letters: the $i$th letter is T or B according to the packet from which the card finishing in position $i$ came. Each of the $2^{52}$ strings corresponds to exactly one cut and merge, so the $2^{52}$ strings are equally likely."
+          },
+          {
+           "k": "p",
+           "t": "A top packet card finishes lower than it started by the number of bottom packet cards above it, so it stays in position only if the string has no B before it. A bottom packet card finishes higher than it started by the number of top packet cards below it, so it stays in position only if the string has no T after it. So the cards that stay in position are those of the run of T's at the start of the string and the run of B's at the end."
+          },
+          {
+           "k": "p",
+           "t": "Let $X$ be the number of cards that stay in position. For the 53 strings T… TB… B the deck is unchanged, so $P(X = 52) = \\dfrac{53}{2^{52}}$. Every other string is $a$ T's, then a middle section beginning with B and ending with T, then $c$ B's, and $X = a + c$. For $X = j$ there are $j+1$ choices of $(a, c)$ and $2^{50-j}$ middle sections, so"
+          },
+          {
+           "k": "math",
+           "t": "P(X = j) = \\frac{(j+1)\\,2^{50-j}}{2^{52}} = \\frac{j+1}{2^{j+2}} \\quad (0 \\le j \\le 50), \\qquad P(X = 51) = 0."
+          },
+          {
+           "k": "p",
+           "t": "Then $E(X) = \\displaystyle\\sum_{j=0}^{50}\\frac{j(j+1)}{2^{j+2}} + 52\\times\\frac{53}{2^{52}}$. Since"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{j^{2}+3j+4}{2^{j+1}} - \\frac{(j+1)^{2}+3(j+1)+4}{2^{j+2}} = \\frac{j(j+1)}{2^{j+2}},"
+          },
+          {
+           "k": "p",
+           "t": "the sum telescopes to $\\dfrac{4}{2} - \\dfrac{51^{2}+3(51)+4}{2^{52}} = 2 - \\dfrac{2758}{2^{52}}$. Hence"
+          },
+          {
+           "k": "math",
+           "t": "E(X) = 2 - \\frac{2758}{2^{52}} + \\frac{2756}{2^{52}} = 2 - \\frac{1}{2^{51}}."
+          },
+          {
+           "k": "p",
+           "t": "(The sum may also be found by differentiating $1 + x + \\cdots + x^{51} = \\dfrac{1-x^{52}}{1-x}$ twice and putting $x = \\frac12$.)"
+          },
+          {
+           "k": "p",
+           "t": "*Markers:* a response that counts, over all $2^{52}$ strings, the total number of cards left in position by adding over positions (position $i$ is unchanged for $2^{52-i} + 2^{i-1}$ strings, the first $i$ letters all T, or the last $53-i$ letters all B, and no string is in both sets) and then divides by $2^{52}$ is a correct calculation of $E(X)$ from equally likely outcomes and earns full marks. A response that adds the probabilities that each position is unchanged, with those probabilities correctly justified, is also a valid method and earns full marks."
+          }
+         ],
+         "commonErrors": [
+          {
+           "k": "p",
+           "t": "treating the cut as equally likely to be at any place; missing that the 53 strings T… TB… B all leave the deck unchanged; assuming that each card stays with the same probability."
+          }
+         ],
+         "classification": {
+          "content": "Permutations and combinations; expected value",
+          "outcomes": [
+           "ME1-11-04",
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "exact",
+          "n": "4503599627370495",
+          "d": "2251799813685248",
+          "display": "2-\\dfrac{1}{2^{51}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p13.py: brute force over all 2^n riffle strings (n<=16) gives E=2-2^(1-n); position count at n=52 is exactly (2^52-1)/2^51. Exact comparison: 2 is not accepted."
+        },
+        {
+         "id": "q12c-ii",
+         "label": "(ii)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The deck of 52 cards, in its original order, is instead given two riffle shuffles, one after the other. The second shuffle is carried out on the deck produced by the first shuffle and is independent of it."
+          },
+          {
+           "k": "p",
+           "t": "Find, in exact form, the probability that after the second shuffle the deck is in its original order."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct probability in exact form"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains a correct condition, in terms of the two shuffles, for the deck to finish in its original order, or correctly counts the first shuffles that the second shuffle can undo, or equivalent merit"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Describes the pair of shuffles by $4^{52}$ equally likely outcomes in a way that determines the final order, or finds the probability of each possible result of one shuffle, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Uses the fact that each cut and merge of one shuffle has probability $\\frac{1}{2^{52}}$ for both shuffles, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Record the first shuffle by a string $s$ and the second by a string $t$, as in part (i). The shuffles are independent, so the $4^{52}$ pairs $(s, t)$ are equally likely."
+          },
+          {
+           "k": "p",
+           "t": "Give each card a two-letter word: its first letter is its packet (T or B) in the first shuffle and its second letter is its packet in the second shuffle. Reading down the final deck gives a sequence of 52 words, each TT, TB, BT or BB. The second letters give $t$, so they show where each card was after the first shuffle, and then the first letters give $s$. So different pairs $(s,t)$ give different sequences, and all $4^{52}$ sequences of words are equally likely."
+          },
+          {
+           "k": "p",
+           "t": "Let $x$ be above $y$ in the final deck."
+          },
+          {
+           "k": "list",
+           "ordered": false,
+           "items": [
+            "If the first letters differ, the card whose first letter is T was the higher in the original deck.",
+            "If the first letters are equal, the first shuffle did not change the order of $x$ and $y$. Then if the second letters differ, the card whose second letter is T was the higher after the first shuffle, and so in the original deck; if they are equal, neither shuffle changed their order, so $x$ was the higher."
+           ]
+          },
+          {
+           "k": "p",
+           "t": "So $x$ was above $y$ in the original deck exactly when the word of $x$ is the same as, or earlier than, the word of $y$ in the order TT, TB, BT, BB. The final deck is in its original order exactly when the words never go back in this order as we read down the deck, that is, when the sequence is $a$ TT's, then $b$ TB's, then $c$ BT's, then $d$ BB's with $a + b + c + d = 52$."
+          },
+          {
+           "k": "p",
+           "t": "The number of such sequences is the number of arrangements of 52 cards and 3 dividers in a row, $\\dbinom{55}{3} = 26\\,235$. The probability is"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{\\binom{55}{3}}{4^{52}} = \\frac{26\\,235}{2^{104}}."
+          },
+          {
+           "k": "p",
+           "t": "*Alternative:* after one shuffle the original order has probability $\\frac{53}{2^{52}}$ and each of the other possible orders has probability $\\frac{1}{2^{52}}$. The second shuffle restores the order with probability $\\frac{53}{2^{52}}$ if the first left it unchanged. Otherwise the first shuffle must be one that a riffle shuffle can undo; these are the shuffles that move one block of neighbouring cards up past another block (cards $1$ to $a$, then $k+1$ to $k+b$, then $a+1$ to $k$, then the rest, with $0 \\le a < k < k + b \\le 52$), of which there are $\\binom{53}{3}$, and each is undone with probability $\\frac{1}{2^{52}}$. Total: $\\dfrac{53^{2} + \\binom{53}{3}}{4^{52}} = \\dfrac{26\\,235}{4^{52}}$."
+          }
+         ],
+         "commonErrors": [
+          {
+           "k": "p",
+           "t": "squaring $\\frac{53}{2^{52}}$ only (ignoring first shuffles that the second can undo); treating all orders reachable in one shuffle as equally likely."
+          }
+         ],
+         "classification": {
+          "content": "Permutations and combinations; probability",
+          "outcomes": [
+           "ME1-11-04"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "exact",
+          "n": "26235",
+          "d": "20282409603651670423947251286016",
+          "display": "\\dfrac{\\binom{55}{3}}{4^{52}}=\\dfrac{26235}{2^{104}}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "verified by tools/papers/verify/p13.py: brute force over all 4^n pairs of shuffles (n<=8) gives C(n+3,3)/4^n; at n=52 it is 26235/2^104. Exact comparison: 0 or a rounded decimal is not accepted."
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figGbriffle"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q13",
+     "number": 13,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q13a",
+       "label": "(a)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A hollow float has the shape of the closed surface formed when the curves $y = \\dfrac{x^{2}}{8}$ and $y = 10 - \\dfrac{x^{2}}{8}$, for $0 \\le x \\le 2\\sqrt{10}$, are rotated about the $y$-axis, where the units are centimetres. The float is made of thin metal and floats upright in a large pond. Water from the pond enters the float through a small hole at its lowest point, and air escapes through a small vent at its highest point, as shown."
+        },
+        {
+         "k": "fig",
+         "name": "figGcfloat"
+        },
+        {
+         "k": "p",
+         "t": "The following facts are known."
+        },
+        {
+         "k": "list",
+         "ordered": false,
+         "items": [
+          "The volume of the part of the float that is below the level of the pond is always equal to the volume of water inside the float plus a fixed volume.",
+          "When the float is empty, its lowest point is 4 cm below the surface of the pond.",
+          "The rate at which water enters through the hole, in cubic centimetres per second, is $\\pi$ times the square root of the difference in height, in centimetres, between the surface of the pond and the surface of the water inside the float.",
+          "The float sinks when the surface of the pond reaches the highest point of the float."
+         ]
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13a-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Starting at an instant when the float is empty, a pump removes water from the float at a constant rate of $p$ cm$^{3}$ s$^{-1}$ whenever there is water in it."
+          },
+          {
+           "k": "p",
+           "t": "Find the least value of $p$ for which the float never sinks. Justify your answer."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct least value $p = \\pi\\sqrt{10 - 2\\sqrt{17}}$ with justification"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains $(10 - D)^{2} + w^{2} = 34$ (or equivalent) for the stage in which the pond is above the widest part and the water inside is below it, and attempts to find the least difference in levels, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains the volume of the float below a given height in both halves, or obtains $D^{2} - w^{2} = 16$ for the first stage, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "*Volumes.* Let $V(d)$ be the volume of the float below height $d$ above its lowest point. For $0 \\le d \\le 5$, $V(d) = \\pi\\displaystyle\\int_{0}^{d}8y\\,dy = 4\\pi d^{2}$, so the lower half has volume $100\\pi$. By symmetry the part above height $d$ has volume $4\\pi(10 - d)^{2}$ when $5 \\le d \\le 10$, so then $V(d) = 200\\pi - 4\\pi(10 - d)^{2}$."
+          },
+          {
+           "k": "p",
+           "t": "Let the lowest point be $D$ cm below the pond and let the water inside be $w$ cm deep. The first two facts give $V(D) = V(w) + V(4) = V(w) + 64\\pi$. The difference in levels is $D - w$."
+          },
+          {
+           "k": "p",
+           "t": "*Stage 1* ($D \\le 5$): $4D^{2} = 4w^{2} + 64$, so $D^{2} - w^{2} = 16$ and $D - w = \\dfrac{16}{D + w}$, which decreases from 4 as the float fills. The stage ends when $D = 5$, $w = 3$, $D - w = 2$."
+          },
+          {
+           "k": "p",
+           "t": "*Stage 2* ($w \\le 5 \\le D$): writing $e = 10 - D$, $200 - 4e^{2} = 4w^{2} + 64$, so"
+          },
+          {
+           "k": "math",
+           "t": "e^{2} + w^{2} = 34, \\qquad D - w = 10 - (e + w) ."
+          },
+          {
+           "k": "p",
+           "t": "Now $(e + w)^{2} = 34 + 2ew \\le 34 + (e^{2} + w^{2}) = 68$, with equality only when $e = w = \\sqrt{17}$. This state is in stage 2, since $w = \\sqrt{17} < 5$ and $D = 10 - \\sqrt{17} > 5$. So in stage 2 the difference in levels falls from 2 to its least value $10 - 2\\sqrt{17}$ and rises to 2 again (when $w = 5$, $e = 3$)."
+          },
+          {
+           "k": "p",
+           "t": "*Stage 3* ($w \\ge 5$): writing also $u = 10 - w$, $200 - 4e^{2} = 200 - 4u^{2} + 64$, so $u^{2} - e^{2} = 16$ and $D - w = u - e = \\dfrac{16}{u + e}$, which increases from 2 to 4 as $u$ and $e$ decrease."
+          },
+          {
+           "k": "p",
+           "t": "So the difference in levels is never less than $10 - 2\\sqrt{17}$, and water never enters more slowly than $m = \\pi\\sqrt{10 - 2\\sqrt{17}}$ cm$^{3}$ s$^{-1}$; it enters at exactly this rate only when $w = \\sqrt{17}$."
+          },
+          {
+           "k": "p",
+           "t": "*If $p < m$:* the volume of water inside increases at a rate of at least $m - p > 0$ at every instant, so the float fills and sinks."
+          },
+          {
+           "k": "p",
+           "t": "*If $p \\ge m$:* if $p \\ge 2\\pi$ the float stays empty. Otherwise there is a depth $w^{*} \\le \\sqrt{17}$ at which water enters at exactly the rate $p$, and for $0 \\le w < w^{*}$ it enters faster. The depth $w$ increases towards $w^{*}$ but cannot pass it: the net rate of filling falls to zero as $w \\to w^{*}$ (when $p = m$ it is proportional to $(w^{*} - w)^{2}$ near $w^{*}$), so $w^{*}$ is approached but never reached. The float never sinks."
+          },
+          {
+           "k": "p",
+           "t": "The least value is $p = \\pi\\sqrt{10 - 2\\sqrt{17}}$ (about $4.16$ cm$^{3}$ s$^{-1}$)."
+          },
+          {
+           "k": "p",
+           "t": "*Common errors.* Answering $2\\pi$ (the rate of entry into the empty float), $\\pi\\sqrt2$ (the rate when the pond reaches the widest part) or $\\pi$; using $D^{2} - w^{2} = 16$ beyond $D = 5$; not checking that $e = w = \\sqrt{17}$ lies in stage 2."
+          }
+         ],
+         "classification": {
+          "content": "Volumes of solids of revolution; rates of change",
+          "outcomes": [
+           "ME1-12-04",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "pi*sqrt(10-2*sqrt(17))",
+          "anyOf": [
+           "4.16",
+           "4.160",
+           "4.1604",
+           "4.16043",
+           "4.160433"
+          ],
+          "display": "\\pi\\sqrt{10-2\\sqrt{17}}"
+         },
+         "autoMarks": 1,
+         "answerSuffix": "cm^3/s",
+         "keyChecks": "p13.py Q13a-i: from the four stated facts, the inflow rate pi*sqrt(E-w) over the whole filling range has minimum 4.160433; ODE with pump 0.98*key sinks, 1.02*key never sinks. Engine: pi*sqrt(10-2*sqrt(17)), π√(10−2√17), sqrt(pi^2*(10-2*sqrt(17))), 4.16, 4.160433 accepted; 4.1, 4.2, pi*sqrt(10+2*sqrt(17)) rejected. A unit typed inside an expression is not stripped, so the unit is shown by answerSuffix only."
+        },
+        {
+         "id": "q13a-ii",
+         "label": "(ii)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose instead that there is no pump."
+          },
+          {
+           "k": "p",
+           "t": "Find the exact time from the instant when the surface of the water inside the float reaches the widest part of the float until the float sinks."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct time, $\\dfrac{8(53\\sqrt2 - 32)}{15}$ seconds"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains a differential equation in one variable that can be integrated, such as $\\big(256h^{-\\frac72} - h^{\\frac12}\\big)\\dfrac{dh}{dt} = \\dfrac12$, with correct end values, or equivalent merit"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains $u^{2} - e^{2} = 16$ and the rate equation $8u\\dfrac{du}{dt} = -\\sqrt{u - e}$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains the volume of water inside when its surface is above the widest part, or obtains $u^{2} - e^{2} = 16$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "During this time both surfaces are above the widest part (stage 3 of part (i)). Let the surface of the water inside be $u$ cm below the highest point of the float and the surface of the pond $e$ cm below it. From part (i), $u^{2} - e^{2} = 16$. At the start $u = 5$, $e = 3$; the float sinks when $e = 0$, $u = 4$."
+          },
+          {
+           "k": "p",
+           "t": "The volume of water inside is $200\\pi - 4\\pi u^{2}$, so the third fact gives"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{d}{dt}\\big(200\\pi - 4\\pi u^{2}\\big) = \\pi\\sqrt{u - e}, \\qquad -8u\\frac{du}{dt} = \\sqrt{u - e} ."
+          },
+          {
+           "k": "p",
+           "t": "In terms of $u$ alone this is $-8u\\dfrac{du}{dt} = \\sqrt{u - \\sqrt{u^{2} - 16}}$, which cannot be integrated as it stands. Instead take the difference in levels $h = u - e$ as the variable. Since $(u - e)(u + e) = 16$,"
+          },
+          {
+           "k": "math",
+           "t": "u + e = \\frac{16}{h}, \\qquad u = \\frac12\\Big(\\frac{16}{h} + h\\Big), \\qquad \\frac{du}{dt} = \\frac12\\Big(1 - \\frac{16}{h^{2}}\\Big)\\frac{dh}{dt} ."
+          },
+          {
+           "k": "p",
+           "t": "Substituting,"
+          },
+          {
+           "k": "math",
+           "t": "-2\\Big(\\frac{16}{h} + h\\Big)\\Big(1 - \\frac{16}{h^{2}}\\Big)\\frac{dh}{dt} = \\sqrt{h}, \\qquad 2\\Big(\\frac{256}{h^{3}} - h\\Big)\\frac{dh}{dt} = \\sqrt{h}, \\qquad \\Big(256h^{-\\frac72} - h^{\\frac12}\\Big)\\frac{dh}{dt} = \\frac12 ,"
+          },
+          {
+           "k": "p",
+           "t": "which is of the form $\\dfrac{dh}{dt} = g(h)$, with $h$ increasing from $5 - 3 = 2$ to $4 - 0 = 4$. So the time $T$ satisfies"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{T}{2} = \\int_{2}^{4}\\Big(256h^{-\\frac72} - h^{\\frac12}\\Big)dh = \\Big[-\\frac{512}{5}h^{-\\frac52} - \\frac23h^{\\frac32}\\Big]_{2}^{4} = \\Big(-\\frac{16}{5} - \\frac{16}{3}\\Big) + \\Big(\\frac{64\\sqrt2}{5} + \\frac{4\\sqrt2}{3}\\Big) = \\frac{212\\sqrt2 - 128}{15} ."
+          },
+          {
+           "k": "p",
+           "t": "Hence $T = \\dfrac{8(53\\sqrt2 - 32)}{15}$ seconds (about 22.9 s)."
+          },
+          {
+           "k": "p",
+           "t": "*Note.* The sum $u + e$ works equally well as the variable. No substitution in an integral is needed: the change of variable is made in the differential equation."
+          },
+          {
+           "k": "p",
+           "t": "*Common errors.* Using the volume formula $4\\pi w^{2}$ above the widest part; taking the float to sink when the water inside reaches the top; using a constant rate of entry."
+          }
+         ],
+         "classification": {
+          "content": "Differential equations in a practical scenario",
+          "outcomes": [
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "8*(53*sqrt(2)-32)/15",
+          "anyOf": [
+           "(424*sqrt(2)-256)/15"
+          ],
+          "display": "\\dfrac{8\\,(53\\sqrt{2}-32)}{15}"
+         },
+         "autoMarks": 1,
+         "answerSuffix": "s",
+         "keyChecks": "p13.py Q13a-ii: quadrature of dt=8(10-w)dw/sqrt(E-w), w from 5 to 6 with E from V(E)=V(w)+V(4), gives 22.908436696412 s = 8(53sqrt2-32)/15 to 15 digits. Engine (exact answer asked, so decimals deliberately rejected): 8(53sqrt2-32)/15, (424sqrt2-256)/15, 424/15*sqrt(2)-256/15 accepted; 8(53sqrt2+32)/15 and decimals rejected."
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figGcfloat"
+       ]
+      },
+      {
+       "id": "q13b",
+       "label": "(b)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A truck travels along a long straight road on level ground at a constant speed. A drone, which starts at the point $S$ on the road 120 metres ahead of the truck, films the truck. The drone flies at a constant speed and always flies forwards. Its camera is fixed to its left-hand side and points sideways, at right angles to the direction of flight. The drone is steered so that the camera points at the truck at every instant."
+        },
+        {
+         "k": "p",
+         "t": "In the view from above, the truck and the drone are points moving in a plane. The velocity of the drone is always perpendicular to the line joining the drone to the truck, and the truck is always on the left of the drone, as shown."
+        },
+        {
+         "k": "fig",
+         "name": "figGcdrone"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q13b-i",
+         "label": "(i)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "The speed of the truck is 15 m s$^{-1}$ and the speed of the drone is 25 m s$^{-1}$."
+          },
+          {
+           "k": "p",
+           "t": "Find the greatest distance between the drone and the truck in the motion that follows. Justify your answer."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct greatest distance, 300 m, with justification that it is reached"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains a relation between $r$ and the position of the drone that does not involve time, such as $25r + 15Y = 3000$, and attempts to find the greatest value of $r$, or equivalent merit"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains correct expressions for two rates of change, such as $\\dfrac{dr}{dt}$ and $\\dfrac{dY}{dt}$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Sets up the motion relative to the truck with the velocity of the drone perpendicular to the line of sight, or finds $\\dfrac{dr}{dt}$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Take $\\mathbf{i}$ in the direction of motion of the truck and $\\mathbf{j}$ perpendicular to the road, to the left of that direction. Let the position vector of the drone relative to the truck be $X\\mathbf{i} + Y\\mathbf{j}$ and let $r = \\sqrt{X^{2} + Y^{2}}$. Initially $X = 120$, $Y = 0$."
+          },
+          {
+           "k": "p",
+           "t": "The velocity of the drone has magnitude $v = 25$ and is perpendicular to $X\\mathbf{i} + Y\\mathbf{j}$, so it is $\\pm\\dfrac{v}{r}\\big(-Y\\mathbf{i} + X\\mathbf{j}\\big)$. The truck, in the direction $-(X\\mathbf{i} + Y\\mathbf{j})$ from the drone, is on the left of the drone, so the sign is $+$: the velocity is $\\dfrac{v}{r}\\big(-Y\\mathbf{i} + X\\mathbf{j}\\big)$, and initially the drone flies in the direction of $\\mathbf{j}$. The truck has velocity $u\\mathbf{i}$, $u = 15$. So"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{dX}{dt} = -\\frac{vY}{r} - u, \\qquad \\frac{dY}{dt} = \\frac{vX}{r} ."
+          },
+          {
+           "k": "p",
+           "t": "Since $r^{2} = X^{2} + Y^{2}$,"
+          },
+          {
+           "k": "math",
+           "t": "r\\frac{dr}{dt} = X\\frac{dX}{dt} + Y\\frac{dY}{dt} = -uX, \\qquad\\text{so}\\qquad \\frac{dr}{dt} = -\\frac{uX}{r} ."
+          },
+          {
+           "k": "p",
+           "t": "Hence $\\dfrac{d}{dt}\\big(vr + uY\\big) = -\\dfrac{uvX}{r} + \\dfrac{uvX}{r} = 0$, so $vr + uY$ is constant:"
+          },
+          {
+           "k": "math",
+           "t": "25r + 15Y = 25\\times 120 = 3000 ."
+          },
+          {
+           "k": "p",
+           "t": "Now $Y \\ge -r$, so $3000 \\ge 25r - 15r = 10r$, that is, $r \\le 300$, with equality exactly when $Y = -r$ (the drone level with the truck, on the other side of the road)."
+          },
+          {
+           "k": "p",
+           "t": "This position is reached. Let $\\theta$ be the angle that the vector $X\\mathbf{i} + Y\\mathbf{j}$ makes with $\\mathbf{i}$, so $\\tan\\theta = \\dfrac{Y}{X}$ (when $X = 0$, use $\\cot\\theta = \\dfrac{X}{Y}$ in the same way). Differentiating, $\\sec^{2}\\theta\\,\\dfrac{d\\theta}{dt} = \\dfrac{1}{X^{2}}\\Big(X\\dfrac{dY}{dt} - Y\\dfrac{dX}{dt}\\Big)$, and $\\sec^{2}\\theta = \\dfrac{r^{2}}{X^{2}}$, so"
+          },
+          {
+           "k": "math",
+           "t": "r^{2}\\frac{d\\theta}{dt} = X\\frac{dY}{dt} - Y\\frac{dX}{dt} = \\frac{v(X^{2} + Y^{2})}{r} + uY = vr + uY = 3000 ."
+          },
+          {
+           "k": "p",
+           "t": "Since $r \\le 300$, $\\dfrac{d\\theta}{dt} \\ge \\dfrac{3000}{300^{2}} = \\dfrac{1}{30}$ radians per second. So the line from the truck to the drone keeps turning anticlockwise at no less than this rate, and it reaches every direction, including the one with $Y = -r$."
+          },
+          {
+           "k": "p",
+           "t": "The greatest distance is 300 m. (Similarly the least distance is $\\dfrac{3000}{40} = 75$ m.)"
+          },
+          {
+           "k": "p",
+           "t": "*Alternative.* With $X = r\\cos\\theta$, $Y = r\\sin\\theta$: $\\dfrac{dr}{dt} = -u\\cos\\theta$ and $r\\dfrac{d\\theta}{dt} = v + u\\sin\\theta$, so $\\dfrac{dr}{d\\theta} = -\\dfrac{ur\\cos\\theta}{v + u\\sin\\theta}$, which is of the form $f(\\theta)g(r)$ and gives $r(v + u\\sin\\theta) = 120v$."
+          },
+          {
+           "k": "p",
+           "t": "*Common errors.* Assuming the greatest distance is the starting distance or occurs when the drone crosses the road; treating the drone as moving in a circle about the truck."
+          }
+         ],
+         "classification": {
+          "content": "Motion in vector form in two dimensions",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 300,
+          "display": "300"
+         },
+         "autoMarks": 1,
+         "answerSuffix": "m",
+         "keyChecks": "p13.py Q13b-i: RK4 simulation of the drone/truck motion (truck 15, drone 25 m/s, 300 s): greatest distance 300.0000 m (least 75.0000 m). Engine: 300, 300 m, 3000/10 accepted; 299, 75, 150, 300 cm rejected."
+        },
+        {
+         "id": "q13b-ii",
+         "label": "(ii)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "On another day the truck and the drone both travel at 25 m s$^{-1}$, and the drone again starts at $S$, 120 metres ahead of the truck."
+          },
+          {
+           "k": "p",
+           "t": "Find the distance from $S$ to the point where the drone next crosses the road."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct distance, 80 m"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds the time taken, $6.4$ s, or equivalent merit"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains $\\dfrac{dX}{dt}$ as a function of $X$ alone, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains $r = 120 - Y$ and the path of the drone relative to the truck, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "With $u = v = 25$ the working of part (i) gives $r + Y = 120$, so $r = 120 - Y$. Then"
+          },
+          {
+           "k": "math",
+           "t": "X^{2} + Y^{2} = (120 - Y)^{2}, \\qquad Y = \\frac{120^{2} - X^{2}}{240}, \\qquad r = 120 - Y = \\frac{120^{2} + X^{2}}{240} ."
+          },
+          {
+           "k": "p",
+           "t": "The drone is on the road when $Y = 0$, that is, when $X = 120$ (the start) or $X = -120$."
+          },
+          {
+           "k": "p",
+           "t": "From part (i),"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{dX}{dt} = -\\frac{25Y}{r} - 25 = -\\frac{25(Y + r)}{r} = -\\frac{25\\times 120}{r} = -\\frac{25\\times 120\\times 240}{120^{2} + X^{2}} ,"
+          },
+          {
+           "k": "p",
+           "t": "which is negative, so $X$ decreases steadily from $120$ to $-120$. The time taken is"
+          },
+          {
+           "k": "math",
+           "t": "T = \\int_{-120}^{120}\\frac{120^{2} + X^{2}}{25\\times120\\times240}\\,dX = \\frac{2\\big(120^{3} + \\frac13\\,120^{3}\\big)}{25\\times 120\\times 240} = \\frac{4\\times120}{3\\times 25} = 6.4 \\text{ s} ."
+          },
+          {
+           "k": "p",
+           "t": "In this time the truck travels $25\\times 6.4 = 160$ m, and the drone is then 120 m behind the truck, so it is $160 - 120 = 40$ m past the starting point of the truck, which is $120 - 40 = 80$ m short of $S$."
+          },
+          {
+           "k": "p",
+           "t": "The drone next crosses the road 80 m from $S$, on the side towards the starting point of the truck."
+          },
+          {
+           "k": "p",
+           "t": "*Common errors.* Assuming the drone returns to the road at $S$; using the time for the truck to reach $S$; assuming a circular path relative to the truck."
+          }
+         ],
+         "classification": {
+          "content": "Motion in vector form; differential equations",
+          "outcomes": [
+           "ME1-12-02",
+           "ME1-12-05"
+          ]
+         },
+         "figures": [],
+         "answerType": "value",
+         "key": {
+          "type": "numeric",
+          "value": 80,
+          "display": "80"
+         },
+         "autoMarks": 1,
+         "answerSuffix": "m",
+         "keyChecks": "p13.py Q13b-ii: RK4 simulation with both speeds 25 m/s and event detection: the next road crossing is at t=6.4 s, 80.000 m from S (towards the truck's start). Engine: 80, 80 m accepted; 40, 81, 120, 160, 80 s rejected."
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figGcdrone"
+       ]
+      }
+     ]
+    },
+    {
+     "id": "q14",
+     "number": 14,
+     "marks": 15,
+     "stem": [],
+     "figures": [],
+     "parts": [
+      {
+       "id": "q14a",
+       "label": "(a)",
+       "marks": 7,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "The Earth is modelled as a sphere with centre $O$ and radius $R$. Three cities $A$, $B$ and $C$ lie on its surface, and"
+        },
+        {
+         "k": "math",
+         "t": "\\cos\\angle AOB = \\frac{7}{25}, \\qquad \\cos\\angle AOC = \\frac{9}{25}, \\qquad \\cos\\angle BOC = \\frac{3}{5}."
+        },
+        {
+         "k": "p",
+         "t": "The shortest route on the surface between two cities is the minor arc joining them of the circle through the two cities that has centre $O$. Distances between points on the surface are measured along such routes."
+        },
+        {
+         "k": "fig",
+         "name": "figGdglobe"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14a-i",
+         "label": "(i)",
+         "marks": 3,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "A fourth city $D$, different from $A$ and $B$, lies on the surface. Two straight tunnels are bored through the Earth, one from $D$ to $A$ and one from $D$ to $B$. The angle $\\angle ADB$ between the two tunnels satisfies $\\cos\\angle ADB = \\dfrac{\\sqrt{10}}{4}$."
+          },
+          {
+           "k": "p",
+           "t": "Find the greatest possible distance, measured on the surface, between $C$ and $D$. Justify your answer."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct solution, including the comparison of the two circles and a check that the extreme position of $D$ gives an acute angle between the tunnels"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Shows that $D$ lies on one of two circles, for example $\\mathbf{d}\\cdot\\mathbf{n} = \\frac15$ for two unit vectors $\\mathbf{n}$, with the restriction that keeps the angle acute, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Introduces unit vectors from $O$ and writes the condition on the tunnels as an equation in scalar products, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $\\mathbf{a}$, $\\mathbf{b}$, $\\mathbf{c}$, $\\mathbf{d}$ be the unit vectors from $O$ towards $A$, $B$, $C$, $D$, so $\\mathbf{a}\\cdot\\mathbf{b} = \\frac{7}{25}$, $\\mathbf{a}\\cdot\\mathbf{c} = \\frac{9}{25}$, $\\mathbf{b}\\cdot\\mathbf{c} = \\frac35$. Take $R = 1$ until the last line."
+          },
+          {
+           "k": "p",
+           "t": "*A frame fitted to $A$ and $B$.* $|\\mathbf{a} + \\mathbf{b}|^{2} = \\frac{64}{25}$ and $|\\mathbf{b} - \\mathbf{a}|^{2} = \\frac{36}{25}$, so $\\mathbf{m} = \\frac58(\\mathbf{a} + \\mathbf{b})$ and $\\mathbf{t} = \\frac56(\\mathbf{b} - \\mathbf{a})$ are unit vectors, and $\\mathbf{m}\\cdot\\mathbf{t} = 0$ because $|\\mathbf{a}| = |\\mathbf{b}|$. Then $\\mathbf{a} = \\frac45\\mathbf{m} - \\frac35\\mathbf{t}$ and $\\mathbf{b} = \\frac45\\mathbf{m} + \\frac35\\mathbf{t}$. Let $\\mathbf{k}$ be the unit vector perpendicular to $\\mathbf{m}$ and $\\mathbf{t}$ with $\\mathbf{c}\\cdot\\mathbf{k} > 0$. Since"
+          },
+          {
+           "k": "math",
+           "t": "\\mathbf{c}\\cdot\\mathbf{m} = \\tfrac58\\big(\\tfrac{9}{25} + \\tfrac{15}{25}\\big) = \\tfrac35, \\qquad \\mathbf{c}\\cdot\\mathbf{t} = \\tfrac56\\big(\\tfrac{15}{25} - \\tfrac{9}{25}\\big) = \\tfrac15, \\qquad \\mathbf{c}\\cdot\\mathbf{k} = \\sqrt{1 - \\tfrac{9}{25} - \\tfrac{1}{25}} = \\tfrac{\\sqrt{15}}{5},"
+          },
+          {
+           "k": "p",
+           "t": "we have $\\mathbf{c} = \\frac35\\mathbf{m} + \\frac15\\mathbf{t} + \\frac{\\sqrt{15}}{5}\\mathbf{k}$. Write $\\mathbf{d} = x\\mathbf{m} + y\\mathbf{t} + z\\mathbf{k}$ with $x^{2} + y^{2} + z^{2} = 1$."
+          },
+          {
+           "k": "p",
+           "t": "*Where $D$ can be.* Let $\\mathbf{u} = \\mathbf{a} - \\mathbf{d}$ and $\\mathbf{v} = \\mathbf{b} - \\mathbf{d}$, the directions of the tunnels, and let $s = \\frac45 - x$. Then"
+          },
+          {
+           "k": "math",
+           "t": "\\mathbf{u}\\cdot\\mathbf{v} = 1 + \\tfrac{7}{25} - \\mathbf{d}\\cdot(\\mathbf{a} + \\mathbf{b}) = \\tfrac85 s, \\qquad |\\mathbf{u}|^{2} = 2 - 2\\,\\mathbf{d}\\cdot\\mathbf{a} = \\tfrac{18}{25} + \\tfrac85 s + \\tfrac65 y, \\qquad |\\mathbf{v}|^{2} = \\tfrac{18}{25} + \\tfrac85 s - \\tfrac65 y ."
+          },
+          {
+           "k": "p",
+           "t": "The angle is acute, so $s > 0$, and $\\cos^{2}\\angle ADB = \\frac{10}{16}$ gives $(\\mathbf{u}\\cdot\\mathbf{v})^{2} = \\frac58|\\mathbf{u}|^{2}|\\mathbf{v}|^{2}$:"
+          },
+          {
+           "k": "math",
+           "t": "\\tfrac{64}{25}s^{2} = \\tfrac58\\Big[\\big(\\tfrac{18}{25} + \\tfrac85 s\\big)^{2} - \\tfrac{36}{25}y^{2}\\Big]."
+          },
+          {
+           "k": "p",
+           "t": "Now $y^{2} = 1 - x^{2} - z^{2} = \\frac{9}{25} + \\frac85 s - s^{2} - z^{2}$, and the bracket simplifies to $4s^{2} + \\frac{36}{25}z^{2}$. So $\\frac{64}{25}s^{2} = \\frac52 s^{2} + \\frac{9}{10}z^{2}$, that is $z^{2} = \\frac{1}{15}s^{2}$, and"
+          },
+          {
+           "k": "math",
+           "t": "x \\pm \\sqrt{15}\\,z = \\tfrac45 ."
+          },
+          {
+           "k": "p",
+           "t": "Each step can be reversed when $s > 0$. So the possible positions of $D$ are exactly the points with"
+          },
+          {
+           "k": "math",
+           "t": "\\mathbf{d}\\cdot\\mathbf{n} = \\tfrac15 \\quad\\text{and}\\quad \\mathbf{d}\\cdot\\mathbf{m} < \\tfrac45, \\qquad\\text{where } \\mathbf{n} = \\tfrac14\\mathbf{m} + \\tfrac{\\sqrt{15}}{4}\\mathbf{k} \\ \\text{ or } \\ \\mathbf{n} = \\tfrac14\\mathbf{m} - \\tfrac{\\sqrt{15}}{4}\\mathbf{k}"
+          },
+          {
+           "k": "p",
+           "t": "(both are unit vectors). These are arcs of two circles on the surface, each from $A$ round to $B$."
+          },
+          {
+           "k": "p",
+           "t": "*The greatest distance.* For a unit vector $\\mathbf{n}$ write $\\mathbf{d} = \\frac15\\mathbf{n} + \\mathbf{d}'$ and $\\mathbf{c} = (\\mathbf{c}\\cdot\\mathbf{n})\\mathbf{n} + \\mathbf{c}'$, with $\\mathbf{d}'$ and $\\mathbf{c}'$ perpendicular to $\\mathbf{n}$. Then $|\\mathbf{d}'| = \\frac{2\\sqrt6}{5}$, $|\\mathbf{c}'| = \\sqrt{1 - (\\mathbf{c}\\cdot\\mathbf{n})^{2}}$ and"
+          },
+          {
+           "k": "math",
+           "t": "\\mathbf{c}\\cdot\\mathbf{d} = \\tfrac15\\,\\mathbf{c}\\cdot\\mathbf{n} + \\mathbf{c}'\\cdot\\mathbf{d}' \\ \\ge\\ \\tfrac15\\,\\mathbf{c}\\cdot\\mathbf{n} - \\tfrac{2\\sqrt6}{5}\\sqrt{1 - (\\mathbf{c}\\cdot\\mathbf{n})^{2}} ."
+          },
+          {
+           "k": "p",
+           "t": "For $\\mathbf{n} = \\frac14\\mathbf{m} + \\frac{\\sqrt{15}}{4}\\mathbf{k}$: $\\mathbf{c}\\cdot\\mathbf{n} = \\frac{3}{20} + \\frac{15}{20} = \\frac{9}{10}$, and the bound is $\\frac{9}{50} - \\frac{2\\sqrt6}{5}\\cdot\\frac{\\sqrt{19}}{10} = \\frac{9 - 2\\sqrt{114}}{50} \\approx -0.247$."
+          },
+          {
+           "k": "p",
+           "t": "For $\\mathbf{n} = \\frac14\\mathbf{m} - \\frac{\\sqrt{15}}{4}\\mathbf{k}$: $\\mathbf{c}\\cdot\\mathbf{n} = \\frac{3}{20} - \\frac{15}{20} = -\\frac35$, and the bound is $-\\frac{3}{25} - \\frac{2\\sqrt6}{5}\\cdot\\frac45 = -\\frac{3 + 8\\sqrt6}{25} \\approx -0.904$."
+          },
+          {
+           "k": "p",
+           "t": "The second is smaller. It is attained when $\\mathbf{d}'$ is opposite to $\\mathbf{c}'$, that is at $\\mathbf{d} = \\frac15\\mathbf{n} - \\frac{\\sqrt6}{2}\\big(\\mathbf{c} + \\frac35\\mathbf{n}\\big)$, and this position is allowed, because there"
+          },
+          {
+           "k": "math",
+           "t": "\\mathbf{d}\\cdot\\mathbf{m} = \\tfrac15\\cdot\\tfrac14 - \\tfrac{\\sqrt6}{2}\\big(\\tfrac35 + \\tfrac35\\cdot\\tfrac14\\big) = \\tfrac{1}{20} - \\tfrac{3\\sqrt6}{8} < \\tfrac45 ."
+          },
+          {
+           "k": "p",
+           "t": "So the least value of $\\cos\\angle COD$ is $-\\dfrac{3 + 8\\sqrt6}{25}$, and the greatest distance between $C$ and $D$ is"
+          },
+          {
+           "k": "math",
+           "t": "R\\cos^{-1}\\!\\Big(-\\frac{3 + 8\\sqrt6}{25}\\Big) = R\\Big(\\pi - \\cos^{-1}\\frac{3 + 8\\sqrt6}{25}\\Big) \\approx 2.699R ."
+          },
+          {
+           "k": "p",
+           "t": "*Remarks.* The plane $ABD$ cuts the surface in a circle through $A$, $B$ and $D$; the angle $ADB$ fixes the radius of that circle, which is why two planes through $A$ and $B$ appear, and the acute angle is found only on the longer arc of each circle. A solution that finds the two circles in this way is equally acceptable."
+          },
+          {
+           "k": "p",
+           "t": "*Common errors.* Adding the angles $\\cos^{-1}\\!\\big(-\\frac35\\big)$ and $\\cos^{-1}\\frac15$: the sum is about $205^{\\circ}$, more than a half turn, so it is not the angle $COD$ (the correct angle is $360^{\\circ}$ minus this). Finding only one of the two circles, or the one nearer $C$, which gives $R\\cos^{-1}\\frac{9 - 2\\sqrt{114}}{50} \\approx 1.82R$. Squaring the condition and keeping the points with $\\mathbf{d}\\cdot\\mathbf{m} > \\frac45$, where the angle between the tunnels is obtuse. Not checking that the extreme position is allowed."
+          }
+         ],
+         "classification": {
+          "content": "Vectors in three dimensions: scalar product",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "R*acos(-(3+8*sqrt(6))/25)",
+          "anyOf": [
+           "R*(pi-acos((3+8*sqrt(6))/25))",
+           "R*(2*pi-acos(-3/5)-acos(1/5))"
+          ],
+          "display": "R\\cos^{-1}\\!\\Big(-\\dfrac{3+8\\sqrt{6}}{25}\\Big)"
+         },
+         "autoMarks": 1,
+         "keyChecks": "p13.py Q14a-i: unit vectors from the Gram matrix; the whole constraint curve cos(ADB)=sqrt10/4 sampled on the sphere and c.d minimised: cos(COD)=-0.90383672 = -(3+8sqrt6)/25, distance 2.699449R. Engine: the R-containing expression works; R*acos(..), R*arccos(..), R*(pi-arccos(..)) accepted; wrong cosines and the guideline's own common error R*(pi-acos(3/5)-acos(1/5)) rejected. Not accepted: cos^-1(...) notation and a decimal coefficient such as 2.699R (the engine cannot take them here)."
+        },
+        {
+         "id": "q14a-ii",
+         "label": "(ii)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "A city can be seen from a satellite when the straight line segment that joins them does not pass through the interior of the Earth."
+          },
+          {
+           "k": "p",
+           "t": "Find the least height above the surface of the Earth at which a satellite can be placed so that all three cities can be seen from it at the same time, and show that no satellite at a lower height can see all three cities."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct solution, including a proof that no satellite at a lower height can see all three cities"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Finds a direction $\\mathbf{n}$ with $\\mathbf{n}\\cdot\\mathbf{a} = \\mathbf{n}\\cdot\\mathbf{b} = \\mathbf{n}\\cdot\\mathbf{c}$ and the corresponding height, or proves the bound without showing that it is attained, or equivalent merit"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains the condition $(R + h)\\,\\mathbf{n}\\cdot\\mathbf{x} \\ge R$ for each city and recognises that the position above the middle of the route $AB$ fails for $C$, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains a correct condition for one city to be seen from the satellite, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let the satellite be at $S$, at height $h$, and let $\\mathbf{n}$ be the unit vector from $O$ towards $S$, so $\\overrightarrow{OS} = (R + h)\\mathbf{n}$."
+          },
+          {
+           "k": "p",
+           "t": "Let $X$ be a city, with unit vector $\\mathbf{x}$ from $O$. A point of the segment $XS$ has position vector $R\\mathbf{x} + s\\,\\mathbf{d}$, where $\\mathbf{d} = \\overrightarrow{XS}$ and $0 \\le s \\le 1$, and"
+          },
+          {
+           "k": "math",
+           "t": "|R\\mathbf{x} + s\\,\\mathbf{d}|^{2} = R^{2} + 2sR\\,\\mathbf{x}\\cdot\\mathbf{d} + s^{2}|\\mathbf{d}|^{2}."
+          },
+          {
+           "k": "p",
+           "t": "This is at least $R^{2}$ for every such $s$ exactly when $\\mathbf{x}\\cdot\\mathbf{d} \\ge 0$ (if $\\mathbf{x}\\cdot\\mathbf{d} < 0$ it is less than $R^{2}$ for small positive $s$). As $\\mathbf{x}\\cdot\\mathbf{d} = (R + h)\\,\\mathbf{n}\\cdot\\mathbf{x} - R$, the city is seen exactly when"
+          },
+          {
+           "k": "math",
+           "t": "\\mathbf{n}\\cdot\\mathbf{x} \\ge \\frac{R}{R + h}."
+          },
+          {
+           "k": "p",
+           "t": "So all three cities are seen when $\\dfrac{R}{R+h} \\le m$, where $m$ is the least of $\\mathbf{n}\\cdot\\mathbf{a}$, $\\mathbf{n}\\cdot\\mathbf{b}$, $\\mathbf{n}\\cdot\\mathbf{c}$, and $h$ is least when $m$ is as large as possible."
+          },
+          {
+           "k": "p",
+           "t": "Let $\\mathbf{g} = 5\\mathbf{a} + 4\\mathbf{b} + 3\\mathbf{c}$. Then"
+          },
+          {
+           "k": "math",
+           "t": "\\mathbf{g}\\cdot\\mathbf{a} = 5 + \\tfrac{28}{25} + \\tfrac{27}{25} = \\tfrac{36}{5},\\qquad \\mathbf{g}\\cdot\\mathbf{b} = \\tfrac{35}{25} + 4 + \\tfrac{9}{5} = \\tfrac{36}{5},\\qquad \\mathbf{g}\\cdot\\mathbf{c} = \\tfrac{45}{25} + \\tfrac{12}{5} + 3 = \\tfrac{36}{5},"
+          },
+          {
+           "k": "p",
+           "t": "and so $|\\mathbf{g}|^{2} = \\mathbf{g}\\cdot(5\\mathbf{a} + 4\\mathbf{b} + 3\\mathbf{c}) = 12\\times\\frac{36}{5} = \\frac{432}{5}$."
+          },
+          {
+           "k": "p",
+           "t": "For any unit vector $\\mathbf{n}$, since the weights 5, 4, 3 are positive,"
+          },
+          {
+           "k": "math",
+           "t": "12m \\le 5\\,\\mathbf{n}\\cdot\\mathbf{a} + 4\\,\\mathbf{n}\\cdot\\mathbf{b} + 3\\,\\mathbf{n}\\cdot\\mathbf{c} = \\mathbf{n}\\cdot\\mathbf{g} \\le |\\mathbf{g}|, \\qquad\\text{so}\\qquad m \\le \\frac{1}{12}\\sqrt{\\frac{432}{5}} = \\sqrt{\\frac{3}{5}}."
+          },
+          {
+           "k": "p",
+           "t": "When $\\mathbf{n} = \\dfrac{\\mathbf{g}}{|\\mathbf{g}|}$, each of the three scalar products is $\\dfrac{36}{5}\\div\\sqrt{\\dfrac{432}{5}} = \\sqrt{\\dfrac{3}{5}}$, so the greatest possible $m$ is $\\sqrt{\\frac35}$."
+          },
+          {
+           "k": "p",
+           "t": "Hence $\\dfrac{R}{R + h} \\le \\sqrt{\\dfrac{3}{5}}$, and the least height is $h = R\\Big(\\sqrt{\\dfrac{5}{3}} - 1\\Big) = \\dfrac{(\\sqrt{15} - 3)R}{3}$, about $0.291R$."
+          },
+          {
+           "k": "p",
+           "t": "*How the weights are found.* Look for $\\mathbf{n}$ in the direction of $\\lambda\\mathbf{a} + \\mu\\mathbf{b} + \\nu\\mathbf{c}$ with equal scalar products with $\\mathbf{a}$, $\\mathbf{b}$, $\\mathbf{c}$: $25\\lambda + 7\\mu + 9\\nu = 7\\lambda + 25\\mu + 15\\nu = 9\\lambda + 15\\mu + 25\\nu$. These give $3\\lambda - 3\\mu = \\nu$ and $\\lambda = 5\\mu - 5\\nu$, so $\\lambda : \\mu : \\nu = 5 : 4 : 3$. The bound above works because all three weights are positive."
+          },
+          {
+           "k": "p",
+           "t": "*Common errors.* Placing the satellite above the middle of the route between the two cities that are farthest apart ($A$ and $B$). There $\\mathbf{n} = \\frac{5}{8}(\\mathbf{a} + \\mathbf{b})$ and $\\mathbf{n}\\cdot\\mathbf{a} = \\mathbf{n}\\cdot\\mathbf{b} = \\frac45$, which suggests $h = \\frac{R}{4}$, but $\\mathbf{n}\\cdot\\mathbf{c} = \\frac58\\big(\\frac{9}{25} + \\frac{15}{25}\\big) = \\frac35 < \\frac45$, so $C$ is below the horizon. Assuming without proof that the position equidistant from the three cities is best (it is not when one of the weights is negative)."
+          }
+         ],
+         "classification": {
+          "content": "Vectors in three dimensions: scalar product",
+          "outcomes": [
+           "ME1-12-02"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "R*(sqrt(5/3)-1)",
+          "anyOf": [
+           "(sqrt(15)-3)*R/3"
+          ],
+          "display": "R\\Big(\\sqrt{\\dfrac{5}{3}}-1\\Big)=\\dfrac{(\\sqrt{15}-3)R}{3}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "p13.py Q14a-ii: minimised |P| subject to P.X>=R^2 for the three cities over the sphere: |P|/R=1.290994449, h=0.290994449R = R(sqrt(5/3)-1). Engine: R*(sqrt(5/3)-1), (sqrt(15)-3)R/3, R*sqrt(5/3)-R, R/sqrt(3/5)-R accepted; R/4 (the AB-midpoint error), R*(sqrt(3/5)-1), R*(sqrt(5/3)+1) rejected. Decimal 0.291R is not accepted."
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figGdglobe"
+       ]
+      },
+      {
+       "id": "q14b",
+       "label": "(b)",
+       "marks": 8,
+       "prompt": [
+        {
+         "k": "p",
+         "t": "A circular paddock of radius 1 km has $N$ posts equally spaced around its boundary, where $N \\ge 3$. Straight fences that join some of the posts enclose a yard. The diagrams show two yards when $N = 11$."
+        },
+        {
+         "k": "fig",
+         "name": "figGdposts"
+        }
+       ],
+       "parts": [
+        {
+         "id": "q14b-i",
+         "label": "(i)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Three different posts are chosen at random, and they are joined by three fences to make a triangular yard."
+          },
+          {
+           "k": "p",
+           "t": "Find the expected value of the area of the yard. Give your answer in terms of $N$ in closed form (without a summation)."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct solution"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Reduces the expected area to a multiple of $\\sum (N-1-k)\\sin\\frac{2\\pi k}{N}$ and makes substantial progress towards a closed form for this sum, or equivalent merit"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains the area of every triangle, including those that do not contain the centre, as $\\frac12(\\sin k_{1}x + \\sin k_{2}x + \\sin k_{3}x)$ and counts the triangles that have a given arc, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Expresses the area of a triangle that contains the centre in terms of the angles at the centre, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Work in kilometres and let $x = \\dfrac{2\\pi}{N}$, the angle at the centre $O$ between neighbouring posts."
+          },
+          {
+           "k": "p",
+           "t": "*Area of one yard.* Going once around the boundary, let the three arcs between the chosen posts contain $k_{1}$, $k_{2}$, $k_{3}$ gaps, so $k_{1} + k_{2} + k_{3} = N$. If $O$ is inside the triangle or on it, the triangle is made of three triangles with a vertex at $O$, of areas $\\frac12\\sin k_{i}x \\ge 0$. If $O$ is outside, one arc is more than half the boundary, say $k_{3}x > \\pi$, and the area is $\\frac12\\sin k_{1}x + \\frac12\\sin k_{2}x - \\frac12\\sin(2\\pi - k_{3}x)$. In every case"
+          },
+          {
+           "k": "math",
+           "t": "\\text{area} = \\tfrac12\\big(\\sin k_{1}x + \\sin k_{2}x + \\sin k_{3}x\\big)."
+          },
+          {
+           "k": "p",
+           "t": "*Counting.* Fix $k$ with $1 \\le k \\le N - 2$. A triangle together with one of its arcs of $k$ gaps is fixed by the post where the arc starts ($N$ ways) and the third vertex, which is any of the $N - 1 - k$ posts not on the arc. Adding the areas of all $\\binom{N}{3}$ triangles therefore gives"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{N}{2}\\sum_{k=1}^{N-1}(N - 1 - k)\\sin kx ."
+          },
+          {
+           "k": "p",
+           "t": "Since $\\sin (N-k)x = -\\sin kx$, $\\displaystyle\\sum_{k=1}^{N-1}\\sin kx = 0$, so the total is $-\\dfrac{N}{2}\\displaystyle\\sum_{k=1}^{N-1}k\\sin kx$."
+          },
+          {
+           "k": "p",
+           "t": "*The sum.* For any angle $u$, $2\\sin\\frac{u}{2}\\cos ku = \\sin\\!\\big(k + \\frac12\\big)u - \\sin\\!\\big(k - \\frac12\\big)u$. Adding for $k = 1, \\dots, N-1$,"
+          },
+          {
+           "k": "math",
+           "t": "\\sum_{k=1}^{N-1}\\cos ku = \\frac{\\sin\\!\\big(N - \\frac12\\big)u}{2\\sin\\frac{u}{2}} - \\frac12 \\qquad\\Big(\\sin\\frac u2 \\ne 0\\Big)."
+          },
+          {
+           "k": "p",
+           "t": "Differentiating with respect to $u$,"
+          },
+          {
+           "k": "math",
+           "t": "-\\sum_{k=1}^{N-1}k\\sin ku = \\frac{(2N - 1)\\cos\\!\\big(N - \\frac12\\big)u\\,\\sin\\frac{u}{2} - \\sin\\!\\big(N - \\frac12\\big)u\\,\\cos\\frac{u}{2}}{4\\sin^{2}\\frac{u}{2}} ."
+          },
+          {
+           "k": "p",
+           "t": "At $u = x$ we have $\\big(N - \\frac12\\big)x = 2\\pi - \\frac{x}{2}$, so the numerator is $(2N - 1)\\cos\\frac x2\\sin\\frac x2 + \\sin\\frac x2\\cos\\frac x2 = 2N\\sin\\frac x2\\cos\\frac x2$, and"
+          },
+          {
+           "k": "math",
+           "t": "-\\sum_{k=1}^{N-1}k\\sin kx = \\frac{N}{2}\\cot\\frac{x}{2} = \\frac{N}{2}\\cot\\frac{\\pi}{N}."
+          },
+          {
+           "k": "p",
+           "t": "*Expected value.* All $\\binom{N}{3}$ triangles are equally likely, so"
+          },
+          {
+           "k": "math",
+           "t": "E(\\text{area}) = \\frac{N}{2}\\cdot\\frac{N}{2}\\cot\\frac{\\pi}{N}\\div\\frac{N(N-1)(N-2)}{6} = \\frac{3N}{2(N-1)(N-2)}\\cot\\frac{\\pi}{N}\\ \\text{km}^{2}."
+          },
+          {
+           "k": "p",
+           "t": "(Check: $N = 3$ gives $\\frac{9}{4}\\cot\\frac{\\pi}{3} = \\frac{3\\sqrt3}{4}$, the area of the only triangle; $N = 4$ gives 1.)"
+          },
+          {
+           "k": "p",
+           "t": "*Alternative for the sum, without calculus.* $2\\sin\\frac x2\\cdot k\\sin kx = k\\cos\\!\\big(k - \\frac12\\big)x - k\\cos\\!\\big(k + \\frac12\\big)x$, and adding gives $\\sum_{k=1}^{N-1}\\cos\\!\\big(k - \\frac12\\big)x - (N-1)\\cos\\!\\big(N - \\frac12\\big)x$. The first sum is $\\dfrac{\\sin (N-1)x}{2\\sin\\frac x2} = -\\cos\\dfrac x2$ and $\\cos\\!\\big(N - \\frac12\\big)x = \\cos\\frac x2$, so $2\\sin\\frac x2\\sum k\\sin kx = -N\\cos\\frac x2$."
+          },
+          {
+           "k": "p",
+           "t": "*Common errors.* Using $\\frac12\\sum\\sin$ only for triangles that contain the centre, or taking absolute values of the sines. Treating the three arcs as independent. Counting each triangle three times without dividing by the number of triangles correctly."
+          }
+         ],
+         "classification": {
+          "content": "Probability; further trigonometric identities",
+          "outcomes": [
+           "ME1-11-04",
+           "ME1-11-03"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "3*N/(2*(N-1)*(N-2))*cot(pi/N)",
+          "anyOf": [
+           "3*N*cos(pi/N)/(2*(N-1)*(N-2)*sin(pi/N))",
+           "3*N/(2*(N-1)*(N-2)*tan(pi/N))"
+          ],
+          "display": "\\dfrac{3N}{2(N-1)(N-2)}\\cot\\dfrac{\\pi}{N}"
+         },
+         "autoMarks": 1,
+         "answerSuffix": "km^2",
+         "keyChecks": "p13.py Q14b-i: mean triangle area over all C(N,3) triangles of the regular N-gon, N=3..14 at 30 digits, equals the key to 1e-30. Engine: cot, cos/sin and 1/tan forms accepted; tan(pi/N), 3N/((N-1)(N-2)) (factor 2 missing), cot(2pi/N) rejected."
+        },
+        {
+         "id": "q14b-ii",
+         "label": "(ii)",
+         "marks": 4,
+         "prompt": [
+          {
+           "k": "p",
+           "t": "Suppose instead that $N$ is odd. Posts are chosen one at a time, each chosen at random from the posts not yet chosen. After each choice the yard is the polygon whose vertices are all the posts chosen so far, and the choosing stops as soon as the centre of the paddock is inside the yard. (The centre is not inside the yard while fewer than three posts have been chosen.)"
+          },
+          {
+           "k": "p",
+           "t": "Find the expected value of the number of posts chosen. Give your answer in terms of $N$ in closed form (without a summation)."
+          }
+         ],
+         "criteria": [
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Provides the correct solution"
+            }
+           ],
+           "marks": 4
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Obtains the expected number as $1 + \\sum N\\binom{m}{k-1}\\big/\\binom{N}{k}$, or equivalent, and makes substantial progress towards a closed form, or equivalent merit"
+            }
+           ],
+           "marks": 3
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Counts the sets of $k$ posts whose yard does not contain the centre, $N\\binom{m}{k-1}$, with a reason why no set is counted twice, or equivalent merit"
+            }
+           ],
+           "marks": 2
+          },
+          {
+           "text": [
+            {
+             "k": "p",
+             "t": "Recognises that the centre is outside the yard exactly when the chosen posts all lie among $m + 1$ neighbouring posts, where $N = 2m + 1$, or equivalent merit"
+            }
+           ],
+           "marks": 1
+          }
+         ],
+         "sampleAnswer": [
+          {
+           "k": "p",
+           "t": "Let $N = 2m + 1$ and let $T$ be the number of posts chosen."
+          },
+          {
+           "k": "p",
+           "t": "*When the choosing continues.* As $N$ is odd, no two posts are at opposite ends of a diameter. If the chosen posts all lie among $m + 1$ neighbouring posts, they lie on an arc that subtends $\\frac{2\\pi m}{N} < \\pi$ at the centre $O$, so $O$ is not inside the yard. If they do not, every arc between neighbouring chosen posts subtends less than $\\pi$, there are at least three chosen posts, and $O$ is inside the yard. So $T > k$ exactly when the first $k$ posts chosen lie among some $m + 1$ neighbouring posts."
+          },
+          {
+           "k": "p",
+           "t": "*Counting.* Take such a set of $k \\ge 1$ posts. Going clockwise, exactly one of its posts, $P$ say, has none of the set among the $m$ posts just before it, and then the other $k - 1$ posts of the set are among the $m$ posts just after $P$. So the number of such sets is $N\\binom{m}{k-1}$. The first $k$ posts chosen are equally likely to be any of the $\\binom{N}{k}$ sets of $k$ posts, so"
+          },
+          {
+           "k": "math",
+           "t": "P(T > k) = \\frac{N\\binom{m}{k-1}}{\\binom{N}{k}} \\quad (1 \\le k \\le m + 1), \\qquad P(T > 0) = 1, \\qquad P(T > k) = 0 \\quad (k \\ge m + 2)."
+          },
+          {
+           "k": "p",
+           "t": "*Expected value by counting.* List the $N!$ equally likely orders in which all the posts could be chosen, and for each order write a mark for every $k \\ge 0$ with $T > k$. An order with $T = t$ gets exactly $t$ marks ($k = 0, 1, \\dots, t - 1$), so the total number of marks is the sum of the values of $T$. Counting the same marks one $k$ at a time, the number of orders marked for $k$ is $N!\\,P(T > k)$. Dividing by $N!$,"
+          },
+          {
+           "k": "math",
+           "t": "E(T) = \\sum_{k \\ge 0}P(T > k) = 1 + \\sum_{k=1}^{m+1}\\frac{N\\binom{m}{k-1}}{\\binom{N}{k}}."
+          },
+          {
+           "k": "p",
+           "t": "*The sum.* Since $\\binom{N}{k} = \\frac{N!}{k!\\,(N-k)!} = \\frac{N}{k}\\binom{N-1}{k-1}$ and $N - 1 = 2m$,"
+          },
+          {
+           "k": "math",
+           "t": "\\frac{N\\binom{m}{k-1}}{\\binom{N}{k}} = \\frac{k\\binom{m}{k-1}}{\\binom{2m}{k-1}} = \\frac{k\\;m!\\,(2m+1-k)!}{(m+1-k)!\\,(2m)!} = \\frac{k\\binom{2m+1-k}{m}}{\\binom{2m}{m}} ."
+          },
+          {
+           "k": "p",
+           "t": "To add these, count in two ways the sets of $m + 2$ numbers chosen from $1, 2, \\dots, 2m + 2$. There are $\\binom{2m+2}{m+2}$ of them. On the other hand, sort them by their second smallest number, which is $k + 1$ for some $k$ from $1$ to $m + 1$: there are then $k$ choices for the smallest number and $\\binom{2m+1-k}{m}$ choices for the $m$ numbers larger than $k + 1$. So"
+          },
+          {
+           "k": "math",
+           "t": "\\sum_{k=1}^{m+1}k\\binom{2m+1-k}{m} = \\binom{2m+2}{m+2}."
+          },
+          {
+           "k": "p",
+           "t": "Hence"
+          },
+          {
+           "k": "math",
+           "t": "E(T) = 1 + \\frac{\\binom{2m+2}{m+2}}{\\binom{2m}{m}} = 1 + \\frac{(2m+2)(2m+1)}{(m+2)(m+1)} = 1 + \\frac{2(2m+1)}{m+2} = \\frac{5m+4}{m+2} = \\frac{5N+3}{N+3}."
+          },
+          {
+           "k": "p",
+           "t": "(Check: $N = 3$ gives 3, as all three posts are needed. For $N = 5$: $P(T>3) = \\frac{5\\times 1}{10} = \\frac12$ and $P(T > 4) = 0$, so $E(T) = 3\\times\\frac12 + 4\\times\\frac12 = \\frac72 = \\frac{28}{8}$.)"
+          },
+          {
+           "k": "p",
+           "t": "*Common errors.* Stopping when three posts have been chosen, or when the yard first has positive area. Counting the sets inside $m + 1$ neighbouring posts as $N\\binom{m+1}{k}$, which counts most of them several times. Using the methods of part (i): areas are not needed here. Leaving the answer as a sum."
+          }
+         ],
+         "classification": {
+          "content": "Permutations and combinations; expected value",
+          "outcomes": [
+           "ME1-11-04",
+           "ME1-12-06"
+          ]
+         },
+         "figures": [],
+         "answerType": "expression",
+         "key": {
+          "type": "expression",
+          "expr": "(5*N+3)/(N+3)",
+          "display": "\\dfrac{5N+3}{N+3}"
+         },
+         "autoMarks": 1,
+         "keyChecks": "p13.py Q14b-ii: exact geometry (centre-in-hull via triangle test) over all k-subsets for N=3,5,...,13 and over all N! orders for N=5,7 gives 3, 7/2, 19/5, 4, 29/7, 17/4 = (5N+3)/(N+3). Engine: (5N+3)/(N+3), 5-12/(N+3) accepted; (5N+3)/(N+2), (5N+4)/(N+3) rejected."
+        }
+       ],
+       "answerType": "group",
+       "criteria": [],
+       "sampleAnswer": [],
+       "figures": [
+        "figGdposts"
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "figures": [
+  "figGsline",
+  "figGsweb",
+  "figGsgraphs",
+  "figGsblock",
+  "figGsroof",
+  "figGbjets",
+  "figGbriffle",
+  "figGcfloat",
+  "figGcdrone",
+  "figGdglobe",
+  "figGdposts"
+ ]
+}

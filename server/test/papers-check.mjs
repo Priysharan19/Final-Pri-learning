@@ -36,7 +36,8 @@ c.eq(real.edition, 'prithagoras', 'the manifest is the Prithagoras edition\'s');
 const SHIPPED = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'];
 c.deq(real.papers.map(p => p.id), SHIPPED.map(n => `ext1-2027-p${n}`), 'thirteen practice papers ship, in order: 01-13 (08, 09, 11 and 12 are the scope-revised versions, each replaced part re-solved 18 Nov 2026)');
 c.deq(real.papers.map(p => p.title), SHIPPED.map(n => `Practice Paper ${n}`), 'titled "Practice Paper NN"');
-const named = new Set(['manifest.json']);
+// The structured papers, their diagrams and the conversion report are content too, not PDFs (paperContent.js).
+const named = new Set(['manifest.json', 'conversion-report.json', 'structured', 'figures']);
 for (const p of real.papers) {
   c.deq([p.course, p.yearLevel, p.marks, p.workingTime], ['nsw-ext1', 12, 70, '2 hours'], `${p.id}: course, year level, marks and working time`);
   c.eq(p.hasGuidelines, p.guidelines !== null, `${p.id}: hasGuidelines agrees with the guidelines file`);
@@ -50,7 +51,7 @@ for (const p of real.papers) {
     c.match(f.file, /^ext1-2027-[a-z0-9]+(-guidelines)?\.pdf$/, `${f.file}: a short slug name`);
   }
 }
-c.deq(readdirSync(PAPERS_DIR).sort(), [...named].sort(), 'the directory holds exactly the manifest and the files it names');
+c.deq(readdirSync(PAPERS_DIR).filter(f => f !== 'approvals.json').sort(), [...named].sort(), 'the directory holds exactly the manifest and the files it names');
 c.deq(real.papers.filter(p => p.sample).map(p => p.id), ['ext1-2027-p01'], 'Practice Paper 01 is the only free sample; the other twelve are Premium');
 c.deq(real.papers.map(p => [p.hasGuidelines, p.paper.pages, p.guidelines.pages]), [[true, 19, 14], [true, 18, 12], [true, 17, 11], [true, 18, 11], [true, 18, 11], [true, 17, 12], [true, 17, 11], [true, 18, 12], [true, 14, 10], [true, 16, 9], [true, 15, 10], [true, 15, 9], [true, 20, 22]], 'every paper has its marking guidelines, with the page counts of the rebuilt files');
 
@@ -129,10 +130,10 @@ try {
     return r.jar;
   }
   const get = (h, path, jar, headers = {}) => h.request(path, { jar, headers });
-  const bytesOf = async (h, path, jar) => {
+  const bytesOf = async (h, path, jar, headers = {}) => {
     const target = new URL(path, h.origin); // an id read from the manifest file can only ever name a path on this server
     if (target.origin !== new URL(h.origin).origin) throw new Error(`not this server: ${path}`);
-    const response = await fetch(target, { headers: { Cookie: cookieHeader(jar) } });
+    const response = await fetch(target, { headers: { Cookie: cookieHeader(jar), ...headers } });
     return { status: response.status, headers: response.headers, bytes: Buffer.from(await response.arrayBuffer()) };
   };
   const free = await student(hAu, 'free@example.test', null);
@@ -153,11 +154,14 @@ try {
   c.eq(list.headers.get('cache-control'), 'private, no-store', 'the list is not cached');
   c.deq([list.data.available, list.data.premium, list.data.capability], [true, false, 'premium-exams'], 'a free account is told it is not Premium');
   c.deq(list.data.papers.map(p => p.id), manifest.papers.map(p => p.id), 'every paper is listed, in manifest order');
-  c.deq(list.data.papers.filter(p => !p.locked).map(p => p.id), [SAMPLE], 'for a free account only the sample is unlocked');
+  // OWNER DECISION 19 Nov 2026 ("give original papers away; sell the supported diagnosis and correction workflow"): a PDF is free for any signed-in
+  // account. What is Premium is SITTING a paper in the app (the sample, Paper 01, excepted), so the list says which papers a free account may sit.
+  c.deq(list.data.papers.filter(p => !p.sitLocked).map(p => p.id), [SAMPLE], 'for a free account only the sample may be sat in the app');
+  c.ok(list.data.papers.every(p => p.locked === undefined), 'no paper is "locked" any more: every PDF is free');
   const row = list.data.papers[0];
   c.deq([row.title, row.marks, row.workingTime, row.pages, row.hasGuidelines, row.guidelinesPages, row.yearLevel, row.course], ['Practice Paper 01', 70, '2 hours', 19, true, 14, 12, 'nsw-ext1'], 'a row carries title, marks, time, pages');
   c.ok(!JSON.stringify(list.data).match(/sha256|\.pdf|server\/content/), 'the list names no file, hash or path');
-  c.deq((await get(hAu, '/v1/papers', paid)).data.papers.filter(p => p.locked), [], 'Premium: nothing is locked');
+  c.deq((await get(hAu, '/v1/papers', paid)).data.papers.filter(p => p.sitLocked), [], 'Premium: nothing is locked from sitting');
   c.eq((await get(hAu, '/v1/papers', paid)).data.premium, true, 'Premium is reported from the server\'s own row');
   c.eq((await get(hAu, '/v1/papers', freeRow)).data.premium, false, 'a free-plan row is not Premium');
   c.eq((await get(hAu, '/v1/papers', free, { 'x-pri-plan': 'premium', 'x-pri-capabilities': 'premium-exams' })).data.premium, false, 'a Premium claim in a header changes nothing');
@@ -175,19 +179,21 @@ try {
   const sampleGuide = await bytesOf(hAu, `/v1/papers/${SAMPLE}/guidelines`, free);
   c.deq([sampleGuide.status, sha(sampleGuide.bytes)], [200, real.papers[0].guidelines.sha256], 'the sample\'s marking guidelines are free too');
   c.match(sampleGuide.headers.get('content-disposition'), /Marking-Guidelines\.pdf"$/, 'the guidelines file says what it is');
-  for (const kind of ['paper', 'guidelines']) {
-    const refusal = await get(hAu, `/v1/papers/${LOCKED}/${kind}`, free);
-    c.deq([refusal.status, refusal.data?.error?.code, refusal.data?.error?.capability, refusal.data?.error?.plan, refusal.data?.error?.retryable], [402, 'PREMIUM_REQUIRED', 'premium-exams', 'free', false],
-      `a free account is refused ${LOCKED}/${kind}: the existing Premium-required shape`);
-    c.eq(refusal.headers.get('content-type')?.startsWith('application/json'), true, 'the refusal is JSON, never a PDF');
-    c.eq(refusal.headers.get('cache-control'), 'private, no-store', 'the refusal is not cached');
+  // Every PDF, paper and guidelines, downloads for a FREE account, a free-plan row, an expired or revoked state and a false claim alike: the server
+  // consults no entitlement for a PDF (decision of 19 Nov 2026). Sign-in is the only gate, kept so downloads can be counted.
+  for (const [name, jar, headers] of [['a free account', free], ['a free-plan row', freeRow], ['an expired period', expired], ['a revoked state', revoked], ['a header claim', free, { 'x-pri-plan': 'premium', 'x-pri-capabilities': 'premium-exams' }]]) {
+    for (const p of manifest.papers) {
+      for (const [kind, f] of [['paper', p.paper], ['guidelines', p.guidelines]]) {
+        if (!f) continue;
+        const known = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13'].map(n => `ext1-2027-p${n}`).concat([NO_GUIDE]).find(x => x === p.id);
+        const got = await bytesOf(hAu, `/v1/papers/${known}/${kind}`, jar, headers ?? {});
+        if (got.status !== 200 || sha(got.bytes) !== f.sha256) c.ok(false, `${name}: ${p.id}/${kind} should arrive intact (status ${got.status})`);
+      }
+    }
+    c.ok(true, `${name}: every paper and guidelines PDF is free and arrives byte for byte`);
   }
-  c.eq((await get(hAu, `/v1/papers/${LOCKED}/paper`, freeRow)).status, 402, 'a free-plan row is refused');
-  c.eq((await get(hAu, `/v1/papers/${LOCKED}/paper`, free, { 'x-pri-plan': 'premium', 'x-pri-capabilities': 'premium-exams' })).status, 402, 'a Premium claim in a header changes nothing');
-  c.eq((await get(hAu, `/v1/papers/${LOCKED}/paper?plan=premium`, free)).status, 402, 'a query claim changes nothing');
-  for (const [name, jar] of [['an expired period', expired], ['a revoked state', revoked]]) {
-    c.eq((await get(hAu, `/v1/papers/${LOCKED}/paper`, jar)).status, 402, `${name} is Free`);
-  }
+  const unauth = await get(hAu, `/v1/papers/${LOCKED}/paper`);
+  c.eq(unauth.status, 401, 'signed out: a PDF is still refused (sign-in is kept so downloads can be counted)');
   for (const [name, jar] of [['an active subscription', paid], ['an active trial', trial], ['a grace period', grace]]) {
     for (const p of manifest.papers) {
       for (const [kind, f] of [['paper', p.paper], ['guidelines', p.guidelines]]) {

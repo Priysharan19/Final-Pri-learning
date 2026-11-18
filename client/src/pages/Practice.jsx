@@ -15,6 +15,7 @@ const RationalNumbersTopperSectionProduction = React.lazy(() => import('../compo
 const LinearEquationsTopperSectionProduction = React.lazy(() => import('../components/LinearEquationsTopperSectionProduction.jsx'));
 const NcertClass8ChapterSection = React.lazy(() => import('../components/NcertClass8ChapterSection.jsx'));
 const NcertClass9ChapterSection = React.lazy(() => import('../components/NcertClass9ChapterSection.jsx'));
+const ExamStyleQuestions = React.lazy(() => import('../paper/ExamStyleQuestions.jsx'));
 const InkPhysicalEvidenceSession = React.lazy(() => import('../components/InkPhysicalEvidenceSession.jsx'));
 
 function LoadingPractice({ physical = false }) {
@@ -77,6 +78,7 @@ export default function Practice() {
       {CLASS9_IDS.includes(chapter) && (
         <OptionalSection key={chapter}><NcertClass9ChapterSection chapterId={chapter} /></OptionalSection>
       )}
+      {/^me1[12]-/.test(chapter || '') && <OptionalSection key={`es-${chapter}`}><ExamStyleQuestions chapter={chapter} /></OptionalSection>}
       <PracticeBase />
     </React.Suspense>
   );

@@ -147,7 +147,14 @@ let PYQ_ARCHIVE_MEASURED = null;
 
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 5_000_000;
+// Raised again 2026-11-19 (branch task/exam-style-questions, the CTO under the same owner decision, "i dont care if the app is 10gb just make
+// it properly end to end"; recorded 2 Oct 2026: download size is not a product constraint): FIRST_VISIT_RAW only, 5,000,000 -> 5,100,000 bytes.
+// A RE-BASELINE, not a weaker gate. Measured with both editions built, on main + guest mode (#1059) + this branch: Prithagoras 4,934 kB
+// (5,052,416 bytes, over the previous 5,050,000 by 2.4 kB), Priyabhata 4,924 kB. What the branch added: the sitting page, the plan and re-test
+// panel and the new answer forms in the checker (checker-core: exact rationals, equations, subscripted names), their Hindi and English strings
+// (about 40 more catalogue entries each), and the HSC Pass arithmetic. The papers UI is already a lazy chunk (App.jsx React.lazy) and the
+// structured papers are server content, so there was no larger saving to take; the new ceiling leaves about 48 kB. Other ceilings unchanged.
+const FIRST_VISIT_RAW_CEILING = 5_100_000;
 const FIRST_VISIT_GZIP_CEILING = 1_750_000;
 
 // Things that must never be in the install again, and what each one costs.

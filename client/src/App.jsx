@@ -39,6 +39,7 @@ import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 const ProgressPage = React.lazy(() => import('./pages/Progress.jsx'));
 const Exams = React.lazy(() => import('./pages/Exams.jsx'));
 const PaperGenerator = React.lazy(() => import('./pages/PaperGenerator.jsx'));
+const PaperSitting = React.lazy(() => import('./paper/PaperSitting.jsx'));
 const ExamRoom = React.lazy(() => import('./pages/ExamRoom.jsx'));
 // Rapid Fire and Match are a literal in a build (vite.config.js __PRI_GAMES__): Prithagoras hides them (owner decision, 19 Nov 2026), and its
 // build then emits neither page. A Node suite or the dev server, with no literal, has them.
@@ -764,6 +765,7 @@ export default function App() {
                     <Route path="/exams" element={studentOnly(<Exams />)} />
                     <Route path="/paper-generator" element={studentOnly(<PaperGenerator />)} />
                     <Route path="/exams/:id" element={studentOnly(<ExamRoom />)} />
+                    <Route path="/papers/sit/:attemptId" element={studentOnly(<PaperSitting />)} />
                     <Route path="/notes" element={studentOnly(<Notes />)} />
                     <Route path="/notes/:chapterId" element={studentOnly(<Notes />)} />
                     {LIBRARY_ON && <Route path="/library" element={studentOnly(<Library />)} />}
