@@ -47,7 +47,6 @@ export const pathwayOffered = pathway => { const o = offering(); return !o || o.
 /** Whether a (year, pathway) a profile holds is one this edition offers; Years 7–10 have no pathway. */
 export const courseOffered = (year, pathway) => yearOffered(year) && (Number(year) < 11 || pathwayOffered(pathway));
 export const offeredYears = (years = [7, 8, 9, 10, 11, 12]) => years.filter(yearOffered);
-export const offeredPathways = (list) => list.filter(p => pathwayOffered(typeof p === 'string' ? p : p.key ?? p[0]));
 /** The year and pathway a new student starts on in this edition, or null when it has no preference. */
 export const defaultOffering = () => { const o = offering(); return o ? { year: o.defaultYear, pathway: o.defaultPathway } : null; };
 /** Whether this edition has parent-facing features (the parent report, its email links, the parent sign-in path). Priyabhata only. */

@@ -124,11 +124,9 @@ function Sounds() {
 
 // Owner request, 19 Nov 2026 (both editions): the release short SHA and build date, in a quiet line at the
 // very bottom, so anyone can tell which build a browser is running. Read from the baked release identity.
-export function buildLine(identity, lang = 'en') {
+export function buildLine(identity) {
   const sha = /^[0-9a-f]{40}$/.test(String(identity?.releaseSha || '')) ? identity.releaseSha.slice(0, 7) : null;
-  const when = identity?.buildTimestamp ? new Date(identity.buildTimestamp) : null;
-  const date = when && !Number.isNaN(when.getTime()) ? when.toLocaleDateString(lang === 'hi' ? 'en-IN' : 'en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
-  return { sha, date };
+  return { sha, date: String(identity?.buildTimestamp || '').slice(0, 10) || null };
 }
 
 function BuildLine() {

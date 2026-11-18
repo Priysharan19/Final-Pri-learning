@@ -1025,7 +1025,6 @@ export default {
   'offer.pick.year': 'वर्ष',
   'offer.pick.course': 'कोर्स',
   'offer.pick.save': 'सहेजें और आगे बढ़ें',
-  'offer.pick.failed': 'यह सहेजा नहीं जा सका। कनेक्शन जाँचें और फिर कोशिश करें।',
   'offer.notYet.title': 'अभी उपलब्ध नहीं',
   'offer.notYet.body': 'Pri का यह हिस्सा अभी उपलब्ध नहीं है।',
   'offer.notYet.home': 'होम पर जाएँ',

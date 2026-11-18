@@ -50,7 +50,7 @@ export function CoursePrompt({ user, setUser }) {
             <button key={k} type="button" role="radio" aria-checked={pathway === k} className={pathway === k ? 'on' : ''} data-testid={`course-pick-${k}`} onClick={() => setPathway(k)}>{COURSE_NAMES[k] || k}</button>
           ))}
         </div>
-        {failed && <p role="alert" style={{ marginTop: 10 }}>{t('offer.pick.failed')}</p>}
+        {failed && <p role="alert" style={{ marginTop: 10 }}>{t('signup.genericError')}</p>}
         <button type="button" className="btn btn-primary" style={{ marginTop: 16 }} disabled={busy} onClick={save} data-testid="course-pick-save">{t('offer.pick.save')}</button>
       </div>
     </>
