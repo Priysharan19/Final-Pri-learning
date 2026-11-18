@@ -20,6 +20,7 @@
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
+import { markWorking } from './fakeServerReader.js';
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const fixture = name => readFileSync(new URL(`./fixtures/heic/${name}`, import.meta.url));
 const b64 = buf => Buffer.from(buf).toString('base64');
@@ -81,7 +82,7 @@ export const photoIntakeFlow = {
     // ── a real HEIC in a browser that cannot open it ───────────────────────
     const before = decoderFetches.length;
     await input.setInputFiles({ name: 'IMG_0001.HEIC', mimeType: '', buffer: fixture('landscape-160x80.heic') });
-    const read = page.locator('[data-photo-read]');
+    const read = page.locator('.photo-thumb img');
     await read.waitFor({ state: 'visible', timeout: 60000 }).catch(() => {});
     const src = await page.locator('.photo-thumb img').getAttribute('src').catch(() => '');
     const dims = await page.locator('.photo-thumb img').evaluate(i => [i.naturalWidth, i.naturalHeight]).catch(() => [0, 0]);
@@ -90,20 +91,19 @@ export const photoIntakeFlow = {
       JSON.stringify({ dims, fetches: decoderFetches.length - before, browserName }));
     await check('the page has labelled controls: Rotate, Choose another photo, Remove (no bare ✕)',
       await page.locator('[data-photo-rotate]').isVisible() && await page.locator('[data-photo-replace]').isVisible() && /Remove/.test(await page.locator('[data-photo-remove]').innerText()));
-    await read.click();
-    await page.locator('[data-photo-lines]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-    await check('Read my photo reaches the reading: the page and the lines in ONE compact view, no OCR confidence figure, one primary button',
-      await page.locator('[data-reading-review]').isVisible() && await page.locator('[data-photo-line]').count() === 3 &&
-        !/OCR confidence/i.test(await page.locator('.qpage').first().innerText()) && await page.locator('.photo-line-text, [data-photo-correct-transcript]').count() === 0 &&
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page.
+    // There is no "Read my photo" button and no lines list: the attached photo waits for the one primary action.
+    await check('the attached photo offers no Read button and no reading lines: one primary button, "Mark my working"',
+      await page.locator('[data-photo-read], [data-photo-lines], [data-reading-review], [data-photo-line]').count() === 0 &&
         /Mark my working/.test(await page.locator('.ws-actions .btn-primary').innerText()),
-      JSON.stringify({ review: await page.locator('[data-reading-review]').isVisible(), lines: await page.locator('[data-photo-line]').count(), ocr: /OCR confidence/i.test(await page.locator('.qpage').first().innerText()), inputs: await page.locator('.photo-line-text, [data-photo-correct-transcript]').count(), primary: await page.locator('.ws-actions .btn-primary').innerText() }));
+      await page.locator('.ws-actions .btn-primary').innerText());
 
     // ── drops ──────────────────────────────────────────────────────────────
     const jpeg = await page.evaluate(async () => { const c = document.createElement('canvas'); c.width = 40; c.height = 30; c.getContext('2d').fillRect(0, 0, 20, 30); return c.toDataURL('image/jpeg').split(',')[1]; });
     let r = await dropOn(page, '.editor-shell', [{ name: 'drop.jpg', type: 'image/jpeg', b64: jpeg }]);
-    await page.locator('[data-photo-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-    await check('a JPEG dropped on the card: the card shows a drop highlight, the drop is claimed, the new page replaces the old reading',
-      r.active === 'active' && r.drop === true && await page.locator('[data-photo-lines]').count() === 0 && await page.locator('[data-photo-read]').isVisible() &&
+    await page.locator('.photo-thumb img').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await check('a JPEG dropped on the card: the card shows a drop highlight, the drop is claimed, the new page replaces the old one',
+      r.active === 'active' && r.drop === true && await page.locator('[data-photo-lines]').count() === 0 && await page.locator('.photo-thumb img').isVisible() &&
         (await page.locator('.photo-thumb img').evaluate(i => i.naturalWidth)) === 40, JSON.stringify(r));
     const afterJpeg = decoderFetches.length;
     r = await dropOn(page, '.editor-shell', [{ name: 'IMG_9.heic', type: 'image/heic', b64: b64(fixture('rotated-orient6-160x80.heic')) }]);
@@ -123,7 +123,7 @@ export const photoIntakeFlow = {
       /JPEG, PNG, WebP, AVIF, HEIC and PDF/.test(failed) && !/save it as a JPEG/i.test(failed) &&
         await page.locator('[data-photo-failed] [data-photo-choose-another]').isVisible() && await page.locator('[data-photo-failed] [data-type-instead]').isVisible() && await page.locator('.photo-thumb').count() === 0, failed);
     r = await dropOn(page, '.editor-shell', [{ name: 'a.jpg', type: 'image/jpeg', b64: jpeg }, { name: 'b.jpg', type: 'image/jpeg', b64: jpeg }]);
-    await page.locator('[data-photo-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await page.locator('.photo-thumb img').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     await check('two files dropped together: the first is used and the page says one file at a time',
       /One file at a time/.test(await page.locator('.photo-answer').innerText()), JSON.stringify(r));
     const textDrop = await dropOn(page, '.editor-shell', [], { text: 'hello' });
@@ -133,6 +133,13 @@ export const photoIntakeFlow = {
       outside.drop === true && page.url().includes('/practice'), JSON.stringify(outside));
     await check('the keyboard path is unchanged: the Choose / Choose another photo buttons are real buttons',
       await page.locator('[data-photo-replace]').evaluate(b => b.tagName === 'BUTTON'));
+    // The last attached page is marked by one press; the reader is the only hop that sees the picture (answer-blind) and the server marks.
+    const readsBeforeMark = reader.requests.length;
+    await markWorking(page);
+    await page.waitForSelector('[data-marked-page], .eval-card, [data-photo-reading-problem]', { timeout: 40000 }).catch(() => {});
+    await check('one press of Mark my working read the photo once (picture only) and put the marked page on screen',
+      reader.requests.length === readsBeforeMark + 1 && await page.locator('[data-marked-page], .eval-card').count() >= 1,
+      `${reader.requests.length - readsBeforeMark} read(s)`);
   }
 };
 

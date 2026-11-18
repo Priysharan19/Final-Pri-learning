@@ -21,7 +21,7 @@
 // returns an expected answer.
 // Run on its own:  node client/test/tour-stale-cloud.js
 // ─────────────────────────────────────────────────────────────────────────────
-import { pressRead } from './fakeServerReader.js';
+import { markWorking, readingIsNotShown } from './fakeServerReader.js';
 import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
@@ -184,67 +184,57 @@ export const flow = {
       await settle();
       return page.locator('.ink-canvas-live').boundingBox();
     };
-    const submitInk = async () => {
-      await page.locator('.editor-foot button.btn').last().click();
-      const confirm = page.getByRole('button', { name: 'That’s what I wrote' });
-      if (await confirm.count()) await confirm.click();
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page.
+    // CTO ruling, 19 Nov 2026: written working is ONE authoritative attempt, so the first press resolves the question.
+    const grades = () => online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);
+    const markPage = async () => {
+      const before = (await grades()).length;
+      await markWorking(page);
+      await page.waitForSelector('[data-marked-page], .eval-card', { timeout: 30000 });
+      const all = await grades();
+      return { call: all.at(-1), sent: all.length - before, text: (await page.locator('[data-marked-page], .eval-card').first().innerText()).replace(/\s+/g, ' ') };
     };
+    // The page is read on its own after the pen rests; wait until the reader has answered this many requests.
+    const readAnswered = async n => { const until = Date.now() + 20000; while (stub.transcribeAnswered < n && Date.now() < until) await page.waitForTimeout(100); await page.waitForTimeout(400); return stub.transcribeAnswered >= n; };
 
-    // ── 1 · control: the server reading is the reading ───────────────────────
+    // ── 1 · control: the server reading is the reading that is marked ───────
     let box = await openWriting();
     stub.transcribeDelay = 100;
     stub.text = '7';
+    const answeredBefore1 = stub.transcribeAnswered;
     await handwrite(page, box, '1');
-    await pressRead(page);   // reading is asked for
-    await readsAs(page, '7');
-    // The transcript is being kept with the ink (a short "Saving…"); the bar
-    // shows the answer once that has settled.
-    for (let i = 0; i < 40 && (await reading(page)).foot !== '7'; i++) await page.waitForTimeout(100);
-    const early = await reading(page);
-    if (!await check('control: the server reading is what the card shows and will submit',
-      early.lines[0] === '7' && early.foot === '7', `read ${JSON.stringify(early)} after ${stub.transcribeAnswered} server readings`)) return;
+    await readAnswered(answeredBefore1 + 1);
+    const hidden1 = await readingIsNotShown(page, []);
+    const m1 = await markPage();
+    if (!await check('control: the server reading is what the card marks, and no reading was shown before it',
+      hidden1.structure.length === 0 && m1.sent === 1 && m1.call?.body?.answer === '7' && m1.call?.json?.authoritative === true,
+      `structure ${JSON.stringify(hidden1)}, sent ${m1.sent}, answer ${JSON.stringify(m1.call?.body?.answer)}`)) return;
 
-    // ── 2 · nothing can be submitted while a reading is still out ────────────
+    // ── 2 · nothing is submitted while a reading is still out ────────────────
     stub.transcribeDelay = 3500;
-    await page.locator('.ink-tool[title="Clear"]').click();
-    await settle();
+    box = await openWriting();
     let glyph = '4';
     online.forgetKeptReads();   // re-scripted stand-in (desk only)
     stub.text = glyph;
     const sentBefore = stub.transcribed;
+    const gradedBefore2 = (await grades()).length;
     await handwrite(page, box, glyph);
-    await pressRead(page);   // reading is asked for
     const until = Date.now() + 15000;
     while (stub.transcribed === sentBefore && Date.now() < until) await page.waitForTimeout(50);
-    const inFlight = await reading(page);
-    const submitDisabled = await page.locator('.editor-foot button.btn').last().isDisabled();
+    const inFlight = await readingIsNotShown(page, [glyph.repeat(3)]);
     await check('the slow server reading was requested', stub.transcribed > sentBefore, JSON.stringify(stub));
-    await check('while it is out, the page shows no reading and Submit is unavailable',
-      inFlight.lines.length === 0 && submitDisabled, `read ${JSON.stringify(inFlight)}, submit disabled ${submitDisabled}`);
-    await readsAs(page, glyph);
+    await check('while it is out, the page shows no reading and nothing has been marked',
+      inFlight.structure.length === 0 && (await grades()).length === gradedBefore2 && await page.locator('[data-marked-page], .eval-card').count() === 0,
+      JSON.stringify(inFlight));
+    await readAnswered(stub.transcribed);
     stub.submittedAt = Date.now();
-    await submitInk();
-    await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 20000 });
-    if (!await page.locator('.eval-card').count()) {
-      await page.locator('.ink-tool[title="Clear"]').click();
-      await settle();
-      glyph = '9';
-      online.forgetKeptReads();   // re-scripted stand-in (desk only)
-      stub.text = glyph;
-      await handwrite(page, box, glyph);
-      await pressRead(page);   // reading is asked for
-      await readsAs(page, glyph);
-      await submitInk();
-    }
-    await page.waitForSelector('.eval-card', { timeout: 20000 });
-    const verdictBefore = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
+    const m2 = await markPage();
+    const verdictBefore = m2.text;
     await page.waitForTimeout(800);
-    const late = await reading(page);
-    await check('after Submit the reading panel still shows what was marked',
-      JSON.stringify(late.lines) === JSON.stringify([glyph]), `read ${JSON.stringify(late)}`);
-    await check('nor does the answer the card holds for the attempt change', late.foot === glyph, `read ${JSON.stringify(late)}`);
-    const verdictAfter = (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
-    await check('nor the verdict on the answer that was submitted', verdictAfter === verdictBefore,
+    const verdictAfter = (await page.locator('[data-marked-page], .eval-card').first().innerText()).replace(/\s+/g, ' ');
+    await check('after marking, the answer the card marked is the reading it had (no late reading rewrote it)',
+      m2.sent === 1 && m2.call?.body?.answer === glyph, `sent ${m2.sent}, answer ${JSON.stringify(m2.call?.body?.answer)}`);
+    await check('nor the marked page on the answer that was submitted', verdictAfter === verdictBefore,
       `before ${JSON.stringify(verdictBefore.slice(0, 120))} after ${JSON.stringify(verdictAfter.slice(0, 120))}`);
 
     // ── 3 · control: a working check for the question on screen is shown ───
@@ -265,25 +255,20 @@ export const flow = {
       await page.locator('.ink-tool[title="Clear"]').click();
       await settle();
       box = await page.locator('.ink-canvas-live').boundingBox();
+      const answered = stub.transcribeAnswered;
       await handwrite(page, box, '1');
       await handwrite(page, box, '2', { y: 230 });
-      await pressRead(page);   // reading is asked for
-      await page.waitForFunction(() => document.querySelectorAll('.ink-line').length === 2, null, { timeout: 15000 }).catch(() => null);
-      await submitInk();
-      await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 20000 });
-      if (!await page.locator('.eval-card').count()) {
-        await submitInk();
-        await page.waitForSelector('.eval-card', { timeout: 20000 });
-      }
-      return (await page.locator('.eval-card').innerText()).replace(/\s+/g, ' ');
+      await readAnswered(answered + 1);
+      // One press, one authoritative attempt: a wrong written page resolves at once (CTO ruling, 19 Nov 2026).
+      return markPage();
     };
     const resolveWrongWithTwoLines = async () => {
       // "2" is only wrong for most of these questions; one it is right for is
       // skipped, so the case is always a wrong answer the server is asked about.
       for (let tries = 0; tries < 6; tries++) {
         await openWriting(UNPLACED_TOPIC);
-        const evaluation = await writeTwoLinesAndResolve();
-        if (!/\b(\d+) \/ \1 marks/.test(evaluation)) return evaluation;
+        const marked = await writeTwoLinesAndResolve();
+        if (marked.call?.json?.correct === false) return marked;
       }
       throw new Error('every question served had 2 as its answer');
     };
@@ -308,7 +293,7 @@ export const flow = {
       await openWriting(UNPLACED_TOPIC);
       const e = await writeTwoLinesAndResolve();
       // A right answer asks for no check, so the delays still line up.
-      if (!/\b(\d+) \/ \1 marks/.test(e)) evalA = e;
+      if (e.call?.json?.correct === false) evalA = e;
     }
     const idA = await shownId();
     const aId = stub.checked;
@@ -345,7 +330,7 @@ export const flow = {
       return { bad: v?.classList.contains('bad') === true, good: v?.classList.contains('good') === true };
     }, idA);
     await check('A\u2019s recorded mark is unchanged in History: still wrong',
-      !!rowA && rowA.bad && !rowA.good && /\b0 \/ \d+ marks/.test(evalA), `row ${JSON.stringify(rowA)}, evaluation ${JSON.stringify(evalA.slice(0, 80))}`);
+      !!rowA && rowA.bad && !rowA.good && evalA?.call?.json?.correct === false, `row ${JSON.stringify(rowA)}, evaluation ${JSON.stringify((evalA?.text || '').slice(0, 80))}`);
     // Every verdict above was the server's, and the late results changed
     // nothing there either: one completion per resolved question, no more.
     const graded = await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/);

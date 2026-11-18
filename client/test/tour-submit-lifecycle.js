@@ -19,7 +19,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { TEMPLATES } from '../src/ink/templates.js';
-import { pressRead, turnOnServerReading } from './fakeServerReader.js';
+import { readingIsNotShown, turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const TOPIC = 'c7-finding-unknown-current';
@@ -214,9 +214,9 @@ export const flow = {
     const inkId = await shownId(page);
     const box = await page.locator('.ink-canvas-live').boundingBox();
     await handwrite(page, box, '1');
-    await pressRead(page);   // reading is asked for: nothing is read because ink was drawn
-    await page.waitForFunction(() => document.querySelectorAll('.ink-line').length === 1, null, { timeout: 15000 }).catch(() => null);
-    const before = await page.locator('.ink-line').count();
+    // Owner decision, 19 Nov 2026: the reading is not shown; the page is read silently after the pen rests.
+    for (let i = 0; i < 40 && online.reader.requests.length === 0; i++) await page.waitForTimeout(250);
+    const readsBefore = online.reader.requests.length;
     // Readable mouse strokes produce an answer line, and an answer line is
     // what enables Submit — never a silently dead button under legible ink.
     const submitOn = await page.waitForFunction(() => {
@@ -232,15 +232,17 @@ export const flow = {
     const readerCallsBeforeReload = online.reader.requests.length;
     await reopen();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 }).catch(() => null);
-    await page.waitForFunction(() => document.querySelectorAll('.ink-line').length >= 1, null, { timeout: 15000 }).catch(() => null);
     await check('the same unanswered question comes back after the reload', await shownId(page) === inkId,
       `before ${inkId} after ${await shownId(page)}`);
-    // Read on request: the transcript was kept with the ink, so it is back
-    // without the page being read — or paid for — a second time.
-    await page.waitForTimeout(1500);
-    await check('its handwriting is back on the page with its transcript, and was NOT read again (no new reader request)',
-      before === 1 && await page.locator('.ink-line').count() === 1 && await page.locator('[data-ink-stale]').count() === 0 && online.reader.requests.length === readerCallsBeforeReload,
-      `lines before ${before}, after ${await page.locator('.ink-line').count()}; reader requests +${online.reader.requests.length - readerCallsBeforeReload}`);
+    // The reading is kept with the ink and is never shown (owner decision, 19 Nov 2026: the reading is not shown; one press
+    // marks the working on the student's own page), so what is pinned is: the ink is back, Mark my working is offered,
+    // no reading is on screen, and the page was NOT read (or paid for) a second time.
+    await page.waitForTimeout(3500);
+    const hidden = await readingIsNotShown(page, []);
+    const markBtn = page.getByRole('button', { name: /^Mark my working/ });
+    await check('its handwriting is back on the page, ready to mark, with no reading shown, and was NOT read again (no new reader request)',
+      readsBefore === 1 && await markBtn.count() === 1 && await markBtn.isEnabled() && hidden.structure.length === 0 && online.reader.requests.length === readerCallsBeforeReload,
+      `reads before ${readsBefore}; reader requests +${online.reader.requests.length - readerCallsBeforeReload}; ${JSON.stringify(hidden)}`);
   }
 };
 

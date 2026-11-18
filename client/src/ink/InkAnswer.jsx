@@ -326,7 +326,7 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       if (permitted !== PROMPT_ANSWER.ACCEPTED) {
         // Closing the prompt chooses nothing: "Read my answer" stays.
         if (permitted !== PROMPT_ANSWER.DISMISSED) waitFor(asker, { reason: permitted === PROMPT_ANSWER.DECLINED ? 'declined' : 'not-permitted' });
-        return;
+        return 'not-permitted';   // the caller (Mark my working) stops waiting for a reading that will not come
       }
     }
     // The page as it stands NOW is what is read: the student may have gone on

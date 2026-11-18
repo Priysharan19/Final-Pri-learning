@@ -2434,7 +2434,10 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       if (inkReadable) { void submit(); return; }
       markFiredRef.current = false;
       setMarkWanted(true);
-      if (inkReaderState?.kind !== INK_READER_STATE.READING) inkControlRef.current?.read?.();
+      if (inkReaderState?.kind !== INK_READER_STATE.READING) {
+        // A prompt the student closes (or declines) sends nothing, so Mark my working must stop waiting and be pressable again.
+        Promise.resolve(inkControlRef.current?.read?.()).then(outcome => { if (outcome === 'not-permitted') setMarkWanted(false); }, () => {});
+      }
       return;
     }
     if (photoInUse) { void submit(); return; }

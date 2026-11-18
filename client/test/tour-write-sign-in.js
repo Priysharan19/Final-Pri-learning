@@ -39,7 +39,7 @@
 // Run on its own:  node client/test/tour-write-sign-in.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite, pressRead } from './fakeServerReader.js';
+import { handwrite, markWorking, readingIsNotShown } from './fakeServerReader.js';
 import { directFormsOnly } from '../src/engine/generators/index.js';
 
 const SURELY_WRONG = '-987654';
@@ -100,15 +100,6 @@ const inkOnCanvas = page => page.evaluate(() => {
   }
   return inked;
 });
-
-/** Correct the doubtful line the reader returned to what the student "wrote". */
-async function correctReading(page, text) {
-  await page.locator('.ink-line .ink-correct-btn').first().click();
-  const box = page.locator('.ink-line form.ink-correct input');
-  await box.fill(text);
-  await page.locator('.ink-line form.ink-correct button[type="submit"]').click();
-  await page.waitForFunction(t => document.querySelector('.ink-line[data-corrected="true"]')?.getAttribute('data-text') === t, text, { timeout: 10000 });
-}
 
 async function pressSubmit(page) {
   const button = page.locator('.ws-actions .btn-primary');
@@ -215,8 +206,7 @@ export const saveTruthFlow = {
   name: 'Write · one true save state: ink survives reload, mode switch, resize, offline; a failed write says so and retries',
 
   async run({ page, ctx, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
-    // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
-    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. There is no Read button: the page is read silently once the pen rests (automatic reading is the default), so the save line settles on "read" with no reading on screen.
     note(`${EVIDENCE}: "Write · one true save state…" [${browserName || 'chromium'}] is browser automation of the device store (a real IndexedDB in a Playwright ${browserName || 'chromium'} context, with write faults injected by the test); the page is read by the scripted stand-in reader and nothing is submitted. Not evidence about a physical device, Safari itself, a real provider or real handwriting.`);
     const { reader } = online;
     Object.assign(reader, { text: '5', lines: null, confidence: 0.97, down: false });
@@ -239,9 +229,7 @@ export const saveTruthFlow = {
     // ── draw ─────────────────────────────────────────────────────────────────
     await resetStatusLog(page);
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
-    // Read on request (#440): the student asks for the reading.
-    await pressRead(page);
-    await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
+    await page.waitForTimeout(3200);   // the page is read in the background once the pen has rested
     const settledFirst = await waitWorkState(page, SETTLED);
     const first = await saveTruth(page, qid);
     const firstLog = await statusLog(page);
@@ -253,8 +241,8 @@ export const saveTruthFlow = {
       JSON.stringify({ ...first, strokes: strokeCount(first.strokes) }));
     await check('"saved" and "not saved" are never on screen together', !(first.saved && first.notSaved), first.shown);
     await check(`and, signed in, the kept page is read [${EVIDENCE}]`,
-      await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === '5' && first.state === 'read',
-      JSON.stringify({ state: first.state, lines: await page.locator('.ink-line').count() }));
+      reader.requests.length >= 1 && first.state === 'read' && (await readingIsNotShown(page, [])).structure.length === 0,
+      JSON.stringify({ state: first.state, reads: reader.requests.length, lines: await page.locator('.ink-line').count() }));
     const written = await inkOnCanvas(page);
 
     // ── mode switches ────────────────────────────────────────────────────────
@@ -319,8 +307,7 @@ export const saveTruthFlow = {
     await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = 'throw'; });
     await resetStatusLog(page);
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '2', { x: 140 });
-    // Read on request (#440): the student asks for the reading.
-    await pressRead(page);
+    await page.waitForTimeout(3200);
     const failed = await waitWorkState(page, 'save-failed');
     const refused = await saveTruth(page, qid);
     const refusedLog = await statusLog(page);
@@ -350,8 +337,7 @@ export const saveTruthFlow = {
     await page.evaluate(() => { globalThis.__PRI_E2E_INK_WRITE__ = 'drop'; });
     await resetStatusLog(page);
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '3', { x: 240 });
-    // Read on request (#440): the student asks for the reading.
-    await pressRead(page);
+    await page.waitForTimeout(3200);
     const caught = await waitWorkState(page, 'save-failed');
     const droppedLog = await statusLog(page);
     const dropped = await saveTruth(page, qid);
@@ -375,7 +361,7 @@ export const saveTruthFlow = {
 export const sessionEndedWriteFlow = {
   id: 'write-session-ended',
   online: true,
-  name: 'Write · session ended before reading: "sign in again" beside the work, then read, corrected and marked over two tries; a real outage still says so, with a retry',
+  name: 'Write · session ended before reading: "sign in again" beside the work, then marked once on the one press; a real outage still says so, with a retry',
 
   async run({ page, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
     // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
@@ -395,36 +381,44 @@ export const sessionEndedWriteFlow = {
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
 
     // ── a REAL reader outage, signed in ──────────────────────────────────────
+    // CTO ruling, 19 Nov 2026: a written or photographed page is ONE authoritative attempt, so the first Mark my working resolves the question (right or wrong); there is no second try for it. One press of Mark my working is what meets the outage.
+    const rightAnswer = await online.answerOf();
+    if (!await check('the right answer is known only from the server\'s sealed copy', typeof rightAnswer.text === 'string' && rightAnswer.text.length > 0, JSON.stringify({ kind: rightAnswer.kind }))) return;
+    const sid = rightAnswer.serverQuestionId;
+    const grades = () => online.practiceCalls(new RegExp(`^/v1/practice/${sid}/submit$`));
     reader.down = true;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
-    // Read on request (#440): the student asks for the reading.
-    await pressRead(page);
+    await markWorking(page);
     const retry = page.locator('[data-ink-retry-reading]');
     await retry.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const outage = await cardText(page);
     await check(`a reader that really is down is said as that — "isn’t answering right now" — with Try again, and is NOT called a sign-in problem [${EVIDENCE}]`,
       OUTAGE_WORDS.test(outage) && await retry.isVisible() && await page.locator('[data-ink-account-recovery]').count() === 0 &&
-        !/sign in again|signed out/i.test(outage) && await page.locator('.ink-line, .eval-card, .verdict-bad').count() === 0,
+        !/sign in again|signed out/i.test(outage) && await page.locator('.ink-line, .eval-card, .verdict-bad, [data-marked-page]').count() === 0,
       outage.slice(0, 400));
     reader.down = false;
+    reader.text = rightAnswer.text;
+    const readsOutage = reader.requests.length;
     await retry.click();
-    await page.waitForSelector('.ink-line', { timeout: 30000 }).catch(() => {});
-    await check(`and Try again reads the page once the reader is back [${EVIDENCE}]`,
-      await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === '12' && !OUTAGE_WORDS.test(await cardText(page)),
+    await page.waitForFunction(() => !document.querySelector('[data-ink-retry-reading]'), null, { timeout: 30000 }).catch(() => {});
+    await settle();
+    await online.settled();
+    await check(`and Try again reads the page once the reader is back, and shows no reading [${EVIDENCE}]`,
+      reader.requests.length === readsOutage + 1 && !OUTAGE_WORDS.test(await cardText(page)) && (await readingIsNotShown(page, [])).structure.length === 0,
       (await cardText(page)).slice(0, 300));
 
     // ── the session ends; the student writes more ────────────────────────────
     const ended = endServerSession(online);
     const readsBefore = reader.requests.length;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '2', { x: 140 });
-    // Read on request (#440): the student asks for the reading.
-    await pressRead(page);
+    await page.waitForTimeout(3200);
+    await markWorking(page);
     const recovery = page.locator('[data-ink-account-recovery]');
     const signIn = recovery.locator('[data-ink-sign-in]');
     await signIn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     await waitWorkState(page, 'waiting-sign-in');
     const seen = await cardText(page);
-    const refusals = (await online.settled(), online.calls.filter(c => /^\/v1\/handwriting\//.test(c.path) && c.status === 401));
+    const refusals = (await online.settled(), online.calls.filter(c => /^\/v1\/(handwriting|practice)\//.test(c.path) && c.status === 401));
     await check('the server refused the read with 401 AUTH_REQUIRED (the session is gone), and the reader was not asked',
       ended >= 1 && refusals.length >= 1 && refusals.some(c => c.json?.error?.code === 'AUTH_REQUIRED') && refusals.every(c => !c.json || c.json.error?.code === 'AUTH_REQUIRED') && reader.requests.length === readsBefore,
       JSON.stringify(online.calls.slice(-4).map(c => `${c.path} ${c.status}`)));
@@ -433,11 +427,12 @@ export const sessionEndedWriteFlow = {
         !OUTAGE_WORDS.test(seen) && !NEEDS_ACCOUNT_WORDS.test(seen) && await page.locator('[data-ink-retry-reading]').count() === 0,
       seen.slice(0, 500));
     const truth = await saveTruth(page, qid);
-    await check('the sign-in is a button beside the work — "Sign in again to check this answer"; the strokes are saved, the question is the same, Submit waits',
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. While signed out, Mark my working stays on the page but marks nothing: no grade request was made.
+    await check('the sign-in is a button beside the work — "Sign in again to check this answer"; the strokes are saved, the question is the same, nothing is marked',
       (await signIn.innerText()).trim() === 'Sign in again to check this answer' && await signIn.isEnabled() &&
         await signIn.evaluate(el => el.tagName === 'BUTTON' && el.classList.contains('btn-primary')) &&
         truth.kept && truth.state === 'waiting-sign-in' && !truth.notSaved && await shownId(page) === qid &&
-        await page.locator('.ws-actions .btn-primary').isDisabled() && await page.locator('.eval-card, .verdict-bad').count() === 0,
+        (await grades()).length === 0 && await page.locator('.eval-card, .verdict-bad, [data-marked-page]').count() === 0,
       JSON.stringify({ state: truth.state, shown: truth.shown }));
     const inkBefore = await inkOnCanvas(page);
 
@@ -451,76 +446,26 @@ export const sessionEndedWriteFlow = {
       await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && new URL(page.url()).pathname === '/practice' &&
         await shownId(page) === qid && await mathText('.q-prompt') === prompt && await inkOnCanvas(page) === inkBefore &&
         await page.locator('[data-ink-account-recovery]').count() === 0, page.url());
-    // Read on request (#440): signing in again reads nothing by itself; the
-    // kept page is read when the student presses Read my answer, once.
-    await check(`signing in again sends nothing to be read: the reader is not asked until the student presses Read my answer [${EVIDENCE}]`,
-      reader.requests.length === readsBefore && await page.locator('[data-ink-read]').first().isVisible().catch(() => false),
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. Signing in again reads and marks nothing by itself; the kept page waits for the student's own press.
+    await check(`signing in again sends nothing to be read or marked: the reader is not asked until the student presses Mark my working [${EVIDENCE}]`,
+      reader.requests.length === readsBefore && (await grades()).length === 0 && await page.getByRole('button', { name: /^Mark my working/ }).first().isVisible().catch(() => false),
       `${reader.requests.length - readsBefore} provider requests before the press`);
-    await pressRead(page);
-    await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
-    await check(`on the press the kept page is read once and the transcript is shown, editable [${EVIDENCE}]`,
-      await page.locator('.ink-line').count() >= 1 && await page.locator('.ink-line .ink-correct-btn').count() >= 1 && reader.requests.length === readsBefore + 1,
-      `${await page.locator('.ink-line').count()} lines; ${reader.requests.length - readsBefore} provider requests`);
-    const right = await online.answerOf();
-    if (!await check('the right answer is known only from the server\'s sealed copy', typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
-    const sid = right.serverQuestionId;
-    const grades = () => online.practiceCalls(new RegExp(`^/v1/practice/${sid}/submit$`));
-
-    // ── first try: the student states a wrong reading and submits ────────────
-    const readLine = await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null);
-    await correctReading(page, SURELY_WRONG);
-    await pressSubmit(page);
-    await page.waitForSelector('.verdict-bad, .eval-card', { timeout: 30000 }).catch(() => {});
-    // One request (#506): the picture travels with /submit, and the server
-    // writes the reader's receipt and the student's correction on top of it
-    // beside the mark — the same two records /recognize and /confirm wrote.
-    const recognized = await online.practiceCalls(new RegExp(`^/v1/practice/${sid}/recognize$`));
-    const confirmed = await online.practiceCalls(new RegExp(`^/v1/practice/${sid}/recognition/[^/]+/confirm$`));
-    const firstGrade = (await grades()).at(-1);
-    const firstCorrection = online.recognitionProof(firstGrade?.json?.reading?.receipt);
-    const firstReading = online.recognitionProof(firstCorrection?.parentReceipt);
-    await check('the correction is recorded by the server as the student\'s, on top of the reader\'s receipt (one request: the receipt and the correction written with the mark)',
-      recognized.length === 0 && confirmed.length === 0 && firstGrade?.json?.reading?.corrected === true &&
-        firstCorrection?.correctedByStudent === true && firstCorrection.text === SURELY_WRONG && firstReading?.text === readLine,
-      JSON.stringify({ readLine, separate: recognized.length + confirmed.length, reading: firstGrade?.json?.reading, correction: firstCorrection?.text, read: firstReading?.text }));
-    await check('a wrong answer: server-authoritative, 0 marks, not resolved, one try remaining, graded as handwriting under the receipt',
-      firstGrade?.status === 200 && firstGrade.json?.authoritative === true && firstGrade.json.correct === false &&
-        firstGrade.json.resolved === false && firstGrade.json.triesLeft === 1 && firstGrade.json.marksEarned === 0 &&
-        firstGrade.json.marksPossible >= 1 && firstGrade.body?.mode === 'ink' && /^data:image\//.test(firstGrade.body?.image || '') &&
-        typeof firstGrade.json.reading?.receipt === 'string' && !!firstCorrection,
-      JSON.stringify(firstGrade && { status: firstGrade.status, json: firstGrade.json }).slice(0, 400));
-    await check('the card shows that miss and keeps the question open for the second try',
-      await page.locator('.verdict-bad').count() >= 1 && await page.locator('.eval-card').count() === 0 && await shownId(page) === qid &&
-        online.ledger(sid).thisDone === 0, (await visibleText(page, '.verdict-bad')).slice(0, 200));
-
-    // ── second try: the page is rewritten and the right answer stated ────────
-    await page.locator('.ink-answer').getByRole('button', { name: /clear/i }).first().click();
-    await page.waitForFunction(() => document.querySelectorAll('.ink-line').length === 0, null, { timeout: 10000 }).catch(() => {});
-    // The stand-in may now be handed a picture it has already read for this
-    // account; the server would rightly answer with the read it kept. A real
-    // reader does not change its mind, so the desk says "a different reader".
     online.forgetKeptReads();
-    reader.text = '7';
-    const readsBeforeSecond = reader.requests.length;
-    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '7');
-    // Read on request (#440): the student asks for the reading.
-    await pressRead(page);
-    await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
-    await check(`the cleared page is rewritten and read again for the second try [${EVIDENCE}]`,
-      await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === '7' && reader.requests.length > readsBeforeSecond,
-      `${await page.locator('.ink-line').count()} lines; ${reader.requests.length - readsBeforeSecond} provider requests`);
-    await correctReading(page, right.text);
-    await pressSubmit(page);
-    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+    await markWorking(page);
+    await page.waitForSelector('[data-marked-page], .eval-card', { timeout: 30000 }).catch(() => {});
     const allGrades = await grades();
     const grade = allGrades.at(-1);
-    await check('the second try is marked by the server: authoritative, correct, full marks, resolved',
-      grade?.status === 200 && grade.json?.authoritative === true && grade.json.correct === true && grade.json.resolved === true &&
-        grade.json.marksEarned === grade.json.marksPossible && await page.locator('.eval-card[data-outcome="correct"]').count() === 1,
-      JSON.stringify(grade && { status: grade.status, json: grade.json }).slice(0, 300));
+    const proof = online.recognitionProof(grade?.json?.reading?.receipt);
+    await check(`on the one press the kept page is read once (answer-blind, picture only) and marked by the server: authoritative, correct, full marks, resolved, under the reader's own receipt, never corrected by the student [${EVIDENCE}]`,
+      allGrades.length === 1 && grade?.status === 200 && grade.json?.authoritative === true && grade.json.correct === true && grade.json.resolved === true &&
+        grade.json.marksEarned === grade.json.marksPossible && grade.body?.mode === 'ink' && /^data:image\//.test(grade.body?.image || '') &&
+        typeof grade.json.reading?.receipt === 'string' && !!proof && grade.json.reading.corrected !== true && grade.json.reading.studentConfirmed === false &&
+        reader.requests.length === readsBefore + 1 && await page.locator('[data-marked-page], .eval-card[data-outcome="correct"]').count() >= 1 &&
+        (await readingIsNotShown(page, [])).structure.length === 0,
+      JSON.stringify(grade && { status: grade.status, json: grade.json }).slice(0, 400));
     const ledger = online.ledger(sid);
-    await check('no duplicate attempts on the server: one completion for the question, two graded submissions',
-      ledger.thisDone === 1 && ledger.completions === 1 && allGrades.filter(c => c.status === 200).length === 2,
+    await check('no duplicate attempts on the server: one completion for the question, one graded submission',
+      ledger.thisDone === 1 && ledger.completions === 1 && allGrades.filter(c => c.status === 200).length === 1,
       `${JSON.stringify(ledger)}; ${allGrades.length} grade requests`);
     await check('no outbound request was refused: nothing tried to reach a real provider', reader.refused.length === 0, JSON.stringify(reader.refused));
 
@@ -542,7 +487,7 @@ export const sessionEndedWriteFlow = {
 export const sessionEndedPhotoFlow = {
   id: 'photo-session-ended',
   online: true,
-  name: 'Photo · session ended before reading: "sign in again" beside the photo, then the same photo is read and marked',
+  name: 'Photo · session ended before reading: "sign in again" beside the photo, then the same photo is read and marked on one press',
 
   async run({ page, ctx, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
     // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
@@ -559,14 +504,20 @@ export const sessionEndedPhotoFlow = {
     const prompt = await mathText('.q-prompt');
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
 
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. CTO ruling, 19 Nov 2026: a written or photographed page is ONE authoritative attempt, so the first Mark my working resolves the question.
+    // Attaching sends nothing and there is no Read button for a photo: the student's one press of Mark my working is the request
+    // the server answers "signed out".
+    const right = await online.answerOf();
+    if (!await check('the right answer is known only from the server\'s sealed copy', typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
+    reader.text = right.text;
     await ctx.clearCookies();
     const readsBefore = reader.requests.length;
     await page.getByRole('button', { name: /answer with a photo/i }).click();
     await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'working.png', mimeType: 'image/png', buffer: PNG });
-    // Attaching sends nothing (owner decision): the student asks for the read,
-    // and it is that request the server answers "signed out".
-    await page.locator('[data-photo-read]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-    await page.locator('[data-photo-read]').click().catch(() => {});
+    await page.locator('.photo-thumb img').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await check('attaching the photo sends nothing and offers no Read button or reading list',
+      reader.requests.length === readsBefore && await page.locator('[data-photo-read], [data-photo-lines], [data-photo-line]').count() === 0);
+    await markWorking(page);
     const signIn = page.locator('[data-photo-sign-in]');
     await signIn.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const thumb = await page.locator('.photo-thumb img').getAttribute('src').catch(() => null);
@@ -579,43 +530,33 @@ export const sessionEndedPhotoFlow = {
       await page.locator('[data-photo-session-ended]').isVisible() && /You’ve been signed out\. Sign in again/i.test(seen) &&
         !OUTAGE_WORDS.test(seen) && !NEEDS_ACCOUNT_WORDS.test(seen) && await page.locator('[data-photo-retry-reading]').count() === 0,
       seen.slice(0, 500));
-    await check('beside the photo: "Sign in again to check this answer"; the photo is still attached, nothing was read, Submit waits',
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. While signed out, Mark my working stays on the page but marks nothing: no grade request was made.
+    const grades = () => online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`));
+    await check('beside the photo: "Sign in again to check this answer"; the photo is still attached, nothing was read or marked',
       (await signIn.innerText()).trim() === 'Sign in again to check this answer' && /^data:image\//.test(thumb || '') &&
         await status.getAttribute('data-work-state') === 'waiting-sign-in' && reader.requests.length === readsBefore &&
-        await page.locator('[data-photo-correct-transcript]').count() === 0 && await page.locator('.ws-actions .btn-primary').isDisabled(),
+        await page.locator('[data-photo-correct-transcript]').count() === 0 && (await grades()).length === 0,
       `state ${await status.getAttribute('data-work-state')}`);
 
     await signIn.click();
     await online.signInHere(page.locator('[data-photo-account-recovery]'), { account });
-    const transcript = page.locator('[data-photo-correct-transcript]');
-    // Read on request (#440): signing in again reads nothing by itself; the
-    // same photo is read when the student asks, once.
-    const readPhoto = page.locator('[data-photo-read], [data-photo-retry-reading]').first();
-    await readPhoto.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    await page.getByRole('button', { name: /^Mark my working/ }).first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     await settle();
     await online.settled();
-    await check(`signed in again in place: nothing is read by itself — the reader is not asked and no transcript appears until the student asks [${EVIDENCE}]`,
-      reader.requests.length === readsBefore && await transcript.count() === 0 && await readPhoto.isVisible().catch(() => false),
-      `${reader.requests.length - readsBefore} provider requests; transcript ${await transcript.count()}`);
-    await readPhoto.click().catch(() => {});
-    // Owner, 18 Nov 2026: a read line is text until tapped; tapping opens it for editing.
-    await page.locator('[data-photo-line="0"] [data-photo-line-open]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-    await page.locator('[data-photo-line="0"] [data-photo-line-open]').click().catch(() => {});
-    await transcript.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-    await check(`then on the student's request: same question, the SAME photo, read once with an editable transcript [${EVIDENCE}]`,
+    await check(`signed in again in place: nothing is read or marked by itself — the reader is not asked and no reading appears until the student presses Mark my working [${EVIDENCE}]`,
+      reader.requests.length === readsBefore && (await grades()).length === 0 && (await readingIsNotShown(page, [])).structure.length === 0 &&
+        await page.getByRole('button', { name: /^Mark my working/ }).first().isVisible().catch(() => false),
+      `${reader.requests.length - readsBefore} provider requests`);
+    await check('same question, the SAME photo still attached',
       await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid && await mathText('.q-prompt') === prompt &&
-        await page.locator('.photo-thumb img').getAttribute('src').catch(() => null) === thumb &&
-        await transcript.inputValue().catch(() => null) === '12' && await transcript.isEditable() && reader.requests.length === readsBefore + 1,
-      `transcript ${JSON.stringify(await transcript.inputValue().catch(() => null))}`);
-    const right = await online.answerOf();
-    if (!await check('the right answer is known only from the server\'s sealed copy', typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
-    await transcript.fill(right.text);
-    await pressSubmit(page);
-    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
-    const grade = (await online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`))).at(-1);
-    await check('Submit then works: marked by the server as a photo answer — authoritative, correct, resolved once',
+        await page.locator('.photo-thumb img').getAttribute('src').catch(() => null) === thumb);
+    await markWorking(page);
+    await page.waitForSelector('[data-marked-page], .eval-card', { timeout: 30000 }).catch(() => {});
+    const grade = (await grades()).at(-1);
+    await check(`the one press reads the same photo once and marks it: authoritative, correct, resolved once, as a photo answer; the reading is not shown [${EVIDENCE}]`,
       grade?.status === 200 && grade.json?.authoritative === true && grade.json.correct === true && grade.json.resolved === true && grade.body?.mode === 'photo' &&
-        await page.locator('.eval-card[data-outcome="correct"]').count() === 1 && online.ledger(right.serverQuestionId).thisDone === 1,
+        reader.requests.length === readsBefore + 1 && await page.locator('[data-marked-page], .eval-card[data-outcome="correct"]').count() >= 1 &&
+        (await readingIsNotShown(page, [])).structure.length === 0 && online.ledger(right.serverQuestionId).thisDone === 1,
       JSON.stringify(grade && { status: grade.status, json: grade.json }).slice(0, 300));
   }
 };
@@ -626,8 +567,7 @@ export const sessionEndedSubmitFlow = {
   name: 'Submit · session ended at Submit: work held, "sign in again", never a wrong-answer verdict; then marked exactly once',
 
   async run({ page, base, check, goto, createProfile, mathText, settle, note, online, browserName }) {
-    // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
-    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. The page is read silently once the pen rests (automatic reading is the default), so the one press has a reading to send.
     note(`${EVIDENCE}: "Submit · session ended…" [${browserName || 'chromium'}] ends a real server session between the reading and Submit; the reader is the scripted stand-in. Not real-provider, real-handwriting, production or real-device evidence.`);
     const { reader } = online;
     reader.text = '12'; reader.confidence = 0.97; reader.down = false;
@@ -641,20 +581,18 @@ export const sessionEndedSubmitFlow = {
     await page.getByRole('button', { name: 'Answer by handwriting' }).click();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     await page.evaluate(() => { window.__PRI_E2E_SAME_PAGE__ = 'kept'; });
-    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
-    // Read on request (#440): the student asks for the reading.
-    await pressRead(page);
-    await page.waitForSelector('.ink-line .ink-correct-btn', { timeout: 30000 }).catch(() => {});
     const right = await online.answerOf();
-    if (!await check(`signed in, the page is read and the right answer is known only from the server's sealed copy [${EVIDENCE}]`,
-      await page.locator('.ink-line').count() === 1 && typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind }))) return;
-    await correctReading(page, right.text);
+    reader.text = right.text;
+    await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), '5');
+    await page.waitForTimeout(3200);
+    if (!await check(`signed in, the page is read silently and the right answer is known only from the server's sealed copy [${EVIDENCE}]`,
+      reader.requests.length >= 1 && (await readingIsNotShown(page, [])).structure.length === 0 && typeof right.text === 'string' && right.text.length > 0, JSON.stringify({ kind: right.kind, reads: reader.requests.length }))) return;
     const inkBefore = await inkOnCanvas(page);
     const submits = () => online.practiceCalls(new RegExp(`^/v1/practice/${right.serverQuestionId}/submit$`));
 
     // ── the session ends, then Submit is pressed ─────────────────────────────
     endServerSession(online);
-    await pressSubmit(page);
+    await markWorking(page);
     const refusal = page.locator('[data-check-refusal="sign-in"]');
     await refusal.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const seen = await cardText(page);
@@ -673,11 +611,11 @@ export const sessionEndedSubmitFlow = {
     // through "Saving…" before it settles — as in the photo flow.
     await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state') !== 'saving', null, { timeout: 15000 }).catch(() => {});
     const held = await saveTruth(page, qid);
-    await check('the work is held: same question, strokes on the page and in the store, the corrected reading still shown, sign-in button beside it',
+    await check('the work is held: same question, strokes on the page and in the store, no reading shown, sign-in button beside it',
       await shownId(page) === qid && await inkOnCanvas(page) === inkBefore && held.kept &&
-        await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === right.text &&
+        (await readingIsNotShown(page, [])).structure.length === 0 &&
         (await signIn.innerText().catch(() => '')).trim() === 'Sign in again to check this answer' && await signIn.isEnabled().catch(() => false),
-      JSON.stringify({ kept: held.kept, state: held.state, line: await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null),
+      JSON.stringify({ kept: held.kept, state: held.state,
         sameQuestion: await shownId(page) === qid, sameInk: await inkOnCanvas(page) === inkBefore,
         signIn: (await signIn.innerText().catch(() => '')).trim(), signInEnabled: await signIn.isEnabled().catch(() => false) }));
 
@@ -685,18 +623,18 @@ export const sessionEndedSubmitFlow = {
     await signIn.click();
     await online.signInHere(page.locator('.verdict'), { account });
     await page.waitForFunction(() => !document.querySelector('[data-check-refusal]'), null, { timeout: 30000 }).catch(() => {});
-    await check('signed in again in place: the refusal is gone, nothing was sent by itself, and the same reading waits for the student\'s own Submit',
+    await check('signed in again in place: the refusal is gone, nothing was sent by itself, and the same page waits for the student\'s own press of Mark my working',
       await page.evaluate(() => window.__PRI_E2E_SAME_PAGE__) === 'kept' && await shownId(page) === qid && await mathText('.q-prompt') === prompt &&
         await page.locator('[data-check-refusal]').count() === 0 && await page.locator('.eval-card').count() === 0 &&
-        (await submits()).every(c => c.status !== 200) && await page.locator('.ink-line').first().getAttribute('data-text').catch(() => null) === right.text,
+        (await submits()).every(c => c.status !== 200) && (await readingIsNotShown(page, [])).structure.length === 0,
       `refusals ${await page.locator('[data-check-refusal]').count()}`);
-    await pressSubmit(page);
-    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+    await markWorking(page);
+    await page.waitForSelector('[data-marked-page], .eval-card', { timeout: 30000 }).catch(() => {});
     const done = (await submits()).filter(c => c.status === 200);
     const ledger = online.ledger(right.serverQuestionId);
     await check('Submit is then marked by the server exactly once: authoritative, correct, one completion',
       done.length === 1 && done[0].json?.authoritative === true && done[0].json.correct === true && done[0].json.resolved === true &&
-        await page.locator('.eval-card[data-outcome="correct"]').count() === 1 && ledger.thisDone === 1 && ledger.completions === 1,
+        await page.locator('[data-marked-page], .eval-card[data-outcome="correct"]').count() >= 1 && ledger.thisDone === 1 && ledger.completions === 1,
       `${done.length} graded; ${JSON.stringify(ledger)}`);
   }
 };

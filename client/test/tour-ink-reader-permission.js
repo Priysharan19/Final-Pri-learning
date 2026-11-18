@@ -37,7 +37,7 @@
 // Run on its own:  node client/test/tour-ink-reader-permission.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { readLines, turnOnServerReading } from './fakeServerReader.js';
+import { turnOnServerReading } from './fakeServerReader.js';
 import { TEMPLATES } from '../src/ink/templates.js';
 import EN from '../src/i18n/strings.en.js';
 
@@ -50,6 +50,10 @@ const TABLET = { width: 834, height: 1194 };
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
 const flat = s => String(s || '').replace(/\s+/g, ' ').trim();
 const SHEET = '[data-reader-permission-sheet]';
+// Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. There is no
+// "Read my answer" button any more: the first press of "Mark my working" is what meets the one-time prompt, and nothing is sent before it.
+const MARK = /^Mark my working/;
+const SENTENCE = 'Pri couldn’t read your final answer. Rewrite that line or type it here.';
 const READS = /^\/v1\/(?:handwriting\/transcribe|practice\/[^/]+\/recognize)$/;
 
 /**
@@ -168,9 +172,9 @@ export const flow = {
     if (input !== 'touch') note('NOT VERIFIED: this engine has no touch input pipeline here; the phone strokes were drawn with the mouse.');
     const readsBefore = await readsSent();
     const providerBefore = reader.requests.length;
-    await page.locator('[data-ink-read]').first().tap().catch(() => page.locator('[data-ink-read]').first().click());
+    await page.getByRole('button', { name: MARK }).first().tap().catch(() => page.getByRole('button', { name: MARK }).first().click());
     const asked = await page.locator(SHEET).waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false);
-    await check('phone: the first "Read my answer" opens the prompt before anything else happens', asked);
+    await check('phone: the first "Mark my working" opens the prompt before anything else happens', asked);
     if (!asked) return;
     await page.waitForTimeout(800);
     const geometry = await page.evaluate(() => {
@@ -202,7 +206,7 @@ export const flow = {
       `reads ${await readsSent() - readsBefore}, provider ${reader.requests.length - providerBefore}`);
     await check('phone, declined: the student is told no one read it, why, and that typing (or Settings) is the way on',
       said === flat(EN['ink.waitingDeclined']) || said === flat(EN['ink.waitingTurnedOff']), said);
-    await check('phone, declined: "Read my answer" is no longer offered', await page.locator('[data-ink-read]').count() === 0);
+    await check('phone, declined: there is still no Read button and nothing marked (owner decision, 19 Nov 2026: the reading is not shown)', await page.locator('[data-ink-read]').count() === 0 && await page.locator('[data-marked-page], .eval-card').count() === 0);
     const declined = await recordOf();
     await check('phone, declined: the decline is recorded on this device for this profile and this wording',
       Object.values(declined || {}).some(r => r.choice === 'declined' && r.version === 1), JSON.stringify(declined));
@@ -239,7 +243,8 @@ export const flow = {
     Object.assign(reader, { lines: [{ text: wrong }], confidence: 0.55 });
     await penWrite(page, second.box, String(second.right.text));
     const tabletBefore = await readsSent();
-    await page.locator('[data-ink-read]').first().click();
+    const mark = () => page.getByRole('button', { name: MARK }).first();
+    await mark().click();
     await check('tablet: a student who said no before is asked again before the next read (turning reading on is not consent)',
       await page.locator(SHEET).waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false));
     const dialogBox = await page.locator('.reader-permission').boundingBox();
@@ -248,31 +253,31 @@ export const flow = {
     await page.keyboard.press('Escape');
     await page.locator(SHEET).waitFor({ state: 'detached', timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(1200);
-    await check(`tablet: Escape closes it without choosing — nothing sent, "Read my answer" still there, the record unchanged ${TAG}`,
-      await readsSent() === tabletBefore && await page.locator('[data-ink-read]').count() === 1 && Object.values(await recordOf() || {}).some(r => r.choice === 'declined'),
-      `reads ${await readsSent() - tabletBefore}; read button ${await page.locator('[data-ink-read]').count()}`);
-    await page.locator('[data-ink-read]').first().click();
+    await check(`tablet: Escape closes it without choosing — nothing sent, "Mark my working" still there, the record unchanged ${TAG}`,
+      await readsSent() === tabletBefore && await mark().count() === 1 && Object.values(await recordOf() || {}).some(r => r.choice === 'declined'),
+      `reads ${await readsSent() - tabletBefore}; mark button ${await mark().count()}`);
+    await mark().click();
     await page.locator(SHEET).waitFor({ state: 'visible', timeout: 10000 });
     await page.locator('[data-reader-permission="accept"]').click();
-    await page.waitForFunction(want => [...document.querySelectorAll('.ink-line')].some(n => n.getAttribute('data-text') === want), wrong, { timeout: 30000 }).catch(() => {});
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. CTO ruling:
+    // a handwritten page is ONE authoritative attempt. The only line is read below the floor, so it is a final answer Pri could not read:
+    // the one sentence and a box, nothing recorded, no try spent; the typed answer is then marked by the server.
+    await page.waitForSelector('[data-final-answer-sentence]', { timeout: 30000 }).catch(() => {});
     const readCalls = (await online.practiceCalls(READS)).slice(tabletBefore);
     await check(`tablet, accepted: exactly one read is sent, and it is the press that opened the prompt ${TAG}`, readCalls.length === 1, `${readCalls.length} read request(s)`);
-    await check('tablet, accepted: the transcript is on the page, its doubtful line marked and editable — nothing is marked yet',
-      JSON.stringify(await readLines(page)) === JSON.stringify([wrong]) && await page.locator('.ink-line.ink-line-low .ink-correct-btn').count() === 1 &&
-        await page.locator('.eval-card').count() === 0, JSON.stringify(await readLines(page)));
-    await page.locator('.ink-line .ink-correct-btn').first().click();
-    await page.locator('.ink-line form.ink-correct input').fill(String(second.right.text));
-    await page.locator('.ink-line form.ink-correct button[type=submit]').click();
-    await page.waitForSelector('.ink-line[data-corrected="true"]', { timeout: 10000 }).catch(() => {});
-    await check('tablet: the student corrects the line to what they wrote', JSON.stringify(await readLines(page)) === JSON.stringify([String(second.right.text)]), JSON.stringify(await readLines(page)));
-    let how = await submitNow();
-    if (await page.locator('.eval-card').count() === 0) how += `+${await submitNow().catch(() => 'none')}`;
-    await page.waitForSelector('.eval-card', { timeout: 30000 }).catch(() => {});
+    await check('tablet, accepted: a doubtful line is never judged: the one sentence is shown with one box, nothing is marked, and the doubtful reading is not shown',
+      (await page.locator('[data-final-answer-sentence]').innerText().catch(() => '')).trim() === SENTENCE && await page.locator('[data-ink-final-answer]').count() === 1 &&
+        await page.locator('.eval-card, [data-marked-page]').count() === 0 && !(await page.locator('body').innerText()).includes(wrong) && (await gradesOf(second.right.serverQuestionId)).length === 0,
+      `${(await gradesOf(second.right.serverQuestionId)).length} grade call(s)`);
+    await page.locator('[data-ink-final-answer]').fill(String(second.right.text));
+    await check('tablet: the student types the answer they wrote', await page.locator('[data-ink-final-answer]').inputValue() === String(second.right.text));
+    const how = (await mark().click(), 'submitted');
+    await page.waitForSelector('.eval-card, [data-marked-page]', { timeout: 30000 }).catch(() => {});
     const inked = (await gradesOf(second.right.serverQuestionId)).at(-1);
     const read = readCalls[0];
-    await check('tablet: the server marks the corrected, confirmed reading — correct, authoritative',
-      inked?.json?.authoritative === true && inked.json.correct === true && inked.body?.answer === String(second.right.text),
-      JSON.stringify({ how, answer: inked?.body?.answer, correct: inked?.json?.correct }));
+    await check('tablet: the server marks the typed final answer — correct, authoritative, and the request says it was typed',
+      inked?.json?.authoritative === true && inked.json.correct === true && inked.body?.answerTyped === true,
+      JSON.stringify({ how, answer: inked?.body?.answer, correct: inked?.json?.correct, typed: inked?.body?.answerTyped }));
     const sameRevision = inked?.body?.image ? inked.body.image === read?.body?.image : !!inked?.body?.transcriptionReceipt;
     await check('tablet: the grade is of the SAME revision that was read — the picture submitted is byte-for-byte the picture read (or its read receipt)',
       sameRevision, `submitted ${inked?.body?.image ? 'a picture' : inked?.body?.transcriptionReceipt ? 'a receipt' : 'neither'}`);
@@ -283,8 +288,8 @@ export const flow = {
       Object.assign(reader, { lines: null, text: String(third.right.text), confidence: 0.97 });
       await penWrite(page, third.box, String(third.right.text));
       const before = await readsSent();
-      await page.locator('[data-ink-read]').first().click();
-      await page.waitForFunction(() => document.querySelectorAll('.ink-line').length > 0, null, { timeout: 30000 }).catch(() => {});
+      await mark().click();
+      await page.waitForSelector('[data-marked-page], .eval-card', { timeout: 30000 }).catch(() => {});
       await check(`tablet: once accepted, the next read goes ahead with no prompt — it is one-time ${TAG}`,
         await page.locator(SHEET).count() === 0 && await readsSent() === before + 1, `reads ${await readsSent() - before}`);
     }
@@ -323,25 +328,26 @@ export const photoAndOffline = {
     Object.assign(reader, { lines: null, text: 'x = 4', confidence: 0.9 });
     await page.getByRole('button', { name: /answer with a photo/i }).click();
     await page.locator('.editor-body input[type="file"]').setInputFiles({ name: 'page.png', mimeType: 'image/png', buffer: PNG });
-    const readMine = page.locator('[data-photo-read]');
-    await readMine.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. Attaching a photo is
+    // not a read; there is no "Read my photo" button. The first press of "Mark my working" meets the one-time prompt, about a photo.
+    const markPhoto = page.getByRole('button', { name: MARK }).first();
+    await page.locator('.photo-thumb img').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
     const before = await readsSent();
     const provider = reader.requests.length;
-    await readMine.click();
+    await markPhoto.click();
     const asked = await page.locator('[data-reader-permission-sheet="photo"]').waitFor({ state: 'visible', timeout: 10000 }).then(() => true, () => false);
-    await check('photo: the first "Read my photo" opens the prompt, about a photo', asked);
+    await check('photo: the first "Mark my working" opens the prompt, about a photo', asked);
     await page.waitForTimeout(800);
     await check(`photo: nothing is sent while it is open ${TAG}`, await readsSent() === before && reader.requests.length === provider);
     await check('photo: the prompt names OpenAI and tells the student to keep their name out of the frame',
       flat(await page.locator('.reader-permission').textContent()).includes(flat(EN['readerPermission.leadPhoto'])) &&
         flat(await page.locator('.reader-permission').textContent()).includes(flat(EN['readerPermission.what'])));
     await page.locator('[data-reader-permission="accept"]').tap().catch(() => page.locator('[data-reader-permission="accept"]').click());
-    // The reading lands as lines the student can tap open to change (owner, 18 Nov 2026: text until tapped).
-    const editable = () => page.locator('.qpage [data-photo-line-text]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-photo-line-text')));
-    await page.waitForFunction(() => [...document.querySelectorAll('.qpage [data-photo-line-text]')].some(n => n.getAttribute('data-photo-line-text') === 'x = 4'), null, { timeout: 30000 }).catch(() => {});
-    await check(`photo, accepted: the photo is sent once and read into the editable transcript ${TAG}`,
-      await readsSent() === before + 1 && reader.requests.length === provider + 1 && (await editable()).includes('x = 4'),
-      `reads ${await readsSent() - before}, provider ${reader.requests.length - provider}, lines ${JSON.stringify(await editable())}`);
+    await page.waitForSelector('[data-marked-page], .eval-card, [data-final-answer-sentence]', { timeout: 30000 }).catch(() => {});
+    await check(`photo, accepted: the photo is sent once, read silently and marked: no reading list is shown ${TAG}`,
+      await readsSent() === before + 1 && reader.requests.length === provider + 1 && await page.locator('[data-photo-line-text], [data-photo-lines], [data-ink-read]').count() === 0 &&
+        await page.locator('[data-marked-page], .eval-card, [data-final-answer-sentence]').count() >= 1,
+      `reads ${await readsSent() - before}, provider ${reader.requests.length - provider}`);
 
     // Offline: ink is kept on the device and the student is told it will be read when they are back.
     await quiet();
@@ -358,21 +364,29 @@ export const photoAndOffline = {
     await page.waitForTimeout(1200);
     const offlineSaid = flat(await page.locator('.ink-answer .ink-status-line').first().textContent({ timeout: 4000 }).catch(() => ''));
     const offlineBefore = await readsSent();
-    await check('offline: the ink is kept, and the student is told it is saved and will be read when they are back online and press Read',
+    await check('offline: the ink is kept, and the student is told it is saved and will be read when they are back online',
       offlineSaid === flat(EN['ink.waitingOffline']) || offlineSaid === flat(EN['ink.waitingOfflinePlain']), offlineSaid);
-    await check('offline: "Read my answer" is not offered while it could not work', await page.locator('[data-ink-read]').count() === 0);
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. There is no Read
+    // button. Offline, "Mark my working" is still on the page (the work is kept), but pressing it sends nothing and marks nothing:
+    // checking needs a connection, and the ink stays where it is.
+    const markNow = page.getByRole('button', { name: MARK }).first();
+    if (await markNow.isEnabled().catch(() => false)) await markNow.click().catch(() => {});
+    await page.waitForTimeout(1200);
+    await check(`offline: there is no Read button, and pressing "Mark my working" sends nothing and marks nothing ${TAG}`,
+      await page.locator('[data-ink-read]').count() === 0 && await readsSent() === offlineBefore && await page.locator('[data-marked-page], .eval-card').count() === 0,
+      `reads ${await readsSent() - offlineBefore}`);
     await ctx.setOffline(false);
     await page.evaluate(() => window.dispatchEvent(new Event('online')));
-    const back = await page.locator('[data-ink-read]').first().waitFor({ state: 'visible', timeout: 15000 }).then(() => true, () => false);
-    await check(`back online: nothing was sent by itself; "Read my answer" is offered for the kept ink ${TAG}`, back && await readsSent() === offlineBefore);
+    const back = await markNow.waitFor({ state: 'visible', timeout: 15000 }).then(() => markNow.isEnabled(), () => false);
+    await check(`back online: nothing was sent by itself; "Mark my working" is offered for the kept ink ${TAG}`, back && await readsSent() === offlineBefore);
     if (back) {
       online.forgetKeptReads();
       Object.assign(reader, { lines: null, text: '12', confidence: 0.97 });
-      await page.locator('[data-ink-read]').first().tap().catch(() => page.locator('[data-ink-read]').first().click());
-      await page.waitForFunction(() => document.querySelectorAll('.ink-line').length > 0, null, { timeout: 30000 }).catch(() => {});
-      await check(`back online: the press reads the ink written offline, with no second prompt (already accepted) ${TAG}`,
-        await page.locator(SHEET).count() === 0 && await readsSent() === offlineBefore + 1 && JSON.stringify(await readLines(page)) === '["12"]',
-        JSON.stringify(await readLines(page)));
+      await markNow.click();
+      await page.waitForSelector('[data-marked-page], .eval-card, [data-final-answer-sentence]', { timeout: 30000 }).catch(() => {});
+      await check(`back online: the press reads the ink written offline and marks it, with no second prompt (already accepted) and no reading shown ${TAG}`,
+        await page.locator(SHEET).count() === 0 && await readsSent() === offlineBefore + 1 && await page.locator('[data-ink-line], .ink-line, [data-mp-reading]').count() === 0 &&
+          await page.locator('[data-marked-page], .eval-card, [data-final-answer-sentence]').count() >= 1);
     }
     Object.assign(reader, { lines: null, text: '1', confidence: 0.97 });
   }

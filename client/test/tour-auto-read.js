@@ -24,7 +24,7 @@
 // Run on its own:  node client/test/tour-auto-read.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite, pressRead, readLines, turnOnServerReading } from './fakeServerReader.js';
+import { handwrite, markWorking, readingIsNotShown, turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const AUTO_WAIT = 2600;
@@ -76,11 +76,18 @@ export const flow = {
     await check('with automatic reading on there is no primary Read my answer button and no read-once hint',
       await primaryRead() === 0 && !(await page.locator('.ink-read-hint').count()));
     await page.locator('[data-reader-permission="accept"]').click();
-    await page.waitForSelector('.ink-line', { timeout: 15000 });
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page. The read
+    // still happens on its own after the pause, silently, so these checks count the provider's requests instead of reading a list.
+    for (let i = 0; i < 60 && reader.requests.length < 1; i++) await page.waitForTimeout(250);
     await shot('2-read-automatically');
-    await check('accepting the prompt lets the page be read with no press of Read, and the reading is on screen', (await readLines(page))[0] === '1');
+    await check('accepting the prompt lets the page be read with no press of Read, and nothing of the reading is on screen',
+      reader.requests.length === 1 && (await readingIsNotShown(page, ['1'].filter(x => x.length > 3))).structure.length === 0 && await page.locator('[data-ink-read]').count() === 0,
+      `${reader.requests.length} provider call(s)`);
     await check('the footer says one plain thing and does not order a manual read first',
-      !/Read your answer first/.test(await page.locator('.ws-actions').innerText()), (await page.locator('.ws-actions .status-line').innerText()).replace(/\s+/g, ' '));
+      !/Read your answer first/.test(await page.locator('.ws-actions').innerText()), (await page.locator('.ws-actions .status-line').innerText().catch(() => '')).replace(/\s+/g, ' '));
+    const footerBefore = (await page.locator('.ws-actions').innerText()).replace(/\s+/g, ' ');
+    await check('and the reading is not leaked in the footer either: no "Your answer: …" line before the student presses Mark my working',
+      !/Your answer/i.test(footerBefore), footerBefore);
     const base1 = reader.requests.length;
 
     // ── 2 · not while writing, after the pause ───────────────────────────────
@@ -88,19 +95,18 @@ export const flow = {
     const t0 = Date.now();
     await handwrite(page, box, '7', { x: 150 });
     const quiet = reader.requests.length === base1;
-    await check('while the pen is still recently writing nothing is sent, and the earlier reading is marked as of earlier writing',
-      quiet && await page.locator('[data-ink-stale]').isVisible(), `${reader.requests.length - base1} call(s) ${Date.now() - t0} ms after the last stroke began`);
-    for (let i = 0; i < 40 && (await readLines(page))[0] !== '17'; i++) await page.waitForTimeout(150);
-    await check('after the pause the page is read on its own, once, and the reading is current', (await readLines(page))[0] === '17' && reader.requests.length === base1 + 1 && await page.locator('[data-ink-stale]').count() === 0,
-      `read ${JSON.stringify(await readLines(page))}; +${reader.requests.length - base1} call(s)`);
-    await check('the reading appears with the honest state, not a verdict', await page.locator('[data-auto-read-state]').count() === 1);
+    await check('while the pen is still recently writing nothing is sent',
+      quiet, `${reader.requests.length - base1} call(s) ${Date.now() - t0} ms after the last stroke began`);
+    for (let i = 0; i < 60 && reader.requests.length < base1 + 1; i++) await page.waitForTimeout(150);
+    await page.waitForTimeout(600);
+    await check('after the pause the page is read on its own, once', reader.requests.length === base1 + 1, `+${reader.requests.length - base1} call(s)`);
 
     // ── 3 · answer-blind, never marked ───────────────────────────────────────
     const sent = (await pageReads()).at(-1);
     await check('the automatic read is the same answer-blind request: the picture and nothing else', !!sent && onlyPictureAndQuestionId(sent.body), JSON.stringify(Object.keys(sent?.body || {})));
     await page.waitForTimeout(1800);
     await check('nothing was marked: no submit request, no verdict, and Mark my working is the only way forward',
-      (await submitCalls()).length === 0 && await page.locator('.eval-card, .verdict-bad').count() === 0 && await page.getByRole('button', { name: /^Mark my working/ }).count() === 1);
+      (await submitCalls()).length === 0 && await page.locator('.eval-card, .verdict-bad, [data-marked-page]').count() === 0 && await page.getByRole('button', { name: /^Mark my working/ }).count() === 1);
     await check('an unchanged page is not read again', reader.requests.length === base1 + 1, `${reader.requests.length - base1} call(s)`);
 
     // ── 4 · a superseded read is cancelled ───────────────────────────────────
@@ -114,42 +120,15 @@ export const flow = {
     await handwrite(page, box, '7', { x: 290 });          // the page changes while that read is out
     release();
     reader.gate = null;
-    for (let i = 0; i < 60 && (await readLines(page))[0] !== '1717'; i++) await page.waitForTimeout(150);
-    await check('the older page\'s late answer never shows as current: only the latest page\'s reading lands',
-      (await readLines(page))[0] === '1717' && await page.locator('[data-ink-stale]').count() === 0, JSON.stringify(await readLines(page)));
-    await check('and still nothing was marked', (await submitCalls()).length === 0 && await page.locator('.eval-card, .verdict-bad').count() === 0);
+    for (let i = 0; i < 60 && reader.requests.length < base1 + 3; i++) await page.waitForTimeout(150);
+    await page.waitForTimeout(600);
+    await check('the page that changed is read again, once: the older read is superseded, not shown',
+      reader.requests.length === base1 + 3, `+${reader.requests.length - base1} call(s)`);
+    await check('and still nothing was marked', (await submitCalls()).length === 0 && await page.locator('.eval-card, .verdict-bad, [data-marked-page]').count() === 0);
 
-    // ── 4b · the owner's live page: three lines, the middle of line 1 misread ─
-    // One state per line, the doubtful span named, one panel, upright functions.
-    await page.locator('.ink-tool[aria-label*="lear"]').first().click();
-    reader.text = '22 + 5sin((n+)/6)\nmax = 22 + 5\n= 27';
-    await handwrite(page, box, '1', { y: 20 });
-    await handwrite(page, box, '1', { y: 130 });
-    await handwrite(page, box, '1', { y: 240 });
-    await page.waitForSelector('[data-confirm-reading]', { timeout: 15000 });
-    await shot('4-misread-line-named');
-    await check('the reading is listed once: the panel names only the one line to check, not all three again',
-      await page.locator('.ink-line').count() === 3 && await page.locator('[data-confirm-line]').count() === 1 && await page.locator('[data-confirm-line="0"]').count() === 1);
-    await check('it says which line and which part: "Line 1: check (n+)" as a control that opens the editor',
-      /Line 1: check/.test(await page.locator('[data-confirm-shape="0"]').innerText()) && (await page.locator('[data-confirm-span="0"]').innerText()).includes('n'));
-    await check('the count says what to do in plain words', (await page.locator('[data-confirm-count]').innerText()).trim() === 'Check line 1, then confirm');
-    await check('focus is on the line to check', await page.evaluate(() => !!document.activeElement?.closest?.('[data-confirm-line="0"]')));
-    await check('the warning is a normal sentence in the body face: not capitals, not monospace, no dashed box',
-      await page.locator('.ws-confirm-unsure').first().evaluate(el => { const c = getComputedStyle(el); return c.textTransform === 'none' && !/mono/i.test(c.fontFamily); })
-      && await page.locator('[data-confirm-line="0"]').evaluate(el => getComputedStyle(el).outlineStyle !== 'dashed'));
-    await check('line 1 is "check" and lines 2 and 3 are not, wherever the state is shown (the leading = on line 3 is working, not an error)',
-      await page.locator('.in-rstate[data-read-state="check"]').count() <= 1 && await page.locator('[data-line-doubt], .ink-line-low').count() <= 1 && await page.locator('.in-read-cf, .in-read-tg:text-is("read")').count() === 0);
-    await check('function names are upright operators in the reading', await page.locator('.ink-line .mop').count() >= 1);
-    await check('Your answer does not begin with a relation sign',
-      !/Your answer:\s*[=≈]/.test((await page.locator('.ws-actions .status-line').innerText()).replace(/\s+/g, ' ')));
-    await page.locator('[data-confirm-span="0"]').click();
-    await check('tapping the doubtful part opens the symbol editor for that line', await page.locator('.ink-correct input').count() === 1);
-    await page.getByRole('button', { name: 'Cancel' }).first().click().catch(() => {});
-    await check('and still nothing was marked', (await submitCalls()).length === 0 && await page.locator('.eval-card, .verdict-bad').count() === 0);
-    await page.locator('.ink-tool[aria-label*="lear"]').first().click();
-    reader.text = '1717';
-    await handwrite(page, box, '1', { x: 40 });
-    for (let i = 0; i < 40 && (await readLines(page))[0] !== '1717'; i++) await page.waitForTimeout(150);
+    // ── 4b · the owner's live page: the doubtful line is named on the MARKED page, not before ─
+    // Owner decision, 19 Nov 2026: the reading is not shown, so the pre-mark confirm panel ("Line 1: check (n+)") is gone;
+    // the line-by-line "not checked" / "See how Pri read this line" behaviour is pinned in tour-no-preview.js.
 
     // ── 5 · mouse, finger and pen all rest and are read ─────────────────────
     for (const type of ['touch', 'pen']) {
@@ -168,7 +147,6 @@ export const flow = {
       for (let i = 0; i < 40 && reader.requests.length === before; i++) await page.waitForTimeout(100);
       await check(`a ${type} pointer's page is read on its own after the pen rests, within the idle window`, reader.requests.length === before + 1 && Date.now() - t1 < 4000, `${reader.requests.length - before} call(s) after ${Date.now() - t1} ms`);
       await check(`and still no primary Read button (${type})`, await primaryRead() === 0);
-      for (let i = 0; i < 30 && await page.locator('[data-ink-stale]').count(); i++) await page.waitForTimeout(150);
     }
 
     // ── 6 · device preference off: the button is back, nothing is read alone ──
@@ -185,11 +163,13 @@ export const flow = {
     await handwrite(page, box2, '9');
     await page.waitForTimeout(AUTO_WAIT);
     await shot('3-preference-off-button');
-    await check('with the device preference off the Read my answer button is present and nothing is read until pressed',
-      await primaryRead() >= 1 && reader.requests.length === before2 && await page.locator('.ink-read-hint').count() === 1, `${reader.requests.length - before2} call(s)`);
-    await pressRead(page);
-    for (let i = 0; i < 40 && reader.requests.length === before2; i++) await page.waitForTimeout(100);
-    await check('pressing it reads', reader.requests.length === before2 + 1);
+    await check('with the device preference off nothing is read until the student marks, and there is still no Read button',
+      await primaryRead() === 0 && reader.requests.length === before2, `${reader.requests.length - before2} call(s)`);
+    // One press of Mark my working reads the page (silently) and marks it: the only way a read is asked for.
+    await markWorking(page);
+    for (let i = 0; i < 60 && (await submitCalls()).length === 0; i++) await page.waitForTimeout(250);
+    await check('one press of Mark my working reads the page once and marks it on the server',
+      reader.requests.length === before2 + 1 && (await submitCalls()).length === 1, `${reader.requests.length - before2} read(s), ${(await submitCalls()).length} submit(s)`);
     await page.evaluate(() => localStorage.removeItem('pri.autoRead'));
   }
 };

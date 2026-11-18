@@ -42,7 +42,7 @@
 // Run on its own:  node client/test/tour-online-check.js
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
-import { handwrite, pressRead } from './fakeServerReader.js';
+import { handwrite, readingIsNotShown } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 
 const TOPIC = 'c7-finding-unknown-current';
@@ -265,11 +265,13 @@ export const writeOffline = {
     const blank = await inkOnCanvas(page);
     reader.text = known.text;
     await handwrite(page, await page.locator('.ink-canvas-live').boundingBox(), known.text);
-    await pressRead(page);   // reading is asked for: nothing is read because ink was drawn
-    await page.waitForSelector('.ink-line', { timeout: 20000 }).catch(() => {});
-    const lines = await page.locator('.ink-line').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-text')));
-    await check(`online, the writing is read and shown as one line [${SYNTHETIC_EVIDENCE}]`,
-      lines.length === 1 && lines[0] === known.text, JSON.stringify(lines));
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page.
+    // The page is read silently once the pen rests (there is no Read button); the student sees none of the reading.
+    await page.waitForTimeout(3200);
+    const reads = reader.requests.length;
+    const hidden = await readingIsNotShown(page, [known.text].filter(x => x.length >= 6));
+    await check(`online, the writing is read silently and not shown: a read was made, no reading list, chips or text [${SYNTHETIC_EVIDENCE}]`,
+      reads >= 1 && hidden.structure.length === 0 && hidden.leaked.length === 0 && await page.locator('[data-ink-read]').count() === 0, JSON.stringify({ reads, hidden }));
     await page.waitForFunction(qid => new Promise(ok => {
       const r = indexedDB.open('pri-learning');
       r.onsuccess = () => { const db = r.result; const q = db.transaction('inkDrafts').objectStore('inkDrafts').getAllKeys();

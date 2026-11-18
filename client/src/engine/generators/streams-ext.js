@@ -1199,7 +1199,8 @@ export const streamsExt = {
         final: { kind: 'expr', expr: F.stepEnd },
         canonicalWorking: `${F.stepStart}\n${F.stepMid}\n${F.stepEnd}`
       },
-      inputHint: `One line per step, e.g.\n${F.stepStart}\n${F.stepMid}\n${F.stepEnd}`,
+      // the worked example stops at the line the question already gives: showing the middle and last lines was the keyed working
+      inputHint: `One line per step, e.g.\n${F.stepStart}\n= (your next step)`,
       traps: [],
       hints: [F.hint1, F.hint2, `Finish on $${F.endTex}$.`],
       steps: [

@@ -21,7 +21,7 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { handwrite, pressRead, turnOnServerReading } from './fakeServerReader.js';
+import { handwrite, readingIsNotShown, turnOnServerReading } from './fakeServerReader.js';
 import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 import en from '../src/i18n/strings.en.js';
 import hi from '../src/i18n/strings.hi.js';
@@ -478,82 +478,35 @@ export const writeFlow = {
     await handwrite(page, box, '111111', { x: 40, y: 24 + pitch });
     await handwrite(page, box, '3' + wrong.replace('-', ''), { x: 40, y: 24 + 2 * pitch });
     await check('nothing is set beside the lines before the page is read (no faked live reading)', await page.locator('[data-reading-chips]').count() === 0);
-    await pressRead(page);
-    await page.waitForFunction(n => document.querySelectorAll('.ink-line').length >= n, 2, { timeout: 20000 }).catch(() => {});
-    const chips = await page.locator('.ink-line .ink-line-math').count();
-    await check('Pri’s reading shows each line as a chip', chips >= 2, `${chips} lines`);
-    const chip = await look('.ink-line .ink-line-math');
-    await check('a reading chip is drawn on the raised surface', !!chip && chip.radius === '4px', JSON.stringify(chip));
-    // The student's own simultaneous pair, drawn (display only).
-    const drawn = page.locator('[data-reading-plot]');
-    await check('the reading’s simultaneous pair is drawn as two lines', await drawn.count() === 1 && await drawn.getAttribute('data-reading-plot') === '2', await drawn.getAttribute('data-reading-plot').catch(() => 'none'));
-    await check('the drawing says it is not a mark', /never sets a mark/i.test(await drawn.textContent().catch(() => '')));
-    // The chips on the page: a visual duplicate of the list, which keeps Edit.
-    const onPage = page.locator('[data-reading-chips]');
-    if (await check('Pri’s reading is set beside each written line', await onPage.count() === 1 && await onPage.locator('[data-read-chip]').count() === 3, await onPage.getAttribute('data-reading-chips').catch(() => 'none'))) {
-      await check('the chips are hidden from assistive tech (the list is the accessible reading)', await onPage.getAttribute('aria-hidden') === 'true');
-      const cf = await onPage.locator('[data-read-confidence]').evaluateAll(els => els.map(e => e.getAttribute('data-read-confidence')));
-      await check('each chip’s confidence bar is the reader’s own confidence', cf.length === 3 && cf.every(v => v === '97'), JSON.stringify(cf));
-      const chipFont = await onPage.locator('.in-read').first().evaluate(el => getComputedStyle(el).fontFamily);
-      await check('a chip is set in Computer Modern', /KaTeX|Latin Modern|Computer Modern|CMU/i.test(chipFont), chipFont);
-      const side = await page.evaluate(() => {
-        const c = document.querySelector('[data-read-chip="0"]')?.getBoundingClientRect(); const s = document.querySelector('.ink-stage')?.getBoundingClientRect();
-        return c && s ? { right: Math.round(s.right - c.right), inside: c.top >= s.top && c.bottom <= s.bottom } : null;
-      });
-      await check('the chip sits on the page beside its line', !!side && side.inside && side.right >= 0 && side.right <= 24, JSON.stringify(side));
-    }
-    await check('the reading list still offers Edit on every line', await page.locator('.ink-line .ink-correct-btn').count() === await page.locator('.ink-line').count());
+    // Owner decision, 19 Nov 2026: the reading is not shown; one press marks the working on the student's own page.
+    // The chips, the reading list, Edit and the drawn pair of lines are gone: the page is read silently once the pen rests and
+    // nothing of the reading is set beside the writing, before or after the mark.
+    await page.waitForTimeout(3200);
+    const hiddenReading = await readingIsNotShown(page, ['x + y = 35', 'x - y = 13']);
+    await check('Pri’s reading is not shown: no chips, no list, no Edit, no drawn pair of lines, none of the reading text',
+      hiddenReading.structure.length === 0 && hiddenReading.leaked.length === 0 && await page.locator('[data-reading-chips], [data-reading-plot], [data-read-chip], .ink-correct-btn').count() === 0, JSON.stringify(hiddenReading));
     writeFileSync(join(outDir, 'write-read-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
-    await shootAll(page, outDir, 'read', SIZES.filter(sz => sz.id === 'web'));
 
     // ⌘↵ / Ctrl+↵ presses Check (the primary), with focus anywhere on the page.
+    // CTO ruling, 19 Nov 2026: a written page is ONE authoritative attempt, so this first press marks it and resolves the question
+    // (right or wrong); there is no "Not quite, one more go" for written working.
+    const replies = [];
+    page.on('response', async r => { if (/\/v1\/practice\/[^/]+\/submit$/.test(r.url())) { try { replies.push(await r.json()); } catch { /* not json */ } } });
     await page.locator('.q-prompt').click();
     await page.keyboard.press('Control+Enter');
-    await page.waitForSelector('.eval-card, .verdict[data-verdict-of]', { timeout: 30000 }).catch(() => {});
-    await check('Ctrl+↵ checks the working, as the primary does', await page.locator('.verdict, .eval-card').count() > 0);
+    await page.waitForSelector('[data-marked-page], .eval-card', { timeout: 30000 }).catch(() => {});
+    await check('Ctrl+↵ checks the working, as the primary does', await page.locator('[data-marked-page], .verdict, .eval-card').count() > 0);
     await check('Check marks the shell for the scan', await shell.getAttribute('data-marked') === 'yes');
-    const sweep = await page.evaluate(() => {
-      const el = document.querySelector('.editor-shell[data-marked="yes"] .in-sweep i');
-      if (!el) return null;
-      const s = getComputedStyle(el);
-      return { name: s.animationName, dur: s.animationDuration, image: s.backgroundImage, shadow: s.boxShadow, pointer: getComputedStyle(el.parentElement).pointerEvents, bg: s.backgroundColor };
-    });
-    await check('the sweep is one ink hairline, 900 ms, once: no gradient, no glow', sweep?.name === 'in-sweep' && sweep.dur === '0.9s' && sweep.image === 'none' && sweep.shadow === 'none', JSON.stringify(sweep));
-    await check('the sweep never takes the pen: it ignores pointer input', sweep?.pointer === 'none');
-    await check('each mark carries its own stamp delay from the line geometry', await page.locator('.editor-shell[data-marked="yes"] .ink-verdict').evaluateAll(els => els.length > 0 && els.every(e => e.style.getPropertyValue('--d').endsWith('ms'))));
-    // After a wrong answer the page says one thing: the marked line is where it went wrong. The
-    // reading of a line marked wrong carries a plain prompt, and its Edit button is the emphasised one.
-    const wrongPage = await page.evaluate(() => ({
-      recheck: !!document.querySelector('.ink-line-recheck'), emph: !!document.querySelector('.ink-correct-btn.is-emph'),
-      text: (document.querySelector('.qpage')?.innerText || '').replace(/\s+/g, ' ')
-    }));
-    await check('a line marked wrong asks to check the reading and makes Edit prominent; the page does not both say the working is checked later and to fix the marked step',
-      wrongPage.recheck && wrongPage.emph && /Check this reading — tap Edit if it isn.t what you wrote/.test(wrongPage.text) &&
-        !(/checked when this question is finished/.test(wrongPage.text) && /Fix it, then submit again/.test(wrongPage.text)) && !/unsettled/i.test(wrongPage.text),
-      JSON.stringify({ recheck: wrongPage.recheck, emph: wrongPage.emph }));
-    // Reduced motion: no hairline, and the marks are there within 200 ms.
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    const still = await page.evaluate(() => new Promise(r => setTimeout(() => {
-      const sw = document.querySelector('.in-sweep');
-      const marks = [...document.querySelectorAll('.editor-shell[data-marked="yes"] .ink-verdict')];
-      r({ sweep: sw ? getComputedStyle(sw).display : 'absent', marks: marks.length, shown: marks.every(m => Number(getComputedStyle(m).opacity) === 1), anim: marks[0] && getComputedStyle(marks[0]).animationName });
-    }, 200)));
-    await check('reduced motion: no hairline, every mark visible within 200 ms (a 120 ms fade)', still.sweep !== 'block' && still.marks > 0 && still.shown && still.anim === 'in-fade', JSON.stringify(still));
-    await page.emulateMedia({ reducedMotion: 'no-preference' });
-    const verdict = page.locator('.verdict').first();
-    await check('a wrong answer gets the slip verdict panel, not the failure one', await verdict.evaluate(el => el.classList.contains('verdict-bad') && !el.classList.contains('verdict-technical')));
+    await check('the one press resolved the question on the server, wrong as it was: no second try for a written page',
+      replies.length === 1 && replies[0].authoritative === true && replies[0].correct === false && replies[0].resolved === true, JSON.stringify(replies.map(r => ({ correct: r.correct, resolved: r.resolved }))));
+    await check('the result shows the server’s mark (the marked page, or the score card for a single-number answer), and the reading is still not shown',
+      await page.locator('[data-mp-mark], .eval-card').count() >= 1 && (await readingIsNotShown(page, ['x + y = 35', 'x - y = 13'])).leaked.length === 0);
     await page.waitForTimeout(1300);
     writeFileSync(join(outDir, 'write-marked-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
     writeFileSync(join(outDir, 'write-swept-web-dark.png'), await page.screenshot({ animations: 'disabled' }));
-    const slipChip = page.locator('[data-reading-chips] .in-read[data-read-state]');
-    await check('the reading chip names only what was read (no slip tag, UI4) and the slipped line is underlined', await slipChip.count() >= 1 && await page.locator('[data-reading-chips] .in-read-tg').filter({ hasText: /slip|checks/i }).count() === 0 && await page.locator('.ink-verdict-layer .ink-underline').count() >= 1, `${await slipChip.count()} chips`);
     await shootAll(page, outDir, 'marked', SIZES.filter(sz => sz.id === 'web'));
 
-    // A second wrong try resolves the question: the reply now carries the
-    // server's mark as CBSE-style step rows, which must agree with it.
-    const replies = [];
-    page.on('response', async r => { if (/\/v1\/practice\/[^/]+\/submit$/.test(r.url())) { try { replies.push(await r.json()); } catch { /* not json */ } } });
-    await page.getByRole('button', { name: /^(Submit|Mark my working)/i }).last().click();
+    // The reply carries the server's mark as CBSE-style step rows, which must agree with it.
     // Main's marking-display rule (0b3712a74, rule A for train 12): the
     // server's mark is shown as aggregate, server-verified credit — method
     // credit as a count, the final answer accepted or not — never as invented
