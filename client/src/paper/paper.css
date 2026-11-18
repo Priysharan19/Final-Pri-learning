@@ -21,6 +21,8 @@
 .pp-question { margin-top: var(--space-8); padding-top: var(--space-6); border-top: 1px solid var(--hairline); }
 .pp-stem, .pp-prompt, .pp-sample, .pp-solution { font-family: var(--font-prose-math); font-size: var(--text-math); line-height: 1.55; color: var(--ink); max-width: var(--measure); }
 .pp-p { margin: 0 0 var(--space-3); }
+/* A formula cannot wrap: a line holding one wider than a phone scrolls inside its own paragraph, never the page. */
+.pp-p, .pp-list li, .pp-criteria li, .pp-read-lines li, .pp-yours { max-width: 100%; overflow-x: auto; overflow-y: hidden; }
 .pp-display { margin: var(--space-3) 0; overflow-x: auto; overflow-y: hidden; max-width: 100%; }
 .pp-list { margin: 0 0 var(--space-3); padding-left: var(--space-6); }
 .pp-list li { margin-bottom: var(--space-1); }
