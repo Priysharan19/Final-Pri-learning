@@ -229,7 +229,7 @@
 .ws-confirm-lines { display: grid; gap: 6px; margin: 8px 0; }
 .ws-confirm-line { display: flex; align-items: baseline; gap: 10px; padding: 4px 8px; border-radius: 4px; }
 .ws-confirm-line.is-unsure { box-shadow: inset 0 0 0 1px var(--in-slip, currentColor); background: color-mix(in srgb, var(--in-slip, currentColor) 10%, transparent); }
-.ws-confirm-unsure { font: 500 11px var(--in-mono, monospace); letter-spacing: 0.06em; text-transform: uppercase; color: var(--in-tx-2, inherit); }
+.ws-confirm-unsure { font: inherit; font-size: 14px; color: var(--in-tx-2, inherit); }
 .ws-confirm-acts { display: flex; gap: 8px; }
 
 /* ── Check what Pri read (verified page, step 1) ─ recognised maths set in Computer
@@ -237,14 +237,18 @@
    outline with its question in words. The only looping motion is the pulse, and it
    exists only when motion is allowed; under reduced motion the outline and the
    words carry it. */
-.ws-confirm-count { margin-left: auto; font: 500 12px var(--in-mono, monospace); font-variant-numeric: tabular-nums; color: var(--in-tx-2, inherit); }
+.ws-confirm-count { margin-left: auto; font: 500 13px inherit; font-family: inherit; font-variant-numeric: tabular-nums; color: var(--in-tx-2, inherit); }
 .ws-confirm-blind { margin: 2px 0 6px; font-size: 12.5px; }
 .ws-confirm-line { display: grid; grid-template-columns: 22px 1fr; gap: 4px 8px; align-items: baseline; }
 .ws-confirm-n { font: 500 11px var(--in-mono, monospace); color: var(--in-tx-3, inherit); }
 .ws-cm .katex { font-size: 1.15em; }
-.ws-confirm-line.is-unsure { outline: 1.5px dashed var(--in-slip, currentColor); outline-offset: 2px; box-shadow: none; }
+.ws-confirm-line.is-unsure { outline: 0; box-shadow: none; border-left: 2px solid var(--uncertain, var(--warn, currentColor)); background: color-mix(in srgb, var(--uncertain, var(--warn, currentColor)) 8%, transparent); border-radius: 4px; }
+.ws-confirm-span { font: inherit; background: none; border: 0; border-bottom: 1px solid currentColor; padding: 0 2px; cursor: pointer; color: inherit; min-height: 24px; }
 .ws-confirm-ask { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .ws-confirm-ask .btn { min-height: 44px; }
 .ws-confirm-acts .btn { min-height: 44px; }
 @keyframes ws-unsure-pulse { 0%, 100% { outline-color: var(--in-slip, currentColor); } 50% { outline-color: color-mix(in srgb, var(--in-slip, currentColor) 35%, transparent); } }
-@media (prefers-reduced-motion: no-preference) { .ws-confirm-line.is-unsure { animation: ws-unsure-pulse 1.4s ease-in-out infinite; } }
+
+
+/* The panel is a quiet "needs a look" surface, not a dashed warning box. */
+.ws-confirm.ws-check { border: 1px solid var(--uncertain-line); }
