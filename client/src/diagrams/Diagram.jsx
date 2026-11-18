@@ -23,11 +23,11 @@ import {
 const poly = pts => pts.map(([x, y], i) => `${i ? 'L' : 'M'}${x} ${y}`).join(' ');
 
 /** A KaTeX label centred (or anchored) at an SVG point. */
-export function Tex({ x, y, tex, w = 64, h = 26, anchor = 'middle', baseline = 'middle', className = '' }) {
+export function Tex({ x, y, tex, w = 64, h = 26, anchor = 'middle', baseline = 'middle', className = '', ...rest }) {
   const left = anchor === 'start' ? x : anchor === 'end' ? x - w : x - w / 2;
   const top = baseline === 'top' ? y : baseline === 'bottom' ? y - h : y - h / 2;
   return (
-    <foreignObject x={left} y={top} width={w} height={h} className={`dg-tex ${className}`} style={{ overflow: 'visible' }}>
+    <foreignObject x={left} y={top} width={w} height={h} className={`dg-tex ${className}`} style={{ overflow: 'visible' }} {...rest}>
       <div xmlns="http://www.w3.org/1999/xhtml" className={`dg-tex-in is-${anchor}`}><MathText text={`$${tex}$`} /></div>
     </foreignObject>
   );
@@ -59,8 +59,8 @@ function Axes({ m, grid = true, labels = true, xLabel = null, yLabel = null }) {
       <line className="dg-axis" x1={y0} x2={y0} y1={m.axes.y[1][1]} y2={m.axes.y[0][1]} markerEnd="url(#dg-arrow)" />
       {labels && m.xTicks.filter(t => t.value !== 0).map(t => <Tex key={`lx${t.value}`} x={t.px} y={x0 + 14} tex={String(t.value)} w={40} h={20} />)}
       {labels && m.yTicks.filter(t => t.value !== 0).map(t => <Tex key={`ly${t.value}`} x={y0 - 6} y={t.px} tex={String(t.value)} w={40} h={20} anchor="end" />)}
-      {xLabel && <Tex x={f.right} y={x0 - 12} tex={xLabel} w={36} h={20} anchor="end" />}
-      {yLabel && <Tex x={y0 + 8} y={f.top - 2} tex={yLabel} w={36} h={20} anchor="start" />}
+      {xLabel && <Tex data-axis-name="x" x={f.right} y={x0 - 12} tex={xLabel} w={36} h={20} anchor="end" />}
+      {yLabel && <Tex data-axis-name="y" x={y0 + 8} y={f.top - 2} tex={yLabel} w={36} h={20} anchor="start" />}
     </g>
   );
 }
