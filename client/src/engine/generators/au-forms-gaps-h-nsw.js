@@ -53,7 +53,7 @@ function numeric(prompt, value, { prefix, suffix, traps = [], hints, steps, dotp
 
 // ═════════════════════ me11-comb · D3 · selections with conditions ═════════════════════
 const GROUPS = ['students', 'members of a robotics club', 'volunteers', 'teachers', 'players', 'council members'];
-const PAIRS = [['Asha', 'Ben'], ['Priya', 'Tom'], ['Mei', 'Jack'], ['Zara', 'Leo'], ['Nina', 'Omar']];
+const PAIRS = [['Asha', 'Ben'], ['Chloe', 'Tom'], ['Mei', 'Jack'], ['Zara', 'Leo'], ['Nina', 'Omar']];
 const cnt = (prompt, value, o) => {
   rej(!Number.isInteger(value) || value <= 0);
   const q = { dotpoint: 1, prompt, answerType: 'numeric', answer: { value }, traps: [], hints: o.hints, steps: o.steps };
