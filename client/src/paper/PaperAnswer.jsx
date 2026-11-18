@@ -157,8 +157,10 @@ function PhotoArea({ part, attemptId, value, onChange, disabled, register }) {
       const dataUrl = await new Promise((ok, no) => { const fr = new FileReader(); fr.onload = () => ok(fr.result); fr.onerror = no; fr.readAsDataURL(file); });
       const { readPhotoWithCloud } = await import('../ink/cloudReader.js');
       const { preparePhoto } = await import('../ink/photoRaster.js');
-      let prepared = null;
-      const out = await readPhotoWithCloud(dataUrl, { user, prepare: async u => { prepared = await preparePhoto(u); return prepared; } });
+      const out = await readPhotoWithCloud(dataUrl, { user });
+      // The picture that is kept is the one that was read: the same preparation of the same photo, which is deterministic, so the server's kept
+      // reading is found again by its picture at "Keep". (No context key is passed to the reader: it stays answer-blind by its public allowlist.)
+      const prepared = await preparePhoto(dataUrl);
       const lines = (out?.transcription?.lines || []).map(l => (typeof l === 'string' ? l : l.text)).filter(Boolean);
       if (!lines.length || !prepared?.dataUrl) { setStatus('failed'); return; }
       pictureRef.current = prepared.dataUrl;
