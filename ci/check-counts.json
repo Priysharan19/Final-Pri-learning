@@ -335,7 +335,7 @@
       "job": "platform-contracts",
       "log": "papers.log",
       "pins": [
-        {"has":"PRACTICE PAPERS: PASS — 220/220 checks"}
+        {"has":"PRACTICE PAPERS: PASS — 221/221 checks"}
       ]
     },
     "platform/resources.log": {
@@ -742,8 +742,8 @@
       "job": "suites-contracts",
       "log": "edition-suites.log",
       "pins": [
-        {"has":"EDITION SUITES COVERAGE: PASS — 40 listed, 3 exempt, 25 importers accounted for","note":"34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
-        {"has":"EDITION SUITES (prithagoras): PASS — 40/40 suites"}
+        {"has":"EDITION SUITES COVERAGE: PASS — 41 listed, 4 exempt, 27 importers accounted for","note":"34 → 36 listed, 20 → 21 importers (train 24 integration, as printed by the CI run). Plan E6: every suite that reads the edition is listed in tools/edition-suites.mjs or exempt with a reason."},
+        {"has":"EDITION SUITES (prithagoras): PASS — 41/41 suites"}
       ]
     },
     "build/install-budget-prithagoras.log": {
@@ -761,7 +761,7 @@
         {"has":"ACCESSIBILITY SUITE PASSED — 49/49 checks across 14 groups","note":"Plan E6: the accessibility walk on a Prithagoras build and server, an NSW Year 10 student; India-only steps (placement, the JEE room, generated papers refused by D15, the India chapter table) are listed as not applicable."},
         {"has":"ACCESSIBILITY SUITE PASSED — 52/52 checks across 15 groups"},
         {"has":"not applicable on prithagoras (India-only): 7"},
-        {"has":"E2E SUITE PASSED — 35/35 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server."},
+        {"has":"E2E SUITE PASSED — 36/36 checks across 1 flows","note":"Plan E6: OTP sign-up on a Prithagoras build and server (36: one more check, no phone channel, parent reached by email)."},
         {"has":"E2E SUITE PASSED — 72/72 checks across 1 flows","note":"The activation gate on a Prithagoras build."},
         {"has":"E2E SUITE PASSED — 5/5 checks across 1 flows","note":"The Exam Desk dark without its flag, Prithagoras."},
         {"has":"E2E SUITE PASSED — 120/120 checks across 4 flows","note":"The Exam Desk sitting, import and desk journeys on Prithagoras."}

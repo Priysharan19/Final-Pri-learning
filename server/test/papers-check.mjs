@@ -18,6 +18,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import './support/hermetic.mjs';
 import { createHash } from 'node:crypto';
+import { inflateSync } from 'node:zlib';
 import { spawnSync } from 'node:child_process';
 import { copyFileSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -54,20 +55,32 @@ c.deq(readdirSync(PAPERS_DIR).sort(), [...named].sort(), 'the directory holds ex
 c.deq(real.papers.filter(p => p.sample).map(p => p.id), ['ext1-2027-p01'], 'Practice Paper 01 is the only free sample; the other twelve are Premium');
 c.deq(real.papers.map(p => [p.hasGuidelines, p.paper.pages, p.guidelines.pages]), [[true, 19, 14], [true, 18, 12], [true, 17, 11], [true, 18, 11], [true, 18, 11], [true, 17, 12], [true, 17, 11], [true, 18, 12], [true, 14, 10], [true, 16, 9], [true, 15, 10], [true, 15, 9], [true, 20, 22]], 'every paper has its marking guidelines, with the page counts of the rebuilt files');
 
-// Text scan of every shipped PDF, under node (pdfjs-dist, the client's own dependency): the brand is spelled right,
-// and no personal contact, street address or old spelling is in any of them (B1 of the review of #1058: the owner's
-// mobile number and personal email were once printed on the last page of twenty-four of them).
-const pdfjs = await import(new URL('../../client/node_modules/pdfjs-dist/legacy/build/pdf.mjs', import.meta.url).href);
-async function pdfText(file) {
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(readFileSync(join(PAPERS_DIR, file))), useSystemFonts: false, verbosity: 0 }).promise;
-  let out = '';
-  for (let n = 1; n <= doc.numPages; n++) out += `${(await (await doc.getPage(n)).getTextContent()).items.map(it => it.str).join(' ')}\n`;
-  return out;
+// Text scan of every shipped PDF, under node with no dependency beyond the standard library (the server jobs install no
+// client packages): the PDFs are pdfTeX output, so every stream is inflated and the strings of its text-showing
+// operators (Tj, TJ) are read, kerning ignored. The brand is spelled right, and no personal contact, street address or
+// old spelling is in any of them (B1 of the review of #1058: the owner's mobile number and personal email were once
+// printed on the last page of twenty-four of them).
+function pdfText(file) {
+  const raw = readFileSync(join(PAPERS_DIR, file)).toString('latin1');
+  const unescape = body => body.replace(/\\([nrtbf()\\]|[0-7]{1,3})/g, (_, e) => ({ n: '\n', r: '\r', t: '\t', b: '\b', f: '\f', '(': '(', ')': ')', '\\': '\\' }[e] ?? String.fromCharCode(parseInt(e, 8))));
+  const pieces = [];
+  for (const m of raw.matchAll(/stream\r?\n/g)) {
+    const start = m.index + m[0].length, end = raw.indexOf('endstream', start);
+    if (end < 0) continue;
+    let text;
+    try { text = inflateSync(Buffer.from(raw.slice(start, end), 'latin1')).toString('latin1'); } catch { continue; }
+    for (const op of text.matchAll(/\[((?:[^\]\\]|\\.)*)\]\s*TJ|\(((?:[^)\\]|\\.)*)\)\s*Tj/g)) {
+      const strings = op[1] !== undefined ? [...op[1].matchAll(/\(((?:[^)\\]|\\.)*)\)/g)].map(x => unescape(x[1])) : [unescape(op[2])];
+      pieces.push(strings.join(''));
+    }
+  }
+  return pieces.join(' ');
 }
+// Spaces inside a word or a number may be kerning, so every pattern tolerates none.
 const SCAN = [
   ['an iCloud address', /@\s*icloud|icloud\s*\.\s*com/i],
-  ['an Australian mobile number', /(?:\+?\s*61\s*)?\(?0?4\d{2}\)?[\s-]*\d{3}[\s-]*\d{3}\b|\b04\d{2}\s?\d{3}\s?\d{3}\b/],
-  ['a street address', /\b\d{1,4}\s+[A-Z][a-z]+\s+(?:Pl|Place|St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Ct|Court|Cres|Crescent|Lane|Ln)\b|\bOakville\b|\bNSW\s+2\d{3}\b/],
+  ['an Australian mobile number', /(?:\+?61\s*)?\(?0?4\d{2}\)?[\s-]*\d{3}[\s-]*\d{3}(?!\d)/],
+  ['a street address', /\b\d{1,4}\s*[A-Z][a-z]+\s*(?:Pl|Place|St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Ct|Court|Cres|Crescent|Lane|Ln)\b|Oakville|NSW\s*2\d{3}\b/],
   ['the old spelling', /Pritagoras/i],
   ['the owner\'s personal name beside a contact', /Priysharan/i]
 ];
@@ -75,15 +88,16 @@ const pdfFiles = [...named].filter(f => f.endsWith('.pdf'));
 const brandRows = [];
 const scanHits = [];
 for (const f of pdfFiles) {
-  const text = await pdfText(f);
-  brandRows.push([f, /Prithagoras/.test(text)]);
+  const text = pdfText(f);
+  brandRows.push([f, /Prithagoras/.test(text), text.length]);
   for (const [label, re] of SCAN) if (re.test(text)) scanHits.push(`${f}: ${label}`);
 }
 c.eq(brandRows.length, 26, 'the text scan read all twenty-six PDFs');
+c.ok(brandRows.every(r => r[2] > 2000), 'and found real text in each');
 c.deq(brandRows.filter(r => !r[1]).map(r => r[0]), [], 'every shipped PDF contains "Prithagoras"');
 c.deq(scanHits, [], 'no shipped PDF carries an iCloud address, an Australian mobile number, a street address, the owner\'s name or the old spelling');
-// The scan itself is proved on a string that must trip it.
-c.ok(SCAN.every(([, re]) => re.test(['0416 169 219', 'impriysharan' + '@' + 'icloud.com', '5 Juniper' + ' Pl', 'Oakv' + 'ille', 'Prit' + 'agoras', 'Priysh' + 'aran'].join(' '))) , 'each pattern catches what it exists to catch');
+// The scan itself is proved on strings that must trip it.
+c.ok(SCAN.every(([, re]) => re.test(['0416 169 219', 'impriysharan' + '@' + 'icloud.com', '5 Juniper' + ' Pl', 'Oakv' + 'ille', 'Prit' + 'agoras', 'Priysh' + 'aran'].join(' '))), 'each pattern catches what it exists to catch');
 c.eq(PAPERS_CAPABILITY, 'premium-exams', 'the capability is the existing premium one');
 
 // ── The fixture: the real files plus two TEST-ONLY entries ────────────────────
