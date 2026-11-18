@@ -201,7 +201,6 @@ jobs:
         timeout-minutes: 25
         run: node scripts/iphone-journey.mjs --family iphone --app "$PRI_SIM_APP" --cloud --dynamic-type --lifecycle --a11y --evidence journey-iphone-ios27.json
 
-      # verify-journey-evidence.mjs rejects e.simulator.runtimePinned !== true.
       - name: The evidence names the pinned runtime, family and exact checkout
         if: always()
         env:
