@@ -192,7 +192,7 @@ export default function LivingFormula({ spec }) {
       <div className="lf-grid">
         <div className="lf-side">
           <div className="lf-formula-card" ref={formulaRef}>
-            <div className="lf-formula" role="math" aria-label={spokenFormula}>{view}</div>
+            <div className="lf-formula" role="group" aria-label={spokenFormula}>{view}</div>
             {showTip && pop && (
               <div className="lf-pop" role="tooltip" id={tipId} style={{ left: pop.left, top: pop.top }}>
                 <p className="lf-pop-what"><span className="lf-sym">{symbolOf(active)}</span> {t(NOTE[spec.id][active])}</p>

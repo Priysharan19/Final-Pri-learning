@@ -95,7 +95,7 @@ try {
             ranges: ranges.length,
             named: ranges.every(r => name(r).length > 3 && r.getAttribute('aria-valuetext')),
             svg: el.querySelector('svg.lf-svg')?.getAttribute('role') === 'img' && el.querySelector('svg.lf-svg').getAttribute('aria-label').length > 10,
-            math: el.querySelector('.lf-formula')?.getAttribute('role') === 'math' && el.querySelector('.lf-formula').getAttribute('aria-label').length > 10,
+            math: el.querySelector('.lf-formula')?.getAttribute('role') === 'group' && el.querySelector('.lf-formula').getAttribute('aria-label').length > 10,
             slotsFocusable: [...el.querySelectorAll('.lf-slot')].some(s => s.tabIndex >= 0 || s.getAttribute('aria-hidden') !== 'true'),
             targets: ranges.every(r => r.getBoundingClientRect().height >= 43) && el.querySelector('.lf-reset').getBoundingClientRect().height >= 43,
             slots: el.querySelectorAll('.lf-slot').length,
@@ -105,7 +105,7 @@ try {
           };
         });
         ok(a11y.ranges >= 2 && a11y.named, `${where}: every parameter is a named slider with a value text`);
-        ok(a11y.svg && a11y.math, `${where}: graph is a labelled image, formula a spoken math role`);
+        ok(a11y.svg && a11y.math, `${where}: graph is a labelled image, formula a named group with its spoken reading`);
         ok(!a11y.slotsFocusable, `${where}: numbers in the formula are not extra tab stops`);
         ok(a11y.targets, `${where}: sliders and Reset are 44 px tall`);
         ok(a11y.slots >= a11y.ranges && /=/.test(a11y.readout) && a11y.caption === 'The dashed grey line is the original.', `${where}: readout "${a11y.readout}" and caption`);
