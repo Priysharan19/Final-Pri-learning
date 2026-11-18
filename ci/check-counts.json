@@ -139,7 +139,7 @@
         {"has":"MISCONCEPTION TARGETING: PASS — 41/41 checks"},
         {"has":"LOST MARKS: PASS — 170/170 checks","note":"Ledger 3.6/3.7 (#366 re-implemented on #430): lost-mark explanations, tolerance policy."},
         {"has":"TOLERANCE POLICY: PASS — 228/228 checks","note":"221 → 228: exact-value demands refuse a calculator display (SymPy differential oracle, 2026-11-18), re-derived by running the suite."},
-        {"has":"PRECISION BAND: PASS — 2046 draws state a precision","note":"Issue #518: a prompt that states a precision keys a tol or rounding."},
+        {"has":"PRECISION BAND: PASS — 2143 draws state a precision","note":"Issue #518: a prompt that states a precision keys a tol or rounding."},
         {"has":"NOTES CONTENT CHECK PASSED — 77/77 chapters","note":"Chapter notes: every curriculum chapter, every worked answer engine-verified."},
         {"has":"I18N VOICE: PASS — 92/92 checks"},
         {"has":"MISCONCEPTION ONTOLOGY: PASS — 99/99 checks"},
