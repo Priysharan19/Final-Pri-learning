@@ -12,13 +12,15 @@ import { chapterEvidence, colourFor, practiceTrack, scopeFor } from './chapters.
 import { layered, layersOf, MAP_W } from './mapLayout.js';
 import TermGloss from '../components/TermGloss.jsx';
 import Working from './Working.jsx';
+import { iconFor } from './chapterIcons.js';
+import { Glyph, GlyphPaths } from './chapterGlyph.jsx';
 // map.css is part of the boot stylesheet (main.jsx), so a first visit offline
 // needs no stylesheet fetched for this tab (#658).
 
 // The syllabus map (v1.1 instrument, design s6): the student's chapters in
 // prerequisite layers, left to right (instrument/mapLayout.js — a chapter's
 // layer is how many chapters it builds on in a chain; its lane is its strand),
-// joined by quiet straight hairlines along Pri's authored prerequisite links
+// joined by quiet hairlines, routed round every chapter name (mapLayout.js routeLinks), along Pri's authored prerequisite links
 // (engine/prerequisites.js for India, engine/prerequisites-nsw.js for NSW — Pri's
 // own teaching maps, not an NCERT, CBSE or NESA publication). Hovering or
 // focusing a chapter lights what it builds on and what builds on it. A node's
@@ -33,14 +35,12 @@ const STRAND_KEY = {
   number: 'inst.strand.number', algebra: 'inst.strand.algebra', geometry: 'inst.strand.geometry', trig: 'inst.strand.trig',
   coord: 'inst.strand.coord', calculus: 'inst.strand.calculus', data: 'inst.strand.data'
 };
-// The floating card's area at the top right, in map units (310px card, its
-// 24px inset and a gap; the map is drawn about 1:1 on a desktop). Nodes are
-// placed clear of it, so the card never covers one.
-// The card is 310px wide, inset 24px, with an 18px gap kept clear; its height
-// is measured. In map units this scales with the rendered map width, and the
-// card floats only while that reserve is a modest share of the map.
-const CARD_PX = { w: 310 + 24 + 18, pad: 24 + 18 };
-const FLOAT_MAX_SHARE = 0.4;
+// The detail card sits in a column to the right of the drawing (sticky, so it
+// stays beside the map as it scrolls) while the page is wide enough to give the
+// drawing a column per prerequisite layer; otherwise it sits under the map.
+const CARD_PX = { w: 310, gap: 24 };
+const LAYER_PX = 190;
+const MAP_PAD_PX = 84;
 // "Most lost marks are in …" is said of a dot point only once it has at least
 // this many certified questions, so one slip is never called a pattern.
 const LOST_DOTPOINT_MIN_QUESTIONS = 3;
@@ -92,16 +92,16 @@ export default function MapPage() {
   const wrapRef = useRef(null);
   const cardRef = useRef(null);
   const [wrapW, setWrapW] = useState(0);
-  const [cardH, setCardH] = useState(320);
+  const [graphW, setGraphW] = useState(0);
   useEffect(() => {
     const wrap = wrapRef.current;
     if (!wrap || typeof ResizeObserver === 'undefined') return undefined;
     const ro = new ResizeObserver(() => {
       setWrapW(Math.round(wrap.clientWidth));
-      if (cardRef.current) setCardH(Math.round(cardRef.current.offsetHeight));
+      if (graphRef.current) setGraphW(Math.round(graphRef.current.clientWidth));
     });
     ro.observe(wrap);
-    if (cardRef.current) ro.observe(cardRef.current);
+    if (graphRef.current) ro.observe(graphRef.current);
     return () => ro.disconnect();
   }, [!!curriculum]);
   const motion = useMapMotion(graphRef, !!curriculum);
@@ -125,7 +125,6 @@ export default function MapPage() {
     return () => { live = false; };
   }, []);
 
-  const unit = wrapW > 0 ? MAP_W / wrapW : 1;
   // The ids a chapter builds on: Pri's India map, or Pri's NSW map.
   const preIdsOf = id => (user?.course === 'in' ? prerequisitesOf(id).map(p => p.id) : nswPrerequisitesOf(id));
   // The card floats beside the drawing only while the drawing keeps enough width per layer.
@@ -133,9 +132,9 @@ export default function MapPage() {
     const rows = scopeFor(curriculum, user)?.chapters || scopeFor(curriculum, user)?.subtopics || [];
     return rows.length ? Math.max(...layersOf(rows.map(r => ({ id: r.id })), preIdsOf).values()) + 1 : 1;
   }, [curriculum, user]);  // eslint-disable-line react-hooks/exhaustive-deps
-  const floating = wrapW > 0 && CARD_PX.w * unit <= MAP_W * FLOAT_MAX_SHARE && layerTotal <= 4;
-  // Rounded to 10 map units so a pixel of resize does not re-lay the map.
-  const reserve = floating ? { w: Math.ceil((CARD_PX.w * unit) / 10) * 10, h: Math.ceil(((cardH + CARD_PX.pad) * unit) / 10) * 10 } : null;
+  const floating = wrapW > 0 && wrapW - CARD_PX.w - CARD_PX.gap >= MAP_PAD_PX + layerTotal * LAYER_PX;
+  // The drawing's width in map units is its width on screen (rounded down to 10 so a pixel of resize does not re-lay the map): text stays at its drawn size.
+  const W = graphW > 0 ? Math.max(320, Math.floor(graphW / 10) * 10) : MAP_W;
   const layout = useMemo(() => {
     const scope = scopeFor(curriculum, user);
     const rows = scope?.chapters || scope?.subtopics || [];
@@ -149,27 +148,22 @@ export default function MapPage() {
     const placed = layered(
       nodes.map(n => ({ id: n.row.id, name: n.row.name, mastery: n.evidence.mastery, strand: strandName(n) })),
       preIds,
-      reserve ? { width: MAP_W - reserve.w, card: reserve, top: 96 } : {}
+      { width: W }
     );
     const at = new Map(placed.nodes.map(p => [p.id, p]));
     nodes.forEach(n => Object.assign(n, { x: at.get(n.row.id).x, y: at.get(n.row.id).y, r: at.get(n.row.id).r, lines: at.get(n.row.id).lines, layer: at.get(n.row.id).layer }));
     const byId = new Map(nodes.map(node => [node.row.id, node]));
-    const edges = [];
     const builds = new Map(nodes.map(n => [n.row.id, []]));
     const feeds = new Map(nodes.map(n => [n.row.id, []]));
-    for (const node of nodes) for (const pid of preIds(node.row.id)) {
-      const from = byId.get(pid);
-      if (!from) continue;
-      edges.push({ from, to: node, d: `M${from.x} ${from.y} L ${node.x} ${node.y}` });
-      builds.get(node.row.id).push(pid);
-      feeds.get(pid).push(node.row.id);
-    }
+    // Each prerequisite link is routed by the layout around every name; the lit sets read the same links.
+    for (const l of placed.edges) { builds.get(l.to).push(l.from); feeds.get(l.from).push(l.to); }
+    const edges = placed.edges.map(l => ({ from: byId.get(l.from), to: byId.get(l.to), d: l.d }));
     const started = nodes.filter(node => node.evidence.attempts > 0).length;
     // Only the chapters drawn on this map count toward the month's total.
     const monthly = month ? nodes.map(n => month[n.row.id]).filter(Boolean).reduce((a, m) => ({ earned: a.earned + (Number(m.earned) || 0), possible: a.possible + (Number(m.possible) || 0) }), { earned: 0, possible: 0 }) : null;
     const layerList = Array.from({ length: placed.layerCount }, (_, l) => nodes.filter(n => n.layer === l));
     return { nodes, edges, height: placed.height, width: placed.width, lanes: placed.lanes, layerList, builds, feeds, byId, started, monthly };
-  }, [curriculum, marks, month, user, reserve?.w, reserve?.h]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [curriculum, marks, month, user, W]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const track = practiceTrack(user);
   const current = layout.byId.get(pick) || layout.byId.get(recommended) || layout.nodes[0] || null;
@@ -228,7 +222,7 @@ export default function MapPage() {
         </header>
         <div className={`in-map-graph${motion.running ? '' : ' is-still'}`} ref={graphRef} data-lit={litId || undefined}
           onMouseLeave={() => setHover(null)}>
-          <svg viewBox={`0 0 ${MAP_W} ${H}`} role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
+          <svg viewBox={`0 0 ${layout.width} ${H}`} role="presentation" aria-hidden="true" preserveAspectRatio="xMidYMid meet">
             {layout.lanes.map(lane => (
               <g key={lane.strand} className="in-map-lane">
                 <line x1={0} x2={layout.width} y1={lane.top + 0.5} y2={lane.top + 0.5} />
@@ -247,6 +241,11 @@ export default function MapPage() {
               <g key={node.row.id} className={`in-map-node${nodeState(node)}${current?.row.id === node.row.id ? ' is-current' : ''}${isRecommended(node) ? ' is-next' : ''}`} style={{ '--cc': `var(${node.colour})` }} data-map-node={node.row.id}>
                 <circle className="in-map-dot" cx={node.x} cy={node.y} r={node.r} style={{ fillOpacity: fillOf(node) }} />
                 <circle className="in-map-ring" cx={node.x} cy={node.y} r={node.r + 6} />
+                {/* The chapter's figure sits on the dot; the name below stays the accessible name. */}
+                <g className={`in-map-glyph${fillOf(node) > 0.6 ? ' is-solid' : ''}`} aria-hidden="true" data-glyph={iconFor(node.row.id, node.strand).key}
+                  transform={`translate(${node.x - node.r * 0.62} ${node.y - node.r * 0.62}) scale(${(node.r * 1.24) / 24})`}>
+                  <GlyphPaths glyph={iconFor(node.row.id, node.strand).key} />
+                </g>
                 <text x={node.x} y={node.y + node.r + 22} className="in-map-name" textAnchor="middle" lang="en">
                   {node.lines.map((ln, k) => <tspan key={k} x={node.x} dy={k ? 16 : 0}>{ln}</tspan>)}
                 </text>
@@ -260,7 +259,7 @@ export default function MapPage() {
                 <h2 id={`in-map-layer-${l}`} className="in-map-layer-h">{l === 0 ? t('inst.mapLayerFirst', { total: layout.layerList.length }) : t('inst.mapLayerN', { n: l + 1, total: layout.layerList.length })}</h2>
                 <ol className="in-map-list" role="list">
                   {nodes.map(node => (
-                    <li key={node.row.id} style={{ left: `${(node.x / MAP_W) * 100}%`, top: `${(node.y / H) * 100}%` }}>
+                    <li key={node.row.id} style={{ left: `${(node.x / layout.width) * 100}%`, top: `${(node.y / H) * 100}%` }}>
                       <button type="button" className="in-map-hit" data-map-chapter={node.row.id}
                         aria-current={current?.row.id === node.row.id ? 'true' : undefined}
                         aria-describedby={current?.row.id === node.row.id ? 'in-map-card' : undefined}
@@ -269,7 +268,7 @@ export default function MapPage() {
                         onMouseEnter={() => setHover(node.row.id)}>
                         {/* On a phone this is the map: the name, how far along it is, and what it builds on. */}
                         <span className="in-map-hit-name" aria-hidden="true">
-                          <i className="in-map-hit-dot" style={{ '--cc': `var(${node.colour})`, '--f': fillOf(node) }} />
+                          <span className="in-map-hit-dot" style={{ '--cc': `var(${node.colour})`, '--f': fillOf(node) }}><Glyph id={node.row.id} strand={node.strand} /></span>
                           <span lang="en">{node.row.name}</span>
                           <em>{metaOf(node)}</em>
                           {preNames(node).length > 0 && <small lang="en">{t('inst.mapBuildsOn', { names: preNames(node).join(', ') })}</small>}
