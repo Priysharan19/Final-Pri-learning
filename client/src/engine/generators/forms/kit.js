@@ -27,7 +27,9 @@ export function typeset(text) {
       t = t.replace(/\+ -(?=\d|\\|[a-z(])/g, '- ');           // "+ -5" → "- 5"
       t = t.replace(/- -(?=\d|\\|[a-z(])/g, '+ ');              // "- -5" → "+ 5"
       t = t.replace(/\\cdot -(\d+(?:\.\d+)?)/g, '\\cdot (-$1)');  // "\cdot -5" → "\cdot (-5)"
-      t = t.replace(/(?<![\w.])0[a-zA-Z](?:\^\{?\d+\}?)?\s[+-]\s/g, ''); // leading "0x + "
+      // leading "0x + " drops with its "+"; a leading "0x - 4" keeps its minus ("-4"). A zero term that follows
+      // another term ("8z^2 + 0z - 4") is left to the trailing rule below, so the sign of what follows survives.
+      t = t.replace(/(?<![\w.]|[+-]\s)0[a-zA-Z](?:\^\{?\d+\}?)?\s([+-])\s/g, (_m, sign) => (sign === '-' ? '-' : ''));
       t = t.replace(/(?<=[a-zA-Z)}\]]|\^\d)\s[+-]\s0[a-zA-Z](?:\^\{?\d+\}?)?/g, ''); // trailing "+ 0x"
       t = t.replace(/(?<=[a-zA-Z)}\]]|\^\d)\s[+-]\s0(?![\d.\w])/g, '');           // trailing "+ 0"
       t = t.replace(/(?<![\d._^{\w])1(?=[a-zA-Z])/g, '');                // "1x" → "x"

@@ -189,17 +189,21 @@ export const year8 = {
     if (diff === 2) {
       const g = ri(rng, 2, 6), p = ri(rng, 2, 5), q = nz(rng, -6, 6);
       const A = g * p, B = g * q;
+      // The highest common factor is g only when p and q are coprime; otherwise
+      // "fully" needs the larger factor (10x + 10 is 10(x + 1), not 2(5x + 5)).
+      const h = gcd(A, Math.abs(B)), P = A / h, Q = B / h;
+      const partial = { expr: `${g}(${A / g}x + ${B / g})`, why: 'A common factor was taken out, but not the *highest* one — check whether the bracket still has a common factor.' };
       return {
         prompt: `Factorise $${A}x ${sgn(B)}$ fully.`,
-        answerType: 'expression', answer: { expr: `${g}(${p}x + ${q})`, anyOf: [`${g}(${p}x ${sgn(q)})`] },
-        inputHint: `e.g. ${g}(2x + 3)`,
-        traps: [{ expr: `${g / (g % 2 === 0 ? 2 : 1) === g ? 2 : g / 2}(${A / 2}x + ${B / 2})`, why: 'A common factor was taken out, but not the *highest* one — check whether the bracket still has a common factor.' }],
-        hints: ['Find the highest number that divides both terms.', `$\\text{HCF}(${A}, ${Math.abs(B)}) = ${g}$.`, `Write $${g}(\\; ? \\;x + \\;?\\;)$ and fill in the bracket.`],
+        answerType: 'expression', answer: { expr: `${h}(${P}x + ${Q})`, anyOf: [`${h}(${P}x ${sgn(Q)})`] },
+        inputHint: `e.g. ${h}(2x + 3)`,
+        traps: [h > g ? partial : { expr: `${g / (g % 2 === 0 ? 2 : 1) === g ? 2 : g / 2}(${A / 2}x + ${B / 2})`, why: partial.why }],
+        hints: ['Find the highest number that divides both terms.', `$\\text{HCF}(${A}, ${Math.abs(B)}) = ${h}$.`, `Write $${h}(\\; ? \\;x + \\;?\\;)$ and fill in the bracket.`],
         steps: [
-          { h: 'Highest common factor', d: `$\\text{HCF}(${A}, ${Math.abs(B)}) = ${g}$` },
-          { h: 'Divide each term by it', d: `$${A}x \\div ${g} = ${p}x$ and $${B} \\div ${g} = ${q}$` },
-          { h: 'Write as a product', d: `$${g}(${p}x ${sgn(q)})$` },
-          { h: 'Check by expanding', d: `$${g} \\times ${p}x = ${A}x$ ✓` }
+          { h: 'Highest common factor', d: `$\\text{HCF}(${A}, ${Math.abs(B)}) = ${h}$` },
+          { h: 'Divide each term by it', d: `$${A}x \\div ${h} = ${P}x$ and $${B} \\div ${h} = ${Q}$` },
+          { h: 'Write as a product', d: `$${h}(${P}x ${sgn(Q)})$` },
+          { h: 'Check by expanding', d: `$${h} \\times ${P}x = ${A}x$ ✓` }
         ]
       };
     }
@@ -322,18 +326,21 @@ export const year8 = {
   // ── Equations with brackets & both sides ─────────────────────────────────
   'y8-equations': (rng, diff) => {
     if (diff === 1) {
-      const x = ri(rng, -7, 12), a = rc(rng, [2, 3, 4, 5, 6]), b = nz(rng, -12, 12);
-      const c = a * x + b;
+      // One bracket, one multiplier, whole-number answer: the first rung of
+      // "solve equations involving brackets". The two-step drill ax + b = c
+      // that used to sit here assessed no bracket skill.
+      const x = ri(rng, -7, 12), a = rc(rng, [2, 3, 4, 5, 6]), b = nz(rng, -9, 9);
+      const c = a * (x + b);
       return {
-        prompt: `Solve $${a}x ${sgn(b)} = ${c}$.`,
-        answerType: 'numeric', answer: { value: x }, answerPrefix: 'x =',
+        prompt: `Solve $${a}(x ${sgn(b)}) = ${c}$.`,
+        answerType: 'numeric', answer: { value: x }, answerPrefix: 'x =', dotpoint: 0,
         stepcheck: { kind: 'equation', variable: 'x', solutions: [x] },
-        traps: [{ value: (c + b) / a, why: `Undo the ${sgn(b)} with its opposite first.` }],
-        hints: ['Undo addition/subtraction first, then the multiplication.', `$${a}x = ${c - b}$.`, `Divide by ${a}.`],
+        traps: [{ value: (c - b) / a, why: `The ${a} multiplies the whole bracket, so ${b >= 0 ? 'subtracting' : 'adding'} ${Math.abs(b)} alone leaves the bracket unmultiplied.` }],
+        hints: [`Divide both sides by ${a} to free the bracket, or expand it first.`, `The bracket equals ${c / a}.`, `Undo the ${sgn(b)} inside the bracket.`],
         steps: [
-          { h: `${b >= 0 ? 'Subtract' : 'Add'} ${Math.abs(b)}`, d: `$${a}x = ${c - b}$` },
-          { h: `Divide by ${a}`, d: `$x = ${x}$` },
-          { h: 'Check', d: `$${a}(${x}) ${sgn(b)} = ${c}$ ✓` }
+          { h: `Divide both sides by ${a}`, d: `$x ${sgn(b)} = ${c / a}$` },
+          { h: `${b >= 0 ? 'Subtract' : 'Add'} ${Math.abs(b)}`, d: `$x = ${x}$` },
+          { h: 'Check', d: `$${a}(${x} ${sgn(b)}) = ${c}$ ✓` }
         ]
       };
     }
@@ -462,6 +469,24 @@ export const year8 = {
         hints: ['Compare with $y = mx + c$.', 'm multiplies x; c stands alone.', `Here $m = ${m}$ and $c = ${c}$.`],
         steps: [
           { h: 'Match to y = mx + c', d: `$m = ${m}$ (slope), $c = ${c}$ (crossing point on the y-axis)` }
+        ]
+      };
+    }
+    if (diff === 4) {
+      // The equation of the line through two points: gradient, then intercept.
+      const m = nz(rng, -4, 4), c = nz(rng, -8, 8);
+      const x1 = ri(rng, -3, 2), dx = ri(rng, 1, 3), x2 = x1 + dx;
+      const y1 = m * x1 + c, y2 = m * x2 + c;
+      return {
+        prompt: `Find the equation of the line through $(${x1}, ${y1})$ and $(${x2}, ${y2})$. Give it in the form $y = mx + c$.`,
+        answerType: 'expression', answer: { expr: `${term(m)} ${sgn(c)}` }, answerPrefix: 'y =', dotpoint: 1,
+        inputHint: 'e.g. 2x - 3',
+        traps: [],
+        hints: ['First the gradient: rise ÷ run between the two points.', `The run is ${dx}.`, 'Put one point and the gradient into $y = mx + c$ and solve for $c$.'],
+        steps: [
+          { h: 'Gradient', d: `$m = \\dfrac{${y2} - (${y1})}{${x2} - (${x1})} = ${m}$` },
+          { h: 'Find c', d: `$${y1} = ${m}(${x1}) + c$, so $c = ${c}$` },
+          { h: 'Equation', d: `$y = ${term(m)} ${sgn(c)}$` }
         ]
       };
     }
@@ -624,8 +649,8 @@ export const year8 = {
     const l = ri(rng, 20, 60), w = ri(rng, 15, 40), h = ri(rng, 10, 30);
     const litres = l * w * h / 1000;
     return {
-      prompt: `A fish tank measures $${l}$ cm × $${w}$ cm × $${h}$ cm. How many **litres** of water does it hold when full? (1 L = 1000 cm³)`,
-      answerType: 'numeric', answer: { value: litres }, answerSuffix: 'L',
+      prompt: `A fish tank measures $${l}$ cm × $${w}$ cm × $${h}$ cm. How many **litres** of water does it hold when full, correct to 3 decimal places where needed? (1 L = 1000 cm³)`,
+      answerType: 'numeric', answer: { value: litres, tol: 0.0006 }, answerSuffix: 'L',
       traps: [{ value: l * w * h, why: 'That’s the volume in cm³ — divide by 1000 to convert to litres.' }],
       hints: ['Find the volume in cm³ first.', `$${l} \\times ${w} \\times ${h} = ${l * w * h}$ cm³.`, 'Divide by 1000 to convert to litres.'],
       steps: [

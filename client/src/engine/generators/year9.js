@@ -671,8 +671,8 @@ export const year9 = {
     }
     if (diff === 3) {
       return {
-        prompt: `An investment of ${moneyPlain(P)} earns ${moneyPlain(I)} in simple interest over $${n}$ years. Find the annual interest **rate** as a percentage.`,
-        answerType: 'numeric', answer: { value: rr, tol: 0.01, percent: true }, answerSuffix: '% p.a.',
+        prompt: `An investment of ${moneyPlain(P)} earns ${moneyPlain(I)} in simple interest over $${n}$ years. Find the annual interest **rate**, as a percentage per year.`,
+        answerType: 'numeric', answer: { value: rr, tol: 0.01, percent: true }, answerSuffix: '%',
         traps: [{ value: r2(I / P * 100), why: `That's the total percentage over all ${n} years — divide by ${n} for the annual rate.` }],
         hints: ['Rearrange $I = Prn$ for $r$.', `$r = \\dfrac{I}{Pn}$.`, `$r = \\dfrac{${I}}{${P} \\times ${n}}$, then × 100 for %.`],
         steps: [
@@ -691,8 +691,8 @@ export const year9 = {
       if (n2 === n || (need * 4) % 1 !== 0 || need < 1 || need > 12) return year9['y9-simint'](rng, diff);
       const Iboth = P * rInt / 100 * n;
       return {
-        prompt: `**Option A:** ${moneyPlain(P)} invested at $${rInt}\\%$ p.a. simple interest for $${n}$ years.\n**Option B:** the same ${moneyPlain(P)} invested for $${n2}$ years.\n\nWhat annual simple-interest rate must Option B pay for the two options to earn **exactly the same interest**?`,
-        answerType: 'numeric', answer: { value: need, tol: 0.005, percent: true }, answerSuffix: '% p.a.',
+        prompt: `**Option A:** ${moneyPlain(P)} invested at $${rInt}\\%$ p.a. simple interest for $${n}$ years.\n**Option B:** the same ${moneyPlain(P)} invested for $${n2}$ years.\n\nWhat annual simple-interest rate, as a percentage per year, must Option B pay for the two options to earn **exactly the same interest**?`,
+        answerType: 'numeric', answer: { value: need, tol: 0.005, percent: true }, answerSuffix: '%',
         traps: [
           { value: rInt, why: `Option B runs for $${n2}$ years, not $${n}$, so the same rate would earn a different amount of interest.`, tol: 0.005 },
           { value: r2(rInt * n2 / n), why: `The rate and the time trade off the other way round: fewer years needs a **higher** rate. Use $r_B = \\dfrac{r_A \\times ${n}}{${n2}}$.`, tol: 0.005 }

@@ -8,7 +8,7 @@ Legend: **AI-A** nothing found wrong · **AI-C** a change is suggested (wording,
 
 Items: 56 of 56 · AI-A 18 · AI-C 38 · AI-R 0
 
-> **Not pre-reviewed (4 items).** These cells joined the packet on train 25, after this file was written. The rows at the end of the table carry AI-C only because the table needs a verdict; none was formed. No pre-review has looked at them, and nothing here says they are right or wrong. A human examiner reviews them like every other item.
+> **Not pre-reviewed (6 items).** These cells joined the packet on train 25 (and, for the last two, in the 19 November 2026 content-gap work), after this file was written. The rows at the end of the table carry AI-C only because the table needs a verdict; none was formed. No pre-review has looked at them, and nothing here says they are right or wrong. A human examiner reviews them like every other item.
 
 | Item | AI verdict | Reason | Defect to fix |
 |---|---|---|---|
@@ -72,3 +72,5 @@ Items: 56 of 56 · AI-A 18 · AI-C 38 · AI-R 0
 | cbse-bank:y7-angles/D1 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
 | cbse-bank:y7-angles/D2 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
 | cbse-bank:y7-angles/D3 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:me11-functions/D2 | AI-C | Not pre-reviewed: this cell joined the packet after this file was written (19 November 2026 content-gap work: the printed-answer format of the cell was repaired). No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:me11-poly/D4 | AI-C | Not pre-reviewed: this cell joined the packet after this file was written (19 November 2026 content-gap work: the printed-answer format of the cell was repaired). No verdict was formed. | Run the pre-review over this cell before the packet is issued. |

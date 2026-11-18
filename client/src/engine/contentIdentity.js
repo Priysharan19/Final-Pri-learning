@@ -65,7 +65,18 @@
 // 2026.11.40 — Train editions-25 CI fix: Some Applications of Trigonometry (c10-trig-applications) draws only
 // figure-bearing heights-and-distances forms (the right-triangle ratio, the ladder and two new ones, a kite string
 // and an angle of depression); the table and identity expressions stay in the Trigonometry chapter.
-export const CONTENT_VERSION = '2026.11.40';
+// 2026.11.41 — Walk-through maths fixes: a grouped-data mode question has one modal class; a numeric key is judged
+// by the band its wording asks for (an exact key carries none, a key to three decimals says so, "exactly" is exact,
+// "to the nearest degree" names its place, a list of solutions is bounded by the precision named); a negative number
+// raised to a power is bracketed in every worked line; Areas Related to Circles serves plane figures (two new forms,
+// arc length and the perimeter of a sector) and Surface Areas and Volumes serves solids (two new forms, the curved
+// surface of a cylinder and the surface of a sphere); the pump question asks how much is removed; the earlier
+// energy-rate, factorise-fully and Year 7 mode corrections are part of this version.
+// 2026.11.42 — NSW content gaps: Advanced and Extension 1 cells that had no question now have verified forms; a set
+// of rational solutions prints as fractions; a previous-year question keeps the exam's published band; the key-format
+// repairs (a constant key, a plain percentage box, a plain value box) and the wider parameter ranges change what
+// those generators serve.
+export const CONTENT_VERSION = '2026.11.42';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

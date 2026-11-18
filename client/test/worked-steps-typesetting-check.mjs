@@ -23,11 +23,12 @@
 // lane L1's train) fixed the last 26. A generator outside HELD with a hit fails
 // here; a HELD generator that no longer exists fails here too.
 // ─────────────────────────────────────────────────────────────────────────────
-import { workedStepHits } from './support/typesetting-rules.mjs';
+import { workedStepHits, negativeBaseHits, NEGATIVE_BASE } from './support/typesetting-rules.mjs';
 
 const { IN_CURRICULUM } = await import('../src/engine/curriculum-in.js');
 const { indiaScope } = await import('../src/engine/indiaProduct.js');
-const { generateQuestion, loadAllBanks, GENERATORS } = await import('../src/engine/generators/index.js');
+const { generateQuestion, loadAllBanks, GENERATORS, EXTRA_FORMS } = await import('../src/engine/generators/index.js');
+const { makeRng } = await import('../src/engine/qhelpers.js');
 
 const DRAWS = 60;
 // Empty since the held L5 commit landed after lane L1's train: every V1
@@ -129,6 +130,64 @@ ok(draws > 50000, `drew every V1 generator ${DRAWS} times at each difficulty (${
   }
   ok(checked >= 150, `drew the collinearity form (${checked})`);
   ok(wrong === 0, `the collinearity hint names the same multiplier as the worked step (${wrong} of ${checked} disagree)`);
+}
+
+// ── 3. A negative number raised to a power is bracketed, in both editions ────
+// "-6^2 - 4(5)(6) = -84" is wrong as written (-6^2 = -36, so the line is -156); the
+// substituted value needs its brackets: "(-6)^2 - 4(5)(6) = -84". Every generator, both
+// editions, every difficulty: no prompt, hint, worked step or trap explanation shows a
+// unary minus on a number that carries an exponent.
+{
+  const RULE = [['$-6^2 - 4(5)(6) = -84$', true], ['$(-6)^2 - 4(5)(6) = 76$', false], ['$5 - 6^2$', false], ['$x = -2^{4}$', true],
+    ['$25\\times -2^{4} = 400$', true], ['$1^2 + -5^2 = 26$', true], ['$-x^2 + 3$', false], ['$e^{-4x}$', false], ['$\\Delta = -6^2$', true], ['$-6^{k+1}$', false]];
+  for (const [text, want] of RULE) ok(negativeBaseHits(text).length > 0 === want, `negative-base rule on ${text} (want ${want})`);
+  const SEEDS = 80;
+  const fields = q => [['prompt', q.prompt], ...(q.hints || []).map(h => ['hint', h]), ...(q.steps || []).map(s => ['step', s?.d]), ...(q.traps || []).map(t => ['trap', t?.why])];
+  let strings = 0, made = 0;
+  const hits = [];
+  for (const id of Object.keys(GENERATORS)) {
+    for (let d = 1; d <= 4; d++) {
+      for (let s = 1; s <= SEEDS; s++) {
+        let q;
+        try { q = generateQuestion(id, d, s * 7919 + d); } catch { continue; }
+        made++;
+        for (const [where, text] of fields(q)) {
+          if (typeof text !== 'string') continue;
+          strings++;
+          const hit = negativeBaseHits(text)[0];
+          if (hit) hits.push(`${id} d${d} ${where}: ${hit.math}`);
+        }
+      }
+    }
+  }
+  // An extra form is drawn by a seed-keyed pick, so a rare one is easily missed above: draw every
+  // form of every skill directly, as the extra-forms check does.
+  let formDraws = 0;
+  for (const [skill, list] of Object.entries(EXTRA_FORMS)) {
+    for (const f of list) {
+      for (let d = 1; d <= 4; d++) {
+        for (let s = 1; s <= 40; s++) {
+          let q;
+          try { q = f.make(makeRng(s * 7919 + d), d).payload; } catch { continue; }
+          formDraws++;
+          for (const [where, text] of fields(q)) {
+            if (typeof text !== 'string') continue;
+            strings++;
+            const hit = negativeBaseHits(text)[0];
+            if (hit) hits.push(`${skill}/${f.form} d${d} ${where}: ${hit.math}`);
+          }
+        }
+      }
+    }
+  }
+  ok(formDraws >= 20000, `negative-base sweep drew ${formDraws} extra-form questions`);
+  made += formDraws;
+  const byGen = new Map();
+  for (const h of hits) { const k = h.split(' ')[0]; byGen.set(k, (byGen.get(k) || 0) + 1); }
+  for (const h of [...new Map(hits.map(x => [x.split(' ')[0] + x.split(' ')[2], x])).values()].slice(0, 30)) failures.push(`unbracketed negative base: ${h}`);
+  ok(made >= 100000, `negative-base sweep drew ${made} questions`);
+  ok(NEGATIVE_BASE.test('-6^2'), 'the negative-base pattern is live');
+  console.log(`negative-base sweep: ${made} questions, ${strings} prompt/hint/step/trap strings, ${hits.length} unbracketed negative base(s) in ${byGen.size} generator(s)`);
 }
 
 const total = pass + failures.length;

@@ -417,7 +417,9 @@ export const year7 = {
       };
     }
     if (diff === 2) {
-      const a = ri(rng, 3, 8), b = nz(rng, -6, 6), c = nz(rng, -5, -1), d = nz(rng, -6, 9);
+      const a = ri(rng, 3, 8), b = nz(rng, -6, 6), d = nz(rng, -6, 9);
+      let c = nz(rng, -5, -1);
+      if (a + c === 0) c -= 1; // the x terms must not cancel: the answer keeps an x term
       const xc = a + c, k = b + d;
       return {
         prompt: `Simplify $${a}x ${sgn(b)} ${c < 0 ? '-' : '+'} ${Math.abs(c)}x ${sgn(d)}$ by collecting like terms.`,
@@ -808,6 +810,9 @@ export const year7 = {
       const modeV = ri(rng, base, base + 8);
       let data = [modeV, modeV, ri(rng, base, base + 9), ri(rng, base, base + 9), ri(rng, base + 1, base + 10)];
       data = data.map((v, i) => (i > 1 && v === modeV ? v + 1 : v));
+      // The other three scores must be distinct from each other as well, or a second value ties for the mode
+      // (11, 6, 11, 6, 5 has two modes while the key names one). Bumping upward draws nothing extra from the rng.
+      for (let i = 3; i < 5; i++) while (data.slice(2, i).includes(data[i]) || data[i] === modeV) data[i] += 1;
       data = rs(rng, data);
       const sorted = [...data].sort((a, b) => a - b);
       const range = sorted[4] - sorted[0];

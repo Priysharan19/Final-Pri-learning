@@ -113,6 +113,9 @@ for (const g of ['me11-poly', 'me12-induction', 'mex-proof']) {
     const meta = stepMetaFor(q); if (!meta) continue;
     const start = meta.kind === 'equation' ? null : spansOf(q.prompt).find(s => { try { return !/=/.test(s) && s.length > 2 && s.length < 80 && exprEquivalent(s, meta.canonical); } catch { return false; } }) || null;
     for (const t of (q.traps || []).slice(0, 3)) {
+      // A trap that is itself one of the equation's solutions ("only one of the three roots") is a true line with an
+      // incomplete final answer, not a wrong line: the step checker rightly does not flag it, so it is not a designed slip.
+      if (meta.kind === 'equation' && Number.isFinite(t?.value) && (meta.solutions || []).some(sol => Math.abs(sol - t.value) < 1e-9)) continue;
       const wrong = meta.kind === 'equation' ? (Number.isFinite(t?.value) ? `${meta.variable} = ${t.value}` : null) : (typeof t?.expr === 'string' ? `= ${t.expr}` : null);
       if (!wrong) continue;
       let finalWrong = false; try { finalWrong = checkAnswer(q, wrong.replace(/^.*?=\s*/, '')).correct === false; } catch { /* skip */ }

@@ -110,5 +110,31 @@ for (let d = 1; d <= 4; d++) for (let i = 1; i <= 60; i++) {
   const q = generateQuestion('c10-trig-applications-current', d, i * 7919 + d);
   if (!/<svg/.test(JSON.stringify(q))) fail(`c10-trig-applications-current d${d} seed ${i * 7919 + d}: no figure (${String(q.prompt).slice(0, 70)})`);
 }
+// Chapter content mismatch (walk-through F12): "Areas Related to Circles" served the volume of a cone and a
+// cylinder, and "Surface Areas and Volumes" the area of a concentric-circle path. Mensuration forms are split by
+// what they ask: plane figures (area, perimeter, arc) belong to the circles chapter, solids to the solids chapter.
+{
+  const SOLID = /\b(?:cone|conical|cylinder|cylindrical|hemisphere|hemispherical|sphere|spherical|solid|volume|surface area|curved surface)\b/i;
+  const PLANE = /\b(?:sector|arc|concentric|circular path|ring|segment|quadrant)\b/i;
+  const plane = ['c10-areas-circles', 'c10-sector-reasoning'], solids = ['c10-surface-volume-combo', 'c10-surface-area-combo', 'c10-volume-combination-reasoning'];
+  let mensuration = 0;
+  for (const [ids, wrong, label] of [[plane, SOLID, 'a solid or volume'], [solids, /\b(?:concentric|circular path|sector|arc length|perimeter of the sector)\b/i, 'a plane-figure area']]) {
+    for (const skill of ids) {
+      const forms = EXTRA_FORMS[skill] || [];
+      if (forms.length < 4) fail(`${skill}: only ${forms.length} extra forms after the mensuration split (need >= 4)`);
+      for (const f of forms) for (let d = 1; d <= 4; d++) for (let i = 1; i <= 20; i++) {
+        const payload = f.make(makeRng(i * 7919 + d), d).payload;
+        mensuration += 1;
+        if (wrong.test(payload.prompt)) fail(`${skill}/${f.form} d${d}: serves ${label} — ${payload.prompt.slice(0, 90)}`);
+      }
+    }
+  }
+  const areasForms = (EXTRA_FORMS['c10-areas-circles'] || []).map(f => f.form).sort().join(',');
+  const solidForms = (EXTRA_FORMS['c10-surface-volume-combo'] || []).map(f => f.form).sort().join(',');
+  if (areasForms !== 'arc-length,ring-area,sector-area,sector-perimeter') fail(`c10-areas-circles forms are ${areasForms}`);
+  if (/ring-area|sector-area|arc-length|sector-perimeter/.test(solidForms)) fail(`c10-surface-volume-combo serves plane forms: ${solidForms}`);
+  if (!PLANE.test('a sector') || !mensuration) fail('the mensuration split check drew nothing');
+  console.log(`mensuration split: ${mensuration} form draws; Areas Related to Circles forms [${areasForms}]; Surface Areas and Volumes forms [${solidForms}]`);
+}
 console.log(failures ? `INDIA EXTRA FORMS: FAIL — ${failures} problem(s)` : `INDIA EXTRA FORMS: PASS — ${forms} forms (${heldBack} held back from the draw by their size, marked from their makers), ${draws} draws, every key matched its independent check; ${figured} figures drawn without printing a key; ${marked} issued questions run through the real marker (key accepted, wrong answers rejected)`);
 process.exit(failures ? 1 : 0);

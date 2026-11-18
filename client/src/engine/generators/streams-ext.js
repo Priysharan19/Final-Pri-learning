@@ -2,7 +2,7 @@
 // Pri Learning · Extension 1 & Extension 2 generators (ME / MEX)
 // ─────────────────────────────────────────────────────────────────────────────
 import { streamsExtNsw } from './streams-ext-nsw.js';
-import { ri, rc, nz, gcd, Frac, mcq, poly, sgn, r1, r2, r3, rad } from '../qhelpers.js';
+import { ri, rc, nz, gcd, Frac, mcq, poly, sgn, r1, r2, r3, rad, br } from '../qhelpers.js';
 import { identityProof } from './identityProofs.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
@@ -258,84 +258,26 @@ export const streamsExt = {
         ]
       };
     }
-    // Solving over the rationals: the rational root theorem narrows the search,
-    // and the factors that come out need not have leading coefficient 1.
-    const branch = ri(rng, 0, 2);
-    if (branch === 0) {
-      const p = rc(rng, [2, 3]);
-      let q = nz(rng, -7, 7);
-      for (let guard = 0; gcd(Math.abs(q), p) !== 1 && guard < 40; guard++) q = nz(rng, -7, 7);
-      if (gcd(Math.abs(q), p) !== 1) return streamsExt['me11-poly'](rng, diff);
-      const r = nz(rng, -5, 5);
-      let s = nz(rng, -5, 5);
-      if (s === r) s = r === 5 ? -1 : r + 1;
-      const c3 = p, c2 = -(p * (r + s) + q), c1 = p * r * s + q * (r + s), c0 = -q * r * s;
-      return {
-        prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals.`,
-        answerType: 'set', answer: { values: [q / p, r, s] },
-        inputHint: 'e.g. x = 3/2, -1, 4',
-        traps: [
-          { value: q, why: `A factor $(${p}x ${sgn(-q)})$ is zero at $x = \\dfrac{${q}}{${p}}$, not at $x = ${q}$ — divide by the leading $${p}$.` },
-          { value: c0, why: 'The rational root theorem says a root is $\\pm\\dfrac{\\text{factor of the constant}}{\\text{factor of the leading coefficient}}$ — the constant term itself is rarely a root.' }
-        ],
-        hints: [`By the rational root theorem any rational root is $\\pm\\dfrac{p}{q}$ with $p \\mid ${Math.abs(c0)}$ and $q \\mid ${p}$.`,
-          `Testing the integer candidates finds $x = ${r}$, so $(x ${sgn(-r)})$ is a factor.`,
-          `Dividing out leaves $(${p}x ${sgn(-q)})(x ${sgn(-s)})$, and one root is a fraction.`],
-        steps: [
-          { h: 'Candidate rational roots', d: `$\\pm\\dfrac{\\text{factors of } ${Math.abs(c0)}}{\\text{factors of } ${p}}$` },
-          { h: 'Factorise fully', d: `$${poly([c3, c2, c1, c0])} = (${p}x ${sgn(-q)})(x ${sgn(-r)})(x ${sgn(-s)})$` },
-          { h: 'Null factor law', d: `$x = \\dfrac{${q}}{${p}}$, $\\ x = ${r}$, $\\ x = ${s}$` }
-        ]
-      };
-    }
-    if (branch === 1) {
-      const p = rc(rng, [2, 3]), r = rc(rng, [2, 3]);
-      let q = nz(rng, -5, 5), s = nz(rng, -5, 5);
-      for (let guard = 0; (gcd(Math.abs(q), p) !== 1 || gcd(Math.abs(s), r) !== 1 || q * r === s * p) && guard < 60; guard++) {
-        q = nz(rng, -5, 5); s = nz(rng, -5, 5);
-      }
-      if (gcd(Math.abs(q), p) !== 1 || gcd(Math.abs(s), r) !== 1 || q * r === s * p) return streamsExt['me11-poly'](rng, diff);
-      const t = nz(rng, -4, 4);
-      const c3 = p * r, c2 = -(p * s + q * r + p * r * t), c1 = q * s + (p * s + q * r) * t, c0 = -q * s * t;
-      return {
-        prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals.`,
-        answerType: 'set', answer: { values: [q / p, s / r, t] },
-        inputHint: 'e.g. x = 1/2, -2/3, 4',
-        traps: [
-          { value: q * s, why: 'Two of the three roots here are fractions — the leading coefficient does not divide out neatly into integer roots.' },
-          { value: t, why: `$x = ${t}$ is only **one** of the three solutions; the question asks for all of them.` }
-        ],
-        hints: [`The leading coefficient is $${c3} = ${p} \\times ${r}$, so denominators of $${p}$ and $${r}$ are both possible.`,
-          `The integer root is $x = ${t}$; divide $(x ${sgn(-t)})$ out first.`,
-          `What is left factorises as $(${p}x ${sgn(-q)})(${r}x ${sgn(-s)})$.`],
-        steps: [
-          { h: 'Find the integer root', d: `$P(${t}) = 0$, so $(x ${sgn(-t)})$ is a factor` },
-          { h: 'Factorise the quadratic left behind', d: `$(${p}x ${sgn(-q)})(${r}x ${sgn(-s)})$` },
-          { h: 'Null factor law', d: `$x = \\dfrac{${q}}{${p}}$, $\\ x = \\dfrac{${s}}{${r}}$, $\\ x = ${t}$` }
-        ]
-      };
-    }
-    const p = rc(rng, [2, 3]);
-    let q = nz(rng, -6, 6);
-    for (let guard = 0; gcd(Math.abs(q), p) !== 1 && guard < 40; guard++) q = nz(rng, -6, 6);
-    if (gcd(Math.abs(q), p) !== 1) return streamsExt['me11-poly'](rng, diff);
-    const t = nz(rng, -5, 5);
-    const c3 = p * p, c2 = -(2 * p * q + p * p * t), c1 = q * q + 2 * p * q * t, c0 = -q * q * t;
+    // D4 (direct form): the factor theorem used twice to find two unknown coefficients. The equations solved over the
+    // rationals are overlay forms (au-forms-gaps-f-nsw.js).
+    const r1_ = nz(rng, -4, 4);
+    let r2_ = nz(rng, -4, 4);
+    if (r2_ === r1_) r2_ = r1_ === 4 ? -4 : r1_ + 1;
+    const s_ = nz(rng, -4, 4), m_ = rc(rng, [1, 2, 3]);
+    const A_ = -m_ * (r1_ + r2_ + s_), B_ = m_ * (r1_ * r2_ + r1_ * s_ + r2_ * s_), C_ = -m_ * r1_ * r2_ * s_;
+    const key_ = A_ + B_;
     return {
-      prompt: `Solve $${poly([c3, c2, c1, c0])} = 0$ over the rationals, listing each **distinct** solution once.`,
-      answerType: 'set', answer: { values: [q / p, t] },
-      inputHint: 'e.g. x = 3/2, -4',
-      traps: [
-        { value: q, why: `$(${p}x ${sgn(-q)})^2 = 0$ gives $x = \\dfrac{${q}}{${p}}$ — the leading $${p}$ still has to be divided out.` },
-        { value: c0, why: 'The constant term is not a root here. Use the rational root theorem to narrow the candidates first.' }
-      ],
-      hints: [`The cubic has a **repeated** rational factor.`,
-        `$x = ${t}$ is one root; dividing $(x ${sgn(-t)})$ out leaves a perfect square.`,
-        `That square is $(${p}x ${sgn(-q)})^2$.`],
+      prompt: `$P(x) = ${m_ === 1 ? '' : m_}x^3 + ax^2 + bx ${sgn(C_)}$ has $(x ${sgn(-r1_)})$ and $(x ${sgn(-r2_)})$ as factors. Find the value of $a + b$.`,
+      answerType: 'numeric', answer: { value: key_ }, answerPrefix: 'a + b =',
+      traps: [{ value: A_, why: 'That is $a$ alone. The question asks for $a + b$.' }, { value: B_, why: 'That is $b$ alone. The question asks for $a + b$.' }].filter(t => t.value !== key_),
+      hints: ['A factor $(x - r)$ means $P(r) = 0$.',
+        `Write $P(${r1_}) = 0$ and $P(${r2_}) = 0$: two equations in $a$ and $b$.`,
+        'Solve the pair, then add the two values.'],
       steps: [
-        { h: 'Factorise', d: `$${poly([c3, c2, c1, c0])} = (${p}x ${sgn(-q)})^2(x ${sgn(-t)})$` },
-        { h: 'Null factor law', d: `$(${p}x ${sgn(-q)})^2 = 0 \\Rightarrow x = \\dfrac{${q}}{${p}}$ (twice); $\\ x = ${t}$` },
-        { h: 'Distinct solutions', d: `$x = \\dfrac{${q}}{${p}}$ or $x = ${t}$` }
+        { h: 'First factor', d: `$P(${r1_}) = 0$ gives an equation in $a$ and $b$` },
+        { h: 'Second factor', d: `$P(${r2_}) = 0$ gives a second equation` },
+        { h: 'Solve together', d: `$a = ${A_}$ and $b = ${B_}$` },
+        { h: 'Add', d: `$a + b = ${key_}$` }
       ]
     };
   },
@@ -388,8 +330,8 @@ export const streamsExt = {
       if (branch === 1) {
         const a = ri(rng, 2, 5), h = nz(rng, -4, 4), k = nz(rng, -6, 6);
         return {
-          prompt: `$f(x) = ${a}\\sqrt{x ${sgn(-h)}} ${sgn(k)}$ has domain $x \\ge ${h}$. State the **domain of $f^{-1}$**, in the form $x \\ge c$.`,
-          answerType: 'numeric', answer: { value: k }, answerPrefix: 'x ≥',
+          prompt: `$f(x) = ${a}\\sqrt{x ${sgn(-h)}} ${sgn(k)}$ has domain $x \\ge ${h}$. The domain of $f^{-1}$ is $x \\ge c$. Find the value of $c$.`,
+          answerType: 'numeric', answer: { value: k }, answerPrefix: 'c =',
           traps: [
             { value: h, why: `$x \\ge ${h}$ is the domain of $f$ itself. The domain of $f^{-1}$ is the **range** of $f$, which is a set of $y$-values of $f$.` },
             { value: -k, why: `At the left end of the domain the surd is $0$, leaving $f(${h}) = ${k}$ — watch the sign of the constant.` }
@@ -805,7 +747,7 @@ export const streamsExt = {
   'me11-comb': (rng, diff) => {
     const GROUP = ['friends', 'cousins', 'teammates', 'band members', 'debaters', 'cyclists', 'chess players', 'volunteers'];
     if (diff === 1) {
-      const n = ri(rng, 5, 10);
+      const n = ri(rng, 5, 13);
       const kind = ri(rng, 1, 4);
       const who = rc(rng, GROUP);
       if (kind === 1) {
@@ -884,7 +826,7 @@ export const streamsExt = {
           ]
         };
       }
-      const n = ri(rng, 5, 9);
+      const n = ri(rng, 5, 12);
       const blockSize = ri(rng, 2, 3);
       const together = rc(rng, [true, false]);
       const val = together
@@ -940,58 +882,26 @@ export const streamsExt = {
         ]
       };
     }
-    const kind = ri(rng, 1, 3);
-    if (kind === 1) {
-      const k = ri(rng, 4, 20);
-      return {
-        prompt: `Socks come in $${k}$ colours, thoroughly mixed in a drawer in the dark. What is the **minimum** number of socks you must take to *guarantee* a matching pair? (Pigeonhole principle.)`,
-        answerType: 'numeric', answer: { value: k + 1 },
-        traps: [
-          { value: 2, why: 'Two socks might be different colours — you need to beat the worst case.' },
-          { value: k, why: `With ${k} socks you might have one of each colour — one more forces a repeat.` }
-        ],
-        hints: ['Think worst case: how many can you draw with all different colours?', `${k} socks could be all different.`, 'One more must repeat a colour.'],
-        steps: [
-          { h: 'Worst case', d: `${k} draws could give one of each colour` },
-          { h: 'Pigeonhole', d: `The $${k + 1}$th sock must match one already drawn` }
-        ]
-      };
-    }
-    if (kind === 2) {
-      const boxes = ri(rng, 3, 10), copies = ri(rng, 2, 5);
-      const val = boxes * (copies - 1) + 1;
-      return {
-        prompt: `A bag holds a large number of tiles in $${boxes}$ different colours. What is the **minimum** number of tiles you must draw to *guarantee* $${copies}$ of the same colour? (Pigeonhole principle.)`,
-        answerType: 'numeric', answer: { value: val },
-        traps: [{ value: boxes * copies, why: `The worst case stops one short in every colour: $${boxes} \\times ${copies - 1} = ${boxes * (copies - 1)}$ — then one more tile forces a ${copies}th.` }],
-        hints: [`Worst case: ${copies - 1} of every colour and no more.`, `That is $${boxes} \\times ${copies - 1} = ${boxes * (copies - 1)}$ tiles.`, 'One further tile must complete a set.'],
-        steps: [
-          { h: 'Worst case', d: `$${boxes} \\times (${copies} - 1) = ${boxes * (copies - 1)}$ tiles with no colour reaching ${copies}` },
-          { h: 'Pigeonhole', d: `Draw one more: $${val}$` }
-        ]
-      };
-    }
-    // A third pigeonhole count. The stars-and-bars question that used to sit
-    // here was a selection with repetition, not the pigeonhole principle, and
-    // this cell is the only route to that dot point — so every branch of it now
-    // forces a worst case. Here it is PAIRS being forced: the worst case leaves
-    // one sock of every colour unpaired before any pair is completed.
-    const colours = ri(rng, 3, 12), pairs = ri(rng, 2, 5);
-    const worst = colours + 2 * (pairs - 1);
-    const val = worst + 1;
+    // D4: counting with a restriction, done by complement (total minus the
+    // arrangements that break the condition). The pigeonhole principle that
+    // used to sit here is in no current NSW syllabus, so it is not issued.
+    const n = ri(rng, 6, 9);
+    const who = rc(rng, GROUP);
+    const total = factorial(n - 1), together = 2 * factorial(n - 2), val = total - together;
     return {
-      prompt: `A drawer holds plenty of socks in $${colours}$ colours, and the light is off. What is the **minimum** number of socks you must take to *guarantee* $${pairs}$ matching pairs? (Pigeonhole principle.)`,
+      prompt: `$${n}$ ${who}, including Asha and Ben, sit around a **circular** table. Rotations of the same seating count as one arrangement. In how many arrangements are Asha and Ben **not** next to each other?`,
       answerType: 'numeric', answer: { value: val },
       traps: [
-        { value: 2 * pairs, why: `Those $${2 * pairs}$ socks could be $${2 * pairs}$ different colours. The guarantee has to beat the worst case, not the best one.` },
-        { value: worst, why: `$${worst}$ socks can still be one of each colour plus $${2 * (pairs - 1)}$ more — that is only $${pairs - 1}$ pair${pairs - 1 === 1 ? '' : 's'}, so one further sock is needed.` }
-      ],
-      hints: [`Worst case first: one sock of each of the $${colours}$ colours pairs up with nothing.`,
-        `On top of those, $${2 * (pairs - 1)}$ socks make only $${pairs - 1}$ pair${pairs - 1 === 1 ? '' : 's'}.`,
-        'Every sock after that must complete the next pair.'],
+        { value: together, why: `$${together}$ counts the seatings where they ARE adjacent. The question asks for the complement.` },
+        { value: factorial(n) - 2 * factorial(n - 1), why: 'Around a circle rotations are the same arrangement, so use $(n-1)!$ and not $n!$ for the total.' }
+      ].filter(t => t.value !== val),
+      hints: ['Count all circular arrangements, then remove the ones the condition forbids.',
+        'To count Asha and Ben adjacent, glue them into one block and remember the block has 2 internal orders.',
+        `All arrangements: $(${n} - 1)!$. Adjacent: $(${n - 1} - 1)! \\times 2$.`],
       steps: [
-        { h: 'Worst case', d: `$${colours} + 2 \\times ${pairs - 1} = ${worst}$ socks give only $${pairs - 1}$ pair${pairs - 1 === 1 ? '' : 's'}` },
-        { h: 'Pigeonhole', d: `One more sock forces pair $${pairs}$: $${val}$` }
+        { h: 'All circular arrangements', d: `$(${n} - 1)! = ${total}$` },
+        { h: 'Asha and Ben adjacent', d: `Block counts as one: $(${n - 1} - 1)! \\times 2 = ${together}$` },
+        { h: 'Complement', d: `$${total} - ${together} = ${val}$` }
       ]
     };
   },
@@ -1084,7 +994,7 @@ export const streamsExt = {
         prompt: `A particle moves so that its displacement is $x = ${amp}\\cos(${n}t)$ metres. Find its **acceleration** at the instant when $x = ${xAt}$ metres.`,
         answerType: 'numeric', answer: { value: acc }, answerSuffix: 'm/s²',
         traps: [
-          { value: n * n * xAt, why: `Differentiating $\\cos$ twice brings down $-${n}^2$, so the acceleration points back towards the centre — the sign matters.` },
+          { value: n * n * xAt, why: `Differentiating $\\cos$ twice brings down $-${n * n}$, so the acceleration points back towards the centre — the sign matters.` },
           { value: -n * xAt, why: `The chain rule contributes a factor of $${n}$ on **each** differentiation, so $\\ddot{x}$ carries $${n}^2 = ${n * n}$.` }
         ].filter(t => t.value !== acc),
         hints: [`Differentiate twice: $\\dot{x} = -${amp * n}\\sin(${n}t)$.`,
@@ -1526,11 +1436,11 @@ export const streamsExt = {
         ]
       };
     }
-    // Areas involving inverse functions: reflecting in y = x turns an area
-    // measured from the y-axis into one measured from the x-axis, and the
-    // bounding rectangle is what links the two.
-    const branch = ri(rng, 0, 2);
-    if (branch === 0) {
+    // Area between a curve, the y-axis and a horizontal line, by subtracting the
+    // area under the curve from the bounding rectangle.
+    // The inverse-function identity and the ln x area (integration by parts) were not confirmed to be in
+    // the Extension 1 (2024) content, so the base D4 asks only for areas by integrating in x.
+    {
       const n = ri(rng, 2, 5), a = ri(rng, 1, 5);
       const area = new Frac(n * Math.pow(a, n + 1), n + 1);
       return {
@@ -1551,46 +1461,6 @@ export const streamsExt = {
         ]
       };
     }
-    if (branch === 1) {
-      const pI = ri(rng, 2, 8), qI = ri(rng, 2, 12);
-      const A = ri(rng, 1, pI * qI - 1);
-      return {
-        prompt: `$f$ is an increasing function with $f(0) = 0$ and $f(${pI}) = ${qI}$, and $\\displaystyle\\int_0^{${pI}} f(x)\\,dx = ${A}$. Find $\\displaystyle\\int_0^{${qI}} f^{-1}(y)\\,dy$.`,
-        answerType: 'numeric', answer: { value: pI * qI - A },
-        traps: [
-          { value: A, why: `The two integrals are equal only when the curve happens to be symmetric in $y = x$. In general they fill the rectangle between them.` },
-          { value: pI * qI, why: `$${pI} \\times ${qI} = ${pI * qI}$ is the whole rectangle. The area under $f$ still has to be taken off it.` }
-        ].filter(t => t.value !== pI * qI - A),
-        hints: ['Reflecting the graph in $y = x$ turns $f$ into $f^{-1}$ and swaps the two axes.',
-          `Together the two regions exactly fill the rectangle $0 \\le x \\le ${pI}$, $0 \\le y \\le ${qI}$.`,
-          `So $\\displaystyle\\int_0^{${pI}} f + \\int_0^{${qI}} f^{-1} = ${pI} \\times ${qI}$.`],
-        steps: [
-          { h: 'The rectangle identity', d: `$\\displaystyle\\int_0^{a} f(x)\\,dx + \\int_0^{f(a)} f^{-1}(y)\\,dy = a\\,f(a)$` },
-          { h: 'Substitute', d: `$${A} + \\displaystyle\\int_0^{${qI}} f^{-1}(y)\\,dy = ${pI} \\times ${qI} = ${pI * qI}$` },
-          { h: 'Rearrange', d: `$\\displaystyle\\int_0^{${qI}} f^{-1}(y)\\,dy = ${pI * qI} - ${A} = ${pI * qI - A}$` }
-        ]
-      };
-    }
-    const k = ri(rng, 2, 9);
-    const val = k * Math.log(k) - k + 1;
-    return {
-      prompt: `The curve $y = \\ln x$ is the reflection of $y = e^{x}$ in the line $y = x$. Find the exact area of the region bounded by $y = \\ln x$, the $x$-axis and the line $x = ${k}$.`,
-      answerType: 'numeric', answer: { value: val, requireExact: true, canonicalInput: `${k}ln(${k}) - ${k - 1}`, tol: 0.0005 },
-      inputHint: `e.g. ${k}ln(${k}) - ${k - 1}`,
-      traps: [
-        { value: k * Math.log(k), why: `That is $x\\ln x$ evaluated at $x = ${k}$. The antiderivative is $x\\ln x - x$, and the value at the lower limit $x = 1$ has to be subtracted as well.`, tol: 0.0005 },
-        { value: Math.log(k), why: `$\\ln ${k}$ is the **height** of the region at its right-hand edge, not its area.`, tol: 0.0005 }
-      ],
-      hints: [`$y = \\ln x$ meets the $x$-axis at $x = 1$, so the region runs from $x = 1$ to $x = ${k}$.`,
-        `Reflect: the same area sits between $y = e^{x}$, the $y$-axis and $y = \\ln ${k}$ — or integrate by parts directly.`,
-        `$\\displaystyle\\int \\ln x\\,dx = x\\ln x - x$.`],
-      steps: [
-        { h: 'Where the region starts', d: `$\\ln x = 0$ at $x = 1$` },
-        { h: 'Antiderivative', d: `$\\displaystyle\\int \\ln x\\,dx = x\\ln x - x$` },
-        { h: 'Evaluate', d: `$\\left[x\\ln x - x\\right]_{1}^{${k}} = (${k}\\ln ${k} - ${k}) - (0 - 1)$` },
-        { h: 'Exact area', d: `$${k}\\ln ${k} - ${k - 1}$` }
-      ]
-    };
   },
   // ── ME-S1 · Binomial distribution ────────────────────────────────────────
   'me12-binomial': (rng, diff) => {
@@ -1924,7 +1794,7 @@ export const streamsExt = {
       traps: [{ value: a / c, why: 'Multiply top and bottom by the conjugate of the denominator first.' }].filter(t => Math.abs(t.value - re.value) > 0.01),
       hints: ['Multiply by the conjugate over itself.', `$\\times \\frac{${c} ${sgn(-d)}i}{${c} ${sgn(-d)}i}$; denominator becomes $${den}$.`, `Real part: $\\frac{${a * c + b * d}}{${den}}$.`],
       steps: [
-        { h: 'Multiply by the conjugate', d: `denominator $= ${c}^2 + ${d}^2 = ${den}$` },
+        { h: 'Multiply by the conjugate', d: `denominator $= ${br(c)}^2 + ${br(d)}^2 = ${den}$` },
         { h: 'Numerator real part', d: `$${a}\\cdot${c} + ${b}\\cdot${d} = ${a * c + b * d}$` },
         { h: 'Real part', d: `$${re.latex()}$` }
       ]

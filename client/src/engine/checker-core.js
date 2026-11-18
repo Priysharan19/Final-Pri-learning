@@ -223,8 +223,11 @@ function paiseAsked(question) {
 // precisions the coarser one bounds it, so a correct answer is never refused.
 const PLACE_WORDS = { one: 1, two: 2, three: 3, four: 4, five: 5, '1': 1, '2': 2, '3': 3, '4': 4, '5': 5 };
 const NAMED_PLACES = /\b(one|two|three|four|five|[1-5])\s*(?:decimal\s+places?|d\.\s?p\.?)/gi;
-const NAMED_NEAREST = /\bnearest\s+(whole(?:\s+number)?|integer|tenth|hundredth|thousandth)\b/gi;
-const NEAREST_PLACES = { whole: 0, 'whole number': 0, integer: 0, tenth: 1, hundredth: 2, thousandth: 3 };
+// "to the nearest degree" names a place as surely as "to the nearest whole number": a band of 0.51
+// accepted 7.14 for 7 on "to the nearest degree" (walk-through audit, numeric-tolerance-sweep-check).
+const NEAREST_UNITS = 'degree|dollar|cent|rupee|metre|meter|centimetre|centimeter|millimetre|millimeter|kilometre|kilometer|kilogram|gram|litre|liter|second|minute|hour|day|year|km|cm|mm|kg|mL|L|m|s';
+const NAMED_NEAREST = new RegExp(String.raw`\bnearest\s+(whole(?:\s+number)?|integer|tenth|hundredth|thousandth|${NEAREST_UNITS})s?\b`, 'gi');
+const NEAREST_PLACES = { whole: 0, 'whole number': 0, integer: 0, tenth: 1, hundredth: 2, thousandth: 3, cent: 2 };
 export function namedDecimalPlaces(question) {
   const text = `${question?.prompt ?? ''} ${question?.answerSuffix ?? ''}`;
   const found = [];
@@ -233,8 +236,14 @@ export function namedDecimalPlaces(question) {
   const aboutData = index => /\b(?:measured|recorded|rounded off|known)\b(?:[^.?!]|\.\d)*$/i.test(text.slice(Math.max(0, index - 60), index))
     && !/\b(?:correct|answer|give|round)\w*\b[^.?!]*$/i.test(text.slice(Math.max(0, index - 30), index));
   for (const m of text.matchAll(NAMED_PLACES)) if (!aboutData(m.index)) found.push(PLACE_WORDS[m[1].toLowerCase()]);
-  for (const m of text.matchAll(NAMED_NEAREST)) if (!aboutData(m.index)) found.push(NEAREST_PLACES[m[1].toLowerCase().replace(/\s+/g, ' ')]);
+  for (const m of text.matchAll(NAMED_NEAREST)) if (!aboutData(m.index)) found.push(NEAREST_PLACES[m[1].toLowerCase().replace(/\s+/g, ' ')] ?? 0);
   return found.length ? Math.min(...found) : null;
+}
+// "evaluate … exactly", "find the exact gradient": the answer is a value, not a rounded one.
+// Maths inside $…$ is not the sentence ("P(\\text{exactly } 1)" asks for a probability).
+const EXACT_ASK = /\bexact\b(?!\s+(?:change|same))|\bexactly\b(?!\s+(?:\d|once|twice|thrice|one|two|three|four|five|when|the same|equal|half|as many|divisible))/i;
+export function asksForExactValue(question) {
+  return EXACT_ASK.test(String(question?.prompt ?? '').replace(/\$[^$]*\$/g, ' '));
 }
 function namedPrecisionBand(question) {
   const places = namedDecimalPlaces(question);
@@ -1222,6 +1231,10 @@ function checkAnswerWithinBudget(question, rawInput) {
         // wrong last digit is wrong (false-positive sweep, m-fp-sweep).
         const named = namedPrecisionBand(question);
         if (named != null) tolUsed = Math.min(tolUsed ?? numericBand(target), named);
+        // A question that asks for the EXACT value is not a rounding question: an authored
+        // absolute tol (0.001 on 1/480, half the size of the key) must never decide it. The
+        // band is the default one, relative to the key (a whole key is exact).
+        if (named == null && ans.tol != null && !ans.rounding && !question.pyq && asksForExactValue(question)) tolUsed = Math.min(tolUsed, numericBand(target));
         // A declared JEE rounding rule (engine/tolerance.js) is read only when the
         // reviewed key itself declares it; nothing is inferred.
         let ok = ans.rounding ? acceptsNumeric(value, target, { rounding: ans.rounding, tol: ans.tol }) : numsClose(value, target, tolUsed);
@@ -1357,8 +1370,11 @@ function checkAnswerWithinBudget(question, rawInput) {
           if (why) return { correct: false, feedback: why };
           return { correct: false, feedback: targets.length > values.length ? `There ${targets.length === 2 ? 'are two solutions' : `are ${targets.length} solutions`} — you've given ${values.length}.` : 'You have listed too many solutions.' };
         }
+        // A precision the question names bounds every solution in the list, as it bounds a single number.
+        const setNamed = namedPrecisionBand(question);
+        const setTol = ans.tol != null && setNamed != null ? Math.min(ans.tol, setNamed) : ans.tol;
         for (const [k, v] of values.entries()) {
-          const i = targets.findIndex(t => numsClose(v, t, ans.tol) && (ans.tol != null || !exactlyNotWhole(parsedParts[k], t)));
+          const i = targets.findIndex(t => numsClose(v, t, setTol) && (ans.tol != null || !exactlyNotWhole(parsedParts[k], t)));
           if (i === -1) {
             const why = matchTraps(question, v, rawInput);
             return { correct: false, feedback: why ?? undefined };
@@ -1652,8 +1668,13 @@ function stepCheckWithinBudget(meta, workingText) {
               const R = evaluate(ast.r, env);
               return Number.isFinite(L) && Number.isFinite(R) && Math.abs(L - R) <= Math.max(1e-6, Math.abs(R) * 1e-6);
             });
-            status = holds ? 'ok' : 'break';
-            if (!holds) note = `This is the line where it goes wrong — the true solution no longer satisfies this equation. Compare it carefully with the line above.`;
+            // A root the question's domain removes is part of correct working ("x = -4, rejected"): a bare
+            // claim x = r for a listed `rejected` root is a true statement about the equation, so it is not a slip.
+            const isRejected = !holds && Array.isArray(meta.rejected) && ast.l?.t === 'var' && ast.l.v === meta.variable
+              && meta.rejected.some(r => { try { return numsClose(evaluate(ast.r, {}), r); } catch { return false; } });
+            status = holds || isRejected ? 'ok' : 'break';
+            if (isRejected) note = 'This root solves the equation but lies outside the domain: say so, and keep the root that is allowed.';
+            if (!holds && !isRejected) note = `This is the line where it goes wrong — the true solution no longer satisfies this equation. Compare it carefully with the line above.`;
           }
         } else {
           // a bare value — treat as a claimed solution

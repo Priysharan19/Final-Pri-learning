@@ -2,7 +2,7 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `3f2b0b930a81a1262cacfca387936789e3d66ea7ced755ab9485962f15f273a0` (`docs/marking/hsc-examiner-certification-dossier.md`).
+Dossier digest: `994eaa14fcbe8f6d3cd2539b5c506d95b8e83fde05006d5a5a54b6b0a3d8bae3` (`docs/marking/hsc-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
@@ -192,6 +192,17 @@ For each item, one issued question (seed shown) and the pages a student might ha
 | alternative | `(5n + 11)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
 | common wrong | `(5n + 11) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
 | partial | `(5n + 11) + 1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y7-algebra/D2` — seed 1009
+
+> A Sydney taxi charges a flag fall of \\$11.00 plus \\$5.00 per kilometre. Write an expression for the cost, in dollars, of a trip of $n$ km.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `5n + 11` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(5n + 11)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(5n + 11) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(5n + 11) + 1` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y7-algebra/D3` — seed 1009
 
@@ -421,7 +432,7 @@ Final answer: 23
 
 ## `nsw-final:y7-data/D1` — seed 1009
 
-> Here are five quiz scores: $13,\\ 14,\\ 17,\\ 13,\\ 14$. Find the **range**.
+> Here are five quiz scores: $15,\\ 14,\\ 17,\\ 13,\\ 14$. Find the **range**.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
@@ -597,54 +608,54 @@ Final answer: 23
 
 ## `nsw-final:y8-equations/D2` — seed 1009
 
-> Solve $3(x - 1) - 1 = 11$.
+> Solve $3(x - 1) + 4 = 13$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `5` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 6
+Final answer: 5
 ```
 </details>
 
-## `nsw-final:y8-equations/D3` — seed 1009
+## `nsw-final:y8-equations/D3` — seed 8928
 
-> Solve $6x - 2 = 2x + 18$.
+> Solve $6x + 8 = 3x + 2$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `-2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `-2.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `-1` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-1` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 6
+Final answer: -1
 ```
 </details>
 
 ## `nsw-final:y8-equations/D4` — seed 1009
 
-> Quinn is $9$ years old. In $5$ years, their coach will be exactly $3$ times as old as them. How old is the coach **now**?
+> Jonah is $8$ years old. In $9$ years, their coach will be exactly $2$ times as old as them. How old is the coach **now**?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `37` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `37.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `38` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `38` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `25` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `25.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `26` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `26` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-linear/D1` — seed 1009
 
@@ -756,6 +767,17 @@ Final answer: 6
 | common wrong | `1807` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `1807` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:y8-volume/D4` — seed 1009
+
+> A fish tank measures $45$ cm × $25$ cm × $18$ cm. How many **litres** of water does it hold when full, correct to 3 decimal places where needed? (1 L = 1000 cm³)
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `81/4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `81/4` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `85/4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `85/4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:y8-rates/D1` — seed 1009
 
 > A cyclist rides at a steady $21$ km/h for $30$ minutes. How far does she ride, in kilometres?
@@ -777,6 +799,17 @@ Final answer: 6
 | alternative | `207/5` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
 | common wrong | `212/5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `212/5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y8-rates/D3` — seed 1009
+
+> A cyclist rides at a steady $72$ km/h for $78$ minutes. How far does she ride, in kilometres?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `468/5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `468/5` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `473/5` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `473/5` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-rates/D4` — seed 1009
 
@@ -812,6 +845,17 @@ Final answer: 6
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y8-probability/D3` — seed 1009
+
+> Which of these **cannot** be a probability?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `3` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 3 is “1.24”. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “71%”. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y8-probability/D4` — seed 1009
 
 > Which of these **cannot** be a probability?
 
@@ -1108,6 +1152,28 @@ Final answer: 6
 | common wrong | `12801` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `12801` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:y9-simint/D3` — seed 1009
+
+> An account pays \\$448.00 each year in simple interest at $3.5\\%$ p.a. What is the amount in the account earning that interest?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `12800` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `12800.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `12801` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `12801` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y9-simint/D4` — seed 1009
+
+> An account pays \\$448.00 each year in simple interest at $3.5\\%$ p.a. What is the amount in the account earning that interest?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `12800` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `12800.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `12801` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `12801` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:y9-data/D1` — seed 1009
 
 > A box plot has min $10$, $Q_1 = 17$, median $24$, $Q_3 = 35$, max $43$. Describe the shape of the distribution.
@@ -1237,6 +1303,26 @@ Final answer: -6, 7
 | alternative | `16.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
 | common wrong | `17` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
 | partial | `17` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y10-quadratics/D4` — seed 1009
+
+> Solve $6x^2 - 294 = 0$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-7, 7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `-6, 7` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-6, 7` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: -6, 7
+```
+</details>
 
 ## `nsw-final:y10-nonlinear/D1` — seed 1009
 
@@ -1414,6 +1500,50 @@ Final answer: -6, 7
 | common wrong | `2sqrt(569)` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `2sqrt(569)` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:y10-compound/D1` — seed 1009
+
+> \\$9,000.00 is invested at $6\\%$ p.a. **compound** interest for $4$ years. Find the final value, correct to the nearest cent.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1136229/100` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `1136229/100` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `1136329/100` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1136329/100` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y10-compound/D2` — seed 1009
+
+> \\$9,000.00 is invested at $6\\%$ p.a. compounding annually for $4$ years. How much **interest** is earned, to the nearest cent?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `236229/100` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `236229/100` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `236329/100` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `236329/100` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y10-compound/D3` — seed 1009
+
+> A car bought for \\$34,000.00 depreciates at $20\\%$ p.a. (declining balance). Find its value after $3$ years, to the nearest dollar.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `17408` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `17408.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `17409` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17409` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y10-compound/D4` — seed 1009
+
+> \\$9,000.00 is invested for $4$ years at $6\\%$ p.a. How much **more** does compound interest (annual) earn than simple interest, to the nearest cent?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `20229/100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `20229/100` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `20329/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `20329/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:y10-similarity/D1` — seed 1009
 
 > Two lookouts are $5.5$ km apart. On a map with scale $1 : 50,000$, how far apart are they, in centimetres?
@@ -1426,6 +1556,17 @@ Final answer: -6, 7
 | partial | `12` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y10-similarity/D2` — seed 1009
+
+> Two similar model surfboards have corresponding heights in the ratio $4 : 6$. The smaller holds $448$ mL. How much does the larger hold, in mL?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1512` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `1512.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `1513` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1513` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y10-similarity/D3` — seed 1009
 
 > Two similar model surfboards have corresponding heights in the ratio $4 : 6$. The smaller holds $448$ mL. How much does the larger hold, in mL?
 
@@ -2283,6 +2424,17 @@ Final answer: -6, 7
 | common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `6` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:y11-quadfunc/D1` — seed 1009
+
+> How many real roots does $x^2 - x - 1 = 0$ have?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `2.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `3` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:y11-quadfunc/D2` — seed 1009
 
 > Which is the completed-square form of $y = 3x^2 + 12x + 9$?
@@ -2425,6 +2577,28 @@ Final answer: -6, 7
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “$\\cos(38°)$”. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-trigfunc/D3` — seed 1009
+
+> Solve $\\cos(\\theta) = -\\frac{\\sqrt{2}}{2}$ for $0° \\le \\theta \\le 720°$. Give all solutions in degrees.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `135, 225, 495, 585` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `136, 225, 495, 585` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `136, 225, 495, 585` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y11-trigfunc/D4` — seed 1009
+
+> Solve $2\\cos(\\theta) + \\sqrt{2} = 0$ for $-360° \\le \\theta \\le 360°$. Give all solutions in degrees.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-225, -135, 135, 225` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `-224, -135, 135, 225` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-224, -135, 135, 225` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y11-sine-cosine-rule/D1` — seed 1009
 
@@ -2668,6 +2842,17 @@ Final answer: -6, 7
 | common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:y12-appdiff/D3` — seed 1009
+
+> The tangent to $y = x^2 - 2x - 6$ at the point where $x = 2$ crosses the $x$-axis at $A$. Find the $x$-coordinate of $A$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `5` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `5.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `6` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `6` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:y12-appdiff/D4` — seed 1009
 
 > Two numbers $x$ and $y$ satisfy $x + y = 78$. Find the **minimum** value of $x^2 + y^2$.
@@ -2689,6 +2874,39 @@ Final answer: -6, 7
 | alternative | `-4914.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
 | common wrong | `-4913` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
 | partial | `-4913` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-integration/D2` — seed 1009
+
+> Evaluate $\\displaystyle\\int_{0}^{1} (2x^2 + 3x)\\,dx$, correct to 3 decimal places where needed.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2167/1000` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2167/1000` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `3167/1000` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `3167/1000` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-integration/D3` — seed 1009
+
+> Find the area enclosed between the curve $y = 4x(6 - x)$ and the x-axis, correct to 3 decimal places where needed.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `144` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `144.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `145` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `145` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-integration/D4` — seed 1009
+
+> Find the area enclosed between the line $y = 3x$ and the parabola $y = x^2$, correct to 3 decimal places where needed.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `9/2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `9/2` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `11/2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11/2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-trigcalc/D1` — seed 1009
 
@@ -2800,6 +3018,17 @@ Final answer: -6, 7
 | common wrong | `1017` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `1017` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:y12-series/D3` — seed 1009
+
+> A geometric sequence has first term $4$ and common ratio $3$. Find the $6$th term.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `972` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `972.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `973` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `973` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:y12-series/D4` — seed 1009
 
 > Evaluate $\\displaystyle\\sum_{k=1}^{7} 4\\cdot 2^{k}$.
@@ -2811,6 +3040,61 @@ Final answer: -6, 7
 | common wrong | `1017` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
 | partial | `1017` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:y12-financial/D1` — seed 1009
+
+> At the end of each month \\$400.00 is deposited into an account paying $6\\%$ p.a. interest, compounded monthly. Find the balance immediately after the second deposit, to the nearest cent.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `802` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `802.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `803` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `803` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-financial/D2` — seed 1009
+
+> \\$2,000.00 is deposited at the **start** of each year for 3 years into an account paying $6\\%$ p.a. compounded annually. What is the balance at the end of the third year, to the nearest cent?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `674923/100` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `674923/100` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `675023/100` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `675023/100` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-financial/D3` — seed 1009
+
+> \\$4,200.00 is deposited at the **end** of each year for $15$ years, earning $6\\%$ p.a. compounded annually. Using the annuity formula $FV = a\\dfrac{(1+r)^n - 1}{r}$, find the future value to the nearest dollar.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `97759` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `97759.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `97760` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `97760` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-financial/D4` — seed 1009
+
+> A \\$21,100.00 loan charges interest at $12\\%$ p.a. compounded **monthly** (1\\% per month), with repayments of \\$550.00 at the end of each month. Find the balance owing after the **second** repayment, to the nearest cent.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2041861/100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `2041861/100` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `2041961/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2041961/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-stats/D1` — seed 1009
+
+> A discrete random variable $X$ has $P(X=0) = 0.3$, $P(X=1) = 0.3$, $P(X=2) = 0.2$, $P(X=3) = 0.2$. Find $E(X)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `13/10` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `13/10` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `23/10` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23/10` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:y12-stats/D2` — seed 1009
 
 > A random variable $X$ has $E(X) = 2.8$ and $E(X^2) = 13.13$. Find the standard deviation of $X$.
@@ -2821,6 +3105,28 @@ Final answer: -6, 7
 | alternative | `23/10` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
 | common wrong | `33/10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `33/10` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-stats/D3` — seed 1009
+
+> Test scores are normally distributed with mean $75$ and standard deviation $6$. Find the **z-score** of a mark of $72$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-1/2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `-1/2` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `1/2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1/2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:y12-stats/D4` — seed 1009
+
+> Heights are normally distributed with mean $75$ and standard deviation $5$. Using the empirical (68–95–99.7) rule, what **percentage** of values lie between $70$ and $75$?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `34` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `34.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `35` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `35` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:y12-motion/D1` — seed 1009
 
@@ -3086,6 +3392,50 @@ Final answer: -6, 7
 | common wrong | `18` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `18` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:ms11-earning/D1` — seed 1009
+
+> Kiri works $29$ hours at \\$31.20 per hour. Calculate their pay for the week.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `4524/5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `4524/5` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `4529/5` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4529/5` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms11-earning/D2` — seed 1009
+
+> An award pays \\$25.50/hour for the first $35$ hours and **time-and-a-half** after that. Calculate the pay for a $39$-hour week.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2091/2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2091/2` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `2093/2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2093/2` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms11-earning/D3` — seed 1009
+
+> A salesperson is offered two pay structures. **Plan A:** a flat \\$1,090.00 per week, whatever they sell. **Plan B:** a retainer of \\$450.00 per week plus $4\\%$ commission on sales.  What weekly sales figure makes the two plans pay **exactly the same**?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `16000` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `16000.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `16001` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `16001` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms11-earning/D4` — seed 1009
+
+> Using this simplified tax table — “\\$5,092.00 plus $32.5$c for each \\$1 over \\$45,000.00” — calculate the income tax payable on a taxable income of \\$92,000.00.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `20367` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `20367.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `20368` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `20368` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:ms11-formulas/D1` — seed 1009
 
 > For the formula $C = 52n + 85$, a student works out $C$ for $n = 5$ and gets $142$. What mistake did the student make?
@@ -3163,6 +3513,61 @@ Final answer: -6, 7
 | common wrong | `447/20` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `447/20` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:ms11-measure/D4` — seed 1009
+
+> A garden bed $4.2$ m long and $2.3$ m wide is filled with soil to a depth of $0.25$ m. How many **litres** of soil is that? (1 m³ = 1000 L)
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `2415` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `2415.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `2416` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2416` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms11-energy/D1` — seed 1009
+
+> A $2000$ W heater runs for $8$ hours. How much energy does it use, in kilowatt-hours (kWh)?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `16` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `16.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `17` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms11-energy/D2` — seed 1009
+
+> Electricity costs $35$ c/kWh. Find the cost of using $29$ kWh, in dollars.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `203/20` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `203/20` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `223/20` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `223/20` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms11-energy/D3` — seed 1009
+
+> A car uses fuel at $8.5$ L/100 km. How many litres does it use on a $659$ km trip?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `56` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `56.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `57` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `57` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms11-energy/D4` — seed 1009
+
+> Replacing a $2400$ W appliance with a $750$ W one (used $5$ h/day, electricity at \\$0.32/kWh) saves how much per **year**, to the nearest dollar?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `964` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `964.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `965` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `965` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:ms11-data/D1` — seed 1009
 
 > Find the mean of: $18,\\ 17,\\ 15,\\ 15,\\ 15$.
@@ -3196,6 +3601,17 @@ Final answer: -6, 7
 | common wrong | `543/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
 | partial | `543/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:ms11-data/D4` — seed 1009
+
+> The ordered data set is $10,\\ 13,\\ 18,\\ 21,\\ 26,\\ 29,\\ 30,\\ 33,\\ 40$. Using the $1.5 \\times IQR$ rule, find the **upper fence** $Q_3 + 1.5 \\times IQR$ above which a value counts as an outlier.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `111/2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `111/2` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `113/2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `113/2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:ms11-relfreq/D1` — seed 1009
 
 > A fair six-sided die has landed on 6 on each of the last 5 rolls. What is the probability that the next roll is a 6?
@@ -3206,6 +3622,17 @@ Final answer: -6, 7
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “$\\left(\\frac{1}{6}\\right)^{6}$”. |
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms11-relfreq/D2` — seed 1009
+
+> A basketballer made $67$ of her last $125$ free throws. Using relative frequency, estimate $P(\\text{make})$ as a decimal, correct to 3 decimal places.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `67/125` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `67/125` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `192/125` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `192/125` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms11-relfreq/D3` — seed 1009
 
@@ -3228,6 +3655,94 @@ Final answer: -6, 7
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `36/81` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `36/81` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-loans/D1` — seed 1009
+
+> \\$14,500.00 is invested at $5.5\\%$ p.a. compounding annually for $5$ years. Find the final value, to the nearest cent.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `473773/25` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `473773/25` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `473798/25` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `473798/25` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-loans/D2` — seed 1009
+
+> A \\$450,000.00 home loan charges $0.5\\%$ interest per **month**. Repayments are \\$2,200.00 per month. Complete the first row of the loan table: how much is **owing after one repayment**, to the nearest cent?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `450050` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `450050.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `450051` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `450051` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-loans/D3` — seed 1009
+
+> A \\$35,000.00 car loan charges $0.9\\%$ per month, with \\$800.00 monthly repayments. How much **interest** has been charged in total over the first two months, to the nearest cent?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `62563/100` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `62563/100` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `62663/100` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `62663/100` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-loans/D4` — seed 1009
+
+> Two $4$-year options for borrowing \\$20,000.00: Loan A charges **flat-rate** interest of $10\\%$ p.a. on the full principal; Loan B charges $7\\%$ p.a. **compounding** annually. How much more interest does the dearer loan cost, to the nearest cent?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `44602/25` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `44602/25` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `44627/25` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `44627/25` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-annuity/D1` — seed 1009
+
+> An annuity table gives a future-value factor of $5.581$ for $5$ yearly contributions at $5.5\\%$ p.a. Find the future value of \\$2,500.00 contributed each year, to the nearest cent.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `27905/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `27905/2` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `27907/2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `27907/2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-annuity/D2` — seed 1009
+
+> \\$2,000.00 is deposited at the **end** of each year for $4$ years at $5.5\\%$ p.a. compound. Find the future value at the end of year $4$, to the nearest cent.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `868453/100` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `868453/100` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `868553/100` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `868553/100` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-annuity/D3` — seed 1009
+
+> Using the future-value factor $6.888$ (for $6$ years at $5.5\\%$), what yearly contribution grows to \\$50,000.00? Answer to the nearest cent.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `7259` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `7259.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `7260` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7260` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-annuity/D4` — seed 1009
+
+> An annuity pays \\$10,000.00 at the end of each year for $4$ years, with money valued at $5.5\\%$ p.a. Find its **present value** (the lump sum equivalent today), to the nearest cent.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `70103/2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `70103/2` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `70105/2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `70105/2` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-networks/D1` — seed 1009
 
@@ -3273,6 +3788,28 @@ Final answer: -6, 7
 | common wrong | `29` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
 | partial | `29` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:ms12-normal/D1` — seed 1009
+
+> Scores are normally distributed with mean $75$ and standard deviation $6$. Find the $z$-score of a result of $72$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-1/2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `-1/2` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `1/2` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1/2` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-normal/D2` — seed 1009
+
+> Heights are normal with mean $75$ and sd $6$. Using the 68–95–99.7 rule, what **percentage** lies between $69$ and $75$?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `34` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `34.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `35` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `35` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:ms12-normal/D3` — seed 1009
 
 > About 95% of the results on an aptitude test, which are normally distributed, lie between $81$ and $101$. What is the standard deviation?
@@ -3305,6 +3842,39 @@ Final answer: -6, 7
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
 | common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “Cannot tell from a scatterplot”. |
 | partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-bivariate/D2` — seed 1009
+
+> A line of best fit for plant growth is $h = 29 + 3w$, where $w$ is weeks and $h$ height in cm. **Predict** the height after $10$ weeks.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `59` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `59.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `60` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `60` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-bivariate/D3` — seed 1009
+
+> For the fitted line $h = 29 + 3w$ (height in cm after $w$ weeks), after how many **weeks** does the model predict a height of $59$ cm?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `10` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `10.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `11` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `11` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:ms12-bivariate/D4` — seed 1009
+
+> The least-squares line for plant growth is $h = 29 + 3w$. A plant measured at week $9$ was actually $58.5$ cm tall. Find the **residual** for that data point.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `5/2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `5/2` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `7/2` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7/2` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:ms12-nonright/D1` — seed 1009
 
@@ -3867,38 +4437,69 @@ Final answer: -6, 7
 | common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “$-4$”. |
 | partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
-## `nsw-final:me11-functions/D1` — seed 1009
+## `nsw-final:me11-poly/D4` — seed 1009
 
-> Find the inverse function of $f(x) = 4x + 2$.
+> Find all real solutions of $2x^4 - 40x^2 + 128 = 0$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `(x - 2)/4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `((x - 2)/4)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
-| common wrong | `((x - 2)/4) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `((x - 2)/4) + 1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-4, -2, 2, 4` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `-3, -2, 2, 4` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-3, -2, 2, 4` | no | 0/4 | 0/4 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: -3, -2, 2, 4
+```
+</details>
+
+## `nsw-final:me11-functions/D1` — seed 1009
+
+> Find the inverse function of $f(x) = 4x - 1$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `(x - -1)/4` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `((x - -1)/4)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `((x - -1)/4) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `((x - -1)/4) + 1` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me11-functions/D2` — seed 1009
+
+> For $f(x) = 3 \\times 2^x + 4$, evaluate $f^{-1}(28)$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `3.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `4` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-functions/D3` — seed 1009
 
-> For $f(x) = x^3 + 3$, evaluate $f^{-1}(4)$.
+> For $f(x) = x^3 + 2$, evaluate $f^{-1}(1)$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `2` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `-1` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-1.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `0` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-functions/D4` — seed 1009
 
-> $f(x) = 2x + 2$ and $g(x) = -x - 1$ are one-to-one functions. Which expression is equal to $(f \\circ g)^{-1}(x)$?
+> For $f(x) = x - 2$ and $g(x) = -x + 4$, find $(f \\circ g)^{-1}(x)$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `1` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. Option 1 is “$g^{-1}\\!\\left(f^{-1}(x)\\right)$”. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. Option 0 is “$\\dfrac{1}{f(g(x))}$”. |
-| partial | `0` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+| correct | `(x - 2)/((-1))` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
+| alternative | `((x - 2)/((-1)))` | yes | 4/4 | 4/4 | The same expression written with brackets. |
+| common wrong | `((x - 2)/((-1))) + 1` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `((x - 2)/((-1))) + 1` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me11-trigid/D1` — seed 1009
 
@@ -3988,6 +4589,50 @@ Final answer: -6, 7
 | common wrong | `0.428801` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
 | partial | `0.428801` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:me11-comb/D1` — seed 1009
+
+> $10$ band members sit around a **circular** table. How many seating arrangements are there, counting rotations of the same order as identical?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `362880` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `362880.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `362881` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `362881` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me11-comb/D2` — seed 1009
+
+> $8$ teammates line up for a photo. $2$ of them are siblings. In how many arrangements are the siblings **not all together**?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `30240` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `30240.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `30241` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `30241` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me11-comb/D3` — seed 1009
+
+> $12$ points lie on a circle, and one of them is labelled $P$. How many different quadrilaterals can be formed using these points as vertices, if $P$ must be one of the vertices?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `165` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `165.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `166` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `166` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me11-comb/D4` — seed 1009
+
+> 10 points are marked on a plane. Exactly 4 of them lie on one straight line, and no other three of the points are collinear. How many different triangles have all three vertices among these points?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `116` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `116.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `117` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `117` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:me11-rates/D1` — seed 1009
 
 > The size $N$ of a bacterial culture decreases at a rate proportional to its current size, by $26\\%$ of $N$ per hour. Which equation models this?
@@ -4065,6 +4710,17 @@ Final answer: -6, 7
 | common wrong | `11693` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
 | partial | `11693` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:me12-induction/D4` — seed 1009
+
+> An induction proof of $\\displaystyle\\sum_{r=1}^{n} r^2 = \\dfrac{n(n+1)(2n+1)}{6}$ assumes the result for $n = k$ and adds the next term to both sides. For $k = 5$, by how much does the **right-hand side** increase when $n$ goes from $5$ to $6$?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `36` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `36.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `37` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `37` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:me12-vectors/D1` — seed 1009
 
 > $PQRS$ is a parallelogram with vertices in that order, where $P(-6, -3)$, $Q(6, -4)$ and $R(3, -2)$. Find the $x$-coordinate of $S$.
@@ -4109,6 +4765,94 @@ Final answer: -6, 7
 | common wrong | `11` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
 | partial | `11` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
+## `nsw-final:me12-trigeq/D1` — seed 1009
+
+> Solve $\\sqrt{3}\\tan\\theta = 1$ for $-180° \\le \\theta \\le 180°$. Give **all** solutions in degrees.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-150, 30` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `-149, 30` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-149, 30` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-trigeq/D2` — seed 1009
+
+> Solve $\\tan^2\\theta = 3$ for $-180° \\le \\theta \\le 180°$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-120, -60, 60, 120` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `-119, -60, 60, 120` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-119, -60, 60, 120` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-trigeq/D3` — seed 1009
+
+> Solve $\\cos^2\\theta = \\tfrac{1}{\\sqrt{2}}\\,\\cos\\theta$ for $-180° \\le \\theta \\le 180°$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-90, -45, 45, 90` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `-89, -45, 45, 90` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-89, -45, 45, 90` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-trigeq/D4` — seed 1009
+
+> Solve $\\sin 2\\theta = \\sqrt{2}\\sin\\theta$ for $0° \\le \\theta \\le 720°$, using $\\sin 2\\theta = 2\\sin\\theta\\cos\\theta$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `0, 45, 180, 315, 360, 405, 540, 675, 720` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `1, 45, 180, 315, 360, 405, 540, 675, 720` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `1, 45, 180, 315, 360, 405, 540, 675, 720` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-calc/D1` — seed 1009
+
+> Find $\\displaystyle\\int 5\\cos^{4}x\\,\\sin x\\,dx$. (You may omit +C.)
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-1*cos(x)^5` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(-1*cos(x)^5)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `2*(-1*cos(x)^5)` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `2*(-1*cos(x)^5)` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-calc/D2` — seed 1009
+
+> Using $u = \\ln x$, evaluate $\\displaystyle\\int_{1}^{e^{4}} \\frac{9(\\ln x)^{3}}{x}\\,dx$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `576` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `577` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `577` | no | 0/2 | 0/2 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-calc/D3` — seed 1009
+
+> The region enclosed between the parabola $y = x^2$ and the line $y = 7x$ is rotated about the $x$-axis. Find the **exact** volume of the solid formed.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `33614pi/15` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `7041.099697` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7041.099697` | no | 0/3 | 0/3 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-calc/D4` — seed 1009
+
+> Find the area of the region enclosed by the curve $y = \\sqrt{x}$ and the line $y = \\dfrac{x}{7}$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `343/6` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `349/6` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `349/6` | no | 0/4 | 0/4 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
 ## `nsw-final:me12-binomial/D1` — seed 1009
 
 > A binomial random variable has $n = 17$ trials and success probability $p = 0.44$. In the formula $P(X = 4) = \\binom{n}{k}p^k(1 - p)^{n - k}$, evaluate the binomial coefficient $\\binom{17}{4}$.
@@ -4119,6 +4863,17 @@ Final answer: -6, 7
 | alternative | `2380.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
 | common wrong | `2381` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
 | partial | `2381` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
+
+## `nsw-final:me12-binomial/D2` — seed 1009
+
+> For a binomial random variable with $n = 40$ and $p = 0.43$, which value is the **variance**?
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 1 is “$9.804$”. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “$7.396$”. |
+| partial | `0` | no | 0/1 | 0/1 | No step check: working is never marked for this question, so any wrong final answer earns nothing. |
 
 ## `nsw-final:me12-binomial/D3` — seed 1009
 

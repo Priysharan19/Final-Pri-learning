@@ -11,7 +11,7 @@
 // direct enumeration) in `agree`; a disagreement throws, so no wrong key can
 // be issued. SYNTHETIC: no student or examiner evidence.
 // ─────────────────────────────────────────────────────────────────────────────
-import { ri, rc, nz, mcq, term, poly, sgn, r2, r3 } from '../qhelpers.js';
+import { ri, rc, nz, mcq, term, poly, sgn, r2, r3, br } from '../qhelpers.js';
 
 // ── Local helpers ───────────────────────────────────────────────────────────
 const lin = (a, b, v = 'x') => (b === 0 ? term(a, v) : `${term(a, v)} ${sgn(b)}`);
@@ -101,7 +101,7 @@ diffForms.push({ diffs: [1], make: (rng) => {
     steps: [
       { h: 'Chain rule', d: `$\\dfrac{dy}{dx} = ${n * a}${pw(L, n - 1)}$` },
       { h: 'Evaluate the bracket', d: `$${a}(${x0}) ${sgn(b)} = ${s}$` },
-      { h: 'Substitute', d: `$${n * a}\\times ${s}^{${n - 1}} = ${val}$` }
+      { h: 'Substitute', d: `$${n * a}\\times ${br(s)}^{${n - 1}} = ${val}$` }
     ]
   };
 } });
@@ -143,7 +143,7 @@ diffForms.push({ diffs: [1], make: (rng) => {
     steps: [
       { h: 'Differentiate', d: `$\\dfrac{dV}{dt} = ${n * a}${pw(L, n - 1)}$` },
       { h: 'Substitute', d: `$t = ${t0}$: bracket $= ${s}$` },
-      { h: 'Rate', d: `$${n * a}\\times ${s}^{${n - 1}} = ${val}$ cm³/s` }
+      { h: 'Rate', d: `$${n * a}\\times ${br(s)}^{${n - 1}} = ${val}$ cm³/s` }
     ]
   };
 } });
@@ -361,7 +361,7 @@ diffForms.push({ diffs: [3], make: (rng) => {
   const val = r3(num / (den * den));
   agree(val, dnum(x => (a * x + b) / (c * x + d), x0), 'quotient point');
   return {
-    prompt: `Find the gradient of $y = \\dfrac{${lin(a, b)}}{${lin(c, d)}}$ at the point where $x = ${x0}$. Give your answer as a decimal.`,
+    prompt: `Find the gradient of $y = \\dfrac{${lin(a, b)}}{${lin(c, d)}}$ at the point where $x = ${x0}$. Give your answer as a decimal, correct to 3 decimal places where needed.`,
     answerType: 'numeric', answer: { value: val, tol: 0.0011 },
     traps: keepT([
       { value: r3(num / den), why: 'Quotient rule: divide by $v^2$, the *square* of the denominator.' },
@@ -425,7 +425,7 @@ diffForms.push({ diffs: [3], make: (rng) => {
   agree(val, dnum(t => (a * t + b) / (c * t + d), t0), 'quotient context');
   return {
     prompt: `The concentration of a drug in the blood is $C = \\dfrac{${lin(a, b, 't')}}{${lin(c, d, 't')}}$ mg/L, $t$ hours after it is given. Find the rate of change of the concentration after ${pl(t0, 'hour')}, as a decimal. (A negative answer means the concentration is falling.)`,
-    answerType: 'numeric', answer: { value: val, tol: 0.0011 }, answerSuffix: 'mg/L per hour',
+    answerType: 'numeric', answer: { value: val }, answerSuffix: 'mg/L per hour',
     traps: keepT([
       { value: r3((a * t0 + b) / den), why: 'That is the concentration itself, not its rate of change.' },
       { value: r3(-num / (den * den)), why: 'Order matters in the quotient rule: $u\'v - uv\'$.' }
@@ -497,7 +497,7 @@ diffForms.push({ diffs: [4], make: (rng) => {
     steps: [
       { h: 'Chain rule', d: `$y' = ${n}${pw(L, n - 1)}(${lin(2 * a, b)})$` },
       { h: 'Evaluate the parts', d: `bracket $= ${s}$, inner derivative $= ${2 * a * x0 + b}$` },
-      { h: 'Substitute', d: `$${n}\\times ${s}^{${n - 1}}\\times ${2 * a * x0 + b} = ${val}$` }
+      { h: 'Substitute', d: `$${n}\\times ${br(s)}^{${n - 1}}\\times ${br(2 * a * x0 + b)} = ${val}$` }
     ]
   };
 } });
@@ -509,7 +509,7 @@ diffForms.push({ diffs: [4], make: (rng) => {
   agree(val, dnum(x => Math.sqrt(a * x * x + b), x0), 'sqrt point');
   s = sRoot;
   return {
-    prompt: `Find the gradient of $y = \\sqrt{${poly([a, 0, b])}}$ at the point where $x = ${x0}$. Give your answer as a decimal.`,
+    prompt: `Find the gradient of $y = \\sqrt{${poly([a, 0, b])}}$ at the point where $x = ${x0}$. Give your answer as a decimal, correct to 3 decimal places where needed.`,
     answerType: 'numeric', answer: { value: val, tol: 0.0011 },
     traps: keepT([
       { value: r3(a * x0 / (s * s)), why: `$\\sqrt{${s * s}} = ${s}$: halve the $2$ with the $\\dfrac{1}{2\\sqrt{\\ }}$ rule, giving $\\dfrac{${2 * a * x0}}{${2 * s}}$.` },
@@ -540,7 +540,7 @@ diffForms.push({ diffs: [4], make: (rng) => {
     steps: [
       { h: 'Product rule', d: `$y' = 1\\cdot${pw(L, n)} + x\\cdot ${n}${pw(L, n - 1)}(${2 * a}x)$` },
       { h: 'Substitute', d: `bracket $= ${s}$, $x = ${x0}$` },
-      { h: 'Evaluate', d: `$${s}^{${n}} + ${2 * n * a * x0 * x0}\\times ${s}^{${n - 1}} = ${val}$` }
+      { h: 'Evaluate', d: `$${br(s)}^{${n}} + ${2 * n * a * x0 * x0}\\times ${br(s)}^{${n - 1}} = ${val}$` }
     ]
   };
 } });
@@ -601,7 +601,7 @@ diffForms.push({ diffs: [4], make: (rng) => {
     steps: [
       { h: 'Differentiate', d: `$\\dfrac{dN}{dt} = ${n}${pw(L, n - 1)}\\times ${2 * a}t$` },
       { h: 'Substitute', d: `$t = ${t0}$: bracket $= ${s}$` },
-      { h: 'Rate', d: `$${2 * n * a * t0}\\times ${s}^{${n - 1}} = ${val}$ thousand per hour` }
+      { h: 'Rate', d: `$${2 * n * a * t0}\\times ${br(s)}^{${n - 1}} = ${val}$ thousand per hour` }
     ]
   };
 } });
@@ -866,7 +866,7 @@ appForms.push({ diffs: [2], make: (rng) => {
   const key = r3(-1 / mSlope);
   agree(dnum(x => a * x * x + b * x + c, x0), mSlope, 'normal slope');
   return {
-    prompt: `Find the gradient of the normal to the curve $y = ${poly([a, b, c])}$ at the point where $x = ${x0}$. Give your answer as a decimal.`,
+    prompt: `Find the gradient of the normal to the curve $y = ${poly([a, b, c])}$ at the point where $x = ${x0}$. Give your answer as a decimal, correct to 3 decimal places where needed.`,
     answerType: 'numeric', answer: { value: key, tol: 0.0011 },
     traps: keepT([
       { value: mSlope, why: 'That is the gradient of the tangent: the normal is perpendicular to it.' },
@@ -1360,14 +1360,14 @@ statsForms.push({ diffs: [2], make: (rng) => {
     prompt: `A random variable $X$ has $E(X) = ${mu}$ and $\\text{Var}(X) = ${v}$. Find $\\text{Var}(${a}X ${sgn(b)})$.`,
     answerType: 'numeric', answer: { value: key },
     traps: keepT([
-      { value: a * v, why: `Variance scales by the *square* of the multiplier: $${a}^2 = ${a * a}$.` },
+      { value: a * v, why: `Variance scales by the *square* of the multiplier: $${br(a)}^2 = ${a * a}$.` },
       { value: a * a * v + b, why: 'Adding a constant shifts every value equally, so it does not change the variance.' },
       { value: a * mu + b, why: `That is $E(${a}X ${sgn(b)})$, not the variance.` }
     ], key),
-    hints: ['$\\text{Var}(aX + b) = a^2\\,\\text{Var}(X)$.', 'The added constant does not change the spread.', `$${a}^2 \\times ${v}$.`],
+    hints: ['$\\text{Var}(aX + b) = a^2\\,\\text{Var}(X)$.', 'The added constant does not change the spread.', `$${br(a)}^2 \\times ${v}$.`],
     steps: [
       { h: 'Rule', d: `$\\text{Var}(aX + b) = a^2\\,\\text{Var}(X)$` },
-      { h: 'Substitute', d: `$${a}^2 \\times ${v}$` },
+      { h: 'Substitute', d: `$${br(a)}^2 \\times ${v}$` },
       { h: 'Evaluate', d: `$${key}$` }
     ]
   };
@@ -1408,10 +1408,10 @@ statsForms.push({ diffs: [2], make: (rng) => {
   return {
     prompt: `For a random variable $X$, $E(X) = ${m}$ and $E(X^2) = ${s}$. What is $\\text{Var}(X)$?`,
     answerType: 'mcq', answer: { correctIndex: m2.correctIndex, optionTraps: m2.optionTraps }, mcqOptions: m2.options,
-    hints: ['$\\text{Var}(X) = E(X^2) - [E(X)]^2$.', `$[E(X)]^2 = ${m}^2 = ${r2(m * m)}$.`, `Subtract: $${s} - ${r2(m * m)}$.`],
+    hints: ['$\\text{Var}(X) = E(X^2) - [E(X)]^2$.', `$[E(X)]^2 = ${br(m)}^2 = ${r2(m * m)}$.`, `Subtract: $${s} - ${r2(m * m)}$.`],
     steps: [
       { h: 'Formula', d: `$\\text{Var}(X) = E(X^2) - [E(X)]^2$` },
-      { h: 'Substitute', d: `$${s} - ${m}^2 = ${s} - ${r2(m * m)}$` },
+      { h: 'Substitute', d: `$${s} - ${br(m)}^2 = ${s} - ${r2(m * m)}$` },
       { h: 'Evaluate', d: `$${key}$` }
     ]
   };
@@ -1427,7 +1427,7 @@ statsForms.push({ diffs: [2], make: (rng) => {
       { value: r2(r * r), why: 'That is the variance: take its square root for the standard deviation.' },
       { value: r2(Math.sqrt(s)), why: 'First subtract $[E(X)]^2$: $\\text{Var}(X) = E(X^2) - [E(X)]^2$.' }
     ].map(t => ({ ...t, tol: 0.011 })), r),
-    hints: ['Find the variance, then take the square root.', `$\\text{Var}(X) = ${s} - ${m}^2 = ${r2(r * r)}$.`, `$\\sigma = \\sqrt{${r2(r * r)}}$.`],
+    hints: ['Find the variance, then take the square root.', `$\\text{Var}(X) = ${s} - ${br(m)}^2 = ${r2(r * r)}$.`, `$\\sigma = \\sqrt{${r2(r * r)}}$.`],
     steps: [
       { h: 'Variance', d: `$\\text{Var}(X) = ${s} - (${m})^2 = ${r2(r * r)}$` },
       { h: 'Standard deviation', d: `$\\sigma = \\sqrt{${r2(r * r)}} = ${r}$` }

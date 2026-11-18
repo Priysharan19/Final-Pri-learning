@@ -53,6 +53,11 @@ export function moneyPlain(v) {
   // Escaped dollar so prompts don't collide with $…$ math delimiters
   return `\\$${Math.abs(v).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+/**
+ * A substituted value that is raised to a power or multiplied: a negative number is bracketed,
+ * "(-6)^2", never "-6^2" (which reads as -(6^2) = -36). Positive values and strings are unchanged.
+ */
+export const br = v => (typeof v === 'number' && v < 0 ? `(${v})` : `${v}`);
 export const num = v => Number.isInteger(v) ? String(v) : String(r3(v));
 
 // ── Fractions ────────────────────────────────────────────────────────────────
