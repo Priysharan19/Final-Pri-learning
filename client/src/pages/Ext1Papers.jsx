@@ -59,7 +59,7 @@ export default function Ext1Papers() {
     <section className="card" style={{ gridColumn: '1 / -1' }} data-ext1-papers aria-labelledby="ext1-papers-title">
       <h2 className="card-title" id="ext1-papers-title">{t('papers.ext1.heading')}</h2>
       <p className="sub" style={{ marginBottom: 14 }} data-ext1-papers-note>{t('papers.ext1.note')}</p>
-      {!list && !failed && <p className="muted" role="status"><Working pending size={24} /><span>{t('papers.ext1.loading')}</span></p>}
+      {!list && !failed && <p className="muted" role="status"><Working pending={!list && !failed} size={24} /><span>{t('papers.ext1.loading')}</span></p>}
       {failed && <p className="muted" data-ext1-papers-unavailable>{t('papers.ext1.unavailable')}</p>}
       {list && list.papers.length > 0 && <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
         {list.papers.map(p => (
