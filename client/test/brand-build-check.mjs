@@ -142,7 +142,13 @@ if (BOTH) {
       // `import{It as v,…}` carries other letters, and the shell's preload lists hold one notes chunk more or fewer.
       // They differ in those letters and lists only; the brand and commerce checks below still apply to every chunk.
       App: 'cascade', IndexPage: 'cascade', InstrumentBar: 'cascade', MapPage: 'cascade', PageLink: 'cascade', QuestionCard: 'cascade',
-      SyllabusBoard: 'cascade', api: 'cascade', classroomWords: 'cascade', copy: 'cascade', latex: 'cascade'
+      SyllabusBoard: 'cascade', api: 'cascade', classroomWords: 'cascade', copy: 'cascade', latex: 'cascade',
+      // Owner decisions of 19 Nov 2026 (the edition table: offering, games, hints, themeDefault, walkthroughFixes): a chunk that reads one
+      // of those values through the edition helpers is built with that edition's value, and its importers carry the other
+      // letters. The brand and commerce checks below still apply to every one of them.
+      AccountActivationGate: 'edition values', ExamRoom: 'edition values', Exams: 'edition values', History: 'edition values', InkAnswer: 'edition values',
+      PaperGenerator: 'edition values', PracticeBase: 'edition values', PractisePhoto: 'edition values', ReportHead: 'edition values',
+      Settings: 'edition values', Tasks: 'edition values', TrialNotice: 'edition values'
     };
     //   core           i18n/core.js (split from i18n/index.js in train 23 so the server
     //                  can translate without React) picks the edition's en-AU overrides
