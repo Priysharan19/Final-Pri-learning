@@ -30,12 +30,13 @@ function fakeWin({ storage = true } = {}) {
     setAttribute(k, v) { this.attrs[k] = v; }, appendChild(c) { this.children.push(c); },
     addEventListener(t, f) { this.listeners[t] = f; } });
   const body = el('body');
-  const doc = { body, visibilityState: 'visible', createElement: el, getElementById: (id) => body.children.find(c => c.id === id) || null, addEventListener() {}, removeEventListener() {} };
+  const doc = { querySelector: () => ({ getAttribute: () => '/assets/index-OLD.js' }), body, visibilityState: 'visible', createElement: el, getElementById: (id) => body.children.find(c => c.id === id) || null, addEventListener() {}, removeEventListener() {} };
   const replaced = [];
   const cachesState = { 'pri-old': new Set(['/index.html', '/', '/assets/x.js']), 'pri-new': new Set(['/index.html', '/']) };
   const win = {
     document: doc, reloads: 0, updates: 0, added, fetches: 0, fetchOk: true,
-    fetchShell: async () => { win.fetches++; if (!win.fetchOk) return null; return { clone() { return this; } }; },
+    fetchShell: async (sha) => { win.fetches++; win.shellUrls.push(sha); if (!win.fetchOk) return null; return { clone() { return this; }, text: async () => `<html><script type="module" crossorigin src="/assets/${win.shellEntry}"></script></html>` }; },
+    shellUrls: [], shellEntry: 'index-NEW.js',
     addEventListener(t, f) { (handlers[t] = handlers[t] || []).push(f); },
     removeEventListener() {},
     fire(t) { (handlers[t] || []).forEach(f => f({})); },
@@ -110,7 +111,30 @@ for (const type of ['keydown', 'input', 'pointerdown', 'touchstart', 'paste']) {
 {
   const win = fakeWin(); win.fetchOk = false;
   const { r } = await run(win, B);
-  ok(r === 'reload' && win.replaced.length === 0 && win.cachesState['pri-old'].has('/index.html') && win.cachesState['pri-new'].has('/'), 'fetch of the new shell failed: nothing deleted, shell still cached');
+  ok(r === 'notice' && win.reloads === 0 && win.replaced.length === 0 && win.cachesState['pri-old'].has('/index.html') && win.cachesState['pri-new'].has('/'), 'fetch of the new shell failed: nothing replaced, no pointless reload, notice shown');
+}
+
+// B1: a "live" shell that boots from the same entry as this page is the stale one coming back: never written, never reloaded into
+{
+  const win = fakeWin(); win.shellEntry = 'index-OLD.js';
+  const { r } = await run(win, B);
+  ok(r === 'notice' && win.reloads === 0 && win.replaced.length === 0, 'a shell with this page\'s own entry is not the new build: no write, no reload, notice');
+  const w2 = fakeWin();
+  const w = watchFreshBuild(w2, { read: async () => ({ releaseSha: B }), ownSha: A, immediate: false, fetchShell: w2.fetchShell });
+  ok(await w.check() === 'reload' && w2.shellUrls[0] === B, 'the shell is requested for the live build');
+  const lie = fakeWin(); let n = 0;
+  const w3 = watchFreshBuild(lie, { read: async () => ({ releaseSha: n++ === 0 ? B : A }), ownSha: A, immediate: false, fetchShell: lie.fetchShell });
+  ok(await w3.check() === 'notice' && lie.replaced.length === 0, 'the manifest no longer names the live build when the shell arrived: nothing written');
+}
+
+// (c) the shell request can never be a precache hit: it carries a search string, and "/" is the precache key
+{
+  const { liveShellUrl } = await import('../src/platform/cloudTransport.js');
+  const u = new URL(liveShellUrl('https://x.test', B));
+  ok(u.pathname === '/' && u.search === `?shell=${B}`, 'shell URL is /?shell=<sha>');
+  ok(u.search !== '' && u.href !== 'https://x.test/', 'so it can never equal the precached "/" request');
+  const sw = readFileSync(new URL('../public/sw.js', import.meta.url), 'utf8');
+  ok(/const CACHEABLE = \/\(\?:\^\\\/assets\\\/\)\|\(\?:\\\.\(\?:js\|css\|html/.test(sw) && !/\\\/\$/.test(sw.match(/const CACHEABLE = .*/)[0]), 'the worker keeps only build assets and static files, never a response for the path "/"');
 }
 
 // the boot check never fires while the page is still loading, and waits a quiet moment after it

@@ -53,22 +53,38 @@ export function freshnessAction({ ownSha, liveSha, touched, alreadyReloadedFor }
   return 'reload';
 }
 
+const ENTRY = /<script\b[^>]*\btype=["']module["'][^>]*\bsrc=["']([^"']+)["']/i;
+
+/** The entry script a page (live document or fetched HTML) boots from, or ''. */
+export function entryOf(htmlOrDoc) {
+  if (typeof htmlOrDoc === 'string') return ENTRY.exec(htmlOrDoc)?.[1] || '';
+  try { return htmlOrDoc?.querySelector?.('script[type="module"][src]')?.getAttribute('src') || ''; } catch { return ''; }
+}
+
 /**
- * Replace the cached shell with the live one BEFORE reloading: the new shell is fetched first, and only a
- * successful answer is written over the old entry. A connection that drops here leaves the old shell in
- * place (the reload then still opens offline), never an empty cache. Returns whether the shell was replaced.
+ * Replace the cached shell with the live one BEFORE reloading. The live shell is fetched in a way the worker
+ * cannot answer from its own cache, and is only trusted when it is HTML that boots from a different entry than
+ * this page and the manifest still names the live build; otherwise nothing is written and false is returned (the
+ * caller then shows the notice instead of reloading into the same old build). A failed fetch leaves the old
+ * shell in place, so the reload still opens offline. Returns whether the shell was replaced.
  */
-async function replaceStaleShell(win, fetchShell = readLiveShell) {
+async function replaceStaleShell(win, { fetchShell, liveSha, read }) {
   try {
-    const fresh = await fetchShell();
+    const fresh = await fetchShell(liveSha);
     if (!fresh) return false;
+    const html = await fresh.clone().text();
+    const entry = entryOf(html);
+    const own = entryOf(win.document);
+    if (!entry || entry === own) return false;
+    const again = await read();
+    if (String(again?.releaseSha || '') !== liveSha) return false;
     const names = (await win.caches.keys()).filter(n => n.startsWith('pri-'));
     await Promise.all(names.map(async n => {
       const cache = await win.caches.open(n);
       await Promise.all(SHELL_PATHS.map(p => cache.put(p, fresh.clone())));
     }));
     return true;
-  } catch { return false; /* offline, or no cache API: the old shell stays and the worker is asked as before */ }
+  } catch { return false; /* offline, or no cache API: the old shell stays */ }
 }
 
 async function askWorkerToUpdate(win) {
@@ -116,12 +132,15 @@ export function watchFreshBuild(win = window, { read = readReleaseIdentityManife
   const touch = () => { touched = true; };
   for (const type of TOUCH_EVENTS) win.addEventListener(type, touch, { capture: true, passive: true });
 
+  const shellArgs = (liveSha) => ({ fetchShell, liveSha, read });
+
   async function reloadNow(liveSha) {
     // Record the attempt first: if storage refuses, there is no way to prove
     // the reload happened, so the notice is the only safe outcome.
     if (!writeGuard(win, liveSha)) return false;
     await askWorkerToUpdate(win);
-    await replaceStaleShell(win, fetchShell);
+    // A reload that would only bring the same old shell back is not made: the notice is shown instead.
+    if (!await replaceStaleShell(win, shellArgs(liveSha))) return false;
     win.location.reload();
     return true;
   }
@@ -141,7 +160,7 @@ export function watchFreshBuild(win = window, { read = readReleaseIdentityManife
         showNotice(win, () => { void (async () => {
           writeGuard(win, liveSha);
           await askWorkerToUpdate(win);
-          await replaceStaleShell(win, fetchShell);
+          await replaceStaleShell(win, shellArgs(liveSha));
           win.location.reload();
         })(); });
         return 'notice';

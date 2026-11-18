@@ -266,6 +266,7 @@
     "test:working": "node client/test/working-indicator-check.mjs",
     "test:boot": "node client/test/boot-resilience-check.mjs",
     "test:fresh": "node client/test/fresh-build-check.mjs",
+    "test:fresh:browser": "node client/test/tour-fresh-release.js",
     "test:india:surfaces": "node client/test/india-native-surfaces-check.mjs",
     "test:cbse:marking": "node client/test/cbse-marking-check.mjs",
     "test:one-login": "node client/test/one-login-entry-contract-check.mjs",
