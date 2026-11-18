@@ -25,6 +25,16 @@ export function serverEdition(env = process.env) {
   return resolveEdition(env);
 }
 
+/** What this deployment's edition offers of the curriculum (owner decision, 19 Nov 2026), or null for everything. */
+export function editionOffering(env = process.env) {
+  return EDITIONS[resolveEdition(env)].offering ?? null;
+}
+
+/** Whether this deployment's edition gives hints without a mark deduction (owner decision, 19 Nov 2026: Prithagoras). */
+export function hintsAreFree(env = process.env) {
+  return EDITIONS[resolveEdition(env)].hints?.free === true;
+}
+
 /** The request header a client declares its build's edition in. */
 export const EDITION_HEADER = 'x-pri-edition';
 

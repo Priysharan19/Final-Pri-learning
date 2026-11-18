@@ -99,7 +99,8 @@ check('the welcome page\'s hard-coded track kicker is not drawn in Prithagoras',
   assert.match(login, /!offersCourse\('in'\) \? t\('login\.brandKicker'\) : featureEnabled\('extendedTracks'\)/);
 });
 check('the Prithagoras sign-in screen: its own eyebrow and value line, no language switch, no India footer links, one short note', () => {
-  assert.equal(AU_STRINGS['login.brandKicker'], 'NSW Years 7–10 · Stage 6 Standard, Advanced, Extension 1 & 2');
+  // owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12, Advanced and Extension 1 only.
+  assert.equal(AU_STRINGS['login.brandKicker'], 'NSW Years 11 and 12 · Advanced and Extension 1');
   assert.match(AU_STRINGS['login.welcomeSub'], /HSC/);
   assert.ok(!BAN.test(AU_STRINGS['login.welcomeSub']));
   const login = readFileSync(fileURLToPath(new URL('../src/pages/Login.jsx', here)), 'utf8');

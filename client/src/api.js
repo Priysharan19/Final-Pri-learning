@@ -31,6 +31,7 @@ import { dispatchIndiaExam, indiaExamRoute } from './local/indiaExamBackend.js';
 import { dispatchNswExam, nswExamRoute } from './local/nswExamBackend.js';
 import { dispatchGeneratedPaper, generatedRoute } from './local/generatedPaperBackend.js';
 import { scopeForYear } from './engine/curriculum.js';
+import { offeredScope } from './engine/offering.js';
 import { indiaGeneratorsForScope, indiaChapter, cleanIndiaTrack } from './engine/indiaProduct.js';
 import { loadBanks, loadBanksFor, loadAllBanks } from './engine/generators/index.js';
 
@@ -53,7 +54,7 @@ function warmScope(year, pw, selectedCourse = course, selectedIndiaTrack = india
   if (!y) return;
   const ids = selectedCourse === 'in'
     ? indiaGeneratorsForScope(cleanIndiaTrack(selectedIndiaTrack, y), y)
-    : (() => { const { own, revision } = scopeForYear(y, y >= 11 ? (pw || 'advanced') : 'advanced'); return [...own, ...revision].map(s => s.id); })();
+    : (() => { const { own, revision } = offeredScope(scopeForYear(y, y >= 11 ? (pw || 'advanced') : 'advanced')); return [...own, ...revision].map(s => s.id); })();
   const job = loadBanksFor(ids);
   scopeReady = Promise.all([scopeReady, job]).then(() => { }, () => { });
 }

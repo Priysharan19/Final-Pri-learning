@@ -156,7 +156,7 @@ const BODY_RULES = [
     optionalString(body, 'course', 30); optionalString(body, 'role', 30);
     optionalString(body, 'language', 20); optionalBoolean(body, 'mathsGloss');
     optionalString(body, 'avatar', 32); optionalString(body, 'email', 180);
-    optionalString(body, 'provider', 30); optionalString(body, 'password', 1024);
+    optionalString(body, 'provider', 30); optionalString(body, 'password', 1024); optionalBoolean(body, 'restoring');
     optionalString(body, 'pathway', 30); optionalString(body, 'indiaTrack', 30); optionalString(body, 'timezone', 64);
   }],
   [/^POST \/profiles\/demo$/, body => {

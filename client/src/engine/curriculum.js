@@ -824,6 +824,8 @@ export function yearOfSubtopic(id) {
   return SUBTOPIC_BY_ID[id]?.year ?? null;
 }
 
+// Owner decision, 19 Nov 2026 (Prithagoras): the student reads these words, never the D1 to D4 codes.
+export const DIFF_WORDS = { 1: 'Foundation', 2: 'Intermediate', 3: 'Advanced', 4: 'Extension' };
 export const DIFF_LABELS = { 1: 'D1 · Foundation', 2: 'D2 · Intermediate', 3: 'D3 · Advanced', 4: 'D4 · Exam Extension' };
 
 // ── Dot points ───────────────────────────────────────────────────────────────

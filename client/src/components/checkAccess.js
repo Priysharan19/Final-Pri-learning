@@ -5,6 +5,7 @@
 // connection and a server-issued question. The local backend refuses anything
 // else with a coded error and changes nothing; this module names the reason.
 // It is pure: no marking, no account state, no storage.
+import { walkthroughFixes } from '../platform/edition.js';
 export const CHECK_REFUSAL = Object.freeze({
   SIGN_IN: 'sign-in',
   RECONNECT: 'reconnect',
@@ -27,7 +28,10 @@ export const CHECK_REFUSAL = Object.freeze({
   // make it a twenty-first, and the server refused to issue it. The work is
   // kept; it comes back at midnight, or Premium removes the cap. A retry will
   // not change the day, and the next question is capped the same way.
-  FREE_CAP: 'free-cap'
+  FREE_CAP: 'free-cap',
+  // Owner decision, 19 Nov 2026 (Prithagoras): the server answered with a fault of its own (a 500). That is
+  // not "check your connection": the work is kept and trying again is safe.
+  SERVER_FAULT: 'server-fault'
 });
 
 // The server answered, but not with a receipt this device can trust. That is
@@ -36,6 +40,18 @@ const UNTRUSTED_ANSWER = new Set([
   'GRADE_ACK_MISSING', 'GRADE_RESOLUTION_MISSING', 'GRADE_MARKS_UNCERTIFIED', 'GRADE_RECEIPT_MISSING',
   'RECOGNITION_ACK_MISSING', 'REVEAL_ACK_MISSING', 'ONLINE_GRADE_REQUIRED', 'ONLINE_REVEAL_REQUIRED'
 ]);
+
+/**
+ * A fault of the server's own: a 5xx that is not one of its named "come back when connected" refusals.
+ * Only an edition with the walk-through fixes says so (Prithagoras); elsewhere it stays "reconnect".
+ */
+export function serverFault(error) {
+  if (!walkthroughFixes() || !error) return false;
+  const status = Number(error.status);
+  if (!Number.isInteger(status) || status < 500) return false;
+  return !['RECONNECT_TO_CHECK', 'CLOUD_DISABLED', 'QUESTION_CHECK_UNAVAILABLE', 'GUARDIAN_CONSENT_UNAVAILABLE'].includes(String(error.code || ''))
+    && error.name !== 'TimeoutError' && error.name !== 'AbortError';
+}
 
 /**
  * The reason a check was refused, or null when the error is not one of these
@@ -84,7 +100,8 @@ const COPY = Object.freeze({
   [CHECK_REFUSAL.NEW_QUESTION]: { titleKey: 'check.newQuestionTitle', hintKey: 'check.newQuestionHint', action: 'next' },
   [CHECK_REFUSAL.TEACHER_QUESTION]: { titleKey: 'check.teacherTitle', hintKey: 'check.teacherHint', action: 'none' },
   [CHECK_REFUSAL.RESTART]: { titleKey: 'check.restartTitle', hintKey: 'check.restartHint', action: 'restart' },
-  [CHECK_REFUSAL.FREE_CAP]: { titleKey: 'check.freeCapTitle', hintKey: 'check.freeCapHint', action: 'premium' }
+  [CHECK_REFUSAL.FREE_CAP]: { titleKey: 'check.freeCapTitle', hintKey: 'check.freeCapHint', action: 'premium' },
+  [CHECK_REFUSAL.SERVER_FAULT]: { titleKey: 'check.serverFaultTitle', hintKey: 'check.serverFaultHint', action: 'retry' }
 });
 
 /**
@@ -143,7 +160,7 @@ export function legacyDeviceReplay(result) {
 export function refusedCheckState(error, via, { diagnostic = false } = {}) {
   // The placement check is issued and marked by the server too, so it has the
   // same account and connection refusals as any other check.
-  const refusal = checkRefusal(error);
+  const refusal = serverFault(error) ? CHECK_REFUSAL.SERVER_FAULT : checkRefusal(error);
   return {
     phase: 'retry',
     res: {

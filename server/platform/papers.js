@@ -94,7 +94,7 @@ export function createPapersRouter(rawDb, { edition = serverEdition(process.env)
       return res.status(402).json({
         error: {
           code: 'PREMIUM_REQUIRED',
-          message: 'The Extension 1 practice papers are part of Pri Learning Premium. Practice papers marked as a sample are free.',
+          message: 'The Extension 1 practice papers are part of Pri Learning HSC Pass. Practice papers marked as a sample are free.',
           capability: PAPERS_CAPABILITY, plan: 'free', retryable: false
         }
       });

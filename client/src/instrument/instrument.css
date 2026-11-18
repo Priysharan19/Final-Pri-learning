@@ -106,12 +106,12 @@ html.ui-instrument {
 html.ui-instrument[data-theme="dark"] {
   --in-void: #121212; --in-base: #1a1a1b; --in-l1: #202021; --in-l2: #262627; --in-l3: #2d2d2f; --in-l4: #363638; --in-l5: #444447;
   --in-edge: rgba(255, 255, 255, 0.07); --in-edge-2: rgba(255, 255, 255, 0.11); --in-edge-3: rgba(255, 255, 255, 0.18);
-  --in-tx: #ecebe6; --in-tx-2: #a9a8a2; --in-tx-3: #9a9993; --in-tx-4: #57564f;
+  --in-tx: #ecebe6; --in-tx-2: #bdbcb6; --in-tx-3: #a5a49e; --in-tx-4: #96958f;
   --in-action: #ecebe6; --in-on-action: #1a1a1b; --in-signal: #ff6a2e;
   --in-c1: #86a3c9; --in-c2: #d2a45e; --in-c3: #93b79c; --in-c4: #d27e66; --in-c5: #a990bd; --in-c6: #aab56f; --in-c7: #cdbf8e; --in-c8: #c78fa6;
-  --in-good: #8cc796; --in-slip: #e08a52; --in-unc: #9ea6e2; --in-bad: #e2574c; --in-ink: #f1ede3;
+  --in-good: #8cc796; --in-slip: #e08a52; --in-unc: #9ea6e2; --in-bad: #ff7468; --in-ink: #f1ede3;
   --in-hi: rgba(255, 255, 255, 0.04); --in-shadow: rgba(0, 0, 0, 0.6);
-  --control-border: #6f6e69;
+  --control-border: #8a8982;
   --accent-hover: #ffffff;
   --accent-pressed: #d6d4cc;
   --accent-soft: rgba(236, 235, 230, 0.07);

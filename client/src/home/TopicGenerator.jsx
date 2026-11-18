@@ -20,6 +20,7 @@ import { useT } from '../i18n/index.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
 import { studyHref } from '../lib/studyJourney.js';
+import { offeredYears } from '../platform/edition.js';
 
 const DIFF_KEYS = { 1: 'difficulty.1', 2: 'difficulty.2', 3: 'difficulty.3', 4: 'difficulty.4' };
 
@@ -232,7 +233,7 @@ export default function TopicGenerator({ user, curriculum }) {
                 <>
                   <div className="gen-pane-title">{t(india ? 'home.pickClass' : 'home.pickYear')}</div>
                   <div className="gen-opts">
-                    {[7, 8, 9, 10, 11, 12].map(y => (
+                    {offeredYears([7, 8, 9, 10, 11, 12]).map(y => (
                       <button key={y} className={`gen-opt ${year === y ? 'on' : ''}`} aria-pressed={year === y}
                         onClick={() => { setYear(y); setSectionKey(null); setSubtopic(null); setDotpoint(null); setCat('course'); }}>
                         {t(india ? 'common.classNumber' : 'common.yearNumber', { n: y })}{y === user.year ? <small>{t('home.yours')}</small> : null}

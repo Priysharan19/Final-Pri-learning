@@ -198,7 +198,7 @@ export function refusePracticeCap(res, verdict, now = Date.now()) {
   return res.status(402).json({
     error: {
       code: 'FREE_CAP_REACHED',
-      message: `You have used today's ${verdict.limit} free practice questions. They reset at midnight (${verdict.timeZone}), and Premium removes the daily cap.`,
+      message: `You have used today's ${verdict.limit} free practice questions. They reset at midnight (${verdict.timeZone}), and ${serverEdition() === 'prithagoras' ? 'HSC Pass' : 'Premium'} removes the daily cap.`,
       capability: 'unlimited-practice',
       plan: 'free',
       used: verdict.used,

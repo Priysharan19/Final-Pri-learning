@@ -34,6 +34,7 @@
 .signup-choices-2 { grid-template-columns: 1fr 1fr; }
 .signup-choices-4 { grid-template-columns: repeat(4, 1fr); }
 .signup-choices-6 { grid-template-columns: repeat(6, 1fr); }
+.signup-choices-2 { grid-template-columns: repeat(2, 1fr); }
 .signup-choice-wide { grid-column: span 4; }
 .signup-choice {
   min-height: 52px; padding: var(--space-3); border-radius: 12px; border: 1px solid var(--hairline-strong);

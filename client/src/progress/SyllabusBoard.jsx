@@ -34,6 +34,7 @@ import {
   paperReadiness, syllabusBoard, tallyOf
 } from '../engine/syllabusBoard.js';
 import { practiceHref } from '../lib/practiceLinks.js';
+import { offering, pathwayOffered } from '../platform/edition.js';
 
 // hsc-forecast (PR #1003) when it is in this build; until then the glob is empty
 // and the board falls back to Pri's blueprint, labelled as such.
@@ -57,6 +58,15 @@ const TREND_WORD = { up: 'board.ready.trendUp', down: 'board.ready.trendDown', l
 
 /** The NSW courses a student is on, the one to show first first. */
 export function nswCoursesFor(user) {
+  const all = allNswCoursesFor(user);
+  // Owner decision, 19 Nov 2026: only the courses the edition offers are shown (Prithagoras: Advanced and
+  // Extension 1). A student still on a hidden course sees Advanced until they choose (components/OfferedCourse.jsx).
+  if (!offering()) return all;
+  const shown = all.filter(c => !c.startsWith('k10') && pathwayOffered(BOARD_COURSE_PATHWAY[c]));
+  return shown.length ? shown : ['advanced'];
+}
+const BOARD_COURSE_PATHWAY = { 'standard-1': 'standard', 'standard-2': 'standard', advanced: 'advanced', 'extension-1': 'ext1', 'extension-2': 'ext2' };
+function allNswCoursesFor(user) {
   const y = Number(user?.year);
   if (y <= 8) return ['k10-stage4'];
   if (y <= 10) return ['k10-stage5'];

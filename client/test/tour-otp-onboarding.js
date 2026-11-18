@@ -69,7 +69,7 @@ export const flow = {
     await page.getByTestId('signup-agree').check();
     await page.getByTestId('signup-age-next').click();
     await waitForStep(card, 'class');
-    await page.getByTestId('signup-class-9').click();
+    await page.getByTestId(AU ? 'signup-class-12' : 'signup-class-9').click();
     // The exam-track choice is the India edition's (SignUpFlow: `!au`); the Prithagoras sign-up asks for the year only.
     const hasTracks = (process.env.PRI_EDITION || 'priyabhata') === 'priyabhata';
     if (hasTracks) await check('JEE is not offered below Class 11', await page.getByTestId('signup-track-jee-main').isDisabled());

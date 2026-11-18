@@ -18,7 +18,8 @@ import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark, EditionByline } from './components/BrandMark.jsx';
 import { BRAND } from './brand/edition.js';
-import { parentFeaturesOffered } from './platform/edition.js';
+import { parentFeaturesOffered, gamesOffered } from './platform/edition.js';
+import { CoursePrompt } from './components/OfferedCourse.jsx';
 import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
@@ -179,7 +180,8 @@ const STUDENT_NAV = [
     { to: '/map', key: 'inst.tabMap', ico: I.map }, { to: '/review', key: 'inst.tabScripts', ico: I.review },
     ...(PARENT_REPORT_ON ? [{ to: '/parent-report', key: 'nav.parentReport', ico: I.progress }] : [])
   ] },
-  { label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] },
+  // Rapid Fire and Match: not offered in Prithagoras (owner decision, 19 Nov 2026).
+  ...(gamesOffered() ? [{ label: 'nav.groupPlay', items: [{ to: '/rush', key: 'nav.rush', ico: I.rush }, { to: '/match', key: 'nav.match', ico: I.match }] }] : []),
   { label: 'nav.groupAccount', items: [{ to: '/settings', key: 'nav.settings', ico: I.settings }] },
 ];
 
@@ -722,8 +724,9 @@ export default function App() {
                     {LIBRARY_ON && <Route path="/library/:id" element={studentOnly(<Library desk={DESK_ON} />)} />}
                     {DESK_ON && <Route path="/desk/import" element={studentOnly(<DeskImport />)} />}
                     {DESK_ON && <Route path="/desk/:attemptId" element={studentOnly(<DeskPage />)} />}
-                    <Route path="/rush" element={studentOnly(<Rush />)} />
-                    <Route path="/match" element={studentOnly(<Match />)} />
+                    {/* Owner decision, 19 Nov 2026: Rapid Fire and Match are hidden in Prithagoras; their URLs go Home. */}
+                    <Route path="/rush" element={gamesOffered() ? studentOnly(<Rush />) : <Navigate to="/" replace />} />
+                    <Route path="/match" element={gamesOffered() ? studentOnly(<Match />) : <Navigate to="/" replace />} />
                     <Route path="/review" element={studentOnly(<History />)} />
                     <Route path="/history" element={<Navigate to="/review" replace />} />
                     <Route path="/favorites" element={<Navigate to="/review?filter=bookmarked" replace />} />
@@ -787,6 +790,8 @@ export default function App() {
         </>
       )}
       {/* D17: asks once, before the first handwriting or photo read. */}
+      {/* Owner decision, 19 Nov 2026: a student on a year or course this edition no longer offers chooses one, once. */}
+      <CoursePrompt user={user} setUser={setUser} />
       <ReaderPermissionHost />
       <ToastLayer toasts={toasts} />
     </AppCtx.Provider>

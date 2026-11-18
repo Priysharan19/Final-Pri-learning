@@ -13,6 +13,8 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import '../notes/Notes.css';
+import { NotOffered } from '../components/OfferedCourse.jsx';
+import { offeredYears, pathwayOffered, yearOffered, defaultOffering } from '../platform/edition.js';
 import { Flashcards, NextPractice, useReveal } from '../notes/NotesParts.jsx';
 import { ChapterSheet } from '../notes/nsw/NswParts.jsx';
 import { nswPracticeSubtopic, nswPracticeHref } from '../notes/nsw/nswPractice.js';
@@ -22,10 +24,15 @@ import {
 
 const COURSE_IDS = NSW_NOTES_COURSES.map(c => c.id);
 const yearOf = value => (NSW_NOTES_YEARS.includes(Number(value)) ? Number(value) : null);
+// Owner decision, 19 Nov 2026: only the years and courses the edition offers are shown (the rest stay in the catalogue).
+const SHOWN_YEARS = offeredYears(NSW_NOTES_YEARS);
+const SHOWN_COURSES = NSW_NOTES_COURSES.filter(c => pathwayOffered(c.id));
+const topicOffered = tp => tp.years.some(yearOffered) && (!tp.course || pathwayOffered(tp.course));
 
 // The student's own year, from the profile (the year field holds 7–12 for an NSW student).
 function ownYear(user) {
-  return yearOf(user?.year) || 7;
+  const own = yearOf(user?.year) || 7;
+  return yearOffered(own) ? own : (defaultOffering()?.year ?? own);
 }
 
 function useStageNotes(stage, course = null) {
@@ -64,7 +71,8 @@ function NotesIndex() {
   const { user } = useApp() || {};
   const [params, setParams] = useSearchParams();
   const year = yearOf(params.get('year')) || ownYear(user);
-  const course = COURSE_IDS.includes(params.get('course')) ? params.get('course') : (COURSE_IDS.includes(user?.nswCourse) ? user.nswCourse : 'advanced');
+  const course = COURSE_IDS.includes(params.get('course')) ? params.get('course') : (COURSE_IDS.includes(user?.nswCourse) ? user.nswCourse : (SHOWN_COURSES.some(c => c.id === user?.pathway) ? user.pathway : 'advanced'));
+  const hidden = !yearOffered(year) || (year >= 11 && !pathwayOffered(course));
   const [query, setQuery] = useState('');
   const root = useRef(null);
   const topics = useMemo(() => topicsFor(year, course), [year, course]);
@@ -78,15 +86,16 @@ function NotesIndex() {
 
   const set = (patch) => { const p = new URLSearchParams(params); for (const [k, v] of Object.entries(patch)) p.set(k, String(v)); setParams(p, { replace: true }); };
   const onTabKey = (e) => {
-    const i = NSW_NOTES_YEARS.indexOf(year);
-    const next = e.key === 'ArrowRight' ? NSW_NOTES_YEARS[(i + 1) % NSW_NOTES_YEARS.length]
-      : e.key === 'ArrowLeft' ? NSW_NOTES_YEARS[(i - 1 + NSW_NOTES_YEARS.length) % NSW_NOTES_YEARS.length] : null;
+    const i = SHOWN_YEARS.indexOf(year);
+    const next = e.key === 'ArrowRight' ? SHOWN_YEARS[(i + 1) % SHOWN_YEARS.length]
+      : e.key === 'ArrowLeft' ? SHOWN_YEARS[(i - 1 + SHOWN_YEARS.length) % SHOWN_YEARS.length] : null;
     if (next == null) return;
     e.preventDefault();
     set({ year: next });
     requestAnimationFrame(() => root.current?.querySelector(`[data-year="${next}"]`)?.focus());
   };
 
+  if (hidden) return <NotOffered />;
   return (
     <div className="nt" ref={root} data-nsw-notes>
       <header className="nt-head">
@@ -98,7 +107,7 @@ function NotesIndex() {
 
       <div className="nt-toolbar">
         <div className="nt-classes" role="tablist" aria-label={t('notes.nsw.yearLabel')} onKeyDown={onTabKey}>
-          {NSW_NOTES_YEARS.map(y => (
+          {SHOWN_YEARS.map(y => (
             <button key={y} type="button" role="tab" data-year={y} aria-selected={y === year}
               tabIndex={y === year ? 0 : -1} className={y === year ? 'is-on' : ''} onClick={() => set({ year: y })}>
               {t('notes.nsw.yearTab', { n: y })}
@@ -113,7 +122,7 @@ function NotesIndex() {
 
       {year >= 11 && (
         <div className="nt-classes" role="group" aria-label={t('notes.nsw.courseLabel')}>
-          {NSW_NOTES_COURSES.map(c => (
+          {SHOWN_COURSES.map(c => (
             <button key={c.id} type="button" aria-pressed={c.id === course} className={c.id === course ? 'is-on' : ''} onClick={() => set({ course: c.id })}>
               {t(c.labelKey)}
             </button>
@@ -185,6 +194,7 @@ function TopicNotes({ topicId }) {
   if (!topic) {
     return <div className="nt"><p className="nt-quiet">{t('notes.nsw.notFound')}</p><PageLink className="nt-back" to="/notes">← {t('notes.nsw.back')}</PageLink></div>;
   }
+  if (!topicOffered(topic)) return <NotOffered />;
   return (
     <article className="nt nt-article" ref={root} aria-labelledby="nt-ch-title" data-nsw-notes>
       <PageLink className="nt-back" to={back}>← {t('notes.nsw.back')}</PageLink>

@@ -48,20 +48,23 @@ import { readOnboardingAuthority } from './onboardingAuthority.js';
 import { parentFeaturesOffered, defaultCourse, phoneDialCode, smsOffered } from '../platform/edition.js';
 import { planStoredProfile } from '../platform/accountProfileRestore.js';
 import { EDITION_ID } from '../brand/edition.js';
+import { offeredYears, pathwayOffered, defaultOffering } from '../platform/edition.js';
 
 export { isNetworkFailure, signInErrorCopy };
 import './SignUpFlow.css';
 
-const CLASSES = [7, 8, 9, 10, 11, 12];
+const CLASSES = offeredYears([7, 8, 9, 10, 11, 12]);
 const AGES = [11, 12, 13, 14, 15, 16, 17];
 // Prithagoras: the NSW Stage 6 maths courses a Year 11 or 12 student picks from.
 // Course names, written the same in every language (the profile's `pathway`).
+// Owner decision, 19 Nov 2026: Prithagoras offers Advanced and Extension 1 only
+// (the edition table `offering`); the others stay in the catalogue.
 const AU_PATHWAYS = [
   { key: 'standard', label: 'Standard' },
   { key: 'advanced', label: 'Advanced' },
   { key: 'ext1', label: 'Extension 1' },
   { key: 'ext2', label: 'Extension 2' }
-];
+].filter(option => pathwayOffered(option.key));
 const TRACKS = [
   // Examination names, written the same in every language (as in Login.jsx).
   { key: 'cbse', label: 'CBSE' },
@@ -155,6 +158,14 @@ export default function SignUpFlow({
   const newAccount = !!ticket || !!pendingSocial;
 
   useEffect(() => { onStep?.(step); }, [step, onStep]);
+  // Owner decision, 19 Nov 2026: a new Prithagoras student starts on Year 12,
+  // Mathematics Advanced (the edition table `offering`); the two choices are
+  // one tap each.
+  useEffect(() => {
+    const d = defaultOffering();
+    if (step === 'class' && d && year === null && !inline) { setYear(d.year); setPathway(d.pathway); }
+  }, [step]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     // The landing screen keeps its own focus on first paint; every later step
     // moves focus to its heading so a screen reader hears where it is.
@@ -727,8 +738,8 @@ export default function SignUpFlow({
     body = (
       <>
         {heading('signup.classTitle')}
-        <div className="signup-choices signup-choices-6" role="group" aria-label={t('signup.classLabel')}>
-          {CLASSES.map(c => choice(year === c, String(c), () => { setYear(c); if (c < 11) setTrack('cbse'); }, `signup-class-${c}`))}
+        <div className={`signup-choices signup-choices-${CLASSES.length}`} role="group" aria-label={t('signup.classLabel')}>
+          {CLASSES.map(c => choice(year === c, au ? `Year ${c}` : String(c), () => { setYear(c); if (c < 11) setTrack('cbse'); }, `signup-class-${c}`))}
         </div>
         {au && year !== null && year >= 11 && (
           <>

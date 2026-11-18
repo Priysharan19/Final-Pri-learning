@@ -11,6 +11,7 @@ import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import { BrandMark } from '../components/BrandMark.jsx';
 import { CUT } from '../brand/edition.js';
+import { currentReleaseIdentity } from '../platform/releaseIdentity.js';
 import { HANDS, readHand, writeHand } from '../lib/writingHand.js';
 import { autoReadEnabled, setAutoRead } from '../lib/autoRead.js';
 import { soundsEnabled, setSoundsEnabled, playSound } from '../lib/sound.js';
@@ -121,6 +122,25 @@ function Sounds() {
   );
 }
 
+// Owner request, 19 Nov 2026 (both editions): the release short SHA and build date, in a quiet line at the
+// very bottom, so anyone can tell which build a browser is running. Read from the baked release identity.
+export function buildLine(identity, lang = 'en') {
+  const sha = /^[0-9a-f]{40}$/.test(String(identity?.releaseSha || '')) ? identity.releaseSha.slice(0, 7) : null;
+  const when = identity?.buildTimestamp ? new Date(identity.buildTimestamp) : null;
+  const date = when && !Number.isNaN(when.getTime()) ? when.toLocaleDateString(lang === 'hi' ? 'en-IN' : 'en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+  return { sha, date };
+}
+
+function BuildLine() {
+  const t = useT();
+  const { sha, date } = buildLine(currentReleaseIdentity());
+  return (
+    <p className="muted" data-build-line style={{ margin: '22px 0 8px', fontSize: 12, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>
+      {sha ? t('about.build', { sha, date: date || '—' }) : t('about.buildDev')}
+    </p>
+  );
+}
+
 export default function Settings() {
   const { user } = useApp();
   // The classroom product is outside public V1 (PRI_V1_RELEASE_SCOPE §11): a
@@ -140,6 +160,7 @@ export default function Settings() {
       <Sounds />
       <AboutEdition />
       <StaffOperations />
+      <BuildLine />
     </>
   );
 }

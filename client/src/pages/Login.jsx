@@ -18,7 +18,7 @@ import { EditionByline } from '../components/BrandMark.jsx';
 import { EDITION_ID } from '../brand/edition.js';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
 import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
-import { defaultCourse, offersCourse } from '../platform/edition.js';
+import { defaultCourse, offersCourse, offeredYears, pathwayOffered, defaultOffering } from '../platform/edition.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
@@ -69,7 +69,7 @@ const YEAR_CHOOSER = SIGNUP_COURSE !== 'in';
 
 function freshProfileDraft() {
   const draft = {
-    name: '', email: '', password: '', password2: '', study: '', year: YEAR_CHOOSER ? 10 : STUDY_DEFAULT.year,
+    name: '', email: '', password: '', password2: '', study: '', year: YEAR_CHOOSER ? (defaultOffering()?.year ?? 10) : STUDY_DEFAULT.year,
     avatar: '🚀', role: '', course: SIGNUP_COURSE, pathway: 'advanced', indiaTrack: STUDY_DEFAULT.track,
     protect: false
   };
@@ -520,7 +520,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
     if (!pid) {
       const r = await api.post('/profiles', {
         name: name || account.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
-        language: signInLanguage(), course: SIGNUP_COURSE,
+        language: signInLanguage(), course: SIGNUP_COURSE, ...(restoredProfile ? { restoring: true } : {}),
         ...(SIGNUP_COURSE === 'in' ? { indiaTrack: track || 'cbse' } : { pathway: pathway || 'advanced' })
       });
       pid = r.user.id;
@@ -785,7 +785,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                       <label className="label" htmlFor="signup-year">{t('settings.schoolYear')}</label>
                       <select className="input" id="signup-year" value={form.year}
                         onChange={e => { setForm(f => ({ ...f, year: Number(e.target.value) })); setError(''); }}>
-                        {[7, 8, 9, 10, 11, 12].map(y => <option key={y} value={y}>{t('common.yearNumber', { n: y })}</option>)}
+                        {offeredYears([7, 8, 9, 10, 11, 12]).map(y => <option key={y} value={y}>{t('common.yearNumber', { n: y })}</option>)}
                       </select>
                     </div>
                     <div className="field">
@@ -801,7 +801,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                       <div className="label" id="signup-pathway">{t('settings.hscPathway')}</div>
                       <div className="pathway-row" role="group" aria-labelledby="signup-pathway">
                         {[['standard', 'Standard'], ['advanced', 'Advanced'], ['ext1', 'Extension 1'], ['ext2', 'Extension 2']]
-                          .filter(([k]) => k !== 'ext2' || form.year === 12)
+                          .filter(([k]) => (k !== 'ext2' || form.year === 12) && pathwayOffered(k))
                           .map(([k, name]) => (
                             <button key={k} type="button" className={`pathway-pick ${form.pathway === k ? 'on' : ''}`}
                               aria-pressed={form.pathway === k}
