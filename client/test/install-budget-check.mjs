@@ -147,7 +147,11 @@ let PYQ_ARCHIVE_MEASURED = null;
 
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 5_000_000;
+// Raised again 2026-11-19 (branch task/exam-style-questions, the CTO under the same owner decision, "i dont care if the app is 10gb just make
+// it properly end to end"): FIRST_VISIT_RAW only, 5,000,000 -> 5,250,000 bytes. Main plus the structured-paper sitting page, the plan and re-test
+// panel and the answer forms measured 4,897 kB (5,014,000 bytes) with both editions built, 14 kB over the old ceiling; the new one leaves about
+// 230 kB. The structured papers themselves are server content and never in the install. The other ceilings are unchanged.
+const FIRST_VISIT_RAW_CEILING = 5_250_000;
 const FIRST_VISIT_GZIP_CEILING = 1_750_000;
 
 // Things that must never be in the install again, and what each one costs.
