@@ -28,6 +28,27 @@ export const EDITION_HEADER = 'X-Pri-Edition';
 export const edition = () => EDITION_RECORD;
 export const defaultCourse = () => EDITION_RECORD.defaultCourse;
 export const offersCourse = course => EDITION_RECORD.courses.includes(course);
+/**
+ * What this edition offers inside its course (owner decision, 19 Nov 2026):
+ * null offers the whole catalogue (India); Prithagoras offers Years 11 and 12,
+ * Advanced and Extension 1. Hidden content stays in the catalogue.
+ */
+/** Whether this edition offers Rapid Fire and Match (owner decision, 19 Nov 2026: not Prithagoras). */
+/** The theme preference a new device opens with in this edition. */
+export const themeDefault = () => EDITION_RECORD.themeDefault || 'system';
+/** Whether hints are free of mark deductions in this edition (owner decision, 19 Nov 2026: Prithagoras). */
+export const hintsFree = () => EDITION_RECORD.hints?.free === true;
+/** Whether this edition carries the 19 Nov 2026 walk-through behaviour fixes (Prithagoras first). */
+export const walkthroughFixes = () => EDITION_RECORD.walkthroughFixes === true;
+export const gamesOffered = () => EDITION_RECORD.games !== false;
+export const offering = () => EDITION_RECORD.offering ?? null;
+export const yearOffered = year => { const o = offering(); return !o || o.years.includes(Number(year)); };
+export const pathwayOffered = pathway => { const o = offering(); return !o || o.pathways.includes(pathway || 'advanced'); };
+/** Whether a (year, pathway) a profile holds is one this edition offers; Years 7–10 have no pathway. */
+export const courseOffered = (year, pathway) => yearOffered(year) && (Number(year) < 11 || pathwayOffered(pathway));
+export const offeredYears = (years = [7, 8, 9, 10, 11, 12]) => years.filter(yearOffered);
+/** The year and pathway a new student starts on in this edition, or null when it has no preference. */
+export const defaultOffering = () => { const o = offering(); return o ? { year: o.defaultYear, pathway: o.defaultPathway } : null; };
 /** Whether this edition has parent-facing features (the parent report, its email links, the parent sign-in path). Priyabhata only. */
 /** Whether this edition offers interface language `id` (its record's `languages`). */
 export const offersLanguage = id => EDITION_RECORD.languages.includes(id);

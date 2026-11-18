@@ -56,7 +56,8 @@ import { verifyReadReceipt } from './readReceipt.js';
 // banks that passed their gates (nswBanks.js). Never a request field.
 import { bankPolicy, sealForEdition, FINAL_ANSWER_MARKING } from './editionBanks.js';
 import { courseAllowedForTests } from './indiaBanks.js';
-import { serverEdition } from './edition.js';
+import { serverEdition, hintsAreFree, editionOffering } from './edition.js';
+import { subtopicOfferedIn } from '../../client/src/engine/offeringRules.js';
 import { serverEntitlementCapabilities } from './entitlements.js';
 import { PYQ_RECORDS } from '../../client/src/engine/pyq/pyqArchive.js';
 import { pyqPayload } from '../../client/src/engine/pyq/pyqSchema.js';
@@ -567,11 +568,12 @@ async function chooseQuestionFor(db, accountId, request, now, { draw = () => ran
  * may start working on before signing in, and the sealed token that lets one
  * account turn it into an issued question later.
  */
-export function createPracticePrepareRoute(db, { banks = bankPolicy() } = {}) {
+export function createPracticePrepareRoute(db, { banks = bankPolicy(), env = process.env } = {}) {
   db = asStore(db);
   return [rateLimit(db, 'practice-prepare', { limit: 90, windowMs: 60 * 60 * 1000 }), asyncHandler(async (req, res) => {
     const request = readQuestionRequest(req.body, PREPARE_FIELDS, banks);
     if (request.error) return reject(res, ...request.error);
+    if (!subtopicOfferedIn(editionOffering(env), request.generator)) return refuseNotOffered(res);
     await ensureBanks();
     let chosen;
     try { chosen = chooseQuestion(request, null, { banks }); }
@@ -641,6 +643,16 @@ export function hintWorkNote(work, locale = 'en') {
   return T[work.status] || null;
 }
 
+/**
+ * Owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12, Advanced and Extension 1 only.
+ * The student app hides everything else; this is the server's refusal for a request that names it
+ * anyway (defence in depth). Priyabhata's offering is null, so it never refuses.
+ */
+function refuseNotOffered(res) {
+  res.set('Cache-Control', 'no-store');
+  return res.status(403).json({ error: { code: 'COURSE_NOT_OFFERED', message: 'This year or course is not offered yet. Year 11 and Year 12 Mathematics Advanced and Extension 1 are.', retryable: false } });
+}
+
 export function createPracticeRouter(db, { transcribe = transcribeHandwriting, env = process.env, banks = bankPolicy() } = {}) {
   db = asStore(db);
   // The free-practice day is the deployment edition's calendar day (plan H7).
@@ -686,6 +698,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // so a refused bind leaves the prepared token for an account that may.
       const premiumGap = await premiumContentRefusal(db, { accountId, generator: sealed.g, now });
       if (premiumGap) return refusePremiumContent(res, premiumGap);
+      if (!subtopicOfferedIn(editionOffering(env), sealed.g)) return refuseNotOffered(res);
       try { q = generateQuestion(sealed.g, sealed.d, sealed.s, sealed.p); }
       catch { return reject(res, 422, 'PRACTICE_CONTENT_UNSUPPORTED', 'The requested question form is unavailable.'); }
       practiceMode = sealed.m;
@@ -697,6 +710,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       if (request.error) return reject(res, ...request.error);
       const premiumGap = await premiumContentRefusal(db, { accountId, generator: request.generator, now });
       if (premiumGap) return refusePremiumContent(res, premiumGap);
+      if (!subtopicOfferedIn(editionOffering(env), request.generator)) return refuseNotOffered(res);
       if (request.band) {
         const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
         if (!serverEntitlementCapabilities(snapshot, now).includes(JEE_BAND_CAPABILITY)) {
@@ -1129,7 +1143,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       const rung = buildHintLadder(q)[want - 1];
       return { response: { authoritative: true, questionId: qid, rung: rung.rung, level: reached,
         hint: rung.text, thin: rung.thin, remaining: HINT_RUNGS.length - reached,
-        markWeight: markWeightAfter(reached), next: nextRungAfter(reached) } };
+        markWeight: markWeightAfter(reached, hintsAreFree(env)), next: nextRungAfter(reached) } };
     }, { accountScope: accountId, lock: syncLockKey(accountId) });
     if (!result.status && work) {
       // Charged only after the rung was served, and only for a check that ran.
@@ -1585,7 +1599,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
       // The hint ladder's charge, from the level committed under this lock.
       // `marksEarned` stays the deterministic engine's mark; `creditedMarks`
       // is that mark times the weight the served rungs left.
-      const ladder = ladderEvidence(hintLevel);
+      const ladder = ladderEvidence(hintLevel, hintsAreFree(env));
       const creditedMarks = Math.round(marksEarned * ladder.markWeight * 100) / 100;
       // What the error notebook may file a wrong resolution under: only what
       // the deterministic engine diagnosed — the authored trap its feedback
@@ -1981,6 +1995,7 @@ export function createPracticeRouter(db, { transcribe = transcribeHandwriting, e
     const generator = typeof original._generator === 'string' ? original._generator : original.subtopic;
     const premiumGap = await premiumContentRefusal(db, { accountId, generator, now });
     if (premiumGap) return refusePremiumContent(res, premiumGap);
+    if (!subtopicOfferedIn(editionOffering(env), generator)) return refuseNotOffered(res);
     let chosen;
     try {
       chosen = await chooseQuestionFor(db, accountId, { generator, difficulty: Number(original.difficulty) || 2,

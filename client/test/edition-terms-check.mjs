@@ -79,7 +79,8 @@ check('Priyabhata keeps Class and NCERT: the shared catalogue is unchanged', () 
 });
 check('the override applies only to a Prithagoras build in English', () => {
   const idx = readFileSync(fileURLToPath(new URL('../src/i18n/core.js', here)), 'utf8');
-  assert.match(idx, /EDITION_ID === 'prithagoras' && language === 'en' && Object\.hasOwn\(AU_STRINGS, key\)/);
+  // owner decision, 19 Nov 2026: the same condition, now named once (`au`) because the paid tier's rename uses it too.
+  assert.match(idx, /const au = EDITION_ID === 'prithagoras' && language === 'en';\s+const overridden = au && Object\.hasOwn\(AU_STRINGS, key\);/);
 });
 check('every year selector and tab goes through common.classNumber (Year N in Prithagoras), never a literal "Class N" in a screen', () => {
   const walk = d => readdirSync(d).flatMap(n => { const p = `${d}/${n}`; return statSync(p).isDirectory() ? walk(p) : [p]; });
@@ -99,7 +100,8 @@ check('the welcome page\'s hard-coded track kicker is not drawn in Prithagoras',
   assert.match(login, /!offersCourse\('in'\) \? t\('login\.brandKicker'\) : featureEnabled\('extendedTracks'\)/);
 });
 check('the Prithagoras sign-in screen: its own eyebrow and value line, no language switch, no India footer links, one short note', () => {
-  assert.equal(AU_STRINGS['login.brandKicker'], 'NSW Years 7–10 · Stage 6 Standard, Advanced, Extension 1 & 2');
+  // owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12, Advanced and Extension 1 only.
+  assert.equal(AU_STRINGS['login.brandKicker'], 'NSW Years 11 and 12 · Advanced and Extension 1');
   assert.match(AU_STRINGS['login.welcomeSub'], /HSC/);
   assert.ok(!BAN.test(AU_STRINGS['login.welcomeSub']));
   const login = readFileSync(fileURLToPath(new URL('../src/pages/Login.jsx', here)), 'utf8');

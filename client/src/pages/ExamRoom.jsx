@@ -55,6 +55,7 @@ import { useAnnounce } from '../examShell/useAnnounce.js';
 import { useExamShortcuts } from '../examShell/useExamShortcuts.js';
 import '../workspace.css';
 import Working from '../instrument/Working.jsx';
+import { walkthroughFixes } from '../platform/edition.js';
 
 const SAVE_DEBOUNCE_MS = 600;
 // A submitted paper waiting for the server is asked about again this often.
@@ -871,7 +872,7 @@ export default function ExamRoom() {
               <span className="tag">{t('examRoom.qNumber', { n: i + 1 })}</span>
               {d.sectionLabel && <span className="tag" lang="en">{d.sectionLabel}</span>}
               <span className="tag" lang="en">{d.subtopicName}</span>
-              <span className="tag">{t('examRoom.difficultyTag', { n: d.difficulty })}</span>
+              <span className="tag">{walkthroughFixes() ? t(`difficulty.${d.difficulty}`) : t('examRoom.difficultyTag', { n: d.difficulty })}</span>
               {d.pending ? (
                 <span className="tag" data-exam-pending-line={d.pendingState}>{t('examRoom.tagPending', { n: d.marks })}</span>
               ) : (

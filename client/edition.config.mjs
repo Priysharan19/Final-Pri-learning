@@ -149,6 +149,18 @@ export const EDITIONS = Object.freeze({
     region: 'IN',
     defaultCourse: 'in',
     courses: Object.freeze(['in']),
+    // What a student of this edition may be offered inside its course. null =
+    // everything the catalogue holds (India, unchanged).
+    offering: null,
+    // Behavioural fixes from the 19 Nov 2026 walk-through (plain server-fault wording, one error notebook
+    // count, the practice cap counted on answers only). India adopts them when the owner decides.
+    walkthroughFixes: false,
+    // Hints cost marks in this edition (the ladder's -10/-20/-30 % weights): unchanged.
+    hints: Object.freeze({ free: false }),
+    // The theme a NEW device opens with: 'system' (follow the device), 'dark' or 'light'.
+    themeDefault: 'system',
+    // Rapid Fire and Match (with their leaderboard). Owner decision, 19 Nov 2026: Prithagoras hides them.
+    games: true,
     languages: Object.freeze(['en', 'hi']),
     locale: 'en-IN',
     timezone: 'Asia/Kolkata',
@@ -196,11 +208,24 @@ export const EDITIONS = Object.freeze({
       cut: 'square',                         // icon counter cut: the right-angle box
       accent: Object.freeze({ light: '#7d5a00', dark: '#e0b44a' }),
       onAccent: Object.freeze({ light: '#f4f3ef', dark: '#1a1a1b' }),
-      description: 'Maths practice for NSW students, Years 7–12 and the HSC. Handwriting read line by line, worked solutions. Answers are checked by our server with a Prithagoras account.'
+      description: 'Maths practice for NSW students, Years 11 and 12 and the HSC. Handwriting read line by line, worked solutions. Answers are checked by our server with a Prithagoras account.'
     }),
     region: 'AU',
     defaultCourse: 'nsw',
     courses: Object.freeze(['nsw']),
+    // Owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12, Mathematics
+    // Advanced and Mathematics Extension 1 only. Everything else stays in the
+    // catalogue (hidden, not deleted). Set to null to offer the whole catalogue
+    // again: this is the one switch. Pathway ids are the profile's `pathway`.
+    games: false,
+    walkthroughFixes: true,
+    // Owner decision, 19 Nov 2026: hints are FREE in Prithagoras practice (no mark
+    // deduction; the ladder stays, and the full solution still ends the attempt).
+    hints: Object.freeze({ free: true }),
+    // Owner decision, 19 Nov 2026: Prithagoras opens DARK on a new device (Light and
+    // Match device stay in Settings); this replaces the 2026-10-20 follow-device default for it.
+    themeDefault: 'dark',
+    offering: Object.freeze({ years: Object.freeze([11, 12]), pathways: Object.freeze(['advanced', 'ext1']), defaultYear: 12, defaultPathway: 'advanced' }),
     languages: Object.freeze(['en']),
     locale: 'en-AU',
     timezone: 'Australia/Sydney',
@@ -326,6 +351,11 @@ export function editionProblems(editions = EDITIONS) {
     if (list !== null && !(list && ['monthly', 'annual'].every(k => Number.isFinite(list[k]) && list[k] > 0))) problems.push(`${key}: commerce.listPrice must be null or { monthly, annual } positive amounts`);
     if (list && !e.billing?.providers?.length) problems.push(`${key}: commerce.listPrice is set but the edition sells through no provider`);
     for (const d of e.commerce?.differentiators || []) if (!Object.hasOwn(DIFFERENTIATORS, d)) problems.push(`${key}: unknown differentiator ${JSON.stringify(d)}`);
+    const off = e.offering;
+    if (off !== null && off !== undefined) {
+      if (!off.years?.length || !off.pathways?.length) problems.push(`${key}: offering needs years and pathways, or null`);
+      else if (!off.years.includes(off.defaultYear) || !off.pathways.includes(off.defaultPathway)) problems.push(`${key}: offering default year and pathway must be offered`);
+    } else if (off === undefined) problems.push(`${key}: offering must be declared (null offers everything)`);
     if (!e.courses?.includes(e.defaultCourse)) problems.push(`${key}: default course ${JSON.stringify(e.defaultCourse)} is not one of its courses`);
     for (const c of e.courses || []) courses.add(c);
     if (!e.languages?.length || !e.languages.every(isLanguage)) problems.push(`${key}: every language must be one the app is translated into`);

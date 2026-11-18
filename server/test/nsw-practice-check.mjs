@@ -38,7 +38,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_FREE_PRACTICE_PER_DAY', 'PRI_EDITION', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT'];
+const keys = ['NODE_ENV', 'PRI_OFFERING', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLIC_ORIGIN', 'PRI_FREE_PRACTICE_PER_DAY', 'PRI_EDITION', 'PRI_METHOD_MARKS', 'PRI_METHOD_MARKS_EXAMINER_RESULT'];
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-nsw-practice-'));
 process.env.NODE_ENV = 'test';
@@ -48,6 +48,10 @@ process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
 // The switch that pays method marks on a test server. Prithagoras must not honour it.
 process.env.PRI_METHOD_MARKS = 'on';
 process.env.PRI_EDITION = 'prithagoras';
+// owner decision, 19 Nov 2026: a Prithagoras server offers Years 11 and 12, Advanced and Extension 1 only. THIS suite is the
+// CATALOGUE suite: it proves every bank still issues, marks and seals correctly, hidden ones included, so it lifts the
+// offering (test process only). What a server refuses is held by nsw-offering-check.mjs.
+process.env.PRI_OFFERING = 'catalogue';
 delete process.env.PRI_METHOD_MARKS_EXAMINER_RESULT;
 delete process.env.PRI_PUBLIC_ORIGIN;
 

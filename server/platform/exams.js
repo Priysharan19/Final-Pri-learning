@@ -174,6 +174,8 @@ import {
 import { loadBanksFor } from '../../client/src/engine/generators/index.js';
 import { practicePapersAllowed } from './indiaBanks.js';
 import { bankPolicy, sealForEdition } from './editionBanks.js';
+import { editionOffering } from './edition.js';
+import { courseOfferedIn } from '../../client/src/engine/offeringRules.js';
 import { nswExamsOn, nswRelease, nswExamPool, nswExamCatalogue, outcomeNamed } from './nswExamPool.js';
 import { slotsOf, formsForSlot, nswPaperTitle, NSW_EXAM_LABEL, NSW_MARKING_NOTE } from '../../client/src/engine/nswExams.js';
 import { generateMultipart } from '../../client/src/engine/generators/multipart.js';
@@ -760,8 +762,29 @@ const pdfReply = (name, lines, title, extra = {}) => ({
   filename: name, mimeType: 'application/pdf', pdfBase64: buildPdf({ title, lines }).toString('base64'), ...extra
 });
 
+/**
+ * Owner decision, 19 Nov 2026: a paper for a year or course the edition does not offer is refused by name
+ * (the student app hides it; the server enforces). `null` when offered, or when the request names no year yet.
+ */
+const NOT_OFFERED = Object.freeze(refusal(403, 'COURSE_NOT_OFFERED', 'This year or course is not offered yet. Year 11 and Year 12 Mathematics Advanced and Extension 1 are.'));
+function offeringRefusal(body, env) {
+  const off = editionOffering(env);
+  if (!off || !plain(body)) return null;
+  let year, pathway;
+  if (body.kind === 'generated' && plain(body.generated)) ({ year, pathway } = body.generated);
+  else if (body.kind === 'practice-paper' && plain(body.paper)) ({ year, pathway } = body.paper);
+  else if (body.kind === 'nsw' && plain(body.blueprint) && typeof body.blueprint.id === 'string') {
+    const c = /^nsw-hsc-(standard-[12]|advanced|extension-1|extension-2)-/.exec(body.blueprint.id)?.[1];
+    if (!c) return null;
+    year = 12; pathway = c.startsWith('standard') ? 'standard' : c === 'extension-1' ? 'ext1' : c === 'extension-2' ? 'ext2' : 'advanced';
+  } else return null;
+  return courseOfferedIn(off, year, pathway ?? (Number(year) >= 11 ? 'advanced' : null)) ? null : NOT_OFFERED;
+}
+
 function readSpec(body, env = process.env) {
   if (!plain(body) || unknown(body, CREATE_FIELDS).length) return INVALID();
+  const hidden = offeringRefusal(body, env);
+  if (hidden) return hidden;
   // D15: the practice paper is the NSW course's, built from banks outside the
   // India curriculum's covers, so it is refused (indiaBanks.js).
   if (body.kind === 'practice-paper' && !practicePapersAllowed()) {
@@ -2085,7 +2108,9 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
   // covers and lacks. 404 unless this is a Prithagoras server with the switch on.
   router.get('/nsw', rateLimit(db, 'exam-read', { limit: 600, windowMs: 60 * 60 * 1000 }), async (req, res) => {
     if (bankPolicy().curriculum !== 'nsw' || !nswExamsOn(env)) return reject(res, 404, 'EXAM_KIND_UNAVAILABLE', 'These papers are not available here.');
-    return res.status(200).json(nswExamCatalogue(nswExamPool(), env));
+    // Owner decision, 19 Nov 2026: only the papers of an offered course are listed (the server enforces what the app hides).
+    const catalogue = nswExamCatalogue(nswExamPool(), env);
+    return res.status(200).json({ ...catalogue, papers: catalogue.papers.filter(paper => !offeringRefusal({ kind: 'nsw', blueprint: { id: paper.id } }, env)) });
   });
 
   router.post('/', rateLimit(db, 'exam-create', { limit: 60, windowMs: 60 * 60 * 1000 }), async (req, res) => {
@@ -2293,6 +2318,8 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
     const pathway = typeof body.pathway === 'string' && /^[a-z0-9-]{1,24}$/.test(body.pathway) ? body.pathway : null;
     const track = typeof body.track === 'string' && /^[a-z0-9-]{1,24}$/.test(body.track) ? body.track : (curriculum === 'in' ? 'cbse' : undefined);
     if (!Number.isInteger(year) || year < 6 || year > 12) return reject(res, 400, 'EXAM_SPEC_INVALID', 'Name the year.');
+    const hidden = offeringRefusal({ kind: 'generated', generated: { year, pathway } }, process.env);
+    if (hidden) return reject(res, ...hidden.refused);
     const model = generatorModel({ year, pathway, track });
     return res.status(200).json({
       label: GENERATED_LABEL, edition: curriculum === 'in' ? 'priyabhata' : 'prithagoras', style: model.style, note: EDITION_NOTE[model.style],
@@ -2303,6 +2330,8 @@ export function createExamRouter(db, { transcribe = transcribeHandwriting, env =
 
   // Can the banks fill this request? Counts and names only; nothing is sealed or recorded.
   const assembleFor = async (req, res, { print = false } = {}) => {
+    const hidden = offeringRefusal({ kind: 'generated', generated: req.body?.generated }, process.env);
+    if (hidden) { reject(res, ...hidden.refused); return null; }
     const spec = readGeneratedSpec({ kind: 'generated', generated: req.body?.generated });
     if (!plain(req.body) || unknown(req.body, new Set(['generated'])).length) { reject(res, 400, 'EXAM_SPEC_INVALID', 'Send the generated paper’s request only.'); return null; }
     if (spec.refused) { reject(res, ...spec.refused); return null; }

@@ -343,7 +343,8 @@ try {
   c.eq((await h.request('/v1/health')).data?.edition, 'prithagoras', 'the server is Prithagoras');
   const a = await registerAccount(h, { email: 'edition.day@example.test', deviceId: 'ipad-edition-day' });
   c.eq((await verifyEmail(h, a.account.id)).status, 200, 'a free student is verified');
-  const issue = () => h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: { generator: 'y8-equations', difficulty: 3, curriculum: 'nsw' } });
+  // owner decision, 19 Nov 2026: a Prithagoras server issues Years 11 and 12 only, so the free-cap clock is driven with a Year 11 subtopic.
+  const issue = () => h.request('/v1/practice/issue', { method: 'POST', jar: a.jar, body: { generator: 'y11-functions', difficulty: 3, curriculum: 'nsw' } });
   // 23:00 AEDT on Sunday 4 October 2026, the 23-hour day.
   clockAt = Date.UTC(2026, 9, 4, 12, 0, 0);
   const counted = async key => {

@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import { useT } from '../i18n/index.js';
 import { NCERT_CLASS8_3_13_IDS } from '../engine/ncert/class8-chapters-3-13-syllabus.js';
 import { NCERT_CLASS9_SYLLABUS } from '../engine/ncert/class9-syllabus.js';
+const NotOffered = React.lazy(() => import('../components/NotOffered.jsx'));  // on demand: a link to something hidden is rare
+import { subtopicOffered } from '../engine/offering.js';
 
 // Practice is one of the heaviest product surfaces: handwriting, the maths
 // workspace and source-audited curriculum shells are irrelevant to Home/Login/
@@ -62,6 +64,9 @@ export default function Practice() {
       </React.Suspense>
     );
   }
+
+  // Owner decision, 19 Nov 2026: a link to a subtopic the edition does not offer lands on a calm page.
+  if (chapter && !subtopicOffered(chapter)) return <React.Suspense fallback={null}><NotOffered /></React.Suspense>;
 
   return (
     <React.Suspense fallback={<LoadingPractice />}>

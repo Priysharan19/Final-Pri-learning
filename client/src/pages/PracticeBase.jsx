@@ -24,6 +24,7 @@ import { consumeSessionReceipt } from './practiceSessionReceipt.js';
 import { shouldReloadPracticeOnCloudSignIn } from './practiceCloudRecovery.js';
 import { BRAND } from '../brand/edition.js';
 import Working from '../instrument/Working.jsx';
+import { difficultyPair } from '../lib/difficultyText.js';
 
 // Reuse the existing verified account flow; never create a parallel practice login.
 const PracticeAccountRecovery = React.lazy(() => import('../components/CloudAccountPanel.jsx'));
@@ -569,7 +570,7 @@ function ProfilePractice() {
           <div className="notice" role="status" data-difficulty-unavailable
             data-difficulty-requested={difficultyGap.requested || ''}>
             <strong>{t(difficultyGap.dotpoint ? 'practice.levelUnavailableDotpoint' : 'practice.levelUnavailableTopic', {
-              requested: difficultyGap.requested ? `D${difficultyGap.requested} · ${t(`difficulty.${difficultyGap.requested}`)}` : ''
+              requested: difficultyGap.requested ? difficultyPair(difficultyGap.requested, t) : ''
             })}</strong>
             <p className="muted" style={{ margin: '4px 0 10px' }}>
               {t(difficultyGap.available.length ? 'practice.levelUnavailableChoose' : 'practice.levelUnavailableNone')}
@@ -578,7 +579,7 @@ function ProfilePractice() {
               {difficultyGap.available.map(d => (
                 <button key={d} type="button" className="btn btn-primary btn-sm" data-difficulty-choice={d}
                   onClick={() => { const next = new URLSearchParams(params); next.set('difficulty', String(d)); setParams(next); }}>
-                  {t('practice.levelPractiseAt', { level: `D${d} · ${t(`difficulty.${d}`)}` })}
+                  {t('practice.levelPractiseAt', { level: difficultyPair(d, t) })}
                 </button>
               ))}
               {difficulty != null && !taskId && !assignmentMode && (

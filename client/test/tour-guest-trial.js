@@ -99,7 +99,8 @@ for (const edition of editions) {
     const labels = await page.locator('[data-question-picker] label, [data-question-picker] legend').allInnerTexts();
     check(`${edition}: every control has a label (${labels.length})`, labels.length >= 6, labels.join(' | '));
     const yearOptions = await page.locator('[data-picker-year] option').count();
-    check(`${edition}: six years or classes`, yearOptions === 6, String(yearOptions));
+    // owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12 only; India keeps its six classes.
+    check(`${edition}: ${edition === 'prithagoras' ? 'two years, 11 and 12' : 'six years or classes'}`, yearOptions === (edition === 'prithagoras' ? 2 : 6), String(yearOptions));
     if (edition === 'prithagoras') {
       const first = await page.evaluate(() => ({ year: document.querySelector('[data-picker-year]').value, course: document.querySelector('[data-picker-course]').selectedOptions[0].textContent, courses: [...document.querySelectorAll('[data-picker-course] option')].map(o => o.textContent) }));
       check('prithagoras: a new visitor starts at Year 12 Mathematics Advanced, Extension 1 one choice away', first.year === '12' && first.course === 'Advanced' && first.courses.includes('Extension 1'), JSON.stringify(first));

@@ -20,6 +20,7 @@
 import { indiaProductSections, indiaRequestableDifficulties, resolveIndiaTarget } from '../engine/indiaProduct.js';
 import { CURRICULUM, PATHWAYS, STREAM_CURRICULUM, streamSubtopics } from '../engine/curriculum.js';
 import { nswIssuedLevels } from '../engine/nswOffer.js';
+import { offeredYears, pathwayOffered, defaultOffering } from '../platform/edition.js';
 
 const YEARS = Object.freeze([7, 8, 9, 10, 11, 12]);
 const FORMS = Object.freeze(['typed', 'choice', 'written']);
@@ -41,18 +42,21 @@ const NSW_SENIOR = Object.freeze([
   Object.freeze({ key: 'ext2', label: PATHWAYS.ext2.short, stream: y => (y === 12 ? 'ext2-12' : null), only: 12 })
 ]);
 
-/** The school years the picker offers (the same six in both editions). */
-export const guestYears = () => YEARS;
+/**
+ * The school years the picker offers: the same six in both editions, less the years an edition does not offer
+ * (owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12; India's offering is none, so all six).
+ */
+export const guestYears = () => offeredYears(YEARS);
 
 /** The courses (NSW) or tracks (India) available in a year: [{ key, label }]. `mathsLabel` names the single junior NSW course. */
 export function coursesFor(edition, year, { mathsLabel = 'Mathematics' } = {}) {
   const y = Number(year);
-  if (!YEARS.includes(y)) return [];
+  if (!guestYears().includes(y)) return [];
   // A course with no chapter that has a question is not listed (owner decision 2026-11-18).
   const offered = list => list.filter(c => chaptersFor(edition, y, c.key).length > 0);
   if (isIndia(edition)) return offered(INDIA_TRACKS.filter(t => y >= t.from).map(({ key, label }) => ({ key, label })));
   if (y <= 10) return offered([{ key: 'core', label: mathsLabel }]);
-  return offered(NSW_SENIOR.filter(c => c.only === undefined || c.only === y).map(({ key, label }) => ({ key, label })));
+  return offered(NSW_SENIOR.filter(c => (c.only === undefined || c.only === y) && pathwayOffered(c.key)).map(({ key, label }) => ({ key, label })));
 }
 
 function indiaSection(year, courseKey) {
@@ -109,7 +113,8 @@ export function guestTarget(edition, { year, course, chapter, difficulty }, rand
 /** A saved or defaulted choice, brought back to something this edition offers (never throws). */
 export function settleChoice(edition, choice = {}, { defaultYear = 9 } = {}) {
   const years = guestYears();
-  const year = years.includes(Number(choice.year)) ? Number(choice.year) : (years.includes(Number(defaultYear)) ? Number(defaultYear) : 9);
+  // (a year the edition does not offer falls back to its own default: Prithagoras Year 12, owner decision 19 Nov 2026)
+  const year = years.includes(Number(choice.year)) ? Number(choice.year) : (years.includes(Number(defaultYear)) ? Number(defaultYear) : (defaultOffering()?.year ?? 9));
   const courses = coursesFor(edition, year);
   const course = courses.some(c => c.key === choice.course) ? choice.course : courses[0]?.key || null;
   const chapters = course ? chaptersFor(edition, year, course) : [];

@@ -44,6 +44,8 @@ import { tagPolicy } from './routePolicy.js';
 import { encryptDeliveryToken, decryptDeliveryToken, guestKey } from './deliveryCrypto.js';
 import { bankPolicy, sealForEdition } from './editionBanks.js';
 import { generateQuestion } from '../../client/src/engine/generators/index.js';
+import { subtopicOfferedIn } from '../../client/src/engine/offeringRules.js';
+import { editionOffering } from './edition.js';
 import { premiumCapabilityForGenerator } from '../../client/src/engine/practiceAllowance.js';
 import { ensureBanks, safeQuestion, answerTextFor } from './practice.js';
 import { markerPool, MARKING_BUSY } from './markerPool.js';
@@ -248,6 +250,8 @@ export function createGuestTrialRouter(db, { env = process.env, banks = bankPoli
     }
     // An edition's own banks only; and nothing premium or archival for a guest.
     if (!banks.issues(generator)) return reject(res, banks.outside.status, banks.outside.code, banks.outside.message);
+    // Owner decision, 19 Nov 2026: the year or course must be one this edition offers (practice.js refuseNotOffered).
+    if (!subtopicOfferedIn(editionOffering(env), generator)) return reject(res, 403, 'COURSE_NOT_OFFERED', 'This year or course is not offered yet. Year 11 and Year 12 Mathematics Advanced and Extension 1 are.');
     if (premiumCapabilityForGenerator(generator) || /^pyq-/.test(generator)) {
       return reject(res, 402, 'GUEST_SIGN_UP_REQUIRED', 'This part of Pri Learning needs an account.');
     }

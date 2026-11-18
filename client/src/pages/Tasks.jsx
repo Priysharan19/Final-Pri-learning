@@ -12,6 +12,7 @@ import { assignmentSections, defaultSectionKey, describeTaskTargets } from '../p
 import { useT } from '../i18n/index.js';
 import Working from '../instrument/Working.jsx';
 import { offeredChapters } from '../engine/curriculumAvailability.js';
+import { difficultyLabel } from '../lib/difficultyText.js';
 
 export default function Tasks() {
   const { user, toast } = useApp();
@@ -132,7 +133,7 @@ export default function Tasks() {
                 <div className="pill-select" role="group" aria-labelledby="task-difficulty">
                   {[null, ...Array.from({ length: section?.difficultyCeiling || 3 }, (_, i) => i + 1)].map(d => (
                     <button key={String(d)} className={`pill-opt ${form.difficulty === d ? 'on' : ''}`} aria-pressed={form.difficulty === d}
-                      onClick={() => setForm(f => ({ ...f, difficulty: d }))}>{d == null ? t('common.adaptive') : `D${d}`}</button>
+                      onClick={() => setForm(f => ({ ...f, difficulty: d }))}>{d == null ? t('common.adaptive') : difficultyLabel(d, t)}</button>
                   ))}
                 </div>
               </div>

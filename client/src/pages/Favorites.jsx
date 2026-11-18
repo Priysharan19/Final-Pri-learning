@@ -5,6 +5,7 @@ import { MathText } from '../lib/latex.jsx';
 import { useT } from '../i18n/index.js';
 import TermGloss from '../components/TermGloss.jsx';
 import Working from '../instrument/Working.jsx';
+import { difficultyLabel } from '../lib/difficultyText.js';
 
 export default function Favorites() {
   const [data, setData] = useState(null);
@@ -60,7 +61,7 @@ export default function Favorites() {
                   {it.correct ? '✓' : '✗'}<span className="sr-only">{t(it.correct ? 'app.correct' : 'app.incorrect')}</span>
                 </span>
                 <span className="hist-name" lang="en"><TermGloss text={it.subtopicName} /></span>
-                <span className="tag">{`D${it.difficulty}`}</span>
+                <span className="tag">{difficultyLabel(it.difficulty, t)}</span>
                 {it.mode !== 'practice' && <span className="tag">{it.mode}</span>}
               </div>
               <div className="hist-prompt"><MathText text={it.prompt} /></div>

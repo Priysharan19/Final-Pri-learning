@@ -36,10 +36,16 @@ export function editionRecord(id) {
     region: e.region,
     defaultCourse: e.defaultCourse,
     courses: Object.freeze([...e.courses]),
+    // Owner decision, 19 Nov 2026: what the edition offers inside its course (null = all).
+    offering: e.offering ? Object.freeze({ years: Object.freeze([...e.offering.years]), pathways: Object.freeze([...e.offering.pathways]), defaultYear: e.offering.defaultYear, defaultPathway: e.offering.defaultPathway }) : null,
     languages: Object.freeze([...e.languages]),
     currency: e.currency,
     // The pricing page's facts: list price and live differentiators (packaging proposal).
     commerce: editionCommerce(id),
+    games: e.games !== false,
+    walkthroughFixes: e.walkthroughFixes === true,
+    hints: Object.freeze({ free: e.hints?.free === true }),
+    themeDefault: e.themeDefault || 'system',
     family: Object.freeze({ parentFeatures: e.family.parentFeatures === true }),
     identity: Object.freeze({
       brandHi: e.identity.brandHi,

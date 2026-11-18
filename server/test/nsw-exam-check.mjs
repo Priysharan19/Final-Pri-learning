@@ -36,6 +36,9 @@ const keys = ['NODE_ENV', 'PRI_PLATFORM_DB', 'PRI_AUTH_DELIVERY_KEY', 'PRI_PUBLI
 const before = Object.fromEntries(keys.map(key => [key, process.env[key]]));
 const scratch = mkdtempSync(join(tmpdir(), 'pri-nsw-exam-'));
 process.env.NODE_ENV = 'test';
+// owner decision, 19 Nov 2026: the Standard and Extension 2 papers are hidden from a Prithagoras server; this is the CATALOGUE suite for papers
+// and lifts the offering in its own test process (nsw-offering-check.mjs holds the refusals).
+process.env.PRI_OFFERING = 'catalogue';
 process.env.PRI_PLATFORM_DB = join(scratch, 'platform.db');
 process.env.PRI_AUTH_DELIVERY_KEY = 'b3'.repeat(32);
 // The method-mark switch is ON: a Prithagoras paper must still pay the final
