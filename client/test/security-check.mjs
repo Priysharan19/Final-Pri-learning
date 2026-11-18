@@ -976,7 +976,10 @@ async function run() {
     // Two shapes are accounted for: a figure that came from the API (sanitised
     // before it was ever stored, and again on the way out) and the prompt
     // renderer's own output. A third shape is a sink nobody has looked at.
-    const unaccounted = sinks.filter(s => !/(^|[.\s])figure\b/.test(s.expr) && !(s.file === 'lib/latex.jsx' && s.expr === 'html'));
+    const unaccounted = sinks.filter(s => !/(^|[.\s])figure\b/.test(s.expr) && !(s.file === 'lib/latex.jsx' && s.expr === 'html')
+      // The living formulas typeset FIXED tex written in living/specs.js (tokens and constants), never text from a student,
+      // a request or the server; the only values interpolated are the parameter numbers, drawn as separate nodes.
+      && !(s.file === 'living/LivingFormula.jsx' && s.expr === 'renderMath(s, false, locale)'));
     eq('every place raw markup is written comes from a figure or the prompt renderer',
       unaccounted.map(s => `${s.file}: ${s.expr}`), []);
   } catch (err) { crashed(err); }
