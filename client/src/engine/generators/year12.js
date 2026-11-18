@@ -213,7 +213,9 @@ export const year12 = {
       };
     }
     if (diff === 3) {
-      const a = 1, b = nz(rng, -5, 5), c = nz(rng, -6, 6), x0 = nz(rng, -3, 3);
+      const a = 1, b = nz(rng, -5, 5), c = nz(rng, -6, 6);
+      let x0 = nz(rng, -3, 3);
+      if (2 * x0 + b === 0) x0 += 1; // a horizontal tangent would key a zero-gradient term ("0x + c"); this form asks for y = mx + c with m non-zero
       const y0 = x0 * x0 + b * x0 + c;
       const mGrad = 2 * x0 + b;
       const cc = y0 - mGrad * x0;

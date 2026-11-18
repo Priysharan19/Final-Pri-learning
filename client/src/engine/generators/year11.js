@@ -173,7 +173,7 @@ export const year11 = {
       const disc = b * b - 4 * a * c;
       return {
         prompt: `Find the discriminant of $${poly([a, b, c])} = 0$.`,
-        answerType: 'numeric', answer: { value: disc }, answerPrefix: 'Δ =',
+        answerType: 'numeric', answer: { value: disc }, dotpoint: 1,
         traps: [
           { value: b * b + 4 * a * c, why: 'The discriminant is $b^2 - 4ac$: subtract, and mind the signs of a and c.' },
           { value: b - 4 * a * c, why: 'Square b first: $\\Delta = b^2 - 4ac$.' }
@@ -649,6 +649,38 @@ export const year11 = {
           { h: 'Reference angle', d: `$\\${fn}(${base}°) = ${ltx}$` },
           { h: 'Locate quadrants', d: quadNote },
           { h: 'Solutions', d: `$\\theta = ${sols.join('°, ')}°$` }
+        ]
+      };
+    }
+    if (diff === 4) {
+      // Angles of any magnitude: a multiple of a full turn (or a negative angle)
+      // is carried back to a reference angle in 30°, 45° or 60°, with the sign
+      // from the quadrant. Every value is read from the exact table.
+      const base = rc(rng, [30, 45, 60]);
+      const quad = rc(rng, [1, 2, 3, 4]);
+      const principal = quad === 1 ? base : quad === 2 ? 180 - base : quad === 3 ? 180 + base : 360 - base;
+      let turn;
+      turn = 360 * rc(rng, [-3, -2, 2, 3]);
+      const ang = principal + turn;
+      const fn = rc(rng, ['sin', 'cos', 'tan']);
+      const sign = fn === 'sin' ? (quad <= 2 ? 1 : -1) : fn === 'cos' ? (quad === 1 || quad === 4 ? 1 : -1) : (quad === 1 || quad === 3 ? 1 : -1);
+      const [ltx, typed, val] = EXACT[base][fn];
+      const signed = sign * val;
+      const turns = turn / 360;
+      return {
+        prompt: `Find the **exact value** of $\\${fn}(${ang}°)$.`,
+        answerType: 'numeric', answer: { value: signed, requireExact: true, canonicalInput: sign === 1 ? typed : `-${typed}` }, dotpoint: 1,
+        inputHint: 'e.g. -sqrt(3)/2',
+        traps: [{ value: -signed, why: `Find the quadrant of the coterminal angle ${principal}° (ASTC) before choosing the sign.`, tol: 0.001 }],
+        hints: [
+          `Add or subtract whole turns of 360° until the angle is between 0° and 360°.`,
+          `${ang}° is coterminal with ${principal}°, which lies in quadrant ${quad}; its reference angle is ${base}°.`,
+          `Use the exact value for ${base}° and the ASTC sign for quadrant ${quad}.`
+        ],
+        steps: [
+          { h: 'Coterminal angle', d: `$${ang}° ${turns > 0 ? '-' : '+'} ${Math.abs(turns)} \\times 360° = ${principal}°$` },
+          { h: 'Reference angle and quadrant', d: `Quadrant ${quad}, reference angle $${base}°$` },
+          { h: 'Exact value with sign', d: `$\\${fn}(${ang}°) = ${sign === -1 ? '-' : ''}${ltx}$` }
         ]
       };
     }
