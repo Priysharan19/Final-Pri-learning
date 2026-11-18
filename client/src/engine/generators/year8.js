@@ -189,17 +189,21 @@ export const year8 = {
     if (diff === 2) {
       const g = ri(rng, 2, 6), p = ri(rng, 2, 5), q = nz(rng, -6, 6);
       const A = g * p, B = g * q;
+      // The highest common factor is g only when p and q are coprime; otherwise
+      // "fully" needs the larger factor (10x + 10 is 10(x + 1), not 2(5x + 5)).
+      const h = gcd(A, Math.abs(B)), P = A / h, Q = B / h;
+      const partial = { expr: `${g}(${A / g}x + ${B / g})`, why: 'A common factor was taken out, but not the *highest* one — check whether the bracket still has a common factor.' };
       return {
         prompt: `Factorise $${A}x ${sgn(B)}$ fully.`,
-        answerType: 'expression', answer: { expr: `${g}(${p}x + ${q})`, anyOf: [`${g}(${p}x ${sgn(q)})`] },
-        inputHint: `e.g. ${g}(2x + 3)`,
-        traps: [{ expr: `${g / (g % 2 === 0 ? 2 : 1) === g ? 2 : g / 2}(${A / 2}x + ${B / 2})`, why: 'A common factor was taken out, but not the *highest* one — check whether the bracket still has a common factor.' }],
-        hints: ['Find the highest number that divides both terms.', `$\\text{HCF}(${A}, ${Math.abs(B)}) = ${g}$.`, `Write $${g}(\\; ? \\;x + \\;?\\;)$ and fill in the bracket.`],
+        answerType: 'expression', answer: { expr: `${h}(${P}x + ${Q})`, anyOf: [`${h}(${P}x ${sgn(Q)})`] },
+        inputHint: `e.g. ${h}(2x + 3)`,
+        traps: [h > g ? partial : { expr: `${g / (g % 2 === 0 ? 2 : 1) === g ? 2 : g / 2}(${A / 2}x + ${B / 2})`, why: partial.why }],
+        hints: ['Find the highest number that divides both terms.', `$\\text{HCF}(${A}, ${Math.abs(B)}) = ${h}$.`, `Write $${h}(\\; ? \\;x + \\;?\\;)$ and fill in the bracket.`],
         steps: [
-          { h: 'Highest common factor', d: `$\\text{HCF}(${A}, ${Math.abs(B)}) = ${g}$` },
-          { h: 'Divide each term by it', d: `$${A}x \\div ${g} = ${p}x$ and $${B} \\div ${g} = ${q}$` },
-          { h: 'Write as a product', d: `$${g}(${p}x ${sgn(q)})$` },
-          { h: 'Check by expanding', d: `$${g} \\times ${p}x = ${A}x$ ✓` }
+          { h: 'Highest common factor', d: `$\\text{HCF}(${A}, ${Math.abs(B)}) = ${h}$` },
+          { h: 'Divide each term by it', d: `$${A}x \\div ${h} = ${P}x$ and $${B} \\div ${h} = ${Q}$` },
+          { h: 'Write as a product', d: `$${h}(${P}x ${sgn(Q)})$` },
+          { h: 'Check by expanding', d: `$${h} \\times ${P}x = ${A}x$ ✓` }
         ]
       };
     }

@@ -421,16 +421,16 @@ export const streamsStandard = {
       };
     }
     const oldW = rc(rng, [1600, 1800, 2000, 2200, 2400, 2800]), newW = rc(rng, [400, 500, 600, 750, 800, 1000]);
-    const hrs = ri(rng, 2, 9), rate = rc(rng, [0.28, 0.3, 0.32, 0.35, 0.38]);
+    const hrs = ri(rng, 2, 9), rate = rc(rng, [0.28, 0.3, 0.32, 0.35, 0.38]), rateTxt = rate.toFixed(2);
     const saving = (oldW - newW) / 1000 * hrs * 365 * rate;
     return {
-      prompt: `Replacing a $${oldW}$ W appliance with a $${newW}$ W one (used $${hrs}$ h/day, electricity at \\$0.32/kWh) saves how much per **year**, to the nearest dollar?`,
+      prompt: `Replacing a $${oldW}$ W appliance with a $${newW}$ W one (used $${hrs}$ h/day, electricity at \\$${rateTxt}/kWh) saves how much per **year**, to the nearest dollar?`,
       answerType: 'numeric', answer: { value: Math.round(saving), tol: 1.01 }, answerPrefix: '$',
       traps: [{ value: r2((oldW - newW) / 1000 * hrs * rate), why: 'That’s the saving per *day* — multiply by 365 for a year.', tol: 0.02 }],
-      hints: ['Find the daily energy saving in kWh first.', `Daily: $${(oldW - newW) / 1000} \\times ${hrs} = ${r2((oldW - newW) / 1000 * hrs)}$ kWh.`, 'Then × 365 days × $0.32.'],
+      hints: ['Find the daily energy saving in kWh first.', `Daily: $${(oldW - newW) / 1000} \\times ${hrs} = ${r2((oldW - newW) / 1000 * hrs)}$ kWh.`, `Then × 365 days × $${rateTxt}.`],
       steps: [
         { h: 'Power saved', d: `$${oldW} - ${newW} = ${oldW - newW}$ W $= ${(oldW - newW) / 1000}$ kW` },
-        { h: 'Daily saving', d: `$${(oldW - newW) / 1000} \\times ${hrs} \\times 0.32 = ${r2((oldW - newW) / 1000 * hrs * rate)}$` },
+        { h: 'Daily saving', d: `$${(oldW - newW) / 1000} \\times ${hrs} \\times ${rateTxt} = ${r2((oldW - newW) / 1000 * hrs * rate)}$` },
         { h: 'Yearly', d: `$\\times 365 \\approx ${moneyPlain(Math.round(saving))}$` }
       ]
     };
