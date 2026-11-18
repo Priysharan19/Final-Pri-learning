@@ -1,7 +1,8 @@
 // Pri Learning · the Premium screen says only what is true (client/src/paywall/).
 //   · D19 / D20: the comparison states the figures the server enforces, from
-//     the same definitions (20 questions a day, one timed paper in 30 days,
-//     5 / 25 reads and photos a day, JEE Advanced, unlimited on Premium);
+//     the same definitions (practice uncapped, one timed paper in 30 days,
+//     5 / 50 reads and photos a day, JEE Advanced, unlimited papers on Premium;
+//     owner decision 2026-11-18, packaging value-2026-11);
 //   · no price is written into the source or the copy: the billed amount is
 //     the store's displayPrice (StoreKit or Google Play);
 //   · the yearly per-month figure comes from the store's numeric price,
@@ -36,21 +37,22 @@ const keys = Object.keys(en).filter(k => k.startsWith('paywall.'));
 const text = cat => keys.map(k => (typeof cat[k] === 'string' ? cat[k] : Object.values(cat[k]).join(' '))).join(' \n ');
 const row = r => translateEnglish(r.key, r.vars);
 
-// 1 · D19 / D20, from the definitions the server enforces
-eq('D19: free practice is 20 questions a day', FREE_PRACTICE_ALLOWANCE.perDay, 20);
+// 1 · the active packaging (value-2026-11, owner decision 2026-11-18, replacing
+// D19 / D20), from the definitions the server enforces
+eq('free practice is not capped (owner decision 2026-11-18)', FREE_PRACTICE_ALLOWANCE.perDay, null);
 eq('D19: free papers are one every 30 days', [FREE_EXAM_ALLOWANCE.examsPerWindow, FREE_EXAM_ALLOWANCE.examWindowDays], [1, 30]);
-eq('D20: reads are 5 free and 25 Premium a day', READ_ALLOWANCE, { free: 5, premium: 25 });
-eq('D20: the server\'s read allowance defaults to the same definition, per kind', [AI_ALLOWANCE_DEFAULTS.handwriting, AI_ALLOWANCE_DEFAULTS['question-photo']].map(x => [x.free, x.premium]), [[5, 25], [5, 25]]);
-eq('the free column says exactly the free plan (active packaging d19-d20; every difficulty is free on every packaging)', FREE_ROWS.map(row), [
-  '20 practice questions a day', 'Every difficulty level, with spaced reviews of what you got wrong', 'One timed paper every 30 days', '5 reads of your writing and 5 question photos a day', 'The error notebook and its reviews'
+eq('reads are 5 free and 50 Premium a day (owner decision 2026-11-18)', READ_ALLOWANCE, { free: 5, premium: 50 });
+eq('the server\'s read allowance defaults to the same definition, per kind', [AI_ALLOWANCE_DEFAULTS.handwriting, AI_ALLOWANCE_DEFAULTS['question-photo']].map(x => [x.free, x.premium]), [[5, 50], [5, 50]]);
+eq('the free column says exactly the free plan (active packaging value-2026-11; every difficulty is free on every packaging)', FREE_ROWS.map(row), [
+  'Practice questions with no daily limit', 'Every difficulty level, with spaced reviews of what you got wrong', 'One timed paper every 30 days', '5 reads of your writing and 5 question photos a day', 'The error notebook and its reviews'
 ]);
 eq('the Premium column says exactly what Premium adds', PREMIUM_ROWS.map(row), [
-  'Unlimited practice questions', 'Unlimited timed papers', 'After each timed paper, where your time went, section by section',
-  'The JEE Advanced track', '25 reads of your writing and 25 question photos a day',
+  'Unlimited timed papers', 'After each timed paper, where your time went, section by section',
+  'The JEE Advanced track', '50 reads of your writing and 50 question photos a day',
   'An estimate of your mark from your own practice, with its range and how much of the paper it covers',
   'The slips you make most often, across chapters'
 ]);
-ok('the plan rows hold no figure of their own: every number comes from a definition', !/\b(5|20|25|30)\b/.test(plans.replace(/\/\/.*$/gm, '')));
+ok('the plan rows hold no figure of their own: every number comes from a definition', !/\b(5|20|25|30|50)\b/.test(plans.replace(/\/\/.*$/gm, '')));
 eq('the Premium screen has one address', PAYWALL_ROUTE, '/premium');
 
 // 1b · the screen sells only what the SERVER enforces (paywall review, L6)

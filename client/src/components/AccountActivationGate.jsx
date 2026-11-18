@@ -21,6 +21,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import PageLink from './PageLink.jsx';
 import { cloud } from '../platform/cloudTransport.js';
+import { phoneDialCode, smsOffered } from '../platform/edition.js';
 import { cloudAccountLink, cloudDeviceId, linkSignedInAccount, verifyCloudSession } from '../platform/cloudAccount.js';
 import {
   ACTIVATION_BLOCKED_CODES, ACTIVATION_GUARDIAN_CODES, ACTIVATION_SIGN_IN_CODES, ensureAccountActivated
@@ -105,7 +106,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
     void check();
     cloudAccountLink(user.id).then(setLink).catch(() => setLink(null));
     cloud.otpChannels().then(result => {
-      if (result?.channels) setChannels({ email: result.channels.email !== false, sms: result.channels.sms === true });
+      if (result?.channels) setChannels({ email: result.channels.email !== false, sms: result.channels.sms === true && smsOffered() });
     }).catch(() => {});
     return () => { generation.current++; checking.current = false; };
   }, [check, user.id]);
@@ -256,7 +257,7 @@ export default function AccountActivationGate({ user, onReady, onSwitch }) {
                 )}
                 <label className="label" htmlFor="activation-parent-destination">{guardianSms ? t('signup.parentPhoneLabel') : t('signup.parentEmailLabel')}</label>
                 <div className={guardianSms ? 'signup-phone' : ''}>
-                  {guardianSms && <span className="signup-cc" aria-hidden="true">+91</span>}
+                  {guardianSms && <span className="signup-cc" aria-hidden="true">{phoneDialCode()}</span>}
                   <input className="input" id="activation-parent-destination" value={guardianDestination}
                     type={guardianSms ? 'tel' : 'email'} inputMode={guardianSms ? 'tel' : 'email'} autoComplete="off" autoCapitalize="none" maxLength={guardianSms ? 16 : 254}
                     onChange={e => { setGuardianDestination(e.target.value); setError(''); }} />

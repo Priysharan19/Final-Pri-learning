@@ -370,6 +370,11 @@ jobs:
           # account-scoped, capped, in the export and gone with the account.
           node server/test/resource-bookmark-sync-check.mjs 2>&1 | tee resource-bookmark.log
           node tools/ci-check-counts.mjs verify platform/resource-bookmark.log
+          # Extension 1 practice papers (Prithagoras): the manifest equals the files on disk,
+          # Premium (premium-exams) by the server's own row, Paper 01 free as the sample,
+          # Priyabhata 404, no path traversal.
+          node server/test/papers-check.mjs 2>&1 | tee papers.log
+          node tools/ci-check-counts.mjs verify platform/papers.log
           # The Exam Desk (ADR-0002 §8 plan F4a): the unmarked mode — server-stamped
           # clock, one open attempt per paper, the import, never a mark — and the
           # static proof that it reaches nothing of the marking path.
@@ -1022,6 +1027,9 @@ jobs:
             # Plan G4: a Prithagoras student sits an NSW HSC-style paper: server-owned reading
             # time (inputs disabled, nothing sent), working time, an answer-checked result, no band.
             node client/test/tour-nsw-exams.js 2>&1 | tee -a browser.log
+            # Extension 1 practice papers (Prithagoras): the section shows for an Extension 1
+            # Year 11-12 profile only; Paper 01 free, the rest Premium; real PDF downloads.
+            node client/test/tour-ext1-papers.js 2>&1 | tee -a browser.log
             # A Prithagoras NSW student's practice is issued and marked by the
             # server: the device names the profile's own course, never 'in'.
             node client/test/tour-nsw-practice-marked.js 2>&1 | tee -a browser.log

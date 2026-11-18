@@ -113,7 +113,7 @@
         {"has":"PLOTTING: PASS — 78/78 checks"},
         {"has":"README TRUTH: PASS — 16/16 checks"},
         {"has":"LEGAL PAGES: PASS — 387/387 checks","note":"387 (owner privacy, 18 Nov): the street address and personal iCloud address are absent from every published surface, and the pattern is proven. 364 (m-finish-16): the review switch, store-purchase wording, retention and crash-report disclosures, and the generated third-party notices page. 374 (L7): no notice makes a coverage claim D24 forbids, in either language. 375 (L7): the D18 wording matches the accounts stream's code (#736). 378 (L7): the notice describes the D17 prompt and is pinned to its code (#737). 383 (L7, Train 4 truth): banner conditions walked, Practise-this and Hindi D18 pinned."},
-        {"has":"LEGAL PROMISES GATE: PASS — 23/23 checks","note":"16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination. 19 (L7): the D17 prompt promise."},
+        {"has":"LEGAL PROMISES GATE: PASS — 35/35 checks","note":"23 → 35 (legal pages of 2026-11-18, re-derived by running node tools/legal-promises.test.mjs). 16 (L7): the accounts stream's names, and PRI_CHILD_ERASURE=enforce printed at nomination. 19 (L7): the D17 prompt promise."},
         {"has":"COUNSEL QUESTIONS: PASS — 13/13 checks","note":"L7: the counsel question sheet quotes the current text and code locations."},
         {"has":"CLOUD HANDWRITING CLIENT: PASS — 199/199 checks","note":"186 → 192 (#196): a remembered read is dropped when the cloud account changes, so account A's transcript and read receipt are never handed to account B on the same device."},
         {"has":"CONTENT HONESTY: PASS","note":"Content honesty (Nov 2026): no student surface claims a review a human never did; marketing, ad, promotion and store copy carry none of the retired claims; past papers are off by default (D23)."},
@@ -132,7 +132,7 @@
         {"has":"RESIDENCY CLAIMS (H7): PASS — ","note":"Plan H7: nothing says work stays in, never leaves or is processed in India or Australia (the count follows the files read)."},
         {"has":"STUDY PLAN: PASS — 215/215 checks","note":"211 → 215 (Train 8, re-derived by a full local run of the 4 suite shards on the merged tree)."},
         {"has":"REMINDERS: PASS — 183/183 checks"},
-        {"has":"I18N COVERAGE: PASS — 94/94 checks — 109 files scanned, 0 hard-coded strings","note":"92 → 93 files (standard #08: + components/OriginalWork.jsx, re-derived by running the check). 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason. 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt). 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770). 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree). 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards). 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check). 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost \"P\" and \"Pri Learning.\" and gained Priyabhata, Prithagoras, प्रियभट and \"by Pri Learning\". 80 → 89 files (plan F4b: + src/desk (DeskPage, DeskImport, DeskEntry) and src/examShell (six components), re-derived by running the check)."},
+        {"has":"I18N COVERAGE: PASS — 94/94 checks — 110 files scanned, 0 hard-coded strings","note":"109 → 110 files (Ext1Papers.jsx, re-derived by running the check). 92 → 93 files (standard #08: + components/OriginalWork.jsx, re-derived by running the check). 91: two key-chord literals (⌘/Ctrl ↵ and the ARIA aria-keyshortcuts value) joined the allowlist, each checked for its stated reason. 74 (Train 4, re-derived by running): main 71 + src/parent (ParentReport.jsx, ParentReportEmailAction.jsx, #743) + ink/ReaderPermission.jsx (#737, the D17 prompt). 75 (Train 6, re-derived by running on the merged tree): 74 + tutor/MistakeDiagnosis.jsx (#770). 75 → 77 files (Train 10, re-derived by a full local run of the 4 suite shards on the merged tree). 77 → 78 files (Train 15: + tutor/StepCoachLive.jsx from #826, re-derived by running all 4 shards). 78 → 79 files (plan F1: + library/Library.jsx, re-derived by running the check). 91 → 94 (plan E4, re-derived by running): +1 the ambient placeholders are exactly {brand} and {company}; the allowlist JSON lost \"P\" and \"Pri Learning.\" and gained Priyabhata, Prithagoras, प्रियभट and \"by Pri Learning\". 80 → 89 files (plan F4b: + src/desk (DeskPage, DeskImport, DeskEntry) and src/examShell (six components), re-derived by running the check)."},
         {"has":"I18N: PASS — 205/205 checks","note":"198 → 209 (Prithagoras Hindi trim, re-derived by running): six checks that an edition without Hindi ships no Hindi catalogue and Priyabhata is untouched, and five that run the languages.js a Prithagoras build really uses (an English-only list, a stored hi clamped to English, the table still knowing Hindi, and the build stopping if languages.js changes under the clamp). 200 → 198 (plan E4, re-derived by running): \"P\" and \"Pri Learning.\" (the brand tile) and \"Pri\" (the old bar label) left the literal allowlist; \"by Pri Learning\" joined it."},
         {"has":"READER PERMISSION (D17): PASS — 124/124 checks"},
         {"has":"PAGE LINK HISTORY: PASS — 39/39 checks"},
@@ -158,7 +158,7 @@
         {"has":"WORKING INDICATOR: PASS — 66/66 checks","note":"Lit Instrument D6: the working indicator is one component, shown only while real work is pending (400 ms in, 480 ms held). 62 → 66 (Paper Generator, re-derived by running: its two sites). 46 → 62 (UI-IND-2, re-derived by running): each of the new sites is checked for a real pending flag and its size."},
         {"has":"CBSE STEP MARKING: PASS — 37/37 checks"},
         {"has":"ENTITLEMENT ENFORCEMENT: PASS — 68/68 checks"},
-        {"has":"PAYWALL HONESTY: PASS — 81/81 checks","note":"68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
+        {"has":"PAYWALL HONESTY: PASS — 79/79 checks","note":"81 → 79 (packaging value-2026-11, re-derived by running client/test/paywall-honesty-check.mjs: the Premium column no longer has the unlimited-practice row). 68 → 79 (plan E5): an edition with no payment provider has no store, no price and no purchase control, and says Premium is not on sale."},
         {"has":"NOTEBOOK VIEW: PASS — 19/19 checks"},
         {"has":"PARENT REPORT UI: PASS — 35/35 checks"},
         {"has":"LIBRARY UI: PASS — 56/56 checks","note":"39 → 56 (plan F2): the save toggle and its pending state, the hidden-count line, saved-first order, and the local route that never touches the question bookmarks."},
@@ -331,6 +331,13 @@
         {"has":"RESOURCE BOOKMARK SYNC — PASS — 30/30 checks"}
       ]
     },
+    "platform/papers.log": {
+      "job": "platform-contracts",
+      "log": "papers.log",
+      "pins": [
+        {"has":"PRACTICE PAPERS: PASS — 171/171 checks"}
+      ]
+    },
     "platform/resources.log": {
       "job": "platform-contracts",
       "log": "resources.log",
@@ -421,7 +428,7 @@
       "log": "practice-http.log",
       "pins": [
         {"has":"INDIA BANK ISSUE COVERAGE: PASS"},
-        {"has":"DAILY PRACTICE CAP: PASS — 98/98 checks"},
+        {"has":"DAILY PRACTICE CAP: PASS — 100/100 checks","note":"98 → 100 (owner decision 2026-11-18, packaging value-2026-11): the suite now also pins that the active packaging leaves practice uncapped and that the deployment cap of 20 is what it exercises. Re-derived by running."},
         {"has":"PREMIUM PRACTICE CONTENT: PASS — 41/41 checks"},
         {"has":"MISTAKE NOTEBOOK: PASS — 49/49 checks"},
         {"has":"READINESS FORECAST: PASS — 29/29 checks"},
@@ -635,6 +642,7 @@
         {"has":"India exam · JEE Main handwritten, reloaded, analysed"},
         {"has":"India exam · the clock runs out and the paper submits itself"},
         {"has":"NSW PAPERS TOUR (G4): PASS — 24/24 checks"},
+        {"has":"EXT1 PAPERS TOUR: PASS — 20/20 checks"},
         {"has":"Placement · onboarding → diagnostic → evidence map"},
         {"has":"Phone · every destination reachable at 390px"},
         {"has":"iPhone portrait · safe areas, sticky bar, mode switch, write and photo space"},

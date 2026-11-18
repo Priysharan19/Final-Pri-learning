@@ -6,7 +6,8 @@
 //       Premium; never where nothing is on sale;
 //   2 · the surfaces of those forbidden moments never link to Premium;
 //   3 · free never blocks core practice: the device gate's only refusals are
-//       the packaged allowances, practice is uncapped under the proposal, and
+//       the packaged allowances, practice is uncapped under the approved packaging (owner decision
+//       2026-11-18), and
 //       no difficulty level is Premium-only;
 //   4 · price strings come from the edition table and match the AU legal
 //       documents, with an edition check (Priyabhata states no constant price);
@@ -74,8 +75,9 @@ for (const f of FORBIDDEN_SURFACES) ok(`${f} never links to Premium`, !PREMIUM_L
   const linking = walk(join(root, 'src')).map(p => p.slice(root.length)).filter(p => PREMIUM_LINK.test(readFileSync(join(root, p), 'utf8')) && !p.startsWith('src/paywall/')).sort();
   eq('only value-moment surfaces link to Premium (add a new one here only with a moment)', linking, [
     'src/App.jsx', 'src/components/ErrorNotebook.jsx', 'src/components/FreeCapNotice.jsx', 'src/components/QuestionCard.jsx',
-    'src/components/SectionTime.jsx', 'src/insights/Insights.jsx', 'src/pages/Today.jsx'
+    'src/components/SectionTime.jsx', 'src/insights/Insights.jsx', 'src/pages/Ext1Papers.jsx', 'src/pages/Today.jsx'
   ]);
+  // Ext1Papers.jsx: the moment is a student asking for a Premium-only practice paper (it states the paper is part of Premium, then links once).
 }
 {
   const qc = read('src/components/QuestionCard.jsx');
@@ -119,7 +121,7 @@ for (const f of FORBIDDEN_SURFACES) ok(`${f} never links to Premium`, !PREMIUM_L
   ok('no Premium content rule is about difficulty: every level is free', PREMIUM_PRACTICE_CONTENT.every(rule => !('difficulty' in rule)) && PLAN_PROMISES.difficulties === 'all');
   ok('the gate holds no difficulty check (it reads no question\'s difficulty)', !/\.difficulty\b|\bdifficulty\s*(?:[<>]=?|===?)/.test(read('src/local/entitlementGate.js')));
   eq('games and the placement check are never counted', CAPPED_PRACTICE_MODES, ['practice', 'review', 'task']);
-  eq('under the proposal free practice is not capped at all', PACKAGINGS['value-2026-11'].free.practicePerDay, null);
+  eq('under the value packaging (approved 2026-11-18) free practice is not capped at all', PACKAGINGS['value-2026-11'].free.practicePerDay, null);
 }
 
 // ── 4 · prices ──────────────────────────────────────────────────────────────

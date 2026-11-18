@@ -1,6 +1,7 @@
 import { createForecastRouter } from './forecast.js';
 import { createMistakeDnaRouter } from './mistakeDna.js';
 import { createRootGapRouter } from './rootGap.js';
+import { createPapersRouter } from './papers.js';
 import { asyncRouter } from './asyncRouter.js';
 import { clientCompatibility } from './clientCompatibility.js';
 import { asStore } from './store.js';
@@ -75,7 +76,7 @@ const PROVIDER_CALLBACK = /^\/account\/identity\/apple\/callback$/;
 // and no cookie. Its token can only stop parent reports (parentReport.js).
 const ONE_CLICK_UNSUBSCRIBE = /^\/parent-report\/unsubscribe\/one-click$/;
 
-export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {}, desk = {}, publicCatalogue: publicOverride = {} } = {}) {
+export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckout = {}, billingNative = {}, billingLifecycle = {}, tutor = {}, parentReport = {}, resources = {}, desk = {}, papers = {}, publicCatalogue: publicOverride = {} } = {}) {
   assertPlatformConfig();
   db = asStore(db);
   const router = asyncRouter();
@@ -275,6 +276,9 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // an original is written only with its mark, by /practice submit.
   router.use('/originals', requireGuardianConsent(db), createOriginalsRouter(db, { edition }));
   router.use('/habits', requireGuardianConsent(db), createMistakeDnaRouter(db));
+  // Extension 1 practice papers (papers.js): Prithagoras only, Premium by the
+  // server's own entitlement row, a manifest entry flagged `sample` is free (none today).
+  router.use('/papers', requireGuardianConsent(db), createPapersRouter(db, { edition: resources.edition ?? edition, ...papers }));
   router.use('/root-gap', requireGuardianConsent(db), createRootGapRouter(db));
   // An examination paper is issued, collected and marked here: the same
   // eligibility as checking one answer (session, verified email, student,
