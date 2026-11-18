@@ -29,6 +29,14 @@ export const edition = () => EDITION_RECORD;
 export const defaultCourse = () => EDITION_RECORD.defaultCourse;
 export const offersCourse = course => EDITION_RECORD.courses.includes(course);
 /** Whether this edition has parent-facing features (the parent report, its email links, the parent sign-in path). Priyabhata only. */
+/** Whether this edition offers interface language `id` (its record's `languages`). */
+export const offersLanguage = id => EDITION_RECORD.languages.includes(id);
+/** The languages of `all` ({ id }) this edition offers, in their order. */
+export const offeredLanguages = all => all.filter(l => offersLanguage(l.id));
+/** Whether this edition reaches a person by phone (SMS). The SMS provider is India-only: Priyabhata yes, Prithagoras email only. */
+export const smsOffered = () => EDITION_RECORD.region === 'IN';
+/** The country calling code a phone number is typed under in this edition, or null when it offers no phone channel. */
+export const phoneDialCode = () => (smsOffered() ? '+91' : null);
 export const parentFeaturesOffered = () => EDITION_RECORD.family.parentFeatures === true;
 
 const EDITION_ID = /^[a-z]{3,24}$/;

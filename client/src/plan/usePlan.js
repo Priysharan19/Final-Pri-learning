@@ -14,7 +14,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ratingsFor } from '../local/store.js';
 import { byIndex } from '../local/idb.js';
-import { dayKey } from '../lib/locale.js';
+import { dayKey, defaultTimezone } from '../lib/locale.js';
 import { buildStudyPlan, slipFocus, todayProgress } from './studyPlan.js';
 import { api } from '../api.js';
 import { loadPlanSettings, savePlanSettings, loadTodayPin, saveTodayPin } from './settings.js';
@@ -30,7 +30,7 @@ function minutesToday(activity, today) {
 
 export function usePlan(user, { stats = null, now = null } = {}) {
   const pid = user?.id || null;
-  const tz = user?.timezone || 'Asia/Kolkata';
+  const tz = user?.timezone || defaultTimezone(user?.course || 'in');
   // The instant the plan is measured at is fixed per load of the evidence, not
   // per render: a re-render must not re-plan, re-pin and re-sync by itself.
   const [nowMs, setNowMs] = useState(() => now ?? Date.now());

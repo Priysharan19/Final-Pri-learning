@@ -12,6 +12,7 @@ import { downloadJSON, readJSONFile, readTextFile, dateStamp, printPage } from '
 import { parseRoster } from '../lib/csv.js';
 import { MathText } from '../lib/latex.jsx';
 import { CURRICULUM } from '../engine/curriculum.js';
+import { offersCourse } from '../platform/edition.js';
 import { assignmentSections, describeTaskTargets, sectionKeyForChapter } from '../platform/assignmentTarget.js';
 import ClassroomPanel from '../components/ClassroomPanel.jsx';
 import { tLater, translate, useT, useTx } from '../i18n/index.js';
@@ -151,7 +152,7 @@ export default function Teach() {
   const [analytics, setAnalytics] = useState(null);
   const [selClass, setSelClass] = useState(null);
   const [newClass, setNewClass] = useState('');
-  const [taskForm, setTaskForm] = useState(EMPTY_TASK);
+  const [taskForm, setTaskForm] = useState(() => (offersCourse('in') ? EMPTY_TASK : { ...EMPTY_TASK, syllabus: 'nsw' }));
   const [customs, setCustoms] = useState([]);
   const [showQBuilder, setShowQBuilder] = useState(false);
   const [qForm, setQForm] = useState({ name: '', prompt: '', answerType: 'numeric', value: '', expr: '', mcqOptions: ['', '', '', ''], correctIndex: 0, solutionText: '', hint: '', difficulty: 2 });
@@ -185,7 +186,7 @@ export default function Teach() {
   useEffect(() => {
     if (!cls) return;
     const students = cls.students || [];
-    const india = user?.course === 'in' || !students.length || students.some(s => s.course === 'in');
+    const india = offersCourse('in') && (user?.course === 'in' || !students.length || students.some(s => s.course === 'in'));
     const indian = students.filter(s => s.course === 'in');
     const year = indian[0]?.year || (user?.course === 'in' ? user.year : 10);
     const track = indian[0]?.indiaTrack || 'cbse';
@@ -417,7 +418,7 @@ export default function Teach() {
               <div className="field">
                 <div className="label" id="teach-syllabus">{t('settings.syllabus')}</div>
                 <div className="pill-select" role="group" aria-labelledby="teach-syllabus">
-                  <button className={`pill-opt ${taskForm.syllabus === 'in' ? 'on' : ''}`} aria-pressed={taskForm.syllabus === 'in'} onClick={() => setTaskForm(f => ({ ...f, syllabus: 'in' }))}>{t('teach.syllabusIndia')}</button>
+                  {offersCourse('in') && <button className={`pill-opt ${taskForm.syllabus === 'in' ? 'on' : ''}`} aria-pressed={taskForm.syllabus === 'in'} onClick={() => setTaskForm(f => ({ ...f, syllabus: 'in' }))}>{t('teach.syllabusIndia')}</button>}
                   <button className={`pill-opt ${taskForm.syllabus === 'nsw' ? 'on' : ''}`} aria-pressed={taskForm.syllabus === 'nsw'} onClick={() => setTaskForm(f => ({ ...f, syllabus: 'nsw' }))}>{t('teach.syllabusNsw')}</button>
                 </div>
               </div>
