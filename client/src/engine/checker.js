@@ -742,6 +742,46 @@ function checkLinesAfterBreakAgainstPrevious(out, firstBreak, meta) {
  * may be a perfectly valid step, and every mark still reads the status. A last
  * line whose own note says it still allows another value is flagged the same way.
  */
+/**
+ * Owner decision 7 (18 Nov 2026, PR #1054): a value line is a break only when the value is not a root of
+ * the original equation; a true root is never marked wrong; a missing root is flagged as incomplete,
+ * not as a wrong line. A line the engine broke only for LOSING a root (it is true of some roots, of no
+ * value that is not one) becomes an "incomplete" note naming what is missing. No credit is given for
+ * the missing part and the final answer is still marked by the answer check.
+ */
+function incompleteNote(variable, wanted, held) {
+  const missing = wanted.filter(w => !held.some(h => numsClose(h, w)));
+  if (!missing.length) return null;
+  const list = missing.map(r => `${variable} = ${shownRoot(r)}`.replace(/-/g, '−'));
+  return `${list.join(' and ')} ${list.length > 1 ? 'are' : 'is'} also a solution.`;
+}
+function downgradeLostRoots(out, meta) {
+  if (meta?.kind !== 'equation') return;
+  const wanted = uniqueNumeric(meta.solutions);
+  out.forEach((row, i) => {
+    const code = row.diagnosis?.code;
+    if (row.status !== 'break' || (code !== 'lost-root' && code !== 'lost-solution')) return;
+    try {
+      const ast = parse(normalize(proseCleanOf(row.text)));
+      let held;
+      if (ast.t === 'equation') {
+        held = solutionsSatisfying(ast, meta);
+        if (!held.length || extraneousRootOf(ast, meta.variable, wanted) !== null) return;
+        // An exponential or logarithmic line: its complete real solution set must be proved, and every
+        // value in it must be a root (log x (log x − 3) = 0 also gives x = 1000, which is not).
+        if (isExpLogLine(ast, meta.variable)) {
+          const sol = expLogSolutionSet(ast, meta.variable, wanted);
+          if (!sol || sol.roots.some(r => !wanted.some(w => sameRoot(r, w)))) return;
+          held = sol.roots;
+        }
+      } else return;
+      const note = incompleteNote(meta.variable, wanted, held);
+      if (!note) return;
+      out[i] = { text: row.text, status: 'note', state: 'incomplete', incomplete: true, note };
+    } catch { /* stays as it was */ }
+  });
+}
+
 function flagUnfinishedFinalLine(out, meta) {
   if (meta?.kind !== 'equation' || !out.length) return;
   const row = out[out.length - 1];
@@ -818,7 +858,31 @@ function expressionReference(meta, prompt, out, { lineAbove = false } = {}) {
   return null;
 }
 
-function judgeExpressionLine(cleaned, meta, { reference = null } = {}) {
+/**
+ * `text` is a TRUE PARTIAL of `whole`: the sum of some, not all, of its top-level terms (the working
+ * 4(4x + 2) → 16x + 8 on the way to 4(4x + 2) + 2). Only that shape is a partial; a line that merely equals
+ * some part of a quotient or a power is not, so a slip is not excused by coincidence.
+ */
+function isPartOf(text, whole) {
+  const target = parseExpr(text), tree = parseExpr(whole);
+  if (!target || !tree) return false;
+  const terms = [];
+  const flatten = (node, sign) => {
+    if (node?.t === 'group' && (node.v?.t === 'bin' && (node.v.op === '+' || node.v.op === '-')) && terms.length === 0 && sign === 1 && node === tree) return flatten(node.v, sign);
+    if (node?.t === 'bin' && (node.op === '+' || node.op === '-')) { flatten(node.l, sign); flatten(node.r, node.op === '-' ? -sign : sign); }
+    else terms.push(sign === 1 ? node : { t: 'neg', v: node });
+  };
+  flatten(tree, 1);
+  if (terms.length < 2 || terms.length > 7) return false;
+  for (let mask = 1; mask < (1 << terms.length) - 1; mask++) {
+    let sum = null;
+    terms.forEach((term, k) => { if (mask & (1 << k)) sum = sum ? { t: 'bin', op: '+', l: sum, r: term } : term; });
+    try { if (exprEquivalent(target, sum) === true) return true; } catch { /* not comparable */ }
+  }
+  return false;
+}
+
+function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = [] } = {}) {
   const text = bareExpressionLine(cleaned);
   const same = (a, b) => exprEquivalent(a, b, { positiveOnly: meta.positiveOnly }) === true;
   const parts = text.split('=').map(x => x.trim());
@@ -845,7 +909,8 @@ function judgeExpressionLine(cleaned, meta, { reference = null } = {}) {
   }
   // Not the answer: a mistake only where the line says it IS the expression above.
   const allowed = new Set([...variablesOf(parseExpr(meta.canonical) || {}), ...(reference ? variablesOf(parseExpr(reference) || {}) : [])]);
-  if (rest.length && reference && parseExpr(rest[0]) && parseExpr(tail) && same(rest[0], reference)
+  const sameKind = !continued || (() => { const a = [...variablesOf(parseExpr(tail))].filter(v => v !== 'e').sort().join(), b = [...variablesOf(parseExpr(reference) || {})].filter(v => v !== 'e').sort().join(); return a === b; })();
+  if (rest.length && reference && sameKind && parseExpr(rest[0]) && parseExpr(tail) && same(rest[0], reference)
       && (continued || [...variablesOf(parseExpr(tail))].every(v => allowed.has(v)))) {
     return { status: 'break', note: 'This line is no longer equivalent to the expression you started with — the slip is here.' };
   }
@@ -858,6 +923,11 @@ function judgeExpressionLine(cleaned, meta, { reference = null } = {}) {
     const canonLetters = canon ? new Set([...variablesOf(canon)]) : new Set();
     // (a numeric answer: every bare numeric line of the chain is that same number)
     if (ast && (letters.length || !canonLetters.size) && letters.every(v => canonLetters.has(v))) {
+      // A TRUE PARTIAL result is not a slip: a line equal to a proper part of the expression above (or of
+      // the question's own) is that part worked out, so it is "couldn't verify", never a cross.
+      if (reference && isPartOf(tail, reference)) return unread;
+      // A line that only restates something the question writes is not a claim about the answer.
+      if (promptSpans.some(span => { try { return same(tail, span); } catch { return false; } })) return unread;
       return { status: 'break', note: 'This line is no longer equivalent to the expression you started with — the slip is here.' };
     }
   }
@@ -973,6 +1043,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     let lineDiagnosis = null;
     let restates = false;
     let impliedStep = false;
+    let incomplete = false;
     try {
       const listed = readSolutionList(line, meta);
       if (listed) {
@@ -988,9 +1059,10 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             lineDiagnosis = extraListedRootDiagnosis(meta.variable, extra);
             note = lineDiagnosis.message;
           } else if (missing.length || listed.values.length !== wanted.length) {
-            status = 'break';
-            lineDiagnosis = lostRootDiagnosis(meta.variable, listed.values.join(' or '), wanted.length);
-            note = lineDiagnosis.message;
+            // Owner decision 7 (18 Nov 2026): every value named is a root, so this is incomplete, not wrong.
+            status = 'note';
+            note = incompleteNote(meta.variable, wanted, listed.values);
+            incomplete = true;
           } else {
             status = 'ok';
             pendingExtraneous = []; expLogChain = false;
@@ -998,7 +1070,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           }
         }
         if (status === 'break' && firstBreak === -1) firstBreak = i;
-        out.push({ text: line, status, note, ...(status === 'ok' ? { coversAll: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+        out.push({ text: line, status, note, ...(incomplete ? { state: 'incomplete', incomplete: true } : {}), ...(status === 'ok' ? { coversAll: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
         return;
       }
 
@@ -1108,8 +1180,13 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             } catch { return null; }
           });
           const allNamedAreRoots = named.every(v => v !== null && Number.isFinite(v) && wanted.some(sol => numsClose(v, sol)));
+          // A ± line that does not state `letter = number` (cosθ = ±√3/2) cannot be judged against the roots: a note.
+          if (!ok && named.some(v => v === null)) {
+            out.push({ text: line, status: 'note', note: 'Not checked — Pri cannot tell which values this line gives, so it is not marked right or wrong.' });
+            return;
+          }
           if (!ok && allNamedAreRoots) {
-            out.push({ text: line, status: 'note', note: `True for ${meta.variable} = ${named.map(shownRoot).join(' and ')}, but the question has ${wanted.length} solutions, and the rest are still to find.` });
+            out.push({ text: line, status: 'note', note: incompleteNote(meta.variable, wanted, named), state: 'incomplete', incomplete: true });
             return;
           }
           status = ok ? 'ok' : 'break';
@@ -1436,9 +1513,10 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
             status = 'break';
             note = 'This value doesn’t satisfy the original equation.';
           } else if (wanted.length > 1) {
-            status = 'break';
-            lineDiagnosis = lostRootDiagnosis(meta.variable, v, wanted.length);
-            note = lineDiagnosis.message;
+            // Owner decision 7 (18 Nov 2026): a true root is never marked wrong; a missing root is incomplete.
+            status = 'note';
+            note = incompleteNote(meta.variable, wanted, [v]);
+            incomplete = true;
           } else {
             status = 'ok';
             pendingExtraneous = []; expLogChain = false;
@@ -1468,7 +1546,8 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
           if (assessed.diagnosis) lineDiagnosis = assessed.diagnosis;
         } else {
           const judged = judgeExpressionLine(cleaned, meta, {
-            reference: expressionReference(meta, prompt, out, { lineAbove: /^\s*=/.test(bareExpressionLine(cleaned)) })
+            reference: expressionReference(meta, prompt, out, { lineAbove: /^\s*=/.test(bareExpressionLine(cleaned)) }),
+            promptSpans: [...String(prompt || '').matchAll(/\$([^$]+)\$/g)].map(m => { try { return plainTex(m[1]); } catch { return ''; } }).filter(t => t && !/[=<>≤≥,]/.test(t) && parseExpr(t))
           });
           status = judged.status;
           if (judged.note) note = judged.note;
@@ -1493,7 +1572,7 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       if (named) { note = named.message; lineDiagnosis = named; }
     }
     if (status === 'break' && firstBreak === -1) firstBreak = i;
-    out.push({ text: line, status, note, ...(restates ? { restates: true } : {}), ...(impliedStep ? { implied: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
+    out.push({ text: line, status, note, ...(incomplete ? { state: 'incomplete', incomplete: true } : {}), ...(restates ? { restates: true } : {}), ...(impliedStep ? { implied: true } : {}), ...(lineDiagnosis ? { diagnosis: lineDiagnosis } : {}) });
   });
 
   // Branches were allowed on the promise that the working keeps every root.
@@ -1508,7 +1587,8 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
       // the rest: a true statement about the root it names, not a mistake.
       // The answer is still incomplete, and the final line is judged on that.
       for (const b of branchLines) {
-        out[b.index].note = `True for ${meta.variable} = ${b.covered.join(' or ')} — the equation has ${wanted.length} solutions, and the other is still to find.`;
+        out[b.index].note = incompleteNote(meta.variable, wanted, b.covered) || out[b.index].note;
+        out[b.index].state = 'incomplete'; out[b.index].incomplete = true;
       }
     } else if (!listedInFull && !complete && (firstBreak === -1 || (branchLines[0].index < firstBreak && out[firstBreak]?.diagnosis?.code !== 'branch-value-mismatch' && (branchLines[0].valued || !statesPlainValue(out[firstBreak]?.text, meta.variable))))) {
       const { index } = branchLines[0];
@@ -1546,6 +1626,8 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
     };
   }
 
+  downgradeLostRoots(out, meta);
+  if (firstBreak !== -1 && out[firstBreak]?.status !== 'break') firstBreak = out.findIndex(l => l.status === 'break');
   flagUnfinishedFinalLine(out, meta);
   if (firstBreak === -1) return { lines: out, firstBreak, diagnosis: null };
   for (let i = firstBreak + 1; i < out.length; i++) {

@@ -16,7 +16,7 @@ import { useT } from '../i18n/index.js';
 import { buildAnnotatedWorking, lineRange } from './annotatedWorkingModel.js';
 import './AnnotatedWorking.css';
 
-const STATUS_ICON = { condition: 'check', checked: 'check', 'first-error': 'alert', follows: 'arrowRight', 'not-verified': 'uncertain', unread: 'uncertain' };
+const STATUS_ICON = { incomplete: 'uncertain', condition: 'check', checked: 'check', 'first-error': 'alert', follows: 'arrowRight', 'not-verified': 'uncertain', unread: 'uncertain' };
 // Every string key written out, so the catalogue checks can see each one used.
 const RULE_KEY = Object.freeze({
   'reciprocal': 'aw.rule.reciprocal',
@@ -47,7 +47,7 @@ const RULE_KEY = Object.freeze({
   'factorise': 'aw.rule.factorise',
   'difference-of-squares': 'aw.rule.differenceOfSquares',
 });
-const STATUS_KEY = Object.freeze({ checked: 'aw.status.checked', 'first-error': 'aw.status.firstError', 'not-verified': 'aw.status.notVerified', unread: 'aw.status.unread', condition: 'aw.status.condition' });
+const STATUS_KEY = Object.freeze({ checked: 'aw.status.checked', 'first-error': 'aw.status.firstError', 'not-verified': 'aw.status.notVerified', unread: 'aw.status.unread', condition: 'aw.status.condition', incomplete: 'aw.status.incomplete' });
 const SCOPE_KEY = Object.freeze({ numerator: 'aw.scope.numerator', denominator: 'aw.scope.denominator', both: 'aw.scope.both' });
 const listOf = ns => ns.join(', ');
 
@@ -65,6 +65,7 @@ function CardBody({ card, model, t, renderBreakDetail }) {
   if (card.status === 'unread') return <p>{t('aw.body.unread')}</p>;
   if (card.valueChain === 'given') return <p>{t('aw.body.given')}</p>;
   if (card.valueChain === 'verified') return <p>{t('aw.body.valueVerified')}</p>;
+  if (card.status === 'incomplete') return <p>{card.note}</p>;
   if (card.status === 'condition') return <p>{t('aw.body.condition')}</p>;
   // The lines of a value-chain report that were not verified share one reason, said once below the cards.
   if (card.status === 'not-verified' && model.unverified) return null;

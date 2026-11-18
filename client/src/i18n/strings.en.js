@@ -4177,6 +4177,7 @@ export default {
   "aw.body.firstErrorStart": "This line is not equal to the expression in the question.",
   "aw.body.follows": "This line follows correctly from line {n}, but it carries the error from line {e}.",
   "aw.body.notVerified": "Pri could not check this line against the line above it.",
+  "aw.status.incomplete": "Incomplete",
   "aw.status.condition": "Stated condition",
   "aw.body.given": "This is the function from the question.",
   "aw.body.valueVerified": "Checked: this is true for the question.",

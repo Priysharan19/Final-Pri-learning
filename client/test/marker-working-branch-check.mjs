@@ -84,8 +84,11 @@ const oneBranchOnly = stepCheck(quadratic, [
   'x + 3 = 0',
   'x = -3'
 ].join('\n'));
-breaksAt(oneBranchOnly, 1, 'lost root: the working stops after one branch');
-eq(oneBranchOnly.diagnosis?.code === undefined ? 'none' : 'named', 'named', 'lost root: the break carries a diagnosis');
+// OWNER DECISION 7 (18 Nov 2026, PR #1054): a true root is never marked wrong; a missing root is incomplete, not a wrong
+// line. x = -3 is a root, so the working that stops after it is INCOMPLETE (a note naming x = −6), never a break.
+eq(oneBranchOnly.firstBreak, -1, 'lost root: the working that stops after one true branch is not a break');
+eq(oneBranchOnly.lines[1].state, 'incomplete', 'lost root: the unfinished branch is marked incomplete');
+eq(/x = −6 is also a solution/.test(String(oneBranchOnly.lines[1].note)), true, 'lost root: the note names the missing root');
 
 const rootDroppedWithoutFactorising = stepCheck(quadratic, [
   'x^2 + 9x + 18 = 0',

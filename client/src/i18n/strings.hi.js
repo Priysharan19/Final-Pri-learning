@@ -4225,6 +4225,7 @@ export default {
   "aw.body.firstErrorStart": "यह पंक्ति प्रश्न के व्यंजक के बराबर नहीं है।",
   "aw.body.follows": "यह पंक्ति पंक्ति {n} से सही निकलती है, पर इसमें पंक्ति {e} की गलती आगे चलती है।",
   "aw.body.notVerified": "Pri इस पंक्ति को ऊपर वाली पंक्ति से नहीं जाँच सका।",
+  "aw.status.incomplete": "अधूरा",
   "aw.status.condition": "बताई गई शर्त",
   "aw.body.given": "यह प्रश्न में दिया गया फलन है।",
   "aw.body.valueVerified": "जाँचा गया: यह प्रश्न के लिए सही है।",

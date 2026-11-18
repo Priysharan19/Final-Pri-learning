@@ -1899,6 +1899,15 @@ function stepMetaFor(q) {
   if (q.answerType === 'numeric' && a.value !== undefined) {
     const m = (q.answerPrefix || '').match(/^([a-z])\s*=$/i);
     if (m) return { kind: 'equation', variable: m[1], solutions: [a.value] };
+    // Kept identical to the server's stepMetaFor (server/platform/markerOps.js), the marker's authority: a
+    // numeric prompt that is one plain single-variable equation is checked as that equation.
+    const source = String(q.prompt || '').match(/^\s*\$([^$]+)\$\s*$/);
+    const equation = source?.[1]?.trim();
+    if (equation && /^[0-9a-z\s+*/().=\-]+$/i.test(equation) &&
+        equation.split('=').length === 2 && Number.isFinite(Number(a.value))) {
+      const symbols = [...new Set((equation.match(/[a-z]/gi) || []).map(v => v.toLowerCase()))];
+      if (symbols.length === 1) return { kind: 'equation', variable: symbols[0], solutions: [a.value], source: equation };
+    }
   }
   if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) {
     return { kind: 'equation', variable: 'x', solutions: a.values };
