@@ -36,7 +36,7 @@ import { IN_CHAPTERS, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
 import { evidenceProgress } from '../engine/progressEvidence.js';
 import { generateQuestion } from '../engine/generators/index.js';
 import { HINT_RUNGS, rungLevelOf, nextRungAfter, markWeightAfter, helpUnitsAfter } from '../engine/hintLadder.js';
-import { offeredScope, subtopicOffered } from '../engine/offering.js';
+import { offeredScope } from '../engine/offering.js';
 import { hintsFree, walkthroughFixes, yearOffered, pathwayOffered, courseOffered, offering } from '../platform/edition.js';
 import { contentRefOf, contentHashOf, drawDistinct } from '../engine/contentIdentity.js';
 import { checkAnswer, stepCheck, methodMarks } from '../engine/checker.js';

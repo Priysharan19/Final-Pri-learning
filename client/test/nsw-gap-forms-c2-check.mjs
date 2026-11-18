@@ -97,7 +97,6 @@ function sweep(diff) {
         let tv; try { tv = checkAnswer(q, t.expr); } catch { tv = { correct: false }; }
         if (tv.correct) fail(cell, seed, `marker accepts trap ${t.expr}`, q);
       }
-      for (const h of q.hints) if (/\+\s*C\s*\$?$/.test(h) && /=/.test(h) && h.length > 0 && /\\frac\{d/.test(h) === false && false) fail(cell, seed, 'x', q);
     } else {
       if (diff !== 2) fail(cell, seed, 'numeric at D1', q);
       const ref = simpson(P.f, P.lo, P.hi);

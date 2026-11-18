@@ -51,7 +51,6 @@ const evalTyped = t => new Function(`return (${String(t).replace(/sqrt\(/g, 'Mat
 const near = (a, b, e = 1e-9) => Math.abs(a - b) <= e * Math.max(1, Math.abs(a), Math.abs(b));
 const SETINT = (f, lo, hi) => { const out = []; for (let t = lo; t <= hi; t++) { const r = f(t); if (r) out.push(t); } return out; };
 
-function textOf(q) { return [q.prompt, ...(q.hints || []), ...(q.steps || []).map(s => s.d), ...(q.mcqOptions || [])].join(' '); }
 
 function commonChecks(cell, seed, q, keyStr, finals) {
   if (hasBad(q)) fail(cell, seed, 'undefined/NaN in question text', q);

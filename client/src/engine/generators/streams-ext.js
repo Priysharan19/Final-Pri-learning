@@ -2,7 +2,7 @@
 // Pri Learning · Extension 1 & Extension 2 generators (ME / MEX)
 // ─────────────────────────────────────────────────────────────────────────────
 import { streamsExtNsw } from './streams-ext-nsw.js';
-import { ri, rc, nz, gcd, Frac, mcq, poly, sgn, r1, r2, r3, rad, br } from '../qhelpers.js';
+import { ri, rc, nz, Frac, mcq, poly, sgn, r1, r2, r3, rad, br } from '../qhelpers.js';
 import { identityProof } from './identityProofs.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
