@@ -151,7 +151,7 @@ ok(/import grievance from '\.\.\/\.\.\/\.\.\/docs\/legal\/grievance\.md\?raw'/.t
 const privacy = au('privacy'), terms = au('terms'), refund = au('refund-policy'), contact = au('contact');
 for (const [label, re] of [
   ['the Australian Privacy Principles / Privacy Act 1988', /Australian Privacy Principles[\s\S]{0,200}Privacy Act 1988|Privacy Act 1988[\s\S]{0,200}Australian Privacy Principles/],
-  ['who is responsible, with an address', /Oakville NSW 2765, Australia/], ['what is collected', /What we collect/], ['why', /Why we use it/],
+  ['who is responsible, with the ABN', /ABN 20 192 090 394/], ['what is collected', /What we collect/], ['why', /Why we use it/],
   ['overseas disclosure under APP 8, with the recipients', /Sending information overseas[\s\S]*OpenAI[\s\S]*Resend/], ['APP 12 and 13: access and correction', /APP 12 and APP 13/],
   ['a complaint to us then the OAIC', /write to us first[\s\S]{0,300}Office of the Australian\s+Information Commissioner \(OAIC\)/],
   ['children: under 18 treated as a child; a parent or guardian confirms', /unless you say you are, the account is\s+treated as a child's/],
@@ -171,7 +171,7 @@ for (const [label, re] of [
   ['an explicit non-statement about GST registration', /not a statement that we\s+are registered for GST/], ['Stripe named as the processor', /Payments are taken by Stripe, our payment processor/], ['the prices', /A\$9\.99 a month\*\* or \*\*A\$99 a year/], ['no card number received or stored', /never receive or store a\s+card number/], ['cancelling at the end of the paid period', /Premium then stays on\s+until the end of the period you have already paid for/], ['a full refund ending Premium at once', /refunded in full, Premium for that period ends at once/], ['NSW Fair Trading', /NSW Fair Trading/]
 ]) ok(re.test(refund), `the refund policy has ${label}`);
 ok(!/no refund|non-refundable|all sales (?:are )?final|refunds? (?:are )?not (?:given|available|offered)/i.test(refund + terms), 'no "no refunds" wording anywhere');
-ok(!/registered for GST(?! and)/.test(refund.replace(/not a statement that we\s+are registered for GST/, '')) && !/\bABN\b/.test(all), 'no claim to be registered for GST, no ABN');
+ok(!/registered for GST(?! and)/.test(refund.replace(/not a statement that we\s+are registered for GST/, '')) && (all.match(/\bABN\b[^\n]{0,20}/g) || []).every(m => /^ABN 20 192 090 394/.test(m)), 'no claim to be registered for GST; the only ABN named is the owner-supplied 20 192 090 394 (no registration or GST claim follows from it)');
 ok(/Office of the Australian\s+Information Commissioner/.test(contact) && /NSW Fair Trading/.test(contact) && /48 hours/.test(contact) && /30 days/.test(contact), 'the contact page says who to write to, what happens, and where to escalate (OAIC, NSW Fair Trading)');
 ok(!/grievance/i.test(all), 'no notice uses the word grievance: Prithagoras has a contact page, not a Grievance Officer');
 
@@ -209,7 +209,7 @@ ok(/'\/account\/delete-request'/.test(read('client/src/main.jsx')) && existsSync
 ok(/48 hours/.test(contact) && /48 hours/.test(privacy), 'the 48-hour acknowledgement is stated the same way on both pages');
 
 // ── 5 · Placeholders, and the review switch ─────────────────────────────────
-const DECLARED = new Set(['AU_HOSTING_PROVIDER_AND_REGION', 'AU_DATABASE_PROVIDER_AND_REGION', 'CONTACT_EMAIL']);
+const DECLARED = new Set(['AU_HOSTING_PROVIDER_AND_REGION', 'AU_DATABASE_PROVIDER_AND_REGION']);
 const found = new Set((all.match(/\{\{[A-Z_]+\}\}/g) || []).map(p => p.slice(2, -2)));
 for (const name of found) ok(DECLARED.has(name), `placeholder {{${name}}} is one of the declared four`);
 for (const name of DECLARED) ok(found.has(name), `declared placeholder {{${name}}} is used`);

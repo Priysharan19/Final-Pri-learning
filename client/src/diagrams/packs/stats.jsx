@@ -90,7 +90,7 @@ export function BarChart({ title = null, caption = null, ...params }) {
       {H ? <line className="dg-axis" x1={f.left} x2={f.right} y1={f.bottom} y2={f.bottom} /> : <line className="dg-axis" x1={f.left} x2={f.left} y1={f.top} y2={f.bottom} />}
       {m.showValues && m.bars.map((b, k) => <Tex key={`v${k}`} x={b.label.x} y={b.label.y} tex={b.tex} w={H ? m.valW : 50} h={18} anchor={H ? b.label.anchor : 'middle'} className="dg-small" />)}
       {m.cats.map((c, i) => c.shown && <Label key={`c${i}`} x={c.x} y={c.y} text={catLabel(c, i)} w={H ? m.catW : Math.max(40, m.slot * (m.axis.mode === 'stagger' ? 2 : m.axis.every) - 4)} h={18} anchor={H ? 'end' : 'middle'} className="dgs-cat" />)}
-      {m.yLabel && <Label x={H ? f.right : f.left - 4} y={H ? f.bottom + 30 : f.top - (m.dual ? 34 : 14)} text={!/\$/.test(m.yLabel) && m.yLabel.length <= 2 ? `$${m.yLabel}$` : m.yLabel} w={160} h={18} anchor={H ? 'end' : 'start'} className="dg-small" />}
+      {m.yLabel && <Label x={H ? f.right : f.left - 4} y={H ? f.bottom + 30 : f.top - (m.dual ? 34 : 22)} text={!/\$/.test(m.yLabel) && m.yLabel.length <= 2 ? `$${m.yLabel}$` : m.yLabel} w={160} h={18} anchor={H ? 'end' : 'start'} className="dg-small" />}
       {m.xLabel && <Label x={(f.left + f.right) / 2} y={f.height - 9} text={m.xLabel} w={200} h={18} className="dg-small" />}
       {m.dual && (
         <g className="dgs-legend-svg">

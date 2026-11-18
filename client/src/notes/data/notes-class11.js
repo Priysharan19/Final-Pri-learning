@@ -37,7 +37,7 @@ export default {
       { wrong: '$(A\\cup B)’ = A’ \\cup B’$.', right: 'Complement swaps union and intersection: $(A\\cup B)’ = A’\\cap B’$.' }
     ],
     examples: [
-      { question: 'In a class, 25 students take Maths, 18 take Physics and 10 take both. How many take at least one of the two?', steps: ['$n(M\\cup P) = n(M) + n(P) - n(M\\cap P)$', '$= 25 + 18 - 10$'], answer: '33', verify: { kind: 'value', expr: '25+18-10', answer: '33' } },
+      { question: 'In a class, 25 students take Maths, 18 take Physics and 10 take both. How many take at least one of the two?', steps: ['Inclusion–exclusion: $n(M\\cup P) = n(M) + n(P) - n(M\\cap P)$', 'Substitute the numbers: $= 25 + 18 - 10$'], answer: '33', verify: { kind: 'value', expr: '25+18-10', answer: '33' } },
       { question: 'How many subsets does $A = \\{1, 2, 3, 4, 5\\}$ have?', steps: ['$n(A) = 5$', 'Number of subsets $= 2^5$'], answer: '32', verify: { kind: 'value', expr: '2^5', answer: '32' } }
     ]
   },
@@ -214,7 +214,7 @@ export default {
     ],
     examples: [
       { question: 'Solve $3x - 7 > 5x + 1$.', steps: ['$3x - 5x > 1 + 7$', '$-2x > 8$', 'Divide by $-2$ and reverse: $x < -4$'], answer: '$x < -4$', verify: { kind: 'roots', f: '3x-7-(5x+1)', answers: ['-4'], degree: 1 } },
-      { question: 'Find the largest integer $x$ with $\\dfrac{x}{2} + 3 \\le 7$.', steps: ['$\\dfrac{x}{2} \\le 4$', '$x \\le 8$'], answer: '8', verify: { kind: 'value', expr: '(7-3)*2', answer: '8' } }
+      { question: 'Find the largest integer $x$ with $\\dfrac{x}{2} + 3 \\le 7$.', steps: ['Subtract $3$ from both sides: $\\dfrac{x}{2} \\le 4$', 'Multiply both sides by $2$: $x \\le 8$'], answer: '8', verify: { kind: 'value', expr: '(7-3)*2', answer: '8' } }
     ]
   },
 
@@ -388,8 +388,8 @@ export default {
       { wrong: 'Slope of $2x + 3y = 6$ is $2$.', right: 'Rearrange: $y = -\\tfrac23x + 2$, so $m = -\\tfrac23$.' }
     ],
     examples: [
-      { question: 'Find the distance of the point $(3, -2)$ from the line $3x - 4y - 7 = 0$.', steps: ['$d = \\dfrac{|3(3) - 4(-2) - 7|}{\\sqrt{9 + 16}}$', '$= \\dfrac{|9 + 8 - 7|}{5} = \\dfrac{10}{5}$'], answer: '2', verify: { kind: 'value', expr: 'abs(3*3-4*(-2)-7)/sqrt(3^2+4^2)', answer: '2' } },
-      { question: 'Find the equation of the line through $(1, 2)$ with slope $3$, in the form $y = mx + c$.', steps: ['$y - 2 = 3(x - 1)$', '$y = 3x - 1$'], answer: '$y = 3x - 1$', verify: { kind: 'equivalent', a: '3(x-1)+2', b: '3x-1' } }
+      { question: 'Find the distance of the point $(3, -2)$ from the line $3x - 4y - 7 = 0$.', steps: ['Distance of a point from a line: $d = \\dfrac{|3(3) - 4(-2) - 7|}{\\sqrt{9 + 16}}$', 'Simplify: $= \\dfrac{|9 + 8 - 7|}{5} = \\dfrac{10}{5}$'], answer: '2', verify: { kind: 'value', expr: 'abs(3*3-4*(-2)-7)/sqrt(3^2+4^2)', answer: '2' } },
+      { question: 'Find the equation of the line through $(1, 2)$ with slope $3$, in the form $y = mx + c$.', steps: ['Point-slope form: $y - 2 = 3(x - 1)$', 'Expand to slope-intercept form: $y = 3x - 1$'], answer: '$y = 3x - 1$', verify: { kind: 'equivalent', a: '3(x-1)+2', b: '3x-1' } }
     ]
   },
 
@@ -434,7 +434,7 @@ export default {
     ],
     examples: [
       { question: 'Find the eccentricity and latus rectum length of $\\dfrac{x^2}{25} + \\dfrac{y^2}{9} = 1$.', steps: ['$a = 5$, $b = 3$, $c = \\sqrt{25 - 9} = 4$', '$e = \\dfrac{c}{a} = \\dfrac45$', 'Latus rectum $= \\dfrac{2b^2}{a} = \\dfrac{18}{5}$'], answer: '$e = \\dfrac45$, latus rectum $= \\dfrac{18}{5}$', verify: { kind: 'values', pairs: [['sqrt(25-9)/5', '4/5'], ['2*9/5', '18/5']] } },
-      { question: 'Find the radius of the circle $x^2 + y^2 - 6x + 8y - 11 = 0$.', steps: ['$g = -3$, $f = 4$, $c = -11$', '$r = \\sqrt{9 + 16 + 11} = \\sqrt{36}$'], answer: '6', verify: { kind: 'value', expr: 'sqrt((-3)^2+4^2-(-11))', answer: '6' } }
+      { question: 'Find the radius of the circle $x^2 + y^2 - 6x + 8y - 11 = 0$.', steps: ['Compare with $x^2+y^2+2gx+2fy+c=0$: $g = -3$, $f = 4$, $c = -11$', 'The radius: $r = \\sqrt{9 + 16 + 11} = \\sqrt{36}$'], answer: '6', verify: { kind: 'value', expr: 'sqrt((-3)^2+4^2-(-11))', answer: '6' } }
     ]
   },
 
@@ -474,7 +474,7 @@ export default {
     ],
     examples: [
       { question: 'Find the distance between $P(1, -2, 3)$ and $Q(3, 1, -3)$.', steps: ['Differences: $2, 3, -6$', '$PQ = \\sqrt{4 + 9 + 36} = \\sqrt{49}$'], answer: '7', verify: { kind: 'value', expr: 'sqrt((3-1)^2+(1+2)^2+(-3-3)^2)', answer: '7' } },
-      { question: 'Find the point dividing $A(2, 1, -3)$ and $B(5, -8, 3)$ internally in the ratio $2 : 1$.', steps: ['$x = \\dfrac{2(5) + 1(2)}{3} = 4$', '$y = \\dfrac{2(-8) + 1(1)}{3} = -5$', '$z = \\dfrac{2(3) + 1(-3)}{3} = 1$'], answer: '$(4, -5, 1)$', verify: { kind: 'values', pairs: [['(2*5+2)/3', '4'], ['(2*(-8)+1)/3', '-5'], ['(2*3-3)/3', '1']] } }
+      { question: 'Find the point dividing $A(2, 1, -3)$ and $B(5, -8, 3)$ internally in the ratio $2 : 1$.', steps: ['Section formula for $x$: $x = \\dfrac{2(5) + 1(2)}{3} = 4$', 'Section formula for $y$: $y = \\dfrac{2(-8) + 1(1)}{3} = -5$', 'Section formula for $z$: $z = \\dfrac{2(3) + 1(-3)}{3} = 1$'], answer: '$(4, -5, 1)$', verify: { kind: 'values', pairs: [['(2*5+2)/3', '4'], ['(2*(-8)+1)/3', '-5'], ['(2*3-3)/3', '1']] } }
     ]
   },
 
@@ -600,8 +600,8 @@ export default {
       { wrong: 'Treating "mutually exclusive" and "exhaustive" as the same.', right: 'Exclusive: no overlap. Exhaustive: together they cover $S$.' }
     ],
     examples: [
-      { question: 'Two cards are drawn at random from a pack of 52. Find the probability that both are aces.', steps: ['$n(S) = {}^{52}C_2 = 1326$', '$n(E) = {}^4C_2 = 6$', '$P = \\dfrac{6}{1326} = \\dfrac{1}{221}$'], answer: '$\\dfrac{1}{221}$', verify: { kind: 'value', expr: '4C2/52C2', answer: '1/221' } },
-      { question: 'If $P(A) = 0.5$, $P(B) = 0.4$ and $P(A\\cap B) = 0.2$, find $P(A\\cup B)$.', steps: ['$P(A\\cup B) = 0.5 + 0.4 - 0.2$'], answer: '0.7', verify: { kind: 'value', expr: '0.5+0.4-0.2', answer: '0.7' } }
+      { question: 'Two cards are drawn at random from a pack of 52. Find the probability that both are aces.', steps: ['Total outcomes: $n(S) = {}^{52}C_2 = 1326$', 'Favourable outcomes: $n(E) = {}^4C_2 = 6$', 'Probability: $P = \\dfrac{6}{1326} = \\dfrac{1}{221}$'], answer: '$\\dfrac{1}{221}$', verify: { kind: 'value', expr: '4C2/52C2', answer: '1/221' } },
+      { question: 'If $P(A) = 0.5$, $P(B) = 0.4$ and $P(A\\cap B) = 0.2$, find $P(A\\cup B)$.', steps: ['Addition rule: $P(A\\cup B) = 0.5 + 0.4 - 0.2$'], answer: '0.7', verify: { kind: 'value', expr: '0.5+0.4-0.2', answer: '0.7' } }
     ]
   }
 };

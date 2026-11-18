@@ -12,7 +12,7 @@ has not yet been reviewed by one. The app says so above this notice, and will
 stop saying so only when that review has happened.
 
 The person responsible for your information is
-Priysharan Tripathi, 5 Juniper Pl, Oakville NSW 2765, Australia.
+Priysharan Tripathi, Pri Learning, ABN 20 192 090 394.
 
 ## The short version
 
@@ -299,7 +299,7 @@ You can ask us to (these requests follow the access and correction principles, A
   under "How long we keep it".
 - **Withdraw consent**, after which we stop processing and delete.
 
-Write to {{CONTACT_EMAIL}}. We aim to acknowledge your message within 48 hours and
+Write to prilearning19@gmail.com. We aim to acknowledge your message within 48 hours and
 answer within 30 days. If we cannot give you access to something, or cannot
 correct it, we will tell you why.
 
@@ -326,4 +326,4 @@ OAIC where the Privacy Act requires it.
 If we change this notice we will publish the new version here and, where the
 change is significant, ask again for consent.
 
-Questions: {{CONTACT_EMAIL}}.
+Questions: prilearning19@gmail.com.

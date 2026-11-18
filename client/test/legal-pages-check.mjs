@@ -35,7 +35,7 @@
 // so this suite only has to prove it is reachable, rendered by the same reader,
 // and loaded on demand rather than carried by every install.
 // ─────────────────────────────────────────────────────────────────────────────
-import { readFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseAst } from 'vite';
@@ -541,7 +541,7 @@ const LATIN_IN_HINDI = new Map([
 
 // The owner's facts as filled into the templates (docs/legal/README.md). Each
 // must appear in the English notices too, so this cannot hide prose.
-const OWNER_FACTS = ['Priysharan Tripathi', '5 Juniper Pl, Oakville NSW 2765, Australia'];
+const OWNER_FACTS = ['Priysharan Tripathi', 'ABN 20 192 090 394'];
 for (const fact of OWNER_FACTS) {
   ok(PAGES.some(([slug]) => readDoc(slug, 'en').replace(/\s+/g, ' ').includes(fact)),
     `owner fact "${fact}" is filled into the English notices as well`);
@@ -838,6 +838,38 @@ for (const dir of imported) {
     `the image's client build copies ${dir}, which the client imports from outside client/`);
 }
 ok(imported.length > 0, 'the legal page imports its documents from the repository, not a copy');
+
+// Owner privacy (18 Nov 2026): no street or postal address of the owner, and no
+// personal iCloud address, may appear on any published or shipped surface. The
+// business is named by its ABN and the prilearning19@gmail.com mailbox instead.
+{
+  const SURFACES = ['docs/legal', 'docs/release/store', 'site/src', 'site/public', 'client/src', 'server', 'README.md'];
+  const SKIP = new Set(['node_modules', 'dist', '.git']);
+  const TEXT = /\.(md|mjs|js|jsx|json|html|txt|css|svg|xml)$/;
+  const PRIVATE = [
+    ['the owner\'s street', /\bJuniper\s+Pl\b|\bOakville\b/i],
+    ['an Australian street address', /\b\d{1,5}[A-Za-z]?\s+[A-Z][A-Za-z']+(?:\s+[A-Z][A-Za-z']+)?\s+(?:Pl|Place|St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Ln|Lane|Ct|Court|Cres|Crescent|Pde|Parade|Way|Tce|Terrace)\b[.,]?\s+[A-Z][A-Za-z ]+\s+(?:NSW|VIC|QLD|WA|SA|TAS|ACT|NT)\s+\d{4}\b/],
+    ['the owner\'s personal iCloud address', /impriysharan@icloud\.com/i],
+    ['an unfilled contact placeholder', /\{\{\s*CONTACT_EMAIL\s*\}\}/],
+  ];
+  const hits = [];
+  const walk = (rel) => {
+    const abs = join(ROOT, rel);
+    let entries = null;
+    try { entries = readdirSync(abs, { withFileTypes: true }); } catch { /* a file, or not there */ }
+    if (entries) {
+      for (const e of entries) if (!SKIP.has(e.name)) walk(`${rel}/${e.name}`);
+    } else if (TEXT.test(rel)) {
+      let text = null;
+      try { text = readFileSync(abs, 'utf8'); } catch { /* absent */ }
+      if (text !== null) for (const [what, re] of PRIVATE) if (re.test(text)) hits.push(`${rel}: ${what}`);
+    }
+  };
+  for (const rel of SURFACES) walk(rel);
+  ok(hits.length === 0, `no published surface carries the owner's street address or personal iCloud address${hits.length ? ' — ' + hits.slice(0, 6).join('; ') : ''}`);
+  ok(PRIVATE[1][1].test('x 5 Juniper Pl, Oakville NSW 2765') && PRIVATE[1][1].test('12 Smith Street Parramatta NSW 2150')
+    && !PRIVATE[1][1].test('ABN 20 192 090 394'), 'the address pattern catches a street address and leaves the ABN alone');
+}
 
 console.log(failures.length
   ? `LEGAL PAGES: FAIL — ${failures.length} of ${pass + failures.length} checks failed\n  · ${failures.join('\n  · ')}`

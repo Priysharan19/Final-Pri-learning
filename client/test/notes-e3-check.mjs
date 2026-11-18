@@ -169,7 +169,7 @@ if (!only) {
       let m = null;
       try { m = functionGraphModel(sp); } catch (e) { ok(false, `${w}: the function model throws — ${e.message}`); }
       if (m) for (const pt of [...m.points, ...m.curves.flatMap(c => [c.yIntercept, ...(c.xIntercepts || [])].filter(Boolean))]) {
-        if (pt.place) ok(pt.place.cost === 0, `${w}: the label at (${pt.x}, ${pt.y}) collides with something (cost ${pt.place.cost}); move the point's frame or drop the label`);
+        if (pt.place) ok((pt.place.clash ?? pt.place.cost) === 0, `${w}: the label at (${pt.x}, ${pt.y}) collides with something (clash ${pt.place.clash ?? pt.place.cost}); move the point's frame or drop the label`);
       }
     }
     if (sp.kind === 'function') for (const p of sp.points || []) {

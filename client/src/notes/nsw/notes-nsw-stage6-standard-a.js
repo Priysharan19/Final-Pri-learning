@@ -42,14 +42,25 @@ export default {
         question: 'A car starts at $u=5$ m/s and accelerates at $a=2.5$ m/s$^2$ for $t=8$ s. Use $v=u+at$ to find its final speed.',
         steps: ['Write the formula and substitute: $v=5+2.5\\times8$.', 'Multiply first: $2.5\\times8=20$.', 'Add: $v=25$, in metres per second.'],
         answer: '$25$ m/s',
-        working: '\\begin{aligned}v&=u+at\\\\&=5+2.5\\times8\\\\&=5+20\\\\&=25\\text{ m/s}\\end{aligned}',
+        working: [
+          { say: 'Formula:', tex: 'v&=u+at' },
+          { say: 'Substitute $u=5$, $a=2.5$, $t=8$:', tex: '&=5+2.5\\times8' },
+          { say: 'Multiply first:', tex: '&=5+20' },
+          { say: 'Add:', tex: '&=25\\text{ m/s}' }
+        ],
         verify: { kind: 'value', expr: '5+2.5*8', answer: '25' }
       },
       {
         question: 'Make $F$ the subject of $C=\\tfrac{5}{9}(F-32)$, then find $F$ when $C=30$.',
         steps: ['Multiply both sides by $9$: $9C=5(F-32)$.', 'Divide by $5$: $\\tfrac{9C}{5}=F-32$, so $F=\\tfrac{9C}{5}+32$.', 'Substitute $C=30$: $F=\\tfrac{9\\times30}{5}+32=54+32=86$.'],
         answer: '$F=\\tfrac{9C}{5}+32$, and $F=86$ when $C=30$',
-        working: '\\begin{aligned}C&=\\tfrac{5}{9}(F-32)\\\\9C&=5(F-32)\\\\\\tfrac{9C}{5}&=F-32\\\\F&=\\tfrac{9C}{5}+32\\\\&=\\tfrac{9\\times30}{5}+32=86\\end{aligned}',
+        working: [
+          { say: 'Start with the formula:', tex: 'C&=\\dfrac{5}{9}(F-32)' },
+          { say: 'Multiply both sides by $9$:', tex: '9C&=5(F-32)' },
+          { say: 'Divide both sides by $5$:', tex: '\\dfrac{9C}{5}&=F-32' },
+          { say: 'Add $32$:', tex: 'F&=\\dfrac{9C}{5}+32' },
+          { say: 'Substitute $C=30$:', tex: '&=\\dfrac{9\\times30}{5}+32=86' }
+        ],
         verify: { kind: 'value', expr: '9*30/5+32', answer: '86' }
       }
     ],
@@ -103,14 +114,25 @@ export default {
         question: 'A taxi charges a flagfall of $\\$4.20$ plus $\\$2.10$ per kilometre. Write the rule and find the fare for $12$ km.',
         steps: ['The flagfall is the starting value $c=4.20$ and the rate is $m=2.10$.', 'The rule is $C=4.20+2.10d$.', 'For $d=12$: $C=4.20+2.10\\times12=4.20+25.20=29.40$.'],
         answer: '$C=4.20+2.10d$, and the fare is $\\$29.40$',
-        working: '\\begin{aligned}C&=4.20+2.10d\\\\&=4.20+2.10\\times12\\\\&=4.20+25.20\\\\&=\\$29.40\\end{aligned}',
+        working: [
+          { say: 'Rule: flagfall plus rate times distance:', tex: 'C&=4.20+2.10d' },
+          { say: 'Substitute $d=12$:', tex: '&=4.20+2.10\\times12' },
+          { say: 'Multiply first:', tex: '&=4.20+25.20' },
+          { say: 'Add:', tex: '&=\\$29.40' }
+        ],
         verify: { kind: 'value', expr: '4.2+2.1*12', answer: '29.4' }
       },
       {
         question: 'Plan A costs $C=20+9w$ and Plan B costs $C=56+5w$, where $w$ is the number of weeks. When do the plans cost the same, and what is that cost?',
         steps: ['Set the rules equal: $20+9w=56+5w$.', 'Subtract $5w$ and $20$: $4w=36$, so $w=9$.', 'Cost at $9$ weeks: $20+9\\times9=101$.'],
         answer: '$9$ weeks, at a cost of $\\$101.00$ for each plan',
-        working: '\\begin{aligned}20+9w&=56+5w\\\\4w&=36\\\\w&=9\\\\C&=20+9(9)=\\$101\\end{aligned}',
+        working: [
+          { say: 'Set the two costs equal:', tex: '20+9w&=56+5w' },
+          { say: 'Subtract $5w$ and $20$ from both sides:', tex: '4w&=36' },
+          { say: 'Divide both sides by $4$:', tex: 'w&=9' },
+          { say: 'Substitute $w=9$ into Plan A:', tex: 'C&=20+9(9)=\\$101' },
+          { say: 'Check with Plan B:', tex: 'C&=56+5(9)=\\$101' }
+        ],
         verify: { kind: 'roots', f: '20+9*w-(56+5*w)', var: 'w', answers: ['9'] }
       }
     ],
@@ -164,14 +186,23 @@ export default {
         question: 'Mia is paid $\\$28.50$ an hour. In one week she works $38$ ordinary hours and $6$ hours of overtime at time and a half. Find her gross pay.',
         steps: ['Ordinary pay: $38\\times28.50=1083$.', 'Overtime rate: $1.5\\times28.50=42.75$, so overtime pay is $6\\times42.75=256.50$.', 'Gross pay: $1083+256.50=1339.50$.'],
         answer: '$\\$1339.50$',
-        working: '\\begin{aligned}\\text{Ordinary}&=38\\times28.50=\\$1083.00\\\\\\text{Overtime}&=6\\times1.5\\times28.50=\\$256.50\\\\\\text{Gross}&=1083.00+256.50=\\$1339.50\\end{aligned}',
+        working: [
+          { say: 'Ordinary pay, $38$ hours at the base rate:', tex: '\\text{Ordinary}&=38\\times28.50=\\$1083.00' },
+          { say: 'Overtime pay, $6$ hours at time and a half:', tex: '\\text{Overtime}&=6\\times1.5\\times28.50=\\$256.50' },
+          { say: 'Add ordinary and overtime pay:', tex: '\\text{Gross}&=1083.00+256.50=\\$1339.50' }
+        ],
         verify: { kind: 'value', expr: '38*28.5+6*1.5*28.5', answer: '1339.5' }
       },
       {
         question: 'Tax on a taxable income of $\\$62\\,000$ is $\\$4288$ plus $30$ cents for each dollar over $\\$45\\,000$. Find the tax payable.',
         steps: ['Income over the lower limit: $62\\,000-45\\,000=17\\,000$.', 'Tax on that part: $0.30\\times17\\,000=5100$.', 'Add the fixed amount: $4288+5100=9388$.'],
         answer: '$\\$9388.00$',
-        working: '\\begin{aligned}T&=4288+0.30\\times(62\\,000-45\\,000)\\\\&=4288+0.30\\times17\\,000\\\\&=4288+5100\\\\&=\\$9388.00\\end{aligned}',
+        working: [
+          { say: 'Tax on the part of income over the lower limit:', tex: 'T&=4288+0.30\\times(62\\,000-45\\,000)' },
+          { tex: '&=4288+0.30\\times17\\,000' },
+          { tex: '&=4288+5100' },
+          { tex: '&=\\$9388.00' }
+        ],
         verify: { kind: 'value', expr: '4288+0.3*(62000-45000)', answer: '9388' }
       }
     ],
@@ -225,14 +256,23 @@ export default {
         question: 'A jacket costs $\\$159.50$ including GST. Find the price before GST and the amount of GST.',
         steps: ['Price including GST is $1.1$ times the price before GST.', 'Divide: $159.50\\div1.1=145.00$.', 'GST is the difference: $159.50-145.00=14.50$.'],
         answer: 'Price before GST $\\$145.00$, and GST $\\$14.50$',
-        working: '\\begin{aligned}P_{\\text{excl}}&=\\dfrac{159.50}{1.1}=\\$145.00\\\\\\text{GST}&=159.50-145.00=\\$14.50\\end{aligned}',
+        working: [
+          { say: 'GST-inclusive price is $110\\%$ of the price before GST, so divide by $1.1$:', tex: 'P_{\\text{excl}}&=\\dfrac{159.50}{1.1}=\\$145.00' },
+          { say: 'GST is the difference between the two prices:', tex: '\\text{GST}&=159.50-145.00=\\$14.50' }
+        ],
         verify: { kind: 'values', pairs: [['159.5/1.1', '145'], ['159.5-159.5/1.1', '14.5']] }
       },
       {
         question: 'Find the simple interest on $\\$6000$ invested at $5.2\\%$ p.a. for $30$ months.',
         steps: ['Convert the time: $30$ months $=2.5$ years.', 'Write the rate as a decimal: $r=0.052$.', 'Substitute: $I=6000\\times0.052\\times2.5=780$.'],
         answer: '$\\$780.00$',
-        working: '\\begin{aligned}I&=Prn\\\\&=6000\\times0.052\\times2.5\\\\&=\\$780.00\\end{aligned}',
+        working: [
+          { say: 'Simple interest formula:', tex: 'I&=Prn' },
+          { say: 'Convert $30$ months to years:', tex: 'n&=\\dfrac{30}{12}=2.5' },
+          { say: 'Write the rate as a decimal:', tex: 'r&=\\dfrac{5.2}{100}=0.052' },
+          { say: 'Substitute $P=6000$, $r=0.052$, $n=2.5$:', tex: 'I&=6000\\times0.052\\times2.5' },
+          { tex: '&=\\$780.00' }
+        ],
         verify: { kind: 'value', expr: '6000*0.052*2.5', answer: '780' }
       }
     ],
@@ -286,14 +326,24 @@ export default {
         question: 'A cylindrical tank has a radius of $0.5$ m and a height of $1.2$ m. Find its capacity to the nearest litre.',
         steps: ['Volume: $V=\\pi r^2h=\\pi\\times0.5^2\\times1.2=0.3\\pi\\text{ m}^3$.', 'Evaluate: $0.3\\pi\\approx0.9425\\text{ m}^3$.', 'Convert: $1\\text{ m}^3=1000$ L, so the capacity is about $942$ L.'],
         answer: '$942$ L',
-        working: '\\begin{aligned}V&=\\pi r^2h\\\\&=\\pi\\times0.5^2\\times1.2\\\\&=0.3\\pi\\approx0.9425\\text{ m}^3\\\\&=942\\text{ L}\\end{aligned}',
+        working: [
+          { say: 'Volume of a cylinder:', tex: 'V&=\\pi r^2h' },
+          { tex: '&=\\pi\\times0.5^2\\times1.2' },
+          { tex: '&=0.3\\pi\\text{ m}^3' },
+          { tex: '&\\approx0.9425\\text{ m}^3' },
+          { say: 'Convert to litres, using $1\\text{ m}^3=1000$ L:', tex: '\\text{Capacity}&=0.3\\pi\\times1000\\approx942\\text{ L}' }
+        ],
         verify: { kind: 'value', expr: 'pi*0.5^2*1.2*1000', answer: '942.47780' }
       },
       {
         question: 'A fish tank is $80$ cm long, $35$ cm wide and $40$ cm high. How many litres of water does it hold when it is filled to $90\\%$ of its height?',
         steps: ['Volume of the full tank: $80\\times35\\times40=112\\,000\\text{ cm}^3$.', 'Convert: $112\\,000\\div1000=112$ L.', 'Filled to $90\\%$: $0.9\\times112=100.8$ L.'],
         answer: '$100.8$ L',
-        working: '\\begin{aligned}V&=80\\times35\\times40=112\\,000\\text{ cm}^3\\\\&=112\\text{ L}\\\\0.9\\times112&=100.8\\text{ L}\\end{aligned}',
+        working: [
+          { say: 'Volume of the full tank:', tex: 'V&=80\\times35\\times40=112\\,000\\text{ cm}^3' },
+          { say: 'Convert, using $1000\\text{ cm}^3=1$ L:', tex: '&=112\\text{ L}' },
+          { say: 'Water fills $90\\%$ of the height:', tex: '0.9\\times112&=100.8\\text{ L}' }
+        ],
         verify: { kind: 'value', expr: '80*35*40/1000*0.9', answer: '100.8' }
       }
     ],
@@ -347,14 +397,22 @@ export default {
         question: 'A flight leaves Sydney (UTC+10) at $9{:}15$ am and takes $4$ h $35$ min to reach Perth (UTC+8). Find the local arrival time in Perth.',
         steps: ['Arrival in Sydney time: $9{:}15+4{:}35=13{:}50$, which is $1{:}50$ pm.', 'Perth is $2$ hours behind Sydney, so subtract $2$ hours.', 'Local arrival time in Perth: $11{:}50$ am.'],
         answer: '$11{:}50$ am Perth time',
-        working: '\\begin{aligned}\\text{Sydney time}&=9{:}15+4{:}35=1{:}50\\text{ pm}\\\\\\text{Perth time}&=1{:}50\\text{ pm}-2\\text{ h}\\\\&=11{:}50\\text{ am}\\end{aligned}',
+        working: [
+          { say: 'Add the flight time to the departure time (Sydney time):', tex: '\\text{Sydney time}&=9{:}15+4{:}35=13{:}50=1{:}50\\text{ pm}' },
+          { say: 'Perth is $2$ hours behind Sydney:', tex: '\\text{Perth time}&=1{:}50\\text{ pm}-2\\text{ h}' },
+          { tex: '&=11{:}50\\text{ am}' }
+        ],
         verify: { kind: 'value', expr: '9+15/60+4+35/60-2', answer: '11+50/60' }
       },
       {
         question: 'Sydney is at longitude $151^{\\circ}$E and Perth is at $116^{\\circ}$E. By how many minutes does solar time in Sydney lead Perth?',
         steps: ['Both are east, so subtract: $151-116=35^{\\circ}$.', 'Each $15^{\\circ}$ is $1$ hour, so $35\\div15=2.33$ hours.', 'In minutes: $\\tfrac{35}{15}\\times60=140$.'],
         answer: '$140$ minutes, which is $2$ h $20$ min',
-        working: '\\begin{aligned}\\Delta\\text{longitude}&=151-116=35^{\\circ}\\\\\\Delta t&=\\dfrac{35}{15}\\text{ h}\\\\&=\\dfrac{35}{15}\\times60=140\\text{ min}\\end{aligned}',
+        working: [
+          { say: 'Difference in longitude (both are east):', tex: '\\Delta\\text{longitude}&=151-116=35^{\\circ}' },
+          { say: 'Every $15^{\\circ}$ is $1$ hour:', tex: '\\Delta t&=\\dfrac{35}{15}\\text{ h}' },
+          { say: 'Convert hours to minutes:', tex: '&=\\dfrac{35}{15}\\times60=140\\text{ min}' }
+        ],
         verify: { kind: 'value', expr: '(151-116)/15*60', answer: '140' }
       }
     ],
@@ -407,14 +465,22 @@ export default {
         question: 'In the network shown, the edge weights are $AB=4$, $AC=2$, $BC=1$, $BD=6$, $CD=8$, $CE=7$, $DE=2$, $DF=6$ and $EF=3$. Find the shortest path from $A$ to $F$.',
         steps: ['Labels from $A$: $C=2$, $B=3$ (through $C$), $D=9$ (through $B$), $E=9$ (through $C$).', '$F$ from $E$ is $9+3=12$, from $D$ is $9+6=15$. The smaller is $12$.', 'Route: $A\\to C\\to E\\to F$.'],
         answer: '$A\\to C\\to E\\to F$, of length $12$',
-        working: '\\begin{aligned}A\\to C\\to E\\to F&=2+7+3\\\\&=12\\\\A\\to C\\to B\\to D\\to E\\to F&=2+1+6+2+3=14\\end{aligned}',
+        working: [
+          { say: 'Route through $C$ and $E$:', tex: 'A\\to C\\to E\\to F&=2+7+3' },
+          { tex: '&=12' },
+          { say: 'Compare the best route through $D$:', tex: 'A\\to C\\to B\\to D\\to E\\to F&=2+1+6+2+3=14' }
+        ],
         verify: { kind: 'values', pairs: [['2+7+3', '12'], ['2+1+6+2+3', '14']] }
       },
       {
         question: 'Use Kruskal\'s method to find the minimum spanning tree of the same network and its total weight.',
         steps: ['In order: $BC\\,1$, $AC\\,2$, $DE\\,2$, $EF\\,3$ are all accepted.', '$AB\\,4$ would close the cycle $ABC$, so it is rejected. $BD\\,6$ joins the two parts, so it is accepted. $DF\\,6$ would close the cycle $DEF$, so it is rejected.', 'That is $5$ edges for $6$ vertices, so stop. Total: $1+2+2+3+6=14$.'],
         answer: 'Edges $BC$, $AC$, $DE$, $EF$, $BD$, total weight $14$',
-        working: '\\begin{aligned}\\text{Total}&=BC+AC+DE+EF+BD\\\\&=1+2+2+3+6\\\\&=14\\end{aligned}',
+        working: [
+          { say: 'Edges accepted in order of weight ($BC$, $AC$, $DE$, $EF$, then $BD$):', tex: '\\text{Total}&=BC+AC+DE+EF+BD' },
+          { say: 'Substitute the weights:', tex: '&=1+2+2+3+6' },
+          { tex: '&=14' }
+        ],
         verify: { kind: 'value', expr: '1+2+2+3+6', answer: '14' }
       }
     ],
@@ -469,14 +535,24 @@ export default {
         question: 'For the data $3,5,6,7,8,8,9,10,12,13,14,25$, find the mean and the population standard deviation.',
         steps: ['The sum is $120$ and $n=12$, so $\\bar{x}=10$.', 'The squared deviations are $49,25,16,9,4,4,1,0,4,9,16,225$, which add to $362$.', '$\\sigma=\\sqrt{362\\div12}\\approx5.49$.'],
         answer: 'Mean $10$, standard deviation $5.49$',
-        working: '\\begin{aligned}\\bar{x}&=\\dfrac{120}{12}=10\\\\\\sum(x-\\bar{x})^2&=362\\\\\\sigma&=\\sqrt{\\dfrac{362}{12}}\\approx5.49\\end{aligned}',
+        working: [
+          { say: 'Mean is the sum divided by $n$:', tex: '\\bar{x}&=\\dfrac{120}{12}=10' },
+          { say: 'Add the squared deviations from the mean:', tex: '\\sum(x-\\bar{x})^2&=362' },
+          { say: 'Population standard deviation:', tex: '\\sigma&=\\sqrt{\\dfrac{362}{12}}\\approx5.49' }
+        ],
         verify: { kind: 'values', pairs: [['(3+5+6+7+8+8+9+10+12+13+14+25)/12', '10'], ['sqrt(362/12)', '5.492419']] }
       },
       {
         question: 'For the same data, find $Q_1$, $Q_3$ and the IQR, then test whether $25$ is an outlier.',
         steps: ['Median is $(8+9)\\div2=8.5$. Lower half $3,5,6,7,8,8$ gives $Q_1=(6+7)\\div2=6.5$.', 'Upper half $9,10,12,13,14,25$ gives $Q_3=(12+13)\\div2=12.5$. $\\text{IQR}=6$.', 'Upper fence $12.5+1.5\\times6=21.5$. Since $25>21.5$, $25$ is an outlier.'],
         answer: '$Q_1=6.5$, $Q_3=12.5$, IQR $6$; $25$ is an outlier',
-        working: '\\begin{aligned}Q_1&=\\tfrac{6+7}{2}=6.5,\\quad Q_3=\\tfrac{12+13}{2}=12.5\\\\\\text{IQR}&=12.5-6.5=6\\\\\\text{Upper fence}&=12.5+1.5\\times6=21.5\\\\25&>21.5\\end{aligned}',
+        working: [
+          { say: 'Median of the lower half gives $Q_1$:', tex: 'Q_1&=\\dfrac{6+7}{2}=6.5' },
+          { say: 'Median of the upper half gives $Q_3$:', tex: 'Q_3&=\\dfrac{12+13}{2}=12.5' },
+          { say: 'Interquartile range:', tex: '\\text{IQR}&=12.5-6.5=6' },
+          { say: 'Upper fence is $Q_3+1.5\\times\\text{IQR}$:', tex: '\\text{Upper fence}&=12.5+1.5\\times6=21.5' },
+          { say: 'Compare the largest value with the fence, so it is an outlier:', tex: '25&>21.5' }
+        ],
         verify: { kind: 'values', pairs: [['(6+7)/2', '6.5'], ['(12+13)/2', '12.5'], ['12.5+1.5*(12.5-6.5)', '21.5']] }
       }
     ],
@@ -530,14 +606,25 @@ export default {
         question: 'A ball is thrown so that its height after $t$ seconds is $h=-5t^2+20t$ metres. When does it land, and what is its greatest height?',
         steps: ['Set $h=0$: $-5t(t-4)=0$, so $t=0$ or $t=4$. It lands after $4$ s.', 'The turning point is halfway: $t=2$.', 'Height at $t=2$: $h=-5(4)+20(2)=20$ metres.'],
         answer: 'Lands after $4$ s; greatest height $20$ m at $t=2$ s',
-        working: '\\begin{aligned}-5t^2+20t&=0\\\\-5t(t-4)&=0\\\\t&=0\\ \\text{or}\\ 4\\\\h(2)&=-5(2)^2+20(2)=20\\text{ m}\\end{aligned}',
+        working: [
+          { say: 'It lands when the height is zero:', tex: '-5t^2+20t&=0' },
+          { say: 'Factorise:', tex: '-5t(t-4)&=0' },
+          { say: 'Each factor gives a root:', tex: 't&=0\\ \\text{or}\\ 4' },
+          { say: 'The greatest height is halfway between the roots:', tex: 't&=\\dfrac{0+4}{2}=2' },
+          { say: 'Substitute $t=2$:', tex: 'h(2)&=-5(2)^2+20(2)=20\\text{ m}' }
+        ],
         verify: { kind: 'roots', f: '-5*t^2+20*t', var: 't', answers: ['0', '4'] }
       },
       {
         question: 'A culture starts with $200$ bacteria and doubles every $3$ hours: $N=200\\times2^{t/3}$. How many bacteria are there after $12$ hours?',
         steps: ['Substitute $t=12$: $N=200\\times2^{12/3}$.', 'The exponent is $12\\div3=4$, and $2^4=16$.', '$N=200\\times16=3200$.'],
         answer: '$3200$ bacteria',
-        working: '\\begin{aligned}N&=200\\times2^{12/3}\\\\&=200\\times2^4\\\\&=200\\times16\\\\&=3200\\end{aligned}',
+        working: [
+          { say: 'Substitute $t=12$:', tex: 'N&=200\\times2^{12/3}' },
+          { say: 'Simplify the exponent:', tex: '&=200\\times2^4' },
+          { tex: '&=200\\times16' },
+          { tex: '&=3200' }
+        ],
         verify: { kind: 'value', expr: '200*2^(12/3)', answer: '3200' }
       }
     ],
@@ -592,21 +679,34 @@ export default {
         question: 'Find the future value and the interest earned when $\\$5000$ is invested at $4\\%$ p.a. compounded quarterly for $3$ years.',
         steps: ['Rate per quarter: $r=0.04\\div4=0.01$. Periods: $n=3\\times4=12$.', '$A=5000\\times(1.01)^{12}=5634.13$.', 'Interest: $5634.13-5000=634.13$.'],
         answer: 'Future value $\\$5634.13$, interest $\\$634.13$',
-        working: '\\begin{aligned}A&=5000(1+0.01)^{12}\\\\&=\\$5634.13\\\\I&=5634.13-5000\\\\&=\\$634.13\\end{aligned}',
+        working: [
+          { say: 'Rate per quarter is $0.04\\div4=0.01$, with $12$ periods:', tex: 'A&=5000(1+0.01)^{12}' },
+          { tex: '&\\approx\\$5634.13' },
+          { say: 'Interest is future value less principal:', tex: 'I&=5634.13-5000' },
+          { tex: '&=\\$634.13' }
+        ],
         verify: { kind: 'values', pairs: [['5000*(1+0.04/4)^(3*4)', '5634.12515'], ['5000*(1+0.04/4)^(3*4)-5000', '634.12515']] }
       },
       {
         question: 'How much should be invested now at $5\\%$ p.a. compounded annually to reach $\\$20\\,000$ in $5$ years?',
         steps: ['Rearrange $A=P(1+r)^n$ to $P=\\tfrac{A}{(1+r)^n}$.', 'Substitute: $P=\\tfrac{20\\,000}{1.05^5}$.', '$1.05^5=1.27628$, so $P=\\$15\\,670.52$.'],
         answer: '$\\$15\\,670.52$',
-        working: '\\begin{aligned}P&=\\dfrac{A}{(1+r)^n}\\\\&=\\dfrac{20\\,000}{1.05^5}\\\\&=\\$15\\,670.52\\end{aligned}',
+        working: [
+          { say: 'Rearrange $A=P(1+r)^n$ for $P$:', tex: 'P&=\\dfrac{A}{(1+r)^n}' },
+          { say: 'Substitute $A=20\\,000$, $r=0.05$, $n=5$:', tex: '&=\\dfrac{20\\,000}{1.05^5}' },
+          { tex: '&\\approx\\$15\\,670.52' }
+        ],
         verify: { kind: 'value', expr: '20000/1.05^5', answer: '15670.52333' }
       },
       {
         question: 'Anna deposits $\\$2000$ at the end of each year for $5$ years at $4\\%$ p.a. The future value factor from the table is $5.4163$. Find the future value.',
         steps: ['Future value $=$ contribution $\\times$ factor.', '$2000\\times5.4163=10\\,832.60$.', 'She deposits $5\\times2000=\\$10\\,000$, so the interest is $\\$832.60$.'],
         answer: '$\\$10\\,832.60$',
-        working: '\\begin{aligned}FV&=2000\\times5.4163\\\\&=\\$10\\,832.60\\\\I&=10\\,832.60-10\\,000=\\$832.60\\end{aligned}',
+        working: [
+          { say: 'Future value is contribution times table factor:', tex: 'FV&=2000\\times5.4163' },
+          { tex: '&=\\$10\\,832.60' },
+          { say: 'Interest is future value less total deposited ($5\\times2000$):', tex: 'I&=10\\,832.60-10\\,000=\\$832.60' }
+        ],
         verify: { kind: 'values', pairs: [['2000*5.4163', '10832.6'], ['2000*5.4163-5*2000', '832.6']] }
       }
     ],
@@ -661,21 +761,32 @@ export default {
         question: 'A car costs $\\$32\\,000$ and depreciates at $15\\%$ p.a. by the declining-balance method. Find its value after $3$ years.',
         steps: ['Multiplier: $1-0.15=0.85$.', 'Substitute: $S=32\\,000\\times0.85^3$.', '$0.85^3=0.614125$, so $S=\\$19\\,652.00$.'],
         answer: '$\\$19\\,652.00$',
-        working: '\\begin{aligned}S&=V_0(1-r)^n\\\\&=32\\,000\\times0.85^3\\\\&=\\$19\\,652.00\\end{aligned}',
+        working: [
+          { say: 'Declining-balance formula, with multiplier $1-0.15=0.85$:', tex: 'S&=V_0(1-r)^n' },
+          { say: 'Substitute $V_0=32\\,000$, $n=3$:', tex: '&=32\\,000\\times0.85^3' },
+          { tex: '&=\\$19\\,652.00' }
+        ],
         verify: { kind: 'value', expr: '32000*(1-0.15)^3', answer: '19652' }
       },
       {
         question: 'A $\\$15\\,000$ loan is repaid monthly over $5$ years. The table factor is $\\$20.28$ per $\\$1000$ per month. Find the monthly repayment, the total repaid and the interest.',
         steps: ['Repayment: $15\\times20.28=304.20$.', 'Number of payments: $5\\times12=60$, so the total is $60\\times304.20=18\\,252$.', 'Interest: $18\\,252-15\\,000=3252$.'],
         answer: 'Repayment $\\$304.20$, total $\\$18\\,252.00$, interest $\\$3252.00$',
-        working: '\\begin{aligned}\\text{Repayment}&=15\\times20.28=\\$304.20\\\\\\text{Total}&=60\\times304.20=\\$18\\,252.00\\\\\\text{Interest}&=18\\,252-15\\,000=\\$3252.00\\end{aligned}',
+        working: [
+          { say: 'Repayment is $15$ thousands times the table factor:', tex: '\\text{Repayment}&=15\\times20.28=\\$304.20' },
+          { say: 'Total over $5\\times12=60$ payments:', tex: '\\text{Total}&=60\\times304.20=\\$18\\,252.00' },
+          { say: 'Interest is total repaid less the loan:', tex: '\\text{Interest}&=18\\,252-15\\,000=\\$3252.00' }
+        ],
         verify: { kind: 'values', pairs: [['15*20.28', '304.2'], ['60*15*20.28', '18252'], ['60*15*20.28-15000', '3252']] }
       },
       {
         question: 'A $\\$15\\,000$ loan at $8\\%$ p.a. is repaid by $\\$500$ a month on a reducing balance. Find the balance after the first month and after the second month.',
         steps: ['Month 1: interest is $15\\,000\\times\\tfrac{0.08}{12}=100$, so the balance is $15\\,000+100-500=14\\,600$.', 'Month 2: interest is $14\\,600\\times\\tfrac{0.08}{12}=97.33$.', 'Balance: $14\\,600+97.33-500=14\\,197.33$.'],
         answer: '$\\$14\\,600.00$ after month 1, $\\$14\\,197.33$ after month 2',
-        working: '\\begin{aligned}B_1&=15\\,000\\left(1+\\tfrac{0.08}{12}\\right)-500=\\$14\\,600.00\\\\B_2&=14\\,600\\left(1+\\tfrac{0.08}{12}\\right)-500=\\$14\\,197.33\\end{aligned}',
+        working: [
+          { say: 'Add one month\'s interest, then subtract the repayment:', tex: 'B_1&=15\\,000\\left(1+\\dfrac{0.08}{12}\\right)-500=\\$14\\,600.00' },
+          { say: 'Repeat for the second month:', tex: 'B_2&=14\\,600\\left(1+\\dfrac{0.08}{12}\\right)-500\\approx\\$14\\,197.33' }
+        ],
         verify: { kind: 'values', pairs: [['15000*(1+0.08/12)-500', '14600'], ['(15000*(1+0.08/12)-500)*(1+0.08/12)-500', '14197.33333']] }
       }
     ],
@@ -728,14 +839,22 @@ export default {
         question: 'A $25$ m cable runs from the top of a vertical pole to a point on level ground $20$ m from its base. Find the pole\'s height, and the angle the cable makes with the ground, to the nearest degree.',
         steps: ['Pythagoras: $h=\\sqrt{25^2-20^2}=\\sqrt{225}=15$ m.', 'Adjacent $=20$ and hypotenuse $=25$, so use cosine: $\\cos\\theta=\\tfrac{20}{25}=0.8$.', '$\\theta=\\cos^{-1}(0.8)\\approx36.87^{\\circ}$, so $37^{\\circ}$ to the nearest degree.'],
         answer: 'Height $15$ m; angle $37^{\\circ}$',
-        working: '\\begin{aligned}h&=\\sqrt{25^2-20^2}=\\sqrt{225}=15\\text{ m}\\\\\\cos\\theta&=\\dfrac{20}{25}=0.8\\\\\\theta&=\\cos^{-1}(0.8)\\approx37^{\\circ}\\end{aligned}',
+        working: [
+          { say: 'Pythagoras for the pole:', tex: 'h&=\\sqrt{25^2-20^2}=\\sqrt{225}=15\\text{ m}' },
+          { say: 'Adjacent and hypotenuse are known, so use cosine:', tex: '\\cos\\theta&=\\dfrac{20}{25}=0.8' },
+          { say: 'Inverse cosine:', tex: '\\theta&=\\cos^{-1}(0.8)\\approx37^{\\circ}' }
+        ],
         verify: { kind: 'values', pairs: [['sqrt(25^2-20^2)', '15'], ['acos(0.8)*180/pi', '36.86990']] }
       },
       {
         question: 'From a point $20$ m from the base of a tower, the angle of elevation of the top is $35^{\\circ}$. Find the height of the tower to one decimal place.',
         steps: ['The $20$ m is adjacent to the angle and the height is opposite, so use tangent.', '$\\tan35^{\\circ}=\\tfrac{h}{20}$, so $h=20\\tan35^{\\circ}$.', '$h\\approx14.0$ m.'],
         answer: '$14.0$ m',
-        working: '\\begin{aligned}\\tan35^{\\circ}&=\\dfrac{h}{20}\\\\h&=20\\tan35^{\\circ}\\\\&\\approx14.0\\text{ m}\\end{aligned}',
+        working: [
+          { say: 'The $20$ m is adjacent and the height is opposite, so use tangent:', tex: '\\tan35^{\\circ}&=\\dfrac{h}{20}' },
+          { say: 'Make $h$ the subject:', tex: 'h&=20\\tan35^{\\circ}' },
+          { tex: '&\\approx14.0\\text{ m}' }
+        ],
         verify: { kind: 'value', expr: '20*tan(35*pi/180)', answer: '14.00415' }
       }
     ],
@@ -789,14 +908,21 @@ export default {
         question: 'A business makes a profit of $\\$9100$, shared between two partners in the ratio $2:5$. How much does each receive?',
         steps: ['Total parts: $2+5=7$.', 'One part: $9100\\div7=1300$.', 'Shares: $2\\times1300=2600$ and $5\\times1300=6500$.'],
         answer: '$\\$2600.00$ and $\\$6500.00$',
-        working: '\\begin{aligned}\\text{One part}&=\\dfrac{9100}{7}=\\$1300\\\\\\text{Shares}&=2\\times1300=\\$2600\\\\&\\phantom{=}\\;5\\times1300=\\$6500\\end{aligned}',
+        working: [
+          { say: 'Find the value of one part ($2+5=7$ parts):', tex: '\\text{One part}&=\\dfrac{9100}{7}=\\$1300' },
+          { say: 'Smaller share:', tex: '\\text{First share}&=2\\times1300=\\$2600' },
+          { say: 'Larger share:', tex: '\\text{Second share}&=5\\times1300=\\$6500' }
+        ],
         verify: { kind: 'values', pairs: [['9100/7*2', '2600'], ['9100/7*5', '6500']] }
       },
       {
         question: 'A car uses fuel at $7.8$ litres per $100$ km. How much fuel does it use on a $640$ km trip, and what does it cost at $\\$1.95$ per litre?',
         steps: ['Fuel: $\\tfrac{7.8}{100}\\times640=49.92$ L.', 'Cost: $49.92\\times1.95=97.344$.', 'To the nearest cent the cost is $\\$97.34$.'],
         answer: '$49.92$ L, costing $\\$97.34$',
-        working: '\\begin{aligned}\\text{Fuel}&=\\dfrac{7.8}{100}\\times640=49.92\\text{ L}\\\\\\text{Cost}&=49.92\\times1.95\\approx\\$97.34\\end{aligned}',
+        working: [
+          { say: 'Fuel used on the trip:', tex: '\\text{Fuel}&=\\dfrac{7.8}{100}\\times640=49.92\\text{ L}' },
+          { say: 'Cost, to the nearest cent:', tex: '\\text{Cost}&=49.92\\times1.95\\approx\\$97.34' }
+        ],
         verify: { kind: 'values', pairs: [['7.8/100*640', '49.92'], ['49.92*1.95', '97.344']] }
       }
     ],
@@ -849,14 +975,22 @@ export default {
         question: 'For the data $(1,46)$, $(2,52)$, $(3,55)$, $(4,62)$, $(5,65)$ the means are $\\bar{x}=3$ and $\\bar{y}=56$, with $\\sum(x-\\bar{x})(y-\\bar{y})=48$ and $\\sum(x-\\bar{x})^2=10$. Find the least-squares line.',
         steps: ['Gradient: $m=\\tfrac{48}{10}=4.8$.', 'Intercept: $c=56-4.8\\times3=41.6$.', 'The line is $y=4.8x+41.6$.'],
         answer: '$y=4.8x+41.6$',
-        working: '\\begin{aligned}m&=\\dfrac{48}{10}=4.8\\\\c&=\\bar{y}-m\\bar{x}=56-4.8(3)\\\\&=41.6\\\\y&=4.8x+41.6\\end{aligned}',
+        working: [
+          { say: 'Gradient from the sums:', tex: 'm&=\\dfrac{48}{10}=4.8' },
+          { say: 'The line passes through $(\\bar{x},\\bar{y})$:', tex: 'c&=\\bar{y}-m\\bar{x}=56-4.8(3)' },
+          { tex: '&=41.6' },
+          { say: 'Write the line:', tex: 'y&=4.8x+41.6' }
+        ],
         verify: { kind: 'values', pairs: [['48/10', '4.8'], ['56-4.8*3', '41.6']] }
       },
       {
         question: 'Use $y=4.8x+41.6$ to predict the mark for $4.5$ hours of study, and for $10$ hours. Comment on each.',
         steps: ['$x=4.5$: $y=4.8\\times4.5+41.6=63.2$. This is inside the data range from $1$ to $5$, so it is interpolation.', '$x=10$: $y=4.8\\times10+41.6=89.6$.', '$10$ hours is outside the range, so this is extrapolation and may be unreliable.'],
         answer: '$63.2$ (reliable); $89.6$ (extrapolation, unreliable)',
-        working: '\\begin{aligned}y(4.5)&=4.8(4.5)+41.6=63.2\\\\y(10)&=4.8(10)+41.6=89.6\\end{aligned}',
+        working: [
+          { say: 'Inside the data range ($1$ to $5$), so interpolation:', tex: 'y(4.5)&=4.8(4.5)+41.6=63.2' },
+          { say: 'Outside the data range, so extrapolation and less reliable:', tex: 'y(10)&=4.8(10)+41.6=89.6' }
+        ],
         verify: { kind: 'values', pairs: [['4.8*4.5+41.6', '63.2'], ['4.8*10+41.6', '89.6']] }
       }
     ],
@@ -910,14 +1044,21 @@ export default {
         question: 'A spinner is spun $200$ times and lands on red $46$ times. Find the relative frequency of red, and the expected number of reds in $500$ spins.',
         steps: ['Relative frequency: $\\tfrac{46}{200}=0.23$.', 'Use it as the probability: $E=0.23\\times500$.', '$E=115$ reds.'],
         answer: 'Relative frequency $0.23$; expect about $115$ reds',
-        working: '\\begin{aligned}\\text{Relative frequency}&=\\dfrac{46}{200}=0.23\\\\E&=0.23\\times500=115\\end{aligned}',
+        working: [
+          { say: 'Relative frequency is the count over the total:', tex: '\\text{Relative frequency}&=\\dfrac{46}{200}=0.23' },
+          { say: 'Expected number is probability times the number of trials:', tex: 'E&=0.23\\times500=115' }
+        ],
         verify: { kind: 'values', pairs: [['46/200', '0.23'], ['500*46/200', '115']] }
       },
       {
         question: 'A bag has $3$ red and $2$ blue marbles. Two are drawn without replacement. Find the probability that both are red and the probability that they are different colours.',
         steps: ['Both red: $\\tfrac{3}{5}\\times\\tfrac{2}{4}=\\tfrac{6}{20}=\\tfrac{3}{10}$.', 'Red then blue: $\\tfrac{3}{5}\\times\\tfrac{2}{4}=\\tfrac{3}{10}$. Blue then red: $\\tfrac{2}{5}\\times\\tfrac{3}{4}=\\tfrac{3}{10}$.', 'Different colours: $\\tfrac{3}{10}+\\tfrac{3}{10}=\\tfrac{3}{5}$.'],
         answer: '$P(\\text{both red})=\\tfrac{3}{10}$, $P(\\text{different})=\\tfrac{3}{5}$',
-        working: '\\begin{aligned}P(RR)&=\\tfrac{3}{5}\\times\\tfrac{2}{4}=\\tfrac{3}{10}\\\\P(\\text{different})&=P(RB)+P(BR)\\\\&=\\tfrac{3}{5}\\times\\tfrac{2}{4}+\\tfrac{2}{5}\\times\\tfrac{3}{4}=\\tfrac{3}{5}\\end{aligned}',
+        working: [
+          { say: 'Multiply along the branches for two reds:', tex: 'P(RR)&=\\dfrac{3}{5}\\times\\dfrac{2}{4}=\\dfrac{3}{10}' },
+          { say: 'Different colours means red then blue, or blue then red:', tex: 'P(\\text{different})&=P(RB)+P(BR)' },
+          { tex: '&=\\dfrac{3}{5}\\times\\dfrac{2}{4}+\\dfrac{2}{5}\\times\\dfrac{3}{4}=\\dfrac{3}{5}' }
+        ],
         verify: { kind: 'values', pairs: [['3/5*2/4', '3/10'], ['3/5*2/4+2/5*3/4', '3/5']] }
       }
     ],

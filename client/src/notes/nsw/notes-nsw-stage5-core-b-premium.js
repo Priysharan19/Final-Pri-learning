@@ -17,9 +17,20 @@ export default {
       { title: 'Rise over run', spec: { kind: 'function', xmin: -1, xmax: 7, ymin: -2, ymax: 12, curves: [{ expr: '2*x', label: 'y=2x' }], points: [{ x: 1, y: 2, label: '(1,2)' }, { x: 5, y: 10, label: '(5,10)' }] }, note: 'From $(1,2)$ to $(5,10)$ the run is $4$ and the rise is $8$, so the gradient is $\\tfrac{8}{4}=2$.' }
     ],
     working: [
-      '\\begin{aligned}m&=\\frac{y_2-y_1}{x_2-x_1}\\\\&=\\frac{10-2}{5-1}\\\\&=\\frac{8}{4}=2\\end{aligned}',
-      '\\begin{aligned}d&=\\sqrt{(4-(-1))^2+(15-3)^2}\\\\&=\\sqrt{25+144}\\\\&=\\sqrt{169}=13\\end{aligned}',
-      '\\begin{aligned}M&=\\left(\\frac{-2+6}{2},\\ \\frac{7+(-1)}{2}\\right)\\\\&=(2,3)\\end{aligned}'
+      [
+        { say: 'Gradient formula:', tex: 'm&=\\dfrac{y_2-y_1}{x_2-x_1}' },
+        { say: 'Substitute the coordinates:', tex: '&=\\dfrac{10-2}{5-1}' },
+        { tex: '&=\\dfrac{8}{4}=2' }
+      ],
+      [
+        { say: 'Distance formula:', tex: 'd&=\\sqrt{(4-(-1))^2+(15-3)^2}' },
+        { tex: '&=\\sqrt{25+144}' },
+        { tex: '&=\\sqrt{169}=13' }
+      ],
+      [
+        { say: 'Average the coordinates:', tex: 'M&=\\left(\\dfrac{-2+6}{2},\\ \\dfrac{7+(-1)}{2}\\right)' },
+        { tex: '&=(2,3)' }
+      ]
     ],
     check: [
       { question: 'Find the gradient of the line through $(2,3)$ and $(6,11)$.', answer: '$2$', verify: { kind: 'value', expr: '(11-3)/(6-2)', answer: '2' } },
@@ -38,9 +49,22 @@ export default {
       { title: 'Two lines, one point', spec: { kind: 'function', xmin: -1, xmax: 11, ymin: -2, ymax: 14, curves: [{ expr: '2*x+1', label: 'y=2x+1' }, { expr: '10-x', label: 'y=10-x' }], points: [{ x: 3, y: 7, label: '(3,7)' }] }, note: 'The lines $y=2x+1$ and $x+y=10$ cross at $(3,7)$, the solution of the pair.' }
     ],
     working: [
-      '\\begin{aligned}y-5&=3(x-2)\\\\y-5&=3x-6\\\\y&=3x-1\\end{aligned}',
-      '\\begin{aligned}m&=-\\tfrac{1}{2}\\\\y-1&=-\\tfrac{1}{2}(x-4)\\\\y&=-\\tfrac{1}{2}x+3\\end{aligned}',
-      '\\begin{aligned}x+(2x+1)&=10\\\\3x&=9\\\\x&=3,\\quad y=2(3)+1=7\\end{aligned}'
+      [
+        { say: 'Point-gradient form:', tex: 'y-5&=3(x-2)' },
+        { say: 'Expand the bracket:', tex: 'y-5&=3x-6' },
+        { say: 'Add $5$ to both sides:', tex: 'y&=3x-1' }
+      ],
+      [
+        { say: 'Perpendicular gradient is the negative reciprocal of $2$:', tex: 'm&=-\\dfrac{1}{2}' },
+        { say: 'Point-gradient form through $(4,1)$:', tex: 'y-1&=-\\dfrac{1}{2}(x-4)' },
+        { say: 'Expand and add $1$:', tex: 'y&=-\\dfrac{1}{2}x+3' }
+      ],
+      [
+        { say: 'Substitute $y=2x+1$ into $x+y=10$:', tex: 'x+(2x+1)&=10' },
+        { say: 'Collect like terms:', tex: '3x&=9' },
+        { say: 'Divide by $3$:', tex: 'x&=3' },
+        { say: 'Substitute back into $y=2x+1$:', tex: 'y&=2(3)+1=7' }
+      ]
     ],
     check: [
       { question: 'Find $y$ when $x=4$ on the line $y=3x-1$.', answer: '$11$', verify: { kind: 'value', expr: '3*4-1', answer: '11' } },
@@ -59,9 +83,20 @@ export default {
       { title: 'The decimal part sits between 1 and 10', spec: { kind: 'numberLine', min: 0, max: 10, points: [{ value: 4.53, label: '4.53' }], intervals: [{ from: 1, to: 10, toOpen: true }] }, note: 'In $4.53\\times10^7$ the decimal part $4.53$ lies in the interval from $1$ up to, but not including, $10$.' }
     ],
     working: [
-      '\\begin{aligned}45\\,300\\,000&=4.53\\times10\\,000\\,000\\\\&=4.53\\times10^7\\end{aligned}',
-      '\\begin{aligned}(3\\times10^4)(2.5\\times10^{-2})&=(3\\times2.5)\\times10^{4+(-2)}\\\\&=7.5\\times10^2\\\\&=750\\end{aligned}',
-      '\\begin{aligned}\\frac{10^{-3}}{2\\times10^{-6}}&=0.5\\times10^{-3-(-6)}\\\\&=0.5\\times10^3\\\\&=500\\end{aligned}'
+      [
+        { say: 'Write the number as a leading number times a power of $10$:', tex: '45\\,300\\,000&=4.53\\times10\\,000\\,000' },
+        { say: 'Write the power of $10$ as an index:', tex: '&=4.53\\times10^7' }
+      ],
+      [
+        { say: 'Multiply the leading numbers and add the indices:', tex: '(3\\times10^4)(2.5\\times10^{-2})&=(3\\times2.5)\\times10^{4+(-2)}' },
+        { tex: '&=7.5\\times10^2' },
+        { say: 'As an ordinary number:', tex: '&=750' }
+      ],
+      [
+        { say: 'Divide the lengths and subtract the indices:', tex: '\\dfrac{10^{-3}}{2\\times10^{-6}}&=0.5\\times10^{-3-(-6)}' },
+        { tex: '&=0.5\\times10^3' },
+        { tex: '&=500' }
+      ]
     ],
     check: [
       { question: 'Write $0.00072$ in scientific notation.', answer: '$7.2\\times10^{-4}$', verify: { kind: 'value', expr: '7.2*10^(-4)', answer: '0.00072' } },
@@ -80,9 +115,23 @@ export default {
       { title: 'Move the vertex', spec: { kind: 'transform', base: 'quadratic', initial: { h: 3, k: 1 }, show: ['a', 'h', 'k'] }, note: 'Set $h=3$ and $k=1$ to see $y=(x-3)^2+1$ with its vertex at $(3,1)$.' }
     ],
     working: [
-      '\\begin{aligned}x^2-4x-5&=0\\\\(x-5)(x+1)&=0\\\\x&=5\\ \\text{or}\\ -1\\\\x_{\\text{axis}}&=\\tfrac{5+(-1)}{2}=2,\\quad y=2^2-4(2)-5=-9\\end{aligned}',
-      '\\begin{aligned}y&=(x-3)^2+1\\\\\\text{vertex}&=(3,1)\\\\x=0:\\ y&=(-3)^2+1=10\\end{aligned}',
-      '\\begin{aligned}x^2+2x-8&=0\\\\(x+4)(x-2)&=0\\\\x&=-4\\ \\text{or}\\ 2\\end{aligned}'
+      [
+        { say: '$x$-intercepts occur where $y=0$:', tex: 'x^2-4x-5&=0' },
+        { say: 'Factorise:', tex: '(x-5)(x+1)&=0' },
+        { say: 'Set each factor to zero:', tex: 'x&=5\\ \\text{or}\\ -1' },
+        { say: 'Axis of symmetry is halfway between the intercepts:', tex: 'x_{\\text{axis}}&=\\dfrac{5+(-1)}{2}=2' },
+        { say: 'Substitute $x=2$ for the vertex:', tex: 'y&=2^2-4(2)-5=-9' }
+      ],
+      [
+        { say: 'Vertex form:', tex: 'y&=(x-3)^2+1' },
+        { say: 'The vertex is $(h,k)$ with $h=3$, $k=1$:', tex: '\\text{vertex}&=(3,1)' },
+        { say: '$y$-intercept, set $x=0$:', tex: 'x=0:\\ y&=(-3)^2+1=10' }
+      ],
+      [
+        { say: 'Start with the equation:', tex: 'x^2+2x-8&=0' },
+        { say: 'Factorise, using $4$ and $-2$:', tex: '(x+4)(x-2)&=0' },
+        { say: 'Set each factor to zero:', tex: 'x&=-4\\ \\text{or}\\ 2' }
+      ]
     ],
     check: [
       { question: 'Solve $x^2-9=0$.', answer: '$x=3$ or $x=-3$', verify: { kind: 'roots', f: 'x^2-9', answers: ['3', '-3'] } },
@@ -101,9 +150,21 @@ export default {
       { title: 'A hyperbola', spec: { kind: 'function', xmin: -8, xmax: 8, ymin: -8, ymax: 8, curves: [{ expr: '12/x', label: 'y=12/x' }], points: [{ x: 3, y: 4, label: '(3,4)' }, { x: -3, y: -4, label: '(-3,-4)' }] }, note: 'Every point on the curve has $xy=12$, for example $3\\times4$. The two branches never meet either axis.' }
     ],
     working: [
-      '\\begin{aligned}x=0:\\ y&=3\\times2^0=3\\\\x=1:\\ y&=3\\times2^1=6\\\\x=2:\\ y&=3\\times2^2=12\\\\x=3:\\ y&=3\\times2^3=24\\end{aligned}',
-      '\\begin{aligned}V&=1000\\times0.8^2\\\\&=1000\\times0.64\\\\&=640\\end{aligned}',
-      '\\begin{aligned}(3,4):\\ 3^2+4^2&=25=5^2\\ \\text{(on)}\\\\(2,5):\\ 2^2+5^2&=29>25\\ \\text{(outside)}\\end{aligned}'
+      [
+        { say: 'Substitute $x=0$:', tex: 'x=0:\\ y&=3\\times2^0=3' },
+        { say: 'Substitute $x=1$:', tex: 'x=1:\\ y&=3\\times2^1=6' },
+        { say: 'Substitute $x=2$:', tex: 'x=2:\\ y&=3\\times2^2=12' },
+        { say: 'Substitute $x=3$:', tex: 'x=3:\\ y&=3\\times2^3=24' }
+      ],
+      [
+        { say: 'Multiply by $0.8$ each year for $2$ years:', tex: 'V&=1000\\times0.8^2' },
+        { tex: '&=1000\\times0.64' },
+        { tex: '&=640' }
+      ],
+      [
+        { say: 'Compare $x^2+y^2$ with $r^2=25$ for $(3,4)$:', tex: '(3,4):\\ 3^2+4^2&=25=5^2\\ \\text{(on)}' },
+        { say: 'Same test for $(2,5)$:', tex: '(2,5):\\ 2^2+5^2&=29>25\\ \\text{(outside)}' }
+      ]
     ],
     check: [
       { question: 'Find $y$ when $x=4$ on $y=2^x$.', answer: '$16$', verify: { kind: 'value', expr: '2^4', answer: '16' } },
@@ -123,9 +184,20 @@ export default {
       { title: 'Netball and swimming', spec: { kind: 'venn', sets: 2, labels: ['Netball', 'Swim'], counts: { A: 13, B: 7, AB: 5, none: 5 }, universe: 30 }, note: 'Netball only is $18-5=13$ and swimming only is $12-5=7$. The $5$ outside both gives $P(\\text{neither})=\\tfrac{5}{30}=\\tfrac{1}{6}$.' }
     ],
     working: [
-      '\\begin{aligned}P(RR)&=\\tfrac{3}{5}\\times\\tfrac{3}{5}\\\\&=\\tfrac{9}{25}\\end{aligned}',
-      '\\begin{aligned}P(RR)&=\\tfrac{3}{5}\\times\\tfrac{2}{4}\\\\&=\\tfrac{6}{20}\\\\&=\\tfrac{3}{10}\\end{aligned}',
-      '\\begin{aligned}n(\\text{netball or swim})&=18+12-5=25\\\\n(\\text{neither})&=30-25=5\\\\P(\\text{neither})&=\\tfrac{5}{30}=\\tfrac{1}{6}\\end{aligned}'
+      [
+        { say: 'Independent draws, multiply along the branch:', tex: 'P(RR)&=\\dfrac{3}{5}\\times\\dfrac{3}{5}' },
+        { tex: '&=\\dfrac{9}{25}' }
+      ],
+      [
+        { say: 'Second draw has $2$ red among $4$ counters:', tex: 'P(RR)&=\\dfrac{3}{5}\\times\\dfrac{2}{4}' },
+        { tex: '&=\\dfrac{6}{20}' },
+        { tex: '&=\\dfrac{3}{10}' }
+      ],
+      [
+        { say: 'Inclusion-exclusion for netball or swimming:', tex: 'n(\\text{netball or swim})&=18+12-5=25' },
+        { say: 'Those who do neither:', tex: 'n(\\text{neither})&=30-25=5' },
+        { say: 'Probability:', tex: 'P(\\text{neither})&=\\dfrac{5}{30}=\\dfrac{1}{6}' }
+      ]
     ],
     check: [
       { question: 'A fair coin is tossed twice. Find $P(\\text{two heads})$.', answer: '$\\tfrac{1}{4}$', verify: { kind: 'value', expr: '1/2*1/2', answer: '1/4' } },
@@ -143,9 +215,22 @@ export default {
       { title: 'A 6, 8, 10 triangle', spec: { kind: 'triangle', a: 6, b: 8, c: 10 }, note: 'With the right angle between the sides $6$ and $8$, the angle opposite $6$ has $\\tan\\theta=\\tfrac{6}{8}=0.75$, so $\\theta\\approx36.9^\\circ$.' }
     ],
     working: [
-      '\\begin{aligned}\\sin30^\\circ&=\\frac{x}{10}\\\\x&=10\\sin30^\\circ\\\\&=5\\end{aligned}',
-      '\\begin{aligned}\\tan\\theta&=\\frac{6}{8}=0.75\\\\\\theta&=\\tan^{-1}(0.75)\\\\&\\approx36.9^\\circ\\end{aligned}',
-      '\\begin{aligned}\\sin40^\\circ&=\\frac{7}{h}\\\\h&=\\frac{7}{\\sin40^\\circ}\\\\&\\approx10.9\\end{aligned}'
+      [
+        { say: 'Opposite and hypotenuse, so use sine:', tex: '\\sin30^\\circ&=\\dfrac{x}{10}' },
+        { say: 'Multiply both sides by $10$:', tex: 'x&=10\\sin30^\\circ' },
+        { say: 'Substitute $\\sin30^\\circ=0.5$:', tex: '&=10\\times0.5' },
+        { tex: '&=5' }
+      ],
+      [
+        { say: 'Opposite and adjacent, so use tangent:', tex: '\\tan\\theta&=\\dfrac{6}{8}=0.75' },
+        { say: 'Inverse tangent:', tex: '\\theta&=\\tan^{-1}(0.75)' },
+        { tex: '&\\approx36.9^\\circ' }
+      ],
+      [
+        { say: 'Opposite and hypotenuse, so use sine:', tex: '\\sin40^\\circ&=\\dfrac{7}{h}' },
+        { say: 'Rearrange for $h$:', tex: 'h&=\\dfrac{7}{\\sin40^\\circ}' },
+        { tex: '&\\approx10.9' }
+      ]
     ],
     check: [
       { question: 'Find $\\cos60^\\circ$.', answer: '$0.5$', verify: { kind: 'value', expr: 'cos(60*pi/180)', answer: '0.5' } },
@@ -164,9 +249,22 @@ export default {
       { title: 'Exact values at 30 degrees', spec: { kind: 'unitCircle', deg: 30 }, note: 'At $30^\\circ$ the point on the circle is $\\left(\\tfrac{\\sqrt3}{2},\\tfrac{1}{2}\\right)$, so $\\cos30^\\circ=\\tfrac{\\sqrt3}{2}$ and $\\sin30^\\circ=\\tfrac{1}{2}$.' }
     ],
     working: [
-      '\\begin{aligned}\\tan\\theta&=\\frac{30}{40}=0.75\\\\\\theta&=\\tan^{-1}(0.75)\\\\&\\approx37^\\circ\\end{aligned}',
-      '\\begin{aligned}\\tan35^\\circ&=\\frac{h}{40}\\\\h&=40\\tan35^\\circ\\\\&\\approx28.0\\end{aligned}',
-      '\\begin{aligned}\\text{south}&=12\\cos30^\\circ\\\\&=12\\times\\tfrac{\\sqrt3}{2}\\\\&=6\\sqrt3\\approx10.4\\end{aligned}'
+      [
+        { say: 'Opposite is $30$ and adjacent is $40$, so use tangent:', tex: '\\tan\\theta&=\\dfrac{30}{40}=0.75' },
+        { say: 'Inverse tangent:', tex: '\\theta&=\\tan^{-1}(0.75)' },
+        { tex: '&\\approx37^\\circ' }
+      ],
+      [
+        { say: 'Opposite is unknown and adjacent is $40$, so use tangent:', tex: '\\tan35^\\circ&=\\dfrac{h}{40}' },
+        { say: 'Make $h$ the subject:', tex: 'h&=40\\tan35^\\circ' },
+        { tex: '&\\approx28.0' }
+      ],
+      [
+        { say: 'The southward distance is adjacent to the angle $180^\\circ-150^\\circ=30^\\circ$:', tex: '\\text{south}&=12\\cos30^\\circ' },
+        { tex: '&=12\\times\\dfrac{\\sqrt3}{2}' },
+        { tex: '&=6\\sqrt3' },
+        { tex: '&\\approx10.4' }
+      ]
     ],
     check: [
       { question: 'A ship sails $10$ km on a bearing of $090^\\circ$ and then $10$ km on $180^\\circ$. Find its distance from the start, in surd form.', answer: '$10\\sqrt2$', verify: { kind: 'value', expr: 'sqrt(10^2+10^2)', answer: '10*sqrt(2)' } },
@@ -182,9 +280,24 @@ export default {
     ],
     diagrams: [],
     working: [
-      '\\begin{aligned}A&=\\tfrac{1}{2}\\times6\\times4=12\\\\V&=Ah=12\\times10\\\\&=120\\ \\text{cm}^3\\end{aligned}',
-      '\\begin{aligned}V&=\\pi r^2h\\\\&=\\pi\\times3^2\\times10\\\\&=90\\pi\\approx282.7\\ \\text{cm}^3\\end{aligned}',
-      '\\begin{aligned}V&=\\tfrac{1}{3}\\pi r^2h\\\\&=\\tfrac{1}{3}\\pi\\times5^2\\times12\\\\&=100\\pi\\approx314.2\\ \\text{cm}^3\\end{aligned}'
+      [
+        { say: 'Area of the triangular cross-section:', tex: 'A&=\\dfrac{1}{2}\\times6\\times4=12' },
+        { say: 'Volume is cross-section times length:', tex: 'V&=Ah=12\\times10' },
+        { tex: '&=120\\ \\text{cm}^3' }
+      ],
+      [
+        { say: 'Volume of a cylinder:', tex: 'V&=\\pi r^2h' },
+        { say: 'Substitute $r=3$, $h=10$:', tex: '&=\\pi\\times3^2\\times10' },
+        { tex: '&=90\\pi' },
+        { tex: '&\\approx282.7\\ \\text{cm}^3' },
+        { say: 'Convert to litres, since $1\\,000\\ \\text{cm}^3=1$ L:', tex: 'V&\\approx\\dfrac{282.7}{1\\,000}\\approx0.283\\ \\text{L}' }
+      ],
+      [
+        { say: 'Volume of a cone:', tex: 'V&=\\dfrac{1}{3}\\pi r^2h' },
+        { say: 'Substitute $r=5$, $h=12$:', tex: '&=\\dfrac{1}{3}\\pi\\times5^2\\times12' },
+        { tex: '&=100\\pi' },
+        { tex: '&\\approx314.2\\ \\text{cm}^3' }
+      ]
     ],
     check: [
       { question: 'Find the volume of a rectangular prism $5$ cm by $4$ cm by $3$ cm.', answer: '$60$ cm$^3$', verify: { kind: 'value', expr: '5*4*3', answer: '60' } },

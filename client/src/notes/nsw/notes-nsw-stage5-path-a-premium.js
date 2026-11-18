@@ -18,9 +18,19 @@ export default {
       { title: 'Factors and intercepts', spec: { kind: 'function', xmin: -6, xmax: 1, ymin: -2, ymax: 14, curves: [{ expr: 'x^2+7*x+12', intercepts: true, label: 'y=x^2+7x+12' }] }, note: 'The curve $y=(x+3)(x+4)$ crosses the $x$-axis at $-4$ and $-3$, and the $y$-axis at $12$. Each bracket gives one intercept.' }
     ],
     working: [
-      '\\begin{aligned}x^2+7x+12&=x^2+3x+4x+12\\\\&=(x+3)(x+4)\\end{aligned}',
-      '\\begin{aligned}2x^2+7x+3&=2x^2+x+6x+3\\\\&=x(2x+1)+3(2x+1)\\\\&=(2x+1)(x+3)\\end{aligned}',
-      '\\begin{aligned}12x^2-27&=3(4x^2-9)\\\\&=3(2x-3)(2x+3)\\end{aligned}'
+      [
+        { say: 'Split $7x$ using $3$ and $4$ (product $12$, sum $7$):', tex: 'x^2+7x+12&=x^2+3x+4x+12' },
+        { say: 'Factorise by grouping:', tex: '&=(x+3)(x+4)' }
+      ],
+      [
+        { say: 'Split the middle term, since $2\\times3=6=1\\times6$ and $1+6=7$:', tex: '2x^2+7x+3&=2x^2+x+6x+3' },
+        { say: 'Group in pairs:', tex: '&=x(2x+1)+3(2x+1)' },
+        { say: 'Take out the common factor $2x+1$:', tex: '&=(2x+1)(x+3)' }
+      ],
+      [
+        { say: 'Take out the common factor $3$:', tex: '12x^2-27&=3\\left(4x^2-9\\right)' },
+        { say: 'Difference of two squares, $(2x)^2-3^2$:', tex: '&=3(2x-3)(2x+3)' }
+      ]
     ],
     check: [
       { question: 'Factorise $x^2-5x+6$.', answer: '$(x-2)(x-3)$', verify: { kind: 'equivalent', a: 'x^2-5*x+6', b: '(x-2)*(x-3)' } },
@@ -38,9 +48,18 @@ export default {
       { title: 'A simplified fraction as a graph', spec: { kind: 'function', xmin: -8, xmax: 8, ymin: -4, ymax: 6, curves: [{ expr: '(x-3)/x', label: 'y=(x-3)/x' }], asymptotes: [{ x: 0 }, { y: 1 }] }, note: 'The simplified $\\dfrac{x-3}{x}$ has asymptotes $x=0$ and $y=1$. The original fraction has this graph with a single hole at $x=-3$, where its value would be $2$.' }
     ],
     working: [
-      '\\begin{aligned}\\frac{x^2-9}{x^2+3x}&=\\frac{(x-3)(x+3)}{x(x+3)}\\\\&=\\frac{x-3}{x}\\end{aligned}',
-      '\\begin{aligned}\\frac{1}{x+1}+\\frac{2}{x-1}&=\\frac{(x-1)+2(x+1)}{(x+1)(x-1)}\\\\&=\\frac{3x+1}{(x+1)(x-1)}\\end{aligned}',
-      '\\begin{aligned}\\frac{x^2-4}{x+5}\\div\\frac{x+2}{3x+15}&=\\frac{(x-2)(x+2)}{x+5}\\times\\frac{3(x+5)}{x+2}\\\\&=3(x-2)\\end{aligned}'
+      [
+        { say: 'Factorise the numerator and denominator:', tex: '\\dfrac{x^2-9}{x^2+3x}&=\\dfrac{(x-3)(x+3)}{x(x+3)}' },
+        { say: 'Cancel the common factor $x+3$:', tex: '&=\\dfrac{x-3}{x}' }
+      ],
+      [
+        { say: 'Common denominator $(x+1)(x-1)$:', tex: '\\dfrac{1}{x+1}+\\dfrac{2}{x-1}&=\\dfrac{(x-1)+2(x+1)}{(x+1)(x-1)}' },
+        { say: 'Collect the numerator, $x-1+2x+2$:', tex: '&=\\dfrac{3x+1}{(x+1)(x-1)}' }
+      ],
+      [
+        { say: 'Multiply by the reciprocal and factorise:', tex: '\\dfrac{x^2-4}{x+5}\\div\\dfrac{x+2}{3x+15}&=\\dfrac{(x-2)(x+2)}{x+5}\\times\\dfrac{3(x+5)}{x+2}' },
+        { say: 'Cancel $x+2$ and $x+5$:', tex: '&=3(x-2)' }
+      ]
     ],
     check: [
       { question: 'Simplify $\\dfrac{x^2+5x+6}{x+2}$.', answer: '$x+3$', verify: { kind: 'equivalent', a: '(x^2+5*x+6)/(x+2)', b: 'x+3' } },
@@ -56,9 +75,23 @@ export default {
     ],
     diagrams: [],
     working: [
-      '\\begin{aligned}l&=\\sqrt{5^2+12^2}=13\\\\A&=\\pi(5)^2+\\pi(5)(13)\\\\&=25\\pi+65\\pi\\\\&=90\\pi\\end{aligned}',
-      '\\begin{aligned}A&=4\\pi r^2\\\\&=4\\pi(3)^2\\\\&=36\\pi\\approx113.1\\end{aligned}',
-      '\\begin{aligned}A&=\\pi(3)^2+2\\pi(3)(10)+2\\pi(3)^2\\\\&=9\\pi+60\\pi+18\\pi\\\\&=87\\pi\\end{aligned}'
+      [
+        { say: 'Slant height by Pythagoras:', tex: 'l&=\\sqrt{5^2+12^2}=13' },
+        { say: 'Base plus curved surface:', tex: 'A&=\\pi(5)^2+\\pi(5)(13)' },
+        { tex: '&=25\\pi+65\\pi' },
+        { tex: '&=90\\pi' }
+      ],
+      [
+        { say: 'Surface area of a sphere:', tex: 'A&=4\\pi r^2' },
+        { say: 'Substitute $r=3$:', tex: '&=4\\pi(3)^2' },
+        { tex: '&=36\\pi' },
+        { tex: '&\\approx113.1' }
+      ],
+      [
+        { say: 'Base, side of the cylinder and curved surface of the hemisphere (the joining circle is hidden):', tex: 'A&=\\pi(3)^2+2\\pi(3)(10)+2\\pi(3)^2' },
+        { tex: '&=9\\pi+60\\pi+18\\pi' },
+        { tex: '&=87\\pi' }
+      ]
     ],
     check: [
       { question: 'Find the surface area of a sphere of radius $5$ cm, in terms of $\\pi$.', answer: '$100\\pi\\text{ cm}^2$', verify: { kind: 'value', expr: '4*pi*5^2', answer: '100*pi' } },
@@ -77,9 +110,21 @@ export default {
       { title: 'Radius and tangent', spec: { kind: 'circleTheorem', theorem: 'tangent', params: { a: 40 } }, note: 'The tangent meets the radius at the point of contact at $90^\\circ$. Triangle $OTP$ therefore has a right angle at $T$.' }
     ],
     working: [
-      '\\begin{aligned}\\angle\\text{circumference}&=\\tfrac{1}{2}\\times\\angle\\text{centre}\\\\&=\\tfrac{1}{2}\\times120^\\circ\\\\&=60^\\circ\\end{aligned}',
-      '\\begin{aligned}\\angle C&=180^\\circ-78^\\circ=102^\\circ\\\\\\angle D&=180^\\circ-95^\\circ=85^\\circ\\end{aligned}',
-      '\\begin{aligned}\\angle OPT&=180^\\circ-\\angle OTP-\\angle TOP\\\\&=180^\\circ-90^\\circ-50^\\circ\\\\&=40^\\circ\\end{aligned}'
+      [
+        { say: 'The angle at the circumference is half the angle at the centre:', tex: '\\angle\\text{circumference}&=\\dfrac{1}{2}\\times\\angle\\text{centre}' },
+        { say: 'Substitute $120^\\circ$:', tex: '&=\\dfrac{1}{2}\\times120^\\circ' },
+        { tex: '&=60^\\circ' }
+      ],
+      [
+        { say: 'Opposite angles of a cyclic quadrilateral are supplementary:', tex: '\\angle C&=180^\\circ-78^\\circ=102^\\circ' },
+        { say: 'Likewise for $\\angle D$:', tex: '\\angle D&=180^\\circ-95^\\circ=85^\\circ' },
+        { say: 'Check that the angles sum to $360^\\circ$:', tex: '78^\\circ+95^\\circ+102^\\circ+85^\\circ&=360^\\circ' }
+      ],
+      [
+        { say: 'The radius meets the tangent at $90^\\circ$; angle sum of a triangle:', tex: '\\angle OPT&=180^\\circ-\\angle OTP-\\angle TOP' },
+        { say: 'Substitute $\\angle OTP=90^\\circ$ and $\\angle TOP=50^\\circ$:', tex: '&=180^\\circ-90^\\circ-50^\\circ' },
+        { tex: '&=40^\\circ' }
+      ]
     ],
     check: [
       { question: 'An angle in a semicircle is $90^\\circ$. If the diameter is $AB$ and $\\angle BAC=35^\\circ$, find $\\angle ABC$.', answer: '$55^\\circ$', verify: { kind: 'value', expr: '180-90-35', answer: '55' } },
@@ -97,9 +142,21 @@ export default {
       { title: 'A box plot of seven values', spec: { kind: 'boxPlot', data: [4, 7, 9, 10, 12, 15, 18] }, note: 'The median is $10$, the quartiles are $7$ and $15$, so the middle half of the data spans $8$ units: $\\text{IQR}=8$.' }
     ],
     working: [
-      '\\begin{aligned}\\bar{x}&=\\tfrac{40}{8}=5\\\\\\sum(x-\\bar{x})^2&=9+1+1+1+0+0+4+16=32\\\\\\sigma&=\\sqrt{\\tfrac{32}{8}}=2\\end{aligned}',
-      '\\begin{aligned}\\sigma_A&=\\sqrt{\\tfrac{16+4+0+4+16}{5}}=\\sqrt{8}\\approx2.83\\\\\\sigma_B&=\\sqrt{\\tfrac{1+0+0+0+1}{5}}=\\sqrt{0.4}\\approx0.63\\end{aligned}',
-      '\\begin{aligned}\\text{IQR}&=Q_3-Q_1\\\\&=15-7\\\\&=8\\end{aligned}'
+      [
+        { say: 'Mean:', tex: '\\bar{x}&=\\dfrac{40}{8}=5' },
+        { say: 'Sum of squared deviations from the mean:', tex: '\\sum(x-\\bar{x})^2&=9+1+1+1+0+0+4+16=32' },
+        { say: 'Standard deviation:', tex: '\\sigma&=\\sqrt{\\dfrac{32}{8}}=2' }
+      ],
+      [
+        { say: 'Team A, squared deviations from $14$:', tex: '\\sigma_A&=\\sqrt{\\dfrac{16+4+0+4+16}{5}}=\\sqrt{8}\\approx2.83' },
+        { say: 'Team B, squared deviations from $14$:', tex: '\\sigma_B&=\\sqrt{\\dfrac{1+0+0+0+1}{5}}=\\sqrt{0.4}\\approx0.63' },
+        { say: 'Compare:', tex: '\\sigma_B&<\\sigma_A' }
+      ],
+      [
+        { say: 'Interquartile range:', tex: '\\text{IQR}&=Q_3-Q_1' },
+        { say: 'Substitute $Q_1=7$ and $Q_3=15$:', tex: '&=15-7' },
+        { tex: '&=8' }
+      ]
     ],
     check: [
       { question: 'Find the standard deviation of $1,1,5,5$.', answer: '$2$', verify: { kind: 'value', expr: 'sqrt(((1-3)^2+(1-3)^2+(5-3)^2+(5-3)^2)/4)', answer: '2' } },
@@ -117,9 +174,23 @@ export default {
       { title: 'Roots as intercepts', spec: { kind: 'function', xmin: -5, xmax: 10, ymin: -24, ymax: 20, curves: [{ expr: 'x^2-5*x-14', intercepts: true, label: 'y=x^2-5x-14' }] }, note: 'Solving $x^2-5x-14=0$ asks where the curve meets the $x$-axis. It does so at $x=-2$ and $x=7$.' }
     ],
     working: [
-      '\\begin{aligned}x^2-5x-14&=0\\\\(x-7)(x+2)&=0\\\\x=7\\ \\text{or}\\ x&=-2\\end{aligned}',
-      '\\begin{aligned}2x^2-3x-9&=0\\\\(2x+3)(x-3)&=0\\\\x=-\\tfrac{3}{2}\\ \\text{or}\\ x&=3\\end{aligned}',
-      '\\begin{aligned}x(x+3)&=40\\\\x^2+3x-40&=0\\\\(x+8)(x-5)&=0\\\\x&=5\\ (x>0)\\end{aligned}'
+      [
+        { say: 'Equation:', tex: 'x^2-5x-14&=0' },
+        { say: 'Factorise, using $-7$ and $2$ (product $-14$, sum $-5$):', tex: '(x-7)(x+2)&=0' },
+        { say: 'Each factor can be zero:', tex: 'x=7\\ \\text{or}\\ x&=-2' }
+      ],
+      [
+        { say: 'Rearrange to equal zero:', tex: '2x^2-3x-9&=0' },
+        { say: 'Factorise:', tex: '(2x+3)(x-3)&=0' },
+        { say: 'Each factor can be zero:', tex: 'x=-\\dfrac{3}{2}\\ \\text{or}\\ x&=3' }
+      ],
+      [
+        { say: 'Area of the rectangle, width $x$ and length $x+3$:', tex: 'x(x+3)&=40' },
+        { say: 'Rearrange to equal zero:', tex: 'x^2+3x-40&=0' },
+        { say: 'Factorise:', tex: '(x+8)(x-5)&=0' },
+        { say: 'Each factor can be zero:', tex: 'x=-8\\ \\text{or}\\ x&=5' },
+        { say: 'A width cannot be negative:', tex: 'x&=5\\ (x>0)' }
+      ]
     ],
     check: [
       { question: 'Solve $x^2+2x-15=0$.', answer: '$x=-5$ or $x=3$', verify: { kind: 'roots', f: 'x^2+2*x-15', answers: ['-5', '3'] } },
@@ -137,9 +208,20 @@ export default {
       { title: 'Two irrational roots', spec: { kind: 'function', xmin: -2, xmax: 4, ymin: -6, ymax: 10, curves: [{ expr: '2*x^2-5*x-1', label: 'y=2x^2-5x-1' }] }, note: 'Here $\\Delta=33>0$, so the parabola crosses the axis twice, near $x=-0.19$ and $x=2.69$.' }
     ],
     working: [
-      '\\begin{aligned}x^2+6x&=-2\\\\(x+3)^2&=7\\\\x&=-3\\pm\\sqrt{7}\\end{aligned}',
-      '\\begin{aligned}\\Delta&=(-5)^2-4(2)(-1)=33\\\\x&=\\frac{5\\pm\\sqrt{33}}{4}\\end{aligned}',
-      '\\begin{aligned}\\Delta&=(-2)^2-4(3)(5)\\\\&=4-60\\\\&=-56<0\\end{aligned}'
+      [
+        { say: 'Move the constant:', tex: 'x^2+6x&=-2' },
+        { say: 'Add $\\left(\\dfrac{6}{2}\\right)^2=9$ to both sides:', tex: '(x+3)^2&=7' },
+        { say: 'Take square roots of both sides:', tex: 'x&=-3\\pm\\sqrt{7}' }
+      ],
+      [
+        { say: 'Discriminant with $a=2$, $b=-5$, $c=-1$:', tex: '\\Delta&=(-5)^2-4(2)(-1)=33' },
+        { say: 'Quadratic formula:', tex: 'x&=\\dfrac{5\\pm\\sqrt{33}}{4}' }
+      ],
+      [
+        { say: 'Discriminant with $a=3$, $b=-2$, $c=5$:', tex: '\\Delta&=(-2)^2-4(3)(5)' },
+        { tex: '&=4-60' },
+        { say: 'Negative, so there are no real solutions:', tex: '&=-56<0' }
+      ]
     ],
     check: [
       { question: 'Solve $x^2-4x+1=0$ exactly.', answer: '$x=2\\pm\\sqrt{3}$', verify: { kind: 'roots', f: 'x^2-4*x+1', answers: ['2+sqrt(3)', '2-sqrt(3)'] } },
@@ -157,9 +239,22 @@ export default {
       { title: 'The hyperbola $y=6/x$', spec: { kind: 'function', xmin: -8, xmax: 8, ymin: -8, ymax: 8, curves: [{ expr: '6/x', label: 'y=6/x' }], asymptotes: [{ x: 0 }, { y: 0 }], points: [{ x: 3, y: 2, label: '(3,2)' }, { x: -1.5, y: -4, label: '(-1.5,-4)' }] }, note: 'The marked points are $f(3)=2$ and the solution of $f(x)=-4$ at $x=-\\tfrac{3}{2}$. Both axes are asymptotes.' }
     ],
     working: [
-      '\\begin{aligned}f(-2)&=3(-2)^2-2(-2)+1\\\\&=12+4+1\\\\&=17\\end{aligned}',
-      '\\begin{aligned}f(3)&=\\tfrac{6}{3}=2\\\\\\tfrac{6}{x}&=-4\\\\x&=-\\tfrac{3}{2}\\end{aligned}',
-      '\\begin{aligned}3^2+y^2&=25\\\\y^2&=16\\\\y&=\\pm4\\end{aligned}'
+      [
+        { say: 'Substitute $x=-2$:', tex: 'f(-2)&=3(-2)^2-2(-2)+1' },
+        { say: 'Evaluate:', tex: '&=12+4+1' },
+        { tex: '&=17' }
+      ],
+      [
+        { say: 'Substitute $x=3$:', tex: 'f(3)&=\\dfrac{6}{3}=2' },
+        { say: 'Set $f(x)=-4$:', tex: '\\dfrac{6}{x}&=-4' },
+        { say: 'Multiply by $x$, then divide by $-4$:', tex: 'x&=-\\dfrac{3}{2}' }
+      ],
+      [
+        { say: 'Substitute $(3,4)$ into $x^2+y^2$:', tex: '3^2+4^2&=9+16=25' },
+        { say: 'So the point lies on the circle. Now put $x=3$:', tex: '3^2+y^2&=25' },
+        { say: 'Subtract $9$:', tex: 'y^2&=16' },
+        { say: 'Take square roots; $4$ is the given point, so the other value is $-4$:', tex: 'y&=\\pm4' }
+      ]
     ],
     check: [
       { question: 'If $f(x)=x^2-4$, find $f(-3)$.', answer: '$5$', verify: { kind: 'value', expr: '(-3)^2-4', answer: '5' } },
@@ -177,9 +272,21 @@ export default {
       { title: 'An isosceles triangle', spec: { kind: 'triangle', a: 5, b: 5, C: 40 }, note: 'With two equal sides and an apex of $40^\\circ$ the base angles are each $(180^\\circ-40^\\circ)\\div2=70^\\circ$.' }
     ],
     working: [
-      '\\begin{aligned}\\angle C&=180^\\circ-62^\\circ-48^\\circ\\\\&=70^\\circ\\\\\\angle R&=\\angle C=70^\\circ\\end{aligned}',
-      '\\begin{aligned}\\text{Parallelogram}&=8\\times5=40\\\\\\text{Each triangle}&=\\tfrac{1}{2}\\times8\\times5=20\\end{aligned}',
-      '\\begin{aligned}\\angle B&=\\angle C\\\\&=\\frac{180^\\circ-40^\\circ}{2}\\\\&=70^\\circ\\end{aligned}'
+      [
+        { say: 'Angle sum of triangle $ABC$:', tex: '\\angle C&=180^\\circ-62^\\circ-48^\\circ' },
+        { tex: '&=70^\\circ' },
+        { say: '$C$ corresponds to $R$ in congruent triangles:', tex: '\\angle R&=\\angle C=70^\\circ' }
+      ],
+      [
+        { say: '$AB=CD$ and $BC=DA$ (opposite sides), $AC$ common, so $\\triangle ABC\\equiv\\triangle CDA$ (SSS):', tex: '\\triangle ABC&\\equiv\\triangle CDA' },
+        { say: 'Area of the parallelogram, base times height:', tex: '\\text{Parallelogram}&=8\\times5=40' },
+        { say: 'Congruent triangles have equal area, so each is half:', tex: '\\text{Each triangle}&=\\dfrac{1}{2}\\times8\\times5=20' }
+      ],
+      [
+        { say: 'With $M$ the midpoint of $BC$: $AB=AC$, $BM=CM$, $AM$ common, so $\\triangle ABM\\equiv\\triangle ACM$ (SSS):', tex: '\\angle B&=\\angle C' },
+        { say: 'Angle sum of the triangle, shared equally by $B$ and $C$:', tex: '&=\\dfrac{180^\\circ-40^\\circ}{2}' },
+        { tex: '&=70^\\circ' }
+      ]
     ],
     check: [
       { question: 'Triangles $ABC$ and $DEF$ are congruent with $\\angle A=\\angle D=50^\\circ$ and $\\angle B=\\angle E=60^\\circ$. Find $\\angle F$.', answer: '$70^\\circ$', verify: { kind: 'value', expr: '180-50-60', answer: '70' } },
@@ -197,9 +304,20 @@ export default {
       { title: 'The 3, 4, 5 triangle', spec: { kind: 'triangle', a: 3, b: 4, c: 5 }, note: 'Enlarging by scale factor $3$ gives sides $9$, $12$ and $15$, the same shape with equal angles.' }
     ],
     working: [
-      '\\begin{aligned}k&=\\tfrac{9}{3}=3\\\\4\\times3&=12\\\\5\\times3&=15\\end{aligned}',
-      '\\begin{aligned}k&=\\tfrac{12}{3}=4\\\\\\text{height}&=2\\times4=8\\ \\text{m}\\end{aligned}',
-      '\\begin{aligned}\\text{Area}&=12\\times k^2\\\\&=12\\times3^2\\\\&=108\\end{aligned}'
+      [
+        { say: 'Scale factor, shortest side $9$ over $3$:', tex: 'k&=\\dfrac{9}{3}=3' },
+        { say: 'Scale the side $4$:', tex: '4\\times3&=12' },
+        { say: 'Scale the side $5$:', tex: '5\\times3&=15' }
+      ],
+      [
+        { say: 'Scale factor from pole shadow to tree shadow:', tex: 'k&=\\dfrac{12}{3}=4' },
+        { say: 'Scale the pole height:', tex: '\\text{height}&=2\\times4=8\\ \\text{m}' }
+      ],
+      [
+        { say: 'Areas scale by $k^2$:', tex: '\\text{Area}&=12\\times k^2' },
+        { say: 'Substitute $k=3$:', tex: '&=12\\times3^2' },
+        { tex: '&=108' }
+      ]
     ],
     check: [
       { question: 'Triangles with sides $4,6,8$ and $10,15,x$ are similar. Find $x$.', answer: '$20$', verify: { kind: 'value', expr: '10/4*8', answer: '20' } },
@@ -217,9 +335,19 @@ export default {
       { title: 'The curve $y=x^{1/2}$', spec: { kind: 'function', xmin: 0, xmax: 10, ymin: 0, ymax: 4, curves: [{ expr: 'x^(1/2)', label: 'y=x^{1/2}' }], points: [{ x: 1, y: 1, label: '(1,1)' }, { x: 4, y: 2, label: '(4,2)' }, { x: 9, y: 3, label: '(9,3)' }] }, note: 'The index $\\tfrac{1}{2}$ is a square root, so $4^{1/2}=2$ and $9^{1/2}=3$.' }
     ],
     working: [
-      '\\begin{aligned}8^{2/3}&=\\left(\\sqrt[3]{8}\\right)^2\\\\&=2^2\\\\&=4\\end{aligned}',
-      '\\begin{aligned}\\left(\\tfrac{9}{4}\\right)^{-1/2}&=\\left(\\tfrac{4}{9}\\right)^{1/2}\\\\&=\\tfrac{2}{3}\\end{aligned}',
-      '\\begin{aligned}\\frac{1}{\\sqrt[3]{x^2}}&=\\frac{1}{x^{2/3}}\\\\&=x^{-2/3}\\end{aligned}'
+      [
+        { say: 'Cube root first, then square:', tex: '8^{2/3}&=\\left(\\sqrt[3]{8}\\right)^2' },
+        { tex: '&=2^2' },
+        { tex: '&=4' }
+      ],
+      [
+        { say: 'The negative index flips the fraction:', tex: '\\left(\\dfrac{9}{4}\\right)^{-1/2}&=\\left(\\dfrac{4}{9}\\right)^{1/2}' },
+        { say: 'The index $\\dfrac{1}{2}$ is a square root:', tex: '&=\\dfrac{2}{3}' }
+      ],
+      [
+        { say: 'Cube root as an index:', tex: '\\dfrac{1}{\\sqrt[3]{x^2}}&=\\dfrac{1}{x^{2/3}}' },
+        { tex: '&=x^{-2/3}' }
+      ]
     ],
     check: [
       { question: 'Evaluate $16^{3/4}$.', answer: '$8$', verify: { kind: 'value', expr: '16^(3/4)', answer: '8' } },
@@ -238,9 +366,23 @@ export default {
       { title: 'Surds on the number line', spec: { kind: 'numberLine', min: 0, max: 3, points: [{ value: 1.4142, label: '\\sqrt{2}' }, { value: 1.7321, label: '\\sqrt{3}' }, { value: 2.2361, label: '\\sqrt{5}' }] }, note: 'The surds sit between whole numbers: $\\sqrt{2}\\approx1.414$, $\\sqrt{3}\\approx1.732$ and $\\sqrt{5}\\approx2.236$.' }
     ],
     working: [
-      '\\begin{aligned}\\sqrt{72}&=\\sqrt{36\\times2}\\\\&=\\sqrt{36}\\times\\sqrt{2}\\\\&=6\\sqrt{2}\\end{aligned}',
-      '\\begin{aligned}3\\sqrt{2}+\\sqrt{50}-\\sqrt{8}&=3\\sqrt{2}+5\\sqrt{2}-2\\sqrt{2}\\\\&=6\\sqrt{2}\\end{aligned}',
-      '\\begin{aligned}\\frac{4}{3-\\sqrt{5}}&=\\frac{4(3+\\sqrt{5})}{(3-\\sqrt{5})(3+\\sqrt{5})}\\\\&=\\frac{4(3+\\sqrt{5})}{4}\\\\&=3+\\sqrt{5}\\end{aligned}'
+      [
+        { say: 'Take out the largest square factor:', tex: '\\sqrt{72}&=\\sqrt{36\\times2}' },
+        { tex: '&=\\sqrt{36}\\times\\sqrt{2}' },
+        { tex: '&=6\\sqrt{2}' }
+      ],
+      [
+        { say: 'Simplify each surd:', tex: '\\sqrt{50}&=\\sqrt{25\\times2}=5\\sqrt{2}' },
+        { say: 'Simplify each surd:', tex: '\\sqrt{8}&=\\sqrt{4\\times2}=2\\sqrt{2}' },
+        { say: 'Substitute, so all terms are multiples of $\\sqrt{2}$:', tex: '3\\sqrt{2}+\\sqrt{50}-\\sqrt{8}&=3\\sqrt{2}+5\\sqrt{2}-2\\sqrt{2}' },
+        { tex: '&=(3+5-2)\\sqrt{2}' },
+        { tex: '&=6\\sqrt{2}' }
+      ],
+      [
+        { say: 'Multiply top and bottom by the conjugate:', tex: '\\dfrac{4}{3-\\sqrt{5}}&=\\dfrac{4(3+\\sqrt{5})}{(3-\\sqrt{5})(3+\\sqrt{5})}' },
+        { say: 'Difference of two squares in the denominator:', tex: '(3-\\sqrt{5})(3+\\sqrt{5})&=9-5=4' },
+        { say: 'Substitute and cancel:', tex: '\\dfrac{4(3+\\sqrt{5})}{4}&=3+\\sqrt{5}' }
+      ]
     ],
     check: [
       { question: 'Simplify $\\sqrt{48}$.', answer: '$4\\sqrt{3}$', verify: { kind: 'equivalent', a: 'sqrt(48)', b: '4*sqrt(3)' } },
@@ -258,9 +400,25 @@ export default {
       { title: 'Two lines meeting', spec: { kind: 'function', xmin: -3, xmax: 8, ymin: -2, ymax: 12, curves: [{ expr: '2*x+3', label: 'y=2x+3' }, { expr: '9-x', label: 'x+y=9' }], points: [{ x: 2, y: 7, label: '(2,7)' }] }, note: 'The lines $y=2x+3$ and $x+y=9$ cross at $(2,7)$, where both equations are true.' }
     ],
     working: [
-      '\\begin{aligned}m&=-\\tfrac{1}{2}\\\\y-1&=-\\tfrac{1}{2}(x-4)\\\\y&=-\\tfrac{1}{2}x+3\\end{aligned}',
-      '\\begin{aligned}x+(2x+3)&=9\\\\3x&=6\\\\x&=2,\\ y=7\\end{aligned}',
-      '\\begin{aligned}m_1m_2&=\\tfrac{3}{4}\\times\\left(-\\tfrac{4}{3}\\right)\\\\&=-1\\end{aligned}'
+      [
+        { say: 'Perpendicular gradients multiply to $-1$, and the given gradient is $2$:', tex: '2m&=-1' },
+        { say: 'Perpendicular gradient:', tex: 'm&=-\\dfrac{1}{2}' },
+        { say: 'Point-gradient form through $(4,1)$:', tex: 'y-1&=-\\dfrac{1}{2}(x-4)' },
+        { say: 'Expand and make $y$ the subject:', tex: 'y&=-\\dfrac{1}{2}x+2+1' },
+        { tex: '&=-\\dfrac{1}{2}x+3' }
+      ],
+      [
+        { say: 'Substitute $y=2x+3$ into $x+y=9$:', tex: 'x+(2x+3)&=9' },
+        { say: 'Collect like terms:', tex: '3x&=6' },
+        { say: 'Solve for $x$:', tex: 'x&=2' },
+        { say: 'Substitute back to find $y$:', tex: 'y&=2(2)+3=7' }
+      ],
+      [
+        { say: 'Gradient of the first line, $y=\\dfrac{3}{4}x-2$:', tex: 'm_1&=\\dfrac{3}{4}' },
+        { say: 'Gradient of the second line, $y=-\\dfrac{4}{3}x+\\dfrac{7}{3}$:', tex: 'm_2&=-\\dfrac{4}{3}' },
+        { say: 'Product of the gradients:', tex: 'm_1m_2&=\\dfrac{3}{4}\\times\\left(-\\dfrac{4}{3}\\right)' },
+        { tex: '&=-1' }
+      ]
     ],
     check: [
       { question: 'A line has gradient $-3$. What is the gradient of a line perpendicular to it?', answer: '$\\tfrac{1}{3}$', verify: { kind: 'value', expr: '-1/(-3)', answer: '1/3' } },
@@ -278,9 +436,22 @@ export default {
       { title: 'A logarithm is the inverse of a power', spec: { kind: 'function', xmin: -3, xmax: 8, ymin: -3, ymax: 8, curves: [{ expr: '2^x', label: 'y=2^x' }, { expr: 'ln(x)/ln(2)', label: 'y=\\log_2 x' }, { expr: 'x', label: 'y=x', tone: 'secondary' }], points: [{ x: 3, y: 8, label: '(3,8)' }, { x: 8, y: 3, label: '(8,3)' }] }, note: 'The point $(3,8)$ on $y=2^x$ becomes $(8,3)$ on $y=\\log_2 x$. The two curves are reflections in the line $y=x$, so $\\log_2 8=3$.' }
     ],
     working: [
-      '\\begin{aligned}\\log_2 32&=y\\\\2^y&=32=2^5\\\\y&=5\\end{aligned}',
-      '\\begin{aligned}\\log_6 4+\\log_6 9&=\\log_6(4\\times9)\\\\&=\\log_6 36\\\\&=2\\end{aligned}',
-      '\\begin{aligned}3^x&=20\\\\x\\log 3&=\\log 20\\\\x&=\\frac{\\log 20}{\\log 3}\\approx2.727\\end{aligned}'
+      [
+        { say: 'Let the logarithm equal $y$:', tex: '\\log_2 32&=y' },
+        { say: 'Write in index form:', tex: '2^y&=32=2^5' },
+        { say: 'Equate the indices:', tex: 'y&=5' }
+      ],
+      [
+        { say: 'Product law:', tex: '\\log_6 4+\\log_6 9&=\\log_6(4\\times9)' },
+        { tex: '&=\\log_6 36' },
+        { say: 'Since $6^2=36$:', tex: '&=2' }
+      ],
+      [
+        { say: 'Take logarithms of both sides:', tex: '3^x&=20' },
+        { say: 'Power law:', tex: 'x\\log 3&=\\log 20' },
+        { say: 'Divide by $\\log 3$:', tex: 'x&=\\dfrac{\\log 20}{\\log 3}' },
+        { say: 'Calculator:', tex: '&\\approx2.727' }
+      ]
     ],
     check: [
       { question: 'Evaluate $\\log_{10}1000$.', answer: '$3$', verify: { kind: 'value', expr: 'ln(1000)/ln(10)', answer: '3' } },

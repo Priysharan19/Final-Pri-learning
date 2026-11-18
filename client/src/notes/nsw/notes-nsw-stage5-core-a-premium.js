@@ -17,9 +17,19 @@ export default {
       { title: 'Factors show where a graph crosses the axis', spec: { kind: 'function', xmin: -1, xmax: 7, ymin: -3, ymax: 14, curves: [{ expr: 'x^2-7*x+12', intercepts: true, label: 'y=x^2-7x+12' }] }, note: 'The factorised form $(x-3)(x-4)$ is zero at $x=3$ and $x=4$, exactly where the curve meets the $x$-axis.' }
     ],
     working: [
-      '\\begin{aligned}(x+3)(x-5)&=x^2-5x+3x-15\\\\&=x^2-2x-15\\end{aligned}',
-      '\\begin{aligned}x^2-7x+12&=(x-3)(x-4)\\\\\\text{check: }(x-3)(x-4)&=x^2-4x-3x+12\\end{aligned}',
-      '\\begin{aligned}4x^2-25&=(2x)^2-5^2\\\\&=(2x-5)(2x+5)\\end{aligned}'
+      [
+        { say: 'Multiply every term by every term:', tex: '(x+3)(x-5)&=x^2-5x+3x-15' },
+        { say: 'Collect like terms:', tex: '&=x^2-2x-15' }
+      ],
+      [
+        { say: 'Find two numbers with product $12$ and sum $-7$ ($-3$ and $-4$):', tex: 'x^2-7x+12&=(x-3)(x-4)' },
+        { say: 'Check by expanding:', tex: '(x-3)(x-4)&=x^2-4x-3x+12' },
+        { tex: '&=x^2-7x+12' }
+      ],
+      [
+        { say: 'Write both terms as squares:', tex: '4x^2-25&=(2x)^2-5^2' },
+        { say: 'Difference of two squares, $a^2-b^2=(a-b)(a+b)$:', tex: '&=(2x-5)(2x+5)' }
+      ]
     ],
     check: [
       { question: 'Expand $(x+4)^2$.', answer: '$x^2+8x+16$', verify: { kind: 'equivalent', a: '(x+4)^2', b: 'x^2+8*x+16' } },
@@ -35,9 +45,24 @@ export default {
     ],
     diagrams: [],
     working: [
-      '\\begin{aligned}A&=\\tfrac{72}{360}\\times\\pi\\times10^2\\\\&=\\tfrac15\\times100\\pi\\\\&=20\\pi\\approx62.8\\end{aligned}',
-      '\\begin{aligned}SA&=2\\pi r(r+h)\\\\&=2\\pi\\times3\\times11\\\\&=66\\pi\\approx207.3\\end{aligned}',
-      '\\begin{aligned}SA&=2\\times\\left(\\tfrac12\\times3\\times4\\right)+(3+4+5)\\times10\\\\&=12+120\\\\&=132\\end{aligned}'
+      [
+        { say: 'Fraction of a circle, then area of the circle:', tex: 'A&=\\dfrac{72}{360}\\times\\pi\\times10^2' },
+        { tex: '&=\\dfrac{1}{5}\\times100\\pi' },
+        { tex: '&=20\\pi' },
+        { say: 'As a decimal:', tex: 'A&\\approx62.8' }
+      ],
+      [
+        { say: 'Surface area of a closed cylinder:', tex: 'SA&=2\\pi r(r+h)' },
+        { say: 'Substitute $r=3$, $h=8$:', tex: '&=2\\pi\\times3\\times(3+8)' },
+        { tex: '&=2\\pi\\times3\\times11' },
+        { tex: '&=66\\pi' },
+        { say: 'As a decimal:', tex: 'SA&\\approx207.3' }
+      ],
+      [
+        { say: 'Two triangular ends plus three rectangles (perimeter times length):', tex: 'SA&=2\\times\\left(\\dfrac{1}{2}\\times3\\times4\\right)+(3+4+5)\\times10' },
+        { tex: '&=12+120' },
+        { tex: '&=132' }
+      ]
     ],
     check: [
       { question: 'Find the exact arc length of a sector of radius $6\\text{ cm}$ and angle $60^\\circ$.', answer: '$2\\pi\\text{ cm}$', verify: { kind: 'value', expr: '60/360*2*pi*6', answer: '2*pi' } },
@@ -55,9 +80,21 @@ export default {
       { title: 'Grouped data as a histogram', spec: { kind: 'histogram', bins: { edges: [0, 10, 20, 30, 40], counts: [4, 6, 10, 5] } }, note: 'The tallest bar is the modal class, $20$–$29$. The $25$ values sit in four classes with frequencies $4$, $6$, $10$ and $5$.' }
     ],
     working: [
-      '\\begin{aligned}\\sum fx&=6+15+32+20=73\\\\\\sum f&=20\\\\\\bar{x}&=\\tfrac{73}{20}=3.65\\end{aligned}',
-      '\\begin{aligned}\\sum fx&=18+87+245+172.5=522.5\\\\\\bar{x}&\\approx\\tfrac{522.5}{25}=20.9\\end{aligned}',
-      '\\begin{aligned}\\text{total needed}&=75\\times6=450\\\\\\text{total so far}&=72\\times5=360\\\\\\text{sixth mark}&=450-360=90\\end{aligned}'
+      [
+        { say: 'Multiply each score by its frequency and add:', tex: '\\sum fx&=6+15+32+20=73' },
+        { say: 'Total frequency:', tex: '\\sum f&=20' },
+        { say: 'Mean is the total of the scores divided by the number of scores:', tex: '\\bar{x}&=\\dfrac{73}{20}=3.65' },
+        { say: 'With $20$ values the median is the average of the 10th and 11th, which are both $4$ (cumulative frequencies $3,8,16,20$):', tex: '\\text{median}&=\\dfrac{4+4}{2}=4' }
+      ],
+      [
+        { say: 'Sum of frequency times midpoint:', tex: '\\sum fx&=18+87+245+172.5=522.5' },
+        { say: 'Estimated mean:', tex: '\\bar{x}&=\\dfrac{522.5}{25}=20.9' }
+      ],
+      [
+        { say: 'Total needed for a mean of $75$ over six tests:', tex: '\\text{total needed}&=75\\times6=450' },
+        { say: 'Total of the first five tests:', tex: '\\text{total so far}&=72\\times5=360' },
+        { say: 'Sixth mark is the difference:', tex: '\\text{sixth mark}&=450-360=90' }
+      ]
     ],
     check: [
       { question: 'The scores $1,2,3$ occur with frequencies $2,5,3$. Find the mean.', answer: '$2.1$', verify: { kind: 'value', expr: '(1*2+2*5+3*3)/(2+5+3)', answer: '2.1' } },
@@ -75,9 +112,28 @@ export default {
       { title: 'A box plot with an outlier', spec: { kind: 'boxPlot', data: [12, 14, 15, 15, 16, 18, 19, 38] }, note: 'The median is $15.5$, the quartiles are $14.5$ and $18.5$, and the value $38$ lies far beyond the upper fence of $24.5$ and stretches the whisker.' }
     ],
     working: [
-      '\\begin{aligned}Q_1&=\\tfrac{7+8}{2}=7.5\\\\\\text{median}&=\\tfrac{10+12}{2}=11\\\\Q_3&=\\tfrac{13+15}{2}=14\\\\\\text{IQR}&=14-7.5=6.5\\end{aligned}',
-      '\\begin{aligned}\\text{IQR}&=18.5-14.5=4\\\\\\text{upper fence}&=18.5+1.5\\times4=24.5\\\\38&>24.5\\end{aligned}',
-      '\\begin{aligned}\\text{mean with }38&=\\tfrac{147}{8}=18.375\\\\\\text{mean without}&=\\tfrac{109}{7}\\approx15.57\\end{aligned}'
+      [
+        { say: 'Minimum and maximum:', tex: '\\text{minimum},\\ \\text{maximum}&=4,\\ 21' },
+        { say: 'Lower quartile is the median of the lower half $4,7,8,10$:', tex: 'Q_1&=\\dfrac{7+8}{2}=7.5' },
+        { say: 'Median of all $8$ values:', tex: '\\text{median}&=\\dfrac{10+12}{2}=11' },
+        { say: 'Upper quartile is the median of the upper half $12,13,15,21$:', tex: 'Q_3&=\\dfrac{13+15}{2}=14' },
+        { say: 'Interquartile range:', tex: '\\text{IQR}&=14-7.5=6.5' }
+      ],
+      [
+        { say: 'Lower quartile, median of $12,14,15,15$:', tex: 'Q_1&=\\dfrac{14+15}{2}=14.5' },
+        { say: 'Upper quartile, median of $16,18,19,38$:', tex: 'Q_3&=\\dfrac{18+19}{2}=18.5' },
+        { say: 'Interquartile range:', tex: '\\text{IQR}&=18.5-14.5=4' },
+        { say: 'Upper fence is $Q_3+1.5\\times\\text{IQR}$:', tex: '\\text{upper fence}&=18.5+1.5\\times4=24.5' },
+        { say: 'Compare the value with the fence:', tex: '38&>24.5' }
+      ],
+      [
+        { say: 'Total of all eight values:', tex: '\\sum x&=12+14+15+15+16+18+19+38=147' },
+        { say: 'Mean with the outlier:', tex: '\\text{mean with }38&=\\dfrac{147}{8}=18.375' },
+        { say: 'Remove $38$ from the total:', tex: '\\text{total without}&=147-38=109' },
+        { say: 'Mean of the remaining seven values:', tex: '\\text{mean without}&=\\dfrac{109}{7}\\approx15.57' },
+        { say: 'Median of the eight values is the average of the 4th and 5th:', tex: '\\text{median with }38&=\\dfrac{15+16}{2}=15.5' },
+        { say: 'Median of the seven values is the 4th value:', tex: '\\text{median without}&=15' }
+      ]
     ],
     check: [
       { question: 'Find the interquartile range of $2,4,6,8,10,12,14$.', answer: '$8$', verify: { kind: 'values', pairs: [['12-4', '8']] } },
@@ -95,9 +151,23 @@ export default {
       { title: 'Solving as an intersection', spec: { kind: 'function', xmin: -2, xmax: 14, ymin: -14, ymax: 40, curves: [{ expr: '3*x-6', label: 'y=3(x-2)' }, { expr: '2*x+5', label: 'y=2x+5' }], points: [{ x: 11, y: 27, label: '(11, 27)' }] }, note: 'The two sides of $3(x-2)=2x+5$ are equal where the lines cross, at $x=11$, where both equal $27$.' }
     ],
     working: [
-      '\\begin{aligned}3(x-2)&=2x+5\\\\3x-6&=2x+5\\\\x-6&=5\\\\x&=11\\end{aligned}',
-      '\\begin{aligned}\\tfrac{x}{3}+\\tfrac{x-1}{2}&=7\\\\2x+3(x-1)&=42\\\\5x&=45\\\\x&=9\\end{aligned}',
-      '\\begin{aligned}5-2x&>11\\\\-2x&>6\\\\x&<-3\\end{aligned}'
+      [
+        { say: 'Start with the equation:', tex: '3(x-2)&=2x+5' },
+        { say: 'Expand the bracket:', tex: '3x-6&=2x+5' },
+        { say: 'Subtract $2x$ from both sides:', tex: 'x-6&=5' },
+        { say: 'Add $6$ to both sides:', tex: 'x&=11' }
+      ],
+      [
+        { say: 'Start with the equation:', tex: '\\dfrac{x}{3}+\\dfrac{x-1}{2}&=7' },
+        { say: 'Multiply every term by $6$:', tex: '2x+3(x-1)&=42' },
+        { say: 'Expand and collect like terms:', tex: '5x&=45' },
+        { say: 'Divide both sides by $5$:', tex: 'x&=9' }
+      ],
+      [
+        { say: 'Start with the inequality:', tex: '5-2x&>11' },
+        { say: 'Subtract $5$ from both sides:', tex: '-2x&>6' },
+        { say: 'Divide by $-2$ and reverse the inequality sign:', tex: 'x&<-3' }
+      ]
     ],
     check: [
       { question: 'Solve $4x-7=2x+9$.', answer: '$x=8$', verify: { kind: 'roots', f: '4*x-7-(2*x+9)', answers: ['8'] } },
@@ -115,9 +185,20 @@ export default {
       { title: 'Price including GST', spec: { kind: 'function', xmin: 0, xmax: 200, ymin: 0, ymax: 220, curves: [{ expr: '1.1*x', label: 'y=1.1x' }], points: [{ x: 150, y: 165, label: '(150, 165)' }] }, note: 'The GST-inclusive price is $1.1$ times the price before GST, so a $\\$150$ item costs $\\$165$ including GST.' }
     ],
     working: [
-      '\\begin{aligned}\\text{normal}&=38\\times28=1064\\\\\\text{overtime}&=6\\times28\\times1.5=252\\\\\\text{gross}&=1064+252=1316\\end{aligned}',
-      '\\begin{aligned}\\text{before GST}&=165\\div1.1=150\\\\\\text{GST}&=165-150=15\\end{aligned}',
-      '\\begin{aligned}\\text{selling price}&=240\\times1.4\\times0.85=285.60\\\\\\text{profit}\\%&=\\tfrac{285.60-240}{240}\\times100=19\\end{aligned}'
+      [
+        { say: 'Normal pay:', tex: '\\text{normal}&=38\\times28=1064' },
+        { say: 'Overtime at time-and-a-half:', tex: '\\text{overtime}&=6\\times28\\times1.5=252' },
+        { say: 'Gross pay is the sum:', tex: '\\text{gross}&=1064+252=1316' }
+      ],
+      [
+        { say: 'Divide by $1.1$ to remove GST:', tex: '\\text{before GST}&=165\\div1.1=150' },
+        { say: 'GST is the difference:', tex: '\\text{GST}&=165-150=15' }
+      ],
+      [
+        { say: 'Marked price after a $40\\%$ mark-up:', tex: '\\text{marked price}&=240\\times1.4=336' },
+        { say: 'Selling price after a $15\\%$ discount:', tex: '\\text{selling price}&=336\\times0.85=285.60' },
+        { say: 'Profit as a percentage of cost:', tex: '\\text{profit}\\%&=\\dfrac{285.60-240}{240}\\times100=19' }
+      ]
     ],
     check: [
       { question: 'A price before GST is $\\$64$. Find the price including GST.', answer: '$\\$70.40$', verify: { kind: 'value', expr: '64*1.1', answer: '70.4' } },
@@ -135,9 +216,21 @@ export default {
       { title: 'Compound growth against simple interest', spec: { kind: 'compound', principal: 8000, rate: 0.05, years: 3, perYear: 1 }, note: '$\\$8000$ at $5\\%$ a year grows to $\\$9261$ after $3$ years by compounding. Simple interest would reach only $\\$9200$.' }
     ],
     working: [
-      '\\begin{aligned}I&=Prn\\\\&=5000\\times0.04\\times3\\\\&=600\\end{aligned}',
-      '\\begin{aligned}A&=8000\\times1.05^3\\\\&=9261\\\\I&=9261-8000=1261\\end{aligned}',
-      '\\begin{aligned}V&=30\\,000\\times0.85^3\\\\&=30\\,000\\times0.614125\\\\&=18\\,423.75\\end{aligned}'
+      [
+        { say: 'Simple interest formula:', tex: 'I&=Prn' },
+        { say: 'Substitute $P=5000$, $r=0.04$, $n=3$:', tex: '&=5000\\times0.04\\times3' },
+        { tex: '&=600' }
+      ],
+      [
+        { say: 'Compound interest formula with $P=8000$, $r=0.05$, $n=3$:', tex: 'A&=8000\\times1.05^3' },
+        { tex: '&=9261' },
+        { say: 'Interest is the final value less the principal:', tex: 'I&=9261-8000=1261' }
+      ],
+      [
+        { say: 'Multiply by $0.85$ each year for $3$ years:', tex: 'V&=30\\,000\\times0.85^3' },
+        { tex: '&=30\\,000\\times0.614125' },
+        { tex: '&=18\\,423.75' }
+      ]
     ],
     check: [
       { question: 'Find the value of $\\$2000$ after $2$ years at $6\\%$ per annum, compounded yearly.', answer: '$\\$2247.20$', verify: { kind: 'value', expr: '2000*1.06^2', answer: '2247.2' } },
@@ -156,9 +249,19 @@ export default {
       { title: 'A regular decagon', spec: { kind: 'polygon', n: 10, side: 1 }, note: 'Ten sides give $(10-2)\\times180^\\circ=1440^\\circ$ in total, so each interior angle is $144^\\circ$.' }
     ],
     working: [
-      '\\begin{aligned}k&=\\tfrac{9}{6}=1.5\\\\8\\times1.5&=12\\\\10\\times1.5&=15\\end{aligned}',
-      '\\begin{aligned}S&=(10-2)\\times180^\\circ=1440^\\circ\\\\\\text{each angle}&=\\tfrac{1440^\\circ}{10}=144^\\circ\\end{aligned}',
-      '\\begin{aligned}\\tfrac{\\text{tree}}{1.8}&=\\tfrac{10}{2.4}\\\\\\text{tree}&=1.8\\times\\tfrac{10}{2.4}=7.5\\end{aligned}'
+      [
+        { say: 'Scale factor from the shortest sides:', tex: 'k&=\\dfrac{9}{6}=1.5' },
+        { say: 'Middle side:', tex: '8\\times1.5&=12' },
+        { say: 'Longest side:', tex: '10\\times1.5&=15' }
+      ],
+      [
+        { say: 'Angle sum of a polygon with $n=10$ sides:', tex: 'S&=(10-2)\\times180^\\circ=1440^\\circ' },
+        { say: 'Equal angles in a regular decagon:', tex: '\\text{each angle}&=\\dfrac{1440^\\circ}{10}=144^\\circ' }
+      ],
+      [
+        { say: 'Similar triangles, so corresponding sides are in proportion:', tex: '\\dfrac{\\text{tree}}{1.8}&=\\dfrac{10}{2.4}' },
+        { say: 'Multiply both sides by $1.8$:', tex: '\\text{tree}&=1.8\\times\\dfrac{10}{2.4}=7.5' }
+      ]
     ],
     check: [
       { question: 'Find each exterior angle of a regular hexagon.', answer: '$60^\\circ$', verify: { kind: 'value', expr: '360/6', answer: '60' } },
@@ -176,9 +279,20 @@ export default {
       { title: 'Powers of $3$ running past zero', spec: { kind: 'sequence', type: 'geometric', first: 81, step: 1 / 3, n: 6 }, note: 'The terms $81,27,9,3,1,\\tfrac13$ are $3^4,3^3,3^2,3^1,3^0,3^{-1}$. Each step divides by $3$, so $3^0=1$ and $3^{-1}=\\tfrac13$.' }
     ],
     working: [
-      '\\begin{aligned}\\frac{(3x^2)^3}{9x^4}&=\\frac{27x^6}{9x^4}\\\\&=3x^{6-4}\\\\&=3x^2\\end{aligned}',
-      '\\begin{aligned}2^{-3}+\\left(\\tfrac12\\right)^{-2}&=\\tfrac18+2^2\\\\&=\\tfrac18+4\\\\&=\\tfrac{33}{8}\\end{aligned}',
-      '\\begin{aligned}(3\\times10^5)(4\\times10^{-2})&=12\\times10^{3}\\\\&=1.2\\times10^{4}\\end{aligned}'
+      [
+        { say: 'Apply the power to each factor:', tex: '\\dfrac{(3x^2)^3}{9x^4}&=\\dfrac{27x^6}{9x^4}' },
+        { say: 'Divide coefficients and subtract indices:', tex: '&=3x^{6-4}' },
+        { tex: '&=3x^2' }
+      ],
+      [
+        { say: 'Rewrite using negative indices:', tex: '2^{-3}+\\left(\\dfrac12\\right)^{-2}&=\\dfrac18+2^2' },
+        { tex: '&=\\dfrac18+4' },
+        { tex: '&=\\dfrac{33}{8}' }
+      ],
+      [
+        { say: 'Multiply the leading numbers and add the indices:', tex: '(3\\times10^5)(4\\times10^{-2})&=12\\times10^{3}' },
+        { say: 'Write $12$ as $1.2\\times10$ so the leading number is between $1$ and $10$:', tex: '&=1.2\\times10^{4}' }
+      ]
     ],
     check: [
       { question: 'Write $x^{-2}$ with a positive index.', answer: '$\\dfrac{1}{x^2}$', verify: { kind: 'equivalent', a: 'x^(-2)', b: '1/x^2' } },

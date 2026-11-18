@@ -38,7 +38,7 @@ export default {
       { wrong: 'Claiming a function is onto without reference to the codomain.', right: 'Onto compares the range with the stated codomain.' }
     ],
     examples: [
-      { question: 'If $f(x)=2x+3$ and $g(x)=x^2$, find $(g\\circ f)(1)$ and $(f\\circ g)(1)$.', steps: ['$f(1)=5$, so $(g\\circ f)(1)=g(5)=25$.', '$g(1)=1$, so $(f\\circ g)(1)=f(1)=5$.'], answer: '$25$ and $5$', verify: { kind: 'values', pairs: [['(2*1+3)^2', '25'], ['2*1^2+3', '5']] } },
+      { question: 'If $f(x)=2x+3$ and $g(x)=x^2$, find $(g\\circ f)(1)$ and $(f\\circ g)(1)$.', steps: ['Apply $f$ first, then $g$: $f(1)=5$, so $(g\\circ f)(1)=g(5)=25$.', 'Apply $g$ first, then $f$: $g(1)=1$, so $(f\\circ g)(1)=f(1)=5$.'], answer: '$25$ and $5$', verify: { kind: 'values', pairs: [['(2*1+3)^2', '25'], ['2*1^2+3', '5']] } },
       { question: 'Find the inverse of the bijection $f:\\mathbb R\\to\\mathbb R$, $f(x)=3x-4$, and evaluate $f^{-1}(5)$.', steps: ['Put $y=3x-4$, so $x=\\dfrac{y+4}{3}$.', 'Hence $f^{-1}(y)=\\dfrac{y+4}{3}$ and $f^{-1}(5)=3$.'], answer: '$f^{-1}(x)=\\dfrac{x+4}{3}$, $f^{-1}(5)=3$', verify: { kind: 'values', pairs: [['(5+4)/3', '3'], ['3*3-4', '5']] } }
     ]
   },
@@ -79,7 +79,7 @@ export default {
     ],
     examples: [
       { question: 'Find $\\cos^{-1}\\left(-\\tfrac12\\right)+2\\sin^{-1}\\left(\\tfrac12\\right)$.', steps: ['$\\cos^{-1}(-\\tfrac12)=\\pi-\\tfrac{\\pi}{3}=\\tfrac{2\\pi}{3}$.', '$\\sin^{-1}(\\tfrac12)=\\tfrac{\\pi}{6}$, doubled is $\\tfrac{\\pi}{3}$.', 'Sum: $\\tfrac{2\\pi}{3}+\\tfrac{\\pi}{3}=\\pi$.'], answer: '$\\pi$', verify: { kind: 'value', expr: 'acos(-1/2)+2*asin(1/2)', answer: 'pi' } },
-      { question: 'Show $\\tan^{-1}\\tfrac12+\\tan^{-1}\\tfrac13=\\tfrac{\\pi}{4}$.', steps: ['$xy=\\tfrac16<1$, so the sum formula applies.', '$\\dfrac{\\frac12+\\frac13}{1-\\frac16}=\\dfrac{5/6}{5/6}=1$.', '$\\tan^{-1}1=\\tfrac{\\pi}{4}$.'], answer: '$\\dfrac{\\pi}{4}$', verify: { kind: 'value', expr: 'atan(1/2)+atan(1/3)', answer: 'pi/4' } }
+      { question: 'Show $\\tan^{-1}\\left(\\tfrac12\\right)+\\tan^{-1}\\left(\\tfrac13\\right)=\\tfrac{\\pi}{4}$.', steps: ['$xy=\\tfrac16<1$, so the sum formula applies.', '$\\dfrac{\\frac12+\\frac13}{1-\\frac16}=\\dfrac{5/6}{5/6}=1$.', '$\\tan^{-1}1=\\tfrac{\\pi}{4}$.'], answer: '$\\dfrac{\\pi}{4}$', verify: { kind: 'value', expr: 'atan(1/2)+atan(1/3)', answer: 'pi/4' } }
     ]
   },
 
@@ -163,7 +163,7 @@ export default {
     ],
     examples: [
       { question: 'Evaluate $\\begin{vmatrix}1&2&3\\\\0&4&5\\\\1&0&6\\end{vmatrix}$.', steps: ['Expand along row 1: $1(24-0)-2(0-5)+3(0-4)$.', '$=24+10-12=22$.'], answer: '$22$', verify: { kind: 'value', expr: '1*(4*6-5*0)-2*(0*6-5*1)+3*(0*0-4*1)', answer: '22' } },
-      { question: 'Solve $2x+y=5$, $x-3y=-1$ by the matrix method.', steps: ['$A=\\begin{pmatrix}2&1\\\\1&-3\\end{pmatrix}$, $|A|=-7\\ne0$.', '$\\operatorname{adj}A=\\begin{pmatrix}-3&-1\\\\-1&2\\end{pmatrix}$, so $X=-\\tfrac17\\begin{pmatrix}-15+1\\\\-5-2\\end{pmatrix}=\\begin{pmatrix}2\\\\1\\end{pmatrix}$.'], answer: '$x=2,\\ y=1$', verify: { kind: 'system', equations: ['2*x+y=5', 'x-3*y=-1'], solution: { x: '2', y: '1' } } }
+      { question: 'Solve $2x+y=5$, $x-3y=-1$ by the matrix method.', steps: ['Coefficient matrix and its determinant: $A=\\begin{pmatrix}2&1\\\\1&-3\\end{pmatrix}$, $|A|=-7\\ne0$.', 'Use $X=A^{-1}B$: $\\operatorname{adj}A=\\begin{pmatrix}-3&-1\\\\-1&2\\end{pmatrix}$, so $X=-\\tfrac17\\begin{pmatrix}-15+1\\\\-5-2\\end{pmatrix}=\\begin{pmatrix}2\\\\1\\end{pmatrix}$.'], answer: '$x=2,\\ y=1$', verify: { kind: 'system', equations: ['2*x+y=5', 'x-3*y=-1'], solution: { x: '2', y: '1' } } }
     ]
   },
 
@@ -414,7 +414,7 @@ export default {
       { wrong: 'Middle term sign error in the cross product determinant.', right: 'The $\\hat j$ component is $-(a_1b_3-a_3b_1)$.', misconception: 'sign-flipped' }
     ],
     examples: [
-      { question: 'Find the angle between $\\vec a=\\hat i+\\hat j$ and $\\vec b=\\hat j+\\hat k$.', steps: ['$\\vec a\\cdot\\vec b=1$; $|\\vec a|=|\\vec b|=\\sqrt2$.', '$\\cos\\theta=\\frac12$, so $\\theta=\\frac{\\pi}{3}$.'], answer: '$\\dfrac{\\pi}{3}$', verify: { kind: 'value', expr: 'acos((1*0+1*1+0*1)/(sqrt(2)*sqrt(2)))', answer: 'pi/3' } },
+      { question: 'Find the angle between $\\vec a=\\hat i+\\hat j$ and $\\vec b=\\hat j+\\hat k$.', steps: ['Dot product and magnitudes: $\\vec a\\cdot\\vec b=1$; $|\\vec a|=|\\vec b|=\\sqrt2$.', 'Angle between the vectors: $\\cos\\theta=\\frac12$, so $\\theta=\\frac{\\pi}{3}$.'], answer: '$\\dfrac{\\pi}{3}$', verify: { kind: 'value', expr: 'acos((1*0+1*1+0*1)/(sqrt(2)*sqrt(2)))', answer: 'pi/3' } },
       { question: 'Find the area of the triangle with sides $\\vec a=\\hat i+2\\hat j+3\\hat k$ and $\\vec b=2\\hat i-\\hat j+\\hat k$.', steps: ['$\\vec a\\times\\vec b=(2\\cdot1-3\\cdot(-1))\\hat i-(1\\cdot1-3\\cdot2)\\hat j+(1\\cdot(-1)-2\\cdot2)\\hat k=5\\hat i+5\\hat j-5\\hat k$.', '$|\\vec a\\times\\vec b|=5\\sqrt3$; area $=\\frac{5\\sqrt3}{2}$.'], answer: '$\\dfrac{5\\sqrt3}{2}$', verify: { kind: 'value', expr: '(1/2)*sqrt(5^2+5^2+5^2)', answer: '5*sqrt(3)/2' } }
     ]
   },
@@ -457,7 +457,7 @@ export default {
       { wrong: 'Using the skew-line formula for parallel lines.', right: 'If $\\vec b_1\\times\\vec b_2=\\vec0$, use the parallel-line formula.' }
     ],
     examples: [
-      { question: 'Find the distance of $(2,1,-1)$ from the plane $x-2y+2z=5$.', steps: ['$d=\\frac{|2-2-2-5|}{\\sqrt{1+4+4}}$.', '$=\\frac{7}{3}$.'], answer: '$\\dfrac73$', verify: { kind: 'value', expr: 'abs(2-2*1+2*(-1)-5)/sqrt(1+4+4)', answer: '7/3' } },
+      { question: 'Find the distance of $(2,1,-1)$ from the plane $x-2y+2z=5$.', steps: ['Distance of a point from a plane: $d=\\frac{|2-2-2-5|}{\\sqrt{1+4+4}}$.', 'Simplify: $=\\frac{7}{3}$.'], answer: '$\\dfrac73$', verify: { kind: 'value', expr: 'abs(2-2*1+2*(-1)-5)/sqrt(1+4+4)', answer: '7/3' } },
       { question: 'Find the shortest distance between $\\vec r=(\\hat i+\\hat j)+\\lambda(2\\hat i-\\hat j+\\hat k)$ and $\\vec r=(2\\hat i+\\hat j-\\hat k)+\\mu(3\\hat i-5\\hat j+2\\hat k)$.', steps: ['$\\vec b_1\\times\\vec b_2=(-2+5)\\hat i-(4-3)\\hat j+(-10+3)\\hat k=3\\hat i-\\hat j-7\\hat k$, magnitude $\\sqrt{59}$.', '$\\vec a_2-\\vec a_1=\\hat i-\\hat k$; dot product $3+7=10$.', '$d=\\frac{10}{\\sqrt{59}}$.'], answer: '$\\dfrac{10}{\\sqrt{59}}$', verify: { kind: 'value', expr: 'abs(3*1+(-1)*0+(-7)*(-1))/sqrt(9+1+49)', answer: '10/sqrt(59)' } }
     ]
   },

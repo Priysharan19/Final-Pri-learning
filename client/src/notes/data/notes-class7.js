@@ -378,7 +378,7 @@ export default {
       },
       {
         question: 'How many pieces of length $\\frac{3}{4}$ m can be cut from $6$ m of rope?',
-        steps: ['$6 \\div \\frac{3}{4} = 6 \\times \\frac{4}{3}$.', '$= \\frac{24}{3} = 8$.'],
+        steps: ['Dividing by a fraction means multiplying by its reciprocal: $6 \\div \\frac{3}{4} = 6 \\times \\frac{4}{3}$.', 'Simplify: $= \\frac{24}{3} = 8$.'],
         answer: '$8$ pieces',
         verify: { kind: 'value', expr: '6/(3/4)', answer: '8' }
       }
@@ -466,7 +466,7 @@ export default {
     examples: [
       {
         question: 'Evaluate $(-8) \\times 3 + (-24) \\div (-6) - 5$.',
-        steps: ['$(-8) \\times 3 = -24$.', '$(-24) \\div (-6) = 4$.', '$-24 + 4 - 5 = -25$.'],
+        steps: ['Multiply first: $(-8) \\times 3 = -24$.', 'Then divide: $(-24) \\div (-6) = 4$.', 'Add and subtract from left to right: $-24 + 4 - 5 = -25$.'],
         answer: '$-25$',
         verify: { kind: 'value', expr: '(-8)*3+(-24)/(-6)-5', answer: '-25' }
       },

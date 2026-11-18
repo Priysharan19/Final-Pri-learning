@@ -51,7 +51,7 @@ have under Indian consumer law or under the store's own policy.
 
 ## How to ask
 
-Write to impriysharan@icloud.com from the email address on the account, with the
+Write to prilearning19@gmail.com from the email address on the account, with the
 date of the charge and which store took it. We acknowledge within 48 hours and
 reply within 3 working days. A refund we issue through Google Play usually
 shows on the original payment method within 5 to 7 working days; your bank may

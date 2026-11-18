@@ -787,7 +787,8 @@ export default defineConfig(({ command }) => {
     define: {
       ...featureDefines(command),
       __PRI_FEATURE_TUTOR__: JSON.stringify(featureTutor),
-      __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build')
+      __PRI_PRODUCTION_BUILD__: JSON.stringify(command === 'build'),
+      __PRI_BUILD_SHA__: JSON.stringify(command === 'build' ? String(releaseIdentity.releaseSha || '') : '')
     },
     plugins: [react(), editionRecordPlugin(featureStates(command).edition, { mustLoad: command === 'build' }), editionLegalPlugin(featureStates(command).edition), editionBrand(featureStates(command).edition), editionLanguages(featureStates(command).edition), releaseIdentityManifest(releaseIdentity), featureManifest({ ...featureStates(command), tutor: featureTutor }), precache()],
     server: { port: 5173 },
