@@ -15,7 +15,7 @@ import { useNavigate } from 'react-router-dom';
 import { loadSavedFilters, saveFilters } from './homeCache.js';
 import Icon from '../components/Icon.jsx';
 import TermGloss from '../components/TermGloss.jsx';
-import { dotpointAvailable, practiceTargetAvailable, selectableDifficulties, topicAvailability } from '../engine/curriculumAvailability.js';
+import { chapterOffered, dotpointAvailable, practiceTargetAvailable, selectableDifficulties, topicAvailability } from '../engine/curriculumAvailability.js';
 import { useT } from '../i18n/index.js';
 import { textMatches, useGlossary } from '../i18n/glossary.js';
 import { practiceDifficulties, practiceHref } from '../lib/practiceLinks.js';
@@ -80,6 +80,8 @@ export default function TopicGenerator({ user, curriculum }) {
     if (!section) return [];
     const m = new Map();
     for (const s of section.subtopics) {
+      // A chapter with no question at any level is not offered (owner decision 2026-11-18).
+      if (!chapterOffered(s)) continue;
       if (topicQuery.trim() && !textMatches(s.name, topicQuery) && !textMatches(s.strand || '', topicQuery)) continue;
       if (!m.has(s.strand)) m.set(s.strand, []);
       m.get(s.strand).push(s);

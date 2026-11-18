@@ -234,7 +234,7 @@
     "test:desk:clock": "node client/test/desk-clock-check.mjs",
     "test:desk:import": "node client/test/desk-import-check.mjs",
     "test:desk:ui": "node client/test/desk-ui-check.mjs && node client/test/work-state-check.mjs && node client/test/ethical-commerce-check.mjs",
-    "test:map": "node client/test/map-layout-check.mjs && node client/test/edition-terms-check.mjs && node client/test/au-no-india-surface-check.mjs",
+    "test:map": "node client/test/map-layout-check.mjs && node client/test/edition-terms-check.mjs && node client/test/au-no-india-surface-check.mjs && node client/test/empty-content-hidden-check.mjs",
     "test:exports": "node client/test/export-file-check.mjs && node client/test/progress-export-check.mjs",
     "test:insights": "node client/test/insights-view-check.mjs",
     "test:error-reports": "node client/test/error-report-check.mjs",
