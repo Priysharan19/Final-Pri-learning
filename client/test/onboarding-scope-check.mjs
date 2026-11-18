@@ -174,7 +174,9 @@ async function run() {
     const courseOpts = [...(ausCourse.match(/<select[^>]*id="signup-course"[\s\S]*?<\/select>/)?.[0] || '').matchAll(/<option value="([^"]+)"( selected="")?/g)].map(m => [m[1], !!m[2]]);
     ok(JSON.stringify(courseOpts) === JSON.stringify([['nsw', true]]), `Prithagoras: the syllabus select offers exactly ['nsw'], preselected — got ${JSON.stringify(courseOpts)}`);
     const yearSel = ausCourse.match(/<select[^>]*id="signup-year"[\s\S]*?<\/select>/)?.[0] || '';
-    ok(/<option value="10" selected="">Year 10<\/option>/.test(yearSel), 'Prithagoras: Year 10 is preselected');
+    // owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12 only and starts a new student on Year 12.
+    ok(/<option value="12" selected="">Year 12<\/option>/.test(yearSel), 'Prithagoras: Year 12 is preselected');
+    ok(JSON.stringify([...yearSel.matchAll(/<option value="(\d+)"/g)].map(m => m[1])) === '["11","12"]', `Prithagoras: the year select offers exactly Years 11 and 12 — got ${yearSel.replace(/\s+/g, ' ').slice(0, 200)}`);
     ok(!/Back to Indian/.test(ausCourse), 'Prithagoras: no way back to an India course on the course step');
   }
 

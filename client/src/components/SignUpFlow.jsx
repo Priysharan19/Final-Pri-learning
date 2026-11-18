@@ -739,7 +739,7 @@ export default function SignUpFlow({
       <>
         {heading('signup.classTitle')}
         <div className={`signup-choices signup-choices-${CLASSES.length}`} role="group" aria-label={t('signup.classLabel')}>
-          {CLASSES.map(c => choice(year === c, au ? `Year ${c}` : String(c), () => { setYear(c); if (c < 11) setTrack('cbse'); }, `signup-class-${c}`))}
+          {CLASSES.map(c => choice(year === c, au ? t('common.yearNumber', { n: c }) : String(c), () => { setYear(c); if (c < 11) setTrack('cbse'); }, `signup-class-${c}`))}
         </div>
         {au && year !== null && year >= 11 && (
           <>
