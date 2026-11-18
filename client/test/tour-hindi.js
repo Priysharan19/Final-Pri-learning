@@ -55,6 +55,8 @@ export const flow = {
   online: true,
 
   async run({ page, base, check, goto, createProfile, settle, online }) {
+    // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
+    await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     const audit = async (screen) => {
       await settle();
       await check(`${screen}: the document is declared Hindi`,
