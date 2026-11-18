@@ -2374,7 +2374,7 @@ html { background-color: var(--page); }
   .photo-pick { width: 100%; padding-left: 16px; padding-right: 16px; }
 
   /* The first screen's text links are finger-sized targets. */
-  .auth-wrap .linklike { min-height: var(--tap-min); padding: 0 8px; }
+  .auth-wrap .linklike { display: inline-flex; align-items: center; justify-content: center; min-height: var(--tap-min); padding: 0 8px; }
 
   /* The two ends of the question bar are one pair: back and next are the
      same 44px keycap, an arrow each. */
