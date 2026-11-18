@@ -307,12 +307,12 @@ check('handwriting drafts live in one recovery store and are restored, never mar
   assert.match(recovery, /Neither ever holds the expected answer, a solution or a mark/);
 });
 
-check('a reading in doubt is confirmed in place, not by rewriting', () => {
-  // The in-place confirmation now lives in the Check-what-Pri-read panel: the
-  // primary becomes Confirm and mark and stays disabled until every doubted
-  // line is resolved (confirm-reading-check.mjs pins the same rule).
-  assert.match(card, /needsCheck\s*\n?\s*\? \{ label: t\('verdict\.confirmAndSubmit'\), run: acceptReading, disabled: busy \|\| !canSubmit \|\| toConfirm > 0 \}/);
-  assert.match(card, /className="ws-check ws-confirm"/);
+check('written working is marked by one press, and no reading is confirmed by the student first', () => {
+  // Owner decision 19 Nov 2026 (ADR-0001 amendment): the reading is not shown before marking and the student does not
+  // confirm it; one press of "Mark my working" marks the page, and a doubtful line is excluded by the server's reading
+  // floor (reading-floor-check.mjs pins that). The old "Confirm and mark" panel no longer exists.
+  assert.match(card, /label: t\(busy \|\| markWanted \? 'verdict\.marking' : 'verdict\.markMyWorking'\), run: pressMark/);
+  assert.ok(!/confirmAndSubmit|acceptReading|ws-confirm/.test(card), 'no confirm-and-mark step remains in the card');
 });
 
 check('mistakes, uncertainty and failures are three different states', () => {
