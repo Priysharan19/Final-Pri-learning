@@ -45,7 +45,18 @@ review and does not remove the banner. Nothing here says the pages comply with a
 4. **Store listings were not changed.** `docs/release/app-store-privacy-labels.md` and
    `docs/release/play-data-safety.md` still need the stored-handwriting facts before an app goes
    to a store. I did not touch them.
-5. **The parent weekly report is not on the pages.** It is switched off in the code
+5. **No screen shows a stored original yet.** The server keeps it, the student's export carries it,
+   and the server would let a class teacher open the originals of handed-in work. But no student
+   screen and no teacher screen displays it (`client/src/classroom/ReviewQueue.jsx` still has
+   `MarkedOriginal = null`). An independent check caught that my first draft said "you can always
+   see it" and "the app tells you" when over the limit. I changed the pages to say plainly that the
+   app has no such screen yet. Also, exam answers never store an original, so today a teacher has
+   no handed-in handwriting to see. When the viewer ships, the pages should be updated (a test
+   reminds us).
+6. **Guardian contact.** The pages say a guardian is asked for a name and an email address. The code
+   also has a guardian phone (SMS) route, but it stays off unless an SMS provider is configured, and
+   none is. If SMS is ever turned on, the pages must change first.
+7. **The parent weekly report is not on the pages.** It is switched off in the code
    (`PRI_PARENT_REPORT`), so nothing happens. If it is switched on, the pages must change first.
 
 ## Plans: what you approved against what the code does
@@ -92,7 +103,7 @@ messages", "Product measurement and experiments").
 | It is kept 2 years (730 days), then deleted automatically | `originalWork.js` (`ORIGINAL_RETENTION_MS`), `server/platform/housekeeping.js` |
 | It is deleted with the account | `supabase/migrations/20261118010000_attempt_originals.sql` (`on delete cascade`) |
 | It is in the data export | `server/platform/accounts.js` |
-| Who sees it: the student; a class teacher only for work handed in | `originalWork.js` (the `handedIn` check), `server/platform/classroom.js` (`TEACHER_VISIBILITY`) |
+| Who can open it: only the student (via the export); a class teacher only for work handed in; **the app has no screen for it yet** | `originalWork.js` (the `handedIn` check), `server/platform/classroom.js` (`TEACHER_VISIBILITY`), `server/platform/accounts.js` |
 | No admin screen or parent report opens it | `server/platform/admin.js`, `server/platform/parentReport.js` do not read it |
 | Limit of 40 MB of handwriting and 24 MB of photos; past it the answer is still marked | `originalWork.js` (`ORIGINAL_QUOTA`, `keepOriginal`) |
 | A "Practise this" photo is not kept | `server/platform/questionPhoto.js` never calls `keepOriginal` |
@@ -201,7 +212,9 @@ needs `{{CONTACT_EMAIL}}` from you.
 10. **"No third-party trackers".** Is this safe to say, given that Stripe, OpenAI, Apple and Google
     handle data on their own pages?
 11. **Terms.** Each clause against unfair-contract-terms rules; the liability limit; New South
-    Wales and New Delhi courts.
+    Wales and New Delhi courts. The Australian terms say a parent must agree to the terms and to any
+    purchase for anyone under 18, while sign-up asks for a guardian only under 15. Is that
+    consistent?
 12. **The Hindi.** The Hindi is a translation and needs a native-speaker review (decision D11).
 
 ## What I did not do

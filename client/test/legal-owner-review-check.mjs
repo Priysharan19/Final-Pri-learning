@@ -44,7 +44,11 @@ both(/deleted with your account\*\*, and \*\*included when you export your (?:da
 ok(/SELECT \* FROM attempt_originals WHERE account_id=\? ORDER BY created_at, id/.test(accounts), 'the account export carries the originals (accounts.js)');
 ok(/strokesBytes: 40 \* 1024 \* 1024, imageBytes: 24 \* 1024 \* 1024/.test(original), 'the per-account limits are 40 MB of handwriting and 24 MB of photos (originalWork.js)');
 both(/up to 40 MB of handwriting and 24 MB of photos/, 'states those limits');
-ok(/reason: 'quota'/.test(original) && /'ow\.unavailable'/.test(read('client/src/i18n/strings.en.js')), 'past the limit the answer is still marked and the app says the original is not kept (originalWork.js, ow.unavailable)');
+ok(/reason: 'quota'/.test(original) && /Over quota: nothing is written/.test(original), 'past the limit the answer is still marked and the original is not kept on the server (originalWork.js)');
+ok(/const MarkedOriginal = null;/.test(read('client/src/classroom/ReviewQueue.jsx')) && !/OriginalWork/.test(read('client/src/components/QuestionCard.jsx').replace(/import[^\n]*OriginalWork[^\n]*\n/g, '')), 'no screen shows an original yet, so the pages say so; when one ships, update the pages (ReviewQueue.jsx MarkedOriginal, QuestionCard.jsx)');
+both(/The app has\s+no screen that shows it yet/, 'says there is no screen showing an original yet');
+both(/the\s+teacher's screen does not show it yet/, 'and that the teacher\'s screen does not show it yet');
+ok(!/You can always see it|and the app tells you so/.test(IN.privacy + AU.privacy), 'the pages no longer promise a screen or a notice that does not exist');
 ok(/requireRole\('student'\)/.test(original) && /requireRole\('teacher'\)/.test(original) && !/guardian/i.test(original.replace(/consentBlockerCode|consentState|guardian has not given|guardianConsent/gi, '')), 'only the student and, below, a teacher have a route to an original; no guardian route (originalWork.js)');
 ok(/const handedIn = items\.some/.test(original) && /member\.joined_at/.test(original) && /'handed-in-handwriting'/.test(read('server/platform/classroom.js')), 'a teacher is served an original only when it belongs to handed-in work of a class they teach (originalWork.js, classroom.js)');
 ok(!/attempt_originals/.test(read('server/platform/admin.js')) && !/attempt_originals/.test(read('server/platform/parentReport.js')), 'no administrator screen and no parent report reads originals');

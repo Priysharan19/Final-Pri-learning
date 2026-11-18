@@ -37,8 +37,9 @@ find where a mistake is. Both are described below.
 **Your original handwriting is kept with your marks.** When you submit a
 handwritten or photographed practice answer to be marked, we keep your original
 handwriting or photo with the mark for 2 years, and then delete it
-automatically. You can always see it. Your class teacher can see it only for
-work you hand in. See "Your original handwriting and photos" below.
+automatically. You can get it in your data export. Only you, and your class
+teacher for work you hand in, can ever be allowed to open it. The app has no
+screen that shows it yet. See "Your original handwriting and photos" below.
 
 **Some of your information goes overseas.** The handwriting reading service, our
 email delivery service and our payment processor are outside our control and are likely to handle
@@ -157,15 +158,17 @@ device can open a profile that has no password.
   automatically.
 - **An original is deleted with your account**, and **included when you export your
   information**.
-- **Who can see an original:** you. If you are in a class and hand in work to your class
-  teacher, that teacher can see the original of the answers in the work you
-  hand in, and nothing you have not handed in. No other student or teacher can
-  open it. There is no screen in the app, and none in our administrator tools,
-  for opening it, although we, as the operator, can reach the database it is
-  stored in to run the service.
+- **Who can open an original:** only you (it is in your data export). The app has
+  no screen that shows it yet. If you are in a class and hand in work to your
+  class teacher, our server will let that teacher open the original of the
+  answers in the work you hand in, and nothing you have not handed in; the
+  teacher's screen does not show it yet. No other student or teacher can open it.
+  There is no screen in our administrator tools for opening it either, although
+  we, as the operator, can reach the database it is stored in to run the
+  service.
 - **A limit on what is kept:** one account can have up to 40 MB of handwriting and 24 MB of
   photos kept. Past that, the answer is still marked, but its original is not
-  kept on our server, and the app tells you so.
+  kept on our server. Your device still has its own copy.
 - **Reading is answer-blind and you confirm it.** The reading service sees
   only the picture, never the expected answer or the solution. You check what
   was read, and can correct it, before the answer counts. The reading never
@@ -330,8 +333,9 @@ and only while you are a member and your account is allowed to use the cloud:
   work stands; counts of common mistakes across the class, with no names
   attached; papers you hand in to that teacher (the score, each question's marks,
   your working as read, line checks and where the first mistake was); the
-  handwriting of the answers in a paper you hand in; and the marks and comments
-  the teacher gives.
+  handwriting of the answers in a paper you hand in, where one is kept (our server
+  allows it; the teacher's screen does not show it yet); and the marks and
+  comments the teacher gives.
 - **A teacher cannot see:** your email address, your guardian's details, your
   plan, your notes, your conversations with the AI tutor, your practice working,
   your photos or your practice handwriting, papers you have not handed in, or

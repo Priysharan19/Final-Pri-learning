@@ -236,7 +236,7 @@ OpenAI.
 
 **Current text** · `client/src/i18n/strings.en.js` · `readerPermission.keep`
 
-> Pri does not keep the picture it sends for reading. When you then submit the answer to be marked, Pri keeps your original handwriting or photo with the mark for 2 years, so you can look back at it. OpenAI is asked not to store it, but says it may keep it for up to 30 days to check for misuse, and does not use it to train its models by default.
+> Pri does not keep the picture it sends for reading. When you then submit the answer to be marked, Pri keeps your original handwriting or photo with the mark for 2 years, so a record of exactly what was marked exists. OpenAI is asked not to store it, but says it may keep it for up to 30 days to check for misuse, and does not use it to train its models by default.
 
 **Current text** · `client/src/i18n/strings.en.js` · `readerPermission.marks`
 

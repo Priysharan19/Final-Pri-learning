@@ -2686,7 +2686,7 @@ export default {
   'readerPermission.leadPhoto': 'To read a photo of your working, Pri’s server sends the photo to OpenAI, an AI company. OpenAI reads it and sends back the text it sees.',
   'readerPermission.leadQuestionPhoto': 'To find the question in your photo, Pri’s server sends the photo to OpenAI, an AI company. OpenAI reads it and sends back the text it sees.',
   'readerPermission.what': 'For handwriting, only a picture drawn from your strokes is sent: not the question, not the answer, not your name. A photo is sent as you took it, so keep your name and anything private out of the frame.',
-  'readerPermission.keep': 'Pri does not keep the picture it sends for reading. When you then submit the answer to be marked, Pri keeps your original handwriting or photo with the mark for 2 years, so you can look back at it. OpenAI is asked not to store it, but says it may keep it for up to 30 days to check for misuse, and does not use it to train its models by default.',
+  'readerPermission.keep': 'Pri does not keep the picture it sends for reading. When you then submit the answer to be marked, Pri keeps your original handwriting or photo with the mark for 2 years, so a record of exactly what was marked exists. OpenAI is asked not to store it, but says it may keep it for up to 30 days to check for misuse, and does not use it to train its models by default.',
   'readerPermission.marks': 'The reading only suggests what you wrote. You check it, and Pri’s own marker decides the mark, never the AI.',
   'readerPermission.choice': 'Nothing is sent until you choose. If you would rather not, you can type every answer instead, and change this later in Settings → Handwriting.',
   'readerPermission.accept': 'Send it to be read',
