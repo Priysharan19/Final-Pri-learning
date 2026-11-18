@@ -30,7 +30,7 @@ export default {
   "c12-inverse-trigonometric": {
     "examples": [
       {
-        "question": "Evaluate $\\tan^{-1}\\tfrac{1}{2} + \\tan^{-1}\\tfrac{1}{3}$ exactly.",
+        "question": "Evaluate $\\tan^{-1}\\left(\\tfrac{1}{2}\\right) + \\tan^{-1}\\left(\\tfrac{1}{3}\\right)$ exactly.",
         "steps": [
           "Both principal values are positive acute angles, and their sum stays below $\\tfrac{\\pi}{2}$.",
           "By the tangent addition identity, the tangent of the sum is $\\dfrac{\\tfrac{1}{2} + \\tfrac{1}{3}}{1 - \\tfrac{1}{6}} = 1$.",

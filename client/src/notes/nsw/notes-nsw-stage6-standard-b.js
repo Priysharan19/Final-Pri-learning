@@ -41,21 +41,36 @@ export default {
         question: 'A stall has costs $C=1200+15n$ and takes revenue $R=40n$ dollars for $n$ items. Find the break-even number of items and the profit when $80$ items are sold.',
         steps: ['Set $R=C$: $40n=1200+15n$.', 'Subtract $15n$: $25n=1200$, so $n=48$.', 'At $n=80$: $R=3200$ and $C=1200+1200=2400$.', 'Profit is $3200-2400=800$.'],
         answer: 'Break-even at $n=48$ items; profit $\\$800.00$ at $80$ items.',
-        working: '\\begin{aligned}40n&=1200+15n\\\\25n&=1200\\\\n&=48\\\\P(80)&=40(80)-\\left(1200+15(80)\\right)\\\\&=3200-2400=800\\end{aligned}',
+        working: [
+          { say: 'Break-even is where revenue equals cost:', tex: '40n&=1200+15n' },
+          { say: 'Subtract $15n$ from both sides:', tex: '25n&=1200' },
+          { say: 'Divide by $25$:', tex: 'n&=48' },
+          { say: 'Profit is revenue less cost at $n=80$:', tex: 'P(80)&=40(80)-\\left(1200+15(80)\\right)' },
+          { tex: '&=3200-2400=800' }
+        ],
         verify: { kind: 'roots', f: '40*x-(1200+15*x)', answers: ['48'] }
       },
       {
         question: 'A car is worth $\\$30000$ and loses $20\\%$ of its value each year, so $V=30000\\times0.8^t$. Find its value after $3$ years.',
         steps: ['A $20\\%$ fall each year gives the factor $0.8$.', 'After $3$ years: $V=30000\\times0.8^3$.', '$0.8^3=0.512$.', '$30000\\times0.512=15360$.'],
         answer: '$\\$15360.00$',
-        working: '\\begin{aligned}V&=30000\\times0.8^3\\\\&=30000\\times0.512\\\\&=15360\\end{aligned}',
+        working: [
+          { say: 'Multiply by the factor $0.8$ for each of the $3$ years:', tex: 'V&=30000\\times0.8^3' },
+          { say: 'Evaluate the power:', tex: '&=30000\\times0.512' },
+          { tex: '&=15360' }
+        ],
         verify: { kind: 'value', expr: '30000*0.8^3', answer: '15360' }
       },
       {
         question: 'A ball is hit so that its height in metres after $t$ seconds is $h=20t-5t^2$. When does it land, and what is its greatest height?',
         steps: ['It lands when $h=0$: $20t-5t^2=5t(4-t)=0$.', 'The roots are $t=0$ and $t=4$, so it lands after $4$ seconds.', 'The maximum is halfway: $t=2$.', 'At $t=2$: $h=20(2)-5(4)=20$.'],
         answer: 'It lands after $4$ seconds; the greatest height is $20$ m.',
-        working: '\\begin{aligned}20t-5t^2&=0\\\\5t(4-t)&=0\\\\t&=0\\ \\text{or}\\ t=4\\\\h(2)&=40-20=20\\end{aligned}',
+        working: [
+          { say: 'It lands when the height is zero:', tex: '20t-5t^2&=0' },
+          { say: 'Factorise:', tex: '5t(4-t)&=0' },
+          { say: 'Each factor gives a root:', tex: 't&=0\\ \\text{or}\\ t=4' },
+          { say: 'Greatest height at the halfway point $t=2$:', tex: 'h(2)&=40-20=20' }
+        ],
         verify: { kind: 'roots', f: '20*x-5*x^2', answers: ['0', '4'] }
       }
     ],
@@ -110,21 +125,33 @@ export default {
         question: 'Find the value of $\\$8000$ invested at $6\\%$ p.a. compounded monthly for $3$ years, and the interest earned.',
         steps: ['Monthly rate: $r=0.06\\div12=0.005$.', 'Periods: $n=3\\times12=36$.', '$FV=8000\\times1.005^{36}=9573.44$.', 'Interest: $9573.44-8000=1573.44$.'],
         answer: '$\\$9573.44$, so the interest is $\\$1573.44$.',
-        working: '\\begin{aligned}FV&=8000(1+0.005)^{36}\\\\&=8000\\times1.19668\\ldots\\\\&=9573.44\\\\I&=9573.44-8000=1573.44\\end{aligned}',
+        working: [
+          { say: 'Monthly rate $0.005$ and $36$ periods:', tex: 'FV&=8000(1+0.005)^{36}' },
+          { tex: '&\\approx8000\\times1.19668' },
+          { tex: '&\\approx9573.44' },
+          { say: 'Interest is future value less principal:', tex: 'I&=9573.44-8000=1573.44' }
+        ],
         verify: { kind: 'value', expr: '8000*1.005^36', answer: '9573.444198587318' }
       },
       {
         question: 'A $\\$20000$ loan at $6\\%$ p.a. is charged interest monthly and repaid at $\\$500$ a month. Find the balance after the first two repayments.',
         steps: ['Monthly rate $0.005$. Month 1 interest: $20000\\times0.005=100$.', 'Balance: $20000+100-500=19600$.', 'Month 2 interest: $19600\\times0.005=98$.', 'Balance: $19600+98-500=19198$.'],
         answer: '$\\$19198.00$',
-        working: '\\begin{aligned}B_1&=20000+100-500=19600\\\\B_2&=19600+98-500=19198\\end{aligned}',
+        working: [
+          { say: 'Balance after month 1 (interest, then repayment):', tex: 'B_1&=20000+100-500=19600' },
+          { say: 'Balance after month 2:', tex: 'B_2&=19600+98-500=19198' }
+        ],
         verify: { kind: 'values', pairs: [['20000*0.005', '100'], ['19600*0.005', '98'], ['19600+98-500', '19198']] }
       },
       {
         question: 'How much must be invested now at $5\\%$ p.a. compounded yearly to have $\\$10000$ in $4$ years?',
         steps: ['The target is the future value: $FV=10000$, with $r=0.05$ and $n=4$.', '$PV=\\dfrac{10000}{1.05^{4}}$.', '$1.05^4=1.21550625$.', '$PV=8227.02$ to the nearest cent.'],
         answer: '$\\$8227.02$',
-        working: '\\begin{aligned}PV&=\\dfrac{10000}{1.05^{4}}\\\\&=\\dfrac{10000}{1.21550625}\\\\&=8227.02\\end{aligned}',
+        working: [
+          { say: 'Present value of a target future value of $10000$:', tex: 'PV&=\\dfrac{10000}{1.05^{4}}' },
+          { say: 'Evaluate $1.05^4$:', tex: '&=\\dfrac{10000}{1.21550625}' },
+          { tex: '&\\approx8227.02' }
+        ],
         verify: { kind: 'value', expr: '10000/1.05^4', answer: '8227.024747918818' }
       }
     ],
@@ -179,21 +206,33 @@ export default {
         question: 'Find the future value of $\\$1000$ paid at the end of each year for $3$ years into an account paying $4\\%$ p.a.',
         steps: ['Payment $1$ earns $2$ years: $1000\\times1.04^2=1081.60$.', 'Payment $2$ earns $1$ year: $1000\\times1.04=1040$.', 'Payment $3$ earns none: $1000$.', 'Add: $1081.60+1040+1000=3121.60$.'],
         answer: '$\\$3121.60$',
-        working: '\\begin{aligned}FV&=1000\\times\\dfrac{1.04^{3}-1}{0.04}\\\\&=1000\\times3.1216\\\\&=3121.60\\end{aligned}',
+        working: [
+          { say: 'Future value of an annuity formula:', tex: 'FV&=1000\\times\\dfrac{1.04^{3}-1}{0.04}' },
+          { tex: '&=1000\\times3.1216' },
+          { tex: '&=3121.60' }
+        ],
         verify: { kind: 'value', expr: '1000*1.04^2+1000*1.04+1000', answer: '3121.6' }
       },
       {
         question: 'Find the present value of an annuity of $\\$2000$ a year for $5$ years at $5\\%$ p.a.',
         steps: ['$M=2000$, $r=0.05$, $n=5$.', '$PV=2000\\times\\dfrac{1-1.05^{-5}}{0.05}$.', '$1-1.05^{-5}=0.216474$ and $\\dfrac{0.216474}{0.05}\\approx4.329477$.', '$2000\\times4.329477\\approx8658.95$.'],
         answer: '$\\$8658.95$',
-        working: '\\begin{aligned}PV&=2000\\times\\dfrac{1-1.05^{-5}}{0.05}\\\\&\\approx2000\\times4.329477\\\\&\\approx8658.95\\end{aligned}',
+        working: [
+          { say: 'Present value of an annuity formula:', tex: 'PV&=2000\\times\\dfrac{1-1.05^{-5}}{0.05}' },
+          { say: 'Evaluate the factor:', tex: '&\\approx2000\\times4.329477' },
+          { tex: '&\\approx8658.95' }
+        ],
         verify: { kind: 'value', expr: '2000*(1-1.05^-5)/0.05', answer: '8658.953341261646' }
       },
       {
         question: 'Natalie saves $\\$500$ at the end of every quarter for $2$ years at $8\\%$ p.a. compounded quarterly. Find the future value.',
         steps: ['Quarterly rate: $r=0.08\\div4=0.02$.', 'Number of payments: $n=2\\times4=8$.', '$FV=500\\times\\dfrac{1.02^{8}-1}{0.02}$.', '$\\dfrac{1.02^8-1}{0.02}\\approx8.582969$, so $FV\\approx4291.48$.'],
         answer: '$\\$4291.48$',
-        working: '\\begin{aligned}FV&=500\\times\\dfrac{1.02^{8}-1}{0.02}\\\\&\\approx500\\times8.582969\\\\&\\approx4291.48\\end{aligned}',
+        working: [
+          { say: 'Future value of an annuity formula, with $r=0.02$ and $n=8$:', tex: 'FV&=500\\times\\dfrac{1.02^{8}-1}{0.02}' },
+          { say: 'Evaluate the factor:', tex: '&\\approx500\\times8.582969' },
+          { tex: '&\\approx4291.48' }
+        ],
         verify: { kind: 'value', expr: '500*(1.02^8-1)/0.02', answer: '4291.484525056643' }
       }
     ],
@@ -248,21 +287,34 @@ export default {
         question: 'In triangle $ABC$, $a=10$ cm, $A=40^\\circ$ and $B=60^\\circ$. Find $b$ to $2$ decimal places.',
         steps: ['Side $a$ is opposite $A$, and $b$ is opposite $B$, so the sine rule applies.', '$\\dfrac{b}{\\sin60^\\circ}=\\dfrac{10}{\\sin40^\\circ}$.', '$b=\\dfrac{10\\sin60^\\circ}{\\sin40^\\circ}$.', '$b=13.47$ cm.'],
         answer: '$b=13.47$ cm',
-        working: '\\begin{aligned}\\dfrac{b}{\\sin60^\\circ}&=\\dfrac{10}{\\sin40^\\circ}\\\\b&=\\dfrac{10\\sin60^\\circ}{\\sin40^\\circ}\\\\&=13.47\\end{aligned}',
+        working: [
+          { say: 'Sine rule, as $a$ is opposite $A$ and $b$ is opposite $B$:', tex: '\\dfrac{b}{\\sin60^\\circ}&=\\dfrac{10}{\\sin40^\\circ}' },
+          { say: 'Make $b$ the subject:', tex: 'b&=\\dfrac{10\\sin60^\\circ}{\\sin40^\\circ}' },
+          { tex: '&\\approx13.47' }
+        ],
         verify: { kind: 'value', expr: '10*sin(60*pi/180)/sin(40*pi/180)', answer: '13.472963553338607' }
       },
       {
         question: 'In triangle $ABC$, $a=8$ cm, $b=11$ cm and the angle between them is $C=50^\\circ$. Find $c$ to $2$ decimal places.',
         steps: ['Two sides and the included angle: use the cosine rule.', '$c^2=8^2+11^2-2(8)(11)\\cos50^\\circ$.', '$c^2=185-176\\cos50^\\circ=71.87$.', '$c=\\sqrt{71.87}=8.48$ cm.'],
         answer: '$c=8.48$ cm',
-        working: '\\begin{aligned}c^{2}&=8^{2}+11^{2}-2(8)(11)\\cos50^\\circ\\\\&=185-176\\cos50^\\circ\\\\&=71.87\\\\c&=8.48\\end{aligned}',
+        working: [
+          { say: 'Cosine rule, as two sides and the included angle are known:', tex: 'c^{2}&=8^{2}+11^{2}-2(8)(11)\\cos50^\\circ' },
+          { tex: '&=185-176\\cos50^\\circ' },
+          { tex: '&\\approx71.87' },
+          { say: 'Take the square root:', tex: 'c&\\approx8.48' }
+        ],
         verify: { kind: 'value', expr: 'sqrt(8^2+11^2-2*8*11*cos(50*pi/180))', answer: '8.477581063910216' }
       },
       {
         question: 'Find the area of the same triangle, with sides $8$ cm and $11$ cm enclosing $50^\\circ$.',
         steps: ['Use $A=\\tfrac{1}{2}ab\\sin C$.', '$A=\\tfrac{1}{2}(8)(11)\\sin50^\\circ$.', '$A=44\\sin50^\\circ=33.71$.'],
         answer: '$33.71$ cm$^2$',
-        working: '\\begin{aligned}A&=\\tfrac{1}{2}(8)(11)\\sin50^\\circ\\\\&=44\\sin50^\\circ\\\\&=33.71\\end{aligned}',
+        working: [
+          { say: 'Use $A=\\dfrac{1}{2}ab\\sin C$ with $a=8$, $b=11$, $C=50^\\circ$', tex: 'A&=\\dfrac{1}{2}(8)(11)\\sin50^\\circ' },
+          { tex: '&=44\\sin50^\\circ' },
+          { say: 'Evaluate and round to $2$ decimal places', tex: '&\\approx33.71' }
+        ],
         verify: { kind: 'value', expr: '0.5*8*11*sin(50*pi/180)', answer: '33.70595549723503' }
       }
     ],
@@ -317,21 +369,31 @@ export default {
         question: 'Aisha and Ben share a $\\$2400$ prize in the ratio $3:5$. How much does Ben get?',
         steps: ['The total number of shares is $3+5=8$.', 'One share is $2400\\div8=300$.', 'Ben has $5$ shares: $5\\times300=1500$.', 'Check: $900+1500=2400$.'],
         answer: '$\\$1500.00$',
-        working: '\\begin{aligned}\\text{Ben}&=\\dfrac{5}{8}\\times2400\\\\&=5\\times300\\\\&=1500\\end{aligned}',
+        working: [
+          { say: 'Ben\'s fraction of the prize is $\\dfrac{5}{8}$ ($3+5=8$ shares)', tex: '\\text{Ben}&=\\dfrac{5}{8}\\times2400' },
+          { tex: '&=5\\times300' },
+          { tex: '&=1500' }
+        ],
         verify: { kind: 'value', expr: '5/8*2400', answer: '1500' }
       },
       {
         question: 'On a map with scale $1:50000$, two towns are $4$ cm apart. How far apart are they in kilometres?',
         steps: ['Real distance in cm: $4\\times50000=200000$.', 'Divide by $100000$ to convert to km.', '$200000\\div100000=2$.'],
         answer: '$2$ km',
-        working: '\\begin{aligned}4\\times50000&=200000\\ \\text{cm}\\\\200000\\div100000&=2\\ \\text{km}\\end{aligned}',
+        working: [
+          { say: 'Real distance in centimetres (multiply by the scale factor)', tex: '4\\times50000&=200000\\ \\text{cm}' },
+          { say: 'Convert to kilometres (divide by $100000$)', tex: '200000\\div100000&=2\\ \\text{km}' }
+        ],
         verify: { kind: 'value', expr: '4*50000/100000', answer: '2' }
       },
       {
         question: 'A car uses $7.5$ L per $100$ km. Petrol is $\\$1.95$ per litre. Find the fuel cost of a $640$ km trip.',
         steps: ['Litres needed: $640\\div100\\times7.5=48$.', 'Cost: $48\\times1.95=93.60$.'],
         answer: '$\\$93.60$',
-        working: '\\begin{aligned}\\text{Litres}&=\\dfrac{640}{100}\\times7.5=48\\\\\\text{Cost}&=48\\times1.95=93.60\\end{aligned}',
+        working: [
+          { say: 'Litres needed for $640$ km at $7.5$ L per $100$ km', tex: '\\text{Litres}&=\\dfrac{640}{100}\\times7.5=48' },
+          { say: 'Cost at 1.95 dollars per litre', tex: '\\text{Cost}&=48\\times1.95=93.60' }
+        ],
         verify: { kind: 'value', expr: '640/100*7.5*1.95', answer: '93.6' }
       }
     ],
@@ -385,14 +447,24 @@ export default {
         question: 'A network has edges $S\\to A$ (capacity $10$), $S\\to B$ ($6$), $A\\to B$ ($3$), $A\\to T$ ($7$) and $B\\to T$ ($8$). Find the maximum flow.',
         steps: ['Cut $\\{S\\}$ separates $S$ from the rest: $10+6=16$.', 'Cut $\\{S,A\\}$: edges $S\\to B$, $A\\to B$, $A\\to T$ give $6+3+7=16$.', 'Cut $\\{S,B\\}$: edges $S\\to A$ and $B\\to T$ give $10+8=18$.', 'Cut $\\{S,A,B\\}$: edges into $T$ give $7+8=15$.', 'The minimum cut is $15$, so the maximum flow is $15$.'],
         answer: 'Maximum flow $=15$',
-        working: '\\begin{aligned}\\{S\\}&:\\ 10+6=16\\\\\\{S,A\\}&:\\ 6+3+7=16\\\\\\{S,B\\}&:\\ 10+8=18\\\\\\{S,A,B\\}&:\\ 7+8=15\\end{aligned}',
+        working: [
+          { say: 'Cut around $S$ alone, edges leaving $S$', tex: '\\text{Cut }\\{S\\}&=10+6=16' },
+          { say: 'Cut $\\{S,A\\}$, edges leaving the set', tex: '\\text{Cut }\\{S,A\\}&=6+3+7=16' },
+          { say: 'Cut $\\{S,B\\}$, edges leaving the set', tex: '\\text{Cut }\\{S,B\\}&=10+8=18' },
+          { say: 'Cut $\\{S,A,B\\}$, edges into $T$', tex: '\\text{Cut }\\{S,A,B\\}&=7+8=15' },
+          { say: 'Maximum flow equals the minimum cut, the smallest of $16,16,18,15$', tex: '\\text{Maximum flow}&=15' }
+        ],
         verify: { kind: 'values', pairs: [['10+6', '16'], ['6+3+7', '16'], ['10+8', '18'], ['7+8', '15']] }
       },
       {
         question: 'In the same network, $S\\to B$ carries its full $6$ units, $9$ units arrive at $A$ and $7$ leave along $A\\to T$. How much flows along $A\\to B$, and what is the flow into $T$ if $B\\to T$ is full?',
         steps: ['Flow in equals flow out at $A$: $9=7+x$, so $x=2$.', 'The inflow at $B$ is $6+2=8$, which equals the capacity of $B\\to T$.', 'Flow into $T$: $7+8=15$, matching the minimum cut.'],
         answer: '$2$ units along $A\\to B$; the flow into $T$ is $15$.',
-        working: '\\begin{aligned}9&=7+x\\\\x&=2\\\\\\text{into }T&=7+8=15\\end{aligned}',
+        working: [
+          { say: 'Flow in equals flow out at $A$', tex: '9&=7+x' },
+          { say: 'Solve for the flow along $A\\to B$', tex: 'x&=2' },
+          { say: 'Flow into $T$ is the flow along $A\\to T$ plus the full $B\\to T$ (the inflow at $B$ is $6+2=8$)', tex: '\\text{Flow into }T&=7+8=15' }
+        ],
         verify: { kind: 'values', pairs: [['9-7', '2'], ['7+8', '15']] }
       }
     ],
@@ -446,21 +518,33 @@ export default {
         question: 'A project has activities $A$ ($3$ days), $B$ ($4$), $C$ ($5$), $D$ ($2$) and $E$ ($3$). $C$ follows $A$, $D$ follows $B$, and $E$ follows both $C$ and $D$. Find the critical path and the minimum time.',
         steps: ['Path $A,C,E$: $3+5+3=11$.', 'Path $B,D,E$: $4+2+3=9$.', 'The longest is $A,C,E$.', 'The minimum completion time is $11$ days.'],
         answer: 'Critical path $A,C,E$; minimum time $11$ days.',
-        working: '\\begin{aligned}A,C,E&:\\ 3+5+3=11\\\\B,D,E&:\\ 4+2+3=9\\end{aligned}',
+        working: [
+          { say: 'Add the durations along the first path', tex: 'A,C,E&=3+5+3=11' },
+          { say: 'Add the durations along the second path', tex: 'B,D,E&=4+2+3=9' },
+          { say: 'The longest path is critical, and sets the minimum time', tex: '\\text{Minimum time}&=11\\ \\text{days}' }
+        ],
         verify: { kind: 'values', pairs: [['3+5+3', '11'], ['4+2+3', '9']] }
       },
       {
         question: 'Using the same project, find the float of activity $D$.',
         steps: ['$D$ starts when $B$ finishes: earliest start $4$.', '$E$ must start by day $8$ (after $A$ and $C$), so the latest finish of $D$ is $8$.', 'Float $=8-4-2=2$ days.'],
         answer: '$2$ days',
-        working: '\\begin{aligned}\\text{float}&=\\text{LFT}-\\text{EST}-\\text{duration}\\\\&=8-4-2\\\\&=2\\end{aligned}',
+        working: [
+          { say: 'Float is the latest finish less the earliest start less the duration', tex: '\\text{float}&=\\text{LFT}-\\text{EST}-\\text{duration}' },
+          { say: 'Substitute the earliest start $4$, latest finish $8$ and duration $2$', tex: '&=8-4-2' },
+          { tex: '&=2' }
+        ],
         verify: { kind: 'value', expr: '8-4-2', answer: '2' }
       },
       {
         question: 'Activity $C$ is shortened from $5$ days to $3$ days. What is the new minimum time?',
         steps: ['Path $A,C,E$ becomes $3+3+3=9$.', 'Path $B,D,E$ is still $4+2+3=9$.', 'Both paths are now $9$, so both are critical.', 'The minimum time drops from $11$ days to $9$ days, and not lower, because $B,D,E$ now controls it.'],
         answer: '$9$ days',
-        working: '\\begin{aligned}A,C,E&:\\ 3+3+3=9\\\\B,D,E&:\\ 4+2+3=9\\end{aligned}',
+        working: [
+          { say: 'Path $A,C,E$ with $C$ shortened to $3$ days', tex: 'A,C,E&=3+3+3=9' },
+          { say: 'Path $B,D,E$ is unchanged', tex: 'B,D,E&=4+2+3=9' },
+          { say: 'Both paths are critical, so the minimum time is', tex: '\\text{Minimum time}&=9\\ \\text{days}' }
+        ],
         verify: { kind: 'values', pairs: [['3+3+3', '9'], ['4+2+3', '9']] }
       }
     ],
@@ -515,21 +599,32 @@ export default {
         question: 'Five students record hours of study $x$ and test mark $y$: $(1,52)$, $(2,57)$, $(3,63)$, $(4,66)$, $(5,72)$. For these data $\\bar x=3$, $\\bar y=62$, $S_{xx}=10$ and $S_{xy}=49$. Find the line of best fit.',
         steps: ['Gradient: $m=\\dfrac{S_{xy}}{S_{xx}}=\\dfrac{49}{10}=4.9$.', 'Intercept: $c=\\bar y-m\\bar x=62-4.9\\times3=47.3$.', 'The line is $y=4.9x+47.3$.'],
         answer: '$y=4.9x+47.3$',
-        working: '\\begin{aligned}m&=\\dfrac{49}{10}=4.9\\\\c&=62-4.9(3)=47.3\\\\y&=4.9x+47.3\\end{aligned}',
+        working: [
+          { say: 'Gradient', tex: ':m&=\\dfrac{S_{xy}}{S_{xx}}=\\dfrac{49}{10}=4.9' },
+          { say: 'Intercept from $c=\\bar y-m\\bar x$', tex: 'c&=62-4.9(3)=47.3' },
+          { say: 'The line of best fit', tex: 'y&=4.9x+47.3' }
+        ],
         verify: { kind: 'values', pairs: [['49/10', '4.9'], ['62-4.9*3', '47.3']] }
       },
       {
         question: 'Use $y=4.9x+47.3$ to predict the mark for $3.5$ hours and for $8$ hours. Which prediction is more reliable?',
         steps: ['At $x=3.5$: $y=4.9(3.5)+47.3=64.45$.', 'At $x=8$: $y=4.9(8)+47.3=86.5$.', '$3.5$ lies inside the data range $1$ to $5$, so it is interpolation.', '$8$ lies outside it, so it is extrapolation and less reliable.'],
         answer: '$64.45$ marks (reliable) and $86.5$ marks (less reliable).',
-        working: '\\begin{aligned}y(3.5)&=4.9(3.5)+47.3=64.45\\\\y(8)&=4.9(8)+47.3=86.5\\end{aligned}',
+        working: [
+          { say: 'Predict for $3.5$ hours (interpolation, inside the data range $1$ to $5$)', tex: 'y(3.5)&=4.9(3.5)+47.3=64.45' },
+          { say: 'Predict for $8$ hours (extrapolation, outside the data range, so less reliable)', tex: 'y(8)&=4.9(8)+47.3=86.5' }
+        ],
         verify: { kind: 'values', pairs: [['4.9*3.5+47.3', '64.45'], ['4.9*8+47.3', '86.5']] }
       },
       {
         question: 'With $S_{xx}=10$, $S_{yy}=242$ and $S_{xy}=49$, find $r$ and describe the correlation.',
         steps: ['$r=\\dfrac{S_{xy}}{\\sqrt{S_{xx}S_{yy}}}=\\dfrac{49}{\\sqrt{10\\times242}}$.', '$\\sqrt{2420}=49.19$, so $r=0.996$.', 'This is a very strong positive linear correlation.'],
         answer: '$r=0.996$: strong positive correlation.',
-        working: '\\begin{aligned}r&=\\dfrac{49}{\\sqrt{10\\times242}}\\\\&=\\dfrac{49}{49.19}\\\\&=0.996\\end{aligned}',
+        working: [
+          { say: 'Correlation coefficient', tex: 'r&=\\dfrac{S_{xy}}{\\sqrt{S_{xx}S_{yy}}}=\\dfrac{49}{\\sqrt{10\\times242}}' },
+          { say: 'Evaluate the square root, $\\sqrt{2420}\\approx49.19$', tex: '&\\approx\\dfrac{49}{49.19}' },
+          { tex: '&\\approx0.996' }
+        ],
         verify: { kind: 'value', expr: '49/sqrt(10*242)', answer: '0.9960666445226335' }
       }
     ],
@@ -584,21 +679,33 @@ export default {
         question: 'A die is rolled $200$ times and a six appears $38$ times. Find the relative frequency of a six, and compare the number of sixes expected in $600$ rolls from this result with the theoretical expectation.',
         steps: ['Relative frequency: $\\dfrac{38}{200}=0.19$.', 'From the experiment: $600\\times0.19=114$.', 'Theoretical: $P(6)=\\tfrac{1}{6}$, so $600\\times\\tfrac{1}{6}=100$.', 'The experimental estimate is a little higher, which is chance variation.'],
         answer: 'Relative frequency $0.19$; $114$ sixes from the experiment against $100$ theoretical.',
-        working: '\\begin{aligned}\\dfrac{38}{200}&=0.19\\\\600\\times0.19&=114\\\\600\\times\\tfrac{1}{6}&=100\\end{aligned}',
+        working: [
+          { say: 'Relative frequency of a six', tex: '\\text{Relative frequency}&=\\dfrac{38}{200}=0.19' },
+          { say: 'Expected sixes in $600$ rolls from the experiment', tex: '600\\times0.19&=114' },
+          { say: 'Expected sixes in $600$ rolls from the theory, $P(6)=\\dfrac{1}{6}$', tex: '600\\times\\dfrac{1}{6}&=100' }
+        ],
         verify: { kind: 'values', pairs: [['38/200', '0.19'], ['600*0.19', '114'], ['600/6', '100']] }
       },
       {
         question: 'A bag has $5$ red and $3$ blue marbles. Two are drawn without replacement. Find the probability that both are red.',
         steps: ['First red: $\\tfrac{5}{8}$.', 'One red is gone, so $4$ red remain among $7$: $\\tfrac{4}{7}$.', 'Multiply: $\\tfrac{5}{8}\\times\\tfrac{4}{7}=\\tfrac{20}{56}=\\tfrac{5}{14}$.'],
         answer: '$\\tfrac{5}{14}$',
-        working: '\\begin{aligned}P(RR)&=\\tfrac{5}{8}\\times\\tfrac{4}{7}\\\\&=\\tfrac{20}{56}\\\\&=\\tfrac{5}{14}\\end{aligned}',
+        working: [
+          { say: 'Multiply the probability of a first red by that of a second red (one red removed)', tex: 'P(RR)&=\\dfrac{5}{8}\\times\\dfrac{4}{7}' },
+          { tex: '&=\\dfrac{20}{56}' },
+          { say: 'Simplify', tex: '&=\\dfrac{5}{14}' }
+        ],
         verify: { kind: 'value', expr: '5/8*4/7', answer: '5/14' }
       },
       {
         question: 'Using the same bag, find the probability that at least one of the two marbles is blue.',
         steps: ['"At least one blue" is the complement of "no blue", which is both red.', '$P(\\text{both red})=\\tfrac{5}{14}$.', '$P(\\text{at least one blue})=1-\\tfrac{5}{14}=\\tfrac{9}{14}$.'],
         answer: '$\\tfrac{9}{14}$',
-        working: '\\begin{aligned}P(\\text{at least one blue})&=1-P(RR)\\\\&=1-\\tfrac{5}{14}\\\\&=\\tfrac{9}{14}\\end{aligned}',
+        working: [
+          { say: 'Use the complement: not "at least one blue" means both red', tex: 'P(\\text{at least one blue})&=1-P(RR)' },
+          { say: 'Substitute $P(RR)=\\dfrac{5}{14}$', tex: '&=1-\\dfrac{5}{14}' },
+          { tex: '&=\\dfrac{9}{14}' }
+        ],
         verify: { kind: 'value', expr: '1-5/14', answer: '9/14' }
       }
     ],
@@ -653,21 +760,32 @@ export default {
         question: 'Adult heights are normally distributed with mean $170$ cm and standard deviation $6$ cm. Find the z-score of a person who is $182$ cm tall.',
         steps: ['Use $z=\\dfrac{x-\\mu}{\\sigma}$.', '$z=\\dfrac{182-170}{6}=\\dfrac{12}{6}=2$.', 'The height is $2$ standard deviations above the mean.'],
         answer: '$z=2$',
-        working: '\\begin{aligned}z&=\\dfrac{182-170}{6}\\\\&=\\dfrac{12}{6}\\\\&=2\\end{aligned}',
+        working: [
+          { say: 'Use $z=\\dfrac{x-\\mu}{\\sigma}$', tex: 'z&=\\dfrac{182-170}{6}' },
+          { tex: '&=\\dfrac{12}{6}' },
+          { tex: '&=2' }
+        ],
         verify: { kind: 'value', expr: '(182-170)/6', answer: '2' }
       },
       {
         question: 'Using the same heights, what percentage of adults are taller than $182$ cm?',
         steps: ['$182$ is $2$ standard deviations above the mean.', 'About $95\\%$ lie within $2$ standard deviations, so about $5\\%$ lie outside.', 'By symmetry half of that $5\\%$ is above: $5\\%\\div2=2.5\\%$.'],
         answer: 'About $2.5\\%$',
-        working: '\\begin{aligned}100\\%-95\\%&=5\\%\\\\5\\%\\div2&=2.5\\%\\end{aligned}',
+        working: [
+          { say: 'The area outside $2$ standard deviations (about $95\\%$ lie inside)', tex: '100\\%-95\\%&=5\\%' },
+          { say: 'Half of this lies above the mean, by symmetry', tex: '5\\%\\div2&=2.5\\%' }
+        ],
         verify: { kind: 'value', expr: '(100-95)/2', answer: '2.5' }
       },
       {
         question: 'For the same heights find the height with a z-score of $-1.5$.',
         steps: ['Use $x=\\mu+z\\sigma$.', '$x=170+(-1.5)(6)$.', '$x=170-9=161$.'],
         answer: '$161$ cm',
-        working: '\\begin{aligned}x&=170+(-1.5)(6)\\\\&=170-9\\\\&=161\\end{aligned}',
+        working: [
+          { say: 'Use $x=\\mu+z\\sigma$ with $z=-1.5$', tex: 'x&=170+(-1.5)(6)' },
+          { tex: '&=170-9' },
+          { tex: '&=161' }
+        ],
         verify: { kind: 'value', expr: '170+(-1.5)*6', answer: '161' }
       }
     ],

@@ -17,9 +17,25 @@ export default {
       { title: 'A histogram of $30$ values', spec: { kind: 'histogram', bins: { edges: [0, 10, 20, 30, 40], counts: [4, 9, 12, 5] } }, note: 'The bars have heights $4$, $9$, $12$ and $5$, so the total is $30$. The tallest bar holds $12$ values, which is $40\\%$ of the data.' }
     ],
     working: [
-      '\\begin{aligned}\\text{angle}&=\\frac{12}{40}\\times360^{\\circ}\\\\&=0.3\\times360^{\\circ}\\\\&=108^{\\circ}\\end{aligned}',
-      '\\begin{aligned}\\text{total}&=4+9+12+5=30\\\\\\text{share}&=\\frac{12}{30}\\times100\\%=40\\%\\end{aligned}',
-      '\\begin{aligned}\\frac{36}{5}&=7.2\\ \\to\\ \\text{width }8\\\\5\\times8&=40\\ge36\\\\\\text{classes}&:\\ 10\\text{–}17,\\ 18\\text{–}25,\\ \\ldots,\\ 42\\text{–}49\\end{aligned}'
+      [
+        { say: 'Fraction of the full turn:', tex: '\\text{angle}&=\\dfrac{12}{40}\\times360^{\\circ}' },
+        { tex: '&=0.3\\times360^{\\circ}' },
+        { tex: '&=108^{\\circ}' }
+      ],
+      [
+        { say: 'Total frequency:', tex: '\\text{total}&=4+9+12+5' },
+        { tex: '&=30' },
+        { say: 'Share in the tallest bar:', tex: '\\text{share}&=\\dfrac{12}{30}\\times100\\%' },
+        { tex: '&=40\\%' }
+      ],
+      [
+        { say: 'Number of whole marks, divided by $5$ classes:', tex: '\\dfrac{47-12+1}{5}&=\\dfrac{36}{5}' },
+        { tex: '&=7.2' },
+        { say: 'Width $7$ is too small, so round up to the class width:', tex: 'w&=8' },
+        { say: 'Five classes of that width cover:', tex: '5\\times8&=40' },
+        { say: 'Check the classes cover all $36$ marks:', tex: '40&\\ge36' },
+        { say: 'Start at $10$; the last class ends at $10+40-1$:', tex: '10+5\\times8-1&=49' }
+      ]
     ],
     check: [
       { question: 'In a survey of $60$ people, $15$ prefer tea. What is the sector angle for tea?', answer: '$90^\\circ$', verify: { kind: 'value', expr: '15/60*360', answer: '90' } },
@@ -39,9 +55,25 @@ export default {
       { title: 'An isosceles triangle with a $40^\\circ$ apex', spec: { kind: 'triangle', a: 5, b: 5, C: 40 }, note: 'Two equal sides meet at the apex angle of $40^\\circ$. The other two angles are equal, $\\tfrac{180-40}{2}=70$ degrees each.' }
     ],
     working: [
-      '\\begin{aligned}x+(2x+30)&=180&&\\text{(co-interior angles, parallel lines)}\\\\3x&=150\\\\x&=50\\end{aligned}',
-      '\\begin{aligned}\\text{Sum}&=(10-2)\\times180^{\\circ}=1440^{\\circ}\\\\\\text{One angle}&=1440^{\\circ}\\div10=144^{\\circ}\\end{aligned}',
-      '\\begin{aligned}\\text{Base angle}&=\\frac{180^{\\circ}-40^{\\circ}}{2}=70^{\\circ}\\\\\\text{Exterior angle}&=40^{\\circ}+70^{\\circ}=110^{\\circ}\\end{aligned}'
+      [
+        { say: 'Co-interior angles add to $180^\\circ$:', tex: 'x+(2x+30)&=180' },
+        { say: 'Collect like terms:', tex: '3x+30&=180' },
+        { say: 'Subtract $30$:', tex: '3x&=150' },
+        { say: 'Divide by $3$:', tex: 'x&=50' }
+      ],
+      [
+        { say: 'Angle sum of a polygon:', tex: '\\text{Sum}&=(10-2)\\times180^{\\circ}' },
+        { tex: '&=1440^{\\circ}' },
+        { say: 'Divide among $10$ equal angles:', tex: '\\text{One angle}&=1440^{\\circ}\\div10' },
+        { tex: '&=144^{\\circ}' }
+      ],
+      [
+        { say: 'Base angles are equal; angles add to $180^\\circ$:', tex: '\\text{Base angle}&=\\dfrac{180^{\\circ}-40^{\\circ}}{2}' },
+        { tex: '&=70^{\\circ}' },
+        { say: 'Exterior angle is the sum of the two opposite interior angles:', tex: '\\text{Exterior angle}&=40^{\\circ}+70^{\\circ}' },
+        { tex: '&=110^{\\circ}' },
+        { say: 'Check, angles on a straight line:', tex: '110^{\\circ}+70^{\\circ}&=180^{\\circ}' }
+      ]
     ],
     check: [
       { question: 'Find the sum of the interior angles of a hexagon.', answer: '$720^\\circ$', verify: { kind: 'value', expr: '(6-2)*180', answer: '720' } },

@@ -17,9 +17,23 @@ export default {
       { title: 'Why $x+\\tfrac1x\\ge2$', spec: { kind: 'function', xmin: 0, xmax: 5, ymin: 0, ymax: 6, curves: [{ expr: 'x+1/x', label: 'y=x+1/x' }], asymptotes: [{ x: 0 }], points: [{ x: 1, y: 2, label: '(1,2)' }] }, note: 'The curve $y=x+\\tfrac1x$ never drops below $2$ for $x>0$, and touches $2$ only at $x=1$, where $(x-1)^2=0$.' }
     ],
     working: [
-      '\\begin{aligned}\\text{Base }(n=1):\\ &1=1^2\\\\\\text{Assume }(n=k):\\ &1+3+\\cdots+(2k-1)=k^2\\\\\\text{Step: }&k^2+(2k+1)=(k+1)^2\\end{aligned}',
-      '\\begin{aligned}n=2m+1\\ \\Rightarrow\\ n^2&=4m^2+4m+1\\\\&=2(2m^2+2m)+1\\ \\text{(odd)}\\end{aligned}',
-      '\\begin{aligned}x+\\frac1x-2&=\\frac{x^2-2x+1}{x}\\\\&=\\frac{(x-1)^2}{x}\\ge0\\end{aligned}'
+      [
+        { say: 'Basis case $n=1$:', tex: '1&=1^2' },
+        { say: 'Assume $P(k)$:', tex: '1+3+\\cdots+(2k-1)&=k^2' },
+        { say: 'Add the next term $2k+1$ to both sides:', tex: '1+3+\\cdots+(2k-1)+(2k+1)&=k^2+(2k+1)' },
+        { tex: '&=(k+1)^2' }
+      ],
+      [
+        { say: 'Prove the contrapositive: let $n$ be odd:', tex: 'n&=2m+1' },
+        { say: 'Square:', tex: 'n^2&=4m^2+4m+1' },
+        { tex: '&=2\\left(2m^2+2m\\right)+1,\\ \\text{which is odd}' }
+      ],
+      [
+        { say: 'Form the difference over a common denominator:', tex: 'x+\\dfrac1x-2&=\\dfrac{x^2-2x+1}{x}' },
+        { say: 'The numerator is a perfect square:', tex: '&=\\dfrac{(x-1)^2}{x}' },
+        { tex: '&\\ge0' },
+        { say: 'A square is non-negative and $x>0$, so:', tex: 'x+\\dfrac1x&\\ge2,\\quad\\text{with equality only when }x=1' }
+      ]
     ],
     check: [
       { question: 'In proving that $7^n-1$ is divisible by $6$, test the case $n=3$: evaluate $\\dfrac{7^3-1}{6}$.', answer: '$57$', verify: { kind: 'value', expr: '(7^3-1)/6', answer: '57' } },
@@ -38,9 +52,29 @@ export default {
       { title: 'Two vectors and their sum', spec: { kind: 'vector', vectors: [{ label: '\\mathbf a', dx: 3, dy: 1 }, { label: '\\mathbf b', dx: 1, dy: 3 }] }, note: 'In the plane, $\\mathbf a=(3,1)$ and $\\mathbf b=(1,3)$ give $\\mathbf a+\\mathbf b=(4,4)$. Here $\\mathbf a\\cdot\\mathbf b=6$ and $|\\mathbf a|=|\\mathbf b|=\\sqrt{10}$, so $\\cos\\theta=\\tfrac{6}{10}$ and the angle between them is about $53.1^\\circ$. In space the same rules hold with a third component.' }
     ],
     working: [
-      '\\begin{aligned}\\mathbf a\\cdot\\mathbf b&=2(1)+(-1)(2)+2(2)=4\\\\|\\mathbf a|=|\\mathbf b|&=3\\\\\\cos\\theta&=\\frac49\\ \\Rightarrow\\ \\theta\\approx63.6^{\\circ}\\end{aligned}',
-      '\\begin{aligned}1+\\lambda&=\\mu\\\\2\\lambda&=1+\\mu\\ \\Rightarrow\\ \\lambda=2,\\ \\mu=3\\\\2-\\lambda&=3-\\mu\\ \\Rightarrow\\ 0=0\\\\\\text{Point}&=(3,4,0)\\end{aligned}',
-      '\\begin{aligned}(x-1)^2+(y+2)^2+(z-3)^2&=11+1+4+9\\\\&=25\\\\\\text{centre }(1,-2,3),&\\ R=5\\end{aligned}'
+      [
+        { say: 'Scalar product:', tex: '\\mathbf a\\cdot\\mathbf b&=2(1)+(-1)(2)+2(2)=4' },
+        { say: 'Magnitudes:', tex: '|\\mathbf a|=|\\mathbf b|&=\\sqrt{4+1+4}=3' },
+        { say: 'Angle formula $\\cos\\theta=\\dfrac{\\mathbf a\\cdot\\mathbf b}{|\\mathbf a||\\mathbf b|}$:', tex: '\\cos\\theta&=\\dfrac{4}{3\\times3}=\\dfrac49' },
+        { say: 'Angle:', tex: '\\theta&\\approx63.6^\\circ' }
+      ],
+      [
+        { say: 'Equate the $x$-components:', tex: '1+\\lambda&=\\mu' },
+        { say: 'Equate the $y$-components:', tex: '2\\lambda&=1+\\mu' },
+        { say: 'Equate the $z$-components:', tex: '2-\\lambda&=3-\\mu' },
+        { say: 'Substitute $\\mu=1+\\lambda$ into the second equation:', tex: '2\\lambda&=2+\\lambda' },
+        { say: 'Solve:', tex: '\\lambda&=2,\\quad\\mu=3' },
+        { say: 'Test the third equation:', tex: '2-2&=0=3-3' },
+        { say: 'Point of intersection, from the first line with $\\lambda=2$:', tex: '\\mathbf r&=(1+2,\\ 0+4,\\ 2-2)=(3,4,0)' },
+        { say: 'Check with the second line, $\\mu=3$:', tex: '\\mathbf r&=(0+3,\\ 1+3,\\ 3-3)=(3,4,0)' }
+      ],
+      [
+        { say: 'Move the constant to the right:', tex: 'x^2+y^2+z^2-2x+4y-6z&=11' },
+        { say: 'Complete the square in each variable:', tex: '(x-1)^2+(y+2)^2+(z-3)^2&=11+1+4+9' },
+        { tex: '&=25' },
+        { say: 'Compare with $(x-a)^2+(y-b)^2+(z-c)^2=R^2$:', tex: '\\text{centre}&=(1,-2,3)' },
+        { say: 'Radius:', tex: 'R&=\\sqrt{25}=5' }
+      ]
     ],
     check: [
       { question: 'Find $\\mathbf a\\cdot\\mathbf b$ for $\\mathbf a=(2,-3,1)$ and $\\mathbf b=(1,1,1)$. What does the result tell you?', answer: '$0$, so the vectors are perpendicular.', verify: { kind: 'value', expr: '2*1+(-3)*1+1*1', answer: '0' } },
@@ -59,9 +93,22 @@ export default {
       { title: 'Adding complex numbers on the Argand diagram', spec: { kind: 'vector', vectors: [{ label: 'z_1', dx: 3, dy: 1 }, { label: 'z_2', dx: 1, dy: 2 }] }, note: 'Plot $z_1=3+i$ and $z_2=1+2i$ as vectors. Placed tip to tail they give $z_1+z_2=4+3i$, with modulus $\\sqrt{16+9}=5$.' }
     ],
     working: [
-      '\\begin{aligned}(3+2i)(1-4i)&=3-12i+2i-8i^2\\\\&=3-10i+8\\\\&=11-10i\\end{aligned}',
-      '\\begin{aligned}|z|&=\\sqrt{1^2+(\\sqrt3)^2}=2\\\\\\tan\\theta&=\\sqrt3,\\ \\text{first quadrant}\\ \\Rightarrow\\ \\theta=\\tfrac\\pi3\\\\z&=2\\left(\\cos\\tfrac\\pi3+i\\sin\\tfrac\\pi3\\right)\\end{aligned}',
-      '\\begin{aligned}z&=\\frac{4\\pm\\sqrt{16-52}}{2}\\\\&=\\frac{4\\pm6i}{2}\\\\&=2\\pm3i\\end{aligned}'
+      [
+        { say: 'Expand:', tex: '(3+2i)(1-4i)&=3-12i+2i-8i^2' },
+        { say: 'Use $i^2=-1$:', tex: '&=3-10i+8' },
+        { say: 'Collect real and imaginary parts:', tex: '&=11-10i' }
+      ],
+      [
+        { say: 'Modulus:', tex: '|z|&=\\sqrt{1^2+\\left(\\sqrt3\\right)^2}=2' },
+        { say: 'Argument, from $\\tan\\theta=\\dfrac{\\sqrt3}{1}$:', tex: '\\tan\\theta&=\\sqrt3' },
+        { say: 'The point is in the first quadrant:', tex: '\\theta&=\\dfrac\\pi3' },
+        { say: 'Modulus-argument form:', tex: 'z&=2\\left(\\cos\\left(\\dfrac\\pi3\\right)+i\\sin\\left(\\dfrac\\pi3\\right)\\right)' }
+      ],
+      [
+        { say: 'Quadratic formula:', tex: 'z&=\\dfrac{4\\pm\\sqrt{16-52}}{2}' },
+        { say: 'Discriminant is $-36$, and $\\sqrt{-36}=6i$:', tex: '&=\\dfrac{4\\pm6i}{2}' },
+        { say: 'Divide through by $2$:', tex: '&=2\\pm3i' }
+      ]
     ],
     check: [
       { question: 'Write $\\dfrac{2+i}{1+i}$ in the form $a+bi$. Give the real part $a$.', answer: '$a=\\tfrac32$ (the number is $\\tfrac32-\\tfrac12i$)', verify: { kind: 'values', pairs: [['(2*1+1*1)/(1^2+1^2)', '3/2'], ['(1*1-2*1)/(1^2+1^2)', '-1/2']] } },
@@ -80,9 +127,23 @@ export default {
       { title: 'Rectangles under $y=xe^x$', spec: { kind: 'riemannSlider', expr: 'x*e^x', a: 0, b: 1, initialN: 4 }, note: 'The exact area under $y=xe^x$ from $0$ to $1$ is $1$, the answer to the first worked example. Increase the number of rectangles and the total moves towards it.' }
     ],
     working: [
-      '\\begin{aligned}\\int_0^1xe^x\\,dx&=\\left[xe^x\\right]_0^1-\\int_0^1e^x\\,dx\\\\&=e-(e-1)\\\\&=1\\end{aligned}',
-      '\\begin{aligned}\\int_2^3\\frac{dx}{(x-1)(x+2)}&=\\frac13\\left[\\ln\\frac{x-1}{x+2}\\right]_2^3\\\\&=\\frac13\\left(\\ln\\frac25-\\ln\\frac14\\right)\\\\&=\\frac13\\ln\\frac85\\end{aligned}',
-      '\\begin{aligned}I_0&=\\frac\\pi2\\\\I_2&=\\frac12I_0=\\frac\\pi4\\\\I_4&=\\frac34I_2=\\frac{3\\pi}{16}\\end{aligned}'
+      [
+        { say: 'Integrate by parts with $u=x$ and $dv=e^x\\,dx$:', tex: '\\int_0^1xe^x\\,dx&=\\left[xe^x\\right]_0^1-\\int_0^1e^x\\,dx' },
+        { say: 'Evaluate each part:', tex: '&=e-(e-1)' },
+        { tex: '&=1' }
+      ],
+      [
+        { say: 'Partial fractions:', tex: '\\dfrac{1}{(x-1)(x+2)}&=\\dfrac13\\left(\\dfrac1{x-1}-\\dfrac1{x+2}\\right)' },
+        { say: 'Integrate:', tex: '\\int_2^3\\dfrac{dx}{(x-1)(x+2)}&=\\dfrac13\\left[\\ln(x-1)-\\ln(x+2)\\right]_2^3' },
+        { say: 'Substitute the limits:', tex: '&=\\dfrac13\\left[(\\ln2-\\ln5)-(\\ln1-\\ln4)\\right]' },
+        { say: 'Combine the logarithms:', tex: '&=\\dfrac13\\left(\\ln\\left(\\dfrac25\\right)-\\ln\\left(\\dfrac14\\right)\\right)' },
+        { tex: '&=\\dfrac13\\ln\\left(\\dfrac85\\right)' }
+      ],
+      [
+        { say: 'Starting value:', tex: 'I_0&=\\int_0^{\\pi/2}1\\,dx=\\dfrac\\pi2' },
+        { say: 'Apply $I_n=\\dfrac{n-1}{n}I_{n-2}$ with $n=2$:', tex: 'I_2&=\\dfrac12I_0=\\dfrac\\pi4' },
+        { say: 'Apply it with $n=4$:', tex: 'I_4&=\\dfrac34I_2=\\dfrac34\\times\\dfrac\\pi4=\\dfrac{3\\pi}{16}' }
+      ]
     ],
     check: [
       { question: 'Evaluate $\\displaystyle\\int_0^3\\frac{dx}{x^2+9}$.', answer: '$\\dfrac\\pi{12}$', verify: { kind: 'value', expr: '(1/3)*(atan(3/3)-atan(0))', answer: 'pi/12' } },
@@ -102,9 +163,31 @@ export default {
       { title: 'Displacement in simple harmonic motion', spec: { kind: 'function', xmin: 0, xmax: 4.2, ymin: -5, ymax: 5, curves: [{ expr: '4*cos(3*x)', label: 'x=4\\cos3t' }] }, note: 'The displacement $x=4\\cos3t$ swings between $-4$ and $4$. One full cycle takes $\\tfrac{2\\pi}{3}\\approx2.09$ units of time.' }
     ],
     working: [
-      '\\begin{aligned}v&=\\frac gk\\left(1-e^{-kt}\\right)=20\\left(1-e^{-0.5t}\\right)\\\\v(2)&=20\\left(1-e^{-1}\\right)\\approx12.6\\\\v_{\\text{terminal}}&=\\frac gk=20\\end{aligned}',
-      '\\begin{aligned}v\\frac{dv}{dx}&=10-0.1v^2\\ \\Rightarrow\\ x=5\\ln\\frac{10}{10-0.1v^2}\\\\x=10&\\Rightarrow\\ 10-0.1v^2=10e^{-2}\\\\v&=10\\sqrt{1-e^{-2}}\\approx9.3\\end{aligned}',
-      '\\begin{aligned}\\ddot x&=-36\\cos3t=-9x\\ \\Rightarrow\\ n=3\\\\T&=\\frac{2\\pi}{3}\\\\v_{\\max}&=na=12,\\quad|\\ddot x|_{\\max}=n^2a=36\\end{aligned}'
+      [
+        { say: 'Terminal velocity, where $\\ddot x=0$:', tex: 'v_{\\text{terminal}}&=\\dfrac gk=\\dfrac{10}{0.5}=20' },
+        { say: 'Speed for a fall from rest:', tex: 'v&=\\dfrac gk\\left(1-e^{-kt}\\right)=20\\left(1-e^{-0.5t}\\right)' },
+        { say: 'Evaluate the speed when $t=2$:', tex: 'v(2)&=20\\left(1-e^{-0.5\\times2}\\right)=20\\left(1-e^{-1}\\right)' },
+        { tex: '&\\approx12.6' }
+      ],
+      [
+        { say: 'Terminal velocity, where $\\ddot x=0$:', tex: '10-0.1v^2&=0' },
+        { say: 'Take the positive root:', tex: 'v&=\\sqrt{100}=10' },
+        { say: 'Use $\\ddot x=v\\dfrac{dv}{dx}$:', tex: 'v\\dfrac{dv}{dx}&=10-0.1v^2' },
+        { say: 'Integrate, with $v=0$ at $x=0$:', tex: 'x&=5\\ln\\left(\\dfrac{10}{10-0.1v^2}\\right)' },
+        { say: 'Set $x=10$:', tex: '\\ln\\left(\\dfrac{10}{10-0.1v^2}\\right)&=2' },
+        { say: 'Exponentiate:', tex: '10-0.1v^2&=10e^{-2}' },
+        { say: 'Make $v^2$ the subject:', tex: 'v^2&=100\\left(1-e^{-2}\\right)' },
+        { say: 'Take the positive root:', tex: 'v&=10\\sqrt{1-e^{-2}}' },
+        { tex: '&\\approx9.3' }
+      ],
+      [
+        { say: 'Differentiate:', tex: '\\dot x&=-12\\sin(3t)' },
+        { say: 'Differentiate again and compare with $x=4\\cos(3t)$:', tex: '\\ddot x&=-36\\cos(3t)=-9x' },
+        { say: 'This has the form $\\ddot x=-n^2x$, so the motion is simple harmonic with $n=3$:', tex: '\\ddot x&=-3^2x' },
+        { say: 'Period:', tex: 'T&=\\dfrac{2\\pi}{n}=\\dfrac{2\\pi}{3}' },
+        { say: 'Maximum speed, with amplitude $a=4$:', tex: 'v_{\\max}&=na=3\\times4=12' },
+        { say: 'Maximum acceleration:', tex: '\\left|\\ddot x\\right|_{\\max}&=n^2a=9\\times4=36' }
+      ]
     ],
     check: [
       { question: 'A body falls from rest with $\\ddot x=9.8-0.2v$. Find its terminal velocity.', answer: '$49$', verify: { kind: 'value', expr: '9.8/0.2', answer: '49' } },

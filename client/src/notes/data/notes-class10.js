@@ -211,7 +211,7 @@ export default {
       { wrong: 'Using $S_n$ when the question asks for the $n$th term.', right: 'Read carefully: "term" needs $a_n$, "sum" needs $S_n$.' }
     ],
     examples: [
-      { question: 'Find the sum of the first $20$ terms of $3, 7, 11, \\ldots$', steps: ['$a = 3$, $d = 4$, $n = 20$.', '$S_{20} = \\dfrac{20}{2}[2(3) + 19(4)] = 10 \\times 82$.'], answer: '$820$', verify: { kind: 'value', expr: '(20/2)*(2*3+(20-1)*4)', answer: '820' } },
+      { question: 'Find the sum of the first $20$ terms of $3, 7, 11, \\ldots$', steps: ['First term, common difference and number of terms: $a = 3$, $d = 4$, $n = 20$.', 'Sum of the first $n$ terms: $S_{20} = \\dfrac{20}{2}[2(3) + 19(4)] = 10 \\times 82$.'], answer: '$820$', verify: { kind: 'value', expr: '(20/2)*(2*3+(20-1)*4)', answer: '820' } },
       { question: 'A person saves ₹2 in week 1, ₹7 in week 2, ₹12 in week 3, and so on. How much is saved in week 10?', steps: ['Weekly savings form an AP with $a = 2$, $d = 5$.', '$a_{10} = 2 + 9 \\times 5 = 47$.'], answer: '₹47', verify: { kind: 'value', expr: '2+(10-1)*5', answer: '47' } }
     ]
   },
@@ -298,7 +298,7 @@ export default {
     ],
     examples: [
       { question: 'Find the distance between $(2, 3)$ and $(10, -3)$.', steps: ['$x$-gap: $10 - 2 = 8$; $y$-gap: $-3 - 3 = -6$.', 'Distance $= \\sqrt{64 + 36} = \\sqrt{100}$.'], answer: '$10$ units', verify: { kind: 'value', expr: 'sqrt((10-2)^2+(-3-3)^2)', answer: '10' } },
-      { question: 'Find the point dividing the join of $A(-1, 7)$ and $B(4, -3)$ internally in the ratio $2 : 3$.', steps: ['$m_1 = 2$, $m_2 = 3$.', '$x = \\dfrac{2(4) + 3(-1)}{5} = \\dfrac{5}{5} = 1$.', '$y = \\dfrac{2(-3) + 3(7)}{5} = \\dfrac{15}{5} = 3$.'], answer: '$(1, 3)$', verify: { kind: 'values', pairs: [['(2*4+3*(-1))/5', '1'], ['(2*(-3)+3*7)/5', '3']] } }
+      { question: 'Find the point dividing the join of $A(-1, 7)$ and $B(4, -3)$ internally in the ratio $2 : 3$.', steps: ['The ratio is $m_1:m_2$ with $m_1=2$, $m_2=3$. Section formula: $m_1 = 2$, $m_2 = 3$.', 'The $x$-coordinate: $x = \\dfrac{2(4) + 3(-1)}{5} = \\dfrac{5}{5} = 1$.', 'The $y$-coordinate: $y = \\dfrac{2(-3) + 3(7)}{5} = \\dfrac{15}{5} = 3$.'], answer: '$(1, 3)$', verify: { kind: 'values', pairs: [['(2*4+3*(-1))/5', '1'], ['(2*(-3)+3*7)/5', '3']] } }
     ]
   },
 
@@ -385,7 +385,7 @@ export default {
       { wrong: 'Taking $\\tan 30^\\circ = \\sqrt{3}$.', right: '$\\tan 30^\\circ = \\tfrac{1}{\\sqrt{3}}$; $\\tan 60^\\circ = \\sqrt{3}$.' }
     ],
     examples: [
-      { question: 'From a point $30$ m from the foot of a tower on level ground, the angle of elevation of its top is $30^\\circ$. Find the height of the tower.', steps: ['$\\tan 30^\\circ = \\dfrac{h}{30}$.', '$h = 30 \\times \\dfrac{1}{\\sqrt{3}} = \\dfrac{30}{\\sqrt{3}} = 10\\sqrt{3}$.'], answer: '$10\\sqrt{3}$ m', verify: { kind: 'value', expr: '30*tan(pi/6)', answer: '10*sqrt(3)' } },
+      { question: 'From a point $30$ m from the foot of a tower on level ground, the angle of elevation of its top is $30^\\circ$. Find the height of the tower.', steps: ['Tangent of the angle of elevation: $\\tan 30^\\circ = \\dfrac{h}{30}$.', 'Solve for the height: $h = 30 \\times \\dfrac{1}{\\sqrt{3}} = \\dfrac{30}{\\sqrt{3}} = 10\\sqrt{3}$.'], answer: '$10\\sqrt{3}$ m', verify: { kind: 'value', expr: '30*tan(pi/6)', answer: '10*sqrt(3)' } },
       { question: 'From the top of a $75$ m lighthouse, the angles of depression of two ships on the same side, in line with its base, are $30^\\circ$ and $45^\\circ$. Find the distance between the ships.', steps: ['Nearer ship ($45^\\circ$): distance $= \\dfrac{75}{\\tan 45^\\circ} = 75$ m.', 'Farther ship ($30^\\circ$): distance $= \\dfrac{75}{\\tan 30^\\circ} = 75\\sqrt{3}$ m.', 'Gap $= 75\\sqrt{3} - 75 = 75(\\sqrt{3} - 1)$.'], answer: '$75(\\sqrt{3} - 1)$ m', verify: { kind: 'value', expr: '75/tan(pi/6)-75/tan(pi/4)', answer: '75*(sqrt(3)-1)' } }
     ]
   },
@@ -470,7 +470,7 @@ export default {
       { wrong: 'Using the diameter as $r$.', right: 'Halve the diameter before squaring.' }
     ],
     examples: [
-      { question: 'Find the area of a sector of radius $21$ cm with central angle $60^\\circ$. Use $\\pi = \\tfrac{22}{7}$.', steps: ['$A = \\dfrac{60}{360} \\times \\dfrac{22}{7} \\times 21^2$.', '$= \\dfrac{1}{6} \\times 1386$.'], answer: '$231$ cm$^2$', verify: { kind: 'value', expr: '(60/360)*(22/7)*21^2', answer: '231' } },
+      { question: 'Find the area of a sector of radius $21$ cm with central angle $60^\\circ$. Use $\\pi = \\tfrac{22}{7}$.', steps: ['Area of a sector is the fraction of the circle: $A = \\dfrac{60}{360} \\times \\dfrac{22}{7} \\times 21^2$.', 'Simplify: $= \\dfrac{1}{6} \\times 1386$.'], answer: '$231$ cm$^2$', verify: { kind: 'value', expr: '(60/360)*(22/7)*21^2', answer: '231' } },
       { question: 'A chord of a circle of radius $10$ cm subtends a right angle at the centre. Find the area of the minor segment. Use $\\pi = 3.14$.', steps: ['Sector: $\\dfrac{90}{360} \\times 3.14 \\times 100 = 78.5$ cm$^2$.', 'Triangle: $\\dfrac{1}{2} \\times 10 \\times 10 = 50$ cm$^2$.', 'Segment $= 78.5 - 50$.'], answer: '$28.5$ cm$^2$', verify: { kind: 'value', expr: '(90/360)*3.14*10^2-(1/2)*10*10', answer: '28.5' } }
     ]
   },

@@ -51,9 +51,9 @@ export default {
   "c11-trig-functions": {
     "examples": [
       {
-        "question": "How many solutions does $\\sin 2x = \\sin x$ have for $0 \\le x < 2\\pi$?",
+        "question": "How many solutions does $\\sin(2x) = \\sin x$ have for $0 \\le x < 2\\pi$?",
         "steps": [
-          "Use $\\sin 2x = 2\\sin x\\cos x$, so $\\sin x\\,(2\\cos x - 1) = 0$.",
+          "Use $\\sin(2x) = 2\\sin x\\cos x$, so $\\sin x\\,(2\\cos x - 1) = 0$.",
           "$\\sin x = 0$ gives $x = 0, \\pi$; $\\cos x = \\tfrac{1}{2}$ gives $x = \\tfrac{\\pi}{3}, \\tfrac{5\\pi}{3}$.",
           "There are exactly four distinct solutions in the half-open interval."
         ],

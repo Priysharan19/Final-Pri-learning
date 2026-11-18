@@ -94,7 +94,7 @@ export default {
     ],
     "examples": [
       {
-        "question": "Solve $\\sin 2x = 0$ for $0 \\le x < 2\\pi$ and count the solutions.",
+        "question": "Solve $\\sin(2x) = 0$ for $0 \\le x < 2\\pi$ and count the solutions.",
         "steps": [
           "$\\sin\\theta = 0$ exactly at integer multiples of $\\pi$.",
           "Thus $2x = k\\pi$ and $x = \\tfrac{k\\pi}{2}$.",

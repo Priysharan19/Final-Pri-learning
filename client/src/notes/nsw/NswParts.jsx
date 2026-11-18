@@ -14,6 +14,7 @@ import { MathText } from '../../lib/latex.jsx';
 import Icon from '../../components/Icon.jsx';
 import DiagramFromSpec from '../../diagrams/DiagramFromSpec.jsx';
 import { useT } from '../../i18n/index.js';
+import { workingRows, normaliseWorkingTex } from '../workingRows.js';
 import { Objective, BuildsOn, Intuition, TeachingDiagrams, SelfCheck } from '../NotesParts.jsx';
 import '../notesFonts.css';
 import '../notesSheet.css';
@@ -95,18 +96,42 @@ export function Traps({ items }) {
   );
 }
 
+/**
+ * The working of an example, set the way a marking guideline sets it: each step's reason in words,
+ * then its line of maths, every line aligned on its relation sign in one column and in one maths style
+ * (notes/workingRows.js). A row without an `&` is a statement and runs across both columns.
+ */
+export function Working({ rows }) {
+  return (
+    <div className="nn-wk" role="group">
+      {rows.map((r, i) => (
+        <React.Fragment key={i}>
+          {r.say && <MathText block className="nn-wk-say" text={r.say} />}
+          {r.lhs == null
+            ? <div className="nn-wk-line"><DisplayMath tex={normaliseWorkingTex(r.rest)} className="nn-wk-m" /></div>
+            : <>
+                <div className="nn-wk-l">{r.lhs && <DisplayMath tex={normaliseWorkingTex(r.lhs)} className="nn-wk-m" />}</div>
+                <div className="nn-wk-r"><DisplayMath tex={normaliseWorkingTex(r.rest)} className="nn-wk-m" /></div>
+              </>}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
 /** A worked example. The student sees the problem first and asks for the working one step at a time. */
 export function WorkedExample({ ex, n }) {
   const t = useT();
   const [shown, setShown] = useState(0);
   const done = shown >= ex.steps.length;
+  const rows = workingRows(ex.working);
   return (
     <div className="nn-example">
       <p className="nn-label">{t('notes.exampleNumber', { n })}</p>
       <MathText block className="nn-read nn-q" text={ex.question} />
       {ex.diagram && <DiagramFromSpec spec={ex.diagram} interactive />}
-      {/* Once every step has been asked for, the aligned working replaces the list so the solution is written once. */}
-      {!(done && ex.working) && (
+      {/* Once every step has been asked for, the set-out working replaces the list so the solution is written once. */}
+      {!(done && rows.length > 0) && (
         <ol className="nn-steps">
           {ex.steps.slice(0, shown).map((s, i) => <li key={i}><MathText className="nn-read" text={s} /></li>)}
         </ol>
@@ -118,8 +143,8 @@ export function WorkedExample({ ex, n }) {
         </div>
       ) : (
         <div className="nn-answer">
-          {ex.working && <><p className="nn-label">{t('notes.nsw.working')}</p><DisplayMath tex={ex.working} className="nn-working" /></>}
-          <p className="nn-label">{t('notes.answer')} <span className="nn-checked">{t('notes.engineChecked')}</span></p>
+          {rows.length > 0 && <><p className="nn-label">{t('notes.nsw.working')}</p><Working rows={rows} /></>}
+          <p className="nn-label">{t('notes.answer')}{ex.verify && ' '}{ex.verify && <span className="nn-checked">{t('notes.engineChecked')}</span>}</p>
           <MathText block className="nn-read nn-final" text={ex.answer} />
         </div>
       )}

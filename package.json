@@ -331,7 +331,7 @@
     "test:forms:diagrams": "node client/test/forms-diagrams-check.mjs",
     "content:capacity": "node tools/question-capacity.mjs",
     "content:capacity:check": "node tools/question-capacity.mjs --check",
-    "test:notes:nsw": "node client/test/nsw-notes-content-check.mjs && node client/test/nsw-notes-bands-check.mjs && node client/test/nsw-notes-no-india-check.mjs",
+    "test:notes:nsw": "node client/test/nsw-notes-content-check.mjs && node client/test/nsw-notes-bands-check.mjs && node client/test/nsw-notes-no-india-check.mjs && node client/test/worked-example-format-check.mjs",
     "test:notes:nsw:browser": "node client/test/nsw-notes-visual-check.mjs",
     "test:notes:pages:browser": "node client/test/notes-pages-check.mjs",
     "test:notes:e3": "node client/test/notes-e3-check.mjs && node client/test/notes-coverage-check.mjs"
