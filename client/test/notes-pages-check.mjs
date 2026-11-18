@@ -34,6 +34,8 @@ import { loadNotesForGrade, loadOlympiadNotes } from '../src/notes/notesIndex.js
 import { NSW_NOTES_TOPIC_BY_ID, loadNswNotesForStage } from '../src/notes/nsw/nswNotesIndex.js';
 import { nswPracticeSubtopic } from '../src/notes/nsw/nswPractice.js';
 import { IN_CHAPTER_BY_ID } from '../src/engine/curriculum-in.js';
+import { livingIdsIn } from '../src/living/placement.india.js';
+import { livingIdsNsw } from '../src/living/placement.nsw.js';
 import { studyResourcesForGrade } from '../src/notes/data/notes-study-resources.js';
 
 const CLIENT = fileURLToPath(new URL('..', import.meta.url));
@@ -43,8 +45,8 @@ let pass = 0;
 const failures = [];
 const ok = (cond, label) => { if (cond) pass++; else failures.push(label); };
 
-const IN_ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'points', 'diagram', 'examples', 'mistakes', 'check', 'resources', 'practice'];
-const NSW_ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'diagram', 'examples', 'examiners', 'mistakes', 'check', 'practice'];
+const IN_ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'living', 'points', 'diagram', 'examples', 'mistakes', 'check', 'resources', 'practice'];
+const NSW_ORDER = ['objective', 'prerequisites', 'intuition', 'ideas', 'definitions', 'formulas', 'living', 'diagram', 'examples', 'examiners', 'mistakes', 'check', 'practice'];
 
 const india = await loadNotesForGrade(10);
 const olympiad = await loadOlympiadNotes();
@@ -75,7 +77,9 @@ function expectedSections(c) {
     objective: !!n.objective,
     prerequisites: (n.prereqs || []).some(p => (c.nsw ? NSW_NOTES_TOPIC_BY_ID[p] : IN_CHAPTER_BY_ID[p])),
     intuition: !!n.intuition, points: n.points?.length > 0, diagram: n.diagrams?.length > 0, examiners: n.examiners?.length > 0,
-    mistakes: n.mistakes?.length > 0, check: n.check?.length > 0, resources: !!c.resources
+    mistakes: n.mistakes?.length > 0, check: n.check?.length > 0, resources: !!c.resources,
+    // living formulas sit after the formulas wherever the chapter has them (client/src/living/placement.*.js)
+    living: (c.nsw ? livingIdsNsw(c.id) : livingIdsIn(c.id)).length > 0
   };
   return c.order.filter(s => !(s in has) || has[s]);
 }

@@ -1,0 +1,117 @@
+/* Pri Learning · living formulas. A quiet figure on the notes paper: hairline box, the notes' own tokens,
+   the plot tokens for the graph, one accent for the live curve, grey dashes for where it began. No gradient,
+   no shadow, no new colour. The only motion is a colour change on a number being touched, and none at all
+   with prefers-reduced-motion. */
+.lf {
+  position: relative;
+  --lf-ui: var(--nn-ui, var(--in-ui, 'Instrument Sans Variable', system-ui, sans-serif));
+  --lf-read: var(--nn-read, 'CMU Serif', 'Latin Modern Roman', Georgia, serif);
+  margin: 0 0 var(--nn-s5, 24px);
+  padding: var(--nn-s4, 16px);
+  border: 1px solid var(--nt-rule, var(--hairline));
+  border-radius: var(--nt-r, 6px);
+  background: var(--nt-raised, var(--surface-raised));
+  color: var(--nt-ink, var(--ink));
+}
+.lf-title { font-family: var(--lf-ui); font-size: 15px; font-weight: 600; margin: 0 0 var(--nn-s3, 12px); }
+.lf-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--nn-s5, 24px); align-items: start; }
+.lf-side { display: grid; gap: var(--nn-s3, 12px); min-width: 0; }
+
+.lf-formula-card { position: relative; background: var(--nt-paper, var(--paper)); border: 1px solid var(--nt-rule, var(--hairline)); border-radius: var(--nt-r, 6px); padding: 4px var(--nn-s4, 16px); }
+.lf-pop { position: absolute; z-index: 3; transform: translateX(-50%); width: max-content; max-width: min(260px, 86%); pointer-events: none; background: var(--nt-raised, var(--surface-raised)); border: 1px solid var(--nt-rule-strong, var(--hairline-strong)); border-radius: var(--nt-r, 6px); padding: 8px 12px; font-family: var(--lf-ui); }
+.lf-pop p { margin: 0; }
+.lf-pop-what { font-size: 13.5px; line-height: 1.45; color: var(--nt-ink, var(--ink)); }
+.lf-pop-now { font-family: var(--font-mono, ui-monospace, monospace); font-size: 12.5px; color: var(--nt-ink-3, var(--ink-3)); margin-top: 4px !important; }
+@media (prefers-reduced-motion: no-preference) { .lf-pop { animation: lf-pop-in 120ms ease-out; } }
+@keyframes lf-pop-in { from { opacity: 0; } to { opacity: 1; } }
+.lf-formula { font-family: var(--font-math, 'KaTeX_Main', serif); font-size: clamp(19px, 1.2vw + 12.5px, 24px); line-height: 2.1; display: flex; flex-wrap: wrap; align-items: baseline; row-gap: 2px; padding: var(--nn-s2, 8px) 0; }
+.lf-tex .pri-math, .lf-tex .katex { font-size: 1em; }
+.lf-tex { white-space: nowrap; }
+.lf-signed { display: inline-flex; align-items: baseline; white-space: nowrap; }
+.lf-op { padding: 0 0.3em; }
+.lf-sup { font-size: 0.72em; line-height: 0; position: relative; top: -0.6em; vertical-align: baseline; white-space: nowrap; }
+.lf-sup .lf-slot { padding-block: 0; }
+.lf-sq { font-size: 0.72em; }
+.lf-slot {
+  display: inline-block; position: relative; padding: 0 0.12em; margin: 0 0.04em;
+  border-bottom: 2px solid var(--nt-accent, var(--accent)); border-radius: 1px;
+  cursor: ew-resize; touch-action: none; user-select: none; -webkit-user-select: none;
+  font-variant-numeric: tabular-nums; min-width: 1ch; text-align: center;
+}
+/* a 44px-tall target without moving the line: the hit area is wider than the number */
+.lf-slot::before { content: ''; position: absolute; inset: -12px -6px; }
+.lf-slot.is-active { background: var(--nt-accent-soft, var(--accent-soft)); }
+.lf-slot.is-dragging { background: var(--nt-accent-soft, var(--accent-soft)); border-bottom-width: 3px; }
+@media (prefers-reduced-motion: no-preference) { .lf-slot { transition: background-color 120ms; } }
+
+.lf-params { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--nn-s3, 12px); }
+.lf-param { display: grid; gap: 2px; padding-left: var(--nn-s2, 8px); border-radius: 3px; }
+.lf-param.is-active { background: var(--nt-accent-soft, var(--accent-soft)); }
+.lf-note { font-family: var(--lf-ui); font-size: 14px; line-height: 1.45; color: var(--nt-ink-2, var(--ink-2)); }
+.lf-sym { font-family: var(--font-math, serif); font-size: 17px; font-style: italic; color: var(--nt-ink, var(--ink)); border-bottom: 2px solid var(--nt-accent, var(--accent)); padding: 0 0.1em; margin-right: 0.15em; }
+.lf-ctl { display: flex; align-items: center; gap: var(--nn-s3, 12px); }
+.lf-ctl input[type='range'] { flex: 1; min-width: 0; min-height: 44px; margin: 0; accent-color: var(--nt-accent, var(--accent)); }
+.lf-ctl input[type='range']:focus-visible { outline: 2px solid var(--focus, var(--nt-accent)); outline-offset: 2px; }
+.lf-val { flex: none; min-width: 3.2ch; text-align: right; font-family: var(--font-math, serif); font-size: 17px; font-variant-numeric: tabular-nums; }
+.lf-reset { justify-self: start; min-height: 44px; }
+
+.lf-graph { min-width: 0; }
+.lf-svg { display: block; width: 100%; height: auto; max-width: 440px; margin-inline: auto; }
+.lf-grid-lines path { stroke: var(--plot-grid, var(--hairline)); stroke-width: 1; fill: none; }
+.lf-axes path { stroke: var(--plot-axis, var(--ink-3)); stroke-width: 1.2; fill: none; }
+.lf-ticks text { font-family: var(--lf-ui); font-size: 9.5px; fill: var(--plot-label, var(--ink-3)); font-variant-numeric: tabular-nums; }
+.lf-curve { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.lf-base { stroke: var(--plot-label, var(--ink-3)); stroke-width: 1.5; stroke-dasharray: 5 4; opacity: 0.85; }
+.lf-now { stroke: var(--plot-a, var(--accent)); stroke-width: 2.4; }
+.lf-guide { stroke: var(--plot-b, var(--correction)); stroke-width: 1.2; stroke-dasharray: 2 3; fill: none; }
+.lf-mark { stroke: var(--plot-point, var(--ink)); stroke-width: 1.8; }
+.lf-m-ring { fill: var(--nt-raised, var(--surface-raised)); }
+.lf-m-dot { fill: var(--plot-point, var(--ink)); }
+.lf-m-diamond { fill: var(--nt-raised, var(--surface-raised)); stroke-linejoin: round; }
+.lf-key { display: flex; flex-wrap: wrap; gap: var(--nn-s2, 8px) var(--nn-s4, 16px); justify-content: center; font-family: var(--lf-ui); font-size: 13px; color: var(--nt-ink-2, var(--ink-2)); margin-top: var(--nn-s2, 8px); }
+.lf-key span { display: inline-flex; align-items: center; gap: 6px; }
+.lf-swatch { width: 28px; height: 8px; }
+.lf-swatch .lf-curve { stroke-width: 2; }
+
+.lf-feats { margin-top: var(--nn-s4, 16px); padding-top: var(--nn-s3, 12px); border-top: 1px solid var(--nt-rule, var(--hairline)); }
+.lf-sub { font-family: var(--lf-ui); font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--nt-ink-3, var(--ink-3)); margin: 0 0 var(--nn-s2, 8px); }
+.lf-list { list-style: none; margin: 0; padding: 0; display: grid; font-family: var(--lf-ui); font-size: 14.5px; line-height: 1.45; }
+.lf-row { display: grid; grid-template-columns: 24px minmax(9.5em, 12.5em) minmax(7em, 17em) minmax(0, 1fr); column-gap: var(--nn-s3, 12px); align-items: baseline; padding: 7px var(--nn-s2, 8px); border-radius: 3px; cursor: default; }
+.lf-row + .lf-row { border-top: 1px solid var(--nt-rule, var(--hairline)); }
+.lf-row.is-hot { background: var(--nt-accent-soft, var(--accent-soft)); }
+.lf-icon { width: 24px; height: 24px; align-self: center; fill: none; stroke: var(--nt-ink-3, var(--ink-3)); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.lf-row.is-hot .lf-icon { stroke: var(--nt-accent, var(--accent)); }
+.lf-row-label { font-weight: 600; color: var(--nt-ink, var(--ink)); }
+.lf-row-val { font-family: var(--font-math, 'KaTeX_Main', serif); font-size: 17px; font-variant-numeric: tabular-nums; color: var(--nt-ink, var(--ink)); overflow-wrap: anywhere; }
+.lf-row-note { color: var(--nt-ink-3, var(--ink-3)); }
+@media (max-width: 720px) {
+  .lf-row { grid-template-columns: 24px minmax(0, 1fr); row-gap: 1px; }
+  .lf-row-label { grid-column: 2; }
+  .lf-row-val { grid-column: 2; }
+  .lf-row-note { grid-column: 2; font-size: 13.5px; }
+  .lf-icon { grid-row: 1 / span 3; align-self: start; margin-top: 2px; }
+}
+.lf-legend { font-family: var(--lf-ui); font-size: 13px; color: var(--nt-ink-3, var(--ink-3)); margin: var(--nn-s3, 12px) 0 0; }
+.lf-status { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.lf-intro { font-family: var(--lf-read, 'CMU Serif', serif); font-size: 18px; line-height: 1.55; color: var(--nt-ink-2, var(--ink-2)); max-width: 62ch; margin: 0 0 var(--nn-s4, 16px); }
+.lf-set { display: grid; gap: var(--nn-s4, 16px); }
+
+@media (max-width: 720px) {
+  .lf-grid { grid-template-columns: minmax(0, 1fr); gap: var(--nn-s4, 16px); }
+  .lf-graph { order: -1; }
+  .lf { padding: var(--nn-s3, 12px); }
+}
+
+/* Notebook cells: prose, formula card, controls with graph, current values, what the graph shows. A thin rule between each. */
+.lf { padding: 0; overflow: visible; }
+.lf > * { padding-inline: var(--nn-s5, 24px); }
+.lf > figcaption { padding-top: var(--nn-s4, 16px); padding-bottom: var(--nn-s3, 12px); }
+.lf .lf-grid { padding-top: var(--nn-s4, 16px); padding-bottom: var(--nn-s4, 16px); border-top: 1px solid var(--nt-rule, var(--hairline)); }
+.lf-readout { margin: 0; padding-top: var(--nn-s3, 12px); padding-bottom: var(--nn-s3, 12px); border-top: 1px solid var(--nt-rule, var(--hairline)); font-family: var(--font-mono, ui-monospace, monospace); font-size: 13.5px; color: var(--nt-ink-2, var(--ink-2)); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.lf .lf-feats { margin-top: 0; border-top: 1px solid var(--nt-rule, var(--hairline)); padding-top: var(--nn-s4, 16px); padding-bottom: var(--nn-s4, 16px); }
+.lf-caption { font-family: var(--lf-ui); font-size: 13px; text-align: center; color: var(--nt-ink-3, var(--ink-3)); margin: var(--nn-s1, 4px) 0 0; }
+.lf-set { gap: var(--nn-s6, 32px); }
+.lf-mark.is-hot { stroke-width: 2.6; }
+.lf-guide.is-hot { stroke: var(--plot-a, var(--accent)); stroke-width: 2; }
+@media (max-width: 720px) { .lf > * { padding-inline: var(--nn-s3, 12px); } }

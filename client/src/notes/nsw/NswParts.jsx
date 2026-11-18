@@ -9,16 +9,20 @@
 // All mathematics goes through KaTeX (lib/latex.jsx for running text, DisplayMath
 // below for display and aligned working). Nothing here builds maths from HTML or
 // Unicode super/subscripts. Icons are the app's stroke icons, never emoji or glyph ticks.
-import React, { useState } from 'react';
+import React, { Suspense, lazy, useState } from 'react';
 import { MathText } from '../../lib/latex.jsx';
 import Icon from '../../components/Icon.jsx';
 import DiagramFromSpec from '../../diagrams/DiagramFromSpec.jsx';
 import { useT } from '../../i18n/index.js';
 import { workingRows, normaliseWorkingTex } from '../workingRows.js';
+import { livingIdsNsw } from '../../living/placement.nsw.js';
 import { Objective, BuildsOn, Intuition, TeachingDiagrams, SelfCheck } from '../NotesParts.jsx';
 import '../notesFonts.css';
 import '../notesSheet.css';
 import './nswNotes.css';
+
+// The living formulas load only for a topic that has them: a chunk of their own.
+const LivingFormulas = lazy(() => import('../../living/LivingFormulas.jsx'));
 
 /** One display equation (or an aligned block). A render error is drawn as KaTeX's own .katex-error span, which the notes checks fail on. */
 export function DisplayMath({ tex, className = '' }) {
@@ -168,6 +172,7 @@ export function ChapterSheet({ notes, topicId, buildsOn = [], next = null }) {
       <SectionBlock id="formulas" title={t('notes.sectionFormulas')}>
         <div className="nn-formulas">{notes.formulas.map((f, i) => <FormulaBox key={i} f={f} />)}</div>
       </SectionBlock>
+      {livingIdsNsw(topicId).length > 0 && <SectionBlock id="living" title={t('living.ui.section')}><Suspense fallback={null}><LivingFormulas ids={livingIdsNsw(topicId)} /></Suspense></SectionBlock>}
       {notes.diagrams?.length > 0 && <SectionBlock id="diagram" title={t('notes.sectionDiagrams')}><TeachingDiagrams items={notes.diagrams} /></SectionBlock>}
       <SectionBlock id="examples" title={t('notes.sectionExamples')}>
         {notes.examples.map((ex, i) => <WorkedExample key={topicId + ':' + ex.question} ex={ex} n={i + 1} />)}

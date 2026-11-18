@@ -1363,6 +1363,16 @@ async function run() {
       await wait(page, 1600);
     });
 
+    // Living formulas (client/src/living): the drag-a-number figures with native sliders, a labelled graph and hover notes.
+    await step('notes · living formulas', '/notes/:chapterId', async () => {
+      await goTo(page, BASE, INDIA ? '/notes/c10-quadratic-equations' : '/notes/ma4-lin-c-01?year=7');
+      await page.waitForSelector('[data-living-formula] input[type="range"]', { timeout: 20000 });
+      await page.evaluate(() => document.querySelectorAll('.nt-reveal').forEach(el => el.classList.add('is-in')));
+      await page.locator('[data-living-formula] input[type="range"]').first().focus();
+      await page.keyboard.press('ArrowRight');
+      await wait(page, 600);
+    });
+
     await step('notes · revision flashcards', '/notes/:chapterId', async () => {
       await click(page, '[data-testid="notes-revise"]');
       await page.waitForSelector('.nt-card', { timeout: 10000 });
