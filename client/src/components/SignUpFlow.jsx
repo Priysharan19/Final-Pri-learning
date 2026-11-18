@@ -352,7 +352,7 @@ export default function SignUpFlow({
       if (parent) { go('class'); return; }
       let stored = null;
       try { stored = await readStoredAccountProfile(result.account?.id); }
-      catch (err) { if (err?.status === 403) { go('class'); return; } fail(err); return; }
+      catch (err) { fail(err); return; }
       if (stored && stored.course === defaultCourse()) {
         restored.current = stored;
         if (stored.name && !name.trim()) setName(stored.name);
