@@ -61,7 +61,9 @@ export const flow = {
       await page.getByTestId('signup-age-18').isVisible() && h.db.prepare('SELECT COUNT(*) AS n FROM accounts WHERE email=?').get(childEmail).n === 0);
     await check('the step heading takes focus for screen readers', await page.evaluate(() => document.activeElement?.id === 'signup-step-title'));
     await page.locator('#signup-flow-name').fill('Asha');
-    await page.getByTestId('signup-age-15').click();
+    // India: under 18 needs a parent. Prithagoras: under 15 does (guardianConsent.learnerIsChild), so the learner is 13 there.
+    const childAge = (process.env.PRI_EDITION || 'priyabhata') === 'priyabhata' ? 15 : 13;
+    await page.getByTestId(`signup-age-${childAge}`).click();
     await page.getByTestId('signup-agree').check();
     await page.getByTestId('signup-age-next').click();
     await waitForStep(card, 'class');
@@ -74,7 +76,7 @@ export const flow = {
     await shot('class');
     await page.getByTestId('signup-class-next').click();
     await waitForStep(card, 'parent');
-    await check('a 15-year-old is asked for a parent next, and the app has not opened',
+    await check(`a ${childAge}-year-old is asked for a parent next, and the app has not opened`,
       await page.getByRole('heading', { name: 'Now, a parent’s approval' }).isVisible() && await page.locator('.shell').count() === 0);
 
     const account = h.db.prepare('SELECT id, email, age_basis FROM accounts WHERE email=?').get(childEmail);
