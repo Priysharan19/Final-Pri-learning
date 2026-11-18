@@ -256,7 +256,7 @@
    2. In Write mode beside the hint ladder (about 900 to 1180 px wide) the status text was squeezed into a column
       of its own beside three buttons. It takes its own full row under them instead. */
 html[data-edition=prithagoras]:has(.qpage.ws){scroll-padding-bottom:148px}
-html[data-edition=prithagoras] .qpage.ws :is(.verdict,[data-check-refusal],[data-check-retry]){scroll-margin-bottom:148px}
+html[data-edition=prithagoras] .qpage.ws .verdict{scroll-margin-bottom:148px}
 @media (max-width:1180px){
   html[data-edition=prithagoras] .ws-actions.editor-foot{row-gap:6px}
   html[data-edition=prithagoras] .ws-actions.editor-foot .status-line{flex:1 1 100%;order:2;min-width:0}

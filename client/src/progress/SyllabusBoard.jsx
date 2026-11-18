@@ -66,8 +66,7 @@ export function nswCoursesFor(user) {
   // Owner decision, 19 Nov 2026: only the courses the edition offers are shown (Prithagoras: Advanced and
   // Extension 1). A student still on a hidden course sees Advanced until they choose (components/OfferedCourse.jsx).
   if (!offering()) return all;
-  const pathwayOf = { 'standard-1': 'standard', 'standard-2': 'standard', advanced: 'advanced', 'extension-1': 'ext1', 'extension-2': 'ext2' };
-  const shown = all.filter(c => !c.startsWith('k10') && pathwayOffered(pathwayOf[c]));
+  const shown = all.filter(c => !c.startsWith('k10') && pathwayOffered(c.startsWith('standard') ? 'standard' : c === 'extension-1' ? 'ext1' : c === 'extension-2' ? 'ext2' : 'advanced'));
   return shown.length ? shown : ['advanced'];
 }
 

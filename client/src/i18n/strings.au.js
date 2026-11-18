@@ -68,11 +68,11 @@ export const AU_STRINGS = Object.freeze({
   'cloudError.consentDeclarationRequired': 'Tell us whether the learner is 18 or older, or their year with a parent or guardian’s name and email, then try again.',
   'upgrade.jeeAdvanced': "This part of the course is included with HSC Pass.",
   // Owner decision, 19 Nov 2026: Years 11 and 12 only.
-  'notes.nsw.lede': 'Notes for NSW Mathematics, Years 11 and 12: the ideas in plain words, the formulas, what markers look for, the usual traps and worked examples whose answers the maths engine has checked.',
+  'notes.nsw.lede': 'Notes for NSW Mathematics, Years 11 and 12: the ideas in plain words, the formulas, what markers look for, the usual traps, and worked examples the maths engine has checked.',
   // Owner walk-through, 19 Nov 2026: the notebook said "Nothing filed yet" while Review listed wrong answers. Review
   // lists every wrong answer, including ones where the solution was shown and paper answers; the notebook files a
   // wrong answer only when its question was finished without the solution. It says so.
-  'notebook.empty': 'Nothing filed yet. A wrong answer is filed here once you finish the question without showing its solution. All your answers are in Review.',
+  'notebook.empty': 'Nothing filed yet. A wrong answer is filed once you finish the question without showing its solution. Review lists them all.',
   // Owner walk-through, 19 Nov 2026: difficulty is read in words, never as D1 to D4.
   'settings.allDifficulties': 'All difficulties',
   'home.difficultyChip': '{label}',
