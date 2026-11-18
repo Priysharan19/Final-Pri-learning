@@ -6,8 +6,8 @@
  "sectionII": {
   "parts": 25,
   "criteria": 60,
-  "engineCanAward": 15,
-  "engineCannot": 45
+  "engineCanAward": 16,
+  "engineCannot": 44
  },
  "parts": [
   {
@@ -116,16 +116,16 @@
    "id": "q11d",
    "question": 11,
    "marks": 3,
-   "answerType": "open",
-   "keyed": false,
+   "answerType": "value",
+   "keyed": true,
    "criteria": [
     {
      "key": "c1",
      "text": "Provides the correct number with justification",
      "marks": 3,
-     "engine": "no",
-     "decidedBy": "student, against the sample answer",
-     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+     "engine": "yes, final answer only",
+     "decidedBy": "answer checker",
+     "why": "the engine checks the final answer against a key verified by computation (numeric). It earns 1 mark at most, because a bare answer earns at most 1 mark on a multi-mark part (CTO decision, 19 Nov 2026, to be confirmed by the author). The justification the criterion also asks for cannot be verified."
     },
     {
      "key": "c2",
@@ -133,7 +133,7 @@
      "marks": 2,
      "engine": "no",
      "decidedBy": "student, against the sample answer",
-     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
     },
     {
      "key": "c3",
@@ -141,7 +141,7 @@
      "marks": 1,
      "engine": "no",
      "decidedBy": "student, against the sample answer",
-     "why": "a part whose answer is not a single value, expression, set, interval or equation (or whose key could not be verified), so it has no key."
+     "why": "a method step. The line checker can say a written line is true or follows from the line above; it cannot tell that the line is the step this criterion names, so it awards nothing for it."
     }
    ],
    "digest": "6e5b5c5995a1e84b45aa1d0f2aff019a123830e51f6b521081f180786f623be9"

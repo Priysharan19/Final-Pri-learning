@@ -1251,15 +1251,15 @@
        "sampleAnswer": [
         {
          "k": "p",
-         "t": "There are 10 letters, with two A's and two R's, so there are $\\dfrac{10!}{2!\\,2!} = 907\\,200$ arrangements."
+         "t": "There are 11 letters, with two A's and two R's, so there are $\\dfrac{11!}{2!\\,2!} = 9\\,979\\,200$ arrangements."
         },
         {
          "k": "p",
-         "t": "The A's are together in $\\dfrac{9!}{2!} = 181\\,440$ arrangements (treat AA as one letter), and the R's are together in the same number. Both pairs are together in $8! = 40\\,320$ arrangements."
+         "t": "The A's are together in $\\dfrac{10!}{2!} = 1\\,814\\,400$ arrangements (treat AA as one letter), and the R's are together in the same number. Both pairs are together in $9! = 362\\,880$ arrangements."
         },
         {
          "k": "p",
-         "t": "So the number with at least one pair together is $181\\,440 + 181\\,440 - 40\\,320 = 322\\,560$, and the required number is $907\\,200 - 322\\,560 = 584\\,640$."
+         "t": "So the number with at least one pair together is $1\\,814\\,400 + 1\\,814\\,400 - 362\\,880 = 3\\,265\\,920$, and the required number is $9\\,979\\,200 - 3\\,265\\,920 = 6\\,713\\,280$."
         }
        ],
        "classification": {
@@ -1269,9 +1269,14 @@
         ]
        },
        "figures": [],
-       "answerType": "open",
-       "key": null,
-       "autoMarks": 0
+       "answerType": "value",
+       "key": {
+        "type": "numeric",
+        "value": 6713280,
+        "display": "6\\,713\\,280"
+       },
+       "autoMarks": 1,
+       "keyChecks": "verified by tools/papers/verify/p05.py: brute force over all 9,979,200 distinct arrangements of PRITHAGORAS, inclusion-exclusion and a placement count agree on 6,713,280"
       },
       {
        "id": "q11e",

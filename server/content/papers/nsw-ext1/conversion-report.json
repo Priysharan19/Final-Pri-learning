@@ -78,7 +78,6 @@
   "id": "ext1-2027-p05",
   "notes": [],
   "gaps": [
-   "q11d: a find/calculate part with no key yet (self-check until one is written and verified)",
    "q12a: a find/calculate part with no key yet (self-check until one is written and verified)"
   ],
   "manual": [],
@@ -86,9 +85,9 @@
    "totalMarks": 70,
    "mcq": 10,
    "section2Leaves": 25,
-   "autoMarks": 25,
-   "selfCheckMarks": 45,
-   "keyedSection2Parts": 15
+   "autoMarks": 26,
+   "selfCheckMarks": 44,
+   "keyedSection2Parts": 16
   },
   "katex": []
  },

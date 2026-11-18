@@ -34,10 +34,10 @@
  {
   "id": "ext1-2027-p05",
   "parts": 25,
-  "keyed": 15,
+  "keyed": 16,
   "criteria": 60,
-  "yes": 15,
-  "no": 45
+  "yes": 16,
+  "no": 44
  },
  {
   "id": "ext1-2027-p06",

@@ -29,7 +29,7 @@ Every other criterion is "no". The reasons, in the draft files, are one of these
 | Paper 02 | 22 | 7 | 60 | 7 | 53 |
 | Paper 03 | 22 | 9 | 60 | 9 | 51 |
 | Paper 04 | 22 | 11 | 60 | 11 | 49 |
-| Paper 05 | 25 | 15 | 60 | 15 | 45 |
+| Paper 05 | 25 | 16 | 60 | 16 | 44 |
 | Paper 06 | 25 | 14 | 60 | 14 | 46 |
 | Paper 07 | 24 | 15 | 60 | 15 | 45 |
 | Paper 08 | 26 | 13 | 60 | 13 | 47 |
@@ -38,7 +38,7 @@ Every other criterion is "no". The reasons, in the draft files, are one of these
 | Paper 11 | 22 | 9 | 60 | 9 | 51 |
 | Paper 12 | 22 | 12 | 60 | 12 | 48 |
 | Paper 13 | 16 | 13 | 60 | 13 | 47 |
-| All thirteen | 298 | 157 | 780 | 157 | 623 |
+| All thirteen | 298 | 158 | 780 | 158 | 622 |
 
 Read "Engine can award" as: the engine can decide the final-answer criterion of that many parts, and no other criterion of any Section II part. Section I adds ten multiple-choice marks to every paper.
 

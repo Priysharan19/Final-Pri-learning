@@ -69,7 +69,7 @@ def finish(known):
     if shipped_dis: print('DISAGREE ON A SHIPPED KEY:', shipped_dis)
     print(f"PAPER {NN}: {nk} keyed parts PASS, {nm} MCQ PASS, {nd} MCQ DISAGREE, {nu} UNVERIFIED")
     sys.exit(1 if (bad or missing or unk or shipped_dis) else 0)
-KNOWN_DISAGREEMENTS = {'q11d'}
+KNOWN_DISAGREEMENTS = set()
 
 def figtext(name):
     t = open(FIGS_TEX).read(); i = t.index('\\newcommand{\\%s}' % name); j = t.find('\\newcommand', i + 10)
@@ -197,10 +197,24 @@ def q11b():
     part('q11b', ok, f"sign-change scan of the product - 1/8 on (0,pi) and refinement: {[mp.nstr(r, 12) for r in sorted(roots)]}")
 
 def q11d():
-    # the word PRITHAGORAS: count arrangements directly
+    # The word PRITHAGORAS (11 letters; the A's and the R's repeat). The guideline was written for the 10-letter word PRITAGORAS and was
+    # not recomputed when the brand was respelled (19 Nov 2026); the corrected answer is verified three independent ways.
+    from sympy.utilities.iterables import multiset_permutations
     word = 'PRITHAGORAS'
     L = len(word)
-    # place the 2 A's, then the 2 R's, in non-adjacent positions, remaining letters distinct: 7! orders
+    assert L == 11 and word.count('A') == 2 and word.count('R') == 2 and len(set(word)) == 9
+    # 1 · brute force over EVERY distinct arrangement of the multiset (11!/(2!2!) = 9,979,200 of them)
+    seen = 0; good = 0
+    for w in multiset_permutations(list(word)):
+        seen += 1
+        ok = True
+        for k in range(L - 1):
+            if w[k] == w[k + 1] and w[k] in 'AR': ok = False; break
+        good += ok
+    # 2 · inclusion-exclusion
+    allp = math.factorial(L) // 4; ta = math.factorial(L - 1) // 2; both = math.factorial(L - 2)
+    ie = allp - 2 * ta + both
+    # 3 · place the A's, then the R's, in non-adjacent places; the other seven letters are distinct
     cnt = 0
     for A in itertools.combinations(range(L), 2):
         if A[1] - A[0] == 1: continue
@@ -208,16 +222,11 @@ def q11d():
         for R in itertools.combinations(rest, 2):
             if R[1] - R[0] == 1: continue
             cnt += 1
-    rem = sorted(set(word) - {'A', 'R'}); assert len(rem) == 7 and L == 11 and word.count('A') == 2 and word.count('R') == 2
-    total = cnt * math.factorial(len(rem))
-    # cross-check by inclusion-exclusion
-    allp = math.factorial(L)//4; ta = math.factorial(L-1)//2; both = math.factorial(L-2)
-    ie = allp - 2*ta + both
-    author = 584640
-    status = 'DISAGREE' if total != author else 'PASS'
-    assert total == ie
-    report('q11d', status, f"PRITHAGORAS has {L} letters (not 10): placements {cnt} x 7! = {total} = inclusion-exclusion {ie} (total arrangements {allp}, A together {ta}, both {both}); author's guideline gives {author} (it counts 10 letters: 10!/(2!2!)=907200)")
-    CHECKED.add('q11d')
+    placed = cnt * math.factorial(7)
+    key = OVR['q11d']['key']['value']
+    old10 = math.factorial(10) // 4 - 2 * (math.factorial(9) // 2) + math.factorial(8)   # what the 10-letter word PRITAGORAS gives: 584,640
+    part('q11d', seen == allp and good == ie == placed == int(key) == 6713280 and old10 == 584640,
+         f"PRITHAGORAS: brute force over all {seen} distinct arrangements = {good}; inclusion-exclusion = {ie} (total {allp}, A's together {ta}, both pairs {both}); placements {cnt} x 7! = {placed}; the old guideline's 584640 is the 10-letter PRITAGORAS ({old10})")
 
 def q11e():
     v = mp.quad(lambda x: (x*x + 1)/(x**4 - x*x + 1), [1, (1 + mp.sqrt(5))/2])
