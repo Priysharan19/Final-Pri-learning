@@ -318,7 +318,6 @@
     "test:platform:recognize-cap": "node server/test/recognize-question-cap-check.mjs",
     "test:auto:read": "node client/test/auto-read-check.mjs",
     "test:sounds": "node client/test/sound-check.mjs",
-    "test:confirm:reading": "node client/test/confirm-reading-check.mjs",
     "test:confirm:reading": "node client/test/confirm-reading-check.mjs && node client/test/reading-shape-check.mjs",
     "test:diagrams": "node client/test/diagram-geometry-check.mjs && node client/test/diagram-render-check.mjs && node client/test/diagram-kit-i18n-check.mjs && node client/test/diagram-pack-space-check.mjs && node client/test/diagram-pack-stats-check.mjs && node client/test/diagram-pack-plane-check.mjs && node client/test/diagram-pack-algebra-check.mjs && node client/test/algebra-formatter-check.mjs",
     "test:diagrams:browser": "node client/test/diagram-kit-browser-check.mjs && node client/test/notes-diagram-layout-check.mjs",
