@@ -149,4 +149,8 @@
 .login-more p { margin: 0 0 var(--space-2); text-align: left; }
 
 .signup-segment-4 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-@media (min-width: 420px) { .signup-segment-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+/* Four course names in a 2x2 at every width: "Extension 1" never wraps and no
+   option touches its neighbour. The grid gap shows the card colour between
+   cells, so each cell keeps its own even padding. */
+.signup-segment-4 { gap: 4px; padding: 4px; }
+.signup-segment-4 .signup-seg { min-height: 44px; padding: 0 var(--space-3); white-space: nowrap; }

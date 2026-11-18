@@ -45,7 +45,8 @@ import OtpInput, { OTP_LENGTH } from './OtpInput.jsx';
 import { priNative } from '../platform/native/index.js';
 import { isNetworkFailure, signInErrorCopy } from './signInErrors.js';
 import { readOnboardingAuthority } from './onboardingAuthority.js';
-import { parentFeaturesOffered } from '../platform/edition.js';
+import { parentFeaturesOffered, defaultCourse } from '../platform/edition.js';
+import { readStoredAccountProfile } from '../platform/accountProfileRestore.js';
 import { EDITION_ID } from '../brand/edition.js';
 
 export { isNetworkFailure, signInErrorCopy };
@@ -140,6 +141,8 @@ export default function SignUpFlow({
   const sending = useRef(false);
   const finishing = useRef(false);
   const [pathway, setPathway] = useState('advanced');
+  // The stored profile of a returning account (see signedIn); null otherwise.
+  const restored = useRef(null);
   const available = cloudAvailable();
 
   const needsParent = !!consent?.required && consent.state !== 'given';
@@ -335,10 +338,23 @@ export default function SignUpFlow({
     if (!name.trim() && result.account?.name) setName(result.account.name);
     setBusy('');
     const parent = !!state?.required && state.state !== 'given';
-    // A returning student on a device with no profile yet: the class sets up
-    // this device, and is the only thing asked. Inside a page the profile
-    // exists, so nothing more is asked at all.
-    if (!inline && year === null) { go('class'); return; }
+    // A returning student on a device with no profile yet. Their account
+    // already holds their profile: it is read first and the device is set up
+    // from it, so nothing is asked twice and nothing stored is replaced by a
+    // blank one. The class is asked only when the server truly holds none.
+    // Inside a page the profile exists, so nothing more is asked at all.
+    if (!inline && year === null) {
+      let stored = null;
+      try { stored = await readStoredAccountProfile(result.account?.id); }
+      catch (err) { fail(err); return; }
+      if (stored && stored.course === defaultCourse()) {
+        restored.current = stored;
+        if (stored.name && !name.trim()) setName(stored.name);
+        setYear(stored.year);
+        if (stored.pathway) setPathway(stored.pathway);
+        if (stored.indiaTrack) setTrack(stored.indiaTrack);
+      } else { go('class'); return; }
+    }
     if (parent) { go('parent'); return; }
     await finish(result.account);
   }
@@ -485,6 +501,12 @@ export default function SignUpFlow({
         if (authority.outcome === 'waiting') {
           if (step !== 'parent' && step !== 'parent-wait') go('parent');
           setError(tLater('signup.parentStillWaiting'));
+          return;
+        }
+        const stored = restored.current;
+        if (stored) {
+          await onFinish({ account: signedInAccount, name: stored.name || name.trim() || signedInAccount?.name || '', year: stored.year, track: stored.indiaTrack || track,
+            ...(EDITION_ID === 'prithagoras' && stored.year >= 11 ? { pathway: stored.pathway || pathway } : {}), restoredProfile: stored });
           return;
         }
         await onFinish({ account: signedInAccount, name: name.trim() || signedInAccount?.name || '', year: year || 9, track, ...(EDITION_ID === 'prithagoras' && year >= 11 ? { pathway } : {}) });

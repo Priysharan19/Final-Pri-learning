@@ -400,7 +400,12 @@ async function applyRemoteEntity(pid, entity, state, unpublished) {
     // may not have touched in a year, and the rescan would then publish the
     // overwritten values straight back over the real ones. The push that comes
     // next is what makes the server converge.
-    if (unpublished(key)) return;
+    // ...except a profile row this device only made as a vessel for the stored
+    // one (sign-in on a device with no profile): it holds nothing the cloud
+    // lacks, so the stored profile is taken whole.
+    const vessel = entity.kind === 'profile' && entity.entityId === 'self' && !entity.tombstone && plain(entity.body)
+      && !!(await get('profiles', pid).catch(() => null))?.restoredFromAccount;
+    if (unpublished(key) && !vessel) return;
     const remote = {
       kind: entity.kind, entityId: entity.entityId, version: safeInt(entity.version),
       body: plain(entity.body) ? entity.body : null, tombstone: !!entity.tombstone
@@ -409,7 +414,7 @@ async function applyRemoteEntity(pid, entity, state, unpublished) {
     // same-version divergence asks for a merge this offline client has no way to
     // put to anyone, and by here the local copy holds nothing unpublished to
     // lose, so the authoritative record is taken.
-    if (resolveEntityConflict(local, remote).winner === 'local') return;
+    if (!vessel && resolveEntityConflict(local, remote).winner === 'local') return;
   }
 
   if (entity.kind === 'profile' && entity.entityId === 'self' && !entity.tombstone && plain(entity.body)) {
@@ -418,6 +423,7 @@ async function applyRemoteEntity(pid, entity, state, unpublished) {
       const allowed = ['name', 'year', 'course', 'pathway', 'indiaTrack', 'avatar', 'theme', 'dailyGoal', 'handwriting'];
       const next = { ...row };
       for (const field of allowed) if (entity.body[field] !== undefined) next[field] = entity.body[field];
+      delete next.restoredFromAccount;
       await put('profiles', next);
     }
     return;
@@ -696,6 +702,10 @@ async function syncNowOnce(pid) {
       const coveredBelow = (await profileOutboxStats(pid)).nextSeq;
       prePull = await pullAll(pid, deviceId, state, unpublished);
       push = await pushFullRescan(pid, deviceId, rescan, state, coveredBelow, recovery);
+      // The first sync is over: the stored profile (if any) has been adopted
+      // and published, so the row is an ordinary profile from here on.
+      const settled = await get('profiles', pid).catch(() => null);
+      if (settled?.restoredFromAccount) { delete settled.restoredFromAccount; await put('profiles', settled); }
     } else if (pending.length) {
       let batch = await buildNormalBatch(pending, pid, deviceId, state);
       if (batch.events.length || batch.entities.length) {
