@@ -88,6 +88,7 @@
 .pp-verdict[data-paper-verdict="incorrect"] .pp-verdict-line strong { color: var(--correction); }
 .pp-yours { margin: var(--space-1) 0 0; overflow-wrap: anywhere; }
 .pp-yours-text { white-space: pre-wrap; }
+.pp-after-row > * { min-width: 0; max-width: 100%; }
 .pp-after-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--space-4); margin-top: var(--space-3); }
 .pp-how { flex: 1 1 100%; }
 .pp-how summary { cursor: pointer; min-height: var(--tap); display: flex; align-items: center; font-size: var(--text-sm); color: var(--ink-2); }
