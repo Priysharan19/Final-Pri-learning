@@ -29,7 +29,8 @@ const MAX_SKIPS = 12;
 // A Year 10 chapter whose every cell the Prithagoras server issues
 // (server/platform/nswBanks.js), so the tour never depends on which chapter the
 // device draws. y10-compound is not banked yet: a student there still gets drafts.
-const CHAPTER = 'y10-simeq';
+// owner decision, 19 Nov 2026: Prithagoras offers Years 11 and 12 only, so this walk is a Year 11 student on a Year 11 subtopic.
+const CHAPTER = 'y11-explog';
 
 let pass = 0;
 const failures = [];
@@ -91,9 +92,9 @@ try {
   await page.goto(platform.origin, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector('.auth-wrap, .shell', { timeout: 30000 });
   stage = 'create the verified profile';
-  await createVerifiedProfile(page, platform, { name: 'NSW Practice Student', year: 10, fromPicker: await page.getByTestId('picker-create-account').count() > 0 });
+  await createVerifiedProfile(page, platform, { name: 'NSW Practice Student', year: 11, fromPicker: await page.getByTestId('picker-create-account').count() > 0 });
   stage = 'switch the syllabus';
-  await switchSyllabus(page, platform, { course: 'nsw', year: 10 });
+  await switchSyllabus(page, platform, { course: 'nsw', year: 11 });
   // Since E3 a Prithagoras sign-up is an NSW profile from the start, so EVERY
   // issue request this page makes names NSW and the server issues every one.
   // (Counting only from the switch missed the run where the first question was
