@@ -2,7 +2,7 @@
 // Pri Learning · Extension 1 & Extension 2 generators (ME / MEX)
 // ─────────────────────────────────────────────────────────────────────────────
 import { streamsExtNsw } from './streams-ext-nsw.js';
-import { ri, rc, nz, gcd, Frac, mcq, poly, sgn, r1, r2, r3, rad } from '../qhelpers.js';
+import { ri, rc, nz, gcd, Frac, mcq, poly, sgn, r1, r2, r3, rad, br } from '../qhelpers.js';
 import { identityProof } from './identityProofs.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
@@ -1084,7 +1084,7 @@ export const streamsExt = {
         prompt: `A particle moves so that its displacement is $x = ${amp}\\cos(${n}t)$ metres. Find its **acceleration** at the instant when $x = ${xAt}$ metres.`,
         answerType: 'numeric', answer: { value: acc }, answerSuffix: 'm/s²',
         traps: [
-          { value: n * n * xAt, why: `Differentiating $\\cos$ twice brings down $-${n}^2$, so the acceleration points back towards the centre — the sign matters.` },
+          { value: n * n * xAt, why: `Differentiating $\\cos$ twice brings down $-${n * n}$, so the acceleration points back towards the centre — the sign matters.` },
           { value: -n * xAt, why: `The chain rule contributes a factor of $${n}$ on **each** differentiation, so $\\ddot{x}$ carries $${n}^2 = ${n * n}$.` }
         ].filter(t => t.value !== acc),
         hints: [`Differentiate twice: $\\dot{x} = -${amp * n}\\sin(${n}t)$.`,
@@ -1924,7 +1924,7 @@ export const streamsExt = {
       traps: [{ value: a / c, why: 'Multiply top and bottom by the conjugate of the denominator first.' }].filter(t => Math.abs(t.value - re.value) > 0.01),
       hints: ['Multiply by the conjugate over itself.', `$\\times \\frac{${c} ${sgn(-d)}i}{${c} ${sgn(-d)}i}$; denominator becomes $${den}$.`, `Real part: $\\frac{${a * c + b * d}}{${den}}$.`],
       steps: [
-        { h: 'Multiply by the conjugate', d: `denominator $= ${c}^2 + ${d}^2 = ${den}$` },
+        { h: 'Multiply by the conjugate', d: `denominator $= ${br(c)}^2 + ${br(d)}^2 = ${den}$` },
         { h: 'Numerator real part', d: `$${a}\\cdot${c} + ${b}\\cdot${d} = ${a * c + b * d}$` },
         { h: 'Real part', d: `$${re.latex()}$` }
       ]

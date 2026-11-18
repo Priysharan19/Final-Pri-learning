@@ -808,6 +808,9 @@ export const year7 = {
       const modeV = ri(rng, base, base + 8);
       let data = [modeV, modeV, ri(rng, base, base + 9), ri(rng, base, base + 9), ri(rng, base + 1, base + 10)];
       data = data.map((v, i) => (i > 1 && v === modeV ? v + 1 : v));
+      // The other three scores must be distinct from each other as well, or a second value ties for the mode
+      // (11, 6, 11, 6, 5 has two modes while the key names one). Bumping upward draws nothing extra from the rng.
+      for (let i = 3; i < 5; i++) while (data.slice(2, i).includes(data[i]) || data[i] === modeV) data[i] += 1;
       data = rs(rng, data);
       const sorted = [...data].sort((a, b) => a - b);
       const range = sorted[4] - sorted[0];
