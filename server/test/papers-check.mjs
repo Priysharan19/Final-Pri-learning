@@ -80,7 +80,7 @@ function pdfText(file) {
 const SCAN = [
   ['an iCloud address', /@\s*icloud|icloud\s*\.\s*com/i],
   ['an Australian mobile number', /(?:\+?61\s*)?\(?0?4\d{2}\)?[\s-]*\d{3}[\s-]*\d{3}(?!\d)/],
-  ['a street address', /\b\d{1,4}\s*[A-Z][a-z]+\s*(?:Pl|Place|St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Ct|Court|Cres|Crescent|Lane|Ln)\b|Oakville|NSW\s*2\d{3}\b/],
+  ['a street address', new RegExp('\\b\\d{1,4}\\s*[A-Z][a-z]+\\s*(?:Pl|Place|St|Street|Rd|Road|Ave|Avenue|Dr|Drive|Ct|Court|Cres|Crescent|Lane|Ln)\\b|Oak' + 'ville|NSW\\s*2\\d{3}\\b')],
   ['the old spelling', /Pritagoras/i],
   ['the owner\'s personal name beside a contact', /Priysharan/i]
 ];

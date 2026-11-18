@@ -66,7 +66,7 @@ export function otpEmailMessage(code, purpose, origin = process.env.PRI_PUBLIC_O
   // /account/delete-request page can be asked for by anyone who knows the
   // address, so the mail itself has to say what entering the code does.
   if (intent === 'account-delete') {
-    const body = `Someone asked to DELETE the ${brand} account for this address. Entering this code on the account deletion page permanently deletes the account and its data. Never share it or read it out to anyone.`;
+    const body = 'Someone asked to DELETE the ' + brand + ' account for this address. Entering this code on the account deletion page permanently deletes the account and its data. Never share it or read it out to anyone.';
     const tail = 'If you did not ask for this, ignore this email: your account stays exactly as it is. The code is valid for 10 minutes.';
     return {
       subject: `${code} is the code to delete your ${brand} account`,
