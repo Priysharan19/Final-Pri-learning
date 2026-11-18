@@ -670,13 +670,20 @@ async function run() {
     };
 
     // ── signed out: the first screen is the guest question picker (ADR-0003) ──
-    await step('guest · question picker', '/', async () => {
+    // Prithagoras opens on a question the server has already drawn, its choices one click away (GuestPage.jsx).
+    const AU_FIRST = process.env.PRI_EDITION === 'prithagoras';
+    await step(AU_FIRST ? 'guest · the first question' : 'guest · question picker', '/', async () => {
       await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('[data-guest-try] [data-question-picker]', { timeout: 20000 });
+      await page.waitForSelector(AU_FIRST ? '[data-guest-try] [data-guest-question]' : '[data-guest-try] [data-question-picker]', { timeout: 30000 });
       await wait(page, 600);
     });
+    if (AU_FIRST) await step('guest · the choices', '/', async () => {
+      await page.click('[data-guest-change]');
+      await page.waitForSelector('[data-guest-chooser]', { timeout: 20000 });
+      await wait(page, 300);
+    });
     await step('guest · a question', '/', async () => {
-      await page.click('[data-picker-start]');
+      await page.click(AU_FIRST ? '[data-guest-back]' : '[data-picker-start]');
       await page.waitForSelector('[data-guest-question]', { timeout: 30000 });
       await wait(page, 300);
     });
@@ -690,9 +697,10 @@ async function run() {
     });
     await step('guest · sign-up prompt', '/', async () => {
       await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('[data-picker-form="written"]', { timeout: 20000 });
-      await page.locator('[data-picker-form="written"]').check();
-      await page.click('[data-picker-start]');
+      const written = AU_FIRST ? '[data-pick-form="written"]' : '[data-picker-form="written"]';
+      await page.waitForSelector(written, { timeout: 20000 });
+      await page.locator(written).check();
+      await page.click(AU_FIRST ? '[data-guest-begin]' : '[data-picker-start]');
       await page.waitForSelector('[data-guest-signup="written"]', { timeout: 20000 });
     });
 

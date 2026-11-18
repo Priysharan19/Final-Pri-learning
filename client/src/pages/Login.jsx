@@ -19,12 +19,15 @@ import { EDITION_ID } from '../brand/edition.js';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, useLanguage, useT } from '../i18n/index.js';
 import { featureEnabled, INSTRUMENT_UI } from '../platform/features.js';
 import { defaultCourse, offersCourse, offeredYears, pathwayOffered, defaultOffering } from '../platform/edition.js';
+import { guestTrialAvailable } from '../guest/guestTrial.js';
 import { cloudAvailable } from '../platform/cloudTransport.js';
 import { appleSignInAvailable, rememberAppleSignInIntent } from '../platform/native/appleSignIn.js';
 import { flushSync } from 'react-dom';
 
 // The instrument build's sign-in carries a decorative plot panel (design s10);
 // the flag-off build never loads it.
+// Prithagoras only: the sign-in page offers a visitor the way back to the question they can try without an account.
+const TRY_FIRST = EDITION_ID === 'prithagoras';
 const SignInPlot = INSTRUMENT_UI ? React.lazy(() => import('../instrument/SignInScenes.jsx')) : null;
 // Lazy: the account flow is not on the offline first-run path, so it stays out
 // of the install (client/test/install-budget-check.mjs).
@@ -603,6 +606,10 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                 </div>
               )}
               {error && <div className="error-box" role="alert" style={{ marginTop: 12 }}>{error}</div>}
+              {/* Prithagoras: a visitor's first screen is a question (guest trial, ADR-0003); this is the way back to it. */}
+              {TRY_FIRST && profiles?.length === 0 && guestTrialAvailable() && (
+                <p className="login-try"><PageLink to="/" className="linklike" data-testid="hero-try-first">{t('login.tryFirst')}</PageLink></p>
+              )}
               <p className="muted login-note" style={{ marginTop: 22, textAlign: 'center', fontSize: 13 }}>{t('login.heroNote')}</p>
               {/* The full data statement is one tap away, not a paragraph on the screen. */}
               <details className="login-more">

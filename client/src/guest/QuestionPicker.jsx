@@ -16,10 +16,10 @@ import { coursesFor, chaptersFor, guestYears, settleChoice, PICKER_FORMS } from 
 const STORE = 'pri.picker.v1';
 const FORM_KEY = { typed: 'picker.typeTyped', choice: 'picker.typeChoice', written: 'picker.typeWritten' };
 
-function remembered(edition) {
+export function rememberedChoice(edition) {
   try { return JSON.parse(globalThis.localStorage?.getItem(`${STORE}.${edition}`) || '{}') || {}; } catch { return {}; }
 }
-function remember(edition, choice) {
+export function rememberChoice(edition, choice) {
   try { globalThis.localStorage?.setItem(`${STORE}.${edition}`, JSON.stringify(choice)); } catch { /* a convenience only */ }
 }
 
@@ -30,7 +30,7 @@ function remember(edition, choice) {
  */
 export default function QuestionPicker({ edition, defaultYear = 9, forms = PICKER_FORMS, onStart, busy = false, idPrefix = 'qp', startLabel = null }) {
   const t = useT();
-  const [choice, setChoice] = useState(() => settleChoice(edition, remembered(edition), { defaultYear }));
+  const [choice, setChoice] = useState(() => settleChoice(edition, rememberedChoice(edition), { defaultYear }));
 
   const courses = useMemo(() => coursesFor(edition, choice.year, { mathsLabel: t('picker.maths') }), [edition, choice.year, t]);
   const chapters = useMemo(() => (choice.course ? chaptersFor(edition, choice.year, choice.course) : []), [edition, choice.year, choice.course]);
@@ -41,7 +41,7 @@ export default function QuestionPicker({ edition, defaultYear = 9, forms = PICKE
     return [...map.entries()];
   }, [chapters]);
 
-  useEffect(() => { remember(edition, choice); }, [edition, choice]);
+  useEffect(() => { rememberChoice(edition, choice); }, [edition, choice]);
 
   // Any change settles to a choice that is still on offer (a new year may have no such course or chapter).
   const change = patch => setChoice(prev => settleChoice(edition, { ...prev, ...patch }, { defaultYear }));
