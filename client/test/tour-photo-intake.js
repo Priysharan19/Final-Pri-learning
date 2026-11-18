@@ -52,7 +52,7 @@ export const photoIntakeFlow = {
     const { reader } = online;
     const decoderFetches = [];
     page.on('request', r => { if (/\/assets\/heicDecoder-/.test(r.url())) decoderFetches.push(r.url()); });
-    reader.lines = ['y = 2x', 'x = 3', 'y = 6']; reader.confidence = 0.9; reader.down = false;
+    reader.lines = [{ text: 'y = 2x' }, { text: 'x = 3' }, { text: 'y = 6' }]; reader.confidence = 0.9; reader.down = false;
     await goto('/');
     await createProfile({ name: 'Photo Intake', course: 'in', year: 10 });
     await online.signIn({ name: 'Photo Intake' });
@@ -92,7 +92,6 @@ export const photoIntakeFlow = {
       await page.locator('[data-photo-rotate]').isVisible() && await page.locator('[data-photo-replace]').isVisible() && /Remove/.test(await page.locator('[data-photo-remove]').innerText()));
     await read.click();
     await page.locator('[data-photo-lines]').waitFor({ state: 'visible', timeout: 30000 }).catch(() => {});
-    note('DEBUG ' + JSON.stringify({ state: await page.locator('[data-photo-answer]').getAttribute('data-photo-state'), text: (await page.locator('.photo-answer').innerText()).slice(0, 300) }));
     await check('Read my photo reaches the reading: the page and the lines in ONE compact view, no OCR confidence figure, one primary button',
       await page.locator('[data-reading-review]').isVisible() && await page.locator('[data-photo-line]').count() === 3 &&
         !/OCR confidence/i.test(await page.locator('.qpage').first().innerText()) && await page.locator('.photo-line-text, [data-photo-correct-transcript]').count() === 0 &&
