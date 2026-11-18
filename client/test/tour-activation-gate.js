@@ -50,6 +50,9 @@ const guardianState = page => page.evaluate(async () => { const r = await fetch(
 const gateStatus = page => page.locator(GATE).getAttribute('data-activation-status').catch(() => null);
 
 /** The parent, on their own device: a separate context, no profile, no session. */
+// A child needs a parent under 18 in India, under 15 in Prithagoras (guardianConsent.learnerIsChild).
+const CHILD_AGE = process.env.PRI_EDITION === 'prithagoras' ? 13 : 15;
+
 async function approveAsParent(ctx, base, platform, parentEmail, childName) {
   const parentCtx = await ctx.browser().newContext({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
   try {
@@ -131,7 +134,8 @@ export const flow = {
     await page.getByTestId('signup-age-next').click();
     await page.locator(`${CARD}[data-signup-step="class"]`).waitFor({ timeout: 20000 });
     await page.getByTestId('signup-class-10').click();
-    await check('JEE is not offered below Class 11', await page.getByTestId('signup-track-jee-main').isDisabled());
+    // The exam-track choice is the India edition's (SignUpFlow: `!au`).
+    if (process.env.PRI_EDITION !== 'prithagoras') await check('JEE is not offered below Class 11', await page.getByTestId('signup-track-jee-main').isDisabled());
     await page.getByTestId('signup-class-next').click();
     await page.locator('.shell').waitFor({ timeout: 60000 });
     await page.waitForURL(/\/practice/, { timeout: 30000 }).catch(() => {});
@@ -181,13 +185,13 @@ export const flow = {
       const parentEmail = freshEmail('parent');
       await child.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
       await child.locator(`${CARD}[data-signup-step="method"]`).waitFor({ timeout: 30000 });
-      await signInOnCard(child.locator(CARD), platform, { email: childEmail, name: 'Ravi Child', age: 15 });
+      await signInOnCard(child.locator(CARD), platform, { email: childEmail, name: 'Ravi Child', age: CHILD_AGE });
       await child.locator(`${CARD}[data-signup-step="class"]`).waitFor({ timeout: 20000 });
       await child.getByTestId('signup-class-9').click();
       await child.getByTestId('signup-class-next').click();
       await child.locator(`${CARD}[data-signup-step="parent"]`).waitFor({ timeout: 20000 });
       const minor = accountRow(platform, childEmail);
-      await check('a 15-year-old is asked for a parent next, and the shell has not opened',
+      await check(`a ${CHILD_AGE}-year-old is asked for a parent next, and the shell has not opened`,
         await child.getByRole('heading', { name: 'Now, a parent’s approval' }).isVisible() && await child.locator('.shell').count() === 0);
       await check('the account exists, limited: consent pending on the server',
         minor?.age_basis !== 'adult' && consentRow(platform, minor?.id)?.confirmed_at === null, JSON.stringify({ minor, consent: consentRow(platform, minor?.id) }));
