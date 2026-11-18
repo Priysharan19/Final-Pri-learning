@@ -163,8 +163,12 @@ const INSTALL_GZIP_CEILING = 1_000_000;
 // panel and the new answer forms in the checker (checker-core: exact rationals, equations, subscripted names), their Hindi and English strings
 // (about 40 more catalogue entries each), and the HSC Pass arithmetic. The papers UI is already a lazy chunk (App.jsx React.lazy) and the
 // structured papers are server content, so there was no larger saving to take; the new ceiling leaves about 48 kB. Other ceilings unchanged.
-const FIRST_VISIT_RAW_CEILING = 5_150_000;
-const FIRST_VISIT_GZIP_CEILING = 1_750_000;
+// Raised once more 2026-11-19 (train editions-28 after merging main's guest trial, papers and exam-style questions; the CTO under the same
+// owner decision, size not a constraint): FIRST_VISIT_RAW 5,150,000 -> 5,250,000 and FIRST_VISIT_GZIP 1,750,000 -> 1,850,000 bytes. Measured on the
+// merged tree: 5,031 kB raw and 1,713 kB gzipped install plus warm, over 5,029 / 1,709 kB. A re-baseline for the combined branch, not a weaker
+// gate: the install ceilings, the banned-from-install list, render-from-install and offline coverage are unchanged. Headroom is about 95 kB.
+const FIRST_VISIT_RAW_CEILING = 5_250_000;
+const FIRST_VISIT_GZIP_CEILING = 1_850_000;
 
 // Things that must never be in the install again, and what each one costs.
 const BANNED_FROM_INSTALL = [
