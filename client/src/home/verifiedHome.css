@@ -6,7 +6,7 @@
   align-items: start; padding: 28px 30px 22px 20px; border-bottom: 1px solid var(--in-edge);
 }
 .vp-home:not(:has(.vp-aside)) { grid-template-columns: minmax(0, 1fr); }
-.vp-next { min-width: 0; max-width: 860px; }
+.vp-next { min-width: 0; max-width: 790px; }   /* KALP-04: the desktop command centre stays deliberately bounded (790px) */
 .vp-next .in-resume { margin: 18px 0 0; padding: 22px 22px 20px; gap: 14px 18px; border-radius: 10px; }
 .vp-next .in-resume b { font-size: clamp(20px, 2.4vw, 30px); line-height: 1.15; letter-spacing: -0.03em; font-weight: 600; }
 .vp-next .in-resume small { font-size: 13px; }
