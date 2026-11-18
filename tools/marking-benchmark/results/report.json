@@ -1,6 +1,6 @@
 {
  "date": "2026-11-18",
- "commit": "6bb10b39b",
+ "commit": "ee90985e9",
  "corpus": {
   "total": 248,
   "judged": 248,
@@ -15,27 +15,27 @@
    "falseCreditSolutions": 0,
    "falseRejectSolutions": 0,
    "abstainOnCorrect": 0,
-   "abstainOnWrong": 3,
-   "firstBreakExact": 146,
+   "abstainOnWrong": 5,
+   "firstBreakExact": 139,
    "firstBreakTotal": 149,
    "invalidLines": 149,
-   "falseCreditLines": 0,
+   "falseCreditLines": 5,
    "validLines": 271,
    "falseRejectLines": 0,
-   "abstainLines": 14,
+   "abstainLines": 16,
    "laterErrorLines": 26,
    "laterErrorLinesTicked": 0,
    "examples": [],
    "rates": {
     "falseCreditSolutions": "0.0%",
     "falseRejectSolutions": "0.0%",
-    "firstBreakExact": "98.0%",
-    "firstBreakExactOfAllWrong": "93.6%",
+    "firstBreakExact": "93.3%",
+    "firstBreakExactOfAllWrong": "89.1%",
     "laterErrorLinesTicked": "0.0%",
-    "falseCreditLines": "0.0%",
+    "falseCreditLines": "3.4%",
     "falseRejectLines": "0.0%",
     "abstainOnCorrect": "0.0%",
-    "abstainOnWrong": "1.9%"
+    "abstainOnWrong": "3.2%"
    },
    "consistency": "100% (deterministic: same input, same output)",
    "cost": {
@@ -47,12 +47,12 @@
  "engineWithoutIncompleteRule": {
   "falseCreditSolutions": "0.0%",
   "falseRejectSolutions": "0.0%",
-  "firstBreakExact": "94.6%",
-  "firstBreakExactOfAllWrong": "90.4%",
+  "firstBreakExact": "93.3%",
+  "firstBreakExactOfAllWrong": "89.1%",
   "laterErrorLinesTicked": "0.0%",
   "falseCreditLines": "3.4%",
   "falseRejectLines": "0.0%",
   "abstainOnCorrect": "0.0%",
-  "abstainOnWrong": "1.9%"
+  "abstainOnWrong": "3.2%"
  }
 }

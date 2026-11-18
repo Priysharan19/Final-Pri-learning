@@ -54,7 +54,8 @@ ok(/const handedIn = items\.some/.test(original) && /member\.joined_at/.test(ori
 ok(!/attempt_originals/.test(read('server/platform/admin.js')) && !/attempt_originals/.test(read('server/platform/parentReport.js')), 'no administrator screen and no parent report reads originals');
 ok(/keepOriginal\(db, \{ accountId, edition, questionId: qid/.test(read('server/platform/practice.js')) && !/keepOriginal/.test(read('server/platform/questionPhoto.js')) && !/keepOriginal/.test(read('server/platform/exams.js')), 'originals are kept for marked practice answers, not for "Practise this" photos or exams (practice.js)');
 ok(/Reading stays ANSWER-BLIND/.test(original), 'reading is answer-blind (originalWork.js)');
-both(/Reading is answer-blind and you confirm it/, 'says reading is answer-blind and the student confirms it');
+both(/Reading is answer-blind, and you can see it/, 'says reading is answer-blind and that the student can see it');
+both(/You do not confirm the reading before marking[\s\S]*See how Pri read this line/, 'says the reading is not confirmed before marking and names where to see it');
 both(/Settings\s*→\s*Reading my handwriting/, 'names the Settings section that turns automatic reading off');
 both(/about 1\.6 seconds/, 'states the pause before an automatic read');
 ok(/AUTO_READ_IDLE_MS\s*=\s*1600/.test(read('client/src/ink/InkAnswer.jsx') + read('client/src/lib/autoRead.js') + read('client/src/components/QuestionCard.jsx')), 'the pause is 1600 ms in the client');

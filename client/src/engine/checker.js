@@ -11,7 +11,7 @@ import { normalize, parse, evaluate, exprEquivalent, numsClose, variablesOf, wit
 // working is checked comes out of this — see "What an evaluation may cost" in expr.js.
 const EVALUATION_BUDGET = 50000;
 import { diagnoseStep } from './diagnose.js';
-import { assessCalculusLine, calculusContext, refineDerivativeLine } from './calculusSteps.js';
+import { assessCalculusLine, calculusContext, lineProvenFalse, refineDerivativeLine } from './calculusSteps.js';
 import { diagnoseTopicLine } from './misconceptions/topics/index.js';
 import { answerTooLong } from './checker-core.js';
 import { changedTerm } from './slips.js';
@@ -844,7 +844,18 @@ function parseExpr(text) {
 function expressionReference(meta, prompt, out, { lineAbove = false } = {}) {
   const before = [...out].reverse().find(l => l.status === 'ok');
   // A leading "=" continues the line directly above, and only a verified one.
-  if (lineAbove && (!before || out[out.length - 1] !== before)) return null;
+  // Every-reading rule: with nothing above, or only the restated question directly above, the "= …" line still has the
+  // question's own expression as the line above (reading a); the caller crosses it only if it is neither that nor the answer.
+  if (lineAbove && (!before || out[out.length - 1] !== before)) {
+    const above = out[out.length - 1];
+    if (above && !(above.status === 'note' && above.restates)) return null;
+    if (above) {
+      const t = String(above.text).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '');
+      const last = bareExpressionLine(normalize(t)).split('=').pop().trim();
+      if (last && parseExpr(last)) return last;
+      return null;
+    }
+  }
   if (before) {
     const t = String(before.text).replace(/^∴\s*/, '').replace(/^(so|hence|then|therefore)\s+/i, '');
     const last = bareExpressionLine(normalize(t)).split('=').pop().trim();
@@ -882,7 +893,7 @@ function isPartOf(text, whole) {
   return false;
 }
 
-function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = [] } = {}) {
+function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = [], knownLetters = null } = {}) {
   const text = bareExpressionLine(cleaned);
   const same = (a, b) => exprEquivalent(a, b, { positiveOnly: meta.positiveOnly }) === true;
   const parts = text.split('=').map(x => x.trim());
@@ -892,6 +903,8 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
   const unread = { status: 'note', note: 'Not checked — Pri cannot place this line on the way to the answer, so it is not marked right or wrong.' };
   // "= RHS" where the question states no sides concludes with a name that is not an expression (pinned by step-justify-check).
   if (/^(?:RHS|LHS)$/i.test(parts[parts.length - 1]) && !same(parts[parts.length - 1], meta.canonical)) return { status: 'break', note: 'RHS is not an expression you have shown: the question does not give a right-hand side to reach.' };
+  // "= 2x⁸" on its own, written as the answer: it is the answer (the same tick the line gets with its '=' dropped).
+  if (continued && !reference && parts.length === 2 && parts[1] && same(parts[1], meta.canonical)) return { status: 'ok' };
   if (parts.some(x => !x)) return unread;
   const tail = parts[parts.length - 1];
   const rest = parts.slice(0, -1);
@@ -910,6 +923,19 @@ function judgeExpressionLine(cleaned, meta, { reference = null, promptSpans = []
   // Not the answer: a mistake only where the line says it IS the expression above.
   const allowed = new Set([...variablesOf(parseExpr(meta.canonical) || {}), ...(reference ? variablesOf(parseExpr(reference) || {}) : [])]);
   const sameKind = !continued || (() => { const a = [...variablesOf(parseExpr(tail))].filter(v => v !== 'e').sort().join(), b = [...variablesOf(parseExpr(reference) || {})].filter(v => v !== 'e').sort().join(); return a === b; })();
+  // A "= …" line about other letters than the line above (the question's n against the student's p): the line above is no
+  // reading of it, so it is judged as the bare line it is. Still crossed only if it is not the answer in the answer's own letters.
+  if (continued && reference && !sameKind) {
+    // A letter the question and the working above never introduce is not a reading of anything: "= 1 + v²" after a line in x,
+    // when only u was set, equals nothing. (Only where the question is known, so a letter it may define is not mistaken.)
+    if (knownLetters) {
+      const fresh = [...variablesOf(parseExpr(tail) || {})].filter(l => l.length === 1 && l !== 'e' && !knownLetters.has(l));
+      if (fresh.length) return { status: 'break', note: `This line uses ${fresh[0]}, which neither the question nor the working above introduces, so it cannot equal the line above.` };
+    }
+    return judgeExpressionLine(tail, meta, { reference: null, promptSpans });
+  }
+  // The line above written again (reading a) is true: never crossed.
+  if (continued && reference && sameKind && same(tail, reference)) return unread;
   if (rest.length && reference && sameKind && parseExpr(rest[0]) && parseExpr(tail) && same(rest[0], reference)
       && (continued || [...variablesOf(parseExpr(tail))].every(v => allowed.has(v)))) {
     return { status: 'break', note: 'This line is no longer equivalent to the expression you started with — the slip is here.' };
@@ -1533,7 +1559,15 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
         // antiderivative is verified by differentiating it, and a slip is
         // named. A line it cannot read falls through to the old rule below.
         const assessed = assessCalculusLine(line, calculus, meta, calculusStage);
-        if (assessed && assessed.status === 'break' && (SIDE_DEFINITION.test(proseClean.replace(/\s+/g, '')) || AUXILIARY_CALCULUS.test(proseClean) || !DERIVATIVE_CLAIM.test(proseClean.replace(/\s+/g, '')))) {
+        // Every-reading rule (CTO ruling): a bare or "= …" line, or a line "∫f dx = F", is crossed only when the engine proves it
+        // false under every plausible reading; otherwise it abstains below. A definition of the method (u = …, du = …) never is.
+        const squashed = proseClean.replace(/\s+/g, '');
+        const onlyIntegralAux = /∫/.test(proseClean) && !/[→]|d\/d[a-z]\s*[(\[a-z0-9]|\b[uvw]\b|\bd[uvw]\b/i.test(proseClean);
+        const provenFalse = assessed && assessed.status === 'break' && !SIDE_DEFINITION.test(squashed)
+          && (!AUXILIARY_CALCULUS.test(proseClean) || onlyIntegralAux)
+          && lineProvenFalse(line, calculus, out.map(l => String(l.text)));
+        if (assessed && assessed.status === 'break' && !provenFalse && (SIDE_DEFINITION.test(squashed) || AUXILIARY_CALCULUS.test(proseClean) || !DERIVATIVE_CLAIM.test(squashed)
+            || calculus?.relation === 'antiderivative')) {   // a derivative claim inside an integral question is about a side function
           // A definition or a side derivative of the method (u = 2x + 2, du = 2x dx, d/du u^4 = 4u^3)
           // is a line about another quantity: it is not the integral or the derivative, so it is
           // not held to it.
@@ -1547,7 +1581,8 @@ function stepCheckSingle(meta, workingText, system = null, { loneBranches = fals
         } else {
           const judged = judgeExpressionLine(cleaned, meta, {
             reference: expressionReference(meta, prompt, out, { lineAbove: /^\s*=/.test(bareExpressionLine(cleaned)) }),
-            promptSpans: [...String(prompt || '').matchAll(/\$([^$]+)\$/g)].map(m => { try { return plainTex(m[1]); } catch { return ''; } }).filter(t => t && !/[=<>≤≥,]/.test(t) && parseExpr(t))
+            promptSpans: [...String(prompt || '').matchAll(/\$([^$]+)\$/g)].map(m => { try { return plainTex(m[1]); } catch { return ''; } }).filter(t => t && !/[=<>≤≥,]/.test(t) && parseExpr(t)),
+            knownLetters: prompt ? new Set((`${prompt} ${meta.canonical || ''} ${meta.source || ''} ${out.map(l => l.text).join(' ')}`.replace(/\\[a-zA-Z]+/g, ' ').match(/[A-Za-z]/g) || [])) : null
           });
           status = judged.status;
           if (judged.note) note = judged.note;

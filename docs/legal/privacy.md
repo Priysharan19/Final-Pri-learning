@@ -140,15 +140,13 @@ are not carried over into your account.
   OpenAI the same way after the same one-time permission, but the Handwriting
   setting does not cover it. It is sent only when you use "Practise this", and
   that photo is not kept. What the reading service returns is a transcription of your
-  writing, nothing more, and you can correct it before it counts: your mark is
-  always decided by the marking engine on our server, never by the reading
+  writing, nothing more, and you can open it afterwards and correct it: your mark is always decided by the marking engine on our server, never by the reading
   service.
 - **Reading happens by itself after a pause.** Once you have agreed to the
   reader, are signed in and are online, the page you are writing is read
   automatically when your pen has rested for about 1.6 seconds, so you do not
   have to press Read. It is the same reading with the same rules: only the
-  picture is sent, nothing is sent before you have agreed, and nothing is marked
-  until you check the reading and confirm it. To turn it off, go to Settings →
+  picture is sent, nothing is sent before you have agreed, and nothing is marked until you press Mark my working. The reading is not put in front of you to confirm first. To turn it off, go to Settings →
   Reading my handwriting; you can still press Read my answer yourself. That
   choice is kept on your device. The reading service never sees the expected
   answer, and the AI never decides a mark.
@@ -159,9 +157,8 @@ are not carried over into your account.
   device recorded them (where the pen was, when, how hard it pressed, how it was
   tilted, and the strokes you erased). For a photo it is the photo or scanned
   page as you sent it. We also keep a fingerprint of it (a SHA-256 value), which
-  shows it has not been changed; which strokes each line you confirmed came from;
-  and the reading beside it: what Pri read, the text you confirmed and any edits
-  you made.
+  shows it has not been changed; which strokes each line came from;
+  and the reading beside it: what Pri read, the text that was marked and any edits you made.
 - **How long an original is kept:** 2 years (730 days) after it was kept. Then it is deleted
   automatically.
 - **An original is deleted with your account**, and **included when you export your data**.
@@ -176,10 +173,7 @@ are not carried over into your account.
 - **A limit on what is kept:** one account can have up to 40 MB of handwriting and 24 MB of
   photos kept. Past that, the answer is still marked, but its original is not
   kept on our server. Your device still has its own copy.
-- **Reading is answer-blind and you confirm it.** The reading service sees
-  only the picture, never the expected answer or the solution. You check what
-  was read, and can correct it, before the answer counts. The reading never
-  decides a mark.
+- **Reading is answer-blind, and you can see it.** The reading service sees only the picture, never the expected answer or the solution. You do not confirm the reading before marking: when you press Mark my working, Pri reads the page and marks it in one step. Afterwards you can open "See how Pri read this line" on any line to see what was read, and correct it. A line that could not be read confidently is left out and shown as not read, never marked right or wrong. The reading never decides a mark.
 - **Help from an AI explainer, when you ask for it.** When you open a hint
   step, a walk-through, "Why this step?", a check of a line of your working or a
   mistake explanation, or type a question to the tutor, our server sends what is

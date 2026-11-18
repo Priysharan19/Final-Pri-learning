@@ -134,6 +134,8 @@ const cleanPoly = p => new Map([...p].filter(([, c]) => Math.abs(c) > 1e-12));
 const TEX_SPAN = /\$([^$]+)\$/g;
 function texToPlain(tex) {
   let s = String(tex || '');
+  // An exponent in braces first, so a fraction whose denominator carries one (\dfrac{12}{x^{3}}) has no nested braces left.
+  for (let guard = 0; guard < 6 && /\^\s*\{[^{}]*\}/.test(s); guard++) s = s.replace(/\^\s*\{([^{}]*)\}/g, '^($1)');
   for (let guard = 0; guard < 6 && /\\d?frac/.test(s); guard++) {
     s = s.replace(/\\d?frac\s*(\{[^{}]*\}|[0-9a-zA-Z])\s*(\{[^{}]*\}|[0-9a-zA-Z])/g, (_, a, b) => `((${a.replace(/^\{|\}$/g, '')})/(${b.replace(/^\{|\}$/g, '')}))`);
   }
@@ -328,6 +330,15 @@ export function assessCalculusLine(line, ctx, meta, stage = { claimed: false }) 
   // The same expression later on is a claim, and judged as one.
   const startAllowed = !/^\s*=/.test(String(line));
   try {
+    // "dy/dx = … + C": a derivative is a function, not a family of them. Said as a claim (a derivative label), an added arbitrary
+    // constant is false under every reading, whatever else the line says.
+    if (ctx.relation === 'derivative' && /^\s*(?:∴\s*)?(?:d[a-z]\s*\/\s*d[a-z]|[a-z]\s*['′](?:\s*\(\s*[a-z]\s*\))?|[a-z]\s*\(\s*[a-z]\s*\)\s*['′])\s*=/i.test(String(line))) {
+      const tail = segmentsOf(line).filter(t => t !== '').pop();
+      if (tail && termsOf(tail).some(t => t.sign > 0 && CONSTANT_TERM.test(t.text)) && termsOf(tail).length > 1) {
+        const d = D('diff-constant-kept', 'A constant was added', 'A derivative is one function: an arbitrary constant + C belongs to an integral, not to a derivative.', 'Leave out + C when you differentiate.', 'high');
+        return { status: 'break', note: d.message, diagnosis: d };
+      }
+    }
     const segs = segmentsOf(line).filter(s => s !== '');
     if (!segs.length) return null;
     const read = [];
@@ -610,6 +621,81 @@ export function refineDerivativeLine(text, meta, assessed, stage = { claimed: fa
     const named = derivativeSlip({ given: source, canonical, student: last, variable });
     return named ? { status: 'break', note: named.message, diagnosis: named } : assessed;
   } catch { return assessed; }
+}
+
+/**
+ * Is this line PROVEN false under every plausible reading? (CTO ruling on the owner's rule "a true line is never crossed".)
+ *
+ * A bare line, or a "= …" continuation, in a derivative question has two readings: (a) it equals an expression written
+ * above it, (b) it is the requested derivative. It is false only if it fails both: it is neither the derivative nor any
+ * earlier plain line of the chain. A line "∫f dx = F" in an antiderivative question is a statement about the integral:
+ * it is false when F′ is not f, whichever integrand f it is about (a true side integral is never crossed).
+ * Anything unreadable, approximated, or about another letter is NOT proven: the caller abstains with a note.
+ */
+export function lineProvenFalse(line, ctx, previousTexts = []) {
+  try {
+    if (!ctx || !line || String(line).length > MAX_LINE_CHARS) return false;
+    const v = ctx.variable;
+    // A function written without brackets ("sin 6x + 6", "ln x + 1") has two readings of how far its argument runs: abstain.
+    if (/\b(?:sin|cos|tan|sec|cosec|csc|cot|ln|log|exp|sqrt)\s+[^(\s]/i.test(String(line))) return false;
+    // A line that names a function or its derivative (f(x) = …, f'(x) = …, g′ = …) is a definition of the method, not a claim.
+    if (ctx.relation === 'antiderivative' && /^\s*(?:∴\s*)?[a-zA-Z]\s*(?:['′]\s*)?(?:\(\s*[a-z]\s*\))?\s*=/.test(String(line)) && !/^\s*[Fy]\s*(\(\s*[a-z]\s*\))?\s*=/.test(String(line))) return false;
+    const segs = segmentsOf(line).filter(t => t !== '' && !LABEL.test(t));
+    if (!segs.length) return false;
+    const read = segs.map(t => readSegment(t, ctx));
+    if (read.some(r => !r)) return false;
+    if (ctx.relation === 'antiderivative') {
+      // ∫g dx = F (= F2 …): each later segment must have g as its derivative.
+      const first = read[0];
+      if (read.length === 1 && first.kind === 'plain' && !first.approx.used) {
+        // A bare or "= …" line: it is an antiderivative of the question's integrand, or of an integrand a line above names
+        // (a side integral, or a factor pulled out: "(2x+3)^3 → …"), or it restates one of them or another line above.
+        // It is false only if it is none of these. A line with no variable (a du factor, 1/6) claims no antiderivative.
+        if (!variablesOf(first.plainAst || {}).has(v)) return false;
+        const targets = [x => valueAt(ctx.given, x, v)];
+        const restated = [];
+        for (const prior of previousTexts) {
+          const pieces = String(prior).split(/→|->/).flatMap(t => segmentsOf(t)).filter(t => t !== '' && !LABEL.test(t));
+          for (const piece of pieces) {
+            const r = readSegment(piece, ctx);
+            if (!r) { if (/∫|\\int|d\s*\/\s*d|[uvw]\b/.test(piece)) continue; return false; }
+            if (r.kind === 'operator' && r.parts[0].kind === 'integral') { const body = r.parts[0].body; targets.push(x => valueAt(body, x, v)); }
+            else if (r.kind === 'plain') { const ast = r.plainAst; targets.push(x => valueAt(ast, x, v)); restated.push(x => valueAt(ast, x, v)); }
+          }
+        }
+        if (read.length === 1 && segs.length === 1 && /^\s*[a-zA-Z]\s*(\(\s*[a-z]\s*\))?\s*=/.test(String(line)) && !/^\s*[Fy]\s*(\(\s*[a-z]\s*\))?\s*=/.test(String(line))) return false;   // "f(x) = …": a definition
+        const q = x => valueAt(first.plainAst, x, v);
+        return targets.every(t => !sameFunction(first.asFunction, t)) && restated.every(t => !sameFunction(q, t)) && (/^\s*=/.test(String(line)) || segmentsOf(line).some(t => LABEL.test(t)) || !sameFunction(q, x => valueAt(ctx.given, x, v)));   // "= f" after ∫f dx is false; "y = f" is a claim; a bare f only rewrites the integrand
+      }
+      // The FIRST line of the working that is a lone integral is the restated question: a different integrand is a mis-copy.
+      if (read.length === 1 && first.kind === 'operator' && first.parts[0].kind === 'integral' && previousTexts.length === 0 && !/^\s*=/.test(String(line))) {
+        return !sameFunction(x => valueAt(first.parts[0].body, x, v), x => valueAt(ctx.given, x, v));
+      }
+      if (read.length < 2 || first.kind !== 'operator' || first.parts[0].kind !== 'integral') return false;
+      const g = x => valueAt(first.parts[0].body, x, v);
+      for (const seg of read.slice(1)) {
+        if (seg.kind !== 'plain' || seg.approx.used) return false;
+        if (!sameFunction(seg.asFunction, g)) return true;
+      }
+      return false;
+    }
+    // Derivative question: a plain line, judged under both readings.
+    const last = read[read.length - 1];
+    if (last.kind !== 'plain' || last.approx.used || read.some(r => r.kind !== 'plain')) return false;
+    const expected = ctx.canonical ? (x => valueAt(ctx.canonical, x, v)) : null;
+    if (!expected) return false;
+    if (sameFunction(last.asFunction, expected, 1e-7)) return false;               // reading (b): it is the derivative
+    for (const prior of previousTexts) {                                            // reading (a): equal to a line above
+      const ps = segmentsOf(prior).filter(t => t !== '' && !LABEL.test(t));
+      if (!ps.length) return false;                                                 // an unreadable line above: not proven
+      const pr = readSegment(ps[ps.length - 1], ctx);
+      if (!pr) { if (!/∫|d\s*\/\s*d/.test(ps[ps.length - 1])) return false; continue; }
+      if (pr.kind === 'plain' && sameFunction(last.asFunction, pr.asFunction)) return false;
+    }
+    const given = x => valueAt(ctx.given, x, v);
+    if (sameFunction(last.asFunction, given)) return false;                          // equal to the question's own function
+    return true;
+  } catch { return false; }
 }
 
 /** Every diagnosis code this module can name, for the misconception ontology and its tests. */

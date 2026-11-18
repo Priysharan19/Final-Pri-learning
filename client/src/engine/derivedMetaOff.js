@@ -8,8 +8,8 @@
 //   y9-indices-sci  : working moves between index and scientific forms, not an equation in one letter
 //   y11-explog      : a rounded-root line (ln(2^x) = ln(258)) is a true step the derived meta cannot follow
 //   c11-straight-lines : the same slope/intercept chain mis-modelled as one equation
-//   y12-integration : the integrand restated as the first line is a true step the expression meta crosses
+//   (y12-integration is back ON: the every-reading rule, calculusSteps.lineProvenFalse, never crosses the integrand restated as a line)
 // An authored `q.stepcheck` is never affected. Used by the server's and the device's stepMetaFor.
-export const DERIVED_META_OFF = Object.freeze(['y10-nonlinear', 'mex-vectors', 'y9-indices-sci', 'y11-explog', 'c11-straight-lines', 'y12-integration']);
+export const DERIVED_META_OFF = Object.freeze(['y10-nonlinear', 'mex-vectors', 'y9-indices-sci', 'y11-explog', 'c11-straight-lines']);
 const OFF = new Set(DERIVED_META_OFF);
 export const derivedMetaOff = q => OFF.has(String(q?.subtopic ?? ''));
