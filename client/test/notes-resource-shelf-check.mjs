@@ -14,7 +14,8 @@ assert.ok(view.includes('aria-label={resource.title}'), 'External links require 
 assert.ok(view.includes("t('notes.sectionResources')"), 'External reference shelf must have a dedicated translated heading');
 assert.ok(view.includes("t('notes.showMoreExamples')"), 'Incremental diagrams must have an accessible translated action');
 // A figure with an authored question is visible before any solution step is revealed.
-assert.ok(view.includes("import StudyDiagram from '../notes/StudyDiagram.jsx'"), 'diagram rendering module not wired');
+// The worked example, and so the import, lives in NotesParts.jsx ('./StudyDiagram.jsx'); the page itself no longer imports it.
+assert.ok(view.includes("import StudyDiagram from '../notes/StudyDiagram.jsx'") || view.includes("import StudyDiagram from './StudyDiagram.jsx'"), 'diagram rendering module not wired');
 assert.ok(view.includes('<StudyDiagram figure={ex.figure} />'), 'diagram not in the problem statement');
 assert.ok(view.includes('const [shown, setShown] = useState(0)'), 'revealed solution step before student sees figure');
 assert.ok(view.includes('const [visibleExamples, setVisibleExamples] = useState(6)'), 'visual examples must mount incrementally');

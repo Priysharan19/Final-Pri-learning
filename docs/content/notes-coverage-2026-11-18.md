@@ -44,7 +44,7 @@ Diagrams counted here are kit diagrams (`client/src/diagrams/`, accuracy-tested)
 - `ma5-mag-c-01` Numbers of any magnitude — Scientific notation and significant figures are place-value rules. Moving a slider would only redisplay a number; the conversions and the rounding are clearer worked on the page digit by digit.
 - `ma5-geo-p-02` Properties of geometrical figures C (Path) — A congruence proof is a chain of stated reasons about one fixed figure; moving a vertex changes the figure but does not teach which facts prove the triangles identical.
 - `ma5-net-p-01` Introduction to networks (Path) — These skills are counting and comparing on one fixed network; there is no quantity whose movement teaches more than the two highlighted networks with their weights.
-- `mst-11-06` Time and location — This topic rests on one fixed rate, $15^\circ$ of longitude per hour, and on offsets that each question states; there is no quantity to vary whose effect a slider would show more clearly than the two number lines.
+- `mst-11-06` Time and location — This topic rests on one fixed rate, $15^\\circ$ of longitude per hour, and on offsets that each question states; there is no quantity to vary whose effect a slider would show more clearly than the two number lines.
 - `mst-11-07` Networks, paths and trees — Shortest paths and spanning trees come from step-by-step methods on one fixed network; nothing varies continuously, and the two highlighted diagrams show each result with its total.
 - `me1-11-04` Permutations and combinations — Counting here is exact reasoning about discrete choices. No quantity varies smoothly, so a slider would only replay the tree and Pascal's triangle without showing anything they do not.
 
