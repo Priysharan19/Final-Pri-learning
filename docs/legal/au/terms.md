@@ -1,6 +1,6 @@
 # Terms of use
 
-**Last updated: 18 November 2026**
+**Last updated: 19 November 2026**
 
 These terms are an agreement between you and Priysharan Tripathi
 trading as Pri Learning, ABN 20 192 090 394, about your use of Prithagoras
@@ -71,6 +71,15 @@ subscription renews each month or year until you cancel it. You can cancel in th
 app, and Premium then stays on until the end of the period you have paid for.
 See the [refund policy](/refund-policy) for cancelling, refunds and your rights
 under the Australian Consumer Law.
+
+HSC Pass to the exams (when it is on sale). A second way to buy Premium is one payment
+that does not renew. It gives the same Premium until the day after the last HSC
+Mathematics written exam of its exam year, and then it ends on its own; nothing
+is charged again. Before you pay, the app shows the exact price in Australian
+dollars and the exact date it ends. The price is lower the nearer that date is,
+down to a minimum, and the price you are shown is the price you pay. The pass is
+not a promise of any HSC mark. If a payment for the pass is refunded in full,
+Premium from that pass ends at once.
 
 If you are under 18, a parent or guardian must make or approve any purchase.
 

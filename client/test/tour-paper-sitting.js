@@ -276,6 +276,7 @@ try {
       .slice(0, 6).map(el => `${el.tagName.toLowerCase()}.${String(el.className?.baseVal ?? el.className).slice(0, 40)}@${Math.round(el.getBoundingClientRect().right)}`);
   }) : [];
   check('at 390 px the page does not scroll sideways', overflow <= 0, `overflow ${overflow}px ${JSON.stringify(wide)}`);
+  check('a timed paper sitting offers no hints: no hint control anywhere on the page', await page.getByRole('button', { name: /hint/i }).count() === 0 && await page.locator('[data-hint], [data-hint-ladder]').count() === 0);
   check('ACCESSIBILITY: every control has a name', (await unnamedControls(page)).length === 0, JSON.stringify(await unnamedControls(page)));
   await page.setViewportSize({ width: 1180, height: 820 });
   await page.waitForTimeout(300);
@@ -295,4 +296,4 @@ if (failures.length) {
   console.error(`PAPER SITTING TOUR: FAIL — ${failures.length} failed, ${pass} passed`);
   process.exit(1);
 }
-console.log(`PAPER SITTING TOUR: PASS — ${pass}/${pass} checks — a free Extension 1 student sits Practice Paper 1 in the app: Section I by click and keyboard, a typed final answer and a written proof, autosave and resume, nothing secret before Submit, the honest totals line and per-part feedback. [SYNTHETIC student]`);
+console.log(`PAPER SITTING TOUR: PASS — ${pass}/${pass} checks — a free Extension 1 student sits Practice Paper 1 in the app: Section I by click and keyboard, a typed final answer, a written proof, a photographed answer and a written (ink) answer, autosave and resume, nothing secret before Submit, the honest totals line, per-criterion feedback and no hints. [SYNTHETIC student; SYNTHETIC reader]`);
