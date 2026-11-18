@@ -170,7 +170,7 @@ export default {
     ],
     examples: [
       { question: 'Factorise $x^2 + 5x + 6$.', steps: ['Find two numbers with sum $5$ and product $6$: $2$ and $3$.', '$x^2 + 2x + 3x + 6 = x(x + 2) + 3(x + 2)$.'], answer: '$(x + 2)(x + 3)$', verify: { kind: 'equivalent', a: 'x^2+5x+6', b: '(x+2)(x+3)' } },
-      { question: 'Use an identity to find $103 \\times 97$.', steps: ['$103 \\times 97 = (100 + 3)(100 - 3)$.', '$= 100^2 - 3^2 = 10000 - 9$.'], answer: '$9991$', verify: { kind: 'value', expr: '103*97', answer: '9991' } }
+      { question: 'Use an identity to find $103 \\times 97$.', steps: ['Write it as a difference of two squares: $103 \\times 97 = (100 + 3)(100 - 3)$.', 'Apply $(a+b)(a-b)=a^2-b^2$: $= 100^2 - 3^2 = 10000 - 9$.'], answer: '$9991$', verify: { kind: 'value', expr: '103*97', answer: '9991' } }
     ]
   },
 
@@ -257,7 +257,7 @@ export default {
       { wrong: 'Mixing diameter and radius in $\\pi r^2$.', right: 'Halve the diameter first.' }
     ],
     examples: [
-      { question: 'Find the area of a triangle with sides $13$ cm, $14$ cm and $15$ cm.', steps: ['$s = (13 + 14 + 15)/2 = 21$.', '$A = \\sqrt{21 \\times 8 \\times 7 \\times 6} = \\sqrt{7056}$.'], answer: '$84\\text{ cm}^2$', verify: { kind: 'value', expr: 'sqrt(21*(21-13)*(21-14)*(21-15))', answer: '84' } },
+      { question: 'Find the area of a triangle with sides $13$ cm, $14$ cm and $15$ cm.', steps: ['Semi-perimeter: $s = (13 + 14 + 15)/2 = 21$.', 'Heron’s formula: $A = \\sqrt{21 \\times 8 \\times 7 \\times 6} = \\sqrt{7056}$.'], answer: '$84\\text{ cm}^2$', verify: { kind: 'value', expr: 'sqrt(21*(21-13)*(21-14)*(21-15))', answer: '84' } },
       { question: 'Find the area of a sector of radius $7$ cm and angle $90^\\circ$, in terms of $\\pi$.', steps: ['Fraction of the circle: $90/360 = 1/4$.', 'Area $= \\frac{1}{4} \\times \\pi \\times 49$.'], answer: '$\\dfrac{49\\pi}{4}\\text{ cm}^2$', verify: { kind: 'value', expr: '(90/360)*pi*7^2', answer: '49*pi/4' } }
     ]
   },
@@ -340,8 +340,8 @@ export default {
       { wrong: 'Treating $2$, $4$, $8$, $16$ as an AP.', right: 'Differences change but ratios are all $2$: it is a GP.' }
     ],
     examples: [
-      { question: 'For the AP $3$, $7$, $11$, ..., find the 20th term and the sum of the first $20$ terms.', steps: ['$a = 3$, $d = 4$. $a_{20} = 3 + 19 \\times 4 = 79$.', '$S_{20} = \\frac{20}{2}(3 + 79) = 10 \\times 82$.'], answer: '$a_{20} = 79$, $S_{20} = 820$', verify: { kind: 'values', pairs: [['3+(20-1)*4', '79'], ['20/2*(2*3+(20-1)*4)', '820']] } },
-      { question: 'Find the 6th term of the GP $2$, $6$, $18$, ...', steps: ['$a = 2$, $r = 6/2 = 3$.', '$a_6 = 2 \\times 3^5 = 2 \\times 243$.'], answer: '$486$', verify: { kind: 'value', expr: '2*3^(6-1)', answer: '486' } }
+      { question: 'For the AP $3$, $7$, $11$, ..., find the 20th term and the sum of the first $20$ terms.', steps: ['First term, common difference and the 20th term: $a = 3$, $d = 4$. $a_{20} = 3 + 19 \\times 4 = 79$.', 'Sum of the first 20 terms: $S_{20} = \\frac{20}{2}(3 + 79) = 10 \\times 82$.'], answer: '$a_{20} = 79$, $S_{20} = 820$', verify: { kind: 'values', pairs: [['3+(20-1)*4', '79'], ['20/2*(2*3+(20-1)*4)', '820']] } },
+      { question: 'Find the 6th term of the GP $2$, $6$, $18$, ...', steps: ['First term and common ratio: $a = 2$, $r = 6/2 = 3$.', 'The 6th term: $a_6 = 2 \\times 3^5 = 2 \\times 243$.'], answer: '$486$', verify: { kind: 'value', expr: '2*3^(6-1)', answer: '486' } }
     ]
   }
 };

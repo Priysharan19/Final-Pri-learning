@@ -344,7 +344,7 @@ export default {
     examples: [
       {
         question: 'Find the amount and the compound interest on ₹$5000$ for $2$ years at $10\\%$ per year, compounded annually.',
-        steps: ['$A=5000\\left(1+\\frac{10}{100}\\right)^2=5000\\times 1.21$.', '$A=$ ₹$6050$.', '$CI=6050-5000=$ ₹$1050$.'],
+        steps: ['Amount after two years: $A=5000\\left(1+\\frac{10}{100}\\right)^2=5000\\times 1.21$.', 'Amount: $A=$ ₹$6050$.', 'Compound interest is the amount minus the principal: $CI=6050-5000=$ ₹$1050$.'],
         answer: 'Amount ₹$6050$; CI ₹$1050$',
         verify: { kind: 'values', pairs: [['5000*(1+10/100)^2', '6050'], ['5000*(1+10/100)^2-5000', '1050']] }
       },
@@ -450,7 +450,7 @@ export default {
     examples: [
       {
         question: 'A trapezium has parallel sides $12$ cm and $8$ cm, and the distance between them is $5$ cm. Find its area.',
-        steps: ['$A=\\frac{1}{2}(12+8)\\times 5$.', '$=\\frac{1}{2}\\times 20\\times 5=50$.'],
+        steps: ['Area of a trapezium, half the sum of the parallel sides times the height: $A=\\frac{1}{2}(12+8)\\times 5$.', 'Evaluate: $=\\frac{1}{2}\\times 20\\times 5=50$.'],
         answer: '$50\\text{ cm}^2$',
         verify: { kind: 'value', expr: '1/2*(12+8)*5', answer: '50' }
       },

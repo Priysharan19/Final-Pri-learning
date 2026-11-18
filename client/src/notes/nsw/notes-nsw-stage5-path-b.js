@@ -38,7 +38,7 @@ export default {
       {
         question: 'A network has five vertices with degrees $3,3,2,2,4$. How many edges does it have, and does it have a path that uses every edge exactly once?',
         steps: ['Add the degrees: $3+3+2+2+4=14$.', 'Each edge contributes $2$ to the total, so $E=14\\div2=7$.', 'Exactly two vertices have odd degree (the two of degree $3$), so a path using every edge once exists, provided the network is connected. It runs from one degree-$3$ vertex to the other.'],
-        answer: '$7$ edges; such a path exists if the network is connected',
+        answer: '$7$ edges; exactly two vertices have odd degree (the two of degree $3$), so a path using every edge exactly once exists provided the network is connected',
         verify: { kind: 'value', expr: '(3+3+2+2+4)/2', answer: '7' }
       },
       {
@@ -340,7 +340,7 @@ export default {
       },
       {
         question: 'A triangle has sides $a=7$, $b=5$ and $c=8$. Find the angle $A$ opposite the side of length $7$.',
-        steps: ['Rearrange the cosine rule: $\\cos A=\\dfrac{b^2+c^2-a^2}{2bc}=\\dfrac{25+64-49}{80}$.', '$\\cos A=\\dfrac{40}{80}=\\tfrac12$.', '$A=\\cos^{-1}\\tfrac12=60^\\circ$.'],
+        steps: ['Rearrange the cosine rule: $\\cos A=\\dfrac{b^2+c^2-a^2}{2bc}=\\dfrac{25+64-49}{80}$.', '$\\cos A=\\dfrac{40}{80}=\\tfrac12$.', '$A=\\cos^{-1}\\left(\\tfrac12\\right)=60^\\circ$.'],
         answer: '$A=60^\\circ$',
         verify: { kind: 'value', expr: 'arccos((5^2+8^2-7^2)/(2*5*8))*180/pi', answer: '60' }
       }
