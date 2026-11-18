@@ -816,6 +816,12 @@ jobs:
         with:
           path: ${{ runner.temp }}/apt-debs
           key: apt-debs-${{ steps.image.outputs.build }}-${{ hashFiles('client/package-lock.json') }}-${{ matrix.browsers }}
+          # A lockfile change must not mean downloading every package again from
+          # a slow mirror: fall back to the newest files kept for this runner
+          # image. apt only reuses a cached .deb whose size and hash match the
+          # package index, so an out-of-date file is fetched again, never used.
+          restore-keys: |
+            apt-debs-${{ steps.image.outputs.build }}-
       # Two commands, bounded differently, because a kill is safe for one and
       # not the other. System packages: once, never under `timeout` — GNU
       # timeout signals the whole process group, and a SIGTERM while dpkg is
