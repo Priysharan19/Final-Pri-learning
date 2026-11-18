@@ -49,7 +49,7 @@ Where this file and an older release document disagree, this file wins until the
 | # | Question | Default taken | Owner to confirm |
 |---|---|---|---|
 | D19 | Free and Premium | Prices stay ₹199 a month and ₹1,499 a year. Free: 20 questions a day, one timed paper in 30 days. Premium: unlimited questions and papers, plus JEE Advanced, which the server enforces. | Yes |
-| D20 | Handwriting and photo reads | Free 5 a day, Premium 25 a day, per kind. These are modelled defaults, to be revisited after real cost data. | Yes |
+| D20 | Handwriting and photo reads | Free 5 a day, Premium 50 a day, per kind (raised from 25 by the owner on 18 Nov 2026). These are modelled defaults, to be revisited after real cost data. | Yes |
 | D21 | Paid-call ceiling | Unchanged at 120 an hour and 300 a day. The owner must also set a hard monthly limit in the OpenAI console. | Yes |
 | D22 | Paid features | The notebook and the compliant paywall ship. Board mock papers ship as typed timed papers. The parent report is finished in code behind a flag that stays off until counsel reviews email about minors. | Yes |
 | D23 | Past papers | Off for students until a rights opinion exists. Generated questions cover every chapter without them. | Counsel |

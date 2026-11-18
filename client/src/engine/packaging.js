@@ -37,7 +37,7 @@ export const PACKAGINGS = Object.freeze({
       examsPerWindow: 1,
       examWindowDays: 30
     }),
-    premium: Object.freeze({ readsPerDay: 25 })
+    premium: Object.freeze({ readsPerDay: 50 })
   }),
   'value-2026-11': Object.freeze({
     id: 'value-2026-11',

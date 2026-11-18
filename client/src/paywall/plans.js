@@ -8,7 +8,7 @@
 //              5 reads of your writing and 5 question photos a day, and the
 //              mistake notebook;
 //   Premium  — unlimited practice questions and timed papers, the JEE
-//              Advanced track, 25 reads and 25 photos a day; and, on the
+//              Advanced track, 50 reads and 50 photos a day; and, on the
 //              server's own entitlement record, where the time went in each
 //              section of a timed paper (premium-exams), the estimate from
 //              practice and the mistake patterns on Insights

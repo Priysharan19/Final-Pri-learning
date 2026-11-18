@@ -243,6 +243,6 @@ Tested in `server/test/recognition-dedupe-check.mjs` (§12) and `client/test/tou
 | Per student-month (30 days, every allowed answer used) | Typical (4 reads) | Hard cap (12 reads, terra) |
 | --- | ---: | ---: |
 | Free, 5 answers a day (150 answers) | $3.00 | $9.00 |
-| Premium, 25 answers a day (750 answers) | $15.00 | $45.00 |
+| Premium, 50 answers a day (1,500 answers) | $30.00 | $90.00 |
 
 These are ceilings per account, not forecasts: most students will not use every answer, and a student who does is bounded by the deployment ceiling regardless. They scale linearly with the unverified prices and with how often the client re-reads (`AUTO_READ_MAX` 12, rest `AUTO_READ_IDLE_MS`).

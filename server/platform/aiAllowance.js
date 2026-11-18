@@ -35,7 +35,7 @@ export const AI_KINDS = Object.freeze(['handwriting', 'working', 'question-photo
 // calls and is unchanged (D21: 120 an hour, 300 a day, spendCeiling.js).
 //
 // Owner default D20 (docs/release/V1_DECISIONS_2026-11-01.md): handwriting and
-// photo reads are Free 5 a day and Premium 25 a day, PER KIND. They are
+// photo reads are Free 5 a day and Premium 50 a day, PER KIND. They are
 // modelled defaults, to be revisited after real cost data, so each is
 // configurable. "Handwriting" is every read of the student's own writing —
 // ink, or a photo of written working, both read by /v1/handwriting/transcribe.

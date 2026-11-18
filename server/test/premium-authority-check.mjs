@@ -38,11 +38,11 @@ const env = {
 };
 const EXPECTED_CHECKS = 60; // every check is unconditional
 
-// ── configuration (owner default D20: 5 free / 25 Premium a day, per kind) ──
-const D20 = { free: 5, premium: 25 };
+// ── configuration (owner default D20: 5 free / 50 Premium a day, per kind) ──
+const D20 = { free: 5, premium: 50 };
 ok(JSON.stringify(aiAllowance({}, 'handwriting')) === JSON.stringify(D20) && JSON.stringify(AI_ALLOWANCE_DEFAULTS.handwriting) === JSON.stringify(D20),
-  'D20: reads of the student\'s writing default to 5 a day free and 25 a day Premium');
-ok(JSON.stringify(aiAllowance({}, 'question-photo')) === JSON.stringify(D20), 'D20: question photos default to 5 a day free and 25 a day Premium, as their own kind');
+  'D20: reads of the student\'s writing default to 5 a day free and 50 a day Premium');
+ok(JSON.stringify(aiAllowance({}, 'question-photo')) === JSON.stringify(D20), 'D20: question photos default to 5 a day free and 50 a day Premium, as their own kind');
 ok(aiAllowance({}, 'working').free === 120 && aiAllowance({}, 'working').premium === 1200, 'the working check is not a read (not named by D20) and keeps its allowance');
 ok(Object.keys(AI_ALLOWANCE_DEFAULTS).every(kind => AI_ALLOWANCE_DEFAULTS[kind].premium > AI_ALLOWANCE_DEFAULTS[kind].free), 'Premium includes more than free for every kind');
 ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '-3' }).length === 1 && aiAllowanceConfigProblems({ PRI_AI_DAILY_PREMIUM: '0' }).length === 1 &&
@@ -50,7 +50,7 @@ ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '-3' }).length === 1 && aiAllo
   'a non-positive or nonsense value, global or per kind, is a configuration problem (production refuses to boot)');
 ok(aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }).length === 3 &&
   ['handwriting', 'question-photo', 'working'].every(kind => aiAllowance({ PRI_AI_DAILY_FREE: '50', PRI_AI_DAILY_PREMIUM: '10' }, kind).premium === 50) &&
-  aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE_PHOTO: '30' }).length === 1,
+  aiAllowanceConfigProblems({ PRI_AI_DAILY_FREE_PHOTO: '60' }).length === 1,
   'Premium below free is flagged for each kind it affects, and never applied below free');
 ok(aiAllowance({ PRI_AI_DAILY_FREE: '9', PRI_AI_DAILY_FREE_PHOTO: '3' }, 'question-photo').free === 3 &&
   aiAllowance({ PRI_AI_DAILY_FREE: '9', PRI_AI_DAILY_FREE_PHOTO: '3' }, 'handwriting').free === 9,
@@ -171,23 +171,23 @@ try {
   ok(later.allowed && later.plan === 'free', 'a new window restores the allowance');
   ok(await consumeAiAllowance(db, { accountId: 'free', kind: 'video', env }).then(() => false, e => /unknown/.test(e.message)), 'an unknown kind is a programming error');
   ok(db.prepare("SELECT plan,status FROM entitlement_snapshots WHERE account_id='free'").get().plan === 'free', 'no request changed the server\'s entitlement record');
-  // 9 · D20 at its defaults, over HTTP: 5 / 25 a day for each kind, separately.
-  const d20 = async (account, path, body) => { let n = 0; let last = null; for (let i = 0; i < 40; i++) { last = await post(path, account, body()); if (last.status !== 200) break; n += 1; } return { n, r: last }; };
+  // 9 · D20 at its defaults, over HTTP: 5 / 50 a day for each kind, separately.
+  const d20 = async (account, path, body) => { let n = 0; let last = null; for (let i = 0; i < 60; i++) { last = await post(path, account, body()); if (last.status !== 200) break; n += 1; } return { n, r: last }; };
   const ink = () => ({ image: freshPicture() });
   const photo = () => ({ image: freshPicture() });
   const before20 = readCalls;
   const freeInk = await d20('d20free', '/d20/handwriting/transcribe', ink);
   ok(freeInk.n === 5 && readCalls - before20 === 5 && freeInk.r.status === 429 && freeInk.r.data.error.limit === 5 && freeInk.r.data.error.kind === 'handwriting',
     `D20: a free account gets exactly 5 reads of its writing a day (${freeInk.n}, ${readCalls - before20} provider calls)`);
-  ok(/5 handwritten answers/.test(freeInk.r.data.error.message) && /renew in about (23|24) hours/.test(freeInk.r.data.error.message) && /type your answer/.test(freeInk.r.data.error.message) && /Premium includes 25 a day/.test(freeInk.r.data.error.message) && !/on-device/i.test(freeInk.r.data.error.message),
+  ok(/5 handwritten answers/.test(freeInk.r.data.error.message) && /renew in about (23|24) hours/.test(freeInk.r.data.error.message) && /type your answer/.test(freeInk.r.data.error.message) && /Premium includes 50 a day/.test(freeInk.r.data.error.message) && !/on-device/i.test(freeInk.r.data.error.message),
     'the refusal names the count in answers, when it renews (a duration, never a bare clock time), the typed alternative and Premium\'s figure, and promises no on-device reader (D16)');
   const freePhoto = await d20('d20free', '/d20/question-photo/identify', photo);
   ok(freePhoto.n === 5 && photoCalls === 5 && freePhoto.r.status === 429 && freePhoto.r.data.error.kind === 'question-photo',
     `D20: photos are their own kind — 5 more for the same free account after its reads ran out (${freePhoto.n})`);
   const premiumInk = await d20('d20premium', '/d20/handwriting/transcribe', ink);
   const premiumPhoto = await d20('d20premium', '/d20/question-photo/identify', photo);
-  ok(premiumInk.n === 25 && premiumPhoto.n === 25 && premiumInk.r.data.error.plan === 'premium' && !/Premium includes/.test(premiumInk.r.data.error.message),
-    `D20: Premium gets exactly 25 of each kind (${premiumInk.n} reads, ${premiumPhoto.n} photos)`);
+  ok(premiumInk.n === 50 && premiumPhoto.n === 50 && premiumInk.r.data.error.plan === 'premium' && !/Premium includes/.test(premiumInk.r.data.error.message),
+    `D20: Premium gets exactly 50 of each kind (${premiumInk.n} reads, ${premiumPhoto.n} photos)`);
   // 10 · The unit is one ANSWER (owner decision 18 Nov 2026), keyed on a server-issued question id.
   const qid = k => `00000000-0000-4000-8000-0000000000${String(k).padStart(2, '0')}`;
   const issue = (acct, id) => db.prepare("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,?,?,?,?,?,?)")
