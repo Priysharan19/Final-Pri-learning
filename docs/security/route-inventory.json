@@ -686,7 +686,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "own account only: every query is keyed by the session account id; no id is taken from the request; deviceId must equal the session device; idempotency keys are scoped per account",
+      "ownership": "own account only: every query is keyed by the authenticated session account id; optional request accountId is a match constraint and never a selector; deviceId must equal the session device; idempotency keys are scoped per account",
       "rateLimits": [
         {
           "key": "sync-push",
@@ -699,6 +699,27 @@
       "origin": "enforced",
       "bodyLimit": "1mb",
       "innerLimits": "≤100 items; event payload ≤256 KiB; entity body ≤512 KiB"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/sync/pull/:expectedAccountId/:cursor",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "account ID in URL is a constraint only: reject when it differs from the authenticated session account; all queries remain keyed by the session account ID; cursor pages only within that account",
+      "rateLimits": [
+        {
+          "key": "sync-pull",
+          "limit": 180,
+          "windowMs": 60000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
     },
     {
       "method": "GET",
@@ -808,6 +829,69 @@
         {
           "key": "billing-cancel-web",
           "limit": 6,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/billing/cancel-feedback",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: accepted only when the session account asked to cancel in the last day; one closed-set reason, no free text",
+      "rateLimits": [
+        {
+          "key": "billing-cancel-feedback",
+          "limit": 6,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/referral/",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: the caller's own invite code and trial dates; a declared store app is offered no code",
+      "rateLimits": [
+        {
+          "key": "referral-read",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/referral/claim",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: the caller (a new, verified account) presents a code; the server resolves the inviter, refuses self-referral, grants each account at most one trial ever; no contact data is accepted or stored",
+      "rateLimits": [
+        {
+          "key": "referral-claim",
+          "limit": 5,
           "windowMs": 3600000,
           "identity": "account"
         }
@@ -1904,7 +1988,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "a body naming serverQuestionId is grounded in that server-issued practice question, read from the practice-question escrow keyed by (account_id, id): another account's id, an expired id and an unknown id are the same 404 TUTOR_QUESTION_NOT_FOUND before the cache, the allowance or the provider; such a body may not carry question (400); the Step Check is re-run on the server and, until the question is resolved, the answer is never excused and level walkthrough is 409 TUTOR_LEVEL_ORDER. A device question (no serverQuestionId) is stateless per account. Ladder replies (nudge/socratic/walkthrough) cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request; a conversational turn (level ask: free-text message ≤600 chars, control characters stripped, last 6 history turns server-trimmed) is cached under a key that also takes a truncated hash of the account, so free text is never read back by another account. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call (PAID_CEILING_HIGH alert at 80%). Level why (\"Why this step?\", stepIndex into the grounded solution, optional follow-up message and history as for ask, cached per account): only on a RESOLVED question — a server-issued one by the server's own completion record (409 TUTOR_LEVEL_ORDER otherwise), a device one by resolved:true; Premium by the server's entitlement snapshot (additional-ai-usage) or one of PRI_TUTOR_WHY_FREE_PER_DAY (default 3) free taster calls a day per account, else 402 TUTOR_PREMIUM_REQUIRED before the allowance, ceiling or provider; reply maths must be copied from the solution, question or student lines, else the verified step itself is shown. Level diagnose: an open attempt is engine-only (no model, no spend, one fixed shape); a resolved one is one model call under the same allowance and ceiling. A resolved issued question passes the server Step Check's misconception id to the model; the device's is never taken",
+      "ownership": "a body naming serverQuestionId is grounded in that server-issued practice question, read from the practice-question escrow keyed by (account_id, id): another account's id, an expired id and an unknown id are the same 404 TUTOR_QUESTION_NOT_FOUND before the cache, the allowance or the provider; such a body may not carry question (400); the Step Check is re-run on the server and, until the question is resolved, the answer is never excused and level walkthrough is 409 TUTOR_LEVEL_ORDER. A device question (no serverQuestionId) is stateless per account. Ladder replies (nudge/socratic/walkthrough) cached by a SHA-256 of the request content only (no account id), so an account can read back only a reply to an identical request; a conversational turn (level ask: free-text message ≤600 chars, control characters stripped, last 6 history turns server-trimmed) is cached under a key that also takes a truncated hash of the account, so free text is never read back by another account. 404 unless PRI_FEATURE_TUTOR=1; practice context only (TUTOR_EXAM_LOCKED); closed body ≤48 kB, maths-only (TUTOR_NOT_MATHS); per-account daily allowance (PRI_TUTOR_CALLS_PER_ACCOUNT_DAY, plan-aware) and one unit of the deployment paid-call ceiling per model call (PAID_CEILING_HIGH alert at 80%). Level why (\"Why this step?\", stepIndex into the grounded solution, optional follow-up message and history as for ask, cached per account): only on a RESOLVED question — a server-issued one by the server's own completion record (409 TUTOR_LEVEL_ORDER otherwise), a device one by resolved:true; Premium by the server's entitlement snapshot (additional-ai-usage) or one of PRI_TUTOR_WHY_FREE_PER_DAY (default 3) free taster calls a day per account, else 402 TUTOR_PREMIUM_REQUIRED before the allowance, ceiling or provider; reply maths must be copied from the solution, question or student lines, else the verified step itself is shown. Level diagnose: an open attempt is engine-only (no model, no spend, one fixed shape); a resolved one is one model call under the same allowance and ceiling. A resolved issued question passes the server Step Check's misconception id to the model; the device's is never taken. Since attempt support v2 (server/platform/attemptSupport.js) help actually served on a server-issued question is recorded against it (practice-tutor-help, keyed by this account and the question id; a refusal records nothing), so that question's graded attempt says supported.",
       "rateLimits": [
         {
           "key": "tutor-help",
@@ -1925,7 +2009,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "same account-scoped serverQuestionId grounding as /v1/tutor/help (another account's issued question is 404 TUTOR_QUESTION_NOT_FOUND as JSON before any event); otherwise stateless per account; same body contract, exam lock, maths-only and size bounds as /v1/tutor/help, for levels nudge, socratic and ask only (walkthrough captions stay on /help). Every refusal — 404 dark, TUTOR_EXAM_LOCKED, body, TUTOR_NOT_CONFIGURED, TUTOR_DAILY_LIMIT (429), PAID_CAPACITY_REACHED — is answered as JSON before any event-stream byte and before the provider is contacted. The reply streams as text/event-stream (meta, delta, done | fallback | error); each sentence is checked against the verified solution before release and a leak ends the stream with the authored hint, uncached. Cache keyed as /help (per-account for ask). One open stream per session: a newer stream closes the older with TUTOR_STREAM_SUPERSEDED. Provider output capped per turn (STREAM_MAX_OUTPUT_TOKENS, MAX_STREAM_CHARS).",
+      "ownership": "same account-scoped serverQuestionId grounding as /v1/tutor/help (another account's issued question is 404 TUTOR_QUESTION_NOT_FOUND as JSON before any event); otherwise stateless per account apart from the help marker below; same body contract, exam lock, maths-only and size bounds as /v1/tutor/help, for levels nudge, socratic and ask only (walkthrough captions stay on /help). Every refusal — 404 dark, TUTOR_EXAM_LOCKED, body, TUTOR_NOT_CONFIGURED, TUTOR_DAILY_LIMIT (429), PAID_CAPACITY_REACHED — is answered as JSON before any event-stream byte and before the provider is contacted. The reply streams as text/event-stream (meta, delta, done | fallback | error); each sentence is checked against the verified solution before release and a leak ends the stream with the authored hint, uncached. Cache keyed as /help (per-account for ask). One open stream per session: a newer stream closes the older with TUTOR_STREAM_SUPERSEDED. Provider output capped per turn (STREAM_MAX_OUTPUT_TOKENS, MAX_STREAM_CHARS). Since attempt support v2 (server/platform/attemptSupport.js) help actually served on a server-issued question is recorded against it (practice-tutor-help, keyed by this account and the question id; a refusal records nothing), so that question's graded attempt says supported.",
       "rateLimits": [
         {
           "key": "tutor-stream",
@@ -2034,6 +2118,29 @@
       "guardianConsent": false,
       "mfa": true,
       "ownership": "admin; aggregate counts only; also carries the operator health detail (provider flags, backlog counts, housekeeping)",
+      "rateLimits": [
+        {
+          "key": "admin",
+          "limit": 300,
+          "windowMs": 60000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/admin/funnel",
+      "auth": "session",
+      "roles": [
+        "admin"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": false,
+      "mfa": true,
+      "ownership": "admin; aggregate counts only, cells under 10 suppressed; no account id, email or timestamp per person",
       "rateLimits": [
         {
           "key": "admin",
@@ -2663,6 +2770,29 @@
       "bodyLimit": "no-body"
     },
     {
+      "method": "GET",
+      "path": "/v1/root-gap/",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "read-only; derived from this account's own server-graded attempts (learning_events where account_id = the session's account and device_id = 'server-grader'); the root-gap reading only when the server's own entitlement_snapshots row grants advanced-analytics, otherwise a count; no-store; nothing written",
+      "rateLimits": [
+        {
+          "key": "root-gap",
+          "limit": 120,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
       "method": "POST",
       "path": "/v1/practice/:id/hint",
       "auth": "session",
@@ -2676,6 +2806,29 @@
       "rateLimits": [
         {
           "key": "practice-hint",
+          "limit": 400,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/practice/:id/help-plan",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "404 NOT_FOUND unless PRI_FEATURE_TUTOR_POLICY=1 (checked after the practice router's session, verified-email and student gates, like every practice route). Student owns the live server-issued question (escrow row keyed by this account; another account's id and an unknown id are the same 404); a completed question is 409. Closed body (lines ≤40×400 chars, recognition, offered plan actions from the policy's menu, mistakeGraph, drawable line numbers 2–40 (the see-why view is offered only for a break on one of them), helpRequested; anything else 400 HELP_PLAN_INVALID). Reads the account's own server-graded attempts and committed rung level and returns one tutor-policy decision (client/src/engine/tutorPolicy.js): it serves no hint text, opens and charges no rung, and changes no mark, credit or receipt; the decision's envelope (with its cause class) and the engine's diagnosis code never leave the server. Lines are checked unless the device reports its reading unconfirmed or low-confidence: the same guarded line check as the nudge (marker pool, never on a final-answer attempt, never by value), gated like /v1/tutor/line-check by one of the question's LINE_CHECKS_PER_QUESTION and one unit of the account's daily tutor allowance (tutor-day), both peeked before the check runs and taken only when it ran. While experiment tutor-first-help-v1 is active (PRI_EXPERIMENTS) the account's control arm is answered plan:null before any check. Every request, in every arm, is recorded under the account's practice-help-plan scope and copied onto the graded attempt as policyAssistance (exported with the account's data); a plan whose wording names the cause kind (practice only, never charged) adds causeShown:true to the attempt.",
+      "rateLimits": [
+        {
+          "key": "practice-help-plan",
           "limit": 400,
           "windowMs": 3600000,
           "identity": "account"
@@ -2718,7 +2871,7 @@
       "verifiedEmail": true,
       "guardianConsent": true,
       "mfa": false,
-      "ownership": "student owns a sealed server-issued question; final answer or authenticated ink/photo receipt is marked server-side; stable idempotency key commits numerical marks and exactly-once progress; no client award authority",
+      "ownership": "student owns a sealed server-issued question; final answer or authenticated ink/photo receipt is marked server-side; stable idempotency key commits numerical marks and exactly-once progress; no client award authority. The graded attempt's support (independent / after-feedback / supported / revealed, support v2) is derived from the server's own records of the question; the closed body accepts no support claim, only deviceHelp: true (help shown offline), which can only lower it. A handwritten or photographed submission may carry its ORIGINAL (strokes pri-ink-v1 or the photographed page), checked against its SHA-256 before anything is read or marked, kept insert-once in the same transaction as the mark (attempt_originals, per-account quota), and named by digest in the reply and the graded-attempt event; never sent to any reader",
       "rateLimits": [
         {
           "key": "practice-grade",
@@ -3562,6 +3715,261 @@
       "rateLimits": [
         {
           "key": "resources-file",
+          "limit": 300,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/originals/",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Original work (standard #08, originalWork.js): the strokes or photographed page a marked answer was read from, written ONLY by POST /v1/practice/:id/submit in the mark's own transaction and never here. Read-only; Cache-Control no-store; every read is keyed on (id, account_id, this server's edition) and the stored bytes are re-checked against their SHA-256 before they are served (500 ORIGINAL_CORRUPT otherwise). Unknown, malformed, another account's and another edition's ids are the same 404 ORIGINAL_NOT_FOUND. The student's own: ?attemptId= or ?questionId=&submissionId=, read inside a transaction declared for the account (RLS pri_account_scope on attempt_originals); any other query is 400.",
+      "rateLimits": [
+        {
+          "key": "original-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/originals/:id",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Original work (standard #08, originalWork.js): the strokes or photographed page a marked answer was read from, written ONLY by POST /v1/practice/:id/submit in the mark's own transaction and never here. Read-only; Cache-Control no-store; every read is keyed on (id, account_id, this server's edition) and the stored bytes are re-checked against their SHA-256 before they are served (500 ORIGINAL_CORRUPT otherwise). Unknown, malformed, another account's and another edition's ids are the same 404 ORIGINAL_NOT_FOUND. The student's own, read inside a transaction declared for the account (RLS pri_account_scope on attempt_originals).",
+      "rateLimits": [
+        {
+          "key": "original-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/originals/class/:classId/student/:studentId/:id",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "Original work (standard #08, originalWork.js): the strokes or photographed page a marked answer was read from, written ONLY by POST /v1/practice/:id/submit in the mark's own transaction and never here. Read-only; Cache-Control no-store; every read is keyed on (id, account_id, this server's edition) and the stored bytes are re-checked against their SHA-256 before they are served (500 ORIGINAL_CORRUPT otherwise). Unknown, malformed, another account's and another edition's ids are the same 404 ORIGINAL_NOT_FOUND. Their teacher: server authorization first — the caller teaches an active (unarchived) class the student is an active member of, and the student's guardian consent is not blocked — and only then is the student's row read — and only one kept at or after the student joined that class (created_at >= joined_at: joining opens nothing done before) — at system scope (RLS confines account scope to the caller's own rows; the authorization is the boundary, as for every system-scope handler). A class the caller does not teach, a removed member and a blocked consent are the same 404.",
+      "rateLimits": [
+        {
+          "key": "original-read",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/visibility",
+      "auth": "session",
+      "roles": null,
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own session only: returns the fixed list of what a teacher can and cannot see (TEACHER_VISIBILITY); reads no record",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/mine",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "own account only: keyed by the session account id (student); the classes it is an active member of, its own hand-ins and the teacher marks on them; no teacher id",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/classroom/classes/:classId/assignments/:assignmentId/hand-in",
+      "auth": "session",
+      "roles": [
+        "student"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "student: an active member of the class, a non-archived paper assignment of that class, and an exam result owned by the session account that matches the assignment template; otherwise 404/409",
+      "rateLimits": [
+        {
+          "key": "classroom-hand-in",
+          "limit": 30,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/classes/:classId/assignments/:assignmentId/results",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class (not archived) and the assignment; only active, consented members are listed; otherwise 404",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/classes/:classId/assignments/:assignmentId/results.csv",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class (not archived) and the assignment; only active, consented members; audited (assignment.results.export); otherwise 404",
+      "rateLimits": [
+        {
+          "key": "classroom-export",
+          "limit": 60,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/classes/:classId/review",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class (not archived); only items of active, consented members; otherwise 404",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/classes/:classId/review/:itemId/history",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class and the item, its student still an active, consented member; otherwise 404",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "POST",
+      "path": "/v1/classroom/classes/:classId/review/:itemId",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": true,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class and the item, its student still an active, consented member; marks capped by the item; append-only and audited; otherwise 404",
+      "rateLimits": [
+        {
+          "key": "classroom-teacher-mark",
+          "limit": 600,
+          "windowMs": 3600000,
+          "identity": "account"
+        }
+      ],
+      "csrf": "double-submit-when-session-cookie",
+      "origin": "enforced",
+      "bodyLimit": "1mb"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/board/courses",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher: the fixed list of NSW board courses of this edition; reads no record",
+      "rateLimits": [],
+      "csrf": "not-applicable",
+      "origin": "not-applicable",
+      "bodyLimit": "no-body"
+    },
+    {
+      "method": "GET",
+      "path": "/v1/classroom/classes/:classId/board",
+      "auth": "session",
+      "roles": [
+        "teacher"
+      ],
+      "verifiedEmail": false,
+      "guardianConsent": true,
+      "mfa": false,
+      "ownership": "teacher who owns the class (not archived); counts and drill-down over active, consented members only, from server-grader records; otherwise 404",
+      "rateLimits": [
+        {
+          "key": "classroom-board",
           "limit": 300,
           "windowMs": 3600000,
           "identity": "account"

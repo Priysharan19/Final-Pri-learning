@@ -28,12 +28,15 @@ import './support/hermetic.mjs';
 import assert from 'node:assert/strict';
 
 process.env.NODE_ENV ??= 'test';
-const { loadAllBanks, generateQuestion } = await import('../../client/src/engine/generators/index.js');
+const { loadAllBanks, generateQuestion, directFormsOnly } = await import('../../client/src/engine/generators/index.js');
 const { IN_CHAPTER_BY_ID } = await import('../../client/src/engine/curriculum-in.js');
 const { resolveIndiaTarget } = await import('../../client/src/engine/indiaProduct.js');
 const { chooseQuestion, ensureBanks, seekBudget, opaqueContentHash } = await import('../platform/practice.js');
 await loadAllBanks();
 await ensureBanks();
+// #540 is reproduced on the cell sizes of the skills' direct forms (the extra structural forms enlarge a cell and hide
+// the old budget's miss, as the later covers do); the sections below that follow forms on turn them back on.
+directFormsOnly(true);
 
 let n = 0;
 const failures = [];
@@ -159,7 +162,10 @@ ok(before.missed.length > 0, `the old flat budget gave up on a fresh item it cou
 ok(before.missed.every(r => r.pool < WINDOW), 'every such miss was on the cell smaller than the window, with items of it still fresh');
 eq(after.missed, [], `with the seek budget the picker never returns a repeat while the cell still has a fresh item (${SITTINGS} seeded sittings)`);
 ok(after.exhausted.every(r => r.pool < WINDOW && r.avoided >= r.pool), `the repeats that remain are cells whose whole pool is in the window — ${after.exhausted.length} of ${SITTINGS} sittings, none avoidable by drawing more`);
+// The live chapter as served: the extra structural forms ON.
+directFormsOnly(false);
 const liveAfter = sweep(null, live);
+directFormsOnly(true);
 eq(liveAfter.missed, [], `on the live chapter, with its later forms, the seek budget never returns a repeat while a fresh item remains (${SITTINGS} seeded sittings)`);
 console.log(`seeded sittings: ${SITTINGS} · old flat budget: ${before.missed.length} missed, ${before.exhausted.length} exhausted · seek budget: ${after.missed.length} missed, ${after.exhausted.length} exhausted`);
 // What the picker cannot do is the device's job: a request that lands on a

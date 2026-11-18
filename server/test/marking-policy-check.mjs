@@ -44,6 +44,8 @@ const { markingPolicy, methodMarksRefusal, policyOf, FINAL_ANSWER_ONLY } = await
 const { MARKER_OPS, stepEvidence, examAnswerStage, examWorkingStage, marksPossibleFor } = await import('../platform/markerOps.js');
 const { createMarkerPool } = await import('../platform/markerPool.js');
 const { generateQuestion, loadAllBanks } = await import('../../client/src/engine/generators/index.js');
+// The question is named by its seed: the direct form, not another form of the skill (client/test/support/direct-forms.mjs).
+(await import('../../client/src/engine/generators/index.js')).directFormsOnly(true);
 const { startApp, checks, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
 await loadAllBanks();

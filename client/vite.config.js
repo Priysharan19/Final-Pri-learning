@@ -98,6 +98,9 @@ export const CHUNK_GROUPS = [
   // a name of its own, so the service worker can leave it out of the install
   // (see ON_DEMAND) and the budget check can prove it did.
   { name: 'exam-desk', test: /\/src\/(?:desk\/[^?]*|examShell\/(?!(?:ConfirmSheet|ShortcutsSheet|useAnnounce|useExamShortcuts)\.|shortcuts\.css)[^?]*|engine\/desk(?:Clock|Import)\.js)$/, priority: 40 },
+  // The HSC 2027 priorities (Prithagoras): the view and the NESA paper metadata
+  // behind it, in one named chunk so the install can leave it out (ON_DEMAND).
+  { name: 'hsc-priorities', test: /\/src\/(?:hsc\/|engine\/hsc\/)[^?]*$/, priority: 40 },
   { name: 'vendor-react', test: /\/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//, priority: 30 },
   { name: 'vendor-katex', test: /\/node_modules\/katex\//, priority: 30 }
 ];
@@ -174,6 +177,18 @@ export const ON_DEMAND = [
   // Desk reads a paper through them too.)
   [/(^|\/)(Library|libraryApi)-[^/]*\.(js|css)$/, 'resource library (online-only)'],
 
+  // Annotated working (QuestionCard's lazy AnnotatedWorking chunk, with the
+  // step-justification engine): drawn only for an attempt the server has just
+  // marked, and marking is online-only (ADR-0001 amendment 2026-10-10), so the
+  // chunk is always requested over a live connection and cached from then on.
+  // A chunk that cannot load leaves the plain step report in its place.
+  [/(^|\/)AnnotatedWorking-[^/]*\.(js|css)$/, 'annotated working (shown only after online marking)'],
+  // The public landing and its plain pages (landing/): signed-out web routes
+  // behind import() in App.jsx, for a visitor who has not installed anything
+  // yet. A signed-in student never opens them, and an offline copy would serve
+  // nobody, so they are fetched when visited and never warmed.
+  [/(^|\/)(Landing|PublicInfo)-[^/]*\.(js|css)$/, 'public landing (signed out, online)'],
+
   // The Exam Desk (ADR-0002 §8 plan F4b, PRI_FEATURE_EXAM_DESK): the desk's
   // pages, the shared exam shell they are built on and the desk's pure clock
   // and import reader, in one named chunk behind import() in App.jsx and
@@ -185,6 +200,15 @@ export const ON_DEMAND = [
   // room moves onto the shell (plan F4c) the shell leaves this chunk and is
   // warmed with the room.
   [/(^|\/)(exam-desk|Desk(Page|Import|Entry)|deskCache)-[^/]*\.(js|css)$/, 'exam desk (started online)'],
+
+  // The HSC 2027 priorities (Prithagoras): the view and its NESA paper
+  // metadata, behind import() in pages/ProgressLegacy.jsx and local/backend.js
+  // (a paper weighted by the priorities). Only an NSW Year 11–12 student ever
+  // reaches it, so an Indian install would carry it for nothing; the paper it
+  // weights is issued by the server, so that half needs a connection anyway.
+  // A student who has opened the view once has it from the runtime cache; the
+  // one case lost is opening it for the very first time offline.
+  [/(^|\/)(hsc-priorities|HscPriorities)-[^/]*\.(js|css)$/, 'HSC priorities (Prithagoras)'],
 
   // The live step coach's practice route (F1, #826): behind import() in
   // local/backend.js, reached only when the server has the coach on for this
@@ -316,11 +340,15 @@ export const ON_DEMAND = [
   //     teacherOnly(), which redirects every other role before the lazy route
   //     is ever rendered, and only TEACHER_NAV links to it. A teacher's first
   //     open fetches it and the runtime rule keeps it from then on.
+  //   · TeacherWorkspace — a teacher's class board, papers and review queue
+  //     (client/src/classroom/). ClassroomPanel imports it lazily and draws it
+  //     only for a signed-in account whose role is teacher; a student's
+  //     inbox uses StudentClassroom, which stays in the install.
   //   · StaffOperationsPanel — the content-operations and admin console.
   //     Settings.jsx asks for it only once the signed-in cloud account reports
   //     a support or admin role, and the server authorises every call it makes
   //     regardless.
-  [/(^|\/)(Teach|StaffOperationsPanel|MfaPanel)-[^/]*\.js$/, 'staff-only screen'],
+  [/(^|\/)(Teach|TeacherWorkspace|StaffOperationsPanel|MfaPanel)-[^/]*\.js$/, 'staff-only screen'],
 
   // The placement check: its page, the adaptive engine and the Pri-authored
   // prerequisite graph. A student opens it once after onboarding and perhaps
@@ -355,7 +383,16 @@ export const ON_DEMAND = [
   // read once online is there offline from then on. The one case this shows,
   // opening Notes for the first time with no connection, Notes.jsx reports by
   // name and offers a retry; practice, which needs none of it, is unaffected.
-  [/(^|\/)(Notes|notes-class(7|8|9|10|11|12))-[A-Za-z0-9_-]+\.(js|css)$/, 'chapter notes'],
+  // The Prithagoras edition's NSW notes page and its Stage data chunks are the same
+  // idea (pages/NswNotes.jsx, notes/nsw/): opened on demand, never installed.
+  // Every notes data chunk is in this rule, not only the base class and stage files: a
+  // class's notes load as one Promise.all of its base, supplements, figure waves and
+  // Experience 3 layer (notesIndex.js), so warming the supplements without the base buys
+  // nothing offline. The same holds for the NSW course bands (notes-nsw-ext1-a, …), the
+  // NSW Experience 3 layers and the Olympiad topic notes, and for the loaders themselves.
+  // The diagram kit rides inside the notes page chunk (NotesParts.jsx, nsw/NswParts.jsx).
+  [/(^|\/)cmu-serif-[^/]*\.woff2$/, 'CMU Serif, the notes reading face (both editions): fetched with a chapter, then kept like the chapter itself'],
+  [/(^|\/)(Notes|NswNotes|notesIndex|nswNotesIndex|notes-[a-z0-9]+(-[a-z0-9]+)*)-[A-Za-z0-9_-]{8}\.(js|css)$/, 'chapter notes'],
 
   // "Practise this": photograph a question and practise its skill. The page
   // cannot do anything without a connection — reading the photo is a server
@@ -554,6 +591,10 @@ export function editionLanguages(edition) {
     load(id) {
       const clean = id.split('?')[0].replace(/\\/g, '/');
       if (dropped.some(rel => clean.endsWith(`/${rel}`))) return 'export default {};\n';
+      // The en-AU wording belongs to the Prithagoras edition alone (i18n/strings.au.js, read by i18n/core.js behind an
+      // EDITION_ID check the bundler cannot fold away). Any other edition loads it empty, so its core chunk carries none of
+      // it; the object used to ride along harmlessly until it named the edition ("Prithagoras stores the student's name").
+      if (edition !== 'prithagoras' && clean.endsWith('/src/i18n/strings.au.js')) return 'export const AU_STRINGS = Object.freeze({});\n';
       return null;
     },
     transform(code, id) {
@@ -657,7 +698,7 @@ export const SHIPPABLE_FEATURE_FLAGS = Object.freeze(['TUTOR']);
 // flags (features.json, __PRI_FEATURE_INSTRUMENT__) so the bundles can be held
 // to it, but its value comes from client/interface.config.mjs in every build and
 // on the development server alike.
-export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK', 'EXPORTS', 'NSW_EXAMS', 'SYLLABUS_BOARD']);
+export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HANDWRITING', 'PAST_PAPERS', 'PARENT_REPORT', 'LIBRARY', 'EXAM_DESK', 'EXPORTS', 'NSW_EXAMS', 'SYLLABUS_BOARD', 'TUTOR_POLICY']);
 //   PAST_PAPERS — previous-year questions (src/engine/pastPapers.js). Opt-in
 //   everywhere, the dev server included: off until a rights opinion exists
 //   (decision D23). The server reads PRI_PAST_PAPERS=1 for the same switch.
@@ -682,7 +723,11 @@ export const PENDING_FEATURE_FLAGS = Object.freeze(['EXTENDED_TRACKS', 'EXAM_HAN
 //   Progress page (both editions). Off in a production build: the Prithagoras
 //   board names NSW outcome codes and focus areas to students, and whether that
 //   needs NESA permission is an open question (research §5.7).
-const OPT_IN_FLAGS = new Set(['PAST_PAPERS']);
+//   TUTOR_POLICY — the tutor policy's "smallest next step" panel above the hint
+//   ladder (src/engine/tutorPolicy.js, src/components/HelpPlan.jsx). Opt-in
+//   everywhere, the dev server included: turning it on is an owner decision,
+//   and the server answers 404 too unless PRI_FEATURE_TUTOR_POLICY=1.
+const OPT_IN_FLAGS = new Set(['PAST_PAPERS', 'TUTOR_POLICY']);
 const flagKey = name => name.toLowerCase().replace(/_([a-z])/g, (_, c) => c.toUpperCase());
 export function featureStates(command, env = process.env) {
   const on = name => (command === 'build' || OPT_IN_FLAGS.has(name) ? env[`PRI_FEATURE_${name}`] === '1' : env[`PRI_FEATURE_${name}`] !== '0');
@@ -704,8 +749,12 @@ export function featureDefines(command, env = process.env) {
     __PRI_FEATURE_EXPORTS__: JSON.stringify(states.exports),
     __PRI_FEATURE_NSW_EXAMS__: JSON.stringify(states.nswExams),
     __PRI_FEATURE_SYLLABUS_BOARD__: JSON.stringify(states.syllabusBoard),
+    __PRI_FEATURE_TUTOR_POLICY__: JSON.stringify(states.tutorPolicy),
     __PRI_INTERFACE_SKIN__: JSON.stringify(states.skin),
     __PRI_EDITION__: JSON.stringify(states.edition),
+    // Which notes page this build carries: a literal, so the other edition's page and its whole notes data are
+    // dead code and are not emitted (App.jsx; client/test/nsw-notes-no-india-check.mjs).
+    __PRI_NOTES_PAGE__: JSON.stringify(states.edition === 'prithagoras' ? 'nsw' : 'india'),
     // Plan E5: false in a build of an edition with no payment provider, so its
     // bundle holds no purchase flow at all (client/src/platform/nativeBilling.js).
     __PRI_PREMIUM_ON_SALE__: JSON.stringify(editionOf(states.edition).billing.providers.length > 0),

@@ -79,3 +79,25 @@ export function yearlySavingPercent(annual, monthly) {
   const pct = Math.floor((1 - a / (12 * m)) * 100);
   return pct > 0 ? pct : null;
 }
+
+/**
+ * An edition's own list price (the edition table's `commerce.listPrice`,
+ * the owner's live prices as the legal documents state them), cents kept where
+ * the price has them: 9.99 → "$9.99", 99 → "$99". Null when it cannot be said.
+ */
+export function formatListAmount(amount, currency, locale = 'en-AU') {
+  if (!Number.isFinite(amount) || amount <= 0 || !/^[A-Z]{3}$/.test(String(currency || ''))) return null;
+  const cents = Math.round(amount * 100) % 100 !== 0;
+  try {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: cents ? 2 : 0, maximumFractionDigits: cents ? 2 : 0 }).format(amount);
+  } catch { return null; }
+}
+
+/** { monthly, annual, currency } as display strings, or null without a list price. */
+export function listPriceOf(commerce, locale) {
+  const list = commerce?.listPrice;
+  if (!list) return null;
+  const monthly = formatListAmount(list.monthly, commerce.currency, locale);
+  const annual = formatListAmount(list.annual, commerce.currency, locale);
+  return monthly && annual ? { monthly, annual, currency: commerce.currency } : null;
+}

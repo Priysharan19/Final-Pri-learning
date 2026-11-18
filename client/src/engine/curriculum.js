@@ -708,6 +708,26 @@ export const STREAM_CURRICULUM = {
         'Differentiate an inverse sine',
         'Differentiate an inverse tangent',
         'Integrate to inverse trigonometric functions'
+      ]),
+      T('me12-induction-forms', 'Proof by Induction: Original Forms', 'Algebra', 8, 'ME-P1', [
+        'Find the base case and the next term in a series proof',
+        'Find the constant in a divisibility step',
+        'Use a result proved by induction'
+      ]),
+      T('me12-vectors-forms', 'Vectors in Two Dimensions: Original Forms', 'Algebra', 8, 'ME-V1', [
+        'Dot product, magnitude, perpendicular and parallel vectors',
+        'Scalar projection and the angle between vectors',
+        'Position vectors in a parallelogram and on a line segment'
+      ]),
+      T('me12-projectile-forms', 'Projectile Motion: Original Forms', 'Calculus', 8, 'ME-V1', [
+        'Time of flight, range and greatest height from launch components',
+        'Horizontal launches from a cliff',
+        'Height at a time and the times at a given height'
+      ]),
+      T('me12-binomial-forms', 'The Binomial Distribution: Original Forms', 'Statistics & Probability', 8, 'ME-S1', [
+        'Mean, variance and standard deviation of a binomial variable',
+        'Exact binomial probabilities and the complement rule',
+        'Find the number of trials or the probability of success'
       ])
     ]
   },
@@ -751,12 +771,6 @@ export const STREAM_CURRICULUM = {
       ])
     ]
   }
-};
-
-const streamKeyFor = (pathway, year) => {
-  if (pathway === 'standard') return `standard-${year}`;
-  if (pathway === 'ext1' || pathway === 'ext2') return `ext1-${year}`;
-  return null;
 };
 
 export function streamSubtopics(key) {
@@ -1003,6 +1017,10 @@ export const DOTPOINT_FORMS = Object.freeze({
   'me12-calc': [[0], [0], [1], [2]],
   'me12-binomial': [[0], [1], [1], [0, 2]],
   'me12-projectile': [[2], [0], [0], [1]],
+  'me12-induction-forms': [[0], [0, 1], [0, 2], [0, 2]],
+  'me12-vectors-forms': [[0], [0, 2], [1, 2], [0, 1]],
+  'me12-projectile-forms': [[0, 1], [0, 1, 2], [0, 1, 2], [0, 1, 2]],
+  'me12-binomial-forms': [[0, 1], [0, 1], [2], [0, 1]],
   // ── Extension 2 · Year 12 ─────────────────────────────────────────────────
   'mex-proof': [[2], [0], [1], [1]],
   'mex-complex': [[0], [0], [1], [2]],

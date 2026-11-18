@@ -47,7 +47,7 @@ export const CAPABILITY_ENFORCEMENT = Object.freeze({
   // plan, and the Premium screen (paywall/plans.js) does not list it. Gating it
   // would take something away from free students — the owner's call, not a fix.
   [ENTITLEMENTS.ADVANCED_EXPLAIN]: 'none · not enforced and not sold: Pri Explain (PriExplainV5) plays in full on every plan, and the Premium screen does not list it',
-  [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'server · GET /v1/forecast (server/platform/forecast.js) and GET /v1/habits (server/platform/mistakeDna.js) give a free account the offer instead of the reading, and the parent weekly report (server/platform/parentReport.js) is refused at read and at send, all from the server\'s own entitlement record; Progress priorities, the knowledge map and the progress-file export stay free on every plan',
+  [ENTITLEMENTS.ADVANCED_ANALYTICS]: 'server · GET /v1/forecast (server/platform/forecast.js) and GET /v1/habits (server/platform/mistakeDna.js) and GET /v1/root-gap (server/platform/rootGap.js) give a free account the offer instead of the reading, and the parent weekly report (server/platform/parentReport.js) is refused at read and at send, all from the server\'s own entitlement record; Progress priorities, the knowledge map and the progress-file export stay free on every plan',
   [ENTITLEMENTS.EXTRA_AI]: 'server · POST /v1/handwriting/transcribe, /v1/working/check and /v1/question-photo/identify daily allowance (server/platform/aiAllowance.js), raised only by the server\'s own entitlement record (SEC-COMM-01)'
 });
 
@@ -151,6 +151,8 @@ export async function practiceAllowance(profile, now = clock()) {
   const resetsAt = nextDayStart(now, timeZone);
   const base = { used, resetsAt, timeZone, day, reason: decision.reason, refreshRequired: !!decision.refreshRequired };
   if (decision.allowed) return { ...base, allowed: true, plan: 'premium', unlimited: true, limit: null };
+  // Packaging that does not cap free practice (engine/packaging.js): never refused.
+  if (FREE_TIER.practicePerDay === null) return { ...base, allowed: true, plan: 'free', unlimited: true, limit: null };
   return { ...base, allowed: used < FREE_TIER.practicePerDay, plan: 'free', unlimited: false, limit: FREE_TIER.practicePerDay };
 }
 

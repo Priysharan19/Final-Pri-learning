@@ -27,7 +27,7 @@ import {
 } from '../engine/indiaProduct.js';
 import { indiaReasonLabel } from '../engine/indiaProgress.js';
 import { reportSeries, needsAnotherLookIds, HISTORY_FILTERS, HISTORY_SORTS } from '../engine/reportSeries.js';
-import { attemptTotals, isCreditedCorrect, isRepeat as isRepeatAttempt, quotedTotals } from '../engine/progressTruth.js';
+import { attemptTotals, evidenceByKey, isCreditedCorrect, isRepeat as isRepeatAttempt, quotedTotals } from '../engine/progressTruth.js';
 import { indiaExamBlueprint } from '../engine/indiaExams.js';
 import { predictExamMark } from '../engine/markPredictor.js';
 import { nswIssuedLevels, nswIssuedForms, nswOfferedCell } from '../engine/nswOffer.js';
@@ -82,6 +82,8 @@ import { pendingSummary } from './examPages.js';
 import { settleIfLeaving } from './pageLeaving.js';
 import { rasterizeInk } from '../ink/cloudRaster.js';
 import { preparePhoto } from '../ink/photoRaster.js';
+import { buildImageOriginal, buildInkOriginal, originalWireChars } from '../ink/originalWork.js';
+import { isPdf } from '../ink/pdfPage.js';
 
 // True in a production build made with the tutor off. tutorFeatureEnabled() is
 // then false on every device, so the ask route below is dead code; written as
@@ -981,6 +983,19 @@ function loadMultipart() {
       .catch(err => { multipartBank = null; throw err; });
   }
   return multipartBank;
+}
+
+// The HSC priorities engine (Prithagoras): its NESA metadata is a chunk of its
+// own (vite.config.js 'hsc-priorities'), fetched only when an NSW Year 11–12
+// student asks for a paper weighted by the priorities.
+let hscPracticeModule = null;
+
+function loadHscPractice() {
+  if (!hscPracticeModule) {
+    hscPracticeModule = import('../engine/hsc/hscPractice.js')
+      .catch(err => { hscPracticeModule = null; throw err; });
+  }
+  return hscPracticeModule;
 }
 
 const indiaGeneratorIds = chapter => [...new Set((chapter?.covers || []).map(c => c.gen))];
@@ -2827,7 +2842,7 @@ const IMPORT_ROWS = {
     answerGiven: sanitizeText(r.answerGiven, 300), ms: safeInt(r.ms, 0, 1e9, 0),
     hintsUsed: safeInt(r.hintsUsed, 0, 20, 0), mode: sanitizeText(r.mode, 20) || 'practice',
     tutorLevel: safeInt(r.tutorLevel, 0, 3, 0),
-    support: r.support === 'independent' ? 'independent' : (r.support === 'supported' ? 'supported' : undefined),
+    support: ['independent', 'after-feedback', 'supported', 'revealed'].includes(r.support) ? r.support : undefined,
     viaInk: !!r.viaInk, ratingBefore: safeNum(r.ratingBefore, 0), ratingAfter: safeNum(r.ratingAfter, 0),
     createdAt: safeTime(r.createdAt) || Date.now(),
     // A repeat stays a repeat: restored without the flag it would count as
@@ -3397,6 +3412,15 @@ const routes = {
       }));
       return { country: 'in', years, streams, userYear: p.year, pathway: null, course: 'in', indiaTrack: trackId, aheadUnlocked, window: indiaDifficultyWindow(trackId, p.year) };
     }
+    // Learning evidence per subtopic from the attempt rows (engine/progressTruth.js):
+    // answers, right answers, and right answers with no help. The HSC priorities
+    // view (Prithagoras) reads `independentCorrect`; the ratings above stay the
+    // adaptive engine's and are not changed by this.
+    const evidence = evidenceByKey(await byIndex('attempts', 'pid', p.id));
+    const evidenceOf = id => {
+      const e = evidence[id];
+      return { attempts: e?.attempts || 0, correct: e?.correct || 0, independentCorrect: e?.independentCorrect || 0 };
+    };
     /** Dot points with their own mastery, and an honest `generated` flag. */
     // Only what the server can issue is offered (engine/nswOffer.js): a dot
     // point's levels, its `generated` flag and the `requestable` list the
@@ -3422,7 +3446,7 @@ const routes = {
           id: s.id, name: s.name, strand: s.strand, weight: s.weight, code: s.code || null,
           dotpoints: dotpointRows(s, st), requestable: [...nswIssuedLevels(s.id)],
           mastery: Math.round(m * 100), band: st ? masteryBand(m) : 'unseen',
-          attempts: st?.attempts || 0, correct: st?.correct || 0,
+          attempts: st?.attempts || 0, correct: st?.correct || 0, evidence: evidenceOf(s.id),
           due: due.has(s.id), rating: st?.rating || null
         };
       })
@@ -3447,7 +3471,7 @@ const routes = {
             id: s2.id, name: s2.name, strand: s2.strand, weight: s2.weight, code: s2.code,
             dotpoints: dotpointRows(s2, st), requestable: [...nswIssuedLevels(s2.id)],
             mastery: Math.round(m * 100), band: st ? masteryBand(m) : 'unseen',
-            attempts: st?.attempts || 0, correct: st?.correct || 0,
+            attempts: st?.attempts || 0, correct: st?.correct || 0, evidence: evidenceOf(s2.id),
             due: due.has(s2.id), rating: st?.rating || null
           };
         })
@@ -3924,6 +3948,39 @@ const routes = {
   // "Why this step?" — a grounded dialogue about one step of a RESOLVED
   // question's verified solution. Writes nothing to the row (no charge: the
   // mark is decided; Premium and the free taster are the server's to enforce).
+  // The tutor policy's smallest next step (engine/tutorPolicy.js), decided by
+  // the server for its own issued question (server/platform/helpPlan.js).
+  // It serves and charges nothing: a rung it points at is opened through the
+  // hint route above. Lines ride only while this question still has a line
+  // check left, and a check the server spent is counted here like the line
+  // check's, so the two never give a question more than two between them.
+  'POST /practice/:id/help-plan': async (body, params) => {
+    if (!featureEnabled('tutorPolicy')) throw Object.assign(new Error('Not enabled in this build.'), { status: 404, code: 'NOT_FOUND' });
+    const p = await requireProfile();
+    const row = await get('questions', params.id);
+    if (!row || row.pid !== p.id) throw Object.assign(new Error('Question not found'), { status: 404 });
+    assertPracticeRow(row);
+    if (row.discardedAt) throw Object.assign(new Error('Question was skipped'), { status: 409, code: 'QUESTION_DISCARDED' });
+    if (row.answered) throw Object.assign(new Error('Already answered'), { status: 409, code: 'ALREADY_RESOLVED' });
+    if (!row.serverQuestionId) throw Object.assign(new Error('Only a question the server issued has a help plan.'), { status: 409, code: 'HELP_PLAN_UNAVAILABLE' });
+    const usedChecks = Math.max(0, Number(row.lineChecks) || 0);
+    const lines = usedChecks < 2 ? (Array.isArray(body?.lines) ? body.lines : []).map(l => sanitizeText(l, 400)).filter(Boolean).slice(0, 40) : [];
+    // Action names only; the server checks them against the policy's menu.
+    const offered = (Array.isArray(body?.offered) ? body.offered : []).filter(a => typeof a === 'string' && /^[a-z-]{1,24}$/.test(a)).slice(0, 8);
+    const recognition = ['confirmed', 'unconfirmed', 'low-confidence'].includes(body?.recognition) ? body.recognition : undefined;
+    const r = await viaServer(() => cloud.helpPlanPractice(row.serverQuestionId, {
+      ...(lines.length ? { lines } : {}), ...(recognition ? { recognition } : {}), offered,
+      // Line numbers are the server's count of the lines it receives: if
+      // cleaning dropped any line here, the device's drawable numbers no
+      // longer match, so the view is not offered at all.
+      ...(Array.isArray(body?.drawable) && lines.length === (Array.isArray(body?.lines) ? body.lines.length : -1)
+        ? { mistakeGraph: body?.mistakeGraph === true, drawable: body.drawable.filter(n => Number.isInteger(n) && n >= 2 && n <= lines.length).slice(0, 40) }
+        : { mistakeGraph: false }),
+      helpRequested: body?.helpRequested !== false
+    }));
+    if (r?.lineCheckSpent === true) { row.lineChecks = usedChecks + 1; await put('questions', row); }
+    return { plan: r?.plan && typeof r.plan === 'object' ? r.plan : null, experiment: r?.experiment || null };
+  },
   'POST /practice/:id/tutor/why': async (body, params) => {
     if (!tutorFeatureEnabled()) throw tutorDisabledError();
     const p = await requireProfile();
@@ -4362,8 +4419,27 @@ const routes = {
     const subtopics = examPw ? scopeForYear(year, examPw).own : subtopicsForYear(year);
     const diffs = [];
     for (let i = 0; i < length; i++) { const t = i / length; diffs.push(t < 0.2 ? 1 : t < 0.6 ? 2 : t < 0.9 ? 3 : 4); }
+    // A paper weighted by the HSC 2027 priorities (Prithagoras, Year 12 only):
+    // the same practice paper — Pri's own questions from the issued banks, the
+    // same ladder, checked by the server — whose subtopics are drawn in
+    // proportion to the priorities' expected marks share instead of the
+    // syllabus weights. It predicts nothing; its title says how it was weighted.
+    const hsc = body?.hscPriorities;
+    let hscWeights = null;
+    if (hsc !== undefined) {
+      const { hscCoursesFor, hscPaperWeights } = await loadHscPractice();
+      if (year !== 12 || !hscCoursesFor({ ...p, course: p.course || 'nsw', year, pathway: examPw }).includes(hsc)) {
+        throw Object.assign(new Error('A paper weighted by the HSC priorities is for Year 12 Advanced or Extension 1 only.'), { status: 400, code: 'EXAM_KIND_UNAVAILABLE' });
+      }
+      hscWeights = hscPaperWeights(hsc, subtopics.map(s => s.id));
+      if (Object.keys(hscWeights).length < 2) throw Object.assign(new Error('Not enough Pri practice behind the priorities for this paper yet.'), { status: 409, code: 'EXAM_BLUEPRINT_NOT_RELEASED' });
+    }
     const bag = [];
-    for (const s of subtopics) for (let i = 0; i < Math.max(1, Math.round(s.weight / 3)); i++) bag.push(s.id);
+    if (hscWeights) {
+      for (const [id, w] of Object.entries(hscWeights)) for (let i = 0; i < Math.max(1, Math.round(w * 40)); i++) bag.push(id);
+    } else {
+      for (const s of subtopics) for (let i = 0; i < Math.max(1, Math.round(s.weight / 3)); i++) bag.push(s.id);
+    }
     const slots = [];
     let lastPick = null;
     for (let i = 0; i < length; i++) {
@@ -4379,10 +4455,10 @@ const routes = {
     if (mpIds.length) slots.push({ multipart: mpIds[Math.floor(Math.random() * mpIds.length)] });
     const count = (await byIndex('exams', 'pid', p.id)).length;
     const pwLabel = examPw && examPw !== 'advanced' ? ` ${PATHWAYS[examPw].short}` : '';
-    const title = `Year ${year}${pwLabel} Practice Paper ${count + 1}`;
+    const title = `Year ${year}${pwLabel} Practice Paper ${count + 1}${hscWeights ? ` · weighted by HSC 2027 priorities (${hsc === 'extension1' ? 'Extension 1' : 'Advanced'})` : ''}`;
     const issued = await issueServerExam(p.id, {
       kind: 'practice-paper', paper: { year, minutes, ...(examPw ? { pathway: examPw } : {}) }, slots
-    }, `practice-paper:${year}:${examPw || ''}:${length}:${minutes}`);
+    }, `practice-paper:${year}:${examPw || ''}:${length}:${minutes}${hscWeights ? `:hsc-${hsc}` : ''}`);
     return storeServerPaper(p, issued, { year, pathway: examPw, title });
   },
   'GET /exams': async () => {
@@ -5009,6 +5085,13 @@ const routes = {
     if (!Object.hasOwn(HISTORY_SORTS, sort)) throw Object.assign(new Error('sort must be newest, oldest or marks'), { status: 400 });
     const allRows = await byIndex('questions', 'pid', p.id);
     const rows = allRows.filter(r => r.answered);
+    // Historic exam questions can name NSW generators no longer issued as
+    // markable Practice. Do not advertise an impossible Retry action; a
+    // server-issued question can still be replayed by its source id.
+    const nswHistory = practiceCurriculumOf(p) === 'nsw';
+    const canRetryFromBank = r => !nswHistory || !!nswOfferedCell({
+      generator: r.generator || r.subtopic, difficulty: r.difficulty
+    });
     const attempts = await attemptsInOrder(p.id);
     const attemptByQ = {};
     for (const a of attempts) attemptByQ[a.questionId] = a;   // latest wins (answer order)
@@ -5042,7 +5125,7 @@ const routes = {
         viaInk: !!a?.viaInk, hasInk: !!(ink && ink.strokes?.length), hasPhoto: !!ink?.photo, hasScribble: !!(ink?.scribble?.length),
         bookmarked: marked.has(r.id),
         needsLook: needsLook.has(r.id),
-        canRetry: !q.custom && !q.multipart,
+        canRetry: !q.custom && !q.multipart && (!!r.serverQuestionId || canRetryFromBank(r)),
         answeredAt: a?.createdAt || r.createdAt,
         // The server-certified mark and its step rows, when the server sent one.
         ...(() => { const m = certifiedMarksOfRow(r); return m ? { marksEarned: m.earned, marksPossible: m.possible, markRows: m.markRows, ...(m.repeat || r.repeatOf ? { repeat: true } : {}) } : {}; })()
@@ -6463,7 +6546,7 @@ function readerRefusal(cause) {
   return refusal;
 }
 
-async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow = false } = {}) {
+async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow = false, keepOriginal = true } = {}) {
   if (!row.serverQuestionId || !submissionId) {
     throw notMarked(Object.assign(new Error('An online-issued question and stable submission are required to mark.'), {
       status: 503, code: 'ONLINE_GRADE_REQUIRED'
@@ -6496,6 +6579,10 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
   // a picture too large to share a request body, and a kept read that has
   // expired while the draft still holds its signed read receipt.
   let picture = null;
+  // The student's original page, kept by the server with the mark (standard
+  // #08, server/platform/originalWork.js): the pen samples the card built
+  // before compacting the strokes, or — for a photo — the picture itself.
+  let original = null;
   // Reading the handwriting or photo comes before marking and is not marking:
   // a failure anywhere in it means the answer was not sent to be marked. (It
   // runs only while no marking request under this key has been sent: after
@@ -6516,9 +6603,23 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
     // The picture never travels with the marking request.
     const attested = mode === 'ink' ? body.ink?.attested : body.photoAttested;
     const workingChars = Array.isArray(body.steps) ? body.steps.join('\n').length : String(body.steps || '').length;
-    if (receiptFlow !== true && image.length + String(body.answer).length + workingChars + 2048 <= SINGLE_REQUEST_BODY_CHARS) {
+    if (mode === 'ink' && keepOriginal) {
+      const carried = body.ink?.original;
+      original = carried && typeof carried === 'object' && carried.kind === 'strokes' ? carried
+        // A page restored from this device's draft has only its drawn points
+        // (rounded, no timing): kept all the same, and marked as such inside
+        // the format (CONDITIONED), never presented as raw pen samples.
+        : await buildInkOriginal({ strokes: (body.ink?.strokes || []).map(s => ({ points: (s?.points || []).map(p => (Array.isArray(p) ? { x: p[0], y: p[1] } : p)) })) }).catch(() => null);
+    }
+    const originalChars = mode === 'ink' ? originalWireChars(original) : 0;
+    if (receiptFlow !== true && image.length + originalChars + String(body.answer).length + workingChars + 2048 <= SINGLE_REQUEST_BODY_CHARS) {
       picture = image;
+      // A photo's original is the picture this request already carries.
+      if (mode === 'photo' && keepOriginal) original = await buildImageOriginal(image, { origin: isPdf(body.photo) ? 'pdf-page' : 'photo', samePicture: true }).catch(() => null);
     } else {
+    // Without the picture in the body, a photo's original would not fit
+    // beside it: it stays on this device (the reply says it was not kept).
+    if (mode === 'photo') original = null;
     const read = await cloud.recognizePractice(row.serverQuestionId, mode, image, attested && typeof attested === 'object' ? attested : null).catch(cause => {
       throw readerRefusal(cause);
     });
@@ -6542,7 +6643,13 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
   const payload = resend
     || {
         submissionId, answer: String(body.answer), mode, steps: body.steps,
-        ms: body.ms, ...(receipt ? { transcriptionReceipt: receipt } : picture ? { image: picture } : {})
+        ms: body.ms, ...(receipt ? { transcriptionReceipt: receipt } : picture ? { image: picture } : {}),
+        // Tutor help this device showed (the server marks what it served
+        // itself; this covers the offline fallback). One-way: it can only
+        // make the attempt count as supported.
+        // (the live step coach also records its reads on row.assistance)
+        ...(Number(row.tutorLevel) > 0 || row.assistance?.stepCoach?.reads > 0 ? { deviceHelp: true } : {}),
+        ...(original ? { original } : {})
       };
   // `at` lets a sync pull tell a grade in flight from one abandoned after the
   // server committed it (cloudSyncRestore: issued-here events).
@@ -6553,6 +6660,19 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
   await put('questions', row);
   let acknowledged;
   try { acknowledged = await cloud.gradePractice(row.serverQuestionId, payload); } catch (cause) {
+    // The server refused the ORIGINAL (it checks it before reading or marking
+    // anything): the answer is still the student's to have marked. This same
+    // press goes again under the same key without it; the page stays on this
+    // device and the reply says the server did not keep it.
+    // A server that does not take an original yet refuses the request by its
+    // shape (PRACTICE_SUBMISSION_INVALID) before reading or marking anything:
+    // the same press goes without it too.
+    if (payload.original && !sentBefore && Number(cause?.status) >= 400 && Number(cause?.status) < 500 && keepOriginal
+      && (/^ORIGINAL_/.test(String(cause?.code || '')) || cause?.code === 'PRACTICE_SUBMISSION_INVALID')) {
+      row.pendingGrade = null;
+      await put('questions', row).catch(() => {});
+      return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow, keepOriginal: false });
+    }
     if (typeof payload.image === 'string' && !sentBefore && Number(cause?.status) >= 400) {
       // A server that does not take a picture here yet refuses the request by
       // its shape, before reading or marking anything: use the receipt
@@ -6560,7 +6680,7 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
       if (cause.status === 400 && cause.code === 'PRACTICE_SUBMISSION_INVALID' && receiptFlow !== true) {
         row.pendingGrade = null;
         await put('questions', row).catch(() => {});
-        return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true });
+        return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true, keepOriginal });
       }
       // The server no longer keeps the read the student asked for, but the
       // draft holds its signed read receipt: prove the read with it (no new
@@ -6570,7 +6690,7 @@ async function gradeOnServer(row, body, submissionId, requestDigest, { receiptFl
       if (cause.status === 409 && cause.code === 'RECOGNITION_READ_EXPIRED' && receiptFlow !== true && attestedRead && typeof attestedRead === 'object') {
         row.pendingGrade = null;
         await put('questions', row).catch(() => {});
-        return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true });
+        return gradeOnServer(row, body, submissionId, requestDigest, { receiptFlow: true, keepOriginal });
       }
       // The reading failed or was refused (a limit, an allowance, a reader
       // that did not answer, nothing legible). The server answers these
@@ -6676,6 +6796,7 @@ async function runGated(method, pattern, handler, body, params) {
     key === 'POST /practice/:id/submit'
     || key === 'POST /practice/:id/reveal'
     || key === 'POST /practice/:id/hint'
+    || key === 'POST /practice/:id/help-plan'
     || key === 'POST /practice/:id/tutor'
     || key === 'POST /practice/:id/tutor/diagnose'
     || key === 'POST /practice/:id/tutor/line-check'

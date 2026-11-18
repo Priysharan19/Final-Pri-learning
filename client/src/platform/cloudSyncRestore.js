@@ -112,7 +112,9 @@ export function eventTime(event) {
 export function effectiveHelp(payload) {
   const hints = Math.max(0, num(payload?.hintsUsed, 0));
   const tutor = Math.max(0, Math.min(3, num(payload?.tutorLevel, 0)));
-  const supported = payload?.support === 'supported';
+  // `after-feedback` is a re-submission after a spent try (support version 2,
+  // server/platform/attemptSupport.js): credited one try, like `supported`.
+  const supported = payload?.support === 'supported' || payload?.support === 'after-feedback' || payload?.support === 'revealed';
   return { hints, tutor, tries: supported && hints + tutor === 0 ? 1 : 0, help: hints + tutor };
 }
 

@@ -270,6 +270,12 @@ function tokenize(input) {
       let j = i;
       while (j < src.length && /[a-zA-Z]/.test(src[j])) j++;
       let run = src.slice(i, j);
+      // `log2(x)`, `log10(x)`, `log_2(x)`: a base is part of the function name,
+      // not a number multiplying the next factor.
+      if (run.toLowerCase() === 'log') {
+        const base = /^_?\{?(2|10)\}?(?=\()/.exec(src.slice(j));
+        if (base) { tokens.push({ t: 'fn', v: `log${base[1]}` }); i = j + base[0].length; continue; }
+      }
       while (run.length) {
         const lower = run.toLowerCase();
         const fn = FUNC_NAMES.find(f => lower.startsWith(f));

@@ -15,6 +15,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { normalize, parse, evaluate, numsClose, variablesOf } from './expr.js';
+import { sameFormalForm } from './reason-forms.js';
 import {
   assessEquationLine as assessEquationLineV1,
   assessNumericCheckLine as assessNumericCheckLineV1,
@@ -46,7 +47,6 @@ function constantNumber(node) {
 }
 
 function nearZero(v) { return Math.abs(v) <= EPS; }
-function nearOne(v) { return Math.abs(v - 1) <= EPS; }
 
 function stableKey(node) {
   node = unwrap(node);
@@ -543,6 +543,149 @@ function relationFault(a, b) {
   }
   return null;
 }
+// The solution region of a polynomial inequality in one variable (degree <= 4),
+// compared by MEMBERSHIP on every piece the two relations' real roots cut the
+// line into: a polynomial has a constant sign on each piece, so agreement on a
+// representative of every piece and every root is exact agreement (up to the
+// roots' numeric precision). Null unless both are exactly polynomial in the one
+// variable (confirmed at nine points beyond the fit).
+function polyFit(rel) {
+  if (!rel || rel.t !== 'relation') return null;
+  const vars = new Set([...variablesOf(rel.l), ...variablesOf(rel.r)]);
+  if (vars.size > 1) return null;
+  const v = vars.size ? [...vars][0] : 'x';
+  const f = t => { const env = { [v]: t }; return evaluate(rel.l, env) - evaluate(rel.r, env); };
+  try {
+    const xs = [0, 1, 2, 3, 4];
+    const ys = xs.map(f);
+    if (!ys.every(Number.isFinite)) return null;
+    // Newton forward differences -> monomial coefficients by solving Vandermonde.
+    const n = xs.length;
+    const M = xs.map((x, i) => [...xs.map((_, j) => Math.pow(x, j)), ys[i]]);
+    for (let c = 0; c < n; c++) {
+      let piv = c;
+      for (let r = c + 1; r < n; r++) if (Math.abs(M[r][c]) > Math.abs(M[piv][c])) piv = r;
+      if (Math.abs(M[piv][c]) < 1e-12) return null;
+      [M[c], M[piv]] = [M[piv], M[c]];
+      for (let r = 0; r < n; r++) {
+        if (r === c) continue;
+        const k = M[r][c] / M[c][c];
+        for (let j = c; j <= n; j++) M[r][j] -= k * M[c][j];
+      }
+    }
+    const co = M.map((row, i) => row[n] / row[i]);
+    const evalPoly = t => co.reduce((acc, c, i) => acc + c * Math.pow(t, i), 0);
+    const scale = Math.max(1, ...co.map(Math.abs));
+    for (const t of [-1, -2, -3.5, 0.5, 1.5, 2.5, 5, 7, 11]) {
+      const want = f(t);
+      if (!Number.isFinite(want) || Math.abs(want - evalPoly(t)) > 1e-8 * Math.max(1, Math.abs(want), scale * Math.pow(Math.abs(t) + 1, 4))) return null;
+    }
+    const clean = co.map(c => (Math.abs(c) <= 1e-10 * scale ? 0 : c));
+    const roots = realRootsOf(clean);
+    return { co: clean, v, op: rel.op, f: evalPoly, scale, zeros: roots, cuts: roots, tol: degreeOf(clean) > 2 ? 1e-7 : 1e-10 };
+  } catch { return null; }
+}
+function realRootsOf(co) {
+  const c = co.slice();
+  while (c.length > 1 && c[c.length - 1] === 0) c.pop();
+  const deg = c.length - 1;
+  if (deg <= 0) return [];
+  if (deg === 1) return [-c[0] / c[1]];
+  if (deg === 2) {
+    const d = c[1] * c[1] - 4 * c[2] * c[0];
+    if (d < 0) return [];
+    const q = Math.sqrt(d);
+    return [(-c[1] - q) / (2 * c[2]), (-c[1] + q) / (2 * c[2])];
+  }
+  // Durand–Kerner on the monic polynomial.
+  const a = c.map(x => x / c[deg]);
+  let z = Array.from({ length: deg }, (_, k) => ({ re: Math.cos(2 * Math.PI * k / deg + 0.4) * 3, im: Math.sin(2 * Math.PI * k / deg + 0.4) * 3 }));
+  const mul = (p, q) => ({ re: p.re * q.re - p.im * q.im, im: p.re * q.im + p.im * q.re });
+  const sub = (p, q) => ({ re: p.re - q.re, im: p.im - q.im });
+  const div = (p, q) => { const d = q.re * q.re + q.im * q.im; return { re: (p.re * q.re + p.im * q.im) / d, im: (p.im * q.re - p.re * q.im) / d }; };
+  for (let it = 0; it < 400; it++) {
+    let moved = 0;
+    z = z.map((zi, i) => {
+      let num = { re: 0, im: 0 }; // Horner
+      for (let k = deg; k >= 0; k--) { num = mul(num, zi); num.re += a[k]; }
+      let den = { re: 1, im: 0 };
+      z.forEach((zj, j) => { if (j !== i) den = mul(den, sub(zi, zj)); });
+      if (den.re === 0 && den.im === 0) return zi;
+      const next = sub(zi, div(num, den));
+      moved = Math.max(moved, Math.hypot(next.re - zi.re, next.im - zi.im));
+      return next;
+    });
+    if (moved < 1e-13) break;
+  }
+  return z.filter(r => Math.abs(r.im) < 1e-6 * Math.max(1, Math.abs(r.re))).map(r => r.re);
+}
+// Membership at a point. A ROOT sample is "zero" only if it is within a tight
+// relative tolerance of one of this polynomial's own roots (never by the size
+// of its value, which is meaningless far from the origin); any other sample is
+// judged by the exact sign of the value.
+const degreeOf = co => { let d = co.length - 1; while (d > 0 && co[d] === 0) d--; return d; };
+
+// `abs(Q) op P` (or `P op abs(Q)`), Q and P polynomials of degree <= 2: the
+// function |Q| - P changes sign only at roots of Q - P and -Q - P, and has a
+// kink at roots of Q, so those are the cut points; the zeros are the cut points
+// where |Q| really equals P.
+function absFit(rel) {
+  if (!rel || rel.t !== 'relation') return null;
+  const strip = n => { let o = n; while (o?.t === 'group') o = o.v; return o; };
+  let l = strip(rel.l), r = strip(rel.r), op = rel.op;
+  const isAbs = n => n?.t === 'call' && n.fn === 'abs';
+  if (!isAbs(l) && isAbs(r)) { [l, r] = [r, l]; op = flipRelation(op); }
+  if (!isAbs(l) || isAbs(r)) return null;
+  const rest = n => { const o = strip(n); return o && !(function has(x) { x = strip(x); return !!x && typeof x === 'object' && ((x.t === 'call' && x.fn === 'abs') || ['l', 'r', 'v', 'arg'].some(k => has(x[k]))); })(o); };
+  if (!rest(r) || !rest(l.arg)) return null;
+  const zero = { t: 'num', v: 0 };
+  const q = polyFit({ t: 'relation', op: '=', l: l.arg, r: zero });
+  const p = polyFit({ t: 'relation', op: '=', l: r, r: zero });
+  if (!q || !p || degreeOf(q.co) > 2 || degreeOf(p.co) > 2) return null;
+  if (q.v !== p.v && q.co.length > 1 && p.co.length > 1) return null;
+  const sub = (a, b) => a.map((x, i) => x - b[i]);
+  const f = t => Math.abs(q.f(t)) - p.f(t);
+  const c1 = realRootsOf(sub(q.co, p.co)), c2 = realRootsOf(sub(q.co.map(x => -x), p.co)), c3 = realRootsOf(q.co);
+  const scale = Math.max(1, q.scale, p.scale);
+  const zeros = [...c1, ...c2].filter(x => Number.isFinite(x) && Math.abs(f(x)) <= 1e-9 * scale * (1 + Math.abs(x)));
+  // The unknown is the one of Q or P that has one (polyFit defaults a constant's to 'x').
+  const unknown = degreeOf(q.co) > 0 ? q.v : degreeOf(p.co) > 0 ? p.v : q.v;
+  return { co: null, v: unknown, op, f, scale, zeros, cuts: [...c1, ...c2, ...c3], tol: 1e-10 };
+}
+const regionFit = rel => polyFit(rel) || absFit(rel);
+
+// Membership at a point. A ROOT sample is "zero" only if it is within a tight
+// relative tolerance of one of this function's own zeros (never by the size of
+// its value, which is meaningless far from the origin); any other sample is
+// judged by the exact sign of the value.
+function holds(fit, t, atRoot) {
+  const val = fit.f(t);
+  const zero = atRoot && fit.zeros.some(r => Math.abs(r - t) <= fit.tol * Math.max(1, Math.abs(r)));
+  if (fit.op === '<') return !zero && val < 0;
+  if (fit.op === '>') return !zero && val > 0;
+  if (fit.op === '<=') return zero || val <= 0;
+  return zero || val >= 0;
+}
+function sameRegion(a, b) {
+  const fa = regionFit(a), fb = regionFit(b);
+  if (!fa || !fb) return null;
+  // Different unknowns are different regions: a constant relation has no unknown to compare.
+  const nonConstant = fit => !fit.co || degreeOf(fit.co) > 0;
+  if (nonConstant(fa) && nonConstant(fb) && fa.v !== fb.v) return null;
+  const tol = Math.max(fa.tol, fb.tol);
+  const cuts = [...fa.cuts, ...fb.cuts].filter(Number.isFinite).sort((x, y) => x - y);
+  const uniq = [];
+  for (const r of cuts) if (!uniq.length || Math.abs(r - uniq[uniq.length - 1]) > tol * Math.max(1, Math.abs(r))) uniq.push(r);
+  const samples = []; // [t, isRoot]
+  samples.push([uniq.length ? uniq[0] - 1 - Math.abs(uniq[0]) : -1, false]);
+  uniq.forEach((r, i) => {
+    samples.push([r, true]);
+    samples.push([i + 1 < uniq.length ? (r + uniq[i + 1]) / 2 : r + 1 + Math.abs(r), false]);
+  });
+  if (!uniq.length) samples.push([0, false], [1, false]);
+  return samples.every(([t, root]) => holds(fa, t, root) === holds(fb, t, root));
+}
+
 export function assessRelationLine({ text, previous = null, previousTrusted = false, meta = null } = {}) {
   const rel = typeof text === 'string' ? parseRelation(text) : text;
   if (!rel) return { status: 'note', trusted: false, relation: null, note: 'Skipped — I couldn’t parse this inequality safely.' };
@@ -568,6 +711,21 @@ export function assessRelationLine({ text, previous = null, previousTrusted = fa
     }
   }
 
+  if (previous) {
+    // Proportional residuals did not settle it (collecting terms moves the
+    // coefficient's sign, or the sides were rearranged): compare the solution
+    // regions themselves. A disproof needs a verified line above it.
+    const same = sameRegion(previous, rel);
+    if (same === true) {
+      return previousTrusted
+        ? { status: 'ok', trusted: true, relation: rel }
+        : { status: 'note', trusted: false, relation: rel, note: 'This follows from the previous inequality, but the starting line was not independently verified.' };
+    }
+    if (same === false && previousTrusted) {
+      const fault = { code: 'inequality-step-false', title: 'This step changes the solutions', message: 'This line does not have the same solutions as the line above it — check the arithmetic and the sign of each coefficient when collecting terms.', fix: 'Redo this step from the line above, keeping the sign of every term.', confidence: 'high' };
+      return { status: 'break', trusted: false, relation: rel, note: fault.message, diagnosis: fault };
+    }
+  }
   return { status: 'note', trusted: false, relation: rel, note: 'Pri cannot yet prove that this inequality has exactly the same solution region, so it is not marked correct.' };
 }
 
@@ -627,7 +785,14 @@ export function differentiateAst(ast, variable = 'x') {
     }
     if (ast.op === '^') {
       const exponent = constantNumber(ast.r);
-      if (exponent === null || !dl) return null;
+      // b^v, b a positive constant (e^x, 2^(3x)): b^v · ln b · v'.
+      if (exponent === null) {
+        const base = constantNumber(ast.l);
+        if (base === null || base <= 0 || !dr) return null;
+        const lnb = Math.abs(base - Math.E) < 1e-12 ? N(1) : N(Math.log(base));
+        return simplify(B('*', B('*', B('^', ast.l, ast.r), lnb), dr));
+      }
+      if (!dl) return null;
       return simplify(B('*', B('*', N(exponent), B('^', ast.l, N(exponent - 1))), dl));
     }
     return null;
@@ -678,6 +843,8 @@ function expressionCounterexample(expected, candidate, variable) {
 export function assessDerivativeLine({ text, meta = null } = {}) {
   if (!meta?.source) return { status: 'note', trusted: false, note: 'Pri needs the original function before it can verify differentiation.' };
   const variable = meta.variable || 'x';
+  // `e` as the variable of differentiation is a letter here, never Euler's number.
+  if (variable === 'e') return { status: 'note', trusted: false, note: 'This derivative uses a rule outside Pri’s verified calculus vocabulary.' };
   let source, expected;
   try {
     source = parse(meta.source);
@@ -699,5 +866,8 @@ export function assessDerivativeLine({ text, meta = null } = {}) {
     };
     return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
   }
+  // No counterexample, so the line agrees with the derivative everywhere it
+  // was tried. It is credited only when the two are the same formal form.
+  if (sameFormalForm(expected, candidate) === true) return { status: 'ok', trusted: true };
   return { status: 'note', trusted: false, note: 'Pri could not prove this derivative form symbolically, so it is not marked correct.' };
 }

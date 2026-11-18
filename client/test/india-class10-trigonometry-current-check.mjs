@@ -6,6 +6,7 @@ import {
 } from '../src/engine/generators/india-class10-trigonometry.js';
 import { indiaClass10 } from '../src/engine/generators/india-class10.js';
 import { bankOf } from '../src/engine/generators/index.js';
+import { checkWorking } from '../src/engine/checker.js';
 
 for (const id of ['c10-trigonometry-current', 'c10-trig-applications-current']) {
   assert.equal(bankOf(id), 'india-class10', `${id} must be reachable through the India Class 10 lazy bank`);
@@ -17,6 +18,7 @@ const standard = new Set([0, 30, 45, 60, 90]);
 const applicationAngles = new Set([30, 45, 60]);
 const seenStandardAngles = new Set();
 const seenApplicationKinds = new Set();
+const seenProofs = new Set();
 const forbiddenSenior = /radian|unit circle|negative angle|quadrant|sum formula|difference formula|compound angle|180°|270°|360°/i;
 let coreChecked = 0;
 let applicationsChecked = 0;
@@ -52,6 +54,16 @@ for (let seed = 1; seed <= 64; seed++) {
       assert.equal(q.answerType, 'numeric');
       assert.ok(q.answer?.value > 0 && q.answer.value <= 1, 'acute-angle sine/cosine result must be positive and at most 1');
       assert.match(all, /sin\^2A\+\\?cos\^2A=1|sin\^2A\+cos\^2A=1/i);
+    } else if (q.trigSkill === 'identity-proof') {
+      // "Prove that LHS = RHS", written line by line: the authored proof must be
+      // a complete, verified proof under the same check the server marks with.
+      assert.equal(q.dotpoint, 3);
+      assert.equal(q.answerType, 'working');
+      assert.match(q.prompt, /^Prove that \$/);
+      assert.equal(q.answer?.stepMeta?.kind, 'expression');
+      assert.ok(q.answer.stepMeta.sides?.lhs && q.answer.stepMeta.sides?.rhs, 'a proof item states both sides');
+      assert.equal(checkWorking(q, q.answer.canonicalWorking).correct, true, `D4 proof seed ${seed} must verify its own worked proof`);
+      seenProofs.add(q.answer.stepMeta.sides.lhs);
     } else {
       assert.equal(q.dotpoint, 3);
       assert.equal(q.trigSkill, 'identity-proof-step');
@@ -95,5 +107,6 @@ for (let seed = 1; seed <= 64; seed++) {
 assert.ok(seenStandardAngles.has(0) && seenStandardAngles.has(30) && seenStandardAngles.has(45) && seenStandardAngles.has(60) && seenStandardAngles.has(90),
   `deterministic standard-angle sample should exercise all five prescribed angles; saw ${[...seenStandardAngles].sort((a,b)=>a-b).join(', ')}`);
 assert.deepEqual([...seenApplicationKinds].sort(), ['depression', 'single-elevation', 'two-heights', 'two-observation-points']);
+assert.ok(seenProofs.size >= 2, `the deterministic sample should serve at least two distinct identity proofs at D4; saw ${seenProofs.size}`);
 
 console.log(`PASS — current Class 10 Trigonometry: ${coreChecked} core forms + ${applicationsChecked} heights-and-distances forms stay inside the prescribed exact-angle, identity and ≤2-right-triangle boundaries.`);

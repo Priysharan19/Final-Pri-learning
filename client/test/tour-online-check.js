@@ -696,11 +696,12 @@ export const preparedTaken = {
   id: 'prepared-taken',
   name: 'Prepared · taken up by another account: not marked here, work kept, next one is',
   online: true,
+  inspectNetwork: true, // interception must not be short-circuited by the service worker
 
   async run({ page, ctx, base, check, goto, createProfile, mathText, settle, online }) {
     await goto('/');
-    await createProfile({ name: 'Late Binder', year: 7 });
-    const account = await online.signIn({ name: 'Late Binder' });
+    // Attach the interceptor before onboarding can issue or prefetch the
+    // first question; otherwise the route cannot prove the prepared fallback.
     // While armed, a fresh issue (no prepared token) fails at the route, so
     // serveQuestion falls back to a prepared question for this signed-in student.
     let armed = true;
@@ -712,6 +713,8 @@ export const preparedTaken = {
       return route.continue();
     };
     await ctx.route(issueRoute, handler);
+    await createProfile({ name: 'Late Binder', year: 7 });
+    const account = await online.signIn({ name: 'Late Binder' });
     await page.goto(`${base}/practice?subtopic=${TOPIC}`, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('.qpage[data-question-id] .q-prompt', { timeout: 30000 });
     const found = await findPreparedTyped(page, settle, online);

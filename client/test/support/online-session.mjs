@@ -438,7 +438,9 @@ function onlineSession(platform, ctx, page) {
     const sealed = platform.h.db.prepare("SELECT account_id, response_json FROM idempotency_keys WHERE scope='practice-question' AND key=?").get(shown.serverQuestionId);
     if (!sealed) return null;
     const q = JSON.parse(sealed.response_json);
-    return { serverQuestionId: shown.serverQuestionId, accountId: String(sealed.account_id), generator: typeof q._generator === 'string' ? q._generator : (q.subtopic ?? null) };
+    return { serverQuestionId: shown.serverQuestionId, accountId: String(sealed.account_id), generator: typeof q._generator === 'string' ? q._generator : (q.subtopic ?? null),
+      // How many worked steps the sealed solution has (null when the server keeps none here): a question with one step has no step-to-step equation motion.
+      solutionSteps: Array.isArray(q.solution?.steps) ? q.solution.steps.length : (Array.isArray(q.steps) ? q.steps.length : null) };
   }
 
   /**

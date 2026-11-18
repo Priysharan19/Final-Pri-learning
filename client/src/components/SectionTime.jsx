@@ -9,6 +9,7 @@ import React from 'react';
 import { useT } from '../i18n/index.js';
 import PageLink from './PageLink.jsx';
 import { PAYWALL_ROUTE } from '../paywall/route.js';
+import { useUpgradeOffer } from '../paywall/UpgradeNote.jsx';
 
 function clock(ms) {
   const total = Math.round((Number(ms) || 0) / 1000);
@@ -33,8 +34,11 @@ function Rule({ value, kind, label }) {
 
 export default function SectionTime({ report, offered }) {
   const t = useT();
+  // A finished paper is a value moment (moments.js); the result is shown only
+  // once the paper is submitted, so the exam is not in progress here.
+  const offer = useUpgradeOffer('paper-completed', { examFinished: true });
   if (!report) {
-    if (!offered) return null;
+    if (!offered || !offer?.show) return null;
     return (
       <p className="muted" data-section-time-offer style={{ fontSize: 13 }}>
         {t('sectionTime.offer')} <PageLink to={PAYWALL_ROUTE} state={{ from: 'time-report' }}>{t('sectionTime.offerLink')}</PageLink>

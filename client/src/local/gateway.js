@@ -257,6 +257,7 @@ const BODY_RULES = [
     optionalString(body, 'nsw', 64);
     // The Paper Generator: a request (year, topics, length, mix), never a question.
     if (body.generated !== undefined && !plainObject(body.generated)) throw apiError('generated must be an object.', 400, 'INVALID_FIELD');
+    if (body.hscPriorities !== undefined && body.hscPriorities !== 'advanced' && body.hscPriorities !== 'extension1') throw apiError('hscPriorities must be advanced or extension1.', 400, 'INVALID_FIELD');
   }],
   [/^POST \/exams\/generator\/options$/, body => {
     requireObject(body, 'generator options'); optionalNumber(body, 'year'); optionalString(body, 'pathway', 24); optionalString(body, 'track', 24);

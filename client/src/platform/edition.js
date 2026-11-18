@@ -28,6 +28,8 @@ export const EDITION_HEADER = 'X-Pri-Edition';
 export const edition = () => EDITION_RECORD;
 export const defaultCourse = () => EDITION_RECORD.defaultCourse;
 export const offersCourse = course => EDITION_RECORD.courses.includes(course);
+/** Whether this edition has parent-facing features (the parent report, its email links, the parent sign-in path). Priyabhata only. */
+export const parentFeaturesOffered = () => EDITION_RECORD.family.parentFeatures === true;
 
 const EDITION_ID = /^[a-z]{3,24}$/;
 

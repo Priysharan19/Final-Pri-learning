@@ -2,7 +2,7 @@
 // Pri Learning · Year 11 generators (Advanced foundations)
 // ─────────────────────────────────────────────────────────────────────────────
 import { year11Nsw } from './year11-nsw.js';
-import { ri, rc, rs, nz, Frac, mcq, term, poly, sgn, surdLatex, surdStr, r1, r2, r3, rad, NAMES } from '../qhelpers.js';
+import { ri, rc, nz, Frac, mcq, term, poly, sgn, surdLatex, surdStr, r1, r2, r3, rad } from '../qhelpers.js';
 
 const factorial = n => n <= 1 ? 1 : n * factorial(n - 1);
 const nCr = (n, r) => Math.round(factorial(n) / (factorial(r) * factorial(n - r)));
@@ -497,7 +497,7 @@ export const year11 = {
     const x = nz(rng, -4, 5), y = ri(rng, -5, 6);
     const m1 = nz(rng, -3, 3);
     let m2 = nz(rng, -3, 3);
-    if (m2 === m1) m2 = m1 === 3 ? -3 : m1 + 1;
+    if (m2 === m1) m2 = m1 === 3 ? -3 : m1 === -1 ? 1 : m1 + 1;   // distinct and never 0, which would print as "y =  + 2"
     const c1 = y - m1 * x, c2 = y - m2 * x;
     return {
       prompt: `Find the point of intersection of $y = ${term(m1)} ${sgn(c1)}$ and $y = ${term(m2)} ${sgn(c2)}$.`,
@@ -896,7 +896,7 @@ export const year11 = {
         ]
       };
     }
-    const a = 1, b = nz(rng, -6, 6), c = nz(rng, -8, 8);
+    const b = nz(rng, -6, 6), c = nz(rng, -8, 8);
     const targetGrad = nz(rng, -6, 6);
     const x0v = (targetGrad - b) / 2;
     if (!Number.isInteger(x0v)) return year11['y11-diff'](rng, diff);

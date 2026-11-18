@@ -122,7 +122,8 @@ export function selectEntitlementSource(eventState, alternatives, now) {
 export async function supportGrantSources(db, accountId) {
   const rows = await db.all('SELECT product_id,period_end FROM entitlement_support_grants WHERE account_id=?', [accountId]);
   const out = rows.map(row => ({
-    plan: 'premium', status: 'active', provider: 'admin', productId: row.product_id,
+    // The referral trial is a dated grant like any other, said as a trial.
+    plan: 'premium', status: row.product_id === 'referral-trial' ? 'trialing' : 'active', provider: 'admin', productId: row.product_id,
     currentPeriodEnd: Number(row.period_end) || null, graceUntil: null, offlineUntil: null
   }));
   if (!out.length) {

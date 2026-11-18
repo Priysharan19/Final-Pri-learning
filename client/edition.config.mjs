@@ -83,6 +83,21 @@ export const CAPABILITIES = Object.freeze([
  */
 export const BILLING_PROVIDERS = Object.freeze(['razorpay', 'stripe', 'apple', 'google']);
 
+/**
+ * What the pricing page may claim as a reason to choose Pri (packaging
+ * proposal docs/product/packaging-2026-11.md). Each claim names the edition
+ * capability it rests on; editionCommerce() drops a claim whose capability is
+ * not `true` in that edition, so a page can never claim what is still pending.
+ * The wording is the i18n key `pricing.why.<id>` (en-AU overrides where the
+ * edition's facts differ). No statistic and no competitor is ever named.
+ */
+export const DIFFERENTIATORS = Object.freeze({
+  engineSteps: Object.freeze({ requires: 'stepFeedback' }),
+  youConfirm: Object.freeze({ requires: 'handwritingRecognition' }),
+  syllabus: Object.freeze({ requires: 'notesAndWorkedExamples' }),
+  examPapers: Object.freeze({ requires: 'timedExams' })
+});
+
 const pending = text => Object.freeze({ pending: text });
 
 const NSW_CONTENT = pending('No approved NSW question banks, answer specifications or certified Australian marking guidelines yet (plan G2, G3, G6).');
@@ -147,6 +162,15 @@ export const EDITIONS = Object.freeze({
       policy: 'switchable',
       reason: 'Method marks follow the process-wide switch (markingPolicy.js, D12): off until an independent examiner signs the India rubric result (#499), then switchable by the operator.'
     }),
+    // listPrice null: the price shown is the store's or the server's own
+    // display configuration (PRI_DISPLAY_*), never a constant here.
+    commerce: Object.freeze({ listPrice: null, differentiators: Object.freeze(['engineSteps', 'youConfirm', 'syllabus', 'examPapers']) }),
+    // Parent-facing features (the parent weekly report, its email links and the
+    // "I'm a parent or guardian" sign-in path). Priyabhata only: owner decision
+    // 2026-11-18, Prithagoras has no parent account. Legally required guardian
+    // consent is a separate rule (server/platform/guardianConsent.js) and is not
+    // turned off by this switch.
+    family: Object.freeze({ parentFeatures: true }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,
@@ -192,6 +216,14 @@ export const EDITIONS = Object.freeze({
       policy: 'final-answer-only',
       reason: 'No certified Australian method rubric exists (plan G6); the India examiner result says nothing about NSW marking guidelines, so only the final answer is marked until an HSC examiner certifies one.'
     }),
+    // The owner's live Stripe prices (owner decision O2), as the AU refund
+    // policy and terms state them (docs/legal/au/*.md; packaging-check holds
+    // the three equal). Changing a price is an owner action in Stripe first.
+    commerce: Object.freeze({ listPrice: Object.freeze({ monthly: 9.99, annual: 99 }), differentiators: Object.freeze(['engineSteps', 'youConfirm', 'syllabus', 'examPapers']) }),
+    // No parent account, parent report or parent invite in Prithagoras (owner
+    // decision 2026-11-18). Guardian CONSENT for a young student is a legal rule,
+    // kept by the existing consent machinery; see Priyabhata above.
+    family: Object.freeze({ parentFeatures: false }),
     capabilities: Object.freeze({
       handwritingRecognition: true,
       photoAndPdfInput: true,
@@ -290,6 +322,10 @@ export function editionProblems(editions = EDITIONS) {
     if (!MARKING_POLICIES.includes(e.marking?.policy)) problems.push(`${key}: marking.policy must be one of ${MARKING_POLICIES.join(', ')}`);
     if (typeof e.marking?.reason !== 'string' || e.marking.reason.trim().length < 40) problems.push(`${key}: marking.reason must say why this edition marks as it does`);
     if (e.billing?.currency !== e.currency) problems.push(`${key}: billing.currency must be the edition's currency`);
+    const list = e.commerce?.listPrice;
+    if (list !== null && !(list && ['monthly', 'annual'].every(k => Number.isFinite(list[k]) && list[k] > 0))) problems.push(`${key}: commerce.listPrice must be null or { monthly, annual } positive amounts`);
+    if (list && !e.billing?.providers?.length) problems.push(`${key}: commerce.listPrice is set but the edition sells through no provider`);
+    for (const d of e.commerce?.differentiators || []) if (!Object.hasOwn(DIFFERENTIATORS, d)) problems.push(`${key}: unknown differentiator ${JSON.stringify(d)}`);
     if (!e.courses?.includes(e.defaultCourse)) problems.push(`${key}: default course ${JSON.stringify(e.defaultCourse)} is not one of its courses`);
     for (const c of e.courses || []) courses.add(c);
     if (!e.languages?.length || !e.languages.every(isLanguage)) problems.push(`${key}: every language must be one the app is translated into`);
@@ -304,4 +340,18 @@ export function editionProblems(editions = EDITIONS) {
     }
   }
   return problems;
+}
+
+/**
+ * The commercial facts a build of edition `id` may show: its list price (or
+ * null) and the differentiators whose capability is live in that edition.
+ */
+export function editionCommerce(id) {
+  const e = editionOf(id);
+  const live = d => { const need = DIFFERENTIATORS[d].requires; return !need || e.capabilities[need] === true; };
+  return Object.freeze({
+    currency: e.currency,
+    listPrice: e.commerce.listPrice ? Object.freeze({ ...e.commerce.listPrice }) : null,
+    differentiators: Object.freeze(e.commerce.differentiators.filter(live))
+  });
 }

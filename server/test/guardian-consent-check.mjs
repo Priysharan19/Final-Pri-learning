@@ -99,6 +99,24 @@ eq((await consentState(db, 'acct-child')).state, 'given', 'and the account is pe
 ok(!(await confirmConsent(db, 'acct-child', CONSENT_NOTICE_VERSION, now)), 'confirming twice changes nothing');
 ok(await withdrawConsent(db, 'acct-child', now + 1), 'a guardian withdraws');
 eq((await consentState(db, 'acct-child')).state, 'withdrawn', 'and the account is not permitted again');
+// Step 05: a guardian may have withdrawn *after* the router's original
+// authorization but *before* the pre-marker consent read. Previously the
+// cached truthy blocker skipped the final transactional consent read, so a
+// device could commit a grade despite an already-withdrawn guardian.
+{
+  const { authorityAtCommit } = await import('../platform/practice.js');
+  const request = { cookies: { [SESSION_COOKIE]: 'raw-acct-child' } };
+  let wouldWrite = false;
+  const late = await db.transaction(async () => {
+    const denied = await authorityAtCommit(db, request, 'acct-child', 'GUARDIAN_CONSENT_WITHDRAWN');
+    if (!denied) wouldWrite = true;
+    return denied;
+  });
+  eq([late?.status, late?.code], [403, 'GUARDIAN_CONSENT_WITHDRAWN'],
+    'commit denies a withdrawn guardian even when the earlier read was already blocked');
+  ok(!wouldWrite, 'no practice or exam write may follow a revoked cached consent state');
+}
+
 ok((await consentState(db, 'acct-child')).row.requested_at > 0 && (await consentState(db, 'acct-child')).row.confirmed_at > 0,
   'the record keeps that it was asked and given, rather than being deleted — a guardian may need that shown back');
 

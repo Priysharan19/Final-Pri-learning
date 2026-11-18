@@ -44,6 +44,7 @@ import { deflateSync } from 'node:zlib';
 import { randomUUID } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { handwrite, pressRead } from './fakeServerReader.js';
+import { directFormsOnly } from '../src/engine/generators/index.js';
 
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=', 'base64');
@@ -130,7 +131,11 @@ export const ownerPageFlow = {
   online: true,
   name: 'Photo · the owner\'s page: notes left out, a sign corrected, answer 6 proposed, restored after reload, server-marked',
 
-  async run({ page, ctx, base, check, goto, createProfile, mathText, note, online, browserName }) {
+  // This flow names one question (by seed, or by needing typed working). The
+  // in-process server draws the skill's direct form for it; every other form
+  // is marked by the sweeps over all issued questions.
+  async run(env) { const was = directFormsOnly(true); try { return await this.runDirect(env); } finally { directFormsOnly(was); } },
+  async runDirect({ page, ctx, base, check, goto, createProfile, mathText, note, online, browserName }) {
     note(`${EVIDENCE}: "Photo · the owner's page" [${browserName || 'chromium'}] uses a 1×1 test image and the scripted stand-in reader, which returns the owner's recorded transcript (it never looks at a picture). The server, its SQLite database, sign-in, issue / recognise / confirm / grade and every mark are real. Not real-photo, real-provider or real-device evidence — that is tools/acceptance/real-photo.mjs.`);
     const { reader } = online;
     try {

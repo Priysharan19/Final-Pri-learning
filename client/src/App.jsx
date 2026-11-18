@@ -12,11 +12,13 @@ import { onCloudSessionChange } from './platform/cloudSession.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { setDraftProfile } from './components/drafts.js';
 import { setLanguage, signInLanguage, useT } from './i18n/index.js';
+import { claimPendingInvite } from './platform/referral.js';
 import Login from './pages/Login.jsx';
 import Practice from './pages/Practice.jsx';
 import Icon from './components/Icon.jsx';
 import { BrandWordmark, EditionByline } from './components/BrandMark.jsx';
 import { BRAND } from './brand/edition.js';
+import { parentFeaturesOffered } from './platform/edition.js';
 import ReaderPermissionHost from './ink/ReaderPermission.jsx';
 
 // ── Routes nobody has opened yet ─────────────────────────────────────────────
@@ -71,7 +73,19 @@ const LEGAL_ROUTES_EXTRA = EDITION === 'prithagoras' ? (
     <Route path="/refunds" element={<Navigate to="/refund-policy" replace />} />
   </>
 ) : <Route path="/grievance" element={<Legal />} />;
-const Notes = React.lazy(() => import('./pages/Notes.jsx'));
+// The public landing (the verified page, §3) and its three plain pages are
+// signed-out web routes, each its own chunk: a student who opens the app never
+// downloads them.
+const Landing = React.lazy(() => import('./landing/Landing.jsx'));
+const PublicInfo = React.lazy(() => import('./landing/PublicInfo.jsx'));
+// The Prithagoras edition has its own NSW notes page, built from the NSW curriculum
+// model; it never loads or shows the India notes (client/test/nsw-notes-no-india-check.mjs).
+// __PRI_NOTES_PAGE__ is a literal in a build (vite.config.js, from the edition the build resolved), so the
+// other edition's page, and its whole notes data, is dead code and is not emitted (nor warmed offline).
+const NSW_NOTES_BUILD = typeof __PRI_NOTES_PAGE__ === 'string' && __PRI_NOTES_PAGE__ === 'nsw';
+const Notes = NSW_NOTES_BUILD
+  ? React.lazy(() => import('./pages/NswNotes.jsx'))
+  : React.lazy(() => import('./pages/Notes.jsx'));
 const ParentReport = React.lazy(() => import('./parent/ParentReport.jsx'));
 // The shared resource library (ADR-0002 plan F1): its own chunk, built only
 // where PRI_FEATURE_LIBRARY is on.
@@ -85,7 +99,7 @@ const Insights = React.lazy(() => import('./insights/Insights.jsx'));
 const PLACEMENT_ON = featureEnabled('placement');
 // The parent weekly report's screen: off in a production build until counsel
 // has reviewed email about minors (D22, PRI_FEATURE_PARENT_REPORT).
-const PARENT_REPORT_ON = featureEnabled('parentReport');
+const PARENT_REPORT_ON = featureEnabled('parentReport') && parentFeaturesOffered();
 // The resource library's page: off in a production build (PRI_FEATURE_LIBRARY).
 const LIBRARY_ON = featureEnabled('library');
 // The Exam Desk is reached from a library paper, so it needs both flags.
@@ -269,7 +283,7 @@ export default function App() {
   const [toasts, setToasts] = useState([]);
   const [dueCount, setDueCount] = useState(0);
   const [dueUnit, setDueUnit] = useState('topic');
-  const [recent, setRecent] = useState([]);
+  const [, setRecent] = useState([]);
   const moreButtonRef = useRef(null);
   const moreSheetRef = useRef(null);
   const loc = useLocation();
@@ -528,8 +542,15 @@ export default function App() {
   const activate = useCallback((ready) => {
     setActivated(ready && ready.profileId && ready.accountId && userIdRef.current != null && String(ready.profileId) === String(userIdRef.current) ? ready : null);
   }, []);
-  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate }),
-    [user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate]);
+  // A friend's invite kept from the link (platform/referral.js) is presented
+  // once this profile's account is admitted; the server alone grants the trial.
+  useEffect(() => {
+    if (!user?.id || activated?.profileId !== user.id) return;
+    claimPendingInvite().then(result => { if (result?.granted) toast(t('invite.claimed', { days: result.trialDays || 7 })); }).catch(() => {});
+  }, [activated?.profileId, user?.id]);
+
+  const ctx = useMemo(() => ({ user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate, activated }),
+    [user, setUser, refreshUser, toast, celebrate, dueCount, dueUnit, refreshDue, refreshRecent, activate, activated]);
 
   if (user === undefined) {
     return (
@@ -553,6 +574,10 @@ export default function App() {
             <Route path="/refund-policy" element={<Legal />} />
             {LEGAL_ROUTES_EXTRA}
             <Route path="/third-party-notices" element={<Legal />} />
+            <Route path="/welcome" element={<Landing />} />
+            <Route path="/welcome/marking" element={<PublicInfo page="marking" />} />
+            <Route path="/welcome/syllabus" element={<PublicInfo page="syllabus" />} />
+            <Route path="/welcome/teachers" element={<PublicInfo page="teachers" />} />
             <Route path="*" element={<Login />} />
           </Routes>
         </React.Suspense>

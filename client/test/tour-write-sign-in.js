@@ -40,9 +40,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { pathToFileURL } from 'node:url';
 import { handwrite, pressRead } from './fakeServerReader.js';
+import { directFormsOnly } from '../src/engine/generators/index.js';
 
 const SURELY_WRONG = '-987654';
 const MAX_SKIPS = 14;
+// The typed-working flow needs a question that offers typed working; the chapter now mixes in forms that do not, so it draws further.
+const TYPED_WORKING_SKIPS = 40;
 const EVIDENCE = 'SYNTHETIC-READER EVIDENCE';
 const shownId = page => page.locator('.qpage').first().getAttribute('data-question-id');
 
@@ -701,7 +704,11 @@ export const typedReloadFlow = {
   online: true,
   name: 'Type · typed answer and working survive a reload, then the same question is server-marked',
 
-  async run({ page, base, check, goto, createProfile, mathText, settle, online }) {
+  // This flow names one question (by seed, or by needing typed working). The
+  // in-process server draws the skill's direct form for it; every other form
+  // is marked by the sweeps over all issued questions.
+  async run(env) { const was = directFormsOnly(true); try { return await this.runDirect(env); } finally { directFormsOnly(was); } },
+  async runDirect({ page, base, check, goto, createProfile, mathText, settle, online }) {
     // Press-to-read flow: automatic reading (owner decision, 18 Nov 2026) is switched off on this device, as a student can in Settings; auto mode is pinned in tour-auto-read.js.
     await page.context().addInitScript(() => { try { localStorage.setItem('pri.autoRead', 'off'); } catch { /* none */ } });
     const WORKING = '2 + 2 = 4\n3 + 3 = 6';
@@ -713,7 +720,7 @@ export const typedReloadFlow = {
     const answerBox = page.locator('.editor-body input.answer-input');
     const workingBox = page.locator('.editor-body textarea');
     let right = null;
-    for (let skips = 0; skips <= MAX_SKIPS; skips++) {
+    for (let skips = 0; skips <= TYPED_WORKING_SKIPS; skips++) {
       const typeTab = page.getByRole('button', { name: 'Answer by typing' });
       if (await typeTab.count()) { await typeTab.click(); await settle(); }
       if (await answerBox.count() === 1 && await page.locator('.editor-body .btn-disclose').count() === 1) {

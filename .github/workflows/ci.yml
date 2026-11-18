@@ -376,6 +376,17 @@ jobs:
           node tools/ci-check-counts.mjs verify platform/desk.log
           node server/test/desk-isolation-check.mjs 2>&1 | tee -a desk.log
           node tools/ci-check-counts.mjs verify platform/desk.log#2
+          # The teacher workspace: hand-in of a server-marked paper, the review
+          # queue, append-only TEACHER marks kept apart from engine marks, class
+          # isolation, removal and guardian consent (R4).
+          node server/test/classroom-check.mjs 2>&1 | tee classroom.log
+          node server/test/class-board-check.mjs 2>&1 | tee -a classroom.log
+          node tools/ci-check-counts.mjs verify platform/classroom.log
+          # The student's original work (standard #08): the strokes or photo kept
+          # with the mark by SHA-256, insert-once, answer-blind, isolated, exported,
+          # deleted with the account and expired after the edition's retention.
+          node server/test/original-work-check.mjs 2>&1 | tee original-work.log
+          node tools/ci-check-counts.mjs verify platform/original-work.log
           # The anonymous public resource catalogue (plan F6a): off by default,
           # published rows of this server's edition only, no cookie, CORS only
           # for a listed origin, rate-limited; the signed-in library stays signed in.
@@ -439,6 +450,8 @@ jobs:
           node server/test/mistake-dna-check.mjs 2>&1 | tee -a practice-http.log
           # F7 (L5): official JEE questions by recorded-working band, Premium only; India edition, refused on Prithagoras.
           node server/test/jee-band-practice-check.mjs 2>&1 | tee -a practice-http.log
+          # F12 (L1): where a gap starts, from the server's own marks; Premium; India edition, refused on Prithagoras.
+          node server/test/root-gap-check.mjs 2>&1 | tee -a practice-http.log
           node tools/ci-check-counts.mjs verify platform/practice-http.log#5
       - name: Marker isolation (worker pool, hard deadline, exactly-once under concurrency)
         run: |
@@ -803,6 +816,13 @@ jobs:
         with:
           path: ${{ runner.temp }}/apt-debs
           key: apt-debs-${{ steps.image.outputs.build }}-${{ hashFiles('client/package-lock.json') }}-${{ matrix.browsers }}
+          # A lockfile change must not mean downloading every package again from
+          # a slow mirror: fall back to the newest files kept for this runner
+          # image. apt only reuses a cached .deb whose size and hash match the
+          # package index, so an out-of-date file is fetched again, never used.
+          restore-keys: |
+            apt-debs-${{ steps.image.outputs.build }}-
+            apt-debs-ubuntu24-
       # Two commands, bounded differently, because a kill is safe for one and
       # not the other. System packages: once, never under `timeout` — GNU
       # timeout signals the whole process group, and a SIGTERM while dpkg is
@@ -828,6 +848,9 @@ jobs:
             sudo cp "$APT_DEBS"/*.deb /var/cache/apt/archives/
             echo "apt: $(ls "$APT_DEBS"/*.deb | wc -l) cached package files offered"
           fi
+          # A stalled mirror connection must fail over, not hang the step: apt
+          # gives each connection 30 s and retries a failed fetch three times.
+          printf 'Acquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nAcquire::Retries "3";\nAcquire::ForceIPv4 "true";\n' | sudo tee /etc/apt/apt.conf.d/99pri-timeouts > /dev/null
           npx playwright install-deps $BROWSERS
           mkdir -p "$APT_DEBS"
           sudo find /var/cache/apt/archives -maxdepth 1 -name '*.deb' -exec cp -f {} "$APT_DEBS"/ \;
@@ -878,6 +901,9 @@ jobs:
             # The sign-in card helper the gate and login tours sign in with:
             # a card that leaves the page is read in one look, never waited on.
             node client/test/signin-card-step-check.mjs 2>&1 | tee -a browser.log
+            # Both editions build, sign in and walk the main routes: any page error
+            # or the crash screen fails here, before a train.
+            node client/test/app-boot-smoke-check.mjs 2>&1 | tee -a browser.log
             node client/test/notes-illustrated-browser-check.mjs --no-build 2>&1 | tee -a browser.log
             node client/test/notes-wave8-browser-check.mjs --no-build 2>&1 | tee -a browser.log
             # A request cancelled by leaving the page is not "no connection":
@@ -983,6 +1009,9 @@ jobs:
             # The diagram kit (shared by Notes and questions) at phone width, in light and dark,
             # by keyboard, with reduced motion.
             node client/test/diagram-kit-browser-check.mjs 2>&1 | tee -a browser.log
+            # Every NSW notes chapter in light and dark: no KaTeX error, one section order, CMU Serif
+            # for reading, no stripe, gradient, emoji or overflow at phone width.
+            node client/test/nsw-notes-visual-check.mjs 2>&1 | tee -a browser.log
             # Plan E5: a built Prithagoras client on a Prithagoras server shows
             # no price, plan or purchase control and reaches no store.
             node client/test/tour-paywall-edition.js 2>&1 | tee -a browser.log

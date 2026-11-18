@@ -77,6 +77,11 @@ function readConfig() {
     annualPriceId: String(process.env.PRI_STRIPE_ANNUAL_PRICE_ID || '').trim() || null,
     publicOrigin: String(process.env.PRI_PUBLIC_ORIGIN || '').trim().replace(/\/+$/, ''),
     trialDays: positiveInt('PRI_DISPLAY_TRIAL_DAYS', 0) || 0,
+    // Owner option (packaging proposal): a trial that asks for no card. Stripe
+    // collects a payment method only if one is needed, and a trial that ends
+    // with none on file cancels (the subscription's own events then expire
+    // Premium) instead of becoming an unpaid invoice. Off unless set to 1.
+    trialWithoutCard: String(process.env.PRI_STRIPE_TRIAL_NO_CARD || '').trim() === '1',
     graceDays: positiveInt('PRI_WEB_GRACE_DAYS', 0) || 0
   });
 }
@@ -333,7 +338,12 @@ export function createStripeBilling(db, { fetchImpl = globalThis.fetch, now: clo
           success_url: `${cfg.publicOrigin}/?billing=success`,
           cancel_url: `${cfg.publicOrigin}/?billing=cancelled`,
           metadata: meta,
-          subscription_data: { metadata: meta, ...(trialApplied ? { trial_period_days: cfg.trialDays } : {}) }
+          ...(trialApplied && cfg.trialWithoutCard ? { payment_method_collection: 'if_required' } : {}),
+          subscription_data: {
+            metadata: meta,
+            ...(trialApplied ? { trial_period_days: cfg.trialDays } : {}),
+            ...(trialApplied && cfg.trialWithoutCard ? { trial_settings: { end_behavior: { missing_payment_method: 'cancel' } } } : {})
+          }
         }
       });
     } catch (error) {

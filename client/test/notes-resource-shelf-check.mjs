@@ -6,14 +6,16 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { STUDY_RESOURCE_LINKS, studyResourcesForGrade } from '../src/notes/data/notes-study-resources.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const view = readFileSync(join(__dirname, '../src/pages/Notes.jsx'), 'utf8');
+// The page and the parts it draws chapters with (the worked example lives in NotesParts.jsx).
+const view = readFileSync(join(__dirname, '../src/pages/Notes.jsx'), 'utf8') + readFileSync(join(__dirname, '../src/notes/NotesParts.jsx'), 'utf8');
 assert.ok(view.includes('data-testid="notes-study-resources"'), 'Study resources missing from student Notes');
 assert.ok(view.includes('target="_blank" rel="noopener noreferrer"'), 'External link must be isolated from opener');
 assert.ok(view.includes('aria-label={resource.title}'), 'External links require an accessible name');
 assert.ok(view.includes("t('notes.sectionResources')"), 'External reference shelf must have a dedicated translated heading');
 assert.ok(view.includes("t('notes.showMoreExamples')"), 'Incremental diagrams must have an accessible translated action');
 // A figure with an authored question is visible before any solution step is revealed.
-assert.ok(view.includes("import StudyDiagram from '../notes/StudyDiagram.jsx'"), 'diagram rendering module not wired');
+// The worked example, and so the import, lives in NotesParts.jsx ('./StudyDiagram.jsx'); the page itself no longer imports it.
+assert.ok(view.includes("import StudyDiagram from '../notes/StudyDiagram.jsx'") || view.includes("import StudyDiagram from './StudyDiagram.jsx'"), 'diagram rendering module not wired');
 assert.ok(view.includes('<StudyDiagram figure={ex.figure} />'), 'diagram not in the problem statement');
 assert.ok(view.includes('const [shown, setShown] = useState(0)'), 'revealed solution step before student sees figure');
 assert.ok(view.includes('const [visibleExamples, setVisibleExamples] = useState(6)'), 'visual examples must mount incrementally');

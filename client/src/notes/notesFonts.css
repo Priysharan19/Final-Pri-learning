@@ -1,0 +1,11 @@
+/* Computer Modern Unicode Serif (CMU Serif), the reading face of the notes in both
+   editions. Self-hosted from the MIT-licensed `computer-modern` package (fonts under
+   the SIL Open Font Licence, see fonts/OFL.txt). Reading text only: maths is KaTeX and
+   the interface stays in Instrument Sans. Imported only by the notes parts
+   (NotesParts.jsx, nsw/NswParts.jsx), which live in the lazily loaded notes chunk, and
+   the faces are fetched on demand the first time a chapter paints in them, never
+   installed (vite.config.js ON_DEMAND). */
+@font-face { font-family: 'CMU Serif'; font-style: normal; font-weight: 400; font-display: swap; src: url(./fonts/cmu-serif-500-roman.woff2) format('woff2'); }
+@font-face { font-family: 'CMU Serif'; font-style: italic; font-weight: 400; font-display: swap; src: url(./fonts/cmu-serif-500-italic.woff2) format('woff2'); }
+@font-face { font-family: 'CMU Serif'; font-style: normal; font-weight: 700; font-display: swap; src: url(./fonts/cmu-serif-700-roman.woff2) format('woff2'); }
+@font-face { font-family: 'CMU Serif'; font-style: italic; font-weight: 700; font-display: swap; src: url(./fonts/cmu-serif-700-italic.woff2) format('woff2'); }

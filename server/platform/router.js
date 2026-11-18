@@ -1,5 +1,6 @@
 import { createForecastRouter } from './forecast.js';
 import { createMistakeDnaRouter } from './mistakeDna.js';
+import { createRootGapRouter } from './rootGap.js';
 import { asyncRouter } from './asyncRouter.js';
 import { clientCompatibility } from './clientCompatibility.js';
 import { asStore } from './store.js';
@@ -8,6 +9,7 @@ import { createAdminRouter } from './admin.js';
 import { createAssignmentExecutionRouter } from './assignments.js';
 import { createBillingRouter } from './billing.js';
 import { createClassRouter } from './classes.js';
+import { createClassroomRouter } from './classroom.js';
 import { createContentRouter } from './content.js';
 import { createEntitlementRouter } from './entitlements.js';
 import { createIdentityRouter } from './identities.js';
@@ -16,6 +18,7 @@ import { createReportRouter } from './reports.js';
 import { createParentReportRecipientRouter, createParentReportRouter, parentReportEnabled } from './parentReport.js';
 import { createSyncRouter } from './sync.js';
 import { createHandwritingRouter } from './handwriting.js';
+import { createOriginalsRouter } from './originalWork.js';
 import { createPracticeRouter, createPracticePrepareRoute } from './practice.js';
 import { createExamRouter } from './exams.js';
 import { createResourceRouter } from './resources.js';
@@ -28,6 +31,7 @@ import { createCurriculumRouter } from './curriculum.js';
 import { createWorkingRouter } from './working.js';
 import { createQuestionPhotoRouter } from './questionPhoto.js';
 import { createTutorRouter } from './tutor.js';
+import { createReferralRouter } from './referral.js';
 import { requireGuardianConsent } from './guardianConsent.js';
 import { createTelemetryRouter } from './telemetry.js';
 import { assertPlatformConfig, syncQuota } from './config.js';
@@ -236,6 +240,8 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // and pass straight through (guardianConsent.js requireGuardianConsent).
   router.use('/sync', requireGuardianConsent(db), createSyncRouter(db));
   router.use('/entitlements', createEntitlementRouter(db));
+  // The referral-unlocked 7-day trial (referral.js): a child needs a guardian's approval first.
+  router.use('/referral', requireGuardianConsent(db), createReferralRouter(db));
   router.use('/billing', requireGuardianConsent(db), createBillingRouter(db, {
     verifiers: billingVerifiers,
     checkout: billingCheckout,
@@ -244,6 +250,10 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   }));
   router.use('/classes', requireGuardianConsent(db), createClassRouter(db));
   router.use('/assignments', requireGuardianConsent(db), createAssignmentExecutionRouter(db));
+  // The teacher workspace (classroom.js): hand-in, results, review queue and
+  // teacher marks. Same consent gate as the class routes: a child whose
+  // guardian has not consented, or has withdrawn, reaches none of it.
+  router.use('/classroom', requireGuardianConsent(db), createClassroomRouter(db));
   router.use('/content', createContentRouter(db));
   router.use('/reports', requireGuardianConsent(db), createReportRouter(db));
   // The parent weekly report. The recipient's confirm/unsubscribe routes carry
@@ -261,7 +271,11 @@ export function createPlatformRouter(db, { billingVerifiers = {}, billingCheckou
   // account later goes through the guarded /practice/issue below.
   router.post('/practice/prepare', ...createPracticePrepareRoute(db));
   router.use('/practice', requireGuardianConsent(db), createPracticeRouter(db));
+  // The student's original work behind each mark (standard #08): read-only;
+  // an original is written only with its mark, by /practice submit.
+  router.use('/originals', requireGuardianConsent(db), createOriginalsRouter(db, { edition }));
   router.use('/habits', requireGuardianConsent(db), createMistakeDnaRouter(db));
+  router.use('/root-gap', requireGuardianConsent(db), createRootGapRouter(db));
   // An examination paper is issued, collected and marked here: the same
   // eligibility as checking one answer (session, verified email, student,
   // guardian consent), for the whole life of the paper.

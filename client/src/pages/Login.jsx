@@ -507,7 +507,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
    * from there; nothing of the shell is reached with an unlinked, stale or
    * unconfirmed profile.
    */
-  const finishAccount = async ({ account, name, year, track }) => {
+  const finishAccount = async ({ account, name, year, track, pathway }) => {
     if (!account?.id) throw new Error(t('signup.genericError'));
 
     // Creating the local profile and linking the cloud account are two requests.
@@ -521,7 +521,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
       const r = await api.post('/profiles', {
         name: name || account.name || 'Pri', year: Number(year), avatar: '🚀', role: 'student',
         language: signInLanguage(), course: SIGNUP_COURSE,
-        ...(SIGNUP_COURSE === 'in' ? { indiaTrack: track || 'cbse' } : { pathway: 'advanced' })
+        ...(SIGNUP_COURSE === 'in' ? { indiaTrack: track || 'cbse' } : { pathway: pathway || 'advanced' })
       });
       pid = r.user.id;
       accountProfileRef.current = { accountId: account.id, pid };
@@ -576,7 +576,7 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
           <Logo large byline />
           {atStart && (
             <>
-              <div className="hero-kicker">{EDITION_ID === 'prithagoras' ? t('login.brandKicker') : featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
+              <div className="hero-kicker">{!offersCourse('in') ? t('login.brandKicker') : featureEnabled('extendedTracks') ? 'CBSE · NCERT · JEE MAIN · JEE ADVANCED · OLYMPIAD' : 'CBSE · NCERT · JEE MAIN · JEE ADVANCED'}</div>
               <h1 className="hero-title">{t('login.welcomeTitle')}</h1>
               <p className="hero-sub">{t('login.welcomeSub')}</p>
             </>
@@ -602,6 +602,10 @@ export default function Login({ initialStage = 'hero', initialStep = 0 } = {}) {
                 <summary>{t('login.privacyDetail')}</summary>
                 <p className="muted">{t('login.heroPrivacy')}</p>
               </details>
+              {/* The public landing's live demo: see a line checked before signing in. */}
+              <p style={{ marginTop: 6, textAlign: 'center', fontSize: 13 }}>
+                <PageLink to="/welcome" className="linklike" data-testid="hero-landing-link">{t('login.seeHowMarking')}</PageLink>
+              </p>
               {appleEntry}
               <LanguagePicker />
               {/* A store reviewer, a payment provider and a parent all look for

@@ -35,12 +35,13 @@ import { renderPdfPages } from '../ink/pdfPage.js';
 import PriPlot from './PriPlot.jsx';
 import { canRetryPhotoReading, readerRefusalAtSubmit, definitiveSubmissionRefusal, draftPersistenceWarning, earlierSubmissionNotice, pdfReceiptWarning, photoEligibleForGrading, photoReadFailure, photoSupportedFormats, photoAwaitingOnlineReader, pdfReaderNeedsOnlineDownload } from './photoSubmissionGuard.js';
 import { plotSpecFor } from '../engine/plotSpec.js';
+import { buildInkOriginal } from '../ink/originalWork.js';
 import { attestedGrade, gradingReceiptMismatch, matchingGradeResponse, numericalGradeUnavailable, showCommittedMethodAwardNote } from './authoritativeGrade.js';
 import { checkRefusalCopy, legacyDeviceReplay, needsAccountToCheck, refusalForQuestion, refusedCheckState, retryActionFor, serverRevealReceipt, unmarkableNotice } from './checkAccess.js';
 import { CheckRefusal, CheckSignIn, SignInChoices } from './CheckRefusal.jsx';
 import { awardStepMarks, marksSentenceKey } from '../engine/cbseMarking.js';
 import { checkWorkingWithCloud, CLOUD_WORKING_ENGINE, mergeVerdicts, misconceptionProposal, shouldCheckWorking, workingNote } from '../ink/cloudWorking.js';
-import { strokeSignature, createStrokeSignature } from '../ink/strokeSignature.js';
+import { createStrokeSignature } from '../ink/strokeSignature.js';
 import { annotationsLive, inkLineVerdicts, photoFingerprint, revisionKey, sameLines, workingEvidence, workingEvidenceCopy } from './attemptEvidence.js';
 import { misconceptionById } from '../engine/misconceptions.js';
 import { practiceWorkState } from '../platform/workState.js';
@@ -62,9 +63,10 @@ import '../workspace.css';
 import { tutorFeatureEnabled } from '../tutor/flag.js';
 import { asksForInequality } from '../ink/relationSwap.js';
 import { finalAnswerStatus, showDiagnoseButton, showLineCheckButton } from '../tutor/diagnoseGate.js';
-import { INSTRUMENT_UI } from '../platform/features.js';
+import { INSTRUMENT_UI, featureEnabled } from '../platform/features.js';
 import QuestionHead from '../instrument/QuestionHead.jsx';
 import { haptic } from '../platform/native/haptics.js';
+import UpgradeNote from '../paywall/UpgradeNote.jsx';
 // v1.1 instrument (display only): the s4/s5 header, chips, dial, ladder and footer.
 // The step credit itself is main's VerifiedMarkBreakdown (aggregate, no
 // line-by-line award; docs/marking/TASK02-PR601-INTEGRATION-HANDOFF.md).
@@ -78,6 +80,11 @@ const CHECK_KEY_GLYPH = '⌘/Ctrl ↵';
 // keeps TutorHelp.jsx out of a dark build entirely (install-budget-check.mjs).
 /* global __PRI_FEATURE_TUTOR__, __PRI_PRODUCTION_BUILD__ */
 const TUTOR_BUILT_OUT = typeof __PRI_PRODUCTION_BUILD__ === 'boolean' && __PRI_PRODUCTION_BUILD__ && __PRI_FEATURE_TUTOR__ !== true;
+// The tutor policy's panel (PRI_FEATURE_TUTOR_POLICY, opt-in everywhere): a
+// build made without it folds the lazy import away, so the panel is not built.
+/* global __PRI_FEATURE_TUTOR_POLICY__ */
+const POLICY_BUILT_OUT = typeof __PRI_FEATURE_TUTOR_POLICY__ === 'boolean' && __PRI_FEATURE_TUTOR_POLICY__ !== true;
+const HelpPlan = POLICY_BUILT_OUT ? null : React.lazy(() => import('./HelpPlan.jsx'));
 
 const DIFF_CLASS = { 1: 'tag-d1', 2: 'tag-d2', 3: 'tag-d3', 4: 'tag-d4' };
 // Public question metadata may constrain what a single answer glyph can be,
@@ -142,6 +149,10 @@ const StepCoachLive = TUTOR_BUILT_OUT ? null : React.lazy(() => import('../tutor
 // fetched only when a step report actually has a break. A chunk that cannot
 // load (offline, a stale deploy) shows nothing rather than breaking the card.
 const MistakeGraph = React.lazy(() => import('./MistakeGraph.jsx').catch(() => ({ default: () => null })));
+// Annotated working: each checked line's named rule, numbered against the ink,
+// and the evaluation built from the receipt. Engine-only, feedback only, and
+// its own chunk; a chunk that cannot load shows the plain step report instead.
+const AnnotatedWorkingPart = React.lazy(() => import('./AnnotatedWorking.jsx').catch(() => ({ default: () => null })));
 
 class TutorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { failed: false }; }
@@ -357,6 +368,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const { language } = useLanguage();
   // Dark by default (src/tutor/flag.js): off, the card offers only the hints.
   const tutorEnabled = useMemo(() => tutorFeatureEnabled(), []);
+  const tutorPolicyOn = useMemo(() => !!HelpPlan && featureEnabled('tutorPolicy'), []);
   const [working, setWorking] = useState('');
   const [showWorking, setShowWorking] = useState(false);
   const [showScribble, setShowScribble] = useState(false);
@@ -1401,6 +1413,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
 
   // Every submit control leads here, so the confirmation step cannot be walked
   // around: a reading in doubt turns the press into the question instead.
+  const originalBuildRef = useRef(false);
   async function submit(vouchedNow) {
     setRereadAsked(false);
     if (inFlightRef.current || busy || resolved) return;
@@ -1446,6 +1459,17 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
       given = answer;
       if (String(given).trim() === '') return;
       steps = (workingOpen || mode === 'photo') && working.trim() ? working : undefined;
+    }
+    // The student's own page goes with the answer, to be kept with the mark
+    // (standard #08): the pen samples as written, never the reading. Built
+    // from the full strokes, before they are compacted for the device's
+    // history, and before the pending record is written (nothing awaits
+    // between that write and the send). A page too large to keep stays on this device.
+    // Hashing takes a moment: a second press meanwhile is the same press.
+    if (ink && inkResult) {
+      if (originalBuildRef.current) return;
+      originalBuildRef.current = true;
+      try { ink.original = await buildInkOriginal(inkResult).catch(() => null); } finally { originalBuildRef.current = false; }
     }
     // D17: a photo the student did not allow to be read (declined, or never
     // asked) never leaves the device with the answer — "Type instead" sends
@@ -2123,6 +2147,27 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   // its verdict is shown without a marks figure rather than with a claim that
   // marks are missing.
   const shownGrade = committedGrade;
+  // The annotated panel reads only what the marked attempt already holds: the
+  // step report, the lines that were checked, the receipt and the released
+  // solution. It never marks: the receipt's marks are passed through as-is.
+  // "Marked again · attempt n": the distinct server submissions this card has
+  // seen marked, for this question only.
+  const markedSubmissions = useRef({ id: null, seen: new Set() });
+  if (markedSubmissions.current.id !== question?.id) markedSubmissions.current = { id: question?.id, seen: new Set() };
+  const markedId = (resolved ? res?.submissionId : state.res?.submissionId);
+  if (typeof markedId === 'string' && markedId && (resolved || gradedRetry)) markedSubmissions.current.seen.add(markedId);
+  const markedCount = markedSubmissions.current.seen.size;
+  const awInput = useMemo(() => {
+    if (!resolved || previousAttempt || !res || res.revealed || res.invalid || !Array.isArray(res.stepReport?.lines) || res.stepReport.lines.length < 2) return null;
+    const lines = writeMode ? (judged?.lines || inkResult?.lines || []) : String(working || '').split('\n').filter(Boolean);
+    return {
+      lines, stepReport: res.stepReport, solution: res.solution || null, source: writeMode ? 'handwriting' : 'typed',
+      receipt: shownGrade ? { awarded: shownGrade.awarded, possible: shownGrade.possible, id: typeof res.submissionId === 'string' ? res.submissionId : null } : null,
+      attempt: markedCount
+    };
+  }, [resolved, previousAttempt, res, writeMode, judged, inkResult, working, shownGrade, markedCount]);
+  const [awModel, setAwModel] = useState(null);
+  useEffect(() => { if (!awInput) setAwModel(null); }, [awInput]);
   const instrumentScore = INSTRUMENT && !!shownGrade && Number.isFinite(Number(shownGrade.awarded))
     && Number(shownGrade.possible) > 0 && Number(shownGrade.awarded) >= 0 && Number(shownGrade.awarded) <= Number(shownGrade.possible);
 
@@ -2506,6 +2551,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         {figure && <div className="q-figure" dangerouslySetInnerHTML={{ __html: figure }} />}
         {showWhy && why && <p className="q-why">{why}</p>}
 
+        {/* The tutor policy's smallest next step (engine/tutorPolicy.js), above
+            the ladder; a rung it suggests is opened by getHint, as the rung is. */}
+        {HelpPlan && tutorPolicyOn && ladderOffered && !resolved && !diagnostic && (
+          <React.Suspense fallback={null}>
+            <HelpPlan key={question.id} questionId={question.id} nextRung={nextRung} busy={busy} onOpenRung={getHint}
+              lines={writeMode && !inkStale ? (inkResult?.lines || []).map(l => String(typeof l === 'string' ? l : l?.text ?? '').trim()).filter(Boolean).slice(0, 40) : null}
+              recognition={writeMode && !inkStale && inkResult?.lines?.length ? (doubtOf(inkResult) ? 'unconfirmed' : 'confirmed') : null} />
+          </React.Suspense>
+        )}
         {INSTRUMENT && ladderOffered && (!resolved || hints.length > 0) ? (
           // v1.1 instrument: every rung of the ladder, the locked ones closed.
           // Each states the charge the server's table makes (engine/hintLadder.js);
@@ -2827,13 +2881,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             </div>
           </div>
         ) : (
-          <div className="ink-row">
+          <div className={`ink-row${awModel ? ' aw-row' : ''}`}>
             {/* data-marked starts the reading sweep (theme.css): it appears only
                 when the deterministic engine has actually marked this page. */}
             <div className={`editor-shell${inkAccountBlocked ? ' ink-account-waiting' : ''}${inkReaderState?.blocker === 'ink.waitingSignIn' && inkAccountBlocked ? ' ink-account-signin' : ''}`}
               data-marked={(resolved && !res?.revealed) || (gradedRetry && judgedLive && !state.res?.invalid) ? 'yes' : undefined}>
               {InkAnswer && restoredInk !== undefined && (
                 <InkAnswer feedback autoRead={!resolved} liveRead={coachOn && !resolved} promptAsksInequality={asksForInequality(question.prompt)} onRecognized={onInkRecognized} onReaderState={setInkReaderState} height={inkPageHeight} lineVerdicts={lineVerdicts}
+                  lineMarkers={awModel && writeMode && awModel.cards.length === (inkResult?.lines?.length || 0) ? awModel.cards.map(c => c.n) : null}
                   disabled={resolved || (busy && !replaying)} checkingEarlier={replaying && !resolved}
                   focusSymbol={checkFocus} recognitionContext={recognitionContext}
                   initialStrokes={latestInk.current || restoredInk || null} onStrokes={onInkStrokes}
@@ -2933,6 +2988,11 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 </div>
               )}
             </div>
+            {awInput && writeMode && awModel && (
+              <React.Suspense fallback={null}>
+                <AnnotatedWorkingPart part="comments" input={awInput} />
+              </React.Suspense>
+            )}
           </div>
         )}
 
@@ -3118,6 +3178,9 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                     )}
                     <button type="button" className="btn btn-quiet btn-sm" data-type-instead onClick={() => { setState({ phase: 'answering' }); flipMode('type'); }}>{t('verdict.typeInstead')}</button>
                   </div>
+                  {/* Today's marked-work allowance is used: a value moment. The
+                      placement check is onboarding, so it never offers. */}
+                  {state.res.readerBlock.kind === 'allowance' && <UpgradeNote moment="marked-work-allowance" context={{ signUp: !!diagnostic }} />}
                 </div>
               ) : previousAttempt ? (
                 /* The page has changed since this was marked. The earlier
@@ -3153,7 +3216,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
           </div>
         )}
 
-        {firstBad && (
+        {firstBad && !awModel && (
           <div className="ink-comments">
             <div className="ink-comment bad">
               <div className="ic-head">{t('verdict.lookHere')}<span className="ic-line">{t('verdict.onLine', { n: firstBad.line })}</span></div>
@@ -3185,7 +3248,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
             )}
           </div>
         )}
-        {!firstBad && cloudWorkingNote && (
+        {(!firstBad || awModel) && cloudWorkingNote && (
           <div className="ink-comments">
             <div className={`ink-comment ${cloudWorkingNote.tone === 'break' ? 'bad' : 'note'}`}>
               <div className="ic-head">{t(cloudWorkingNote.tone === 'break' ? 'verdict.whereItBreaks' : cloudWorkingNote.tone === 'maybe' ? 'verdict.possibly' : 'verdict.yourAlgebra')}</div>
@@ -3271,7 +3334,12 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 {!verdictGood && res.solution && (
                   <div className="eval-expected">{t('verdict.expected')} <b><MathText text={answerToTex(res.solution.answerText)} /></b></div>
                 )}
-                {res.stepReport && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}
+                {awInput && (
+                  <React.Suspense fallback={null}>
+                    <AnnotatedWorkingPart part={writeMode ? 'evaluation' : 'both'} input={awInput} onModel={setAwModel} />
+                  </React.Suspense>
+                )}
+                {res.stepReport && !awModel && <StepReport report={res.stepReport} instrument={INSTRUMENT} correctAnswer={!verdictGood && !res.revealed ? res.solution?.answerText : null} />}
                 {/* Only display the matched server receipt after resolution. */}
                 {serverAuthoritative && shownGrade && <VerifiedMarkBreakdown result={res} grade={shownGrade} />}
                 {boardAward && (
@@ -3566,6 +3634,7 @@ function StepReport({ report, instrument = false, correctAnswer = null }) {
         <span aria-hidden="true">{l.status === 'ok' ? '✓' : l.status === 'break' ? '✗' : '·'}</span>
         <span>{l.text}</span>
         {l.status === 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t(i === first ? 'verdict.mistakeIsHere' : 'verdict.alsoWrong')}</b>}
+        {l.secondBreak === true && l.status !== 'break' && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.alsoWrong')}</b>}
         {l.status === 'ok' && l.ecf === true && <b style={{ fontFamily: 'var(--font)', fontSize: 12.5, whiteSpace: 'nowrap' }}>{t('verdict.carriedForward')}</b>}
         {l.note && !l.diagnosis && <span style={{ fontFamily: 'var(--font)', fontWeight: 400, fontSize: 12.5 }}> — {l.note}</span>}
       </div>

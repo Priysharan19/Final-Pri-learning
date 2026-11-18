@@ -4,6 +4,8 @@ import { currentSyncCursor } from './db.js';
 import { MFA_STEP_UP_MS, rateLimit, requireMfa, requireRole, requireSession } from './security.js';
 import { INVITE_MAX_TTL_DAYS, inviteTtlDays, listTeacherInvites, mintTeacherInvite } from './teacherInvites.js';
 import { operatorHealthDetail } from './operatorHealth.js';
+import { valueFunnel } from './valueFunnel.js';
+import { serverEdition } from './edition.js';
 
 function ensureAdminTables(db) {
   // SQLite builds its schema at boot; Postgres is migrated (supabase/migrations).
@@ -54,6 +56,13 @@ export function createAdminRouter(db) {
       ...await operatorHealthDetail(db),
       checkedAt: Date.now()
     });
+  });
+
+  // The product funnel, aggregate only with small cells suppressed
+  // (valueFunnel.js; definitions in docs/product/value-metrics.md).
+  router.get('/funnel', async (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(await valueFunnel(db, { days: Number(req.query?.days) || 30, edition: serverEdition() }));
   });
 
   router.get('/users', async (req, res) => {

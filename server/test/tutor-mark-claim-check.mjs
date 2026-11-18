@@ -33,13 +33,12 @@ for (const resolved of [false, true]) {
 }
 // Hints, "why" and streamed replies refuse a mark claim too (AI red-team, 2026-11-18);
 // on a percentage question "percent" is the mathematics, not a score.
-const linear = { prompt: 'Solve 3x + 5 = 20.' };
 for (const t of ['Great work — that earns you full marks for this step!', 'You would get full marks here.', "You'd get 2 marks here.", "You've earned 2 marks.", 'You scored 3', 'you passed', 'Perfect score!', "That's 10/10!", 'That would score well.', "You'll be marked correct.", 'This would be marked right.', 'Top marks!', 'Ten out of ten!', 'Youve earned 2 marks', 'That costs you 2 marks.', 'You lost marks for this step.', 'This is worth 3 marks.', 'You passed this question.', 'आपको पूरे अंक मिलेंगे।']) {
-  ok(replyMarkClaimIssues(t, linear).length === 1, `a hint claiming a mark is refused: ${t}`);
+  ok(replyMarkClaimIssues(t).length === 1, `a hint claiming a mark is refused: ${t}`);
 }
 // …and the everyday maths words stay hints (#1001 review).
 for (const t of ['Multiply 4 by 3 and you get 12; now compare.', 'You get 2 equations; solve them together.', 'When you expand (x+1)^2 you get 3 terms.', "You've got 3 terms on the left.", "That's 3/4 of the whole bar.", 'This is 3/4, so shade three parts.', 'That is 2 out of 6 outcomes.', 'Look at a score of 12 out of 20 in the table.', 'It looks like you failed to change the sign.', 'You failed to carry the 1.', 'You passed 3 on the number line; go back.', 'The line has passed through (0, 2) already.', "It's a line through 2 points.", 'Plot 3 points and join them.', 'The marked angle is 40°.', 'The graph passed through (0, 2).', 'Find the score of the third batsman.', 'Look at the graded scale.', 'There is a 25% chance of rain.', 'Think about what percent means here: per hundred.']) {
-  ok(replyMarkClaimIssues(t, linear).length === 0, `an ordinary hint passes: ${t}`);
+  ok(replyMarkClaimIssues(t).length === 0, `an ordinary hint passes: ${t}`);
 }
 // A range that brackets the answer, in any wording, is a leak.
 const g = buildGuard({ prompt: 'Solve 3x + 5 = 20.', steps: [{ h: 'Subtract 5', d: '$3x = 15$' }, { h: 'Divide by 3', d: '$x = 5$' }], answer: 'x = 5', hints: [] });

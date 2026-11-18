@@ -13,7 +13,7 @@
 import { readFileSync } from 'node:fs';
 import {
   FAMILIES, INSTALL_ATTEMPTS, INSTALL_TIMEOUT_MS, bootFamily, describeRuntimes, installApp, keepOnlySimulator, otherBooted, parseDevices, pickSimulator,
-  requiredRuntime, runtimeMatches,
+  requiredRuntime, runtimeMatches, selectedSimulatorRuntimeEvidence,
 } from '../../scripts/simulator-fleet.mjs';
 import { EXPECTED_CASES, MAX_DEVIATION_PX, judge } from '../../scripts/ink-native-check.mjs';
 import { judgeContentEnd } from '../../scripts/native-bridge-selfcheck.mjs';
@@ -72,6 +72,15 @@ ok(parseDevices('').length === 0 && parseDevices(null).length === 0, 'empty outp
   ok(pickSimulator(multi, { family: 'iPhone' })?.name === 'iPhone 17', 'the family filter applies');
   ok(pickSimulator(multi, { named: 'iPad Air' }) === null && pickSimulator('') === null, 'no match is null, not a guess');
   ok(pickSimulator(LISTING)?.udid === IPAD, 'the fixture listing picks its booted iPad');
+ok(selectedSimulatorRuntimeEvidence(pickSimulator(LISTING, { runtime: '27.0' }), '27.0') === 'iOS-27-0',
+  'iOS 27 evidence records the actual pinned runtime already observed in the device selection');
+ok(throwsWith(() => selectedSimulatorRuntimeEvidence(pickSimulator(LISTING, { runtime: '27.0' }), '26.5'), /differs from the pin/),
+  'evidence cannot relabel a real iOS27 simulator as iOS26');
+ok(throwsWith(() => selectedSimulatorRuntimeEvidence({ udid: IPAD, runtime: '' }, '27.0'), /unavailable/),
+  'missing observed runtime fails closed rather than claiming the environment pin');
+ok(throwsWith(() => selectedSimulatorRuntimeEvidence({ udid: null, runtime: 'iOS 27.0' }, '27.0'), /unavailable/),
+  'evidence cannot accept an unselected simulator without an actual UDID');
+
 }
 
 // ── the runtime is NAMED: a pin, never "the newest installed" ────────────────
@@ -252,6 +261,24 @@ for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfc
     'both bridge self-checks reuse the built app');
   ok((wf.match(/xcodebuild -scheme PriLearning/g) || []).length === 1, 'the workflow contains exactly one xcodebuild of the package');
   ok(/'scripts\/simulator-fleet\.mjs'/.test(wf), 'the shared simulator rule is in the lane\'s path filter');
+}
+
+{
+  // All three native harnesses must run on the lane's pinned iOS runtime.
+  // The bridge used to pick the newest installed instead of the pinned iOS 27,
+  // which could cold-boot another phone and invalidate the journey evidence.
+  for (const script of ['scripts/iphone-journey.mjs', 'scripts/native-bridge-selfcheck.mjs', 'scripts/ink-native-check.mjs']) {
+    const content = src(script);
+    ok(/pickSimulator\(listing, \{[^}]*\bruntime\b/.test(content) && /requiredRuntime\(\)/.test(content),
+      `${script}: picks a simulator through the shared pinned-runtime selector`);
+  }
+  const wf = src('.github/workflows/native-journey-ios27.yml');
+  const sequence = [...wf.matchAll(/--family (ipad|iphone)/g)].map(x => x[1]);
+  const firstPhone = sequence.indexOf('iphone');
+  ok(firstPhone > 0 && sequence.slice(firstPhone).every(f => f === 'iphone'),
+    `iOS 27: both iPad bridge and journey finish before the first iPhone boot (${sequence.join(' → ')})`);
+  ok((wf.match(/timeout-minutes: 35/g) || []).length >= 1 && (wf.match(/timeout-minutes: 25/g) || []).length >= 1,
+    'iOS 27: the full journeys retain bounded step limits and never weaken their assertions');
 }
 
 // ── The page's WebContent process ends (native-bridge-selfcheck.mjs) ──

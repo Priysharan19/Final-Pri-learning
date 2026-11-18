@@ -26,7 +26,7 @@ import { createSmsProviderFromEnv } from './smsProvider.js';
 import { createOtpEmailSenderFromEnv, otpEmailMessage } from './otpEmail.js';
 import { testMailboxAccepts } from './testMailboxPolicy.js';
 import { depositTestMail } from './testMailbox.js';
-import { CONSENT_NOTICE_VERSION, GUARDIAN_AWAITING_METHOD, acceptsCurrentNotice, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
+import { consentNoticeVersion, GUARDIAN_AWAITING_METHOD, acceptsCurrentNotice, ageDecision, confirmConsent, consentState, withdrawConsent } from './guardianConsent.js';
 import { WITHDRAW_CREDENTIAL_MS, deleteAccountRows, invalidatePendingTokens, queueAccountToken } from './accounts.js';
 import { maybeBootstrapAdmin } from './bootstrapAdmin.js';
 import { clipText } from './text.js';
@@ -66,7 +66,7 @@ function profileFrom(body) {
   // The one shared age rule (guardianConsent.js ageDecision, as /register and
   // provider sign-up): an explicit declaration is required, fail closed. The
   // parent is asked on the next screen, so guardianLater.
-  const decision = ageDecision({ isAdult: profile.isAdult, year }, { guardianLater: true });
+  const decision = ageDecision({ isAdult: profile.isAdult, year, age: profile.age }, { guardianLater: true });
   if (!decision.ok) return { error: decision.code, message: decision.message };
   return { name, basis: decision.basis };
 }
@@ -265,7 +265,7 @@ export function createOtpRouter(db, {
           if (child) {
             await db.run(`INSERT INTO guardian_consents
                 (account_id, guardian_name, guardian_email, notice_version, requested_at, confirmed_at, withdrawn_at, method)
-              VALUES (?, '', '', ?, ?, NULL, NULL, ?)`, [accountId, CONSENT_NOTICE_VERSION, now, GUARDIAN_AWAITING_METHOD]);
+              VALUES (?, '', '', ?, ?, NULL, NULL, ?)`, [accountId, consentNoticeVersion(), now, GUARDIAN_AWAITING_METHOD]);
           }
         });
       } catch (err) {
@@ -470,7 +470,7 @@ export function createOtpRouter(db, {
               method=excluded.method
             WHERE guardian_consents.withdrawn_at IS NULL`,
           [accountId, name, channel === 'email' ? destination : '', channel === 'sms' ? destination : null,
-            CONSENT_NOTICE_VERSION, now, method]);
+            consentNoticeVersion(), now, method]);
           await db.run('INSERT INTO audit_log(actor_account_id,action,target_kind,target_id,metadata_json,created_at) VALUES (?,?,?,?,?,?)', [
             accountId, 'account.age-declaration.update', 'account', accountId,
             JSON.stringify({ previousAgeBasis: state.ageBasis ?? null, ageBasis: 'child', previousGuardianState: state.state, guardianHistoryPreserved: !!state.row }),
@@ -480,14 +480,14 @@ export function createOtpRouter(db, {
           await db.run(`UPDATE guardian_consents SET guardian_name = ?, guardian_email = ?, guardian_phone = ?,
               notice_version = ?, requested_at = ?, confirmed_at = NULL, method = ?
             WHERE account_id = ? AND withdrawn_at IS NULL`, [name, channel === 'email' ? destination : '', channel === 'sms' ? destination : null,
-            CONSENT_NOTICE_VERSION, now, method, accountId]);
+            consentNoticeVersion(), now, method, accountId]);
         }
         // Email parents also get the existing link, so they can approve (and
         // later withdraw) from their own inbox rather than the child's device.
         if (channel === 'email') await queueAccountToken(db, accountId, destination, 'guardian-consent', now);
       });
       const sent = await deliver({ channel, destination, purpose: 'guardian-consent', accountId, now });
-      res.status(202).json({ ok: true, channel, noticeVersion: CONSENT_NOTICE_VERSION, ...sent });
+      res.status(202).json({ ok: true, channel, noticeVersion: consentNoticeVersion(), ...sent });
     } catch (error) {
       if (error?.status) return bad(res, error.code, error.message, error.status);
       next(error);

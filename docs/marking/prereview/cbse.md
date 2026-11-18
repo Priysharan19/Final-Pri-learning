@@ -1,0 +1,74 @@
+# AI pre-review — CBSE (Priyabhata)
+
+> **AI pre-review — synthetic, not an examiner's verdict, never used as certification.**
+
+This file is written by an AI model. It is **not** an examiner's review, it signs, approves and certifies nothing, it sets no certification record, and method marks stay OFF. Only a real, independent, qualified examiner can sign (see `docs/marking/certifications/`). It is kept apart from the examiner review page on purpose: the page never reads it and never pre-fills a verdict from it.
+
+Legend: **AI-A** nothing found wrong · **AI-C** a change is suggested (wording, mark weight, missing alternative form) · **AI-R** an apparent defect that should not be served until fixed. Each reason was reached by working the item independently of the key; a row with a defect names the fix. Defects judged genuine are fixed through the normal R4 path in the same change as this file, and their rows describe the state of the packet **before** that fix.
+
+Items: 56 of 56 · AI-A 18 · AI-C 38 · AI-R 0
+
+> **Not pre-reviewed (4 items).** These cells joined the packet on train 25, after this file was written. The rows at the end of the table carry AI-C only because the table needs a verdict; none was formed. No pre-review has looked at them, and nothing here says they are right or wrong. A human examiner reviews them like every other item.
+
+| Item | AI verdict | Reason | Defect to fix |
+|---|---|---|---|
+| cbse-policy:ap-ecf | AI-C | No worked case; "AP/ECF" is not defined in the packet, so I cannot confirm it matches Board practice (one arithmetic/accuracy penalty, then ECF). | State the rule explicitly: one deduction per slip, ECF only while the method stays valid. |
+| cbse-call:A-wrong-givens-substitution | AI-C | Misreading one given is commonly allowed ECF, but "wholly wrong givens" paying the substitution mark risks paying for a different problem. | Pay it only for a single misread or mis-copied datum, not for wholly invented givens. |
+| cbse-call:B-formula-then-guess | AI-C | Board gives the formula mark for a correct formula, but a guessed answer with no substitution should not earn a separate "method" mark. | Limit it to the formula mark only; no substitution or method mark without substitution. |
+| cbse-call:class-xi-least-value-d3 | AI-C | Final-answer-only on a 3-mark least-value item is harsh, since school marking schemes give step marks; defensible only as a tool limitation. | Record it as a tool limitation, not Board practice, or add step marks. |
+| cbse-bank:c10-ap-inverse-competency/D1 | AI-C | Key 11 is correct (5n²+53n-1188=0, n=11). The same question is served at 1, 2, 3 and 4 marks, so 1 mark for a quadratic word problem is unrealistic. | Tie marks to difficulty, or serve one weight only. |
+| cbse-bank:c10-ap-inverse-competency/D2 | AI-C | Key right. A wrong final answer with correct working scores 0 with method marks, but Board gives step marks (equation formed, quadratic solved). | Add a step ladder, or label as final-answer-only. Identical stem at several weights. |
+| cbse-bank:c10-ap-inverse-competency/D3 | AI-C | Same: 3 marks but 0 credit for right method, and the partial is only a placeholder. | As D2. |
+| cbse-bank:c10-ap-inverse-competency/D4 | AI-C | Same: 4 marks but all-or-nothing. | As D2. |
+| cbse-bank:c10-areas-circles/D1 | AI-C | 135/360 x 22/7 x 441 = 2079/4 = 519.75 cm^2, so the key is right and 2080/4 (=520) is rightly refused. The Board answer is the decimal 519.75 cm^2. The key is an improper fraction with no rounding or unit rule stated. | Confirm 519.75 is accepted as equal to 2079/4. State the unit. The alternative row should test the decimal form. |
+| cbse-bank:c10-areas-circles/D2 | AI-A | Arc 44 + 42 = 86 is correct; the 1/2 for correct working with a slipped final answer and the 1/2 for an ECF slip are consistent with Board M/A splits. | — |
+| cbse-bank:c10-areas-circles/D3 | AI-A | Sector 693/2 minus triangle 441/2 = 126 is correct; 2/3 for a sector-value slip carried forward matches Board practice. | — |
+| cbse-bank:c10-areas-circles/D4 | AI-C | 1764 - 1386 = 378 is correct, but the Board awards a mark for recognising that four quarter-circles make one full circle, and the plan has no such step. | Add that recognition to the plan/ladder. |
+| cbse-bank:c10-arithmetic-progressions/D1 | AI-A | a+16d = 42 is correct; 1 mark, final-answer-only is fine. | — |
+| cbse-bank:c10-arithmetic-progressions/D2 | AI-A | S14 = 7(20+26) = 322 is correct; 1/2 for a slipped l fed into the (a+l) form is valid ECF. | — |
+| cbse-bank:c10-arithmetic-progressions/D3 | AI-C | n = 16 is correct, but 3 marks is too many for one linear equation, and a wrong answer gets 0 even with method marks. | Lower to 2 marks, or add formula/substitution marks. |
+| cbse-bank:c10-arithmetic-progressions/D4 | AI-A | S15 = 15/2·(448+434) = 6615 is correct; the step ladder and the 13245/2 ECF partial are valid. | — |
+| cbse-bank:c10-linear-ticket-competency/D1 | AI-C | s = 30 is correct (7560-63s = 5670), but 1 mark for a two-equation word problem is unrealistic and the same stem recurs at 4 weights. | Tie marks to difficulty. |
+| cbse-bank:c10-linear-ticket-competency/D2 | AI-C | Same stem; 0 credit for correct method. | Add step marks or label final-answer-only. |
+| cbse-bank:c10-linear-ticket-competency/D3 | AI-C | Same. | As D2. |
+| cbse-bank:c10-linear-ticket-competency/D4 | AI-C | 4 marks is realistic, but no step credit (equations, elimination) is possible. | Add a step ladder. |
+| cbse-bank:c10-polynomial-zeroes/D2 | AI-A | Zeroes are 2 and 3; the key "3, 2" is correct and "4, 2" is wrong. The Board splits the marks as factorise 1 + zeroes 1, but method marks are off so the item certifies the final answer only. | — (an order-swapped "2, 3" and "x=2, x=3" should be tried as the alternative, which the tool did not generate) |
+| cbse-bank:c10-quadratic-triangle-competency/D1 | AI-C | h = 18 is correct (h²+7h-450 = 0, base 25), but 1 mark is unrealistic and the stem repeats at 4 weights. | Tie marks to difficulty. |
+| cbse-bank:c10-quadratic-triangle-competency/D2 | AI-C | Same stem; no step credit. | Add step marks. |
+| cbse-bank:c10-quadratic-triangle-competency/D3 | AI-C | Same. | Add step marks. |
+| cbse-bank:c10-quadratic-triangle-competency/D4 | AI-C | Same; the negative root rejection mark is not modelled. | Add a ladder: form, factorise, reject negative. |
+| cbse-bank:c10-sector-reasoning/D1 | AI-C | Angle 6 x 11 = 66 degrees. Area 66/360 x 22/7 x 784 = 6776/15 = 451.73 cm^2, so the key is right. Partial (theta = 67) gives 20636/45, which is correct ECF. The Board answer is 451.73; the exact fraction is unnatural and the rounding is unspecified. | Accept 451.73 and 451.7 explicitly, or state the rounding in the stem. The partial is shown 0/1, which is correct for a 1-mark item. |
+| cbse-bank:c10-sector-reasoning/D2 | AI-C | Same stem and key as D1, correct. Method ladder 1/2 for a correct formula and substitution with a wrong final value is consistent with Board practice. Same rounding gap. Identical stem to D1, D3 and D4. | Same decimal/rounding fix. The stem is reused unchanged at 1, 2, 3 and 3 marks, so the mark weight is not tied to the demand. |
+| cbse-bank:c10-sector-reasoning/D3 | AI-C | Key correct. 2/3 for method with a wrong final value is plausible (angle, formula, substitution). Same rounding gap. | Same as D2. |
+| cbse-bank:c10-sector-reasoning/D4 | AI-C | Exact duplicate of D3 (same stem, same 3 marks, same pages). It adds no coverage. | Remove it or give it a distinct stem. Same rounding gap. |
+| cbse-bank:c10-surface-volume-combo/D1 | AI-C | 44352 is correct (24948+19404), but 1 mark for a 5-step chain is unrealistic. | Raise to 3 marks, as in the Board. |
+| cbse-bank:c10-surface-volume-combo/D2 | AI-C | Same stem; the Board awards 3 marks (cylinder, hemisphere, total). | Re-weight and add a ladder. |
+| cbse-bank:c11-linear-inequalities/D1 | AI-A | 7x + 3 > 38 gives x > 5, which is option 2, so the key is right. Option 0 (x > 6) is wrong and refused. | — |
+| cbse-bank:c11-linear-inequalities/D2 | AI-C | -6x > 6 gives x < -1, which is option 2, so the key is right. The common-wrong option 0 is "x > 6", which no recognised error produces. The diagnostic slip, not reversing the sign (x > -1), should be an option. | Check the distractors include x > -1, the sign-not-reversed error. Option 0 is identical to D1's option 0, which suggests a templated distractor. |
+| cbse-bank:c11-linear-inequalities/D3 | AI-C | 5 is correct (-2 ≤ x ≤ 2), but 3 marks with zero credit for the right range. | Add step marks (isolate, bounds, count). |
+| cbse-bank:c11-linear-inequalities/D4 | AI-C | 2 is correct (-9/5 < x < 1 gives -1, 0), but there is no step credit for the modulus split, and the strict bound at 1 is a trap worth a distractor check. | Add step marks; add the wrong answer 3 (including 1) as a named distractor. |
+| cbse-bank:c12-applications-integrals/D1 | AI-A | Area = 7·36/2 = 126 is correct; 1 mark, final-answer-only is fine. | — |
+| cbse-bank:c12-applications-integrals/D2 | AI-A | Area = (64 - 8)/3 = 56/3 square units, so the key is right. 57/3 (=19) is wrong and refused. The exact fraction is the Board form. | — (units are not stated, minor) |
+| cbse-bank:c12-applications-integrals/D3 | AI-C | 36 is correct (limits 0 and 6), but 3 marks with no credit for the limits or integrand. | Add step marks. |
+| cbse-bank:c12-applications-integrals/D4 | AI-C | 36 is correct, but the same answer as D3, so a weak distinct item. | Change the item; add step marks. |
+| cbse-bank:ms11-formulas/D2 | AI-C | n = 5 is correct (245/49), but a dollar amount in a CBSE packet is off-curriculum and there is no substitution mark. | Use ₹; add a substitution mark. |
+| cbse-bank:y10-quadratics/D1 | AI-A | Roots 3 and 2, so the key is right and "4, 2" is wrong. | — |
+| cbse-bank:y10-quadratics/D3 | AI-A | Roots 2 and 3, so the key is right and "4, 2" is wrong. "By factorising" cannot be enforced with method marks off, which is acceptable because the item certifies the final answer. | — |
+| cbse-bank:y10-quadratics/D4 | AI-C | x = (-1 +/- sqrt3)/2 = 0.366 and -1.366, which is 0.37 and -1.37 to 2 d.p. The key (37/100, -137/100) is right and 137/100, -137/100 is rightly refused. "If needed" leaves exact surd answers ambiguous. The Board accepts them, but no row tests them. The key is printed as fractions although the student types decimals. | Test that "0.37, -1.37", the surd form and unrounded decimals are accepted, or state "exact or 2 d.p.". Add an alternative row. |
+| cbse-bank:y11-diff/D1 | AI-A | dy/dx = 28x^6, so the key is right. The bracketed form is accepted and "+1" is refused. | — |
+| cbse-bank:y11-diff/D2 | AI-C | f'(x) = 9x^2 + 2x - 1, so the key is right. The key prints as "9x^2 + 2x + -1", which is not how a student writes it, and the alternative repeats the "+ -1" form. | Print the key as "9x^2 + 2x - 1" and confirm that form is accepted by the engine. |
+| cbse-bank:y11-diff/D3 | AI-C | -4 is correct (6x+2 at -1), but 2 marks with no credit for the correct derivative. | Add a derivative mark. |
+| cbse-bank:y11-diff/D4 | AI-A | 2x + 3 = -1 gives x = -2 and y = 4 - 6 + 2 = 0, so (-2, 0) is right. (-1, 0) is a genuine slip (a root of the curve, not where the gradient is -1) and is refused. | — (point written as "x = -2, y = 0" is untested) |
+| cbse-bank:y11-explog/D3 | AI-C | x = 2 is correct, but 3 marks for 6^(x+1) = 6³ is overweighted and has no step credit. | Reduce to 2 marks; add a step mark. |
+| cbse-bank:y7-angles/D4 | AI-C | x = 33 is correct (3x+15 = x+81), but 3 marks with no equation-forming credit. | Add a step mark. |
+| cbse-bank:y7-equations/D1 | AI-A | x = 6 is correct; 1 mark, final-answer-only is fine. | — |
+| cbse-bank:y7-equations/D2 | AI-A | x = 6 is correct; acceptable. | — |
+| cbse-bank:y7-equations/D3 | AI-A | x = 5 is correct; acceptable. | — |
+| cbse-bank:y7-equations/D4 | AI-C | n = 23 is correct, but the task asks to write an equation, and the equation is not assessed (3/3 for the number alone). | Mark the equation, or drop the instruction. |
+| cbse-bank:y8-equations/D1 | AI-A | x = 6 is correct; acceptable. | — |
+| cbse-bank:y8-equations/D2 | AI-A | x = 5 is correct; acceptable. | — |
+| cbse-bank:y8-equations/D3 | AI-C | x = 5 is correct, but 3 marks with no step credit. | Add step marks. |
+| cbse-bank:y10-quadratics/D2 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:y7-angles/D1 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:y7-angles/D2 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |
+| cbse-bank:y7-angles/D3 | AI-C | Not pre-reviewed: this cell joined the packet on train 25, after this file was written. No verdict was formed. | Run the pre-review over this cell before the packet is issued. |

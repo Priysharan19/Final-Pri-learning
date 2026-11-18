@@ -198,8 +198,14 @@ try {
     e.entityId === e.payload.questionId &&
     typeof e.payload.subtopic === 'string' && Number.isFinite(e.payload.difficulty) &&
     ['practice','review','task','rush','match'].includes(e.payload.mode) &&
-    e.payload.support === 'supported' && e.payload.hintsUsed === 1), true,
-    'every pulled grade has reserved server identity and conservative replay metadata');
+    // Support version 2 (server/platform/attemptSupport.js): the server's own
+    // records decide `support`, and the event says which records did.
+    e.payload.supportVersion === 2 && ['independent', 'after-feedback', 'supported', 'revealed'].includes(e.payload.support) &&
+    Array.isArray(e.payload.supportSources) &&
+    e.payload.support === (e.payload.revealed ? 'revealed' : e.payload.supportSources.some(s => s !== 'retry') ? 'supported' : e.payload.supportSources.includes('retry') ? 'after-feedback' : 'independent') &&
+    e.payload.hintsUsed === (e.payload.revealed ? Math.max(1, e.payload.hintHelpUnits) : e.payload.hintHelpUnits)), true,
+    'every pulled grade has reserved server identity and support derived from the server\'s own records');
+  assertOk(canonical.some(e => e.payload.support === 'after-feedback' && e.payload.supportSources.includes('retry')), 'a question resolved on its second try is after-feedback, never independent');
   const forged = await h.request('/v1/sync/push', { method: 'POST', jar: a.jar,
     headers: { 'Idempotency-Key': 'no-client-grade-claim-01' },
     body: { schemaVersion: 1, deviceId: 'ipad-grade-a',

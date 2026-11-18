@@ -2,166 +2,166 @@
 
 > **Not yet reviewed by a human examiner.** This packet is a review request generated from the code. Nothing in it is academically approved, and no examiner has seen or signed it.
 
-Dossier digest: `c0252fcf06832b4a9450b1e45460a489eca5f3a182ee1327b3e4f1d2c43893ba` (`docs/marking/order14-examiner-certification-dossier.md`).
+Dossier digest: `bb23f44c67c05d313f328d4d50c8526ab161990873918aa949495d6cc4adcf03` (`docs/marking/order14-examiner-certification-dossier.md`).
 
 For each item, one issued question (seed shown) and the pages a student might hand in, with the engine's verdict as the server computes it (`server/platform/markerOps.js`). *Final-answer-only* is what production pays today. *With method marks* is what the engine would pay if method marks were switched on — which they are not. Record every disagreement on the decision form.
 
-## `cbse-bank:c10-ap-inverse-competency/D1` — seed 1009
+## `cbse-bank:c10-ap-inverse-competency/D1` — seed 96037
 
-> A community amphitheatre has $29$ seats in its first row. Each following row has $5$ more seats than the previous row. All rows together have $594$ seats. How many rows are there?
+> A lecture hall has $27$ seats in its first row. Each following row has $6$ more seats than the previous row. All rows together have $315$ seats. How many rows are there?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `11` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `11.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `12` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `12` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `7` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 12
+Final answer: 8
 ```
 </details>
 
-## `cbse-bank:c10-ap-inverse-competency/D2` — seed 1009
+## `cbse-bank:c10-ap-inverse-competency/D2` — seed 96037
 
-> A community amphitheatre has $29$ seats in its first row. Each following row has $5$ more seats than the previous row. All rows together have $594$ seats. How many rows are there?
+> A lecture hall has $27$ seats in its first row. Each following row has $6$ more seats than the previous row. All rows together have $315$ seats. How many rows are there?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `11` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `11.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `12` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `12` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 12
+Final answer: 8
 ```
 </details>
 
-## `cbse-bank:c10-ap-inverse-competency/D3` — seed 1009
+## `cbse-bank:c10-ap-inverse-competency/D3` — seed 96037
 
-> A community amphitheatre has $29$ seats in its first row. Each following row has $5$ more seats than the previous row. All rows together have $594$ seats. How many rows are there?
+> A lecture hall has $27$ seats in its first row. Each following row has $6$ more seats than the previous row. All rows together have $315$ seats. How many rows are there?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `11` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `11.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `12` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `12` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `7` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 12
+Final answer: 8
 ```
 </details>
 
-## `cbse-bank:c10-ap-inverse-competency/D4` — seed 1009
+## `cbse-bank:c10-ap-inverse-competency/D4` — seed 96037
 
-> A community amphitheatre has $29$ seats in its first row. Each following row has $5$ more seats than the previous row. All rows together have $594$ seats. How many rows are there?
+> A lecture hall has $27$ seats in its first row. Each following row has $6$ more seats than the previous row. All rows together have $315$ seats. How many rows are there?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `11` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
-| alternative | `11.0` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
-| common wrong | `12` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `12` | no | 0/4 | 0/4 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `7` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/4 | 0/4 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 12
+Final answer: 8
 ```
 </details>
 
-## `cbse-bank:c10-areas-circles/D1` — seed 1009
+## `cbse-bank:c10-areas-circles/D1` — seed 96037
 
-> Find the area of a sector of angle $135^\\circ$ in a circle of radius $21$ cm. Take $\\pi = \\dfrac{22}{7}$.
+> Find the area of a sector of angle $180^\\circ$ in a circle of radius $21$ cm. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2079/4` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `2079/4` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `2083/4` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
+| correct | `693` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `693` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `694` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 21, θ = 135
+r = 21, θ = 180
 A = θ/360 × π × r^2
-A = (135)/360 × (22/7) × (21)^2
-= 2079/4
-Final answer: 2079/4
+A = (180)/360 × (22/7) × (21)^2
+= 693
+Final answer: 693
 ```
 common wrong:
 ```text
-r = 21, θ = 135
+r = 21, θ = 180
 A = θ/360 × π × r^2
-A = (135)/360 × (22/7) × (21)^2
-= 2079/4
-Final answer: 2083/4
+A = (180)/360 × (22/7) × (21)^2
+= 693
+Final answer: 694
 ```
 </details>
 
-## `cbse-bank:c10-areas-circles/D2` — seed 1009
+## `cbse-bank:c10-areas-circles/D2` — seed 96037
 
-> Find the perimeter of a sector of angle $120^\\circ$ in a circle of radius $21$ cm. Take $\\pi = \\dfrac{22}{7}$.
+> Find the perimeter of a sector of angle $180^\\circ$ in a circle of radius $21$ cm. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `86` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `86` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `87` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `87` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `108` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `108` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `109` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `109` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 21, θ = 120
+r = 21, θ = 180
 l = θ/360 × 2 × π × r
-l = (120)/360 × 2 × (22/7) × (21)
-= 44
-P = (44)+2 × (21)
-= 86
-Final answer: 86
+l = (180)/360 × 2 × (22/7) × (21)
+= 66
+P = (66)+2 × (21)
+= 108
+Final answer: 108
 ```
 common wrong:
 ```text
-r = 21, θ = 120
+r = 21, θ = 180
 l = θ/360 × 2 × π × r
-l = (120)/360 × 2 × (22/7) × (21)
-= 44
-P = (44)+2 × (21)
-= 86
-Final answer: 87
+l = (180)/360 × 2 × (22/7) × (21)
+= 66
+P = (66)+2 × (21)
+= 108
+Final answer: 109
 ```
 partial:
 ```text
-r = 21, θ = 120
+r = 21, θ = 180
 l = θ/360 × 2 × π × r
-l = (120)/360 × 2 × (22/7) × (21)
-= 45
-P = (45)+2 × (21)
-= 87
-Final answer: 87
+l = (180)/360 × 2 × (22/7) × (21)
+= 67
+P = (67)+2 × (21)
+= 109
+Final answer: 109
 ```
 </details>
 
-## `cbse-bank:c10-areas-circles/D3` — seed 1009
+## `cbse-bank:c10-areas-circles/D3` — seed 96037
 
 > A chord of a circle of radius $21$ cm subtends a right angle at the centre. Find the area of the minor segment cut off. Take $\\pi = \\dfrac{22}{7}$.
 
@@ -215,7 +215,7 @@ Final answer: 127
 ```
 </details>
 
-## `cbse-bank:c10-areas-circles/D4` — seed 1009
+## `cbse-bank:c10-areas-circles/D4` — seed 96037
 
 > From a square of side $42$ cm, four quarter-circles of radius $21$ cm are removed, one at each corner. Find the area remaining. Take $\\pi = \\dfrac{22}{7}$.
 
@@ -269,149 +269,149 @@ Final answer: 379
 ```
 </details>
 
-## `cbse-bank:c10-arithmetic-progressions/D1` — seed 1009
+## `cbse-bank:c10-arithmetic-progressions/D1` — seed 96037
 
-> An arithmetic progression has first term $10$ and common difference $2$. Find its $17$th term.
+> An arithmetic progression has first term $6$ and common difference $6$. Find its $9$th term.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `42` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `42` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `43` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
+| correct | `54` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `54` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `55` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-a = 10, d = 2, n = 17
+a = 6, d = 6, n = 9
 T_n = a + (n-1) × d
-T_n = (10) + ((17)-1) × (2)
-= 42
-Final answer: 42
+T_n = (6) + ((9)-1) × (6)
+= 54
+Final answer: 54
 ```
 common wrong:
 ```text
-a = 10, d = 2, n = 17
+a = 6, d = 6, n = 9
 T_n = a + (n-1) × d
-T_n = (10) + ((17)-1) × (2)
-= 42
-Final answer: 43
+T_n = (6) + ((9)-1) × (6)
+= 54
+Final answer: 55
 ```
 </details>
 
-## `cbse-bank:c10-arithmetic-progressions/D2` — seed 1009
+## `cbse-bank:c10-arithmetic-progressions/D2` — seed 96037
 
-> An arithmetic progression has first term $10$ and common difference $2$. Find the sum of its first $14$ terms.
+> An arithmetic progression has first term $6$ and common difference $6$. Find the sum of its first $7$ terms.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `322` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `322` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `323` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `329` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `168` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `168` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `169` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `343/2` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-a = 10, d = 2, n = 14
+a = 6, d = 6, n = 7
 T_n = a + (n-1) × d
-T_n = (10) + ((14)-1) × (2)
-= 36
+T_n = (6) + ((7)-1) × (6)
+= 42
 S_n = n/2 × (2 × a+(n-1) × d)
-S_n = (14)/2 × (2 × (10)+((14)-1) × (2))
-= 322
-Final answer: 322
+S_n = (7)/2 × (2 × (6)+((7)-1) × (6))
+= 168
+Final answer: 168
 ```
 common wrong:
 ```text
-a = 10, d = 2, n = 14
+a = 6, d = 6, n = 7
 T_n = a + (n-1) × d
-T_n = (10) + ((14)-1) × (2)
-= 36
+T_n = (6) + ((7)-1) × (6)
+= 42
 S_n = n/2 × (2 × a+(n-1) × d)
-S_n = (14)/2 × (2 × (10)+((14)-1) × (2))
-= 322
-Final answer: 323
+S_n = (7)/2 × (2 × (6)+((7)-1) × (6))
+= 168
+Final answer: 169
 ```
 partial:
 ```text
-a = 10, d = 2, n = 14
+a = 6, d = 6, n = 7
 T_n = a + (n-1) × d
-T_n = (10) + ((14)-1) × (2)
-= 37
+T_n = (6) + ((7)-1) × (6)
+= 43
 S_n = n/2 × (2 × a+(n-1) × d)
-S_n = (14)/2 × ((10)+(37))
-= 329
-Final answer: 329
+S_n = (7)/2 × ((6)+(43))
+= 343/2
+Final answer: 343/2
 ```
 </details>
 
-## `cbse-bank:c10-arithmetic-progressions/D3` — seed 1009
+## `cbse-bank:c10-arithmetic-progressions/D3` — seed 96037
 
-> In the arithmetic progression with first term $10$ and common difference $2$, which term is equal to $40$? Give the term number.
+> In the arithmetic progression with first term $6$ and common difference $6$, which term is equal to $48$? Give the term number.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `16` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `16.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `17` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `17` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `8` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `8.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `9` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 17
+Final answer: 9
 ```
 </details>
 
-## `cbse-bank:c10-arithmetic-progressions/D4` — seed 1009
+## `cbse-bank:c10-arithmetic-progressions/D4` — seed 96037
 
-> Priya saves $₹224$ in the first month and increases her saving by $₹31$ every month after that. How much has she saved in total after $15$ months?
+> Priya saves $₹122$ in the first month and increases her saving by $₹45$ every month after that. How much has she saved in total after $6$ months?
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6615` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `6615` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `6616` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `13245/2` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `1407` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `1407` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `1408` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `1410` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-a = 224, d = 31, n = 15
+a = 122, d = 45, n = 6
 T_n = a + (n-1) × d
-T_n = (224) + ((15)-1) × (31)
-= 658
+T_n = (122) + ((6)-1) × (45)
+= 347
 S_n = n/2 × (2 × a+(n-1) × d)
-S_n = (15)/2 × (2 × (224)+((15)-1) × (31))
-= 6615
-Final answer: 6615
+S_n = (6)/2 × (2 × (122)+((6)-1) × (45))
+= 1407
+Final answer: 1407
 ```
 common wrong:
 ```text
-a = 224, d = 31, n = 15
+a = 122, d = 45, n = 6
 T_n = a + (n-1) × d
-T_n = (224) + ((15)-1) × (31)
-= 658
+T_n = (122) + ((6)-1) × (45)
+= 347
 S_n = n/2 × (2 × a+(n-1) × d)
-S_n = (15)/2 × (2 × (224)+((15)-1) × (31))
-= 6615
-Final answer: 6616
+S_n = (6)/2 × (2 × (122)+((6)-1) × (45))
+= 1407
+Final answer: 1408
 ```
 partial:
 ```text
-a = 224, d = 31, n = 15
+a = 122, d = 45, n = 6
 T_n = a + (n-1) × d
-T_n = (224) + ((15)-1) × (31)
-= 659
+T_n = (122) + ((6)-1) × (45)
+= 348
 S_n = n/2 × (2 × a+(n-1) × d)
-S_n = (15)/2 × ((224)+(659))
-= 13245/2
-Final answer: 13245/2
+S_n = (6)/2 × ((122)+(348))
+= 1410
+Final answer: 1410
 ```
 </details>
 
@@ -501,385 +501,385 @@ Final answer: 31
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `3, 2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `4, 2` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `4, 2` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: 4, 2
 ```
 </details>
 
-## `cbse-bank:c10-quadratic-triangle-competency/D1` — seed 1009
+## `cbse-bank:c10-quadratic-triangle-competency/D1` — seed 96037
 
-> A triangular fabric decoration has area $225$ cm². Its base is $7$ cm longer than its perpendicular height. Find the height in centimetres.
+> A triangular school banner has area $192$ cm². Its base is $8$ cm longer than its perpendicular height. Find the height in centimetres.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `18` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `18.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `19` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `19` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `16` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `16.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `17` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 19
+Final answer: 17
 ```
 </details>
 
-## `cbse-bank:c10-quadratic-triangle-competency/D2` — seed 1009
+## `cbse-bank:c10-quadratic-triangle-competency/D2` — seed 96037
 
-> A triangular fabric decoration has area $225$ cm². Its base is $7$ cm longer than its perpendicular height. Find the height in centimetres.
+> A triangular school banner has area $192$ cm². Its base is $8$ cm longer than its perpendicular height. Find the height in centimetres.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `18` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `18.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `19` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `19` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `16` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `16.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `17` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 19
+Final answer: 17
 ```
 </details>
 
-## `cbse-bank:c10-quadratic-triangle-competency/D3` — seed 1009
+## `cbse-bank:c10-quadratic-triangle-competency/D3` — seed 96037
 
-> A triangular fabric decoration has area $225$ cm². Its base is $7$ cm longer than its perpendicular height. Find the height in centimetres.
+> A triangular school banner has area $192$ cm². Its base is $8$ cm longer than its perpendicular height. Find the height in centimetres.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `18` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `18.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `19` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `19` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `16` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `16.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `17` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 19
+Final answer: 17
 ```
 </details>
 
-## `cbse-bank:c10-quadratic-triangle-competency/D4` — seed 1009
+## `cbse-bank:c10-quadratic-triangle-competency/D4` — seed 96037
 
-> A triangular fabric decoration has area $225$ cm². Its base is $7$ cm longer than its perpendicular height. Find the height in centimetres.
+> A triangular school banner has area $192$ cm². Its base is $8$ cm longer than its perpendicular height. Find the height in centimetres.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `18` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
-| alternative | `18.0` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
-| common wrong | `19` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `19` | no | 0/4 | 0/4 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `16` | yes | 4/4 | 4/4 | The keyed answer as the server prints it. |
+| alternative | `16.0` | yes | 4/4 | 4/4 | The same value written in another equivalent form. |
+| common wrong | `17` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
+| partial | `17` | no | 0/4 | 0/4 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 19
+Final answer: 17
 ```
 </details>
 
-## `cbse-bank:c10-sector-reasoning/D1` — seed 32685
+## `cbse-bank:c10-sector-reasoning/D1` — seed 135632
 
-> The minute hand of a clock is $28$ cm long. Find the area swept by it in $11$ minutes. Take $\\pi = \\dfrac{22}{7}$.
+> The minute hand of a clock is $10$ cm long. Find the distance travelled by its tip in $42$ minutes. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6776/15` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `6776/15` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `6791/15` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `20636/45` | no | 0/1 | 0/1 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `44` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `44` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `45` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `2783/63` | no | 0/1 | 0/1 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 66
-A = θ/360 × π × r^2
-A = (66)/360 × (22/7) × (28)^2
-= 6776/15
-Final answer: 6776/15
+r = 10, m = 42
+θ = 6 × (42)
+= 252
+l = θ/360 × 2 × π × r
+l = (252)/360 × 2 × (22/7) × (10)
+= 44
+Final answer: 44
 ```
 common wrong:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 66
-A = θ/360 × π × r^2
-A = (66)/360 × (22/7) × (28)^2
-= 6776/15
-Final answer: 6791/15
+r = 10, m = 42
+θ = 6 × (42)
+= 252
+l = θ/360 × 2 × π × r
+l = (252)/360 × 2 × (22/7) × (10)
+= 44
+Final answer: 45
 ```
 partial:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 67
-A = θ/360 × π × r^2
-A = (67)/360 × (22/7) × (28)^2
-= 20636/45
-Final answer: 20636/45
+r = 10, m = 42
+θ = 6 × (42)
+= 253
+l = θ/360 × 2 × π × r
+l = (253)/360 × 2 × (22/7) × (10)
+= 2783/63
+Final answer: 2783/63
 ```
 </details>
 
-## `cbse-bank:c10-sector-reasoning/D2` — seed 32685
+## `cbse-bank:c10-sector-reasoning/D2` — seed 135632
 
-> The minute hand of a clock is $28$ cm long. Find the area swept by it in $11$ minutes. Take $\\pi = \\dfrac{22}{7}$.
+> The minute hand of a clock is $10$ cm long. Find the distance travelled by its tip in $42$ minutes. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6776/15` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `6776/15` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `6791/15` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `20636/45` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `44` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `44` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `45` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `2783/63` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 66
-A = θ/360 × π × r^2
-A = (66)/360 × (22/7) × (28)^2
-= 6776/15
-Final answer: 6776/15
+r = 10, m = 42
+θ = 6 × (42)
+= 252
+l = θ/360 × 2 × π × r
+l = (252)/360 × 2 × (22/7) × (10)
+= 44
+Final answer: 44
 ```
 common wrong:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 66
-A = θ/360 × π × r^2
-A = (66)/360 × (22/7) × (28)^2
-= 6776/15
-Final answer: 6791/15
+r = 10, m = 42
+θ = 6 × (42)
+= 252
+l = θ/360 × 2 × π × r
+l = (252)/360 × 2 × (22/7) × (10)
+= 44
+Final answer: 45
 ```
 partial:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 67
-A = θ/360 × π × r^2
-A = (67)/360 × (22/7) × (28)^2
-= 20636/45
-Final answer: 20636/45
+r = 10, m = 42
+θ = 6 × (42)
+= 253
+l = θ/360 × 2 × π × r
+l = (253)/360 × 2 × (22/7) × (10)
+= 2783/63
+Final answer: 2783/63
 ```
 </details>
 
-## `cbse-bank:c10-sector-reasoning/D3` — seed 32685
+## `cbse-bank:c10-sector-reasoning/D3` — seed 135632
 
-> The minute hand of a clock is $28$ cm long. Find the area swept by it in $11$ minutes. Take $\\pi = \\dfrac{22}{7}$.
+> The minute hand of a clock is $10$ cm long. Find the distance travelled by its tip in $42$ minutes. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6776/15` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `6776/15` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `6791/15` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `20636/45` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `44` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `44` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `45` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `2783/63` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 66
-A = θ/360 × π × r^2
-A = (66)/360 × (22/7) × (28)^2
-= 6776/15
-Final answer: 6776/15
+r = 10, m = 42
+θ = 6 × (42)
+= 252
+l = θ/360 × 2 × π × r
+l = (252)/360 × 2 × (22/7) × (10)
+= 44
+Final answer: 44
 ```
 common wrong:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 66
-A = θ/360 × π × r^2
-A = (66)/360 × (22/7) × (28)^2
-= 6776/15
-Final answer: 6791/15
+r = 10, m = 42
+θ = 6 × (42)
+= 252
+l = θ/360 × 2 × π × r
+l = (252)/360 × 2 × (22/7) × (10)
+= 44
+Final answer: 45
 ```
 partial:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 67
-A = θ/360 × π × r^2
-A = (67)/360 × (22/7) × (28)^2
-= 20636/45
-Final answer: 20636/45
+r = 10, m = 42
+θ = 6 × (42)
+= 253
+l = θ/360 × 2 × π × r
+l = (253)/360 × 2 × (22/7) × (10)
+= 2783/63
+Final answer: 2783/63
 ```
 </details>
 
-## `cbse-bank:c10-sector-reasoning/D4` — seed 32685
+## `cbse-bank:c10-sector-reasoning/D4` — seed 135632
 
-> The minute hand of a clock is $28$ cm long. Find the area swept by it in $11$ minutes. Take $\\pi = \\dfrac{22}{7}$.
+> The minute hand of a clock is $10$ cm long. Find the distance travelled by its tip in $42$ minutes. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6776/15` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `6776/15` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `6791/15` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `20636/45` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `44` | yes | 3/3 | 3/3 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `44` | yes | 3/3 | 3/3 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `45` | no | 0/3 | 2/3 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `2783/63` | no | 0/3 | 2/3 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 66
-A = θ/360 × π × r^2
-A = (66)/360 × (22/7) × (28)^2
-= 6776/15
-Final answer: 6776/15
+r = 10, m = 42
+θ = 6 × (42)
+= 252
+l = θ/360 × 2 × π × r
+l = (252)/360 × 2 × (22/7) × (10)
+= 44
+Final answer: 44
 ```
 common wrong:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 66
-A = θ/360 × π × r^2
-A = (66)/360 × (22/7) × (28)^2
-= 6776/15
-Final answer: 6791/15
+r = 10, m = 42
+θ = 6 × (42)
+= 252
+l = θ/360 × 2 × π × r
+l = (252)/360 × 2 × (22/7) × (10)
+= 44
+Final answer: 45
 ```
 partial:
 ```text
-r = 28, m = 11
-θ = 6 × (11)
-= 67
-A = θ/360 × π × r^2
-A = (67)/360 × (22/7) × (28)^2
-= 20636/45
-Final answer: 20636/45
+r = 10, m = 42
+θ = 6 × (42)
+= 253
+l = θ/360 × 2 × π × r
+l = (253)/360 × 2 × (22/7) × (10)
+= 2783/63
+Final answer: 2783/63
 ```
 </details>
 
-## `cbse-bank:c10-surface-volume-combo/D1` — seed 1009
+## `cbse-bank:c10-surface-volume-combo/D1` — seed 96037
 
-> A solid is a cylinder of radius $21$ cm and height $18$ cm with a hemisphere of the same radius on top. Find its total volume. Take $\\pi = \\dfrac{22}{7}$.
+> A solid is a cylinder of radius $14$ cm and height $21$ cm with a hemisphere of the same radius on top. Find its total volume. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `44352` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `44352` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `44353` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `44353` | no | 0/1 | 0/1 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `56056/3` | yes | 1/1 | 1/1 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `56056/3` | yes | 1/1 | 1/1 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `56057/3` | no | 0/1 | 0/1 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `56059/3` | no | 0/1 | 0/1 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 21, h = 18
+r = 14, h = 21
 V_1 = π × r^2 × h
-V_1 = (22/7) × (21)^2 × (18)
-= 24948
+V_1 = (22/7) × (14)^2 × (21)
+= 12936
 V_2 = 2/3 × π × r^3
-V_2 = 2/3 × (22/7) × (21)^3
-= 19404
-V = (24948)+(19404)
-= 44352
-Final answer: 44352
+V_2 = 2/3 × (22/7) × (14)^3
+= 17248/3
+V = (12936)+(17248/3)
+= 56056/3
+Final answer: 56056/3
 ```
 common wrong:
 ```text
-r = 21, h = 18
+r = 14, h = 21
 V_1 = π × r^2 × h
-V_1 = (22/7) × (21)^2 × (18)
-= 24948
+V_1 = (22/7) × (14)^2 × (21)
+= 12936
 V_2 = 2/3 × π × r^3
-V_2 = 2/3 × (22/7) × (21)^3
-= 19404
-V = (24948)+(19404)
-= 44352
-Final answer: 44353
+V_2 = 2/3 × (22/7) × (14)^3
+= 17248/3
+V = (12936)+(17248/3)
+= 56056/3
+Final answer: 56057/3
 ```
 partial:
 ```text
-r = 21, h = 18
+r = 14, h = 21
 V_1 = π × r^2 × h
-V_1 = (22/7) × (21)^2 × (18)
-= 24949
+V_1 = (22/7) × (14)^2 × (21)
+= 12937
 V_2 = 2/3 × π × r^3
-V_2 = 2/3 × (22/7) × (21)^3
-= 19404
-V = (24949)+(19404)
-= 44353
-Final answer: 44353
+V_2 = 2/3 × (22/7) × (14)^3
+= 17248/3
+V = (12937)+(17248/3)
+= 56059/3
+Final answer: 56059/3
 ```
 </details>
 
-## `cbse-bank:c10-surface-volume-combo/D2` — seed 1009
+## `cbse-bank:c10-surface-volume-combo/D2` — seed 96037
 
-> A solid is a cylinder of radius $21$ cm and height $18$ cm with a hemisphere of the same radius on top. Find its total volume. Take $\\pi = \\dfrac{22}{7}$.
+> A solid is a cylinder of radius $14$ cm and height $21$ cm with a hemisphere of the same radius on top. Find its total volume. Take $\\pi = \\dfrac{22}{7}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `44352` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
-| alternative | `44352` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
-| common wrong | `44353` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
-| partial | `44353` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
+| correct | `56056/3` | yes | 2/2 | 2/2 | The model page: every formula, substitution and value, with the right answer. |
+| alternative | `56056/3` | yes | 2/2 | 2/2 | Right answer with no working. The engine has no authored alternative method for this plan; the examiner should mark their own alternative method and record any disagreement. |
+| common wrong | `56057/3` | no | 0/2 | 1/2 | The model working, then a wrong final answer (a transcription slip at the end). |
+| partial | `56059/3` | no | 0/2 | 1/2 | One arithmetic slip in the first evaluated stage, carried forward correctly to the end. |
 
 <details><summary>Pages</summary>
 
 correct:
 ```text
-r = 21, h = 18
+r = 14, h = 21
 V_1 = π × r^2 × h
-V_1 = (22/7) × (21)^2 × (18)
-= 24948
+V_1 = (22/7) × (14)^2 × (21)
+= 12936
 V_2 = 2/3 × π × r^3
-V_2 = 2/3 × (22/7) × (21)^3
-= 19404
-V = (24948)+(19404)
-= 44352
-Final answer: 44352
+V_2 = 2/3 × (22/7) × (14)^3
+= 17248/3
+V = (12936)+(17248/3)
+= 56056/3
+Final answer: 56056/3
 ```
 common wrong:
 ```text
-r = 21, h = 18
+r = 14, h = 21
 V_1 = π × r^2 × h
-V_1 = (22/7) × (21)^2 × (18)
-= 24948
+V_1 = (22/7) × (14)^2 × (21)
+= 12936
 V_2 = 2/3 × π × r^3
-V_2 = 2/3 × (22/7) × (21)^3
-= 19404
-V = (24948)+(19404)
-= 44352
-Final answer: 44353
+V_2 = 2/3 × (22/7) × (14)^3
+= 17248/3
+V = (12936)+(17248/3)
+= 56056/3
+Final answer: 56057/3
 ```
 partial:
 ```text
-r = 21, h = 18
+r = 14, h = 21
 V_1 = π × r^2 × h
-V_1 = (22/7) × (21)^2 × (18)
-= 24949
+V_1 = (22/7) × (14)^2 × (21)
+= 12937
 V_2 = 2/3 × π × r^3
-V_2 = 2/3 × (22/7) × (21)^3
-= 19404
-V = (24949)+(19404)
-= 44353
-Final answer: 44353
+V_2 = 2/3 × (22/7) × (14)^3
+= 17248/3
+V = (12937)+(17248/3)
+= 56059/3
+Final answer: 56059/3
 ```
 </details>
 
@@ -889,9 +889,9 @@ Final answer: 44353
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `2` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. Option 2 is “$x > 5$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. Option 0 is “$x > 6$”. |
 | partial | `0` | no | 0/1 | 0/1 | The step check is an inequality check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
@@ -909,9 +909,9 @@ Final answer: 0
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
+| correct | `2` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. Option 2 is “$x < -1$”. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. Option 0 is “$x > 6$”. |
 | partial | `0` | no | 0/2 | 0/2 | The step check is an inequality check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
@@ -963,67 +963,67 @@ Final answer: 3
 ```
 </details>
 
-## `cbse-bank:c12-applications-integrals/D1` — seed 1009
+## `cbse-bank:c12-applications-integrals/D1` — seed 96037
 
-> Find the area of the region bounded by the line $y = 7x$, the $x$-axis and the line $x = 6$.
+> Find the area of the region bounded by the line $y = 6x$, the $x$-axis and the line $x = 7$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `126` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `126.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `127` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `127` | no | 0/1 | 0/1 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `147` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `147.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `148` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `148` | no | 0/1 | 0/1 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 127
+Final answer: 148
 ```
 </details>
 
-## `cbse-bank:c12-applications-integrals/D2` — seed 1009
+## `cbse-bank:c12-applications-integrals/D2` — seed 96037
 
-> Find the area under the curve $y = x^2$ between $x = 2$ and $x = 4$.
+> Find the area under the curve $y = x^2$ between $x = 1$ and $x = 4$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `56/3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `56/3` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `59/3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `59/3` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `21` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `21.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `22` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `22` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 59/3
+Final answer: 22
 ```
 </details>
 
-## `cbse-bank:c12-applications-integrals/D3` — seed 1009
+## `cbse-bank:c12-applications-integrals/D3` — seed 96037
 
-> Find the area of the region enclosed between the parabola $y = x^2$ and the line $y = 6x$.
+> Find the area of the region enclosed between the parabola $y = x^2$ and the line $y = 5x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `36` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `36.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `37` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `37` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `125/6` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `126/6` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `126/6` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 37
+Final answer: 126/6
 ```
 </details>
 
-## `cbse-bank:c12-applications-integrals/D4` — seed 1009
+## `cbse-bank:c12-applications-integrals/D4` — seed 96037
 
 > Find the area of the region bounded by the curve $y = x(6 - x)$ and the $x$-axis.
 
@@ -1043,283 +1043,363 @@ Final answer: 37
 ```
 </details>
 
-## `cbse-bank:ms11-formulas/D2` — seed 1009
+## `cbse-bank:ms11-formulas/D2` — seed 32685
 
-> Using $C = 49n + 107$, find the number of hours $n$ for which the charge is \\$352.00.
+> Using $C = 54n + 60$, find the number of hours $n$ for which the charge is \\$438.00.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 6
+Final answer: 8
 ```
 </details>
 
 ## `cbse-bank:y10-quadratics/D1` — seed 1009
 
-> Solve $(x - 3)(x - 2) = 0$.
+> Solve $6x^2 - 294 = 0$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `-7, 7` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `-6, 7` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-6, 7` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: -6, 7
 ```
 </details>
 
-## `cbse-bank:y10-quadratics/D3` — seed 1009
+## `cbse-bank:y10-quadratics/D2` — seed 72280
 
-> Solve $x^2 - 5x + 6 = 0$ by factorising.
+> Solve $6(x - 8)(x + 11) = 0$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
+| correct | `8, -11` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `9, -11` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `9, -11` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: 9, -11
+```
+</details>
+
+## `cbse-bank:y10-quadratics/D3` — seed 32685
+
+> Solve $x^2 - 36 = 0$ by factorising.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `6, -6` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
+| common wrong | `7, -6` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `7, -6` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: 7, -6
 ```
 </details>
 
 ## `cbse-bank:y10-quadratics/D4` — seed 1009
 
-> Use the quadratic formula to solve $2x^2 + 2x - 1 = 0$. Give both solutions, correct to 2 decimal places if needed.
+> Solve $6x^2 - 294 = 0$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/4 | 0/4 | The keyed answer as the server prints it. |
+| correct | `-7, 7` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/4 | 0/4 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/4 | 0/4 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `-6, 7` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-6, 7` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: -6, 7
 ```
 </details>
 
-## `cbse-bank:y11-diff/D1` — seed 1009
+## `cbse-bank:y11-diff/D1` — seed 32685
 
-> Differentiate $y = 4x^{7}$.
+> Differentiate $y = 6x^{2}$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/1 | 0/1 | The keyed answer as the server prints it. |
+| correct | `12x^1` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `(12x^1)` | yes | 1/1 | 1/1 | The same expression written with brackets. |
+| common wrong | `(12x^1) + 1` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(12x^1) + 1` | no | 0/1 | 0/1 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: (12x^1) + 1
+```
+</details>
+
+## `cbse-bank:y11-diff/D2` — seed 32685
+
+> Differentiate $f(x) = 3x^3 - 4x^2 + 3x - 3$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `9x^2 + -8x + 3` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `(9x^2 + -8x + 3)` | yes | 2/2 | 2/2 | The same expression written with brackets. |
+| common wrong | `(9x^2 + -8x + 3) + 1` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(9x^2 + -8x + 3) + 1` | no | 0/2 | 0/2 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: (9x^2 + -8x + 3) + 1
+```
+</details>
+
+## `cbse-bank:y11-diff/D3` — seed 32685
+
+> Find the gradient of the tangent to $y = 3x^2 - 5x + 4$ at the point where $x = -1$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `-11` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `-11.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `-10` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `-10` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+
+<details><summary>Pages</summary>
+
+partial:
+```text
+(working with the right method, ending in a wrong value)
+Final answer: -10
+```
+</details>
+
+## `cbse-bank:y11-diff/D4` — seed 32685
+
+> Find the point on the curve $y = x^2 + 3x - 6$ where the gradient equals $-3$.
+
+| Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
+|---|---|---|---|---|---|
+| correct | `(-3, -6)` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
 | alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/1 | 0/1 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| common wrong | `(-2, -6)` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `(-2, -6)` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: (-2, -6)
 ```
 </details>
 
-## `cbse-bank:y11-diff/D2` — seed 1009
+## `cbse-bank:y11-explog/D3` — seed 32685
 
-> Differentiate $f(x) = 3x^3 + x^2 - x - 1$.
+> Solve $6^{x - 3} = 1296$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/2 | 0/2 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/2 | 0/2 | The step check is an derivative check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `7` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `7.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `8` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `8` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: 8
 ```
 </details>
 
-## `cbse-bank:y11-diff/D3` — seed 1009
+## `cbse-bank:y7-angles/D1` — seed 1009
 
-> Find the gradient of the tangent to $y = 3x^2 + 2x - 1$ at the point where $x = -1$.
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `-4` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `-4.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `-3` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `-3` | no | 0/2 | 0/2 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `22` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: -3
+Final answer: 23
 ```
 </details>
 
-## `cbse-bank:y11-diff/D4` — seed 1009
+## `cbse-bank:y7-angles/D2` — seed 1009
 
-> Find the point on the curve $y = x^2 + 3x + 2$ where the gradient equals $-1$.
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `undefined` | no | 0/3 | 0/3 | The keyed answer as the server prints it. |
-| alternative | — | — | — | — | The tool knows no equivalent written form for this answer type; the examiner should try their own. |
-| common wrong | `0` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `0` | no | 0/3 | 0/3 | The step check is an plan check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `22` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 0
+Final answer: 23
 ```
 </details>
 
-## `cbse-bank:y11-explog/D3` — seed 1009
+## `cbse-bank:y7-angles/D3` — seed 1009
 
-> Solve $6^{x + 1} = 216$.
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `2` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `2.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `3` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `3` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `22` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 3
+Final answer: 23
 ```
 </details>
 
 ## `cbse-bank:y7-angles/D4` — seed 1009
 
-> Two vertically opposite angles are $(3x + 15)°$ and $(1x + 81)°$. Find $x$.
+> Two angles on a straight line are $(3x + 29)°$ and $(2x + 41)°$. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `33` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `33.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `34` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `34` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `22` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `22.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `23` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `23` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 34
+Final answer: 23
 ```
 </details>
 
 ## `cbse-bank:y7-equations/D1` — seed 1009
 
-> Solve $4x = 24$.
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
-| alternative | `6.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
-| common wrong | `7` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
-| partial | `7` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `17` | yes | 1/1 | 1/1 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 1/1 | 1/1 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/1 | 0/1 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/1 | 0/1 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 7
+Final answer: 18
 ```
 </details>
 
 ## `cbse-bank:y7-equations/D2` — seed 1009
 
-> Solve $4x - 2 = 22$.
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `6` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `6.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `7` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `7` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `17` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 7
+Final answer: 18
 ```
 </details>
 
 ## `cbse-bank:y7-equations/D3` — seed 1009
 
-> Solve $3(x - 1) = 12$.
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `5` | yes | 2/2 | 2/2 | The keyed answer as the server prints it. |
-| alternative | `5.0` | yes | 2/2 | 2/2 | The same value written in another equivalent form. |
-| common wrong | `6` | no | 0/2 | 0/2 | A plainly wrong final answer of the same kind as the key. |
-| partial | `6` | no | 0/2 | 0/2 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `17` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 6
+Final answer: 18
 ```
 </details>
 
 ## `cbse-bank:y7-equations/D4` — seed 1009
 
-> Leo thinks of a number, multiplies it by $4$, then adds $11$. The result is $103$. Let the number be $n$ — write an equation and solve it to find $n$.
+> A rectangular netball practice court has length $(x + 4)$ metres and width $10$ metres. Its perimeter is $62$ metres. Find $x$.
 
 | Case | Final answer written | Engine: correct? | Final-answer-only | With method marks | Note |
 |---|---|---|---|---|---|
-| correct | `23` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
-| alternative | `23.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
-| common wrong | `24` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
-| partial | `24` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
+| correct | `17` | yes | 3/3 | 3/3 | The keyed answer as the server prints it. |
+| alternative | `17.0` | yes | 3/3 | 3/3 | The same value written in another equivalent form. |
+| common wrong | `18` | no | 0/3 | 0/3 | A plainly wrong final answer of the same kind as the key. |
+| partial | `18` | no | 0/3 | 0/3 | The step check is an equation check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page. |
 
 <details><summary>Pages</summary>
 
 partial:
 ```text
 (working with the right method, ending in a wrong value)
-Final answer: 24
+Final answer: 18
 ```
 </details>
 

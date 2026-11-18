@@ -57,8 +57,47 @@ assert.deepEqual(JSON.parse(calls[3].options.body), { name: 'Class 10 Mathematic
 assert.equal(calls[6].options.method, 'PATCH');
 assert.equal(calls[7].options.method, 'POST');
 
+// The teacher workspace (server/platform/classroom.js): the same audited boundary.
+calls.length = 0;
+await cloud.classJoinCode('cls_demo');
+await cloud.classroomMine();
+await cloud.handInPaper('cls_demo', 'asn_demo', '0f8fad5b-d9cb-469f-a165-70867728950e');
+await cloud.boardCourses();
+await cloud.classBoard('cls_demo', 'k10-stage4');
+await cloud.classBoard('cls_demo', 'k10-stage4', 'MA4-INT-C-01');
+await cloud.paperResults('cls_demo', 'asn_demo');
+const csv = await cloud.paperResultsCsv('cls_demo', 'asn_demo');
+await cloud.classReviewQueue('cls_demo');
+await cloud.classReviewQueue('cls_demo', 'decided');
+await cloud.classReviewDecide('cls_demo', 'rvw_1', { decision: 'award', marks: 1 });
+await cloud.classReviewHistory('cls_demo', 'rvw_1');
+assert.deepEqual(calls.map(call => { const u = new URL(call.url); return u.pathname + u.search; }), [
+  '/v1/classes/cls_demo/join-code',
+  '/v1/classroom/mine',
+  '/v1/classroom/classes/cls_demo/assignments/asn_demo/hand-in',
+  '/v1/classroom/board/courses',
+  '/v1/classroom/classes/cls_demo/board?course=k10-stage4',
+  '/v1/classroom/classes/cls_demo/board?course=k10-stage4&node=MA4-INT-C-01',
+  '/v1/classroom/classes/cls_demo/assignments/asn_demo/results',
+  '/v1/classroom/classes/cls_demo/assignments/asn_demo/results.csv',
+  '/v1/classroom/classes/cls_demo/review',
+  '/v1/classroom/classes/cls_demo/review?state=decided',
+  '/v1/classroom/classes/cls_demo/review/rvw_1',
+  '/v1/classroom/classes/cls_demo/review/rvw_1/history'
+]);
+assert.equal(csv, '{}', 'a CSV export is returned as the file text, not parsed');
+assert.equal(calls[2].options.method, 'POST');
+assert.deepEqual(JSON.parse(calls[2].options.body), { examId: '0f8fad5b-d9cb-469f-a165-70867728950e' });
+assert.equal(calls[10].options.method, 'POST');
+assert.equal(calls[10].options.headers['X-Pri-CSRF'], 'test-csrf');
+for (const bad of [['cls_demo', 'k10 stage4'], ['cls_demo', 'x', 'a&b=c'], ['cls_demo', '']]) {
+  let refused = false;
+  try { await cloud.classBoard(...bad); } catch { refused = true; }
+  assert.equal(refused, true, `a query value outside the plain-id set is refused (${JSON.stringify(bad)})`);
+}
+
 let rejected = false;
 try { await cloud.classDetails('../admin'); } catch { rejected = true; }
 assert.equal(rejected, true, 'class ids must not escape the audited cloud path');
 
-console.log('PASS — classroom UI operations stay inside the authenticated audited cloud transport boundary.');
+console.log('PASS — classroom and teacher-workspace UI operations stay inside the authenticated audited cloud transport boundary; queries and the CSV export are named, plain-id parameters on a browser GET only.');

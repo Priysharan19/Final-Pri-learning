@@ -19,8 +19,15 @@ const { default: hi } = await import('../src/i18n/strings.hi.js');
 let checks = 0;
 const ok = (value, message) => { assert.ok(value, message); checks += 1; };
 
+// The notice version is per edition (ADR-0002): the client names one literal for each edition in a single
+// conditional, the server one constant for each. Both pairs must agree, edition by edition.
 const current = version(server, 'CONSENT_NOTICE_VERSION');
-ok(current && current === version(signUp, 'GUARDIAN_NOTICE_VERSION'), 'client and server show and check the same notice version');
+const auCurrent = server.match(/AU_CONSENT_NOTICE_VERSION = '([^']+)'/)?.[1];
+const clientEditions = signUp.match(/GUARDIAN_NOTICE_VERSION = EDITION_ID === 'prithagoras' \? '([^']+)' : '([^']+)'/);
+ok(current && auCurrent && clientEditions, 'the server names a notice version for each edition and the client one conditional on the edition');
+ok(clientEditions[2] === current, 'Priyabhata: client and server show and check the same notice version');
+ok(clientEditions[1] === auCurrent, 'Prithagoras: client and server show and check the same notice version');
+ok(/consentNoticeVersion = \(edition = serverEdition\(\)\) => \(edition === 'prithagoras' \? AU_CONSENT_NOTICE_VERSION : CONSENT_NOTICE_VERSION\)/.test(server), 'the server picks the version by edition the same way');
 ok(/guardianConfirm: \(token, noticeVersion\) => [^\n]*approve: true, noticeVersion/.test(transport), 'the link confirmation sends approve and the notice version');
 ok(guardianPage.includes('guardianConfirm(linkToken, GUARDIAN_NOTICE_VERSION)'), 'the parent page confirms the notice it renders');
 ok(/<Notice t=\{t\} \/>[\s\S]*guardian-link-approve/.test(guardianPage), 'and renders it above the approve button');

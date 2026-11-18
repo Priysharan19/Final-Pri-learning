@@ -364,6 +364,8 @@ const INDIA_BANK_OF = {
 
 /** Holds the generators of every bank loaded so far, keyed by subtopic id. */
 export const GENERATORS = {};
+/** Further structural forms per skill id: [{ form, make(rng, diff) => { payload, check } }]. */
+export const EXTRA_FORMS = {};
 
 const loaded = new Set();
 const inflight = new Map();
@@ -405,13 +407,22 @@ function bankLoader(name) {
   };
 }
 
+/** Extra structural forms ride with the Indian banks only, one chunk per class (forms/loader.js). */
+function extraFormsFor(name, ids) {
+  return String(name).startsWith('india-') ? import('./forms/loader.js').then(m => m.loadExtraForms(ids)) : Promise.resolve({});
+}
+
 function loadBank(name) {
   const loader = bankLoader(name);
   if (!loader || loaded.has(name)) return Promise.resolve();
   let job = inflight.get(name);
   if (!job) {
-    job = loader().then(bank => {
+    job = loader().then(async bank => {
+      const overlay = await import('./au-forms.js').then(m => m.loadAuForms(name));
+      if (overlay) bank = (await import('./au-forms-apply.js')).applyAuForms(bank, overlay);
+      const extra = await extraFormsFor(name, Object.keys(bank));
       Object.assign(GENERATORS, bank);
+      Object.assign(EXTRA_FORMS, extra);
       loaded.add(name);
       inflight.delete(name);
     }, err => {
@@ -574,10 +585,119 @@ function difficultyFor(dp, difficulty, seed) {
 // `pick` (server only, F7 band practice) replaces the generator's own draw: it is
 // handed the seeded rng and returns the payload of the one item it chose, which
 // is then stamped exactly as a drawn one. It may not be combined with a dot point.
+// A suite that names a question by (skill, difficulty, seed) pins the skill's direct form; the extra
+// structural forms and the capacity overlays draw other forms from the same seeds. Such a suite turns them
+// off for its own process with directFormsOnly(true). Nothing in the app calls it.
+let directOnly = false;
+/** Turn the direct-forms-only mode on or off. Returns the mode it replaced, so a caller can put it back. */
+export function directFormsOnly(on = true) { const was = directOnly; directOnly = on === true; return was; }
+
+// ── Which form a seed draws ──────────────────────────────────────────────────
+// A cell is the direct form plus its extra forms. Drawing a form uniformly
+// shadowed the direct form: a skill whose direct form serves 10^8 different
+// questions gave it one draw in six, and the five other forms, some with a few
+// hundred questions in all (count the relations on a set of n, the order of a
+// product), were repeated back to students five times in six. That cut the
+// cell's effective count by three to four orders of magnitude when forms were
+// ADDED. A form is now drawn with the weight of the questions it can serve
+// (its smallest capacity over the four difficulties, so that a seed draws the same form at every difficulty):
+// the capacity estimated from a fixed, seeded sample of its own draws (the
+// bias-corrected collision estimate of tools/distinct-questions.mjs, capped at
+// CAPACITY_CAP), the direct form never below its old share of one draw in the number of forms. Forms that never repeat in the sample draw equally, so a cell
+// of rich forms is drawn exactly as before; a form that repeats within a few
+// hundred draws is drawn in proportion to how few questions it has. The
+// estimate is deterministic (fixed seeds, fixed sample size) and cached.
+const CAPACITY_SAMPLE = 160;
+const CAPACITY_CAP = 1e6;
+const formWeights = new Map();
+function keyOf(payload) {
+  const nums = (String(payload?.prompt).match(/-?\d+(?:\.\d+)?/g) || []).join(',');
+  const a = payload?.answer || {};
+  const answer = JSON.stringify(a.value ?? a.correctIndex ?? a.points ?? a.set ?? a.expr ?? a);
+  const options = (payload?.mcqOptions || []).map(o => String(o).replace(/\s+/g, '')).join('¦');
+  return `${nums}|${answer}|${options}`;
+}
+function capacityOf(draw) {
+  const keys = new Map();
+  let drawn = 0;
+  for (let i = 1; i <= CAPACITY_SAMPLE; i++) {
+    try {
+      const k = keyOf(draw(makeRng(Number((BigInt(i) * 2654435761n) % 4294967291n))));
+      keys.set(k, (keys.get(k) || 0) + 1);
+      drawn += 1;
+    } catch { /* a draw that throws serves nothing */ }
+  }
+  if (drawn === 0) return 1;
+  if (drawn === keys.size) return CAPACITY_CAP;
+  let f1 = 0, f2 = 0;
+  for (const n of keys.values()) { if (n === 1) f1 += 1; else if (n === 2) f2 += 1; }
+  return Math.max(1, Math.min(CAPACITY_CAP, keys.size + (f1 * (f1 - 1)) / (2 * (f2 + 1))));
+}
+function sharesOf(subtopicId, direct, extra) {
+  let weights = formWeights.get(subtopicId);
+  if (!weights || weights.length !== extra.length + 1) {
+    // One weight per form for the whole skill, the SMALLEST capacity over the four difficulties: the draw must pick
+    // the same form at every difficulty for a seed (a skill authored at one difficulty serves that form at all four,
+    // and its tests rely on it), so it cannot depend on the difficulty asked for.
+    weights = [direct, ...extra.map(form => form.make)].map((make, i) => {
+      let least = CAPACITY_CAP;
+      for (let d = 1; d <= 4; d++) least = Math.min(least, capacityOf(rng => (i === 0 ? make(rng, d) : make(rng, d).payload)));
+      return least;
+    });
+    formWeights.set(subtopicId, weights);
+  }
+  // The skill's direct form carries its authored working plan and its dot points, so it keeps at least the share
+  // it always had, one draw in (forms): a direct form with few questions is not squeezed out by rich extra forms.
+  // It only ever raises the direct form's weight, so a rich direct form is unaffected.
+  const extraWeight = weights.slice(1).reduce((n, w) => n + w, 0);
+  const shares = weights.slice();
+  shares[0] = Math.max(weights[0], extraWeight / (weights.length - 1));
+  return shares;
+}
+
+function pickForm(subtopicId, direct, extra, r) {
+  const shares = sharesOf(subtopicId, direct, extra);
+  const total = shares.reduce((n, w) => n + w, 0);
+  let at = r * total;
+  for (let i = 0; i < shares.length; i++) {
+    if (at < shares[i]) return i;
+    at -= shares[i];
+  }
+  return shares.length - 1;
+}
+
+/**
+ * The probability that a seed draws each form of a skill at a difficulty: [direct, ...extra forms in order], or null
+ * when the skill has no extra form. A form with very few questions has a share near 0 by design (see above); it is
+ * still a form of the skill and still reachable by an explicit pick or by calling its maker.
+ */
+export function formDrawShares(subtopicId) {
+  const extra = Object.hasOwn(EXTRA_FORMS, subtopicId) ? EXTRA_FORMS[subtopicId] : null;
+  const entry = Object.hasOwn(GENERATORS, subtopicId) ? GENERATORS[subtopicId] : null;
+  if (!extra || !entry) return null;
+  const shares = sharesOf(subtopicId, entry, extra);
+  const total = shares.reduce((n, w) => n + w, 0);
+  return shares.map(w => w / total);
+}
+
+// A designed wrong answer that is also the right answer is not a wrong answer. A distractor whose value lands on the
+// key at a special case (tan 45° = 1; f(g(1)) = g(f(1)); a height equal to a distance at 45°) would tell a student
+// who typed the correct value that they had made the slip. Enforced here, once, for every form the engine serves
+// (direct, overlay, extra, picked), not trusted to each author: the distractor is dropped, the key and its tolerance
+// are untouched.
+function withoutKeyTraps(payload) {
+  const key = payload?.answer?.value;
+  if (!Array.isArray(payload?.traps) || typeof key !== 'number' || !Number.isFinite(key)) return payload;
+  const band = Math.max(Number(payload.answer.tol) || 0, 1e-9 * Math.max(1, Math.abs(key)));
+  const traps = payload.traps.filter(t => !(Number.isFinite(Number(t?.value)) && Math.abs(Number(t.value) - key) <= band));
+  return traps.length === payload.traps.length ? payload : { ...payload, traps };
+}
+
 export function generateQuestion(subtopicId, difficulty, seed, dotpointId, pick = null) {
   // Own entries only: a subtopic id from a request such as "constructor" must
   // resolve to no generator, not to an inherited Object.prototype member.
-  const gen = typeof subtopicId === 'string' && Object.hasOwn(GENERATORS, subtopicId) ? GENERATORS[subtopicId] : undefined;
+  const entry = typeof subtopicId === 'string' && Object.hasOwn(GENERATORS, subtopicId) ? GENERATORS[subtopicId] : undefined;
+  const gen = directOnly && typeof entry?.direct === 'function' ? entry.direct : entry;
   if (!gen) {
     const bank = bankOf(subtopicId);
     if (bank && !loaded.has(bank)) {
@@ -596,7 +716,13 @@ export function generateQuestion(subtopicId, difficulty, seed, dotpointId, pick 
   const rng = makeRng(s);
   const d = Math.min(4, Math.max(1, want | 0));
   if (pick && dotpointId != null) throw new Error('A picked item has no requested dot point');
-  const payload = pick ? pick(rng) : gen(rng, d);
+  // The established generator is the skill's direct form. Skills with extra
+  // forms draw one from the seed through a separate rng, so the direct form's
+  // own stream (and every seed it already served) is unchanged. (A picked item
+  // is its own form: no extra form is drawn for it.)
+  const extra = !pick && !directOnly && Object.hasOwn(EXTRA_FORMS, subtopicId) ? EXTRA_FORMS[subtopicId] : null;
+  const formPick = extra ? pickForm(subtopicId, gen, extra, makeRng((s ^ 0x2f6b9c1d) >>> 0)()) : 0;
+  const payload = withoutKeyTraps(pick ? pick(rng) : formPick === 0 ? gen(rng, d) : extra[formPick - 1].make(rng, d).payload);
   const q = { seed: s, subtopic: subtopicId, difficulty: pick ? payload.difficulty : d, ...payload };
   const { list, source, perQuestion } = dotpointsOf(gen, subtopicId, q.difficulty, payload);
   q.dotpoints = list.map(dp => dp.id);

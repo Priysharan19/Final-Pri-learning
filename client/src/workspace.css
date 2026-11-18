@@ -132,7 +132,7 @@
 .ink-comment.good .ic-head { color: var(--good); }
 .ink-comment .ic-head { letter-spacing: 0.06em; font-weight: 600; }
 .eval-card { border: 1px solid var(--hairline-strong); border-radius: var(--radius); margin-top: 0; box-shadow: none; background: var(--surface-raised); overflow: hidden; }
-.eval-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px 12px; background: none; border-bottom: 1px solid var(--hairline); }
+.eval-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 14px 18px 12px; background: none; border-bottom: 1px solid var(--hairline); }
 .eval-title { font-size: 15px; font-weight: 600; color: var(--ink); display: inline-flex; align-items: center; gap: 8px; }
 .eval-title svg { width: 18px; height: 18px; }
 .eval-card[data-outcome="correct"] .eval-title svg { color: var(--good); }

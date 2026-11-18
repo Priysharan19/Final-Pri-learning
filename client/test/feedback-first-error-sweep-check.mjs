@@ -33,7 +33,19 @@
 // students. Marks are not touched here: marks.test suites assert that.
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
-const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
+const { generateQuestion: generateAnyForm, loadAllBanks, EXTRA_FORMS, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
+// The slip catalogues and the designed wrong answers below are written against each skill's direct form.
+// The extra structural forms (generators/forms/) and the Prithagoras capacity overlays (au-forms-apply.js)
+// draw other shapes of question from the same seeds, which would dilute these cells; every one of them is
+// read by the marker sweeps over all issued questions. So the sweep asks for the direct form.
+function generateQuestion(id, d, seed, ...rest) {
+  const extra = EXTRA_FORMS[id], wrapped = GENERATORS[id];
+  const direct = typeof wrapped?.direct === 'function' ? wrapped.direct : null;
+  if (!extra && !direct) return generateAnyForm(id, d, seed, ...rest);
+  if (extra) delete EXTRA_FORMS[id];
+  if (direct) GENERATORS[id] = direct;
+  try { return generateAnyForm(id, d, seed, ...rest); } finally { if (extra) EXTRA_FORMS[id] = extra; GENERATORS[id] = wrapped; }
+}
 const { stepCheck, checkAnswer } = await import(`${SRC}engine/checker.js`);
 const { NSW_ISSUED_CELLS } = await import(`${SRC}engine/nswIssuedCells.js`);
 const { polyOf, calculusContext, fmtNum, innerCoefficient } = await import(`${SRC}engine/calculusSteps.js`);
@@ -41,7 +53,7 @@ const { stepMetaFor } = await import('../../server/platform/markerOps.js');
 const { parse, normalize, evaluate, exprEquivalent } = await import(`${SRC}engine/expr.js`);
 await loadAllBanks();
 
-const SEEDS = Number(process.argv[2]) || 8;
+const SEEDS = Number(process.argv.slice(2).find(a => /^\d+$/.test(a))) || 8;
 const failures = [];
 const fail = text => { if (failures.length < 60) failures.push(text); };
 let checks = 0;
@@ -250,6 +262,7 @@ for (const [generator, levels] of Object.entries(NSW_ISSUED_CELLS)) {
         const located = r.firstBreak === 1 && r.lines[0].status !== 'break';
         if (located) coverage.located++; else fail(`${tag}: flagged line ${r.firstBreak + 1} of [${start}] [${wrong}] — ${JSON.stringify(r.lines.map(l => l.status))}`);
         const code = r.lines[1]?.diagnosis?.code;
+        if (GENERIC.has(code) && process.argv.includes('--list-generic')) console.log(`GENERIC ${generator} D${d} :: ${start}  →  ${wrong}  [${code}] :: ${String(r.lines[1]?.note).slice(0,70)}`);
         if (!GENERIC.has(code)) coverage.named++; else coverage.generic[generator] = (coverage.generic[generator] || 0) + 1;
         if (rightLine) {
           const later = report(meta, q.prompt, [start, rightLine, wrong]);
@@ -268,7 +281,22 @@ for (const [generator, levels] of Object.entries(NSW_ISSUED_CELLS)) {
 }
 ok(coverage.items > 100, `the location sweep ran over ${coverage.items} designed wrong answers`);
 ok(coverage.located === coverage.items, `the first flagged line was the wrong one in ${coverage.located} of ${coverage.items} cases`);
+ok(coverage.named / coverage.items >= 0.9, `at least 90% of flagged lines outside calculus carry a named, specific diagnosis (${coverage.named} of ${coverage.items})`);
 ok(coverage.controlsClean === coverage.controls, `correct working was left alone in ${coverage.controlsClean} of ${coverage.controls} cases`);
+
+// ── B2 · the forms a pinned seed does not name, step-marked too ──────────────
+// The slip catalogues above are designed against each skill's direct form. Every other form of the same
+// cells (the Prithagoras overlays, the Priyabhata extra forms) is drawn from the same seeds here and held to
+// the invariants that hold for any step-marked question (support/extra-form-step-sweep.mjs): the model line
+// is clean, a changed line is a break at that line, a restated prompt is never verified work.
+{
+  const { sweepStepMarkingOfOtherForms } = await import('./support/extra-form-step-sweep.mjs');
+  const other = sweepStepMarkingOfOtherForms({ cells: Object.keys(GENERATORS).map(id => ({ id })), seeds: Array.from({ length: Math.max(6, SEEDS) }, (_, i) => 1009 + i * 7919) });
+  checks += other.checks - other.failures.length;
+  for (const text of other.failures) fail(`other forms: ${text}`);
+  ok(other.stepMarked > 100, `the step marker was run over ${other.stepMarked} questions of other forms (${JSON.stringify(other.byKind)})`);
+  console.log(`other forms: ${other.stepMarked} step-marked questions of ${other.questions} drawn (${JSON.stringify(other.byKind)}), ${other.checks} checks`);
+}
 
 // ── C · honest coverage ─────────────────────────────────────────────────────
 const noCheckTopics = new Set([...coverage.noCheck].map(c => c.split('|')[0]));

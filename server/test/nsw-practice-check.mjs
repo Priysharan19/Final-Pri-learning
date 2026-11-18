@@ -114,6 +114,11 @@ try {
     const banded = await issue({ generator: 'pyq-jee-main-c11-straight-lines', difficulty: 3, curriculum: 'nsw', mode: 'practice', band: 'short' });
     c.deq([banded.status, banded.data?.error?.code], [422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM'], 'a JEE band issue is refused on a Prithagoras server');
   }
+  // F12 parity: the root-gap reading walks India's prerequisite graph, so a Prithagoras server refuses it.
+  {
+    const gap = await h.request('/v1/root-gap', { jar: a.jar });
+    c.deq([gap.status, gap.data?.error?.code], [422, 'PRACTICE_BANK_OUTSIDE_CURRICULUM'], 'the India root-gap reading is refused on a Prithagoras server');
+  }
   const submit = (qid, submissionId, answer, steps, jar = a.jar) => h.request(`/v1/practice/${qid}/submit`, {
     method: 'POST', jar, headers: { 'Idempotency-Key': submissionId }, body: { submissionId, answer, mode: 'typed', ...(steps ? { steps } : {}) } });
   const escrowCount = async accountId => Number((await h.db.get("SELECT COUNT(*) AS n FROM idempotency_keys WHERE account_id=? AND scope='practice-question'", [accountId]))?.n || 0);
@@ -196,7 +201,7 @@ try {
 
   // ── Final answer only, with the method-mark switch ON ─────────────────────
   {
-    const r = await issue({ generator: 'y7-equations', difficulty: 2, seed: 1, curriculum: 'nsw' });
+    const r = await issue({ generator: 'y7-equations', difficulty: 2, seed: 14071, curriculum: 'nsw' });
     c.deq([r.status, r.data.question.prompt], [201, 'Solve $2x + 1 = 11$.'], 'a two-mark equation is issued');
     c.ok(r.data.question.criteriaCount >= 2 && r.data.question.supportsSteps === true, 'it carries two marks and its working can be read');
     const sealed = await sealedOf(a.account.id, r.data.question.id);
@@ -216,7 +221,7 @@ try {
     const [event] = await eventsOf(r.data.question.id);
     c.deq([event.marksEarned, event.correct, event.curriculum?.outcomes?.[0]?.code], [0, false, 'MA4-EQU-C-01'], 'the recorded attempt: no marks, and its outcome');
     // Working alone, no final answer, earns nothing either.
-    const again = await issue({ generator: 'y7-equations', difficulty: 2, seed: 2, curriculum: 'nsw' });
+    const again = await issue({ generator: 'y7-equations', difficulty: 2, seed: 52507, curriculum: 'nsw' });
     await submit(again.data.question.id, 'nsw-working-only-1', '', ['3x - 5 = 16', '3x = 21']);
     const only = await submit(again.data.question.id, 'nsw-working-only-2', '', ['3x - 5 = 16', '3x = 21']);
     c.deq([only.data.resolved, only.data.marksEarned, only.data.partial], [true, 0, null], 'working with no final answer earns nothing');
@@ -369,7 +374,7 @@ try {
     const { generateQuestion, loadAllBanks } = await import('../../client/src/engine/generators/index.js');
     await loadAllBanks();
     const plant = async extra => {
-      const payload = JSON.stringify({ ...generateQuestion('y7-equations', 2, 1), _practiceMode: 'practice', _generator: 'y7-equations', ...extra });
+      const payload = JSON.stringify({ ...generateQuestion('y7-equations', 2, 14071), _practiceMode: 'practice', _generator: 'y7-equations', ...extra });
       const id = randomUUID();
       const now = Date.now();
       await india.db.transaction(() => india.db.run("INSERT INTO idempotency_keys(account_id,scope,key,response_json,request_digest,created_at,expires_at) VALUES (?,'practice-question',?,?,?,?,?)",

@@ -106,17 +106,49 @@ let PYQ_ARCHIVE_MEASURED = null;
 // sign-in that follows. Notes fonts and the diagram kit stay on demand. The
 // other three ceilings are unchanged.
 
-// Raised again 2026-11-18 (train editions-24, CTO under the same owner
-// decision): FIRST_VISIT_RAW only, 3,600,000 -> 3,700,000 bytes. The train-24
-// tree (21 branches: Progress rebuilt around evidence and the syllabus board,
-// Check-what-Pri-read, auto-read handwriting, sign-in design, passkey work)
-// measured 3,543 kB (about 3,628,000 bytes) against the 3,516 kB ceiling. The
-// new ceiling leaves about 70 kB. The other three ceilings are unchanged.
+// Raised again 2026-11-18 (au-skills bands: Standard 2 #973, Years 9-10 #975,
+// Years 7-8 #980; CTO under the same owner decision, "i dont care if the app is
+// 10gb just make it properly end to end"): FIRST_VISIT_RAW only, 3,450,000 ->
+// 3,900,000 bytes. The three Prithagoras capacity overlays (au-forms-*-nsw.js,
+// the extra tagged question forms that take every Standard 2 and Year 7-10 skill
+// to 10,000+ instances) ride in the year/stream bank chunks and so in the warm
+// pass: measured 3,674 kB (3,762,000 bytes) with all three bands built together,
+// over the 3,450,000 ceiling; each band alone is 3,378-3,448 kB. The 3,900,000
+// ceiling leaves about 135 kB for the rest of the Lit Instrument interface and
+// the Priyabhata capacity work. The gzip ceilings, the banned-from-install list,
+// render-from-install and offline coverage are unchanged and still pass.
+
+// Raised once for the whole Prithagoras capacity programme on 2026-11-18 (au-skills
+// bands #973/#975/#980 and the Advanced Year 11-12 / Extension 1-2 bands; CTO under
+// the same owner decision, "i dont care if the app is 10gb just make it properly end
+// to end", size not a constraint): FIRST_VISIT_RAW 3,900,000 -> 4,350,000 and
+// FIRST_VISIT_GZIP 1,290,000 -> 1,450,000 bytes. This is a projection for the merged
+// chain, not the size of this commit alone: a scratch tree combining every band
+// branch (either edition) measured 4,146 kB raw (4,245,000 bytes) and 1,373 kB
+// gzipped (1,406,000 bytes) install plus warm; this PR alone measures about 148 kB
+// raw / 43 kB gzipped above its parent (3,645 kB / 1,224 kB). Margins on the
+// projection are about 100 kB raw and 44 kB gzipped. The overlays (au-forms-*-nsw.js)
+// are dynamic imports loaded by course through au-forms.js, so a Year 7 session
+// imports none of the Extension 2 forms; the warm pass still precaches every chunk.
+// The install ceilings, the banned-from-install list, render-from-install and offline
+// coverage are unchanged and still pass.
+
+// Raised again 2026-11-18 (train editions-25, CTO under the same owner decision, "i dont
+// care if the app is 10gb just make it properly end to end", size not a constraint):
+// FIRST_VISIT_RAW 4,350,000 -> 5,000,000 and FIRST_VISIT_GZIP 1,450,000 -> 1,750,000
+// bytes. Train 25 merges thirty-three branches on train 24 (the Priyabhata extra forms
+// and diagrams for Classes 7-12, the Prithagoras capacity overlays, NSW Extension 1/2
+// notes, the teacher workspace, the landing pages, passkeys and Apple sign-in, annotated
+// working and the step-justification engine, the tutor policy): the combined tree,
+// either edition, measured 4,784 kB raw (4,898,816 bytes) and 1,628 kB gzipped
+// (1,667,072 bytes) install plus warm, over the 4,350,000 / 1,450,000 ceilings. The new
+// ceilings leave about 100 kB raw and 80 kB gzipped. The install ceilings, the
+// banned-from-install list, render-from-install and offline coverage are unchanged.
 
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 3_700_000;
-const FIRST_VISIT_GZIP_CEILING = 1_290_000;
+const FIRST_VISIT_RAW_CEILING = 5_000_000;
+const FIRST_VISIT_GZIP_CEILING = 1_750_000;
 
 // Things that must never be in the install again, and what each one costs.
 const BANNED_FROM_INSTALL = [

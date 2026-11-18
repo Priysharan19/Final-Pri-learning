@@ -18,7 +18,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
 const { checkAnswer } = await import(`${SRC}engine/checker.js`);
-const { generateQuestion, loadAllBanks, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
+const { generateQuestion, loadAllBanks, GENERATORS, directFormsOnly } = await import(`${SRC}engine/generators/index.js`);
+// The review's served repros name a question by (skill, difficulty, seed): the skill's direct form. The sweeps in this
+// file over every generator keep drawing every form.
+const pinned = (...args) => { const was = directFormsOnly(true); try { return generateQuestion(...args); } finally { directFormsOnly(was); } };
 await loadAllBanks();
 
 const groups = {};
@@ -112,7 +115,7 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
     ['c10-linear-pair-methods', 4, 4, ['147', '₹147'], ['147 litres', '147 kilograms']],
     ['c8-monomial-product-reasoning', 1, 1, ['3456', '3456 cm³'], ['3456 cm']]
   ]) {
-    const q = generateQuestion(id, d, s);
+    const q = pinned(id, d, s);
     for (const input of credited) check(G, verdict(q, input).correct === true, `${id} d${d} s${s}: "${input}" is credited`);
     for (const input of unread) check(G, verdict(q, input).correct !== true, `${id} d${d} s${s}: "${input}" is not credited`);
   }
@@ -155,11 +158,11 @@ const fmt = x => (Number.isInteger(x) ? String(x) : String(Number(x.toPrecision(
 // ── P4 · a percentage label ─────────────────────────────────────────────────
 {
   const G = 'p4-percent-label';
-  const profit = generateQuestion('y8-percentages', 3, 2);
+  const profit = pinned('y8-percentages', 3, 2);
   for (const input of ['Profit % = 20', 'Profit% = 20', '% profit = 20', 'Profit % = 20%', 'Percentage profit = 20'])
     check(G, verdict(profit, input).correct === true, `y8-percentages d3 s2: "${input}" is the asked percentage, and correct`);
   check(G, verdict(profit, 'Profit % = 25').correct === false, 'y8-percentages d3 s2: a wrong value under the label is wrong');
-  const fall = generateQuestion('c8-gst-reasoning', 1, 1013946281);
+  const fall = pinned('c8-gst-reasoning', 1, 1013946281);
   for (const input of ['Loss % = 12', 'Fall % = 12', 'Loss percent = 12']) {
     const r = verdict(fall, input);
     check(G, r.correct === false && r.invalid === true, `c8-gst-reasoning: "${input}" on "by what percentage did the price fall?" is left unread, never marked wrong (got ${state(r)})`);

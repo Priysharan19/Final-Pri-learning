@@ -82,13 +82,18 @@ export async function bundleLogin({ extended, tag = 'scope', edition = null }) {
         'process.env.NODE_ENV': '"production"'
       }
     },
-    plugins: edition ? [{
+    // `?url` imports (the PDF worker) are Vite's; the landing screen never loads one, so they resolve to an empty string.
+    plugins: [{
+      name: 'vite-url-stub',
+      resolveId(source) { return source.endsWith('?url') ? `\0url-stub:${source}` : null; },
+      load(id) { return id.startsWith('\0url-stub:') ? "export default '';" : null; }
+    }, ...(edition ? [{
       name: 'edition-record-stub',
       resolveId(source, importer) {
         if (importer && importer.endsWith(join('src', 'platform', 'edition.js')) && source === './edition-record.js') return join(dir, 'edition-record-stub.js');
         return null;
       }
-    }] : [],
+    }] : [])],
     resolve: {
       modules: [join(CLIENT, 'node_modules')],
       alias: { '../App.jsx': join(dir, 'app-stub.jsx'), '../api.js': join(dir, 'api-stub.js'), '../components/SignUpFlow.jsx': join(dir, 'signup-stub.jsx'), '../instrument/SignInScenes.jsx': join(dir, 'scenes-stub.jsx') }

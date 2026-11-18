@@ -42,6 +42,9 @@ const ALLOW = [
   [/^login\.olympiadTrack$/, 'Indian track chooser at sign-up'],
   [/^signup\.trackJeeHint$/, 'Indian track chooser at sign-up'],
   [/^board\.ready\.whyIn$/, 'the Priyabhata honesty box under exam readiness (progress/SyllabusBoard.jsx draws whyNsw for Prithagoras, whyIn only for edition "in")'],
+  [/^tw\.paper\.(cbse10Standard|cbse10Basic|cbse11|cbse12|jeeMain|jeeAdvanced|indiaOther)$/, 'the India paper templates a teacher sets (classroom/classroomWords.js INDIA_PAPERS); TeacherWorkspace.jsx offers them only when the edition\'s default course is not NSW, and a Prithagoras server refuses an india paper (server/platform/paperAssignments.js paperKindsForEdition)'],  [/^notes\.olympiad(Tab|Topics|Lede|Eyebrow|Scope)$/, 'the Olympiad tab of the India notes page (pages/Notes.jsx); a Prithagoras build routes /notes to pages/NswNotes.jsx and does not carry the India page'],
+  [/^landing\.proofSyllabusIn$/, 'the verified landing page picks proofSyllabusAu for Prithagoras (landing/Landing.jsx syllabusKey)'],
+  [/^landing\.syllabus\.in$/, 'the plain syllabus page picks landing.syllabus.au for Prithagoras (landing/PublicInfo.jsx)'],
   [/^board\.prio\.sourceIndia$/, 'the CBSE unit-weightage note under syllabus-board priorities (progress/SyllabusBoard.jsx draws it only when india is true, i.e. an Indian course)']
 ];
 
@@ -93,7 +96,7 @@ check('every year selector and tab goes through common.classNumber (Year N in Pr
 });
 check('the welcome page\'s hard-coded track kicker is not drawn in Prithagoras', () => {
   const login = readFileSync(fileURLToPath(new URL('../src/pages/Login.jsx', here)), 'utf8');
-  assert.match(login, /EDITION_ID === 'prithagoras' \? t\('login\.brandKicker'\) : featureEnabled\('extendedTracks'\)/);
+  assert.match(login, /!offersCourse\('in'\) \? t\('login\.brandKicker'\) : featureEnabled\('extendedTracks'\)/);
 });
 check('the Prithagoras sign-in screen: its own eyebrow and value line, no language switch, no India footer links, one short note', () => {
   assert.equal(AU_STRINGS['login.brandKicker'], 'NSW Years 7–10 · Stage 6 Standard, Advanced, Extension 1 & 2');
@@ -116,6 +119,27 @@ check('the sign-in scenes: Prithagoras lists only scenes that are live there (no
   const src = readFileSync(fileURLToPath(new URL('../src/instrument/SignInScenes.jsx', here)), 'utf8');
   assert.match(src, /prithagoras'\) return \['hand', \.\.\.\(flags\.desk \? \['desk'\] : \[\]\), 'daily'\]/);
   assert.match(src, /return \['hand', 'papers', 'notes', 'daily'\]/);
+});
+check('parent features are Priyabhata only: the edition record, the sign-in link, the report nav and route, the report email page', async () => {
+  const cfg = await import('../edition.config.mjs');
+  assert.equal(cfg.EDITIONS.priyabhata.family.parentFeatures, true);
+  assert.equal(cfg.EDITIONS.prithagoras.family.parentFeatures, false);
+  const read = f => readFileSync(fileURLToPath(new URL(`../src/${f}`, here)), 'utf8');
+  assert.match(read('components/SignUpFlow.jsx'), /\{!inline && parentFeaturesOffered\(\) && \(\s*<div className="signup-alt signup-alt-quiet">/);
+  assert.match(read('App.jsx'), /PARENT_REPORT_ON = featureEnabled\('parentReport'\) && parentFeaturesOffered\(\)/);
+  assert.match(read('main.jsx'), /PARENT_EMAIL_MODE = featureEnabled\('parentReport'\) && parentFeaturesOffered\(\)/);
+  assert.match(read('platform/edition-record.js'), /family: Object\.freeze\(\{ parentFeatures: e\.family\.parentFeatures === true \}\)/);
+});
+check('Prithagoras onboarding: Year (not Class), NSW courses for Year 11 and 12, no CBSE/JEE tracks; the age is sent so the AU rule can decide', () => {
+  const src = readFileSync(fileURLToPath(new URL('../src/components/SignUpFlow.jsx', here)), 'utf8');
+  assert.match(src, /const AU_PATHWAYS = \[\s*\{ key: 'standard'[\s\S]*key: 'ext2'/);
+  assert.match(src, /\{!au && <div className="signup-segment" role="radiogroup" aria-labelledby="signup-track-label">/);
+  assert.match(src, /const jee = !au && track !== 'cbse';/);
+  assert.match(src, /isAdult: age === null \? undefined : age >= 18, age: age === null \? undefined : age/);
+  assert.match(src, /isAdult: p\.isAdult, age: p\.age, guardianLater: true/, 'social sign-up sends the stated age too');
+  assert.equal(AU_STRINGS['signup.classTitle'], 'Which year are you in?');
+  assert.match(AU_STRINGS['signup.ageLead'], /under 15/);
+  assert.ok(!/under 18|class|CBSE/i.test(AU_STRINGS['signup.ageLead']));
 });
 check('every allowlist entry still matches a key (a dead entry is removed)', () => {
   for (const [re] of ALLOW) assert.ok(Object.keys(en).some(k => re.test(k)), `${re} matches no key`);

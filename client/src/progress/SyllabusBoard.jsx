@@ -40,7 +40,7 @@ import { practiceHref } from '../lib/practiceLinks.js';
 const FORECAST = import.meta.glob('../engine/hsc/hscPriorities.js');
 
 // Explicit maps (not template keys) so the catalogue check sees every string.
-const STATE_WORD = {
+export const STATE_WORD = {
   'not-started': 'board.state.notStarted', seen: 'board.state.seen', assisted: 'board.state.assisted',
   thin: 'board.state.thin', recheck: 'board.state.recheck', independent: 'board.state.independent', retained: 'board.state.retained'
 };
@@ -252,7 +252,16 @@ export function MapCanvas({ areas, links, selected, onSelect, raised, label, axi
   // Taller for a map with more rows, so its labels keep their room.
   const rowCount = areas.length ? Math.max(...areas.map(a => a.row)) + 1 : 1;
   const height = phone ? Math.max(360, rowCount * 44 + 80) : Math.max(440, rowCount * (rowCount > 8 ? 84 : 72) + 128);
-  return <canvas ref={ref} className="sb-canvas" role="img" aria-label={label} onClick={pick} style={{ height, minHeight: height, maxHeight: 'none' }} data-board-map data-rows={rowCount} />;
+  // Picking a point with the pointer is an enhancement of the picture: the keyboard and screen-reader view is the
+  // list (the Map/List switch above is a tab stop), which does everything the picture does. The pointer listener is
+  // attached here, not as a React onClick, so the canvas is a labelled image and not a half-interactive control.
+  useEffect(() => {
+    const canvas = ref.current;
+    if (!canvas) return undefined;
+    canvas.addEventListener('click', pick);
+    return () => canvas.removeEventListener('click', pick);
+  });
+  return <canvas ref={ref} className="sb-canvas" role="img" aria-label={label} style={{ height, minHeight: height, maxHeight: 'none' }} data-board-map data-rows={rowCount} />;
 }
 
 // ── The list: the same areas, a listbox moved with the arrow keys ────────────
@@ -273,7 +282,7 @@ export function AreaList({ sections, selected, onSelect, label }) {
     if (flat[i]) onSelect(flat[i].id);
   };
   return (
-    <div role="listbox" tabIndex={0} aria-label={label} aria-activedescendant={selected ? `sb-opt-${selected}` : undefined} onKeyDown={key} className="sb-listbox" data-board-list>
+    <div role="listbox" tabIndex={0} aria-label={label} aria-activedescendant={at >= 0 ? `sb-opt-${selected}` : flat[0] ? `sb-opt-${flat[0].id}` : undefined} onKeyDown={key} className="sb-listbox" data-board-list>
       {sections.map(s => (
         <div role="group" aria-label={s.label} key={s.label}>
           <div className="sb-list-head" aria-hidden="true">{s.label}</div>

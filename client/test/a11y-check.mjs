@@ -67,7 +67,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { startOnlinePlatform } from './support/online-session.mjs';
 import { createVerifiedProfile, freshEmail, signInOnCard } from './support/verified-onboarding.mjs';
 import { acceptReaderPermissionOnSight } from './fakeServerReader.js';
-import { resolveEdition } from '../edition.config.mjs';
+import { resolveEdition, EDITIONS } from '../edition.config.mjs';
 
 // Plan E6: the walk runs per edition (PRI_EDITION, unset = Priyabhata). The
 // app is the same; the student is the edition's own: CBSE Class 10 on
@@ -149,7 +149,7 @@ function buildApp() {
     // only passes where the CI job happens to export the variable.
     // (KALP-02 pins the four-flag env below; PARENT_REPORT (#743) is added on top so /parent-report is walked too,
     // and LIBRARY (plan F1) so /library and /library/:id are, and EXAM_DESK (plan F4b) so /desk/import and /desk/:attemptId are.)
-    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1', PRI_FEATURE_LIBRARY: '1', PRI_FEATURE_EXAM_DESK: '1' } });
+    { cwd: CLIENT, encoding: 'utf8', env: { ...{ env: { ...process.env, PRI_FEATURE_PLACEMENT: '1', PRI_FEATURE_EXTENDED_TRACKS: '1', PRI_FEATURE_EXAM_HANDWRITING: '1' } }.env, PRI_FEATURE_PARENT_REPORT: '1', PRI_FEATURE_LIBRARY: '1', PRI_FEATURE_EXAM_DESK: '1', PRI_FEATURE_SYLLABUS_BOARD: '1' } });
   if (r.status !== 0) throw new Error(`the build failed:\n${r.stdout || ''}${r.stderr || ''}`);
   if (!existsSync(join(out, 'index.html'))) throw new Error('the build emitted no index.html');
   return out;
@@ -210,6 +210,17 @@ function auditPage() {
   const interactive = (el) => {
     const role = el.getAttribute('role');
     if (role && INTERACTIVE_ROLES.has(role)) return true;
+    // A listbox is a composite widget: ONE tab stop that owns its options. It counts as interactive only when it
+    // keeps that contract: a name, role="option" children, and a key handler (the arrow keys move the active
+    // option, named by aria-activedescendant) or options that are themselves in the tab order (roving tabindex).
+    if (role === 'listbox') {
+      const named = !!((el.getAttribute('aria-label') || '').trim() || el.getAttribute('aria-labelledby'));
+      const options = el.querySelectorAll('[role="option"]');
+      const keyed = typeof reactProps(el)?.onKeyDown === 'function' || (!el.hasAttribute('aria-activedescendant') && [...options].some(o => o.hasAttribute('tabindex')));
+      const active = el.getAttribute('aria-activedescendant');
+      const activeOk = !active || !!el.querySelector(`[id="${CSS.escape(active)}"][role="option"]`);
+      return named && options.length > 0 && keyed && activeOk;
+    }
     if (el.matches(NATIVELY_FOCUSABLE)) return !(el.tagName === 'A' && !el.hasAttribute('href'));
     return el.isContentEditable;
   };
@@ -238,8 +249,8 @@ function auditPage() {
 
   const out = {
     headings: [], unnamedFields: [], positiveTabindex: [], inertFocusable: [],
-    unreachable: [], colourOnly: [], liveRegions: [],
-    counts: { controls: 0, fields: 0, elements: 0, handlers: 0, colours: verdictColours.size }
+    unreachable: [], colourOnly: [], liveRegions: [], mathFaults: [],
+    counts: { controls: 0, fields: 0, elements: 0, handlers: 0, colours: verdictColours.size, math: 0 }
   };
 
   for (const h of document.querySelectorAll('h1, [role="heading"][aria-level="1"]')) {
@@ -268,6 +279,24 @@ function auditPage() {
         : el.getAttribute('title') ? 'its title alone' : 'nothing at all';
       out.unnamedFields.push({ el: el2str(el), detail: `no <label> and no aria-label — named by ${via}` });
     }
+  }
+
+  // Spoken mathematics: every rendered formula is a role="math" node with a spoken accessible name, its
+  // KaTeX (and the MathML inside it) is kept out of the accessibility tree so it is announced once, and
+  // a role="math" never sits inside another.
+  for (const k of document.querySelectorAll('.katex')) {
+    if (!shown(k)) continue;
+    out.counts.math++;
+    const wrap = k.closest('[role="math"]');
+    if (!wrap) { out.mathFaults.push({ el: el2str(k), detail: 'a formula with no role="math" wrapper, so it has no spoken name' }); continue; }
+    const name = (wrap.getAttribute('aria-label') || '').trim();
+    if (!name) out.mathFaults.push({ el: el2str(wrap), detail: 'role="math" with no aria-label: nothing is spoken for this formula' });
+    else if (!/[\p{L}\p{N}]/u.test(name)) out.mathFaults.push({ el: el2str(wrap), detail: `role="math" is named "${name}": not words` });
+    if (/\\[a-zA-Z]+|[{}^_]|\b(?:lfloor|rfloor|lceil|rceil|neg|Vert|langle|rangle|dfrac|sqrt|mathbf|mathbb|cdot|ldots|infty|leq|geq|neq|pmatrix|bmatrix)\b/.test(name)) out.mathFaults.push({ el: el2str(wrap), detail: `the spoken name still carries LaTeX: "${name.slice(0, 60)}"` });
+    if (!k.closest('[aria-hidden="true"]')) out.mathFaults.push({ el: el2str(wrap), detail: 'the formula is exposed to assistive technology as well as named, so it would be announced twice' });
+    if (wrap.parentElement && wrap.parentElement.closest('[role="math"]')) out.mathFaults.push({ el: el2str(wrap), detail: 'a role="math" inside another role="math"' });
+    for (const inner of wrap.querySelectorAll('[role="math"]')) out.mathFaults.push({ el: el2str(inner), detail: 'a role="math" inside another role="math"' });
+    if (wrap.hasAttribute('tabindex') && !hiddenFromAT(wrap) && Number(wrap.getAttribute('tabindex')) > 0) out.mathFaults.push({ el: el2str(wrap), detail: 'a formula with a positive tabindex' });
   }
 
   for (const el of document.querySelectorAll('[tabindex]')) {
@@ -622,9 +651,12 @@ async function run() {
       for (const f of res.inertFocusable) file('inert', view, f.el, f.detail);
       for (const f of res.unreachable) file('reachable', view, f.el, f.detail);
       for (const f of res.colourOnly) file('colour', view, f.el, f.detail);
+      for (const f of res.mathFaults) file('math', view, f.el, f.detail);
+      mathSeen += res.counts.math;
       return res;
     }
 
+    let mathSeen = 0;
     const indiaOnly = (view, why) => { notApplicable.push(`${view} — ${why}`); };
     const step = async (view, route, drive) => {
       try {
@@ -641,6 +673,24 @@ async function run() {
       await page.waitForSelector('.auth-wrap', { timeout: 20000 });
       await wait(page, 600);
     });
+
+    // ── signed out: the public landing and its plain pages (the verified page) ──
+    // The demo is driven to its end — confirm the reading, let the engine's
+    // verdicts lock, See why open — so the audit sees every state it shows.
+    await step('landing · demo waiting for the reading', '/welcome', async () => {
+      await page.goto(BASE + '/welcome', { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-landing-demo][data-demo-state="waiting"]', { timeout: 20000 });
+    });
+    await step('landing · demo checked, See why open', '/welcome', async () => {
+      await page.click('[data-demo-confirm]');
+      await page.waitForSelector('[data-landing-demo][data-demo-state="done"] [data-demo-seewhy] [role="slider"]', { timeout: 20000 });
+    });
+    for (const sub of ['marking', 'syllabus', 'teachers']) {
+      await step(`landing · ${sub}`, `/welcome/${sub}`, async () => {
+        await page.goto(`${BASE}/welcome/${sub}`, { waitUntil: 'domcontentloaded' });
+        await page.waitForSelector(`[data-landing-page="${sub}"]`, { timeout: 20000 });
+      });
+    }
 
     // ── the skip link, measured on a page nothing has focused yet ────────────
     try {
@@ -695,6 +745,29 @@ async function run() {
     await online.signIn({ name: 'Accessibility Student' });
 
     await step('home', '/', async () => { await goTo(page, BASE, '/'); });
+
+    // ── the teacher workspace, the student's side (Settings) ────────────────
+    // TEST DESK: a teacher account and its class are made at the server's own
+    // routes; the student signed in on this page joins with the class code
+    // over the same route the app uses, carrying this page's own cookies.
+    await step('settings · a paper set by a teacher and what the teacher can see', '/settings', async () => {
+      const { registerAccount, verifyEmail, promoteRole } = await import('../../server/test/support/app-harness.mjs');
+      const h = platform.h;
+      h.db.prepare("DELETE FROM rate_limits WHERE bucket LIKE 'register%'").run();
+      const made = await registerAccount(h, { email: freshEmail('a11y-class-teacher'), name: 'A11y Class Teacher', deviceId: 'a11y-desk-teacher' });
+      await verifyEmail(h, made.account.id);
+      await promoteRole(h, made.jar, made.account.id, 'teacher');
+      const cls = await h.request('/v1/classes', { method: 'POST', jar: made.jar, body: { name: 'A11y class' } });
+      await h.request(`/v1/classes/${cls.data.class.id}/assignments`, { method: 'POST', jar: made.jar,
+        body: { title: 'Week 4 paper', specification: { kind: 'paper', paper: INDIA ? { kind: 'india', track: 'cbse', grade: 10 } : { kind: 'practice-paper', year: 7, minutes: 30 } } } });
+      const jar = Object.fromEntries((await ctx.cookies()).map(c => [c.name, c.value]));
+      const joined = await h.request('/v1/classes/join', { method: 'POST', jar, body: { code: cls.data.joinCode } });
+      if (joined.status !== 200) throw new Error(`the student could not join the desk's class (${joined.status} ${joined.text})`);
+      await goTo(page, BASE, '/settings');
+      await page.waitForSelector('[data-teacher-can-see]', { timeout: 30000 });
+      await page.waitForSelector('[data-paper-assignment]', { timeout: 30000 });
+      await wait(page, 600);
+    });
 
     await step('home · generator open', '/', async () => {
       await goTo(page, BASE, '/');
@@ -1172,7 +1245,11 @@ async function run() {
 
     // The parent weekly report (#743, D22): built only with PRI_FEATURE_PARENT_REPORT=1,
     // which this walk sets, so its route is rendered and audited like the others.
-    await step('parent report · the week, or why there is none', '/parent-report', async () => {
+    // An edition without parent features (edition.config.mjs family.parentFeatures) builds no such route.
+    if (EDITIONS[EDITION].family.parentFeatures !== true) {
+      notApplicableRoutes.add('/parent-report');
+      notApplicable.push(`parent report · the week, or why there is none — ${EDITION} offers no parent features (family.parentFeatures)`);
+    } else await step('parent report · the week, or why there is none', '/parent-report', async () => {
       await goTo(page, BASE, '/parent-report');
       await page.waitForSelector('.parent-page h1', { timeout: 20000 });
       await page.waitForSelector('.parent-page [data-parent-report], .parent-page [data-parent-error]', { timeout: 20000 });
@@ -1266,15 +1343,22 @@ async function run() {
       await wait(page, 600);
     });
 
+    // The Prithagoras edition's notes are the NSW page (Year tabs, topics; plan nsw-notes),
+    // never the India chapter map.
     await step('notes · index and chapter map', '/notes', async () => {
-      await goTo(page, BASE, '/notes?class=10');
-      await page.waitForSelector('.nt-map-node', { timeout: 20000 });
+      if (INDIA) {
+        await goTo(page, BASE, '/notes?class=10');
+        await page.waitForSelector('.nt-map-node', { timeout: 20000 });
+      } else {
+        await goTo(page, BASE, '/notes?year=7');
+        await page.waitForSelector('[data-nsw-notes] [data-testid="notes-chapter"]', { timeout: 20000 });
+      }
       await wait(page, 1200);
     });
 
     await step('notes · a chapter read through', '/notes/:chapterId', async () => {
-      await goTo(page, BASE, '/notes/c10-quadratic-equations');
-      await page.waitForSelector('.nt-formula', { timeout: 20000 });
+      await goTo(page, BASE, INDIA ? '/notes/c10-quadratic-equations' : '/notes/ma4-equ-c-01?year=7');
+      await page.waitForSelector(INDIA ? '.nt-formula' : '.nn-formula', { timeout: 20000 });
       await page.evaluate(() => document.querySelectorAll('.nt-reveal').forEach(el => el.classList.add('is-in')));
       await wait(page, 1600);
     });
@@ -1524,6 +1608,7 @@ async function run() {
     });
 
     // ── teacher-only workspace, exercised under a real teacher profile ──────
+    const teacherEmail = freshEmail('a11y-teacher');
     await step('teacher studio', '/teach', async () => {
       await insideLive('/');
       await click(page, '.user-chip');
@@ -1541,7 +1626,7 @@ async function run() {
       await page.getByRole('button', { name: 'Open Teacher Workspace' }).click();
       // A teacher is a device role; the gate still asks for an account first.
       await page.waitForSelector('[data-testid="account-activation-gate"] [data-signin-card="inline"]', { timeout: 30000 });
-      await signInOnCard(page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]'), platform, { email: freshEmail('a11y-teacher'), age: 18 });
+      await signInOnCard(page.locator('[data-testid="account-activation-gate"] [data-signin-card="inline"]'), platform, { email: teacherEmail, age: 18 });
       await page.waitForSelector('.teacher-workspace-head', { timeout: 60000 });
       await wait(page, 700);
     });
@@ -1556,6 +1641,44 @@ async function run() {
 
     await step('teacher studio · question builder', '/teach', async () => {
       await click(page, 'button.btn-ghost', { text: 'Write a question' });
+    });
+
+    // ── the teacher workspace (cloud classes): onboarding, board, papers ────
+    // TEST DESK: the account behind this teacher profile is given the teacher
+    // role in the database, as the bootstrap/CLI does (an invite code in production).
+    await step('teacher workspace · a class and its join code', '/teach', async () => {
+      platform.h.db.prepare("UPDATE accounts SET role='teacher' WHERE email=?").run(teacherEmail.toLowerCase());
+      await goTo(page, BASE, '/teach');
+      const form = page.locator('section[aria-labelledby="classroom-title"] form').first();
+      await form.waitFor({ timeout: 30000 });
+      await form.locator('input').first().fill('A11y 7MA');
+      await form.locator('button.btn-primary').click();
+      await page.waitForSelector('[data-join-code]', { timeout: 20000 });
+      await page.waitForSelector('[data-teacher-workspace]', { timeout: 30000 });
+      await wait(page, 700);
+    });
+
+    await step('teacher workspace · class board', '/teach', async () => {
+      await click(page, '[data-tw-view="board"]');
+      await page.waitForSelector('[data-class-board] table, [data-class-board-not-yet]', { timeout: 30000 });
+      await wait(page, 500);
+    });
+
+    await step('teacher workspace · papers and results', '/teach', async () => {
+      await click(page, '[data-tw-view="papers"]');
+      await page.waitForSelector('[data-paper-form]', { timeout: 20000 });
+      await page.locator('#tw-paper-title').fill('Week 4 paper');
+      await click(page, '[data-paper-form] button.btn-primary');
+      await page.waitForSelector('[data-open-results]', { timeout: 20000 });
+      await click(page, '[data-open-results]');
+      await page.waitForSelector('[data-paper-results] table', { timeout: 20000 });
+      await wait(page, 500);
+    });
+
+    await step('teacher workspace · review queue', '/teach', async () => {
+      await click(page, '[data-tw-view="review"]');
+      await page.waitForSelector('[data-review-queue]', { timeout: 20000 });
+      await wait(page, 500);
     });
 
     // ── verdicts ─────────────────────────────────────────────────────────────
@@ -1677,6 +1800,10 @@ async function run() {
       refusals.read?.stale?.label?.role === 'status' && /\p{L}/u.test(refusals.read.stale.label.text) && refusals.read.stale.again?.tag === 'button' &&
         /\p{L}/u.test(refusals.read.stale.again.name) && refusals.read.stale.reason?.key === 'ink.submitReadAgain' && refusals.read.stale.reason.describes === true,
       JSON.stringify(refusals.read?.stale));
+
+    section('spoken mathematics');
+    ok('formulas were seen, so the rule is alive', mathSeen >= 20, `only ${mathSeen} formulas were found across the views`);
+    ok('every formula is a role="math" with a spoken name, announced once, never nested', findingsFor('math').length === 0, show(findingsFor('math')));
 
     section('colour is never alone');
     ok('correct / incorrect is never carried by colour alone', findingsFor('colour').length === 0, show(findingsFor('colour')));

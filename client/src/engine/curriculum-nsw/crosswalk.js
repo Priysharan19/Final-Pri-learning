@@ -257,6 +257,14 @@ export const LEGACY_CROSSWALK = Object.freeze([
     'No current dot point asks for areas involving inverse functions; Extension 1 has derivatives of inverse functions (ME1-12-04) and areas between curves (ME1-12-05).'),
   row('me12-binomial', EXT1, ['ME-S1'], same('ME1-12-06'), 'mapped', 'as-labelled'),
   row('me12-projectile', EXT1, ['ME-V1'], same('ME1-12-02'), 'mapped', 'as-labelled'),
+  row('me12-induction-forms', EXT1, ['ME-P1'], same('ME1-12-01'), 'mapped', 'as-labelled',
+    'Pri-authored exact-answer forms: series and divisibility steps, missing constants, inequality base cases.'),
+  row('me12-vectors-forms', EXT1, ['ME-V1'], same('ME1-12-02'), 'mapped', 'as-labelled',
+    'Pri-authored forms with figures: dot product, projection, angle, parallelogram and line-segment position vectors.'),
+  row('me12-projectile-forms', EXT1, ['ME-V1'], same('ME1-12-02'), 'mapped', 'as-labelled',
+    'Pri-authored projectile forms with trajectory figures (g = 10 m/s²): level ground and horizontal launch from a cliff.'),
+  row('me12-binomial-forms', EXT1, ['ME-S1'], same('ME1-12-06'), 'mapped', 'as-labelled',
+    'Pri-authored exact-decimal binomial forms: mean, variance, probabilities, reverse and complement questions.'),
 
   // ── Extension 2 (streams) → Mathematics Extension 2 11–12 (2024) ─────────
   row('mex-proof', EXT2, ['MEX-P1', 'MEX-P2'], same('ME2-12-01'), 'mapped', 'as-labelled'),
@@ -295,9 +303,6 @@ export const LEGACY_CROSSWALK = Object.freeze([
   row('mex-vectors-lines', EXT2, ['MEX-V1'], same('ME2-12-02'), 'mapped', 'as-labelled',
     'Pri-authored exact-answer forms.')
 ]);
-
-/** Current outcomes that no legacy subtopic reaches: the content gap with no generator. */
-const gap = (syllabus, outcome, note = '') => Object.freeze({ subtopicId: null, syllabus, outcome, status: 'new-no-generator', note });
 
 export const NEW_OUTCOME_GAPS = Object.freeze([
 ]);

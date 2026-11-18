@@ -10,12 +10,12 @@
 // SYNTHETIC: software checking of software-written items. Not a human maths
 // review, not an examiner review, not board approval.
 import assert from 'node:assert/strict';
-import { generateQuestion, loadAllBanks } from '../src/engine/generators/index.js';
+import { generateQuestion, loadAllBanks, EXTRA_FORMS } from '../src/engine/generators/index.js';
 import { CLASS10_ALGEBRA_FORMS, CLASS10_ALGEBRA_FORMS_MAP } from '../src/engine/generators/india-class10-algebra-forms.js';
 import { IN_CHAPTERS } from '../src/engine/curriculum-in.js';
 
 await loadAllBanks();
-const SEEDS = 400;
+const SEEDS = 500;   // the extra forms take a share of each draw and have their own suite, so the authored forms need more seeds to be re-derived as often as before (6000 items on main)
 const nums = s => (String(s).replace(/\\dfrac\{(-?\d+)\}\{(\d+)\}/g, '($1/$2)').match(/-?\d+/g) || []).map(Number);
 const plain = p => String(p).replace(/\$/g, '').replace(/\\ /g, ' ').replace(/\\ldots/g, '...').replace(/\^\{\\text\{(st|nd|rd|th)\}\}/g, '');
 const near = (a, b) => Math.abs(a - b) < 1e-9;
@@ -122,6 +122,8 @@ for (const gen of Object.keys(CLASS10_ALGEBRA_FORMS)) {
       const q = generateQuestion(gen, d, seed);
       const again = generateQuestion(gen, d, seed);
       assert.deepEqual(again, q, `${gen} D${d} seed ${seed} is reproducible`);
+      // Extra structural forms (generators/forms) have their own independent checks; this suite proves the authored forms.
+      if ((EXTRA_FORMS[gen] || []).some(f => f.form === q.form)) continue;
       const solve = SOLVE[q.form];
       assert.ok(solve, `${gen}: an independent solver for form ${q.form}`);
       const got = solve(plain(q.prompt));

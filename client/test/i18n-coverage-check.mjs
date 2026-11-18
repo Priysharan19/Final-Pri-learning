@@ -68,7 +68,7 @@ const eq = (a, b, label) => ok(JSON.stringify(a) === JSON.stringify(b), `${label
 
 // ── Which files ──────────────────────────────────────────────────────────────
 const jsxIn = dir => readdirSync(join(ROOT, dir)).filter(f => f.endsWith('.jsx')).map(f => `${dir}/${f}`);
-export const SCANNED = ['src/App.jsx', ...jsxIn('src/pages'), ...jsxIn('src/components'), ...jsxIn('src/tutor'), ...jsxIn('src/ink'), ...jsxIn('src/home'), ...jsxIn('src/plan'), ...jsxIn('src/reminders'), ...jsxIn('src/paywall'), ...jsxIn('src/parent'), ...jsxIn('src/library'), ...jsxIn('src/desk'), ...jsxIn('src/examShell')];
+export const SCANNED = ['src/App.jsx', ...jsxIn('src/pages'), ...jsxIn('src/components'), ...jsxIn('src/tutor'), ...jsxIn('src/ink'), ...jsxIn('src/home'), ...jsxIn('src/plan'), ...jsxIn('src/reminders'), ...jsxIn('src/paywall'), ...jsxIn('src/parent'), ...jsxIn('src/library'), ...jsxIn('src/desk'), ...jsxIn('src/examShell'), ...jsxIn('src/classroom')];
 
 // ── What reads as prose ──────────────────────────────────────────────────────
 // A capitalised word followed by at least one more token, or a phrase with a
@@ -361,7 +361,6 @@ for (const lang of LANGUAGES) {
 // catalogue must say exactly what the engine says.
 // ─────────────────────────────────────────────────────────────────────────────
 const exams = await import('../src/engine/indiaExams.js');
-const examsPage = read('src/pages/Exams.jsx');
 // The keys live in lib/blueprintKeys.js, shared by Exams and Progress.
 const blueprintKeySource = read('src/lib/blueprintKeys.js');
 const blueprintKeys = Object.fromEntries([...blueprintKeySource.matchAll(/'([a-z0-9-]+)': \['(exams\.bp\.\w+)', '(exams\.bp\.\w+)'\]/g)].map(m => [m[1], [m[2], m[3]]]));

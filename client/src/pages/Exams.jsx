@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { printPage } from '../lib/files.js';
 import { useNavigate } from 'react-router-dom';
+import { hscCoursesFor } from '../engine/hscCourses.js';
 import { api } from '../api.js';
 import { useApp } from '../App.jsx';
 import { answerToTex } from '../engine/answerTex.js';
@@ -112,6 +113,13 @@ export default function Exams() {
       {!paper && <h1 className="sr-only">{t('nav.exams')}</h1>}
       {generatedPapersFor(user) && <GeneratorEntry nav={nav} />}
       {user.course === 'nsw' && featureEnabled('nswExams') && <NswPapers busy={busy} start={start} />}
+      {hscCoursesFor(user).length > 0 && (
+        <div className="card" data-hsc-link>
+          <div className="card-title">{t('hsc.examsCardTitle')}</div>
+          <p className="sub" style={{ marginBottom: 14 }}>{t('hsc.examsCardBody')}</p>
+          <button className="btn btn-ghost" onClick={() => nav('/progress?tab=hsc')}>{t('hsc.examsCardOpen')}</button>
+        </div>
+      )}
       <div className="card">
         <div className="card-title">{t('exams.sitPaperTitle')}</div>
         <p className="sub" style={{ marginBottom: 18 }}>

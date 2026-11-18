@@ -18,7 +18,20 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
 const { checkAnswer, stepCheck } = await import(`${SRC}engine/checker.js`);
-const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
+const { generateQuestion: generateAnyForm, loadAllBanks, EXTRA_FORMS, GENERATORS } = await import(`${SRC}engine/generators/index.js`);
+// These cases name a question by (skill, difficulty, seed) and pin its answer: they are written against each
+// skill's direct form. The extra structural forms (generators/forms/) draw from the same seed, so a pinned
+// seed would otherwise land on another form; every extra form is marked by the sweeps over all issued
+// questions (false-positive, correct-answer, decimal) instead. A capacity overlay (au-forms-apply.js) wraps the
+// generator and keeps the established one as `direct`.
+function generateQuestion(id, d, seed, ...rest) {
+  const extra = EXTRA_FORMS[id], wrapped = GENERATORS[id];
+  const direct = typeof wrapped?.direct === 'function' ? wrapped.direct : null;   // a Prithagoras capacity overlay
+  if (!extra && !direct) return generateAnyForm(id, d, seed, ...rest);
+  if (extra) delete EXTRA_FORMS[id];
+  if (direct) GENERATORS[id] = direct;
+  try { return generateAnyForm(id, d, seed, ...rest); } finally { if (extra) EXTRA_FORMS[id] = extra; GENERATORS[id] = wrapped; }
+}
 await loadAllBanks();
 
 const groups = {};
@@ -348,6 +361,18 @@ const numQ = (value, prompt = 'How many whole units?') => ({ answerType: 'numeri
   const lin = { answerType: 'expression', answer: { expr: 'x' } };
   for (const w of ['x+sin(x)/1e9', 'x+ln(x)/1e10', 'x+(x^2-1e12)^2/1e40']) expect(G, `XFAIL-${w}`, lin, w, true);
   expect(G, 'XFAIL-sin(x)+x^30/1e90', { answerType: 'expression', answer: { expr: 'sin(x)' } }, 'sin(x)+x^30/1e90', true);
+}
+
+// ── The forms a pinned seed does not name, step-marked too ───────────────────
+// Everything above is written against each skill's direct form. Every other form of the same cells (the
+// Prithagoras overlays, the Priyabhata extra forms) is drawn from the same seeds and held to the invariants
+// that hold for any step-marked question (support/extra-form-step-sweep.mjs).
+{
+  const { sweepStepMarkingOfOtherForms } = await import('./support/extra-form-step-sweep.mjs');
+  const other = sweepStepMarkingOfOtherForms({ cells: Object.keys(GENERATORS).map(id => ({ id })), seeds: [1009, 8928, 16847, 24766, 32685, 40604] });
+  groups['other-forms-step-marking'] = { pass: other.checks - other.failures.length, total: other.checks };
+  for (const text of other.failures) failures.push(`other-forms-step-marking · ${text}`);
+  if (other.stepMarked <= 100) failures.push(`other-forms-step-marking: only ${other.stepMarked} step-marked questions of other forms were reached (${JSON.stringify(other.byKind)})`);
 }
 
 // ── Counts are part of the contract ─────────────────────────────────────────

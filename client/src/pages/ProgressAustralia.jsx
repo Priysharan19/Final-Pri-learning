@@ -5,6 +5,11 @@ import { tLater, useT } from '../i18n/index.js';
 import EvidenceProgress from '../progress/EvidenceProgress.jsx';
 import SyllabusBoard from '../progress/SyllabusBoard.jsx';
 import { featureEnabled } from '../platform/features.js';
+import { hscCoursesFor } from '../engine/hscCourses.js';
+
+// The HSC 2027 priorities (Prithagoras, Years 11–12): its own on-demand chunk
+// with the NESA metadata behind it (vite.config.js 'hsc-priorities').
+const HscPriorities = React.lazy(() => import('../hsc/HscPriorities.jsx'));
 
 /**
  * A Prithagoras student's Progress: the same evidence page as Priyabhata's
@@ -34,6 +39,8 @@ export default function ProgressAustralia() {
   }, [curriculum, user.year, user.pathway, t]);
   const rows = useMemo(() => (scope?.subtopics || []).map(s => ({ id: s.id, name: s.name, strand: s.strand })), [scope]);
 
+  const hscCourses = hscCoursesFor(user);
+
   if (error) return <div className="card" role="alert">{error}</div>;
   if (!curriculum || !evidence) return <div className="skeleton" style={{ height: 420 }} />;
 
@@ -47,6 +54,11 @@ export default function ProgressAustralia() {
       ownHeading
     >
       {featureEnabled('syllabusBoard') && <SyllabusBoard user={user} india={false} />}
+      {hscCourses.length > 0 && (
+        <React.Suspense fallback={<div className="skeleton" style={{ height: 400 }} />}>
+          <HscPriorities user={user} courses={hscCourses} curriculum={curriculum} />
+        </React.Suspense>
+      )}
     </EvidenceProgress>
   );
 }

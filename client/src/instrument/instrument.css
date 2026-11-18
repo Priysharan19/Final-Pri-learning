@@ -799,9 +799,11 @@ html.ui-instrument .crash-card > .card-title { margin: 0 0 18px; padding: 12px 1
 html.ui-instrument .crash-card > :not(.card-title) { margin-left: 18px; margin-right: 18px; }
 html.ui-instrument .crash-title { font: 500 22px/1.2 var(--in-ui); letter-spacing: -0.02em; }
 
-/* Notes (s13, "two voices"): prose talks in the interface sans; Computer
-   Modern stays for mathematics, which KaTeX draws in its own faces. */
-html.ui-instrument .nt { --nt-serif: var(--in-ui); }
+/* Notes: reading text is Computer Modern (CMU Serif, notes/notesFonts.css, fetched
+   with the notes chunk) in both editions, as the notes Experience 3 brief of
+   18 Nov 2026 sets (replacing s13's "prose in the interface sans"); KaTeX draws the
+   mathematics in its own faces and labels and controls stay in Instrument Sans. */
+html.ui-instrument .nt { --nt-serif: 'CMU Serif', 'Latin Modern Roman', var(--in-ui); }
 html.ui-instrument .nt-title { font-weight: 500; letter-spacing: -0.035em; }
 html.ui-instrument .nt-lede { font-size: 16px; }
 
@@ -1469,7 +1471,9 @@ html[data-pushed] .shell .main { transform: scale(var(--in-push-scale)); transfo
 .pg-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .pg-topics { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 6px; }
 .pg-check, .pg-pick { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; padding: 10px 12px; border: 1px solid var(--in-edge); border-radius: 6px; cursor: pointer; color: var(--in-tx); }
-.pg-check input, .pg-pick input { margin-top: 3px; accent-color: var(--in-action); }
+.pg-check input, .pg-pick input { flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--in-action); }
+/* The page title is a title, not the small caps eyebrow every card label uses. */
+.pg-head h1.card-title { text-transform: none; letter-spacing: normal; font-size: 1.75rem; line-height: 1.2; font-weight: 600; color: var(--in-tx); margin: 0 0 8px; }
 .pg-check.is-on, .pg-pick.is-on { border-color: var(--in-action); background: var(--in-l1); }
 .pg-check:focus-within, .pg-pick:focus-within { outline: 2px solid var(--in-action); outline-offset: 2px; }
 .pg-options { display: flex; flex-wrap: wrap; gap: 8px; }

@@ -16,14 +16,18 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import PageLink from '../components/PageLink.jsx';
 import { MathText } from '../lib/latex.jsx';
-import StudyDiagram from '../notes/StudyDiagram.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
-import { IN_CURRICULUM, IN_CHAPTER_BY_ID } from '../engine/curriculum-in.js';
-import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, notesSearchText } from '../notes/notesIndex.js';
+import { IN_CURRICULUM, IN_CHAPTER_BY_ID, OLYMPIAD_TOPICS } from '../engine/curriculum-in.js';
+import { NOTES_GRADES, gradeOfChapter, loadNotesForGrade, loadOlympiadNotes, notesSearchText } from '../notes/notesIndex.js';
 import { studyResourcesForGrade } from '../notes/data/notes-study-resources.js';
 import { studyHref, selectedStudyContext, selectedStudyPracticeHref } from '../lib/studyJourney.js';
+import { practiceHref } from '../lib/practiceLinks.js';
 import '../notes/Notes.css';
+import {
+  Section, Concepts, Formula, Example, Flashcards, useReveal,
+  Objective, BuildsOn, Intuition, TeachingDiagrams, SelfCheck, NextPractice
+} from '../notes/NotesParts.jsx';
 import { notesBookmarkKey } from './notesBookmarkScope.js';
 import { chapterNotesLink, notesIndexReturnLink } from './notesStudyLinks.js';
 import { loadAllSearchNotes, keepNotesQueryForReload, readNotesQueryAfterReload, clearNotesQueryAfterReload } from './notesSearchRecovery.js';
@@ -35,6 +39,17 @@ const STUDY_TRACK_LABELS = Object.freeze({
   'jee-main': 'JEE Main',
   'jee-advanced': 'JEE Advanced'
 });
+
+// The Olympiad topics (PRMO → RMO → INMO) are not a class: they have a tab of their own on
+// the index (?class=olympiad), their own notes chunk, and practise on the olympiad track.
+const OLYMPIAD = 'olympiad';
+const NOTES_TABS = Object.freeze([...NOTES_GRADES, OLYMPIAD]);
+const isOlympiadId = id => /^olymp-/.test(String(id || ''));
+const OLYMPIAD_GROUP = Object.freeze({ grade: OLYMPIAD, chapters: OLYMPIAD_TOPICS });
+/** The notes behind one index tab: a class, or the Olympiad topics. */
+const loadNotesFor = key => (key === OLYMPIAD ? loadOlympiadNotes() : loadNotesForGrade(key));
+/** A chapter's notes page. Olympiad topics have no study filters to carry. */
+const notesLinkFor = (chapter, params) => (isOlympiadId(chapter?.id) ? `/notes/${encodeURIComponent(chapter.id)}` : chapterNotesLink(chapter, params));
 
 // ── Small utilities ──────────────────────────────────────────────────────────
 function readBookmarks(key) {
@@ -60,36 +75,13 @@ function useBookmarks() {
   return [marks, toggle];
 }
 
-const reducedMotion = () => {
-  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; }
-};
-
-/** Adds `is-in` to every `.nt-reveal` under `root` as it scrolls into view. */
-function useReveal(rootRef, deps) {
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root) return undefined;
-    const items = [...root.querySelectorAll('.nt-reveal:not(.is-in)')];
-    if (reducedMotion() || typeof IntersectionObserver !== 'function') {
-      for (const el of items) el.classList.add('is-in');
-      return undefined;
-    }
-    const io = new IntersectionObserver(entries => {
-      for (const e of entries) if (e.isIntersecting) { e.target.classList.add('is-in'); io.unobserve(e.target); }
-    }, { rootMargin: '0px 0px -8% 0px', threshold: 0.08 });
-    for (const el of items) io.observe(el);
-    return () => io.disconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, deps);
-}
-
 function useNotes(grade) {
   const [state, setState] = useState({ grade, notes: null, failed: false });
   const [attempt, setAttempt] = useState(0);
   useEffect(() => {
     let live = true;
     setState({ grade, notes: null, failed: false });
-    loadNotesForGrade(grade).then(
+    loadNotesFor(grade).then(
       notes => { if (live) setState({ grade, notes, failed: false }); },
       () => { if (live) setState({ grade, notes: null, failed: true }); }
     );
@@ -120,9 +112,12 @@ function NotesIndex() {
   const t = useT();
   const { user } = useApp() || {};
   const [params, setParams] = useSearchParams();
-  const ownGrade = user?.course === 'in' && NOTES_GRADES.includes(Number(user?.year)) ? Number(user.year) : 10;
-  const grade = NOTES_GRADES.includes(Number(params.get('class'))) ? Number(params.get('class')) : ownGrade;
-  const group = IN_CURRICULUM.find(g => g.grade === grade);
+  const ownGrade = user?.course === 'in' && user?.indiaTrack === OLYMPIAD ? OLYMPIAD
+    : user?.course === 'in' && NOTES_GRADES.includes(Number(user?.year)) ? Number(user.year) : 10;
+  const asked = params.get('class');
+  const grade = asked === OLYMPIAD ? OLYMPIAD : NOTES_GRADES.includes(Number(asked)) ? Number(asked) : ownGrade;
+  const olympiad = grade === OLYMPIAD;
+  const group = olympiad ? OLYMPIAD_GROUP : IN_CURRICULUM.find(g => g.grade === grade);
   const [{ notes, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [onlyMarked, setOnlyMarked] = useState(false);
@@ -140,9 +135,9 @@ function NotesIndex() {
 
   const setGrade = (g) => { const p = new URLSearchParams(params); p.set('class', String(g)); setParams(p, { replace: true }); };
   const onTabKey = (e) => {
-    const i = NOTES_GRADES.indexOf(grade);
-    const next = e.key === 'ArrowRight' ? NOTES_GRADES[(i + 1) % NOTES_GRADES.length]
-      : e.key === 'ArrowLeft' ? NOTES_GRADES[(i - 1 + NOTES_GRADES.length) % NOTES_GRADES.length] : null;
+    const i = NOTES_TABS.indexOf(grade);
+    const next = e.key === 'ArrowRight' ? NOTES_TABS[(i + 1) % NOTES_TABS.length]
+      : e.key === 'ArrowLeft' ? NOTES_TABS[(i - 1 + NOTES_TABS.length) % NOTES_TABS.length] : null;
     if (next == null) return;
     e.preventDefault();
     setGrade(next);
@@ -159,10 +154,10 @@ function NotesIndex() {
 
       <div className="nt-toolbar">
         <div className="nt-classes" role="tablist" aria-label={t('notes.classLabel')} onKeyDown={onTabKey}>
-          {NOTES_GRADES.map(g => (
+          {NOTES_TABS.map(g => (
             <button key={g} type="button" role="tab" data-grade={g} aria-selected={g === grade}
               tabIndex={g === grade ? 0 : -1} className={g === grade ? 'is-on' : ''} onClick={() => setGrade(g)}>
-              {t('common.classNumber', { n: g })}
+              {g === OLYMPIAD ? t('notes.olympiadTab') : t('common.classNumber', { n: g })}
             </button>
           ))}
         </div>
@@ -180,15 +175,16 @@ function NotesIndex() {
           <>
             {failed && <LoadFailed retry={retry} />}
             {!failed && !notes && <p className="nt-status" role="status">{t('notes.loading')}</p>}
-            {notes && group && <ChapterMap group={group} notes={notes} key={grade} />}
+            {notes && group && !olympiad && <ChapterMap group={group} notes={notes} key={grade} />}
             <section className="nt-index" aria-labelledby="nt-index-h">
               <div className="nt-index-head">
-                <h2 id="nt-index-h">{t('notes.chapters')}</h2>
+                <h2 id="nt-index-h">{olympiad ? t('notes.olympiadTopics') : t('notes.chapters')}</h2>
                 <label className="nt-check">
                   <input type="checkbox" checked={onlyMarked} onChange={e => setOnlyMarked(e.target.checked)} />
                   <span>{t('notes.bookmarkedOnly')}</span>
                 </label>
               </div>
+              {olympiad && <p className="nt-quiet" data-olympiad-lede>{t('notes.olympiadLede')}</p>}
               {onlyMarked && !chapters.length && <p className="nt-quiet">{t('notes.noBookmarks')}</p>}
               <ol className="nt-chapters">
                 {chapters.map((c) => {
@@ -196,12 +192,13 @@ function NotesIndex() {
                   const num = (group.chapters.indexOf(c) + 1);
                   return (
                     <li key={c.id} className="nt-reveal" style={{ '--i': Math.min(num, 14) }}>
-                      <PageLink to={chapterNotesLink(c, params)} className="nt-chapter" data-testid="notes-chapter">
+                      <PageLink to={notesLinkFor(c, params)} className="nt-chapter" data-testid="notes-chapter">
                         <span className="nt-chapter-n">{String(num).padStart(2, '0')}</span>
                         <span className="nt-chapter-body">
                           <span className="nt-chapter-name">{c.name}</span>
                           <span className="nt-chapter-meta">
                             {c.strand}{n ? <> · {t('notes.formulaCount', { count: n.formulas.length })}</> : null}
+                            {olympiad && notes && !n ? <> · <span data-not-written>{t('notes.notWrittenYet')}</span></> : null}
                           </span>
                         </span>
                         {marks.has(c.id) && <span className="nt-chapter-mark" aria-label={t('notes.bookmarked')}><BookmarkGlyph on /></span>}
@@ -320,7 +317,7 @@ function SearchResults({ query }) {
     // Retry must invoke the real dynamic grade loaders again. Clearing only
     // the failed flag used to strand the learner on a permanent Loading message.
     setAll(null); setFailed(false);
-    loadAllSearchNotes(NOTES_GRADES, loadNotesForGrade).then(
+    loadAllSearchNotes(NOTES_TABS, loadNotesFor).then(
       notes => { if (live) setAll(notes); },
       () => { if (live) setFailed(true); }
     );
@@ -330,7 +327,7 @@ function SearchResults({ query }) {
     if (!all) return [];
     const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
     const out = [];
-    for (const group of IN_CURRICULUM) {
+    for (const group of [...IN_CURRICULUM, OLYMPIAD_GROUP]) {
       const notes = all[group.grade] || {};
       for (const c of group.chapters) {
         const hay = notesSearchText(c, notes[c.id]);
@@ -356,8 +353,8 @@ function SearchResults({ query }) {
       <ol className="nt-chapters">
         {results.slice(0, 40).map(({ c, grade, snippet }) => (
           <li key={c.id}>
-            <PageLink to={chapterNotesLink(c, params)} className="nt-chapter">
-              <span className="nt-chapter-n">{grade}</span>
+            <PageLink to={notesLinkFor(c, params)} className="nt-chapter">
+              <span className="nt-chapter-n">{grade === OLYMPIAD ? t('notes.olympiadTab') : grade}</span>
               <span className="nt-chapter-body">
                 <span className="nt-chapter-name">{c.name}</span>
                 {snippet && <MathText className="nt-chapter-meta" text={snippet} />}
@@ -385,11 +382,17 @@ function snippetFor(notes, terms) {
 }
 
 // ── One chapter ──────────────────────────────────────────────────────────────
+// In the order of Experience 3 of the Learning Experience Standard: objective, builds on,
+// intuition, the ideas, the formal statement (definitions, formulas, important points),
+// diagrams, worked examples, common mistakes, the self-check, and the next step into
+// Practice with the chapter and the selected course named. A section the chapter has no
+// content for is left out, never stubbed.
 function ChapterNotes({ chapterId }) {
   const t = useT();
   const nav = useNavigate();
   const chapter = IN_CHAPTER_BY_ID[chapterId];
-  const grade = gradeOfChapter(chapterId);
+  const olympiad = isOlympiadId(chapterId) && !!chapter;
+  const grade = olympiad ? OLYMPIAD : gradeOfChapter(chapterId);
   const [{ notes: all, failed }, retry] = useNotes(grade);
   const [marks, toggleMark] = useBookmarks();
   const [cards, setCards] = useState(false);
@@ -400,9 +403,11 @@ function ChapterNotes({ chapterId }) {
   const selectedExamples = visualOnly ? (notes?.examples || []).filter(ex => ex.figure) : (notes?.examples || []);
   const [params] = useSearchParams();
   const selected = selectedStudyContext(chapter, params);
-  const linkedResources = studyResourcesForGrade(grade, selected?.track || 'cbse');
-  const practiceLink = selectedStudyPracticeHref(chapter, params);
-  const mode = params.get('view') === 'examples' ? 'examples' : 'notes';
+  const linkedResources = olympiad ? [] : studyResourcesForGrade(grade, selected?.track || 'cbse');
+  const practiceLink = olympiad
+    ? practiceHref({ subtopic: chapterId, track: OLYMPIAD })
+    : selectedStudyPracticeHref(chapter, params);
+  const mode = !olympiad && params.get('view') === 'examples' ? 'examples' : 'notes';
   const changeMode = next => {
     const href = studyHref({ ...selected, view: next });
     if (href) nav(href);
@@ -417,9 +422,17 @@ function ChapterNotes({ chapterId }) {
   useReveal(root, [chapterId, notes, visibleExamples, visualOnly]);
   useEffect(() => { setVisibleExamples(6); setVisualOnly(false); window.scrollTo?.(0, 0); }, [chapterId]);
 
-  const group = IN_CURRICULUM.find(g => g.grade === grade);
+  const group = olympiad ? OLYMPIAD_GROUP : IN_CURRICULUM.find(g => g.grade === grade);
   const number = group ? group.chapters.findIndex(c => c.id === chapterId) + 1 : 0;
-  const backTo = notesIndexReturnLink(chapter, params);
+  const backTo = olympiad ? `/notes?class=${OLYMPIAD}` : notesIndexReturnLink(chapter, params);
+  // What the next step practises: this chapter, in the class and track (or the Olympiad) selected.
+  const scope = olympiad ? t('notes.olympiadScope')
+    : `${t('common.classNumber', { n: grade })} · ${STUDY_TRACK_LABELS[selected.track]}${selected.difficulty != null ? ` · ${t('home.difficultyChip', { n: selected.difficulty, label: t(`difficulty.${selected.difficulty}`) })}` : ''}`;
+  const buildsOn = (notes?.prereqs || []).filter(p => IN_CHAPTER_BY_ID[p]).map(p => ({
+    to: notesLinkFor(IN_CHAPTER_BY_ID[p], params),
+    label: IN_CHAPTER_BY_ID[p].name,
+    sub: isOlympiadId(p) ? t('notes.olympiadTab') : t('common.classNumber', { n: gradeOfChapter(p) })
+  })).filter(l => l.to);
 
   if (!chapter) {
     return <div className="nt"><p className="nt-quiet">{t('notes.notFound')}</p><PageLink className="nt-back" to="/notes">← {t('notes.back')}</PageLink></div>;
@@ -428,29 +441,34 @@ function ChapterNotes({ chapterId }) {
     <article className="nt nt-article" ref={root} aria-labelledby="nt-ch-title">
       <PageLink className="nt-back" to={backTo}>← {t('notes.back')}</PageLink>
       <header className="nt-ch-head">
-        <p className="nt-eyebrow">{t('common.classNumber', { n: grade })} · {t('notes.chapterNumber', { n: number })} · {chapter.strand}</p>
+        <p className="nt-eyebrow">
+          {olympiad ? t('notes.olympiadEyebrow', { n: number }) : <>{t('common.classNumber', { n: grade })} · {t('notes.chapterNumber', { n: number })}</>} · {chapter.strand}
+        </p>
         <h1 className="nt-title" id="nt-ch-title">{chapter.name}</h1>
         <nav className="nt-path" aria-label={t('study.path')} data-study-path>
           <PageLink to="/">{t('study.curriculum')}</PageLink>
-          <span>{t('common.classNumber', { n: grade })}</span>
-          <span data-study-track>{STUDY_TRACK_LABELS[selected.track]}</span>
+          {olympiad
+            ? <span data-study-track>{t('notes.olympiadScope')}</span>
+            : <><span>{t('common.classNumber', { n: grade })}</span><span data-study-track>{STUDY_TRACK_LABELS[selected.track]}</span></>}
           <span>{t('study.subject')}</span>
           <span aria-current="page">{chapter.name}</span>
         </nav>
-        {selected.difficulty != null && (
+        {!olympiad && selected.difficulty != null && (
           <p className="nt-selected-difficulty" data-study-difficulty>
             {t('home.difficultyChip', { n: selected.difficulty, label: t(`difficulty.${selected.difficulty}`) })}
           </p>
         )}
-        {selected.dotpoint != null && (
+        {!olympiad && selected.dotpoint != null && (
           <p className="nt-selected-outcome">{t('study.selectedOutcome')}: {typeof chapter.dotpoints[selected.dotpoint] === 'string'
             ? chapter.dotpoints[selected.dotpoint] : chapter.dotpoints[selected.dotpoint]?.text}</p>
         )}
-        <div className="nt-journey-tabs" role="group" aria-label={t('study.choosePath')} data-study-journey>
-          <button type="button" className={mode === 'notes' ? 'on' : ''} aria-pressed={mode === 'notes'} data-study-notes onClick={() => changeMode('notes')}>{t('study.notes')}</button>
-          <button type="button" className={mode === 'examples' ? 'on' : ''} aria-pressed={mode === 'examples'} data-study-examples onClick={() => changeMode('examples')}>{t('study.examples')}</button>
-          <button type="button" data-study-practice onClick={() => nav(practiceLink)}>{t('study.practice')}</button>
-        </div>
+        {!olympiad && (
+          <div className="nt-journey-tabs" role="group" aria-label={t('study.choosePath')} data-study-journey>
+            <button type="button" className={mode === 'notes' ? 'on' : ''} aria-pressed={mode === 'notes'} data-study-notes onClick={() => changeMode('notes')}>{t('study.notes')}</button>
+            <button type="button" className={mode === 'examples' ? 'on' : ''} aria-pressed={mode === 'examples'} data-study-examples onClick={() => changeMode('examples')}>{t('study.examples')}</button>
+            <button type="button" data-study-practice onClick={() => nav(practiceLink)}>{t('study.practice')}</button>
+          </div>
+        )}
         {notes && <MathText block className="nt-lede" text={notes.summary} />}
         <div className="nt-actions">
           <button type="button" className="btn btn-primary" onClick={() => nav(practiceLink)} data-testid="notes-practise">
@@ -466,22 +484,34 @@ function ChapterNotes({ chapterId }) {
             <span>{marks.has(chapterId) ? t('notes.bookmarked') : t('notes.bookmark')}</span>
           </button>
         </div>
-        {notes?.prereqs?.length > 0 && (
-          <p className="nt-builds">
-            <span>{t('notes.buildsOn')}</span>
-            {notes.prereqs.filter(p => IN_CHAPTER_BY_ID[p]).map(p => (
-              <PageLink key={p} to={chapterNotesLink(IN_CHAPTER_BY_ID[p], params)}>{IN_CHAPTER_BY_ID[p].name} <small>{t('common.classNumber', { n: gradeOfChapter(p) })}</small></PageLink>
-            ))}
-          </p>
-        )}
       </header>
 
       {failed && <LoadFailed retry={retry} />}
       {!failed && !all && <p className="nt-status" role="status">{t('notes.loading')}</p>}
-      {all && !notes && <p className="nt-quiet">{t('notes.notFound')}</p>}
+      {all && !notes && (olympiad
+        ? <p className="nt-quiet" role="status" data-not-written>{t('notes.olympiadNotWritten', { topic: chapter.name })}</p>
+        : <p className="nt-quiet">{t('notes.notFound')}</p>)}
 
       {notes && (
         <div className="nt-sheet">
+          {notes.objective && (
+            <Section id="objective" title={t('notes.sectionObjective')}>
+              <Objective text={notes.objective} />
+            </Section>
+          )}
+
+          {buildsOn.length > 0 && (
+            <Section id="prerequisites" title={t('notes.buildsOn')}>
+              <BuildsOn links={buildsOn} />
+            </Section>
+          )}
+
+          {notes.intuition && (
+            <Section id="intuition" title={t('notes.sectionIntuition')}>
+              <Intuition text={notes.intuition} />
+            </Section>
+          )}
+
           <Section id="ideas" title={t('notes.sectionIdeas')}>
             <Concepts concepts={notes.concepts} />
           </Section>
@@ -504,27 +534,24 @@ function ChapterNotes({ chapterId }) {
             </div>
           </Section>
 
-          <Section id="points" title={t('notes.sectionPoints')}>
-            <ol className="nt-points">
-              {notes.points.map((p, i) => (
-                <li key={i} className="nt-reveal" style={{ '--i': i }}>
-                  <MathText className="nt-point-front" text={p.front} />
-                  <MathText className="nt-point-back" text={p.back} />
-                </li>
-              ))}
-            </ol>
-          </Section>
+          {notes.points?.length > 0 && (
+            <Section id="points" title={t('notes.sectionPoints')}>
+              <ol className="nt-points">
+                {notes.points.map((p, i) => (
+                  <li key={i} className="nt-reveal" style={{ '--i': i }}>
+                    <MathText className="nt-point-front" text={p.front} />
+                    <MathText className="nt-point-back" text={p.back} />
+                  </li>
+                ))}
+              </ol>
+            </Section>
+          )}
 
-          <Section id="mistakes" title={t('notes.sectionMistakes')}>
-            <ul className="nt-mistakes">
-              {notes.mistakes.map((m, i) => (
-                <li key={i} className="nt-reveal" style={{ '--i': i }}>
-                  <div className="nt-wrong"><span className="nt-tag">{t('notes.mistakeWrong')}</span><MathText text={m.wrong} /></div>
-                  <div className="nt-right"><span className="nt-tag">{t('notes.mistakeRight')}</span><MathText text={m.right} /></div>
-                </li>
-              ))}
-            </ul>
-          </Section>
+          {notes.diagrams?.length > 0 && (
+            <Section id="diagram" title={t('notes.sectionDiagrams')}>
+              <TeachingDiagrams items={notes.diagrams} />
+            </Section>
+          )}
 
           <Section id="examples" title={t('notes.sectionExamples')}>
             {notes.examples.some(ex => ex.figure) && (
@@ -548,6 +575,25 @@ function ChapterNotes({ chapterId }) {
             )}
           </Section>
 
+          {notes.mistakes?.length > 0 && (
+            <Section id="mistakes" title={t('notes.sectionMistakes')}>
+              <ul className="nt-mistakes">
+                {notes.mistakes.map((m, i) => (
+                  <li key={i} className="nt-reveal" style={{ '--i': i }}>
+                    <div className="nt-wrong"><span className="nt-tag">{t('notes.mistakeWrong')}</span><MathText text={m.wrong} /></div>
+                    <div className="nt-right"><span className="nt-tag">{t('notes.mistakeRight')}</span><MathText text={m.right} /></div>
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
+
+          {notes.check?.length > 0 && (
+            <Section id="check" title={t('notes.sectionCheck')}>
+              <SelfCheck items={notes.check} />
+            </Section>
+          )}
+
           {linkedResources.length > 0 && (
             <Section id="resources" title={t('notes.sectionResources')}>
               <ul className="nt-chapters" data-testid="notes-study-resources">
@@ -568,10 +614,14 @@ function ChapterNotes({ chapterId }) {
             </Section>
           )}
 
-          <div className="nt-end nt-reveal">
-            <button type="button" className="btn btn-primary" onClick={() => nav(practiceLink)}>{t('notes.practise')}</button>
-            <button type="button" className="btn btn-secondary" onClick={() => setCards(true)}>{t('notes.revise')}</button>
-          </div>
+          <Section id="practice" title={t('notes.sectionNext')}>
+            <NextPractice what={t('notes.nextWhat', { chapter: chapter.name, scope })}>
+              <div className="nt-end">
+                <button type="button" className="btn btn-primary" onClick={() => nav(practiceLink)} data-testid="notes-next-practise">{t('notes.practise')}</button>
+                <button type="button" className="btn btn-secondary" onClick={() => setCards(true)}>{t('notes.revise')}</button>
+              </div>
+            </NextPractice>
+          </Section>
         </div>
       )}
 
@@ -610,187 +660,5 @@ function ComplexArgandFigure() {
       </svg>
       <figcaption>{t('study.argandCaption')}</figcaption>
     </figure>
-  );
-}
-
-function Section({ id, title, children }) {
-  return (
-    <section className="nt-section" id={id} aria-labelledby={`nt-s-${id}`}>
-      <h2 className="nt-section-h nt-reveal" id={`nt-s-${id}`}>{title}</h2>
-      {children}
-    </section>
-  );
-}
-
-function Concepts({ concepts }) {
-  const t = useT();
-  const [open, setOpen] = useState(() => new Set([0]));
-  const allOpen = open.size === concepts.length;
-  const toggle = (i) => setOpen(prev => { const n = new Set(prev); if (n.has(i)) n.delete(i); else n.add(i); return n; });
-  return (
-    <>
-      <button type="button" className="nt-link-btn" onClick={() => setOpen(allOpen ? new Set() : new Set(concepts.map((_, i) => i)))}>
-        {allOpen ? t('notes.foldAll') : t('notes.unfoldAll')}
-      </button>
-      <div className="nt-concepts">
-        {concepts.map((c, i) => {
-          const isOpen = open.has(i);
-          return (
-            <div key={i} className={`nt-concept nt-reveal${isOpen ? ' is-open' : ''}`} style={{ '--i': i }}>
-              <h3>
-                <button type="button" aria-expanded={isOpen} aria-controls={`nt-c-${i}`} onClick={() => toggle(i)}>
-                  <span className="nt-concept-n">{i + 1}</span>
-                  <MathText text={c.title} />
-                  <span className="nt-fold" aria-hidden="true" />
-                </button>
-              </h3>
-              <div id={`nt-c-${i}`} className="nt-concept-body" hidden={!isOpen}>
-                <MathText block text={c.body} />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-function Formula({ f, i }) {
-  // Rendered through MathText, the one escaped KaTeX sink, in display style.
-  const text = useMemo(() => `$\\displaystyle ${f.tex}$`, [f.tex]);
-  return (
-    <figure className="nt-formula nt-reveal" style={{ '--i': i }}>
-      <figcaption><MathText text={f.label} /></figcaption>
-      <div className="nt-ink">
-        <MathText block className="nt-ink-tex" text={text} />
-        <span className="nt-ink-veil" aria-hidden="true" />
-      </div>
-      <svg className="nt-ink-stroke" viewBox="0 0 300 10" preserveAspectRatio="none" aria-hidden="true">
-        <path d="M2 6.5 C 60 3, 120 8.5, 190 5 S 270 3.5, 298 5.5" pathLength="1" />
-      </svg>
-      {f.note && <MathText block className="nt-formula-note" text={f.note} />}
-    </figure>
-  );
-}
-
-function Example({ ex, n }) {
-  const t = useT();
-  // The student first sees only the problem, never an unsolicited solution.
-  const [shown, setShown] = useState(0);
-  const done = shown >= ex.steps.length;
-  return (
-    <div className="nt-example nt-reveal">
-      <p className="nt-example-n">{t('notes.exampleNumber', { n })}</p>
-      <MathText block className="nt-example-q" text={ex.question} />
-      {ex.figure && <StudyDiagram figure={ex.figure} />}
-      <ol className="nt-steps">
-        {ex.steps.slice(0, shown).map((s, i) => <li key={i} className="nt-step">
-          <MathText text={s} />
-          {ex.reasons?.[i] && <p className="nt-step-reason"><MathText text={ex.reasons[i]} /></p>}
-        </li>)}
-      </ol>
-      {!done ? (
-        <div className="nt-example-more">
-          <button type="button" className="btn btn-secondary" onClick={() => setShown(s => s + 1)}>{t('notes.nextStep')}</button>
-          <button type="button" className="nt-link-btn" onClick={() => setShown(ex.steps.length)}>{t('notes.allSteps')}</button>
-        </div>
-      ) : (
-        <div className="nt-answer nt-step">
-          <span className="nt-tag">{t('notes.answer')}</span>
-          <MathText text={ex.answer} />
-          <span className="nt-checked">{t('notes.engineChecked')}</span>
-          {ex.alternative && (
-            <details className="nt-alternative">
-              <summary>{t('study.alternative')}</summary>
-              <MathText block text={ex.alternative} />
-            </details>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ── Revise in five minutes ───────────────────────────────────────────────────
-function Flashcards({ chapter, points, onClose }) {
-  const t = useT();
-  const [i, setI] = useState(0);
-  const [flipped, setFlipped] = useState(false);
-  const dialog = useRef(null);
-  const opener = useRef(typeof document !== 'undefined' ? document.activeElement : null);
-  const finished = i >= points.length;
-
-  const go = useCallback((d) => { setFlipped(false); setI(x => Math.max(0, Math.min(points.length, x + d))); }, [points.length]);
-
-  useEffect(() => {
-    dialog.current?.querySelector('.nt-card, .nt-cards-done button')?.focus();
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prevOverflow; opener.current?.focus?.(); };
-  }, []);
-  // The card is re-keyed per index (so it slides in), which drops focus with the
-  // old node; put it back so arrow keys keep working inside the dialog.
-  useEffect(() => {
-    const el = dialog.current;
-    if (el && (!el.contains(document.activeElement) || document.activeElement === document.body || finished)) {
-      el.querySelector('.nt-card, .nt-cards-done button')?.focus();
-    }
-  }, [i, finished]);
-
-  const onKey = (e) => {
-    if (e.key === 'Escape') { e.preventDefault(); onClose(); return; }
-    if (e.key === 'ArrowRight') { e.preventDefault(); go(1); return; }
-    if (e.key === 'ArrowLeft') { e.preventDefault(); go(-1); return; }
-    if (e.key === 'Tab') {
-      const f = [...dialog.current.querySelectorAll('button:not([disabled])')];
-      if (!f.length) return;
-      const first = f[0], last = f[f.length - 1];
-      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-    }
-  };
-  const card = points[i];
-
-  return (
-    <div className="nt-cards-scrim" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="nt-cards" role="dialog" aria-modal="true" aria-labelledby="nt-cards-h" ref={dialog} onKeyDown={onKey}>
-        <div className="nt-cards-top">
-          <h2 id="nt-cards-h">{t('notes.cardsTitle', { chapter: chapter.name })}</h2>
-          <button type="button" className="nt-close" onClick={onClose} aria-label={t('notes.close')}>×</button>
-        </div>
-        <div className="nt-cards-progress" aria-hidden="true">
-          <span style={{ transform: `scaleX(${Math.min(i, points.length) / points.length})` }} />
-        </div>
-        {!finished ? (
-          <>
-            <p className="nt-sr" aria-live="polite">{t('notes.cardProgress', { n: i + 1, total: points.length })}</p>
-            <button type="button" key={i} className={`nt-card${flipped ? ' is-flipped' : ''}`} data-testid="notes-card"
-              aria-label={`${t('notes.flip')} — ${t('notes.cardProgress', { n: i + 1, total: points.length })}`}
-              onClick={() => setFlipped(f => !f)}>
-              <span className="nt-card-inner">
-                <span className="nt-card-face nt-card-front" aria-hidden={flipped}>
-                  <MathText text={card.front} />
-                </span>
-                <span className="nt-card-face nt-card-back" aria-hidden={!flipped}>
-                  <MathText text={card.back} />
-                </span>
-              </span>
-            </button>
-            <p className="nt-quiet nt-cards-hint">{t('notes.flipHint')}</p>
-            <div className="nt-cards-nav">
-              <button type="button" className="btn btn-secondary" onClick={() => go(-1)} disabled={i === 0}>{t('notes.prev')}</button>
-              <span className="nt-cards-count">{t('notes.cardProgress', { n: i + 1, total: points.length })}</span>
-              <button type="button" className="btn btn-primary" onClick={() => go(1)} data-testid="notes-card-next">{t('notes.next')}</button>
-            </div>
-          </>
-        ) : (
-          <div className="nt-cards-done">
-            <p>{t('notes.cardsDone')}</p>
-            <button type="button" className="btn btn-secondary" onClick={() => { setI(0); setFlipped(false); }}>{t('notes.again')}</button>
-            <button type="button" className="btn btn-primary" onClick={onClose}>{t('notes.close')}</button>
-          </div>
-        )}
-      </div>
-    </div>
   );
 }

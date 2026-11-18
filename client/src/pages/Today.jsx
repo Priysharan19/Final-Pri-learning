@@ -9,6 +9,7 @@ import { isEntitlementGate } from '../local/entitlementGate.js';
 import { PAYWALL_ROUTE } from '../paywall/route.js';
 import { unassisted } from '../today/todaySet.js';
 import { useToday } from '../today/useToday.js';
+import TrialNotice from '../components/TrialNotice.jsx';
 
 // Today: a short mixed set of retests of recent mistakes (a fresh instance,
 // unassisted) and reviews of dot points due on the spaced ladder, interleaved
@@ -37,6 +38,7 @@ export default function Today() {
     <div className="today-page" data-today-page style={{ maxWidth: 720 }}>
       <h1 style={{ marginBottom: 6 }}>{t('today.title')}</h1>
       <p className="muted" style={{ margin: '0 0 18px', lineHeight: 1.5 }}>{t('today.how')}</p>
+      <TrialNotice />
       {state && state.available === false && <p className="muted" data-today-state="unavailable">{t('today.unavailable')}</p>}
       {set && !set.items.length && <p className="muted" data-today-state="empty">{t('today.empty')}</p>}
       {set && set.items.length > 0 && (
@@ -57,7 +59,7 @@ export default function Today() {
           </ol>
         </>
       )}
-      <p><PageLink to="/error-log" data-today-errorlog>{t('today.errorLogLink')}</PageLink></p>
+      <p style={{ marginTop: 16 }}><PageLink to="/error-log" className="btn btn-ghost btn-sm" data-today-errorlog>{t('today.errorLogLink')}</PageLink></p>
     </div>
   );
 }

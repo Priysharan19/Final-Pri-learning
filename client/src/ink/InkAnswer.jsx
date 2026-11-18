@@ -122,7 +122,7 @@ function readStateOf(line, floor) {
   return isLowConfidence(line, floor) ? 'check' : 'read';
 }
 
-export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false, autoRead = false }) {
+export default function InkAnswer({ onRecognized, onStrokes = null, onReaderState = null, initialStrokes = null, initialReading = null, height = 300, disabled, lineVerdicts = null, focusSymbol = null, recognitionContext = null, draftSaved = true, readExpired = 0, controlRef = null, checkingEarlier = false, promptAsksInequality = false, liveRead = false, feedback = false, autoRead = false, lineMarkers = null }) {
   const [NATIVE_INK] = useState(nativeInkAvailable);
   const Surface = NATIVE_INK ? NativeInkCanvas : InkCanvas;
   const [diagnostics] = useState(inkDiagnosticsVisible);
@@ -254,7 +254,13 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
       // What the card keeps with the ink so a reload restores the transcript
       // (and the student's corrections) without reading the page again.
       kept: r.lines.length ? { signature: readRef.current, reading: r } : null,
-      strokes
+      strokes,
+      // The student's original page, for keeping with the mark (standard #08):
+      // the strokes they erased or undid (kept as corrections), the page size
+      // the points are in, and which surface captured them.
+      removed: canvasRef.current?.getRemovedStrokes?.() || [],
+      page: canvasRef.current?.getPageSize?.() || null,
+      inkSource: NATIVE_INK ? 'pencilkit' : 'web-pointer'
     });
   }, [onRecognized]);
 
@@ -712,6 +718,19 @@ export default function InkAnswer({ onRecognized, onStrokes = null, onReaderStat
                 );
               });
             })()}
+          </div>
+        )}
+        {/* Numbered markers linking each checked line to its card in the
+            Comments panel (AnnotatedWorking.jsx). Decoration: the numbered
+            list there is what assistive tech reads, in the same order. */}
+        {lineMarkers && rec.lines.some(l => l.box) && (
+          <div className="ink-marker-layer" aria-hidden="true">
+            {rec.lines.map((line, li) => {
+              const n = lineMarkers[li];
+              if (!Number.isInteger(n) || !line.box) return null;
+              const b = feedbackGeometry(line).anchor || line.box;
+              return <span key={li} className="ink-aw-marker" data-ink-marker={n} style={{ left: Math.max(2, b.x - 30), top: Math.max(2, b.y - 6) }}>{n}</span>;
+            })}
           </div>
         )}
         {/* v1.1 instrument: Pri's reading set beside each written line, as

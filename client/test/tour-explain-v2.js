@@ -28,7 +28,13 @@ export const flow = {
     // not one whose solution has an equation-motion step: such a question is
     // skipped, not taught from.
     const answerBox = page.locator('.editor-body input.answer-input');
-    const linearTyped = async () => await answerBox.count() === 1 && (await online.issuedShown())?.generator === TOPIC;
+    // A form of this generator whose worked solution is a single step (`x + 17 = 62`: one Subtract line)
+    // has no step-to-step equation motion either: it is skipped like the context question.
+    const linearTyped = async () => {
+      if (await answerBox.count() !== 1) return false;
+      const shown = await online.issuedShown();
+      return shown?.generator === TOPIC && (shown.solutionSteps === null || shown.solutionSteps >= 2);
+    };
     let served = false;
     for (let skips = 0; skips < 12; skips++) {
       const typeTab = page.getByRole('button', { name: 'Answer by typing' });

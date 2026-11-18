@@ -106,6 +106,19 @@ export function pickSimulator(listText, { family = 'iPad', named = null, runtime
   return matching.slice().sort((a, b) => compareVersions(runtimeVersion(b.runtime), runtimeVersion(a.runtime)))[0] || null;
 }
 
+/**
+ * Preserve the selected simulator's actual runtime in journey evidence.
+ * pickSimulator enumerated this exact UDID under a real simctl runtime group.
+ * Do not query a saturated CoreSimulator again after the student journey.
+ */
+export function selectedSimulatorRuntimeEvidence(selected, pin) {
+  const runtime = String(selected?.runtime || '');
+  if (!selected?.udid || !runtimeVersion(runtime).length || !runtimeMatches(runtime, pin)) {
+    throw new Error(`simulator evidence runtime is unavailable or differs from the pin: ${runtime || '(none)'} (expected ${pin || 'a real iOS runtime'})`);
+  }
+  return runtime.replace(/^iOS /, 'iOS-').replace(/\./g, '-');
+}
+
 /** UDIDs of simulators that are booted or still booting, other than `udid`. */
 export function otherBooted(listText, udid) {
   const keep = String(udid || '').toUpperCase();

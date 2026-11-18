@@ -1,0 +1,58 @@
+{
+ "date": "2026-11-18",
+ "commit": "6bb10b39b",
+ "corpus": {
+  "total": 248,
+  "judged": 248,
+  "excluded": []
+ },
+ "contenders": [
+  {
+   "name": "Pri deterministic engine",
+   "items": 248,
+   "wrongSolutions": 156,
+   "correctSolutions": 92,
+   "falseCreditSolutions": 0,
+   "falseRejectSolutions": 0,
+   "abstainOnCorrect": 0,
+   "abstainOnWrong": 3,
+   "firstBreakExact": 146,
+   "firstBreakTotal": 149,
+   "invalidLines": 149,
+   "falseCreditLines": 0,
+   "validLines": 271,
+   "falseRejectLines": 0,
+   "abstainLines": 14,
+   "laterErrorLines": 26,
+   "laterErrorLinesTicked": 0,
+   "examples": [],
+   "rates": {
+    "falseCreditSolutions": "0.0%",
+    "falseRejectSolutions": "0.0%",
+    "firstBreakExact": "98.0%",
+    "firstBreakExactOfAllWrong": "93.6%",
+    "laterErrorLinesTicked": "0.0%",
+    "falseCreditLines": "0.0%",
+    "falseRejectLines": "0.0%",
+    "abstainOnCorrect": "0.0%",
+    "abstainOnWrong": "1.9%"
+   },
+   "consistency": "100% (deterministic: same input, same output)",
+   "cost": {
+    "usd": 0,
+    "note": "runs on our own server"
+   }
+  }
+ ],
+ "engineWithoutIncompleteRule": {
+  "falseCreditSolutions": "0.0%",
+  "falseRejectSolutions": "0.0%",
+  "firstBreakExact": "94.6%",
+  "firstBreakExactOfAllWrong": "90.4%",
+  "laterErrorLinesTicked": "0.0%",
+  "falseCreditLines": "3.4%",
+  "falseRejectLines": "0.0%",
+  "abstainOnCorrect": "0.0%",
+  "abstainOnWrong": "1.9%"
+ }
+}

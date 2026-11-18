@@ -22,6 +22,7 @@ import { isCommonPassword } from './commonPasswords.js';
 import { PHONE_ACCOUNT_EMAIL_DOMAIN, verifyReauthCode } from './otp.js';
 import { maskPhone } from './otpCore.js';
 import { ERASURE_REASONS, scheduleErasure } from './childErasure.js';
+import { originalView } from './originalWork.js';
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const TOKEN_MS = 1000 * 60 * 60;
@@ -291,7 +292,8 @@ export async function deleteAccountRows(db, accountId, { beforeDelete = null, re
 // request digest (a hash) never is.
 //   · EXPORT_BODY_SCOPES — what the student wrote or was already shown: their
 //     answer snapshots, results, gradings, reading transcripts, completions,
-//     reveals, hint rungs, tries, issue replies and the daily counter.
+//     reveals, hint rungs, tries, issue replies, the daily counter and the
+//     tutor policy's offers.
 //   · SEALED_SCOPES — the escrowed question/paper holds the answers, worked
 //     steps and marking criteria. Its body is exported only once the question
 //     is resolved (its completion/result row exists for the same key); an
@@ -302,7 +304,9 @@ export async function deleteAccountRows(db, accountId, { beforeDelete = null, re
 //     withheld. A new scope is withheld until someone decides otherwise here.
 const EXPORT_BODY_SCOPES = new Set([
   'exam-answers', 'exam-result', 'practice-grade', 'practice-recognition', 'recognition-read', 'practice-completion',
-  'practice-reveal', 'practice-hints', 'practice-tries', 'practice-issue', 'practice-prepared', 'practice-daily', 'practice-content'
+  'practice-reveal', 'practice-hints', 'practice-tries', 'practice-issue', 'practice-prepared', 'practice-daily', 'practice-content',
+  // The tutor policy's offers on an item (helpPlan.js): what the student was shown.
+  'practice-help-plan'
 ]);
 const SEALED_SCOPES = { 'exam-paper': 'exam-result', 'practice-question': 'practice-completion' };
 
@@ -879,6 +883,22 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
     // idempotency key or request digests.
     const deskRows = await db.all(`SELECT id,edition,mode,origin,resource_id,paper_json,clock_json,questions_json,state,imported_from_json,created_at,updated_at,finished_at
       FROM desk_attempts WHERE account_id=? ORDER BY created_at, id`, [accountId]);
+    // Teacher workspace (classroom.js): the papers this student handed in, the
+    // items their teacher may judge, and every teacher mark on them — the whole
+    // history, labelled as teacher marks. The teacher's account id is not
+    // exported, as with assignment feedback.
+    const handinRows = await db.all(`SELECT assignment_id,class_id,exam_id,paper_kind,score,total,questions_json,handed_in_at
+      FROM assignment_handins WHERE student_account_id=? ORDER BY handed_in_at, assignment_id`, [accountId]);
+    const reviewRows = await db.all(`SELECT id,assignment_id,exam_id,question_key,question_order,outcome_code,subtopic,marks_possible,engine_awarded,criterion,available,evidence_json,created_at
+      FROM teacher_review_items WHERE student_account_id=? ORDER BY created_at, id`, [accountId]);
+    const teacherMarkRows = await db.all(`SELECT id,review_item_id,assignment_id,criterion,decision,marks,comment,engine_awarded,ink_digest,supersedes,created_at
+      FROM teacher_marks WHERE student_account_id=? ORDER BY created_at, id`, [accountId]);
+    // The student's original work behind each mark (originalWork.js, #08): the
+    // strokes or photographed page itself, its digest, each line's strokes and
+    // the reading layer (what was read, what they confirmed, their edits).
+    const originalRows = await db.all('SELECT * FROM attempt_originals WHERE account_id=? ORDER BY created_at, id', [accountId]);
+    // The bytes as stored (gzip for strokes, `encoding` says so): not inflated here.
+    const originals = originalRows.map(row => originalView(row, { stored: true }));
     // A receipt with no personal data: the format and how many rows each
     // section carried, so a bulk read of an account is visible in the audit
     // trail without copying any of it.
@@ -887,7 +907,7 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
       counts: {
         identities: identities.length, learningEvents: events.length, entities: entities.length, classes: classes.length,
         assignmentSubmissions: submissions.length, assignmentFeedback: feedback.length, telemetry: telemetry.length, issueReports: reports.length,
-        receipts: receipts.length, phones: phones.length
+        receipts: receipts.length, phones: phones.length, originals: originals.length
       }
     }, Date.now());
     res.set('Cache-Control', 'no-store');
@@ -938,7 +958,25 @@ export function createAccountRouter(db, { beforeDelete = null } = {}) {
           state: row.state, imported: row.imported_from_json ? json(row.imported_from_json, null) : null,
           createdAt: Number(row.created_at), updatedAt: Number(row.updated_at), finishedAt: row.finished_at == null ? null : Number(row.finished_at)
         };
-      })
+      }),
+      teacherWorkspace: (() => {
+        const json = (text, fallback) => { try { return JSON.parse(text); } catch { return fallback; } };
+        return {
+          handins: handinRows.map(row => ({ assignmentId: row.assignment_id, classId: row.class_id, examId: row.exam_id, paperKind: row.paper_kind,
+            engine: { score: Number(row.score), total: Number(row.total) }, questions: json(row.questions_json, []), handedInAt: Number(row.handed_in_at) })),
+          reviewItems: reviewRows.map(row => ({ id: row.id, assignmentId: row.assignment_id, examId: row.exam_id, questionKey: row.question_key,
+            order: Number(row.question_order), outcomeCode: row.outcome_code || null, subtopic: row.subtopic || null,
+            marksPossible: Number(row.marks_possible), engineAwarded: Number(row.engine_awarded), criterion: row.criterion,
+            available: Number(row.available), evidence: json(row.evidence_json, {}), createdAt: Number(row.created_at) })),
+          teacherMarks: teacherMarkRows.map(row => ({ id: row.id, label: 'teacher', reviewItemId: row.review_item_id, assignmentId: row.assignment_id,
+            criterion: row.criterion, decision: row.decision, marks: Number(row.marks), comment: row.comment || null,
+            engineAwardedAtDecision: Number(row.engine_awarded), inkDigest: row.ink_digest || null, supersedes: row.supersedes || null, decidedAt: Number(row.created_at) }))
+        };
+      })(),
+      // Strokes are pri-ink-v1 bytes (client/src/engine/originalInk.js
+      // documents the format), gzip when `encoding` says so; an image's bytes
+      // are its own; both base64, with the SHA-256 of the canonical bytes.
+      originals
     });
   });
 

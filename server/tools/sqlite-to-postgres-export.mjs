@@ -193,6 +193,8 @@ function csvCell(value) {
     return String(value);
   }
   if (typeof value === 'string') return `"${value.replaceAll('"', '""')}"`;
+  // bytea (attempt_originals.content) in Postgres's hex input form.
+  if (Buffer.isBuffer(value)) return `"\\x${value.toString('hex')}"`;
   throw toolError('EXPORT_UNSUPPORTED_TYPE', `unsupported SQLite value type ${Buffer.isBuffer(value) ? 'BLOB' : typeof value}`);
 }
 
@@ -204,6 +206,7 @@ function sqlLiteral(value) {
     return String(value);
   }
   if (typeof value === 'string') return `'${value.replaceAll("'", "''")}'`;
+  if (Buffer.isBuffer(value)) return `'\\x${value.toString('hex')}'::bytea`;
   throw toolError('EXPORT_UNSUPPORTED_TYPE', `unsupported SQLite value type ${Buffer.isBuffer(value) ? 'BLOB' : typeof value}`);
 }
 

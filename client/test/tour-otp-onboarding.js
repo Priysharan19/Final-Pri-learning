@@ -61,18 +61,23 @@ export const flow = {
       await page.getByTestId('signup-age-18').isVisible() && h.db.prepare('SELECT COUNT(*) AS n FROM accounts WHERE email=?').get(childEmail).n === 0);
     await check('the step heading takes focus for screen readers', await page.evaluate(() => document.activeElement?.id === 'signup-step-title'));
     await page.locator('#signup-flow-name').fill('Asha');
-    await page.getByTestId('signup-age-15').click();
+    // India: under 18 needs a parent. Prithagoras: under 15 does (guardianConsent.learnerIsChild), so the learner is 13 there.
+    const childAge = (process.env.PRI_EDITION || 'priyabhata') === 'priyabhata' ? 15 : 13;
+    await page.getByTestId(`signup-age-${childAge}`).click();
     await page.getByTestId('signup-agree').check();
     await page.getByTestId('signup-age-next').click();
     await waitForStep(card, 'class');
     await page.getByTestId('signup-class-9').click();
-    await check('JEE is not offered below Class 11', await page.getByTestId('signup-track-jee-main').isDisabled());
+    // The exam-track choice is the India edition's (SignUpFlow: `!au`); the Prithagoras sign-up asks for the year only.
+    const hasTracks = (process.env.PRI_EDITION || 'priyabhata') === 'priyabhata';
+    if (hasTracks) await check('JEE is not offered below Class 11', await page.getByTestId('signup-track-jee-main').isDisabled());
+    else await check('Prithagoras offers no India exam track at sign-up (no JEE or CBSE choice)', await page.locator('[data-testid^="signup-track-"]').count() === 0 && !/\b(JEE|CBSE)\b/.test(await page.locator('body').innerText()));
     await page.getByTestId('signup-class-11').click();
-    await page.getByTestId('signup-track-jee-main').click();
+    if (hasTracks) await page.getByTestId('signup-track-jee-main').click();
     await shot('class');
     await page.getByTestId('signup-class-next').click();
     await waitForStep(card, 'parent');
-    await check('a 15-year-old is asked for a parent next, and the app has not opened',
+    await check(`a ${childAge}-year-old is asked for a parent next, and the app has not opened`,
       await page.getByRole('heading', { name: 'Now, a parent’s approval' }).isVisible() && await page.locator('.shell').count() === 0);
 
     const account = h.db.prepare('SELECT id, email, age_basis FROM accounts WHERE email=?').get(childEmail);

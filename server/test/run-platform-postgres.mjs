@@ -161,6 +161,13 @@ export const ENGINE_SUITES = [
   'desk-check.mjs',
   // Resource publishing (plan F3): the schema-16 → 17 upgrade/rollback and the state machine.
   'resource-publishing-check.mjs',
+  // The teacher workspace: hand-in, review queue and append-only teacher marks
+  // under RLS (schema 18), engine marks byte-identical, isolation and removal.
+  'classroom-check.mjs',
+  // The class board: counts per outcome and state over visible students, re-teach, drill-down.
+  'class-board-check.mjs',
+  // The student's original work (standard #08): kept with the mark under RLS, schema 19.
+  'original-work-check.mjs',
   'verification-enforcement-check.mjs',
   'teacher-invite-check.mjs',
   'login-lockout-check.mjs',
@@ -180,6 +187,8 @@ export const ENGINE_SUITES = [
   'billing-edition-check.mjs',
   // Stripe for the Australian edition (AUD): signature, checkout, events, cancel, boundary.
   'stripe-billing-check.mjs',
+  'packaging-enforcement-check.mjs',
+  'referral-trial-check.mjs',
   // Plan H7: the practice day per edition and the paid-call ceiling under each
   // edition; its HTTP part runs a Prithagoras server as pri_server.
   'edition-ai-budgets-check.mjs',

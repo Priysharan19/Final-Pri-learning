@@ -1365,6 +1365,76 @@ export async function put(store, value) {
   await dropTwins(store, value, row);
   return written;
 }
+/**
+ * Increment an account's guardian-denial generation in one IndexedDB
+ * readwrite transaction. Transactions on the device store serialize across
+ * tabs. A generation is an ordering fence, NEVER a wall-clock timestamp:
+ * clock rollback, future test times and sync clockSeenAt cannot affect it.
+ * One account-scoped row is retained regardless of denial/recheck count.
+ */
+export async function advanceDeviceDenialGeneration(id) {
+  if (typeof id !== 'string' || !id.startsWith('pri-activation-denial-v1:')) {
+    throw new Error('Invalid activation denial key');
+  }
+  await ready();
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tr = db.transaction('device', 'readwrite');
+    const store = tr.objectStore('device');
+    let generation = 0;
+    let failure = null;
+    tr.oncomplete = () => resolve(generation);
+    tr.onerror = event => { failure ||= tr.error || event?.target?.error || null; };
+    tr.onabort = () => reject(failure || tr.error || new Error('Activation-denial transaction aborted'));
+    try {
+      const req = store.get(id);
+      req.onsuccess = () => {
+        const previous = Number(req.result?.generation) || 0;
+        if (!Number.isSafeInteger(previous) || previous < 0 || previous >= Number.MAX_SAFE_INTEGER) {
+          try { tr.abort(); } catch { /* already aborted */ }
+          return;
+        }
+        generation = previous + 1;
+        const write = store.put({ id, generation });
+        write.onerror = () => { failure ||= write.error || null; };
+      };
+      req.onerror = () => { failure ||= req.error || null; };
+    } catch (error) {
+      try { tr.abort(); } catch { /* already aborted */ }
+      reject(error);
+    }
+  });
+}
+
+// A negative consent witness only: never permission to enter the app.
+// Written synchronously before an IndexedDB denial transaction may abort.
+// An approval is still granted only by the live server; offline requires
+// that this witness match the one attached to that server-approved record.
+const RECOVERY_DENIAL_PREFIX = 'pri-activation-denial-recovery-v1:';
+const recoveryDenialKey = account => RECOVERY_DENIAL_PREFIX + String(account) + ':';
+export function readDeviceDenialRecoveryFence(account) {
+  if (!account) return null;
+  try {
+    if (!globalThis.localStorage) throw new Error('Recovery witness unavailable');
+    return globalThis.localStorage.getItem(recoveryDenialKey(account));
+  } catch (cause) {
+    throw Object.assign(new Error('Recovery witness unavailable'), { cause });
+  }
+}
+export function advanceDeviceDenialRecoveryFence(account) {
+  if (!account) return false;
+  try {
+    if (!globalThis.localStorage || !globalThis.crypto?.getRandomValues) return false;
+    const words = new Uint32Array(4);
+    globalThis.crypto.getRandomValues(words);
+    const token = [...words].map(x => x.toString(16).padStart(8, '0')).join('');
+    globalThis.localStorage.setItem(recoveryDenialKey(account), token);
+    return readDeviceDenialRecoveryFence(account) === token;
+  } catch {
+    return false;
+  }
+}
+
 export async function del(store, key) {
   await ready();
   const at = await storedKey(store, key);
@@ -1569,9 +1639,22 @@ export async function storageEstimate() {
 }
 
 export function uuid() {
-  return (crypto.randomUUID && crypto.randomUUID()) ||
-    'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-      const r = Math.random() * 16 | 0;
-      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
-    });
+  // IDs from here include the cloud device identity, not just display rows.
+  // An insecure Math.random fallback makes a device/session-bound sync id
+  // guessable on WebViews without randomUUID. Use Web Crypto for every path.
+  const c = globalThis.crypto;
+  try {
+    if (typeof c?.randomUUID === 'function') return c.randomUUID();
+    if (typeof c?.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      c.getRandomValues(bytes);
+      bytes[6] = (bytes[6] & 0x0f) | 0x40;
+      bytes[8] = (bytes[8] & 0x3f) | 0x80;
+      const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+      return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    }
+  } catch { /* If the secure provider throws, refuse the identifier. */ }
+  const error = new Error('Secure UUID generation is unavailable.');
+  error.code = 'SECURE_RANDOM_UNAVAILABLE';
+  throw error;
 }

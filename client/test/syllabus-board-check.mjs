@@ -414,9 +414,13 @@ const BANNED = /predicted (scaled )?mark|scaled mark|predicted score|predicted b
 for (const file of ['src/i18n/strings.en.js', 'src/i18n/strings.hi.js', 'src/i18n/strings.au.js']) {
   // The honesty box names the ATAR only to say UAC scales it: that exact clause is
   // removed from that one key before the whole guard runs on the rest of the line.
+  const NOT_A_MARK_SENTENCE = /It is not a predicted mark, band or ATAR\.|यह (?:अनुमानित|पूर्वानुमानित)[^"]*?ATAR[^"।]*।/;
   const ATAR_CLAUSE = /the ATAR is scaled separately by UAC|ATAR को UAC अलग से स्केल करता है/;
   const hits = read(file).split('\n')
     .map(line => (/^\s*'board\.ready\.whyNsw':/.test(line) ? line.replace(ATAR_CLAUSE, '') : line))
+    // The HSC priorities' honesty line (hsc.notAMark) names the mark, band and ATAR only to say it is not one:
+    // that exact closing sentence is removed from that one key, in each language, before the guard runs.
+    .map(line => (/^\s*'hsc\.notAMark':/.test(line) ? line.replace(NOT_A_MARK_SENTENCE, '') : line))
     .filter(line => /^\s*'[^']+':/.test(line) && BANNED.test(line));
   eq(hits, [], `${file}: no catalogue string offers a predicted or scaled mark, ATAR or band`);
 }

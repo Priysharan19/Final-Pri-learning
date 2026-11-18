@@ -1,0 +1,45 @@
+/* Home, "the verified page" §5: one Next card, and beside it the papers trend
+   and the latest marked work. No ambient motion. The trend line is ink, not
+   the edition accent (the editions decision keeps the accent off charts). */
+.vp-home {
+  grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, 340px); gap: 28px;
+  align-items: start; padding: 28px 30px 22px 20px; border-bottom: 1px solid var(--in-edge);
+}
+.vp-home:not(:has(.vp-aside)) { grid-template-columns: minmax(0, 1fr); }
+.vp-next { min-width: 0; max-width: 790px; }   /* KALP-04: the desktop command centre stays deliberately bounded (790px) */
+.vp-next .in-resume { margin: 18px 0 0; padding: 22px 22px 20px; gap: 14px 18px; border-radius: 10px; }
+.vp-next .in-resume b { font-size: clamp(20px, 2.4vw, 30px); line-height: 1.15; letter-spacing: -0.03em; font-weight: 600; }
+.vp-next .in-resume small { font-size: 13px; }
+.vp-next .in-nextact > div > small:last-child, .vp-next .in-nextact > div > small#home-primary-reason { font-size: 15px; line-height: 1.5; color: var(--in-tx-2); max-width: 60ch; }
+.vp-next .in-resume .in-btn { min-height: 48px; padding: 0 22px; font-size: 15px; border-radius: 8px; }
+.vp-meta { display: block; margin-top: 8px; font: 500 12.5px var(--in-mono); font-variant-numeric: tabular-nums; color: var(--in-tx-3); }
+.vp-aside { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding-top: 34px; }
+.vp-side {
+  display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; min-height: 44px; border-radius: 10px;
+  color: inherit; text-decoration: none; background: var(--in-l1); box-shadow: 0 0 0 1px var(--in-edge-2);
+}
+a.vp-side:hover { background: var(--in-l2); }
+a.vp-side:focus-visible { outline: 2px solid var(--in-tx); outline-offset: 2px; }
+.vp-side-k { font-size: 12px; color: var(--in-tx-3); }
+.vp-side-v { font-size: 14px; line-height: 1.45; }
+.vp-spark-row { display: flex; align-items: center; gap: 12px; }
+.vp-spark { fill: none; stroke: var(--in-tx-2); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.vp-spark-dot { fill: var(--in-tx); }
+.vp-spark-n { font: 500 14px var(--in-mono); font-variant-numeric: tabular-nums; }
+.vp-fine { font-size: 11.5px; line-height: 1.4; color: var(--in-tx-3); }
+.vp-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 980px) {
+  .vp-home { grid-template-columns: minmax(0, 1fr); padding: 16px 0 18px; gap: 14px; }
+  .vp-aside { padding-top: 0; }
+}
+/* iPad portrait (761–980 px): the Index has no side padding of its own here
+   (the spine carries the gutter), so the Next card kept none and the greeting
+   ran into the screen edge. Same 16px gutter as the spine below it. */
+@media (min-width: 761px) and (max-width: 980px) {
+  .vp-home { padding: 16px 16px 18px; }
+}
+@media (max-width: 760px) {
+  .vp-home { order: 1; border-bottom: 0; padding: 6px 0 4px; }
+  .vp-next .in-resume { margin-top: 14px; padding: 18px; grid-template-columns: 1fr; }
+  .vp-next .in-resume .in-btn { justify-self: start; }
+}

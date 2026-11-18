@@ -7,7 +7,7 @@
 // Ordinary algebra keeps the established V1/V2 policy and stable diagnoses.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { parse } from './expr.js';
+import { parse, evaluate, numsClose } from './expr.js';
 import {
   sameEquationClaim as sameEquationClaimV2,
   assessEquationLine as assessEquationLineV2,
@@ -27,7 +27,10 @@ import {
 import {
   compareDomainAwareEquationClaims,
   domainFunctionEquationSignature,
-  domainSolutionDiagnosis
+  domainSolutionDiagnosis,
+  equationSolutionSet,
+  relateSolutionSets,
+  absCaseSets
 } from './reason-v4.js';
 
 function unwrap(node) {
@@ -98,7 +101,85 @@ function exactDomainComparison(a, b, variable = null) {
   return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
 }
 
-export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null } = {}) {
+
+// ── Absolute-value equations, by solution set ────────────────────────────────
+// Where the complete real solution set of a line and of the line above can be
+// found exactly (reason-v4 equationSolutionSet), a step is judged on the sets:
+// the same set is valid; a larger set is an IMPLIED step (every solution kept,
+// a root added: squaring, clearing a denominator) and is credited with a note;
+// a smaller or different set is a break, except that dropping to exactly the
+// question's own answer is rejecting an extraneous root, which is valid; and
+// from an empty set to a non-empty one is a break unless every new value makes
+// the line above undefined (the usual extraneous root). Mirrors the benchmark's
+// SymPy rules. Anything the sets cannot decide falls through unchanged.
+function usesCoveredClass(node, variable = null) {
+  // Absolute value only. Rational equations keep their established policy
+  // (restoring a root a denominator excluded is a break, and a starting
+  // rational line stays unproved), and a starting radical line stays an
+  // abstention (pri-reason-check #7); both are still judged on their LAST line
+  // by the incomplete flag.
+  node = unwrap(node);
+  if (!node || typeof node !== 'object') return false;
+  if (node.t === 'call' && node.fn === 'abs') return containsVariable(node.arg, variable);
+  return ['l', 'r', 'v', 'arg'].some(k => usesCoveredClass(node[k], variable));
+}
+function wantedSolutions(meta) {
+  if (!Array.isArray(meta?.solutions)) return null;
+  const out = [];
+  for (const s of meta.solutions) {
+    const v = typeof s === 'number' ? s : (() => { try { return evaluate(parse(String(s)), {}); } catch { return NaN; } })();
+    if (!Number.isFinite(v)) return null;
+    out.push(v);
+  }
+  return out;
+}
+function undefinedAt(eq, variable, x) {
+  try {
+    const env = { [variable]: x };
+    return !Number.isFinite(evaluate(eq.l, env)) || !Number.isFinite(evaluate(eq.r, env));
+  } catch { return true; }
+}
+const listRoots = roots => roots.map(r => Number(r.toPrecision(8))).join(', ');
+function assessBySolutionSet({ ast, previousAst, previousTrusted, meta, variable, anchorAst = null }) {
+  if (!ast || ast.t !== 'equation' || !variable) return null;
+  if (!usesCoveredClass(ast, variable) && !(previousAst && usesCoveredClass(previousAst, variable))) return null;
+  const cur = equationSolutionSet(ast, variable);
+  if (!cur || cur.kind !== 'finite') return null;
+  const wanted = wantedSolutions(meta);
+  const answer = wanted ? { kind: 'finite', variable, roots: wanted } : null;
+  if (previousTrusted && previousAst?.t === 'equation') {
+    const prev = equationSolutionSet(previousAst, variable);
+    const rel = prev && prev.kind === 'finite' ? relateSolutionSets(prev, cur) : null;
+    if (rel === 'same') return { status: 'ok', trusted: true };
+    if (rel === 'superset') {
+      const added = cur.roots.filter(x => !prev.roots.some(y => numsClose(x, y, 1e-7)));
+      if (prev.roots.length === 0 && !added.every(x => undefinedAt(previousAst, variable, x))) {
+        const diagnosis = domainSolutionDiagnosis({ variable, a: prev, b: cur });
+        return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
+      }
+      return { status: 'ok', trusted: true, implied: true, note: `True of every solution above, and it also allows ${variable} = ${listRoots(added)}, which the line above does not — check each value against the question.` };
+    }
+    // One case of the absolute value (Q = P or -Q = P) is a branch: valid to
+    // write down whatever its sign condition then decides.
+    if (rel === 'subset' || rel === 'different') {
+      const cases = absCaseSets(previousAst, variable) || (anchorAst ? absCaseSets(anchorAst, variable) : null);
+      // The line must BE a case equation (rearranged, scaled), not merely share its roots.
+      const branch = cases && cases.find(c => relateSolutionSets(c, cur) === 'same' && sameEquationClaim(ast, c.equation, variable));
+      if (branch) return { status: 'ok', trusted: true, implied: true, note: `This is one case of the absolute value (${variable} = ${listRoots(cur.roots) || 'no value'}); check it against its own condition.` };
+    }
+    if (rel === 'subset' || rel === 'different') {
+      if (rel === 'subset' && answer && relateSolutionSets(answer, cur) === 'same') return { status: 'ok', trusted: true };
+      const diagnosis = domainSolutionDiagnosis({ variable, a: prev, b: cur });
+      return { status: 'break', trusted: false, note: diagnosis.message, diagnosis };
+    }
+    return null;
+  }
+  // No verified line above: the line stands only if its complete solution set is exactly the question's.
+  if (answer && relateSolutionSets(answer, cur) === 'same') return { status: 'ok', trusted: true };
+  return null;
+}
+
+export function assessEquationLine({ ast, previousAst = null, previousTrusted = false, meta = null, anchorAst = null } = {}) {
   // A line with no unknown left in it is a check of the answer, whichever
   // reasoner would otherwise own it.
   const numericCheck = assessNumericCheckLine(ast, { previousAst, meta });
@@ -118,6 +199,9 @@ export function assessEquationLine({ ast, previousAst = null, previousTrusted = 
     const assessed = exactDomainComparison(previousAst, ast, variable);
     if (assessed) return assessed;
   }
+
+  const bySet = assessBySolutionSet({ ast, previousAst, previousTrusted, meta, variable: variable || meta?.variable || null, anchorAst });
+  if (bySet) return bySet;
 
   if (hasNestedDomainHazard(ast, variable)
       || hasNestedDomainHazard(previousAst, variable)

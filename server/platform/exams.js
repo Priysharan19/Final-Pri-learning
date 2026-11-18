@@ -205,6 +205,7 @@ import {
 import { buildPdf, unprintable } from './pdfLite.js';
 import { indiaBank } from './indiaBanks.js';
 import { nswBank } from './nswBanks.js';
+import { deriveSupport } from './attemptSupport.js';
 
 /** How long after the deadline a finish may still carry its own answers. */
 export const FINISH_GRACE_MS = 2 * 60 * 1000;
@@ -1250,10 +1251,13 @@ export function markPaper(paper, responses, { now, totalMs, seen = null, mark })
       ...(extra.repeat ? { repeat: true } : {}),
       ...(extra.repeat && extra.repeatEvidence ? { repeatEvidence: extra.repeatEvidence } : {}),
       mode: 'exam', inputMode: extra.inputMode, ms: extra.ms,
-      // The server offers an exam question no hint, tutor or second try, but it
-      // cannot see what else was open beside the paper. As with practice, an
-      // attempt whose help is unknown is not recorded as independent.
-      hintsUsed: 1, support: 'supported', createdAt: now, serverAcknowledgedAt: now
+      // The server offers an exam question no hint, tutor (TUTOR_EXAM_LOCKED)
+      // or second try, so its own records say independent — unless the
+      // content's solution was already seen (a repeat). Help the server cannot
+      // see (another tab, a calculator) is outside every version of `support`
+      // (attemptSupport.js); attempts written before support version 2 said
+      // 'supported' for "unknown" and are left as they are.
+      hintsUsed: 0, ...deriveSupport({ solutionSeen: !!extra.repeat }), createdAt: now, serverAcknowledgedAt: now
     });
     return attemptId;
   };
@@ -1410,7 +1414,8 @@ export async function accountTargets(db, accountId, now) {
   return targetsFrom({ due, notebook: book.entries });
 }
 
-async function entitlementRefusal(db, accountId, spec, now) {
+/** Exported for server/test/packaging-enforcement-check.mjs. */
+export async function entitlementRefusal(db, accountId, spec, now) {
   const snapshot = await db.get('SELECT plan,status,current_period_end,grace_until FROM entitlement_snapshots WHERE account_id=?', [accountId]);
   const capabilities = serverEntitlementCapabilities(snapshot, now);
   // JEE Advanced is Premium content: the track's own gate comes first, so a
@@ -1679,7 +1684,7 @@ async function finalise(db, accountId, id, body, fixedNow = null, authorise = nu
 // ── Handwriting read after the paper closed ─────────────────────────────────
 
 /** A frozen page as it stands now: past the recovery window it is a person's to resolve. */
-function pageView(page, handwriting, now) {
+export function pageView(page, handwriting, now) {
   if (page.state === 'resolved') return { ...page, triesLeft: 0, canRetry: false, retryAt: null };
   const triesLeft = Math.max(0, HANDWRITING_MAX_ATTEMPTS - Number(page.attempts || 0));
   if (now > Number(handwriting.windowEndsAt)) return { ...page, state: 'needs-review', reason: 'window-closed', nextAttemptAt: null, triesLeft: 0, canRetry: false, retryAt: null };

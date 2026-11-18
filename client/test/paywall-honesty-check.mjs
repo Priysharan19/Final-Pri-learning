@@ -41,8 +41,8 @@ eq('D19: free practice is 20 questions a day', FREE_PRACTICE_ALLOWANCE.perDay, 2
 eq('D19: free papers are one every 30 days', [FREE_EXAM_ALLOWANCE.examsPerWindow, FREE_EXAM_ALLOWANCE.examWindowDays], [1, 30]);
 eq('D20: reads are 5 free and 25 Premium a day', READ_ALLOWANCE, { free: 5, premium: 25 });
 eq('D20: the server\'s read allowance defaults to the same definition, per kind', [AI_ALLOWANCE_DEFAULTS.handwriting, AI_ALLOWANCE_DEFAULTS['question-photo']].map(x => [x.free, x.premium]), [[5, 25], [5, 25]]);
-eq('the free column says exactly the free plan', FREE_ROWS.map(row), [
-  '20 practice questions a day', 'One timed paper every 30 days', '5 reads of your writing and 5 question photos a day', 'The error notebook and its reviews'
+eq('the free column says exactly the free plan (active packaging d19-d20; every difficulty is free on every packaging)', FREE_ROWS.map(row), [
+  '20 practice questions a day', 'Every difficulty level, with spaced reviews of what you got wrong', 'One timed paper every 30 days', '5 reads of your writing and 5 question photos a day', 'The error notebook and its reviews'
 ]);
 eq('the Premium column says exactly what Premium adds', PREMIUM_ROWS.map(row), [
   'Unlimited practice questions', 'Unlimited timed papers', 'After each timed paper, where your time went, section by section',
@@ -70,6 +70,8 @@ ok('the forecast answers a free account with coverage only, from the server\'s o
   /if \(!serverEntitlementCapabilities\(snapshot, now\)\.includes\(FORECAST_CAPABILITY\)\) \{[\s\S]{0,200}premium: false[^}]*coverage: now_\.coverage, coveredMarks: now_\.coveredMarks, unseenMarks: now_\.unseenMarks \}\);/.test(srv('forecast.js')));
 ok('mistake patterns answer a free account with a count only, from the server\'s own record',
   /if \(!serverEntitlementCapabilities\(snapshot, now\)\.includes\(DNA_CAPABILITY\)\) \{\s*return res\.status\(200\)\.json\(\{ premium: false, capability: DNA_CAPABILITY, habitCount: dna\.habits\.length, answered: dna\.answered \}\);/.test(srv('mistakeDna.js')));
+ok('the root-gap reading answers a free account with a count only, from the server\'s own record',
+  /if \(!serverEntitlementCapabilities\(snapshot, now\)\.includes\(ROOT_GAP_CAPABILITY\)\) \{\s*return res\.status\(200\)\.json\(\{ premium: false, capability: ROOT_GAP_CAPABILITY, gapCount: gap\.gaps\.length, answered: gap\.answered \}\);/.test(srv('rootGap.js')));
 {
   const exams = srv('exams.js');
   ok('the time report is added only for premium-exams, on every result read',
@@ -79,7 +81,7 @@ ok('mistake patterns answer a free account with a count only, from the server\'s
 const sectionTime = read('components/SectionTime.jsx');
 const insights = read('insights/Insights.jsx');
 ok('the time-report offer says why the student arrived', /PageLink to=\{PAYWALL_ROUTE\} state=\{\{ from: 'time-report' \}\}/.test(sectionTime) && ARRIVAL_KEYS['time-report']);
-ok('both Insights offers say why the student arrived', (insights.match(/<PageLink to="\/premium" state=\{\{ from: 'insights' \}\}>/g) || []).length === 2 && !/<PageLink to="\/premium">/.test(insights) && ARRIVAL_KEYS.insights);
+ok('all three Insights offers (forecast, Mistake DNA, root gap) say why the student arrived', (insights.match(/<PageLink to="\/premium" state=\{\{ from: 'insights' \}\}>/g) || []).length === 3 && !/<PageLink to="\/premium">/.test(insights) && ARRIVAL_KEYS.insights);
 ok('an arrival from a Premium reading says what stays free', /stay on the free plan/.test(en['paywall.from.timeReport']) && /stay on the free plan/.test(en['paywall.from.insights']));
 
 // 2 · no price in the source or the copy
@@ -130,7 +132,8 @@ for (const [lang, cat] of [['en', en], ['hi', hi]]) {
 }
 ok('no countdown or timer on the screen', !/setTimeout|setInterval|countdown|expires in/i.test(paywall));
 ok('no urgency, guilt, trial or outcome claim in the copy', !/\b(hurry|only today|limited time|last chance|don.t miss|free trial|guarantee|top rank|percentile|complete|certified|accurate|best)\b/i.test(text(en)), (text(en).match(/\b(hurry|only today|limited time|last chance|free trial|guarantee|complete|certified|accurate|best)\b/i) || [])[0]);
-ok('the web offers no checkout: Premium is bought in the app', /paywall\.inAppOnly/.test(paywall) && !/checkout|razorpay/i.test(paywall));
+ok('the web screen starts no payment itself: it sends the student to their account (where a web provider is configured) or to the app',
+  /paywall\.inAppOnly/.test(paywall) && /billing\?\.webCheckout\s*\? <p[^>]*data-paywall-web>\{t\('pricing\.webSubscribe'\)\}\{' '\}<PageLink to="\/settings#cloud-account-title">/.test(paywall) && !/createWebBillingCheckout|razorpay|stripe|location\.assign/i.test(paywall));
 ok('Premium is never set here: the server verifies every purchase', !/set(?:Premium|Entitlement)\s*\(/.test(paywall));
 ok('every arrival reason has copy in both languages', Object.values(ARRIVAL_KEYS).every(k => en[k] && hi[k]));
 
@@ -154,7 +157,7 @@ ok('every arrival reason has copy in both languages', Object.values(ARRIVAL_KEYS
     /\{!premium && \(apple \|\| google\) && \(\s*<div[^>]*data-paywall-plans>/.test(paywall) && /\{\(apple \|\| google\) && \(\s*<p[^>]*data-paywall-disclosure/.test(paywall) &&
     (paywall.match(/<PlanCard /g) || []).length === 2 && paywall.indexOf('<PlanCard ') > paywall.indexOf('data-paywall-plans>'));
   ok('with no store and nothing on sale the screen says so, and does not send the student to an app to buy',
-    /\{!premium && !apple && !google && \(sellsPremium\(saleAvailable\)\s*\? <p[^>]*data-paywall-in-app>\{t\('paywall\.inAppOnly'\)\}<\/p>\s*: <p[^>]*data-paywall-not-on-sale>\{t\('paywall\.notOnSale'\)\}<\/p>\s*\)\}/.test(paywall));
+    /\{!premium && !apple && !google && \(sellsPremium\(saleAvailable\)\s*\? \(billing\?\.webCheckout\s*\? <p[^>]*data-paywall-web>[\s\S]{0,200}?<\/p>\s*: <p[^>]*data-paywall-in-app>\{t\('paywall\.inAppOnly'\)\}<\/p>\)\s*: <p[^>]*data-paywall-not-on-sale>\{t\('paywall\.notOnSale'\)\}<\/p>\s*\)\}/.test(paywall));
   ok('the account panel offers web checkout only where Premium is on sale: nothing to sell, and the one place that turns it on is never reached',
     (panel.match(/setWebCheckout\(/g) || []).length === 3 && (panel.match(/setWebCheckout\(false\)/g) || []).length === 2 &&
     /if \(!enabled \|\| !PREMIUM_ON_SALE\) \{\s*setPricing\(null\);\s*setWebCheckout\(false\);\s*return \(\) => \{ live = false; \};\s*\}\s*cloud\.billingConfig\(\)/.test(panel) &&

@@ -64,7 +64,7 @@ try {
   await startDemo(page, server.origin);
 
   // ── 1 · Notes is in the navigation and opens on the student's class ───────
-  await page.locator('.sidebar a[href="/notes"]').first().click();
+  await page.getByTestId('tab-notes').click();
   await page.waitForSelector('[data-testid="notes-chapter"]');
   await check('Notes opens from the navigation', page.url().endsWith('/notes'));
   await check('it opens on Class 10, the student’s class',

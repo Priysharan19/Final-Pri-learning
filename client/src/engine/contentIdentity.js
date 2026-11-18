@@ -52,15 +52,20 @@
 // together; no single PR's version above describes the merged content.
 // 2026.11.16 — CBSE XII 2025 65/2/1 Q24, the first Section B record on the Board-scheme
 // contract (#846), restacked on Train 15.
-// 2026.11.17 — CBSE X 2025 Set 30/2/2 Section A: 8 official questions not already
-// carried from 30/2/1 (#856).
-// 2026.11.18 — CBSE X 2025 Set 30/2/3 Section A: 6 official questions not already
-// carried from 30/2/1 (#859; its Q12 is 30/2/1 Q15 word for word).
-// 2026.11.19 — #856 and #859 together (salvaged from Train 18); neither PR's own version describes
-// the merged content.
-// 2026.11.20 — review fix: 30/2/3 prompts had single-backslash LaTeX (tab and lost-backslash
-// corruption), its Q12 duplicated 30/2/1 Q15 and is dropped, and a stray tab in 30/2/1 Q1's step is mended.
-export const CONTENT_VERSION = '2026.11.20';
+// 2026.11.37 — Train editions-25: the merged content of the 33 branches together; the extra Priyabhata
+// forms no longer draw a "- 0" term (Class 7 integers) or a "0^3" limit (Class 12 average value), which the
+// zero-term typesetting rule of the content certification refuses.
+// 2026.11.38 — Train editions-25 review fixes: no floating-point artefacts in the Years 9-10 overlays (variation,
+// scale drawings), no "${" at the start of a combinations span, and every extra form that states a number of
+// decimal places keys the matching tolerance band.
+// 2026.11.39 — Train editions-25 independent-review fixes: a skill's forms are drawn in proportion to the questions each
+// can serve (the direct form no longer shadowed by small extra forms, which cut the distinct-question counts), a
+// designed wrong answer that equals the key is dropped, `N decimal places` reads every digit of N, and the
+// exact-value slips name any angle.
+// 2026.11.40 — Train editions-25 CI fix: Some Applications of Trigonometry (c10-trig-applications) draws only
+// figure-bearing heights-and-distances forms (the right-triangle ratio, the ladder and two new ones, a kite string
+// and an angle of depression); the table and identity expressions stay in the Trigonometry chapter.
+export const CONTENT_VERSION = '2026.11.40';
 export const LEGACY_CONTENT_VERSION = 'legacy-unversioned';
 
 /** FNV-1a over a string, two lanes, as 16 hex characters. */

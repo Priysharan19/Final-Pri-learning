@@ -16,7 +16,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 const SRC = new URL('../src/', import.meta.url).href;
 const { checkAnswer } = await import(`${SRC}engine/checker.js`);
-const { generateQuestion, loadAllBanks } = await import(`${SRC}engine/generators/index.js`);
+// Every question below is named by (skill, difficulty, seed): the direct form (support/direct-forms.mjs).
+const { generateQuestion, loadAllBanks } = await import('./support/direct-forms.mjs');
 
 let pass = 0, fail = 0;
 const failures = [];

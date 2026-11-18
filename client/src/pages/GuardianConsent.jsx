@@ -17,6 +17,7 @@ import { cloud } from '../platform/cloudTransport.js';
 import { LANGUAGES, rememberSignInLanguage, setLanguage, signInLanguage, tLater, useLanguage, useT } from '../i18n/index.js';
 import OtpInput, { OTP_LENGTH } from '../components/OtpInput.jsx';
 import { GUARDIAN_NOTICE_VERSION } from '../components/SignUpFlow.jsx';
+import { EDITION_ID } from '../brand/edition.js';
 import '../components/SignUpFlow.css';
 import { Wordmark } from '../components/BrandMark.jsx';
 
@@ -29,7 +30,9 @@ function Notice({ t }) {
         <li>{t('signup.noticeWhy')}</li>
         <li>{t('signup.noticeNot')}</li>
         <li>{t('signup.noticeWithdraw')}</li>
+        {EDITION_ID === 'prithagoras' && <li>{t('signup.noticeContact')} <a href="/privacy" target="_blank" rel="noreferrer">{t('cloud.privacyNotice')}</a></li>}
       </ul>
+      {EDITION_ID === 'prithagoras' && <p className="signup-notice-foot">{t('signup.noticeUnreviewed')}</p>}
       <p className="signup-notice-foot">{t('signup.noticeVersion', { v: GUARDIAN_NOTICE_VERSION })}</p>
     </section>
   );

@@ -22,12 +22,14 @@ import './instrument/aurora.css';
 import AccountAction from './pages/AccountAction.jsx';
 import { accountActionCleanUrl, parseAccountActionFragment } from './platform/accountAction.js';
 import { parseParentEmailFragment } from './parent/parentReportApi.js';
+import { parentFeaturesOffered } from './platform/edition.js';
 import { checkServerEdition, discoverCloudOrigin, editionMismatch, onEditionMismatch } from './platform/cloudTransport.js';
 import EditionMismatch from './components/EditionMismatch.jsx';
 import { scheduleOfflineWarm } from './local/offlineWarm.js';
 import ErrorBoundary from './components/ErrorBoundary.jsx';
 import { installReleaseIdentityDiagnostics } from './platform/releaseIdentity.js';
 import { priNative } from './platform/native/index.js';
+import { captureInvite } from './platform/referral.js';
 import { installFormFactorAttributes } from './platform/formFactor.js';
 import { installBackNavigation } from './platform/backNavigation.js';
 import { featureEnabled, featureSnapshot } from './platform/features.js';
@@ -42,6 +44,8 @@ bootPhase('module');
 priNative.start();
 // data-ff / data-short / data-pointer on <html>: semantic form factor (CP-03).
 installFormFactorAttributes(window);
+// A friend's invite link (/?invite=CODE): kept on this device, taken out of the address (web only).
+captureInvite();
 // Android Back asks the page first: open sheets/dialogs close (CP-06).
 // (after first paint the body exists for the dialog observer)
 queueMicrotask(() => installBackNavigation(window));
@@ -76,7 +80,7 @@ if (ACCOUNT_ACTION_MODE) {
 // The parent's own page for the weekly report email (confirm / stop): no
 // profile, no session; the token is in the fragment and stripped the same way.
 // Off in a production build until counsel has reviewed email about minors (D22).
-const PARENT_EMAIL_MODE = featureEnabled('parentReport') && window.location.pathname === '/parent/report-email';
+const PARENT_EMAIL_MODE = featureEnabled('parentReport') && parentFeaturesOffered() && window.location.pathname === '/parent/report-email';
 let parentEmailData = null;
 if (PARENT_EMAIL_MODE) {
   parentEmailData = parseParentEmailFragment(window.location.hash);

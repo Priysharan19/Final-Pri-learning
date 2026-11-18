@@ -222,8 +222,21 @@ function cookie(name) {
 }
 
 function requestId() {
-  try { return globalThis.crypto?.randomUUID?.() || `req-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
-  catch { return `req-${Date.now()}`; }
+  // A request correlation ID travels across the native/Web API boundary.
+  // Never downgrade its unpredictability to Math.random or a timestamp if
+  // randomUUID is unavailable in a supported WebView.
+  const crypto = globalThis.crypto;
+  try {
+    if (typeof crypto?.randomUUID === 'function') return crypto.randomUUID();
+    if (typeof crypto?.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      return 'req-' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    }
+  } catch { /* fail closed below when secure randomness is unavailable */ }
+  const error = new Error('Secure cloud request identifiers are unavailable.');
+  error.code = 'SECURE_RANDOM_UNAVAILABLE';
+  throw error;
 }
 
 function byteLength(text) {
@@ -234,6 +247,20 @@ function pathId(value, label = 'id') {
   const id = String(value || '');
   if (!SAFE_ID.test(id)) throw new Error(`${label} is invalid`);
   return id;
+}
+
+const QUERY_KEY = /^[a-z]{1,16}$/;
+/** `?k=v&…` (or `.csv`) for a browser GET: plain-id keys and values only, or it throws. */
+function webOnlySuffix(verb, query, csv) {
+  if (verb !== 'GET') throw new Error('Cloud query is not allowed');
+  let out = csv ? '.csv' : '';
+  const pairs = Object.entries(query || {});
+  if (pairs.length > 4) throw new Error('Cloud query is not allowed');
+  for (const [k, v] of pairs) {
+    if (!QUERY_KEY.test(k) || !SAFE_ID.test(String(v ?? ''))) throw new Error('Cloud query is not allowed');
+  }
+  if (pairs.length) out += '?' + pairs.map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`).join('&');
+  return out;
 }
 
 function parseJson(text) {
@@ -283,11 +310,16 @@ const PROOF_KINDS = new Set(['password', 'otp', 'google', 'apple']);
 const proofList = list => list.filter(kind => typeof kind === 'string' && PROOF_KINDS.has(kind)).slice(0, PROOF_KINDS.size);
 
 export async function cloudRequest(path, {
-  method = 'GET', body = undefined, idempotencyKey = null, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null
+  method = 'GET', body = undefined, idempotencyKey = null, timeoutMs = DEFAULT_TIMEOUT_MS, signal = null,
+  query = null, csv = false
 } = {}) {
   if (!PATH.test(String(path || '')) || String(path).includes('..')) throw new Error('Cloud path is not allowed');
   const verb = String(method || 'GET').toUpperCase();
   if (!['GET', 'POST', 'PATCH', 'DELETE'].includes(verb)) throw new Error('Cloud method is not allowed');
+  // A query string and a CSV export are never part of PATH (the native bridges
+  // refuse both): they are added here, to a GET in a browser only, from named
+  // parameters whose keys and values are plain ids.
+  const extra = (query || csv) ? webOnlySuffix(verb, query, csv) : '';
 
   let payload;
   if (body !== undefined) {
@@ -297,6 +329,11 @@ export async function cloudRequest(path, {
 
   const rid = requestId();
   if (nativeCloudAvailable()) {
+    if (extra) {
+      const err = new Error('This needs Pri in a web browser for now.');
+      err.code = 'CLOUD_WEB_ONLY';
+      throw err;
+    }
     const result = await nativeRequest(path, {
       method: verb, payload, idempotencyKey, timeoutMs, signal, serverRequestId: rid
     });
@@ -343,7 +380,7 @@ export async function cloudRequest(path, {
     throw err;
   }
 
-  const headers = { Accept: 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION };
+  const headers = { Accept: csv ? 'text/csv, application/json' : 'application/json', 'X-Pri-Request-Id': rid, 'X-Pri-Client': 'web-v1', [EDITION_HEADER]: EDITION };
   const csrf = cookie('pri_csrf');
   if (csrf && verb !== 'GET') headers['X-Pri-CSRF'] = csrf;
   if (idempotencyKey) headers['Idempotency-Key'] = String(idempotencyKey).slice(0, 160);
@@ -358,7 +395,7 @@ export async function cloudRequest(path, {
   }
 
   try {
-    const response = await fetch(`${origin}${path}`, {
+    const response = await fetch(`${origin}${path}${extra}`, {
       method: verb,
       headers,
       body: payload,
@@ -369,6 +406,8 @@ export async function cloudRequest(path, {
     });
     const text = await response.text();
     if (byteLength(text) > MAX_RESPONSE_BYTES) throw new Error('Cloud response exceeded safety limit');
+    // A CSV export answers with the file itself; its refusals are JSON like any other.
+    if (csv && response.ok) return text;
     const data = parseJson(text);
     if (!response.ok) {
       const err = new Error(data?.error?.message || data?.error || `Cloud request failed (${response.status})`);
@@ -533,6 +572,11 @@ export async function cloudStreamRequest(path, { body, onEvent, timeoutMs = 45_0
 
 export const cloud = Object.freeze({
   health: () => cloudRequest('/v1/health'),
+  // The student's original work kept with a mark (standard #08): their own,
+  // by the id the grade reply named; or, for their teacher, through the class.
+  original: id => cloudRequest('/v1/originals/' + pathId(id, 'original id')),
+  teacherOriginal: (classId, studentId, id) => cloudRequest('/v1/originals/class/' + pathId(classId, 'class id') + '/student/'
+    + pathId(studentId, 'student id') + '/' + pathId(id, 'original id')),
   // The device never computes a grade: question and attempt authority are on
   // the authenticated server. Transport failures are propagated, not converted
   // into local answers or queued pseudo-receipts.
@@ -575,6 +619,8 @@ export const cloud = Object.freeze({
   // time; the error notebook and the per-dot-point review queue are derived
   // there from this account's server-marked attempts.
   hintPractice: (questionId, rung) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/hint', { method: 'POST', body: { rung } }),
+  // The tutor policy's smallest next step (server/platform/helpPlan.js). Dark: 404 unless the server sets PRI_FEATURE_TUTOR_POLICY=1.
+  helpPlanPractice: (questionId, body) => cloudRequest('/v1/practice/' + pathId(questionId, 'question id') + '/help-plan', { method: 'POST', body }),
   practiceNotebook: () => cloudRequest('/v1/practice/notebook'),
   notebookTwin: attemptId => cloudRequest('/v1/practice/notebook/' + pathId(attemptId, 'attempt id') + '/twin', { method: 'POST', body: {} }),
   reviewQueue: () => cloudRequest('/v1/practice/review-queue'),
@@ -691,7 +737,7 @@ export const cloud = Object.freeze({
   socialSignIn: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/sign-in`, { method: 'POST', body }),
   linkIdentity: (provider, body) => cloudRequest(`/v1/account/identity/${pathId(provider, 'provider')}/link`, { method: 'POST', body }),
   syncPush: (body, idempotencyKey) => cloudRequest('/v1/sync/push', { method: 'POST', body, idempotencyKey }),
-  syncPull: cursor => cloudRequest(`/v1/sync/pull/${Math.max(0, Number(cursor) || 0)}`),
+  syncPull: (cursor, accountId = null) => cloudRequest(`/v1/sync/pull/${accountId == null ? '' : `${pathId(accountId, 'account id')}/`}${Math.max(0, Number(cursor) || 0)}`),
   entitlements: () => cloudRequest('/v1/entitlements'),
   billingConfig: () => cloudRequest('/v1/billing/config'),
   billingStatus: () => cloudRequest('/v1/billing/status'),
@@ -713,6 +759,9 @@ export const cloud = Object.freeze({
   // Cancel/manage contract (server: wp/server-commerce-classes). Web cancels at
   // the end of the paid cycle; Apple subscriptions are managed in the App Store.
   cancelWebBilling: () => cloudRequest('/v1/billing/web/cancel', { method: 'POST', body: {} }),
+  cancelFeedback: reason => cloudRequest('/v1/billing/cancel-feedback', { method: 'POST', body: { reason } }),
+  referral: () => cloudRequest('/v1/referral/'),
+  claimReferral: code => cloudRequest('/v1/referral/claim', { method: 'POST', body: { code } }),
   billingManage: () => cloudRequest('/v1/billing/manage'),
   classes: () => cloudRequest('/v1/classes'),
   classDetails: classId => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}`),
@@ -724,6 +773,19 @@ export const cloud = Object.freeze({
   assignmentDetails: (classId, assignmentId) => cloudRequest(`/v1/assignments/${pathId(classId, 'class id')}/${pathId(assignmentId, 'assignment id')}`),
   updateSubmission: (classId, assignmentId, body) => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/submission`, { method: 'PATCH', body }),
   returnSubmission: (classId, assignmentId, studentId, feedback = {}) => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/submissions/${pathId(studentId, 'student id')}/return`, { method: 'POST', body: { feedback } }),
+  classJoinCode: classId => cloudRequest(`/v1/classes/${pathId(classId, 'class id')}/join-code`),
+  // The teacher workspace (server/platform/classroom.js, classBoard.js). Engine
+  // marks and teacher marks arrive in separate fields and stay separate here.
+  classroomVisibility: () => cloudRequest('/v1/classroom/visibility'),
+  classroomMine: () => cloudRequest('/v1/classroom/mine'),
+  handInPaper: (classId, assignmentId, examId) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/hand-in`, { method: 'POST', body: { examId: String(examId || '') } }),
+  boardCourses: () => cloudRequest('/v1/classroom/board/courses'),
+  classBoard: (classId, course, node = null) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/board`, { query: node ? { course, node } : { course } }),
+  paperResults: (classId, assignmentId) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/results`),
+  paperResultsCsv: (classId, assignmentId) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/assignments/${pathId(assignmentId, 'assignment id')}/results`, { csv: true }),
+  classReviewQueue: (classId, state = 'open') => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/review`, ['decided', 'all'].includes(state) ? { query: { state } } : {}),
+  classReviewDecide: (classId, itemId, body) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/review/${pathId(itemId, 'review item id')}`, { method: 'POST', body }),
+  classReviewHistory: (classId, itemId) => cloudRequest(`/v1/classroom/classes/${pathId(classId, 'class id')}/review/${pathId(itemId, 'review item id')}/history`),
   contentRevisions: () => cloudRequest('/v1/content/admin/revisions'),
   createContentDraft: body => cloudRequest('/v1/content/drafts', { method: 'POST', body }),
   updateContentDraft: (revisionId, body) => cloudRequest(`/v1/content/drafts/${pathId(revisionId, 'revision id')}`, { method: 'PATCH', body }),

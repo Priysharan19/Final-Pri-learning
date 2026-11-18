@@ -46,7 +46,9 @@ for (const id of Object.keys(GENERATORS).sort()) {
   }
 }
 // The walk must actually meet stated precisions, or it proves nothing. Measured
-// at 40 draws: 2,442 draws state a precision; the floor sits at three quarters.
+// at 40 draws: 2,143 draws state a precision (2,442 on main before the extra forms redistributed which forms
+// state one, Train 25; 2,046 before the Applications of Trigonometry forms were narrowed); the floor, 1,830, is
+// unchanged and sits at 85% of the measurement.
 const floor = Math.floor(1830 * Math.min(1, DRAWS / 40));
 if (stated < floor) failures.push(`the walk met ${stated} draws that state a precision (floor ${floor})`);
 if (exempt === 0 && DRAWS >= 40) failures.push('no draw from the reviewed data-precision generators was met: prune DATA_PRECISION');

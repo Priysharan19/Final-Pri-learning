@@ -92,8 +92,41 @@ export function equivalentForm(value) {
   return f !== String(value) ? f : null;
 }
 
+/**
+ * The key as a student would type it, for every answer type (the packet used to print `undefined` for a
+ * multiple-choice, expression, set, point or ratio key, and the decimal value for an exact-form key).
+ * Same reading of the key as client/test/nsw-bank-quality-check.mjs.
+ */
+export function keyText(q) {
+  const a = q.answer || {};
+  switch (q.answerType) {
+    case 'numeric':
+      if (a.canonicalInput) return String(a.canonicalInput);
+      if (a.surdForm) return `${a.surdForm.k === 1 ? '' : a.surdForm.k}sqrt(${a.surdForm.r})`;
+      if (a.simplestFraction && a.simplestFraction.d !== 1) return `${a.simplestFraction.n}/${a.simplestFraction.d}`;
+      return typeof a.value === 'number' ? frac(a.value) : String(a.value);
+    case 'set': return Array.isArray(a.values) ? a.values.map(frac).join(', ') : String(a.values);
+    case 'point': return `(${frac(a.x)}, ${frac(a.y)})`;
+    case 'ratio': return `${a.a}:${a.b}`;
+    case 'expression': return String(a.expr);
+    case 'mcq': return String(a.correctIndex);
+    default: return String(a.value);
+  }
+}
+
+/** For a multiple-choice key, the text of the option the index names (shown beside the index). */
+const optionNote = (q, i) => (q.answerType === 'mcq' && Array.isArray(q.mcqOptions) && q.mcqOptions[i] != null ? ` Option ${i} is “${String(q.mcqOptions[i]).replace(/\s+/g, ' ').slice(0, 80)}”.` : '');
+
 /** A plainly wrong final answer of the same kind as the key. */
 export function wrongForm(q) {
+  const a = q.answer || {};
+  if (q.answerType === 'mcq' && Array.isArray(q.mcqOptions)) { const i = q.mcqOptions.findIndex((_, j) => j !== a.correctIndex); if (i >= 0) return String(i); }
+  if (q.answerType === 'set' && Array.isArray(a.values) && a.values.length) return [frac(a.values[0] + 1), ...a.values.slice(1).map(frac)].join(', ');
+  if (q.answerType === 'point') return `(${frac(a.x + 1)}, ${frac(a.y)})`;
+  if (q.answerType === 'ratio') return `${a.a + 1}:${a.b}`;
+  if (q.answerType === 'expression' && a.expr) return a.stripC || /\+\s*C\b|∫/.test(String(q.prompt)) ? `2*(${a.expr})` : `(${a.expr}) + 1`;
+  if (q.answerType === 'numeric' && a.surdForm) return `${a.surdForm.k + 1}sqrt(${a.surdForm.r})`;
+  if (q.answerType === 'numeric' && a.simplestFraction && a.simplestFraction.d !== 1) return `${a.simplestFraction.n + 1}/${a.simplestFraction.d}`;
   const v = q.answer?.value;
   if (typeof v === 'number' && Number.isFinite(v)) return frac(v + 1);
   if (Array.isArray(q.options) && q.options.length > 1) {
@@ -109,7 +142,7 @@ export function wrongForm(q) {
  */
 export function workedCases(q) {
   const key = q.answer?.value;
-  const right = typeof key === 'number' ? frac(key) : String(key);
+  const right = keyText(q);
   const cases = [];
   const chain = q.stepcheck?.kind === 'plan' && q.stepcheck.chain;
   if (chain) {
@@ -124,12 +157,13 @@ export function workedCases(q) {
       cases.push({ case: 'partial', page: slip.lines, answer: frac(slip.final), note: 'One arithmetic slip in the first evaluated stage, carried forward correctly to the end.' });
     }
   } else {
-    const alt = equivalentForm(key);
-    cases.push({ case: 'correct', page: [], answer: right, note: 'The keyed answer as the server prints it.' });
+    const plainNumeric = q.answerType === 'numeric' && !q.answer?.canonicalInput && !q.answer?.surdForm && !(q.answer?.simplestFraction && q.answer.simplestFraction.d !== 1);
+    const alt = plainNumeric ? equivalentForm(key) : q.answerType === 'expression' && q.answer?.expr ? `(${q.answer.expr})` : null;
+    cases.push({ case: 'correct', page: [], answer: right, note: `The keyed answer as the server prints it.${optionNote(q, q.answer?.correctIndex)}` });
     cases.push(alt
-      ? { case: 'alternative', page: [], answer: alt, note: 'The same value written in another equivalent form.' }
+      ? { case: 'alternative', page: [], answer: alt, note: q.answerType === 'expression' ? 'The same expression written with brackets.' : 'The same value written in another equivalent form.' }
       : { case: 'alternative', page: [], answer: null, note: 'The tool knows no equivalent written form for this answer type; the examiner should try their own.' });
-    cases.push({ case: 'common wrong', page: [], answer: wrongForm(q), note: 'A plainly wrong final answer of the same kind as the key.' });
+    cases.push({ case: 'common wrong', page: [], answer: wrongForm(q), note: `A plainly wrong final answer of the same kind as the key.${q.answerType === 'mcq' ? optionNote(q, Number(wrongForm(q))) : ''}` });
     cases.push({ case: 'partial', page: q.stepcheck ? ['(working with the right method, ending in a wrong value)'] : [], answer: wrongForm(q), note: q.stepcheck
       ? `The step check is an ${q.stepcheck.kind} check, not a chain plan, so the tool cannot write a model page; this is a wrong final answer with a placeholder line. The examiner should write the partial page.`
       : 'No step check: working is never marked for this question, so any wrong final answer earns nothing.' });

@@ -189,6 +189,18 @@ account-bearing shared tables, inside account-scope transactions only. The sente
 means in the code today. Extending account scope to more handlers, or giving the shared tables
 their own policies, is tracked as R-15 in `accepted-risks.md`.
 
+**Teacher workspace (schema 18).** `assignment_handins`, `teacher_review_items` and `teacher_marks`
+carry `pri_scope_required` + a RESTRICTIVE `pri_account_scope` policy on the student or teacher
+column; `classroom.js` serves them in system scope behind server authorization, as the class
+tables are (T3): the class must be the teacher's and not archived, the student an active member
+of an undeleted account whose guardian-consent state allows the cloud, re-checked on every read
+and write. Student work reaches a teacher only when the student hands in a finished,
+server-marked paper for that teacher's assignment; notes, tutor/AI conversations, practice
+working and pictures of handwriting are never read by that module. A TEACHER mark is a separate,
+append-only row (pri_server holds INSERT/SELECT only) with who, when, criterion, the engine's mark
+at the time and the row it supersedes, audited in `audit_log`; it never writes the exam result or
+a graded-attempt event, and no model is consulted (`classroom-check`).
+
 **Exam Desk attempts (schema 16, plan F4a).** `desk_attempts` is account-owned under the same
 `pri_scope_required` + RESTRICTIVE `pri_account_scope` policies, and `desk.js` reads and writes it only
 inside `transaction({ accountScope })`, keyed on (account, id, edition). Its notes are the student's

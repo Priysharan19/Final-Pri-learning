@@ -37,7 +37,15 @@ import {
   mappedIdForTrap, misconceptionIdForTrap, trapShape, shapeHash, canonicalLedgerKey,
   migrateTrapLedger, migrateRatingRow, confirmCloudMisconception
 } from '../src/engine/misconceptions.js';
-import { ALL_DIAGNOSIS_CODES, diagnoseStep } from '../src/engine/diagnose.js';
+import { ALL_DIAGNOSIS_CODES as ENGINE_CODES, diagnoseStep } from '../src/engine/diagnose.js';
+import { registeredTopics } from '../src/engine/misconceptions/topics/index.js';
+// Only the algebra and indices catalogues name their slips with ontology IDs of their own (the entries
+// under "Algebra and indices" in misconceptions.js). The other topic catalogues (number, sequences,
+// finance, trigonometry, functions, polynomial lines, ...) name slips for the "same slip again" note
+// and reuse an existing ontology ID through `misconceptionId` or none: their codes are not entries.
+const ONTOLOGY_TOPICS = ['algebra', 'indices'];
+const topicCodes = registeredTopics().filter(t => ONTOLOGY_TOPICS.includes(t.topic)).flatMap(t => t.slips.map(sl => sl.code));
+const ALL_DIAGNOSIS_CODES = [...new Set([...ENGINE_CODES, ...topicCodes])];
 import { misconceptionKey } from '../src/engine/adaptive.js';
 import { stepCheck } from '../src/engine/checker.js';
 import { GENERATORS, loadAllBanks, generateQuestion } from '../src/engine/generators/index.js';

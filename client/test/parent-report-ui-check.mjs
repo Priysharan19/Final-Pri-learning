@@ -83,7 +83,7 @@ try {
   ok(featureDefines('build', { PRI_FEATURE_PARENT_REPORT: '1' }).__PRI_FEATURE_PARENT_REPORT__ === 'true', 'and on only where the build says so');
   ok([...FEATURE_FLAGS, ...PENDING_FEATURE_FLAGS].includes('PARENT_REPORT'), 'the flag is recorded with the build\'s other flags');
   const app = read('src/App.jsx');
-  ok(/const PARENT_REPORT_ON = featureEnabled\('parentReport'\);/.test(app), 'the app reads the flag');
+  ok(/const PARENT_REPORT_ON = featureEnabled\('parentReport'\) && parentFeaturesOffered\(\);/.test(app), 'the app reads the flag, and only an edition with parent features (Priyabhata) offers the screen');
   ok(/\.\.\.\(PARENT_REPORT_ON \? \[\{ to: '\/parent-report'/.test(app), 'the "For parents" nav entry exists only with the flag');
   ok(/\{PARENT_REPORT_ON && <Route path="\/parent-report"/.test(app), 'and so does its route');
   ok(/const PARENT_EMAIL_MODE = featureEnabled\('parentReport'\) && /.test(read('src/main.jsx')), 'and the emailed confirm/stop page');

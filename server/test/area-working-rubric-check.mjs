@@ -29,8 +29,10 @@ process.env.PRI_FREE_PRACTICE_PER_DAY = '100000';
 delete process.env.PRI_PUBLIC_ORIGIN;
 const { startApp, registerAccount, verifyEmail } = await import('./support/app-harness.mjs');
 const { requestedEngine } = await import('./support/engine.mjs');
-const { generateQuestion, loadAllBanks } = await import('../../client/src/engine/generators/index.js');
+const { generateQuestion, loadAllBanks, directFormsOnly } = await import('../../client/src/engine/generators/index.js');
 await loadAllBanks();
+// The area rubric belongs to the skill's direct form; its extra forms are swept after it (section 7b).
+directFormsOnly(true);
 const h = await startApp({ engine: requestedEngine() });
 let count = 0;
 const eq = (actual, expected, name) => { assert.deepEqual(actual, expected, name); count++; };
@@ -189,6 +191,34 @@ try {
       eq([done.data.correct, done.data.marksEarned], [true, fq.criteriaCount], `D${difficulty} seed ${seed}: the keyed answer is full marks`);
     }
   }
+  // ── 7b · The same family with the extra forms on ───────────────────────────
+  // Over the same seeds, every question that is NOT the direct form is held to what every form owes: the
+  // public question leaks neither key nor rubric, the hint is not the answer, a wrong final answer is wrong,
+  // the key is full marks, and working is offered only where the form carries a rubric behind it.
+  directFormsOnly(false);
+  let extraForms = 0;
+  try {
+    for (const difficulty of [1, 2, 3, 4]) {
+      for (const seed of [1, 4, 9, 23, 1042, 77, 311, 2048]) {
+        const sealed = generateQuestion(GENERATOR, difficulty, seed);
+        if (!sealed.form) continue;
+        extraForms += 1;
+        const tag = `extra form ${sealed.form} D${difficulty} seed ${seed}`;
+        const fq = await fresh(difficulty, seed);
+        const key = sealed.answer.simplestFraction ? sealed.answer.simplestFraction.n + '/' + sealed.answer.simplestFraction.d : String(sealed.answer.value);
+        ok(!('stepcheck' in fq) && !('answer' in fq) && !('steps' in fq), `${tag}: rubric and key stay private`);
+        eq(fq.supportsSteps === true, sealed.stepcheck?.kind === 'plan', `${tag}: working is offered exactly when a rubric stands behind it`);
+        if (sealed.answerType === 'numeric') {
+          ok(sealed.answer.simplestFraction ? !String(fq.inputHint || '').includes(key) : true, `${tag}: the hint is not the answer`);
+          const wrong = await grade(a.jar, fq.id, String(Number(sealed.answer.value) + 987654));
+          eq([wrong.data.correct, wrong.data.marksEarned], [false, 0], `${tag}: a wrong final answer is wrong and earns nothing without working`);
+          const done = await grade(a.jar, fq.id, key);
+          eq(done.data.correct, true, `${tag}: the keyed answer is correct`);
+        }
+      }
+    }
+  } finally { directFormsOnly(true); }
+  ok(extraForms > 0, `the family's extra forms were swept (${extraForms} questions)`);
   console.log(`AREA WORKING RUBRIC (HTTP): PASS — ${count}/${count} checks — a three-mark area task offers marked working, leaks nothing, and credits only verified evidence.`);
 } finally {
   await h.close?.();

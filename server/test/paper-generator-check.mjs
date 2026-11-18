@@ -151,8 +151,12 @@ try {
   const keyed = String(q1.answer?.canonicalInput ?? q1.answer?.correctIndex ?? '');
   c.ok(!/Answer:|marking guide/.test(text), 'and no answer or guide in the paper');
   const shown = [...text.matchAll(/\((.*)\) Tj/g)].map(m => m[1]).join('\n');
-  c.ok(!/\$|\\\\[a-z]|\?/.test(shown) && shown.length > 200, 'the printed questions carry no LaTeX markup and no replaced character');
+  // The replaced character is U+FFFD (a decoded stream). pdfLite writes an unrepresentable glyph as "?", which a prompt may
+  // legitimately end in ("Which term is …?"), so the question mark is not searched for: instead no printed question may hold a
+  // glyph the page cannot carry (pdfLite `unprintable` withholds such a question), which is what would have put a "?" there.
+  c.ok(!/\$|\\\\[a-z]|\uFFFD/.test(shown) && shown.length > 200, 'the printed questions carry no LaTeX markup and no replaced character');
   const { latexToText, unprintable } = await import('../platform/pdfLite.js');
+  c.ok(pa.questions.every(q => !unprintable(String(q.payload.prompt ?? ''))), 'no printed question holds a glyph the page cannot carry, so no "?" in the paper is a replacement');
   c.deq([latexToText('Simplify $x^{3} \\times x^{8}$'), latexToText('\\dfrac{5x}{2} costs \\$5')], ['Simplify x^(3) x x^(8)', '(5x)/(2) costs 5'], 'LaTeX is turned into plain text');
   c.ok(unprintable('\u2220ABC and \u03b1 \u2208 A') && !unprintable('x^{2} \\le 5'), 'a question the page cannot carry faithfully is not printed');
   c.deq(leaks({ ...pdf.data, pdfBase64: undefined }), [], 'no key in the PDF reply');
