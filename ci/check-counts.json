@@ -335,7 +335,7 @@
       "job": "platform-contracts",
       "log": "papers.log",
       "pins": [
-        {"has":"PRACTICE PAPERS: PASS — 71/71 checks"}
+        {"has":"PRACTICE PAPERS: PASS — 171/171 checks"}
       ]
     },
     "platform/resources.log": {
@@ -642,7 +642,7 @@
         {"has":"India exam · JEE Main handwritten, reloaded, analysed"},
         {"has":"India exam · the clock runs out and the paper submits itself"},
         {"has":"NSW PAPERS TOUR (G4): PASS — 24/24 checks"},
-        {"has":"EXT1 PAPERS TOUR: PASS — 17/17 checks"},
+        {"has":"EXT1 PAPERS TOUR: PASS — 20/20 checks"},
         {"has":"Placement · onboarding → diagnostic → evidence map"},
         {"has":"Phone · every destination reachable at 390px"},
         {"has":"iPhone portrait · safe areas, sticky bar, mode switch, write and photo space"},
