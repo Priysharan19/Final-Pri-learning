@@ -8,17 +8,17 @@ Reproduce: `node tools/understanding-audit/run.mjs` (deterministic; fixed seeds;
 
 ## Key numbers
 
-- 92.1% of generated questions have no step check at all: the server never judges a line of their working.
+- 92.0% of generated questions have no step check at all: the server never judges a line of their working.
 - Over all working lines in the corpus, 6.4% get any verdict and 6.4% of correct lines are ticked.
-- Where the step check does run, 60.1% of lines get a verdict, 59.2% of correct lines are ticked, 0 correct lines are crossed, 259 of 279 slipped lines are caught at the right line, and 0 wrong lines are ticked.
+- Where the step check does run, 60.0% of lines get a verdict, 59.1% of correct lines are ticked, 0 correct lines are crossed, 261 of 282 slipped lines are caught at the right line, and 0 wrong lines are ticked.
 
 ## 1. Whether the question offers a step check at all
 
-The server calls `stepCheck` only when `stepMetaFor(q)` returns a meta (an authored `stepcheck`, or a numeric answer with an `x =` prefix, or an expression or set answer). Across 414 families (5474 generated questions at 3 seeds and 4 difficulties, more seeds where a family offers step checking), **435 questions (7.9%) have a meta; 92.1% have none, so no line of their working is ever judged.** 46 of 414 families (11.1%) offer step checking on at least one question.
+The server calls `stepCheck` only when `stepMetaFor(q)` returns a meta (an authored `stepcheck`, or a numeric answer with an `x =` prefix, or an expression or set answer). Across 414 families (5486 generated questions at 3 seeds and 4 difficulties, more seeds where a family offers step checking), **440 questions (8.0%) have a meta; 92.0% have none, so no line of their working is ever judged.** 47 of 414 families (11.4%) offer step checking on at least one question.
 
 | Edition | Families | Families with any step check | Questions | Questions with a meta |
 |---|---:|---:|---:|---:|
-| NSW | 135 | 37 | 2018 | 293 (14.5%) |
+| NSW | 135 | 38 | 2030 | 298 (14.7%) |
 | India | 279 | 9 | 3456 | 142 (4.1%) |
 
 ## 2. Headline: per line of working
@@ -29,30 +29,30 @@ The server calls `stepCheck` only when `stepMetaFor(q)` returns a meta (an autho
 
 | Group | Scored lines | Any verdict | Correct lines ticked | False crosses | Wrong lines caught at the right line | FALSE TICKS |
 |---|---:|---:|---:|---:|---:|---:|
-| All | 80236 | 6.4% | 6.4% | 0 | 6.0% | 0 |
-| NSW | 26926 | 9.8% | 9.8% | 0 | 9.2% | 0 |
+| All | 80526 | 6.4% | 6.4% | 0 | 6.0% | 0 |
+| NSW | 27216 | 9.9% | 9.9% | 0 | 9.3% | 0 |
 | India | 53310 | 4.6% | 4.7% | 0 | 4.1% | 0 |
 
 ### 2b. Only questions where the server runs the step check
 
 | Group | Scored lines | Any verdict | Correct lines ticked | False crosses | Wrong lines caught at the right line | FALSE TICKS |
 |---|---:|---:|---:|---:|---:|---:|
-| All | 8493 | 60.1% | 59.2% | 0 | 92.8% | 0 |
-| NSW | 5616 | 47.1% | 45.8% | 0 | 87.9% | 0 |
+| All | 8590 | 60.0% | 59.1% | 0 | 92.6% | 0 |
+| NSW | 5713 | 47.1% | 45.9% | 0 | 87.5% | 0 |
 | India | 2877 | 85.7% | 85.1% | 0 | 100.0% | 0 |
-| All, excluding template lines | 7894 | 63.2% | 62.3% | 0 | 92.8% | 0 |
+| All, excluding template lines | 7981 | 63.1% | 62.2% | 0 | 92.6% | 0 |
 
 Template lines are authored lines that use a symbol the question never introduces (for example the generic formula `f'(x) = a(cx + e) + c(ax + b)`). They are true in the generator's terms but a student would not write them, so silence on them is arguably right. The last row removes them.
 
-Lines after the slip are judged against the student's own work and are not scored for correctness: of 81, the engine ticked 37 and crossed 0. Prose lines: 161, of which the engine gave a verdict on 0.
+Lines after the slip are judged against the student's own work and are not scored for correctness: of 82, the engine ticked 38 and crossed 0. Prose lines: 161, of which the engine gave a verdict on 0.
 
-**First break on slip transcripts (step-checked questions only, 279 transcripts):** found at the slipped line 259 (92.8%); reported at an earlier, correct line 0; reported later than the slip 0; no break reported 20.
+**First break on slip transcripts (step-checked questions only, 282 transcripts):** found at the slipped line 261 (92.6%); reported at an earlier, correct line 0; reported later than the slip 0; no break reported 21.
 
 ## 3. False ticks (release-blocking)
 
 No wrong line was ticked in this corpus. That is not proof there is none: the corpus has one slip per transcript, in three kinds (sign, arithmetic, dropped factor).
 
-Transcripts of step-checked questions: 1943; with at least one true line crossed: 0 (0.0%).
+Transcripts of step-checked questions: 1966; with at least one true line crossed: 0 (0.0%).
 
 ## 4. False crosses (a true line marked wrong)
 
@@ -65,13 +65,13 @@ None in this corpus.
 | units | 29 | 17.2% | 17.2% | 0 | n/a | 0 |
 | continuation | 29 | 41.4% | 41.4% | 0 | n/a | 0 |
 | substitution | 122 | 48.4% | 48.4% | 0 | n/a | 0 |
-| restate | 1609 | 53.0% | 53.0% | 0 | n/a | 0 |
-| therefore | 1780 | 57.9% | 57.9% | 0 | n/a | 0 |
-| labelled | 1387 | 58.0% | 58.0% | 0 | n/a | 0 |
-| bare | 1750 | 59.4% | 59.4% | 0 | n/a | 0 |
+| restate | 1634 | 52.9% | 52.9% | 0 | n/a | 0 |
+| labelled | 1407 | 57.8% | 57.8% | 0 | n/a | 0 |
+| therefore | 1800 | 57.9% | 57.9% | 0 | n/a | 0 |
+| bare | 1770 | 59.3% | 59.3% | 0 | n/a | 0 |
 | owner-misread | 3 | 66.7% | 66.7% | 0 | n/a | 0 |
-| sentence | 632 | 68.2% | 68.2% | 0 | n/a | 0 |
-| slip | 1134 | 75.5% | 72.4% | 0 | 92.8% | 0 |
+| sentence | 632 | 68.5% | 68.5% | 0 | n/a | 0 |
+| slip | 1146 | 75.1% | 71.9% | 0 | 92.6% | 0 |
 | owner-wrong-choice | 7 | 85.7% | 85.7% | 0 | n/a | 0 |
 | owner-right-choice | 8 | 87.5% | 87.5% | 0 | n/a | 0 |
 | owner-clean | 3 | 100.0% | 100.0% | 0 | n/a | 0 |
@@ -82,14 +82,14 @@ Same, over all questions (including those with no step check):
 
 | Group | Scored lines | Any verdict | Correct lines ticked | False crosses | Wrong lines caught at the right line | FALSE TICKS |
 |---|---:|---:|---:|---:|---:|---:|
-| units | 2822 | 0.2% | 0.2% | 0 | n/a | 0 |
+| units | 2846 | 0.2% | 0.2% | 0 | n/a | 0 |
 | continuation | 508 | 2.4% | 2.4% | 0 | n/a | 0 |
-| labelled | 14877 | 5.4% | 5.4% | 0 | n/a | 0 |
-| slip | 14801 | 5.8% | 5.8% | 0 | 6.0% | 0 |
-| bare | 15857 | 6.6% | 6.6% | 0 | n/a | 0 |
-| therefore | 14863 | 6.9% | 6.9% | 0 | n/a | 0 |
-| sentence | 5809 | 7.4% | 7.4% | 0 | n/a | 0 |
-| restate | 10216 | 8.3% | 8.3% | 0 | n/a | 0 |
+| labelled | 14934 | 5.4% | 5.4% | 0 | n/a | 0 |
+| slip | 14853 | 5.8% | 5.8% | 0 | 6.0% | 0 |
+| bare | 15910 | 6.6% | 6.6% | 0 | n/a | 0 |
+| therefore | 14920 | 7.0% | 7.0% | 0 | n/a | 0 |
+| sentence | 5814 | 7.4% | 7.4% | 0 | n/a | 0 |
+| restate | 10258 | 8.4% | 8.4% | 0 | n/a | 0 |
 | substitution | 462 | 12.8% | 12.8% | 0 | n/a | 0 |
 | owner-misread | 3 | 66.7% | 66.7% | 0 | n/a | 0 |
 | owner-wrong-choice | 7 | 85.7% | 85.7% | 0 | n/a | 0 |
@@ -118,7 +118,7 @@ Same, over all questions (including those with no step check):
 | ms12-nonright (NSW) | 21 | 38.1% | 31.6% | 0 | 100.0% | 0 |
 | ms12-normal (NSW) | 48 | 43.8% | 35.7% | 0 | 100.0% | 0 |
 
-### 6b. All 46 families that offer a step check, worst first
+### 6b. All 47 families that offer a step check, worst first
 
 | Group | Scored lines | Any verdict | Correct lines ticked | False crosses | Wrong lines caught at the right line | FALSE TICKS |
 |---|---:|---:|---:|---:|---:|---:|
@@ -144,15 +144,16 @@ Same, over all questions (including those with no step check):
 | y12-appdiff (NSW) | 230 | 41.7% | 41.2% | 0 | 100.0% | 0 |
 | y9-algebra (NSW) | 176 | 45.5% | 42.2% | 0 | 100.0% | 0 |
 | y11-polynomials (NSW) | 158 | 45.6% | 45.6% | 0 | n/a | 0 |
+| y12-integration (NSW) | 97 | 48.5% | 47.3% | 0 | 66.7% | 0 |
 | y10-indices-neg (NSW) | 208 | 48.1% | 47.8% | 0 | 100.0% | 0 |
 | y11-quadfunc (NSW) | 181 | 50.3% | 48.0% | 0 | 100.0% | 0 |
 | y7-algebra (NSW) | 136 | 52.2% | 49.2% | 0 | 100.0% | 0 |
 | y12-diff (NSW) | 218 | 52.3% | 50.5% | 0 | 100.0% | 0 |
-| me12-induction (NSW) | 75 | 52.0% | 52.0% | 0 | n/a | 0 |
 | y12-stats (NSW) | 125 | 56.0% | 53.0% | 0 | 100.0% | 0 |
+| me12-induction (NSW) | 75 | 53.3% | 53.3% | 0 | n/a | 0 |
 | me11-poly (NSW) | 195 | 57.9% | 57.3% | 0 | 100.0% | 0 |
-| mex-proof (NSW) | 49 | 63.3% | 63.3% | 0 | n/a | 0 |
 | y11-diff (NSW) | 107 | 65.4% | 64.8% | 0 | 100.0% | 0 |
+| mex-proof (NSW) | 49 | 65.3% | 65.3% | 0 | n/a | 0 |
 | y12-series (NSW) | 76 | 69.7% | 67.6% | 0 | 100.0% | 0 |
 | y10-quadratics (NSW) | 224 | 70.1% | 70.1% | 0 | n/a | 0 |
 | c10-linear-pair-methods (India) | 373 | 76.9% | 76.2% | 0 | 100.0% | 0 |
@@ -169,7 +170,7 @@ Same, over all questions (including those with no step check):
 | c8-linear-equations-both-sides (India) | 547 | 100.0% | 100.0% | 0 | 100.0% | 0 |
 | c8-linear-equations-decimals (India) | 459 | 100.0% | 100.0% | 0 | 100.0% | 0 |
 
-### 6c. The 368 families with no step check on any generated question
+### 6c. The 367 families with no step check on any generated question
 
 Their working is never judged by the server, whatever the student writes. By chapter prefix:
 
@@ -189,32 +190,32 @@ Their working is never judged by the server, whatever the student writes. By cha
 | olymp | 7 | 7 |
 | y11 | 7 | 14 |
 | y8 | 7 | 10 |
-| y12 | 6 | 14 |
 | y7 | 6 | 9 |
 | me11 | 5 | 7 |
 | mex | 5 | 7 |
+| y12 | 5 | 14 |
 
-Full list: `c10-ap-daily-life-reasoning`, `c10-ap-inverse-competency`, `c10-ap-sum-forms`, `c10-ap-sum-reasoning`, `c10-ap-term-forms`, `c10-areas-circles`, `c10-arithmetic-progressions`, `c10-bpt-reasoning`, `c10-circles`, `c10-coordinate-geometry`, `c10-distance-reasoning`, `c10-grouped-mean-reasoning`, `c10-grouped-mode-reasoning`, `c10-irrationality-proofs`, `c10-linear-condition-forms`, `c10-linear-graphs`, `c10-linear-pair-situations-reasoning`, `c10-linear-solution-conditions`, `c10-linear-ticket-competency`, `c10-polynomial-zeroes`, `c10-polynomial-zeroes-reasoning`, `c10-probability-classical`, `c10-probability-reasoning`, `c10-quadratic-context`, `c10-quadratic-discriminant`, `c10-quadratic-factorisation-reasoning`, `c10-quadratic-k-forms`, `c10-quadratic-roots`, `c10-quadratic-triangle-competency`, `c10-real-numbers`, `c10-section-reasoning`, `c10-sector-reasoning`, `c10-statistics`, `c10-surface-area-combo`, `c10-surface-volume-combo`, `c10-tangent-length-reasoning`, `c10-triangles-current`, `c10-trig-applications-current`, `c10-trig-boundary-relations`, `c10-trig-ratio-reasoning`, `c10-trig-standard-reasoning`, `c10-trigonometry-current`, `c10-volume-combination-reasoning`, `c10-zero-coefficient-forms`, `c11-3d-distance-jee-reasoning`, `c11-3d-introduction`, `c11-3d-point-jee-reasoning`, `c11-3d-section-jee-reasoning`, `c11-ap-jee-reasoning`, `c11-ap-reasoning`, `c11-arrangement-jee-reasoning`, `c11-arrangement-reasoning`, `c11-binomial-expansion-jee-reasoning`, `c11-binomial-general-term-jee-reasoning`, `c11-binomial-middle-term-jee-reasoning`, `c11-binomial-theorem`, `c11-cartesian-product-reasoning`, `c11-circle-jee-reasoning`, `c11-coefficient-variation-reasoning`, `c11-complex-algebra-reasoning`, `c11-complex-modulus-reasoning`, `c11-complex-polar-reasoning`, `c11-complex-quadratic-jee-reasoning`, `c11-complex-quadratic-reasoning`, `c11-compound-event-reasoning`, `c11-conic-sections`, `c11-counting-principle-jee-reasoning`, `c11-counting-principle-reasoning`, `c11-derivative-rules-reasoning`, `c11-domain-range-reasoning`, `c11-ellipse-hyperbola-jee-reasoning`, `c11-first-principles-reasoning`, `c11-inclusion-exclusion-jee-reasoning`, `c11-inequality-region-jee-reasoning`, `c11-inequality-system-jee-reasoning`, `c11-limit-jee-reasoning`, `c11-limit-reasoning`, `c11-limits-derivatives`, `c11-line-angle-reasoning`, `c11-line-distance-reasoning`, `c11-line-equation-jee-reasoning`, `c11-line-equation-reasoning`, `c11-linear-inequalities`, `c11-linear-inequality-jee-reasoning`, `c11-mean-deviation-jee-reasoning`, `c11-mean-deviation-reasoning`, `c11-parabola-jee-reasoning`, `c11-permutations-combinations`, `c11-probability`, `c11-radian-circle-reasoning`, `c11-radian-unit-circle-reasoning`, `c11-real-function-reasoning`, `c11-relations-functions`, `c11-sample-space-jee-reasoning`, `c11-sample-space-reasoning`, `c11-sequence-means`, `c11-sequences-series`, `c11-set-notation-jee-reasoning`, `c11-set-operations-jee-reasoning`, `c11-statistics`, `c11-straight-lines`, `c11-trig-functions`, `c11-trig-general-solution-reasoning`, `c11-trig-identity-reasoning`, `c11-variance-reasoning`, `c12-3d-geometry`, `c12-applications-derivatives`, `c12-applications-integrals`, `c12-bijection-reasoning`, `c12-composite-inverse-reasoning`, `c12-conditional-probability`, `c12-continuity-mvt`, `c12-continuity-test-reasoning`, `c12-determinants`, `c12-differentiability-reasoning`, `c12-differential-equations`, `c12-differentiation-rules`, `c12-functions-onto-inverse`, `c12-integral-properties`, `c12-integrals-methods`, `c12-inverse-trig-branch-reasoning`, `c12-inverse-trig-evaluate-reasoning`, `c12-inverse-trigonometric`, `c12-linear-programming`, `c12-matrices`, `c12-monotonic-tangent-reasoning`, `c12-optimisation-reasoning`, `c12-principal-value-reasoning`, `c12-probability-bayes`, `c12-random-variable`, `c12-rate-approximation-reasoning`, `c12-related-rates-reasoning`, `c12-relations-equivalence`, `c12-vector-algebra`, `c12-vector-direction-reasoning`, `c12-vector-dot-product`, `c12-vector-magnitude-reasoning`, `c7-angle-construction-reasoning`, `c7-angle-pair-reasoning`, `c7-angle-sum-reasoning`, `c7-arithmetic-expressions-current`, `c7-balance-reasoning`, `c7-bracket-placement-reasoning`, `c7-common-ground-current`, `c7-congruence-inference-reasoning`, `c7-congruent-matching-reasoning`, `c7-connecting-dots-current`, `c7-constructions-tilings-current`, `c7-cryptarithm-reasoning`, `c7-decimal-context-reasoning`, `c7-decimal-division-reasoning`, `c7-decimal-multiplication-reasoning`, `c7-decimal-operations-current`, `c7-decimal-ordering-reasoning`, `c7-decimal-place-value-reasoning`, `c7-decimals-current`, `c7-equation-context-reasoning`, `c7-expression-comparison-reasoning`, `c7-expression-translation-reasoning`, `c7-factor-regroup-reasoning`, `c7-finding-unknown-current`, `c7-formula-evaluation-reasoning`, `c7-fraction-context-reasoning`, `c7-fraction-magnitude-reasoning`, `c7-fraction-product-reasoning`, `c7-fractions-current`, `c7-geometric-twins-current`, `c7-hcf-lcm-context-reasoning`, `c7-hcf-reasoning`, `c7-integer-division-reasoning`, `c7-integer-expression-reasoning`, `c7-integer-operations-current`, `c7-integer-product-sign-reasoning`, `c7-large-numbers-current`, `c7-lcm-reasoning`, `c7-letter-numbers-current`, `c7-letter-pattern-reasoning`, `c7-magic-square-reasoning`, `c7-mean-reasoning`, `c7-number-play-current`, `c7-one-step-equation-reasoning`, `c7-parallel-intersecting-lines-current`, `c7-parity-reasoning`, `c7-perpendicular-bisector-reasoning`, `c7-place-value-systems-reasoning`, `c7-property-rewrite-reasoning`, `c7-rounding-bounds-reasoning`, `c7-solid-shapes`, `c7-sss-sas-reasoning`, `c7-statistical-question-reasoning`, `c7-symmetry`, `c7-tiling-invariant-reasoning`, `c7-transversal-reasoning`, `c7-triangle-angles`, `c7-triangle-construction-reasoning`, `c7-triangle-inequality-reasoning`, `c7-triangles-current`, `c8-algebraic-identities-ncert-mastery`, `c8-area-decomposition-reasoning`, `c8-bar-graph-reasoning`, `c8-common-factor-reasoning`, `c8-comparing-quantities-ncert-mastery`, `c8-cube-multiplier-reasoning`, `c8-cube-pattern-reasoning`, `c8-cubes-roots`, `c8-cubes-roots-ncert-mastery`, `c8-data-charts`, `c8-data-handling-ncert-mastery`, `c8-direct-proportion-reasoning`, `c8-exponent-laws-reasoning`, `c8-exponents-ncert-mastery`, `c8-exterior-angle-reasoning`, `c8-factorisation-ncert-mastery`, `c8-graphs-ncert-mastery`, `c8-gst-reasoning`, `c8-identity-factorisation-reasoning`, `c8-inverse-proportion-reasoning`, `c8-like-terms-reasoning`, `c8-line-graph-reasoning`, `c8-linear-equations-foundations`, `c8-linear-equations-fractions`, `c8-linear-equations-verification`, `c8-mensuration-ncert-mastery`, `c8-monomial-product-reasoning`, `c8-percentage-reasoning`, `c8-pie-chart-reasoning`, `c8-plotting-reasoning`, `c8-proportions-dir-inv`, `c8-proportions-ncert-mastery`, `c8-quadrilateral-property-reasoning`, `c8-quadrilaterals`, `c8-quadrilaterals-ncert-mastery`, `c8-rational-numbers`, `c8-rational-numbers-associativity`, `c8-rational-numbers-between`, `c8-rational-numbers-closure`, `c8-rational-numbers-commutativity`, `c8-rational-numbers-distributivity`, `c8-rational-numbers-foundations`, `c8-rational-numbers-identities`, `c8-rational-numbers-strategy`, `c8-square-pattern-reasoning`, `c8-square-root-reasoning`, `c8-squares-roots`, `c8-squares-roots-ncert-mastery`, `c8-standard-form-reasoning`, `c8-surface-area-reasoning`, `c9-algebraic-identities-ncert-mastery`, `c9-circles`, `c9-circles-ncert-mastery`, `c9-coordinate-geometry`, `c9-coordinate-geometry-ncert-mastery`, `c9-euclid-geometry`, `c9-herons-formula`, `c9-linear-polynomials-ncert-mastery`, `c9-number-systems-ncert-mastery`, `c9-perimeter-area-ncert-mastery`, `c9-polynomial-basics`, `c9-probability-ncert-mastery`, `c9-quadrilaterals`, `c9-sequences-progressions-ncert-mastery`, `c9-statistics-grouped`, `c9-triangles`, `me11-binomial`, `me11-comb`, `me11-inversetrig`, `me11-rates`, `me11-trigid`, `me12-binomial`, `me12-binomial-forms`, `me12-further-calc`, `me12-induction-forms`, `me12-projectile`, `me12-projectile-forms`, `me12-vectors`, `me12-vectors-forms`, `mex-complex`, `mex-demoivre`, `mex-mechanics`, `mex-vectors`, `mex-vectors-lines`, `ms11-data`, `ms11-earning`, `ms11-earning-exact`, `ms11-energy`, `ms11-linear`, `ms11-managing-exact`, `ms11-measure`, `ms11-measure-more`, `ms11-relfreq`, `ms11-time-location`, `ms12-algebraic`, `ms12-annuity`, `ms12-annuity-table`, `ms12-bivariate`, `ms12-bivariate-fit`, `ms12-critical-path`, `ms12-depreciation`, `ms12-invest-loans`, `ms12-loans`, `ms12-network-flow`, `ms12-networks`, `ms12-normal-exact`, `ms12-rates`, `ms12-right-triangle`, `ms12-simple-interest`, `olymp-combinatorics`, `olymp-functional-equations`, `olymp-geometry`, `olymp-inequalities`, `olymp-number-theory`, `olymp-polynomials`, `olymp-proof`, `y10-circle-geometry`, `y10-compound`, `y10-functions`, `y10-geometry-proof`, `y10-logarithms`, `y10-networks`, `y10-nonlinear`, `y10-polynomials`, `y10-probability`, `y10-simeq`, `y10-similarity`, `y10-stats`, `y10-surds`, `y10-trig`, `y10-trig-any-angle`, `y10-trig-nonright`, `y11-data-sets`, `y11-explog-more`, `y11-functions`, `y11-functions-more`, `y11-probability`, `y11-transform`, `y11-trig-ident`, `y12-fin-exact`, `y12-financial`, `y12-func-model`, `y12-integration`, `y12-motion`, `y12-random-var`, `y7-area`, `y7-data`, `y7-decimals-perc`, `y7-fractions`, `y7-integers`, `y7-ratio`, `y8-circles`, `y8-geo-figures`, `y8-indices`, `y8-percentages`, `y8-probability`, `y8-rates`, `y8-volume`, `y9-data`, `y9-data-inquiry`, `y9-indices-sci`, `y9-nonlinear-a`, `y9-probability`, `y9-pythagoras`, `y9-rate-change`, `y9-simint`, `y9-surface-area`, `y9-surface-solids`, `y9-trig`, `y9-variation`, `y9-volume-solids`
+Full list: `c10-ap-daily-life-reasoning`, `c10-ap-inverse-competency`, `c10-ap-sum-forms`, `c10-ap-sum-reasoning`, `c10-ap-term-forms`, `c10-areas-circles`, `c10-arithmetic-progressions`, `c10-bpt-reasoning`, `c10-circles`, `c10-coordinate-geometry`, `c10-distance-reasoning`, `c10-grouped-mean-reasoning`, `c10-grouped-mode-reasoning`, `c10-irrationality-proofs`, `c10-linear-condition-forms`, `c10-linear-graphs`, `c10-linear-pair-situations-reasoning`, `c10-linear-solution-conditions`, `c10-linear-ticket-competency`, `c10-polynomial-zeroes`, `c10-polynomial-zeroes-reasoning`, `c10-probability-classical`, `c10-probability-reasoning`, `c10-quadratic-context`, `c10-quadratic-discriminant`, `c10-quadratic-factorisation-reasoning`, `c10-quadratic-k-forms`, `c10-quadratic-roots`, `c10-quadratic-triangle-competency`, `c10-real-numbers`, `c10-section-reasoning`, `c10-sector-reasoning`, `c10-statistics`, `c10-surface-area-combo`, `c10-surface-volume-combo`, `c10-tangent-length-reasoning`, `c10-triangles-current`, `c10-trig-applications-current`, `c10-trig-boundary-relations`, `c10-trig-ratio-reasoning`, `c10-trig-standard-reasoning`, `c10-trigonometry-current`, `c10-volume-combination-reasoning`, `c10-zero-coefficient-forms`, `c11-3d-distance-jee-reasoning`, `c11-3d-introduction`, `c11-3d-point-jee-reasoning`, `c11-3d-section-jee-reasoning`, `c11-ap-jee-reasoning`, `c11-ap-reasoning`, `c11-arrangement-jee-reasoning`, `c11-arrangement-reasoning`, `c11-binomial-expansion-jee-reasoning`, `c11-binomial-general-term-jee-reasoning`, `c11-binomial-middle-term-jee-reasoning`, `c11-binomial-theorem`, `c11-cartesian-product-reasoning`, `c11-circle-jee-reasoning`, `c11-coefficient-variation-reasoning`, `c11-complex-algebra-reasoning`, `c11-complex-modulus-reasoning`, `c11-complex-polar-reasoning`, `c11-complex-quadratic-jee-reasoning`, `c11-complex-quadratic-reasoning`, `c11-compound-event-reasoning`, `c11-conic-sections`, `c11-counting-principle-jee-reasoning`, `c11-counting-principle-reasoning`, `c11-derivative-rules-reasoning`, `c11-domain-range-reasoning`, `c11-ellipse-hyperbola-jee-reasoning`, `c11-first-principles-reasoning`, `c11-inclusion-exclusion-jee-reasoning`, `c11-inequality-region-jee-reasoning`, `c11-inequality-system-jee-reasoning`, `c11-limit-jee-reasoning`, `c11-limit-reasoning`, `c11-limits-derivatives`, `c11-line-angle-reasoning`, `c11-line-distance-reasoning`, `c11-line-equation-jee-reasoning`, `c11-line-equation-reasoning`, `c11-linear-inequalities`, `c11-linear-inequality-jee-reasoning`, `c11-mean-deviation-jee-reasoning`, `c11-mean-deviation-reasoning`, `c11-parabola-jee-reasoning`, `c11-permutations-combinations`, `c11-probability`, `c11-radian-circle-reasoning`, `c11-radian-unit-circle-reasoning`, `c11-real-function-reasoning`, `c11-relations-functions`, `c11-sample-space-jee-reasoning`, `c11-sample-space-reasoning`, `c11-sequence-means`, `c11-sequences-series`, `c11-set-notation-jee-reasoning`, `c11-set-operations-jee-reasoning`, `c11-statistics`, `c11-straight-lines`, `c11-trig-functions`, `c11-trig-general-solution-reasoning`, `c11-trig-identity-reasoning`, `c11-variance-reasoning`, `c12-3d-geometry`, `c12-applications-derivatives`, `c12-applications-integrals`, `c12-bijection-reasoning`, `c12-composite-inverse-reasoning`, `c12-conditional-probability`, `c12-continuity-mvt`, `c12-continuity-test-reasoning`, `c12-determinants`, `c12-differentiability-reasoning`, `c12-differential-equations`, `c12-differentiation-rules`, `c12-functions-onto-inverse`, `c12-integral-properties`, `c12-integrals-methods`, `c12-inverse-trig-branch-reasoning`, `c12-inverse-trig-evaluate-reasoning`, `c12-inverse-trigonometric`, `c12-linear-programming`, `c12-matrices`, `c12-monotonic-tangent-reasoning`, `c12-optimisation-reasoning`, `c12-principal-value-reasoning`, `c12-probability-bayes`, `c12-random-variable`, `c12-rate-approximation-reasoning`, `c12-related-rates-reasoning`, `c12-relations-equivalence`, `c12-vector-algebra`, `c12-vector-direction-reasoning`, `c12-vector-dot-product`, `c12-vector-magnitude-reasoning`, `c7-angle-construction-reasoning`, `c7-angle-pair-reasoning`, `c7-angle-sum-reasoning`, `c7-arithmetic-expressions-current`, `c7-balance-reasoning`, `c7-bracket-placement-reasoning`, `c7-common-ground-current`, `c7-congruence-inference-reasoning`, `c7-congruent-matching-reasoning`, `c7-connecting-dots-current`, `c7-constructions-tilings-current`, `c7-cryptarithm-reasoning`, `c7-decimal-context-reasoning`, `c7-decimal-division-reasoning`, `c7-decimal-multiplication-reasoning`, `c7-decimal-operations-current`, `c7-decimal-ordering-reasoning`, `c7-decimal-place-value-reasoning`, `c7-decimals-current`, `c7-equation-context-reasoning`, `c7-expression-comparison-reasoning`, `c7-expression-translation-reasoning`, `c7-factor-regroup-reasoning`, `c7-finding-unknown-current`, `c7-formula-evaluation-reasoning`, `c7-fraction-context-reasoning`, `c7-fraction-magnitude-reasoning`, `c7-fraction-product-reasoning`, `c7-fractions-current`, `c7-geometric-twins-current`, `c7-hcf-lcm-context-reasoning`, `c7-hcf-reasoning`, `c7-integer-division-reasoning`, `c7-integer-expression-reasoning`, `c7-integer-operations-current`, `c7-integer-product-sign-reasoning`, `c7-large-numbers-current`, `c7-lcm-reasoning`, `c7-letter-numbers-current`, `c7-letter-pattern-reasoning`, `c7-magic-square-reasoning`, `c7-mean-reasoning`, `c7-number-play-current`, `c7-one-step-equation-reasoning`, `c7-parallel-intersecting-lines-current`, `c7-parity-reasoning`, `c7-perpendicular-bisector-reasoning`, `c7-place-value-systems-reasoning`, `c7-property-rewrite-reasoning`, `c7-rounding-bounds-reasoning`, `c7-solid-shapes`, `c7-sss-sas-reasoning`, `c7-statistical-question-reasoning`, `c7-symmetry`, `c7-tiling-invariant-reasoning`, `c7-transversal-reasoning`, `c7-triangle-angles`, `c7-triangle-construction-reasoning`, `c7-triangle-inequality-reasoning`, `c7-triangles-current`, `c8-algebraic-identities-ncert-mastery`, `c8-area-decomposition-reasoning`, `c8-bar-graph-reasoning`, `c8-common-factor-reasoning`, `c8-comparing-quantities-ncert-mastery`, `c8-cube-multiplier-reasoning`, `c8-cube-pattern-reasoning`, `c8-cubes-roots`, `c8-cubes-roots-ncert-mastery`, `c8-data-charts`, `c8-data-handling-ncert-mastery`, `c8-direct-proportion-reasoning`, `c8-exponent-laws-reasoning`, `c8-exponents-ncert-mastery`, `c8-exterior-angle-reasoning`, `c8-factorisation-ncert-mastery`, `c8-graphs-ncert-mastery`, `c8-gst-reasoning`, `c8-identity-factorisation-reasoning`, `c8-inverse-proportion-reasoning`, `c8-like-terms-reasoning`, `c8-line-graph-reasoning`, `c8-linear-equations-foundations`, `c8-linear-equations-fractions`, `c8-linear-equations-verification`, `c8-mensuration-ncert-mastery`, `c8-monomial-product-reasoning`, `c8-percentage-reasoning`, `c8-pie-chart-reasoning`, `c8-plotting-reasoning`, `c8-proportions-dir-inv`, `c8-proportions-ncert-mastery`, `c8-quadrilateral-property-reasoning`, `c8-quadrilaterals`, `c8-quadrilaterals-ncert-mastery`, `c8-rational-numbers`, `c8-rational-numbers-associativity`, `c8-rational-numbers-between`, `c8-rational-numbers-closure`, `c8-rational-numbers-commutativity`, `c8-rational-numbers-distributivity`, `c8-rational-numbers-foundations`, `c8-rational-numbers-identities`, `c8-rational-numbers-strategy`, `c8-square-pattern-reasoning`, `c8-square-root-reasoning`, `c8-squares-roots`, `c8-squares-roots-ncert-mastery`, `c8-standard-form-reasoning`, `c8-surface-area-reasoning`, `c9-algebraic-identities-ncert-mastery`, `c9-circles`, `c9-circles-ncert-mastery`, `c9-coordinate-geometry`, `c9-coordinate-geometry-ncert-mastery`, `c9-euclid-geometry`, `c9-herons-formula`, `c9-linear-polynomials-ncert-mastery`, `c9-number-systems-ncert-mastery`, `c9-perimeter-area-ncert-mastery`, `c9-polynomial-basics`, `c9-probability-ncert-mastery`, `c9-quadrilaterals`, `c9-sequences-progressions-ncert-mastery`, `c9-statistics-grouped`, `c9-triangles`, `me11-binomial`, `me11-comb`, `me11-inversetrig`, `me11-rates`, `me11-trigid`, `me12-binomial`, `me12-binomial-forms`, `me12-further-calc`, `me12-induction-forms`, `me12-projectile`, `me12-projectile-forms`, `me12-vectors`, `me12-vectors-forms`, `mex-complex`, `mex-demoivre`, `mex-mechanics`, `mex-vectors`, `mex-vectors-lines`, `ms11-data`, `ms11-earning`, `ms11-earning-exact`, `ms11-energy`, `ms11-linear`, `ms11-managing-exact`, `ms11-measure`, `ms11-measure-more`, `ms11-relfreq`, `ms11-time-location`, `ms12-algebraic`, `ms12-annuity`, `ms12-annuity-table`, `ms12-bivariate`, `ms12-bivariate-fit`, `ms12-critical-path`, `ms12-depreciation`, `ms12-invest-loans`, `ms12-loans`, `ms12-network-flow`, `ms12-networks`, `ms12-normal-exact`, `ms12-rates`, `ms12-right-triangle`, `ms12-simple-interest`, `olymp-combinatorics`, `olymp-functional-equations`, `olymp-geometry`, `olymp-inequalities`, `olymp-number-theory`, `olymp-polynomials`, `olymp-proof`, `y10-circle-geometry`, `y10-compound`, `y10-functions`, `y10-geometry-proof`, `y10-logarithms`, `y10-networks`, `y10-nonlinear`, `y10-polynomials`, `y10-probability`, `y10-simeq`, `y10-similarity`, `y10-stats`, `y10-surds`, `y10-trig`, `y10-trig-any-angle`, `y10-trig-nonright`, `y11-data-sets`, `y11-explog-more`, `y11-functions`, `y11-functions-more`, `y11-probability`, `y11-transform`, `y11-trig-ident`, `y12-fin-exact`, `y12-financial`, `y12-func-model`, `y12-motion`, `y12-random-var`, `y7-area`, `y7-data`, `y7-decimals-perc`, `y7-fractions`, `y7-integers`, `y7-ratio`, `y8-circles`, `y8-geo-figures`, `y8-indices`, `y8-percentages`, `y8-probability`, `y8-rates`, `y8-volume`, `y9-data`, `y9-data-inquiry`, `y9-indices-sci`, `y9-nonlinear-a`, `y9-probability`, `y9-pythagoras`, `y9-rate-change`, `y9-simint`, `y9-surface-area`, `y9-surface-solids`, `y9-trig`, `y9-variation`, `y9-volume-solids`
 
 ## 7. Why the engine is silent (questions with a step check)
 
-3385 scored lines got no verdict. Reasons are assigned from the shape of the line (first matching rule), so they are this audit's classification, not the engine's own words.
+3433 scored lines got no verdict. Reasons are assigned from the shape of the line (first matching rule), so they are this audit's classification, not the engine's own words.
 
 | # | Reason | Silent lines | Share of silent | Example |
 |---:|---|---:|---:|---|
-| 1 | equation, other form | 935 | 27.6% | `a^2 = 121` (bare) |
-| 2 | line judged to be off the answer path ("this question’s check covers the lines that lead to the answer") | 627 | 18.5% | `x = 197 - 8 × 22 = 21` (bare) |
-| 3 | line is about a letter other than the question’s unknown | 348 | 10.3% | `x^2 - 2x + 26 = 0` (restate) |
-| 4 | word label before the value ("max = …", "x-int: …", "ans = …") | 229 | 6.8% | `f(g(x)) = (4x + 1) + 2 = 4x + 3` (bare) |
+| 1 | equation, other form | 940 | 27.4% | `a^2 = 121` (bare) |
+| 2 | line judged to be off the answer path ("this question’s check covers the lines that lead to the answer") | 641 | 18.7% | `x = 197 - 8 × 22 = 21` (bare) |
+| 3 | line is about a letter other than the question’s unknown | 358 | 10.4% | `x^2 - 2x + 26 = 0` (restate) |
+| 4 | word label before the value ("max = …", "x-int: …", "ans = …") | 229 | 6.7% | `f(g(x)) = (4x + 1) + 2 = 4x + 3` (bare) |
 | 5 | equation with a symbol the question never introduces (template/formula line) | 208 | 6.1% | `n = k+1` (bare) |
-| 6 | single-letter variable equation ("x = 35", "a = 10") not matching an expected step | 189 | 5.6% | `x = 4y + 1` (bare) |
-| 7 | units / words after the number ("= 27 m", "72 °", "10 years") | 169 | 5.0% | `-33 dollars` (units) |
-| 8 | expression only, no "=" (not an equation) | 129 | 3.8% | `f⁻¹(x): (x - -7)/2` (labelled) |
-| 9 | continuation line starting with "=" | 103 | 3.0% | `= 9` (continuation) |
-| 10 | starts with a "∴" / "so" / "hence" / "therefore" prefix | 100 | 3.0% | `so ans = 2 or 3 or 6 or 8 or 9 or 11 or 12` (therefore) |
+| 6 | single-letter variable equation ("x = 35", "a = 10") not matching an expected step | 189 | 5.5% | `x = 4y + 1` (bare) |
+| 7 | units / words after the number ("= 27 m", "72 °", "10 years") | 170 | 5.0% | `-33 dollars` (units) |
+| 8 | expression only, no "=" (not an equation) | 149 | 4.3% | `f⁻¹(x): (x - -7)/2` (labelled) |
+| 9 | continuation line starting with "=" | 101 | 2.9% | `= 9` (continuation) |
+| 10 | starts with a "∴" / "so" / "hence" / "therefore" prefix | 100 | 2.9% | `so ans = 2 or 3 or 6 or 8 or 9 or 11 or 12` (therefore) |
 | 11 | inequality or chained comparison | 91 | 2.7% | `b^2 - 4ac = 4 - 104 = -100 < 0` (bare) |
-| 12 | function / point evaluation ("f(2) = …", "P(-3) = …") | 90 | 2.7% | `f(x) = 4x + 1` (restate) |
-| 13 | "couldn’t read the solution list / derivative line safely" (sets, lists, derivatives) | 70 | 2.1% | `A = {8, 9, 11, 12}` (bare) |
+| 12 | function / point evaluation ("f(2) = …", "P(-3) = …") | 90 | 2.6% | `f(x) = 4x + 1` (restate) |
+| 13 | "couldn’t read the solution list / derivative line safely" (sets, lists, derivatives) | 70 | 2.0% | `A = {8, 9, 11, 12}` (bare) |
 | 14 | multi-"=" chain (a = b = c) | 41 | 1.2% | `h = 15 + 12×1/2 = 21` (bare) |
 | 15 | substitution line ("when …", "let …") | 24 | 0.7% | `let A = {3, 4, 7, 10, 11}` (substitution) |
 
@@ -222,21 +223,21 @@ The engine's own stated reason for silence (digits normalised to `#`):
 
 | # | Engine note | Lines | Example |
 |---:|---|---:|---|
-| 1 | Not checked — Pri cannot place this line on the way to the answer, so it is not marked right or wrong. | 1216 | `x = 4y + 1` |
-| 2 | Not checked — this question’s check covers the lines that lead to the answer. | 850 | `x = 197 - 8 × 22 = 21` |
-| 3 | This line is about another letter. Pri has nothing in this question to check it against, so it is neither marked wrong nor counted. | 402 | `x^2 - 2x + 26 = 0` |
+| 1 | Not checked — Pri cannot place this line on the way to the answer, so it is not marked right or wrong. | 1201 | `x = 4y + 1` |
+| 2 | Not checked — this question’s check covers the lines that lead to the answer. | 864 | `x = 197 - 8 × 22 = 21` |
+| 3 | This line is about another letter. Pri has nothing in this question to check it against, so it is neither marked wrong nor counted. | 412 | `x^2 - 2x + 26 = 0` |
 | 4 | Skipped — I couldn’t read the solution list safely. | 276 | `A = {8, 9, 11, 12}` |
-| 5 | This defines something the method uses, so it is not checked against the answer. | 274 | `u = x^2 + 5` |
+| 5 | This defines something the method uses, so it is not checked against the answer. | 269 | `u = x^2 + 5` |
 | 6 | Not verified: Pri does not check lines with this label. | 59 | `T = 2π÷(π)/6 = 12` |
-| 7 | True — differentiating this line gives the integrand. It differs from the final answer by a constant, or is not yet simplified. | 43 | `(5(x^2 + 5)^5)/5 + C` |
-| 8 | True for every value (an identity), so it does not carry the equation forward: Pri neither marks it right nor wrong. | 29 | `3x^3 - 23x^2 + 24x + 80 = (3x + 4)(x - 5)(x - 4)` |
-| 9 | True for the answer. It would also allow another value of a, which the question's conditions rule out — check each value against the question. | 27 | `a^2 = 121` |
-| 10 | x = # and x = −# are also a solution. | 24 | `x^2 = 16` |
-| 11 | Not verified: Pri cannot check this line against the question. | 21 | `3 ≤ h ≤ 25` |
-| 12 | Skipped — I couldn’t read this derivative line safely. | 18 | `dy/dx = -8 × 7 x^6 = -56x^6` |
-| 13 | Not checked — Pri cannot tell which values this line gives, so it is not marked right or wrong. | 16 | `cosθ = ±(√(3))/2` |
-| 14 | This power can be read two ways (e^#x is e^(#x) or (e^#)x), so it is not marked wrong. Put the exponent in brackets. | 16 | `y' = 2xe^2x + 2x^2e^2x` |
-| 15 | True whatever the letters stand for — it says nothing about this question. | 15 | `x^2 - 6x + 9 = (x - 3)^2` |
+| 7 | True — differentiating this line gives the integrand. It differs from the final answer by a constant, or is not yet simplified. | 47 | `(5(x^2 + 5)^5)/5 + C` |
+| 8 | This power can be read two ways (e^#x is e^(#x) or (e^#)x), so it is not marked wrong. Put the exponent in brackets. | 43 | `= 3e^4x((x - 4)/4 - 1/16)` |
+| 9 | True for every value (an identity), so it does not carry the equation forward: Pri neither marks it right nor wrong. | 29 | `3x^3 - 23x^2 + 24x + 80 = (3x + 4)(x - 5)(x - 4)` |
+| 10 | True for the answer. It would also allow another value of a, which the question's conditions rule out — check each value against the question. | 27 | `a^2 = 121` |
+| 11 | (no reason given) | 24 | `∫ (x + 1) e^x dx` |
+| 12 | x = # and x = −# are also a solution. | 24 | `x^2 = 16` |
+| 13 | Not verified: Pri cannot check this line against the question. | 21 | `3 ≤ h ≤ 25` |
+| 14 | Skipped — I couldn’t read this derivative line safely. | 18 | `dy/dx = -8 × 7 x^6 = -56x^6` |
+| 15 | Not checked — Pri cannot tell which values this line gives, so it is not marked right or wrong. | 16 | `cosθ = ±(√(3))/2` |
 
 ## 8. Limits of the method
 
