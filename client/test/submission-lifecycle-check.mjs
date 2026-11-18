@@ -613,7 +613,7 @@ await check('QuestionCard and InkAnswer bind late results to the attempt', async
   assert.ok(fresh.indexOf('savePendingSubmission(question.id,') >= 0 && fresh.indexOf('savePendingSubmission(question.id,') < fresh.indexOf('await deliver('), 'no send precedes the pending write');
   assert.match(card, /attemptRef\.current\?\.submissionId !== bound\.submissionId\) return;/, 'a late working check for another attempt is dropped');
   assert.match(card, /misconception`, \{ \.\.\.proposal\.body, submissionId: sid \}/, 'a proposal names its submission');
-  assert.match(card, /disabled=\{resolved \|\| busy\}/, 'the ink surface locks while marking');
+  assert.match(card, /disabled=\{resolved \|\| \(busy && !replaying\)\}/, 'the ink surface locks while marking (a replay of an earlier attempt keeps the page open: the earlier answer is being checked, not this page)');
   assert.match(ink, /seq !== readSeqRef\.current \|\| disabledRef\.current\) return;/, 'a late cloud reading is ignored once the page is locked');
   assert.doesNotMatch(card, /onRecognized=\{setInkResult\}/, 'readings pass through the freeze');
 });
