@@ -412,7 +412,13 @@ try {
   // reason, and covers only that unit; each merged branch is still held to the rule alone. The number comes
   // from the CI ref (refs/pull/N/merge) or PRI_PR_NUMBER; no branch name can opt out.
   const DIRECT_COMMIT_ALLOWANCES = {
+    1064: 'NSW content gaps: the crosswalk rows for me11-comb and me12-calc move from partial to mapped and their third dot points are reworded to current 2024 Extension 1 content, beside the generator forms and registry rows that fill the empty cells; the crosswalk digest is re-pinned from a run and still needs the owner\'s read; reviewed as R4 on its exact head',
     1054: 'train editions-25: the integration commits that fix the merged tree (generator form draw, edition record, regenerated files) sit beside the NSW forms the AU branches added; reviewed as R4 on its exact head'
+  };
+  // The same entry may also name the existing subtopics whose dot-point text or form row that PR changes on purpose;
+  // only those ids are excused from the two per-subtopic comparisons below, every other subtopic is still held.
+  const ALLOWED_SUBTOPIC_CHANGES = {
+    1064: ['y11-trigfunc', 'y12-financial', 'me11-comb', 'me12-calc']
   };
   const prNumber = (process.env.PRI_PR_NUMBER || /^refs\/pull\/(\d+)\//.exec(process.env.GITHUB_REF || '')?.[1] || '').trim();
   const evaluateUnit = async ({ label, ranges, direct }) => {
@@ -468,7 +474,9 @@ try {
       const headMod = last ? await loadCourse(last) : { SUBTOPICS, SUBTOPIC_BY_ID, DOTPOINT_FORMS };
       const byId = headMod.SUBTOPIC_BY_ID || Object.fromEntries(headMod.SUBTOPICS.map(x => [x.id, x]));
       const sig = x => JSON.stringify([x.name, x.strand, x.year, x.weight, x.code, x.dotpoints]);
+      const excused = new Set(direct && DIRECT_COMMIT_ALLOWANCES[prNumber] ? (ALLOWED_SUBTOPIC_CHANGES[prNumber] || []) : []);
       for (const b of baseMod.SUBTOPICS) {
+        if (excused.has(b.id)) { allowed.push(`subtopic ${b.id} excused by the allow-list entry for PR #${prNumber}`); continue; }
         check(byId[b.id] && sig(byId[b.id]) === sig(b), `${label}: curriculum.js changes the existing subtopic ${b.id}`);
         check(JSON.stringify(headMod.DOTPOINT_FORMS[b.id]) === JSON.stringify(baseMod.DOTPOINT_FORMS[b.id]), `${label}: curriculum.js changes the existing dot-point forms of ${b.id}`);
       }
