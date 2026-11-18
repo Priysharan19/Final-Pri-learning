@@ -136,6 +136,7 @@ export const flow = {
     await page.getByTestId('signup-class-10').click();
     // The exam-track choice is the India edition's (SignUpFlow: `!au`).
     if (process.env.PRI_EDITION !== 'prithagoras') await check('JEE is not offered below Class 11', await page.getByTestId('signup-track-jee-main').isDisabled());
+    else await check('Prithagoras offers no India exam track at sign-up (no JEE or CBSE choice)', await page.locator('[data-testid^="signup-track-"]').count() === 0 && !/\b(JEE|CBSE)\b/.test(await page.locator('body').innerText()));
     await page.getByTestId('signup-class-next').click();
     await page.locator('.shell').waitFor({ timeout: 60000 });
     await page.waitForURL(/\/practice/, { timeout: 30000 }).catch(() => {});
