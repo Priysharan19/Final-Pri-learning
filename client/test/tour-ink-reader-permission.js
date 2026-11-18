@@ -152,7 +152,7 @@ export const flow = {
         await page.getByRole('button', { name: 'Confirm reading' }).click();
         return 'confirmed';
       }
-      await page.getByRole('button', { name: /^(Submit answer|Confirm and mark)/i }).click();
+      await page.getByRole('button', { name: /^(Submit answer|Mark my working)/i }).click();
       return 'submitted';
     };
 
@@ -336,9 +336,9 @@ export const photoAndOffline = {
       flat(await page.locator('.reader-permission').textContent()).includes(flat(EN['readerPermission.leadPhoto'])) &&
         flat(await page.locator('.reader-permission').textContent()).includes(flat(EN['readerPermission.what'])));
     await page.locator('[data-reader-permission="accept"]').tap().catch(() => page.locator('[data-reader-permission="accept"]').click());
-    // The reading lands as editable lines (inputs): the student checks each one.
-    const editable = () => page.locator('.qpage input').evaluateAll(nodes => nodes.filter(n => n.type === 'text' || n.type === '').map(n => n.value));
-    await page.waitForFunction(() => [...document.querySelectorAll('.qpage input')].some(n => n.value === 'x = 4'), null, { timeout: 30000 }).catch(() => {});
+    // The reading lands as lines the student can tap open to change (owner, 18 Nov 2026: text until tapped).
+    const editable = () => page.locator('.qpage [data-photo-line-text]').evaluateAll(nodes => nodes.map(n => n.getAttribute('data-photo-line-text')));
+    await page.waitForFunction(() => [...document.querySelectorAll('.qpage [data-photo-line-text]')].some(n => n.getAttribute('data-photo-line-text') === 'x = 4'), null, { timeout: 30000 }).catch(() => {});
     await check(`photo, accepted: the photo is sent once and read into the editable transcript ${TAG}`,
       await readsSent() === before + 1 && reader.requests.length === provider + 1 && (await editable()).includes('x = 4'),
       `reads ${await readsSent() - before}, provider ${reader.requests.length - provider}, lines ${JSON.stringify(await editable())}`);

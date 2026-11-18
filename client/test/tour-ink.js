@@ -26,8 +26,9 @@ import { SYNTHETIC_EVIDENCE } from './support/online-session.mjs';
 const TOPIC = 'c7-finding-unknown-current';
 const MAX_QUESTIONS = 8;
 
-// After a reading the primary button is the combined "Confirm and mark" (P0 #11); before one it is "Submit Answer".
-const SUBMIT = { name: /^(Submit answer|Confirm and mark)/i };
+// Owner, 18 Nov 2026: the one press is "Mark my working" (it IS the confirmation of the reading; was "Confirm and mark").
+// After a reading the primary button is the combined "Mark my working" (P0 #11); before one it is "Submit Answer".
+const SUBMIT = { name: /^(Submit answer|Mark my working)/i };
 
 /** What the reading panel says it read, line by line. */
 const reading = (page) => readLines(page);
@@ -320,8 +321,8 @@ export const flow = {
     // P0 #11: a reading is confirmed before it is sent. The whole recognised
     // answer is on screen, the primary is the one combined tap, and nothing has
     // been sent to be marked yet.
-    await check('a read answer is confirmed first: the whole reading is on screen and the primary reads "Confirm and mark"',
-      await page.locator('[data-confirm-reading], .ink-line').count() > 0 && await page.getByRole('button', { name: /^Confirm and mark/ }).count() === 1,
+    await check('a read answer is confirmed first: the whole reading is on screen and the primary reads "Mark my working"',
+      await page.locator('[data-confirm-reading], .ink-line').count() > 0 && await page.getByRole('button', { name: /^Mark my working/ }).count() === 1,
       `buttons ${JSON.stringify(await page.locator('.ws-actions .btn-primary').allInnerTexts())}`);
     await check('nothing is sent to be marked before the confirming tap', (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === 0);
     await page.getByRole('button', SUBMIT).click();
@@ -462,9 +463,9 @@ export const flow = {
     await check('a line the reader was unsure of is highlighted as doubtful',
       await doubtful.count() === 1 && (await doubtful.first().getAttribute('data-confidence')) === '0.4',
       `${await doubtful.count()} doubtful line(s); confidence ${await page.locator('.ink-line').first().getAttribute('data-confidence')}`);
-    await check('no mark is given from it: the card is not auto-marked, the panel says "1 to confirm" and Confirm and mark waits until the line is resolved',
+    await check('no mark is given from it: the card is not auto-marked, the panel says "1 to confirm" and Mark my working waits until the line is resolved',
       await page.locator('.eval-card, .verdict-bad').count() === 0 && (await page.locator('[data-confirm-count]').innerText()).includes('1') &&
-        await page.getByRole('button', { name: /^Confirm and mark/ }).isDisabled());
+        await page.getByRole('button', { name: /^Mark my working/ }).isDisabled());
     // Relation swaps (relationSwap.js) appear only on a line with a relation
     // sign; this doubtful line reads "7", so it offers none.
     await check('a doubtful line with no relation sign offers no relation swaps', await page.locator('[data-relation-swaps]').count() === 0);
@@ -482,13 +483,13 @@ export const flow = {
       `corrected ${await correctedLine.count()}, text ${JSON.stringify(await correctedLine.getAttribute('data-text'))}`);
     await check('the correction did not go back to the reader — no second provider call', reader.requests.length === readsBeforeCorrection,
       `${reader.requests.length - readsBeforeCorrection} extra request(s)`);
-    await check('with the line resolved nothing is left to confirm and Confirm and mark is enabled: the engine marks what the student wrote',
+    await check('with the line resolved nothing is left to confirm and Mark my working is enabled: the engine marks what the student wrote',
       await page.getByRole('button', SUBMIT).count() === 1 && await page.getByRole('button', SUBMIT).isEnabled() && (await page.locator('[data-confirm-count]').innerText()).toLowerCase().includes('all confirmed'));
     // The edit changed the reading, so it is confirmed again: nothing is sent
     // until the tap, and what is sent is the edited reading.
     const submitsBeforeEditedTap = (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length;
-    await check('an edited reading is confirmed again: the primary reads "Confirm and mark" and nothing was sent by the edit',
-      await page.getByRole('button', { name: /^Confirm and mark/ }).count() === 1 && (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === submitsBeforeEditedTap);
+    await check('an edited reading is confirmed again: the primary reads "Mark my working" and nothing was sent by the edit',
+      await page.getByRole('button', { name: /^Mark my working/ }).count() === 1 && (await online.practiceCalls(/^\/v1\/practice\/[^/]+\/submit$/)).length === submitsBeforeEditedTap);
     await page.getByRole('button', SUBMIT).click();
     await page.waitForSelector('.eval-card, .verdict-bad', { timeout: 20000 });
     // Who decides: the server's deterministic engine, on what the STUDENT said

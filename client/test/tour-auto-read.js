@@ -16,7 +16,7 @@
 //   · a read still out for an older page is cancelled when the page changes;
 //   · the same answer-blind picture-only request as a press of Read my answer;
 //   · nothing is ever marked by a read: the confirmation panel waits for the
-//     student, and Confirm and mark is the only way a mark is asked for.
+//     student, and Mark my working is the only way a mark is asked for.
 //
 // EVIDENCE CLASS. A real browser and the real platform server; the reader's
 // provider hop is a scripted stand-in that never looks at the picture.
@@ -99,8 +99,8 @@ export const flow = {
     const sent = (await pageReads()).at(-1);
     await check('the automatic read is the same answer-blind request: the picture and nothing else', !!sent && onlyPictureAndQuestionId(sent.body), JSON.stringify(Object.keys(sent?.body || {})));
     await page.waitForTimeout(1800);
-    await check('nothing was marked: no submit request, no verdict, and Confirm and mark is the only way forward',
-      (await submitCalls()).length === 0 && await page.locator('.eval-card, .verdict-bad').count() === 0 && await page.getByRole('button', { name: /^Confirm and mark/ }).count() === 1);
+    await check('nothing was marked: no submit request, no verdict, and Mark my working is the only way forward',
+      (await submitCalls()).length === 0 && await page.locator('.eval-card, .verdict-bad').count() === 0 && await page.getByRole('button', { name: /^Mark my working/ }).count() === 1);
     await check('an unchanged page is not read again', reader.requests.length === base1 + 1, `${reader.requests.length - base1} call(s)`);
 
     // ── 4 · a superseded read is cancelled ───────────────────────────────────

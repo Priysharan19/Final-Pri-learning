@@ -552,7 +552,7 @@ export const writeFlow = {
     // server's mark as CBSE-style step rows, which must agree with it.
     const replies = [];
     page.on('response', async r => { if (/\/v1\/practice\/[^/]+\/submit$/.test(r.url())) { try { replies.push(await r.json()); } catch { /* not json */ } } });
-    await page.getByRole('button', { name: /^(Submit|Confirm and mark)/i }).last().click();
+    await page.getByRole('button', { name: /^(Submit|Mark my working)/i }).last().click();
     // Main's marking-display rule (0b3712a74, rule A for train 12): the
     // server's mark is shown as aggregate, server-verified credit — method
     // credit as a count, the final answer accepted or not — never as invented

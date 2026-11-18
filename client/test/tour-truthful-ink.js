@@ -40,8 +40,8 @@ const ARITHMETIC = 'c7-integer-operations-current';
 // D1/D2 forms ask for x (or y) by name.
 const STEP_CHECKED = 'c10-linear-pair-methods';
 const WHOLE = /^-?\d{1,4}$/;
-// After a reading the primary button is the combined "Confirm and mark" (P0 #11); before one it is "Submit Answer".
-const SUBMIT = { name: /^(Submit answer|Confirm and mark)/i };
+// After a reading the primary button is the combined "Mark my working" (P0 #11); before one it is "Submit Answer".
+const SUBMIT = { name: /^(Submit answer|Mark my working)/i };
 const TAG = '[SYNTHETIC-READER EVIDENCE]';
 const flat = s => String(s || '').replace(/\s+/g, ' ').trim();
 const english = (key, vars = {}) => {
@@ -82,7 +82,7 @@ export const flow = {
     const primary = page.locator('.ws-actions .btn-primary').last();
     const submitNow = async () => {
       // The doubted reading asks "which did you write?": the student's tap on
-      // "That's what I wrote" resolves it, and Confirm and mark is then the submit.
+      // "That's what I wrote" resolves it, and Mark my working is then the submit.
       const ask = page.locator('[data-confirm-keep]').first();
       if (await ask.count()) {
         await ask.click();

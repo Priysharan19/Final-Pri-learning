@@ -10,7 +10,7 @@
 // libheif-js is libheif compiled to asm.js: plain JavaScript, no
 // WebAssembly, no eval, no new Function. The app's CSP (`script-src 'self'`,
 // no 'wasm-unsafe-eval') therefore needs no change. Licence: LGPL-3.0, used
-// unmodified as a separate lazily-loaded chunk; see docs/security/third-party.
+// unmodified as a separate lazily-loaded chunk; see docs/legal/third-party/NOTICES.md.
 // Only still images are decoded; the first image of a multi-image file wins.
 // ─────────────────────────────────────────────────────────────────────────────
 import libheifFactory from 'libheif-js/libheif/libheif.js';
