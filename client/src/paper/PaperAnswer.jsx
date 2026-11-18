@@ -27,6 +27,7 @@ import { keepPart, failureKey } from './paperApi.js';
 const InkAnswer = React.lazy(() => import('../ink/InkAnswer.jsx'));
 
 export const MODES = ['typed', 'ink', 'photo'];
+const MODE_KEY = Object.freeze({ typed: 'paper.mode.typed', ink: 'paper.mode.ink', photo: 'paper.mode.photo' });
 
 // ── Multiple choice ───────────────────────────────────────────────────────────
 
@@ -210,7 +211,7 @@ export default function PaperAnswer({ part, attemptId, value, onChange, disabled
           <button key={m} type="button" role="tab" id={`${id}-${m}`} aria-selected={mode === m} tabIndex={mode === m ? 0 : -1} disabled={disabled}
             className={`pp-mode${mode === m ? ' is-on' : ''}`} data-paper-mode={m} onClick={() => setMode(m)}
             onKeyDown={e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); const i = MODES.indexOf(m); setMode(MODES[(i + (e.key === 'ArrowRight' ? 1 : MODES.length - 1)) % MODES.length]); } }}>
-            {t(`paper.mode.${m}`)}
+            {t(MODE_KEY[m])}
           </button>
         ))}
       </div>

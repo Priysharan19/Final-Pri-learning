@@ -9,6 +9,8 @@
 import React from 'react';
 import { useT } from '../i18n/index.js';
 
+const STAGE_KEY = Object.freeze({ reading: 'paper.timer.reading', working: 'paper.timer.working', over: 'paper.timer.over' });
+
 export const clock = ms => {
   const s = Math.max(0, Math.round(ms / 1000));
   const h = Math.floor(s / 3600);
@@ -35,7 +37,7 @@ export default function PaperTimer({ on, onToggle, elapsedMs, readingMs, working
       </label>
       {on && (
         <p className="pp-timer-read" role="timer" aria-live="off" data-paper-timer={stage}>
-          {t(`paper.timer.${stage}`, { time: clock(left) })}
+          {t(STAGE_KEY[stage], { time: clock(left) })}
         </p>
       )}
     </div>

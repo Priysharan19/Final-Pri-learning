@@ -31,6 +31,7 @@ import { failureKey, loadSitting, loadSolution, saveAnswers, submitSitting } fro
 import './paper.css';
 
 const AUTOSAVE_MS = 1500;
+const SAVE_KEY = Object.freeze({ saved: 'paper.save.saved', saving: 'paper.save.saving', pending: 'paper.save.pending', failed: 'paper.save.failed' });
 
 /** Every answerable part of the paper as issued, in order, with the question it belongs to. */
 export function leavesOf(paper) {
@@ -293,7 +294,7 @@ export default function PaperSitting() {
       {!submitted && (
         <div className="pp-bar" role="region" aria-label={t('paper.bar.label')}>
           <p className="pp-bar-status" role="status" aria-live="polite" data-paper-save={save}>
-            {t('paper.bar.progress', { done: doneCount, total: leaves.length })} · {t(`paper.save.${save}`)}
+            {t('paper.bar.progress', { done: doneCount, total: leaves.length })} · {t(SAVE_KEY[save])}
           </p>
           <button type="button" className="btn btn-primary" onClick={() => (empty.length ? setConfirming(true) : doSubmit())} disabled={submitting} data-paper-submit>
             {submitting ? t('paper.submitting') : t('paper.submit')}
