@@ -25,7 +25,7 @@
 //     carries that adult's id — never another session's;
 //   · the session cookie is HttpOnly, SameSite=Lax, bounded, renewed by use,
 //     and ended by sign-out, sign-out-everywhere and deletion;
-//   · the code email is recognisably Pri Learning, states the expiry, says
+//   · the code email names the edition (Priyabhata by default, Prithagoras on its own deployment), states the expiry, says
 //     what to do if it was not asked for, carries NO link for a sign-in code,
 //     and a guardian's link can only ever point at this deployment's own
 //     configured origin.
@@ -424,7 +424,7 @@ try {
   // ── the email itself ─────────────────────────────────────────────────────
   const signIn = otpEmailMessage('483920', 'sign-in', 'https://staging.prilearning.example');
   c.eq(signIn.subject, '483920 is your Priyabhata code', 'the subject carries the code and the name');
-  c.ok(signIn.html.includes('Pri Learning') && signIn.text.includes('Pri Learning'), 'it is recognisably Pri Learning, in HTML and in plain text');
+  c.ok(signIn.html.includes('Priyabhata') && signIn.text.includes('Priyabhata') && !signIn.subject.includes('Pri Learning'), 'it names the edition (Priyabhata here), in HTML and in plain text');
   c.ok(/font:700 34px/.test(signIn.html) && signIn.html.includes('483&nbsp;920'), 'the code is the largest thing in it, grouped 3 + 3 for reading aloud');
   c.ok(/10 minutes/.test(signIn.html) && /10 minutes/.test(signIn.text), 'the expiry is stated');
   c.ok(/did not ask/.test(signIn.html) && /did not ask/.test(signIn.text), 'and what to do if it was not asked for');
@@ -450,7 +450,11 @@ try {
   c.eq(otpEmailConsentLink(''), null, 'nor an unconfigured origin');
   c.eq(otpEmailConsentLink('https://prilearning.example/some/path'), 'https://prilearning.example/guardian/consent', 'a path on the configured origin is ignored: the link is always /guardian/consent on that origin');
   const unlinked = otpEmailMessage('222333', 'guardian-consent', 'javascript:alert(1)');
-  c.ok(hrefs(unlinked.html).length === 0 && /the Pri Learning parent page/.test(unlinked.text), 'with no valid origin the guardian email names the page in words and carries no link');
+  const { otpEmailBrand } = await import('../platform/otpEmail.js');
+  c.deq([otpEmailBrand({}), otpEmailBrand({ PRI_EDITION: 'prithagoras' })], ['Priyabhata', 'Prithagoras'], 'the mail brand is the edition name of the deployment');
+  const au = otpEmailMessage('654321', 'sign-in', 'https://x.example', { brand: 'Prithagoras' });
+  c.ok(au.subject === '654321 is your Prithagoras code' && au.html.includes('Prithagoras') && !/Pri Learning/.test(au.html + au.text), 'a Prithagoras deployment\'s code mail says Prithagoras, never the company name alone');
+  c.ok(hrefs(unlinked.html).length === 0 && /the Priyabhata parent page/.test(unlinked.text), 'with no valid origin the guardian email names the page in words and carries no link');
   c.ok(readTestOutbox({ channel: 'email' }).filter(m => m.purpose === 'guardian-consent').every(m => m.body.includes('http://localhost:5173/guardian/consent')),
     'every guardian code this server sent names the consent page on ITS OWN configured origin');
 

@@ -3871,7 +3871,7 @@ export default {
   'exams.nsw.none': 'Timed practice papers are not available yet.',
   // Extension 1 practice papers (owner-written PDFs; server/platform/papers.js). Not NESA examinations.
   'papers.ext1.heading': 'Extension 1 practice papers',
-  'papers.ext1.note': 'Original practice papers written for Prithagoras. Not NESA examinations. Printed papers are marked by you or your teacher with the marking guidelines.',
+  'papers.ext1.note': 'Original practice papers written for {brand}. Not NESA examinations. Printed papers are marked by you or your teacher with the marking guidelines.',
   'papers.ext1.loading': 'Loading the practice papers…',
   'papers.ext1.unavailable': 'The practice papers need a signed-in account and a connection. Sign in, then try again.',
   'papers.ext1.meta': '{marks} marks · {time} · {pages} pages',
