@@ -2567,8 +2567,8 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
         </div>
         {/* A practice question's marks are the server's alone to state, so the
             card promises no credit figure for it. */}
-        {helpUsed > 0 && !resolved && diagnostic && !HINTS_FREE && (
-          <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
+        {helpUsed > 0 && !resolved && diagnostic && (
+          HINTS_FREE ? null : <p className="q-credit">{t('verdict.creditAvailable', { percent: Math.round(credit * 100), marks: Math.round(totalMarks * credit * 10) / 10 })}</p>
         )}
 
         {/* Question content is English by design under any interface language;
