@@ -46,7 +46,11 @@ export function interpretLineByRules(rawText, description = { functions: [], equ
   if (!t) return unparseable('empty');
   const words = (t.match(/[A-Za-z]{3,}/g) || []).filter(w => !/^(sin|cos|tan|sec|csc|cot|log|max|min|cosec|sqrt|exp|ln|and|cm|km|mm|kg|ml)$/i.test(w));
   if (!MATH_SIGNAL.test(t)) return mk('prose');
-  if (/[<>≤≥≠≈]/.test(t)) return unparseable('relation-not-equals');
+  if (/[<>≤≥≠≈]/.test(t)) {
+    // an inequality is never evaluated here; it can only restate one the question gave
+    const one = (t.match(/[<>≤≥≠≈]/g) || []).length === 1 && !t.includes('=');
+    return one ? mk('expression', { parts: [stripUnit(t)] }) : unparseable('relation-not-equals');
+  }
   if (words.length >= 4) return unparseable('sentence-with-maths');
 
   // let / set / put / when NAME = value
@@ -81,6 +85,14 @@ export function interpretLineByRules(rawText, description = { functions: [], equ
     const pieces = splitEquals(t.slice(1).trim()).map(stripUnit);
     if (!pieces.length || pieces.some(p => !p)) return unparseable('empty-continuation');
     return mk('continues', { parts: pieces });
+  }
+
+  // "the maximum height is 22 + 5 = 27 metres": a quantity named in words, then "is", then the value (or a chain)
+  const isForm = /^(.*?)\s+is\s+(.+)$/i.exec(t);
+  if (isForm && labelParts(isForm[1].trim()) && !/=/.test(isForm[1])) {
+    const lp2 = labelParts(isForm[1].trim());
+    const chain = splitEquals(isForm[2]).map(stripUnit);
+    if (chain.length && chain.every(Boolean)) return mk('quantity', { quantity: labelConcept(lp2.label), label: lp2.label, subject: lp2.subject, parts: chain });
   }
 
   const pieces = splitEquals(t);

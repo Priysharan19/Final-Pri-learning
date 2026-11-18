@@ -154,6 +154,61 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   console.log('false ticks', base.detail.falseTicks.length, 'interpreter false crosses', base.detail.falseCrosses.length);
   const why = Object.entries(base.groups.all).filter(([k]) => k.startsWith('why:')).sort((a, b) => b[1] - a[1]).slice(0, 14);
   console.log('why unverifiable (lines with maths):', why.map(([k, v]) => `${k.slice(4)}=${v}`).join(', '));
+  if (process.argv.includes('--model')) {
+    const N = Number(arg('--model', 0));
+    const PRICE = { inPerM: Number(arg('--price-in', 5)), outPerM: Number(arg('--price-out', 20)), capUsd: Number(arg('--cap', 2.5)) };
+    const cands = [];
+    T.forEach((t, ti) => {
+      const idx = t.texts.map((x, i) => i).filter(i => ['unparseable', 'prose'].includes(t.rules[i].claim.kind) && HAS_MATHS.test(t.texts[i]) && t.engine[i] !== 'ok' && t.engine[i] !== 'break');
+      if (idx.length) cands.push({ ti, idx });
+    });
+    cands.sort((a, b) => hash(`m${a.ti}`) - hash(`m${b.ti}`));
+    const pick = cands.slice(0, N);
+    const subset = pick.map(p => T[p.ti]);
+    const claims = new Map();
+    let spent = 0, tokensIn = 0, tokensOut = 0, calls = 0, ok = 0, stopped = false;
+    const lat = [], statuses = {}, kinds = {}, rejected = { guard: 0, accepted: 0 }, reasons = {};
+    let next = 0;
+    const worker = async () => {
+      while (next < pick.length && !stopped) {
+        const k = next++;
+        const { idx } = pick[k], t = subset[k];
+        const res = await interpretWithModel({ description: t.description, lines: t.texts, indices: idx, env: process.env });
+        calls++; lat.push(res.latencyMs); statuses[res.status] = (statuses[res.status] || 0) + 1;
+        const u = res.usage || {};
+        tokensIn += u.input_tokens || 0; tokensOut += u.output_tokens || 0;
+        spent = (tokensIn * PRICE.inPerM + tokensOut * PRICE.outPerM) / 1e6;
+        if (spent > PRICE.capUsd) stopped = true;
+        if (res.status === 'ok') ok++;
+        for (const [i, claim] of res.claims) {
+          kinds[claim.kind] = (kinds[claim.kind] || 0) + 1;
+          if (claim.kind === 'unparseable') { rejected.guard++; const r = claim.reason || 'model-said-unparseable'; reasons[r] = (reasons[r] || 0) + 1; } else { rejected.accepted++; claims.set(`${k}:${i}`, { claim, source: 'model' }); }
+        }
+      }
+    };
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    const done = Math.min(next, pick.length);
+    const withClaims = subset.slice(0, done);
+    const before = score(withClaims);
+    const after = score(withClaims, { modelClaims: claims });
+    lat.sort((a, b) => a - b);
+    const summary = {
+      candidatesAvailable: cands.length, answersSent: calls, ok, statuses, kinds, rejected, reasons,
+      tokensIn, tokensOut, estUsdAtAssumedPrice: Number(spent.toFixed(4)), assumedPricePerMTok: PRICE,
+      usdPerAnswer: calls ? Number((spent / calls).toFixed(5)) : 0,
+      latencyMs: { p50: lat[Math.floor(lat.length / 2)] || 0, p95: lat[Math.floor(lat.length * 0.95)] || 0, mean: Math.round(lat.reduce((a, b) => a + b, 0) / (lat.length || 1)) },
+      linesInSubset: before.groups.all?.lines || 0,
+      verdictBeforeModel: before.groups.all?.['combined-verdict'] || 0, verdictAfterModel: after.groups.all?.['combined-verdict'] || 0,
+      ticksBefore: before.groups.all?.['combined-ticked-true'] || 0, ticksAfter: after.groups.all?.['combined-ticked-true'] || 0,
+      falseTicksAfter: after.groups.all?.['FALSE-TICK'] || 0, falseCrossesMineAfter: after.groups.all?.['false-cross-mine'] || 0,
+      wrongLines: after.groups.all?.wrong || 0, wrongCrossedBefore: before.groups.all?.['wrong-crossed'] || 0, wrongCrossedAfter: after.groups.all?.['wrong-crossed'] || 0,
+      neutralVerdictAfter: after.groups.all?.['neutral-verdict'] || 0
+    };
+    console.log('MODEL ARM', JSON.stringify(summary, null, 1));
+    const mex = [];
+    for (const [key, v] of claims) { const [k, i] = key.split(':').map(Number); if (mex.length < 25) mex.push({ line: subset[k].texts[i], claim: v.claim, truth: subset[k].truth[i] }); }
+    if (arg('--model-out', null)) fs.writeFileSync(arg('--model-out'), JSON.stringify({ summary, examples: mex }, null, 1));
+  }
   if (process.argv.includes('--liar')) {
     const L = liarSweep(T, { every: Number(arg('--liar', 25)) });
     console.log(`liar sweep: ${L.lines} wrong corpus lines, ${L.lies} guarded lies, ${L.ticks} ticks`);

@@ -26,7 +26,8 @@ import {
   parseSafe, freeVars, constantValue, makeFn, polynomial, degreeOf, polyRoots, extremes, periodOf,
   derivativeAt, ambiguousCall, maybeDegrees, degreesReading, plainArithmetic
 } from './truth.js';
-import { foldText } from './claims.js';
+import { foldText, tokenize } from './claims.js';
+import { labelConcept, derivativeSubject } from './labels.js';
 
 export const VERDICTS = Object.freeze(['valid', 'given', 'first-break', 'follows-from-error', 'unverifiable']);
 export const TICKED = new Set(['valid', 'given']);
@@ -35,39 +36,7 @@ const U = (why, basis = null) => ({ verdict: 'unverifiable', why, basis });
 const V = (basis, extra = {}) => ({ verdict: 'valid', why: null, basis, ...extra });
 const BREAK = (why, basis, extra = {}) => ({ verdict: 'first-break', why, basis, ...extra });
 
-// ── the student's own words for a quantity (closed lexicon, deterministic) ──
-const LABEL_LEXICON = [
-  ['maximum', /^(max|maximum|maximum value|max value|greatest value|largest value|max\.)$/],
-  ['minimum', /^(min|minimum|minimum value|min value|least value|smallest value|min\.)$/],
-  ['amplitude', /^(amplitude|amp)$/],
-  ['period', /^(period)$/],
-  ['midline', /^(midline|mid-line|mean level|centre line|equilibrium|equilibrium level|centre)$/],
-  ['gradient', /^(gradient|slope)$/],
-  ['y-intercept', /^(y-intercept|y intercept|yintercept|y-int)$/],
-  ['x-intercept', /^(x-intercept|x intercept|xintercept|x-int|zero|zeros|roots?)$/],
-  ['stationary-point-x', /^(stationary point|stationary points|turning point|turning points)$/],
-  ['discriminant', /^(discriminant|delta)$/],
-  ['answer', /^(ans|answer)$/],
-  ['area', /^(area|a)$/], ['perimeter', /^(perimeter|p)$/], ['volume', /^(volume|v)$/], ['mean', /^(mean|average)$/], ['median', /^(median)$/]
-];
-const DERIVATIVE_LABEL = /^([a-z])'(?:\(([a-z])\))?$|^d([a-z])\/d([a-z])$|^derivative$/;
-
-/** What a student's label word means, or null. The single letters (a, p, v) count only for the asked concept (see answerFacts). */
-export function labelConcept(label) {
-  const key = foldText(label).toLowerCase().replace(/\s+/g, ' ').trim().replace(/\s*-\s*/g, '-');
-  if (DERIVATIVE_LABEL.test(key.replace(/\s/g, ''))) return 'derivative';
-  for (const [q, re] of LABEL_LEXICON) if (re.test(key)) return q;
-  return null;
-}
-const SINGLE_LETTER_CONCEPTS = new Set(['area', 'perimeter', 'volume']);
-
-/** The name of the function whose derivative a label names (f'(x) -> f, dy/dx -> y), or ''. */
-function derivativeSubject(label) {
-  const key = foldText(label).toLowerCase().replace(/\s/g, '');
-  let m = /^([a-z])'/.exec(key); if (m) return m[1];
-  m = /^d([a-z])\/d[a-z]$/.exec(key); if (m) return m[1];
-  return '';
-}
+export { labelConcept };
 
 // ── expression helpers ──────────────────────────────────────────────────────
 function substituteVar(rhs, variable, arg) {
@@ -307,6 +276,13 @@ function verifyEquation(claim, ctx, first, prev) {
   const parts = claim.parts;
   // one side alone asserts nothing: an equation needs both sides, or there is nothing to be true
   if (parts.length < 2) return U('a single expression is not an equation', 'one-sided');
+  // "x = 15 ÷ 3 = 5": a lone unknown set equal to a chain of numbers. The chain is arithmetic; the last value is a root claim.
+  if (parts.length >= 3 && /^[A-Za-z]$/.test(parts[0].trim()) && parts.slice(1).every(p => constantValue(expandGiven(p, ctx.fns) ?? p) !== null)) {
+    const chain = verifyConstChain(parts.slice(1).map(p => expandGiven(p, ctx.fns) ?? p), ctx, first + 1);
+    if (!chain || chain.verdict !== 'valid') return chain || U('this expression could not be evaluated', 'unreadable');
+    const root = verifySolutionSet({ subject: parts[0].trim(), parts: [lastOf(parts)] }, ctx, prev);
+    return root.verdict === 'valid' ? V('root-by-arithmetic') : U(root.why || 'no equation to substitute this value into', root.basis || 'no-target');
+  }
   // solution asserted for the question's one equation ("x = 4")
   const expanded = parts.map(p => expandGiven(p, ctx.fns));
   if (expanded.some(p => p === null)) return U('a function call could not be read', 'expand');
@@ -441,6 +417,14 @@ export function verifyClaim(claim, ctx, index, prev) {
       case 'unparseable': return U('Pri could not read this line as a mathematical claim', claim.reason || 'unparseable');
       case 'restates-given':
       case 'expression': {
+        const whole = claim.parts[claim.parts.length - 1];
+        if (/[<>≤≥≠≈]/.test(whole)) {
+          // a relation is only ever recognised as the question's own, written again
+          const key = tokenize(whole).join(' ');
+          return ctx.description.pieces.some(p => tokenize(p).join(' ') === key)
+            ? { verdict: 'given', why: null, basis: 'restates-the-question' }
+            : U('an inequality is not checked, only recognised when the question gave it', 'inequality');
+        }
         const e = expandGiven(claim.parts[claim.parts.length - 1], ctx.fns);
         if (e === null || ambiguousCall(e)) return U('a function call could not be read', 'expand');
         const given = ctx.fns.some(f => equivalent(e, f.rhs)) || ctx.description.equations.some(q => equivalent(e, q.lhs) || equivalent(e, q.rhs));

@@ -23,6 +23,8 @@ export const QUANTITIES = Object.freeze([
   'y-intercept', 'stationary-point-x', 'derivative', 'antiderivative', 'discriminant', 'root-set', 'area', 'perimeter', 'volume', 'mean', 'median', 'answer', 'none'
 ]);
 
+import { labelConcept } from './labels.js';
+
 export const MAX_PARTS = 8;
 export const MAX_FIELD_CHARS = 240;
 
@@ -164,6 +166,12 @@ export function guardClaim(claim, lineText) {
     if (typeof v !== 'string' || v.length > MAX_FIELD_CHARS) return unparseable('bad-field');
     if (v !== '' && !isVerbatim(v, text)) return unparseable(`not-verbatim:${key}`);
   }
+  // The small fields cannot be a place to hide mathematics or a negation: a subject is a name (h, f(x), y'),
+  // a label is a word the lexicon knows for a quantity, `at` is a plain number or expression of numbers.
+  const subject = claim.subject || '', label = claim.label || '', at = claim.at || '';
+  if (subject && !(/^[A-Za-z](?:\s*\([^()]{0,12}\))?['\u2032]?$/.test(subject) && ['quantity', 'defines', 'evaluates', 'solution-set', 'condition'].includes(kind))) return unparseable('bad-subject');
+  if (label && !(kind === 'quantity' && labelConcept(label))) return unparseable('bad-label');
+  if (at && !(['evaluates', 'quantity'].includes(kind) && /^[0-9.\s+\-*/^()\u00d7\u00f7\u03c0\u221a]+$/.test(foldText(at)))) return unparseable('bad-at');
   for (const p of parts) {
     if (typeof p !== 'string' || !p.trim() || p.length > MAX_FIELD_CHARS) return unparseable('bad-part');
     if (!isVerbatim(p, text)) return unparseable('not-verbatim:part');

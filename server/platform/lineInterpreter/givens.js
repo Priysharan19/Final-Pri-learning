@@ -128,7 +128,9 @@ export function publicDescription(source) {
   const asked = CONCEPTS.filter(([, re]) => re.test(ask)).map(([k]) => k);
   const cues = CONCEPTS.filter(([, re]) => re.test(bare)).map(([k]) => k);
   const restricted = inequalities.length > 0 || /\b(for|when|between|domain|interval|over|where)\b[^.]*\d/i.test(bare) && /\b(≤|≥|<|>|between|domain|interval|first|within)\b/i.test(prompt + ' ' + spans.join(' '));
+  const pieces = [...seen];
   const out = {
+    pieces,
     prompt: bare.replace(/\s+/g, ' ').trim(),
     spans,
     functions, equations, inequalities,

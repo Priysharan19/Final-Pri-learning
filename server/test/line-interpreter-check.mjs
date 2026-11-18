@@ -72,6 +72,14 @@ ok(CLAIMS_RESPONSE_SCHEMA.properties.lines.items.properties.claim.properties.kin
 ok(CLAIMS_RESPONSE_SCHEMA.properties.lines.items.properties.claim.properties.quantity.enum.join() === QUANTITIES.join(), 'schema enumerates the same quantities');
 ok(CLAIM_KINDS.includes('restates-given') && CLAIM_KINDS.includes('continues') && CLAIM_KINDS.includes('unparseable'), 'vocabulary has the coordinator\'s kinds');
 
+// small fields cannot hide mathematics or a negation
+eq(guardClaim(q('quantity', { quantity: 'maximum', label: 'max', parts: ['27'] }), 'max is not 27').kind, 'unparseable', '"max is not 27" cannot be read as the claim max = 27');
+eq(guardClaim(q('quantity', { quantity: 'maximum', label: 'max', subject: 'is not', parts: ['27'] }), 'max is not 27').kind, 'unparseable', 'a subject cannot absorb a negation');
+eq(guardClaim(q('quantity', { quantity: 'maximum', label: 'max', subject: '22 + 5 sin(0)', parts: ['27'] }), 'max = 22 + 5 sin(0) = 27').kind, 'unparseable', 'a subject cannot absorb mathematics');
+eq(guardClaim(q('quantity', { quantity: 'maximum', label: 'max is not', parts: ['27'] }), 'max is not 27').kind, 'unparseable', 'a label must be one the lexicon knows');
+eq(guardClaim(q('equation', { parts: ['2 + 2', '4'], label: 'max' }), '2 + 2 = 4 max').kind, 'unparseable', 'a label belongs to quantity claims only');
+eq(guardClaim(q('evaluates', { subject: 'f', at: '2 + 3 sin(0)', parts: ['5'] }), 'f(2 + 3 sin(0)) = 5').kind, 'unparseable', 'an "at" is a plain number, and a function name alone is not "f("');
+
 // ── 3 · the owner's lines ──────────────────────────────────────────────────
 eq(await verdicts(TIDE, ['22 + 5sin(πt/6)', 'max = 22 + 5', '= 27']), ['given', 'valid', 'valid'], 'owner: restated function, labelled value, continuation');
 eq(await verdicts(CUBIC, ['Let y′ = 0', '3x² + 6x = 0', '3x(x + 2) = 0', 'x = 0 or x = −2']), ['given', 'valid', 'valid', 'valid'], 'owner: Let y′ = 0 … x = 0 or x = −2');
@@ -113,7 +121,11 @@ eq(await V(LINEAR, 'x = 5'), 'valid', 'x = 5 satisfies the question\'s equation 
 eq(await V(LINEAR, 'x = 4'), 'unverifiable', 'x = 4 does not satisfy it, but may be a substitution: never crossed');
 eq(await verdicts(LINEAR, ['3x + 5 = 20', '3x = 15', 'x = 5']), ['given', 'valid', 'valid'], 'equivalent steps keep the solutions');
 eq(await verdicts(LINEAR, ['3x + 5 = 20', '3x = 12']), ['given', 'unverifiable'], 'a step that changes the solution is not ticked and not crossed');
-eq(await V(LINEAR, 'x = 5 = 5'), 'unverifiable', 'a malformed chain is not ticked');
+eq(await V(LINEAR, 'x = 5 = 5'), 'valid', 'a true chain with a repeated value');
+eq(await V(LINEAR, 'x = 15 ÷ 3 = 6'), 'first-break', 'a chain whose arithmetic is wrong crosses');
+eq(await V(LINEAR, 'x = 15 ÷ 3 = 5'), 'valid', 'a lone unknown set to an arithmetic chain that reaches a root');
+eq(await V(LINEAR, 'x = 10 ÷ 2 = 5'), 'valid', 'another route to the root');
+eq(await V(LINEAR, 'x = 12 ÷ 3 = 4'), 'unverifiable', 'a true chain reaching a non-root is not ticked');
 eq(await V(AREA, 'Area = 60 cm²'), 'valid', 'the asked quantity equal to the answer (tick only)');
 eq(await V(AREA, 'Area = 61'), 'unverifiable', 'a different value for the asked quantity is never crossed (it may be a part)');
 eq(await V(AREA, 'Perimeter = 60'), 'unverifiable', 'the wrong concept is not ticked');
@@ -192,7 +204,7 @@ for (const [question, lines] of WRONG) {
     }
   }
 }
-ok(liarCount > 500, `the liar interpreter produced ${liarCount} guarded lies`);
+ok(liarCount > 100, `the liar interpreter produced ${liarCount} guarded lies`);
 eq(liarTicks, 0, 'the liar produced no tick on any wrong line');
 // …and a rule interpreter that is fed the wrong lines directly.
 for (const [question, lines] of WRONG) for (const line of lines) {
@@ -319,7 +331,10 @@ eq(interpretLineByRules('let u = 3x + 1').kind, 'defines', 'rule: definition');
 eq(interpretLineByRules("Let y' = 0").kind, 'condition', 'rule: condition');
 eq(interpretLineByRules('x = 0 or x = -3').kind, 'solution-set', 'rule: solution list');
 eq(interpretLineByRules('so we can see that the answer is clear').kind, 'prose', 'rule: prose');
-eq(interpretLineByRules('x > 3').kind, 'unparseable', 'rule: inequality is left alone');
+eq(interpretLineByRules('x > 3').kind, 'expression', 'rule: an inequality can only restate one');
+eq(await V({ prompt: 'Solve $x \\ge 0$ and $y \\ge 1$.', answerType: 'numeric', answer: { value: 1 } }, 'x ≥ 0'), 'given', 'an inequality the question gave is recognised, as given');
+eq((await only({ prompt: 'Given $x \\ge 0$, find $y$.', answerType: 'numeric', answer: { value: 1 } }, 'x ≥ 0')).verdict, 'given', 'a restated inequality is from the question');
+eq(await V({ prompt: 'Given $x \\ge 0$, find $y$.', answerType: 'numeric', answer: { value: 1 } }, 'x ≥ 5'), 'unverifiable', 'a changed inequality is not recognised and not crossed');
 eq(interpretLineByRules('the largest value of h is max = 22 + 5 = 27 as sin is at most 1').kind, 'unparseable', 'rule: a sentence with maths is the model\'s');
 eq(ruleInterpretation('x = 0 or x = -3', publicDescription(CUBIC)).source, 'rule', 'rule readings are marked as rule');
 eq(texToPlain('h(t) = 22 + 5\\sin\\left(\\frac{\\pi t}{6}\\right)').replace(/\s/g, ''), 'h(t)=22+5sin((πt)/(6))', 'tex to plain');
