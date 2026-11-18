@@ -870,12 +870,14 @@ ok(imported.length > 0, 'the legal page imports its documents from the repositor
   const hits = [];
   const walk = (rel) => {
     const abs = join(ROOT, rel);
-    if (!existsSync(abs)) return;
-    if (statSync(abs).isDirectory()) {
-      for (const name of readdirSync(abs)) if (!SKIP.has(name)) walk(`${rel}/${name}`);
+    let entries = null;
+    try { entries = readdirSync(abs, { withFileTypes: true }); } catch { /* a file, or not there */ }
+    if (entries) {
+      for (const e of entries) if (!SKIP.has(e.name)) walk(`${rel}/${e.name}`);
     } else if (TEXT.test(rel)) {
-      const text = readFileSync(abs, 'utf8');
-      for (const [what, re] of PRIVATE) if (re.test(text)) hits.push(`${rel}: ${what}`);
+      let text = null;
+      try { text = readFileSync(abs, 'utf8'); } catch { /* absent */ }
+      if (text !== null) for (const [what, re] of PRIVATE) if (re.test(text)) hits.push(`${rel}: ${what}`);
     }
   };
   for (const rel of SURFACES) walk(rel);
