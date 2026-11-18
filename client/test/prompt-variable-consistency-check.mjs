@@ -27,7 +27,7 @@
 const SRC = new URL('../src/', import.meta.url).href;
 
 const seedsArg = process.argv.indexOf('--seeds');
-const SEEDS = seedsArg > 0 ? Math.max(1, Number(process.argv[seedsArg + 1]) || 0) : 120;
+const SEEDS = seedsArg > 0 ? Math.max(1, Number(process.argv[seedsArg + 1]) || 0) : 150; // 150 (was 120): the extra question forms take a share of every draw, so 120 seeds examined fewer claim prompts (447) and stated solutions (2661) than main (526, 2762); 150 examines 566 and 3326
 // The seed that produced the reported defect, and its generator.
 const REPORTED = { generator: 'c8-linear-equations-verification', seed: 642714604 };
 
