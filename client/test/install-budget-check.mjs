@@ -145,9 +145,18 @@ let PYQ_ARCHIVE_MEASURED = null;
 // ceilings leave about 100 kB raw and 80 kB gzipped. The install ceilings, the
 // banned-from-install list, render-from-install and offline coverage are unchanged.
 
+// Raised again 2026-11-18 (train editions-28, CTO under the same owner decision, size not a
+// constraint): FIRST_VISIT_RAW 5,000,000 -> 5,150,000 bytes only. Train 28 merges the photo
+// answer branch (HEIC decoding, PDF and drag-drop intake, the one-view reading), the line
+// interpreter, living formulas and the marked page. The combined tree, built with
+// PRI_EDITION=prithagoras, measured 4,927 kB raw (about 5,045,000 bytes) install plus warm, over
+// the 5,000,000 ceiling; the gzip ceiling was not exceeded and is unchanged, as are the install
+// ceilings, the banned-from-install list, render-from-install and offline coverage. The new
+// ceiling leaves about 100 kB.
+
 const INSTALL_RAW_CEILING = 2_500_000;
 const INSTALL_GZIP_CEILING = 1_000_000;
-const FIRST_VISIT_RAW_CEILING = 5_000_000;
+const FIRST_VISIT_RAW_CEILING = 5_150_000;
 const FIRST_VISIT_GZIP_CEILING = 1_750_000;
 
 // Things that must never be in the install again, and what each one costs.
