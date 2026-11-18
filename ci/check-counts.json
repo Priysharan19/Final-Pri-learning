@@ -421,7 +421,7 @@
       "log": "practice-http.log",
       "pins": [
         {"has":"INDIA BANK ISSUE COVERAGE: PASS"},
-        {"has":"DAILY PRACTICE CAP: PASS — 98/98 checks"},
+        {"has":"DAILY PRACTICE CAP: PASS — 100/100 checks","note":"98 → 100 (owner decision 2026-11-18, packaging value-2026-11): the suite now also pins that the active packaging leaves practice uncapped and that the deployment cap of 20 is what it exercises. Re-derived by running."},
         {"has":"PREMIUM PRACTICE CONTENT: PASS — 41/41 checks"},
         {"has":"MISTAKE NOTEBOOK: PASS — 49/49 checks"},
         {"has":"READINESS FORECAST: PASS — 29/29 checks"},
