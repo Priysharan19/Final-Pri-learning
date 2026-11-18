@@ -13,7 +13,7 @@ import { MathText } from '../lib/latex.jsx';
 import { useApp } from '../App.jsx';
 import { useT } from '../i18n/index.js';
 import '../notes/Notes.css';
-import { NotOffered } from '../components/NotOffered.jsx';
+const NotOffered = React.lazy(() => import('../components/NotOffered.jsx'));  // on demand: a link to something hidden is rare
 import { offeredYears, pathwayOffered, yearOffered, defaultOffering } from '../platform/edition.js';
 import { Flashcards, NextPractice, useReveal } from '../notes/NotesParts.jsx';
 import { ChapterSheet } from '../notes/nsw/NswParts.jsx';
@@ -95,7 +95,7 @@ function NotesIndex() {
     requestAnimationFrame(() => root.current?.querySelector(`[data-year="${next}"]`)?.focus());
   };
 
-  if (hidden) return <NotOffered />;
+  if (hidden) return <React.Suspense fallback={null}><NotOffered /></React.Suspense>;
   return (
     <div className="nt" ref={root} data-nsw-notes>
       <header className="nt-head">
@@ -194,7 +194,7 @@ function TopicNotes({ topicId }) {
   if (!topic) {
     return <div className="nt"><p className="nt-quiet">{t('notes.nsw.notFound')}</p><PageLink className="nt-back" to="/notes">← {t('notes.nsw.back')}</PageLink></div>;
   }
-  if (!topicOffered(topic)) return <NotOffered />;
+  if (!topicOffered(topic)) return <React.Suspense fallback={null}><NotOffered /></React.Suspense>;
   return (
     <article className="nt nt-article" ref={root} aria-labelledby="nt-ch-title" data-nsw-notes>
       <PageLink className="nt-back" to={back}>← {t('notes.nsw.back')}</PageLink>

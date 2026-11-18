@@ -79,7 +79,6 @@ export const AU_STRINGS = Object.freeze({
   // Owner decision, 19 Nov 2026: no "session 1/1" in the student's view.
   'practice.sessionScore': ' · {correct} of {answered} right',
   // Owner decision, 19 Nov 2026: hints are free in Prithagoras practice.
-  'verdict.rungLabelFree': 'Open hint {n} of 4, {rung}. Free. Shortcut: H',
   'tutor.intro': 'Help comes in three levels, in order. Opening a level is free.',
   // Owner decision, 19 Nov 2026: the paid tier is called "HSC Pass" in Prithagoras copy. The words that say "Premium" are renamed at lookup
   // (i18n/tierName.js, applied in i18n/core.js to every string not overridden here); the capability ids keep their names.

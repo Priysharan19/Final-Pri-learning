@@ -2653,7 +2653,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                 <button type="button" className={`icon-btn hint-bulb${solutionRungArmed ? ' on' : ''}`} disabled={busy}
                   data-hint-rung={nextRung} title={label} aria-label={label} aria-keyshortcuts="H" onClick={getHint}>
                   <Icon name="hint" /><span>{solutionRungArmed ? t('verdict.rungSolutionConfirmShort') : t(RUNG_KEY[nextRung])}</span>
-                  <span className="hint-left">{nextRung === 'solution' ? t('verdict.rungEndsShort') : HINTS_FREE ? null : t('verdict.markWeightShort', { percent: left })}</span>
+                  <span className="hint-left">{nextRung === 'solution' ? t('verdict.rungEndsShort') : HINTS_FREE ? null : t('verdict.markWeightShort', { percent: Math.round(markWeightAfter(hintLevel + 1) * 100) })}</span>
                 </button>
               );
             })()}

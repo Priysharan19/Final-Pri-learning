@@ -186,7 +186,7 @@ export const ON_DEMAND = [
 
   // The course choice for an account on a year or course the edition no longer offers (owner decision, 19 Nov 2026):
   // App.jsx renders it only for such an account, so a build whose edition offers everything never fetches it.
-  [/(^|\/)OfferedCourse-[^/]*\.(js|css)$/, 'course choice for an account on a course the edition no longer offers'],
+  [/(^|\/)(OfferedCourse|NotOffered)-[^/]*\.(js|css)$/, 'course choice, and the calm page for a link to a course the edition does not offer'],
   // The public landing and its plain pages (landing/): signed-out web routes
   // behind import() in App.jsx, for a visitor who has not installed anything
   // yet. A signed-in student never opens them, and an offline copy would serve

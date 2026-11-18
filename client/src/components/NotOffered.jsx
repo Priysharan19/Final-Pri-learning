@@ -5,7 +5,7 @@ import React from 'react';
 import { useT } from '../i18n/index.js';
 import PageLink from './PageLink.jsx';
 
-export function NotOffered() {
+export default function NotOffered() {
   const t = useT();
   return (
     <div className="card" role="status" data-not-offered style={{ maxWidth: 560, margin: '48px auto' }}>
