@@ -21,9 +21,11 @@ import { leafParts, publicPaper, validateStructured } from '../platform/paperCon
 const c = checks();
 const B = '\\';
 const mcq = n => `${B}begin{mcq}{${n}}\nWhat is $${n}+1$?\n${B}begin{opts}\n${B}item $${n}$\n${B}item $${n + 1}$\n${B}item $${n + 2}$\n${B}item $${n + 3}$\n${B}end{opts}\n${B}end{mcq}\n`;
+// Question 3 has four drawn options, named in the author's own macros the way the real papers once were (the right one ended "opt").
+const graphMcq = `${B}begin{mcq}{3}\nWhich graph?\n${B}optgrid{${B}figgAwra}{${B}figgAopt}{${B}figgAwrb}{${B}figgAwrc}\n${B}end{mcq}\n`;
 const paperTex = [
   `${B}documentclass{article}`, `${B}begin{document}`,
-  ...Array.from({ length: 10 }, (_, i) => mcq(i + 1)),
+  ...Array.from({ length: 10 }, (_, i) => (i === 2 ? graphMcq : mcq(i + 1))),
   `${B}textbf{Section II}`,
   `${B}textbf{Question 11} (15 marks)`,
   `${B}begin{parts}`,
@@ -63,6 +65,10 @@ const second = assemble({ id: 'ext1-test-fixture', number: 99, paper: parsePaper
 c.eq(JSON.stringify(second.paperDoc), JSON.stringify(first.paperDoc), 'converting twice gives the same bytes');
 const doc = first.paperDoc;
 const leaves = leafParts(doc);
+const q3 = doc.sections[0].questions[2].parts[0];
+c.deq(q3.options.map(o => o.blocks[0]?.name), ['figQ3OptA', 'figQ3OptB', 'figQ3OptC', 'figQ3OptD'], 'an option diagram is published under a neutral name (question and letter), never the author\'s macro name');
+c.deq(Object.values(first.figureSources).sort(), ['figgAopt', 'figgAwra', 'figgAwrb', 'figgAwrc'], 'and the converter knows which macro to draw for each neutral name');
+c.ok(!/figg|(?:opt|wra|wrb|wrc)"/.test(JSON.stringify(doc)), 'no trace of the author\'s macro names remains in the structured paper');
 c.deq(leaves.filter(l => l.part.key && l.part.key.type !== 'mcq').map(l => l.part.id), ['q11a'], 'a key exists only where an override gives it');
 c.eq(leaves.find(l => l.part.id === 'q11b').part.answerType, 'show-that', 'a "prove" part is a show-that with no key');
 c.ok(leaves.filter(l => l.part.key?.type === 'mcq').length === 10 && leaves.every(l => l.part.criteria.length > 0), 'every multiple-choice question has its guideline key and every part its criteria');
