@@ -86,17 +86,25 @@ const draftWritten = (page, pattern) => page.waitForFunction(src => {
 
 // Kept handwriting lives in the sealed inkDrafts IndexedDB store, keyed
 // `${pid}:${questionId}` — never in localStorage.
-const inkKept = (page, questionId) => page.waitForFunction(qid => new Promise(ok => {
+// Polled from the test, one real read of the store each time. (page.waitForFunction given a function that returns a Promise treats the
+// Promise object as truthy and stops at once: the earlier version of this helper never waited for the write, so a reload could come
+// before the sealed row existed and the page came back empty.)
+const inkRowCount = (page, questionId) => page.evaluate(qid => new Promise(ok => {
   const r = indexedDB.open('pri-learning');
   r.onsuccess = () => {
     const db = r.result;
     let req;
-    try { req = db.transaction('inkDrafts').objectStore('inkDrafts').getAllKeys(); } catch { db.close(); return ok(false); }
-    req.onsuccess = () => { db.close(); ok(req.result.some(k => String(k).endsWith(`:${qid}`))); };
-    req.onerror = () => { db.close(); ok(false); };
+    try { req = db.transaction('inkDrafts').objectStore('inkDrafts').getAllKeys(); } catch { db.close(); return ok(0); }
+    req.onsuccess = () => { db.close(); ok(req.result.filter(k => String(k).endsWith(`:${qid}`)).length); };
+    req.onerror = () => { db.close(); ok(0); };
   };
-  r.onerror = () => ok(false);
-}), questionId, { timeout: 15000, polling: 300 }).then(() => true, () => false);
+  r.onerror = () => ok(0);
+}), questionId);
+const inkKept = async (page, questionId, timeout = 20000) => {
+  const until = Date.now() + timeout;
+  while (Date.now() < until) { if (await inkRowCount(page, questionId) > 0) return true; await page.waitForTimeout(150); }
+  return false;
+};
 
 const pendingLeft = (page) => page.evaluate(() => {
   for (let i = 0; i < localStorage.length; i++) if (/\.submit\./.test(localStorage.key(i) || '')) return true;
@@ -114,6 +122,12 @@ export const flow = {
     // server reader (owner decision); its provider hop is the scripted
     // stand-in, which reads back what this flow writes.
     const reader = online.reader;
+    // Regression (CI, four heads): the reader stand-in is shared by every flow of an e2e run and tour-ink, which runs first, left four
+    // requests, its scripted text and a null confidence in it. This flow's reload came before its ink was committed because the wait
+    // keyed on "any request seen". A flow now starts with the stand-in clean, and that is asserted where the ordering bites.
+    await check('the reader stand-in starts clean: no requests, no scripted lines, no gate, nothing held back from an earlier flow',
+      reader.requests.length === 0 && reader.lines === null && reader.gate === null && reader.refused.length === 0 && reader.down === false,
+      JSON.stringify({ requests: reader.requests.length, lines: reader.lines, gate: !!reader.gate, refused: reader.refused.length, down: reader.down }));
     Object.assign(reader, { text: '1', confidence: 0.97, down: false });
     note(`${SYNTHETIC_EVIDENCE}: the handwriting reader in "Submission · interruption recovery…" is a scripted stand-in; the server, its database and every mark are real.`);
     await goto('/');
@@ -227,10 +241,13 @@ export const flow = {
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 });
     const inkId = await shownId(page);
     const box = await page.locator('.ink-canvas-live').boundingBox();
+    // Counted from here, not from zero: the reader stand-in is shared by every flow of an e2e run, so requests from flows before this
+    // one are already in its list (four of them when tour-ink runs first).
+    const readerBaseline = online.reader.requests.length;
     await handwrite(page, box, '1');
     // Owner decision, 19 Nov 2026: the reading is not shown; the page is read silently after the pen rests.
-    for (let i = 0; i < 40 && online.reader.requests.length === 0; i++) await page.waitForTimeout(250);
-    const readsBefore = online.reader.requests.length;
+    for (let i = 0; i < 40 && online.reader.requests.length === readerBaseline; i++) await page.waitForTimeout(250);
+    const readsBefore = online.reader.requests.length - readerBaseline;
     // Readable mouse strokes produce an answer line, and an answer line is
     // what enables Submit — never a silently dead button under legible ink.
     const submitOn = await page.waitForFunction(() => {
@@ -242,7 +259,11 @@ export const flow = {
     // Question ids are opaque [A-Za-z0-9-] tokens, safe inside a pattern.
     const kept = await inkKept(page, inkId);
     await check('the handwriting is kept in the sealed inkDrafts store before the reload', kept, 'no ink draft row was written');
-    await page.waitForFunction(() => document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state') !== 'saving', null, { timeout: 8000 }).catch(() => null);
+    // The reload must come after the write of the page WITH its reading has settled: the card says so by leaving 'saving' for a state
+    // that is neither saving nor still waiting on the reader, and the sealed row exists.
+    await page.waitForFunction(() => { const st = document.querySelector('.ws-actions .status-line')?.getAttribute('data-work-state'); return st && st !== 'saving' && st !== 'awaiting-reading'; }, null, { timeout: 20000 }).catch(() => null);
+    await page.waitForTimeout(1500);   // the trailing write (card debounce 300 ms + coalesce 400 ms + the sealed put) after the reading landed
+    await check('and it is still kept once the reading has landed', await inkRowCount(page, inkId) > 0, 'the row is gone');
     const readerCallsBeforeReload = online.reader.requests.length;
     await reopen();
     await page.waitForSelector('.ink-canvas-live', { timeout: 30000 }).catch(() => null);

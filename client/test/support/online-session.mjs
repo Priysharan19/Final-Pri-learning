@@ -245,7 +245,14 @@ export async function startOnlinePlatform({ dist = DIST, env = {}, allowSeededPr
   const keptReadResults = accountId => h.db.prepare("SELECT response_json FROM idempotency_keys WHERE scope='recognition-read' AND account_id=? AND expires_at>? ORDER BY created_at DESC")
     .all(accountId, Date.now()).map(r => { try { return JSON.parse(r.response_json).result || null; } catch { return null; } }).filter(Boolean);
   const platform = { origin: h.origin, h, db, sms, reader, newAccount, ledger, bindPreparedElsewhere, forgetKeptReads, keptReads, recognitionProof, keptReadResults, close };
-  platform.session = (ctx, page) => onlineSession(platform, ctx, page);
+  // Every flow starts with the reader stand-in as it was built: the flows of one e2e run share this platform, and a flow's scripted lines,
+  // confidence, gate or request list must not reach the next flow (tour-ink left four requests and its own text behind).
+  platform.session = (ctx, page) => {
+    Object.assign(reader, { text: '7', lines: null, confidence: 0.6, down: false, gate: null });
+    reader.requests.length = 0;
+    reader.refused.length = 0;
+    return onlineSession(platform, ctx, page);
+  };
   return platform;
 }
 
