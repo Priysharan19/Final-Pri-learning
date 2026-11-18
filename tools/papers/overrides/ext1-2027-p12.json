@@ -1,0 +1,131 @@
+{
+  "keys": {
+    "q11a": {
+      "answerType": "value",
+      "key": {
+        "type": "interval",
+        "region": "k > -32 and k < 0",
+        "variable": "k",
+        "display": "-32<k<0"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: exact distinct-real-root count of x^3+6x^2+k on a rational grid k in [-60,30] and at k=-32,0 and 1e-6 either side: three roots iff -32<k<0"
+    },
+    "q11d": {
+      "answerType": "value",
+      "key": {
+        "type": "set",
+        "values": [
+          2,
+          4
+        ],
+        "display": "\\tan\\theta=2,\\ 4"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: sign-change scan over theta of (height at 30 m)-35 using the stated position vector, bisected: tan = 2, 4"
+    },
+    "q11e": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "2*sqrt(10)",
+        "display": "2\\sqrt{10}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: grid + golden-section maximum of the original expression over [0,2pi]: 6.324555320"
+    },
+    "q12a": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "ln(e^x+e-1)",
+        "display": "y=\\ln\\!\\left(e^{x}+e-1\\right)"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: RK4 of dy/dx=e^(x-y), y(0)=1 vs the key at 8 points in [-3,3]"
+    },
+    "q12c-i": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "a+2*c/7",
+        "display": "\\overrightarrow{OP}=\\underset{\\sim}{a}+\\dfrac27\\underset{\\sim}{c}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: 6 random parallelograms: P on AB with AP:PB=2:5 located by division, equals a+2c/7 to 1e-12 componentwise"
+    },
+    "q13a-iii": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 33,
+        "display": "33"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: Euler-formula region count from real intersection geometry for n=1..8 random circles (matches n^2-n+2), then least n with count>1000"
+    },
+    "q13b-ii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "atan(n/3)",
+        "display": "S_n=\\tan^{-1}\\!\\left(\\dfrac n3\\right)"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: direct summation of T_k at 30 digits for n=1..40"
+    },
+    "q13b-iii": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "pi/2",
+        "display": "\\dfrac{\\pi}{2}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: mpmath nsum of the series to 30 digits"
+    },
+    "q13b-iv": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 60,
+        "display": "60"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: direct partial sums at 40 digits: first n with S_n>pi/2-1/20"
+    },
+    "q14a": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 5940,
+        "display": "5940"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: SymPy expansion of (3x^3+1/x)^12, coefficient of x^0"
+    },
+    "q14b": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 9,
+        "display": "9"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: exact Fractions: p=18/(5n); P(X=3)=P(X=4) only for n=9 over n=4..300"
+    },
+    "q14c-ii": {
+      "answerType": "value",
+      "key": {
+        "type": "set",
+        "values": [
+          1.7320508075688772,
+          -1.7320508075688772
+        ],
+        "display": "x=\\pm\\sqrt3"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p12.py: sign changes of f'' (SymPy exact) for f=8/(x^2+9)"
+    }
+  }
+}

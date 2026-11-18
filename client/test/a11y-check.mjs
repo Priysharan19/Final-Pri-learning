@@ -1191,6 +1191,19 @@ async function run() {
 
     await step('exams', '/exams', async () => { await goTo(page, BASE, '/exams'); });
 
+    // Sitting an Extension 1 practice paper in the app (Prithagoras only: the server answers 404 PAPERS_NOT_AVAILABLE to any other edition).
+    // The sitting is issued over the platform's own route with this student's session, as the Exams page's button does; the page is then walked
+    // as the student sees it: the sticky bar, the ruled answer areas, the Type / Write / Photo tabs and the multiple-choice radio groups.
+    if (EDITION === 'prithagoras') {
+      const sitJar = Object.fromEntries((await ctx.cookies()).map(c => [c.name, c.value]));
+      const sitting = await platform.h.request('/v1/papers/ext1-2027-p01/attempts', { method: 'POST', jar: sitJar, body: {} });
+      await step('paper sitting · a practice paper', '/papers/sit/:attemptId', async () => {
+        await goTo(page, BASE, `/papers/sit/${sitting.data.attempt.id}`);
+        await page.waitForSelector('[data-paper-sitting]', { timeout: 30000 });
+        await wait(page, SETTLE);
+      });
+    } else notApplicableRoutes.add('/papers/sit/:attemptId');
+
     // The Paper Generator (both editions): choose a topic, and the server answers
     // whether its banks can fill the paper — the screen the student actually uses.
     await step('paper generator', '/paper-generator', async () => {

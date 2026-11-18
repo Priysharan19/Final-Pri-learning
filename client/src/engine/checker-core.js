@@ -24,7 +24,7 @@ import {
 } from './answer-forms.js';
 import { canonicalUnit, unitContradicts, withoutUnit, writtenUnit, unitsStated, unitDimension, angleUnitWritten, withoutAngleUnit, angleUnitOfSuffix, convertAngle } from './units.js';
 import { acceptsNumeric } from './tolerance.js';
-import { exactValue, fraction, ExactLimit } from './exact.js';
+import { exactValue, fraction, sameFraction, ExactLimit } from './exact.js';
 
 const UNIT_TAIL = /(?<![a-zA-Z])(cm³|m³|mm³|cm²|m²|mm²|km²|km\/h|m\/s|cm|mm|km|kg|ml|l\b|m\b|s\b|h\b|hours?|mins?|minutes?|seconds?|degrees?|deg|°|units?²?|sq units)\s*$/i;
 
@@ -937,6 +937,91 @@ export function answerTooLong(rawInput) {
     : null;
 }
 
+
+// ── Practice-paper answer forms ──────────────────────────────────────────────
+/** A subscripted name written as x0, x_0, x_{0} or x₀ becomes the one letter the key uses for it. */
+export function substituteNames(text, names) {
+  let out = String(text);
+  const sub = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9' };
+  out = out.replace(/[₀-₉]/g, ch => `_${sub[ch]}`);
+  for (const [name, letter] of Object.entries(names || {})) {
+    const m = /^([A-Za-z])_?\{?([A-Za-z0-9]+)\}?$/.exec(name);
+    if (!m || !/^[A-Za-z]$/.test(letter)) continue;
+    const [, base, tail] = m;
+    // x_0, x_{0}, x0 — not when more letters follow (x01), and not inside a longer word.
+    out = out.replace(new RegExp(`(?<![A-Za-z_])${base}(?:_\\{${tail}\\}|_${tail}|${tail})(?![A-Za-z0-9_])`, 'g'), letter);
+  }
+  return out;
+}
+
+/** Powers of whole numbers written out (2^104) so the exact reader, bounded to powers of 64, sees the integer. Bounded: 4096 bits. */
+function expandBigPowers(text) {
+  return String(text).replace(/(?<![\d.^])(\d{1,6})\s*\^\s*(\d{1,4})(?![\d.^])/g, (whole, b, e) => {
+    const base = BigInt(b), exp = BigInt(e);
+    if (base < 2n || exp <= 64n) return whole;
+    if (BigInt(b.length) * exp > 1300n) return whole;
+    const v = base ** exp;
+    return v.toString(2).length <= 4096 ? `(${v})` : whole;
+  });
+}
+
+/** A rational key (n/d as integer strings) matched EXACTLY: no band, so 1.3e-27 is not 0 and 2 is not 2 − 1/2^51. */
+function checkExactRational(question, rawInput) {
+  const ans = question.answer;
+  let key;
+  try { key = fraction(BigInt(ans.n), BigInt(ans.d)); } catch { return { correct: false }; }
+  const text = cleanInput(rawInput, { stripUnits: false }).replace(/\s+/g, ' ');
+  if (!text || /%/.test(text)) return { correct: false, invalid: true, feedback: 'Write the exact value as a fraction, or a number written out in full.' };
+  let got;
+  try { got = exactValue(expandBigPowers(text)); } catch (err) {
+    if (err instanceof ExactLimit) return { correct: false, invalid: true, feedback: 'That answer is too large to check. Write the value itself, worked out.' };
+    return { correct: false, invalid: true, feedback: 'Write the exact value, for example as a fraction.' };
+  }
+  if (!got) return { correct: false, invalid: true, feedback: 'Write the exact value as a fraction or a number; a rounded decimal or a root is not the exact value asked for.' };
+  return sameFraction(got, key) ? { correct: true } : { correct: false };
+}
+
+const EQUATION_POINTS = [[0.7, 1.3, 0.4, 1.9], [-1.9, 0.6, 1.7, -0.8], [2.3, -1.4, 0.9, 1.1], [-0.4, -2.2, -1.3, 2.6], [1.6, 2.1, -2.4, 0.3], [-2.7, 1.8, 2.2, -1.5]];
+
+/** An equation, as the same equation up to a nonzero constant multiple: (left − right) must be proportional to the key's. */
+function checkEquation(question, rawInput) {
+  const ans = question.answer;
+  let student, key;
+  try {
+    const text = cleanInput(rawInput, { stripUnits: false }).replace(/^[a-zA-Z]?\s*[=≈]\s*/, m => m);
+    const raw = String(rawInput ?? '').trim().replace(/(?<!\.)\.\s*$/, '');
+    student = parse(normalize(raw || text));
+    key = parse(`(${ans.lhs})-(${ans.rhs})`);
+  } catch { return { correct: false, invalid: true, feedback: 'Write the answer as an equation, like 2x − y = 1.' }; }
+  if (student.t !== 'equation') return { correct: false, invalid: true, feedback: 'Write the answer as an equation, with an = sign.' };
+  let vars;
+  try {
+    vars = new Set([...variablesOf(student.l), ...variablesOf(student.r), ...variablesOf(key)]);
+    vars.delete('e'); vars.delete('pi');
+    if (vars.size > 4) return { correct: false };
+    const names = [...vars];
+    const at = point => Object.fromEntries(names.map((n, i) => [n, point[i]]));
+    const val = (ast, env) => evaluate(ast, env);
+    const studentAt = env => val(student.l, env) - val(student.r, env);
+    let base = null;
+    for (const point of EQUATION_POINTS) {
+      const env = at(point);
+      const k = val(key, env), sv = studentAt(env);
+      if (!Number.isFinite(k) || !Number.isFinite(sv)) return { correct: false };
+      if (!base) {
+        if (Math.abs(k) < 1e-9) continue;
+        if (Math.abs(sv) < 1e-9) return { correct: false };
+        base = { k, s: sv };
+        continue;
+      }
+      // s/k must be the one constant ratio: s·k0 = s0·k
+      const lhs = sv * base.k, rhs = base.s * k;
+      if (Math.abs(lhs - rhs) > 1e-8 * Math.max(1, Math.abs(lhs), Math.abs(rhs))) return { correct: false };
+    }
+    return { correct: !!base };
+  } catch { return { correct: false }; }
+}
+
 export function checkAnswer(question, rawInput) {
   // A sketch's feature set is structured data with its own 8 kB cap (readFeatureSet).
   const long = question?.answerType === 'graph-sketch' ? null : answerTooLong(rawInput);
@@ -952,6 +1037,9 @@ function checkAnswerWithinBudget(question, rawInput) {
     if (type === 'interval' || type === 'matrix' || type === 'vector' || type === 'complex') {
       return checkForm(question, rawInput);
     }
+    // Practice papers (paperContent.js): a rational answer matched exactly, and an equation matched up to a constant multiple.
+    if (type === 'exact-rational') return checkExactRational(question, rawInput);
+    if (type === 'equation') return checkEquation(question, rawInput);
     // A pairing grid: right only when every row matches its key exactly.
     if (type === 'matrix-match') return checkMatrixMatch(question, rawInput);
     // A sketch, marked by its features: the engine derives them from the function.
@@ -1232,6 +1320,8 @@ function checkAnswerWithinBudget(question, rawInput) {
         // Units are never stripped from an expression: a trailing s, m, h or l
         // is a variable the student named, not a unit they appended.
         let student = cleanInput(rawInput, { stripUnits: false });
+        // A subscripted name (x0, x_0, x₀) is ONE variable, never x·0: the key names the single letter that stands for it.
+        if (ans.names) student = substituteNames(student, ans.names);
         if (ans.stripC) student = student.replace(/[+\-]\s*c\s*$/i, '').trim();
         // A final answer is a function: it must not add or remove an isolated
         // hole (x/x is not 1). Interval differences (ln x² vs 2 ln x) are only

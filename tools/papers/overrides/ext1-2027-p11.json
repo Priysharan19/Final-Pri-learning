@@ -1,0 +1,94 @@
+{
+  "keys": {
+    "q11a": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "tan(sin(x)+pi/4)",
+        "display": "y=\\tan\\!\\left(\\sin x+\\dfrac{\\pi}{4}\\right)"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p11.py: RK4 of dy/dx=(1+y^2)cos x, y(0)=1 vs the key at 8 points in [-3,3]"
+    },
+    "q11b": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "pi",
+        "display": "\\pi"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p11.py: mpmath quadrature of 12/(x^2+4) over [0,2sqrt3/3] to 30 digits"
+    },
+    "q11c": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "1/12+3*pi/32",
+        "display": "\\dfrac{1}{12}+\\dfrac{3\\pi}{32}"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p11.py: mpmath quadrature of sin^4(3x) over [0,pi/4] to 30 digits"
+    },
+    "q11d": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 645120,
+        "display": "645120"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p11.py: exact count: all 720 placements of Dev, Ella, Farah in 10 chairs times 7! for the rest"
+    },
+    "q11e": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 15,
+        "display": "15"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p11.py: exact Fractions: p=15/(4n); P(X=3)=P(X=4) only for n=15 over n=4..300"
+    },
+    "q12a": {
+      "answerType": "expression",
+      "key": {
+        "type": "expression",
+        "expr": "18+18*sqrt(5)",
+        "display": "18+18\\sqrt5"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p11.py: mpmath quadrature of x^3/sqrt(x^2+9) over [0,6] to 30 digits"
+    },
+    "q13a-ii": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 8,
+        "display": "8"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p11.py: iterated the recurrence from cos(pi/64) at 120 digits: first n with a_n=1"
+    },
+    "q13b-ii": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 3,
+        "display": "3"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p11.py: exact binomial pmf for n=12, p=3/10: argmax slot"
+    },
+    "q14a-ii": {
+      "answerType": "value",
+      "key": {
+        "type": "numeric",
+        "value": 295245,
+        "display": "295245"
+      },
+      "autoMarks": 1,
+      "keyChecks": "verified by tools/papers/verify/p11.py: SymPy exact polynomial division of x^10+196830x+531441 by (x+3)^2, Q(-3)"
+    }
+  }
+}
