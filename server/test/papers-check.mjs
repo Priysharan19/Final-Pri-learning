@@ -32,8 +32,9 @@ const real = loadManifest();
 
 // ── 1 · the manifest matches the files on disk ────────────────────────────────
 c.eq(real.edition, 'prithagoras', 'the manifest is the Prithagoras edition\'s');
-c.deq(real.papers.map(p => p.id), ['ext1-2027-p13'], 'today only Practice Paper 13 ships');
-const named = new Set(['manifest.json']);
+c.deq(real.papers.map(p => p.id), ['01', '02', '03', '04', '05', '06', '07', '10', '13'].map(n => `ext1-2027-p${n}`), 'Practice Papers 1 to 7, 10 and 13 ship (8, 9, 11 and 12 await the author\'s choice of version)');
+// The structured papers, their diagrams and the conversion report are content too, not PDFs (paperContent.js).
+const named = new Set(['manifest.json', 'conversion-report.json', 'structured', 'figures']);
 for (const p of real.papers) {
   c.deq([p.course, p.yearLevel, p.marks, p.workingTime], ['nsw-ext1', 12, 70, '2 hours'], `${p.id}: course, year level, marks and working time`);
   c.eq(p.hasGuidelines, p.guidelines !== null, `${p.id}: hasGuidelines agrees with the guidelines file`);
@@ -47,9 +48,10 @@ for (const p of real.papers) {
     c.match(f.file, /^ext1-2027-[a-z0-9]+(-guidelines)?\.pdf$/, `${f.file}: a short slug name`);
   }
 }
-c.deq(readdirSync(PAPERS_DIR).sort(), [...named].sort(), 'the directory holds exactly the manifest and the files it names');
-c.deq(real.papers.filter(p => p.sample).map(p => p.id), [], 'no real paper is a free sample yet: Paper 13 is Premium');
-c.deq([real.papers[0].hasGuidelines, real.papers[0].paper.pages, real.papers[0].guidelines.pages], [true, 20, 22], 'Paper 13 has its marking guidelines: 20 and 22 pages');
+c.deq(readdirSync(PAPERS_DIR).filter(f => f !== 'approvals.json').sort(), [...named].sort(), 'the directory holds exactly the manifest and the files it names');
+c.deq(real.papers.filter(p => p.sample).map(p => p.id), ['ext1-2027-p01'], 'Practice Paper 1 is the one free sample; every other paper is Premium');
+const real13 = real.papers.find(p => p.id === 'ext1-2027-p13');
+c.deq([real13.hasGuidelines, real13.paper.pages, real13.guidelines.pages], [true, 20, 22], 'Paper 13 has its marking guidelines: 20 and 22 pages');
 c.eq(PAPERS_CAPABILITY, 'premium-exams', 'the capability is the existing premium one');
 
 // ── The fixture: the real files plus two TEST-ONLY entries ────────────────────
@@ -59,7 +61,7 @@ const fixtureDir = mkdtempSync(join(tmpdir(), 'pri-papers-fixture-'));
 const SAMPLE = 'ext1-test-sample';
 const NO_GUIDE = 'ext1-test-noguide';
 const LOCKED = 'ext1-2027-p13';
-const base = real.papers[0];
+const base = real.papers.find(p => p.id === 'ext1-2027-p13');
 for (const f of [base.paper.file, base.guidelines.file]) copyFileSync(join(PAPERS_DIR, f), join(fixtureDir, f));
 copyFileSync(join(PAPERS_DIR, base.paper.file), join(fixtureDir, `${SAMPLE}.pdf`));
 copyFileSync(join(PAPERS_DIR, base.guidelines.file), join(fixtureDir, `${SAMPLE}-guidelines.pdf`));
