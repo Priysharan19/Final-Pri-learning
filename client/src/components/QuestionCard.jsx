@@ -485,7 +485,6 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
   const toolsRef = useRef(null);
   const scribbleRef = useRef(null);
   const photoInputRef = useRef(null);
-  const photoCameraRef = useRef(null);
   const promptRef = useRef(null);
   const peekRef = useRef(null);
   // What the status line is allowed to say about the student's work:
@@ -1089,6 +1088,14 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
     void clearPhotoDraft(question.id);
   };
   const photoInUse = mode === 'photo' && !!photo && !!photoLines && photoOCR.phase === 'done';
+  // One file input serves both ways in; "Take a photo" asks the phone for its
+  // camera first (capture), "Choose" never does (iOS would hide the library).
+  const chooseFile = (camera) => {
+    const input = photoInputRef.current;
+    if (!input) return;
+    if (camera) input.setAttribute('capture', 'environment'); else input.removeAttribute('capture');
+    input.click();
+  };
   // A quarter turn for a page photographed sideways. Offered before a reading
   // exists; a rotated page is a new page, so it is held, not read, until asked.
   const rotatePhoto = async () => {
@@ -2762,22 +2769,15 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                       setDropNote(null); setAnswerOpen(false);
                       takeFile(file);
                     }} />
-{touchDevice && <input ref={photoCameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} data-photo-camera-input
-                    onChange={e => {
-                      const file = e.target.files?.[0];
-                      e.target.value = '';
-                      if (!file) return;
-                      setDropNote(null); setAnswerOpen(false);
-                      takeFile(file);
-                    }} />}
+
                   {photoIntake
                     ? <PhotoBusy t={t} kind={photoIntake} />
                     : !photo && !heldPdf && photoOCR.phase === 'idle'
                       ? <PhotoEmpty t={t} touch={touchDevice} dragging={drop.dragging}
-                          onChoose={() => photoInputRef.current?.click()} onCapture={() => photoCameraRef.current?.click()} />
+                          onChoose={() => chooseFile(false)} onCapture={() => chooseFile(true)} />
                       : !photo && !heldPdf && !pendingPdf.current && photoOCR.phase === 'failed'
                         ? <PhotoFailure t={t} reasonAttr={photoOCR.unreadable ? 'unreadable' : 'failed'}
-                            onChooseAnother={() => photoInputRef.current?.click()} onType={() => flipMode('type')}>{photoOCR.error}</PhotoFailure>
+                            onChooseAnother={() => chooseFile(false)} onType={() => flipMode('type')}>{photoOCR.error}</PhotoFailure>
                         : (
                           <div className={`photo-attach pf-attached${photoOCR.phase === 'done' && photoLines ? ' is-read' : ''}`}>
                             {/* A PDF sets no preview until its pages render, and the whole
@@ -2788,7 +2788,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                               <PhotoPreview t={t} src={photo} busy={photoOCR.phase === 'reading'} canChange={!resolved}
                                 canRotate={!!photo && !pendingPdf.current && !heldPdf && photoOCR.phase !== 'reading' && photoOCR.phase !== 'done'}
                                 removeLabel={t(photo ? 'verdict.removePhoto' : 'verdict.removeAttachment')}
-                                onRotate={rotatePhoto} onReplace={() => photoInputRef.current?.click()} onRemove={dropPhoto} />
+                                onRotate={rotatePhoto} onReplace={() => chooseFile(false)} onRemove={dropPhoto} />
                             )}
                             <div className="pf-status" role="status" aria-live="polite">
                           {photoOCR.phase === 'reading' && (
@@ -2846,7 +2846,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                             )}
                           {(photoOCR.phase === 'failed' || (photoOCR.phase === 'unavailable' && photoOCR.blockedKey !== 'verdict.photoReadingSignIn')) && !resolved && (
                             <div className="pf-actions" style={{ marginTop: 10 }}>
-                              <button type="button" className="btn btn-primary btn-sm" data-photo-choose-another onClick={() => photoInputRef.current?.click()}>{t('photo.chooseAnother')}</button>
+                              <button type="button" className="btn btn-primary btn-sm" data-photo-choose-another onClick={() => chooseFile(false)}>{t('photo.chooseAnother')}</button>
                               <button type="button" className="btn btn-ghost btn-sm" data-type-instead onClick={() => flipMode('type')}>{t('verdict.typeInstead')}</button>
                             </div>
                           )}
@@ -2892,7 +2892,7 @@ export default function QuestionCard({ question, why, reason, reasonTag = null, 
                   onExclude={(i, out) => changePhotoLines(setLineExcluded(photoLines, i, out))}
                   onKeep={i => changePhotoLines(confirmLine(photoLines, i))}
                   onIncludeAll={() => changePhotoLines(includeAll(photoLines))}
-                  onReplace={() => photoInputRef.current?.click()} onRemove={dropPhoto}>
+                  onReplace={() => chooseFile(false)} onRemove={dropPhoto}>
                   {/* The final answer: taken from the working when a line states the asked
                       quantity, said where it came from, and asked for only when nothing does. */}
                   {!isWorking && !resolved && (
