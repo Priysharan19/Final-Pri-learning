@@ -667,10 +667,37 @@ async function run() {
       }
     };
 
-    // ── signed out: the landing page ─────────────────────────────────────────
-    await step('login · hero', '/', async () => {
+    // ── signed out: the first screen is the guest question picker (ADR-0003) ──
+    await step('guest · question picker', '/', async () => {
       await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.auth-wrap', { timeout: 20000 });
+      await page.waitForSelector('[data-guest-try] [data-question-picker]', { timeout: 20000 });
+      await wait(page, 600);
+    });
+    await step('guest · a question', '/', async () => {
+      await page.click('[data-picker-start]');
+      await page.waitForSelector('[data-guest-question]', { timeout: 30000 });
+      await wait(page, 300);
+    });
+    await step('guest · the server\'s verdict', '/', async () => {
+      // The server's own think time (2 s) has to have passed.
+      await wait(page, 2300);
+      if (await page.locator('#gt-answer').count()) await page.fill('#gt-answer', '1');
+      else await page.locator('.gt-option').first().click();
+      await page.click('[data-guest-check]');
+      await page.waitForSelector('[data-guest-verdict]', { timeout: 30000 });
+    });
+    await step('guest · sign-up prompt', '/', async () => {
+      await page.goto(BASE, { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('[data-picker-form="written"]', { timeout: 20000 });
+      await page.locator('[data-picker-form="written"]').check();
+      await page.click('[data-picker-start]');
+      await page.waitForSelector('[data-guest-signup="written"]', { timeout: 20000 });
+    });
+
+    // ── signed out: the sign-in page ─────────────────────────────────────────
+    await step('login · hero', '/signin', async () => {
+      await page.goto(BASE + '/signin', { waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.auth-wrap .hero-title', { timeout: 20000 });
       await wait(page, 600);
     });
 

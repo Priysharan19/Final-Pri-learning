@@ -233,7 +233,7 @@ function helpers(page, base, flowId) {
   };
 
   /** Load a route and wait for the app to have decided who is signed in. */
-  const goto = async (path = '/') => {
+  const goto = async (path = '/', { guest = false } = {}) => {
     // A load that never shows the app must say why (support/boot-diagnostics):
     // whether the bundle ran, which files failed or came back as the wrong
     // kind, what the service worker was doing, what the console said. It is
@@ -241,7 +241,19 @@ function helpers(page, base, flowId) {
     const watch = watchBoot(page);
     try {
       await page.goto(base + path, { waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .signup-flow, .shell', { timeout: 30000 });
+      await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .signup-flow, .shell, [data-guest-try]', { timeout: 30000 });
+      // The first screen of a visitor is the question picker (ADR-0003). A flow
+      // that is about signing in goes where a person who chooses that goes: the
+      // "Sign in" button. Only the guest tour asks to stay (`guest: true`).
+      if (!guest && await page.locator('[data-guest-try]').count()) {
+        // The card asks which code channels this deployment offers when it mounts;
+        // a flow that reads the card straight away needs that answer, as it had
+        // when the card was already on the page.
+        const channels = page.waitForResponse(r => /\/account\/otp\/channels/.test(r.url()), { timeout: 8000 }).catch(() => null);
+        await page.getByTestId('guest-sign-in').click();
+        await page.waitForSelector('.auth-wrap .hero-title, .auth-card, .signup-flow', { timeout: 30000 });
+        await channels;
+      }
     } catch (err) {
       throw await bootFailure(err, watch, `${path} never showed the app`);
     }

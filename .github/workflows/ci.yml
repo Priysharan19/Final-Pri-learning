@@ -531,6 +531,14 @@ jobs:
           node tools/ci-check-counts.mjs verify platform/secret-shapes.log
           node server/test/security-acceptance-check.mjs
           node server/test/abuse-limits-check.mjs
+          # ADR-0003, the guest trial: a sealed anonymous token (forgery, tamper, expiry,
+          # replay), its own CSRF header, 5 per token / 15 per address / 6 tokens per
+          # address / a process-wide ceiling, no key before the verdict, no account or
+          # paid route reachable, no rows written. And everything its picker lists is
+          # something the server issues, in both editions.
+          node server/test/guest-trial-check.mjs 2>&1 | tee guest-trial.log
+          node server/test/guest-menu-issuable-check.mjs 2>&1 | tee -a guest-trial.log
+          node tools/ci-check-counts.mjs verify platform/guest-trial.log
           # CodeQL #461: prove the recognize route's account-keyed, atomic limit
           # under simultaneous requests rather than only the serial boundary.
           node server/test/pr618-recognition-rate-concurrency-check.mjs
@@ -1037,6 +1045,10 @@ jobs:
             # A Prithagoras NSW student's practice is issued and marked by the
             # server: the device names the profile's own course, never 'in'.
             node client/test/tour-nsw-practice-marked.js 2>&1 | tee -a browser.log
+            # ADR-0003: a visitor with no account meets the question picker first, in both
+            # editions, has up to five typed or multiple-choice questions marked by the
+            # server, and then a calm sign-up prompt; nothing of an account is touched.
+            node client/test/tour-guest-trial.js 2>&1 | tee -a browser.log
             # A failed chunk, a refused cache write or a probe that never settles must
             # end in the app or in a visible notice with Reload, never a silent splash.
             npm run test:boot 2>&1 | tee -a browser.log

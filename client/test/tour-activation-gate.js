@@ -184,7 +184,7 @@ export const flow = {
       const child = await childCtx.newPage();
       const childEmail = freshEmail('child');
       const parentEmail = freshEmail('parent');
-      await child.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+      await child.goto(`${base}/signin`, { waitUntil: 'domcontentloaded' });
       await child.locator(`${CARD}[data-signup-step="method"]`).waitFor({ timeout: 30000 });
       await signInOnCard(child.locator(CARD), platform, { email: childEmail, name: 'Ravi Child', age: CHILD_AGE });
       await child.locator(`${CARD}[data-signup-step="class"]`).waitFor({ timeout: 20000 });
@@ -224,7 +224,7 @@ export const flow = {
       await check('the privacy page stays public meanwhile', await child.locator('main, article, .legal').first().isVisible().catch(() => false) && await child.locator('.shell').count() === 0);
 
       // reload mid-onboarding: the same account, back at the parent step
-      await child.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
+      await child.goto(`${base}/signin`, { waitUntil: 'domcontentloaded' });
       await child.locator(`${CARD}[data-signup-step="method"]`).waitFor({ timeout: 30000 });
       await signInOnCard(child.locator(CARD), platform, { email: childEmail });
       await child.locator(`${CARD}[data-signup-step="class"]`).waitFor({ timeout: 20000 });
