@@ -112,15 +112,15 @@ try {
   ];
   for (const spec of INDIA) await sweep(`India Class ${spec.year} ${spec.indiaTrack}`, { ...spec, course: 'in' }, indiaGenerator);
 
-  // The named case: Year 12 Financial Maths & Annuities has no question at any
-  // level (its D2-D4 forms are held back by the marking-tolerance gate, D1 has
-  // no authored form), so it is hidden; its sibling Financial Mathematics:
-  // Practice, which has questions, stays.
+  // The named case was Year 12 Financial Maths & Annuities, hidden while no level of
+  // it was issued. The marking release issues its D2-D4 forms (engine/nswIssuedCells.js),
+  // so it is now listed, with levels the server really serves; a chapter is hidden only
+  // while it has none (Combinatorics and Further Calculus, asserted below).
   const y12 = (await POST('/profiles', { name: 'Fin', year: 12, course: 'nsw', pathway: 'advanced' })).user;
   await POST('/profiles/select', { id: y12.id });
   const cur = await GET('/curriculum');
   const ids = scopeFor(cur, y12).subtopics.map(s => s.id);
-  ok('Year 12 Financial Maths & Annuities (y12-financial) is hidden', !ids.includes('y12-financial'));
+  ok('Year 12 Financial Maths & Annuities (y12-financial) is listed now that D2-D4 are issued', ids.includes('y12-financial'));
   ok('Year 12 Financial Mathematics: Practice (y12-fin-exact) is listed', ids.includes('y12-fin-exact'));
   ok('the three renamed chapters read ": Practice"', ['y12-integral-calc', 'y12-random-var', 'y12-fin-exact'].every(id => /: Practice$/.test(scopeFor(cur, y12).subtopics.find(s => s.id === id)?.name || '')));
 } catch (err) {
@@ -138,7 +138,8 @@ try {
   ok('the instrument scope (Index, Map, command bar, report head, History) is filtered in one place', /offeredChapters\(scope\.chapters\)/.test(src('instrument/chapters.js')) && /offeredChapters\(scope\.subtopics\)/.test(src('instrument/chapters.js')));
 }
 
-ok('at least the known empty NSW chapters are hidden', hidden.length >= 9, `${hidden.length}`);
+// Every chapter that still has no issued level is hidden: these two (Extension 1 Combinatorics and Further Calculus) are the ones left.
+ok('the NSW chapters that still have no issued level are hidden', hidden.length >= 2 && hidden.some(h => /me11-comb/.test(h)) && hidden.some(h => /me12-calc/.test(h)), `${hidden.length}: ${hidden.join(' | ')}`);
 if (process.env.LIST_HIDDEN) console.log(`HIDDEN CHAPTERS (${hidden.length})\n  ${hidden.join('\n  ')}\nHIDDEN LEVELS (${hiddenLevels.length})\n  ${hiddenLevels.join('\n  ')}`);
 
 const total = pass + failures.length;
